@@ -1,10 +1,37 @@
-//! LLM chat completions via Kong AI Gateway (optional) or direct provider HTTP.
+//! AIH-1 — LLM chat completions with tool-calling wire format.
+//!
+//! `LlmRequest` carries an optional `tools` list; when non-empty, Mistral and
+//! Gemini payloads include the tool declarations and `tool_choice = "auto"`.
+//! `LlmResponse` carries the resulting `tool_calls` (empty when the model
+//! responded with plain text). Ollama has no tool-calling requirement and
+//! always returns an empty `tool_calls` list; existing callers that leave
+//! `tools` empty see no behavior change.
 
 use anyhow::{Context, Result};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_json::json;
 
 use crate::config::Config;
+
+// ── Public wire types ────────────────────────────────────────────────────────
+
+/// A tool the model may call. `parameters` must be a valid JSON Schema object.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct ToolSpec {
+    pub name: String,
+    pub description: String,
+    pub parameters: serde_json::Value,
+}
+
+/// A single tool invocation requested by the model.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct ToolCallRequest {
+    /// Provider-assigned call ID (OpenAI format) or a generated ID for Gemini.
+    pub id: String,
+    pub name: String,
+    /// Parsed arguments object. Callers must validate against the tool schema.
+    pub arguments: serde_json::Value,
+}
 
 #[derive(Clone, Debug)]
 pub struct LlmMessage {
@@ -12,7 +39,7 @@ pub struct LlmMessage {
     pub content: String,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct LlmRequest {
     pub provider: String,
     pub model: String,
@@ -21,6 +48,8 @@ pub struct LlmRequest {
     pub max_tokens: u32,
     pub temperature: Option<f64>,
     pub top_p: Option<f64>,
+    /// Tool declarations to send. Empty means plain-completion (no tool_choice).
+    pub tools: Vec<ToolSpec>,
 }
 
 #[derive(Clone, Debug)]
@@ -30,6 +59,8 @@ pub struct LlmResponse {
     pub output_tokens: u32,
     pub model: String,
     pub provider: String,
+    /// Tool calls requested by the model. Empty when the response is plain text.
+    pub tool_calls: Vec<ToolCallRequest>,
 }
 
 /// Routes chat completion to Kong (when configured) or direct Mistral/Gemini/Ollama APIs.
@@ -104,13 +135,32 @@ impl LlmClient {
         for msg in &req.messages {
             messages.push(json!({"role": msg.role, "content": msg.content}));
         }
-        json!({
+        let mut payload = json!({
             "model": req.model,
             "max_tokens": req.max_tokens,
             "temperature": req.temperature.unwrap_or(0.7),
             "top_p": req.top_p,
             "messages": messages,
-        })
+        });
+        if !req.tools.is_empty() {
+            let specs: Vec<serde_json::Value> = req
+                .tools
+                .iter()
+                .map(|t| {
+                    json!({
+                        "type": "function",
+                        "function": {
+                            "name": t.name,
+                            "description": t.description,
+                            "parameters": t.parameters,
+                        }
+                    })
+                })
+                .collect();
+            payload["tools"] = json!(specs);
+            payload["tool_choice"] = json!("auto");
+        }
+        payload
     }
 
     async fn complete_mistral(&self, req: &LlmRequest) -> Result<LlmResponse> {
@@ -184,6 +234,7 @@ impl LlmClient {
             output_tokens: parsed.eval_count.unwrap_or(0) as u32,
             model,
             provider: "ollama".to_string(),
+            tool_calls: vec![],
         })
     }
 
@@ -211,7 +262,7 @@ impl LlmClient {
             }));
         }
 
-        let body = json!({
+        let mut body = json!({
             "systemInstruction": {
                 "parts": [{ "text": req.system }]
             },
@@ -222,6 +273,23 @@ impl LlmClient {
                 "topP": req.top_p,
             }
         });
+
+        // Map ToolSpec → Gemini functionDeclarations.
+        if !req.tools.is_empty() {
+            let decls: Vec<serde_json::Value> = req
+                .tools
+                .iter()
+                .map(|t| {
+                    json!({
+                        "name": t.name,
+                        "description": t.description,
+                        "parameters": t.parameters,
+                    })
+                })
+                .collect();
+            body["tools"] = json!([{ "functionDeclarations": decls }]);
+            body["toolConfig"] = json!({ "functionCallingConfig": { "mode": "AUTO" } });
+        }
 
         let resp = self
             .http
@@ -238,12 +306,39 @@ impl LlmClient {
         }
 
         let parsed: GeminiGenerateResponse = resp.json().await.context("parse Gemini response")?;
-        let text = parsed
+
+        // A candidate's parts may contain text parts OR functionCall parts (not both).
+        let first_content = parsed
             .candidates
-            .and_then(|c| c.into_iter().next())
-            .and_then(|c| c.content)
-            .and_then(|c| c.parts.into_iter().next())
-            .and_then(|p| p.text)
+            .as_ref()
+            .and_then(|c| c.first())
+            .and_then(|c| c.content.as_ref());
+
+        let text = first_content
+            .map(|c| {
+                c.parts
+                    .iter()
+                    .filter_map(|p| p.text.as_deref())
+                    .collect::<Vec<_>>()
+                    .join("")
+            })
+            .unwrap_or_default();
+
+        // Parse functionCall parts → ToolCallRequest.
+        let tool_calls: Vec<ToolCallRequest> = first_content
+            .map(|c| {
+                c.parts
+                    .iter()
+                    .enumerate()
+                    .filter_map(|(i, p)| {
+                        p.function_call.as_ref().map(|fc| ToolCallRequest {
+                            id: format!("gemini-call-{i}"),
+                            name: fc.name.clone(),
+                            arguments: fc.args.clone(),
+                        })
+                    })
+                    .collect()
+            })
             .unwrap_or_default();
 
         let usage = parsed.usage_metadata.unwrap_or_default();
@@ -254,6 +349,7 @@ impl LlmClient {
             output_tokens: usage.candidates_token_count.unwrap_or(0) as u32,
             model,
             provider: "gemini".to_string(),
+            tool_calls,
         })
     }
 
@@ -263,11 +359,37 @@ impl LlmClient {
         provider: &str,
         model: &str,
     ) -> LlmResponse {
-        let text = body
+        let first_message = body
             .choices
-            .and_then(|c| c.into_iter().next())
-            .and_then(|c| c.message)
-            .and_then(|m| m.content)
+            .as_ref()
+            .and_then(|c| c.first())
+            .and_then(|c| c.message.as_ref());
+
+        let text = first_message
+            .and_then(|m| m.content.as_deref())
+            .unwrap_or_default()
+            .to_string();
+
+        // Parse tool_calls from the message, if present.
+        let tool_calls = first_message
+            .and_then(|m| m.tool_calls.as_ref())
+            .map(|calls| {
+                calls
+                    .iter()
+                    .filter_map(|tc| {
+                        let name = tc.function.name.clone();
+                        let args = serde_json::from_str::<serde_json::Value>(
+                            &tc.function.arguments,
+                        )
+                        .unwrap_or(serde_json::Value::Null);
+                        Some(ToolCallRequest {
+                            id: tc.id.clone(),
+                            name,
+                            arguments: args,
+                        })
+                    })
+                    .collect()
+            })
             .unwrap_or_default();
 
         let (input_tokens, output_tokens) = body
@@ -286,6 +408,7 @@ impl LlmClient {
             output_tokens,
             model: body.model.unwrap_or_else(|| model.to_string()),
             provider: provider.to_string(),
+            tool_calls,
         }
     }
 }
@@ -314,6 +437,20 @@ struct OpenAiChoice {
 #[derive(Debug, Deserialize)]
 struct OpenAiMessage {
     content: Option<String>,
+    tool_calls: Option<Vec<OpenAiToolCall>>,
+}
+
+#[derive(Debug, Deserialize)]
+struct OpenAiToolCall {
+    id: String,
+    function: OpenAiToolCallFunction,
+}
+
+#[derive(Debug, Deserialize)]
+struct OpenAiToolCallFunction {
+    name: String,
+    /// OpenAI serializes arguments as a JSON string, not an object.
+    arguments: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -354,6 +491,15 @@ struct GeminiContent {
 #[derive(Debug, Deserialize)]
 struct GeminiPart {
     text: Option<String>,
+    #[serde(rename = "functionCall")]
+    function_call: Option<GeminiFunctionCall>,
+}
+
+#[derive(Debug, Deserialize)]
+struct GeminiFunctionCall {
+    name: String,
+    /// Gemini serializes arguments as a JSON object directly.
+    args: serde_json::Value,
 }
 
 #[derive(Debug, Default, Deserialize)]
@@ -362,4 +508,219 @@ struct GeminiUsageMetadata {
     prompt_token_count: Option<u64>,
     #[serde(rename = "candidatesTokenCount")]
     candidates_token_count: Option<u64>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    fn dummy_client() -> LlmClient {
+        LlmClient {
+            http: reqwest::Client::new(),
+            kong_url: None,
+            kong_token: None,
+            mistral_api_key: None,
+            google_api_key: None,
+            ollama_url: "http://localhost:11434".to_string(),
+            ollama_llm_model: "llama3".to_string(),
+        }
+    }
+
+    // ── OpenAI/Mistral tool-call parsing ─────────────────────────────────────
+
+    #[test]
+    fn openai_tool_call_response_populates_tool_calls() {
+        let raw = json!({
+            "model": "mistral-large",
+            "choices": [{
+                "message": {
+                    "content": null,
+                    "tool_calls": [{
+                        "id": "call_abc123",
+                        "function": {
+                            "name": "get_weather",
+                            "arguments": "{\"location\":\"Paris\",\"unit\":\"celsius\"}"
+                        }
+                    }]
+                }
+            }],
+            "usage": { "prompt_tokens": 42, "completion_tokens": 18 }
+        });
+
+        let body: OpenAiChatResponse = serde_json::from_value(raw).unwrap();
+        let client = dummy_client();
+        let resp = client.from_openai_response(body, "mistral", "mistral-large");
+
+        assert_eq!(resp.tool_calls.len(), 1);
+        let tc = &resp.tool_calls[0];
+        assert_eq!(tc.id, "call_abc123");
+        assert_eq!(tc.name, "get_weather");
+        assert_eq!(tc.arguments["location"], "Paris");
+        assert_eq!(tc.arguments["unit"], "celsius");
+        assert_eq!(resp.text, "");
+        assert_eq!(resp.input_tokens, 42);
+        assert_eq!(resp.output_tokens, 18);
+    }
+
+    #[test]
+    fn openai_plain_text_response_has_empty_tool_calls() {
+        let raw = json!({
+            "model": "mistral-large",
+            "choices": [{
+                "message": {
+                    "content": "Hello, world!",
+                    "tool_calls": null
+                }
+            }],
+            "usage": { "prompt_tokens": 10, "completion_tokens": 5 }
+        });
+
+        let body: OpenAiChatResponse = serde_json::from_value(raw).unwrap();
+        let client = dummy_client();
+        let resp = client.from_openai_response(body, "mistral", "mistral-large");
+
+        assert!(resp.tool_calls.is_empty());
+        assert_eq!(resp.text, "Hello, world!");
+    }
+
+    // ── Gemini tool-call parsing ──────────────────────────────────────────────
+
+    #[test]
+    fn gemini_tool_call_response_populates_tool_calls() {
+        let raw = json!({
+            "candidates": [{
+                "content": {
+                    "parts": [{
+                        "functionCall": {
+                            "name": "search_docs",
+                            "args": { "query": "SpacetimeDB reducers", "limit": 5 }
+                        }
+                    }]
+                }
+            }],
+            "usageMetadata": {
+                "promptTokenCount": 30,
+                "candidatesTokenCount": 12
+            }
+        });
+
+        let parsed: GeminiGenerateResponse = serde_json::from_value(raw).unwrap();
+
+        let first_content = parsed
+            .candidates
+            .as_ref()
+            .and_then(|c| c.first())
+            .and_then(|c| c.content.as_ref());
+
+        let tool_calls: Vec<ToolCallRequest> = first_content
+            .map(|c| {
+                c.parts
+                    .iter()
+                    .enumerate()
+                    .filter_map(|(i, p)| {
+                        p.function_call.as_ref().map(|fc| ToolCallRequest {
+                            id: format!("gemini-call-{i}"),
+                            name: fc.name.clone(),
+                            arguments: fc.args.clone(),
+                        })
+                    })
+                    .collect()
+            })
+            .unwrap_or_default();
+
+        assert_eq!(tool_calls.len(), 1);
+        let tc = &tool_calls[0];
+        assert_eq!(tc.id, "gemini-call-0");
+        assert_eq!(tc.name, "search_docs");
+        assert_eq!(tc.arguments["query"], "SpacetimeDB reducers");
+        assert_eq!(tc.arguments["limit"], 5);
+    }
+
+    #[test]
+    fn gemini_plain_text_response_has_empty_tool_calls() {
+        let raw = json!({
+            "candidates": [{
+                "content": {
+                    "parts": [{ "text": "Sure, here is the answer." }]
+                }
+            }],
+            "usageMetadata": {
+                "promptTokenCount": 8,
+                "candidatesTokenCount": 6
+            }
+        });
+
+        let parsed: GeminiGenerateResponse = serde_json::from_value(raw).unwrap();
+
+        let first_content = parsed
+            .candidates
+            .as_ref()
+            .and_then(|c| c.first())
+            .and_then(|c| c.content.as_ref());
+
+        let tool_calls: Vec<ToolCallRequest> = first_content
+            .map(|c| {
+                c.parts
+                    .iter()
+                    .enumerate()
+                    .filter_map(|(i, p)| {
+                        p.function_call.as_ref().map(|fc| ToolCallRequest {
+                            id: format!("gemini-call-{i}"),
+                            name: fc.name.clone(),
+                            arguments: fc.args.clone(),
+                        })
+                    })
+                    .collect()
+            })
+            .unwrap_or_default();
+
+        assert!(tool_calls.is_empty());
+    }
+
+    // ── openai_payload: tools included/excluded correctly ────────────────────
+
+    #[test]
+    fn openai_payload_includes_tools_when_non_empty() {
+        let client = dummy_client();
+        let req = LlmRequest {
+            provider: "mistral".to_string(),
+            model: "mistral-large".to_string(),
+            system: "You are helpful.".to_string(),
+            messages: vec![],
+            max_tokens: 100,
+            temperature: None,
+            top_p: None,
+            tools: vec![ToolSpec {
+                name: "my_tool".to_string(),
+                description: "Does something".to_string(),
+                parameters: json!({ "type": "object", "properties": {} }),
+            }],
+        };
+
+        let payload = client.openai_payload(&req);
+        assert!(payload["tools"].is_array());
+        assert_eq!(payload["tool_choice"], "auto");
+        let tools = payload["tools"].as_array().unwrap();
+        assert_eq!(tools[0]["function"]["name"], "my_tool");
+    }
+
+    #[test]
+    fn openai_payload_omits_tools_when_empty() {
+        let client = dummy_client();
+        let req = LlmRequest {
+            provider: "mistral".to_string(),
+            model: "mistral-large".to_string(),
+            system: "You are helpful.".to_string(),
+            messages: vec![],
+            max_tokens: 100,
+            temperature: None,
+            top_p: None,
+            tools: vec![],
+        };
+
+        let payload = client.openai_payload(&req);
+        assert!(payload.get("tools").is_none() || payload["tools"].is_null());
+        assert!(payload.get("tool_choice").is_none() || payload["tool_choice"].is_null());
+    }
 }

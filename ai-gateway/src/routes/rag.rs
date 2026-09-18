@@ -472,6 +472,7 @@ pub async fn post_rag(
             max_tokens: agent.max_tokens,
             temperature: Some(agent.temperature),
             top_p: Some(agent.top_p),
+            tools: vec![],
         })
         .await
         .map_err(|e| AppError::Internal(format!("LLM request failed: {e}")))?;

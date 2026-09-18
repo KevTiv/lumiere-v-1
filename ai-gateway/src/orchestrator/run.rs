@@ -592,6 +592,7 @@ async fn synthesize_summary(
             max_tokens: agent.max_tokens.min(2048),
             temperature: Some(agent.temperature),
             top_p: Some(agent.top_p),
+            tools: vec![],
         })
         .await
         .context("skill synthesis LLM")?;

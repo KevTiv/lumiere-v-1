@@ -6,6 +6,7 @@ use serde_json::Value;
 
 use crate::{
     ai_agent::ResolvedAgentConfig,
+    providers::llm::ToolSpec,
     tools::{
         action_draft, analytics, erp_search, erp_snapshot, save_artifact,
         types::{hash_tool_input, ToolContext, ToolOutput},
@@ -17,6 +18,8 @@ use crate::{
 pub trait AgentTool: Send + Sync {
     fn name(&self) -> &'static str;
     fn required_action(&self) -> &'static str;
+    /// JSON Schema object describing the tool's input parameters.
+    fn schema(&self) -> Value;
     async fn execute(&self, ctx: &ToolContext, input: &Value) -> Result<ToolOutput>;
 }
 
@@ -38,6 +41,27 @@ impl AgentTool for ErpSnapshotTool {
         "live_read"
     }
 
+    fn schema(&self) -> Value {
+        serde_json::json!({
+            "type": "object",
+            "properties": {
+                "entity_type": {
+                    "type": "string",
+                    "description": "ERP entity type to snapshot (e.g. 'product', 'order', 'customer')"
+                },
+                "entity_id": {
+                    "type": "string",
+                    "description": "ID of the entity to snapshot"
+                },
+                "max_snapshots": {
+                    "type": "integer",
+                    "description": "Maximum number of historical snapshots to return (optional)"
+                }
+            },
+            "required": ["entity_type", "entity_id"]
+        })
+    }
+
     async fn execute(&self, ctx: &ToolContext, input: &Value) -> Result<ToolOutput> {
         erp_snapshot::execute(ctx, input).await
     }
@@ -51,6 +75,27 @@ impl AgentTool for ErpSearchTool {
 
     fn required_action(&self) -> &'static str {
         "live_read"
+    }
+
+    fn schema(&self) -> Value {
+        serde_json::json!({
+            "type": "object",
+            "properties": {
+                "query": {
+                    "type": "string",
+                    "description": "Semantic search query against the ERP knowledge base"
+                },
+                "limit": {
+                    "type": "integer",
+                    "description": "Maximum number of results to return (1–20, default 8)"
+                },
+                "score_threshold": {
+                    "type": "number",
+                    "description": "Minimum similarity score threshold (default 0.65)"
+                }
+            },
+            "required": ["query"]
+        })
     }
 
     async fn execute(&self, ctx: &ToolContext, input: &Value) -> Result<ToolOutput> {
@@ -68,6 +113,26 @@ impl AgentTool for SaveArtifactTool {
         "skill_run"
     }
 
+    fn schema(&self) -> Value {
+        serde_json::json!({
+            "type": "object",
+            "properties": {
+                "title": {
+                    "type": "string",
+                    "description": "Artifact title (default: 'Skill artifact')"
+                },
+                "kind": {
+                    "type": "string",
+                    "description": "Artifact format, e.g. 'markdown', 'json' (default: 'markdown')"
+                },
+                "content": {
+                    "description": "Artifact content (string or structured value)"
+                }
+            },
+            "required": ["content"]
+        })
+    }
+
     async fn execute(&self, ctx: &ToolContext, input: &Value) -> Result<ToolOutput> {
         save_artifact::execute(ctx, input).await
     }
@@ -81,6 +146,14 @@ impl AgentTool for AnalyticsSummaryTool {
 
     fn required_action(&self) -> &'static str {
         "analytics_read"
+    }
+
+    fn schema(&self) -> Value {
+        serde_json::json!({
+            "type": "object",
+            "properties": {},
+            "required": []
+        })
     }
 
     async fn execute(&self, ctx: &ToolContext, input: &Value) -> Result<ToolOutput> {
@@ -98,6 +171,23 @@ impl AgentTool for WebSearchTool {
         "web_search"
     }
 
+    fn schema(&self) -> Value {
+        serde_json::json!({
+            "type": "object",
+            "properties": {
+                "query": {
+                    "type": "string",
+                    "description": "Web search query"
+                },
+                "max_results": {
+                    "type": "integer",
+                    "description": "Maximum number of results (optional, default from config)"
+                }
+            },
+            "required": ["query"]
+        })
+    }
+
     async fn execute(&self, ctx: &ToolContext, input: &Value) -> Result<ToolOutput> {
         web_search::execute_search(ctx, input).await
     }
@@ -113,6 +203,23 @@ impl AgentTool for FetchUrlTool {
         "web_search"
     }
 
+    fn schema(&self) -> Value {
+        serde_json::json!({
+            "type": "object",
+            "properties": {
+                "url": {
+                    "type": "string",
+                    "description": "URL to fetch content from"
+                },
+                "max_bytes": {
+                    "type": "integer",
+                    "description": "Maximum bytes to retrieve (optional, default from config)"
+                }
+            },
+            "required": ["url"]
+        })
+    }
+
     async fn execute(&self, ctx: &ToolContext, input: &Value) -> Result<ToolOutput> {
         web_search::execute_fetch(ctx, input).await
     }
@@ -126,6 +233,40 @@ impl AgentTool for ActionDraftTool {
 
     fn required_action(&self) -> &'static str {
         "action_draft"
+    }
+
+    fn schema(&self) -> Value {
+        serde_json::json!({
+            "type": "object",
+            "properties": {
+                "reducer_name": {
+                    "type": "string",
+                    "description": "Name of the ERP reducer to call"
+                },
+                "params_json": {
+                    "type": "string",
+                    "description": "JSON-encoded parameters for the reducer"
+                },
+                "summary": {
+                    "type": "string",
+                    "description": "Human-readable description of the proposed action"
+                },
+                "confidence": {
+                    "type": "number",
+                    "description": "Confidence score 0–1 (default 0.75)"
+                },
+                "elevated": {
+                    "type": "boolean",
+                    "description": "Whether this action requires elevated approval (default false)"
+                },
+                "warnings": {
+                    "type": "array",
+                    "items": { "type": "string" },
+                    "description": "Optional list of caution messages"
+                }
+            },
+            "required": ["reducer_name", "params_json"]
+        })
     }
 
     async fn execute(&self, ctx: &ToolContext, input: &Value) -> Result<ToolOutput> {
@@ -160,6 +301,37 @@ impl ToolRegistry {
 
     pub fn tool_names(&self) -> Vec<&'static str> {
         self.tools.iter().map(|t| t.name()).collect()
+    }
+
+    /// Iterate over all registered tools.
+    pub fn tools(&self) -> impl Iterator<Item = &dyn AgentTool> {
+        self.tools.iter().map(|t| t.as_ref())
+    }
+
+    /// Return `ToolSpec`s for all tools whose `required_action` is permitted by
+    /// `agent` and whose name is in `allowed_tool_names`.  Used by `agent_loop`
+    /// to build the `LlmRequest.tools` list.
+    pub fn specs_for(
+        &self,
+        agent: &ResolvedAgentConfig,
+        allowed_tool_names: &[String],
+    ) -> Vec<ToolSpec> {
+        self.tools
+            .iter()
+            .filter(|tool| {
+                allowed_tool_names.iter().any(|n| n == tool.name())
+                    && agent_allows_action(agent, tool.required_action())
+            })
+            .map(|tool| ToolSpec {
+                name: tool.name().to_string(),
+                description: format!(
+                    "Tool: {} (requires action: {})",
+                    tool.name(),
+                    tool.required_action()
+                ),
+                parameters: tool.schema(),
+            })
+            .collect()
     }
 
     pub fn filter_for_agent<'a>(
