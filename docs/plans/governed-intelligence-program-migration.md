@@ -271,6 +271,14 @@ Promotion is never automatic from frequency or cost. Drift, corrections, policy 
 
 ### GP-17 — migrate known ERP programs
 
+**First controlled integration wave (PR #45):**
+
+- `report_analysis` — production governed graph, calibrated probability gate, reasoning only on ambiguity.
+- `process_research` — explicit read-only graph: approved analytics -> verification -> authorized ERP semantic context -> verification -> generated operations summary.
+- `supplier_discovery` — explicit sourcing graph: authorized ERP vendor context -> verification -> web search -> verification -> cited supplier shortlist.
+- `price_search` — explicit read-only comparison graph: authorized ERP procurement context -> verification -> web price evidence -> verification -> generated comparison. The optional purchase-order draft path is intentionally **not** granted by this first graph; drafting remains a separate governed mutation/approval migration so prose intent can never silently become mutation authority.
+- Harness-managed LLM routes now enter `run_skill_admitted`; reviewed tool-call descriptors are derived server-side from the governed-program catalog rather than continuing through `run_skill_unlocked`.
+
 For each workflow:
 
 1. define explicit typed graph;
