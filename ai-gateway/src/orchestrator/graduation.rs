@@ -4,7 +4,7 @@
 //! and evaluate them against a reviewed policy, but it cannot promote a pattern, alter
 //! routing, execute capabilities, or mutate ERP state.
 
-use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 
 use anyhow::{bail, Context, Result};
 use async_trait::async_trait;
