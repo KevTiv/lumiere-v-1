@@ -1,5 +1,5 @@
 name: PR45 regenerate governed contracts
-# Retrigger after governed storage census and projection-policy updates.
+# Retrigger after model-profile and intelligence-policy hardening (477-table census).
 
 on:
   push:
@@ -9,6 +9,10 @@ on:
 
 permissions:
   contents: write
+
+concurrency:
+  group: pr45-governed-contract-release
+  cancel-in-progress: true
 
 jobs:
   regenerate:
