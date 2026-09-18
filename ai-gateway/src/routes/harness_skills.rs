@@ -192,6 +192,7 @@ pub struct GatewayGovernedLlmSkillRequest {
     pub agent_id: Option<u64>,
     pub team_member_id: Option<u64>,
     pub max_steps: Option<u32>,
+    pub resume_run_id: Option<u64>,
     pub stdb_token: String,
     pub identity_hex: Option<String>,
     #[serde(default)]
@@ -252,6 +253,7 @@ async fn run_llm_route(
             agent_id: req.agent_id,
             team_member_id: req.team_member_id,
             max_steps: req.max_steps,
+            resume_run_id: req.resume_run_id,
         },
         req.company_id,
         policy,
