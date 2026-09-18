@@ -53,7 +53,8 @@ use super::governed_services::{
     AnswerAdmissionOutcome, CapabilityStepOutcome, FinalAnswerAdmission, GovernedCapabilityService,
 };
 use super::intelligence::{
-    ClarificationRequest, DecisionProposal, ReasoningOutcome, ReasoningProvider, ReasoningRequest,
+    ClarificationRequest, DecisionProposal, EvidenceRef, ReasoningOutcome, ReasoningProvider,
+    ReasoningRequest,
 };
 use super::progress::{Progress, ProgressTracker, MAX_UNCHANGED_RESULTS};
 use crate::tools::types::ToolOutput;
@@ -149,6 +150,8 @@ pub(super) async fn run_proposal_loop(
 
     let mut progress = ProgressTracker::new(limits.max_unchanged_results);
     let mut capability_calls_used = 0_u32;
+    let mut known_evidence: std::collections::HashSet<EvidenceRef> =
+        extract_known_evidence(&state);
 
     for round in 0..limits.max_rounds {
         let remaining_rounds = limits.max_rounds - round;
@@ -216,6 +219,10 @@ pub(super) async fn run_proposal_loop(
                     CapabilityStepOutcome::Executed(output)
                     | CapabilityStepOutcome::Replayed(output) => {
                         capability_calls_used = capability_calls_used.saturating_add(1);
+                        known_evidence.insert(EvidenceRef {
+                            kind: "capability_output".to_string(),
+                            id: proposal.capability.clone(),
+                        });
                         record(
                             recorder,
                             &mut event_step,
@@ -364,7 +371,7 @@ pub(super) async fn run_proposal_loop(
                 .await;
             }
             ReasoningOutcome::FinalDraft(draft) => {
-                let admission = final_answer.admit(&draft).await?;
+                let admission = final_answer.admit(&draft, &known_evidence).await?;
                 let stop = match admission {
                     AnswerAdmissionOutcome::Admitted => {
                         ProposalLoopStop::CandidateAdmitted(draft.content)
@@ -452,6 +459,30 @@ fn merge_evidence(
         }
     }
     state
+}
+
+fn extract_known_evidence(state: &Value) -> std::collections::HashSet<EvidenceRef> {
+    let mut known = std::collections::HashSet::new();
+    if let Some(evidence) = state.get("evidence").and_then(Value::as_array) {
+        for entry in evidence {
+            if let Some(cap) = entry.get("capability").and_then(Value::as_str) {
+                known.insert(EvidenceRef {
+                    kind: "capability_output".to_string(),
+                    id: cap.to_string(),
+                });
+            }
+            if let (Some(kind), Some(id)) = (
+                entry.get("kind").and_then(Value::as_str),
+                entry.get("id").and_then(Value::as_str),
+            ) {
+                known.insert(EvidenceRef {
+                    kind: kind.to_string(),
+                    id: id.to_string(),
+                });
+            }
+        }
+    }
+    known
 }
 
 #[allow(clippy::too_many_arguments)]

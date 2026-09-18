@@ -694,6 +694,29 @@ pub(super) trait FinalAnswerAdmission: Send + Sync {
     ) -> Result<AnswerAdmissionOutcome>;
 }
 
+pub(super) struct ShapeOnlyFinalAnswerAdmission;
+
+#[async_trait]
+impl FinalAnswerAdmission for ShapeOnlyFinalAnswerAdmission {
+    async fn admit(
+        &self,
+        draft: &FinalDraft,
+        _known_evidence: &std::collections::HashSet<EvidenceRef>,
+    ) -> Result<AnswerAdmissionOutcome> {
+        if let Err(error) = draft.validate() {
+            return Ok(AnswerAdmissionOutcome::Blocked {
+                reason: error.to_string(),
+            });
+        }
+        if draft.citations.is_empty() {
+            return Ok(AnswerAdmissionOutcome::RequiresReview {
+                reason: "final draft carries no evidence citations".to_string(),
+            });
+        }
+        Ok(AnswerAdmissionOutcome::Admitted)
+    }
+}
+
 pub(super) struct DeterministicFinalAnswerAdmission;
 
 #[async_trait]
@@ -1109,7 +1132,8 @@ mod tests {
             content: String::new(),
             citations: vec![],
         };
-        let outcome = service.admit(&empty).await.unwrap();
+        let known = std::collections::HashSet::new();
+        let outcome = service.admit(&empty, &known).await.unwrap();
         assert!(matches!(outcome, AnswerAdmissionOutcome::Blocked { .. }));
     }
 
@@ -1120,7 +1144,8 @@ mod tests {
             content: "the answer".to_string(),
             citations: vec![],
         };
-        let outcome = service.admit(&draft).await.unwrap();
+        let known = std::collections::HashSet::new();
+        let outcome = service.admit(&draft, &known).await.unwrap();
         assert!(matches!(
             outcome,
             AnswerAdmissionOutcome::RequiresReview { .. }
@@ -1137,7 +1162,42 @@ mod tests {
                 id: "PO-42".to_string(),
             }],
         };
-        let outcome = service.admit(&draft).await.unwrap();
+        let known = std::collections::HashSet::new();
+        let outcome = service.admit(&draft, &known).await.unwrap();
+        assert_eq!(outcome, AnswerAdmissionOutcome::Admitted);
+    }
+
+    #[tokio::test]
+    async fn deterministic_final_answer_admission_blocks_fabricated_citations() {
+        let service = DeterministicFinalAnswerAdmission;
+        let draft = FinalDraft {
+            content: "the answer".to_string(),
+            citations: vec![EvidenceRef {
+                kind: "erp_record".to_string(),
+                id: "PO-42".to_string(),
+            }],
+        };
+        let outcome = service
+            .admit(&draft, &std::collections::HashSet::new())
+            .await
+            .unwrap();
+        assert!(matches!(outcome, AnswerAdmissionOutcome::Blocked { .. }));
+    }
+
+    #[tokio::test]
+    async fn deterministic_final_answer_admission_admits_verified_citations() {
+        let service = DeterministicFinalAnswerAdmission;
+        let citation = EvidenceRef {
+            kind: "erp_record".to_string(),
+            id: "PO-42".to_string(),
+        };
+        let draft = FinalDraft {
+            content: "the answer".to_string(),
+            citations: vec![citation.clone()],
+        };
+        let mut known = std::collections::HashSet::new();
+        known.insert(citation);
+        let outcome = service.admit(&draft, &known).await.unwrap();
         assert_eq!(outcome, AnswerAdmissionOutcome::Admitted);
     }
 

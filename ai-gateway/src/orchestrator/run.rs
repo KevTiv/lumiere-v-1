@@ -41,9 +41,9 @@ use super::{
     },
     governed_programs::{report_analysis_graph, REPORT_ANALYSIS_PROGRAM_REF},
     governed_services::{
-        GovernedCapabilityService, PolicyBackedCapabilityAdmission, ShapeOnlyFinalAnswerAdmission,
-        ShapeOnlyVerificationService, StdbApprovalCoordinator, StdbExecutionRecovery,
-        ToolsBackedCapabilityExecutor,
+        DeterministicFinalAnswerAdmission, GovernedCapabilityService,
+        PolicyBackedCapabilityAdmission, ShapeOnlyVerificationService, StdbApprovalCoordinator,
+        StdbExecutionRecovery, ToolsBackedCapabilityExecutor,
     },
     intelligence::EvidenceRef,
     intelligence_router::{
@@ -711,7 +711,7 @@ pub async fn run_skill_admitted(
             &approvals,
         );
         let verification = ShapeOnlyVerificationService;
-        let answer_admission = ShapeOnlyFinalAnswerAdmission;
+        let answer_admission = DeterministicFinalAnswerAdmission;
         let compute = BuiltinComputeService;
         let calibration = StdbCalibrationProfileStore {
             reader: tool_ctx.stdb.as_ref(),
