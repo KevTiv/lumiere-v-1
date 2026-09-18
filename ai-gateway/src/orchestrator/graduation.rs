@@ -15,6 +15,7 @@ use sha2::{Digest, Sha256};
 use stdb_client::{ReducerCall, StdbClient};
 
 use super::intelligence::{decision_request_hash, DecisionKind, DecisionRequest, DecisionResponse, DecisionTypeRef};
+use super::probabilistic::{CalibrationProfile, Confidence, GateDecision, ThresholdGatePolicy};
 
 const MAX_ANALYSIS_ROWS: u32 = 5_000;
 
@@ -120,8 +121,80 @@ pub(super) struct DeterministicShadowEvidence {
     pub deterministic_output: Option<DeterministicDecisionResponse>,
     pub production_signal: Value,
     pub exact_match: Option<bool>,
+    pub tolerance_match: Option<bool>,
+    pub production_gate_disposition: Option<String>,
+    pub deterministic_gate_disposition: Option<String>,
+    pub gate_disposition_match: Option<bool>,
+    pub conformant: Option<bool>,
     pub evaluation_error: Option<String>,
     pub latency_ms: u64,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub(super) struct NumericTolerance {
+    pub absolute: f64,
+    pub relative: f64,
+}
+
+impl NumericTolerance {
+    fn validate(&self) -> Result<()> {
+        if !self.absolute.is_finite() || self.absolute < 0.0 {
+            bail!("absolute tolerance must be finite and nonnegative");
+        }
+        if !self.relative.is_finite() || self.relative < 0.0 {
+            bail!("relative tolerance must be finite and nonnegative");
+        }
+        Ok(())
+    }
+
+    fn matches(&self, production: f64, deterministic: f64) -> bool {
+        let delta = (production - deterministic).abs();
+        if delta <= self.absolute {
+            return true;
+        }
+        let scale = production.abs().max(deterministic.abs()).max(f64::EPSILON);
+        delta / scale <= self.relative
+    }
+}
+
+#[derive(Clone, Debug)]
+pub(super) struct DecisionConformancePolicy {
+    pub numeric_tolerance: NumericTolerance,
+    pub threshold_gate: Option<ThresholdGatePolicy>,
+    pub calibration_profile: Option<CalibrationProfile>,
+}
+
+impl DecisionConformancePolicy {
+    pub fn validate(&self) -> Result<()> {
+        self.numeric_tolerance.validate()?;
+        if let Some(gate) = &self.threshold_gate {
+            gate.validate()?;
+        }
+        if let Some(profile) = &self.calibration_profile {
+            profile.validate()?;
+        }
+        if self.calibration_profile.is_some() && self.threshold_gate.is_none() {
+            bail!("calibration profile requires a threshold gate policy");
+        }
+        Ok(())
+    }
+}
+
+#[derive(Clone, Debug, Default, PartialEq)]
+pub(super) struct ConformanceAggregate {
+    pub total_events: u64,
+    pub successful_evaluations: u64,
+    pub exact_matches: u64,
+    pub tolerance_matches: u64,
+    pub gate_disposition_matches: u64,
+    pub conformant_events: u64,
+}
+
+impl ConformanceAggregate {
+    pub fn conformance_rate(&self) -> Option<f64> {
+        (self.successful_evaluations > 0)
+            .then(|| self.conformant_events as f64 / self.successful_evaluations as f64)
+    }
 }
 
 #[async_trait]
@@ -191,6 +264,7 @@ impl DeterministicShadowEvaluator<'_> {
         implementation_ref: &str,
         request: &DecisionRequest,
         production: &DecisionResponse,
+        conformance_policy: &DecisionConformancePolicy,
     ) -> Result<DeterministicShadowEvidence> {
         if organization_id == 0 || company_id == 0 || run_id == 0 {
             bail!("deterministic shadow requires nonzero organization/company/run ids");
@@ -200,6 +274,7 @@ impl DeterministicShadowEvaluator<'_> {
         }
         request.validate()?;
         production.validate_against(request)?;
+        conformance_policy.validate()?;
 
         let candidate = self
             .registry
@@ -215,23 +290,47 @@ impl DeterministicShadowEvaluator<'_> {
         let latency_ms = started.elapsed().as_millis().min(u128::from(u64::MAX)) as u64;
 
         let production_signal = decision_response_signal(production);
-        let (deterministic_output, exact_match, evaluation_error) = match result {
+        let (
+            deterministic_output,
+            exact_match,
+            tolerance_match,
+            production_gate_disposition,
+            deterministic_gate_disposition,
+            gate_disposition_match,
+            conformant,
+            evaluation_error,
+        ) = match result {
             Ok(output) => {
                 output.validate_against(request)?;
-                let exact_match = output.signal_json() == production_signal;
-                (Some(output), Some(exact_match), None)
+                let comparison =
+                    compare_conformance(request, production, &output, conformance_policy)?;
+                (
+                    Some(output),
+                    Some(comparison.exact_match),
+                    comparison.tolerance_match,
+                    comparison.production_gate_disposition,
+                    comparison.deterministic_gate_disposition,
+                    comparison.gate_disposition_match,
+                    Some(comparison.conformant),
+                    None,
+                )
             }
-            Err(error) => (None, None, Some(error.to_string())),
+            Err(error) => (None, None, None, None, None, None, None, Some(error.to_string())),
         };
 
         let evidence = DeterministicShadowEvidence {
-            schema_version: 1,
+            schema_version: 2,
             pattern_ref: pattern_ref.to_string(),
             implementation_ref: implementation_ref.to_string(),
             request_hash,
             deterministic_output,
             production_signal,
             exact_match,
+            tolerance_match,
+            production_gate_disposition,
+            deterministic_gate_disposition,
+            gate_disposition_match,
+            conformant,
             evaluation_error,
             latency_ms,
         };
@@ -247,6 +346,118 @@ impl DeterministicShadowEvaluator<'_> {
             )
             .await?;
         Ok(evidence)
+    }
+}
+
+#[derive(Clone, Debug)]
+struct ConformanceComparison {
+    exact_match: bool,
+    tolerance_match: Option<bool>,
+    production_gate_disposition: Option<String>,
+    deterministic_gate_disposition: Option<String>,
+    gate_disposition_match: Option<bool>,
+    conformant: bool,
+}
+
+fn compare_conformance(
+    request: &DecisionRequest,
+    production: &DecisionResponse,
+    deterministic: &DeterministicDecisionResponse,
+    policy: &DecisionConformancePolicy,
+) -> Result<ConformanceComparison> {
+    let exact_match = deterministic.signal_json() == decision_response_signal(production);
+    match request.kind {
+        DecisionKind::Choice => Ok(ConformanceComparison {
+            exact_match,
+            tolerance_match: None,
+            production_gate_disposition: None,
+            deterministic_gate_disposition: None,
+            gate_disposition_match: None,
+            conformant: exact_match,
+        }),
+        DecisionKind::Score => {
+            let production_value = production.score.context("production score missing")?;
+            let deterministic_value =
+                deterministic.score.context("deterministic score missing")?;
+            numeric_conformance(
+                production_value,
+                deterministic_value,
+                exact_match,
+                policy,
+            )
+        }
+        DecisionKind::Probability => {
+            let production_value =
+                production.probability.context("production probability missing")?;
+            let deterministic_value = deterministic
+                .probability
+                .context("deterministic probability missing")?;
+            numeric_conformance(
+                production_value,
+                deterministic_value,
+                exact_match,
+                policy,
+            )
+        }
+    }
+}
+
+fn numeric_conformance(
+    production: f64,
+    deterministic: f64,
+    exact_match: bool,
+    policy: &DecisionConformancePolicy,
+) -> Result<ConformanceComparison> {
+    let tolerance_match = policy.numeric_tolerance.matches(production, deterministic);
+    let (
+        production_gate_disposition,
+        deterministic_gate_disposition,
+        gate_disposition_match,
+    ) = if let Some(gate) = &policy.threshold_gate {
+        let production_gate = evaluate_gate_disposition(production, gate, policy.calibration_profile.as_ref())?;
+        let deterministic_gate =
+            evaluate_gate_disposition(deterministic, gate, policy.calibration_profile.as_ref())?;
+        (
+            Some(gate_decision_label(production_gate).to_string()),
+            Some(gate_decision_label(deterministic_gate).to_string()),
+            Some(production_gate == deterministic_gate),
+        )
+    } else {
+        (None, None, None)
+    };
+    let disposition_ok = gate_disposition_match.unwrap_or(true);
+    Ok(ConformanceComparison {
+        exact_match,
+        tolerance_match: Some(tolerance_match),
+        production_gate_disposition,
+        deterministic_gate_disposition,
+        gate_disposition_match,
+        conformant: tolerance_match && disposition_ok,
+    })
+}
+
+fn evaluate_gate_disposition(
+    value: f64,
+    gate: &ThresholdGatePolicy,
+    calibration: Option<&CalibrationProfile>,
+) -> Result<GateDecision> {
+    if !(0.0..=1.0).contains(&value) {
+        bail!("threshold-gate conformance requires a normalized signal within [0, 1]");
+    }
+    let confidence = Confidence::Raw(value);
+    let confidence = if let Some(profile) = calibration {
+        profile.calibrate(confidence)?
+    } else {
+        confidence
+    };
+    gate.evaluate(confidence)
+}
+
+fn gate_decision_label(decision: GateDecision) -> &'static str {
+    match decision {
+        GateDecision::Continue => "continue",
+        GateDecision::AcquireEvidence => "acquire_evidence",
+        GateDecision::Escalate => "escalate",
     }
 }
 
@@ -638,6 +849,70 @@ fn check_optional_minimum(
         Some(actual) if actual >= required => {}
         Some(_) => reasons.push(format!("{name} is below policy")),
         None => reasons.push(format!("{name} evidence is unavailable")),
+    }
+}
+
+pub(super) struct StdbConformanceAggregator<'a> {
+    pub reader: &'a StdbClient,
+}
+
+impl StdbConformanceAggregator<'_> {
+    pub async fn aggregate(
+        &self,
+        organization_id: u64,
+        company_id: u64,
+        decision_type: &DecisionTypeRef,
+        implementation_ref: &str,
+        limit: u32,
+    ) -> Result<ConformanceAggregate> {
+        decision_type.validate()?;
+        if organization_id == 0 || company_id == 0 || implementation_ref.trim().is_empty() {
+            bail!("conformance aggregation requires organization/company/implementation ref");
+        }
+        if limit == 0 || limit > MAX_ANALYSIS_ROWS {
+            bail!("conformance aggregation limit must be within 1..={MAX_ANALYSIS_ROWS}");
+        }
+        let rows = self
+            .reader
+            .query_sql(&format!(
+                "SELECT output_json FROM ai_intelligence_event WHERE organization_id = {} \
+                 AND company_id = {} AND event_kind = 'deterministic_shadow' \
+                 AND decision_type_name = '{}' AND decision_type_version = {} \
+                 AND model = '{}' LIMIT {}",
+                organization_id,
+                company_id,
+                sql_escape(&decision_type.name),
+                decision_type.version,
+                sql_escape(implementation_ref),
+                limit
+            ))
+            .await
+            .context("aggregate deterministic shadow conformance")?;
+
+        let mut aggregate = ConformanceAggregate::default();
+        for row in rows {
+            aggregate.total_events += 1;
+            let raw = row_string(&row, "outputJson").context("deterministic shadow output_json missing")?;
+            let evidence: DeterministicShadowEvidence =
+                serde_json::from_str(&raw).context("decode deterministic shadow evidence")?;
+            if evidence.evaluation_error.is_some() {
+                continue;
+            }
+            aggregate.successful_evaluations += 1;
+            if evidence.exact_match == Some(true) {
+                aggregate.exact_matches += 1;
+            }
+            if evidence.tolerance_match == Some(true) {
+                aggregate.tolerance_matches += 1;
+            }
+            if evidence.gate_disposition_match == Some(true) {
+                aggregate.gate_disposition_matches += 1;
+            }
+            if evidence.conformant == Some(true) {
+                aggregate.conformant_events += 1;
+            }
+        }
+        Ok(aggregate)
     }
 }
 
@@ -1431,10 +1706,19 @@ mod tests {
                 "deterministic:test@1",
                 &shadow_request(),
                 &production,
+                &DecisionConformancePolicy {
+                    numeric_tolerance: NumericTolerance {
+                        absolute: 0.0,
+                        relative: 0.0,
+                    },
+                    threshold_gate: None,
+                    calibration_profile: None,
+                },
             )
             .await
             .unwrap();
         assert_eq!(evidence.exact_match, Some(true));
+        assert_eq!(evidence.conformant, Some(true));
         assert_eq!(recorder.calls.lock().unwrap().len(), 1);
     }
 
@@ -1447,6 +1731,128 @@ mod tests {
         assert!(registry
             .register(Arc::new(FixedDeterministicCandidate))
             .is_err());
+    }
+
+    #[test]
+    fn probability_can_be_within_tolerance_but_fail_gate_disposition() {
+        let request = DecisionRequest {
+            decision_type: DecisionTypeRef {
+                name: "Test".into(),
+                version: 1,
+            },
+            kind: DecisionKind::Probability,
+            question: "probability".into(),
+            bounded_state: json!({}),
+            candidates: vec![],
+            precedent: vec![],
+            evidence: vec![],
+        };
+        let production = DecisionResponse {
+            kind: DecisionKind::Probability,
+            choice: None,
+            score: None,
+            probability: Some(0.51),
+            confidence: None,
+            rationale: None,
+            model: "m".into(),
+            provider: "p".into(),
+            input_tokens: 1,
+            output_tokens: 1,
+        };
+        let deterministic = DeterministicDecisionResponse {
+            kind: DecisionKind::Probability,
+            choice: None,
+            score: None,
+            probability: Some(0.49),
+            rationale: None,
+        };
+        let comparison = compare_conformance(
+            &request,
+            &production,
+            &deterministic,
+            &DecisionConformancePolicy {
+                numeric_tolerance: NumericTolerance {
+                    absolute: 0.05,
+                    relative: 0.0,
+                },
+                threshold_gate: Some(ThresholdGatePolicy {
+                    name: "route".into(),
+                    hard_stop_at_least: Some(0.5),
+                    continue_below: Some(0.5),
+                    require_calibrated: false,
+                }),
+                calibration_profile: None,
+            },
+        )
+        .unwrap();
+        assert_eq!(comparison.tolerance_match, Some(true));
+        assert_eq!(comparison.gate_disposition_match, Some(false));
+        assert!(!comparison.conformant);
+    }
+
+    #[test]
+    fn calibrated_gate_disposition_is_compared_after_calibration() {
+        use super::super::probabilistic::CalibrationProfileRef;
+
+        let request = DecisionRequest {
+            decision_type: DecisionTypeRef {
+                name: "Test".into(),
+                version: 1,
+            },
+            kind: DecisionKind::Probability,
+            question: "probability".into(),
+            bounded_state: json!({}),
+            candidates: vec![],
+            precedent: vec![],
+            evidence: vec![],
+        };
+        let production = DecisionResponse {
+            kind: DecisionKind::Probability,
+            choice: None,
+            score: None,
+            probability: Some(0.8),
+            confidence: None,
+            rationale: None,
+            model: "m".into(),
+            provider: "p".into(),
+            input_tokens: 1,
+            output_tokens: 1,
+        };
+        let deterministic = DeterministicDecisionResponse {
+            kind: DecisionKind::Probability,
+            choice: None,
+            score: None,
+            probability: Some(0.75),
+            rationale: None,
+        };
+        let profile = CalibrationProfile {
+            profile_ref: CalibrationProfileRef {
+                name: "identity".into(),
+                version: 1,
+            },
+            breakpoints: vec![(0.0, 0.0), (1.0, 1.0)],
+        };
+        let comparison = compare_conformance(
+            &request,
+            &production,
+            &deterministic,
+            &DecisionConformancePolicy {
+                numeric_tolerance: NumericTolerance {
+                    absolute: 0.1,
+                    relative: 0.0,
+                },
+                threshold_gate: Some(ThresholdGatePolicy {
+                    name: "route".into(),
+                    hard_stop_at_least: Some(0.7),
+                    continue_below: Some(0.4),
+                    require_calibrated: true,
+                }),
+                calibration_profile: Some(profile),
+            },
+        )
+        .unwrap();
+        assert_eq!(comparison.gate_disposition_match, Some(true));
+        assert!(comparison.conformant);
     }
 
     #[test]
