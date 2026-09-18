@@ -2,7 +2,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-const EXPECTED_SCHEMA_TABLES: usize = 475;
+const EXPECTED_SCHEMA_TABLES: usize = 477;
 
 use anyhow::{bail, Context, Result};
 use serde::{Deserialize, Serialize};
