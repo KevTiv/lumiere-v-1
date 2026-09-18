@@ -917,7 +917,7 @@ mod tests {
             .await
             .unwrap_err();
 
-        assert!(error.to_string().contains("explicit intelligence policy"));
+        assert!(error.to_string().contains("governed intelligence policy"));
     }
 
     #[tokio::test]
