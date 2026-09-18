@@ -17,14 +17,14 @@ use super::{
 
 #[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub(super) struct GovernedBootstrapResult {
+pub(crate) struct GovernedBootstrapResult {
     pub organization_id: u64,
     pub intelligence_policy_ref: String,
     pub calibration_profiles: Vec<String>,
     pub decision_types_registered: bool,
 }
 
-pub(super) async fn bootstrap_governed_intelligence(
+pub(crate) async fn bootstrap_governed_intelligence(
     writer: &StdbClient,
     reader: &StdbClient,
     organization_id: u64,
@@ -33,6 +33,32 @@ pub(super) async fn bootstrap_governed_intelligence(
     if organization_id == 0 {
         anyhow::bail!("organization_id must be nonzero");
     }
+
+    // Profiles and policies are deployment/admin authored because provider/model
+    // identities are environment-specific. Validate that reviewed policy first,
+    // before seeding any Lumiere-owned defaults, so bootstrap is all-or-nothing
+    // with respect to its preconditions.
+    let store = StdbModelConfigurationStore { reader };
+    let (policy_key, policy_version) = match intelligence_policy_ref {
+        Some(value) if !value.trim().is_empty() => {
+            let parsed = super::model_configuration::ModelProfileRef::parse(value)
+                .context("intelligence policy ref must use policy_key@version")?;
+            (parsed.key, Some(parsed.version))
+        }
+        _ => ("default".to_string(), None),
+    };
+    let policy = store
+        .policy(organization_id, &policy_key, policy_version)
+        .await?
+        .with_context(|| {
+            format!(
+                "active intelligence policy '{}{}' must be registered before governed bootstrap",
+                policy_key,
+                policy_version
+                    .map(|version| format!("@{version}"))
+                    .unwrap_or_default()
+            )
+        })?;
 
     let decision_types = StdbDecisionTypeRegistry {
         writer,
@@ -58,32 +84,6 @@ pub(super) async fn bootstrap_governed_intelligence(
         ))
         .await
         .context("register report-attention calibration profile")?;
-
-    // Profiles and policies are deployment/admin authored because provider/model
-    // identities are environment-specific. Bootstrap only verifies that an
-    // active reviewed policy already exists; it never fabricates one from an
-    // agent's legacy provider configuration.
-    let store = StdbModelConfigurationStore { reader };
-    let (policy_key, policy_version) = match intelligence_policy_ref {
-        Some(value) if !value.trim().is_empty() => {
-            let parsed = super::model_configuration::ModelProfileRef::parse(value)
-                .context("intelligence policy ref must use policy_key@version")?;
-            (parsed.key, Some(parsed.version))
-        }
-        _ => ("default".to_string(), None),
-    };
-    let policy = store
-        .policy(organization_id, &policy_key, policy_version)
-        .await?
-        .with_context(|| {
-            format!(
-                "active intelligence policy '{}{}' must be registered before governed bootstrap",
-                policy_key,
-                policy_version
-                    .map(|version| format!("@{version}"))
-                    .unwrap_or_default()
-            )
-        })?;
 
     Ok(GovernedBootstrapResult {
         organization_id,
