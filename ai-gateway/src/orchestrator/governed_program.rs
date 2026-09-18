@@ -1366,6 +1366,8 @@ impl GovernedProgramExecutor<'_> {
                                         decision_calls,
                                         capability_calls,
                                         &reason_iterations,
+                                        &evidence_overlays,
+                                        &evidence_acquisitions,
                                         Some(PendingApprovalCheckpoint {
                                             node_id: node.id.clone(),
                                             capability: request.capability.clone(),
