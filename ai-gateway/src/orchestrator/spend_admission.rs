@@ -222,6 +222,48 @@ pub(super) fn spend_binding_from_agent(
     })
 }
 
+
+/// Build a spend binding for a resolved intelligence model profile.
+///
+/// The agent remains the budget/rate-limit owner; provider/model/context are
+/// selected by versioned intelligence policy rather than by workflow code.
+pub(super) fn spend_binding_for_profile(
+    agent: &crate::ai_agent::ResolvedAgentConfig,
+    profile: &super::model_configuration::ModelProfile,
+    organization_id: u64,
+    company_id: u64,
+    run_id: u64,
+) -> anyhow::Result<SpendBinding> {
+    if organization_id == 0 || company_id == 0 {
+        bail!("organization and company are required for spend admission");
+    }
+    if !agent.allowed_models.is_empty()
+        && !agent
+            .allowed_models
+            .iter()
+            .any(|model| model.eq_ignore_ascii_case(&profile.model))
+    {
+        bail!(
+            "configured model profile '{}' selects model '{}' outside agent allowed_models",
+            profile.reference.stable_ref(),
+            profile.model
+        );
+    }
+    if profile.context_window == 0 || profile.max_tokens == 0 {
+        bail!("configured model profile requires positive token limits");
+    }
+    Ok(SpendBinding {
+        organization_id,
+        company_id,
+        agent_id: agent.agent_id,
+        run_id,
+        provider: profile.provider.clone(),
+        model: profile.model.clone(),
+        agent_max_tokens: profile.max_tokens.min(agent.max_tokens),
+        context_window: profile.context_window,
+    })
+}
+
 pub(super) struct SpendAdmittedLlm<'a> {
     inner: &'a dyn LlmCompletion,
     ledger: &'a dyn SpendLedger,
