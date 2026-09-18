@@ -139,6 +139,8 @@ struct GovernedProgramCheckpoint {
     decision_calls: u32,
     capability_calls: u32,
     reason_iterations: HashMap<String, u32>,
+    evidence_overlays: HashMap<String, Vec<Value>>,
+    evidence_acquisitions: HashMap<String, u32>,
     pending_approval: Option<PendingApprovalCheckpoint>,
 }
 
@@ -686,6 +688,8 @@ impl GovernedProgramExecutor<'_> {
             mut decision_calls,
             mut capability_calls,
             mut reason_iterations,
+            mut evidence_overlays,
+            mut evidence_acquisitions,
             pending_approval,
         ) = if let Some(checkpoint) = restored {
             (
@@ -696,6 +700,8 @@ impl GovernedProgramExecutor<'_> {
                 checkpoint.decision_calls,
                 checkpoint.capability_calls,
                 checkpoint.reason_iterations,
+                checkpoint.evidence_overlays,
+                checkpoint.evidence_acquisitions,
                 checkpoint.pending_approval,
             )
         } else {
@@ -706,6 +712,8 @@ impl GovernedProgramExecutor<'_> {
                 0_u32,
                 0_u32,
                 0_u32,
+                HashMap::<String, u32>::new(),
+                HashMap::<String, Vec<Value>>::new(),
                 HashMap::<String, u32>::new(),
                 None,
             )
@@ -798,6 +806,8 @@ impl GovernedProgramExecutor<'_> {
                 decision_calls,
                 capability_calls,
                 &reason_iterations,
+                &evidence_overlays,
+                &evidence_acquisitions,
                 None,
                 "running",
             )
@@ -827,6 +837,7 @@ impl GovernedProgramExecutor<'_> {
                             decision.candidates.clone(),
                             event_step,
                             &values,
+                            &evidence_overlays,
                         )
                         .await?;
                     let review = execution.review_reason.clone();
@@ -857,6 +868,7 @@ impl GovernedProgramExecutor<'_> {
                             Vec::new(),
                             event_step,
                             &values,
+                            &evidence_overlays,
                         )
                         .await?;
                     let review = execution.review_reason.clone();
@@ -887,6 +899,7 @@ impl GovernedProgramExecutor<'_> {
                             Vec::new(),
                             event_step,
                             &values,
+                            &evidence_overlays,
                         )
                         .await?;
                     let review = execution.review_reason.clone();
@@ -1043,6 +1056,8 @@ impl GovernedProgramExecutor<'_> {
                                 decision_calls,
                                 capability_calls,
                                 &reason_iterations,
+                                &evidence_overlays,
+                                &evidence_acquisitions,
                                 Some(PendingApprovalCheckpoint {
                                     node_id: node.id.clone(),
                                     capability: request.capability.clone(),
@@ -1087,9 +1102,50 @@ impl GovernedProgramExecutor<'_> {
                     {
                         CapabilityStepOutcome::Executed(output)
                         | CapabilityStepOutcome::Replayed(output) => {
+                            let count = evidence_acquisitions.entry(node.id.clone()).or_default();
+                            if *count >= 1 {
+                                return Ok(outcome(
+                                    GovernedProgramStop::EarlyStop(StopReason::InsufficientEvidence),
+                                    None,
+                                    values,
+                                    trace,
+                                    decision_calls,
+                                    capability_calls,
+                                ));
+                            }
+                            *count += 1;
+
+                            let evidence_value = serde_json::to_value(&output)
+                                .context("serialize acquired evidence for re-evaluation")?;
                             values.insert(node.id.clone(), NodeValue::Tool(output));
                             trace.push(step(&node, "conditional evidence acquired"));
-                            current = next_or_complete(&node)?;
+
+                            let invalidated = affected_closure(graph, &acquire.affects);
+                            for affected in &acquire.affects {
+                                evidence_overlays
+                                    .entry(affected.clone())
+                                    .or_default()
+                                    .push(evidence_value.clone());
+                            }
+                            for stale in &invalidated {
+                                if stale != &node.id {
+                                    values.remove(stale);
+                                    reason_iterations.remove(stale);
+                                }
+                            }
+                            trace.push(GovernedProgramTraceStep {
+                                node_id: node.id.clone(),
+                                kind: "acquire_evidence",
+                                summary: format!(
+                                    "invalidated {} affected/downstream node(s) for bounded re-evaluation",
+                                    invalidated.len()
+                                ),
+                            });
+                            current = acquire
+                                .affects
+                                .first()
+                                .cloned()
+                                .context("acquire evidence must declare at least one affected node")?;
                         }
                         CapabilityStepOutcome::Denied(reason) => {
                             return Ok(outcome(
@@ -1115,6 +1171,8 @@ impl GovernedProgramExecutor<'_> {
                                 decision_calls,
                                 capability_calls,
                                 &reason_iterations,
+                                &evidence_overlays,
+                                &evidence_acquisitions,
                                 Some(PendingApprovalCheckpoint {
                                     node_id: node.id.clone(),
                                     capability: request.capability.clone(),
@@ -1479,6 +1537,8 @@ impl GovernedProgramExecutor<'_> {
                         decision_calls,
                         capability_calls,
                         &reason_iterations,
+                        &evidence_overlays,
+                        &evidence_acquisitions,
                         Some(pending),
                         "awaiting_approval",
                     )
@@ -1520,6 +1580,8 @@ impl GovernedProgramExecutor<'_> {
         decision_calls: u32,
         capability_calls: u32,
         reason_iterations: &HashMap<String, u32>,
+        evidence_overlays: &HashMap<String, Vec<Value>>,
+        evidence_acquisitions: &HashMap<String, u32>,
         pending_approval: Option<PendingApprovalCheckpoint>,
         status: &str,
     ) -> Result<()> {
@@ -1540,6 +1602,8 @@ impl GovernedProgramExecutor<'_> {
                     decision_calls,
                     capability_calls,
                     reason_iterations: reason_iterations.clone(),
+                    evidence_overlays: evidence_overlays.clone(),
+                    evidence_acquisitions: evidence_acquisitions.clone(),
                     pending_approval,
                 },
                 status,
@@ -1558,6 +1622,7 @@ impl GovernedProgramExecutor<'_> {
         candidates: Vec<String>,
         step_no: u32,
         values: &HashMap<String, NodeValue>,
+        evidence_overlays: &HashMap<String, Vec<Value>>,
     ) -> Result<DecisionExecution> {
         let definition = self
             .decision_types
@@ -1569,7 +1634,8 @@ impl GovernedProgramExecutor<'_> {
                     decision_type.name, decision_type.version
                 )
             })?;
-        let bounded_state = state_for_node(node, values, &context.bounded_state);
+        let bounded_state =
+            state_for_node_with_evidence(node, values, &context.bounded_state, evidence_overlays);
         let matches = self
             .precedent
             .retrieve(&PrecedentQuery {
@@ -1706,6 +1772,52 @@ fn dependency_json(
         .iter()
         .filter_map(|id| values.get(id).map(|value| (id.clone(), value.as_json())))
         .collect()
+}
+
+fn state_for_node_with_evidence(
+    node: &GraphNode,
+    values: &HashMap<String, NodeValue>,
+    fallback: &Value,
+    evidence_overlays: &HashMap<String, Vec<Value>>,
+) -> Value {
+    let base = state_for_node(node, values, fallback);
+    let Some(overlays) = evidence_overlays.get(&node.id) else {
+        return base;
+    };
+    json!({
+        "state": base,
+        "acquired_evidence": overlays,
+    })
+}
+
+fn affected_closure(graph: &DecisionGraph, roots: &[String]) -> std::collections::HashSet<String> {
+    let mut affected = roots.iter().cloned().collect::<std::collections::HashSet<_>>();
+    let mut changed = true;
+    while changed {
+        changed = false;
+        for node in &graph.nodes {
+            if affected.contains(&node.id) {
+                continue;
+            }
+            let depends_on_affected = node
+                .depends_on
+                .iter()
+                .any(|dependency| affected.contains(dependency));
+            let structurally_reads_affected = match &node.kind {
+                DecisionNode::Gate(gate) => affected.contains(&gate.source),
+                DecisionNode::Verify(verify) => affected.contains(&verify.source),
+                DecisionNode::EarlyStop(stop) => affected.contains(&stop.source),
+                DecisionNode::RequireApproval(approval) => affected.contains(&approval.source),
+                DecisionNode::Batch(batch) => batch.members.iter().any(|member| affected.contains(member)),
+                _ => false,
+            };
+            if depends_on_affected || structurally_reads_affected {
+                affected.insert(node.id.clone());
+                changed = true;
+            }
+        }
+    }
+    affected
 }
 
 fn state_for_node(
