@@ -11,6 +11,7 @@ use anyhow::{bail, Context, Result};
 use async_trait::async_trait;
 use chrono::Utc;
 use futures::future::join_all;
+use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 use stdb_client::{ReducerCall, StdbClient};
@@ -81,7 +82,7 @@ pub(super) enum GovernedProgramStop {
     UnableToProgress(String),
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub(super) struct GovernedProgramTraceStep {
     pub node_id: String,
     pub kind: &'static str,
@@ -98,7 +99,7 @@ pub(super) struct GovernedProgramOutcome {
     pub capability_calls: u32,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 enum NodeValue {
     Json(Value),
     Decision(DecisionResponse),
@@ -114,6 +115,125 @@ impl NodeValue {
             NodeValue::Tool(value) => serde_json::to_value(value).unwrap_or(Value::Null),
             NodeValue::Text(value) => Value::String(value.clone()),
         }
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+struct PendingApprovalCheckpoint {
+    node_id: String,
+    capability: String,
+    reason: String,
+    draft_id: u64,
+    next_node: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+struct GovernedProgramCheckpoint {
+    schema_version: u32,
+    program_ref: String,
+    graph_hash: String,
+    current_node: String,
+    values: HashMap<String, NodeValue>,
+    trace: Vec<GovernedProgramTraceStep>,
+    event_step: u32,
+    decision_calls: u32,
+    capability_calls: u32,
+    reason_iterations: HashMap<String, u32>,
+    pending_approval: Option<PendingApprovalCheckpoint>,
+}
+
+#[async_trait]
+pub(super) trait ProgramCheckpointStore: Send + Sync {
+    async fn load(
+        &self,
+        context: &GovernedProgramContext,
+        graph_hash: &str,
+    ) -> Result<Option<GovernedProgramCheckpoint>>;
+
+    async fn save(
+        &self,
+        context: &GovernedProgramContext,
+        checkpoint: &GovernedProgramCheckpoint,
+        status: &str,
+    ) -> Result<()>;
+}
+
+pub(super) struct StdbProgramCheckpointStore<'a> {
+    pub writer: &'a StdbClient,
+    pub reader: &'a StdbClient,
+}
+
+#[async_trait]
+impl ProgramCheckpointStore for StdbProgramCheckpointStore<'_> {
+    async fn load(
+        &self,
+        context: &GovernedProgramContext,
+        graph_hash: &str,
+    ) -> Result<Option<GovernedProgramCheckpoint>> {
+        let program_ref = context.program_ref.replace(''', "''");
+        let rows = self
+            .reader
+            .query_sql(&format!(
+                "SELECT * FROM ai_intelligence_event WHERE organization_id = {}                  AND run_id = {} AND event_kind = 'program_checkpoint'                  AND shadow_profile_ref = '{}' ORDER BY id DESC LIMIT 1",
+                context.organization_id, context.run_id, program_ref
+            ))
+            .await
+            .context("load governed program checkpoint")?;
+        let Some(row) = rows.first() else {
+            return Ok(None);
+        };
+        let stored_graph_hash = row
+            .get("model")
+            .and_then(Value::as_str)
+            .context("checkpoint graph hash missing")?;
+        if stored_graph_hash != graph_hash {
+            bail!(
+                "governed program checkpoint graph hash mismatch: stored {stored_graph_hash}, current {graph_hash}"
+            );
+        }
+        let raw = row
+            .get("outputJson")
+            .or_else(|| row.get("output_json"))
+            .and_then(Value::as_str)
+            .context("checkpoint output_json missing")?;
+        let checkpoint: GovernedProgramCheckpoint =
+            serde_json::from_str(raw).context("decode governed program checkpoint")?;
+        if checkpoint.schema_version != 1
+            || checkpoint.program_ref != context.program_ref
+            || checkpoint.graph_hash != graph_hash
+        {
+            bail!("governed program checkpoint identity is invalid");
+        }
+        Ok(Some(checkpoint))
+    }
+
+    async fn save(
+        &self,
+        context: &GovernedProgramContext,
+        checkpoint: &GovernedProgramCheckpoint,
+        status: &str,
+    ) -> Result<()> {
+        let checkpoint_json =
+            serde_json::to_string(checkpoint).context("serialize governed program checkpoint")?;
+        let checkpoint_hash = format!("{:x}", Sha256::digest(checkpoint_json.as_bytes()));
+        self.writer
+            .call_reducer(ReducerCall::from_name(
+                "record_ai_program_checkpoint",
+                json!([
+                    context.organization_id,
+                    context.company_id,
+                    context.run_id,
+                    {
+                        "program_ref": context.program_ref,
+                        "graph_hash": checkpoint.graph_hash,
+                        "checkpoint_hash": checkpoint_hash,
+                        "checkpoint_json": checkpoint_json,
+                        "status": status,
+                    }
+                ]),
+            ))
+            .await
+            .context("persist governed program checkpoint")
     }
 }
 
@@ -496,6 +616,7 @@ fn reasoning_outcome_model(_outcome: &ReasoningOutcome) -> &'static str {
 
 pub(super) struct GovernedProgramExecutor<'a> {
     pub decision_provider: &'a dyn DecisionProvider,
+    pub checkpoint_store: Option<&'a dyn ProgramCheckpointStore>,
     pub decision_resolver: Option<&'a GovernedDecisionResolver<'a>>,
     pub generation_provider: &'a dyn GenerationProvider,
     pub reasoning_provider: &'a dyn ReasoningProvider,
@@ -514,6 +635,25 @@ struct DecisionExecution {
     review_reason: Option<String>,
 }
 
+fn graph_hash(graph: &DecisionGraph) -> String {
+    let mut canonical = graph
+        .nodes
+        .iter()
+        .map(|node| {
+            format!(
+                "{}|{}|{:?}|{:?}|{:?}",
+                node.id,
+                node.kind.label(),
+                node.depends_on,
+                node.next,
+                node.kind
+            )
+        })
+        .collect::<Vec<_>>();
+    canonical.sort();
+    format!("{:x}", Sha256::digest(canonical.join("\n").as_bytes()))
+}
+
 impl GovernedProgramExecutor<'_> {
     pub async fn run(
         &self,
@@ -523,14 +663,90 @@ impl GovernedProgramExecutor<'_> {
         validate_graph(graph)?;
         context.validate()?;
 
-        let mut values = HashMap::<String, NodeValue>::new();
-        let mut trace = Vec::new();
-        let mut current = graph.entry.clone();
-        let mut event_step = 0_u32;
-        let mut decision_calls = 0_u32;
-        let mut capability_calls = 0_u32;
-        let mut reason_iterations = HashMap::<String, u32>::new();
+        let graph_hash = graph_hash(graph);
+        let restored = if let Some(store) = self.checkpoint_store {
+            store.load(context, &graph_hash).await?
+        } else {
+            None
+        };
+        let (
+            mut values,
+            mut trace,
+            mut current,
+            mut event_step,
+            mut decision_calls,
+            mut capability_calls,
+            mut reason_iterations,
+            pending_approval,
+        ) = if let Some(checkpoint) = restored {
+            (
+                checkpoint.values,
+                checkpoint.trace,
+                checkpoint.current_node,
+                checkpoint.event_step,
+                checkpoint.decision_calls,
+                checkpoint.capability_calls,
+                checkpoint.reason_iterations,
+                checkpoint.pending_approval,
+            )
+        } else {
+            (
+                HashMap::<String, NodeValue>::new(),
+                Vec::new(),
+                graph.entry.clone(),
+                0_u32,
+                0_u32,
+                0_u32,
+                HashMap::<String, u32>::new(),
+                None,
+            )
+        };
         let max_steps = graph.nodes.len().saturating_mul(16).max(32);
+
+        if let Some(pending) = pending_approval {
+            match self.capabilities.approval_status(pending.draft_id).await? {
+                super::governed_services::ApprovalStatus::Approved => {
+                    values.insert(
+                        pending.node_id.clone(),
+                        NodeValue::Json(json!({
+                            "approved": true,
+                            "draft_id": pending.draft_id,
+                            "capability": pending.capability,
+                        })),
+                    );
+                    trace.push(GovernedProgramTraceStep {
+                        node_id: pending.node_id,
+                        kind: "require_approval",
+                        summary: "human approval completed; resuming governed program".to_string(),
+                    });
+                    current = pending.next_node;
+                }
+                super::governed_services::ApprovalStatus::Pending => {
+                    return Ok(outcome(
+                        GovernedProgramStop::PendingApproval {
+                            capability: pending.capability,
+                            reason: pending.reason,
+                            draft_id: Some(pending.draft_id),
+                        },
+                        None,
+                        values,
+                        trace,
+                        decision_calls,
+                        capability_calls,
+                    ));
+                }
+                super::governed_services::ApprovalStatus::Rejected(reason) => {
+                    return Ok(outcome(
+                        GovernedProgramStop::Denied(reason),
+                        None,
+                        values,
+                        trace,
+                        decision_calls,
+                        capability_calls,
+                    ));
+                }
+            }
+        }
 
         for _ in 0..max_steps {
             let node = graph
@@ -538,6 +754,20 @@ impl GovernedProgramExecutor<'_> {
                 .with_context(|| format!("control flow reached unknown node '{current}'"))?
                 .clone();
             ensure_dependencies(&node, &values)?;
+            self.checkpoint(
+                context,
+                &graph_hash,
+                &current,
+                &values,
+                &trace,
+                event_step,
+                decision_calls,
+                capability_calls,
+                &reason_iterations,
+                None,
+                "running",
+            )
+            .await?;
 
             match &node.kind {
                 DecisionNode::Compute(compute) => {
@@ -1117,6 +1347,44 @@ impl GovernedProgramExecutor<'_> {
             decision_calls,
             capability_calls,
         ))
+    }
+
+    async fn checkpoint(
+        &self,
+        context: &GovernedProgramContext,
+        graph_hash: &str,
+        current_node: &str,
+        values: &HashMap<String, NodeValue>,
+        trace: &[GovernedProgramTraceStep],
+        event_step: u32,
+        decision_calls: u32,
+        capability_calls: u32,
+        reason_iterations: &HashMap<String, u32>,
+        pending_approval: Option<PendingApprovalCheckpoint>,
+        status: &str,
+    ) -> Result<()> {
+        let Some(store) = self.checkpoint_store else {
+            return Ok(());
+        };
+        store
+            .save(
+                context,
+                &GovernedProgramCheckpoint {
+                    schema_version: 1,
+                    program_ref: context.program_ref.clone(),
+                    graph_hash: graph_hash.to_string(),
+                    current_node: current_node.to_string(),
+                    values: values.clone(),
+                    trace: trace.to_vec(),
+                    event_step,
+                    decision_calls,
+                    capability_calls,
+                    reason_iterations: reason_iterations.clone(),
+                    pending_approval,
+                },
+                status,
+            )
+            .await
     }
 
     #[allow(clippy::too_many_arguments)]
