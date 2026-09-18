@@ -202,23 +202,11 @@ pub(super) fn conditional_evidence_reference_graph() -> DecisionGraph {
             GraphNode {
                 id: "acquire_detail".to_string(),
                 depends_on: vec!["initial_decision".to_string()],
-                next: Some("refined_decision".to_string()),
+                next: Some("initial_decision".to_string()),
                 kind: DecisionNode::AcquireEvidence(AcquireEvidenceNode {
                     capability: "inventory_snapshot".to_string(),
                     max_rows: 25,
-                    affects: vec!["refined_decision".to_string()],
-                }),
-            },
-            GraphNode {
-                id: "refined_decision".to_string(),
-                depends_on: vec!["input".to_string(), "acquire_detail".to_string()],
-                next: Some("routine_summary".to_string()),
-                kind: DecisionNode::Probability(ProbabilityDecisionNode {
-                    decision_type: DecisionTypeRef {
-                        name: "StockReorderPriority".to_string(),
-                        version: 1,
-                    },
-                    question: "Re-evaluate urgency using the newly acquired bounded evidence.".to_string(),
+                    affects: vec!["initial_decision".to_string()],
                 }),
             },
             GraphNode {
