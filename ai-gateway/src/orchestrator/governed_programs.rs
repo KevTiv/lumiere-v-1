@@ -5,8 +5,9 @@
 
 use super::{
     decision_graph::{
-        CapabilityNode, DecisionGraph, DecisionNode, GateBranch, GateCondition, GateNode,
-        GenerateNode, GraphNode, ProbabilityDecisionNode, ReasonNode, VerifyNode,
+        AcquireEvidenceNode, CapabilityNode, ChoiceDecisionNode, ComputeNode, DecisionGraph,
+        DecisionNode, EarlyStopNode, GateBranch, GateCondition, GateNode, GenerateNode, GraphNode,
+        ProbabilityDecisionNode, ReasonNode, RequireApprovalNode, StopReason, VerifyNode,
     },
     intelligence::{
         DecisionTypeRef, PROPOSAL_KIND_CLARIFICATION, PROPOSAL_KIND_FINAL_DRAFT,
@@ -127,6 +128,206 @@ pub(super) fn report_analysis_graph() -> DecisionGraph {
     }
 }
 
+
+pub(super) fn conditional_evidence_reference_graph() -> DecisionGraph {
+    let policy = ThresholdGatePolicy {
+        name: "reference-evidence-confidence".to_string(),
+        hard_stop_at_least: Some(0.8),
+        continue_below: Some(0.3),
+        require_calibrated: false,
+    };
+    DecisionGraph {
+        entry: "input".to_string(),
+        nodes: vec![
+            GraphNode {
+                id: "input".to_string(),
+                depends_on: Vec::new(),
+                next: Some("initial_decision".to_string()),
+                kind: DecisionNode::Compute(ComputeNode {
+                    function_ref: "program_input".to_string(),
+                }),
+            },
+            GraphNode {
+                id: "initial_decision".to_string(),
+                depends_on: vec!["input".to_string()],
+                next: Some("evidence_gate".to_string()),
+                kind: DecisionNode::Probability(ProbabilityDecisionNode {
+                    decision_type: DecisionTypeRef {
+                        name: "StockReorderPriority".to_string(),
+                        version: 1,
+                    },
+                    question: "Is the current evidence sufficient to treat this as urgent?".to_string(),
+                }),
+            },
+            GraphNode {
+                id: "evidence_gate".to_string(),
+                depends_on: vec!["initial_decision".to_string()],
+                next: None,
+                kind: DecisionNode::Gate(GateNode {
+                    source: "initial_decision".to_string(),
+                    branches: vec![
+                        GateBranch {
+                            condition: GateCondition::ThresholdPolicy {
+                                policy: policy.clone(),
+                                calibration_profile: None,
+                                on: GateDecision::AcquireEvidence,
+                            },
+                            target: "acquire_detail".to_string(),
+                        },
+                        GateBranch {
+                            condition: GateCondition::ThresholdPolicy {
+                                policy: policy.clone(),
+                                calibration_profile: None,
+                                on: GateDecision::Escalate,
+                            },
+                            target: "urgent_stop".to_string(),
+                        },
+                        GateBranch {
+                            condition: GateCondition::ThresholdPolicy {
+                                policy,
+                                calibration_profile: None,
+                                on: GateDecision::Continue,
+                            },
+                            target: "routine_summary".to_string(),
+                        },
+                        GateBranch {
+                            condition: GateCondition::Default,
+                            target: "acquire_detail".to_string(),
+                        },
+                    ],
+                }),
+            },
+            GraphNode {
+                id: "acquire_detail".to_string(),
+                depends_on: vec!["initial_decision".to_string()],
+                next: Some("refined_decision".to_string()),
+                kind: DecisionNode::AcquireEvidence(AcquireEvidenceNode {
+                    capability: "inventory_snapshot".to_string(),
+                    max_rows: 25,
+                    affects: vec!["refined_decision".to_string()],
+                }),
+            },
+            GraphNode {
+                id: "refined_decision".to_string(),
+                depends_on: vec!["input".to_string(), "acquire_detail".to_string()],
+                next: Some("routine_summary".to_string()),
+                kind: DecisionNode::Probability(ProbabilityDecisionNode {
+                    decision_type: DecisionTypeRef {
+                        name: "StockReorderPriority".to_string(),
+                        version: 1,
+                    },
+                    question: "Re-evaluate urgency using the newly acquired bounded evidence.".to_string(),
+                }),
+            },
+            GraphNode {
+                id: "urgent_stop".to_string(),
+                depends_on: vec!["initial_decision".to_string()],
+                next: None,
+                kind: DecisionNode::EarlyStop(EarlyStopNode {
+                    source: "initial_decision".to_string(),
+                    reason: StopReason::PolicyViolation,
+                }),
+            },
+            GraphNode {
+                id: "routine_summary".to_string(),
+                depends_on: vec!["input".to_string()],
+                next: None,
+                kind: DecisionNode::Generate(GenerateNode {
+                    format: "bounded inventory assessment with evidence provenance".to_string(),
+                }),
+            },
+        ],
+    }
+}
+
+pub(super) fn consequential_mutation_reference_graph() -> DecisionGraph {
+    DecisionGraph {
+        entry: "input".to_string(),
+        nodes: vec![
+            GraphNode {
+                id: "input".to_string(),
+                depends_on: Vec::new(),
+                next: Some("mutation_decision".to_string()),
+                kind: DecisionNode::Compute(ComputeNode {
+                    function_ref: "program_input".to_string(),
+                }),
+            },
+            GraphNode {
+                id: "mutation_decision".to_string(),
+                depends_on: vec!["input".to_string()],
+                next: Some("mutation_gate".to_string()),
+                kind: DecisionNode::Choice(ChoiceDecisionNode {
+                    decision_type: DecisionTypeRef {
+                        name: "PaymentDisposition".to_string(),
+                        version: 1,
+                    },
+                    question: "Should this bounded transaction proceed to the governed mutation path?".to_string(),
+                    candidates: vec!["clear".to_string(), "flag".to_string()],
+                }),
+            },
+            GraphNode {
+                id: "mutation_gate".to_string(),
+                depends_on: vec!["mutation_decision".to_string()],
+                next: None,
+                kind: DecisionNode::Gate(GateNode {
+                    source: "mutation_decision".to_string(),
+                    branches: vec![
+                        GateBranch {
+                            condition: GateCondition::ChoiceEquals("clear".to_string()),
+                            target: "approval".to_string(),
+                        },
+                        GateBranch {
+                            condition: GateCondition::Default,
+                            target: "blocked".to_string(),
+                        },
+                    ],
+                }),
+            },
+            GraphNode {
+                id: "approval".to_string(),
+                depends_on: vec!["mutation_decision".to_string()],
+                next: Some("mutate".to_string()),
+                kind: DecisionNode::RequireApproval(RequireApprovalNode {
+                    source: "mutation_decision".to_string(),
+                }),
+            },
+            GraphNode {
+                id: "mutate".to_string(),
+                depends_on: vec!["approval".to_string()],
+                next: Some("verify_mutation".to_string()),
+                kind: DecisionNode::Capability(CapabilityNode {
+                    capability: "post_payment".to_string(),
+                }),
+            },
+            GraphNode {
+                id: "verify_mutation".to_string(),
+                depends_on: vec!["mutate".to_string()],
+                next: Some("receipt".to_string()),
+                kind: DecisionNode::Verify(VerifyNode {
+                    source: "mutate".to_string(),
+                }),
+            },
+            GraphNode {
+                id: "receipt".to_string(),
+                depends_on: vec!["verify_mutation".to_string()],
+                next: None,
+                kind: DecisionNode::Generate(GenerateNode {
+                    format: "mutation receipt with verification evidence".to_string(),
+                }),
+            },
+            GraphNode {
+                id: "blocked".to_string(),
+                depends_on: vec!["mutation_decision".to_string()],
+                next: None,
+                kind: DecisionNode::EarlyStop(EarlyStopNode {
+                    source: "mutation_decision".to_string(),
+                    reason: StopReason::PolicyViolation,
+                }),
+            },
+        ],
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -135,5 +336,15 @@ mod tests {
     #[test]
     fn report_analysis_program_is_valid() {
         validate_graph(&report_analysis_graph()).unwrap();
+    }
+
+    #[test]
+    fn conditional_evidence_reference_program_is_valid() {
+        validate_graph(&conditional_evidence_reference_graph()).unwrap();
+    }
+
+    #[test]
+    fn consequential_mutation_reference_program_is_valid() {
+        validate_graph(&consequential_mutation_reference_graph()).unwrap();
     }
 }
