@@ -791,7 +791,10 @@ pub async fn run_skill_admitted(
                 .and_then(Value::as_str)
                 .is_none_or(|value| value.trim().is_empty())
             {
-                if let Some(query) = build_web_search_query(&skill_key, &req.inputs, "") {
+                let extracted = extract_query(&req.inputs);
+                let query = build_web_search_query(&skill_key, &req.inputs, &extracted)
+                    .or_else(|| (!extracted.trim().is_empty()).then_some(extracted));
+                if let Some(query) = query {
                     object.insert("query".to_string(), Value::String(query));
                 }
             }
