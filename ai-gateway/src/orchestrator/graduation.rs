@@ -1963,7 +1963,7 @@ fn shadow_disagreement(events: &[&DecisionEventRow]) -> Result<(Option<f64>, u64
     }
     let disagreements = comparable
         .iter()
-        .filter(|(production, shadow)| *production != *shadow)
+        .filter(|(production, shadow)| production.as_str() != shadow.as_str())
         .count() as u64;
     Ok((
         Some(ratio(disagreements, comparable.len() as u64)),
