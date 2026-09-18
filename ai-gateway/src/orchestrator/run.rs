@@ -37,7 +37,7 @@ use super::{
     },
     decision_type::{register_builtin_decision_types, StdbDecisionTypeRegistry},
     graduation::{
-        DeterministicCandidateRegistry, GovernedDecisionResolver,
+        production_deterministic_candidates, GovernedDecisionResolver,
         StdbAuthorityRollbackRecorder, StdbDecisionResolutionPolicy, StdbDriftMonitor,
         StdbModelShadowRecorder,
     },
@@ -749,7 +749,7 @@ pub async fn run_skill_admitted(
         let calibration = StdbCalibrationProfileStore {
             reader: tool_ctx.stdb.as_ref(),
         };
-        let deterministic_candidates = DeterministicCandidateRegistry::default();
+        let deterministic_candidates = production_deterministic_candidates();
         let decision_resolution_policy = StdbDecisionResolutionPolicy {
             reader: tool_ctx.stdb.as_ref(),
         };
@@ -764,7 +764,7 @@ pub async fn run_skill_admitted(
         };
         let decision_resolver = GovernedDecisionResolver {
             policy: &decision_resolution_policy,
-            candidates: &deterministic_candidates,
+            candidates: deterministic_candidates,
             model: &decision_provider,
             model_shadow_recorder: &model_shadow_recorder,
             drift_monitor: Some(&drift_monitor),
