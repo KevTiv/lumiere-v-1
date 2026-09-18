@@ -38,16 +38,20 @@ pub(super) struct ComputeNode {
 #[derive(Clone, Debug)]
 pub(super) struct ChoiceDecisionNode {
     pub decision_type: DecisionTypeRef,
+    pub question: String,
+    pub candidates: Vec<String>,
 }
 
 #[derive(Clone, Debug)]
 pub(super) struct ScoreDecisionNode {
     pub decision_type: DecisionTypeRef,
+    pub question: String,
 }
 
 #[derive(Clone, Debug)]
 pub(super) struct ProbabilityDecisionNode {
     pub decision_type: DecisionTypeRef,
+    pub question: String,
 }
 
 /// Independent typed questions over the same bounded state (§5). Members
@@ -216,7 +220,7 @@ pub(super) struct DecisionGraph {
 }
 
 impl DecisionGraph {
-    fn get(&self, id: &str) -> Option<&GraphNode> {
+    pub(super) fn get(&self, id: &str) -> Option<&GraphNode> {
         self.nodes.iter().find(|n| n.id == id)
     }
 }
@@ -298,6 +302,7 @@ pub(super) fn validate_graph(graph: &DecisionGraph) -> Result<()> {
 
     let ids: HashSet<&str> = graph.nodes.iter().map(|n| n.id.as_str()).collect();
     for node in &graph.nodes {
+        validate_node_contract(node)?;
         for referenced in referenced_ids(node) {
             if !ids.contains(referenced) {
                 bail!(
@@ -314,6 +319,43 @@ pub(super) fn validate_graph(graph: &DecisionGraph) -> Result<()> {
     validate_gates(graph)?;
     validate_control_flow_cycles_are_bounded(graph)?;
 
+    Ok(())
+}
+
+
+fn validate_node_contract(node: &GraphNode) -> Result<()> {
+    match &node.kind {
+        DecisionNode::Choice(decision) => {
+            decision.decision_type.validate()?;
+            if decision.question.trim().is_empty() {
+                bail!("choice node '{}' must define a question", node.id);
+            }
+            if decision.candidates.len() < 2 {
+                bail!("choice node '{}' must define at least two candidates", node.id);
+            }
+            let unique = decision
+                .candidates
+                .iter()
+                .map(|candidate| candidate.trim())
+                .collect::<HashSet<_>>();
+            if unique.len() != decision.candidates.len() || unique.iter().any(|c| c.is_empty()) {
+                bail!("choice node '{}' candidates must be nonempty and unique", node.id);
+            }
+        }
+        DecisionNode::Score(decision) => {
+            decision.decision_type.validate()?;
+            if decision.question.trim().is_empty() {
+                bail!("score node '{}' must define a question", node.id);
+            }
+        }
+        DecisionNode::Probability(decision) => {
+            decision.decision_type.validate()?;
+            if decision.question.trim().is_empty() {
+                bail!("probability node '{}' must define a question", node.id);
+            }
+        }
+        _ => {}
+    }
     Ok(())
 }
 
@@ -535,6 +577,7 @@ mod tests {
             depends_on: depends_on.iter().map(|s| s.to_string()).collect(),
             kind: DecisionNode::Probability(ProbabilityDecisionNode {
                 decision_type: decision_type("FraudConcern"),
+                question: "How likely is this transaction to be fraudulent?".to_string(),
             }),
         }
     }
