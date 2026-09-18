@@ -32,6 +32,7 @@ use async_trait::async_trait;
 use serde_json::{json, Value};
 use stdb_client::{ReducerCall, StdbClient};
 
+use super::graduation::GraduationPolicy;
 use super::intelligence::{DecisionKind, DecisionRequest, DecisionResponse, DecisionTypeRef};
 use super::precedent::{DecisionCaseStatus, PrecedentPolicy};
 
@@ -172,6 +173,10 @@ pub(super) struct DecisionTypeDefinition {
     pub required_evidence_kinds: Vec<String>,
     pub risk_class: RiskClass,
     pub precedent_policy: PrecedentPolicy,
+    /// Optional GP-16 eligibility policy. Kept inside the existing immutable
+    /// DecisionType policy JSON envelope so graduation does not create a
+    /// second configuration subsystem.
+    pub graduation_policy: Option<GraduationPolicy>,
     pub verification_policy: VerificationPolicy,
     pub escalation_policy: EscalationPolicy,
 }
@@ -183,6 +188,9 @@ impl DecisionTypeDefinition {
             bail!("decision type definition description must be nonempty");
         }
         self.precedent_policy.validate()?;
+        if let Some(policy) = &self.graduation_policy {
+            policy.validate()?;
+        }
         Ok(())
     }
 }
@@ -349,7 +357,7 @@ impl DecisionTypeRegistry for StdbDecisionTypeRegistry<'_> {
                         "output_schema_json": encode_structural_schema(&definition.output_schema).to_string(),
                         "required_evidence_kinds": definition.required_evidence_kinds,
                         "risk_class": risk_class_label(definition.risk_class),
-                        "precedent_policy_json": encode_precedent_policy(&definition.precedent_policy).to_string(),
+                        "precedent_policy_json": encode_decision_policy_envelope(&definition.precedent_policy, definition.graduation_policy.as_ref()).to_string(),
                         "verification_required": definition.verification_policy.required,
                         "escalation_policy_json": encode_escalation_policy(&definition.escalation_policy).to_string(),
                     }
@@ -377,8 +385,9 @@ fn decode_definition(row: &Value) -> Result<DecisionTypeDefinition> {
     };
     let input_schema = decode_structural_schema(&parse_json_string(row, "inputSchemaJson")?)?;
     let output_schema = decode_structural_schema(&parse_json_string(row, "outputSchemaJson")?)?;
-    let precedent_policy =
-        decode_precedent_policy(&parse_json_string(row, "precedentPolicyJson")?)?;
+    let decision_policy_json = parse_json_string(row, "precedentPolicyJson")?;
+    let precedent_policy = decode_precedent_policy(&decision_policy_json)?;
+    let graduation_policy = decode_graduation_policy(&decision_policy_json)?;
     let escalation_policy =
         decode_escalation_policy(&parse_json_string(row, "escalationPolicyJson")?)?;
     let definition = DecisionTypeDefinition {
@@ -393,6 +402,7 @@ fn decode_definition(row: &Value) -> Result<DecisionTypeDefinition> {
         required_evidence_kinds: row_string_list(row, "requiredEvidenceKinds"),
         risk_class,
         precedent_policy,
+        graduation_policy,
         verification_policy: VerificationPolicy {
             required: row_bool(row, "verificationRequired").unwrap_or(false),
         },
@@ -453,6 +463,30 @@ fn encode_precedent_policy(policy: &PrecedentPolicy) -> Value {
         "require_same_program_step": policy.require_same_program_step,
         "include_patterns": policy.include_patterns,
     })
+}
+
+fn encode_decision_policy_envelope(
+    precedent: &PrecedentPolicy,
+    graduation: Option<&GraduationPolicy>,
+) -> Value {
+    let mut value = encode_precedent_policy(precedent);
+    if let (Some(policy), Some(object)) = (graduation, value.as_object_mut()) {
+        object.insert(
+            "graduation".to_string(),
+            serde_json::to_value(policy).expect("GraduationPolicy is serializable"),
+        );
+    }
+    value
+}
+
+fn decode_graduation_policy(value: &Value) -> Result<Option<GraduationPolicy>> {
+    let Some(graduation) = value.get("graduation") else {
+        return Ok(None);
+    };
+    let policy: GraduationPolicy =
+        serde_json::from_value(graduation.clone()).context("decode graduation policy")?;
+    policy.validate()?;
+    Ok(Some(policy))
 }
 
 fn decode_precedent_policy(value: &Value) -> Result<PrecedentPolicy> {
@@ -747,6 +781,7 @@ fn builtin_definitions() -> Vec<DecisionTypeDefinition> {
                 require_same_program_step: false,
                 include_patterns: true,
             },
+            graduation_policy: None,
             verification_policy: VerificationPolicy { required: true },
             escalation_policy: EscalationPolicy {
                 min_confidence: Some(0.6),
@@ -776,6 +811,7 @@ fn builtin_definitions() -> Vec<DecisionTypeDefinition> {
                 require_same_program_step: false,
                 include_patterns: true,
             },
+            graduation_policy: None,
             verification_policy: VerificationPolicy { required: false },
             escalation_policy: EscalationPolicy {
                 min_confidence: Some(0.4),
@@ -802,6 +838,7 @@ fn builtin_definitions() -> Vec<DecisionTypeDefinition> {
                 require_same_program_step: true,
                 include_patterns: true,
             },
+            graduation_policy: None,
             verification_policy: VerificationPolicy { required: true },
             escalation_policy: EscalationPolicy {
                 min_confidence: None,
@@ -828,6 +865,7 @@ fn builtin_definitions() -> Vec<DecisionTypeDefinition> {
                 require_same_program_step: true,
                 include_patterns: true,
             },
+            graduation_policy: None,
             verification_policy: VerificationPolicy { required: false },
             escalation_policy: EscalationPolicy {
                 min_confidence: Some(0.35),
@@ -864,6 +902,7 @@ mod tests {
                 require_same_program_step: false,
                 include_patterns: false,
             },
+            graduation_policy: None,
             verification_policy: VerificationPolicy { required: true },
             escalation_policy: EscalationPolicy {
                 min_confidence: Some(0.6),
