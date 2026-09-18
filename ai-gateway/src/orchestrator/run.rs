@@ -44,6 +44,7 @@ use super::{
     governed_program::{
         graph_requests_generated_capabilities, BuiltinComputeService, GovernedProgramContext,
         GovernedProgramExecutor, GovernedProgramStop, StdbIntelligenceEventRecorder,
+        StdbProgramCheckpointStore,
     },
     governed_programs::governed_program_for_skill,
     governed_services::{
@@ -770,8 +771,13 @@ pub async fn run_skill_admitted(
             drift_monitor: Some(&drift_monitor),
             rollback_recorder: Some(&rollback_recorder),
         };
+        let checkpoint_store = StdbProgramCheckpointStore {
+            writer: state.stdb.as_ref(),
+            reader: tool_ctx.stdb.as_ref(),
+        };
         let executor = GovernedProgramExecutor {
             decision_provider: &decision_provider,
+            checkpoint_store: Some(&checkpoint_store),
             decision_resolver: Some(&decision_resolver),
             generation_provider: &generation_provider,
             reasoning_provider: &reasoning_provider,
