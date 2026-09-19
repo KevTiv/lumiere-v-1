@@ -3010,6 +3010,11 @@
       "reason": "internal governed-intelligence persistence; never exposed through the session BFF"
     },
     {
+      "name": "propose_ai_knowledge_skill_promotion",
+      "exposure": "session",
+      "reason": "invoked by the authenticated, company-scoped knowledge-promotion BFF"
+    },
+    {
       "name": "publish_form_configuration",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
@@ -3408,6 +3413,11 @@
       "name": "reverse_sale_commission_settlement",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
+    },
+    {
+      "name": "review_ai_knowledge_skill_promotion",
+      "exposure": "session",
+      "reason": "invoked by the authenticated, company-scoped knowledge-promotion BFF"
     },
     {
       "name": "review_message_batch",

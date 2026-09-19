@@ -2531,6 +2531,16 @@
       },
       "evidence": "spacetimedb/src/ai/knowledge_entry.rs: body appends a new candidate version without a replay guard"
     },
+    "propose_ai_knowledge_skill_promotion": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "request_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/ai/knowledge_promotion.rs: idempotency key is bound to the exact promotion payload and conflicting replay is rejected"
+    },
     "publish_form_configuration": {
       "semantic_kind": "command",
       "client_facing": true,
@@ -3090,6 +3100,16 @@
         "version": 1
       },
       "evidence": "spacetimedb/src/ai/knowledge_entry.rs: body appends a review record for the current review epoch; approval is derived, never supplied"
+    },
+    "review_ai_knowledge_skill_promotion": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/ai/knowledge_promotion.rs: only a proposed promotion may be reviewed and independent actor plus current knowledge lineage are revalidated"
     },
     "review_message_batch": {
       "semantic_kind": "command",
