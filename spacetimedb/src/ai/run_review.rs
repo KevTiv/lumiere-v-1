@@ -84,7 +84,9 @@ pub fn record_ai_run_review(
         return Err("run_id must be nonzero".to_string());
     }
     if params.program_ref.trim().is_empty() || params.program_ref.len() > MAX_PROGRAM_REF_LEN {
-        return Err(format!("program_ref must be 1..{MAX_PROGRAM_REF_LEN} bytes"));
+        return Err(format!(
+            "program_ref must be 1..{MAX_PROGRAM_REF_LEN} bytes"
+        ));
     }
     if !DISPOSITIONS.contains(&params.disposition.as_str()) {
         return Err(format!("disposition must be one of {DISPOSITIONS:?}"));

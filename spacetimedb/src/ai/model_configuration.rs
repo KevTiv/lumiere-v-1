@@ -223,27 +223,31 @@ pub fn register_ai_intelligence_policy(
         if policy_matches(&existing, &params) {
             return Ok(());
         }
-        return Err("intelligence policy version already exists with different content".to_string());
+        return Err(
+            "intelligence policy version already exists with different content".to_string(),
+        );
     }
 
-    ctx.db.ai_intelligence_policy().insert(AiIntelligencePolicy {
-        id: 0,
-        organization_id,
-        policy_key: params.policy_key.trim().to_string(),
-        policy_version: params.policy_version,
-        default_decision_profile: params.default_decision_profile,
-        default_reasoning_profile: params.default_reasoning_profile,
-        default_generation_profile: params.default_generation_profile,
-        default_review_profile: params.default_review_profile,
-        shadow_profiles: params.shadow_profiles,
-        decision_type_overrides_json: params.decision_type_overrides_json,
-        fallback_profiles_json: params.fallback_profiles_json,
-        is_active: true,
-        create_uid: ctx.sender(),
-        create_date: ctx.timestamp,
-        write_uid: ctx.sender(),
-        write_date: ctx.timestamp,
-    });
+    ctx.db
+        .ai_intelligence_policy()
+        .insert(AiIntelligencePolicy {
+            id: 0,
+            organization_id,
+            policy_key: params.policy_key.trim().to_string(),
+            policy_version: params.policy_version,
+            default_decision_profile: params.default_decision_profile,
+            default_reasoning_profile: params.default_reasoning_profile,
+            default_generation_profile: params.default_generation_profile,
+            default_review_profile: params.default_review_profile,
+            shadow_profiles: params.shadow_profiles,
+            decision_type_overrides_json: params.decision_type_overrides_json,
+            fallback_profiles_json: params.fallback_profiles_json,
+            is_active: true,
+            create_uid: ctx.sender(),
+            create_date: ctx.timestamp,
+            write_uid: ctx.sender(),
+            write_date: ctx.timestamp,
+        });
     Ok(())
 }
 
@@ -344,8 +348,9 @@ fn validate_policy_params(
         validate_profile_ref(ctx, organization_id, profile_ref, "shadow")?;
     }
 
-    let overrides: serde_json::Value = serde_json::from_str(&params.decision_type_overrides_json)
-        .map_err(|_| "decision_type_overrides_json is invalid JSON")?;
+    let overrides: serde_json::Value =
+        serde_json::from_str(&params.decision_type_overrides_json)
+            .map_err(|_| "decision_type_overrides_json is invalid JSON")?;
     if let Some(entries) = overrides.as_object() {
         for value in entries.values() {
             let object = value
@@ -366,12 +371,9 @@ fn validate_policy_params(
                 }
             }
 
-            let require_distinct_profile =
-                bool_override(object, "requireDistinctReviewProfile")?;
-            let require_distinct_provider =
-                bool_override(object, "requireDistinctReviewProvider")?;
-            let _prefer_distinct_provider =
-                bool_override(object, "preferDistinctReviewProvider")?;
+            let require_distinct_profile = bool_override(object, "requireDistinctReviewProfile")?;
+            let require_distinct_provider = bool_override(object, "requireDistinctReviewProvider")?;
+            let _prefer_distinct_provider = bool_override(object, "preferDistinctReviewProvider")?;
 
             if require_distinct_provider {
                 let decision_ref = object
@@ -391,8 +393,7 @@ fn validate_policy_params(
                 }
                 let decision_provider =
                     provider_for_profile_ref(ctx, organization_id, decision_ref)?;
-                let review_provider =
-                    provider_for_profile_ref(ctx, organization_id, review_ref)?;
+                let review_provider = provider_for_profile_ref(ctx, organization_id, review_ref)?;
                 if decision_provider == review_provider {
                     return Err(format!(
                         "requireDistinctReviewProvider resolved both profiles to provider '{}'",
@@ -423,7 +424,9 @@ fn validate_policy_params(
     if let Some(entries) = fallbacks.as_object() {
         for (role, value) in entries {
             if !INTELLIGENCE_ROLES.contains(&role.as_str()) || role == "shadow" {
-                return Err("fallback role must be decision, reasoning, generation, or review".to_string());
+                return Err(
+                    "fallback role must be decision, reasoning, generation, or review".to_string(),
+                );
             }
             let refs = value
                 .as_array()

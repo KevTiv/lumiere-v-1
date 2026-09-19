@@ -21,9 +21,7 @@ use serde_json::{json, Value};
 use stdb_client::{ReducerCall, StdbClient};
 
 use super::governed_program::{GovernedProgramOutcome, GovernedProgramStop};
-use super::intelligence::{
-    DecisionKind, DecisionProvider, DecisionRequest, DecisionTypeRef,
-};
+use super::intelligence::{DecisionKind, DecisionProvider, DecisionRequest, DecisionTypeRef};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -139,7 +137,9 @@ fn deterministic_pre_review(outcome: &GovernedProgramOutcome) -> Option<RunRevie
     };
 
     if outcome.trace.is_empty() {
-        return Some(defect("governed run has an empty observable trace".to_string()));
+        return Some(defect(
+            "governed run has an empty observable trace".to_string(),
+        ));
     }
     if matches!(outcome.stop, GovernedProgramStop::Completed)
         && outcome
@@ -246,13 +246,11 @@ impl RunReviewRecorder for StdbRunReviewRecorder<'_> {
 
 #[cfg(test)]
 mod tests {
+    use super::super::governed_program::{GovernedProgramStop, GovernedProgramTraceStep};
+    use super::super::intelligence::{DecisionProvider, DecisionResponse};
     use super::*;
     use anyhow::Result;
     use async_trait::async_trait;
-    use super::super::governed_program::{
-        GovernedProgramStop, GovernedProgramTraceStep,
-    };
-    use super::super::intelligence::{DecisionResponse, DecisionProvider};
 
     struct Reviewer;
 
@@ -333,7 +331,10 @@ mod tests {
         // exactly — a mismatch here would make every durable run review
         // write fail validation server-side.
         assert_eq!(RunReviewDisposition::Healthy.label(), "healthy");
-        assert_eq!(RunReviewDisposition::ReviewRequired.label(), "review_required");
+        assert_eq!(
+            RunReviewDisposition::ReviewRequired.label(),
+            "review_required"
+        );
         assert_eq!(RunReviewDisposition::Defect.label(), "defect");
         assert_eq!(
             RunReviewDisposition::IncidentCandidate.label(),
@@ -393,6 +394,15 @@ mod tests {
             .unwrap();
         let calls = recorder.calls.lock().unwrap();
         assert_eq!(calls.len(), 1);
-        assert_eq!(calls[0], (9, 3, 42, "test-program@1".to_string(), RunReviewDisposition::Healthy));
+        assert_eq!(
+            calls[0],
+            (
+                9,
+                3,
+                42,
+                "test-program@1".to_string(),
+                RunReviewDisposition::Healthy
+            )
+        );
     }
 }

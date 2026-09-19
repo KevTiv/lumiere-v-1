@@ -150,7 +150,6 @@ impl<'a> ConfiguredIntelligenceRouter<'a> {
     }
 }
 
-
 fn role_scope(role: IntelligenceRole) -> u32 {
     match role {
         IntelligenceRole::Decision => 1,
@@ -367,10 +366,7 @@ impl<'a> RoutedReasoningProvider<'a> {
 #[async_trait::async_trait]
 impl ReasoningProvider for RoutedReasoningProvider<'_> {
     async fn reason(&self, request: ReasoningRequest) -> Result<ReasoningOutcome> {
-        let route = self
-            .router
-            .route(IntelligenceRole::Reasoning, None)
-            .await?;
+        let route = self.router.route(IntelligenceRole::Reasoning, None).await?;
         let mut profiles = Vec::with_capacity(1 + route.fallbacks.len());
         profiles.push(route.primary);
         profiles.extend(route.fallbacks);
@@ -401,7 +397,10 @@ impl ReasoningProvider for RoutedReasoningProvider<'_> {
                 }
             }
         }
-        bail!("all configured reasoning profiles failed: {}", failures.join(" | "))
+        bail!(
+            "all configured reasoning profiles failed: {}",
+            failures.join(" | ")
+        )
     }
 }
 
@@ -476,7 +475,10 @@ impl GenerationProvider for RoutedGenerationProvider<'_> {
                 }
             }
         }
-        bail!("all configured generation profiles failed: {}", failures.join(" | "))
+        bail!(
+            "all configured generation profiles failed: {}",
+            failures.join(" | ")
+        )
     }
 }
 
@@ -553,11 +555,11 @@ impl<'a> IntelligenceRouter<'a> {
 
 #[cfg(test)]
 mod tests {
+    use super::super::intelligence::{DecisionKind, DecisionTypeRef};
     use super::*;
     use anyhow::{bail, Result};
     use async_trait::async_trait;
     use serde_json::json;
-    use super::super::intelligence::{DecisionKind, DecisionTypeRef};
 
     struct Fixed(&'static str);
     struct Broken;

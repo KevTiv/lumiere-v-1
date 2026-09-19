@@ -4,6 +4,11 @@ use serde_json::json;
 use sha2::{Digest, Sha256};
 use spacetimedb::{Identity, ReducerContext, Table};
 
+use crate::ai::evidence_lineage::{
+    ai_artifact_component, ai_evidence_claim, ai_evidence_decision, record_ai_evidence_claim,
+    record_ai_evidence_decision, review_ai_evidence_decision, RecordAiEvidenceClaimParams,
+    RecordAiEvidenceDecisionParams, ReviewAiEvidenceDecisionParams,
+};
 use crate::core::audit::audit_log;
 use crate::core::persistence::{
     organization_commit, organization_commit_cursor, organization_row_change,
@@ -38,6 +43,163 @@ fn definition(module_id: &str, title: &str, base_revision: Option<u64>) -> Strin
         }]
     })
     .to_string()
+}
+
+fn definition_with_evidence(
+    module_id: &str,
+    title: &str,
+    company_id: u64,
+    decision_id: u64,
+    claim_id: u64,
+) -> String {
+    let mut value: serde_json::Value =
+        serde_json::from_str(&definition(module_id, title, None)).expect("valid definition");
+    value["evidenceBinding"] = json!({
+        "companyId": company_id.to_string(),
+        "decisionIds": [decision_id.to_string()],
+        "claimIds": [claim_id.to_string()],
+    });
+    value.to_string()
+}
+
+fn seed_decision(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    accept: bool,
+) -> Result<(u64, u64), String> {
+    record_ai_evidence_claim(
+        ctx,
+        organization_id,
+        company_id,
+        RecordAiEvidenceClaimParams {
+            kind: "concept".into(),
+            statement: "Use the reviewed presentation structure.".into(),
+            supporting_passage_ids: vec![],
+            contradicting_passage_ids: vec![],
+            calculation_ref: None,
+            assumptions: vec![],
+            contribution_id: None,
+            verification_method: "none".into(),
+            verification_outcome: "unverified".into(),
+            verification_note: None,
+            supersedes_claim_id: None,
+        },
+    )?;
+    let claim_id = ctx
+        .db
+        .ai_evidence_claim()
+        .ai_evidence_claim_by_org()
+        .filter(&organization_id)
+        .map(|claim| claim.id)
+        .max()
+        .ok_or("presentation evidence claim missing")?;
+    record_ai_evidence_decision(
+        ctx,
+        organization_id,
+        company_id,
+        RecordAiEvidenceDecisionParams {
+            title: "Adopt presentation structure".into(),
+            adopted_claim_ids: vec![claim_id],
+            supporting_claim_ids: vec![],
+            applicability: vec![],
+            alternatives: vec![],
+            adaptations: vec![],
+            assumptions: vec![],
+            rationale: "The reviewer selected this structure.".into(),
+            contribution_id: None,
+            supersedes_decision_id: None,
+        },
+    )?;
+    let decision_id = ctx
+        .db
+        .ai_evidence_decision()
+        .ai_evidence_decision_by_org()
+        .filter(&organization_id)
+        .map(|decision| decision.id)
+        .max()
+        .ok_or("presentation evidence decision missing")?;
+    if accept {
+        review_ai_evidence_decision(
+            ctx,
+            organization_id,
+            company_id,
+            decision_id,
+            ReviewAiEvidenceDecisionParams {
+                outcome: "accepted".into(),
+                note: Some("Accepted for the saved component.".into()),
+            },
+        )?;
+    }
+    Ok((claim_id, decision_id))
+}
+
+pub fn test_presentation_save_binds_evidence_atomically(
+    ctx: &ReducerContext,
+) -> Result<(), String> {
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let (claim_id, decision_id) =
+        seed_decision(ctx, fixture.organization_id, fixture.company_id, true)?;
+    save_presentation_module(
+        ctx,
+        fixture.organization_id,
+        None,
+        definition_with_evidence(
+            "evidence-bound",
+            "Evidence bound",
+            fixture.company_id,
+            decision_id,
+            claim_id,
+        ),
+    )?;
+    let version = ctx
+        .db
+        .presentation_module_version()
+        .iter()
+        .find(|version| {
+            version.organization_id == fixture.organization_id
+                && version.module_key == "evidence-bound"
+        })
+        .ok_or("evidence-bound presentation version missing")?;
+    let artifact_ref = format!("presentation-module-version:{}", version.id);
+    let component = ctx
+        .db
+        .ai_artifact_component()
+        .ai_artifact_component_by_artifact()
+        .filter((&fixture.organization_id, &artifact_ref))
+        .find(|component| component.component_key == "definition")
+        .ok_or("saved presentation component binding missing")?;
+    if component.content_hash != version.definition_hash
+        || component.decision_ids != vec![decision_id]
+        || component.claim_ids != vec![claim_id]
+    {
+        return Err("saved presentation component lineage mismatch".into());
+    }
+
+    let (unreviewed_claim_id, unreviewed_decision_id) =
+        seed_decision(ctx, fixture.organization_id, fixture.company_id, false)?;
+    let rejected = save_presentation_module(
+        ctx,
+        fixture.organization_id,
+        None,
+        definition_with_evidence(
+            "unreviewed-binding",
+            "Unreviewed binding",
+            fixture.company_id,
+            unreviewed_decision_id,
+            unreviewed_claim_id,
+        ),
+    );
+    if rejected.is_ok()
+        || ctx
+            .db
+            .presentation_module()
+            .iter()
+            .any(|module| module.module_key == "unreviewed-binding")
+    {
+        return Err("unreviewed component binding did not roll back its draft save".into());
+    }
+    Ok(())
 }
 
 pub fn test_presentation_module_revision_round_trip(ctx: &ReducerContext) -> Result<(), String> {

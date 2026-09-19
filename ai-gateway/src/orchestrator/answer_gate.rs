@@ -97,9 +97,7 @@ impl SourcePassage {
     fn effective_on(&self, as_of_micros: i64) -> bool {
         self.effective_from_micros
             .is_none_or(|from| as_of_micros >= from)
-            && self
-                .effective_to_micros
-                .is_none_or(|to| as_of_micros < to)
+            && self.effective_to_micros.is_none_or(|to| as_of_micros < to)
     }
 
     fn has_effective_dates(&self) -> bool {
@@ -412,7 +410,9 @@ impl EvidenceGatedAnswerAdmission<'_> {
         }
 
         // 2-4. Passage identity, status/effective dates, applicability.
-        let resolved = self.resolve_passages(&cited_passages, &mut findings).await?;
+        let resolved = self
+            .resolve_passages(&cited_passages, &mut findings)
+            .await?;
 
         // 5. Arithmetic.
         let mut provenance = AnswerProvenance::default();
@@ -461,7 +461,10 @@ impl EvidenceGatedAnswerAdmission<'_> {
     }
 }
 
-fn report(outcome: AnswerAdmissionOutcome, methods: Vec<VerificationMethod>) -> AnswerAdmissionReport {
+fn report(
+    outcome: AnswerAdmissionOutcome,
+    methods: Vec<VerificationMethod>,
+) -> AnswerAdmissionReport {
     AnswerAdmissionReport { outcome, methods }
 }
 
@@ -558,7 +561,10 @@ impl EvidenceGatedAnswerAdmission<'_> {
         if !passage.effective_on(as_of) {
             findings.add(
                 Severity::Blocked,
-                format!("'{}' is not effective as of the answer date", passage.label()),
+                format!(
+                    "'{}' is not effective as of the answer date",
+                    passage.label()
+                ),
             );
         } else if passage.status == PassageStatus::Superseded {
             findings.add(
@@ -608,7 +614,10 @@ impl EvidenceGatedAnswerAdmission<'_> {
             if declared.is_empty() {
                 findings.add(
                     Severity::Qualified,
-                    format!("'{}' does not declare its {key} applicability", passage.label()),
+                    format!(
+                        "'{}' does not declare its {key} applicability",
+                        passage.label()
+                    ),
                 );
             } else if !declared.iter().any(|tag| *tag == required) {
                 findings.add(
@@ -901,8 +910,12 @@ pub(super) fn collect_json_figures(value: &Value, out: &mut Vec<f64>) {
                 }
             }
         }
-        Value::Array(items) => items.iter().for_each(|item| collect_json_figures(item, out)),
-        Value::Object(map) => map.values().for_each(|item| collect_json_figures(item, out)),
+        Value::Array(items) => items
+            .iter()
+            .for_each(|item| collect_json_figures(item, out)),
+        Value::Object(map) => map
+            .values()
+            .for_each(|item| collect_json_figures(item, out)),
         Value::Null | Value::Bool(_) => {}
     }
 }
@@ -922,7 +935,10 @@ impl VerificationService for EvidenceBackedVerificationService {
         output: &ToolOutput,
         evidence: &[EvidenceRef],
     ) -> Result<VerificationOutcome> {
-        match ShapeOnlyVerificationService.verify(output, evidence).await? {
+        match ShapeOnlyVerificationService
+            .verify(output, evidence)
+            .await?
+        {
             VerificationOutcome::Verified => {}
             other => return Ok(other),
         }
@@ -1214,13 +1230,19 @@ mod tests {
         let checker = FixedChecker(ClaimSupport::Supported, Mutex::new(0));
         let d = draft(
             "The standard rate applies to goods.",
-            vec![claim("standard rate applies to goods", vec![cite("2", "s1")])],
+            vec![claim(
+                "standard rate applies to goods",
+                vec![cite("2", "s1")],
+            )],
         );
         let report = run_gate(&catalog, Some(&checker), &d, &["jurisdiction:US"], &[]).await;
         assert_eq!(report.outcome, AnswerAdmissionOutcome::Admitted);
         assert_eq!(
             report.methods,
-            vec![VerificationMethod::Deterministic, VerificationMethod::ModelAssisted]
+            vec![
+                VerificationMethod::Deterministic,
+                VerificationMethod::ModelAssisted
+            ]
         );
     }
 
@@ -1230,7 +1252,10 @@ mod tests {
         for support in [cite("9", "s1"), cite("2", "nope")] {
             let d = draft("x", vec![claim("c", vec![support])]);
             let report = run_gate(&catalog, None, &d, &[], &[]).await;
-            assert!(matches!(report.outcome, AnswerAdmissionOutcome::Blocked { .. }));
+            assert!(matches!(
+                report.outcome,
+                AnswerAdmissionOutcome::Blocked { .. }
+            ));
         }
     }
 
@@ -1272,7 +1297,10 @@ mod tests {
         for support in [cite("2", "s1"), cite("3", "s2")] {
             let d = draft("x", vec![claim("c", vec![support])]);
             let report = run_gate(&catalog, None, &d, &[], &[]).await;
-            assert!(matches!(report.outcome, AnswerAdmissionOutcome::Blocked { .. }));
+            assert!(matches!(
+                report.outcome,
+                AnswerAdmissionOutcome::Blocked { .. }
+            ));
         }
     }
 
@@ -1309,10 +1337,16 @@ mod tests {
         let d = draft("x", vec![claim("c", vec![cite("2", "s1")])]);
 
         let report = run_gate(&catalog, Some(&checker), &d, &["jurisdiction:EU"], &[]).await;
-        assert!(matches!(report.outcome, AnswerAdmissionOutcome::RequiresReview { .. }));
+        assert!(matches!(
+            report.outcome,
+            AnswerAdmissionOutcome::RequiresReview { .. }
+        ));
 
         let report = run_gate(&catalog, Some(&checker), &d, &["entity:llc"], &[]).await;
-        assert!(matches!(report.outcome, AnswerAdmissionOutcome::Qualified { .. }));
+        assert!(matches!(
+            report.outcome,
+            AnswerAdmissionOutcome::Qualified { .. }
+        ));
     }
 
     #[tokio::test]
@@ -1366,17 +1400,26 @@ mod tests {
             id: "analytics".into(),
         }];
         let report = run_gate(&catalog, None, &d, &[], &[]).await;
-        assert!(matches!(report.outcome, AnswerAdmissionOutcome::Qualified { .. }));
+        assert!(matches!(
+            report.outcome,
+            AnswerAdmissionOutcome::Qualified { .. }
+        ));
 
         // With no citation of any kind the answer needs review instead.
         let d = draft("x", vec![claim("no source", vec![])]);
         let report = run_gate(&catalog, None, &d, &[], &[]).await;
-        assert!(matches!(report.outcome, AnswerAdmissionOutcome::RequiresReview { .. }));
+        assert!(matches!(
+            report.outcome,
+            AnswerAdmissionOutcome::RequiresReview { .. }
+        ));
 
         // A supported claim with no checker must not be admitted.
         let d = draft("x", vec![claim("c", vec![cite("2", "s1")])]);
         let report = run_gate(&catalog, None, &d, &[], &[]).await;
-        assert!(matches!(report.outcome, AnswerAdmissionOutcome::RequiresReview { .. }));
+        assert!(matches!(
+            report.outcome,
+            AnswerAdmissionOutcome::RequiresReview { .. }
+        ));
         assert_eq!(report.methods, vec![VerificationMethod::Deterministic]);
     }
 
@@ -1392,7 +1435,10 @@ mod tests {
             ],
         );
         let report = run_gate(&catalog, Some(&checker), &d, &[], &[]).await;
-        assert!(matches!(report.outcome, AnswerAdmissionOutcome::Blocked { .. }));
+        assert!(matches!(
+            report.outcome,
+            AnswerAdmissionOutcome::Blocked { .. }
+        ));
     }
 
     #[tokio::test]
@@ -1402,11 +1448,17 @@ mod tests {
 
         let partial = FixedChecker(ClaimSupport::Partial, Mutex::new(0));
         let report = run_gate(&catalog, Some(&partial), &d, &[], &[]).await;
-        assert!(matches!(report.outcome, AnswerAdmissionOutcome::Qualified { .. }));
+        assert!(matches!(
+            report.outcome,
+            AnswerAdmissionOutcome::Qualified { .. }
+        ));
 
         let unsupported = FixedChecker(ClaimSupport::Unsupported, Mutex::new(0));
         let report = run_gate(&catalog, Some(&unsupported), &d, &[], &[]).await;
-        assert!(matches!(report.outcome, AnswerAdmissionOutcome::RequiresReview { .. }));
+        assert!(matches!(
+            report.outcome,
+            AnswerAdmissionOutcome::RequiresReview { .. }
+        ));
     }
 
     #[tokio::test]
@@ -1414,7 +1466,10 @@ mod tests {
         let catalog = MemoryCatalog(vec![passage("2", "s1", "t")]);
         let d = draft("x", vec![claim("c", vec![cite("2", "s1")])]);
         let report = run_gate(&catalog, Some(&FailingChecker), &d, &[], &[]).await;
-        assert!(matches!(report.outcome, AnswerAdmissionOutcome::RequiresReview { .. }));
+        assert!(matches!(
+            report.outcome,
+            AnswerAdmissionOutcome::RequiresReview { .. }
+        ));
 
         let claims = (0..3)
             .map(|i| claim(&format!("c{i}"), vec![cite("2", "s1")]))
@@ -1483,7 +1538,10 @@ mod tests {
             data_figures: &data,
         };
         let grounded = gate
-            .admit_with_report(&make("Revenue was $1,234.57, up 12.5%. We had 3 orders in 2024."), &evidence)
+            .admit_with_report(
+                &make("Revenue was $1,234.57, up 12.5%. We had 3 orders in 2024."),
+                &evidence,
+            )
             .await
             .unwrap();
         assert_eq!(grounded.outcome, AnswerAdmissionOutcome::Admitted);
@@ -1500,7 +1558,8 @@ mod tests {
 
     #[test]
     fn figure_extraction_handles_scale_percent_and_identifiers() {
-        let figures = extract_figures("PO42 shipped 3 units; total $1.5m, margin 12.50%, 15,000 units");
+        let figures =
+            extract_figures("PO42 shipped 3 units; total $1.5m, margin 12.50%, 15,000 units");
         let raws: Vec<_> = figures.iter().map(|f| f.raw.as_str()).collect();
         assert_eq!(raws, vec!["3", "1.5m", "12.50%", "15,000"]);
         assert_eq!(figures[1].value, 1_500_000.0);
@@ -1529,7 +1588,10 @@ mod tests {
 
         let mut odd = row.clone();
         odd["status"] = json!("restored");
-        assert_eq!(passage_from_row(&odd).unwrap().status, PassageStatus::Withdrawn);
+        assert_eq!(
+            passage_from_row(&odd).unwrap().status,
+            PassageStatus::Withdrawn
+        );
 
         let mut missing = row;
         missing.as_object_mut().unwrap().remove("passageText");
@@ -1547,7 +1609,10 @@ mod tests {
     #[test]
     fn json_figures_include_numeric_strings() {
         let mut out = Vec::new();
-        collect_json_figures(&json!({"a": 1.5, "b": ["2,500.25", "n/a"], "c": {"d": 7}}), &mut out);
+        collect_json_figures(
+            &json!({"a": 1.5, "b": ["2,500.25", "n/a"], "c": {"d": 7}}),
+            &mut out,
+        );
         out.sort_by(|a, b| a.partial_cmp(b).unwrap());
         assert_eq!(out, vec![1.5, 7.0, 2500.25]);
     }
@@ -1564,7 +1629,11 @@ mod tests {
     #[tokio::test]
     async fn verification_rejects_degraded_inconsistent_and_untraceable_output() {
         let service = EvidenceBackedVerificationService;
-        let degraded = output(json!({"snapshots": [], "retrieval_degraded": true}), Some(0), vec![]);
+        let degraded = output(
+            json!({"snapshots": [], "retrieval_degraded": true}),
+            Some(0),
+            vec![],
+        );
         assert!(matches!(
             service.verify(&degraded, &[]).await.unwrap(),
             VerificationOutcome::RequiresReview { .. }
@@ -1636,7 +1705,9 @@ mod tests {
             ("unsupported", ClaimSupport::Unsupported),
         ] {
             let reviewer = ScriptedReviewer(choice);
-            let checker = DecisionClaimCoverageChecker { reviewer: &reviewer };
+            let checker = DecisionClaimCoverageChecker {
+                reviewer: &reviewer,
+            };
             let verdict = checker.check("claim", &[&p]).await.unwrap();
             assert_eq!(verdict.support, expected);
         }

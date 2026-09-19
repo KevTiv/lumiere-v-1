@@ -71,14 +71,19 @@ pub fn validate_tags(name: &str, tags: &[String]) -> Result<(), String> {
         return Err(format!("{name} allows at most {MAX_TAGS} tags"));
     }
     for tag in tags {
-        let well_formed = tag
-            .split_once(':')
-            .is_some_and(|(key, value)| !key.trim().is_empty() && !value.trim().is_empty());
+        let well_formed = tag.split_once(':').is_some_and(|(key, value)| {
+            !key.is_empty() && !value.is_empty() && key.trim() == key && value.trim() == value
+        });
         if !well_formed || tag.len() > MAX_TAG_LEN {
             return Err(format!(
                 "{name} tag '{tag}' must be 'key:value' and at most {MAX_TAG_LEN} bytes"
             ));
         }
+    }
+    let mut sorted = tags.to_vec();
+    sorted.sort_unstable();
+    if sorted.windows(2).any(|pair| pair[0] == pair[1]) {
+        return Err(format!("{name} must not contain duplicate tags"));
     }
     Ok(())
 }
@@ -118,15 +123,40 @@ pub fn validate_coordinates(coordinates: &[String]) -> Result<(), String> {
         return Err(format!("coordinates allow at most {MAX_TAGS} entries"));
     }
     for coordinate in coordinates {
-        let well_formed = coordinate
-            .split_once(':')
-            .is_some_and(|(kind, rest)| KINDS.contains(&kind) && !rest.trim().is_empty());
+        let well_formed = coordinate.split_once(':').is_some_and(|(kind, rest)| {
+            if !KINDS.contains(&kind) || rest.is_empty() || rest.trim() != rest {
+                return false;
+            }
+            match kind {
+                "page" | "line" => rest.parse::<u64>().is_ok_and(|value| value > 0),
+                "chars" => rest.split_once('-').is_some_and(|(start, end)| {
+                    start
+                        .parse::<u64>()
+                        .ok()
+                        .zip(end.parse::<u64>().ok())
+                        .is_some_and(|(start, end)| start < end)
+                }),
+                "record" => rest.split_once(':').is_some_and(|(table, identity)| {
+                    !table.is_empty()
+                        && identity
+                            .split_once('@')
+                            .is_some_and(|(id, revision)| !id.is_empty() && !revision.is_empty())
+                }),
+                "section" | "table" => true,
+                _ => false,
+            }
+        });
         if !well_formed || coordinate.len() > MAX_TAG_LEN {
             return Err(format!(
                 "coordinate '{coordinate}' must be '<{}>:<locator>' and at most {MAX_TAG_LEN} bytes",
                 KINDS.join("|")
             ));
         }
+    }
+    let mut sorted = coordinates.to_vec();
+    sorted.sort_unstable();
+    if sorted.windows(2).any(|pair| pair[0] == pair[1]) {
+        return Err("coordinates must not contain duplicates".to_string());
     }
     Ok(())
 }
@@ -178,10 +208,32 @@ mod tests {
     #[test]
     fn coordinates_allow_unknown_and_reject_malformed() {
         assert!(validate_coordinates(&[]).is_ok());
-        assert!(validate_coordinates(&["page:12".into(), "section:3.2".into()]).is_ok());
+        assert!(validate_coordinates(&[
+            "page:12".into(),
+            "section:3.2".into(),
+            "chars:10-20".into(),
+            "record:invoice:42@rev7".into(),
+        ])
+        .is_ok());
         assert!(validate_coordinates(&["page:".into()]).is_err());
+        assert!(validate_coordinates(&["page:zero".into()]).is_err());
+        assert!(validate_coordinates(&["chars:20-10".into()]).is_err());
+        assert!(validate_coordinates(&["record:invoice:42".into()]).is_err());
+        assert!(validate_coordinates(&["page:1".into(), "page:1".into()]).is_err());
         assert!(validate_coordinates(&["paragraph:4".into()]).is_err());
         assert!(validate_coordinates(&["no-colon".into()]).is_err());
+    }
+
+    #[test]
+    fn tags_are_exact_and_unique() {
+        assert!(validate_tags("scope", &["jurisdiction:US".into()]).is_ok());
+        assert!(validate_tags("scope", &[" jurisdiction:US".into()]).is_err());
+        assert!(validate_tags("scope", &["jurisdiction: US".into()]).is_err());
+        assert!(validate_tags(
+            "scope",
+            &["jurisdiction:US".into(), "jurisdiction:US".into()]
+        )
+        .is_err());
     }
 
     #[test]

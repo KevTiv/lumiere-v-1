@@ -47,6 +47,7 @@ fn draft() -> ModuleDraft {
         base_revision: None,
         application_contract: "contracts-v1".into(),
         component_catalog_version: 7,
+        evidence_binding: None,
         pages: vec![PageDefinition {
             id: "home".into(),
             title: "Home".into(),

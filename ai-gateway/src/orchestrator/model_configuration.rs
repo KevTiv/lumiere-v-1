@@ -13,10 +13,7 @@ use serde::Deserialize;
 use serde_json::Value;
 use stdb_client::StdbClient;
 
-use crate::{
-    ai_agent::ResolvedAgentConfig,
-    providers::llm::normalize_provider,
-};
+use crate::{ai_agent::ResolvedAgentConfig, providers::llm::normalize_provider};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub(super) enum IntelligenceRole {
@@ -367,7 +364,10 @@ impl<'a> IntelligenceRouteResolver<'a> {
         let mut shadows = Vec::new();
         if role == IntelligenceRole::Decision {
             for reference in policy.shadow_refs(decision_type) {
-                shadows.push(self.load_profile(reference, IntelligenceRole::Shadow).await?);
+                shadows.push(
+                    self.load_profile(reference, IntelligenceRole::Shadow)
+                        .await?,
+                );
             }
         }
 
@@ -380,10 +380,7 @@ impl<'a> IntelligenceRouteResolver<'a> {
         })
     }
 
-    pub async fn validate_review_independence(
-        &self,
-        decision_type: &str,
-    ) -> Result<()> {
+    pub async fn validate_review_independence(&self, decision_type: &str) -> Result<()> {
         let policy_key = self
             .policy_key
             .as_deref()
@@ -393,11 +390,8 @@ impl<'a> IntelligenceRouteResolver<'a> {
             .policy(self.organization_id, policy_key, self.policy_version)
             .await?
             .context("governed review independence policy not found")?;
-        let (
-            mut require_distinct_profile,
-            require_distinct_provider,
-            mut prefer_distinct_provider,
-        ) = policy.review_independence(Some(decision_type));
+        let (mut require_distinct_profile, require_distinct_provider, mut prefer_distinct_provider) =
+            policy.review_independence(Some(decision_type));
         if self.require_policy
             && !require_distinct_profile
             && !require_distinct_provider
@@ -415,8 +409,12 @@ impl<'a> IntelligenceRouteResolver<'a> {
 
         let decision_ref = policy.primary_ref(IntelligenceRole::Decision, Some(decision_type))?;
         let review_ref = policy.primary_ref(IntelligenceRole::Review, Some(decision_type))?;
-        let decision = self.load_profile(&decision_ref, IntelligenceRole::Decision).await?;
-        let review = self.load_profile(&review_ref, IntelligenceRole::Review).await?;
+        let decision = self
+            .load_profile(&decision_ref, IntelligenceRole::Decision)
+            .await?;
+        let review = self
+            .load_profile(&review_ref, IntelligenceRole::Review)
+            .await?;
 
         if require_distinct_profile && decision.reference == review.reference {
             bail!(
@@ -502,10 +500,7 @@ impl IntelligencePolicy {
         self.fallbacks.get(&role).map(Vec::as_slice).unwrap_or(&[])
     }
 
-    fn review_independence(
-        &self,
-        decision_type: Option<&str>,
-    ) -> (bool, bool, bool) {
+    fn review_independence(&self, decision_type: Option<&str>) -> (bool, bool, bool) {
         decision_type
             .and_then(|name| self.overrides.get(name))
             .map(|override_| {
@@ -574,8 +569,8 @@ fn decode_policy(row: &Value) -> Result<IntelligencePolicy> {
         );
     }
 
-    let overrides_raw = row_string(row, "decisionTypeOverridesJson")
-        .unwrap_or_else(|| "{}".to_string());
+    let overrides_raw =
+        row_string(row, "decisionTypeOverridesJson").unwrap_or_else(|| "{}".to_string());
     let overrides_wire: HashMap<String, DecisionTypeOverrideWire> =
         serde_json::from_str(&overrides_raw).context("parse decision type overrides")?;
     let mut overrides = HashMap::new();
@@ -583,8 +578,16 @@ fn decode_policy(row: &Value) -> Result<IntelligencePolicy> {
         overrides.insert(
             name,
             DecisionTypeOverride {
-                primary: wire.primary.as_deref().map(ModelProfileRef::parse).transpose()?,
-                review: wire.review.as_deref().map(ModelProfileRef::parse).transpose()?,
+                primary: wire
+                    .primary
+                    .as_deref()
+                    .map(ModelProfileRef::parse)
+                    .transpose()?,
+                review: wire
+                    .review
+                    .as_deref()
+                    .map(ModelProfileRef::parse)
+                    .transpose()?,
                 shadows: wire
                     .shadows
                     .iter()
@@ -597,8 +600,7 @@ fn decode_policy(row: &Value) -> Result<IntelligencePolicy> {
         );
     }
 
-    let fallbacks_raw =
-        row_string(row, "fallbackProfilesJson").unwrap_or_else(|| "{}".to_string());
+    let fallbacks_raw = row_string(row, "fallbackProfilesJson").unwrap_or_else(|| "{}".to_string());
     let fallback_wire: HashMap<String, Vec<String>> =
         serde_json::from_str(&fallbacks_raw).context("parse fallback profile map")?;
     let mut fallbacks = HashMap::new();
@@ -694,7 +696,6 @@ fn row_string_list(row: &Value, key: &str) -> Vec<String> {
         })
         .unwrap_or_default()
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -868,7 +869,10 @@ mod tests {
     #[tokio::test]
     async fn resolves_default_profile_by_intelligence_role() {
         let store = FakeStore::new();
-        store.insert_profile(9, profile("decision", IntelligenceRole::Decision, "decision-model"));
+        store.insert_profile(
+            9,
+            profile("decision", IntelligenceRole::Decision, "decision-model"),
+        );
         store.insert_policy(9, policy());
 
         let resolver = IntelligenceRouteResolver::new(&store, 9, &agent(), None).unwrap();
@@ -884,9 +888,18 @@ mod tests {
     #[tokio::test]
     async fn resolves_shadow_profiles_only_for_decision_role() {
         let store = FakeStore::new();
-        store.insert_profile(9, profile("decision", IntelligenceRole::Decision, "decision-model"));
-        store.insert_profile(9, profile("reasoning", IntelligenceRole::Reasoning, "reasoning-model"));
-        store.insert_profile(9, profile("shadow-a", IntelligenceRole::Shadow, "shadow-a-model"));
+        store.insert_profile(
+            9,
+            profile("decision", IntelligenceRole::Decision, "decision-model"),
+        );
+        store.insert_profile(
+            9,
+            profile("reasoning", IntelligenceRole::Reasoning, "reasoning-model"),
+        );
+        store.insert_profile(
+            9,
+            profile("shadow-a", IntelligenceRole::Shadow, "shadow-a-model"),
+        );
         let mut with_shadows = policy();
         with_shadows.shadows = vec![ModelProfileRef {
             key: "shadow-a".to_string(),
@@ -915,8 +928,14 @@ mod tests {
     #[tokio::test]
     async fn decision_type_override_changes_profile_not_program_semantics() {
         let store = FakeStore::new();
-        store.insert_profile(9, profile("decision", IntelligenceRole::Decision, "decision-model"));
-        store.insert_profile(9, profile("fraud", IntelligenceRole::Decision, "fraud-model"));
+        store.insert_profile(
+            9,
+            profile("decision", IntelligenceRole::Decision, "decision-model"),
+        );
+        store.insert_profile(
+            9,
+            profile("fraud", IntelligenceRole::Decision, "fraud-model"),
+        );
         store.insert_policy(9, policy());
 
         let resolver = IntelligenceRouteResolver::new(&store, 9, &agent(), None).unwrap();
@@ -946,8 +965,14 @@ mod tests {
     #[tokio::test]
     async fn required_distinct_review_provider_rejects_same_provider() {
         let store = FakeStore::new();
-        store.insert_profile(9, profile("decision", IntelligenceRole::Decision, "decision-model"));
-        store.insert_profile(9, profile("review", IntelligenceRole::Review, "review-model"));
+        store.insert_profile(
+            9,
+            profile("decision", IntelligenceRole::Decision, "decision-model"),
+        );
+        store.insert_profile(
+            9,
+            profile("review", IntelligenceRole::Review, "review-model"),
+        );
         let mut policy = policy();
         policy.overrides.insert(
             "PaymentDisposition".to_string(),
@@ -967,7 +992,9 @@ mod tests {
             .validate_review_independence("PaymentDisposition")
             .await
             .unwrap_err();
-        assert!(error.to_string().contains("review provider must be distinct"));
+        assert!(error
+            .to_string()
+            .contains("review provider must be distinct"));
     }
 
     #[tokio::test]
@@ -1002,8 +1029,7 @@ mod tests {
     #[tokio::test]
     async fn governed_resolver_fails_closed_when_default_policy_is_absent() {
         let store = FakeStore::new();
-        let resolver =
-            IntelligenceRouteResolver::new_governed(&store, 9, &agent(), None).unwrap();
+        let resolver = IntelligenceRouteResolver::new_governed(&store, 9, &agent(), None).unwrap();
         let error = resolver
             .resolve(IntelligenceRole::Decision, Some("ReportAttentionNeed"))
             .await

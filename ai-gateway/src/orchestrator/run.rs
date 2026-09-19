@@ -19,7 +19,8 @@ use crate::{
         ActorCredentials,
     },
     orchestrator::skill_loader::{
-        complete_run, create_run, load_run_key, load_skill, resume_run, set_run_wait_state, LoadedSkill,
+        complete_run, create_run, load_run_key, load_skill, resume_run, set_run_wait_state,
+        LoadedSkill,
     },
     providers::llm::{LlmMessage, LlmRequest},
     state::AppState,
@@ -34,21 +35,16 @@ use super::{
     agent_loop_adapters::{
         run_finalization, run_recorded_loop, AuthorizedLoopTools, RunFinalization,
     },
-    decision_graph::{DecisionGraph, DecisionNode, GateCondition},
-    decision_type::{DecisionTypeRegistry, StdbDecisionTypeRegistry},
-    graduation::{
-        production_deterministic_candidates, GovernedDecisionResolver,
-        StdbAuthorityRollbackRecorder, StdbDecisionResolutionPolicy, StdbDriftMonitor,
-        StdbModelShadowRecorder,
-    },
     answer_gate::{
         DecisionClaimCoverageChecker, EvidenceBackedVerificationService,
         EvidenceGatedAnswerAdmission, GatePolicy, GateScope, StdbPassageCatalog,
     },
+    decision_graph::{DecisionGraph, DecisionNode, GateCondition},
+    decision_type::{DecisionTypeRegistry, StdbDecisionTypeRegistry},
     evidence_inspector::Viewer,
-    evidence_recorder::{RecordingAnswerAdmission, RunEvidenceScope, StdbEvidenceRecorder},
-    knowledge_context::{compile_knowledge_context, knowledge_entry_keys, merge_into_inputs},
-    text_answer_gate::{evidence_from_transcript, gate_text_answer, TextAnswerVerification},
+    evidence_recorder::{
+        AnswerEvidenceRecorder, RecordingAnswerAdmission, RunEvidenceScope, StdbEvidenceRecorder,
+    },
     governed_program::{
         graph_requests_generated_capabilities, BuiltinComputeService, GovernedProgramContext,
         GovernedProgramExecutor, GovernedProgramStop, StdbIntelligenceEventRecorder,
@@ -59,17 +55,31 @@ use super::{
         GovernedCapabilityService, PolicyBackedCapabilityAdmission, StdbApprovalCoordinator,
         StdbExecutionRecovery, ToolsBackedCapabilityExecutor,
     },
+    graduation::{
+        production_deterministic_candidates, GovernedDecisionResolver,
+        StdbAuthorityRollbackRecorder, StdbDecisionResolutionPolicy, StdbDriftMonitor,
+        StdbModelShadowRecorder,
+    },
     intelligence::EvidenceRef,
     intelligence_router::{
         ConfiguredIntelligenceRouter, NoopShadowDecisionRecorder, RoutedDecisionProvider,
         RoutedGenerationProvider, RoutedReasoningProvider, StdbShadowDecisionRecorder,
     },
     invocation_policy::ReviewedInvocationPolicy,
-    model_configuration::{IntelligenceRole, IntelligenceRouteResolver, StdbModelConfigurationStore},
+    knowledge_context::{compile_knowledge_context, knowledge_entry_keys, merge_into_inputs},
+    model_configuration::{
+        IntelligenceRole, IntelligenceRouteResolver, StdbModelConfigurationStore,
+    },
     precedent::StdbPrecedentStore,
     probabilistic::{CalibrationProfileStore, StdbCalibrationProfileStore},
-    run_review::{RunReviewDisposition, RunReviewProgram, RunReviewRecorder, StdbRunReviewRecorder},
+    run_review::{
+        RunReviewDisposition, RunReviewProgram, RunReviewRecorder, StdbRunReviewRecorder,
+    },
     spend_admission::{spend_binding_from_agent, StdbSpendLedger},
+    text_answer_gate::{
+        evidence_from_transcript, gate_text_answer, TextAnswerOutcome, TextAnswerProvenance,
+        TextAnswerVerification,
+    },
 };
 
 const DEFAULT_MAX_STEPS: u32 = 5;
@@ -92,7 +102,10 @@ fn required_applicability(config: &Value) -> Result<Vec<String>> {
         .map(|tag| {
             let tag = tag
                 .as_str()
-                .filter(|tag| tag.split_once(':').is_some_and(|(k, v)| !k.is_empty() && !v.is_empty()))
+                .filter(|tag| {
+                    tag.split_once(':')
+                        .is_some_and(|(k, v)| !k.is_empty() && !v.is_empty())
+                })
                 .with_context(|| {
                     format!("requiredApplicability entry {tag} must be a 'key:value' string")
                 })?;
@@ -155,6 +168,10 @@ pub struct RunSkillResponse {
     /// never the raw candidate.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub verification: Option<TextAnswerVerification>,
+    /// Claim-level support, calculations, and durable recording state for a
+    /// direct-loop answer.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub provenance: Option<TextAnswerProvenance>,
 }
 
 pub async fn run_skill(state: &AppState, req: RunSkillRequest) -> Result<RunSkillResponse> {
@@ -502,6 +519,7 @@ pub async fn run_skill_unlocked(
         skill_key: skill.skill_key,
         evidence_claim_ids: Vec::new(),
         verification: None,
+        provenance: None,
     })
 }
 
@@ -597,6 +615,7 @@ pub async fn run_skill_admitted(
         .filter(|s| !s.trim().is_empty())
         .unwrap_or("0000000000000000000000000000000000000000000000000000000000000000")
         .to_string();
+    let is_resume = req.resume_run_id.is_some();
     let (run_id, run_key) = if let Some(resume_run_id) = req.resume_run_id {
         validate_resume_identity(
             &stdb,
@@ -608,9 +627,7 @@ pub async fn run_skill_admitted(
             &inputs_json,
         )
         .await?;
-        let run_key =
-            load_run_key(&stdb, req.org_id, req.company_id, resume_run_id).await?;
-        resume_run(&stdb, req.org_id, req.company_id, resume_run_id).await?;
+        let run_key = load_run_key(&stdb, req.org_id, req.company_id, resume_run_id).await?;
         (resume_run_id, run_key)
     } else {
         let run_key = Uuid::new_v4().to_string();
@@ -666,7 +683,10 @@ pub async fn run_skill_admitted(
         input: req.inputs.clone(),
         plan,
     };
-    let engine = PolicyEngine::new(SkillRegistry::exact(manifest.clone()), ResourceRegistry::built_in());
+    let engine = PolicyEngine::new(
+        SkillRegistry::exact(manifest.clone()),
+        ResourceRegistry::built_in(),
+    );
     let policy = ReviewedInvocationPolicy::new(engine, base, reviewed_calls)?;
 
     let tool_ctx = ToolContext {
@@ -832,13 +852,8 @@ pub async fn run_skill_admitted(
         let calibration = StdbCalibrationProfileStore {
             reader: tool_ctx.stdb.as_ref(),
         };
-        validate_governed_runtime_configuration(
-            req.org_id,
-            &graph,
-            &decision_types,
-            &calibration,
-        )
-        .await?;
+        validate_governed_runtime_configuration(req.org_id, &graph, &decision_types, &calibration)
+            .await?;
         let deterministic_candidates = production_deterministic_candidates();
         let decision_resolution_policy = StdbDecisionResolutionPolicy {
             reader: tool_ctx.stdb.as_ref(),
@@ -902,6 +917,10 @@ pub async fn run_skill_admitted(
             Viewer {
                 organization_id: req.org_id,
                 company_id: req.company_id,
+                actor_identity: req
+                    .triggered_by_hex
+                    .as_deref()
+                    .and_then(super::evidence_inspector::ActorIdentity::parse),
             },
             &knowledge_entry_keys(&skill.config_json)?,
         )
@@ -921,6 +940,15 @@ pub async fn run_skill_admitted(
             bounded_state: governed_inputs,
             evidence: run_evidence,
         };
+        if is_resume {
+            checkpoint_store
+                .validate_resume(&program_context, &graph)
+                .await?;
+            // This mutation happens only after the current actor, skill,
+            // bounded inputs, graph and knowledge/source dependencies have
+            // all been re-authorized and matched to the immutable checkpoint.
+            resume_run(&stdb, req.org_id, req.company_id, run_id).await?;
+        }
         let program = executor.run(&graph, &program_context).await?;
         let evidence_claim_ids = recording_admission
             .recorded
@@ -984,6 +1012,7 @@ pub async fn run_skill_admitted(
                     skill_key: skill.skill_key,
                     evidence_claim_ids,
                     verification: None,
+                    provenance: None,
                 });
             }
         }
@@ -1043,12 +1072,9 @@ pub async fn run_skill_admitted(
                 .await?;
                 ("agent_settled".to_string(), reason.clone(), None)
             }
-            GovernedProgramStop::Denied(reason)
-            | GovernedProgramStop::UnableToProgress(reason) => (
-                "failed".to_string(),
-                reason.clone(),
-                Some(reason.clone()),
-            ),
+            GovernedProgramStop::Denied(reason) | GovernedProgramStop::UnableToProgress(reason) => {
+                ("failed".to_string(), reason.clone(), Some(reason.clone()))
+            }
         };
 
         if matches!(status.as_str(), "completed" | "failed") {
@@ -1090,6 +1116,7 @@ pub async fn run_skill_admitted(
             skill_key: skill.skill_key,
             evidence_claim_ids,
             verification: None,
+            provenance: None,
         });
     }
 
@@ -1100,6 +1127,14 @@ pub async fn run_skill_admitted(
         max_unchanged_results: 3,
     };
 
+    let mut direct_request = req.llm_request;
+    direct_request.system.push_str(
+        r#"
+
+For the final answer, return only JSON shaped as
+{"content":"complete answer text","claims":[{"text":"an exact non-overlapping segment of content","supportRefs":[{"kind":"tool_result","id":"exact tool_call_id"}],"passageSupport":[]}],"calculations":[]}.
+Claim texts concatenated in order must cover all content. Use only successful tool-result ids from this run. Never cite a display snippet or invent a support id."#,
+    );
     let outcome = run_recorded_loop(
         state.providers.llm.as_ref(),
         &ledger,
@@ -1107,13 +1142,52 @@ pub async fn run_skill_admitted(
         &view,
         &policy,
         &tool_ctx,
-        req.llm_request,
+        direct_request,
         limits,
     )
     .await?;
 
-    let (summary, verification) =
-        summarize_loop_stop(req.org_id, req.company_id, &outcome.stop, &outcome.transcript).await?;
+    let (mut summary, mut verification, mut provenance, durable_provenance) = summarize_loop_stop(
+        req.org_id,
+        req.company_id,
+        &outcome.stop,
+        &outcome.transcript,
+    )
+    .await?;
+    let mut evidence_claim_ids = Vec::new();
+    if let (Some(provenance), Some(durable_provenance)) =
+        (provenance.as_mut(), durable_provenance.as_ref())
+    {
+        let transient_support_only = provenance
+            .claims
+            .iter()
+            .any(|claim| !claim.support_refs.is_empty() && claim.passage_support.is_empty());
+        if transient_support_only {
+            let reason = "run-evidence support has no durable passage binding and was not recorded";
+            withhold_direct_answer(&mut summary, &mut verification, provenance, reason);
+        } else {
+            let recorder = StdbEvidenceRecorder {
+                writer: state.stdb.as_ref(),
+                reader: spend_reader,
+            };
+            let scope = RunEvidenceScope {
+                organization_id: req.org_id,
+                company_id: req.company_id,
+                run_id,
+            };
+            match recorder.record(&scope, durable_provenance).await {
+                Ok(recorded) => {
+                    evidence_claim_ids = recorded.claim_ids.clone();
+                    provenance.mark_persisted(recorded.contribution_id, recorded.claim_ids);
+                }
+                Err(error) => {
+                    tracing::warn!(run_id, error = %error, "direct-loop provenance was not recorded");
+                    let reason = "answer provenance could not be recorded";
+                    withhold_direct_answer(&mut summary, &mut verification, provenance, reason);
+                }
+            }
+        }
+    }
     let status = match run_finalization(&outcome.stop) {
         RunFinalization::Wait { status, .. } => status.to_string(),
         RunFinalization::Failed { error_code } => error_code.to_string(),
@@ -1129,9 +1203,26 @@ pub async fn run_skill_admitted(
         steps: Vec::new(),
         agent_id: agent.agent_id,
         skill_key: skill.skill_key,
-        evidence_claim_ids: Vec::new(),
+        evidence_claim_ids,
         verification,
+        provenance,
     })
+}
+
+fn withhold_direct_answer(
+    summary: &mut String,
+    verification: &mut Option<TextAnswerVerification>,
+    provenance: &mut TextAnswerProvenance,
+    reason: &str,
+) {
+    *summary = format!("This answer could not be verified and was withheld: {reason}");
+    *verification = Some(TextAnswerVerification {
+        outcome: TextAnswerOutcome::RequiresReview,
+        methods: vec!["deterministic"],
+        limitations: Vec::new(),
+        reason: Some(reason.to_string()),
+    });
+    provenance.redact_for_withholding(reason);
 }
 
 /// What the direct-execution loop may return for how it stopped.
@@ -1146,7 +1237,12 @@ async fn summarize_loop_stop(
     company_id: u64,
     stop: &LoopStop,
     transcript: &[crate::providers::llm::LlmMessage],
-) -> Result<(String, Option<TextAnswerVerification>)> {
+) -> Result<(
+    String,
+    Option<TextAnswerVerification>,
+    Option<TextAnswerProvenance>,
+    Option<super::answer_gate::AnswerProvenance>,
+)> {
     match stop {
         LoopStop::CandidateFinal(answer) => {
             let gated = gate_text_answer(
@@ -1160,9 +1256,14 @@ async fn summarize_loop_stop(
                 .released
                 .clone()
                 .unwrap_or_else(|| gated.withheld_notice());
-            Ok((text, Some(gated.verification)))
+            Ok((
+                text,
+                Some(gated.verification),
+                Some(gated.provenance),
+                Some(gated.durable_provenance),
+            ))
         }
-        stop => Ok((format!("agent loop stopped: {stop:?}"), None)),
+        stop => Ok((format!("agent loop stopped: {stop:?}"), None, None, None)),
     }
 }
 
@@ -1181,7 +1282,9 @@ async fn validate_resume_identity(
         ))
         .await
         .context("load governed run resume identity")?;
-    let row = rows.first().context("governed run to resume was not found")?;
+    let row = rows
+        .first()
+        .context("governed run to resume was not found")?;
     let stored_skill_id = row
         .get("skillId")
         .or_else(|| row.get("skill_id"))
@@ -1396,18 +1499,13 @@ mod tests {
     async fn governed_runtime_preflight_never_bootstraps_missing_calibration() {
         let decision_types =
             super::super::decision_type::InMemoryDecisionTypeRegistry::with_builtins();
-        let calibration =
-            super::super::probabilistic::InMemoryCalibrationProfileStore::new();
+        let calibration = super::super::probabilistic::InMemoryCalibrationProfileStore::new();
         let graph = super::super::governed_programs::report_analysis_graph();
 
-        let error = validate_governed_runtime_configuration(
-            9,
-            &graph,
-            &decision_types,
-            &calibration,
-        )
-        .await
-        .unwrap_err();
+        let error =
+            validate_governed_runtime_configuration(9, &graph, &decision_types, &calibration)
+                .await
+                .unwrap_err();
         assert!(error.to_string().contains("run governed bootstrap first"));
 
         calibration
@@ -1420,14 +1518,9 @@ mod tests {
             })
             .unwrap();
 
-        validate_governed_runtime_configuration(
-            9,
-            &graph,
-            &decision_types,
-            &calibration,
-        )
-        .await
-        .unwrap();
+        validate_governed_runtime_configuration(9, &graph, &decision_types, &calibration)
+            .await
+            .unwrap();
     }
 
     #[test]
@@ -1446,7 +1539,7 @@ mod tests {
 
         // No successful tool result: the candidate is withheld, and its text
         // appears nowhere in what is returned.
-        let (summary, verification) = summarize_loop_stop(
+        let (summary, verification, _, _) = summarize_loop_stop(
             1,
             2,
             &candidate,
@@ -1456,9 +1549,24 @@ mod tests {
         .unwrap();
         assert!(!summary.contains("88,888.88"), "{summary}");
         assert!(summary.contains("withheld"), "{summary}");
-        assert_eq!(verification.unwrap().outcome, TextAnswerOutcome::RequiresReview);
+        assert_eq!(
+            verification.unwrap().outcome,
+            TextAnswerOutcome::RequiresReview
+        );
 
-        // Grounded in a tool result: released as written.
+        // Grounded in a tool result: structured support is released.
+        let structured_candidate = LoopStop::CandidateFinal(
+            json!({
+                "content": "Revenue was $88,888.88 last month.",
+                "claims": [{
+                    "text": "Revenue was $88,888.88 last month.",
+                    "supportRefs": [{"kind": "tool_result", "id": "call-1"}],
+                    "passageSupport": []
+                }],
+                "calculations": []
+            })
+            .to_string(),
+        );
         let grounded = vec![
             LlmMessage::text("user", "How was revenue?"),
             LlmMessage::ToolResult {
@@ -1467,9 +1575,42 @@ mod tests {
                 content: json!({ "summary": "ok", "data": { "total": 88888.88 } }).to_string(),
             },
         ];
-        let (summary, verification) = summarize_loop_stop(1, 2, &candidate, &grounded).await.unwrap();
+        let (mut summary, mut verification, provenance, _) =
+            summarize_loop_stop(1, 2, &structured_candidate, &grounded)
+                .await
+                .unwrap();
         assert_eq!(summary, "Revenue was $88,888.88 last month.");
-        assert_eq!(verification.unwrap().outcome, TextAnswerOutcome::Admitted);
+        assert_eq!(
+            verification.as_ref().unwrap().outcome,
+            TextAnswerOutcome::Admitted
+        );
+        let mut provenance = provenance.unwrap();
+        assert!(!provenance.persisted);
+
+        // A post-gate persistence downgrade must scrub the candidate from the
+        // complete API response, not only replace its summary.
+        withhold_direct_answer(
+            &mut summary,
+            &mut verification,
+            &mut provenance,
+            "provenance recording failed",
+        );
+        let response = RunSkillResponse {
+            run_id: 1,
+            run_key: "run".into(),
+            status: "agent_settled".into(),
+            summary,
+            artifacts: Vec::new(),
+            citations: Vec::new(),
+            steps: Vec::new(),
+            agent_id: 1,
+            skill_key: "test".into(),
+            evidence_claim_ids: Vec::new(),
+            verification,
+            provenance: Some(provenance),
+        };
+        let serialized = serde_json::to_string(&response).unwrap();
+        assert!(!serialized.contains("88,888.88"), "{serialized}");
 
         // A figure the tool never produced qualifies, with the caveat attached.
         let mismatched = vec![
@@ -1480,18 +1621,25 @@ mod tests {
                 content: json!({ "summary": "ok", "data": { "total": 1000.5 } }).to_string(),
             },
         ];
-        let (summary, verification) = summarize_loop_stop(1, 2, &candidate, &mismatched).await.unwrap();
+        let (summary, verification, _, _) =
+            summarize_loop_stop(1, 2, &structured_candidate, &mismatched)
+                .await
+                .unwrap();
         assert!(summary.contains("Limitations of this answer:"), "{summary}");
         assert_eq!(verification.unwrap().outcome, TextAnswerOutcome::Qualified);
     }
 
     #[tokio::test]
     async fn non_answer_stops_carry_no_candidate_text_or_verdict() {
-        let (summary, verification) = summarize_loop_stop(1, 2, &LoopStop::RoundLimit, &[]).await.unwrap();
+        let (summary, verification, provenance, durable) =
+            summarize_loop_stop(1, 2, &LoopStop::RoundLimit, &[])
+                .await
+                .unwrap();
         assert_eq!(summary, "agent loop stopped: RoundLimit");
         assert!(verification.is_none());
+        assert!(provenance.is_none());
+        assert!(durable.is_none());
     }
-
 }
 
 async fn synthesize_summary(

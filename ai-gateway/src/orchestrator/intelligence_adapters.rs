@@ -24,7 +24,6 @@ use anyhow::{bail, Context, Result};
 use async_trait::async_trait;
 use serde_json::{json, Value};
 
-use super::model_configuration::ModelProfile;
 use super::intelligence::{
     CapabilityProposal, ClarificationRequest, DecisionKind, DecisionProposal, DecisionProvider,
     DecisionRequest, DecisionResponse, DecisionTypeRef, FinalDraft, GenerationProvider,
@@ -33,6 +32,7 @@ use super::intelligence::{
     PROPOSAL_KIND_CLARIFICATION, PROPOSAL_KIND_DECISION, PROPOSAL_KIND_FINAL_DRAFT,
     PROPOSAL_KIND_PROGRAM_PATCH,
 };
+use super::model_configuration::ModelProfile;
 use crate::providers::llm::{LlmCompletion, LlmMessage, LlmRequest, ToolCallRequest, ToolSpec};
 
 const DECISION_TOOL: &str = "submit_decision";

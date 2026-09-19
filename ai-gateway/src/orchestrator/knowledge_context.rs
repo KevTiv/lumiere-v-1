@@ -185,6 +185,7 @@ mod tests {
     const VIEWER: Viewer = Viewer {
         organization_id: 1,
         company_id: 10,
+        actor_identity: None,
     };
 
     #[test]
@@ -251,6 +252,7 @@ mod tests {
         dependencies: Vec<Value>,
         entries: Vec<Value>,
         versions: Vec<Value>,
+        reviews: Vec<Value>,
     }
 
     #[async_trait]
@@ -297,20 +299,35 @@ mod tests {
                 .cloned()
                 .collect())
         }
+        async fn knowledge_reviews_of(&self, version_id: u64) -> Result<Vec<Value>> {
+            Ok(self
+                .reviews
+                .iter()
+                .filter(|review| review["versionId"] == version_id)
+                .cloned()
+                .collect())
+        }
     }
 
     fn rows(review_state: &str, passage_status: &str, edge_state: &str) -> Rows {
         let mut rows = Rows::default();
         rows.entries = vec![json!({
             "id": 20, "organizationId": 1, "companyId": 10, "entryKey": "sl", "kind": "concept",
-            "domainTags": ["domain:accounting"], "shareScope": "organization"
+            "domainTags": ["domain:accounting"], "shareScope": "organization",
+            "ownerUid": "a".repeat(64)
         })];
+        rows.tables
+            .insert(("ai_knowledge_entry", 20), rows.entries[0].clone());
         rows.versions = vec![json!({
             "id": 21, "organizationId": 1, "companyId": 10, "entryId": 20, "version": 3,
             "title": "Straight line", "body": "Spread cost evenly over the useful life.",
             "applicability": [], "sourcePassageIds": [5], "claimIds": [], "decisionIds": [],
-            "reviewState": review_state
+            "reviewState": review_state, "reviewEpoch": 0, "createUid": "b".repeat(64)
         })];
+        rows.reviews = vec![
+            json!({"id": 1, "versionId": 21, "reviewKind": "source_fidelity", "outcome": "accepted", "reviewEpoch": 0, "reviewerUid": "c".repeat(64)}),
+            json!({"id": 2, "versionId": 21, "reviewKind": "domain_interpretation", "outcome": "accepted", "reviewEpoch": 0, "reviewerUid": "c".repeat(64)}),
+        ];
         rows.tables
             .insert(("ai_knowledge_entry_version", 21), rows.versions[0].clone());
         rows.tables.insert(
@@ -429,6 +446,7 @@ mod tests {
         let sibling = Viewer {
             organization_id: 1,
             company_id: 11,
+            actor_identity: None,
         };
         let context = compile_knowledge_context(
             &rows("approved", "current", "valid"),

@@ -227,7 +227,6 @@ impl PrecedentStore for InMemoryPrecedentStore {
     }
 }
 
-
 pub(super) struct StdbPrecedentStore<'a> {
     pub writer: &'a StdbClient,
     pub reader: &'a StdbClient,
@@ -250,7 +249,11 @@ impl PrecedentStore for StdbPrecedentStore<'_> {
             query.company_id,
             name,
             query.decision_type.version,
-            query.policy.max_cases.saturating_mul(8).max(query.policy.max_cases)
+            query
+                .policy
+                .max_cases
+                .saturating_mul(8)
+                .max(query.policy.max_cases)
         );
         let rows = self
             .reader
@@ -407,7 +410,9 @@ fn row_u64_list(row: &Value, key: &str) -> Vec<u64> {
 }
 
 fn timestamp_micros(value: Option<&Value>) -> i64 {
-    let Some(value) = value else { return 0; };
+    let Some(value) = value else {
+        return 0;
+    };
     value
         .as_object()
         .and_then(|object| object.get("__timestamp_micros_since_unix_epoch__"))

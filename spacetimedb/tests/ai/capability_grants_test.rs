@@ -74,7 +74,8 @@ pub fn test_capability_grant_role_org_mismatch(ctx: &ReducerContext) -> Result<(
         true,
     );
     match result {
-        Err(ref e) if e.to_lowercase().contains("organization") || e.to_lowercase().contains("role") => {}
+        Err(ref e)
+            if e.to_lowercase().contains("organization") || e.to_lowercase().contains("role") => {}
         other => {
             return Err(format!(
                 "AI-CG-002 expected role-org mismatch error, got {other:?}"
@@ -172,7 +173,9 @@ pub fn test_capability_grant_upsert_and_delete(ctx: &ReducerContext) -> Result<(
         .ai_capability_role_grant()
         .ai_capability_grant_by_role()
         .filter(&role_id)
-        .filter(|g| g.organization_id == fixture.organization_id && g.capability_key == capability_key)
+        .filter(|g| {
+            g.organization_id == fixture.organization_id && g.capability_key == capability_key
+        })
         .collect();
     if grants_after_insert.len() != 1 {
         return Err(format!(
@@ -198,7 +201,9 @@ pub fn test_capability_grant_upsert_and_delete(ctx: &ReducerContext) -> Result<(
         .ai_capability_role_grant()
         .ai_capability_grant_by_role()
         .filter(&role_id)
-        .filter(|g| g.organization_id == fixture.organization_id && g.capability_key == capability_key)
+        .filter(|g| {
+            g.organization_id == fixture.organization_id && g.capability_key == capability_key
+        })
         .collect();
     if grants_after_update.len() != 1 {
         return Err(format!(
@@ -218,7 +223,9 @@ pub fn test_capability_grant_upsert_and_delete(ctx: &ReducerContext) -> Result<(
         .ai_capability_role_grant()
         .ai_capability_grant_by_role()
         .filter(&role_id)
-        .filter(|g| g.organization_id == fixture.organization_id && g.capability_key == capability_key)
+        .filter(|g| {
+            g.organization_id == fixture.organization_id && g.capability_key == capability_key
+        })
         .collect();
     if !grants_after_delete.is_empty() {
         return Err(format!(
@@ -249,9 +256,12 @@ pub fn test_capability_grant_upsert_and_delete(ctx: &ReducerContext) -> Result<(
         .next()
         .ok_or("AI-CG-004 foreign grant not found")?;
 
-    let cross_delete = delete_ai_capability_role_grant(ctx, fixture.organization_id, foreign_grant_id);
+    let cross_delete =
+        delete_ai_capability_role_grant(ctx, fixture.organization_id, foreign_grant_id);
     match cross_delete {
-        Err(ref e) if e.to_lowercase().contains("organization") || e.to_lowercase().contains("not found") => {}
+        Err(ref e)
+            if e.to_lowercase().contains("organization")
+                || e.to_lowercase().contains("not found") => {}
         other => {
             return Err(format!(
                 "AI-CG-004 expected denial for cross-org delete, got {other:?}"

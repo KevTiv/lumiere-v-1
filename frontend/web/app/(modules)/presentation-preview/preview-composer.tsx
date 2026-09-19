@@ -5,12 +5,26 @@ import { useErpSession } from '@lumiere/erp-session'
 import { useOperatingCompanyBigInt } from '@lumiere/query-hooks/hooks/use-operating-company'
 import { ComposedCollectionDetailHost } from '@lumiere/ui/composed/ComposedCollectionDetailHost'
 import { Button } from '@lumiere/ui/components/button'
+import { Field, FieldGroup, FieldLabel } from '@lumiere/ui/components/field'
+import { Input } from '@lumiere/ui/components/input'
 import { decodePreviewOptions, decodePreviewResponse } from '@lumiere/presentation-core/preview-decoder'
 import { decodeSavedDraft, decodeSavedDraftList } from '@lumiere/presentation-core/saved-draft-decoder'
 import type { ModuleDraft, PageNode } from '@lumiere/presentation-core/module-contract'
 import type { PreviewOptions, PreviewRequest, PreviewResponse } from '@lumiere/presentation-core/preview-contract'
 import type { SavedDraft, SavedDraftList, SavedDraftSummary } from '@lumiere/presentation-core'
 import { createInitialDraft, draftScopeKey, saveRequest, stateAfterConflict, stateAfterSave, stateFromSavedDraft, type DraftEditorState, updateDraft } from './draft-state'
+
+type EvidenceBoundModuleDraft = ModuleDraft & {
+  evidenceBinding?: {
+    companyId: string
+    decisionIds: string[]
+    claimIds: string[]
+  } | null
+}
+
+function evidenceBinding(definition: ModuleDraft | undefined) {
+  return (definition as EvidenceBoundModuleDraft | undefined)?.evidenceBinding
+}
 
 export function PreviewComposer({ organizationId }: { organizationId: number }) {
   const company = useOperatingCompanyBigInt(organizationId)?.toString()
@@ -54,6 +68,13 @@ function fieldsFor(definition: ModuleDraft, kind: PageNode['kind']): string[] {
   return node && (node.kind === 'collection' || node.kind === 'detail') ? [...node.fields] : []
 }
 
+function evidenceIds(value: string, required: boolean): string[] | null {
+  const parts = value.split(',').map((part) => part.trim()).filter(Boolean)
+  if (required && parts.length === 0) return null
+  if (parts.some((id) => !/^[1-9][0-9]*$/.test(id))) return null
+  return [...new Set(parts)]
+}
+
 function Composer({ organizationId, identity, companyId }: { organizationId: number; identity: string | null; companyId: string | undefined }) {
   const moduleKey = 'collections-preview'
   const scopeKey = draftScopeKey(organizationId, identity, moduleKey)
@@ -66,6 +87,8 @@ function Composer({ organizationId, identity, companyId }: { organizationId: num
   const [saving, setSaving] = useState(false)
   const [result, setResult] = useState<{ key: string; value: PreviewResponse } | null>(null)
   const [conflict, setConflict] = useState(false)
+  const [decisionIdsInput, setDecisionIdsInput] = useState('')
+  const [claimIdsInput, setClaimIdsInput] = useState('')
   const activeRequest = useRef<AbortController | null>(null)
   const scopeRequest = useRef<AbortController | null>(null)
   const saveRequestRef = useRef<AbortController | null>(null)
@@ -119,6 +142,11 @@ function Composer({ organizationId, identity, companyId }: { organizationId: num
 
   useEffect(() => { activeRequest.current?.abort(); setResult(null); setLoading(false) }, [companyId])
 
+  useEffect(() => {
+    setDecisionIdsInput(evidenceBinding(draft?.definition)?.decisionIds.join(', ') ?? '')
+    setClaimIdsInput(evidenceBinding(draft?.definition)?.claimIds.join(', ') ?? '')
+  }, [draft?.revision, scopeKey])
+
   async function reopen() {
     reopenRequestRef.current?.abort()
     const controller = new AbortController()
@@ -158,15 +186,28 @@ function Composer({ organizationId, identity, companyId }: { organizationId: num
   }
 
   async function save() {
-    if (!draft) return
+    if (!draft || !companyId) return
+    const decisionIds = evidenceIds(decisionIdsInput, false)
+    const claimIds = evidenceIds(claimIdsInput, false)
+    if (!decisionIds || !claimIds || !/^[1-9][0-9]*$/.test(companyId)) {
+      setError('Evidence decision and claim IDs must be positive comma-separated integers.'); return
+    }
+    if (claimIds.length > 0 && decisionIds.length === 0) {
+      setError('Evidence claims cannot be bound without at least one accepted decision.'); return
+    }
     saveRequestRef.current?.abort()
     const controller = new AbortController()
     saveRequestRef.current = controller
     const requestScope = scopeKey
-    const submittedDefinition = draft.definition
+    const submittedDefinition: EvidenceBoundModuleDraft = {
+      ...draft.definition,
+      evidenceBinding: decisionIds.length > 0
+        ? { companyId, decisionIds, claimIds }
+        : null,
+    }
     setSaving(true); setError(undefined)
     try {
-      const response = await fetch('/api/presentation/drafts', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(saveRequest(draft)), signal: controller.signal })
+      const response = await fetch('/api/presentation/drafts', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(saveRequest({ ...draft, definition: submittedDefinition })), signal: controller.signal })
       const saved = decodeSavedDraft(await readResponse(response))
       if (saved.moduleKey !== moduleKey) throw new Error('Saved draft module key mismatch')
       if (controller.signal.aborted || scopeKeyRef.current !== requestScope) return
@@ -184,6 +225,8 @@ function Composer({ organizationId, identity, companyId }: { organizationId: num
 
   const collectionFields = useMemo(() => fieldsFor(draft?.definition ?? createInitialDraft(''), 'collection'), [draft])
   const detailFields = useMemo(() => fieldsFor(draft?.definition ?? createInitialDraft(''), 'detail'), [draft])
+  const evidenceDirty = decisionIdsInput.trim() !== (evidenceBinding(draft?.definition)?.decisionIds.join(', ') ?? '')
+    || claimIdsInput.trim() !== (evidenceBinding(draft?.definition)?.claimIds.join(', ') ?? '')
   if (!draft) return <main className="mx-auto max-w-5xl p-6"><p>{error ?? 'Loading saved drafts…'}</p></main>
 
   return <main className="mx-auto max-w-5xl space-y-6 p-6">
@@ -196,7 +239,11 @@ function Composer({ organizationId, identity, companyId }: { organizationId: num
     <form className="space-y-4" onSubmit={(event) => { event.preventDefault(); void preview() }}>
       <label className="block">Module title<input className="ml-3 rounded border p-2" value={draft.definition.title} maxLength={160} required onChange={(event) => editDefinition({ ...draft.definition, title: event.target.value })} /></label>
       {options ? <div className="grid gap-4 sm:grid-cols-2"><fieldset><legend className="font-semibold">Collection fields</legend>{options.fields.map((field) => <label key={field} className="block"><input type="checkbox" checked={collectionFields.includes(field)} onChange={() => toggle('collection', field)} /> {field.replaceAll('_', ' ')}</label>)}</fieldset><fieldset><legend className="font-semibold">Detail fields</legend>{options.fields.map((field) => <label key={field} className="block"><input type="checkbox" checked={detailFields.includes(field)} onChange={() => toggle('detail', field)} /> {field.replaceAll('_', ' ')}</label>)}</fieldset></div> : null}
-      <div className="flex gap-2"><Button type="submit" disabled={!options || !companyId || loading}>Preview module</Button><Button type="button" variant="secondary" disabled={saving || !draft.dirty} onClick={() => void save()}>Save draft</Button>{savedSummary ? <Button type="button" variant="ghost" disabled={saving} onClick={() => void reopen()}>Reopen saved draft</Button> : null}</div>
+      <FieldGroup className="grid gap-4 sm:grid-cols-2">
+        <Field><FieldLabel htmlFor="presentation-decision-ids">Accepted decision IDs</FieldLabel><Input id="presentation-decision-ids" placeholder="12, 18" value={decisionIdsInput} onChange={(event) => setDecisionIdsInput(event.target.value)} /></Field>
+        <Field><FieldLabel htmlFor="presentation-claim-ids">Linked claim IDs (optional)</FieldLabel><Input id="presentation-claim-ids" placeholder="4, 7" value={claimIdsInput} onChange={(event) => setClaimIdsInput(event.target.value)} /></Field>
+      </FieldGroup>
+      <div className="flex gap-2"><Button type="submit" disabled={!options || !companyId || loading}>Preview module</Button><Button type="button" variant="secondary" disabled={saving || (!draft.dirty && !evidenceDirty)} onClick={() => void save()}>Save draft</Button>{savedSummary ? <Button type="button" variant="ghost" disabled={saving} onClick={() => void reopen()}>Reopen saved draft</Button> : null}</div>
     </form>
     {result?.key === key ? <h2 className="text-xl font-semibold">{result.value.definition.title}</h2> : null}
     <ComposedCollectionDetailHost preview={result?.key === key ? result.value : null} loading={loading} error={error} />

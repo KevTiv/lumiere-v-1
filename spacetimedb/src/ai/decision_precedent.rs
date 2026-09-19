@@ -311,7 +311,9 @@ pub fn record_ai_decision_case(
         }
     }
 
-    if let Some(existing) = find_case_by_hash(ctx, organization_id, params.run_id, &params.request_hash) {
+    if let Some(existing) =
+        find_case_by_hash(ctx, organization_id, params.run_id, &params.request_hash)
+    {
         if case_payload_matches(&existing, &params) {
             return Ok(());
         }
@@ -381,7 +383,9 @@ pub fn correct_ai_decision_case(
         }
     }
 
-    if let Some(existing) = find_case_by_hash(ctx, organization_id, params.run_id, &params.request_hash) {
+    if let Some(existing) =
+        find_case_by_hash(ctx, organization_id, params.run_id, &params.request_hash)
+    {
         if existing.correction_of == Some(params.original_case_id)
             && existing.selected_json == params.selected_json
         {
@@ -543,13 +547,12 @@ pub fn propose_ai_decision_pattern(
 
     let applicability: PatternApplicabilityEvidence =
         serde_json::from_str(&params.applicability_json).map_err(|_| {
-            "applicability_json must match the deterministic graduation evidence schema"
-                .to_string()
+            "applicability_json must match the deterministic graduation evidence schema".to_string()
         })?;
     validate_pattern_applicability(&applicability)?;
 
-    let metrics: PatternMetricsSnapshot =
-        serde_json::from_str(&params.outcome_metrics_json).map_err(|_| {
+    let metrics: PatternMetricsSnapshot = serde_json::from_str(&params.outcome_metrics_json)
+        .map_err(|_| {
             "outcome_metrics_json must match the deterministic graduation metrics schema"
                 .to_string()
         })?;
@@ -682,9 +685,7 @@ pub fn promote_ai_decision_pattern(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "ai_decision_pattern", "write")?;
 
-    if params.implementation_ref.trim().is_empty()
-        || !params.implementation_ref.contains('@')
-    {
+    if params.implementation_ref.trim().is_empty() || !params.implementation_ref.contains('@') {
         return Err("implementation_ref must be a nonempty immutable versioned ref".to_string());
     }
 
@@ -706,9 +707,8 @@ pub fn promote_ai_decision_pattern(
             .map_err(|_| "stored pattern applicability evidence is invalid".to_string())?;
     validate_pattern_applicability(&applicability)?;
 
-    let metrics: PatternMetricsSnapshot =
-        serde_json::from_str(&pattern.outcome_metrics_json)
-            .map_err(|_| "stored pattern metrics evidence is invalid".to_string())?;
+    let metrics: PatternMetricsSnapshot = serde_json::from_str(&pattern.outcome_metrics_json)
+        .map_err(|_| "stored pattern metrics evidence is invalid".to_string())?;
     validate_pattern_metrics(&metrics, pattern.correction_rate)?;
 
     revalidate_supporting_cases(ctx, organization_id, &pattern, &applicability)?;
@@ -810,7 +810,10 @@ fn validate_promotion_policy(policy: &GraduationPromotionPolicy) -> Result<(), S
     }
     if !matches!(
         policy.execution_mode.as_str(),
-        "model_primary" | "deterministic_shadow" | "deterministic_primary_model_shadow" | "deterministic_only"
+        "model_primary"
+            | "deterministic_shadow"
+            | "deterministic_primary_model_shadow"
+            | "deterministic_only"
     ) {
         return Err("graduation policy execution_mode is invalid".to_string());
     }
@@ -818,7 +821,10 @@ fn validate_promotion_policy(policy: &GraduationPromotionPolicy) -> Result<(), S
         return Err("graduation policy case thresholds are invalid".to_string());
     }
     for (name, value) in [
-        ("maximum_correction_rate", Some(policy.maximum_correction_rate)),
+        (
+            "maximum_correction_rate",
+            Some(policy.maximum_correction_rate),
+        ),
         (
             "maximum_provider_disagreement_rate",
             policy.maximum_provider_disagreement_rate,
@@ -1108,19 +1114,13 @@ fn validate_pattern_metrics(
             metrics.provider_disagreement_rate,
         ),
         ("decision_entropy", Some(metrics.decision_entropy)),
-        (
-            "precedent_consistency",
-            Some(metrics.precedent_consistency),
-        ),
+        ("precedent_consistency", Some(metrics.precedent_consistency)),
         ("policy_stability_rate", metrics.policy_stability_rate),
         (
             "evidence_shape_stability",
             Some(metrics.evidence_shape_stability),
         ),
-        (
-            "candidate_set_stability",
-            metrics.candidate_set_stability,
-        ),
+        ("candidate_set_stability", metrics.candidate_set_stability),
     ] {
         if let Some(value) = value {
             if !(0.0..=1.0).contains(&value) {
@@ -1259,7 +1259,6 @@ fn case_payload_matches(existing: &AiDecisionCase, params: &RecordAiDecisionCase
         && existing.precedent_refs == params.precedent_refs
 }
 
-
 #[cfg(test)]
 mod graduation_pattern_tests {
     use super::*;
@@ -1365,5 +1364,4 @@ mod graduation_pattern_tests {
         assert!(validate_promotion_policy(&policy).is_ok());
         assert!(validate_metrics_against_promotion_policy(&metrics(), &policy).is_ok());
     }
-
 }

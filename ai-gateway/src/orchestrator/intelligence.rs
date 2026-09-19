@@ -365,9 +365,14 @@ pub struct PassageCitation {
 
 impl PassageCitation {
     pub fn validate(&self) -> Result<()> {
-        if [&self.kind, &self.id, &self.source_version, &self.passage_key]
-            .iter()
-            .any(|field| field.trim().is_empty())
+        if [
+            &self.kind,
+            &self.id,
+            &self.source_version,
+            &self.passage_key,
+        ]
+        .iter()
+        .any(|field| field.trim().is_empty())
         {
             bail!("passage citation kind, id, source_version and passage_key must be nonempty");
         }

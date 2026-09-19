@@ -378,6 +378,22 @@ pub fn record_ai_evidence_source_change(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "ai_evidence_source", "update")?;
     require_company_in_organization(ctx, organization_id, company_id)?;
+    record_ai_evidence_source_change_inner(
+        ctx,
+        organization_id,
+        company_id,
+        source_version_id,
+        params,
+    )
+}
+
+pub(crate) fn record_ai_evidence_source_change_inner(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    source_version_id: u64,
+    params: RecordAiEvidenceSourceChangeParams,
+) -> Result<(), String> {
     require_one_of("change_kind", &params.change_kind, &CHANGE_KINDS)?;
     require_len("reason", &params.reason, MAX_REASON_LEN)?;
 

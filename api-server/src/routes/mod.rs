@@ -4,12 +4,14 @@ mod accounting;
 mod admin;
 mod ai_capabilities;
 mod ai_certifications;
+mod ai_evidence;
 mod auth;
 mod billing;
 mod bootstrap;
 mod country_packs;
 mod crm;
 mod documents;
+mod evidence_inspection;
 pub(crate) mod health;
 mod import;
 mod inventory;
@@ -38,6 +40,8 @@ pub fn domain_router() -> Router<Arc<AppState>> {
     Router::new()
         .merge(ai_capabilities::router())
         .merge(ai_certifications::router())
+        .merge(ai_evidence::router())
+        .merge(evidence_inspection::router())
         .merge(auth::router())
         .merge(session::router())
         .merge(crm::router())

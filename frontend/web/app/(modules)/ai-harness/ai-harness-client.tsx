@@ -7,6 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@lumiere/ui/components
 import { ReportComposerPanel } from "./report-composer-panel"
 import { LowStockPanel } from "./low-stock-panel"
 import { RedActionDraftPanel } from "./red-action-draft-panel"
+import { EvidenceReviewerPanel } from "./evidence-reviewer-panel"
 
 interface AiHarnessClientProps {
   organizationId: bigint
@@ -32,6 +33,9 @@ export function AiHarnessClient({
         <TabsTrigger value="red-action-drafts">
           {t("aiHarness.tabs.redActionDrafts")}
         </TabsTrigger>
+        <TabsTrigger value="evidence-reviewer">
+          Evidence reviewer
+        </TabsTrigger>
       </TabsList>
 
       <TabsContent value="report-composer">
@@ -50,6 +54,10 @@ export function AiHarnessClient({
 
       <TabsContent value="red-action-drafts">
         <RedActionDraftPanel companies={companies} />
+      </TabsContent>
+
+      <TabsContent value="evidence-reviewer">
+        <EvidenceReviewerPanel companies={companies} />
       </TabsContent>
     </Tabs>
   )

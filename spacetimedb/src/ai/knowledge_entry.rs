@@ -38,6 +38,7 @@ use crate::ai::evidence_dependency::{
 use crate::ai::evidence_lineage::{load_claim, load_decision, CLAIM_CURRENT, DECISION_ACCEPTED};
 use crate::ai::evidence_source::require_passage_referencable;
 use crate::core::organization::require_company_in_organization;
+use crate::core::users::user_organization;
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 
 const MAX_KEY_LEN: usize = 128;
@@ -265,6 +266,21 @@ pub fn is_reusable_state(state: &str) -> bool {
     state == STATE_APPROVED
 }
 
+/// Team scopes deliberately reuse the canonical organization membership's
+/// department instead of introducing an unrelated, caller-defined team list.
+pub fn team_department_id(team_ref: &str) -> Option<u64> {
+    team_ref
+        .strip_prefix("department:")
+        .and_then(|value| value.parse::<u64>().ok())
+        .filter(|value| *value > 0)
+}
+
+/// An accepting reviewer must be independent from both the durable entry
+/// owner and the author of the version under review.
+pub fn reviewer_is_independent(reviewer: Identity, owner: Identity, proposer: Identity) -> bool {
+    reviewer != owner && reviewer != proposer
+}
+
 // ── Reducers ─────────────────────────────────────────────────────────────────
 
 /// Create an entry and its first version, as a `candidate`.
@@ -291,6 +307,9 @@ pub fn create_ai_knowledge_entry(
             return Err("only a team-scoped entry names a team".to_string())
         }
         _ => {}
+    }
+    if let Some(team_ref) = &params.team_ref {
+        require_team_membership(ctx, organization_id, company_id, team_ref, ctx.sender())?;
     }
     if ctx
         .db
@@ -357,6 +376,7 @@ pub fn propose_ai_knowledge_entry_version(
     params: AiKnowledgeVersionContent,
 ) -> Result<(), String> {
     let entry = load_entry(ctx, organization_id, company_id, entry_id)?;
+    require_entry_scope_access(ctx, &entry, ctx.sender())?;
     if entry.owner_uid != ctx.sender() {
         check_permission(ctx, organization_id, "ai_knowledge_entry", "update")?;
     }
@@ -422,6 +442,26 @@ pub fn review_ai_knowledge_entry_version(
     }
     if params.review_kind == "implementation" && entry.kind != "procedure" {
         return Err("only a procedure has an implementation review".to_string());
+    }
+    if !reviewer_is_independent(ctx.sender(), entry.owner_uid, version.create_uid) {
+        return Err(
+            "a knowledge entry owner or version proposer cannot review that version".to_string(),
+        );
+    }
+    // Personal scope limits reuse, not independent oversight: a reviewer with
+    // the review permission may review it but still cannot retrieve it. Team
+    // review additionally requires live membership in that same team.
+    if entry.share_scope == "team" {
+        require_team_membership(
+            ctx,
+            organization_id,
+            company_id,
+            entry
+                .team_ref
+                .as_deref()
+                .ok_or("team-scoped knowledge has no team")?,
+            ctx.sender(),
+        )?;
     }
     if params.outcome == "accepted" {
         // Accepting against evidence that has since been withdrawn or
@@ -506,6 +546,19 @@ pub fn set_ai_knowledge_entry_version_state(
         &[STATE_NEEDS_REVIEW, STATE_DISPUTED, STATE_WITHDRAWN],
     )?;
     let version = load_version(ctx, organization_id, company_id, version_id)?;
+    let entry = load_entry(ctx, organization_id, company_id, version.entry_id)?;
+    if entry.share_scope == "team" {
+        require_team_membership(
+            ctx,
+            organization_id,
+            company_id,
+            entry
+                .team_ref
+                .as_deref()
+                .ok_or("team-scoped knowledge has no team")?,
+            ctx.sender(),
+        )?;
+    }
     if !valid_state_move(&version.review_state, &state) {
         return Err(format!(
             "a {} version cannot move to {state}",
@@ -545,6 +598,8 @@ pub fn nominate_ai_knowledge_entry_version(
     check_permission(ctx, organization_id, "ai_knowledge_entry", "update")?;
     require_one_of("signal", &signal, &NOMINATION_SIGNALS)?;
     let mut version = load_version(ctx, organization_id, company_id, version_id)?;
+    let entry = load_entry(ctx, organization_id, company_id, version.entry_id)?;
+    require_entry_scope_access(ctx, &entry, ctx.sender())?;
     version.nomination_signal = Some(signal.clone());
     if matches!(
         version.review_state.as_str(),
@@ -599,6 +654,7 @@ pub(crate) fn mark_version_needs_review(ctx: &ReducerContext, version_id: u64) {
 
 /// Write `state`, bumping the review epoch when the move discards reviews.
 fn apply_state(ctx: &ReducerContext, version: AiKnowledgeEntryVersion, state: &str) {
+    let version_id = version.id;
     let epoch = if state == STATE_NEEDS_REVIEW {
         version.review_epoch + 1
     } else {
@@ -614,6 +670,9 @@ fn apply_state(ctx: &ReducerContext, version: AiKnowledgeEntryVersion, state: &s
             write_date: ctx.timestamp,
             ..version
         });
+    if state != STATE_APPROVED {
+        crate::ai::knowledge_promotion::invalidate_promotions_for_knowledge(ctx, version_id);
+    }
 }
 
 fn insert_version(
@@ -710,6 +769,58 @@ fn latest_verdicts(ctx: &ReducerContext, version_id: u64, epoch: u32) -> Vec<(St
     latest
 }
 
+pub(crate) fn require_entry_scope_access(
+    ctx: &ReducerContext,
+    entry: &AiKnowledgeEntry,
+    identity: Identity,
+) -> Result<(), String> {
+    match entry.share_scope.as_str() {
+        "personal" if entry.owner_uid == identity => Ok(()),
+        "personal" => Err("personal knowledge is only writable by its owner".to_string()),
+        "team" => require_team_membership(
+            ctx,
+            entry.organization_id,
+            entry.company_id,
+            entry
+                .team_ref
+                .as_deref()
+                .ok_or("team-scoped knowledge has no team")?,
+            identity,
+        ),
+        "organization" => Ok(()),
+        _ => Err("knowledge entry has an invalid share scope".to_string()),
+    }
+}
+
+pub(crate) fn require_team_membership(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    team_ref: &str,
+    identity: Identity,
+) -> Result<(), String> {
+    let department_id = team_department_id(team_ref)
+        .ok_or("team_ref must be a canonical department:<id> reference")?;
+    let is_member = ctx
+        .db
+        .user_organization()
+        .user_org_by_user()
+        .filter(&identity)
+        .any(|membership| {
+            membership.organization_id == organization_id
+                && membership.is_active
+                && membership.department_id == Some(department_id)
+                && membership
+                    .company_id
+                    .is_none_or(|member_company| member_company == company_id)
+        });
+    if is_member {
+        Ok(())
+    } else {
+        Err("actor is not an active member of the knowledge team".to_string())
+    }
+}
+
 fn supersede_other_approved(ctx: &ReducerContext, entry_id: u64, keep_version_id: u64) {
     let others: Vec<AiKnowledgeEntryVersion> = ctx
         .db
@@ -719,6 +830,7 @@ fn supersede_other_approved(ctx: &ReducerContext, entry_id: u64, keep_version_id
         .filter(|row| row.id != keep_version_id && row.review_state == STATE_APPROVED)
         .collect();
     for other in others {
+        let other_id = other.id;
         ctx.db
             .ai_knowledge_entry_version()
             .id()
@@ -728,6 +840,7 @@ fn supersede_other_approved(ctx: &ReducerContext, entry_id: u64, keep_version_id
                 write_date: ctx.timestamp,
                 ..other
             });
+        crate::ai::knowledge_promotion::invalidate_promotions_for_knowledge(ctx, other_id);
     }
 }
 
@@ -967,5 +1080,29 @@ mod tests {
         assert!(validate_content("concept", &bad).is_err());
         bad.nomination_signal = Some("repeated_use".into());
         assert!(validate_content("concept", &bad).is_ok());
+    }
+
+    #[test]
+    fn team_refs_are_canonical_department_refs() {
+        assert_eq!(team_department_id("department:42"), Some(42));
+        for invalid in [
+            "department:0",
+            "department:-1",
+            "team:42",
+            "42",
+            "department:",
+        ] {
+            assert_eq!(team_department_id(invalid), None, "{invalid}");
+        }
+    }
+
+    #[test]
+    fn owners_and_proposers_cannot_review_their_own_version() {
+        let owner = Identity::from_byte_array([1; 32]);
+        let proposer = Identity::from_byte_array([2; 32]);
+        let reviewer = Identity::from_byte_array([3; 32]);
+        assert!(!reviewer_is_independent(owner, owner, proposer));
+        assert!(!reviewer_is_independent(proposer, owner, proposer));
+        assert!(reviewer_is_independent(reviewer, owner, proposer));
     }
 }

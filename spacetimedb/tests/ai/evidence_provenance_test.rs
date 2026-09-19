@@ -2,7 +2,11 @@
 //! knowledge records. Each scenario writes through the real reducers and
 //! reads back through the tables, so a pass exercises persisted state and the
 //! authorization/scope checks rather than string matching.
-use spacetimedb::ReducerContext;
+use spacetimedb::{Identity, ReducerContext, Table};
+
+use crate::ai::chat::{
+    ai_chat_session, create_ai_chat_session, AiChatSession, CreateAiChatSessionParams,
+};
 
 use crate::ai::evidence_dependency::{
     ai_evidence_dependency, ai_evidence_source_change, record_ai_evidence_source_change,
@@ -88,6 +92,28 @@ fn add_company(ctx: &ReducerContext, fixture: &OrgFixture, code: &str) -> Result
         .map(|c| c.id)
         .next()
         .ok_or_else(|| "sibling company not found after create".to_string())
+}
+
+fn seed_chat_session(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    session_key: &str,
+) -> Result<(), String> {
+    create_ai_chat_session(
+        ctx,
+        organization_id,
+        company_id,
+        CreateAiChatSessionParams {
+            session_key: session_key.to_string(),
+            title: None,
+            route: None,
+            module: Some("ai-harness".into()),
+            active_tab: None,
+            archived: false,
+            metadata: None,
+        },
+    )
 }
 
 struct Evidence {
@@ -470,6 +496,21 @@ pub fn test_sources_round_trip_and_unknowns_stay_unknown(
         .ok_or("book version")?;
     assert_eq_str(&stored_version.snapshot_state, "retained", "snapshot state")?;
     assert_eq_str(&stored_version.verification, "inspected", "verification")?;
+    record_ai_evidence_source_version(ctx, org, company, book.source_id, version_params("1"))?;
+    let mut changed_retrieval = version_params("1");
+    changed_retrieval.retrieved_at_micros = Some(3_000_000);
+    expect_err(
+        record_ai_evidence_source_version(ctx, org, company, book.source_id, changed_retrieval),
+        "different details",
+        "changed retrieval replay",
+    )?;
+    let mut changed_verification = version_params("1");
+    changed_verification.verification = "user_reported".into();
+    expect_err(
+        record_ai_evidence_source_version(ctx, org, company, book.source_id, changed_verification),
+        "different details",
+        "changed verification replay",
+    )?;
 
     // Company publication: authored by an organization, not a person.
     let mut publication = source_params("pub-1", "organization");
@@ -601,6 +642,7 @@ pub fn test_sources_round_trip_and_unknowns_stay_unknown(
         "does not match",
         "mismatched version",
     )?;
+
     Ok(())
 }
 
@@ -656,6 +698,58 @@ pub fn test_recollected_source_stays_unverified(ctx: &ReducerContext) -> Result<
         note: None,
     };
     expect_err(
+        record_ai_evidence_contribution(ctx, org, company, contribution("unverified_recollection")),
+        "session not found",
+        "nonexistent chat session",
+    )?;
+    let foreign = OrgFixture::seed_minimal(ctx)?;
+    seed_chat_session(
+        ctx,
+        foreign.organization_id,
+        foreign.company_id,
+        "foreign-session",
+    )?;
+    let mut foreign_session = contribution("unverified_recollection");
+    foreign_session.session_ref = "foreign-session".into();
+    expect_err(
+        record_ai_evidence_contribution(ctx, org, company, foreign_session),
+        "session not found",
+        "foreign chat session",
+    )?;
+    let sibling_company = add_company(ctx, &f, "SESSION")?;
+    seed_chat_session(ctx, org, sibling_company, "sibling-session")?;
+    let mut sibling_session = contribution("unverified_recollection");
+    sibling_session.session_ref = "sibling-session".into();
+    expect_err(
+        record_ai_evidence_contribution(ctx, org, company, sibling_session),
+        "session not found",
+        "sibling-company chat session",
+    )?;
+    ctx.db.ai_chat_session().insert(AiChatSession {
+        id: 0,
+        organization_id: org,
+        company_id: company,
+        session_key: "not-owned-session".into(),
+        title: None,
+        route: None,
+        module: Some("ai-harness".into()),
+        active_tab: None,
+        archived: false,
+        create_uid: Identity::from_byte_array([7; 32]),
+        create_date: ctx.timestamp,
+        write_uid: Identity::from_byte_array([7; 32]),
+        write_date: ctx.timestamp,
+        metadata: None,
+    });
+    let mut not_owned = contribution("unverified_recollection");
+    not_owned.session_ref = "not-owned-session".into();
+    expect_err(
+        record_ai_evidence_contribution(ctx, org, company, not_owned),
+        "not owned",
+        "chat session owned by another identity",
+    )?;
+    seed_chat_session(ctx, org, company, "session-1")?;
+    expect_err(
         record_ai_evidence_contribution(ctx, org, company, contribution("inspected")),
         "cannot be 'inspected'",
         "contribution stronger than version",
@@ -674,6 +768,42 @@ pub fn test_recollected_source_stays_unverified(ctx: &ReducerContext) -> Result<
     if !stored.is_secondary_quotation {
         return Err("secondary quotation flag lost".to_string());
     }
+    // Legacy callers without an event id retain append semantics.
+    record_ai_evidence_contribution(ctx, org, company, contribution("unverified_recollection"))?;
+    let legacy_count = ctx
+        .db
+        .ai_evidence_contribution()
+        .ai_evidence_contribution_by_org()
+        .filter(&org)
+        .filter(|row| row.session_ref == "session-1" && row.event_ref.is_none())
+        .count();
+    if legacy_count != 2 {
+        return Err(format!(
+            "event-less contributions unexpectedly deduplicated to {legacy_count} rows"
+        ));
+    }
+    let mut event_contribution = contribution("unverified_recollection");
+    event_contribution.event_ref = Some("event-1".into());
+    record_ai_evidence_contribution(ctx, org, company, event_contribution.clone())?;
+    record_ai_evidence_contribution(ctx, org, company, event_contribution.clone())?;
+    let event_count = ctx
+        .db
+        .ai_evidence_contribution()
+        .ai_evidence_contribution_by_org()
+        .filter(&org)
+        .filter(|row| row.session_ref == "session-1" && row.event_ref.as_deref() == Some("event-1"))
+        .count();
+    if event_count != 1 {
+        return Err(format!(
+            "idempotent event replay stored {event_count} contribution rows"
+        ));
+    }
+    event_contribution.note = Some("divergent replay".into());
+    expect_err(
+        record_ai_evidence_contribution(ctx, org, company, event_contribution),
+        "event already recorded with different details",
+        "divergent contribution event replay",
+    )?;
 
     // An agent contribution must name a run; a bad run is rejected.
     let mut agent = contribution("unverified_recollection");
@@ -736,6 +866,16 @@ pub fn test_recollected_source_stays_unverified(ctx: &ReducerContext) -> Result<
         "hash_only",
         "snapshot state after inspect",
     )?;
+    inspect_ai_evidence_source_version(
+        ctx,
+        org,
+        company,
+        vid,
+        InspectAiEvidenceSourceVersionParams {
+            content_hash: hash('c'),
+            snapshot_ref: None,
+        },
+    )?;
     expect_err(
         inspect_ai_evidence_source_version(
             ctx,
@@ -743,12 +883,12 @@ pub fn test_recollected_source_stays_unverified(ctx: &ReducerContext) -> Result<
             company,
             vid,
             InspectAiEvidenceSourceVersionParams {
-                content_hash: hash('c'),
+                content_hash: hash('d'),
                 snapshot_ref: None,
             },
         ),
-        "already inspected",
-        "second inspect",
+        "different content or snapshot",
+        "divergent inspection replay",
     )?;
     record_ai_evidence_passage(
         ctx,
@@ -768,6 +908,7 @@ pub fn test_cross_scope_references_are_denied(ctx: &ReducerContext) -> Result<()
     let foreign = OrgFixture::seed_minimal(ctx)?;
     let (org, company_a) = (f.organization_id, f.company_id);
     let company_b = add_company(ctx, &f, "XS")?;
+    seed_chat_session(ctx, org, company_b, "scope-session")?;
 
     let private = seed_evidence(ctx, org, company_a, "private-src", "company")?;
     let shared = seed_evidence(ctx, org, company_a, "shared-src", "organization")?;
@@ -778,6 +919,27 @@ pub fn test_cross_scope_references_are_denied(ctx: &ReducerContext) -> Result<()
         "sibling company reading company-scoped source",
     )?;
     record_ai_evidence_claim(ctx, org, company_b, claim_params(vec![shared.passage_id]))?;
+
+    // Organization-scoped versions may also be introduced in a sibling
+    // company's discussion; company-scoped versions remain denied.
+    let contribution = |version_id| RecordAiEvidenceContributionParams {
+        contributor_kind: "user".into(),
+        agent_run_id: None,
+        session_ref: "scope-session".into(),
+        turn_ref: Some("turn-1".into()),
+        event_ref: Some(format!("scope-{version_id}")),
+        introduced_kind: "source_version".into(),
+        source_version_id: Some(version_id),
+        inspection_state: "inspected".into(),
+        is_secondary_quotation: false,
+        note: None,
+    };
+    expect_err(
+        record_ai_evidence_contribution(ctx, org, company_b, contribution(private.version_id)),
+        "outside this scope",
+        "sibling contribution using company-scoped source",
+    )?;
+    record_ai_evidence_contribution(ctx, org, company_b, contribution(shared.version_id))?;
 
     // A knowledge entry in the sibling company cannot widen access either.
     expect_err(
@@ -817,6 +979,7 @@ pub fn test_lineage_reconstructs_after_edit_and_fork(ctx: &ReducerContext) -> Re
     let f = OrgFixture::seed_minimal(ctx)?;
     let (org, company) = (f.organization_id, f.company_id);
     let ev = seed_evidence(ctx, org, company, "lineage-src", "company")?;
+    seed_chat_session(ctx, org, company, "session-9")?;
 
     // Discussion contribution introduces the source (a different identity
     // concept from its author).

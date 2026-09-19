@@ -682,6 +682,7 @@ pub fn create_document(
         folder_residency = folder.residency_region.clone();
     }
 
+    let provided_index_content = params.index_content.clone();
     let checksum = params.checksum.trim().to_lowercase();
     let index_content = Some(truncate_index_content(&build_default_index_content(
         &params.name,
@@ -774,6 +775,26 @@ pub fn create_document(
         current_version_id: Some(version.id),
         ..doc
     });
+
+    // A caller-provided index body is retained as user-reported evidence only;
+    // it is not treated as an inspected extraction of the object bytes.
+    if let (Some(company_id), Some(index_content)) = (company_id, provided_index_content) {
+        let extracted_content = truncate_index_content(&index_content);
+        if !extracted_content.is_empty() {
+            crate::ai::evidence_source::ingest_document_index_content(
+                ctx,
+                organization_id,
+                company_id,
+                doc_id,
+                &doc_name,
+                version.version_number,
+                &version.url,
+                version.checksum.as_deref(),
+                &extracted_content,
+                "user_reported",
+            )?;
+        }
+    }
 
     adjust_folder_document_count(ctx, folder_id, 1);
 

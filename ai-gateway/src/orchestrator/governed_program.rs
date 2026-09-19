@@ -19,24 +19,25 @@ use stdb_client::{ReducerCall, StdbClient};
 use crate::tools::types::ToolOutput;
 
 use super::{
+    answer_gate::collect_json_figures,
     decision_graph::{
         validate_graph, DecisionGraph, DecisionNode, GateCondition, GraphNode, StopReason,
     },
-    answer_gate::collect_json_figures,
     decision_type::{admit_decision, DecisionTypeRegistry},
-    graduation::{DecisionResolutionContext, GovernedDecisionResolver},
     governed_services::{
         qualified_content, AdmissionEvidence, AnswerAdmissionOutcome, CapabilityStepOutcome,
-        FinalAnswerAdmission,
-        GovernedCapabilityService, VerificationOutcome, VerificationService,
+        FinalAnswerAdmission, GovernedCapabilityService, VerificationOutcome, VerificationService,
     },
+    graduation::{DecisionResolutionContext, GovernedDecisionResolver},
     intelligence::{
         decision_request_hash, reasoning_request_hash, CapabilityProposal, DecisionKind,
         DecisionProvider, DecisionRequest, DecisionResponse, EvidenceRef, FinalDraft,
         GenerationProvider, GenerationRequest, ReasoningOutcome, ReasoningProvider,
         ReasoningRequest,
     },
-    precedent::{summarize, DecisionCaseRecord, DecisionCaseStatus, PrecedentQuery, PrecedentStore},
+    precedent::{
+        summarize, DecisionCaseRecord, DecisionCaseStatus, PrecedentQuery, PrecedentStore,
+    },
     probabilistic::{CalibrationProfileStore, Confidence, GateDecision},
 };
 
@@ -79,7 +80,10 @@ pub(super) enum GovernedProgramStop {
         reason: String,
         draft_id: Option<u64>,
     },
-    Clarification { prompt: String, options: Vec<String> },
+    Clarification {
+        prompt: String,
+        options: Vec<String>,
+    },
     ReviewRequired(String),
     UnableToProgress(String),
 }
@@ -129,11 +133,39 @@ struct PendingApprovalCheckpoint {
     next_node: String,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+struct ContinuationManifest {
+    bounded_state_hash: String,
+    dependency_refs: Vec<String>,
+    acquired_evidence_hash: String,
+    decision_state_hash: String,
+    decision_event_cursor: u32,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+struct CompactionSummary {
+    current_node: String,
+    completed_nodes: Vec<String>,
+    event_step: u32,
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
-struct GovernedProgramCheckpoint {
+pub(super) struct GovernedProgramCheckpoint {
     schema_version: u32,
     program_ref: String,
     graph_hash: String,
+    checkpoint_sequence: u64,
+    concurrency_version: u64,
+    parent_checkpoint_hash: Option<String>,
+    continuation_manifest: ContinuationManifest,
+    continuation_manifest_hash: String,
+    compaction_summary: CompactionSummary,
+    compaction_summary_hash: String,
+    /// Hash from the durable event envelope, never serialized into the
+    /// checkpoint itself. Parent links must use the exact persisted bytes,
+    /// not a reserialization of maps with potentially different key order.
+    #[serde(skip)]
+    persisted_hash: Option<String>,
     current_node: String,
     values: HashMap<String, NodeValue>,
     trace: Vec<GovernedProgramTraceStep>,
@@ -169,6 +201,22 @@ pub(super) struct StdbProgramCheckpointStore<'a> {
     pub reader: &'a StdbClient,
 }
 
+impl StdbProgramCheckpointStore<'_> {
+    /// Verify the latest continuation against the current graph, bounded
+    /// inputs and freshly authorized dependency snapshot before a waiting run
+    /// is transitioned back to `running`.
+    pub(super) async fn validate_resume(
+        &self,
+        context: &GovernedProgramContext,
+        graph: &DecisionGraph,
+    ) -> Result<()> {
+        self.load(context, &graph_hash(graph))
+            .await?
+            .context("resumable governed-program checkpoint was not found")?;
+        Ok(())
+    }
+}
+
 #[async_trait]
 impl ProgramCheckpointStore for StdbProgramCheckpointStore<'_> {
     async fn load(
@@ -202,14 +250,25 @@ impl ProgramCheckpointStore for StdbProgramCheckpointStore<'_> {
             .or_else(|| row.get("output_json"))
             .and_then(Value::as_str)
             .context("checkpoint output_json missing")?;
-        let checkpoint: GovernedProgramCheckpoint =
+        let mut checkpoint: GovernedProgramCheckpoint =
             serde_json::from_str(raw).context("decode governed program checkpoint")?;
-        if checkpoint.schema_version != 1
+        let stored_checkpoint_hash = row
+            .get("requestHash")
+            .or_else(|| row.get("request_hash"))
+            .and_then(Value::as_str)
+            .context("checkpoint hash missing")?;
+        let actual_checkpoint_hash = format!("{:x}", Sha256::digest(raw.as_bytes()));
+        if stored_checkpoint_hash != actual_checkpoint_hash {
+            bail!("governed program checkpoint payload hash mismatch");
+        }
+        checkpoint.persisted_hash = Some(stored_checkpoint_hash.to_string());
+        if checkpoint.schema_version != 2
             || checkpoint.program_ref != context.program_ref
             || checkpoint.graph_hash != graph_hash
         {
             bail!("governed program checkpoint identity is invalid");
         }
+        checkpoint.validate_continuation(context)?;
         Ok(Some(checkpoint))
     }
 
@@ -219,37 +278,122 @@ impl ProgramCheckpointStore for StdbProgramCheckpointStore<'_> {
         checkpoint: &GovernedProgramCheckpoint,
         status: &str,
     ) -> Result<()> {
+        let mut checkpoint = checkpoint.clone();
+        let previous = self.load(context, &checkpoint.graph_hash).await?;
+        checkpoint.checkpoint_sequence = previous
+            .as_ref()
+            .map_or(1, |value| value.checkpoint_sequence.saturating_add(1));
+        checkpoint.concurrency_version = checkpoint.checkpoint_sequence;
+        checkpoint.parent_checkpoint_hash = previous
+            .as_ref()
+            .and_then(|value| value.persisted_hash.clone());
+        checkpoint.continuation_manifest = continuation_manifest(
+            context,
+            checkpoint.event_step,
+            &checkpoint.values,
+            &checkpoint.evidence_overlays,
+        )?;
+        checkpoint.continuation_manifest_hash = hash_json(&checkpoint.continuation_manifest)?;
+        checkpoint.compaction_summary = compaction_summary(&checkpoint);
+        checkpoint.compaction_summary_hash = hash_json(&checkpoint.compaction_summary)?;
         let checkpoint_json =
-            serde_json::to_string(checkpoint).context("serialize governed program checkpoint")?;
+            serde_json::to_string(&checkpoint).context("serialize governed program checkpoint")?;
         let checkpoint_hash = format!("{:x}", Sha256::digest(checkpoint_json.as_bytes()));
         self.writer
             .call_reducer(ReducerCall::from_name(
-                "record_ai_reasoning_event",
+                "record_ai_program_checkpoint",
                 json!([
                     context.organization_id,
                     context.company_id,
                     context.run_id,
                     {
-                        "step_no": checkpoint.event_step,
-                        "request_hash": checkpoint_hash,
-                        "request_json": serde_json::to_string(&json!({
-                            "program_ref": context.program_ref,
-                            "graph_hash": checkpoint.graph_hash,
-                            "status": status,
-                        }))?,
-                        "outcome_kind": "program_checkpoint",
-                        "output_json": checkpoint_json,
-                        "provider": "governed-runtime",
-                        "model": checkpoint.graph_hash,
-                        "provider_attempt_id": null,
-                        "input_tokens": 0,
-                        "output_tokens": 0,
+                        "program_ref": context.program_ref,
+                        "graph_hash": checkpoint.graph_hash,
+                        "checkpoint_hash": checkpoint_hash,
+                        "checkpoint_json": checkpoint_json,
+                        "status": status,
                     }
                 ]),
             ))
             .await
             .context("persist governed program checkpoint")
     }
+}
+
+impl GovernedProgramCheckpoint {
+    fn validate_continuation(&self, context: &GovernedProgramContext) -> Result<()> {
+        if self.checkpoint_sequence == 0
+            || self.concurrency_version != self.checkpoint_sequence
+            || self.continuation_manifest.decision_event_cursor != self.event_step
+            || (self.checkpoint_sequence == 1 && self.parent_checkpoint_hash.is_some())
+            || (self.checkpoint_sequence > 1 && self.parent_checkpoint_hash.is_none())
+        {
+            bail!("governed program checkpoint cursor/concurrency lineage is invalid");
+        }
+        let expected_manifest = continuation_manifest(
+            context,
+            self.event_step,
+            &self.values,
+            &self.evidence_overlays,
+        )?;
+        if self.continuation_manifest != expected_manifest
+            || self.continuation_manifest_hash != hash_json(&expected_manifest)?
+        {
+            bail!("governed program continuation dependencies changed or were revoked");
+        }
+        let expected_summary = compaction_summary(self);
+        if self.compaction_summary != expected_summary
+            || self.compaction_summary_hash != hash_json(&expected_summary)?
+        {
+            bail!("governed program compaction summary does not match persisted state");
+        }
+        Ok(())
+    }
+}
+
+fn continuation_manifest(
+    context: &GovernedProgramContext,
+    decision_event_cursor: u32,
+    values: &HashMap<String, NodeValue>,
+    evidence_overlays: &HashMap<String, Vec<Value>>,
+) -> Result<ContinuationManifest> {
+    let mut dependency_refs = context
+        .evidence
+        .iter()
+        .map(|evidence| format!("{}:{}", evidence.kind, evidence.id))
+        .collect::<Vec<_>>();
+    dependency_refs.sort();
+    dependency_refs.dedup();
+    let decision_state = values
+        .iter()
+        .filter_map(|(node_id, value)| match value {
+            NodeValue::Decision(_) => Some((node_id.clone(), value.as_json())),
+            _ => None,
+        })
+        .collect::<serde_json::Map<_, _>>();
+    Ok(ContinuationManifest {
+        bounded_state_hash: hash_json(&context.bounded_state)?,
+        dependency_refs,
+        acquired_evidence_hash: hash_json(evidence_overlays)?,
+        decision_state_hash: hash_json(&decision_state)?,
+        decision_event_cursor,
+    })
+}
+
+fn compaction_summary(checkpoint: &GovernedProgramCheckpoint) -> CompactionSummary {
+    let mut completed_nodes = checkpoint.values.keys().cloned().collect::<Vec<_>>();
+    completed_nodes.sort();
+    CompactionSummary {
+        current_node: checkpoint.current_node.clone(),
+        completed_nodes,
+        event_step: checkpoint.event_step,
+    }
+}
+
+fn hash_json(value: &impl Serialize) -> Result<String> {
+    let canonical = serde_json::to_value(value).context("serialize checkpoint lineage value")?;
+    let bytes = serde_json::to_vec(&canonical).context("encode checkpoint lineage value")?;
+    Ok(format!("{:x}", Sha256::digest(bytes)))
 }
 
 #[async_trait]
@@ -293,14 +437,14 @@ impl ComputeService for BuiltinComputeService {
                         .get(&key)
                         .context("dependency disappeared during deterministic merge")?;
                     let object = value.as_object().with_context(|| {
-                        format!("dependency '{key}' must be an object for merge_object_dependencies")
+                        format!(
+                            "dependency '{key}' must be an object for merge_object_dependencies"
+                        )
                     })?;
                     for (field, value) in object {
                         if let Some(existing) = merged.get(field) {
                             if existing != value {
-                                bail!(
-                                    "merge_object_dependencies conflict for field '{field}'"
-                                );
+                                bail!("merge_object_dependencies conflict for field '{field}'");
                             }
                         } else {
                             merged.insert(field.clone(), value.clone());
@@ -486,7 +630,9 @@ impl IntelligenceEventRecorder for StdbIntelligenceEventRecorder<'_> {
         response: &DecisionResponse,
     ) -> Result<u64> {
         self.writer
-            .call_reducer(ReducerCall::from_name("record_ai_decision_event", json!([
+            .call_reducer(ReducerCall::from_name(
+                "record_ai_decision_event",
+                json!([
                     context.organization_id,
                     context.company_id,
                     context.run_id,
@@ -505,7 +651,8 @@ impl IntelligenceEventRecorder for StdbIntelligenceEventRecorder<'_> {
                         "input_tokens": response.input_tokens,
                         "output_tokens": response.output_tokens,
                     }
-                ])))
+                ]),
+            ))
             .await
             .context("record durable decision event")?;
         self.resolve_event_id(context, step_no, "decision").await
@@ -520,7 +667,9 @@ impl IntelligenceEventRecorder for StdbIntelligenceEventRecorder<'_> {
         outcome: &ReasoningOutcome,
     ) -> Result<u64> {
         self.writer
-            .call_reducer(ReducerCall::from_name("record_ai_reasoning_event", json!([
+            .call_reducer(ReducerCall::from_name(
+                "record_ai_reasoning_event",
+                json!([
                     context.organization_id,
                     context.company_id,
                     context.run_id,
@@ -536,7 +685,8 @@ impl IntelligenceEventRecorder for StdbIntelligenceEventRecorder<'_> {
                         "input_tokens": 0,
                         "output_tokens": 0,
                     }
-                ])))
+                ]),
+            ))
             .await
             .context("record durable reasoning event")?;
         self.resolve_event_id(context, step_no, "reasoning").await
@@ -1002,10 +1152,7 @@ impl GovernedProgramExecutor<'_> {
                         batch_json.insert(id.clone(), serde_json::to_value(&execution.value)?);
                         values.insert(id, NodeValue::Decision(execution.value));
                     }
-                    values.insert(
-                        node.id.clone(),
-                        NodeValue::Json(Value::Object(batch_json)),
-                    );
+                    values.insert(node.id.clone(), NodeValue::Json(Value::Object(batch_json)));
                     trace.push(step(&node, "parallel decision batch completed"));
                     current = next_or_complete(&node)?;
                 }
@@ -1035,7 +1182,11 @@ impl GovernedProgramExecutor<'_> {
                     };
                     match self
                         .capabilities
-                        .run(context.run_id, &proposal, capability_calls.saturating_sub(1))
+                        .run(
+                            context.run_id,
+                            &proposal,
+                            capability_calls.saturating_sub(1),
+                        )
                         .await?
                     {
                         CapabilityStepOutcome::Executed(output)
@@ -1097,8 +1248,7 @@ impl GovernedProgramExecutor<'_> {
                 }
                 DecisionNode::AcquireEvidence(acquire) => {
                     capability_calls += 1;
-                    let mut arguments =
-                        arguments_for_node(&node, &values, &context.bounded_state);
+                    let mut arguments = arguments_for_node(&node, &values, &context.bounded_state);
                     if let Some(object) = arguments.as_object_mut() {
                         object.insert("max_rows".to_string(), acquire.max_rows.into());
                     }
@@ -1109,7 +1259,11 @@ impl GovernedProgramExecutor<'_> {
                     };
                     match self
                         .capabilities
-                        .run(context.run_id, &proposal, capability_calls.saturating_sub(1))
+                        .run(
+                            context.run_id,
+                            &proposal,
+                            capability_calls.saturating_sub(1),
+                        )
                         .await?
                     {
                         CapabilityStepOutcome::Executed(output)
@@ -1117,7 +1271,9 @@ impl GovernedProgramExecutor<'_> {
                             let count = evidence_acquisitions.entry(node.id.clone()).or_default();
                             if *count >= 1 {
                                 return Ok(outcome(
-                                    GovernedProgramStop::EarlyStop(StopReason::InsufficientEvidence),
+                                    GovernedProgramStop::EarlyStop(
+                                        StopReason::InsufficientEvidence,
+                                    ),
                                     None,
                                     values,
                                     trace,
@@ -1153,11 +1309,9 @@ impl GovernedProgramExecutor<'_> {
                                     invalidated.len()
                                 ),
                             });
-                            current = acquire
-                                .affects
-                                .first()
-                                .cloned()
-                                .context("acquire evidence must declare at least one affected node")?;
+                            current = acquire.affects.first().cloned().context(
+                                "acquire evidence must declare at least one affected node",
+                            )?;
                         }
                         CapabilityStepOutcome::Denied(reason) => {
                             return Ok(outcome(
@@ -1211,15 +1365,21 @@ impl GovernedProgramExecutor<'_> {
                     }
                 }
                 DecisionNode::Verify(verify) => {
-                    let source = values
-                        .get(&verify.source)
-                        .with_context(|| format!("verify source '{}' has no output", verify.source))?;
+                    let source = values.get(&verify.source).with_context(|| {
+                        format!("verify source '{}' has no output", verify.source)
+                    })?;
                     let NodeValue::Tool(tool) = source else {
-                        bail!("verify node '{}' source must be a capability output", node.id);
+                        bail!(
+                            "verify node '{}' source must be a capability output",
+                            node.id
+                        );
                     };
                     match self.verification.verify(tool, &context.evidence).await? {
                         VerificationOutcome::Verified => {
-                            values.insert(node.id.clone(), NodeValue::Json(json!({"verified": true})));
+                            values.insert(
+                                node.id.clone(),
+                                NodeValue::Json(json!({"verified": true})),
+                            );
                             trace.push(step(&node, "verification passed"));
                             current = next_or_complete(&node)?;
                         }
@@ -1364,7 +1524,10 @@ impl GovernedProgramExecutor<'_> {
                                 CapabilityStepOutcome::Executed(output)
                                 | CapabilityStepOutcome::Replayed(output) => {
                                     values.insert(node.id.clone(), NodeValue::Tool(output));
-                                    trace.push(step(&node, "reasoning capability proposal admitted"));
+                                    trace.push(step(
+                                        &node,
+                                        "reasoning capability proposal admitted",
+                                    ));
                                 }
                                 CapabilityStepOutcome::Denied(reason) => {
                                     return Ok(outcome(
@@ -1423,8 +1586,14 @@ impl GovernedProgramExecutor<'_> {
                         }
                         ReasoningOutcome::DecisionProposal(proposal) => {
                             proposal.validate()?;
-                            values.insert(node.id.clone(), NodeValue::Json(serde_json::to_value(proposal)?));
-                            trace.push(step(&node, "reasoning decision proposal returned to runtime"));
+                            values.insert(
+                                node.id.clone(),
+                                NodeValue::Json(serde_json::to_value(proposal)?),
+                            );
+                            trace.push(step(
+                                &node,
+                                "reasoning decision proposal returned to runtime",
+                            ));
                         }
                         ReasoningOutcome::ProgramPatchProposal(proposal) => {
                             return Ok(outcome(
@@ -1642,9 +1811,26 @@ impl GovernedProgramExecutor<'_> {
             .save(
                 context,
                 &GovernedProgramCheckpoint {
-                    schema_version: 1,
+                    schema_version: 2,
                     program_ref: context.program_ref.clone(),
                     graph_hash: graph_hash.to_string(),
+                    checkpoint_sequence: 0,
+                    concurrency_version: 0,
+                    parent_checkpoint_hash: None,
+                    continuation_manifest: continuation_manifest(
+                        context,
+                        event_step,
+                        values,
+                        evidence_overlays,
+                    )?,
+                    continuation_manifest_hash: String::new(),
+                    compaction_summary: CompactionSummary {
+                        current_node: current_node.to_string(),
+                        completed_nodes: Vec::new(),
+                        event_step,
+                    },
+                    compaction_summary_hash: String::new(),
+                    persisted_hash: None,
                     current_node: current_node.to_string(),
                     values: values.clone(),
                     trace: trace.to_vec(),
@@ -1850,7 +2036,10 @@ fn state_for_node_with_evidence(
 }
 
 fn affected_closure(graph: &DecisionGraph, roots: &[String]) -> std::collections::HashSet<String> {
-    let mut affected = roots.iter().cloned().collect::<std::collections::HashSet<_>>();
+    let mut affected = roots
+        .iter()
+        .cloned()
+        .collect::<std::collections::HashSet<_>>();
     let mut changed = true;
     while changed {
         changed = false;
@@ -1867,7 +2056,9 @@ fn affected_closure(graph: &DecisionGraph, roots: &[String]) -> std::collections
                 DecisionNode::Verify(verify) => affected.contains(&verify.source),
                 DecisionNode::EarlyStop(stop) => affected.contains(&stop.source),
                 DecisionNode::RequireApproval(approval) => affected.contains(&approval.source),
-                DecisionNode::Batch(batch) => batch.members.iter().any(|member| affected.contains(member)),
+                DecisionNode::Batch(batch) => {
+                    batch.members.iter().any(|member| affected.contains(member))
+                }
                 _ => false,
             };
             if depends_on_affected || structurally_reads_affected {
@@ -1890,7 +2081,9 @@ fn state_for_node(
             .get(only)
             .map(NodeValue::as_json)
             .unwrap_or_else(|| fallback.clone()),
-        _ => serde_json::to_value(dependency_json(node, values)).unwrap_or_else(|_| fallback.clone()),
+        _ => {
+            serde_json::to_value(dependency_json(node, values)).unwrap_or_else(|_| fallback.clone())
+        }
     }
 }
 
@@ -1932,9 +2125,9 @@ impl GovernedProgramExecutor<'_> {
                 GateCondition::ProbabilityAtLeast(threshold) => decision
                     .probability
                     .is_some_and(|value| value >= *threshold),
-                GateCondition::ProbabilityBelow(threshold) => decision
-                    .probability
-                    .is_some_and(|value| value < *threshold),
+                GateCondition::ProbabilityBelow(threshold) => {
+                    decision.probability.is_some_and(|value| value < *threshold)
+                }
                 GateCondition::ScoreAtLeast(threshold) => {
                     decision.score.is_some_and(|value| value >= *threshold)
                 }
@@ -2003,7 +2196,6 @@ fn json_fingerprint(value: &Value) -> Result<String> {
     let encoded = serde_json::to_vec(value)?;
     Ok(format!("{:x}", Sha256::digest(encoded)))
 }
-
 
 fn evidence_for_node(
     node: &GraphNode,
@@ -2140,8 +2332,8 @@ mod generated_capability_detection_tests {
 
 pub(super) fn report_analysis_graph() -> DecisionGraph {
     use super::decision_graph::{
-        CapabilityNode, ComputeNode, GateBranch, GateNode, GenerateNode,
-        ProbabilityDecisionNode, ReasonNode, VerifyNode,
+        CapabilityNode, ComputeNode, GateBranch, GateNode, GenerateNode, ProbabilityDecisionNode,
+        ReasonNode, VerifyNode,
     };
     use super::intelligence::{
         DecisionTypeRef, PROPOSAL_KIND_CLARIFICATION, PROPOSAL_KIND_FINAL_DRAFT,
@@ -2261,7 +2453,10 @@ fn next_or_complete(node: &GraphNode) -> Result<String> {
     if let Some(next) = &node.next {
         return Ok(next.clone());
     }
-    bail!("terminal node '{}' must be Generate, EarlyStop, or have a next successor", node.id)
+    bail!(
+        "terminal node '{}' must be Generate, EarlyStop, or have a next successor",
+        node.id
+    )
 }
 
 fn outcome(
@@ -2282,6 +2477,103 @@ fn outcome(
         trace,
         decision_calls,
         capability_calls,
+    }
+}
+
+#[cfg(test)]
+mod continuation_lineage_tests {
+    use super::*;
+
+    fn context(evidence_id: &str) -> GovernedProgramContext {
+        GovernedProgramContext {
+            organization_id: 7,
+            company_id: 11,
+            run_id: 13,
+            program_ref: "lineage-test".to_string(),
+            objective: "test checked continuation".to_string(),
+            bounded_state: json!({"question": "what changed?"}),
+            evidence: vec![EvidenceRef {
+                kind: "knowledge_version".to_string(),
+                id: evidence_id.to_string(),
+            }],
+        }
+    }
+
+    fn checkpoint(context: &GovernedProgramContext) -> GovernedProgramCheckpoint {
+        let mut checkpoint = GovernedProgramCheckpoint {
+            schema_version: 2,
+            program_ref: context.program_ref.clone(),
+            graph_hash: "graph-hash".to_string(),
+            checkpoint_sequence: 2,
+            concurrency_version: 2,
+            parent_checkpoint_hash: Some("b".repeat(64)),
+            continuation_manifest: continuation_manifest(
+                context,
+                3,
+                &HashMap::new(),
+                &HashMap::new(),
+            )
+            .unwrap(),
+            continuation_manifest_hash: String::new(),
+            compaction_summary: CompactionSummary {
+                current_node: String::new(),
+                completed_nodes: Vec::new(),
+                event_step: 0,
+            },
+            compaction_summary_hash: String::new(),
+            persisted_hash: None,
+            current_node: "review".to_string(),
+            values: HashMap::from([("collect".to_string(), NodeValue::Json(json!({"ok": true})))]),
+            trace: vec![GovernedProgramTraceStep {
+                node_id: "collect".to_string(),
+                kind: "compute".to_string(),
+                summary: "collected".to_string(),
+            }],
+            event_step: 3,
+            decision_calls: 1,
+            capability_calls: 0,
+            reason_iterations: HashMap::new(),
+            evidence_overlays: HashMap::new(),
+            evidence_acquisitions: HashMap::new(),
+            pending_approval: None,
+        };
+        checkpoint.continuation_manifest = continuation_manifest(
+            context,
+            checkpoint.event_step,
+            &checkpoint.values,
+            &checkpoint.evidence_overlays,
+        )
+        .unwrap();
+        checkpoint.continuation_manifest_hash =
+            hash_json(&checkpoint.continuation_manifest).unwrap();
+        checkpoint.compaction_summary = compaction_summary(&checkpoint);
+        checkpoint.compaction_summary_hash = hash_json(&checkpoint.compaction_summary).unwrap();
+        checkpoint
+    }
+
+    #[test]
+    fn continuation_rejects_revoked_or_replaced_dependency_snapshot() {
+        let original = context("knowledge:42:version:3");
+        let checkpoint = checkpoint(&original);
+        checkpoint.validate_continuation(&original).unwrap();
+
+        let replacement = context("knowledge:42:version:4");
+        let error = checkpoint.validate_continuation(&replacement).unwrap_err();
+        assert!(error
+            .to_string()
+            .contains("dependencies changed or were revoked"));
+    }
+
+    #[test]
+    fn continuation_rejects_forged_compaction_summary_and_cursor() {
+        let context = context("knowledge:42:version:3");
+        let mut checkpoint = checkpoint(&context);
+        checkpoint.compaction_summary.current_node = "publish".to_string();
+        assert!(checkpoint.validate_continuation(&context).is_err());
+
+        let mut checkpoint = checkpoint(&context);
+        checkpoint.concurrency_version = 9;
+        assert!(checkpoint.validate_continuation(&context).is_err());
     }
 }
 
@@ -2308,8 +2600,8 @@ mod threshold_gate_tests {
         RecordingApprovalCoordinator, ShapeOnlyFinalAnswerAdmission, ShapeOnlyVerificationService,
     };
     use crate::orchestrator::intelligence::{
-        DecisionRequest, DecisionResponse, GenerationRequest, GenerationResponse,
-        ReasoningOutcome, ReasoningRequest,
+        DecisionRequest, DecisionResponse, GenerationRequest, GenerationResponse, ReasoningOutcome,
+        ReasoningRequest,
     };
     use crate::orchestrator::precedent::InMemoryPrecedentStore;
     use crate::orchestrator::probabilistic::{
@@ -2705,7 +2997,10 @@ mod threshold_gate_tests {
             response: &DecisionResponse,
         ) -> Result<u64> {
             self.decisions.lock().unwrap().push(response.clone());
-            Ok(self.next_id.fetch_add(1, std::sync::atomic::Ordering::SeqCst) + 1)
+            Ok(self
+                .next_id
+                .fetch_add(1, std::sync::atomic::Ordering::SeqCst)
+                + 1)
         }
 
         async fn record_reasoning(
@@ -2720,7 +3015,10 @@ mod threshold_gate_tests {
                 .lock()
                 .unwrap()
                 .push(reasoning_outcome_kind_label(outcome).to_string());
-            Ok(self.next_id.fetch_add(1, std::sync::atomic::Ordering::SeqCst) + 1)
+            Ok(self
+                .next_id
+                .fetch_add(1, std::sync::atomic::Ordering::SeqCst)
+                + 1)
         }
 
         async fn set_verification(
@@ -2864,7 +3162,10 @@ mod threshold_gate_tests {
         // reaching the EarlyStop node.
         let recorder = RecordingIntelligenceRecorder::default();
         let outcome = run_single_decision(0.1, &recorder).await;
-        assert!(matches!(outcome.stop, GovernedProgramStop::ReviewRequired(_)));
+        assert!(matches!(
+            outcome.stop,
+            GovernedProgramStop::ReviewRequired(_)
+        ));
         let escalations = recorder.escalations.lock().unwrap();
         assert_eq!(escalations.len(), 1);
         assert_eq!(escalations[0].1, "review_required");
@@ -3085,14 +3386,23 @@ mod threshold_gate_tests {
             &recorder,
         )
         .await;
-        assert!(matches!(outcome.stop, GovernedProgramStop::ReviewRequired(_)));
+        assert!(matches!(
+            outcome.stop,
+            GovernedProgramStop::ReviewRequired(_)
+        ));
         // The draft is preserved for inspection but not released as complete.
-        assert_eq!(outcome.final_content.as_deref(), Some("The standard rate applies."));
+        assert_eq!(
+            outcome.final_content.as_deref(),
+            Some("The standard rate applies.")
+        );
         let verifications = recorder.verifications.lock().unwrap();
         assert_eq!(verifications.len(), 1);
         assert_eq!(verifications[0].1, "failed");
         let reason = verifications[0].2.as_deref().unwrap();
         assert!(reason.starts_with("[deterministic]"), "{reason}");
-        assert!(reason.contains("does not resolve to a recorded passage"), "{reason}");
+        assert!(
+            reason.contains("does not resolve to a recorded passage"),
+            "{reason}"
+        );
     }
 }

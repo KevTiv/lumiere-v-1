@@ -26,17 +26,17 @@ use std::collections::HashSet;
 
 use anyhow::Result;
 use async_trait::async_trait;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use super::answer_gate::{
-    collect_json_figures, extract_figures, EvidenceGatedAnswerAdmission, GatePolicy, GateScope,
-    PassageCatalog, SourcePassage,
+    collect_json_figures, extract_figures, AnswerProvenance, ClaimAssessment, ClaimVerification,
+    EvidenceGatedAnswerAdmission, GatePolicy, GateScope, PassageCatalog, SourcePassage,
 };
 use super::governed_services::{
     qualified_content, AdmissionEvidence, AnswerAdmissionOutcome, VerificationMethod,
 };
-use super::intelligence::{EvidenceRef, FinalDraft};
+use super::intelligence::{ClaimedCalculation, EvidenceRef, FinalDraft, PassageCitation};
 use crate::providers::llm::LlmMessage;
 
 /// What the server itself established while producing an answer.
@@ -93,12 +93,159 @@ pub struct TextAnswerVerification {
     pub reason: Option<String>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+/// One claim in a free-text answer and the server-known evidence the claim
+/// relies on. Support references are never copied from display snippets.
+#[derive(Debug, Clone, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct TextClaimProvenance {
+    pub text: String,
+    pub support_refs: Vec<EvidenceRef>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub passage_support: Vec<PassageCitation>,
+    pub verification_method: &'static str,
+    pub verification_outcome: &'static str,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub limitations: Vec<String>,
+}
+
+/// Structured provenance returned with every model-produced text answer.
+/// `persisted` is explicit because run-local tool results can support release
+/// without automatically becoming durable source passages.
+#[derive(Debug, Clone, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct TextAnswerProvenance {
+    pub claims: Vec<TextClaimProvenance>,
+    pub citations: Vec<EvidenceRef>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub calculations: Vec<TextCalculationProvenance>,
+    pub persisted: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub persistence_reason: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub contribution_id: Option<u64>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub claim_ids: Vec<u64>,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct TextCalculationProvenance {
+    #[serde(flatten)]
+    pub calculation: ClaimedCalculation,
+    pub verification_method: &'static str,
+    pub verification_outcome: &'static str,
+}
+
+impl TextAnswerProvenance {
+    pub fn mark_persisted(&mut self, contribution_id: u64, claim_ids: Vec<u64>) {
+        self.persisted = true;
+        self.persistence_reason = None;
+        self.contribution_id = (contribution_id != 0).then_some(contribution_id);
+        self.claim_ids = claim_ids;
+    }
+
+    pub fn mark_not_persisted(&mut self, reason: impl Into<String>) {
+        self.persisted = false;
+        self.persistence_reason = Some(reason.into());
+        self.contribution_id = None;
+        self.claim_ids.clear();
+    }
+
+    /// Remove every model-authored or model-selected value before a candidate
+    /// is withheld. A safe answer notice must not be paired with raw claim
+    /// text, calculations, or citation selections in another response field.
+    pub fn redact_for_withholding(&mut self, reason: impl Into<String>) {
+        self.claims.clear();
+        self.citations.clear();
+        self.calculations.clear();
+        self.persisted = false;
+        self.persistence_reason = Some(reason.into());
+        self.contribution_id = None;
+        self.claim_ids.clear();
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub struct GatedTextAnswer {
     /// The text safe to show: the candidate (with limitations appended when
     /// qualified), or `None` when it was withheld.
     pub released: Option<String>,
     pub verification: TextAnswerVerification,
+    pub provenance: TextAnswerProvenance,
+    pub(super) durable_provenance: AnswerProvenance,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct StructuredTextDraft {
+    content: String,
+    claims: Vec<StructuredTextClaim>,
+    #[serde(default)]
+    calculations: Vec<ClaimedCalculation>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct StructuredTextClaim {
+    text: String,
+    #[serde(default)]
+    support_refs: Vec<EvidenceRef>,
+    #[serde(default)]
+    passage_support: Vec<PassageCitation>,
+}
+
+fn empty_provenance(reason: &str) -> TextAnswerProvenance {
+    TextAnswerProvenance {
+        claims: Vec::new(),
+        citations: Vec::new(),
+        calculations: Vec::new(),
+        persisted: false,
+        persistence_reason: Some(reason.to_string()),
+        contribution_id: None,
+        claim_ids: Vec::new(),
+    }
+}
+
+fn blocked_text_answer(reason: impl Into<String>) -> GatedTextAnswer {
+    let reason = reason.into();
+    GatedTextAnswer {
+        released: None,
+        verification: TextAnswerVerification {
+            outcome: TextAnswerOutcome::Blocked,
+            methods: vec!["deterministic"],
+            limitations: Vec::new(),
+            reason: Some(reason.clone()),
+        },
+        provenance: empty_provenance(&reason),
+        durable_provenance: AnswerProvenance::default(),
+    }
+}
+
+fn parse_candidate(
+    candidate: &str,
+    _evidence: &TextEvidence,
+) -> Result<StructuredTextDraft, String> {
+    let trimmed = candidate.trim();
+    if trimmed.starts_with('{') {
+        return serde_json::from_str(trimmed)
+            .map_err(|error| format!("structured answer is malformed: {error}"));
+    }
+    Ok(StructuredTextDraft {
+        content: candidate.to_string(),
+        claims: (!trimmed.is_empty())
+            .then(|| StructuredTextClaim {
+                text: candidate.to_string(),
+                // Compatibility only: a prose response has no trustworthy
+                // claim-to-evidence mapping. Co-occurrence with run evidence
+                // is not support, so the synthesized claim stays unverified
+                // and forces a qualified/review outcome.
+                support_refs: Vec::new(),
+                passage_support: Vec::new(),
+            })
+            .into_iter()
+            .collect(),
+        calculations: Vec::new(),
+    })
 }
 
 impl GatedTextAnswer {
@@ -174,6 +321,79 @@ pub async fn gate_text_answer(
     candidate: &str,
     evidence: &TextEvidence,
 ) -> Result<GatedTextAnswer> {
+    let structured = match parse_candidate(candidate, evidence) {
+        Ok(structured) => structured,
+        Err(reason) => return Ok(blocked_text_answer(reason)),
+    };
+    let known: HashSet<EvidenceRef> = evidence.refs.iter().cloned().collect();
+    if structured.claims.is_empty() && !structured.content.trim().is_empty() {
+        return Ok(blocked_text_answer(
+            "structured answer must identify at least one material claim",
+        ));
+    }
+    let normalized_content = structured
+        .content
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ");
+    let normalized_claims = structured
+        .claims
+        .iter()
+        .flat_map(|claim| claim.text.split_whitespace())
+        .collect::<Vec<_>>()
+        .join(" ");
+    if normalized_content != normalized_claims {
+        return Ok(blocked_text_answer(
+            "structured claims must cover the complete answer content in order",
+        ));
+    }
+
+    let mut citations = Vec::new();
+    let mut claim_provenance = Vec::with_capacity(structured.claims.len());
+    let mut claim_limitations = Vec::new();
+    for claim in &structured.claims {
+        if claim.text.trim().is_empty() || !structured.content.contains(claim.text.trim()) {
+            return Ok(blocked_text_answer(
+                "each structured claim must be nonempty and appear in answer content",
+            ));
+        }
+        if !claim.passage_support.is_empty() {
+            return Ok(blocked_text_answer(
+                "passage support is not accepted without a server-side passage catalog",
+            ));
+        }
+        for support in &claim.support_refs {
+            if !known.contains(support) {
+                return Ok(blocked_text_answer(format!(
+                    "claim support '{}:{}' was not produced by this run",
+                    support.kind, support.id
+                )));
+            }
+            if !citations.contains(support) {
+                citations.push(support.clone());
+            }
+        }
+        let limitations = if claim.support_refs.is_empty() {
+            let limitation = format!("claim has no server-known support: {}", claim.text.trim());
+            claim_limitations.push(limitation.clone());
+            vec![limitation]
+        } else {
+            Vec::new()
+        };
+        claim_provenance.push(TextClaimProvenance {
+            text: claim.text.trim().to_string(),
+            support_refs: claim.support_refs.clone(),
+            passage_support: claim.passage_support.clone(),
+            verification_method: "deterministic",
+            verification_outcome: if claim.support_refs.is_empty() {
+                "unverified"
+            } else {
+                "traceable"
+            },
+            limitations,
+        });
+    }
+
     let catalog = NoPassages;
     let gate = EvidenceGatedAnswerAdmission {
         scope: GateScope {
@@ -186,9 +406,13 @@ pub async fn gate_text_answer(
         catalog: &catalog,
         claim_checker: None,
     };
-    let known: HashSet<EvidenceRef> = evidence.refs.iter().cloned().collect();
-    let draft = FinalDraft::new(candidate.to_string(), evidence.refs.clone());
-    let (report, _) = gate
+    let draft = FinalDraft {
+        content: structured.content.clone(),
+        citations: citations.clone(),
+        claims: Vec::new(),
+        calculations: structured.calculations.clone(),
+    };
+    let (report, mut durable_provenance) = gate
         .evaluate(
             &draft,
             &AdmissionEvidence {
@@ -203,43 +427,98 @@ pub async fn gate_text_answer(
         .iter()
         .map(|method: &VerificationMethod| method.label())
         .collect();
-    Ok(match report.outcome {
+    durable_provenance.claims = claim_provenance
+        .iter()
+        .map(|claim| ClaimAssessment {
+            text: claim.text.clone(),
+            passage_ids: Vec::new(),
+            verification: ClaimVerification::NoSupportCited,
+        })
+        .collect();
+    let calculations = structured
+        .calculations
+        .iter()
+        .zip(&durable_provenance.calculations)
+        .map(|(calculation, assessment)| TextCalculationProvenance {
+            calculation: calculation.clone(),
+            verification_method: "deterministic",
+            verification_outcome: if assessment.recomputes {
+                "supported"
+            } else {
+                "unsupported"
+            },
+        })
+        .collect();
+    let provenance = TextAnswerProvenance {
+        claims: claim_provenance,
+        citations,
+        calculations,
+        persisted: false,
+        persistence_reason: Some("answer provenance has not been durably recorded".to_string()),
+        contribution_id: None,
+        claim_ids: Vec::new(),
+    };
+    let outcome = match report.outcome {
+        AnswerAdmissionOutcome::Admitted if !claim_limitations.is_empty() => {
+            AnswerAdmissionOutcome::Qualified {
+                limitations: claim_limitations,
+            }
+        }
+        other => other,
+    };
+    Ok(match outcome {
         AnswerAdmissionOutcome::Admitted => GatedTextAnswer {
-            released: Some(candidate.to_string()),
+            released: Some(structured.content.clone()),
             verification: TextAnswerVerification {
                 outcome: TextAnswerOutcome::Admitted,
                 methods,
                 limitations: Vec::new(),
                 reason: None,
             },
+            provenance,
+            durable_provenance,
         },
         AnswerAdmissionOutcome::Qualified { limitations } => GatedTextAnswer {
-            released: Some(qualified_content(candidate, &limitations)),
+            released: Some(qualified_content(&structured.content, &limitations)),
             verification: TextAnswerVerification {
                 outcome: TextAnswerOutcome::Qualified,
                 methods,
                 limitations,
                 reason: None,
             },
+            provenance,
+            durable_provenance,
         },
-        AnswerAdmissionOutcome::RequiresReview { reason } => GatedTextAnswer {
-            released: None,
-            verification: TextAnswerVerification {
-                outcome: TextAnswerOutcome::RequiresReview,
-                methods,
-                limitations: Vec::new(),
-                reason: Some(reason),
-            },
-        },
-        AnswerAdmissionOutcome::Blocked { reason } => GatedTextAnswer {
-            released: None,
-            verification: TextAnswerVerification {
-                outcome: TextAnswerOutcome::Blocked,
-                methods,
-                limitations: Vec::new(),
-                reason: Some(reason),
-            },
-        },
+        AnswerAdmissionOutcome::RequiresReview { reason } => {
+            let mut provenance = provenance;
+            provenance.redact_for_withholding("candidate withheld pending review");
+            GatedTextAnswer {
+                released: None,
+                verification: TextAnswerVerification {
+                    outcome: TextAnswerOutcome::RequiresReview,
+                    methods,
+                    limitations: Vec::new(),
+                    reason: Some(reason),
+                },
+                provenance,
+                durable_provenance: AnswerProvenance::default(),
+            }
+        }
+        AnswerAdmissionOutcome::Blocked { reason } => {
+            let mut provenance = provenance;
+            provenance.redact_for_withholding("candidate blocked by answer gate");
+            GatedTextAnswer {
+                released: None,
+                verification: TextAnswerVerification {
+                    outcome: TextAnswerOutcome::Blocked,
+                    methods,
+                    limitations: Vec::new(),
+                    reason: Some(reason),
+                },
+                provenance,
+                durable_provenance: AnswerProvenance::default(),
+            }
+        }
     })
 }
 
@@ -256,31 +535,43 @@ mod tests {
         evidence
     }
 
-    #[tokio::test]
-    async fn an_answer_whose_figures_trace_to_the_data_is_admitted_unchanged() {
-        let evidence = evidence(json!({ "amount_total": 1250.5, "state": "sale" }));
-        let answer = "Order #42 totals $1,250.50 and is confirmed.";
-        let gated = gate_text_answer(1, 2, answer, &evidence).await.unwrap();
-        assert_eq!(gated.verification.outcome, TextAnswerOutcome::Admitted);
-        assert_eq!(gated.released.as_deref(), Some(answer));
-        assert_eq!(gated.verification.methods, vec!["deterministic"]);
+    fn structured(content: &str, kind: &str, id: &str) -> String {
+        json!({
+            "content": content,
+            "claims": [{
+                "text": content,
+                "supportRefs": [{"kind": kind, "id": id}],
+                "passageSupport": []
+            }],
+            "calculations": []
+        })
+        .to_string()
     }
 
     #[tokio::test]
-    async fn an_untraceable_figure_qualifies_and_the_caveat_travels_with_the_text() {
+    async fn an_answer_whose_figures_trace_to_the_data_is_admitted_unchanged() {
+        let evidence = evidence(json!({ "amount_total": 1250.5, "state": "sale" }));
+        let content = "Order #42 totals $1,250.50 and is confirmed.";
+        let answer = structured(content, "live_snapshot", "sale_order:42");
+        let gated = gate_text_answer(1, 2, &answer, &evidence).await.unwrap();
+        assert_eq!(gated.verification.outcome, TextAnswerOutcome::Admitted);
+        assert_eq!(gated.released.as_deref(), Some(content));
+        assert_eq!(gated.verification.methods, vec!["deterministic"]);
+        assert_eq!(gated.provenance.claims[0].verification_outcome, "traceable");
+    }
+
+    #[tokio::test]
+    async fn unstructured_prose_is_withheld_even_when_a_figure_is_traceable() {
         let evidence = evidence(json!({ "amount_total": 1250.5 }));
         let gated = gate_text_answer(1, 2, "Order #42 totals $9,999.99.", &evidence)
             .await
             .unwrap();
-        assert_eq!(gated.verification.outcome, TextAnswerOutcome::Qualified);
-        let released = gated.released.unwrap();
-        assert!(released.starts_with("Order #42 totals $9,999.99."));
-        assert!(
-            released.contains("Limitations of this answer:"),
-            "{released}"
+        assert_eq!(
+            gated.verification.outcome,
+            TextAnswerOutcome::RequiresReview
         );
-        assert!(released.contains("9,999.99"), "{released}");
-        assert!(!gated.verification.limitations.is_empty());
+        assert!(gated.released.is_none());
+        assert!(gated.provenance.claims.is_empty());
     }
 
     #[tokio::test]
@@ -318,7 +609,11 @@ mod tests {
         let gated = gate_text_answer(1, 2, "A $5,000.00 deposit is on file.", &evidence)
             .await
             .unwrap();
-        assert_eq!(gated.verification.outcome, TextAnswerOutcome::Admitted);
+        assert_eq!(
+            gated.verification.outcome,
+            TextAnswerOutcome::RequiresReview
+        );
+        assert!(gated.released.is_none());
     }
 
     #[tokio::test]
@@ -334,6 +629,13 @@ mod tests {
         let serialized = serde_json::to_string(&gated.verification).unwrap();
         assert!(!serialized.contains("Secret unverified"), "{serialized}");
         assert!(!gated.withheld_notice().contains("Secret unverified"));
+        let complete = serde_json::to_string(&json!({
+            "answer": gated.withheld_notice(),
+            "verification": gated.verification,
+            "provenance": gated.provenance,
+        }))
+        .unwrap();
+        assert!(!complete.contains("Secret unverified"), "{complete}");
     }
 
     fn tool_result(id: &str, content: Value) -> LlmMessage {
@@ -409,11 +711,25 @@ mod tests {
             ),
         ];
         let evidence = evidence_from_transcript(&transcript);
-        let gated = gate_text_answer(1, 2, "We sold $12,345.67.", &evidence)
-            .await
-            .unwrap();
+        let answer = structured("We sold $12,345.67.", "tool_result", "call-1");
+        let gated = gate_text_answer(1, 2, &answer, &evidence).await.unwrap();
         assert_eq!(gated.verification.outcome, TextAnswerOutcome::Admitted);
         assert!(gated.is_released());
+    }
+
+    #[tokio::test]
+    async fn malformed_unknown_or_incomplete_claim_provenance_is_blocked() {
+        let evidence = evidence(json!({"amount_total": 1250.5}));
+        for candidate in [
+            r#"{"content":"answer","claims":[]}"#,
+            r#"{"content":"answer","claims":[{"text":"answer","supportRefs":[{"kind":"live_snapshot","id":"sale_order:999"}]}]}"#,
+            r#"{"content":"first second","claims":[{"text":"first","supportRefs":[{"kind":"live_snapshot","id":"sale_order:42"}]}]}"#,
+            r#"{"content":"answer","claims": [}"#,
+        ] {
+            let gated = gate_text_answer(1, 2, candidate, &evidence).await.unwrap();
+            assert_eq!(gated.verification.outcome, TextAnswerOutcome::Blocked);
+            assert!(gated.released.is_none());
+        }
     }
 
     #[test]

@@ -72,13 +72,40 @@ pub fn set_document_index_content(
         .or_else(|| document_search_language_for_company(ctx, organization_id, doc.company_id));
 
     let company_id = doc.company_id;
+    let current_version_id = doc.current_version_id;
+    let document_title = doc.name.clone();
     ctx.db.document().id().update(Document {
-        index_content: Some(content),
+        index_content: Some(content.clone()),
         index_language: language,
         write_uid: ctx.sender(),
         write_date: ctx.timestamp,
         ..doc
     });
+
+    // Bind the user-reported DMS index body to the current server-owned
+    // DocumentVersion in this reducer transaction. It is citable with its
+    // explicit verification state, and replacing a version cannot leave its
+    // predecessor current once the new passages are populated.
+    if let (Some(company_id), Some(version_id)) = (company_id, current_version_id) {
+        let version = ctx
+            .db
+            .document_version()
+            .id()
+            .find(&version_id)
+            .ok_or("Current document version not found")?;
+        crate::ai::evidence_source::ingest_document_index_content(
+            ctx,
+            organization_id,
+            company_id,
+            document_id,
+            &document_title,
+            version.version_number,
+            &version.url,
+            version.checksum.as_deref(),
+            &content,
+            "user_reported",
+        )?;
+    }
 
     write_audit_log_v2(
         ctx,

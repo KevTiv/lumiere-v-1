@@ -151,8 +151,7 @@ pub(super) async fn run_proposal_loop(
 
     let mut progress = ProgressTracker::new(limits.max_unchanged_results);
     let mut capability_calls_used = 0_u32;
-    let mut known_evidence: std::collections::HashSet<EvidenceRef> =
-        extract_known_evidence(&state);
+    let mut known_evidence: std::collections::HashSet<EvidenceRef> = extract_known_evidence(&state);
 
     for round in 0..limits.max_rounds {
         let remaining_rounds = limits.max_rounds - round;

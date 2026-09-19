@@ -292,7 +292,6 @@ impl DecisionTypeRegistry for InMemoryDecisionTypeRegistry {
     }
 }
 
-
 pub(super) struct StdbDecisionTypeRegistry<'a> {
     pub writer: &'a StdbClient,
     pub reader: &'a StdbClient,
@@ -501,11 +500,11 @@ fn decode_precedent_policy(value: &Value) -> Result<PrecedentPolicy> {
         None => DecisionCaseStatus::Observed,
     };
     Ok(PrecedentPolicy {
-        enabled: value.get("enabled").and_then(Value::as_bool).unwrap_or(true),
-        max_cases: value
-            .get("max_cases")
-            .and_then(Value::as_u64)
-            .unwrap_or(5) as u32,
+        enabled: value
+            .get("enabled")
+            .and_then(Value::as_bool)
+            .unwrap_or(true),
+        max_cases: value.get("max_cases").and_then(Value::as_u64).unwrap_or(5) as u32,
         minimum_status,
         require_same_program_step: value
             .get("require_same_program_step")
@@ -864,7 +863,9 @@ fn builtin_definitions() -> Vec<DecisionTypeDefinition> {
                 name: "ReportAttentionNeed".to_string(),
                 version: 1,
             },
-            description: "Estimate whether an approved analytics summary warrants focused human follow-up.".to_string(),
+            description:
+                "Estimate whether an approved analytics summary warrants focused human follow-up."
+                    .to_string(),
             kind: DecisionKind::Probability,
             input_schema: StructuralSchema {
                 fields: vec![FieldSchema::required("data", FieldKind::Object)],
@@ -886,7 +887,6 @@ fn builtin_definitions() -> Vec<DecisionTypeDefinition> {
                 always_escalate_risk_classes: vec![],
             },
         },
-
     ]
 }
 

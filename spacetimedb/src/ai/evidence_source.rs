@@ -46,6 +46,7 @@
 use sha2::{Digest, Sha256};
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
+use crate::ai::chat::ai_chat_session;
 use crate::ai::evidence_common::{
     inspection_rank, is_sha256_hex, reference_in_scope, require_len, require_one_of,
     require_opt_len, validate_coordinates, validate_tags,
@@ -260,6 +261,8 @@ pub struct AiEvidenceContribution {
     pub contributor_uid: Identity,
     pub agent_run_id: Option<u64>,
     pub session_ref: String,
+    /// Opaque client correlation within the owned session. This is not a
+    /// verified `ai_chat_message` reference.
     pub turn_ref: Option<String>,
     pub event_ref: Option<String>,
     /// source_version | concept
@@ -331,6 +334,8 @@ pub struct RecordAiEvidenceContributionParams {
     pub contributor_kind: String,
     pub agent_run_id: Option<u64>,
     pub session_ref: String,
+    /// Opaque client correlation within the owned session. This is not a
+    /// verified `ai_chat_message` reference.
     pub turn_ref: Option<String>,
     pub event_ref: Option<String>,
     pub introduced_kind: String,
@@ -357,6 +362,15 @@ pub fn record_ai_evidence_source(
     }
     check_permission(ctx, organization_id, "ai_evidence_source", "create")?;
     require_company_in_organization(ctx, organization_id, company_id)?;
+    record_ai_evidence_source_inner(ctx, organization_id, company_id, params)
+}
+
+fn record_ai_evidence_source_inner(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    params: RecordAiEvidenceSourceParams,
+) -> Result<(), String> {
     validate_source_params(&params)?;
 
     if let Some(existing) = find_source(
@@ -434,6 +448,16 @@ pub fn record_ai_evidence_source_version(
     params: RecordAiEvidenceSourceVersionParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "ai_evidence_source", "create")?;
+    record_ai_evidence_source_version_inner(ctx, organization_id, company_id, source_id, params)
+}
+
+fn record_ai_evidence_source_version_inner(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    source_id: u64,
+    params: RecordAiEvidenceSourceVersionParams,
+) -> Result<(), String> {
     let source = load_source(ctx, organization_id, company_id, source_id)?;
     validate_version_params(&params, &source.retention_policy)?;
 
@@ -459,9 +483,11 @@ pub fn record_ai_evidence_source_version(
         if existing.edition == params.edition
             && existing.publication_date_micros == params.publication_date_micros
             && existing.uri == params.uri
+            && existing.retrieved_at_micros == params.retrieved_at_micros
             && existing.content_hash == params.content_hash
             && existing.snapshot_ref == params.snapshot_ref
             && existing.origin == params.origin
+            && existing.verification == params.verification
             && existing.supersedes_version_id == params.supersedes_version_id
         {
             return Ok(());
@@ -544,11 +570,20 @@ pub fn inspect_ai_evidence_source_version(
             version.status
         ));
     }
-    if version.verification == "inspected" {
-        return Err("version is already inspected".to_string());
-    }
     if !is_sha256_hex(&params.content_hash) {
         return Err("content_hash must be a lowercase hex SHA-256".to_string());
+    }
+    if version.verification == "inspected" {
+        // `None` means "keep the already-recorded snapshot", matching the
+        // initial inspection update below; it is therefore an identical retry.
+        let snapshot_matches = match &params.snapshot_ref {
+            Some(snapshot) => version.snapshot_ref.as_ref() == Some(snapshot),
+            None => true,
+        };
+        if version.content_hash.as_ref() == Some(&params.content_hash) && snapshot_matches {
+            return Ok(());
+        }
+        return Err("version is already inspected with different content or snapshot".to_string());
     }
     if version.content_hash.is_some() && version.content_hash.as_ref() != Some(&params.content_hash)
     {
@@ -608,6 +643,15 @@ pub fn record_ai_evidence_passage(
     }
     check_permission(ctx, organization_id, "ai_evidence_passage", "create")?;
     require_company_in_organization(ctx, organization_id, company_id)?;
+    record_ai_evidence_passage_inner(ctx, organization_id, company_id, params)
+}
+
+fn record_ai_evidence_passage_inner(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    params: RecordAiEvidencePassageParams,
+) -> Result<(), String> {
     validate_params(&params)?;
 
     if let Some(version_id) = params.source_version_id {
@@ -716,6 +760,191 @@ pub fn record_ai_evidence_passage(
     Ok(())
 }
 
+/// Populate the governed evidence tables from the current DMS index content.
+///
+/// This is intentionally called from the atomic `set_document_index_content`
+/// reducer rather than from a browser-facing ingestion endpoint. The caller
+/// has already resolved the server-owned document and current
+/// `DocumentVersion`; the stable source key is the document id and each
+/// version key includes the DMS version number and extracted-content hash.
+/// Since the current reducer accepts an index body rather than parsing the
+/// object bytes itself, these versions remain `user_reported`.
+/// Replays are idempotent, while a new current version retires its predecessor
+/// through the AIH-18 source-change path before its passages can be cited.
+pub(crate) fn ingest_document_index_content(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    document_id: u64,
+    document_title: &str,
+    version_number: u32,
+    version_url: &str,
+    version_checksum: Option<&str>,
+    extracted_content: &str,
+    verification: &str,
+) -> Result<(u64, usize), String> {
+    require_company_in_organization(ctx, organization_id, company_id)?;
+    if extracted_content.trim().is_empty() {
+        return Err("document evidence content must not be empty".to_string());
+    }
+
+    let source_key = format!("document:{document_id}");
+    let extracted_content_hash = format!("{:x}", Sha256::digest(extracted_content.as_bytes()));
+    // The source version snapshot points at the stored object, so its hash is
+    // the object checksum. Passage rows independently hash their extracted
+    // text. Falling back to the text hash keeps the helper usable for legacy
+    // rows that predate mandatory DMS checksums.
+    let content_hash = version_checksum
+        .map(str::trim)
+        .filter(|checksum| !checksum.is_empty())
+        .map(str::to_ascii_lowercase)
+        .unwrap_or_else(|| extracted_content_hash.clone());
+    let version_key = format!(
+        "v{version_number}-{}",
+        version_checksum
+            .filter(|checksum| !checksum.trim().is_empty())
+            .unwrap_or(&extracted_content_hash)
+    );
+    let version_key = if version_key.len() > MAX_VERSION_LEN {
+        format!("v{version_number}-{}", &content_hash[..16])
+    } else {
+        version_key
+    };
+    let snapshot_ref = (!version_url.trim().is_empty()).then(|| version_url.to_string());
+    let source_params = RecordAiEvidenceSourceParams {
+        source_kind: "document".to_string(),
+        source_key: source_key.clone(),
+        title: document_title.to_string(),
+        author_attribution: "unknown".to_string(),
+        authors: Vec::new(),
+        author_organization: None,
+        scope: "company".to_string(),
+        retention_policy: if snapshot_ref.is_some() {
+            "retain_snapshot".to_string()
+        } else {
+            "hash_only".to_string()
+        },
+    };
+    record_ai_evidence_source_inner(ctx, organization_id, company_id, source_params)?;
+    let source = find_source(ctx, organization_id, company_id, "document", &source_key)
+        .ok_or("document evidence source missing after registration")?;
+
+    let existing_version = ctx
+        .db
+        .ai_evidence_source_version()
+        .ai_evidence_source_version_by_source()
+        .filter(&source.id)
+        .find(|version| version.version == version_key);
+    let predecessor = ctx
+        .db
+        .ai_evidence_source_version()
+        .ai_evidence_source_version_by_source()
+        .filter(&source.id)
+        .filter(|version| version.status == STATUS_CURRENT)
+        .find(|version| version.version != version_key);
+    // Preserve the original predecessor on replay. Once the first ingestion
+    // retires it, there is intentionally no *current* predecessor to discover,
+    // but changing `supersedes_version_id` to `None` would turn an identical
+    // retry into a divergent version replay.
+    let supersedes_version_id = existing_version
+        .as_ref()
+        .and_then(|version| version.supersedes_version_id)
+        .or_else(|| predecessor.as_ref().map(|version| version.id));
+
+    record_ai_evidence_source_version_inner(
+        ctx,
+        organization_id,
+        company_id,
+        source.id,
+        RecordAiEvidenceSourceVersionParams {
+            version: version_key.clone(),
+            edition: Some(format!("DMS version {version_number}")),
+            publication_date_micros: None,
+            uri: (!version_url.trim().is_empty()).then(|| version_url.to_string()),
+            retrieved_at_micros: None,
+            content_hash: Some(content_hash.clone()),
+            snapshot_ref,
+            origin: "user_provided".to_string(),
+            verification: verification.to_string(),
+            supersedes_version_id,
+        },
+    )?;
+    let version = ctx
+        .db
+        .ai_evidence_source_version()
+        .ai_evidence_source_version_by_source()
+        .filter(&source.id)
+        .find(|version| version.version == version_key)
+        .ok_or("document evidence version missing after registration")?;
+
+    if let Some(predecessor) = predecessor {
+        crate::ai::evidence_dependency::record_ai_evidence_source_change_inner(
+            ctx,
+            organization_id,
+            company_id,
+            predecessor.id,
+            crate::ai::evidence_dependency::RecordAiEvidenceSourceChangeParams {
+                change_kind: "corrected".to_string(),
+                replacement_version_id: Some(version.id),
+                reason: format!("DMS document {document_id} current version changed"),
+            },
+        )?;
+    }
+
+    let mut passage_count = 0;
+    for (passage_key, passage_text, start, end) in split_document_passages(extracted_content) {
+        let coordinates = vec![format!("chars:{start}-{end}")];
+        record_ai_evidence_passage_inner(
+            ctx,
+            organization_id,
+            company_id,
+            RecordAiEvidencePassageParams {
+                source_kind: "document".to_string(),
+                source_key: source_key.clone(),
+                source_version: version_key.clone(),
+                passage_key,
+                passage_text,
+                effective_from_micros: None,
+                effective_to_micros: None,
+                applicability: vec![format!("document:{document_id}")],
+                source_version_id: Some(version.id),
+                coordinates,
+                text_origin: "extraction".to_string(),
+                processor_ref: Some("dms.index_content".to_string()),
+            },
+        )?;
+        passage_count += 1;
+    }
+    Ok((version.id, passage_count))
+}
+
+/// Split on UTF-8 character boundaries without changing the extracted text.
+/// `MAX_TEXT_LEN` is a byte limit in the durable contract, so a passage never
+/// needs a lossy conversion or a second synthetic search string.
+fn split_document_passages(text: &str) -> Vec<(String, String, usize, usize)> {
+    let mut passages = Vec::new();
+    let mut start = 0;
+    while start < text.len() {
+        let mut end = (start + MAX_TEXT_LEN).min(text.len());
+        while end > start && !text.is_char_boundary(end) {
+            end -= 1;
+        }
+        if end == start {
+            end = text[start..]
+                .char_indices()
+                .nth(1)
+                .map(|(offset, _)| start + offset)
+                .unwrap_or(text.len());
+        }
+        let passage = &text[start..end];
+        if !passage.trim().is_empty() {
+            passages.push((format!("chars-{start}"), passage.to_string(), start, end));
+        }
+        start = end;
+    }
+    passages
+}
+
 /// Record who introduced a source or concept into a discussion. The
 /// contributor is always the authenticated caller, and the recorded
 /// inspection state can never be stronger than the source version's own.
@@ -732,6 +961,21 @@ pub fn record_ai_evidence_contribution(
     check_permission(ctx, organization_id, "ai_evidence_contribution", "create")?;
     require_company_in_organization(ctx, organization_id, company_id)?;
     validate_contribution_params(&params)?;
+
+    if params.contributor_kind == "user" {
+        let session = ctx
+            .db
+            .ai_chat_session()
+            .ai_chat_session_by_key()
+            .filter(&params.session_ref)
+            .find(|session| {
+                session.organization_id == organization_id && session.company_id == company_id
+            })
+            .ok_or("Chat session not found for this organization/company")?;
+        if session.create_uid != ctx.sender() {
+            return Err("Chat session is not owned by the authenticated caller".to_string());
+        }
+    }
 
     if let Some(run_id) = params.agent_run_id {
         let run = ctx
@@ -752,7 +996,15 @@ pub fn record_ai_evidence_contribution(
             .id()
             .find(&version_id)
             .ok_or("Source version not found")?;
-        let source = load_source(ctx, organization_id, company_id, version.source_id)?;
+        if version.organization_id != organization_id {
+            return Err("Source version is outside this organization".to_string());
+        }
+        let source = ctx
+            .db
+            .ai_evidence_source()
+            .id()
+            .find(&version.source_id)
+            .ok_or("Source not found")?;
         if !reference_in_scope(
             source.organization_id,
             source.company_id,
@@ -770,6 +1022,13 @@ pub fn record_ai_evidence_contribution(
                 params.inspection_state, version.verification
             ));
         }
+    }
+
+    if let Some(existing) = find_contribution_replay(ctx, organization_id, company_id, &params) {
+        if contribution_matches(&existing, ctx.sender(), &params) {
+            return Ok(());
+        }
+        return Err("contribution event already recorded with different details".to_string());
     }
 
     let row = ctx
@@ -889,6 +1148,43 @@ pub(crate) fn find_source(
             &source_key.to_string(),
         ))
         .next()
+}
+
+fn find_contribution_replay(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    params: &RecordAiEvidenceContributionParams,
+) -> Option<AiEvidenceContribution> {
+    let event_ref = params.event_ref.as_ref()?;
+    ctx.db
+        .ai_evidence_contribution()
+        .ai_evidence_contribution_by_org()
+        .filter(&organization_id)
+        .find(|row| {
+            row.company_id == company_id
+                && row.contributor_uid == ctx.sender()
+                && row.session_ref == params.session_ref
+                && row.event_ref.as_ref() == Some(event_ref)
+        })
+}
+
+fn contribution_matches(
+    row: &AiEvidenceContribution,
+    contributor_uid: Identity,
+    params: &RecordAiEvidenceContributionParams,
+) -> bool {
+    row.contributor_kind == params.contributor_kind
+        && row.contributor_uid == contributor_uid
+        && row.agent_run_id == params.agent_run_id
+        && row.session_ref == params.session_ref
+        && row.turn_ref == params.turn_ref
+        && row.event_ref == params.event_ref
+        && row.introduced_kind == params.introduced_kind
+        && row.source_version_id == params.source_version_id
+        && row.inspection_state == params.inspection_state
+        && row.is_secondary_quotation == params.is_secondary_quotation
+        && row.note == params.note
 }
 
 pub(crate) fn load_source(
@@ -1378,5 +1674,30 @@ mod tests {
         assert!(validate_contribution_params(&concept_with_source).is_ok());
         concept_with_source.is_secondary_quotation = true;
         assert!(validate_contribution_params(&concept_with_source).is_err());
+    }
+
+    #[test]
+    fn document_passages_preserve_utf8_and_byte_coordinates() {
+        let text = "alpha\nβeta\n終";
+        let passages = split_document_passages(text);
+        assert_eq!(passages.len(), 1);
+        assert_eq!(passages[0].1, text);
+        assert_eq!(passages[0].2, 0);
+        assert_eq!(passages[0].3, text.len());
+    }
+
+    #[test]
+    fn document_passages_split_at_character_boundaries() {
+        let text = format!("{}終", "a".repeat(MAX_TEXT_LEN));
+        let passages = split_document_passages(&text);
+        assert_eq!(passages.len(), 2);
+        assert!(passages.iter().all(|(_, text, start, end)| {
+            text.len() <= MAX_TEXT_LEN
+                && text.len() == end - start
+                && text.is_char_boundary(0)
+                && text.is_char_boundary(text.len())
+        }));
+        assert_eq!(passages[0].1, "a".repeat(MAX_TEXT_LEN));
+        assert_eq!(passages[1].1, "終");
     }
 }

@@ -489,7 +489,26 @@ pub fn record_ai_evidence_decision(
         }
     }
     if let Some(contribution_id) = params.contribution_id {
-        require_contribution(ctx, organization_id, company_id, contribution_id)?;
+        let contribution = require_contribution(ctx, organization_id, company_id, contribution_id)?;
+        if contribution.contributor_kind == "user" && contribution.contributor_uid != ctx.sender() {
+            return Err(
+                "a user decision must use the authenticated caller's contribution".to_string(),
+            );
+        }
+        if let Some(existing) = ctx
+            .db
+            .ai_evidence_decision()
+            .ai_evidence_decision_by_org()
+            .filter(&organization_id)
+            .find(|row| {
+                row.company_id == company_id && row.contribution_id == Some(contribution_id)
+            })
+        {
+            if decision_matches_params(&existing, &params) {
+                return Ok(());
+            }
+            return Err("the contribution already records a different decision".to_string());
+        }
     }
     let superseded = match params.supersedes_decision_id {
         Some(old_id) => Some(load_decision(ctx, organization_id, company_id, old_id)?),
@@ -666,6 +685,15 @@ pub fn review_ai_evidence_decision(
 /// be bound by claims alone.
 #[reducer]
 pub fn bind_ai_artifact_component(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    params: BindAiArtifactComponentParams,
+) -> Result<(), String> {
+    bind_ai_artifact_component_inner(ctx, organization_id, company_id, params)
+}
+
+pub(crate) fn bind_ai_artifact_component_inner(
     ctx: &ReducerContext,
     organization_id: u64,
     company_id: u64,
@@ -1002,7 +1030,7 @@ fn require_contribution(
     organization_id: u64,
     company_id: u64,
     contribution_id: u64,
-) -> Result<(), String> {
+) -> Result<crate::ai::evidence_source::AiEvidenceContribution, String> {
     let contribution = ctx
         .db
         .ai_evidence_contribution()
@@ -1012,7 +1040,23 @@ fn require_contribution(
     if contribution.organization_id != organization_id || contribution.company_id != company_id {
         return Err("Contribution does not belong to this organization/company".to_string());
     }
-    Ok(())
+    Ok(contribution)
+}
+
+fn decision_matches_params(
+    row: &AiEvidenceDecision,
+    params: &RecordAiEvidenceDecisionParams,
+) -> bool {
+    row.title == params.title
+        && row.adopted_claim_ids == params.adopted_claim_ids
+        && row.supporting_claim_ids == params.supporting_claim_ids
+        && row.applicability == params.applicability
+        && row.alternatives == params.alternatives
+        && row.adaptations == params.adaptations
+        && row.assumptions == params.assumptions
+        && row.rationale == params.rationale
+        && row.contribution_id == params.contribution_id
+        && row.supersedes_decision_id == params.supersedes_decision_id
 }
 
 /// Links a component may be newly bound to: accepted decisions and current

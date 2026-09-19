@@ -355,10 +355,12 @@ pub(super) fn validate_graph(graph: &DecisionGraph) -> Result<()> {
     Ok(())
 }
 
-
 fn validate_node_contract(node: &GraphNode) -> Result<()> {
     if matches!(&node.kind, DecisionNode::Gate(_)) && node.next.is_some() {
-        bail!("gate node '{}' must use branch targets instead of next", node.id);
+        bail!(
+            "gate node '{}' must use branch targets instead of next",
+            node.id
+        );
     }
     match &node.kind {
         DecisionNode::Choice(decision) => {
@@ -367,7 +369,10 @@ fn validate_node_contract(node: &GraphNode) -> Result<()> {
                 bail!("choice node '{}' must define a question", node.id);
             }
             if decision.candidates.len() < 2 {
-                bail!("choice node '{}' must define at least two candidates", node.id);
+                bail!(
+                    "choice node '{}' must define at least two candidates",
+                    node.id
+                );
             }
             let unique = decision
                 .candidates
@@ -375,7 +380,10 @@ fn validate_node_contract(node: &GraphNode) -> Result<()> {
                 .map(|candidate| candidate.trim())
                 .collect::<HashSet<_>>();
             if unique.len() != decision.candidates.len() || unique.iter().any(|c| c.is_empty()) {
-                bail!("choice node '{}' candidates must be nonempty and unique", node.id);
+                bail!(
+                    "choice node '{}' candidates must be nonempty and unique",
+                    node.id
+                );
             }
         }
         DecisionNode::Score(decision) => {
@@ -395,7 +403,10 @@ fn validate_node_contract(node: &GraphNode) -> Result<()> {
                 bail!("acquire evidence node '{}' must name a capability", node.id);
             }
             if acquire.max_rows == 0 {
-                bail!("acquire evidence node '{}' max_rows must be positive", node.id);
+                bail!(
+                    "acquire evidence node '{}' max_rows must be positive",
+                    node.id
+                );
             }
             if acquire.affects.len() != 1 {
                 bail!(
@@ -738,7 +749,7 @@ mod tests {
                 GraphNode {
                     id: "batch".to_string(),
                     depends_on: vec![],
-            next: None,
+                    next: None,
                     kind: DecisionNode::Batch(DecisionBatchNode {
                         members: vec!["only_one".to_string()],
                     }),
@@ -759,7 +770,7 @@ mod tests {
                 GraphNode {
                     id: "batch".to_string(),
                     depends_on: vec![],
-            next: None,
+                    next: None,
                     kind: DecisionNode::Batch(DecisionBatchNode {
                         members: vec!["q1".to_string(), "q2".to_string()],
                     }),
@@ -781,7 +792,7 @@ mod tests {
                 GraphNode {
                     id: "batch".to_string(),
                     depends_on: vec![],
-            next: None,
+                    next: None,
                     kind: DecisionNode::Batch(DecisionBatchNode {
                         members: vec!["q1".to_string(), "q2".to_string()],
                     }),
@@ -970,7 +981,7 @@ mod tests {
                 GraphNode {
                     id: "route_a".to_string(),
                     depends_on: vec!["risk".to_string()],
-            next: None,
+                    next: None,
                     kind: DecisionNode::Gate(GateNode {
                         source: "risk".to_string(),
                         branches: vec![GateBranch {
@@ -982,7 +993,7 @@ mod tests {
                 GraphNode {
                     id: "route_b".to_string(),
                     depends_on: vec!["risk".to_string()],
-            next: None,
+                    next: None,
                     kind: DecisionNode::Gate(GateNode {
                         source: "risk".to_string(),
                         branches: vec![GateBranch {
@@ -1023,7 +1034,7 @@ mod tests {
                 GraphNode {
                     id: "reason".to_string(),
                     depends_on: vec![],
-            next: None,
+                    next: None,
                     kind: DecisionNode::Reason(ReasonNode {
                         allowed_proposal_kinds: vec!["clarification".to_string()],
                         max_iterations: 3,
@@ -1061,7 +1072,7 @@ mod tests {
                 GraphNode {
                     id: "reason".to_string(),
                     depends_on: vec![],
-            next: None,
+                    next: None,
                     kind: DecisionNode::Reason(ReasonNode {
                         allowed_proposal_kinds: vec!["clarification".to_string()],
                         max_iterations: 0,
@@ -1080,7 +1091,7 @@ mod tests {
             vec![GraphNode {
                 id: "stop".to_string(),
                 depends_on: vec![],
-            next: None,
+                next: None,
                 kind: DecisionNode::EarlyStop(EarlyStopNode {
                     source: "missing".to_string(),
                     reason: StopReason::AlreadySettled,
@@ -1098,7 +1109,7 @@ mod tests {
                 GraphNode {
                     id: "capability".to_string(),
                     depends_on: vec![],
-            next: None,
+                    next: None,
                     kind: DecisionNode::Capability(CapabilityNode {
                         capability: "erp.search".to_string(),
                     }),
@@ -1106,7 +1117,7 @@ mod tests {
                 GraphNode {
                     id: "generate".to_string(),
                     depends_on: vec!["capability".to_string()],
-            next: None,
+                    next: None,
                     kind: DecisionNode::Generate(GenerateNode {
                         format: "prose".to_string(),
                     }),
@@ -1163,7 +1174,7 @@ mod tests {
                 GraphNode {
                     id: "evidence".to_string(),
                     depends_on: vec![],
-            next: None,
+                    next: None,
                     kind: DecisionNode::AcquireEvidence(AcquireEvidenceNode {
                         capability: "erp.search".to_string(),
                         max_rows: 50,

@@ -1,7 +1,10 @@
 use serde_json::{json, Value};
 
-use crate::ai_spend::{self, input_request_key, RequestKind, SpendReader};
-use crate::tools::types::{ToolContext, ToolOutput, ToolResult};
+use crate::{
+    ai_spend::{self, input_request_key, RequestKind, SpendReader},
+    orchestrator::{output_gate::admit_generated_output, text_answer_gate::TextEvidence},
+    tools::types::{ToolContext, ToolOutput, ToolResult},
+};
 
 pub async fn execute(ctx: &ToolContext, input: &Value) -> ToolResult {
     let reducer_name = input
@@ -52,7 +55,7 @@ pub async fn execute(ctx: &ToolContext, input: &Value) -> ToolResult {
         .and_then(|v| v.as_bool())
         .unwrap_or(false);
 
-    let warnings: Vec<String> = input
+    let mut warnings: Vec<String> = input
         .get("warnings")
         .and_then(|v| v.as_array())
         .map(|items| {
@@ -62,6 +65,32 @@ pub async fn execute(ctx: &ToolContext, input: &Value) -> ToolResult {
                 .collect()
         })
         .unwrap_or_default();
+
+    // The reducer draft is pending human approval, but its explanation is
+    // still model-authored prose. Preserve the structured pending draft while
+    // replacing unsupported prose with a deterministic notice. This tool
+    // currently has no server-produced evidence channel, so every raw model
+    // explanation is withheld and recorded as a warning.
+    let gated = admit_generated_output(
+        ctx.org_id,
+        ctx.company_id,
+        &summary,
+        &TextEvidence::default(),
+    )
+    .await?;
+    let explanation_verification = gated.verification.clone();
+    let summary = if let Some(released) = gated.released {
+        released
+    } else {
+        let reason = explanation_verification
+            .reason
+            .clone()
+            .unwrap_or_else(|| "output requires review".to_string());
+        warnings.push(format!(
+            "action-draft explanation withheld pending review: {reason}"
+        ));
+        "Action draft explanation withheld pending evidence review.".to_string()
+    };
 
     let source_query = ctx
         .inputs
@@ -92,6 +121,7 @@ pub async fn execute(ctx: &ToolContext, input: &Value) -> ToolResult {
             serde_json::to_string(&json!({
                 "run_id": ctx.run_id,
                 "skill_key": ctx.skill_key,
+                "explanation_verification": explanation_verification,
             }))
             .unwrap_or_else(|_| "{}".to_string()),
         ),
@@ -122,6 +152,7 @@ pub async fn execute(ctx: &ToolContext, input: &Value) -> ToolResult {
             "confidence": confidence,
             "elevated": elevated,
             "warnings": warnings,
+            "explanation_verification": explanation_verification,
         }),
         citations: vec![],
         row_count: Some(1),

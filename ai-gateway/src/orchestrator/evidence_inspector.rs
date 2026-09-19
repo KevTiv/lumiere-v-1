@@ -57,6 +57,16 @@ pub trait EvidenceRows: Send + Sync {
         entry_key: &str,
     ) -> Result<Option<Value>>;
     async fn knowledge_versions_of(&self, entry_id: u64) -> Result<Vec<Value>>;
+    async fn knowledge_reviews_of(&self, version_id: u64) -> Result<Vec<Value>>;
+    async fn knowledge_membership(
+        &self,
+        organization_id: u64,
+        company_id: u64,
+        actor: ActorIdentity,
+    ) -> Result<Option<KnowledgeMembership>> {
+        let _ = (organization_id, company_id, actor);
+        Ok(None)
+    }
 }
 
 #[async_trait]
@@ -115,6 +125,40 @@ impl EvidenceRows for StdbClient {
         .await
         .context("load knowledge versions")
     }
+
+    async fn knowledge_reviews_of(&self, version_id: u64) -> Result<Vec<Value>> {
+        self.query_sql(&format!(
+            "SELECT * FROM ai_knowledge_review WHERE version_id = {version_id}"
+        ))
+        .await
+        .context("load knowledge reviews")
+    }
+
+    async fn knowledge_membership(
+        &self,
+        organization_id: u64,
+        company_id: u64,
+        actor: ActorIdentity,
+    ) -> Result<Option<KnowledgeMembership>> {
+        let rows = self
+            .query_sql(&format!(
+                "SELECT company_id, department_id FROM user_organization \
+                 WHERE organization_id = {organization_id} AND user_identity = {} \
+                 AND is_active = true",
+                actor.sql_literal()
+            ))
+            .await
+            .context("load knowledge team membership")?;
+        let [membership] = rows.as_slice() else {
+            return Ok(None);
+        };
+        if number(membership, "companyId").is_some_and(|id| id != company_id) {
+            return Ok(None);
+        }
+        Ok(Some(KnowledgeMembership {
+            department_id: number(membership, "departmentId").filter(|id| *id > 0),
+        }))
+    }
 }
 
 /// Who is looking. Resolved server-side by the caller; never model input.
@@ -122,6 +166,46 @@ impl EvidenceRows for StdbClient {
 pub struct Viewer {
     pub organization_id: u64,
     pub company_id: u64,
+    /// Present only when a trusted session boundary supplied a valid STDB
+    /// identity. Missing identity denies personal and team reuse.
+    pub actor_identity: Option<ActorIdentity>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ActorIdentity([u8; 32]);
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct KnowledgeMembership {
+    pub department_id: Option<u64>,
+}
+
+impl ActorIdentity {
+    pub fn parse(value: &str) -> Option<Self> {
+        let hex = value
+            .trim()
+            .strip_prefix("0x")
+            .or_else(|| value.trim().strip_prefix("0X"))
+            .unwrap_or(value.trim());
+        if hex.len() != 64 || !hex.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+            return None;
+        }
+        let mut bytes = [0_u8; 32];
+        for (index, pair) in hex.as_bytes().chunks_exact(2).enumerate() {
+            let text = std::str::from_utf8(pair).ok()?;
+            bytes[index] = u8::from_str_radix(text, 16).ok()?;
+        }
+        Some(Self(bytes))
+    }
+
+    fn sql_literal(self) -> String {
+        let mut hex = String::with_capacity(66);
+        hex.push_str("0x");
+        for byte in self.0 {
+            use std::fmt::Write as _;
+            let _ = write!(hex, "{byte:02x}");
+        }
+        hex
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -407,6 +491,14 @@ fn number(row: &Value, field: &str) -> Option<u64> {
     row.get(field).and_then(Value::as_u64)
 }
 
+fn identity(row: &Value, field: &str) -> Option<ActorIdentity> {
+    let value = row.get(field)?;
+    value
+        .as_str()
+        .or_else(|| value.get("__identity__").and_then(Value::as_str))
+        .and_then(ActorIdentity::parse)
+}
+
 fn strings(row: &Value, field: &str) -> Vec<String> {
     row.get(field)
         .and_then(Value::as_array)
@@ -568,6 +660,15 @@ pub async fn inspect(
                 .await?
                 .filter(|row| owned_by(row, viewer))
                 .with_context(|| format!("knowledge version {id} not found"))?;
+            let entry_id = number(&row, "entryId").context("knowledge version has no entry")?;
+            let entry = rows
+                .row("ai_knowledge_entry", entry_id)
+                .await?
+                .filter(|entry| owned_by(entry, viewer))
+                .with_context(|| format!("knowledge version {id} not found"))?;
+            if !knowledge_scope_allowed(rows, viewer, &entry).await? {
+                bail!("knowledge version {id} not found");
+            }
             decision_ids = ids(&row, "decisionIds");
             claim_ids.extend(ids(&row, "claimIds"));
             passage_ids.extend(ids(&row, "sourcePassageIds"));
@@ -1066,14 +1167,11 @@ pub async fn retrieve_reusable_knowledge(
             reasons: vec!["no such knowledge entry in this scope".to_string()],
         });
     };
-    // Personal and team entries need the acting user's identity/membership,
-    // which this read path does not have; deny rather than guess.
-    let share_scope = text(&entry, "shareScope").unwrap_or_default();
-    if share_scope != "organization" {
+    let scope_allowed = knowledge_scope_allowed(rows, viewer, &entry).await?;
+    if !scope_allowed {
         return Ok(KnowledgeRetrieval::Denied {
-            reasons: vec![format!(
-                "a {share_scope}-scoped entry needs the acting user's identity, which is not supplied"
-            )],
+            // Do not confirm which private/team entry exists.
+            reasons: vec!["no such knowledge entry in this scope".to_string()],
         });
     }
     let entry_id = required_id(&entry)?;
@@ -1104,6 +1202,24 @@ pub async fn retrieve_reusable_knowledge(
         });
     }
     let version_id = required_id(approved)?;
+    let review_epoch = number(approved, "reviewEpoch");
+    let owner = identity(&entry, "ownerUid");
+    let proposer = identity(approved, "createUid");
+    let reviews = rows.knowledge_reviews_of(version_id).await?;
+    if !reviews_establish_independent_approval(
+        required_text(&entry, "kind")?.as_str(),
+        review_epoch,
+        owner,
+        proposer,
+        &reviews,
+    ) {
+        return Ok(KnowledgeRetrieval::Denied {
+            reasons: vec![
+                "approved state lacks complete independent reviews in its current epoch"
+                    .to_string(),
+            ],
+        });
+    }
     let lineage = inspect(rows, viewer, InspectTarget::KnowledgeVersion(version_id)).await?;
 
     // Reuse needs a chain with nothing blocking. A knowledge version rests
@@ -1136,6 +1252,87 @@ pub async fn retrieve_reusable_knowledge(
     })))
 }
 
+async fn knowledge_scope_allowed(
+    rows: &dyn EvidenceRows,
+    viewer: Viewer,
+    entry: &Value,
+) -> Result<bool> {
+    let share_scope = text(entry, "shareScope").unwrap_or_default();
+    let membership = match viewer.actor_identity {
+        Some(actor) => {
+            rows.knowledge_membership(viewer.organization_id, viewer.company_id, actor)
+                .await?
+        }
+        None => None,
+    };
+    Ok(match share_scope.as_str() {
+        "organization" => true,
+        "personal" => membership.is_some() && identity(&entry, "ownerUid") == viewer.actor_identity,
+        "team" => {
+            membership.is_some()
+                && text(&entry, "teamRef")
+                    .and_then(|team_ref| {
+                        team_ref
+                            .strip_prefix("department:")
+                            .and_then(|value| value.parse::<u64>().ok())
+                    })
+                    .filter(|department_id| *department_id > 0)
+                    == membership.and_then(|membership| membership.department_id)
+        }
+        _ => false,
+    })
+}
+
+fn reviews_establish_independent_approval(
+    kind: &str,
+    review_epoch: Option<u64>,
+    owner: Option<ActorIdentity>,
+    proposer: Option<ActorIdentity>,
+    reviews: &[Value],
+) -> bool {
+    let (Some(epoch), Some(owner), Some(proposer)) = (review_epoch, owner, proposer) else {
+        return false;
+    };
+    let mut latest = BTreeMap::<String, (u64, String)>::new();
+    for review in reviews {
+        if number(review, "reviewEpoch") != Some(epoch) {
+            continue;
+        }
+        let Some(reviewer) = identity(review, "reviewerUid") else {
+            return false;
+        };
+        if reviewer == owner || reviewer == proposer {
+            return false;
+        }
+        let (Some(review_kind), Some(outcome), Some(id)) = (
+            text(review, "reviewKind"),
+            text(review, "outcome"),
+            number(review, "id"),
+        ) else {
+            return false;
+        };
+        let replace = latest
+            .get(&review_kind)
+            .is_none_or(|(current_id, _)| id > *current_id);
+        if replace {
+            latest.insert(review_kind, (id, outcome));
+        }
+    }
+    if latest.values().any(|(_, outcome)| outcome == "rejected") {
+        return false;
+    }
+    let required = if kind == "procedure" {
+        &["source_fidelity", "domain_interpretation", "implementation"][..]
+    } else {
+        &["source_fidelity", "domain_interpretation"][..]
+    };
+    required.iter().all(|required_kind| {
+        latest
+            .get(*required_kind)
+            .is_some_and(|(_, outcome)| outcome == "accepted")
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use std::collections::HashMap;
@@ -1147,6 +1344,7 @@ mod tests {
     const VIEWER: Viewer = Viewer {
         organization_id: 1,
         company_id: 10,
+        actor_identity: None,
     };
 
     #[derive(Default)]
@@ -1155,6 +1353,9 @@ mod tests {
         dependencies: Vec<Value>,
         entries: Vec<Value>,
         versions: Vec<Value>,
+        reviews: Vec<Value>,
+        team_department_id: Option<u64>,
+        has_active_membership: bool,
     }
 
     #[async_trait]
@@ -1202,6 +1403,24 @@ mod tests {
                 .filter(|row| number(row, "entryId") == Some(entry_id))
                 .cloned()
                 .collect())
+        }
+        async fn knowledge_reviews_of(&self, version_id: u64) -> Result<Vec<Value>> {
+            Ok(self
+                .reviews
+                .iter()
+                .filter(|row| number(row, "versionId") == Some(version_id))
+                .cloned()
+                .collect())
+        }
+        async fn knowledge_membership(
+            &self,
+            _organization_id: u64,
+            _company_id: u64,
+            _actor: ActorIdentity,
+        ) -> Result<Option<KnowledgeMembership>> {
+            Ok(self.has_active_membership.then_some(KnowledgeMembership {
+                department_id: self.team_department_id,
+            }))
         }
     }
 
@@ -1462,6 +1681,7 @@ mod tests {
         let foreign = Viewer {
             organization_id: 2,
             company_id: 10,
+            actor_identity: None,
         };
         let error = inspect(&rows, foreign, InspectTarget::Component(1))
             .await
@@ -1470,6 +1690,7 @@ mod tests {
         let sibling = Viewer {
             organization_id: 1,
             company_id: 11,
+            actor_identity: None,
         };
         assert!(inspect(&rows, sibling, InspectTarget::Component(1))
             .await
@@ -1610,16 +1831,31 @@ mod tests {
 
     fn knowledge_fixture(review_state: &str, share_scope: &str) -> FakeRows {
         let mut rows = healthy();
+        rows.has_active_membership = true;
         rows.entries = vec![json!({
             "id": 20, "organizationId": 1, "companyId": 10, "entryKey": "sl", "kind": "procedure",
-            "domainTags": ["domain:accounting"], "shareScope": share_scope
+            "domainTags": ["domain:accounting"], "shareScope": share_scope,
+            "teamRef": if share_scope == "team" { Some("department:42") } else { None },
+            "ownerUid": "a".repeat(64)
         })];
+        rows.tables
+            .insert(("ai_knowledge_entry", 20), rows.entries[0].clone());
         rows.versions = vec![json!({
             "id": 21, "organizationId": 1, "companyId": 10, "entryId": 20, "version": 1,
             "title": "Straight line", "body": "Spread cost evenly.", "applicability": [],
             "sourcePassageIds": [5], "claimIds": [], "decisionIds": [2],
-            "reviewState": review_state
+            "reviewState": review_state, "reviewEpoch": 0, "createUid": "b".repeat(64)
         })];
+        rows.reviews = ["source_fidelity", "domain_interpretation", "implementation"]
+            .into_iter()
+            .enumerate()
+            .map(|(index, kind)| {
+                json!({
+                    "id": index + 1, "versionId": 21, "reviewKind": kind,
+                    "outcome": "accepted", "reviewEpoch": 0, "reviewerUid": "c".repeat(64)
+                })
+            })
+            .collect();
         rows.tables
             .insert(("ai_knowledge_entry_version", 21), rows.versions[0].clone());
         rows.dependencies = vec![
@@ -1692,6 +1928,51 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn personal_owner_and_current_team_member_can_reuse() {
+        let personal = knowledge_fixture("approved", "personal");
+        let owner = Viewer {
+            actor_identity: ActorIdentity::parse(&"a".repeat(64)),
+            ..VIEWER
+        };
+        let personal_result = retrieve_reusable_knowledge(&personal, owner, "sl")
+            .await
+            .unwrap();
+        assert!(
+            matches!(personal_result, KnowledgeRetrieval::Reusable(_)),
+            "{personal_result:?}"
+        );
+
+        let mut team = knowledge_fixture("approved", "team");
+        team.team_department_id = Some(42);
+        assert!(matches!(
+            retrieve_reusable_knowledge(&team, owner, "sl")
+                .await
+                .unwrap(),
+            KnowledgeRetrieval::Reusable(_)
+        ));
+        team.team_department_id = Some(43);
+        assert!(matches!(
+            retrieve_reusable_knowledge(&team, owner, "sl")
+                .await
+                .unwrap(),
+            KnowledgeRetrieval::Denied { .. }
+        ));
+    }
+
+    #[tokio::test]
+    async fn self_review_cannot_qualify_an_approved_row_for_reuse() {
+        let mut rows = knowledge_fixture("approved", "organization");
+        rows.reviews[0]["reviewerUid"] = json!("a".repeat(64));
+        let result = retrieve_reusable_knowledge(&rows, VIEWER, "sl")
+            .await
+            .unwrap();
+        let KnowledgeRetrieval::Denied { reasons } = result else {
+            panic!("self-reviewed knowledge must be denied");
+        };
+        assert!(reasons.iter().any(|reason| reason.contains("independent")));
+    }
+
+    #[tokio::test]
     async fn knowledge_does_not_widen_access_to_out_of_scope_sources() {
         let mut rows = knowledge_fixture("approved", "organization");
         let mut source = rows.tables[&("ai_evidence_source", 4)].clone();
@@ -1742,6 +2023,7 @@ mod tests {
         let viewer = Viewer {
             organization_id: number(head, "organizationId").unwrap(),
             company_id: number(head, "companyId").unwrap(),
+            actor_identity: None,
         };
         let inspection = inspect(
             &client,
@@ -1800,6 +2082,7 @@ mod tests {
             let viewer = Viewer {
                 organization_id: number(entry, "organizationId").unwrap(),
                 company_id: number(entry, "companyId").unwrap(),
+                actor_identity: None,
             };
             let result = retrieve_reusable_knowledge(&client, viewer, key)
                 .await

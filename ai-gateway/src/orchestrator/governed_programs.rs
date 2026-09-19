@@ -11,9 +11,7 @@ use super::{
         DecisionNode, EarlyStopNode, GateBranch, GateCondition, GateNode, GenerateNode, GraphNode,
         ProbabilityDecisionNode, ReasonNode, RequireApprovalNode, StopReason, VerifyNode,
     },
-    intelligence::{
-        DecisionTypeRef, PROPOSAL_KIND_CLARIFICATION, PROPOSAL_KIND_FINAL_DRAFT,
-    },
+    intelligence::{DecisionTypeRef, PROPOSAL_KIND_CLARIFICATION, PROPOSAL_KIND_FINAL_DRAFT},
     probabilistic::{CalibrationProfileRef, GateDecision, ThresholdGatePolicy},
 };
 
@@ -130,7 +128,6 @@ pub(super) fn report_analysis_graph() -> DecisionGraph {
     }
 }
 
-
 pub(super) fn conditional_evidence_reference_graph() -> DecisionGraph {
     let policy = ThresholdGatePolicy {
         name: "reference-evidence-confidence".to_string(),
@@ -158,7 +155,8 @@ pub(super) fn conditional_evidence_reference_graph() -> DecisionGraph {
                         name: "StockReorderPriority".to_string(),
                         version: 1,
                     },
-                    question: "Is the current evidence sufficient to treat this as urgent?".to_string(),
+                    question: "Is the current evidence sufficient to treat this as urgent?"
+                        .to_string(),
                 }),
             },
             GraphNode {
@@ -251,7 +249,9 @@ pub(super) fn consequential_mutation_reference_graph() -> DecisionGraph {
                         name: "PaymentDisposition".to_string(),
                         version: 1,
                     },
-                    question: "Should this bounded transaction proceed to the governed mutation path?".to_string(),
+                    question:
+                        "Should this bounded transaction proceed to the governed mutation path?"
+                            .to_string(),
                     candidates: vec!["clear".to_string(), "flag".to_string()],
                 }),
             },
@@ -318,9 +318,7 @@ pub(super) struct GovernedProgramCatalogEntry {
     pub reviewed_calls: Vec<PlannedToolCall>,
 }
 
-pub(super) fn governed_program_for_skill(
-    skill_key: &str,
-) -> Option<GovernedProgramCatalogEntry> {
+pub(super) fn governed_program_for_skill(skill_key: &str) -> Option<GovernedProgramCatalogEntry> {
     match skill_key {
         "report_analysis" => Some(GovernedProgramCatalogEntry {
             program_ref: REPORT_ANALYSIS_PROGRAM_REF,
@@ -341,19 +339,13 @@ pub(super) fn governed_program_for_skill(
             program_ref: "skill:supplier_discovery@1",
             graph: supplier_discovery_graph(),
             review_independence_key: "RunReviewDisposition",
-            reviewed_calls: vec![
-                named_read_call("erp_search"),
-                network_call("web_search"),
-            ],
+            reviewed_calls: vec![named_read_call("erp_search"), network_call("web_search")],
         }),
         "price_search" => Some(GovernedProgramCatalogEntry {
             program_ref: "skill:price_search@1",
             graph: price_search_graph(),
             review_independence_key: "RunReviewDisposition",
-            reviewed_calls: vec![
-                named_read_call("erp_search"),
-                network_call("web_search"),
-            ],
+            reviewed_calls: vec![named_read_call("erp_search"), network_call("web_search")],
         }),
         _ => None,
     }

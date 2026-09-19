@@ -13,6 +13,10 @@ use crate::{
         fetch_authorized_live_snapshots, filter_entity_refs_by_allowed_types, ActorCredentials,
         EntityRef, LiveSnapshot,
     },
+    orchestrator::{
+        output_gate::admit_generated_output,
+        text_answer_gate::{TextAnswerVerification, TextEvidence},
+    },
     providers::llm::LlmMessage,
     state::AppState,
 };
@@ -69,6 +73,9 @@ pub struct ActionDraft {
     pub warnings: Vec<String>,
     pub summary: String,
     pub elevated: bool,
+    /// Admission for the human-facing explanation only. Params remain an
+    /// advisory pending draft and are never execution authority.
+    pub explanation_verification: TextAnswerVerification,
 }
 
 #[derive(Debug, Serialize)]
@@ -287,6 +294,14 @@ fn parse_llm_drafts(
             warnings,
             summary,
             elevated: entry.elevated,
+            explanation_verification: TextAnswerVerification {
+                outcome: crate::orchestrator::text_answer_gate::TextAnswerOutcome::RequiresReview,
+                methods: vec!["deterministic"],
+                limitations: Vec::new(),
+                reason: Some(
+                    "explanation admission is performed at the output boundary".to_string(),
+                ),
+            },
         });
     }
 
@@ -623,6 +638,12 @@ fn draft_actions_stub(req: &ActionDraftRequest) -> Result<Vec<ActionDraft>, Stri
             entry.reducer_name
         ),
         elevated: entry.elevated,
+        explanation_verification: TextAnswerVerification {
+            outcome: crate::orchestrator::text_answer_gate::TextAnswerOutcome::RequiresReview,
+            methods: vec!["deterministic"],
+            limitations: Vec::new(),
+            reason: Some("explanation admission is performed at the output boundary".to_string()),
+        },
     }])
 }
 
@@ -653,6 +674,45 @@ pub async fn post_draft(
 
     if let Some(ref snapshots) = grounding_snapshots {
         enrich_drafts_with_grounding(&mut drafts, snapshots);
+    }
+
+    // Gate the prose before it can cross the BFF and be persisted by the
+    // client as an action-draft explanation. Live snapshots are server-owned
+    // evidence; the user/model request is not.
+    let mut evidence = TextEvidence::default();
+    evidence.add_user_text(&req.query);
+    if let Some(snapshots) = grounding_snapshots.as_deref() {
+        for snapshot in snapshots {
+            evidence.add_ref(
+                "live_snapshot",
+                format!("{}:{}", snapshot.entity_type, snapshot.entity_id),
+            );
+            evidence.add_json(&snapshot.row);
+            for relation in &snapshot.relations {
+                for row in &relation.rows {
+                    evidence.add_json(row);
+                }
+            }
+        }
+    }
+    for draft in &mut drafts {
+        let gated = admit_generated_output(
+            req.org_id.unwrap_or_default(),
+            req.company_id,
+            &draft.summary,
+            &evidence,
+        )
+        .await
+        .map_err(|error| {
+            AppError::Internal(format!("action-draft explanation gate failed: {error}"))
+        })?;
+        draft.explanation_verification = gated.verification.clone();
+        if let Some(released) = gated.released {
+            draft.summary = released;
+        } else {
+            draft.summary =
+                "Action draft explanation withheld pending evidence review.".to_string();
+        }
     }
 
     tracing::info!(

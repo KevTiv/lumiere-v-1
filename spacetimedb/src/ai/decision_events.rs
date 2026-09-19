@@ -51,6 +51,7 @@
 //! whether the governed program ultimately acted on the judgment. None of
 //! the three implies the others.
 
+use sha2::{Digest, Sha256};
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::ai::skills::ai_agent_run;
@@ -188,7 +189,6 @@ pub struct RecordAiProgramCheckpointParams {
     pub checkpoint_json: String,
     pub status: String,
 }
-
 
 #[derive(SpacetimeType, Clone, Debug)]
 pub struct RecordAiDecisionShadowEventParams {
@@ -372,7 +372,9 @@ pub fn record_ai_reasoning_event(
         if reasoning_payload_matches(&existing, &params) {
             return Ok(());
         }
-        return Err("reasoning/checkpoint event replay conflicts with the existing event".to_string());
+        return Err(
+            "reasoning/checkpoint event replay conflicts with the existing event".to_string(),
+        );
     }
 
     // Clarification and unable-to-progress are themselves escalation
@@ -483,7 +485,9 @@ pub fn record_ai_decision_shadow_event(
         }
     };
     if !SHADOW_OUTCOME_KINDS.contains(&outcome_kind.as_str()) {
-        return Err(format!("outcome_kind must be one of {SHADOW_OUTCOME_KINDS:?}"));
+        return Err(format!(
+            "outcome_kind must be one of {SHADOW_OUTCOME_KINDS:?}"
+        ));
     }
     if let Some(confidence) = params.confidence {
         if !(0.0..=1.0).contains(&confidence) {
@@ -560,11 +564,19 @@ pub fn record_ai_program_checkpoint(
     params: RecordAiProgramCheckpointParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "ai_intelligence_event", "create")?;
-    let run = ctx.db.ai_agent_run().id().find(&run_id).ok_or("Run not found")?;
+    let run = ctx
+        .db
+        .ai_agent_run()
+        .id()
+        .find(&run_id)
+        .ok_or("Run not found")?;
     if run.organization_id != organization_id || run.company_id != company_id {
         return Err("Run does not belong to this organization/company".to_string());
     }
-    if !matches!(run.status.as_str(), "running" | "pending" | "awaiting_approval" | "agent_settled") {
+    if !matches!(
+        run.status.as_str(),
+        "running" | "pending" | "awaiting_approval" | "agent_settled"
+    ) {
         return Err("Run is not checkpointable".to_string());
     }
     if params.program_ref.trim().is_empty()
@@ -573,7 +585,10 @@ pub fn record_ai_program_checkpoint(
     {
         return Err("program_ref, graph_hash and checkpoint_hash are required".to_string());
     }
-    if !matches!(params.status.as_str(), "running" | "awaiting_approval" | "agent_settled" | "completed") {
+    if !matches!(
+        params.status.as_str(),
+        "running" | "awaiting_approval" | "agent_settled" | "completed"
+    ) {
         return Err("checkpoint status is invalid".to_string());
     }
     if params.checkpoint_json.len() > MAX_JSON_FIELD_LEN {
@@ -581,16 +596,35 @@ pub fn record_ai_program_checkpoint(
     }
     let checkpoint: serde_json::Value = serde_json::from_str(&params.checkpoint_json)
         .map_err(|_| "checkpoint_json must be valid JSON".to_string())?;
-    if checkpoint.get("schema_version").and_then(serde_json::Value::as_u64) != Some(1)
-        || checkpoint.get("program_ref").and_then(serde_json::Value::as_str) != Some(params.program_ref.as_str())
-        || checkpoint.get("graph_hash").and_then(serde_json::Value::as_str) != Some(params.graph_hash.as_str())
+    if checkpoint
+        .get("schema_version")
+        .and_then(serde_json::Value::as_u64)
+        != Some(2)
+        || checkpoint
+            .get("program_ref")
+            .and_then(serde_json::Value::as_str)
+            != Some(params.program_ref.as_str())
+        || checkpoint
+            .get("graph_hash")
+            .and_then(serde_json::Value::as_str)
+            != Some(params.graph_hash.as_str())
     {
         return Err("program checkpoint identity is invalid".to_string());
     }
-    if let Some(existing) = ctx.db.ai_intelligence_event().ai_intelligence_event_by_run().filter(&run_id)
-        .find(|event| event.organization_id == organization_id
-            && event.event_kind == "program_checkpoint"
-            && event.request_hash == params.checkpoint_hash)
+    let actual_hash = format!("{:x}", Sha256::digest(params.checkpoint_json.as_bytes()));
+    if params.checkpoint_hash != actual_hash {
+        return Err("checkpoint_hash does not match checkpoint_json".to_string());
+    }
+    if let Some(existing) = ctx
+        .db
+        .ai_intelligence_event()
+        .ai_intelligence_event_by_run()
+        .filter(&run_id)
+        .find(|event| {
+            event.organization_id == organization_id
+                && event.event_kind == "program_checkpoint"
+                && event.request_hash == params.checkpoint_hash
+        })
     {
         if existing.output_json == params.checkpoint_json
             && existing.shadow_profile_ref.as_deref() == Some(params.program_ref.as_str())
@@ -598,6 +632,98 @@ pub fn record_ai_program_checkpoint(
             return Ok(());
         }
         return Err("checkpoint replay conflicts with existing checkpoint".to_string());
+    }
+
+    let sequence = checkpoint
+        .get("checkpoint_sequence")
+        .and_then(serde_json::Value::as_u64)
+        .ok_or("checkpoint_sequence is required")?;
+    let concurrency_version = checkpoint
+        .get("concurrency_version")
+        .and_then(serde_json::Value::as_u64)
+        .ok_or("concurrency_version is required")?;
+    if sequence == 0 || concurrency_version != sequence {
+        return Err("checkpoint sequence/concurrency version is invalid".to_string());
+    }
+    let event_step = checkpoint
+        .get("event_step")
+        .and_then(serde_json::Value::as_u64)
+        .ok_or("checkpoint event_step is required")?;
+    let manifest = checkpoint
+        .get("continuation_manifest")
+        .ok_or("continuation_manifest is required")?;
+    let manifest_hash = checkpoint
+        .get("continuation_manifest_hash")
+        .and_then(serde_json::Value::as_str)
+        .ok_or("continuation_manifest_hash is required")?;
+    if manifest
+        .get("decision_event_cursor")
+        .and_then(serde_json::Value::as_u64)
+        != Some(event_step)
+        || manifest_hash != hash_json_value(manifest)
+    {
+        return Err("continuation manifest hash/cursor is invalid".to_string());
+    }
+    let summary = checkpoint
+        .get("compaction_summary")
+        .ok_or("compaction_summary is required")?;
+    let summary_hash = checkpoint
+        .get("compaction_summary_hash")
+        .and_then(serde_json::Value::as_str)
+        .ok_or("compaction_summary_hash is required")?;
+    let mut completed_nodes = checkpoint
+        .get("values")
+        .and_then(serde_json::Value::as_object)
+        .ok_or("checkpoint values must be an object")?
+        .keys()
+        .cloned()
+        .collect::<Vec<_>>();
+    completed_nodes.sort();
+    let expected_summary = serde_json::json!({
+        "current_node": checkpoint.get("current_node").and_then(serde_json::Value::as_str)
+            .ok_or("checkpoint current_node is required")?,
+        "completed_nodes": completed_nodes,
+        "event_step": event_step,
+    });
+    if summary != &expected_summary || summary_hash != hash_json_value(summary) {
+        return Err("compaction summary does not match checkpoint state".to_string());
+    }
+    let parent_hash = checkpoint
+        .get("parent_checkpoint_hash")
+        .and_then(serde_json::Value::as_str);
+    let latest = ctx
+        .db
+        .ai_intelligence_event()
+        .ai_intelligence_event_by_run()
+        .filter(&run_id)
+        .filter(|event| {
+            event.organization_id == organization_id
+                && event.event_kind == "program_checkpoint"
+                && event.shadow_profile_ref.as_deref() == Some(params.program_ref.as_str())
+        })
+        .max_by_key(|event| event.id);
+    match latest {
+        Some(ref previous) => {
+            let previous_checkpoint: serde_json::Value =
+                serde_json::from_str(&previous.output_json)
+                    .map_err(|_| "stored parent checkpoint is invalid".to_string())?;
+            let previous_sequence = previous_checkpoint
+                .get("checkpoint_sequence")
+                .and_then(serde_json::Value::as_u64)
+                .ok_or("stored parent checkpoint sequence is missing")?;
+            if sequence != previous_sequence.saturating_add(1)
+                || parent_hash != Some(previous.request_hash.as_str())
+            {
+                return Err(
+                    "checkpoint parent/cursor conflicts with latest persisted checkpoint"
+                        .to_string(),
+                );
+            }
+        }
+        None if sequence != 1 || parent_hash.is_some() => {
+            return Err("first checkpoint must start at sequence one without a parent".to_string());
+        }
+        None => {}
     }
 
     ctx.db.ai_intelligence_event().insert(AiIntelligenceEvent {
@@ -613,7 +739,8 @@ pub fn record_ai_program_checkpoint(
         request_json: serde_json::json!({
             "program_ref": params.program_ref,
             "graph_hash": params.graph_hash,
-        }).to_string(),
+        })
+        .to_string(),
         outcome_kind: params.status,
         output_json: params.checkpoint_json,
         confidence: None,
@@ -638,6 +765,11 @@ pub fn record_ai_program_checkpoint(
     Ok(())
 }
 
+fn hash_json_value(value: &serde_json::Value) -> String {
+    let bytes = serde_json::to_vec(value).expect("JSON value serialization is infallible");
+    format!("{:x}", Sha256::digest(bytes))
+}
+
 /// Persist one zero-authority deterministic candidate evaluation (DG-05).
 #[reducer]
 pub fn record_ai_deterministic_shadow_event(
@@ -654,7 +786,9 @@ pub fn record_ai_deterministic_shadow_event(
         return Err("pattern_ref and implementation_ref are required".to_string());
     }
     if params.decision_type_name.trim().is_empty() || params.decision_type_version == 0 {
-        return Err("decision_type_name and positive decision_type_version are required".to_string());
+        return Err(
+            "decision_type_name and positive decision_type_version are required".to_string(),
+        );
     }
     if params.request_hash.trim().is_empty() {
         return Err("request_hash is required".to_string());
@@ -667,14 +801,24 @@ pub fn record_ai_deterministic_shadow_event(
 
     let evidence: serde_json::Value = serde_json::from_str(&params.evidence_json)
         .map_err(|_| "evidence_json must be valid JSON".to_string())?;
-    if evidence.get("schema_version").and_then(serde_json::Value::as_u64) != Some(2) {
+    if evidence
+        .get("schema_version")
+        .and_then(serde_json::Value::as_u64)
+        != Some(2)
+    {
         return Err("deterministic shadow evidence schema_version must be 2".to_string());
     }
-    if evidence.get("pattern_ref").and_then(serde_json::Value::as_str)
+    if evidence
+        .get("pattern_ref")
+        .and_then(serde_json::Value::as_str)
         != Some(params.pattern_ref.as_str())
-        || evidence.get("implementation_ref").and_then(serde_json::Value::as_str)
+        || evidence
+            .get("implementation_ref")
+            .and_then(serde_json::Value::as_str)
             != Some(params.implementation_ref.as_str())
-        || evidence.get("request_hash").and_then(serde_json::Value::as_str)
+        || evidence
+            .get("request_hash")
+            .and_then(serde_json::Value::as_str)
             != Some(params.request_hash.as_str())
     {
         return Err("deterministic shadow evidence identity does not match params".to_string());
@@ -774,8 +918,7 @@ pub fn record_ai_graduation_authority_rollback(
         .ai_intelligence_event_by_run()
         .filter(&run_id)
         .find(|event| {
-            event.event_kind == "graduation_rollback"
-                && event.request_hash == rollback_key
+            event.event_kind == "graduation_rollback" && event.request_hash == rollback_key
         })
     {
         if existing.organization_id == organization_id {
@@ -1107,7 +1250,6 @@ fn shadow_payload_matches(
         && existing.output_tokens == params.output_tokens
         && existing.shadow_error == params.shadow_error
 }
-
 
 #[cfg(test)]
 mod graduation_rollback_tests {

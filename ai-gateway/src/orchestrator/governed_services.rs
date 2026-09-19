@@ -332,7 +332,9 @@ impl StdbExecutionRecovery<'_> {
             ))
             .await
             .context("load durable capability execution recovery row")?;
-        rows.first().map(decode_capability_execution_row).transpose()
+        rows.first()
+            .map(decode_capability_execution_row)
+            .transpose()
     }
 
     async fn claim(&self, run_id: u64, proposal: &CapabilityProposal, key: &str) -> Result<()> {
@@ -382,7 +384,9 @@ impl ExecutionRecovery for StdbExecutionRecovery<'_> {
                 "failed" => bail!(
                     "capability execution for recovery key '{key}' previously failed ({}); \
                      requires reconciliation before retry",
-                    row.failure_reason.as_deref().unwrap_or("no reason recorded")
+                    row.failure_reason
+                        .as_deref()
+                        .unwrap_or("no reason recorded")
                 ),
                 "claimed" => bail!(
                     "capability execution for recovery key '{key}' is claimed but unresolved; \
@@ -694,9 +698,15 @@ pub(super) enum AnswerAdmissionOutcome {
     Admitted,
     /// Releasable only with the listed limitations shown to the reader —
     /// §7.3's "qualified answer". Never a silent pass.
-    Qualified { limitations: Vec<String> },
-    RequiresReview { reason: String },
-    Blocked { reason: String },
+    Qualified {
+        limitations: Vec<String>,
+    },
+    RequiresReview {
+        reason: String,
+    },
+    Blocked {
+        reason: String,
+    },
 }
 
 /// Which kind of check produced a `VerificationOutcome`/
@@ -932,7 +942,9 @@ impl<'a> GovernedCapabilityService<'a> {
         proposal: &CapabilityProposal,
         completed_calls: u32,
     ) -> Result<Result<ApprovalRequest, String>> {
-        proposal.validate().context("invalid approval capability proposal")?;
+        proposal
+            .validate()
+            .context("invalid approval capability proposal")?;
         let mut decision = self.admission.admit(proposal, completed_calls).await?;
         if decision.outcome == DecisionOutcome::Deny {
             return Ok(Err(reason_summary(&decision)));
@@ -973,7 +985,11 @@ impl<'a> GovernedCapabilityService<'a> {
         }
 
         let key = self.recovery.recovery_key(run_id, proposal)?;
-        if let Some(cached) = self.recovery.already_executed(run_id, proposal, &key).await? {
+        if let Some(cached) = self
+            .recovery
+            .already_executed(run_id, proposal, &key)
+            .await?
+        {
             return Ok(CapabilityStepOutcome::Replayed(cached));
         }
 

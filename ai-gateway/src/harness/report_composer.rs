@@ -21,6 +21,10 @@ use super::{
         PolicyExecutionRequest,
     },
 };
+use crate::orchestrator::{
+    output_gate::admit_generated_output,
+    text_answer_gate::{TextAnswerVerification, TextEvidence},
+};
 
 pub const REPORT_COMPOSER_SKILL_KEY: &str = "report_composer";
 pub const REPORT_COMPOSER_SKILL_VERSION: u32 = 1;
@@ -63,6 +67,7 @@ pub struct ReportComposerResult {
     pub decision: PolicyResult,
     pub summary: String,
     pub citations: Vec<ReportCitation>,
+    pub summary_verification: TextAnswerVerification,
     pub audit: HarnessAuditTrail,
 }
 
@@ -221,11 +226,38 @@ pub async fn compose_report(
             decision,
             summary: String::new(),
             citations: Vec::new(),
+            summary_verification: withheld_verification("report composition denied by policy"),
             audit: audit.into_trail(),
         });
     }
 
-    let summary = build_summary(&output);
+    let candidate_summary = build_summary(&output);
+    let mut evidence = TextEvidence::default();
+    for item in &output.items {
+        // Named-resource rows are server-produced evidence. Add the exact
+        // displayed decimal value rather than only minor units so figure
+        // grounding matches the prose representation.
+        evidence.add_ref("named_resource", REPORT_COMPOSER_RESOURCE);
+        evidence.add_json(&serde_json::json!({
+            "value": item.value_minor_units as f64 / 10f64.powi(item.scale as i32),
+        }));
+    }
+    let gated = admit_generated_output(
+        organization_id,
+        input.company_id,
+        &candidate_summary,
+        &evidence,
+    )
+    .await
+    .map_err(|error| format!("report summary answer gate failed: {error}"))?;
+    let summary_verification = gated.verification;
+    let summary = gated.released.unwrap_or_else(|| {
+        audit.record(
+            "completed",
+            "report summary withheld pending evidence review",
+        );
+        String::new()
+    });
     let citations = output
         .items
         .iter()
@@ -241,8 +273,18 @@ pub async fn compose_report(
         decision,
         summary,
         citations,
+        summary_verification,
         audit: audit.into_trail(),
     })
+}
+
+fn withheld_verification(reason: &str) -> TextAnswerVerification {
+    TextAnswerVerification {
+        outcome: crate::orchestrator::text_answer_gate::TextAnswerOutcome::RequiresReview,
+        methods: vec!["deterministic"],
+        limitations: Vec::new(),
+        reason: Some(reason.to_string()),
+    }
 }
 
 async fn fetch_report_preview(

@@ -6,7 +6,7 @@ use axum::{
 };
 use futures::stream;
 use serde::{Deserialize, Serialize};
-use serde_json::json;
+use serde_json::{json, Value};
 use std::convert::Infallible;
 use std::time::Instant;
 
@@ -21,7 +21,9 @@ use crate::{
         format_live_context_block, resolve_snapshot_candidates, ActorCredentials, LiveSnapshot,
         SnapshotUiContext, RAG_MAX_LIVE_SNAPSHOTS,
     },
-    orchestrator::text_answer_gate::{gate_text_answer, TextAnswerVerification, TextEvidence},
+    orchestrator::text_answer_gate::{
+        gate_text_answer, TextAnswerProvenance, TextAnswerVerification, TextEvidence,
+    },
     providers::llm::LlmMessage,
     retrieval_policy::optional_retrieval,
     state::AppState,
@@ -116,6 +118,9 @@ pub struct RagResponse {
     /// qualified) or a withheld notice, never the raw candidate.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub verification: Option<TextAnswerVerification>,
+    /// Claim-level support and calculation provenance for the gated answer.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub provenance: Option<TextAnswerProvenance>,
 }
 
 fn no_relevant_information_response(retrieval_degraded: bool) -> RagResponse {
@@ -127,12 +132,17 @@ fn no_relevant_information_response(retrieval_degraded: bool) -> RagResponse {
         provider: None,
         model: None,
         verification: None,
+        provenance: None,
     }
 }
 
 /// What the server established for this answer: each live snapshot it read
 /// (and every number in it), plus the numbers the user typed.
-fn rag_text_evidence(snapshots: &[LiveSnapshot], query: &str) -> TextEvidence {
+fn rag_text_evidence(
+    snapshots: &[LiveSnapshot],
+    ranked: &[RankedSource],
+    query: &str,
+) -> TextEvidence {
     let mut evidence = TextEvidence::default();
     for snapshot in snapshots {
         evidence.add_ref(
@@ -145,6 +155,15 @@ fn rag_text_evidence(snapshots: &[LiveSnapshot], query: &str) -> TextEvidence {
                 evidence.add_json(row);
             }
         }
+    }
+    for source in ranked {
+        evidence.add_ref(
+            "memory",
+            format!(
+                "{}:{}",
+                source.rag_source.content_type, source.rag_source.content_id
+            ),
+        );
     }
     evidence.add_user_text(query);
     evidence
@@ -159,20 +178,21 @@ async fn finalize_rag_answer(
     company_id: u64,
     candidate: &str,
     snapshots: &[LiveSnapshot],
+    ranked: &[RankedSource],
     query: &str,
-) -> anyhow::Result<(String, TextAnswerVerification)> {
+) -> anyhow::Result<(String, TextAnswerVerification, TextAnswerProvenance)> {
     let gated = gate_text_answer(
         org_id,
         company_id,
         candidate,
-        &rag_text_evidence(snapshots, query),
+        &rag_text_evidence(snapshots, ranked, query),
     )
     .await?;
     let answer = gated
         .released
         .clone()
         .unwrap_or_else(|| gated.withheld_notice());
-    Ok((answer, gated.verification))
+    Ok((answer, gated.verification, gated.provenance))
 }
 
 /// The pieces the SSE stream replays. Built only from the gated answer, so a
@@ -236,6 +256,10 @@ const LEGACY_SYSTEM_SUFFIX: &str = "Answer the user's question using only the pr
 const CONTEXT_AWARE_SYSTEM_SUFFIX: &str = "Answer the user's question using the retrieved context documents. Use the ERP UI context block only to interpret what screen or module the user is viewing - it is not a data source. Be concise and factual. If the retrieved context doesn't contain enough information, say so.";
 
 const LIVE_SNAPSHOT_SYSTEM_SUFFIX: &str = "Answer using the provided ERP context. Live ERP snapshots are authoritative for current field values and status. Retrieved memory documents may be stale; never contradict a live snapshot. Use the ERP UI context block only to interpret what screen the user is viewing. Be concise and factual. If the context is insufficient, say so.";
+
+const STRUCTURED_ANSWER_SUFFIX: &str = r#"Return only one JSON object with this shape:
+{"content":"complete answer text","claims":[{"text":"an exact, non-overlapping segment of content","supportRefs":[{"kind":"live_snapshot","id":"entity_type:entity_id"}],"passageSupport":[]}],"calculations":[]}
+The claim texts, concatenated in order, must cover all content. Use only support refs explicitly listed in the context. Do not cite display labels or snippets."#;
 
 fn build_user_prompt(
     retrieved_context: &str,
@@ -511,7 +535,10 @@ pub async fn post_rag(
     } else {
         LEGACY_SYSTEM_SUFFIX
     };
-    let system_prompt = format!("{}\n\n{}", agent.system_prompt, context_suffix);
+    let system_prompt = format!(
+        "{}\n\n{}\n\n{}",
+        agent.system_prompt, context_suffix, STRUCTURED_ANSWER_SUFFIX
+    );
 
     let user_content = build_user_prompt(
         &retrieved_context,
@@ -519,6 +546,24 @@ pub async fn post_rag(
         ui_block.as_deref(),
         &req.query,
     );
+    let mut allowed_supports = live_snapshots
+        .iter()
+        .map(|snapshot| {
+            format!(
+                "live_snapshot:{}:{}",
+                snapshot.entity_type, snapshot.entity_id
+            )
+        })
+        .collect::<Vec<_>>();
+    allowed_supports.extend(ranked.iter().map(|source| {
+        format!(
+            "memory:{}:{}",
+            source.rag_source.content_type, source.rag_source.content_id
+        )
+    }));
+    let allowed_supports = allowed_supports.join(", ");
+    let user_content =
+        format!("{user_content}\n\nAllowed structured support refs: {allowed_supports}");
 
     let llm_resp = state
         .providers
@@ -547,16 +592,21 @@ pub async fn post_rag(
         }
     }
 
-    let (answer, verification) = finalize_rag_answer(
+    let (answer, verification, mut provenance) = finalize_rag_answer(
         org_id,
         req.company_id,
         &llm_resp.text,
         &live_snapshots,
+        &ranked,
         &req.query,
     )
     .await
     .map_err(|e| AppError::Internal(format!("answer gate failed: {e}")))?;
+    provenance.mark_not_persisted(
+        "RAG provenance is response-scoped; it has not been recorded as reviewed knowledge",
+    );
     let verification = Some(verification);
+    let provenance = Some(provenance);
     let provider = Some(llm_resp.provider);
     let model = Some(llm_resp.model);
     let agent_id = Some(agent.agent_id);
@@ -585,6 +635,7 @@ pub async fn post_rag(
         provider,
         model,
         verification,
+        provenance,
     }))
 }
 
@@ -600,17 +651,9 @@ pub async fn post_rag_stream(
     }
 
     events.push(
-        Event::default().event("sources").data(
-            json!({
-                "sources": response.sources,
-                "agent_id": response.agent_id,
-                "provider": response.provider,
-                "model": response.model,
-                "retrieval_degraded": response.retrieval_degraded,
-                "verification": response.verification,
-            })
-            .to_string(),
-        ),
+        Event::default()
+            .event("sources")
+            .data(rag_stream_metadata(&response).to_string()),
     );
     events.push(Event::default().event("done").data("{}"));
 
@@ -618,6 +661,18 @@ pub async fn post_rag_stream(
         events.into_iter().map(Ok::<Event, Infallible>),
     ))
     .keep_alive(KeepAlive::default()))
+}
+
+fn rag_stream_metadata(response: &RagResponse) -> Value {
+    json!({
+        "sources": response.sources,
+        "agent_id": response.agent_id,
+        "provider": response.provider,
+        "model": response.model,
+        "retrieval_degraded": response.retrieval_degraded,
+        "verification": response.verification,
+        "provenance": response.provenance,
+    })
 }
 
 #[cfg(test)]
@@ -647,7 +702,7 @@ mod tests {
                 rows: vec![serde_json::json!({"price_subtotal": 999.25})],
             }],
         };
-        let evidence = rag_text_evidence(&[snapshot], "Is $5,000.00 enough?");
+        let evidence = rag_text_evidence(&[snapshot], &[], "Is $5,000.00 enough?");
         assert_eq!(evidence.refs.len(), 1);
         assert_eq!(evidence.refs[0].kind, "live_snapshot");
         assert_eq!(evidence.refs[0].id, "sale_order:42");
@@ -655,7 +710,7 @@ mod tests {
             assert!(evidence.figures.contains(&expected), "{expected}");
         }
         // No snapshots means no evidence: nothing to ground an answer in.
-        assert!(rag_text_evidence(&[], "hello").refs.is_empty());
+        assert!(rag_text_evidence(&[], &[], "hello").refs.is_empty());
     }
 
     #[test]
@@ -742,49 +797,128 @@ mod tests {
     async fn an_ungrounded_rag_candidate_is_replaced_and_never_streamed() {
         use crate::orchestrator::text_answer_gate::TextAnswerOutcome;
 
-        let (answer, verification) = finalize_rag_answer(
+        let (answer, verification, provenance) = finalize_rag_answer(
             1,
             2,
             "Order #42 totals $31,415.92.",
+            &[],
             &[],
             "What does order 42 total?",
         )
         .await
         .unwrap();
         assert_eq!(verification.outcome, TextAnswerOutcome::RequiresReview);
+        assert!(!provenance.persisted);
         assert!(!answer.contains("31,415.92"), "{answer}");
         // The stream is built from the returned answer, so the candidate text
         // cannot appear in any delta.
         let streamed: String = answer_chunks(&answer).concat();
         assert_eq!(streamed, answer);
         assert!(!streamed.contains("31,415.92"));
+
+        let response = RagResponse {
+            answer,
+            sources: Vec::new(),
+            retrieval_degraded: false,
+            agent_id: Some(1),
+            provider: Some("test".into()),
+            model: Some("test".into()),
+            verification: Some(verification),
+            provenance: Some(provenance),
+        };
+        let json_response = serde_json::to_string(&response).unwrap();
+        let sse_metadata = rag_stream_metadata(&response).to_string();
+        assert!(!json_response.contains("31,415.92"), "{json_response}");
+        assert!(!sse_metadata.contains("31,415.92"), "{sse_metadata}");
     }
 
     #[tokio::test]
-    async fn a_grounded_rag_answer_is_released_and_a_wrong_figure_is_qualified() {
+    async fn unstructured_rag_prose_is_withheld_even_with_live_data() {
         use crate::orchestrator::text_answer_gate::TextAnswerOutcome;
 
         let snapshots = [snapshot_with_total(1250.5)];
-        let (answer, verification) =
-            finalize_rag_answer(1, 2, "Order #42 totals $1,250.50.", &snapshots, "Order 42 total?")
-                .await
-                .unwrap();
-        assert_eq!(verification.outcome, TextAnswerOutcome::Admitted);
-        assert_eq!(answer, "Order #42 totals $1,250.50.");
+        let (answer, verification, provenance) = finalize_rag_answer(
+            1,
+            2,
+            "Order #42 totals $1,250.50.",
+            &snapshots,
+            &[],
+            "Order 42 total?",
+        )
+        .await
+        .unwrap();
+        assert_eq!(verification.outcome, TextAnswerOutcome::RequiresReview);
+        assert!(answer.contains("withheld"));
+        assert!(provenance.claims.is_empty());
 
-        let (answer, verification) =
-            finalize_rag_answer(1, 2, "Order #42 totals $9,999.99.", &snapshots, "Order 42 total?")
+        let (answer, verification, _) = finalize_rag_answer(
+            1,
+            2,
+            "Order #42 totals $9,999.99.",
+            &snapshots,
+            &[],
+            "Order 42 total?",
+        )
+        .await
+        .unwrap();
+        assert_eq!(verification.outcome, TextAnswerOutcome::RequiresReview);
+        assert!(answer.contains("withheld"), "{answer}");
+    }
+
+    #[tokio::test]
+    async fn a_server_resolved_memory_ref_can_ground_document_only_rag() {
+        use crate::orchestrator::text_answer_gate::TextAnswerOutcome;
+
+        let ranked = [RankedSource {
+            label: "Policy passage".into(),
+            text: "Returns require approval.".into(),
+            score: 0.9,
+            rag_source: RagSource {
+                kind: "memory".into(),
+                trust: "retrieved".into(),
+                content_type: "policy".into(),
+                content_id: 7,
+                entity_type: None,
+                entity_id: None,
+                score: 0.9,
+                text_snippet: "Returns require approval.".into(),
+                label: Some("Policy passage".into()),
+                field: None,
+                snapshot_at: None,
+            },
+        }];
+        let candidate = json!({
+            "content": "Returns require approval.",
+            "claims": [{
+                "text": "Returns require approval.",
+                "supportRefs": [{"kind": "memory", "id": "policy:7"}],
+                "passageSupport": []
+            }],
+            "calculations": []
+        })
+        .to_string();
+
+        let (answer, verification, provenance) =
+            finalize_rag_answer(1, 2, &candidate, &[], &ranked, "What is the returns rule?")
                 .await
                 .unwrap();
-        assert_eq!(verification.outcome, TextAnswerOutcome::Qualified);
-        assert!(answer.contains("Limitations of this answer:"), "{answer}");
+
+        assert_eq!(verification.outcome, TextAnswerOutcome::Admitted);
+        assert_eq!(answer, "Returns require approval.");
+        assert_eq!(provenance.citations[0].id, "policy:7");
+        assert!(!provenance.persisted);
     }
 
     #[test]
     fn answer_chunks_reassemble_the_answer_exactly() {
-        for answer in ["", "one", "two words", "  padded  text here ", "line\nbreak ok"] {
+        for answer in [
+            "",
+            "one",
+            "two words",
+            "  padded  text here ",
+            "line\nbreak ok",
+        ] {
             assert_eq!(answer_chunks(answer).concat(), answer);
         }
     }
-
 }

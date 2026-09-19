@@ -300,7 +300,10 @@ impl InMemoryCalibrationProfileStore {
 
     pub fn register(&self, profile: CalibrationProfile) -> Result<()> {
         profile.validate()?;
-        let key = (profile.profile_ref.name.clone(), profile.profile_ref.version);
+        let key = (
+            profile.profile_ref.name.clone(),
+            profile.profile_ref.version,
+        );
         self.profiles.write().unwrap().insert(key, profile);
         Ok(())
     }

@@ -222,7 +222,6 @@ pub(super) fn spend_binding_from_agent(
     })
 }
 
-
 /// Build a spend binding for a resolved intelligence model profile.
 ///
 /// The agent remains the budget/rate-limit owner; provider/model/context are
@@ -1084,8 +1083,14 @@ mod tests {
     #[test]
     fn spend_binding_from_agent_rejects_zero_fields() {
         let agent = sample_agent(32_000);
-        assert!(spend_binding_from_agent(&agent, 0, 3, 1).is_err(), "zero org");
-        assert!(spend_binding_from_agent(&agent, 9, 0, 1).is_err(), "zero company");
+        assert!(
+            spend_binding_from_agent(&agent, 0, 3, 1).is_err(),
+            "zero org"
+        );
+        assert!(
+            spend_binding_from_agent(&agent, 9, 0, 1).is_err(),
+            "zero company"
+        );
         let no_window = sample_agent(0);
         assert!(
             spend_binding_from_agent(&no_window, 9, 3, 1).is_err(),

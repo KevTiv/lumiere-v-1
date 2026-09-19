@@ -1004,6 +1004,7 @@ mod tests {
         let viewer = Viewer {
             organization_id: org,
             company_id: company,
+            actor_identity: None,
         };
         let supported = inspect(&client, viewer, InspectTarget::Claim(first.claim_ids[0]))
             .await

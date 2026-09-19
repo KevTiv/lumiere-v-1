@@ -14,11 +14,12 @@ use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 use stdb_client::{ReducerCall, StdbClient};
 
-use super::intelligence::{decision_request_hash, DecisionKind, DecisionRequest, DecisionResponse, DecisionTypeRef};
+use super::intelligence::{
+    decision_request_hash, DecisionKind, DecisionRequest, DecisionResponse, DecisionTypeRef,
+};
 use super::probabilistic::{CalibrationProfile, Confidence, GateDecision, ThresholdGatePolicy};
 
 const MAX_ANALYSIS_ROWS: u32 = 5_000;
-
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub(super) struct DeterministicDecisionResponse {
@@ -43,7 +44,11 @@ impl DeterministicDecisionResponse {
         match self.kind {
             DecisionKind::Choice => {
                 let choice = self.choice.as_deref().context("choice result missing")?;
-                if !request.candidates.iter().any(|candidate| candidate == choice) {
+                if !request
+                    .candidates
+                    .iter()
+                    .any(|candidate| candidate == choice)
+                {
                     bail!("deterministic choice is not in the request candidate set");
                 }
             }
@@ -363,10 +368,9 @@ impl DeterministicShadowEvaluator<'_> {
         production.validate_against(request)?;
         conformance_policy.validate()?;
 
-        let candidate = self
-            .registry
-            .get(implementation_ref)
-            .with_context(|| format!("deterministic candidate '{implementation_ref}' is not registered"))?;
+        let candidate = self.registry.get(implementation_ref).with_context(|| {
+            format!("deterministic candidate '{implementation_ref}' is not registered")
+        })?;
         if candidate.decision_type() != request.decision_type {
             bail!("deterministic candidate DecisionType does not match request");
         }
@@ -402,7 +406,16 @@ impl DeterministicShadowEvaluator<'_> {
                     None,
                 )
             }
-            Err(error) => (None, None, None, None, None, None, None, Some(error.to_string())),
+            Err(error) => (
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                Some(error.to_string()),
+            ),
         };
 
         let evidence = DeterministicShadowEvidence {
@@ -464,27 +477,17 @@ fn compare_conformance(
         }),
         DecisionKind::Score => {
             let production_value = production.score.context("production score missing")?;
-            let deterministic_value =
-                deterministic.score.context("deterministic score missing")?;
-            numeric_conformance(
-                production_value,
-                deterministic_value,
-                exact_match,
-                policy,
-            )
+            let deterministic_value = deterministic.score.context("deterministic score missing")?;
+            numeric_conformance(production_value, deterministic_value, exact_match, policy)
         }
         DecisionKind::Probability => {
-            let production_value =
-                production.probability.context("production probability missing")?;
+            let production_value = production
+                .probability
+                .context("production probability missing")?;
             let deterministic_value = deterministic
                 .probability
                 .context("deterministic probability missing")?;
-            numeric_conformance(
-                production_value,
-                deterministic_value,
-                exact_match,
-                policy,
-            )
+            numeric_conformance(production_value, deterministic_value, exact_match, policy)
         }
     }
 }
@@ -496,22 +499,23 @@ fn numeric_conformance(
     policy: &DecisionConformancePolicy,
 ) -> Result<ConformanceComparison> {
     let tolerance_match = policy.numeric_tolerance.matches(production, deterministic);
-    let (
-        production_gate_disposition,
-        deterministic_gate_disposition,
-        gate_disposition_match,
-    ) = if let Some(gate) = &policy.threshold_gate {
-        let production_gate = evaluate_gate_disposition(production, gate, policy.calibration_profile.as_ref())?;
-        let deterministic_gate =
-            evaluate_gate_disposition(deterministic, gate, policy.calibration_profile.as_ref())?;
-        (
-            Some(gate_decision_label(production_gate).to_string()),
-            Some(gate_decision_label(deterministic_gate).to_string()),
-            Some(production_gate == deterministic_gate),
-        )
-    } else {
-        (None, None, None)
-    };
+    let (production_gate_disposition, deterministic_gate_disposition, gate_disposition_match) =
+        if let Some(gate) = &policy.threshold_gate {
+            let production_gate =
+                evaluate_gate_disposition(production, gate, policy.calibration_profile.as_ref())?;
+            let deterministic_gate = evaluate_gate_disposition(
+                deterministic,
+                gate,
+                policy.calibration_profile.as_ref(),
+            )?;
+            (
+                Some(gate_decision_label(production_gate).to_string()),
+                Some(gate_decision_label(deterministic_gate).to_string()),
+                Some(production_gate == deterministic_gate),
+            )
+        } else {
+            (None, None, None)
+        };
     let disposition_ok = gate_disposition_match.unwrap_or(true);
     Ok(ConformanceComparison {
         exact_match,
@@ -792,7 +796,9 @@ pub(super) struct GraduationPolicy {
     pub execution_mode: DecisionExecutionMode,
 }
 
-fn default_minimum_shadow_conformance_rate() -> f64 { 0.98 }
+fn default_minimum_shadow_conformance_rate() -> f64 {
+    0.98
+}
 
 impl GraduationPolicy {
     pub fn disabled() -> Self {
@@ -821,7 +827,10 @@ impl GraduationPolicy {
             bail!("minimum_verified_cases cannot exceed minimum_cases");
         }
         for (name, value) in [
-            ("maximum_correction_rate", Some(self.maximum_correction_rate)),
+            (
+                "maximum_correction_rate",
+                Some(self.maximum_correction_rate),
+            ),
             (
                 "maximum_provider_disagreement_rate",
                 self.maximum_provider_disagreement_rate,
@@ -907,8 +916,8 @@ impl GraduationPolicy {
         );
         if metrics.shadow_cases < self.minimum_shadow_cases {
             reasons.push(format!(
-                "shadow cases {} < {}", metrics.shadow_cases,
-                self.minimum_shadow_cases
+                "shadow cases {} < {}",
+                metrics.shadow_cases, self.minimum_shadow_cases
             ));
         }
 
@@ -1006,7 +1015,8 @@ impl StdbConformanceAggregator<'_> {
         let mut aggregate = ConformanceAggregate::default();
         for row in rows {
             aggregate.total_events += 1;
-            let raw = row_string(&row, "outputJson").context("deterministic shadow output_json missing")?;
+            let raw = row_string(&row, "outputJson")
+                .context("deterministic shadow output_json missing")?;
             let evidence: DeterministicShadowEvidence =
                 serde_json::from_str(&raw).context("decode deterministic shadow evidence")?;
             if evidence.evaluation_error.is_some() {
@@ -1099,7 +1109,13 @@ impl DecisionResolutionPolicy for StdbDecisionResolutionPolicy<'_> {
             .context("query promoted deterministic decision patterns")?;
 
         let current_context_fingerprint = json_fingerprint(&request.bounded_state)?;
-        let current_candidate_set_hash = canonical_string_list(&request.candidates.iter().map(|v| Value::String(v.clone())).collect::<Vec<_>>());
+        let current_candidate_set_hash = canonical_string_list(
+            &request
+                .candidates
+                .iter()
+                .map(|v| Value::String(v.clone()))
+                .collect::<Vec<_>>(),
+        );
         let current_evidence_shape = value_shape(&request.bounded_state);
 
         let mut matches = Vec::new();
@@ -1129,8 +1145,8 @@ impl DecisionResolutionPolicy for StdbDecisionResolutionPolicy<'_> {
                 .filter(|value| !value.trim().is_empty())
                 .context("promotion evidence missing implementation_ref")?
                 .to_string();
-            let pattern_ref = row_string(&row, "patternKey")
-                .context("promoted pattern key missing")?;
+            let pattern_ref =
+                row_string(&row, "patternKey").context("promoted pattern key missing")?;
             let rollback_mode = latest_persisted_rollback_mode(
                 self.reader,
                 context.organization_id,
@@ -1319,8 +1335,12 @@ pub(super) struct AuthorityDowngrade {
 
 fn next_lower_authority(mode: DecisionExecutionMode) -> Option<DecisionExecutionMode> {
     match mode {
-        DecisionExecutionMode::DeterministicOnly => Some(DecisionExecutionMode::DeterministicPrimaryModelShadow),
-        DecisionExecutionMode::DeterministicPrimaryModelShadow => Some(DecisionExecutionMode::ModelPrimary),
+        DecisionExecutionMode::DeterministicOnly => {
+            Some(DecisionExecutionMode::DeterministicPrimaryModelShadow)
+        }
+        DecisionExecutionMode::DeterministicPrimaryModelShadow => {
+            Some(DecisionExecutionMode::ModelPrimary)
+        }
         DecisionExecutionMode::DeterministicShadow | DecisionExecutionMode::ModelPrimary => None,
     }
 }
@@ -1357,15 +1377,17 @@ impl DriftMonitor for StdbDriftMonitor<'_> {
         let policy = policy_store.policy_for(&request.decision_type).await?;
         let mut reasons = Vec::new();
 
-        let aggregate = StdbConformanceAggregator { reader: self.reader }
-            .aggregate(
-                context.organization_id,
-                context.company_id,
-                &request.decision_type,
-                &resolution.implementation_ref,
-                MAX_ANALYSIS_ROWS,
-            )
-            .await?;
+        let aggregate = StdbConformanceAggregator {
+            reader: self.reader,
+        }
+        .aggregate(
+            context.organization_id,
+            context.company_id,
+            &request.decision_type,
+            &resolution.implementation_ref,
+            MAX_ANALYSIS_ROWS,
+        )
+        .await?;
         if let Some(rate) = aggregate.conformance_rate() {
             if aggregate.successful_evaluations >= policy.minimum_shadow_cases
                 && rate < policy.minimum_shadow_conformance_rate
@@ -1393,8 +1415,8 @@ impl DriftMonitor for StdbDriftMonitor<'_> {
             reasons.push(DriftReason::PatternSuperseded);
         }
 
-        let applicability_raw = row_string(pattern, "applicabilityJson")
-            .context("pattern applicability missing")?;
+        let applicability_raw =
+            row_string(pattern, "applicabilityJson").context("pattern applicability missing")?;
         let applicability: PatternApplicabilityEvidence =
             serde_json::from_str(&applicability_raw).context("decode pattern applicability")?;
         let candidate_values = request
@@ -1421,7 +1443,9 @@ impl DriftMonitor for StdbDriftMonitor<'_> {
                 "SELECT status FROM ai_decision_case WHERE organization_id = {} AND id = {} LIMIT 1",
                 context.organization_id, id
             )).await.context("check supporting case drift")?;
-            if case_rows.first().and_then(|row| row_string(row, "status"))
+            if case_rows
+                .first()
+                .and_then(|row| row_string(row, "status"))
                 .is_some_and(|status| matches!(status.as_str(), "rejected" | "superseded"))
             {
                 reasons.push(DriftReason::CorrectionDrift);
@@ -1429,7 +1453,9 @@ impl DriftMonitor for StdbDriftMonitor<'_> {
             }
         }
 
-        if applicability.material_policy_refs.is_empty() && policy.minimum_policy_stability.is_some() {
+        if applicability.material_policy_refs.is_empty()
+            && policy.minimum_policy_stability.is_some()
+        {
             reasons.push(DriftReason::PolicyDrift);
         }
 
@@ -1509,8 +1535,10 @@ async fn post_promotion_model_shadow_disagreement(
         {
             if let Some(raw) = row_string(&row, "outputJson") {
                 if let Ok(value) = serde_json::from_str::<Value>(&raw) {
-                    deterministic_by_hash
-                        .insert(request_hash, (canonical_json(&decision_signal(&value))?, run_id));
+                    deterministic_by_hash.insert(
+                        request_hash,
+                        (canonical_json(&decision_signal(&value))?, run_id),
+                    );
                 }
             }
         } else if event_kind == "decision_shadow"
@@ -1571,18 +1599,21 @@ impl AuthorityRollbackRecorder for StdbAuthorityRollbackRecorder<'_> {
         decision_type: &DecisionTypeRef,
         downgrade: &AuthorityDowngrade,
     ) -> Result<()> {
-        self.writer.call_reducer(ReducerCall::from_name(
-            "record_ai_graduation_authority_rollback",
-            json!([context.organization_id, context.company_id, context.run_id, {
-                "decision_type_name": decision_type.name,
-                "decision_type_version": decision_type.version,
-                "pattern_ref": downgrade.pattern_ref,
-                "implementation_ref": downgrade.implementation_ref,
-                "from_mode": serde_json::to_value(downgrade.from)?,
-                "to_mode": serde_json::to_value(downgrade.to)?,
-                "reasons_json": serde_json::to_string(&downgrade.reasons)?,
-            }]),
-        )).await.context("record deterministic authority rollback")
+        self.writer
+            .call_reducer(ReducerCall::from_name(
+                "record_ai_graduation_authority_rollback",
+                json!([context.organization_id, context.company_id, context.run_id, {
+                    "decision_type_name": decision_type.name,
+                    "decision_type_version": decision_type.version,
+                    "pattern_ref": downgrade.pattern_ref,
+                    "implementation_ref": downgrade.implementation_ref,
+                    "from_mode": serde_json::to_value(downgrade.from)?,
+                    "to_mode": serde_json::to_value(downgrade.to)?,
+                    "reasons_json": serde_json::to_string(&downgrade.reasons)?,
+                }]),
+            ))
+            .await
+            .context("record deterministic authority rollback")
     }
 }
 
@@ -1609,7 +1640,9 @@ impl GovernedDecisionResolver<'_> {
         if let Some(monitor) = self.drift_monitor {
             if let Some(downgrade) = monitor.evaluate(context, &request, &resolution).await? {
                 if let Some(recorder) = self.rollback_recorder {
-                    recorder.record(context, &request.decision_type, &downgrade).await?;
+                    recorder
+                        .record(context, &request.decision_type, &downgrade)
+                        .await?;
                 }
                 resolution.mode = downgrade.to;
                 if resolution.mode == DecisionExecutionMode::ModelPrimary {
@@ -1649,7 +1682,9 @@ impl GovernedDecisionResolver<'_> {
                             )
                             .await
                         {
-                            tracing::warn!("failed to record deterministic-primary model shadow: {error:#}");
+                            tracing::warn!(
+                                "failed to record deterministic-primary model shadow: {error:#}"
+                            );
                         }
                     }
                     Err(error) => {
@@ -1795,9 +1830,11 @@ impl GraduationAnalyzer for StdbGraduationAnalyzer<'_> {
                 &cohort_events,
                 &economics,
             )?;
-            let dominant_selected = dominant_value(cohort.iter().map(|case| &case.selected))
-                .unwrap_or(Value::Null);
-            let first = cohort.first().context("graduation cohort unexpectedly empty")?;
+            let dominant_selected =
+                dominant_value(cohort.iter().map(|case| &case.selected)).unwrap_or(Value::Null);
+            let first = cohort
+                .first()
+                .context("graduation cohort unexpectedly empty")?;
             let primary_event = cohort_events
                 .iter()
                 .copied()
@@ -1981,9 +2018,8 @@ fn compute_metrics(
             .filter(|case| matches!(case.status.as_str(), "verified" | "reviewed" | "approved"))
             .map(|case| &case.selected),
     );
-    let evidence_shape_stability = dominant_shape_ratio(
-        cases.iter().map(|case| &case.material_constraints),
-    );
+    let evidence_shape_stability =
+        dominant_shape_ratio(cases.iter().map(|case| &case.material_constraints));
 
     let (provider_disagreement_rate, shadow_cases) = shadow_disagreement(events)?;
     let candidate_set_stability = candidate_set_stability(events);
@@ -2031,7 +2067,9 @@ fn shadow_disagreement(events: &[&DecisionEventRow]) -> Result<(Option<f64>, u64
         if event.shadow_error.is_some() {
             continue;
         }
-        let Some(output) = &event.output else { continue };
+        let Some(output) = &event.output else {
+            continue;
+        };
         let canonical = canonical_json(&decision_signal(output))?;
         match event.event_kind.as_str() {
             "decision" => {
@@ -2130,7 +2168,8 @@ fn decision_signal(output: &Value) -> Value {
 fn decode_case(row: &Value) -> Result<CaseRow> {
     Ok(CaseRow {
         id: row_u64(row, "id").context("decision case id missing")?,
-        request_hash: row_string(row, "requestHash").context("decision case request hash missing")?,
+        request_hash: row_string(row, "requestHash")
+            .context("decision case request hash missing")?,
         context_fingerprint: row_string(row, "contextFingerprint")
             .context("decision case context fingerprint missing")?,
         program_ref: row_string(row, "programRef").context("decision case program_ref missing")?,
@@ -2193,7 +2232,11 @@ fn normalized_entropy<'a>(values: impl Iterator<Item = &'a Value>) -> f64 {
         acc - p * p.log2()
     });
     let max_entropy = (counts.len() as f64).log2();
-    if max_entropy == 0.0 { 0.0 } else { entropy / max_entropy }
+    if max_entropy == 0.0 {
+        0.0
+    } else {
+        entropy / max_entropy
+    }
 }
 
 fn dominant_ratio<'a>(values: impl Iterator<Item = &'a Value>) -> f64 {
@@ -2210,7 +2253,10 @@ fn dominant_value<'a>(values: impl Iterator<Item = &'a Value>) -> Option<Value> 
         let entry = counts.entry(key).or_insert((0, value.clone()));
         entry.0 += 1;
     }
-    counts.into_values().max_by_key(|(count, _)| *count).map(|(_, value)| value)
+    counts
+        .into_values()
+        .max_by_key(|(count, _)| *count)
+        .map(|(_, value)| value)
 }
 
 fn frequency<'a>(values: impl Iterator<Item = &'a Value>) -> HashMap<String, u64> {
@@ -2272,7 +2318,11 @@ fn dominant_string_ratio<'a>(values: impl Iterator<Item = &'a str>) -> f64 {
 }
 
 fn ratio(numerator: u64, denominator: u64) -> f64 {
-    if denominator == 0 { 0.0 } else { numerator as f64 / denominator as f64 }
+    if denominator == 0 {
+        0.0
+    } else {
+        numerator as f64 / denominator as f64
+    }
 }
 
 fn average_u64(values: &[u64]) -> Option<u64> {
@@ -2336,7 +2386,9 @@ fn row_u64(row: &Value, key: &str) -> Option<u64> {
 }
 
 fn row_string(row: &Value, key: &str) -> Option<String> {
-    row_value(row, key).and_then(Value::as_str).map(str::to_string)
+    row_value(row, key)
+        .and_then(Value::as_str)
+        .map(str::to_string)
 }
 
 fn timestamp_micros(value: Option<&Value>) -> Option<i64> {
@@ -2421,9 +2473,7 @@ async fn run_reviewed_fixture_suite(
 ) -> Result<()> {
     let digest = format!("{:x}", Sha256::digest(raw.as_bytes()));
     if digest != REVIEWED_GRADUATION_FIXTURES_SHA256 {
-        bail!(
-            "reviewed graduation fixtures changed without updating reviewed checksum: {digest}"
-        );
+        bail!("reviewed graduation fixtures changed without updating reviewed checksum: {digest}");
     }
 
     let suite: ReviewedGraduationFixtureSuite =
@@ -2452,25 +2502,32 @@ async fn run_reviewed_fixture_suite(
         let request_validation = fixture.request.validate();
         if fixture.expect_validation_error {
             if request_validation.is_ok() {
-                bail!("fixture '{}' expected request validation failure", fixture.id);
+                bail!(
+                    "fixture '{}' expected request validation failure",
+                    fixture.id
+                );
             }
             continue;
         }
         request_validation.with_context(|| format!("fixture '{}' request invalid", fixture.id))?;
         if fixture.request.decision_type != fixture.decision_type {
-            bail!("fixture '{}' DecisionType metadata disagrees with request", fixture.id);
+            bail!(
+                "fixture '{}' DecisionType metadata disagrees with request",
+                fixture.id
+            );
         }
 
-        let candidate = registry
-            .get(&fixture.implementation_ref)
-            .with_context(|| {
-                format!(
-                    "fixture '{}' references unregistered implementation '{}'",
-                    fixture.id, fixture.implementation_ref
-                )
-            })?;
+        let candidate = registry.get(&fixture.implementation_ref).with_context(|| {
+            format!(
+                "fixture '{}' references unregistered implementation '{}'",
+                fixture.id, fixture.implementation_ref
+            )
+        })?;
         if candidate.decision_type() != fixture.decision_type {
-            bail!("fixture '{}' implementation DecisionType mismatch", fixture.id);
+            bail!(
+                "fixture '{}' implementation DecisionType mismatch",
+                fixture.id
+            );
         }
 
         let actual = candidate
@@ -2493,13 +2550,15 @@ async fn run_reviewed_fixture_suite(
             continue_below: gate.continue_below,
             require_calibrated: gate.require_calibrated,
         });
-        let calibration_profile = fixture.calibration_profile.map(|profile| CalibrationProfile {
-            profile_ref: super::probabilistic::CalibrationProfileRef {
-                name: profile.name,
-                version: profile.version,
-            },
-            breakpoints: profile.breakpoints,
-        });
+        let calibration_profile = fixture
+            .calibration_profile
+            .map(|profile| CalibrationProfile {
+                profile_ref: super::probabilistic::CalibrationProfileRef {
+                    name: profile.name,
+                    version: profile.version,
+                },
+                breakpoints: profile.breakpoints,
+            });
         let conformance_policy = DecisionConformancePolicy {
             numeric_tolerance: NumericTolerance {
                 absolute: fixture.absolute_tolerance,
@@ -2513,7 +2572,9 @@ async fn run_reviewed_fixture_suite(
         let production = deterministic_to_decision_response(expected.clone(), "fixture-expected@1");
         let comparison =
             compare_conformance(&fixture.request, &production, &actual, &conformance_policy)
-                .with_context(|| format!("fixture '{}' conformance comparison failed", fixture.id))?;
+                .with_context(|| {
+                    format!("fixture '{}' conformance comparison failed", fixture.id)
+                })?;
         if !comparison.conformant {
             bail!(
                 "fixture '{}' ({}) is nonconformant",
@@ -2562,7 +2623,10 @@ mod tests {
         actual.policy_stability_rate = None;
         let result = policy.evaluate(&actual);
         assert!(!result.eligible);
-        assert!(result.reasons.iter().any(|reason| reason.contains("unavailable")));
+        assert!(result
+            .reasons
+            .iter()
+            .any(|reason| reason.contains("unavailable")));
     }
 
     #[test]

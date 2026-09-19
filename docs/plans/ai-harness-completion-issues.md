@@ -270,22 +270,50 @@ ingestion requires its separately admitted capability.
   and empty coordinates mean an unknown location.
 - Cross-scope references deny (`company` vs `organization` scope; nothing
   crosses an organization).
-- Verified by nine persisted-fixture scenarios
+- Source/version and contribution retries are fail-closed and idempotent:
+  identical source-version and inspection replays no-op, divergent replays
+  reject, and a contribution `event_ref` cannot be reused with different
+  details. Passage coordinates and source tags reject malformed, padded, or
+  duplicate values.
+- User-authored contributions have a narrow session route at
+  `/api/ai/evidence/contributions`. The API server derives the organization and
+  actor from the authenticated session, resolves the only allowed company from
+  membership, keeps the reducer denied to generic dispatch, and the reducer
+  requires an owned chat session in the same organization/company.
+- The baseline nine persisted-fixture scenarios
   (`run_ai_evidence_provenance_tests`, `tests/ai/evidence_provenance_test.rs`)
-  executed against a local SpacetimeDB 2.8.2 module, plus unit tests.
+  were executed against a local SpacetimeDB 2.8.2 module. The extended replay,
+  session-ownership, and sibling-company fixtures compile and have focused unit
+  coverage, but have not yet been rerun against a live module.
 
-Still open:
+Current wiring and remaining work:
 
-- No ingestion path from a real book/paper/document/ERP source; every row is
-  written by a reducer call. Fixtures do not establish production readiness.
+- Company-scoped DMS documents now populate the governed evidence tables from
+  their index content during initial creation and explicit reindexing. The
+  document id is the stable source key; the current `DocumentVersion`, stored
+  object checksum and URL bind the source version; UTF-8-safe byte-bounded
+  passages carry deterministic keys and character coordinates. A later DMS
+  version retires its predecessor through the source-change/dependency path,
+  and identical retries preserve the original supersession link.
+- DMS index content is caller supplied today, so these versions are explicitly
+  `origin=user_provided` and `verification=user_reported`, never `inspected`.
+  The path does not yet fetch and parse the server-owned blob, run external
+  PDF/OCR extraction, ingest books/network sources, or react to document
+  deletion/access revocation. A live blob-to-passage proof is still required;
+  the focused splitter tests and compile check do not establish production
+  ingestion readiness.
 - The tables are private and read only by the gateway as a trusted principal;
-  there are no client-facing authorized-read contracts. Every new reducer is
-  classified `denied` (never exposed through the session BFF) because no BFF
-  call site exists yet.
-- Only governed-run answers record contributions (an *agent* contribution via
-  the gateway service identity). A user's own contribution needs the user's
-  session identity and a BFF call site; chat and generation do not call
-  `record_ai_evidence_contribution`.
+  there are no client-facing authorized-read contracts. The contribution
+  reducer remains `denied` to generic dispatch and is reachable only through
+  its fixed, membership-authorized API-server route. Evidence inspection is
+  exposed only through AIH-16's session-owned BFF, which binds the acting user,
+  organization and membership company to an exact current reviewer grant; no
+  generic browser read contract was added.
+- Chat and generation do not call the new user-contribution endpoint, so the
+  route is not yet part of a production discussion flow. `turn_ref` remains a
+  bounded correlation string rather than validated message lineage.
+- Contribution replay currently scans the organization index; a narrower
+  idempotency index is deferred because it would change the generated schema.
 - Generated contracts are regenerated and the C0/C1/C2, operation-history,
   release-manifest and contract-IR gates pass (see AIH-18's verification
   note). This also surfaced and fixed stale hard-coded table counts and an
@@ -332,11 +360,22 @@ Still open:
   fails, a releasable answer is lowered to `RequiresReview`. The ids are on
   the run response as `evidenceClaimIds`. Verified by unit tests and an
   `#[ignore]`d live test against a real module.
-- Still not wired: decisions and component binding at save time (binding needs
-  *accepted* decisions, which are a human reviewer's act), user-attributed
-  discussion capture (needs the user's session identity via the BFF),
-  compaction/resume carrying references, and artifact generation. The
-  resume/edit/fork proof is at table level only.
+- The reviewer screen now captures a user-owned discussion contribution and
+  proposed decision together through a fixed BFF route. The contribution event
+  is idempotent and one contribution can record only one matching decision;
+  actor/organization/reducer fields never come from the browser. A second fixed
+  route records claim or decision verdicts with reducer-level permissions and
+  refreshes the inspection result.
+- Presentation draft saves can carry accepted decision IDs and optional claim
+  IDs in the canonical definition. The denied save reducer derives the
+  immutable artifact reference and content SHA-256 from the inserted revision,
+  rechecks company access and bindability, and writes the component in the same
+  transaction. A failed binding therefore rolls back the draft save.
+- Still open: automatic capture from each chat turn (the reviewer form uses the
+  owned chat session but no verified message ID), compaction/resume carrying
+  references, non-presentation artifact generation, and publishing/pinning the
+  changed presentation wire contract. The resume/edit/fork proof remains at
+  table level only.
 
 ---
 
@@ -379,34 +418,41 @@ never substitutes for required domain approval.
 
 Still open, so AIH-15 must not be marked complete:
 
-- **Free-text paths are now gated, with a weaker check.** `/v1/rag`, its SSE
-  stream and the direct-execution loop's candidate answer go through
-  `orchestrator/text_answer_gate.rs`. Evidence is only what the server
-  produced (live snapshots, tool results that carried data; a tool error, an
-  assistant message or the model's own "I checked" is not evidence). An answer
-  with no such evidence is withheld for review; a material figure that traces
-  to neither the evidence nor the user's own question qualifies the answer
-  with limitations appended to the text; `RequiresReview`/`Blocked` replace
-  the candidate with a withheld notice, so the raw text is never returned and
-  the stream (built from the gated answer) never emits it. The verdict is on
-  the response as `verification`. Regression tests sit at the response seams
-  (`summarize_loop_stop`, `finalize_rag_answer`, `answer_chunks`) and were
-  mutation-checked. Limits: prose carries no passage citations, so the only
-  method is *deterministic* and no claim is checked against a source passage
-  or by a model; `admitted` means "no traceability defect found", never
-  approval. Figure grounding can qualify a correct answer whose figure the
-  model rounded or derived (a total it summed itself), which is deliberate.
-  The loop's run state is unchanged (still parked at `agent_settled`); only
-  the returned text is gated, and admitting a loop answer does not complete
-  the run.
-- **Still ungated (explicit tracked deferral, §7.3):** report composition,
-  artifact publication and action-draft explanations do not call the gate.
-  The direct-execution loop and `/v1/rag` also record no provenance (no
-  `evidenceClaimIds`), since free text has no claims to attribute.
-- Nothing populates `ai_evidence_passage` in production: AIH-13 adds source and
-  version records and reducers to write them, but there is still no ingestion
-  path from a source system, so claim/passage checks are exercised only when
-  passages have been recorded.
+- **RAG and direct-loop answers now require structured claim provenance.**
+  `/v1/rag`, its SSE stream and the direct-execution loop require exhaustive,
+  ordered claims with server-known support references and calculations before
+  `orchestrator/text_answer_gate.rs` can release an answer. Malformed JSON,
+  incomplete claim coverage, unknown support ids and model-supplied passage
+  citations without a server-side passage catalog fail closed. JSON and SSE
+  expose the same `verification` and `provenance` metadata; ranked-source
+  identities use stable `memory:<content_type>:<content_id>` references without
+  trusting display snippets. Plain prose is withheld rather than treating
+  evidence co-occurrence as claim support. Direct-loop tool references remain
+  transient: until they have a durable passage binding the answer is withheld,
+  `persisted` remains false and no misleading evidence-claim ids are emitted.
+  Runtime RAG still initializes ranked memory as empty because authorized
+  passage text is not yet resolved from the reference-only vector hits, so the
+  memory-provenance path is focused-test proof rather than a live
+  passage-backed RAG proof. The loop's run state also remains parked at
+  `agent_settled`; this slice does not complete the run.
+- **More output boundaries now fail closed through the shared text-admission
+  adapter.** The AI report composer grounds its displayed figures in the typed
+  named-resource rows and returns `summaryVerification`; unsupported summaries
+  are withheld. `save_artifact` cannot claim a saved/published artifact because
+  it has no durable evidence/draft contract, so an unsupported body is rejected.
+  Both action-draft APIs gate model-authored explanations before response or
+  persistence: unsupported prose is replaced by a deterministic review notice
+  while the structured pending draft remains available for human review, with
+  verification metadata recorded. Deterministic ERP report rendering is not an
+  AI answer path and was intentionally left unchanged.
+- Report/artifact/action adapters still use the weaker deterministic text gate:
+  they do not carry structured passage citations or material claims through the
+  full semantic `EvidenceGatedAnswerAdmission`, and they record no
+  `evidenceClaimIds`. Other legacy/harness summaries still require an explicit
+  inventory before AIH-15 can be considered complete.
+- DMS document index content now populates `ai_evidence_passage`, but only as
+  `user_reported`; server-owned blob parsing/OCR and a live end-to-end
+  blob-to-passage-to-answer proof remain open.
 - `VerificationMethod::HumanReviewed` is never produced by the gate. Claims
   recorded through AIH-14's `review_ai_evidence_claim` can carry it, but the
   gate does not read `ai_evidence_claim` yet.
@@ -434,28 +480,38 @@ outcome and revision/review history. Reuse generated authorized read contracts.
 foundation through UI/API reads. Denied sources reveal no excerpt through the
 inspector, transcript, exports or caches; unavailable originals are explicit.
 
-**Status — partial; API only, no UI.** `ai-gateway/src/orchestrator/evidence_inspector.rs`
-assembles the chain for a component, decision, claim or knowledge version
-(exact passage/version, original author, introducing contribution,
-adaptations, validation method/outcome, dependency state) and lists blocking
-and review findings. Routes: `POST /v1/evidence/inspect` and
-`POST /v1/knowledge/retrieve`. Every read is re-authorized against
-organization/company; an out-of-scope source is reduced to an id (no excerpt,
-title, author, hash or coordinates), restricted/tombstoned passages return no
-excerpt, and unverified recollections stay visibly unverified. Verified by unit
-tests and by an `#[ignore]`d live test that ran against real `query_sql` output
-from a populated module.
+**Status — partial; minimal reviewer UI and session-owned inspection BFF.**
+`ai-gateway/src/orchestrator/evidence_inspector.rs` assembles the chain for a
+component, decision, claim or knowledge version (exact passage/version,
+original author, introducing contribution, adaptations, validation
+method/outcome, dependency state) and lists blocking and review findings. The
+AI Harness now has a reviewer-only decision/claim lookup screen. Its Next route
+proxies only to `POST /v1/ai/evidence/inspect` on the API server; browser input
+is limited to company intent plus target kind/id. The API server derives the
+organization, actor identity and token from the session, validates company
+membership, requires an active exact `ai.evidence.inspect` role grant, and
+forwards a bounded request to the internal gateway. The gateway revalidates a
+grant envelope bound to that actor, organization and company before loading the
+target. Responses are `no-store`, upstream errors are opaque, and unknown
+authority fields are rejected. An out-of-scope source is reduced to an id (no
+excerpt, title, author, hash or coordinates), restricted/tombstoned passages
+return no excerpt, and the UI defensively suppresses unavailable passage
+content and source metadata. Unit tests cover spoofed authority, expired/inactive
+roles, mismatched actor scope, bounded excerpts and unavailable-content
+redaction.
 
 Still open:
 
-- No frontend inspector and no BFF route; the routes trust `orgId`/`companyId`
-  from the caller like the other gateway routes.
 - Answer → foundation now works for governed-run answers: the run response
   carries `evidenceClaimIds`, and each inspects down to passage, source and
-  author. A *workflow step* has no path yet (no component is bound at save
-  time). Transcript, export and cache paths are not covered — only these two
-  routes.
-- Authorization is organization/company scope, not the acting user's grants.
+  author. The UI does not navigate from an answer or run to those claims, and a
+  *workflow step* has no path yet (no component is bound at save time).
+- The UI exposes only decision and claim lookup and omits several persisted
+  lineage fields, review actions, navigation, export and cache integration.
+- Transcript and export paths are not covered, derived caches are not
+  invalidated, and no live authenticated browser → API server → gateway →
+  SpacetimeDB E2E was run. No default `ai.evidence.inspect` grant is seeded, so
+  deployments deny inspection until an authorized role grant is configured.
 
 ---
 
@@ -487,11 +543,22 @@ version can only reference evidence in its own scope. Retrieval
 from current scope and dependency state. Fixtures approve one concept and one
 procedure and retrieve both with lineage.
 
+Implemented scope and reviewer protections:
+
+- `personal` reuse requires the trusted actor identity to match the owner and
+  rechecks active organization/company membership. `team` uses the closed
+  `department:<id>` vocabulary backed by the actor's current
+  `user_organization.department_id`; membership is rechecked on every retrieval
+  and knowledge-version inspection. The gateway derives actor scope from the
+  trusted BFF envelope, rejects body-supplied authority/team fields, and
+  requires the dedicated `ai.knowledge.retrieve` capability.
+- An entry owner or version proposer cannot review that version. Team reviewers
+  must also be current members of the same team. Retrieval revalidates complete
+  independent current-epoch reviews, so historical approved rows fail closed
+  rather than inheriting weaker legacy approval.
+
 Still open:
 
-- `personal` and `team` share scopes are denied at retrieval (they need the
-  acting user's identity/membership, which the read path does not have); only
-  `organization` entries are served.
 - Wired for governed-run skills: `config_json.knowledgeEntryKeys` names the
   entries a run compiles into its context
   (`ai-gateway/src/orchestrator/knowledge_context.rs`). Each is re-retrieved at
@@ -500,9 +567,17 @@ Still open:
   evidence (`knowledge_version:<id>`); caller-supplied `referenceKnowledge*`
   inputs are discarded. The direct-execution loop and `/v1/rag` do not compile
   knowledge. AIH-20/24 dependencies were not implemented.
-- Reviewer separation (a reviewer other than the author) is not enforced;
-  authority is the `ai_knowledge_review` permission only.
-- Promotion of knowledge into a recipe/skill is out of scope and not built.
+- No live API-server -> gateway -> SpacetimeDB scope/revocation E2E has run;
+  role grants for `ai.knowledge.retrieve` still need provisioning. Governed-run
+  identity still originates from the existing `triggered_by_hex` boundary,
+  although membership is rechecked live. Generated contract/schema artifacts
+  were not regenerated for this slice.
+- Knowledge-to-skill promotion now persists an exact reviewed lineage snapshot,
+  requires an independent promotion reviewer, creates only an unreleased skill
+  version, and relies on the existing independent certification/release gate.
+  Invalidating the knowledge invalidates certification, deactivates an active
+  release and blocks new runtime snapshots. Live source-change cascade E2E and
+  regenerated reducer descriptors/contracts remain open.
 
 ---
 
@@ -590,6 +665,15 @@ migration and the full M6 matrix; M7 remains the usage/evidence-quality gate.
 Disabled specialists/extensions do not block the base, but cannot be
 advertised as admitted until their M8/M9 gates pass.
 
+**Status — partial; not complete.** Certification reads now return persisted
+terminal evidence and a server-computed readiness reason. The API/BFF and skill
+registry UI expose loading, retry, empty, evidence and readiness states; release
+promotion is gated by that persisted readiness rather than client-side hash
+inference. Knowledge-promotion propose/list/review routes are company-scoped and
+feed accepted, unreleased skill versions into the same certification flow.
+Generated reducer descriptors, authenticated browser-to-STDB E2E and the full
+three-scenario admission matrix remain open.
+
 ---
 
 ### AIH-20 — Durable questions and user steering
@@ -674,6 +758,15 @@ remaining budget in a summary cause recovery or a blocked continuation. Resumed
 behavior honors required questions and completed effects; revoked sources remain
 unavailable without leaking excerpts. Summary text cannot grant permissions.
 
+**Status — partial; not complete.** Schema-v2 checkpoints now persist an
+append-only parent hash, checkpoint/concurrency sequence, decision-event cursor,
+bounded-state and decision-state hashes, authorized dependency references,
+acquired-evidence hash, and a checked compaction summary. STDB recomputes these
+hashes and rejects stale parents; resume reauthorizes the actor, skill, inputs,
+graph, knowledge and source dependencies before changing run state. Durable
+questions/approvals, completed-effect reconciliation and recovery/rebuild on
+mismatch remain open.
+
 ---
 
 ### AIH-24 — Session interruption, resume and alternative comparison
@@ -689,6 +782,12 @@ duplicate effects. Interrupt before/during/after a consequential call reconciles
 uncertain outcomes before resume. Forks preserve attribution but reacquire scope,
 budget and execution approval; candidate selection/revert never rolls back posted
 ERP state. Expired/revoked dependencies are rechecked on resume.
+
+**Status — partial; not complete.** Typed continuation-token contracts and
+validated interrupt/resume/fork/compare request shapes exist, and the existing
+resume path now performs checked lineage/dependency validation. The token is not
+yet required by the public resume request; interrupt/fork/compare have no
+reducers, routes or UI, and uncertain consequential effects are not reconciled.
 
 ---
 
