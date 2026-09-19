@@ -2124,6 +2124,41 @@
       "postgres_access_path": "organization_partition"
     },
     {
+      "table": "ai_knowledge_skill_promotion",
+      "module": "ai",
+      "rationale": "AIH-17 reviewed knowledge-to-skill promotion state with immutable lineage, independent review, certification, release, and invalidation status.",
+      "authoritative_resources": [],
+      "durability_class": "durable_operational_state",
+      "organization_ownership": "direct",
+      "organization_column": "organization_id",
+      "company_ownership": "direct",
+      "company_column_path": [
+        "company_id"
+      ],
+      "company_column_nullable": false,
+      "aggregate": {
+        "kind": "child",
+        "parent": {
+          "table": "ai_knowledge_entry_version",
+          "child_column": "knowledge_version_id",
+          "parent_column": "id"
+        }
+      },
+      "primary_key": {
+        "strategy": "auto_increment",
+        "column": "id",
+        "version_strategy": "none"
+      },
+      "projection_mode": "upsert-current",
+      "hot_retention": "always",
+      "cooling_eligibility": "never",
+      "cooling_eligibility_source": "reviewed:aih-17/knowledge-skill-promotion",
+      "dependency_behavior": "follow_parent",
+      "hydration_policy": "not_applicable",
+      "delete_behavior": "tombstone",
+      "postgres_access_path": "organization_index"
+    },
+    {
       "table": "ai_model_profile",
       "module": "ai",
       "rationale": "Versioned organization-owned model/provider execution configuration for governed intelligence roles.",
