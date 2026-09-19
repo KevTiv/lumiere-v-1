@@ -21,6 +21,7 @@ use crate::{
         format_live_context_block, resolve_snapshot_candidates, ActorCredentials, LiveSnapshot,
         SnapshotUiContext, RAG_MAX_LIVE_SNAPSHOTS,
     },
+    orchestrator::text_answer_gate::{gate_text_answer, TextAnswerVerification, TextEvidence},
     providers::llm::LlmMessage,
     retrieval_policy::optional_retrieval,
     state::AppState,
@@ -110,6 +111,11 @@ pub struct RagResponse {
     pub provider: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub model: Option<String>,
+    /// The §7.3 answer-gate verdict. Present whenever a model answer was
+    /// produced; `answer` is then the gated text (limitations appended when
+    /// qualified) or a withheld notice, never the raw candidate.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub verification: Option<TextAnswerVerification>,
 }
 
 fn no_relevant_information_response(retrieval_degraded: bool) -> RagResponse {
@@ -120,7 +126,63 @@ fn no_relevant_information_response(retrieval_degraded: bool) -> RagResponse {
         agent_id: None,
         provider: None,
         model: None,
+        verification: None,
     }
+}
+
+/// What the server established for this answer: each live snapshot it read
+/// (and every number in it), plus the numbers the user typed.
+fn rag_text_evidence(snapshots: &[LiveSnapshot], query: &str) -> TextEvidence {
+    let mut evidence = TextEvidence::default();
+    for snapshot in snapshots {
+        evidence.add_ref(
+            "live_snapshot",
+            format!("{}:{}", snapshot.entity_type, snapshot.entity_id),
+        );
+        evidence.add_json(&snapshot.row);
+        for relation in &snapshot.relations {
+            for row in &relation.rows {
+                evidence.add_json(row);
+            }
+        }
+    }
+    evidence.add_user_text(query);
+    evidence
+}
+
+/// §7.3: the candidate is not an answer until the gate has judged it. A
+/// qualified answer carries its limitations; an unverified one is replaced by a
+/// withheld notice, and neither `post_rag_stream` nor any client ever sees the
+/// raw candidate.
+async fn finalize_rag_answer(
+    org_id: u64,
+    company_id: u64,
+    candidate: &str,
+    snapshots: &[LiveSnapshot],
+    query: &str,
+) -> anyhow::Result<(String, TextAnswerVerification)> {
+    let gated = gate_text_answer(
+        org_id,
+        company_id,
+        candidate,
+        &rag_text_evidence(snapshots, query),
+    )
+    .await?;
+    let answer = gated
+        .released
+        .clone()
+        .unwrap_or_else(|| gated.withheld_notice());
+    Ok((answer, gated.verification))
+}
+
+/// The pieces the SSE stream replays. Built only from the gated answer, so a
+/// withheld candidate can never reach a `delta` event.
+fn answer_chunks(answer: &str) -> Vec<String> {
+    answer
+        .split_inclusive(' ')
+        .filter(|chunk| !chunk.is_empty())
+        .map(str::to_string)
+        .collect()
 }
 
 fn has_grounded_context(ranked: &[RankedSource], snapshots: &[LiveSnapshot]) -> bool {
@@ -485,7 +547,16 @@ pub async fn post_rag(
         }
     }
 
-    let answer = llm_resp.text;
+    let (answer, verification) = finalize_rag_answer(
+        org_id,
+        req.company_id,
+        &llm_resp.text,
+        &live_snapshots,
+        &req.query,
+    )
+    .await
+    .map_err(|e| AppError::Internal(format!("answer gate failed: {e}")))?;
+    let verification = Some(verification);
     let provider = Some(llm_resp.provider);
     let model = Some(llm_resp.model);
     let agent_id = Some(agent.agent_id);
@@ -513,6 +584,7 @@ pub async fn post_rag(
         agent_id,
         provider,
         model,
+        verification,
     }))
 }
 
@@ -523,10 +595,8 @@ pub async fn post_rag_stream(
     let Json(response) = post_rag(State(state), Json(req)).await?;
     let mut events: Vec<Event> = Vec::new();
 
-    for chunk in response.answer.split_inclusive(' ') {
-        if !chunk.is_empty() {
-            events.push(Event::default().event("delta").data(chunk.to_string()));
-        }
+    for chunk in answer_chunks(&response.answer) {
+        events.push(Event::default().event("delta").data(chunk));
     }
 
     events.push(
@@ -537,6 +607,7 @@ pub async fn post_rag_stream(
                 "provider": response.provider,
                 "model": response.model,
                 "retrieval_degraded": response.retrieval_degraded,
+                "verification": response.verification,
             })
             .to_string(),
         ),
@@ -561,6 +632,30 @@ mod tests {
         assert!(response.provider.is_none());
         assert!(response.model.is_none());
         assert!(!has_grounded_context(&[], &[]));
+    }
+
+    #[test]
+    fn rag_evidence_is_the_live_snapshots_and_the_users_own_figures() {
+        let snapshot = LiveSnapshot {
+            entity_type: "sale_order".into(),
+            entity_id: 42,
+            label: "Sale order #42".into(),
+            snapshot_at: "2026-06-12T12:00:00Z".into(),
+            row: serde_json::json!({"amount_total": 1250.5}),
+            relations: vec![crate::harness::snapshot::RelationSnapshot {
+                relation_key: "lines".into(),
+                rows: vec![serde_json::json!({"price_subtotal": 999.25})],
+            }],
+        };
+        let evidence = rag_text_evidence(&[snapshot], "Is $5,000.00 enough?");
+        assert_eq!(evidence.refs.len(), 1);
+        assert_eq!(evidence.refs[0].kind, "live_snapshot");
+        assert_eq!(evidence.refs[0].id, "sale_order:42");
+        for expected in [1250.5, 999.25, 5000.0] {
+            assert!(evidence.figures.contains(&expected), "{expected}");
+        }
+        // No snapshots means no evidence: nothing to ground an answer in.
+        assert!(rag_text_evidence(&[], "hello").refs.is_empty());
     }
 
     #[test]
@@ -632,4 +727,64 @@ mod tests {
 
         assert_eq!(normalized, vec!["product", "sale_order", "contact"]);
     }
+    fn snapshot_with_total(total: f64) -> LiveSnapshot {
+        LiveSnapshot {
+            entity_type: "sale_order".into(),
+            entity_id: 42,
+            label: "Sale order #42".into(),
+            snapshot_at: "2026-06-12T12:00:00Z".into(),
+            row: serde_json::json!({ "amount_total": total }),
+            relations: vec![],
+        }
+    }
+
+    #[tokio::test]
+    async fn an_ungrounded_rag_candidate_is_replaced_and_never_streamed() {
+        use crate::orchestrator::text_answer_gate::TextAnswerOutcome;
+
+        let (answer, verification) = finalize_rag_answer(
+            1,
+            2,
+            "Order #42 totals $31,415.92.",
+            &[],
+            "What does order 42 total?",
+        )
+        .await
+        .unwrap();
+        assert_eq!(verification.outcome, TextAnswerOutcome::RequiresReview);
+        assert!(!answer.contains("31,415.92"), "{answer}");
+        // The stream is built from the returned answer, so the candidate text
+        // cannot appear in any delta.
+        let streamed: String = answer_chunks(&answer).concat();
+        assert_eq!(streamed, answer);
+        assert!(!streamed.contains("31,415.92"));
+    }
+
+    #[tokio::test]
+    async fn a_grounded_rag_answer_is_released_and_a_wrong_figure_is_qualified() {
+        use crate::orchestrator::text_answer_gate::TextAnswerOutcome;
+
+        let snapshots = [snapshot_with_total(1250.5)];
+        let (answer, verification) =
+            finalize_rag_answer(1, 2, "Order #42 totals $1,250.50.", &snapshots, "Order 42 total?")
+                .await
+                .unwrap();
+        assert_eq!(verification.outcome, TextAnswerOutcome::Admitted);
+        assert_eq!(answer, "Order #42 totals $1,250.50.");
+
+        let (answer, verification) =
+            finalize_rag_answer(1, 2, "Order #42 totals $9,999.99.", &snapshots, "Order 42 total?")
+                .await
+                .unwrap();
+        assert_eq!(verification.outcome, TextAnswerOutcome::Qualified);
+        assert!(answer.contains("Limitations of this answer:"), "{answer}");
+    }
+
+    #[test]
+    fn answer_chunks_reassemble_the_answer_exactly() {
+        for answer in ["", "one", "two words", "  padded  text here ", "line\nbreak ok"] {
+            assert_eq!(answer_chunks(answer).concat(), answer);
+        }
+    }
+
 }

@@ -26,3 +26,4 @@ mod run_review;
 pub mod run;
 pub mod skill_loader;
 mod spend_admission;
+pub mod text_answer_gate;

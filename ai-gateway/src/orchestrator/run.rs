@@ -48,6 +48,7 @@ use super::{
     evidence_inspector::Viewer,
     evidence_recorder::{RecordingAnswerAdmission, RunEvidenceScope, StdbEvidenceRecorder},
     knowledge_context::{compile_knowledge_context, knowledge_entry_keys, merge_into_inputs},
+    text_answer_gate::{evidence_from_transcript, gate_text_answer, TextAnswerVerification},
     governed_program::{
         graph_requests_generated_capabilities, BuiltinComputeService, GovernedProgramContext,
         GovernedProgramExecutor, GovernedProgramStop, StdbIntelligenceEventRecorder,
@@ -149,6 +150,11 @@ pub struct RunSkillResponse {
     /// Omitted when the run recorded none.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub evidence_claim_ids: Vec<u64>,
+    /// The §7.3 verdict on a free-text candidate answer (direct-execution
+    /// loop). When present, `summary` is the gated text or a withheld notice,
+    /// never the raw candidate.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub verification: Option<TextAnswerVerification>,
 }
 
 pub async fn run_skill(state: &AppState, req: RunSkillRequest) -> Result<RunSkillResponse> {
@@ -495,6 +501,7 @@ pub async fn run_skill_unlocked(
         agent_id: agent.agent_id,
         skill_key: skill.skill_key,
         evidence_claim_ids: Vec::new(),
+        verification: None,
     })
 }
 
@@ -976,6 +983,7 @@ pub async fn run_skill_admitted(
                     agent_id: agent.agent_id,
                     skill_key: skill.skill_key,
                     evidence_claim_ids,
+                    verification: None,
                 });
             }
         }
@@ -1081,6 +1089,7 @@ pub async fn run_skill_admitted(
             agent_id: agent.agent_id,
             skill_key: skill.skill_key,
             evidence_claim_ids,
+            verification: None,
         });
     }
 
@@ -1103,10 +1112,8 @@ pub async fn run_skill_admitted(
     )
     .await?;
 
-    let summary = match &outcome.stop {
-        LoopStop::CandidateFinal(answer) => answer.clone(),
-        stop => format!("agent loop stopped: {stop:?}"),
-    };
+    let (summary, verification) =
+        summarize_loop_stop(req.org_id, req.company_id, &outcome.stop, &outcome.transcript).await?;
     let status = match run_finalization(&outcome.stop) {
         RunFinalization::Wait { status, .. } => status.to_string(),
         RunFinalization::Failed { error_code } => error_code.to_string(),
@@ -1123,7 +1130,40 @@ pub async fn run_skill_admitted(
         agent_id: agent.agent_id,
         skill_key: skill.skill_key,
         evidence_claim_ids: Vec::new(),
+        verification,
     })
+}
+
+/// What the direct-execution loop may return for how it stopped.
+///
+/// §7.3: a candidate final answer is not an answer until the gate has judged
+/// it. Run state is unchanged (the run still waits at `agent_settled`); what
+/// changes is that the raw candidate is never returned. It is released only
+/// when the gate admits it (limitations appended when qualified) and withheld
+/// otherwise. Other stops carry no candidate text.
+async fn summarize_loop_stop(
+    org_id: u64,
+    company_id: u64,
+    stop: &LoopStop,
+    transcript: &[crate::providers::llm::LlmMessage],
+) -> Result<(String, Option<TextAnswerVerification>)> {
+    match stop {
+        LoopStop::CandidateFinal(answer) => {
+            let gated = gate_text_answer(
+                org_id,
+                company_id,
+                answer,
+                &evidence_from_transcript(transcript),
+            )
+            .await?;
+            let text = gated
+                .released
+                .clone()
+                .unwrap_or_else(|| gated.withheld_notice());
+            Ok((text, Some(gated.verification)))
+        }
+        stop => Ok((format!("agent loop stopped: {stop:?}"), None)),
+    }
 }
 
 async fn validate_resume_identity(
@@ -1397,6 +1437,61 @@ mod tests {
         assert!(reject_legacy_analytics_sql(&json!({"sql": "SELECT 1"})).is_err());
         assert!(reject_legacy_analytics_sql(&json!({"query": "revenue"})).is_ok());
     }
+    #[tokio::test]
+    async fn a_loop_candidate_is_never_returned_ungated() {
+        use crate::orchestrator::text_answer_gate::TextAnswerOutcome;
+        use crate::providers::llm::LlmMessage;
+
+        let candidate = LoopStop::CandidateFinal("Revenue was $88,888.88 last month.".into());
+
+        // No successful tool result: the candidate is withheld, and its text
+        // appears nowhere in what is returned.
+        let (summary, verification) = summarize_loop_stop(
+            1,
+            2,
+            &candidate,
+            &[LlmMessage::text("user", "How was revenue?")],
+        )
+        .await
+        .unwrap();
+        assert!(!summary.contains("88,888.88"), "{summary}");
+        assert!(summary.contains("withheld"), "{summary}");
+        assert_eq!(verification.unwrap().outcome, TextAnswerOutcome::RequiresReview);
+
+        // Grounded in a tool result: released as written.
+        let grounded = vec![
+            LlmMessage::text("user", "How was revenue?"),
+            LlmMessage::ToolResult {
+                tool_call_id: Some("call-1".into()),
+                name: "revenue".into(),
+                content: json!({ "summary": "ok", "data": { "total": 88888.88 } }).to_string(),
+            },
+        ];
+        let (summary, verification) = summarize_loop_stop(1, 2, &candidate, &grounded).await.unwrap();
+        assert_eq!(summary, "Revenue was $88,888.88 last month.");
+        assert_eq!(verification.unwrap().outcome, TextAnswerOutcome::Admitted);
+
+        // A figure the tool never produced qualifies, with the caveat attached.
+        let mismatched = vec![
+            LlmMessage::text("user", "How was revenue?"),
+            LlmMessage::ToolResult {
+                tool_call_id: Some("call-1".into()),
+                name: "revenue".into(),
+                content: json!({ "summary": "ok", "data": { "total": 1000.5 } }).to_string(),
+            },
+        ];
+        let (summary, verification) = summarize_loop_stop(1, 2, &candidate, &mismatched).await.unwrap();
+        assert!(summary.contains("Limitations of this answer:"), "{summary}");
+        assert_eq!(verification.unwrap().outcome, TextAnswerOutcome::Qualified);
+    }
+
+    #[tokio::test]
+    async fn non_answer_stops_carry_no_candidate_text_or_verdict() {
+        let (summary, verification) = summarize_loop_stop(1, 2, &LoopStop::RoundLimit, &[]).await.unwrap();
+        assert_eq!(summary, "agent loop stopped: RoundLimit");
+        assert!(verification.is_none());
+    }
+
 }
 
 async fn synthesize_summary(

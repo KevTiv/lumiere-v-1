@@ -379,11 +379,30 @@ never substitutes for required domain approval.
 
 Still open, so AIH-15 must not be marked complete:
 
-- **Ungated answer paths (explicit tracked deferral, §7.3):** the
-  direct-execution loop (`agent_loop.rs`), `/v1/rag` and the SSE
-  `post_rag_stream` (which streams the ungated answer as `delta` events),
-  report composition, artifact publication and action-draft explanations do
-  not call `FinalAnswerAdmission` yet.
+- **Free-text paths are now gated, with a weaker check.** `/v1/rag`, its SSE
+  stream and the direct-execution loop's candidate answer go through
+  `orchestrator/text_answer_gate.rs`. Evidence is only what the server
+  produced (live snapshots, tool results that carried data; a tool error, an
+  assistant message or the model's own "I checked" is not evidence). An answer
+  with no such evidence is withheld for review; a material figure that traces
+  to neither the evidence nor the user's own question qualifies the answer
+  with limitations appended to the text; `RequiresReview`/`Blocked` replace
+  the candidate with a withheld notice, so the raw text is never returned and
+  the stream (built from the gated answer) never emits it. The verdict is on
+  the response as `verification`. Regression tests sit at the response seams
+  (`summarize_loop_stop`, `finalize_rag_answer`, `answer_chunks`) and were
+  mutation-checked. Limits: prose carries no passage citations, so the only
+  method is *deterministic* and no claim is checked against a source passage
+  or by a model; `admitted` means "no traceability defect found", never
+  approval. Figure grounding can qualify a correct answer whose figure the
+  model rounded or derived (a total it summed itself), which is deliberate.
+  The loop's run state is unchanged (still parked at `agent_settled`); only
+  the returned text is gated, and admitting a loop answer does not complete
+  the run.
+- **Still ungated (explicit tracked deferral, §7.3):** report composition,
+  artifact publication and action-draft explanations do not call the gate.
+  The direct-execution loop and `/v1/rag` also record no provenance (no
+  `evidenceClaimIds`), since free text has no claims to attribute.
 - Nothing populates `ai_evidence_passage` in production: AIH-13 adds source and
   version records and reducers to write them, but there is still no ingestion
   path from a source system, so claim/passage checks are exercised only when
