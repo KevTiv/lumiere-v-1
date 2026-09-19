@@ -799,8 +799,9 @@ approval snapshot is reacquired. Consequential effects have planned/dispatched/
 confirmed/failed/uncertain revisions; uncertain effects block resume until
 reconciled. Responses omit private event payloads and actor identities. Still
 open: live two-client and provider-effect E2E, component/evidence/validation diff
-materialization (compare currently certifies the two continuations only), public
-grant provisioning, and generated-contract release/pin for the new reducers.
+materialization (compare currently certifies the two continuations only), and
+public grant provisioning. The lifecycle reducers are published and pinned in
+the immutable `lumiere-contracts` v0.3.51 release.
 
 ---
 

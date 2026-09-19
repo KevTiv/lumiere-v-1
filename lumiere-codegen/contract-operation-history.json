@@ -142,6 +142,10 @@
       "name": "add_workflow_human_task_comment",
       "shape_fingerprint": "sha256:7fe2eb4d4c384b9d26f86997d4161c070f33a3299212a1df165e3864543084b6"
     },
+    "erp.advance_ai_run_checkpoint": {
+      "name": "advance_ai_run_checkpoint",
+      "shape_fingerprint": "sha256:e15fdf4587527095645ec3ea69aad7e8372abe9cbd2dd115453846d129f0252b"
+    },
     "erp.advance_subscription_dunning": {
       "name": "advance_subscription_dunning",
       "shape_fingerprint": "sha256:d724ae524f8aecb34eb7817a4c0f2d11a71bbb434e7cde5066990ad4292ee56b"
@@ -330,6 +334,10 @@
       "name": "archive_payment_account",
       "shape_fingerprint": "sha256:659d9d25b37a2268fb492284c478c63f785fe903f3c1a652f8e590d717269b26"
     },
+    "erp.ask_ai_run_question": {
+      "name": "ask_ai_run_question",
+      "shape_fingerprint": "sha256:34c4701fcd91d7dc570520d03b9f9900cb5e90079dc761a10866f59c672e9b3a"
+    },
     "erp.assign_benefit_enrollment": {
       "name": "assign_benefit_enrollment",
       "shape_fingerprint": "sha256:08238be5d4ffff0cd13e95c993400b8127041e2512dfe293373827d4295f2d94"
@@ -381,6 +389,10 @@
     "erp.audit_manufacturing_data": {
       "name": "audit_manufacturing_data",
       "shape_fingerprint": "sha256:74c9d3c2fa8e3562af7aa35b9f630e99127d223294c420b5bc277d462c0669f7"
+    },
+    "erp.authorize_ai_run_fork": {
+      "name": "authorize_ai_run_fork",
+      "shape_fingerprint": "sha256:f507ef45f869d2b9e5a795912cfcdae188fd76729cdf2b8b6af73b85aa28af9d"
     },
     "erp.award_purchase_rfq_bid": {
       "name": "award_purchase_rfq_bid",
@@ -657,6 +669,10 @@
     "erp.close_ticket": {
       "name": "close_ticket",
       "shape_fingerprint": "sha256:70bf14c86b5721f074f4c9204af7aafed69a98e10a9e5ad8c9638abd083d24c4"
+    },
+    "erp.compare_ai_runs_checked": {
+      "name": "compare_ai_runs_checked",
+      "shape_fingerprint": "sha256:e8875e8f81e8b2575a8ae578792ae83f41604167923143445510e2db9fbed62b"
     },
     "erp.complete_activity": {
       "name": "complete_activity",
@@ -2322,6 +2338,10 @@
       "name": "fire_workflow_timer",
       "shape_fingerprint": "sha256:b3f00d7bf49306f59a745a7bb5a47f9ef665656904524c4fc777262cda8f356c"
     },
+    "erp.fork_ai_run_checked": {
+      "name": "fork_ai_run_checked",
+      "shape_fingerprint": "sha256:954af3c1bf9beb6bb563cfd14c21fb325db382257fd8660599660eb18934daca"
+    },
     "erp.generate_eu_vat_report": {
       "name": "generate_eu_vat_report",
       "shape_fingerprint": "sha256:d8bcfc18c9d60a4896480d2c564d9f0dc557f5f88dae12b54b46689edccdd9f8"
@@ -2626,6 +2646,10 @@
       "name": "init",
       "shape_fingerprint": "sha256:6c6931988a41f6aba1e5402481f996da9ce28a569be93ff84fe25c1ee93558d5"
     },
+    "erp.initialize_ai_run_lifecycle": {
+      "name": "initialize_ai_run_lifecycle",
+      "shape_fingerprint": "sha256:441101bbf7c888dfbf03fa8418aef6f863bf869bf26dbab200392e78eba7a581"
+    },
     "erp.initialize_default_form_configs": {
       "name": "initialize_default_form_configs",
       "shape_fingerprint": "sha256:40cfd7ca862b8c0523d6eea754b5e4d867400f57ad96b79340ab5ddef824aa73"
@@ -2633,6 +2657,10 @@
     "erp.inspect_ai_evidence_source_version": {
       "name": "inspect_ai_evidence_source_version",
       "shape_fingerprint": "sha256:d00ff425cbce1ef6c01573742b37f3c03676e9961b6807af84d621829105a138"
+    },
+    "erp.interrupt_ai_run": {
+      "name": "interrupt_ai_run",
+      "shape_fingerprint": "sha256:2e62a765ac7b3ec70edcada471d0797b42254443d9f844a27743d3492451324b"
     },
     "erp.invalidate_workflow_human_task": {
       "name": "invalidate_workflow_human_task",
@@ -2974,6 +3002,10 @@
       "name": "reconcile_ai_provider_attempt",
       "shape_fingerprint": "sha256:4e459f9002ce56c056332829823f4364b0a95c2f8b9d718872426bb86d4aac22"
     },
+    "erp.reconcile_ai_run_effect": {
+      "name": "reconcile_ai_run_effect",
+      "shape_fingerprint": "sha256:01afae8315372b076fd9d910e487b32fe3c6373b991bb88ca1177365ccd2adbb"
+    },
     "erp.reconcile_payment_with_invoice": {
       "name": "reconcile_payment_with_invoice",
       "shape_fingerprint": "sha256:6345d3da1ed5816697431dc61bed725044a9c28c20fa028de42091e110fc8b75"
@@ -3045,6 +3077,10 @@
     "erp.record_ai_reasoning_event": {
       "name": "record_ai_reasoning_event",
       "shape_fingerprint": "sha256:f31715cfc6918f6eaa25bac30d31fa5782e223ffbe9776e2719ca0e4c2bf0cab"
+    },
+    "erp.record_ai_run_effect": {
+      "name": "record_ai_run_effect",
+      "shape_fingerprint": "sha256:24b216911536caef0f4f65340070899d76bc0f6c851d6e79e69c1fbce680ecbe"
     },
     "erp.record_ai_run_review": {
       "name": "record_ai_run_review",
@@ -3334,6 +3370,10 @@
       "name": "replace_contact_categories",
       "shape_fingerprint": "sha256:a3413724fede12325724bcedb846b780e4c5df9dce912a72171fc06d5641c1d8"
     },
+    "erp.reply_ai_run_question": {
+      "name": "reply_ai_run_question",
+      "shape_fingerprint": "sha256:077ddf3a1ca5d74325e319cbc086a3bc926a1b80003b054b4dac4fc752b9d50d"
+    },
     "erp.request_ai_skill_certification": {
       "name": "request_ai_skill_certification",
       "shape_fingerprint": "sha256:8191146e81b74b3f2c24515ce0ce3771a698d8d0fc43f09b716b677401dc5b04"
@@ -3397,6 +3437,10 @@
     "erp.restore_proposal_version": {
       "name": "restore_proposal_version",
       "shape_fingerprint": "sha256:4b2ba3d523146b998bec4f4f4684235362fe48818e901a867fca3a37773c1c73"
+    },
+    "erp.resume_ai_run_checked": {
+      "name": "resume_ai_run_checked",
+      "shape_fingerprint": "sha256:5301f7bb2eb84963c29c8dc58f4a3a76041738b24a725a3b6c28945ccdebbc32"
     },
     "erp.resume_subscription": {
       "name": "resume_subscription",
@@ -4630,6 +4674,10 @@
       "name": "start_workorder",
       "shape_fingerprint": "sha256:e44796f87f20b6f0f90484f4539f62b986d9db1579aa8d6140fbd412c384db69"
     },
+    "erp.steer_ai_run": {
+      "name": "steer_ai_run",
+      "shape_fingerprint": "sha256:3302454599842ce001fac8c2a1c6d817d52cc8b496c0e65e3ee57cdda2d73308"
+    },
     "erp.stop_timesheet_timer": {
       "name": "stop_timesheet_timer",
       "shape_fingerprint": "sha256:396463b84b0cc1c11541949955e8e3545943340cf15cbd9d1a14fdcd817dc267"
@@ -5604,6 +5652,14 @@
       "current_operations_fingerprint": "sha256:2aee1fca0a9d32659d7d4e82d1b303c4abebd4f544f645082f04aabff1dff7ca",
       "operation_count": 1381,
       "reason": "retire caller-supplied document index content and its session reducer; document evidence now comes only from server-owned blob ingestion"
+    },
+    {
+      "previous_release": "v0.3.50",
+      "previous_ir_sha256": "sha256:1bd237851f97fadab4fd3e977cd1b154624de33404566ec9de33a2b0f67ec80a",
+      "previous_operations_fingerprint": "sha256:2aee1fca0a9d32659d7d4e82d1b303c4abebd4f544f645082f04aabff1dff7ca",
+      "current_operations_fingerprint": "sha256:5e80c2c5883a8f20c7ac213650d219897d4a7a38fabcaecfbd8de06e70b47886",
+      "operation_count": 1393,
+      "reason": "add durable governed-run lifecycle reducers with checked continuation, questions, steering, fork authorization, comparison and effect reconciliation on top of the released v0.3.50 baseline; preserve every existing operation shape"
     }
   ]
 }
