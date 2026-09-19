@@ -2,6 +2,7 @@
 pub mod capability_grants_test;
 pub mod decision_events_test;
 pub mod embedding_isolation_test;
+pub mod evidence_provenance_test;
 pub mod relational_integrity_test;
 
 use spacetimedb::ReducerContext;
@@ -71,12 +72,36 @@ pub fn run_ai_intelligence_events_tests(ctx: &ReducerContext) -> Result<(), Stri
 }
 
 #[spacetimedb::reducer]
+pub fn run_ai_evidence_provenance_tests(ctx: &ReducerContext) -> Result<(), String> {
+    evidence_provenance_test::test_sources_round_trip_and_unknowns_stay_unknown(ctx)
+        .map_err(|e| format!("sources_round_trip_and_unknowns_stay_unknown: {e}"))?;
+    evidence_provenance_test::test_recollected_source_stays_unverified(ctx)
+        .map_err(|e| format!("recollected_source_stays_unverified: {e}"))?;
+    evidence_provenance_test::test_cross_scope_references_are_denied(ctx)
+        .map_err(|e| format!("cross_scope_references_are_denied: {e}"))?;
+    evidence_provenance_test::test_lineage_reconstructs_after_edit_and_fork(ctx)
+        .map_err(|e| format!("lineage_reconstructs_after_edit_and_fork: {e}"))?;
+    evidence_provenance_test::test_knowledge_is_approved_by_review_not_usage(ctx)
+        .map_err(|e| format!("knowledge_is_approved_by_review_not_usage: {e}"))?;
+    evidence_provenance_test::test_retraction_flags_dependents_and_blocks_reuse(ctx)
+        .map_err(|e| format!("retraction_flags_dependents_and_blocks_reuse: {e}"))?;
+    evidence_provenance_test::test_correction_requires_review_and_recovers(ctx)
+        .map_err(|e| format!("correction_requires_review_and_recovers: {e}"))?;
+    evidence_provenance_test::test_deletion_and_revocation_preserve_honest_history(ctx)
+        .map_err(|e| format!("deletion_and_revocation_preserve_honest_history: {e}"))?;
+    evidence_provenance_test::test_discretionary_dependencies_need_acknowledgement(ctx)
+        .map_err(|e| format!("discretionary_dependencies_need_acknowledgement: {e}"))?;
+    Ok(())
+}
+
+#[spacetimedb::reducer]
 pub fn run_all_ai_tests(ctx: &ReducerContext) -> Result<(), String> {
     run_ai_insight_org_scope_test(ctx)?;
     run_ai_document_processing_job_document_relation_test(ctx)?;
     run_ai_embedding_org_isolation_test(ctx)?;
     run_ai_capability_grants_tests(ctx)?;
     run_ai_intelligence_events_tests(ctx)?;
+    run_ai_evidence_provenance_tests(ctx)?;
     log::info!("✅ run_all_ai_tests complete");
     Ok(())
 }
