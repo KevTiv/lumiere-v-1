@@ -263,7 +263,8 @@ pub struct CompleteAiAgentRunParams {
 }
 
 /// Non-terminal wait state for a run whose agent loop stopped without a final
-/// outcome: `awaiting_approval` (an action draft needs approval) or
+/// outcome: `awaiting_approval` (an action draft needs approval),
+/// `waiting_input` (a durable question needs an answer), `interrupted`, or
 /// `agent_settled` (a candidate answer awaits the answer gate).
 #[derive(SpacetimeType, Clone, Debug)]
 pub struct SetAiAgentRunWaitStateParams {
@@ -1080,7 +1081,7 @@ pub fn set_ai_agent_run_wait_state(
     let run = load_company_run(ctx, organization_id, company_id, run_id)?;
     let status = params.status.trim().to_string();
     if !is_run_wait_state(&status) && status != "running" {
-        return Err("status must be awaiting_approval, agent_settled, or running".to_string());
+        return Err("status must be awaiting_approval, waiting_input, interrupted, agent_settled, or running".to_string());
     }
     if run.status == status {
         return Ok(());
@@ -1122,7 +1123,10 @@ pub fn set_ai_agent_run_wait_state(
 
 /// Non-terminal statuses a stopped agent loop may leave a run in.
 fn is_run_wait_state(status: &str) -> bool {
-    matches!(status, "awaiting_approval" | "agent_settled")
+    matches!(
+        status,
+        "awaiting_approval" | "waiting_input" | "interrupted" | "agent_settled"
+    )
 }
 
 /// A run that may still take new steps, drafts or spend reservations.
@@ -1276,7 +1280,12 @@ mod tests {
 
     #[test]
     fn wait_states_are_open_but_do_not_accept_work() {
-        for status in ["awaiting_approval", "agent_settled"] {
+        for status in [
+            "awaiting_approval",
+            "waiting_input",
+            "interrupted",
+            "agent_settled",
+        ] {
             assert!(is_run_wait_state(status));
             assert!(run_is_open(status));
             assert!(!run_accepts_work(status));

@@ -2,8 +2,14 @@ use serde_json::{json, Value};
 
 use crate::{
     ai_spend::{self, input_request_key, RequestKind, SpendReader},
-    orchestrator::{output_gate::admit_generated_output, text_answer_gate::TextEvidence},
-    tools::types::{ToolContext, ToolOutput, ToolResult},
+    orchestrator::{
+        output_gate::{
+            admit_structured_output, persist_or_withhold_generated_output, GeneratedOutputDraft,
+            PublicationIdentity,
+        },
+        text_answer_gate::TextEvidence,
+    },
+    tools::types::{hash_tool_input, ToolContext, ToolOutput, ToolResult},
 };
 
 pub async fn execute(ctx: &ToolContext, input: &Value) -> ToolResult {
@@ -71,14 +77,29 @@ pub async fn execute(ctx: &ToolContext, input: &Value) -> ToolResult {
     // replacing unsupported prose with a deterministic notice. This tool
     // currently has no server-produced evidence channel, so every raw model
     // explanation is withheld and recorded as a warning.
-    let gated = admit_generated_output(
+    let structured = GeneratedOutputDraft::single_claim(summary, Vec::new());
+    let mut gated = admit_structured_output(
         ctx.org_id,
         ctx.company_id,
-        &summary,
+        &structured,
         &TextEvidence::default(),
     )
     .await?;
+    persist_or_withhold_generated_output(
+        &mut gated,
+        ctx.state.stdb.as_ref(),
+        ctx.state.spend_read_stdb.as_deref(),
+        PublicationIdentity {
+            organization_id: ctx.org_id,
+            company_id: ctx.company_id,
+            session_ref: format!("run:{}:action-draft:{}", ctx.run_id, hash_tool_input(input)),
+            event_ref: "action_draft_explanation".to_string(),
+            note: "tool action-draft explanation admitted by the publication gate".to_string(),
+        },
+    )
+    .await;
     let explanation_verification = gated.verification.clone();
+    let explanation_provenance = gated.provenance;
     let summary = if let Some(released) = gated.released {
         released
     } else {
@@ -122,6 +143,7 @@ pub async fn execute(ctx: &ToolContext, input: &Value) -> ToolResult {
                 "run_id": ctx.run_id,
                 "skill_key": ctx.skill_key,
                 "explanation_verification": explanation_verification,
+                "explanation_provenance": explanation_provenance,
             }))
             .unwrap_or_else(|_| "{}".to_string()),
         ),
@@ -153,6 +175,7 @@ pub async fn execute(ctx: &ToolContext, input: &Value) -> ToolResult {
             "elevated": elevated,
             "warnings": warnings,
             "explanation_verification": explanation_verification,
+            "explanation_provenance": explanation_provenance,
         }),
         citations: vec![],
         row_count: Some(1),

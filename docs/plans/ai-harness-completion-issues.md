@@ -303,7 +303,7 @@ Current wiring and remaining work:
   the focused splitter tests and compile check do not establish production
   ingestion readiness.
 - The tables are private and read only by the gateway as a trusted principal;
-  there are no client-facing authorized-read contracts. The contribution
+  there are no generic client-facing authorized-read contracts. The contribution
   reducer remains `denied` to generic dispatch and is reachable only through
   its fixed, membership-authorized API-server route. Evidence inspection is
   exposed only through AIH-16's session-owned BFF, which binds the acting user,
@@ -435,21 +435,15 @@ Still open, so AIH-15 must not be marked complete:
   memory-provenance path is focused-test proof rather than a live
   passage-backed RAG proof. The loop's run state also remains parked at
   `agent_settled`; this slice does not complete the run.
-- **More output boundaries now fail closed through the shared text-admission
-  adapter.** The AI report composer grounds its displayed figures in the typed
-  named-resource rows and returns `summaryVerification`; unsupported summaries
-  are withheld. `save_artifact` cannot claim a saved/published artifact because
-  it has no durable evidence/draft contract, so an unsupported body is rejected.
-  Both action-draft APIs gate model-authored explanations before response or
-  persistence: unsupported prose is replaced by a deterministic review notice
-  while the structured pending draft remains available for human review, with
-  verification metadata recorded. Deterministic ERP report rendering is not an
-  AI answer path and was intentionally left unchanged.
-- Report/artifact/action adapters still use the weaker deterministic text gate:
-  they do not carry structured passage citations or material claims through the
-  full semantic `EvidenceGatedAnswerAdmission`, and they record no
-  `evidenceClaimIds`. Other legacy/harness summaries still require an explicit
-  inventory before AIH-15 can be considered complete.
+- **Publication adapters now use the full answer admission boundary.** Reports,
+  action explanations, saved artifacts and classic-run summaries construct
+  explicit material claims and pass them through
+  `EvidenceGatedAnswerAdmission`. Server-known run evidence is checked against
+  the exact evidence set; passage support still requires catalog resolution and
+  semantic review. A released publication must persist its contribution and
+  claim ids; missing private-reader access, failed persistence or an empty claim
+  write withholds and redacts the candidate. Deterministic ERP report rendering
+  is not an AI answer path and remains unchanged.
 - DMS document index content now populates `ai_evidence_passage`, but only as
   `user_reported`; server-owned blob parsing/OCR and a live end-to-end
   blob-to-passage-to-answer proof remain open.
@@ -690,6 +684,17 @@ does not re-ask a resolved question. Duplicate replies are idempotent, stale or
 unauthorized replies deny, timeout grants no required answer or action approval,
 and changed requirements cannot reuse an obsolete approval.
 
+**Status — partial; not complete.** Private durable question and lifecycle-event
+records now carry revisions, required/optional semantics and an authorized
+respondent identity/role. Ask, reply and steer commands use a checked continuation
+and payload-bound idempotency key; replays succeed only for the identical command.
+Steering increments a durable revision and forces a fresh checked checkpoint
+before resume. The authenticated BFF/UI exposes inspect, ask, reply and steer
+without accepting browser-supplied authority, while the gateway independently
+rechecks the actor token and `ai.run.lifecycle` grant. Still open: timeout policy,
+fine-grained dependency scheduling (a required question currently blocks the run),
+live authenticated restart/reconnect E2E, and production capability provisioning.
+
 ---
 
 ### AIH-21 — Structured diagnostics and bounded repair
@@ -763,9 +768,12 @@ append-only parent hash, checkpoint/concurrency sequence, decision-event cursor,
 bounded-state and decision-state hashes, authorized dependency references,
 acquired-evidence hash, and a checked compaction summary. STDB recomputes these
 hashes and rejects stale parents; resume reauthorizes the actor, skill, inputs,
-graph, knowledge and source dependencies before changing run state. Durable
-questions/approvals, completed-effect reconciliation and recovery/rebuild on
-mismatch remain open.
+graph, knowledge and source dependencies before changing run state. New runs also
+initialize a private lifecycle continuation, and the runtime resume bridge loads
+that continuation and calls the checked reducer rather than directly changing a
+wait state. Required durable questions and uncertain effects block resume. Full
+continuation manifests still do not include every approval, candidate, progress
+and budget component, and automatic recovery/rebuild on mismatch remains open.
 
 ---
 
@@ -783,11 +791,16 @@ uncertain outcomes before resume. Forks preserve attribution but reacquire scope
 budget and execution approval; candidate selection/revert never rolls back posted
 ERP state. Expired/revoked dependencies are rechecked on resume.
 
-**Status — partial; not complete.** Typed continuation-token contracts and
-validated interrupt/resume/fork/compare request shapes exist, and the existing
-resume path now performs checked lineage/dependency validation. The token is not
-yet required by the public resume request; interrupt/fork/compare have no
-reducers, routes or UI, and uncertain consequential effects are not reconciled.
+**Status — partial; not complete.** Private reducers and the authenticated
+gateway/BFF/UI now implement inspect, interrupt, checked resume, fork and compare
+with event cursors, concurrency versions and payload-bound idempotency. Forks
+start in `fork_pending_authority` and cannot resume until a trusted scope/budget/
+approval snapshot is reacquired. Consequential effects have planned/dispatched/
+confirmed/failed/uncertain revisions; uncertain effects block resume until
+reconciled. Responses omit private event payloads and actor identities. Still
+open: live two-client and provider-effect E2E, component/evidence/validation diff
+materialization (compare currently certifies the two continuations only), public
+grant provisioning, and generated-contract release/pin for the new reducers.
 
 ---
 

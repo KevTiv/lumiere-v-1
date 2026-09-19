@@ -4,32 +4,6 @@ use serde_json::{json, Value};
 use std::sync::Arc;
 use uuid::Uuid;
 
-use crate::{
-    ai_agent::{
-        enforce_chargeable_limits, ensure_allowed_action, ensure_model_allowed,
-        ensure_within_budget, record_ai_spend, resolve_agent,
-    },
-    harness::{
-        data_scope_resolver::ResourceRegistry,
-        policy_engine::{
-            ExecutionMetadata, ExecutionPlan, PlannedToolCall, PolicyEngine, PolicyExecutionRequest,
-        },
-        release_registry::load_active_manifest,
-        skill_registry::SkillRegistry,
-        ActorCredentials,
-    },
-    orchestrator::skill_loader::{
-        complete_run, create_run, load_run_key, load_skill, resume_run, set_run_wait_state,
-        LoadedSkill,
-    },
-    providers::llm::{LlmMessage, LlmRequest},
-    state::AppState,
-    tools::{
-        generated_read::{resolve_actor_grants, GeneratedReadTools},
-        registry::ToolRegistry,
-        types::{SkillCitation, ToolContext},
-    },
-};
 use super::{
     agent_loop::{LoopLimits, LoopStop},
     agent_loop_adapters::{
@@ -70,6 +44,10 @@ use super::{
     model_configuration::{
         IntelligenceRole, IntelligenceRouteResolver, StdbModelConfigurationStore,
     },
+    output_gate::{
+        admit_structured_output, persist_or_withhold_generated_output, GeneratedOutputDraft,
+        PublicationIdentity,
+    },
     precedent::StdbPrecedentStore,
     probabilistic::{CalibrationProfileStore, StdbCalibrationProfileStore},
     run_review::{
@@ -78,7 +56,33 @@ use super::{
     spend_admission::{spend_binding_from_agent, StdbSpendLedger},
     text_answer_gate::{
         evidence_from_transcript, gate_text_answer, TextAnswerOutcome, TextAnswerProvenance,
-        TextAnswerVerification,
+        TextAnswerVerification, TextEvidence,
+    },
+};
+use crate::{
+    ai_agent::{
+        enforce_chargeable_limits, ensure_allowed_action, ensure_model_allowed,
+        ensure_within_budget, record_ai_spend, resolve_agent,
+    },
+    harness::{
+        data_scope_resolver::ResourceRegistry,
+        policy_engine::{
+            ExecutionMetadata, ExecutionPlan, PlannedToolCall, PolicyEngine, PolicyExecutionRequest,
+        },
+        release_registry::load_active_manifest,
+        skill_registry::SkillRegistry,
+        ActorCredentials,
+    },
+    orchestrator::skill_loader::{
+        complete_run, create_run, load_run_key, load_skill, resume_run, set_run_wait_state,
+        LoadedSkill,
+    },
+    providers::llm::{LlmMessage, LlmRequest},
+    state::AppState,
+    tools::{
+        generated_read::{resolve_actor_grants, GeneratedReadTools},
+        registry::ToolRegistry,
+        types::{SkillCitation, ToolContext},
     },
 };
 
@@ -439,8 +443,52 @@ pub async fn run_skill_unlocked(
         }
     }
 
-    let (summary, tokens_used) =
+    let (candidate_summary, tokens_used) =
         synthesize_summary(state, req.org_id, &agent, &skill, &query, &tool_payloads).await?;
+
+    // The classic loop is also a publication boundary. Tool payloads are
+    // server-produced; bind the generated prose explicitly to those exact
+    // results, then persist the gate's claim assessments before exposing the
+    // summary or its markdown artifact.
+    let mut summary_evidence = TextEvidence::default();
+    for (index, payload) in tool_payloads.iter().enumerate() {
+        summary_evidence.add_ref(
+            "run_tool_result",
+            format!("run:{run_id}:result:{}", index + 1),
+        );
+        if let Some(data) = payload.get("data") {
+            summary_evidence.add_json(data);
+        }
+    }
+    let summary_draft =
+        GeneratedOutputDraft::single_claim(candidate_summary, summary_evidence.refs.clone());
+    let mut gated_summary = admit_structured_output(
+        req.org_id,
+        req.company_id,
+        &summary_draft,
+        &summary_evidence,
+    )
+    .await?;
+    persist_or_withhold_generated_output(
+        &mut gated_summary,
+        state.stdb.as_ref(),
+        state.spend_read_stdb.as_deref(),
+        PublicationIdentity {
+            organization_id: req.org_id,
+            company_id: req.company_id,
+            session_ref: format!("run:{run_id}:classic_summary"),
+            event_ref: "classic_run_summary".to_string(),
+            note: "classic run summary admitted by the publication gate".to_string(),
+        },
+    )
+    .await;
+    let summary = gated_summary
+        .released
+        .clone()
+        .unwrap_or_else(|| gated_summary.withheld_notice());
+    let evidence_claim_ids = gated_summary.provenance.claim_ids.clone();
+    let verification = Some(gated_summary.verification.clone());
+    let provenance = Some(gated_summary.provenance.clone());
 
     let artifact = SkillArtifact {
         kind: "markdown".to_string(),
@@ -517,9 +565,9 @@ pub async fn run_skill_unlocked(
         steps,
         agent_id: agent.agent_id,
         skill_key: skill.skill_key,
-        evidence_claim_ids: Vec::new(),
-        verification: None,
-        provenance: None,
+        evidence_claim_ids,
+        verification,
+        provenance,
     })
 }
 

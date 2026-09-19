@@ -13,5 +13,6 @@ mod passage_retrieval;
 pub mod policy;
 pub mod rag;
 pub mod report;
+pub mod run_lifecycle;
 pub mod search;
 pub mod skills;

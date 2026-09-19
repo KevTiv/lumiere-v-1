@@ -14,8 +14,12 @@ use crate::{
         EntityRef, LiveSnapshot,
     },
     orchestrator::{
-        output_gate::admit_generated_output,
-        text_answer_gate::{TextAnswerVerification, TextEvidence},
+        intelligence::EvidenceRef,
+        output_gate::{
+            admit_structured_output, persist_or_withhold_generated_output, GeneratedOutputDraft,
+            PublicationIdentity,
+        },
+        text_answer_gate::{TextAnswerProvenance, TextAnswerVerification, TextEvidence},
     },
     providers::llm::LlmMessage,
     state::AppState,
@@ -76,6 +80,9 @@ pub struct ActionDraft {
     /// Admission for the human-facing explanation only. Params remain an
     /// advisory pending draft and are never execution authority.
     pub explanation_verification: TextAnswerVerification,
+    /// Claim-level evidence selected for the explanation. This never grants
+    /// execution authority to the pending draft.
+    pub explanation_provenance: TextAnswerProvenance,
 }
 
 #[derive(Debug, Serialize)]
@@ -302,6 +309,9 @@ fn parse_llm_drafts(
                     "explanation admission is performed at the output boundary".to_string(),
                 ),
             },
+            explanation_provenance: TextAnswerProvenance::withheld(
+                "explanation admission is performed at the output boundary",
+            ),
         });
     }
 
@@ -644,6 +654,9 @@ fn draft_actions_stub(req: &ActionDraftRequest) -> Result<Vec<ActionDraft>, Stri
             limitations: Vec::new(),
             reason: Some("explanation admission is performed at the output boundary".to_string()),
         },
+        explanation_provenance: TextAnswerProvenance::withheld(
+            "explanation admission is performed at the output boundary",
+        ),
     }])
 }
 
@@ -695,18 +708,36 @@ pub async fn post_draft(
             }
         }
     }
-    for draft in &mut drafts {
-        let gated = admit_generated_output(
+    let support_refs: Vec<EvidenceRef> = evidence.refs.clone();
+    let publication_id = uuid::Uuid::new_v4();
+    for (index, draft) in drafts.iter_mut().enumerate() {
+        let structured =
+            GeneratedOutputDraft::single_claim(draft.summary.clone(), support_refs.clone());
+        let mut gated = admit_structured_output(
             req.org_id.unwrap_or_default(),
             req.company_id,
-            &draft.summary,
+            &structured,
             &evidence,
         )
         .await
         .map_err(|error| {
             AppError::Internal(format!("action-draft explanation gate failed: {error}"))
         })?;
+        persist_or_withhold_generated_output(
+            &mut gated,
+            state.stdb.as_ref(),
+            state.spend_read_stdb.as_deref(),
+            PublicationIdentity {
+                organization_id: req.org_id.unwrap_or_default(),
+                company_id: req.company_id,
+                session_ref: format!("action-draft:{publication_id}:{}", index + 1),
+                event_ref: "action_draft_explanation".to_string(),
+                note: "action-draft explanation admitted by the publication gate".to_string(),
+            },
+        )
+        .await;
         draft.explanation_verification = gated.verification.clone();
+        draft.explanation_provenance = gated.provenance;
         if let Some(released) = gated.released {
             draft.summary = released;
         } else {

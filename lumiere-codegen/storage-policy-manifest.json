@@ -2283,6 +2283,146 @@
       "postgres_access_path": "organization_index"
     },
     {
+      "table": "ai_run_effect",
+      "module": "ai",
+      "rationale": "Durable consequential-effect state for a governed run; uncertain outcomes remain hot until reconciled.",
+      "authoritative_resources": [],
+      "durability_class": "durable_operational_state",
+      "organization_ownership": "direct",
+      "organization_column": "organization_id",
+      "company_ownership": "direct",
+      "company_column_path": [
+        "company_id"
+      ],
+      "company_column_nullable": false,
+      "aggregate": {
+        "kind": "child",
+        "parent": {
+          "table": "ai_agent_run",
+          "child_column": "run_id",
+          "parent_column": "id"
+        }
+      },
+      "primary_key": {
+        "strategy": "auto_increment",
+        "column": "id",
+        "version_strategy": "none"
+      },
+      "projection_mode": "upsert-current",
+      "hot_retention": "always",
+      "cooling_eligibility": "never",
+      "cooling_eligibility_source": "reviewed:governed-intelligence/aih-24/effect-reconciliation",
+      "dependency_behavior": "follow_parent",
+      "hydration_policy": "not_applicable",
+      "delete_behavior": "tombstone",
+      "postgres_access_path": "organization_index"
+    },
+    {
+      "table": "ai_run_lifecycle_event",
+      "module": "ai",
+      "rationale": "Append-only checked lifecycle history for a governed run, including replay-safe command identity.",
+      "authoritative_resources": [],
+      "durability_class": "durable_history",
+      "organization_ownership": "direct",
+      "organization_column": "organization_id",
+      "company_ownership": "direct",
+      "company_column_path": [
+        "company_id"
+      ],
+      "company_column_nullable": false,
+      "aggregate": {
+        "kind": "child",
+        "parent": {
+          "table": "ai_agent_run",
+          "child_column": "run_id",
+          "parent_column": "id"
+        }
+      },
+      "primary_key": {
+        "strategy": "auto_increment",
+        "column": "id",
+        "version_strategy": "none"
+      },
+      "projection_mode": "append-history",
+      "hot_retention": "always",
+      "cooling_eligibility": "never",
+      "cooling_eligibility_source": "reviewed:governed-intelligence/aih-24/lifecycle-history",
+      "dependency_behavior": "follow_parent",
+      "hydration_policy": "not_applicable",
+      "delete_behavior": "append_only",
+      "postgres_access_path": "organization_partition"
+    },
+    {
+      "table": "ai_run_lifecycle_state",
+      "module": "ai",
+      "rationale": "Current checked continuation and authority state for a governed run.",
+      "authoritative_resources": [],
+      "durability_class": "durable_operational_state",
+      "organization_ownership": "direct",
+      "organization_column": "organization_id",
+      "company_ownership": "direct",
+      "company_column_path": [
+        "company_id"
+      ],
+      "company_column_nullable": false,
+      "aggregate": {
+        "kind": "child",
+        "parent": {
+          "table": "ai_agent_run",
+          "child_column": "run_id",
+          "parent_column": "id"
+        }
+      },
+      "primary_key": {
+        "strategy": "natural",
+        "column": "run_id",
+        "version_strategy": "none"
+      },
+      "projection_mode": "upsert-current",
+      "hot_retention": "always",
+      "cooling_eligibility": "never",
+      "cooling_eligibility_source": "reviewed:governed-intelligence/aih-23/checked-continuation",
+      "dependency_behavior": "follow_parent",
+      "hydration_policy": "not_applicable",
+      "delete_behavior": "tombstone",
+      "postgres_access_path": "organization_index"
+    },
+    {
+      "table": "ai_run_question",
+      "module": "ai",
+      "rationale": "Durable versioned question and reply state for an authorized governed-run respondent.",
+      "authoritative_resources": [],
+      "durability_class": "durable_operational_state",
+      "organization_ownership": "direct",
+      "organization_column": "organization_id",
+      "company_ownership": "direct",
+      "company_column_path": [
+        "company_id"
+      ],
+      "company_column_nullable": false,
+      "aggregate": {
+        "kind": "child",
+        "parent": {
+          "table": "ai_agent_run",
+          "child_column": "run_id",
+          "parent_column": "id"
+        }
+      },
+      "primary_key": {
+        "strategy": "auto_increment",
+        "column": "id",
+        "version_strategy": "none"
+      },
+      "projection_mode": "upsert-current",
+      "hot_retention": "always",
+      "cooling_eligibility": "never",
+      "cooling_eligibility_source": "reviewed:governed-intelligence/aih-20/durable-questions",
+      "dependency_behavior": "follow_parent",
+      "hydration_policy": "not_applicable",
+      "delete_behavior": "tombstone",
+      "postgres_access_path": "organization_index"
+    },
+    {
       "table": "ai_run_review",
       "module": "ai",
       "rationale": "Append-only durable independent review evidence for a completed governed run, including reviewer identity and typed disposition.",

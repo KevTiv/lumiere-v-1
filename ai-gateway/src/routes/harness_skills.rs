@@ -31,9 +31,7 @@ use crate::{
         skill_registry::SkillRegistry,
         ActorCredentials,
     },
-    orchestrator::governed_bootstrap::{
-        bootstrap_governed_intelligence, GovernedBootstrapResult,
-    },
+    orchestrator::governed_bootstrap::{bootstrap_governed_intelligence, GovernedBootstrapResult},
     state::AppState,
 };
 

@@ -7,6 +7,7 @@
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use stdb_client::StdbClient;
 
 use super::{
     audit::{DecisionOutcome, PolicyResult},
@@ -22,8 +23,12 @@ use super::{
     },
 };
 use crate::orchestrator::{
-    output_gate::admit_generated_output,
-    text_answer_gate::{TextAnswerVerification, TextEvidence},
+    intelligence::EvidenceRef,
+    output_gate::{
+        admit_structured_output, persist_or_withhold_generated_output, GeneratedOutputClaim,
+        GeneratedOutputDraft, PublicationIdentity,
+    },
+    text_answer_gate::{TextAnswerProvenance, TextAnswerVerification, TextEvidence},
 };
 
 pub const REPORT_COMPOSER_SKILL_KEY: &str = "report_composer";
@@ -68,6 +73,7 @@ pub struct ReportComposerResult {
     pub summary: String,
     pub citations: Vec<ReportCitation>,
     pub summary_verification: TextAnswerVerification,
+    pub summary_provenance: TextAnswerProvenance,
     pub audit: HarnessAuditTrail,
 }
 
@@ -163,6 +169,8 @@ pub async fn compose_report(
     stdb_token: &str,
     input: ReportComposerInput,
     policy: PolicyEngine,
+    evidence_writer: &StdbClient,
+    evidence_reader: Option<&StdbClient>,
 ) -> Result<ReportComposerResult, String> {
     let correlation_id = uuid::Uuid::new_v4().to_string();
     let mut audit = HarnessAuditLogger::new(correlation_id.clone());
@@ -227,30 +235,63 @@ pub async fn compose_report(
             summary: String::new(),
             citations: Vec::new(),
             summary_verification: withheld_verification("report composition denied by policy"),
+            summary_provenance: TextAnswerProvenance::withheld(
+                "report composition denied by policy",
+            ),
             audit: audit.into_trail(),
         });
     }
 
-    let candidate_summary = build_summary(&output);
+    let (candidate_summary, claim_texts) = build_summary(&output);
     let mut evidence = TextEvidence::default();
+    let report_ref = EvidenceRef {
+        kind: "named_resource".to_string(),
+        id: REPORT_COMPOSER_RESOURCE.to_string(),
+    };
     for item in &output.items {
         // Named-resource rows are server-produced evidence. Add the exact
         // displayed decimal value rather than only minor units so figure
         // grounding matches the prose representation.
-        evidence.add_ref("named_resource", REPORT_COMPOSER_RESOURCE);
+        if evidence.refs.is_empty() {
+            evidence.refs.push(report_ref.clone());
+        }
         evidence.add_json(&serde_json::json!({
             "value": item.value_minor_units as f64 / 10f64.powi(item.scale as i32),
         }));
     }
-    let gated = admit_generated_output(
-        organization_id,
-        input.company_id,
-        &candidate_summary,
-        &evidence,
+    let draft = GeneratedOutputDraft {
+        content: candidate_summary,
+        claims: claim_texts
+            .into_iter()
+            .map(|text| GeneratedOutputClaim {
+                text,
+                support_refs: vec![report_ref.clone()],
+                passage_support: Vec::new(),
+            })
+            .collect(),
+        calculations: Vec::new(),
+    };
+    let mut gated = admit_structured_output(organization_id, input.company_id, &draft, &evidence)
+        .await
+        .map_err(|error| format!("report summary answer gate failed: {error}"))?;
+    persist_or_withhold_generated_output(
+        &mut gated,
+        evidence_writer,
+        evidence_reader,
+        PublicationIdentity {
+            organization_id,
+            company_id: input.company_id,
+            session_ref: format!(
+                "report:{}:{}:{}",
+                input.report_key, input.company_id, input.date
+            ),
+            event_ref: "report_summary".to_string(),
+            note: "report summary admitted by the publication gate".to_string(),
+        },
     )
-    .await
-    .map_err(|error| format!("report summary answer gate failed: {error}"))?;
+    .await;
     let summary_verification = gated.verification;
+    let summary_provenance = gated.provenance;
     let summary = gated.released.unwrap_or_else(|| {
         audit.record(
             "completed",
@@ -274,6 +315,7 @@ pub async fn compose_report(
         summary,
         citations,
         summary_verification,
+        summary_provenance,
         audit: audit.into_trail(),
     })
 }
@@ -441,12 +483,12 @@ fn push_total(
     Ok(())
 }
 
-fn build_summary(output: &ReportComposerOutput) -> String {
+fn build_summary(output: &ReportComposerOutput) -> (String, Vec<String>) {
     let mut parts = Vec::new();
     parts.push(format!("Daily business summary for {}.", output.report_key));
     for item in &output.items {
         let value = item.value_minor_units as f64 / 10f64.powi(item.scale as i32);
         parts.push(format!("{}: {:.2}", item.label, value));
     }
-    parts.join(" ")
+    (parts.join(" "), parts)
 }

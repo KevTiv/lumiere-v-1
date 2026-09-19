@@ -1,8 +1,14 @@
 use serde_json::{json, Value};
 
 use crate::{
-    orchestrator::{output_gate::admit_generated_output, text_answer_gate::TextEvidence},
-    tools::types::{ToolContext, ToolOutput, ToolResult},
+    orchestrator::{
+        output_gate::{
+            admit_structured_output, persist_or_withhold_generated_output, GeneratedOutputDraft,
+            PublicationIdentity,
+        },
+        text_answer_gate::TextEvidence,
+    },
+    tools::types::{hash_tool_input, ToolContext, ToolOutput, ToolResult},
 };
 
 pub async fn execute(ctx: &ToolContext, input: &Value) -> ToolResult {
@@ -27,13 +33,27 @@ pub async fn execute(ctx: &ToolContext, input: &Value) -> ToolResult {
         Value::String(text) => text.clone(),
         value => serde_json::to_string(value).unwrap_or_default(),
     };
-    let gated = admit_generated_output(
+    let structured = GeneratedOutputDraft::single_claim(candidate, Vec::new());
+    let mut gated = admit_structured_output(
         ctx.org_id,
         ctx.company_id,
-        &candidate,
+        &structured,
         &TextEvidence::default(),
     )
     .await?;
+    persist_or_withhold_generated_output(
+        &mut gated,
+        ctx.state.stdb.as_ref(),
+        ctx.state.spend_read_stdb.as_deref(),
+        PublicationIdentity {
+            organization_id: ctx.org_id,
+            company_id: ctx.company_id,
+            session_ref: format!("run:{}:artifact:{}", ctx.run_id, hash_tool_input(input)),
+            event_ref: "artifact_body".to_string(),
+            note: "artifact body admitted by the publication gate".to_string(),
+        },
+    )
+    .await;
     let Some(released) = gated.released else {
         anyhow::bail!(
             "artifact body withheld by answer gate: {}",

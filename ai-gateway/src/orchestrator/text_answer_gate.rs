@@ -30,13 +30,15 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use super::answer_gate::{
-    collect_json_figures, extract_figures, AnswerProvenance, ClaimAssessment, ClaimVerification,
-    EvidenceGatedAnswerAdmission, GatePolicy, GateScope, PassageCatalog, SourcePassage,
+    collect_json_figures, extract_figures, AnswerProvenance, EvidenceGatedAnswerAdmission,
+    GatePolicy, GateScope, PassageCatalog, SourcePassage,
 };
 use super::governed_services::{
     qualified_content, AdmissionEvidence, AnswerAdmissionOutcome, VerificationMethod,
 };
-use super::intelligence::{ClaimedCalculation, EvidenceRef, FinalDraft, PassageCitation};
+use super::intelligence::{
+    ClaimedCalculation, EvidenceRef, FinalDraft, MaterialClaim, PassageCitation,
+};
 use crate::providers::llm::LlmMessage;
 
 /// What the server itself established while producing an answer.
@@ -137,6 +139,18 @@ pub struct TextCalculationProvenance {
 }
 
 impl TextAnswerProvenance {
+    pub fn withheld(reason: impl Into<String>) -> Self {
+        Self {
+            claims: Vec::new(),
+            citations: Vec::new(),
+            calculations: Vec::new(),
+            persisted: false,
+            persistence_reason: Some(reason.into()),
+            contribution_id: None,
+            claim_ids: Vec::new(),
+        }
+    }
+
     pub fn mark_persisted(&mut self, contribution_id: u64, claim_ids: Vec<u64>) {
         self.persisted = true;
         self.persistence_reason = None;
@@ -195,15 +209,7 @@ struct StructuredTextClaim {
 }
 
 fn empty_provenance(reason: &str) -> TextAnswerProvenance {
-    TextAnswerProvenance {
-        claims: Vec::new(),
-        citations: Vec::new(),
-        calculations: Vec::new(),
-        persisted: false,
-        persistence_reason: Some(reason.to_string()),
-        contribution_id: None,
-        claim_ids: Vec::new(),
-    }
+    TextAnswerProvenance::withheld(reason)
 }
 
 fn blocked_text_answer(reason: impl Into<String>) -> GatedTextAnswer {
@@ -357,11 +363,6 @@ pub async fn gate_text_answer(
                 "each structured claim must be nonempty and appear in answer content",
             ));
         }
-        if !claim.passage_support.is_empty() {
-            return Ok(blocked_text_answer(
-                "passage support is not accepted without a server-side passage catalog",
-            ));
-        }
         for support in &claim.support_refs {
             if !known.contains(support) {
                 return Ok(blocked_text_answer(format!(
@@ -409,10 +410,18 @@ pub async fn gate_text_answer(
     let draft = FinalDraft {
         content: structured.content.clone(),
         citations: citations.clone(),
-        claims: Vec::new(),
+        claims: structured
+            .claims
+            .iter()
+            .map(|claim| MaterialClaim {
+                text: claim.text.clone(),
+                support_refs: claim.support_refs.clone(),
+                supports: claim.passage_support.clone(),
+            })
+            .collect(),
         calculations: structured.calculations.clone(),
     };
-    let (report, mut durable_provenance) = gate
+    let (report, durable_provenance) = gate
         .evaluate(
             &draft,
             &AdmissionEvidence {
@@ -426,14 +435,6 @@ pub async fn gate_text_answer(
         .methods
         .iter()
         .map(|method: &VerificationMethod| method.label())
-        .collect();
-    durable_provenance.claims = claim_provenance
-        .iter()
-        .map(|claim| ClaimAssessment {
-            text: claim.text.clone(),
-            passage_ids: Vec::new(),
-            verification: ClaimVerification::NoSupportCited,
-        })
         .collect();
     let calculations = structured
         .calculations

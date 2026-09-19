@@ -1,5 +1,6 @@
 use anyhow::{Context, Result};
 use serde_json::Value;
+use sha2::{Digest, Sha256};
 use stdb_client::StdbClient;
 
 use crate::skills::{compose_prompt, load_bundled_skill};
@@ -242,7 +243,38 @@ pub async fn create_run(
     .await
     .context("create_ai_agent_run")?;
 
-    lookup_run_id(stdb, run_key).await
+    let run_id = lookup_run_id(stdb, run_key).await?;
+    let checkpoint_hash = format!(
+        "{:x}",
+        Sha256::digest(serde_json::to_vec(&serde_json::json!({
+            "organization_id": org_id,
+            "company_id": company_id,
+            "run_id": run_id,
+            "skill_id": skill.id,
+            "agent_id": agent_id,
+            "team_member_id": team_member_id,
+            "run_key": run_key,
+            "inputs_json": inputs_json,
+            "triggered_by_hex": triggered_by_hex,
+        }))?)
+    );
+    call_pending_lifecycle_reducer(
+        stdb,
+        "initialize_ai_run_lifecycle",
+        serde_json::json!([
+            org_id,
+            company_id,
+            run_id,
+            {
+                "checkpoint_hash": checkpoint_hash,
+                "cursor": 0,
+                "idempotency_key": format!("run-created:{run_id}"),
+            }
+        ]),
+    )
+    .await
+    .context("initialize durable AI run lifecycle")?;
+    Ok(run_id)
 }
 
 pub async fn complete_run(
@@ -290,12 +322,72 @@ pub async fn resume_run(
     company_id: u64,
     run_id: u64,
 ) -> Result<()> {
-    stdb.call_reducer(stdb_client::reducer_call!(
-        "set_ai_agent_run_wait_state",
-        serde_json::json!([org_id, company_id, run_id, { "status": "running" }]),
-    ))
+    let row = stdb
+        .query_sql(&format!(
+            "SELECT checkpoint_hash, cursor, concurrency_version FROM ai_run_lifecycle_state \
+             WHERE organization_id = {org_id} AND company_id = {company_id} AND run_id = {run_id} LIMIT 1"
+        ))
+        .await
+        .context("load checked run continuation")?
+        .into_iter()
+        .next()
+        .context("run lifecycle is not initialized")?;
+    let checkpoint_hash = row
+        .get("checkpointHash")
+        .and_then(Value::as_str)
+        .context("run lifecycle checkpoint hash missing")?;
+    let cursor = row_u64(&row, "cursor") as u32;
+    let concurrency_version = row_u64(&row, "concurrencyVersion");
+    call_pending_lifecycle_reducer(
+        stdb,
+        "resume_ai_run_checked",
+        serde_json::json!([
+            org_id,
+            company_id,
+            run_id,
+            {
+                "continuation": {
+                    "checkpoint_hash": checkpoint_hash,
+                    "cursor": cursor,
+                    "concurrency_version": concurrency_version,
+                },
+                "idempotency_key": format!("runtime-resume:{run_id}:{concurrency_version}"),
+            }
+        ]),
+    )
     .await
-    .context("resume governed ai_agent_run")?;
+    .context("resume governed ai_agent_run through checked lifecycle")?;
+    Ok(())
+}
+
+async fn call_pending_lifecycle_reducer(
+    stdb: &StdbClient,
+    reducer: &str,
+    arguments: Value,
+) -> Result<()> {
+    if !matches!(
+        reducer,
+        "initialize_ai_run_lifecycle" | "resume_ai_run_checked"
+    ) {
+        anyhow::bail!("unsupported lifecycle reducer");
+    }
+    let response = stdb
+        .http()
+        .post(format!(
+            "{}/v1/database/{}/call/{reducer}",
+            stdb.base_url(),
+            stdb.module()
+        ))
+        .bearer_auth(stdb.token())
+        .json(&arguments)
+        .send()
+        .await
+        .with_context(|| format!("call lifecycle reducer {reducer}"))?;
+    if !response.status().is_success() {
+        let status = response.status();
+        let body = response.text().await.unwrap_or_default();
+        anyhow::bail!("lifecycle reducer {reducer} failed ({status}): {body}");
+    }
     Ok(())
 }
 

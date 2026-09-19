@@ -232,6 +232,10 @@ async fn main() -> anyhow::Result<()> {
             post(routes::harness_skills::post_governed_bootstrap),
         )
         .route(
+            "/v1/internal/harness/runs/lifecycle",
+            post(routes::run_lifecycle::post_run_lifecycle),
+        )
+        .route(
             "/v1/skills/import-mapping",
             post(routes::harness_skills::post_import_mapping),
         )

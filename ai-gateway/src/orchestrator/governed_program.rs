@@ -3366,6 +3366,7 @@ mod threshold_gate_tests {
             }],
             claims: vec![MaterialClaim {
                 text: "standard rate applies".to_string(),
+                support_refs: Vec::new(),
                 supports: vec![PassageCitation {
                     kind: "policy".to_string(),
                     id: "vat-guide".to_string(),

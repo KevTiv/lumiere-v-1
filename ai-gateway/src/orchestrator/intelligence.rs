@@ -393,6 +393,11 @@ impl PassageCitation {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MaterialClaim {
     pub text: String,
+    /// Server-known non-passage evidence such as a named resource result or
+    /// authorized live snapshot. These prove traceability for this run, but
+    /// do not become durable source passages.
+    #[serde(default)]
+    pub support_refs: Vec<EvidenceRef>,
     #[serde(default)]
     pub supports: Vec<PassageCitation>,
 }
@@ -401,6 +406,9 @@ impl MaterialClaim {
     pub fn validate(&self) -> Result<()> {
         if self.text.trim().is_empty() {
             bail!("material claim text must be nonempty");
+        }
+        for support in &self.support_refs {
+            support.validate()?;
         }
         for support in &self.supports {
             support.validate()?;

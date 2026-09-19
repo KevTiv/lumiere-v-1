@@ -179,6 +179,9 @@ pub(super) struct ClaimVerdict {
 /// persisted (AIH-14) rather than lost once the gate has decided.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(super) enum ClaimVerification {
+    /// The claim selects server-produced non-passage evidence from this run.
+    /// It is deterministically traceable, but not reusable as a sourced fact.
+    RunEvidence,
     /// The claim cited no passage at all.
     NoSupportCited,
     /// It cited passages, but none resolved cleanly.
@@ -652,6 +655,25 @@ impl EvidenceGatedAnswerAdmission<'_> {
                 passage_ids,
                 verification,
             };
+            if claim.supports.is_empty() && !claim.support_refs.is_empty() {
+                let all_known = claim
+                    .support_refs
+                    .iter()
+                    .all(|support| draft.citations.contains(support));
+                if all_known {
+                    assessments.push(assess(Vec::new(), ClaimVerification::RunEvidence));
+                } else {
+                    findings.add(
+                        Severity::Blocked,
+                        format!(
+                            "claim selects evidence not produced by this run: {}",
+                            claim.text
+                        ),
+                    );
+                    assessments.push(assess(Vec::new(), ClaimVerification::Unresolved));
+                }
+                continue;
+            }
             if claim.supports.is_empty() {
                 findings.add(
                     Severity::Qualified,
@@ -1139,6 +1161,7 @@ mod tests {
     fn claim(text: &str, supports: Vec<PassageCitation>) -> MaterialClaim {
         MaterialClaim {
             text: text.into(),
+            support_refs: Vec::new(),
             supports,
         }
     }
@@ -1214,6 +1237,29 @@ mod tests {
         )
         .await
         .unwrap()
+    }
+
+    #[tokio::test]
+    async fn server_known_non_passage_support_is_deterministically_traceable() {
+        let support = EvidenceRef {
+            kind: "named_resource".into(),
+            id: "reports.daily_business_summary.v1".into(),
+        };
+        let draft = FinalDraft {
+            content: "Revenue is 1250.".into(),
+            citations: vec![support.clone()],
+            claims: vec![MaterialClaim {
+                text: "Revenue is 1250.".into(),
+                support_refs: vec![support],
+                supports: Vec::new(),
+            }],
+            calculations: Vec::new(),
+        };
+
+        let report = run_gate(&MemoryCatalog(Vec::new()), None, &draft, &[], &[1250.0]).await;
+
+        assert_eq!(report.outcome, AnswerAdmissionOutcome::Admitted);
+        assert_eq!(report.methods, vec![VerificationMethod::Deterministic]);
     }
 
     fn blocked_or_review_reason(report: &AnswerAdmissionReport) -> String {

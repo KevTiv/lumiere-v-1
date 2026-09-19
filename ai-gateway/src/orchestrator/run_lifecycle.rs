@@ -9,10 +9,14 @@ use anyhow::{bail, Result};
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ContinuationToken {
+    #[serde(alias = "run_id")]
     pub run_id: u64,
+    #[serde(alias = "checkpoint_hash")]
     pub checkpoint_hash: String,
     pub cursor: u32,
+    #[serde(alias = "concurrency_version")]
     pub concurrency_version: u64,
 }
 

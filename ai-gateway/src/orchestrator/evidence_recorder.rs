@@ -71,6 +71,16 @@ pub(super) struct RecordedEvidence {
     pub claim_ids: Vec<u64>,
 }
 
+/// Durable identity for a publication that is not itself an agent run.
+#[derive(Debug, Clone)]
+pub(super) struct PublicationEvidenceScope {
+    pub organization_id: u64,
+    pub company_id: u64,
+    pub session_ref: String,
+    pub event_ref: String,
+    pub note: String,
+}
+
 #[async_trait]
 pub(super) trait AnswerEvidenceRecorder: Send + Sync {
     async fn record(
@@ -103,6 +113,14 @@ pub(super) fn claim_record(assessment: &ClaimAssessment) -> ClaimRecord {
         note: Some(note.to_string()),
     };
     match &assessment.verification {
+        ClaimVerification::RunEvidence => ClaimRecord {
+            kind: "inference",
+            verification_method: "deterministic",
+            verification_outcome: "qualified",
+            note: Some(
+                "traceable to server-produced run evidence; no durable passage binding".to_string(),
+            ),
+        },
         ClaimVerification::NoSupportCited => {
             unsupported("the answer cited no passage for this claim")
         }
@@ -172,18 +190,32 @@ fn opt<T: Serialize>(value: Option<T>) -> Value {
 }
 
 fn contribution_params(scope: &RunEvidenceScope) -> Value {
+    contribution_params_for(
+        &scope.session_ref(),
+        Some(scope.run_id),
+        "final_answer",
+        "final answer drafted by the governed program",
+    )
+}
+
+fn contribution_params_for(
+    session_ref: &str,
+    agent_run_id: Option<u64>,
+    event_ref: &str,
+    note: &str,
+) -> Value {
     json!({
         "contributor_kind": "agent",
-        "agent_run_id": opt(Some(scope.run_id)),
-        "session_ref": scope.session_ref(),
+        "agent_run_id": opt(agent_run_id),
+        "session_ref": session_ref,
         "turn_ref": opt::<String>(None),
-        "event_ref": opt(Some("final_answer")),
+        "event_ref": opt(Some(event_ref)),
         "introduced_kind": "concept",
         "source_version_id": opt::<u64>(None),
         // What the agent produced is model output, not an inspected source.
         "inspection_state": "unverified_recollection",
         "is_secondary_quotation": false,
-        "note": opt(Some("final answer drafted by the governed program")),
+        "note": opt(Some(note)),
     })
 }
 
@@ -220,14 +252,43 @@ pub(super) struct StdbEvidenceRecorder<'a> {
 }
 
 impl StdbEvidenceRecorder<'_> {
+    pub(super) async fn record_publication(
+        &self,
+        scope: &PublicationEvidenceScope,
+        provenance: &AnswerProvenance,
+    ) -> Result<RecordedEvidence> {
+        let run_scope = RunEvidenceScope {
+            organization_id: scope.organization_id,
+            company_id: scope.company_id,
+            run_id: 0,
+        };
+        self.record_scoped(
+            &run_scope,
+            provenance,
+            &scope.session_ref,
+            None,
+            &scope.event_ref,
+            &scope.note,
+        )
+        .await
+    }
+
     async fn contribution_id(&self, scope: &RunEvidenceScope) -> Result<Option<u64>> {
+        self.contribution_id_for(scope, &scope.session_ref()).await
+    }
+
+    async fn contribution_id_for(
+        &self,
+        scope: &RunEvidenceScope,
+        session_ref: &str,
+    ) -> Result<Option<u64>> {
+        let session_ref = session_ref.replace('\'', "''");
         let rows = self
             .reader
             .query_sql(&format!(
                 "SELECT * FROM ai_evidence_contribution WHERE organization_id = {} \
                  AND session_ref = '{}' LIMIT 1",
-                scope.organization_id,
-                scope.session_ref()
+                scope.organization_id, session_ref
             ))
             .await
             .context("look up run contribution")?;
@@ -309,6 +370,28 @@ impl AnswerEvidenceRecorder for StdbEvidenceRecorder<'_> {
         scope: &RunEvidenceScope,
         provenance: &AnswerProvenance,
     ) -> Result<RecordedEvidence> {
+        self.record_scoped(
+            scope,
+            provenance,
+            &scope.session_ref(),
+            Some(scope.run_id),
+            "final_answer",
+            "final answer drafted by the governed program",
+        )
+        .await
+    }
+}
+
+impl StdbEvidenceRecorder<'_> {
+    async fn record_scoped(
+        &self,
+        scope: &RunEvidenceScope,
+        provenance: &AnswerProvenance,
+        session_ref: &str,
+        agent_run_id: Option<u64>,
+        event_ref: &str,
+        note: &str,
+    ) -> Result<RecordedEvidence> {
         if provenance.claims.is_empty() && provenance.calculations.is_empty() {
             // Nothing material to attribute; do not create an empty contribution.
             return Ok(RecordedEvidence {
@@ -316,7 +399,7 @@ impl AnswerEvidenceRecorder for StdbEvidenceRecorder<'_> {
                 claim_ids: Vec::new(),
             });
         }
-        let contribution_id = match self.contribution_id(scope).await? {
+        let contribution_id = match self.contribution_id_for(scope, session_ref).await? {
             Some(id) => id,
             None => {
                 self.writer
@@ -325,12 +408,12 @@ impl AnswerEvidenceRecorder for StdbEvidenceRecorder<'_> {
                         json!([
                             scope.organization_id,
                             scope.company_id,
-                            contribution_params(scope)
+                            contribution_params_for(session_ref, agent_run_id, event_ref, note)
                         ]),
                     ))
                     .await
                     .context("record_ai_evidence_contribution reducer failed")?;
-                self.contribution_id(scope)
+                self.contribution_id_for(scope, session_ref)
                     .await?
                     .context("contribution was recorded but could not be read back")?
             }
@@ -364,7 +447,11 @@ impl AnswerEvidenceRecorder for StdbEvidenceRecorder<'_> {
                     contribution_id,
                     &format!("Calculation: {}", calculation.label),
                     &[],
-                    Some(scope.calculation_ref(index)),
+                    Some(if agent_run_id.is_some() {
+                        scope.calculation_ref(index)
+                    } else {
+                        format!("{session_ref}:calc:{}", index + 1)
+                    }),
                     &record,
                 )
                 .await?,
@@ -661,6 +748,7 @@ mod tests {
             claims: vec![
                 MaterialClaim {
                     text: "The standard VAT rate is 20 percent.".into(),
+                    support_refs: Vec::new(),
                     supports: vec![PassageCitation {
                         kind: "policy".into(),
                         id: "vat-guide".into(),
@@ -670,6 +758,7 @@ mod tests {
                 },
                 MaterialClaim {
                     text: "Exports are exempt.".into(),
+                    support_refs: Vec::new(),
                     supports: vec![],
                 },
             ],
