@@ -2894,6 +2894,10 @@
       "name": "propose_ai_knowledge_entry_version",
       "shape_fingerprint": "sha256:58128fa835756eb60cad67c08ba4acbd2fb3ea40c9e4141a4b631869d310a2c3"
     },
+    "erp.propose_ai_knowledge_skill_promotion": {
+      "name": "propose_ai_knowledge_skill_promotion",
+      "shape_fingerprint": "sha256:047a225f62b14dfef36627ce86335148ceb16eb6053861121ceded4664868b83"
+    },
     "erp.publish_form_configuration": {
       "name": "publish_form_configuration",
       "shape_fingerprint": "sha256:e77d804e42c073d2b3b2b03a60aba13a7b714b969a3e97ea768df8b92494a328"
@@ -3437,6 +3441,10 @@
     "erp.review_ai_knowledge_entry_version": {
       "name": "review_ai_knowledge_entry_version",
       "shape_fingerprint": "sha256:5c14cb0a5f4aa1845fbc452f8231c6d9d8bcfec2415e71a56026878e1b3cc039"
+    },
+    "erp.review_ai_knowledge_skill_promotion": {
+      "name": "review_ai_knowledge_skill_promotion",
+      "shape_fingerprint": "sha256:29842751a428bdcc600ccb6925f57bc9d7b5c5587a60cdd900970534a0ab26f5"
     },
     "erp.review_message_batch": {
       "name": "review_message_batch",
@@ -5588,9 +5596,9 @@
       "previous_release": "v0.3.48",
       "previous_ir_sha256": "sha256:a6488e3c53a0cbad15d1b2ba1ebe3452c041b567a07e9c6eeeae6852d18ee54e",
       "previous_operations_fingerprint": "sha256:541b8dc7b12a4abd662b604c48faa21fbd9cbb4d6a3d2086471ccd64f337cf60",
-      "current_operations_fingerprint": "sha256:4e5e715af8cf79509a0440cd20d59850328494695ad9efe1fbeacb36773799eb",
-      "operation_count": 1380,
-      "reason": "add AIH-13 to AIH-18 evidence, provenance and knowledge reducers (source, version, passage, contribution, claim, decision, artifact component, dependency, source change, knowledge entry) and record already-shipped governed-intelligence reducers (run review, program checkpoint, shadow events, authority rollback, pattern promotion) on top of the released v0.3.48 baseline; every existing operation shape is unchanged"
+      "current_operations_fingerprint": "sha256:ef7405f3da51da1e40be486c0aa71f3eff5911c07b024164705bac009a7b099d",
+      "operation_count": 1382,
+      "reason": "add AIH-13 to AIH-18 evidence, provenance, knowledge and reviewed knowledge-to-skill promotion reducers (source, version, passage, contribution, claim, decision, artifact component, dependency, source change, knowledge entry, promotion proposal and independent review) and record already-shipped governed-intelligence reducers (run review, program checkpoint, shadow events, authority rollback, pattern promotion) on top of the released v0.3.48 baseline; every existing operation shape is unchanged"
     }
   ]
 }
