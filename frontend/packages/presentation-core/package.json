@@ -12,7 +12,7 @@
     "./saved-draft-decoder": "./src/saved-draft-decoder.ts"
   },
   "dependencies": {
-    "@lumiere/contracts": "github:KevTiv/lumiere-contracts#v0.3.46&path:packages/contracts",
+    "@lumiere/contracts": "github:KevTiv/lumiere-contracts#v0.3.49&path:packages/contracts",
     "ajv": "8.18.0"
   },
   "scripts": {

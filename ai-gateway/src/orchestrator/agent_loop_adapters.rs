@@ -13,15 +13,18 @@ use super::spend_admission::{SpendAdmittedLlm, SpendBinding, SpendLedger};
 use crate::{
     providers::llm::{LlmCompletion, LlmRequest, ToolCallRequest},
     tools::{
+        generated::embedded_catalog,
+        generated_read::{resolve_actor_grants, GeneratedReadTools},
         registry::AuthorizedToolView,
         types::{hash_tool_input, ToolContext, ToolOutput},
     },
 };
 
-/// Internal seam for later governed routing; the caller must first create a
-/// durable run. No HTTP handler or skill invokes this until H5 admission exists.
-/// Every provider attempt is admitted through `ledger` against `binding`, which
-/// must describe the same organization, company and durable run as `context`.
+/// Internal seam for governed routing; the caller must first create a durable
+/// run. Invoked via `run::run_skill_admitted`, which wires the H5b spend layer,
+/// H4 policy engine and H3 tool view. Every provider attempt is admitted through
+/// `ledger` against `binding`, which must describe the same organization, company
+/// and durable run as `context`.
 #[allow(clippy::too_many_arguments)]
 pub(super) async fn run_recorded_loop(
     llm: &dyn LlmCompletion,
@@ -30,7 +33,7 @@ pub(super) async fn run_recorded_loop(
     view: &AuthorizedToolView<'_>,
     policy: &ReviewedInvocationPolicy,
     context: &ToolContext,
-    request: LlmRequest,
+    mut request: LlmRequest,
     limits: LoopLimits,
 ) -> Result<LoopOutcome> {
     policy.ensure_context(context.org_id, context.company_id, &context.skill_key)?;
@@ -41,7 +44,34 @@ pub(super) async fn run_recorded_loop(
         "spend binding does not match the durable run context"
     );
     let admitted = SpendAdmittedLlm::new(llm, ledger, binding)?;
-    let tools = AuthorizedLoopTools { view, context };
+    let catalog = embedded_catalog()?;
+    let generated_requested = request
+        .tools
+        .iter()
+        .any(|tool| catalog.advertises(&tool.name));
+    let generated_grants = if generated_requested {
+        resolve_actor_grants(context).await?
+    } else {
+        Vec::new()
+    };
+    if generated_requested {
+        let granted_specs = catalog.specs_for_grants(&generated_grants)?;
+        request.tools.retain_mut(|tool| {
+            if !catalog.advertises(&tool.name) {
+                return true;
+            }
+            let Some(granted) = granted_specs.iter().find(|spec| spec.name == tool.name) else {
+                return false;
+            };
+            *tool = granted.clone();
+            true
+        });
+    }
+    let tools = AuthorizedLoopTools {
+        view,
+        generated: GeneratedReadTools::new(&generated_grants),
+        context,
+    };
     let recorder = StdbLoopRecorder {
         stdb: &context.stdb,
         organization_id: context.org_id,
@@ -95,6 +125,7 @@ pub(super) async fn run_recorded_loop(
 /// Binds the loop's tool execution to the H3 invocation view and trusted scope.
 pub(super) struct AuthorizedLoopTools<'a> {
     pub view: &'a AuthorizedToolView<'a>,
+    pub generated: GeneratedReadTools<'a>,
     pub context: &'a ToolContext,
 }
 
@@ -107,6 +138,9 @@ impl LoopTools for AuthorizedLoopTools<'_> {
             call.name != "action_draft",
             "action drafts require H5 approval handling"
         );
+        if embedded_catalog()?.advertises(&call.name) {
+            return self.generated.execute(call, self.context).await;
+        }
         self.view
             .run_named(&call.name, self.context, &call.arguments)
             .await

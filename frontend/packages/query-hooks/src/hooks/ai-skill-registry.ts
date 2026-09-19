@@ -91,6 +91,65 @@ export type AiSkillCertificationRequestRow = {
   errorCode?: string
   error_code?: string
   hasCurrentPassingEvidence?: boolean
+  readiness?: {
+    ready: boolean
+    code: string
+  }
+  evidence?: AiSkillCertificationEvidenceRow | null
+}
+
+export type AiSkillCertificationEvidenceRow = AiSkillTestRunRow & {
+  runtimeProfileId?: number
+  runtime_profile_id?: number
+  certificationEnvironmentId?: number
+  certification_environment_id?: number
+  sourceHash?: string
+  source_hash?: string
+  manifestHash?: string
+  manifest_hash?: string
+  fixtureHash?: string
+  fixture_hash?: string
+  runtimeHash?: string
+  runtime_hash?: string
+  environmentHash?: string
+  environment_hash?: string
+  policySnapshotHash?: string
+  policy_snapshot_hash?: string
+  executionEvidenceHash?: string
+  execution_evidence_hash?: string
+  executorRunId?: string
+  executor_run_id?: string
+  failureKind?: string
+  failure_kind?: string
+}
+
+export type AiKnowledgeSkillPromotionRow = {
+  id: number
+  companyId?: number
+  company_id?: number
+  knowledgeEntryId?: number
+  knowledge_entry_id?: number
+  knowledgeVersionId?: number
+  knowledge_version_id?: number
+  skillKey?: string
+  skill_key?: string
+  skillName?: string
+  skill_name?: string
+  status?: string
+  certificationState?: string
+  certification_state?: string
+  skillId?: number | null
+  skill_id?: number | null
+  skillVersionId?: number | null
+  skill_version_id?: number | null
+  lineageHash?: string
+  lineage_hash?: string
+  proposedAt?: string
+  proposed_at?: string
+  reviewedAt?: string | null
+  reviewed_at?: string | null
+  reviewNote?: string | null
+  review_note?: string | null
 }
 
 function registryQueryKey(organizationId: bigint, resource: string) {
@@ -190,6 +249,29 @@ export function useAiSkillCertificationRequests(organizationId: bigint, enabled 
   })
 }
 
+export function useAiKnowledgeSkillPromotions(
+  organizationId: bigint,
+  companyId: number | null,
+) {
+  return useQuery({
+    queryKey: [
+      "ai-skill-registry",
+      "knowledge-promotions",
+      rqBigIntKey(organizationId),
+      companyId,
+    ],
+    enabled: organizationId > 0n && companyId != null && companyId > 0,
+    queryFn: async () => {
+      const rows = await fetchQueryList(
+        `/api/ai/knowledge/skill-promotions/company/${companyId}`,
+        "Failed to fetch knowledge promotions",
+      )
+      return rows as AiKnowledgeSkillPromotionRow[]
+    },
+    staleTime: 2_000,
+  })
+}
+
 export function versionWorkflowStatus(
   versionId: number,
   releases: AiSkillReleaseRow[],
@@ -227,10 +309,18 @@ export function certificationHasPassingEvidence(
   const request = latestCertificationFor(fixtureId, versionId, requests)
   if (
     !request ||
+    request.readiness?.ready === false ||
     request.hasCurrentPassingEvidence !== true ||
     String(request.status ?? "").toLowerCase() !== "completed"
   ) {
     return false
+  }
+  if (request.evidence) {
+    return (
+      Number(request.evidence.fixtureId ?? request.evidence.fixture_id) === fixtureId &&
+      Number(request.evidence.skillVersionId ?? request.evidence.skill_version_id) === versionId &&
+      String(request.evidence.status ?? "").toLowerCase() === "passed"
+    )
   }
   return runs.some(
     (run) =>
@@ -293,6 +383,81 @@ export function useRequestAiSkillCertification(organizationId: number) {
       if (!response.ok) throw new Error(await parseCallError(response))
     },
     onSuccess: () => invalidateRegistry(qc, organizationId),
+  })
+}
+
+export function useProposeAiKnowledgeSkillPromotion(
+  organizationId: number,
+  companyId: number | null,
+) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (args: {
+      knowledgeVersionId: number
+      skillId?: number
+      skillKey: string
+      skillName: string
+      manifestJson: string
+      idempotencyKey: string
+    }) => {
+      if (companyId == null || companyId <= 0) throw new Error("Select an operating company")
+      const response = await apiFetch("/api/ai/knowledge/skill-promotions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ companyId, ...args }),
+      })
+      if (!response.ok) throw new Error(await parseCallError(response))
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({
+        queryKey: [
+          "ai-skill-registry",
+          "knowledge-promotions",
+          String(organizationId),
+          companyId,
+        ],
+      })
+    },
+  })
+}
+
+export function useReviewAiKnowledgeSkillPromotion(
+  organizationId: number,
+  companyId: number | null,
+) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (args: {
+      promotionId: number
+      outcome: "accepted" | "rejected"
+      note?: string
+    }) => {
+      if (companyId == null || companyId <= 0) throw new Error("Select an operating company")
+      const response = await apiFetch(
+        `/api/ai/knowledge/skill-promotions/${args.promotionId}/review`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            companyId,
+            outcome: args.outcome,
+            note: args.note ?? null,
+          }),
+        },
+      )
+      if (!response.ok) throw new Error(await parseCallError(response))
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({
+        queryKey: [
+          "ai-skill-registry",
+          "knowledge-promotions",
+          String(organizationId),
+          companyId,
+        ],
+      })
+      invalidateRegistry(qc, organizationId)
+    },
   })
 }
 

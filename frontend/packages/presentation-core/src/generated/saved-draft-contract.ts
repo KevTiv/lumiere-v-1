@@ -132,6 +132,10 @@ export interface ModuleDraft {
    */
   componentCatalogVersion: number;
   /**
+   * Optional accepted-decision lineage for this immutable saved revision.
+   */
+  evidenceBinding?: EvidenceBindingIntent | null;
+  /**
    * Stable module identifier.
    */
   moduleId: string;
@@ -147,6 +151,23 @@ export interface ModuleDraft {
    * Human-facing module title.
    */
   title: string;
+}
+/**
+ * Untrusted linkage intent validated again at the persistence boundary.
+ */
+export interface EvidenceBindingIntent {
+  /**
+   * Optional current claims linked directly for inspection.
+   */
+  claimIds: string[];
+  /**
+   * Membership-derived company intent as a canonical positive decimal.
+   */
+  companyId: string;
+  /**
+   * Accepted decisions that justify the definition.
+   */
+  decisionIds: string[];
 }
 /**
  * A composed page and its ordered presentation nodes.

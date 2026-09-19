@@ -1079,13 +1079,17 @@ pub fn set_ai_agent_run_wait_state(
 
     let run = load_company_run(ctx, organization_id, company_id, run_id)?;
     let status = params.status.trim().to_string();
-    if !is_run_wait_state(&status) {
-        return Err("wait status must be awaiting_approval or agent_settled".to_string());
+    if !is_run_wait_state(&status) && status != "running" {
+        return Err("status must be awaiting_approval, agent_settled, or running".to_string());
     }
     if run.status == status {
         return Ok(());
     }
-    if !run_accepts_work(&run.status) {
+    if status == "running" {
+        if !is_run_wait_state(&run.status) {
+            return Err("only a waiting run can resume to running".to_string());
+        }
+    } else if !run_accepts_work(&run.status) {
         return Err("only a running or pending run can enter a wait state".to_string());
     }
 

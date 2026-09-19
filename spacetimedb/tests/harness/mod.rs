@@ -32,6 +32,7 @@ mod presentation;
 #[spacetimedb::reducer]
 pub fn run_presentation_draft_tests(ctx: &spacetimedb::ReducerContext) -> Result<(), String> {
     presentation::test_presentation_module_revision_round_trip(ctx)?;
+    presentation::test_presentation_save_binds_evidence_atomically(ctx)?;
     presentation::test_presentation_module_rejects_invalid_payload(ctx)?;
     presentation::test_presentation_module_owner_scope_isolated(ctx)?;
     presentation::test_presentation_module_rejects_inactive_cross_org_actor(ctx)?;

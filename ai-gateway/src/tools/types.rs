@@ -43,7 +43,7 @@ pub struct SkillCitation {
     pub fetched_at: Option<String>,
 }
 
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ToolOutput {
     pub summary: String,
     pub data: Value,

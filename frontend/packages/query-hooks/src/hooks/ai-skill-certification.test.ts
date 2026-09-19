@@ -59,3 +59,33 @@ test("a later failed request supersedes an older pass", () => {
   assert.equal(latestCertificationFor(3, 4, requests)?.id, 11)
   assert.equal(certificationHasPassingEvidence(3, 4, requests, evidence), false)
 })
+
+test("embedded persisted evidence is sufficient when server readiness is current", () => {
+  const request: AiSkillCertificationRequestRow = {
+    id: 10,
+    skillVersionId: 4,
+    fixtureId: 3,
+    status: "Completed",
+    hasCurrentPassingEvidence: true,
+    readiness: { ready: true, code: "ready" },
+    evidence: {
+      id: 20,
+      certificationRequestId: 10,
+      skillVersionId: 4,
+      fixtureId: 3,
+      status: "Passed",
+      executionEvidenceHash: `sha256:${"a".repeat(64)}`,
+    },
+  }
+
+  assert.equal(certificationHasPassingEvidence(3, 4, [request], []), true)
+  assert.equal(
+    certificationHasPassingEvidence(
+      3,
+      4,
+      [{ ...request, readiness: { ready: false, code: "evidence_stale_or_failed" } }],
+      [],
+    ),
+    false,
+  )
+})

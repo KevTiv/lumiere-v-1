@@ -157,6 +157,9 @@ jobs:
       - name: api-server reducer contract tests
         run: python3 scripts/run-required-cargo-tests.py --locked -p api-server --lib commands::tests
 
+      - name: Deterministic graduation conformance
+        run: cargo test --locked -p ai-gateway --bin gateway deterministic_graduation_conformance_suite
+
       - name: ai-gateway unit tests
         run: cargo test --locked -p ai-gateway --bin gateway
 
