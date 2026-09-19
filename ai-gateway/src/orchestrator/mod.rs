@@ -1,9 +1,12 @@
 mod agent_loop;
+mod answer_gate;
 mod agent_loop_adapters;
 #[cfg(test)]
 mod agent_loop_tests;
 mod decision_graph;
 mod decision_type;
+pub mod evidence_inspector;
+mod evidence_recorder;
 mod governed_services;
 pub(crate) mod governed_bootstrap;
 mod graduation;
@@ -11,6 +14,7 @@ mod governed_program;
 mod governed_programs;
 pub mod intelligence;
 mod intelligence_adapters;
+mod knowledge_context;
 mod intelligence_router;
 mod invocation_policy;
 mod model_configuration;

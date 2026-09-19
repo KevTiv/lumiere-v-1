@@ -351,21 +351,146 @@ impl ProgramPatchProposal {
     }
 }
 
+/// A citation that names one passage of one source version. Like
+/// `EvidenceRef` it is only a *claim* by the drafter: the answer gate
+/// resolves it against the server-side passage catalog and never trusts
+/// the version, passage or text the drafter asserts.
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct PassageCitation {
+    pub kind: String,
+    pub id: String,
+    pub source_version: String,
+    pub passage_key: String,
+}
+
+impl PassageCitation {
+    pub fn validate(&self) -> Result<()> {
+        if [&self.kind, &self.id, &self.source_version, &self.passage_key]
+            .iter()
+            .any(|field| field.trim().is_empty())
+        {
+            bail!("passage citation kind, id, source_version and passage_key must be nonempty");
+        }
+        Ok(())
+    }
+
+    pub fn evidence_ref(&self) -> EvidenceRef {
+        EvidenceRef {
+            kind: self.kind.clone(),
+            id: self.id.clone(),
+        }
+    }
+}
+
+/// One material factual claim in a draft and the passages it relies on.
+/// A claim with no supporting passage is an explicit gap the gate turns
+/// into a qualified/review outcome rather than a validated statement.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MaterialClaim {
+    pub text: String,
+    #[serde(default)]
+    pub supports: Vec<PassageCitation>,
+}
+
+impl MaterialClaim {
+    pub fn validate(&self) -> Result<()> {
+        if self.text.trim().is_empty() {
+            bail!("material claim text must be nonempty");
+        }
+        for support in &self.supports {
+            support.validate()?;
+        }
+        Ok(())
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CalculationOp {
+    Sum,
+    Difference,
+    Product,
+    Ratio,
+}
+
+/// A calculation the draft states. The gate recomputes it from the
+/// operands; the drafter's `claimed_result` is never trusted.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct ClaimedCalculation {
+    pub label: String,
+    pub op: CalculationOp,
+    pub operands: Vec<f64>,
+    pub claimed_result: f64,
+}
+
+impl ClaimedCalculation {
+    pub fn validate(&self) -> Result<()> {
+        if self.label.trim().is_empty() {
+            bail!("calculation label must be nonempty");
+        }
+        if self.operands.len() < 2 {
+            bail!("calculation '{}' needs at least two operands", self.label);
+        }
+        if self
+            .operands
+            .iter()
+            .chain(std::iter::once(&self.claimed_result))
+            .any(|value| !value.is_finite())
+        {
+            bail!("calculation '{}' has a non-finite value", self.label);
+        }
+        if matches!(self.op, CalculationOp::Difference | CalculationOp::Ratio)
+            && self.operands.len() != 2
+        {
+            bail!(
+                "calculation '{}': difference/ratio take exactly two operands",
+                self.label
+            );
+        }
+        Ok(())
+    }
+}
+
 /// A candidate final answer. Still subject to the §7 answer/publication
 /// gate before it may be presented as complete (architecture §9).
-#[derive(Clone, Debug, Serialize, Deserialize)]
+///
+/// `citations` are run-level evidence refs (existence only). The optional
+/// fields are what let the gate check more than existence: passage-level
+/// citations, the material claims the prose makes, and stated
+/// calculations. All default to empty so a draft without them is still a
+/// valid draft — it simply cannot earn more than the checks it supports.
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct FinalDraft {
     pub content: String,
     pub citations: Vec<EvidenceRef>,
+    #[serde(default)]
+    pub claims: Vec<MaterialClaim>,
+    #[serde(default)]
+    pub calculations: Vec<ClaimedCalculation>,
 }
 
 impl FinalDraft {
+    pub fn new(content: String, citations: Vec<EvidenceRef>) -> Self {
+        Self {
+            content,
+            citations,
+            claims: Vec::new(),
+            calculations: Vec::new(),
+        }
+    }
+
     pub fn validate(&self) -> Result<()> {
         if self.content.trim().is_empty() {
             bail!("final draft content must be nonempty");
         }
         for citation in &self.citations {
             citation.validate()?;
+        }
+        for claim in &self.claims {
+            claim.validate()?;
+        }
+        for calculation in &self.calculations {
+            calculation.validate()?;
         }
         Ok(())
     }

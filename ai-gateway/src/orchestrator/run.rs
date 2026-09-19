@@ -41,6 +41,13 @@ use super::{
         StdbAuthorityRollbackRecorder, StdbDecisionResolutionPolicy, StdbDriftMonitor,
         StdbModelShadowRecorder,
     },
+    answer_gate::{
+        DecisionClaimCoverageChecker, EvidenceBackedVerificationService,
+        EvidenceGatedAnswerAdmission, GatePolicy, GateScope, StdbPassageCatalog,
+    },
+    evidence_inspector::Viewer,
+    evidence_recorder::{RecordingAnswerAdmission, RunEvidenceScope, StdbEvidenceRecorder},
+    knowledge_context::{compile_knowledge_context, knowledge_entry_keys, merge_into_inputs},
     governed_program::{
         graph_requests_generated_capabilities, BuiltinComputeService, GovernedProgramContext,
         GovernedProgramExecutor, GovernedProgramStop, StdbIntelligenceEventRecorder,
@@ -48,8 +55,7 @@ use super::{
     },
     governed_programs::governed_program_for_skill,
     governed_services::{
-        DeterministicFinalAnswerAdmission, GovernedCapabilityService,
-        PolicyBackedCapabilityAdmission, ShapeOnlyVerificationService, StdbApprovalCoordinator,
+        GovernedCapabilityService, PolicyBackedCapabilityAdmission, StdbApprovalCoordinator,
         StdbExecutionRecovery, ToolsBackedCapabilityExecutor,
     },
     intelligence::EvidenceRef,
@@ -66,6 +72,33 @@ use super::{
 };
 
 const DEFAULT_MAX_STEPS: u32 = 5;
+
+/// `key:value` scope tags a skill requires cited passages to apply to
+/// (`config_json.requiredApplicability`). Absent means no requirement. A
+/// present-but-malformed value is an error: silently dropping a required
+/// tag would make the gate more permissive than the skill's owner intended.
+fn required_applicability(config: &Value) -> Result<Vec<String>> {
+    let Some(raw) = config
+        .get("requiredApplicability")
+        .or_else(|| config.get("required_applicability"))
+    else {
+        return Ok(Vec::new());
+    };
+    let tags = raw
+        .as_array()
+        .context("requiredApplicability must be an array of 'key:value' strings")?;
+    tags.iter()
+        .map(|tag| {
+            let tag = tag
+                .as_str()
+                .filter(|tag| tag.split_once(':').is_some_and(|(k, v)| !k.is_empty() && !v.is_empty()))
+                .with_context(|| {
+                    format!("requiredApplicability entry {tag} must be a 'key:value' string")
+                })?;
+            Ok(tag.to_string())
+        })
+        .collect()
+}
 
 #[derive(Debug, Deserialize)]
 pub struct RunSkillRequest {
@@ -111,6 +144,11 @@ pub struct RunSkillResponse {
     pub steps: Vec<RunSkillStepSummary>,
     pub agent_id: u64,
     pub skill_key: String,
+    /// Ids of the `ai_evidence_claim` rows recorded for this run's answer
+    /// (AIH-14), in order. Inspectable via `POST /v1/evidence/inspect`.
+    /// Omitted when the run recorded none.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub evidence_claim_ids: Vec<u64>,
 }
 
 pub async fn run_skill(state: &AppState, req: RunSkillRequest) -> Result<RunSkillResponse> {
@@ -456,6 +494,7 @@ pub async fn run_skill_unlocked(
         steps,
         agent_id: agent.agent_id,
         skill_key: skill.skill_key,
+        evidence_claim_ids: Vec::new(),
     })
 }
 
@@ -745,8 +784,43 @@ pub async fn run_skill_admitted(
             &recovery,
             &approvals,
         );
-        let verification = ShapeOnlyVerificationService;
-        let answer_admission = DeterministicFinalAnswerAdmission;
+        // AIH-15: the §7.3 answer gate. Passages resolve against the
+        // server-side catalog; claim coverage is judged by the review-role
+        // provider (model-assisted, recorded as such, never approval).
+        let verification = EvidenceBackedVerificationService;
+        let passage_catalog = StdbPassageCatalog {
+            reader: spend_reader,
+        };
+        let claim_checker = DecisionClaimCoverageChecker {
+            reviewer: &review_provider,
+        };
+        let answer_admission = EvidenceGatedAnswerAdmission {
+            scope: GateScope {
+                organization_id: req.org_id,
+                company_id: req.company_id,
+                as_of_micros: chrono::Utc::now().timestamp_micros(),
+                required_applicability: required_applicability(&skill.config_json)?,
+            },
+            policy: GatePolicy::default(),
+            catalog: &passage_catalog,
+            claim_checker: Some(&claim_checker),
+        };
+        // AIH-14: persist the provenance of every answer the gate judges, so
+        // it can be inspected claim by claim and invalidated with its sources.
+        let evidence_recorder = StdbEvidenceRecorder {
+            writer: state.stdb.as_ref(),
+            reader: spend_reader,
+        };
+        let recording_admission = RecordingAnswerAdmission {
+            gate: &answer_admission,
+            recorder: &evidence_recorder,
+            scope: RunEvidenceScope {
+                organization_id: req.org_id,
+                company_id: req.company_id,
+                run_id,
+            },
+            recorded: std::sync::Mutex::new(Vec::new()),
+        };
         let compute = BuiltinComputeService;
         let calibration = StdbCalibrationProfileStore {
             reader: tool_ctx.stdb.as_ref(),
@@ -793,7 +867,7 @@ pub async fn run_skill_admitted(
             precedent: &precedent,
             capabilities: &capabilities,
             verification: &verification,
-            answer_admission: &answer_admission,
+            answer_admission: &recording_admission,
             compute: &compute,
             recorder: &recorder,
             calibration: &calibration,
@@ -813,6 +887,24 @@ pub async fn run_skill_admitted(
                 }
             }
         }
+        // AIH-17: compile the approved knowledge the skill asks for. Entries
+        // are re-authorized and re-validated now, not trusted from when they
+        // were approved, and request inputs can never forge them.
+        let knowledge = compile_knowledge_context(
+            spend_reader,
+            Viewer {
+                organization_id: req.org_id,
+                company_id: req.company_id,
+            },
+            &knowledge_entry_keys(&skill.config_json)?,
+        )
+        .await?;
+        merge_into_inputs(&mut governed_inputs, &knowledge);
+        let mut run_evidence = vec![EvidenceRef {
+            kind: "governed_run_step".to_string(),
+            id: format!("run:{run_id}:analytics"),
+        }];
+        run_evidence.extend(knowledge.evidence.iter().cloned());
         let program_context = GovernedProgramContext {
             organization_id: req.org_id,
             company_id: req.company_id,
@@ -820,12 +912,14 @@ pub async fn run_skill_admitted(
             program_ref: catalog.program_ref.to_string(),
             objective: skill.prompt_template.clone(),
             bounded_state: governed_inputs,
-            evidence: vec![EvidenceRef {
-                kind: "governed_run_step".to_string(),
-                id: format!("run:{run_id}:analytics"),
-            }],
+            evidence: run_evidence,
         };
         let program = executor.run(&graph, &program_context).await?;
+        let evidence_claim_ids = recording_admission
+            .recorded
+            .lock()
+            .map(|ids| ids.clone())
+            .unwrap_or_default();
 
         let review = if matches!(&program.stop, GovernedProgramStop::Completed) {
             let result = RunReviewProgram::new(&review_provider)
@@ -881,6 +975,7 @@ pub async fn run_skill_admitted(
                         .collect(),
                     agent_id: agent.agent_id,
                     skill_key: skill.skill_key,
+                    evidence_claim_ids,
                 });
             }
         }
@@ -985,6 +1080,7 @@ pub async fn run_skill_admitted(
                 .collect(),
             agent_id: agent.agent_id,
             skill_key: skill.skill_key,
+            evidence_claim_ids,
         });
     }
 
@@ -1026,6 +1122,7 @@ pub async fn run_skill_admitted(
         steps: Vec::new(),
         agent_id: agent.agent_id,
         skill_key: skill.skill_key,
+        evidence_claim_ids: Vec::new(),
     })
 }
 
@@ -1238,6 +1335,22 @@ fn reject_legacy_analytics_sql(inputs: &Value) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn required_applicability_parses_absent_valid_and_rejects_malformed() {
+        assert!(required_applicability(&json!({})).unwrap().is_empty());
+        assert_eq!(
+            required_applicability(&json!({"requiredApplicability": ["jurisdiction:US"]})).unwrap(),
+            vec!["jurisdiction:US".to_string()]
+        );
+        for bad in [
+            json!({"requiredApplicability": "jurisdiction:US"}),
+            json!({"requiredApplicability": ["jurisdiction"]}),
+            json!({"requiredApplicability": [7]}),
+        ] {
+            assert!(required_applicability(&bad).is_err());
+        }
+    }
 
     #[tokio::test]
     async fn governed_runtime_preflight_never_bootstraps_missing_calibration() {

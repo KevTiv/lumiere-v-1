@@ -391,10 +391,7 @@ impl ReasoningProvider for AgentLoopReasoner<'_> {
                         .unwrap_or(true),
                 })
             }
-            TOOL_SUBMIT_FINAL_DRAFT => ReasoningOutcome::FinalDraft(FinalDraft {
-                content: required_str(args, "content")?,
-                citations: Vec::new(),
-            }),
+            TOOL_SUBMIT_FINAL_DRAFT => ReasoningOutcome::FinalDraft(parse_final_draft(args)?),
             TOOL_UNABLE_TO_PROGRESS => ReasoningOutcome::UnableToProgress(UnableToProgress {
                 reason: required_str(args, "reason")?,
                 last_step_no: args
@@ -412,6 +409,29 @@ impl ReasoningProvider for AgentLoopReasoner<'_> {
             .context("provider returned a malformed or unadmitted reasoning outcome")?;
         Ok(outcome)
     }
+}
+
+/// Parses `submit_final_draft` arguments. Structured fields the model got
+/// wrong fail the whole outcome (fail closed, like every other reasoning
+/// outcome) rather than being silently dropped — a dropped claim or
+/// calculation would look like a draft that never made one.
+fn parse_final_draft(args: &serde_json::Map<String, Value>) -> Result<FinalDraft> {
+    fn optional_typed<T: serde::de::DeserializeOwned>(
+        args: &serde_json::Map<String, Value>,
+        key: &str,
+    ) -> Result<Vec<T>> {
+        match args.get(key) {
+            None | Some(Value::Null) => Ok(Vec::new()),
+            Some(value) => serde_json::from_value(value.clone())
+                .with_context(|| format!("final draft '{key}' is malformed")),
+        }
+    }
+    Ok(FinalDraft {
+        content: required_str(args, "content")?,
+        citations: optional_typed(args, "citations")?,
+        claims: optional_typed(args, "claims")?,
+        calculations: optional_typed(args, "calculations")?,
+    })
 }
 
 fn parse_decision_proposal(args: &serde_json::Map<String, Value>) -> Result<DecisionProposal> {
@@ -520,7 +540,71 @@ fn reasoning_tool_specs(request: &ReasoningRequest) -> Vec<ToolSpec> {
                     .to_string(),
                 parameters: json!({
                     "type": "object",
-                    "properties": {"content": {"type": "string"}},
+                    "properties": {
+                        "content": {"type": "string"},
+                        "citations": {
+                            "type": "array",
+                            "description": "Run-level evidence refs the answer relies on.",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "kind": {"type": "string"},
+                                    "id": {"type": "string"},
+                                },
+                                "required": ["kind", "id"],
+                                "additionalProperties": false,
+                            },
+                        },
+                        "claims": {
+                            "type": "array",
+                            "description": "Each material factual claim and the source \
+                                passages it relies on. A claim with no supports is \
+                                treated as unsupported.",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "text": {"type": "string"},
+                                    "supports": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "object",
+                                            "properties": {
+                                                "kind": {"type": "string"},
+                                                "id": {"type": "string"},
+                                                "source_version": {"type": "string"},
+                                                "passage_key": {"type": "string"},
+                                            },
+                                            "required": [
+                                                "kind", "id", "source_version", "passage_key"
+                                            ],
+                                            "additionalProperties": false,
+                                        },
+                                    },
+                                },
+                                "required": ["text"],
+                                "additionalProperties": false,
+                            },
+                        },
+                        "calculations": {
+                            "type": "array",
+                            "description": "Calculations stated in the answer. The gate \
+                                recomputes them; the claimed result is not trusted.",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "label": {"type": "string"},
+                                    "op": {
+                                        "type": "string",
+                                        "enum": ["sum", "difference", "product", "ratio"],
+                                    },
+                                    "operands": {"type": "array", "items": {"type": "number"}},
+                                    "claimed_result": {"type": "number"},
+                                },
+                                "required": ["label", "op", "operands", "claimed_result"],
+                                "additionalProperties": false,
+                            },
+                        },
+                    },
                     "required": ["content"],
                     "additionalProperties": false,
                 }),

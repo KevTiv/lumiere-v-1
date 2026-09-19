@@ -22,10 +22,12 @@ use super::{
     decision_graph::{
         validate_graph, DecisionGraph, DecisionNode, GateCondition, GraphNode, StopReason,
     },
+    answer_gate::collect_json_figures,
     decision_type::{admit_decision, DecisionTypeRegistry},
     graduation::{DecisionResolutionContext, GovernedDecisionResolver},
     governed_services::{
-        AnswerAdmissionOutcome, CapabilityStepOutcome, FinalAnswerAdmission,
+        qualified_content, AdmissionEvidence, AnswerAdmissionOutcome, CapabilityStepOutcome,
+        FinalAnswerAdmission,
         GovernedCapabilityService, VerificationOutcome, VerificationService,
     },
     intelligence::{
@@ -1257,18 +1259,41 @@ impl GovernedProgramExecutor<'_> {
                     let draft = FinalDraft {
                         content: response.content.clone(),
                         citations: evidence_for_node(&node, &values, &context.evidence),
+                        ..Default::default()
                     };
                     let known_evidence = known_evidence_for_run(context, &values);
-                    match self.answer_admission.admit(&draft, &known_evidence).await? {
+                    let data_figures = data_figures_for_run(&values);
+                    let report = self
+                        .answer_admission
+                        .admit_with_report(
+                            &draft,
+                            &AdmissionEvidence {
+                                known: &known_evidence,
+                                data_figures: &data_figures,
+                            },
+                        )
+                        .await?;
+                    let admitted = match report.outcome {
                         AnswerAdmissionOutcome::Admitted => {
-                            values.insert(node.id.clone(), NodeValue::Text(response.content.clone()));
-                            trace.push(step(&node, "generated answer admitted"));
+                            Ok((response.content.clone(), "generated answer admitted"))
+                        }
+                        AnswerAdmissionOutcome::Qualified { limitations } => Ok((
+                            qualified_content(&response.content, &limitations),
+                            "generated answer admitted with limitations",
+                        )),
+                        AnswerAdmissionOutcome::RequiresReview { reason }
+                        | AnswerAdmissionOutcome::Blocked { reason } => Err(reason),
+                    };
+                    match admitted {
+                        Ok((content, summary)) => {
+                            values.insert(node.id.clone(), NodeValue::Text(content.clone()));
+                            trace.push(step(&node, summary));
                             if let Some(next) = &node.next {
                                 current = next.clone();
                             } else {
                                 return Ok(outcome(
                                     GovernedProgramStop::Completed,
-                                    Some(response.content),
+                                    Some(content),
                                     values,
                                     trace,
                                     decision_calls,
@@ -1276,8 +1301,7 @@ impl GovernedProgramExecutor<'_> {
                                 ));
                             }
                         }
-                        AnswerAdmissionOutcome::RequiresReview { reason }
-                        | AnswerAdmissionOutcome::Blocked { reason } => {
+                        Err(reason) => {
                             return Ok(outcome(
                                 GovernedProgramStop::ReviewRequired(reason),
                                 Some(response.content),
@@ -1430,16 +1454,20 @@ impl GovernedProgramExecutor<'_> {
                         }
                         ReasoningOutcome::FinalDraft(draft) => {
                             let known_evidence = known_evidence_for_run(context, &values);
-                            let admission = self.answer_admission.admit(&draft, &known_evidence).await?;
-                            let (verification_status, verification_reason) = match &admission {
-                                AnswerAdmissionOutcome::Admitted => ("verified", None),
-                                AnswerAdmissionOutcome::RequiresReview { reason } => {
-                                    ("requires_review", Some(reason.clone()))
-                                }
-                                AnswerAdmissionOutcome::Blocked { reason } => {
-                                    ("failed", Some(reason.clone()))
-                                }
-                            };
+                            let data_figures = data_figures_for_run(&values);
+                            let report = self
+                                .answer_admission
+                                .admit_with_report(
+                                    &draft,
+                                    &AdmissionEvidence {
+                                        known: &known_evidence,
+                                        data_figures: &data_figures,
+                                    },
+                                )
+                                .await?;
+                            let (verification_status, verification_reason) =
+                                report.verification_record();
+                            let admission = report.outcome;
                             self.recorder
                                 .set_verification(
                                     context,
@@ -1453,6 +1481,16 @@ impl GovernedProgramExecutor<'_> {
                                     return Ok(outcome(
                                         GovernedProgramStop::Completed,
                                         Some(draft.content),
+                                        values,
+                                        trace,
+                                        decision_calls,
+                                        capability_calls,
+                                    ));
+                                }
+                                AnswerAdmissionOutcome::Qualified { limitations } => {
+                                    return Ok(outcome(
+                                        GovernedProgramStop::Completed,
+                                        Some(qualified_content(&draft.content, &limitations)),
                                         values,
                                         trace,
                                         decision_calls,
@@ -2008,6 +2046,19 @@ fn known_evidence_for_run(
         }
     }
     known
+}
+
+/// Every number in this run's capability outputs — what the answer gate
+/// checks the prose's figures against, so a figure has to trace to data
+/// the server produced rather than to the drafter's say-so.
+fn data_figures_for_run(values: &HashMap<String, NodeValue>) -> Vec<f64> {
+    let mut figures = Vec::new();
+    for value in values.values() {
+        if let NodeValue::Tool(output) = value {
+            collect_json_figures(&output.data, &mut figures);
+        }
+    }
+    figures
 }
 
 /// Whether any `Capability`/`AcquireEvidence` node in `graph` names a
@@ -2822,5 +2873,226 @@ mod threshold_gate_tests {
             recorder.acceptances.lock().unwrap().is_empty(),
             "a decision requiring escalation must not also be marked accepted"
         );
+    }
+
+    // ── AIH-15: the real answer gate, through the program runtime ──────────
+
+    struct ScriptedGeneration(&'static str);
+
+    #[async_trait]
+    impl GenerationProvider for ScriptedGeneration {
+        async fn generate(&self, _request: GenerationRequest) -> Result<GenerationResponse> {
+            Ok(GenerationResponse {
+                content: self.0.to_string(),
+                model: "m".to_string(),
+                provider: "p".to_string(),
+                input_tokens: 1,
+                output_tokens: 1,
+            })
+        }
+    }
+
+    struct ScriptedReasoning(std::sync::Mutex<Option<ReasoningOutcome>>);
+
+    #[async_trait]
+    impl ReasoningProvider for ScriptedReasoning {
+        async fn reason(&self, _request: ReasoningRequest) -> Result<ReasoningOutcome> {
+            Ok(self.0.lock().unwrap().take().expect("one scripted outcome"))
+        }
+    }
+
+    struct EmptyCatalog;
+
+    #[async_trait]
+    impl crate::orchestrator::answer_gate::PassageCatalog for EmptyCatalog {
+        async fn source_passages(
+            &self,
+            _organization_id: u64,
+            _company_id: u64,
+            _kind: &str,
+            _source_key: &str,
+        ) -> Result<Vec<crate::orchestrator::answer_gate::SourcePassage>> {
+            Ok(Vec::new())
+        }
+    }
+
+    fn gate_context() -> GovernedProgramContext {
+        GovernedProgramContext {
+            evidence: vec![EvidenceRef {
+                kind: "governed_run_step".to_string(),
+                id: "run:42:analytics".to_string(),
+            }],
+            ..context()
+        }
+    }
+
+    fn generate_graph() -> DecisionGraph {
+        DecisionGraph {
+            entry: "input".to_string(),
+            nodes: vec![
+                GraphNode {
+                    id: "input".to_string(),
+                    depends_on: Vec::new(),
+                    next: Some("answer".to_string()),
+                    kind: DecisionNode::Compute(super::super::decision_graph::ComputeNode {
+                        function_ref: "program_input".to_string(),
+                    }),
+                },
+                GraphNode {
+                    id: "answer".to_string(),
+                    depends_on: vec!["input".to_string()],
+                    next: None,
+                    kind: DecisionNode::Generate(super::super::decision_graph::GenerateNode {
+                        format: "summary".to_string(),
+                    }),
+                },
+            ],
+        }
+    }
+
+    fn reason_graph() -> DecisionGraph {
+        DecisionGraph {
+            entry: "think".to_string(),
+            nodes: vec![GraphNode {
+                id: "think".to_string(),
+                depends_on: Vec::new(),
+                next: None,
+                kind: DecisionNode::Reason(super::super::decision_graph::ReasonNode {
+                    allowed_proposal_kinds: vec![
+                        super::super::intelligence::PROPOSAL_KIND_FINAL_DRAFT.to_string(),
+                    ],
+                    max_iterations: 1,
+                    loop_back_to: None,
+                }),
+            }],
+        }
+    }
+
+    async fn run_with_real_gate(
+        graph: &DecisionGraph,
+        generation: &dyn GenerationProvider,
+        reasoning: &dyn ReasoningProvider,
+        recorder: &RecordingIntelligenceRecorder,
+    ) -> GovernedProgramOutcome {
+        use crate::orchestrator::answer_gate::{
+            EvidenceBackedVerificationService, EvidenceGatedAnswerAdmission, GatePolicy, GateScope,
+        };
+        let decision_provider = FixedDecisionProvider(probability_response(0.9));
+        let decision_types = InMemoryDecisionTypeRegistry::with_builtins();
+        let precedent = InMemoryPrecedentStore::new();
+        let admission = UnreachableCapabilityAdmission;
+        let executor_svc = UnreachableCapabilityExecutor;
+        let recovery = InMemoryExecutionRecovery::new();
+        let approvals = RecordingApprovalCoordinator;
+        let capabilities =
+            GovernedCapabilityService::new(&admission, &executor_svc, &recovery, &approvals);
+        let verification = EvidenceBackedVerificationService;
+        let catalog = EmptyCatalog;
+        let answer_admission = EvidenceGatedAnswerAdmission {
+            scope: GateScope {
+                organization_id: 9,
+                company_id: 3,
+                as_of_micros: 1_700_000_000_000_000,
+                required_applicability: Vec::new(),
+            },
+            policy: GatePolicy::default(),
+            catalog: &catalog,
+            claim_checker: None,
+        };
+        let compute = BuiltinComputeService;
+        let calibration = InMemoryCalibrationProfileStore::new();
+        let executor = GovernedProgramExecutor {
+            decision_provider: &decision_provider,
+            checkpoint_store: None,
+            decision_resolver: None,
+            generation_provider: generation,
+            reasoning_provider: reasoning,
+            decision_types: &decision_types,
+            precedent: &precedent,
+            capabilities: &capabilities,
+            verification: &verification,
+            answer_admission: &answer_admission,
+            compute: &compute,
+            recorder,
+            calibration: &calibration,
+        };
+        executor.run(graph, &gate_context()).await.unwrap()
+    }
+
+    #[tokio::test]
+    async fn a_generated_answer_with_ungrounded_figures_completes_qualified() {
+        let recorder = RecordingIntelligenceRecorder::default();
+        let outcome = run_with_real_gate(
+            &generate_graph(),
+            &ScriptedGeneration("Revenue was $9,999.99 this quarter."),
+            &UnreachableReasoningProvider,
+            &recorder,
+        )
+        .await;
+        assert!(matches!(outcome.stop, GovernedProgramStop::Completed));
+        let content = outcome.final_content.unwrap();
+        assert!(content.contains("Revenue was $9,999.99"));
+        assert!(content.contains("Limitations of this answer:"));
+        assert!(content.contains("9,999.99"));
+        assert_eq!(
+            outcome.trace.last().unwrap().summary,
+            "generated answer admitted with limitations"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_generated_answer_without_material_figures_is_admitted_plainly() {
+        let recorder = RecordingIntelligenceRecorder::default();
+        let outcome = run_with_real_gate(
+            &generate_graph(),
+            &ScriptedGeneration("3 orders shipped in 2024."),
+            &UnreachableReasoningProvider,
+            &recorder,
+        )
+        .await;
+        assert!(matches!(outcome.stop, GovernedProgramStop::Completed));
+        assert_eq!(outcome.final_content.unwrap(), "3 orders shipped in 2024.");
+    }
+
+    #[tokio::test]
+    async fn a_reasoned_draft_citing_a_fabricated_passage_is_held_and_recorded_as_failed() {
+        use crate::orchestrator::intelligence::{FinalDraft, MaterialClaim, PassageCitation};
+        let draft = FinalDraft {
+            content: "The standard rate applies.".to_string(),
+            citations: vec![EvidenceRef {
+                kind: "governed_run_step".to_string(),
+                id: "run:42:analytics".to_string(),
+            }],
+            claims: vec![MaterialClaim {
+                text: "standard rate applies".to_string(),
+                supports: vec![PassageCitation {
+                    kind: "policy".to_string(),
+                    id: "vat-guide".to_string(),
+                    source_version: "9".to_string(),
+                    passage_key: "s1".to_string(),
+                }],
+            }],
+            ..Default::default()
+        };
+        let reasoning = ScriptedReasoning(std::sync::Mutex::new(Some(
+            ReasoningOutcome::FinalDraft(draft),
+        )));
+        let recorder = RecordingIntelligenceRecorder::default();
+        let outcome = run_with_real_gate(
+            &reason_graph(),
+            &UnreachableGenerationProvider,
+            &reasoning,
+            &recorder,
+        )
+        .await;
+        assert!(matches!(outcome.stop, GovernedProgramStop::ReviewRequired(_)));
+        // The draft is preserved for inspection but not released as complete.
+        assert_eq!(outcome.final_content.as_deref(), Some("The standard rate applies."));
+        let verifications = recorder.verifications.lock().unwrap();
+        assert_eq!(verifications.len(), 1);
+        assert_eq!(verifications[0].1, "failed");
+        let reason = verifications[0].2.as_deref().unwrap();
+        assert!(reason.starts_with("[deterministic]"), "{reason}");
+        assert!(reason.contains("does not resolve to a recorded passage"), "{reason}");
     }
 }

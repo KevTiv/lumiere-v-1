@@ -49,11 +49,11 @@
 //!   it to the H5 draft-creation reducer is a GP-04 wiring step; a draft
 //!   is not fabricated here.
 //! - `VerificationService` / `FinalAnswerAdmission`: the full evidence/
-//!   answer gate remains AIH-15's dedicated scope (§7.3 of the completion
-//!   plan) — passage/source-version matching, applicability/effective-date
-//!   checks, arithmetic verification, and model-assisted claim-coverage /
-//!   prose-to-evidence consistency are not implemented here.
-//!   `DeterministicFinalAnswerAdmission` does perform one real §7.3 check
+//!   answer gate is AIH-15's scope (§7.3 of the completion plan) and lives
+//!   in `answer_gate.rs` (`EvidenceBackedVerificationService`,
+//!   `EvidenceGatedAnswerAdmission`). The shape-only and
+//!   citation-existence implementations here remain as the minimal
+//!   fixtures. `DeterministicFinalAnswerAdmission` performs one real §7.3 check
 //!   deterministically: every citation a `FinalDraft` carries must resolve
 //!   against evidence the server actually produced for this run, or the
 //!   draft is blocked — "resolve citations server-side... fabricated IDs
@@ -644,11 +644,12 @@ pub(super) enum VerificationOutcome {
 }
 
 /// Validates a capability's output/evidence before it may feed a decision
-/// or final answer. This is a **shape-only placeholder**: it does not
-/// resolve citations, check applicability/effective dates, or verify
-/// arithmetic. AIH-15 owns that full evidence/answer gate; this trait only
-/// reserves the seam so later steps route through *a* verification call
-/// rather than none.
+/// or final answer. `ShapeOnlyVerificationService` is the minimal
+/// shape-only fixture: it does not resolve citations, check
+/// applicability/effective dates, or verify arithmetic. Production wires
+/// `answer_gate::EvidenceBackedVerificationService` (AIH-15), which also
+/// rejects degraded output, row-count inconsistencies and untraceable
+/// citations.
 #[async_trait]
 pub(super) trait VerificationService: Send + Sync {
     async fn verify(
@@ -691,6 +692,9 @@ impl VerificationService for ShapeOnlyVerificationService {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(super) enum AnswerAdmissionOutcome {
     Admitted,
+    /// Releasable only with the listed limitations shown to the reader —
+    /// §7.3's "qualified answer". Never a silent pass.
+    Qualified { limitations: Vec<String> },
     RequiresReview { reason: String },
     Blocked { reason: String },
 }
@@ -701,11 +705,11 @@ pub(super) enum AnswerAdmissionOutcome {
 /// approval." `Deterministic` is a plain mechanical check (citation
 /// existence, shape, arithmetic); `ModelAssisted` used a provider call and
 /// is therefore fallible; `HumanReviewed` means a person, not code, made
-/// the call. Nothing in this module produces `ModelAssisted` or
-/// `HumanReviewed` today — both are real AIH-15 scope, not implemented
-/// here — but the type exists now so a caller records which kind of
-/// evidence it is holding rather than treating every outcome as
-/// equally authoritative.
+/// the call. `answer_gate` produces `ModelAssisted` (claim coverage).
+/// Nothing yet produces `HumanReviewed`: that needs the reviewer workflow
+/// (AIH-18), and a model's pass is never recorded as one. The type keeps a
+/// caller honest about which kind of evidence it is holding rather than
+/// treating every outcome as equally authoritative.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) enum VerificationMethod {
     Deterministic,
@@ -736,12 +740,12 @@ impl VerificationMethod {
 /// nothing about `EvidenceRef`'s shape alone proves the model didn't just
 /// invent a plausible-looking kind/id pair.
 ///
-/// What this still does **not** do, and is real remaining AIH-15/§7.3
-/// scope: passage/source-version matching within a resolved citation,
-/// applicability/effective-date checks, arithmetic verification, and
-/// claim-coverage / prose-to-evidence consistency (which needs a
-/// model-assisted semantic check — `VerificationMethod::ModelAssisted` —
-/// since it cannot be done by citation-existence alone).
+/// `DeterministicFinalAnswerAdmission` and `ShapeOnlyFinalAnswerAdmission`
+/// stay as the citation-existence-only and shape-only gates (unit-test and
+/// fixture use). Production wires `answer_gate::EvidenceGatedAnswerAdmission`,
+/// which adds passage/source-version matching, applicability and
+/// effective-date checks, arithmetic and figure verification, and
+/// model-assisted claim coverage.
 #[async_trait]
 pub(super) trait FinalAnswerAdmission: Send + Sync {
     async fn admit(
@@ -749,6 +753,80 @@ pub(super) trait FinalAnswerAdmission: Send + Sync {
         draft: &FinalDraft,
         known_evidence: &std::collections::HashSet<EvidenceRef>,
     ) -> Result<AnswerAdmissionOutcome>;
+
+    /// Same decision plus which kinds of check produced it (§7.3: "record
+    /// whether that check was deterministic, model-assisted, or
+    /// human-reviewed"). `evidence.data_figures` are numbers the server
+    /// itself holds from capability outputs, so a gate can check the
+    /// prose's figures against data rather than against the drafter's word.
+    /// The default keeps every existing implementation source-compatible:
+    /// it reports a deterministic check only.
+    async fn admit_with_report(
+        &self,
+        draft: &FinalDraft,
+        evidence: &AdmissionEvidence<'_>,
+    ) -> Result<AnswerAdmissionReport> {
+        let outcome = self.admit(draft, evidence.known).await?;
+        Ok(AnswerAdmissionReport {
+            outcome,
+            methods: vec![VerificationMethod::Deterministic],
+        })
+    }
+}
+
+/// The reader-facing form of a qualified answer: the draft, then the
+/// limitations the gate found, so a caveat can never be dropped between
+/// the gate and the presentation.
+pub(super) fn qualified_content(content: &str, limitations: &[String]) -> String {
+    let mut out = content.trim_end().to_string();
+    out.push_str("\n\nLimitations of this answer:");
+    for limitation in limitations {
+        out.push_str("\n- ");
+        out.push_str(limitation);
+    }
+    out
+}
+
+/// What the server itself knows when a draft is admitted.
+pub(super) struct AdmissionEvidence<'a> {
+    pub known: &'a std::collections::HashSet<EvidenceRef>,
+    /// Numbers present in this run's capability outputs.
+    pub data_figures: &'a [f64],
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(super) struct AnswerAdmissionReport {
+    pub outcome: AnswerAdmissionOutcome,
+    /// Every kind of check that contributed. A `ModelAssisted` entry never
+    /// means the outcome carries domain approval.
+    pub methods: Vec<VerificationMethod>,
+}
+
+impl AnswerAdmissionReport {
+    /// `(status, reason)` in the vocabulary of
+    /// `set_ai_intelligence_event_verification`. The reason leads with the
+    /// methods so the durable record shows what kind of check it was.
+    pub fn verification_record(&self) -> (&'static str, Option<String>) {
+        let methods = self
+            .methods
+            .iter()
+            .map(|method| method.label())
+            .collect::<Vec<_>>()
+            .join("+");
+        match &self.outcome {
+            AnswerAdmissionOutcome::Admitted => ("verified", Some(format!("[{methods}]"))),
+            AnswerAdmissionOutcome::Qualified { limitations } => (
+                "verified",
+                Some(format!("[{methods}] qualified: {}", limitations.join("; "))),
+            ),
+            AnswerAdmissionOutcome::RequiresReview { reason } => {
+                ("requires_review", Some(format!("[{methods}] {reason}")))
+            }
+            AnswerAdmissionOutcome::Blocked { reason } => {
+                ("failed", Some(format!("[{methods}] {reason}")))
+            }
+        }
+    }
 }
 
 pub(super) struct ShapeOnlyFinalAnswerAdmission;
@@ -1211,6 +1289,7 @@ mod tests {
         let empty = FinalDraft {
             content: String::new(),
             citations: vec![],
+            ..Default::default()
         };
         let known = std::collections::HashSet::new();
         let outcome = service.admit(&empty, &known).await.unwrap();
@@ -1223,6 +1302,7 @@ mod tests {
         let draft = FinalDraft {
             content: "the answer".to_string(),
             citations: vec![],
+            ..Default::default()
         };
         let known = std::collections::HashSet::new();
         let outcome = service.admit(&draft, &known).await.unwrap();
@@ -1241,6 +1321,7 @@ mod tests {
                 kind: "erp_record".to_string(),
                 id: "PO-42".to_string(),
             }],
+            ..Default::default()
         };
         let known = std::collections::HashSet::new();
         let outcome = service.admit(&draft, &known).await.unwrap();
@@ -1256,6 +1337,7 @@ mod tests {
                 kind: "erp_record".to_string(),
                 id: "PO-42".to_string(),
             }],
+            ..Default::default()
         };
         let outcome = service
             .admit(&draft, &std::collections::HashSet::new())
@@ -1274,6 +1356,7 @@ mod tests {
         let draft = FinalDraft {
             content: "the answer".to_string(),
             citations: vec![citation.clone()],
+            ..Default::default()
         };
         let mut known = std::collections::HashSet::new();
         known.insert(citation);

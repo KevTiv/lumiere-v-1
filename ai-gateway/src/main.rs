@@ -196,6 +196,11 @@ async fn main() -> anyhow::Result<()> {
         .route("/v1/skills", get(routes::skills::get_skills))
         .route("/v1/skills/run", post(routes::skills::post_run))
         .route("/v1/skills/sync", post(routes::skills::post_sync))
+        .route("/v1/evidence/inspect", post(routes::evidence::post_inspect))
+        .route(
+            "/v1/knowledge/retrieve",
+            post(routes::evidence::post_knowledge_retrieve),
+        )
         .route("/v1/forms/suggest", post(routes::forms::post_suggest))
         .route("/v1/forms/validate", post(routes::forms::post_validate))
         .route("/v1/import/analyze", post(routes::import::post_analyze))

@@ -50,7 +50,8 @@ use serde_json::{json, Value};
 
 use super::agent_loop::{LoopEvent, LoopRecorder};
 use super::governed_services::{
-    AnswerAdmissionOutcome, CapabilityStepOutcome, FinalAnswerAdmission, GovernedCapabilityService,
+    qualified_content, AnswerAdmissionOutcome, CapabilityStepOutcome, FinalAnswerAdmission,
+    GovernedCapabilityService,
 };
 use super::intelligence::{
     ClarificationRequest, DecisionProposal, EvidenceRef, ReasoningOutcome, ReasoningProvider,
@@ -375,6 +376,12 @@ pub(super) async fn run_proposal_loop(
                 let stop = match admission {
                     AnswerAdmissionOutcome::Admitted => {
                         ProposalLoopStop::CandidateAdmitted(draft.content)
+                    }
+                    AnswerAdmissionOutcome::Qualified { limitations } => {
+                        ProposalLoopStop::CandidateAdmitted(qualified_content(
+                            &draft.content,
+                            &limitations,
+                        ))
                     }
                     AnswerAdmissionOutcome::RequiresReview { reason } => {
                         ProposalLoopStop::CandidateRequiresReview {
@@ -708,6 +715,7 @@ mod tests {
                         kind: "erp_record".to_string(),
                         id: "PO-42".to_string(),
                     }],
+                    ..Default::default()
                 })),
             ]),
         };
@@ -759,6 +767,7 @@ mod tests {
             outcomes: Mutex::new(vec![Ok(ReasoningOutcome::FinalDraft(FinalDraft {
                 content: "an uncited answer".to_string(),
                 citations: vec![],
+                ..Default::default()
             }))]),
         };
 
