@@ -4704,6 +4704,66 @@
       "name": "waive_tax_deadline",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
+    },
+    {
+      "name": "advance_ai_run_checkpoint",
+      "exposure": "denied",
+      "reason": "trusted lifecycle gateway only; continuation and capability authority are server-validated"
+    },
+    {
+      "name": "ask_ai_run_question",
+      "exposure": "denied",
+      "reason": "trusted lifecycle gateway only; continuation and capability authority are server-validated"
+    },
+    {
+      "name": "authorize_ai_run_fork",
+      "exposure": "denied",
+      "reason": "trusted lifecycle gateway only; continuation and capability authority are server-validated"
+    },
+    {
+      "name": "compare_ai_runs_checked",
+      "exposure": "denied",
+      "reason": "trusted lifecycle gateway only; continuation and capability authority are server-validated"
+    },
+    {
+      "name": "fork_ai_run_checked",
+      "exposure": "denied",
+      "reason": "trusted lifecycle gateway only; continuation and capability authority are server-validated"
+    },
+    {
+      "name": "initialize_ai_run_lifecycle",
+      "exposure": "denied",
+      "reason": "trusted lifecycle gateway only; immutable run authority is server-derived"
+    },
+    {
+      "name": "interrupt_ai_run",
+      "exposure": "denied",
+      "reason": "trusted lifecycle gateway only; continuation and capability authority are server-validated"
+    },
+    {
+      "name": "reconcile_ai_run_effect",
+      "exposure": "denied",
+      "reason": "trusted lifecycle gateway only; effect reconciliation is server-authorized"
+    },
+    {
+      "name": "record_ai_run_effect",
+      "exposure": "denied",
+      "reason": "trusted lifecycle gateway only; effect planning is server-authorized"
+    },
+    {
+      "name": "reply_ai_run_question",
+      "exposure": "denied",
+      "reason": "trusted lifecycle gateway only; respondent identity and role are server-derived"
+    },
+    {
+      "name": "resume_ai_run_checked",
+      "exposure": "denied",
+      "reason": "trusted lifecycle gateway only; continuation and capability authority are server-validated"
+    },
+    {
+      "name": "steer_ai_run",
+      "exposure": "denied",
+      "reason": "trusted lifecycle gateway only; actor identity and revalidation are server-controlled"
     }
   ]
 }

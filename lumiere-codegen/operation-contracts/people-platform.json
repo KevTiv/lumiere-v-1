@@ -5320,6 +5320,90 @@
         "version": 1
       },
       "evidence": "spacetimedb/src/core/queue.rs: body writes or refreshes deterministic state and safely repeats the same input"
+    },
+    "advance_ai_run_checkpoint": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "request_guarded",
+      "codec": { "id": "spacetimedb-sats-json", "version": 1 },
+      "evidence": "spacetimedb/src/ai/run_lifecycle.rs: full command payload is bound to an idempotency key before continuation state advances"
+    },
+    "ask_ai_run_question": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "request_guarded",
+      "codec": { "id": "spacetimedb-sats-json", "version": 1 },
+      "evidence": "spacetimedb/src/ai/run_lifecycle.rs: full question payload is bound to an idempotency key before durable insertion"
+    },
+    "authorize_ai_run_fork": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "request_guarded",
+      "codec": { "id": "spacetimedb-sats-json", "version": 1 },
+      "evidence": "spacetimedb/src/ai/run_lifecycle.rs: authority snapshot command is payload-bound and replay checked"
+    },
+    "compare_ai_runs_checked": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "request_guarded",
+      "codec": { "id": "spacetimedb-sats-json", "version": 1 },
+      "evidence": "spacetimedb/src/ai/run_lifecycle.rs: both continuations are checked and the comparison command is payload-bound"
+    },
+    "fork_ai_run_checked": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "request_guarded",
+      "codec": { "id": "spacetimedb-sats-json", "version": 1 },
+      "evidence": "spacetimedb/src/ai/run_lifecycle.rs: fork keys and checked continuation are bound to the replay guard"
+    },
+    "initialize_ai_run_lifecycle": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "request_guarded",
+      "codec": { "id": "spacetimedb-sats-json", "version": 1 },
+      "evidence": "spacetimedb/src/ai/run_lifecycle.rs: immutable run identity and initial continuation are payload-bound"
+    },
+    "interrupt_ai_run": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "request_guarded",
+      "codec": { "id": "spacetimedb-sats-json", "version": 1 },
+      "evidence": "spacetimedb/src/ai/run_lifecycle.rs: checked continuation and reason are bound to the replay guard"
+    },
+    "reconcile_ai_run_effect": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "request_guarded",
+      "codec": { "id": "spacetimedb-sats-json", "version": 1 },
+      "evidence": "spacetimedb/src/ai/run_lifecycle.rs: expected effect revision and reconciliation payload are replay guarded"
+    },
+    "record_ai_run_effect": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "request_guarded",
+      "codec": { "id": "spacetimedb-sats-json", "version": 1 },
+      "evidence": "spacetimedb/src/ai/run_lifecycle.rs: effect key, kind, and request hash are bound to the replay guard"
+    },
+    "reply_ai_run_question": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "request_guarded",
+      "codec": { "id": "spacetimedb-sats-json", "version": 1 },
+      "evidence": "spacetimedb/src/ai/run_lifecycle.rs: respondent identity, role, and answer are bound to the replay guard"
+    },
+    "resume_ai_run_checked": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "request_guarded",
+      "codec": { "id": "spacetimedb-sats-json", "version": 1 },
+      "evidence": "spacetimedb/src/ai/run_lifecycle.rs: resume uses a checked continuation and payload-bound replay guard"
+    },
+    "steer_ai_run": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "request_guarded",
+      "codec": { "id": "spacetimedb-sats-json", "version": 1 },
+      "evidence": "spacetimedb/src/ai/run_lifecycle.rs: steering instruction and checked continuation are payload-bound"
     }
   }
 }

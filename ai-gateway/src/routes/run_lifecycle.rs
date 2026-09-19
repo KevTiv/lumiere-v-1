@@ -294,42 +294,36 @@ async fn apply_intent(
     Ok(comparison)
 }
 
-/// Release bridge for lifecycle reducers added in the current source tree.
+/// Dispatch a lifecycle command through the pinned generated reducer contract.
 /// The name is selected only from the closed intent enum, never request data.
 async fn call_lifecycle_reducer(
     stdb: &StdbClient,
     reducer: &str,
     arguments: Value,
 ) -> AppResult<()> {
-    if !matches!(
-        reducer,
-        "ask_ai_run_question"
-            | "reply_ai_run_question"
-            | "steer_ai_run"
-            | "interrupt_ai_run"
-            | "resume_ai_run_checked"
-            | "fork_ai_run_checked"
-            | "compare_ai_runs_checked"
-    ) {
-        return Err(AppError::Internal("unsupported lifecycle reducer".into()));
-    }
-    let response = stdb
-        .http()
-        .post(format!(
-            "{}/v1/database/{}/call/{reducer}",
-            stdb.base_url(),
-            stdb.module()
-        ))
-        .bearer_auth(stdb.token())
-        .json(&arguments)
-        .send()
+    let call = match reducer {
+        "ask_ai_run_question" => {
+            stdb_client::reducer_call!("ask_ai_run_question", arguments)
+        }
+        "reply_ai_run_question" => {
+            stdb_client::reducer_call!("reply_ai_run_question", arguments)
+        }
+        "steer_ai_run" => stdb_client::reducer_call!("steer_ai_run", arguments),
+        "interrupt_ai_run" => stdb_client::reducer_call!("interrupt_ai_run", arguments),
+        "resume_ai_run_checked" => {
+            stdb_client::reducer_call!("resume_ai_run_checked", arguments)
+        }
+        "fork_ai_run_checked" => {
+            stdb_client::reducer_call!("fork_ai_run_checked", arguments)
+        }
+        "compare_ai_runs_checked" => {
+            stdb_client::reducer_call!("compare_ai_runs_checked", arguments)
+        }
+        _ => return Err(AppError::Internal("unsupported lifecycle reducer".into())),
+    };
+    stdb.call_reducer(call)
         .await
-        .map_err(|_| AppError::Unavailable("run lifecycle persistence is unavailable".into()))?;
-    if response.status().is_success() {
-        return Ok(());
-    }
-    let message = response.text().await.unwrap_or_default();
-    Err(lifecycle_error(message))
+        .map_err(|error| lifecycle_error(error.to_string()))
 }
 
 fn continuation_params(token: &ContinuationToken, expected_run_id: u64) -> AppResult<Value> {

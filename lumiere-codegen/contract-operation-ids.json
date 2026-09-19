@@ -1381,6 +1381,18 @@
     "verify_contact_identity": "erp.verify_contact_identity",
     "void_payment_transaction": "erp.void_payment_transaction",
     "waive_tax_deadline": "erp.waive_tax_deadline",
-    "worker_heartbeat": "erp.worker_heartbeat"
+    "worker_heartbeat": "erp.worker_heartbeat",
+    "advance_ai_run_checkpoint": "erp.advance_ai_run_checkpoint",
+    "ask_ai_run_question": "erp.ask_ai_run_question",
+    "authorize_ai_run_fork": "erp.authorize_ai_run_fork",
+    "compare_ai_runs_checked": "erp.compare_ai_runs_checked",
+    "fork_ai_run_checked": "erp.fork_ai_run_checked",
+    "initialize_ai_run_lifecycle": "erp.initialize_ai_run_lifecycle",
+    "interrupt_ai_run": "erp.interrupt_ai_run",
+    "reconcile_ai_run_effect": "erp.reconcile_ai_run_effect",
+    "record_ai_run_effect": "erp.record_ai_run_effect",
+    "reply_ai_run_question": "erp.reply_ai_run_question",
+    "resume_ai_run_checked": "erp.resume_ai_run_checked",
+    "steer_ai_run": "erp.steer_ai_run"
   }
 }

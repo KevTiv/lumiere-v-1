@@ -258,8 +258,7 @@ pub async fn create_run(
             "triggered_by_hex": triggered_by_hex,
         }))?)
     );
-    call_pending_lifecycle_reducer(
-        stdb,
+    stdb.call_reducer(stdb_client::reducer_call!(
         "initialize_ai_run_lifecycle",
         serde_json::json!([
             org_id,
@@ -271,7 +270,7 @@ pub async fn create_run(
                 "idempotency_key": format!("run-created:{run_id}"),
             }
         ]),
-    )
+    ))
     .await
     .context("initialize durable AI run lifecycle")?;
     Ok(run_id)
@@ -338,8 +337,7 @@ pub async fn resume_run(
         .context("run lifecycle checkpoint hash missing")?;
     let cursor = row_u64(&row, "cursor") as u32;
     let concurrency_version = row_u64(&row, "concurrencyVersion");
-    call_pending_lifecycle_reducer(
-        stdb,
+    stdb.call_reducer(stdb_client::reducer_call!(
         "resume_ai_run_checked",
         serde_json::json!([
             org_id,
@@ -354,40 +352,9 @@ pub async fn resume_run(
                 "idempotency_key": format!("runtime-resume:{run_id}:{concurrency_version}"),
             }
         ]),
-    )
+    ))
     .await
     .context("resume governed ai_agent_run through checked lifecycle")?;
-    Ok(())
-}
-
-async fn call_pending_lifecycle_reducer(
-    stdb: &StdbClient,
-    reducer: &str,
-    arguments: Value,
-) -> Result<()> {
-    if !matches!(
-        reducer,
-        "initialize_ai_run_lifecycle" | "resume_ai_run_checked"
-    ) {
-        anyhow::bail!("unsupported lifecycle reducer");
-    }
-    let response = stdb
-        .http()
-        .post(format!(
-            "{}/v1/database/{}/call/{reducer}",
-            stdb.base_url(),
-            stdb.module()
-        ))
-        .bearer_auth(stdb.token())
-        .json(&arguments)
-        .send()
-        .await
-        .with_context(|| format!("call lifecycle reducer {reducer}"))?;
-    if !response.status().is_success() {
-        let status = response.status();
-        let body = response.text().await.unwrap_or_default();
-        anyhow::bail!("lifecycle reducer {reducer} failed ({status}): {body}");
-    }
     Ok(())
 }
 
