@@ -418,6 +418,10 @@
       "name": "bill_timesheets",
       "shape_fingerprint": "sha256:a2a123c517df931d317783bb93afbd0fad7371d5737e4d70061209a99fbe9fb1"
     },
+    "erp.bind_ai_artifact_component": {
+      "name": "bind_ai_artifact_component",
+      "shape_fingerprint": "sha256:7e3bb4d421a647cab48d87a32149bd4fb193f0f6a190db0dabb7a32656f049f8"
+    },
     "erp.bind_password_reset_token": {
       "name": "bind_password_reset_token",
       "shape_fingerprint": "sha256:22c231cb6a160958b2250f490a164cf8b3459cbdc1a2985f540ab54ec1d7ce29"
@@ -909,6 +913,10 @@
     "erp.create_ai_insight": {
       "name": "create_ai_insight",
       "shape_fingerprint": "sha256:925e19dd09922970461d2946e70fc77982cc0d5a16fce28bbd6a789c3258db00"
+    },
+    "erp.create_ai_knowledge_entry": {
+      "name": "create_ai_knowledge_entry",
+      "shape_fingerprint": "sha256:782e9ec2ac4c3fe43c97cb7a1168aa41215af40389ac8b3c3bed4f4503e066f8"
     },
     "erp.create_ai_reducer_allowlist": {
       "name": "create_ai_reducer_allowlist",
@@ -2622,6 +2630,10 @@
       "name": "initialize_default_form_configs",
       "shape_fingerprint": "sha256:40cfd7ca862b8c0523d6eea754b5e4d867400f57ad96b79340ab5ddef824aa73"
     },
+    "erp.inspect_ai_evidence_source_version": {
+      "name": "inspect_ai_evidence_source_version",
+      "shape_fingerprint": "sha256:d00ff425cbce1ef6c01573742b37f3c03676e9961b6807af84d621829105a138"
+    },
     "erp.invalidate_workflow_human_task": {
       "name": "invalidate_workflow_human_task",
       "shape_fingerprint": "sha256:37a5918e8e9b7e74dab1849e07441e86953e549331f6235e2e2e98e06916d076"
@@ -2741,6 +2753,10 @@
     "erp.move_stock_quant": {
       "name": "move_stock_quant",
       "shape_fingerprint": "sha256:9d27f79ff300cf692d1e28f7b1cb04d171fd3929f81a0c32d844c840b21e801c"
+    },
+    "erp.nominate_ai_knowledge_entry_version": {
+      "name": "nominate_ai_knowledge_entry_version",
+      "shape_fingerprint": "sha256:adf0f65a42beff13170e95e91aea5e14272bc960de0f5f388398c8e7b677142b"
     },
     "erp.open_account_period": {
       "name": "open_account_period",
@@ -2862,6 +2878,10 @@
       "name": "project_user_profile",
       "shape_fingerprint": "sha256:e2bed41bebcae2e5af6da2b8a383b7f780ec71b089065c4cedd76993b619b6d7"
     },
+    "erp.promote_ai_decision_pattern": {
+      "name": "promote_ai_decision_pattern",
+      "shape_fingerprint": "sha256:bc64da8a8a6cd23414674bdf47b1fc64e2cea6ede4d0febc2793d419763adca2"
+    },
     "erp.promote_ai_skill_version": {
       "name": "promote_ai_skill_version",
       "shape_fingerprint": "sha256:105d3e620bfefe71bff55091eff19d018fd2a500a7246584c5e9cf80f5c34944"
@@ -2869,6 +2889,10 @@
     "erp.propose_ai_decision_pattern": {
       "name": "propose_ai_decision_pattern",
       "shape_fingerprint": "sha256:5d13f53417341d2963a783bc558a7dac132b0bad2e0889198c150c9497c07e45"
+    },
+    "erp.propose_ai_knowledge_entry_version": {
+      "name": "propose_ai_knowledge_entry_version",
+      "shape_fingerprint": "sha256:58128fa835756eb60cad67c08ba4acbd2fb3ea40c9e4141a4b631869d310a2c3"
     },
     "erp.publish_form_configuration": {
       "name": "publish_form_configuration",
@@ -2966,6 +2990,50 @@
       "name": "record_ai_decision_event",
       "shape_fingerprint": "sha256:4f09a0f22c501981f1d75d9ca332ad95b258651e512129879aec45b48966e46c"
     },
+    "erp.record_ai_decision_shadow_event": {
+      "name": "record_ai_decision_shadow_event",
+      "shape_fingerprint": "sha256:d18bb9c230cf6fa3fb66fa14fabfeb5cf301fc09ac159ca2e6c4dfd1d738f82a"
+    },
+    "erp.record_ai_deterministic_shadow_event": {
+      "name": "record_ai_deterministic_shadow_event",
+      "shape_fingerprint": "sha256:7229b3dbfa9aedf1af1beb619d7e4a3f577ab554a869d54ba3ce9e20c197e804"
+    },
+    "erp.record_ai_evidence_claim": {
+      "name": "record_ai_evidence_claim",
+      "shape_fingerprint": "sha256:0b57cf9b13c540bbecc8f946707d89c9e936416236836e0a89fa6c0e3084f054"
+    },
+    "erp.record_ai_evidence_contribution": {
+      "name": "record_ai_evidence_contribution",
+      "shape_fingerprint": "sha256:915b399341954fa5f5e21298ec96164a54d57e2781a5c534c9c92bec3d561e5a"
+    },
+    "erp.record_ai_evidence_decision": {
+      "name": "record_ai_evidence_decision",
+      "shape_fingerprint": "sha256:bc1fad453c79c4f9045a988fcec800769569b7c084d56fa46a29e5e9f3e1c7b9"
+    },
+    "erp.record_ai_evidence_passage": {
+      "name": "record_ai_evidence_passage",
+      "shape_fingerprint": "sha256:fc7e608bfd7198a11da1cb768a5f615e69d79d3a8b487d2096ec0b2985bf806b"
+    },
+    "erp.record_ai_evidence_source": {
+      "name": "record_ai_evidence_source",
+      "shape_fingerprint": "sha256:36976e36056bc5fc6842757998e11c9b0639241b960c39c0d90e74275a6c2034"
+    },
+    "erp.record_ai_evidence_source_change": {
+      "name": "record_ai_evidence_source_change",
+      "shape_fingerprint": "sha256:4c6ce970d7941bea9ab98959ee8a5058aa2b2fad0ed863fa7455711a6e938cb9"
+    },
+    "erp.record_ai_evidence_source_version": {
+      "name": "record_ai_evidence_source_version",
+      "shape_fingerprint": "sha256:fd1f0a54e98a74c96785849cbb4bd2e2579f1f099cece07938db18b794f35a35"
+    },
+    "erp.record_ai_graduation_authority_rollback": {
+      "name": "record_ai_graduation_authority_rollback",
+      "shape_fingerprint": "sha256:c309b5644c73f7637e854986df72ffce36f45cab69f88e2f1af7797077b7e6e5"
+    },
+    "erp.record_ai_program_checkpoint": {
+      "name": "record_ai_program_checkpoint",
+      "shape_fingerprint": "sha256:ef643d2325ff5222878795312a68f94f0a513615d0f82d7f8047a2493687bbd9"
+    },
     "erp.record_ai_provider_attempt_result": {
       "name": "record_ai_provider_attempt_result",
       "shape_fingerprint": "sha256:09db7ff12487a9b08d83e332fe016f5abd6c489c8ecef611fc58a8fcede78fe2"
@@ -2973,6 +3041,10 @@
     "erp.record_ai_reasoning_event": {
       "name": "record_ai_reasoning_event",
       "shape_fingerprint": "sha256:f31715cfc6918f6eaa25bac30d31fa5782e223ffbe9776e2719ca0e4c2bf0cab"
+    },
+    "erp.record_ai_run_review": {
+      "name": "record_ai_run_review",
+      "shape_fingerprint": "sha256:628597bd05508fe6775403223b4362113e2e0442468931eab34eaa0f411a280e"
     },
     "erp.record_ai_spend": {
       "name": "record_ai_spend",
@@ -3286,6 +3358,10 @@
       "name": "reset_leave_to_draft",
       "shape_fingerprint": "sha256:c7a13b03c787a0cad24105097f71e0263ec124fbb1115a4f6dec15c2e8c64f17"
     },
+    "erp.resolve_ai_evidence_dependency": {
+      "name": "resolve_ai_evidence_dependency",
+      "shape_fingerprint": "sha256:4ebbec7da0acd9856f646fb0865d4cfe40f7fcd16e966834fa3027606c0b5e7b"
+    },
     "erp.resolve_inventory_audit_violation": {
       "name": "resolve_inventory_audit_violation",
       "shape_fingerprint": "sha256:2bd3a6acddc47f3b04ba893769d03fd17580e6dd3e95135af2745a8e1f7368ba"
@@ -3346,6 +3422,22 @@
       "name": "reverse_sale_commission_settlement",
       "shape_fingerprint": "sha256:262236cf86c70013286c4489dffedabce647cf924fc77dd954beb8aa222a8d96"
     },
+    "erp.review_ai_artifact_component_links": {
+      "name": "review_ai_artifact_component_links",
+      "shape_fingerprint": "sha256:6c3626892fc08270c598b5251f10624a499a0efbd04d8c1ebb13ebc6feb8e1b5"
+    },
+    "erp.review_ai_evidence_claim": {
+      "name": "review_ai_evidence_claim",
+      "shape_fingerprint": "sha256:3fd3dd731d9d191c9e4a7179c9d13ee11b23fbbb4d7b745629bd93e369628180"
+    },
+    "erp.review_ai_evidence_decision": {
+      "name": "review_ai_evidence_decision",
+      "shape_fingerprint": "sha256:22489cc93d669b40eebbfb54d69bb58379d4e027b0aed20a3f1e16dfd8d1ad3e"
+    },
+    "erp.review_ai_knowledge_entry_version": {
+      "name": "review_ai_knowledge_entry_version",
+      "shape_fingerprint": "sha256:5c14cb0a5f4aa1845fbc452f8231c6d9d8bcfec2415e71a56026878e1b3cc039"
+    },
     "erp.review_message_batch": {
       "name": "review_message_batch",
       "shape_fingerprint": "sha256:2699545202ed4be2a1b62be3b16bb9c3221d4cc1c1664a62e911d0eac2f4b8a2"
@@ -3353,6 +3445,10 @@
     "erp.review_supplier_intake": {
       "name": "review_supplier_intake",
       "shape_fingerprint": "sha256:aea36f2d54825c4dadc6a4ae4eaae92b185c3f33daa87e40926e086da0257fef"
+    },
+    "erp.revise_ai_artifact_component": {
+      "name": "revise_ai_artifact_component",
+      "shape_fingerprint": "sha256:6dc2e06674980b054f13633eaf7a3276647b51a859157f71c9954fac46c80580"
     },
     "erp.revoke_delegated_admin_scope": {
       "name": "revoke_delegated_admin_scope",
@@ -3453,6 +3549,10 @@
     "erp.run_ai_embedding_org_isolation_test": {
       "name": "run_ai_embedding_org_isolation_test",
       "shape_fingerprint": "sha256:bd95b68fde4de891c0c0d1ce1912b6ca20c9497ce0355ff28dcee1b2ecd7cd6d"
+    },
+    "erp.run_ai_evidence_provenance_tests": {
+      "name": "run_ai_evidence_provenance_tests",
+      "shape_fingerprint": "sha256:d0a1f659c512863f2fd9e9e5fc36288046760a7c9e5d258d4175334a54b27b29"
     },
     "erp.run_ai_insight_org_scope_test": {
       "name": "run_ai_insight_org_scope_test",
@@ -4314,6 +4414,10 @@
       "name": "set_ai_decision_type_active",
       "shape_fingerprint": "sha256:64603be2b1595581e850aa551db7435b36a0f3f5760c38aac5d1f58dd2307d45"
     },
+    "erp.set_ai_evidence_passage_status": {
+      "name": "set_ai_evidence_passage_status",
+      "shape_fingerprint": "sha256:aa1349d00bcef83b9dcef24e5d7c5a325647c094b80af005d595af728bff00cf"
+    },
     "erp.set_ai_intelligence_event_acceptance": {
       "name": "set_ai_intelligence_event_acceptance",
       "shape_fingerprint": "sha256:b5250d758d55ff080b97202549db9abfebdc455ccf25fd92c734000eab05e0a6"
@@ -4329,6 +4433,10 @@
     "erp.set_ai_intelligence_policy_active": {
       "name": "set_ai_intelligence_policy_active",
       "shape_fingerprint": "sha256:90a128967cdf427405cbca077447a8e7ffb9624eddd0a08ba35cab2295be472d"
+    },
+    "erp.set_ai_knowledge_entry_version_state": {
+      "name": "set_ai_knowledge_entry_version_state",
+      "shape_fingerprint": "sha256:b9b910a6b8aad7bb8c801ecf87d74e38a5d306cfd18b6ef922c284abcf6b7235"
     },
     "erp.set_ai_model_profile_active": {
       "name": "set_ai_model_profile_active",
@@ -5475,6 +5583,14 @@
       "current_operations_fingerprint": "sha256:541b8dc7b12a4abd662b604c48faa21fbd9cbb4d6a3d2086471ccd64f337cf60",
       "operation_count": 1353,
       "reason": "add durable GP-03 capability-execution recovery, GP-09 calibration profile registration, governed model/intelligence-policy config reducers, and the ai_capability_role_grant delete/set operations staged by prior harness work on this branch, on top of the released v0.3.47 baseline; preserve existing operation baselines and compatibility exceptions"
+    },
+    {
+      "previous_release": "v0.3.48",
+      "previous_ir_sha256": "sha256:a6488e3c53a0cbad15d1b2ba1ebe3452c041b567a07e9c6eeeae6852d18ee54e",
+      "previous_operations_fingerprint": "sha256:541b8dc7b12a4abd662b604c48faa21fbd9cbb4d6a3d2086471ccd64f337cf60",
+      "current_operations_fingerprint": "sha256:4e5e715af8cf79509a0440cd20d59850328494695ad9efe1fbeacb36773799eb",
+      "operation_count": 1380,
+      "reason": "add AIH-13 to AIH-18 evidence, provenance and knowledge reducers (source, version, passage, contribution, claim, decision, artifact component, dependency, source change, knowledge entry) and record already-shipped governed-intelligence reducers (run review, program checkpoint, shadow events, authority rollback, pattern promotion) on top of the released v0.3.48 baseline; every existing operation shape is unchanged"
     }
   ]
 }

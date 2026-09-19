@@ -1362,6 +1362,37 @@
       "postgres_access_path": "organization_index"
     },
     {
+      "table": "ai_artifact_component",
+      "module": "ai",
+      "rationale": "AIH-14 versioned artifact component bound to decisions. Edits and forks write new versions with parent lineage; only link_state/status change in place.",
+      "authoritative_resources": [],
+      "durability_class": "durable_operational_state",
+      "organization_ownership": "direct",
+      "organization_column": "organization_id",
+      "company_ownership": "direct",
+      "company_column_path": [
+        "company_id"
+      ],
+      "company_column_nullable": false,
+      "aggregate": {
+        "kind": "root",
+        "parent": null
+      },
+      "primary_key": {
+        "strategy": "auto_increment",
+        "column": "id",
+        "version_strategy": "none"
+      },
+      "projection_mode": "upsert-current",
+      "hot_retention": "always",
+      "cooling_eligibility": "never",
+      "cooling_eligibility_source": "reviewed:aih-14/artifact-component",
+      "dependency_behavior": "independent",
+      "hydration_policy": "not_applicable",
+      "delete_behavior": "tombstone",
+      "postgres_access_path": "organization_index"
+    },
+    {
       "table": "ai_calibration_profile",
       "module": "ai",
       "rationale": "GP-09 durable calibration profile: immutable versioned org-scoped raw-to-calibrated confidence mapping, independent of other aggregates.",
@@ -1643,6 +1674,258 @@
       "postgres_access_path": "organization_index"
     },
     {
+      "table": "ai_evidence_claim",
+      "module": "ai",
+      "rationale": "AIH-14 claim/concept with supporting passages, assumptions and verification outcome. Revised by superseding rows; only review/status fields change in place.",
+      "authoritative_resources": [],
+      "durability_class": "durable_operational_state",
+      "organization_ownership": "direct",
+      "organization_column": "organization_id",
+      "company_ownership": "direct",
+      "company_column_path": [
+        "company_id"
+      ],
+      "company_column_nullable": false,
+      "aggregate": {
+        "kind": "root",
+        "parent": null
+      },
+      "primary_key": {
+        "strategy": "auto_increment",
+        "column": "id",
+        "version_strategy": "none"
+      },
+      "projection_mode": "upsert-current",
+      "hot_retention": "always",
+      "cooling_eligibility": "never",
+      "cooling_eligibility_source": "reviewed:aih-14/evidence-claim",
+      "dependency_behavior": "independent",
+      "hydration_policy": "not_applicable",
+      "delete_behavior": "tombstone",
+      "postgres_access_path": "organization_index"
+    },
+    {
+      "table": "ai_evidence_contribution",
+      "module": "ai",
+      "rationale": "AIH-13 append-only record of who introduced a source or concept into a discussion, kept separate from the original author.",
+      "authoritative_resources": [],
+      "durability_class": "durable_history",
+      "organization_ownership": "direct",
+      "organization_column": "organization_id",
+      "company_ownership": "direct",
+      "company_column_path": [
+        "company_id"
+      ],
+      "company_column_nullable": false,
+      "aggregate": {
+        "kind": "root",
+        "parent": null
+      },
+      "primary_key": {
+        "strategy": "auto_increment",
+        "column": "id",
+        "version_strategy": "none"
+      },
+      "projection_mode": "append-history",
+      "hot_retention": "always",
+      "cooling_eligibility": "never",
+      "cooling_eligibility_source": "reviewed:aih-13/evidence-contribution",
+      "dependency_behavior": "independent",
+      "hydration_policy": "not_applicable",
+      "delete_behavior": "append_only",
+      "postgres_access_path": "organization_partition"
+    },
+    {
+      "table": "ai_evidence_decision",
+      "module": "ai",
+      "rationale": "AIH-14 observable design decision (alternatives, adaptations, bounded rationale) with reviewer. Revised by superseding rows.",
+      "authoritative_resources": [],
+      "durability_class": "durable_operational_state",
+      "organization_ownership": "direct",
+      "organization_column": "organization_id",
+      "company_ownership": "direct",
+      "company_column_path": [
+        "company_id"
+      ],
+      "company_column_nullable": false,
+      "aggregate": {
+        "kind": "root",
+        "parent": null
+      },
+      "primary_key": {
+        "strategy": "auto_increment",
+        "column": "id",
+        "version_strategy": "none"
+      },
+      "projection_mode": "upsert-current",
+      "hot_retention": "always",
+      "cooling_eligibility": "never",
+      "cooling_eligibility_source": "reviewed:aih-14/evidence-decision",
+      "dependency_behavior": "independent",
+      "hydration_policy": "not_applicable",
+      "delete_behavior": "tombstone",
+      "postgres_access_path": "organization_index"
+    },
+    {
+      "table": "ai_evidence_dependency",
+      "module": "ai",
+      "rationale": "AIH-18 reverse-dependency edge from evidence to its dependents, carrying the policy-versioned validity state that gates reuse and execution.",
+      "authoritative_resources": [],
+      "durability_class": "durable_operational_state",
+      "organization_ownership": "direct",
+      "organization_column": "organization_id",
+      "company_ownership": "direct",
+      "company_column_path": [
+        "company_id"
+      ],
+      "company_column_nullable": false,
+      "aggregate": {
+        "kind": "root",
+        "parent": null
+      },
+      "primary_key": {
+        "strategy": "auto_increment",
+        "column": "id",
+        "version_strategy": "none"
+      },
+      "projection_mode": "upsert-current",
+      "hot_retention": "always",
+      "cooling_eligibility": "never",
+      "cooling_eligibility_source": "reviewed:aih-18/evidence-dependency",
+      "dependency_behavior": "independent",
+      "hydration_policy": "not_applicable",
+      "delete_behavior": "tombstone",
+      "postgres_access_path": "organization_index"
+    },
+    {
+      "table": "ai_evidence_passage",
+      "module": "ai",
+      "rationale": "AIH-15 versioned source passages the answer gate resolves citations against. Text is immutable once recorded; status only moves forward, so the row is durable evidence rather than current-state cache.",
+      "authoritative_resources": [],
+      "durability_class": "durable_operational_state",
+      "organization_ownership": "direct",
+      "organization_column": "organization_id",
+      "company_ownership": "direct",
+      "company_column_path": [
+        "company_id"
+      ],
+      "company_column_nullable": false,
+      "aggregate": {
+        "kind": "root",
+        "parent": null
+      },
+      "primary_key": {
+        "strategy": "auto_increment",
+        "column": "id",
+        "version_strategy": "none"
+      },
+      "projection_mode": "upsert-current",
+      "hot_retention": "always",
+      "cooling_eligibility": "never",
+      "cooling_eligibility_source": "reviewed:aih-15/answer-gate/evidence-passages",
+      "dependency_behavior": "independent",
+      "hydration_policy": "not_applicable",
+      "delete_behavior": "tombstone",
+      "postgres_access_path": "organization_index"
+    },
+    {
+      "table": "ai_evidence_source",
+      "module": "ai",
+      "rationale": "AIH-13 registered source identity (original author/organization, scope, retention policy). Immutable once recorded; a corrected attribution is a new source.",
+      "authoritative_resources": [],
+      "durability_class": "durable_history",
+      "organization_ownership": "direct",
+      "organization_column": "organization_id",
+      "company_ownership": "direct",
+      "company_column_path": [
+        "company_id"
+      ],
+      "company_column_nullable": false,
+      "aggregate": {
+        "kind": "root",
+        "parent": null
+      },
+      "primary_key": {
+        "strategy": "auto_increment",
+        "column": "id",
+        "version_strategy": "none"
+      },
+      "projection_mode": "append-history",
+      "hot_retention": "always",
+      "cooling_eligibility": "never",
+      "cooling_eligibility_source": "reviewed:aih-13/evidence-source",
+      "dependency_behavior": "independent",
+      "hydration_policy": "not_applicable",
+      "delete_behavior": "append_only",
+      "postgres_access_path": "organization_partition"
+    },
+    {
+      "table": "ai_evidence_source_change",
+      "module": "ai",
+      "rationale": "AIH-18 append-only record of a source correction, supersession, retraction, access revocation or deletion; its id is the cache-invalidation watermark.",
+      "authoritative_resources": [],
+      "durability_class": "durable_history",
+      "organization_ownership": "direct",
+      "organization_column": "organization_id",
+      "company_ownership": "direct",
+      "company_column_path": [
+        "company_id"
+      ],
+      "company_column_nullable": false,
+      "aggregate": {
+        "kind": "root",
+        "parent": null
+      },
+      "primary_key": {
+        "strategy": "auto_increment",
+        "column": "id",
+        "version_strategy": "none"
+      },
+      "projection_mode": "append-history",
+      "hot_retention": "always",
+      "cooling_eligibility": "never",
+      "cooling_eligibility_source": "reviewed:aih-18/evidence-source-change",
+      "dependency_behavior": "independent",
+      "hydration_policy": "not_applicable",
+      "delete_behavior": "append_only",
+      "postgres_access_path": "organization_partition"
+    },
+    {
+      "table": "ai_evidence_source_version",
+      "module": "ai",
+      "rationale": "AIH-13 immutable-content edition/version of a source with origin, verification and snapshot state. Only verification (forward), snapshot fields and status change, so history of what was cited remains inspectable.",
+      "authoritative_resources": [],
+      "durability_class": "durable_operational_state",
+      "organization_ownership": "direct",
+      "organization_column": "organization_id",
+      "company_ownership": "direct",
+      "company_column_path": [
+        "company_id"
+      ],
+      "company_column_nullable": false,
+      "aggregate": {
+        "kind": "child",
+        "parent": {
+          "table": "ai_evidence_source",
+          "child_column": "source_id",
+          "parent_column": "id"
+        }
+      },
+      "primary_key": {
+        "strategy": "auto_increment",
+        "column": "id",
+        "version_strategy": "none"
+      },
+      "projection_mode": "upsert-current",
+      "hot_retention": "always",
+      "cooling_eligibility": "never",
+      "cooling_eligibility_source": "reviewed:aih-13/evidence-source-version",
+      "dependency_behavior": "follow_parent",
+      "hydration_policy": "not_applicable",
+      "delete_behavior": "tombstone",
+      "postgres_access_path": "organization_index"
+    },
+    {
       "table": "ai_insight",
       "module": "ai",
       "rationale": "Independent organization-owned aggregate root; related rows do not determine storage routing.",
@@ -1738,6 +2021,107 @@
       "hydration_policy": "not_applicable",
       "delete_behavior": "tombstone",
       "postgres_access_path": "organization_index"
+    },
+    {
+      "table": "ai_knowledge_entry",
+      "module": "ai",
+      "rationale": "AIH-17 reviewed knowledge entry identity (kind, domain, owner, share scope). Non-executable; grants no permission.",
+      "authoritative_resources": [],
+      "durability_class": "durable_operational_state",
+      "organization_ownership": "direct",
+      "organization_column": "organization_id",
+      "company_ownership": "direct",
+      "company_column_path": [
+        "company_id"
+      ],
+      "company_column_nullable": false,
+      "aggregate": {
+        "kind": "root",
+        "parent": null
+      },
+      "primary_key": {
+        "strategy": "auto_increment",
+        "column": "id",
+        "version_strategy": "none"
+      },
+      "projection_mode": "upsert-current",
+      "hot_retention": "always",
+      "cooling_eligibility": "never",
+      "cooling_eligibility_source": "reviewed:aih-17/knowledge-entry",
+      "dependency_behavior": "independent",
+      "hydration_policy": "not_applicable",
+      "delete_behavior": "tombstone",
+      "postgres_access_path": "organization_index"
+    },
+    {
+      "table": "ai_knowledge_entry_version",
+      "module": "ai",
+      "rationale": "AIH-17 versioned knowledge content with source/claim/decision lineage and review state. Content is immutable; review_state and epoch move under review.",
+      "authoritative_resources": [],
+      "durability_class": "durable_operational_state",
+      "organization_ownership": "direct",
+      "organization_column": "organization_id",
+      "company_ownership": "direct",
+      "company_column_path": [
+        "company_id"
+      ],
+      "company_column_nullable": false,
+      "aggregate": {
+        "kind": "child",
+        "parent": {
+          "table": "ai_knowledge_entry",
+          "child_column": "entry_id",
+          "parent_column": "id"
+        }
+      },
+      "primary_key": {
+        "strategy": "auto_increment",
+        "column": "id",
+        "version_strategy": "none"
+      },
+      "projection_mode": "upsert-current",
+      "hot_retention": "always",
+      "cooling_eligibility": "never",
+      "cooling_eligibility_source": "reviewed:aih-17/knowledge-entry-version",
+      "dependency_behavior": "follow_parent",
+      "hydration_policy": "not_applicable",
+      "delete_behavior": "tombstone",
+      "postgres_access_path": "organization_index"
+    },
+    {
+      "table": "ai_knowledge_review",
+      "module": "ai",
+      "rationale": "AIH-17 append-only record of what a named reviewer reviewed (source fidelity, domain interpretation, implementation) and their verdict.",
+      "authoritative_resources": [],
+      "durability_class": "durable_history",
+      "organization_ownership": "direct",
+      "organization_column": "organization_id",
+      "company_ownership": "direct",
+      "company_column_path": [
+        "company_id"
+      ],
+      "company_column_nullable": false,
+      "aggregate": {
+        "kind": "child",
+        "parent": {
+          "table": "ai_knowledge_entry_version",
+          "child_column": "version_id",
+          "parent_column": "id"
+        }
+      },
+      "primary_key": {
+        "strategy": "auto_increment",
+        "column": "id",
+        "version_strategy": "none"
+      },
+      "projection_mode": "append-history",
+      "hot_retention": "always",
+      "cooling_eligibility": "never",
+      "cooling_eligibility_source": "reviewed:aih-17/knowledge-review",
+      "dependency_behavior": "follow_parent",
+      "hydration_policy": "not_applicable",
+      "delete_behavior": "append_only",
+      "postgres_access_path": "organization_partition"
     },
     {
       "table": "ai_model_profile",
