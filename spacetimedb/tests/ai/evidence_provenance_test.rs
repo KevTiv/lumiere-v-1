@@ -23,11 +23,11 @@ use crate::ai::evidence_lineage::{
 };
 use crate::ai::evidence_source::{
     ai_evidence_contribution, ai_evidence_passage, ai_evidence_source, ai_evidence_source_version,
-    find_source, inspect_ai_evidence_source_version, record_ai_evidence_contribution,
-    record_ai_evidence_passage, record_ai_evidence_source, record_ai_evidence_source_version,
-    InspectAiEvidenceSourceVersionParams, RecordAiEvidenceContributionParams,
-    RecordAiEvidencePassageParams, RecordAiEvidenceSourceParams,
-    RecordAiEvidenceSourceVersionParams,
+    find_source, ingest_document_blob_content, inspect_ai_evidence_source_version,
+    record_ai_evidence_contribution, record_ai_evidence_passage, record_ai_evidence_source,
+    record_ai_evidence_source_version, InspectAiEvidenceSourceVersionParams,
+    RecordAiEvidenceContributionParams, RecordAiEvidencePassageParams,
+    RecordAiEvidenceSourceParams, RecordAiEvidenceSourceVersionParams,
 };
 use crate::ai::knowledge_entry::{
     ai_knowledge_entry, ai_knowledge_entry_version, create_ai_knowledge_entry,
@@ -36,6 +36,9 @@ use crate::ai::knowledge_entry::{
     AiKnowledgeVersionContent, CreateAiKnowledgeEntryParams, ReviewAiKnowledgeEntryVersionParams,
 };
 use crate::core::organization::{company, create_company, CreateCompanyParams};
+use crate::documents::documents::{
+    create_document, delete_document, document, CreateDocumentParams,
+};
 use crate::test_harness::{ensure_test_superuser, OrgFixture};
 
 // ── Fixtures ─────────────────────────────────────────────────────────────────
@@ -2112,6 +2115,222 @@ pub fn test_deletion_and_revocation_preserve_honest_history(
     if !after_replay.passage_text.is_empty() {
         return Err("replaying a passage restored deleted text".to_string());
     }
+    Ok(())
+}
+
+/// Production-shaped ingestion proof: content extracted from a server-owned
+/// document blob is persisted as a source/version/passage chain, can support a
+/// durable claim, and stops supporting answers as soon as access is revoked.
+/// Deletion additionally removes the retained passage text without erasing its
+/// integrity hash.
+pub fn test_document_blob_passage_claim_lifecycle(ctx: &ReducerContext) -> Result<(), String> {
+    ensure_test_superuser(ctx)?;
+    let f = OrgFixture::seed_minimal(ctx)?;
+    let (org, company) = (f.organization_id, f.company_id);
+    let blob_text = "Returns over 500 EUR require controller approval.";
+    let checksum = hash('b');
+
+    create_document(
+        ctx,
+        org,
+        Some(company),
+        CreateDocumentParams {
+            name: "Returns policy".into(),
+            description: None,
+            file_name: "returns.txt".into(),
+            file_size: blob_text.len() as u64,
+            mimetype: "text/plain".into(),
+            url: "/api/documents/blobs/object/1/default/returns".into(),
+            checksum: checksum.clone(),
+            folder_id: None,
+            res_model: None,
+            res_id: None,
+            partner_id: None,
+            tag_ids: vec![],
+            is_favorite: false,
+            classification_id: None,
+            retention_days: None,
+            fiscal_kind: None,
+            residency_region: None,
+            metadata: None,
+        },
+    )?;
+    let doc = ctx
+        .db
+        .document()
+        .iter()
+        .find(|doc| doc.organization_id == org && doc.name == "Returns policy")
+        .ok_or("document missing after registration")?;
+    if find_source(
+        ctx,
+        org,
+        company,
+        "document",
+        &format!("document:{}", doc.id),
+    )
+    .is_some()
+    {
+        return Err("create_document promoted caller text into governed evidence".to_string());
+    }
+    let (version_id, passage_count) = ingest_document_blob_content(
+        ctx,
+        org,
+        company,
+        doc.id,
+        "Returns policy",
+        1,
+        "/api/documents/blobs/object/41/default/blob",
+        Some(&checksum),
+        blob_text,
+        "inspected",
+    )?;
+    if passage_count != 1 {
+        return Err(format!(
+            "expected one extracted passage, got {passage_count}"
+        ));
+    }
+
+    let source_key = format!("document:{}", doc.id);
+    let source = find_source(ctx, org, company, "document", &source_key)
+        .ok_or("document source missing after blob ingestion")?;
+    if source.scope != "company" {
+        return Err(format!(
+            "document source must be company scoped, got {}",
+            source.scope
+        ));
+    }
+    let version = ctx
+        .db
+        .ai_evidence_source_version()
+        .id()
+        .find(&version_id)
+        .ok_or("document source version missing after blob ingestion")?;
+    assert_eq_str(&version.verification, "inspected", "blob verification")?;
+    assert_eq_str(
+        version.content_hash.as_deref().unwrap_or_default(),
+        &checksum,
+        "blob checksum",
+    )?;
+
+    let passage = ctx
+        .db
+        .ai_evidence_passage()
+        .ai_evidence_passage_by_source()
+        .filter((&org, &company, &"document".to_string(), &source_key))
+        .next()
+        .ok_or("document passage missing after blob ingestion")?;
+    assert_eq_str(&passage.passage_text, blob_text, "server extracted text")?;
+    assert_eq_str(&passage.text_origin, "extraction", "passage origin")?;
+    assert_eq_str(&passage.text_state, "present", "passage text state")?;
+    if passage.source_version_id != Some(version_id) {
+        return Err("passage is not bound to the ingested source version".to_string());
+    }
+
+    let claim_id = seed_claim(ctx, org, company, vec![passage.id])?;
+    let claim = ctx
+        .db
+        .ai_evidence_claim()
+        .id()
+        .find(&claim_id)
+        .ok_or("claim missing after passage binding")?;
+    assert_eq_str(&claim.status, "supported", "passage-backed claim")?;
+
+    record_ai_evidence_source_change(
+        ctx,
+        org,
+        company,
+        version_id,
+        change("access_revoked", None),
+    )?;
+    let restricted = ctx
+        .db
+        .ai_evidence_passage()
+        .id()
+        .find(&passage.id)
+        .ok_or("restricted passage missing")?;
+    assert_eq_str(&restricted.status, "withdrawn", "revoked passage")?;
+    assert_eq_str(&restricted.text_state, "restricted", "revoked passage text")?;
+    let changed_claim = ctx
+        .db
+        .ai_evidence_claim()
+        .id()
+        .find(&claim_id)
+        .ok_or("claim missing after revocation")?;
+    assert_eq_str(&changed_claim.status, "needs_review", "revoked claim")?;
+    expect_err(
+        record_ai_evidence_claim(ctx, org, company, claim_params(vec![passage.id])),
+        "cannot support new work",
+        "claim after blob access revocation",
+    )?;
+
+    create_document(
+        ctx,
+        org,
+        Some(company),
+        CreateDocumentParams {
+            name: "Deleted handbook".into(),
+            description: None,
+            file_name: "deleted.txt".into(),
+            file_size: 36,
+            mimetype: "text/plain".into(),
+            url: "/api/documents/blobs/object/1/default/deleted".into(),
+            checksum: hash('c'),
+            folder_id: None,
+            res_model: None,
+            res_id: None,
+            partner_id: None,
+            tag_ids: vec![],
+            is_favorite: false,
+            classification_id: None,
+            retention_days: None,
+            fiscal_kind: None,
+            residency_region: None,
+            metadata: None,
+        },
+    )?;
+    let deleted_doc = ctx
+        .db
+        .document()
+        .iter()
+        .find(|doc| doc.organization_id == org && doc.name == "Deleted handbook")
+        .ok_or("document for deletion missing")?;
+    let deleted_source_key = format!("document:{}", deleted_doc.id);
+    let (_deleted_version_id, _) = ingest_document_blob_content(
+        ctx,
+        org,
+        company,
+        deleted_doc.id,
+        "Deleted handbook",
+        1,
+        "/api/documents/blobs/object/42/default/blob",
+        Some(&hash('c')),
+        "This text must not survive deletion.",
+        "inspected",
+    )?;
+    let deleted_passage = ctx
+        .db
+        .ai_evidence_passage()
+        .ai_evidence_passage_by_source()
+        .filter((&org, &company, &"document".to_string(), &deleted_source_key))
+        .next()
+        .ok_or("passage for deleted blob missing")?;
+    let deleted_hash = deleted_passage.content_hash.clone();
+    delete_document(ctx, org, deleted_doc.id)?;
+    let tombstone = ctx
+        .db
+        .ai_evidence_passage()
+        .id()
+        .find(&deleted_passage.id)
+        .ok_or("deleted passage tombstone missing")?;
+    assert_eq_str(&tombstone.text_state, "tombstoned", "deleted passage text")?;
+    if !tombstone.passage_text.is_empty() {
+        return Err("deleted document passage retained plaintext".to_string());
+    }
+    assert_eq_str(
+        &tombstone.content_hash,
+        &deleted_hash,
+        "deleted passage hash",
+    )?;
     Ok(())
 }
 

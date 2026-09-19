@@ -760,18 +760,17 @@ fn record_ai_evidence_passage_inner(
     Ok(())
 }
 
-/// Populate the governed evidence tables from the current DMS index content.
+/// Populate the governed evidence tables from content parsed from the current
+/// server-owned DMS blob.
 ///
-/// This is intentionally called from the atomic `set_document_index_content`
-/// reducer rather than from a browser-facing ingestion endpoint. The caller
-/// has already resolved the server-owned document and current
-/// `DocumentVersion`; the stable source key is the document id and each
-/// version key includes the DMS version number and extracted-content hash.
-/// Since the current reducer accepts an index body rather than parsing the
-/// object bytes itself, these versions remain `user_reported`.
+/// The trusted ingestion adapter has already resolved and checksum-verified
+/// the server-owned object plus its current `DocumentVersion`; the stable
+/// source key is the document id and each version key includes the DMS version
+/// number and object hash. Browser-provided index text must never call this
+/// helper.
 /// Replays are idempotent, while a new current version retires its predecessor
 /// through the AIH-18 source-change path before its passages can be cited.
-pub(crate) fn ingest_document_index_content(
+pub(crate) fn ingest_document_blob_content(
     ctx: &ReducerContext,
     organization_id: u64,
     company_id: u64,
@@ -910,12 +909,57 @@ pub(crate) fn ingest_document_index_content(
                 source_version_id: Some(version.id),
                 coordinates,
                 text_origin: "extraction".to_string(),
-                processor_ref: Some("dms.index_content".to_string()),
+                processor_ref: Some("server.document_blob_ingestion.v1".to_string()),
             },
         )?;
         passage_count += 1;
     }
     Ok((version.id, passage_count))
+}
+
+/// Apply an irreversible lifecycle transition to every retained version of a
+/// server-owned document. Missing evidence is an idempotent no-op because a
+/// document may be deleted before its first successful ingestion.
+pub(crate) fn retire_document_evidence(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    document_id: u64,
+    change_kind: &str,
+    reason: &str,
+) -> Result<usize, String> {
+    if !matches!(change_kind, "access_revoked" | "deleted") {
+        return Err("document evidence retirement must revoke access or delete".to_string());
+    }
+    let source_key = format!("document:{document_id}");
+    let Some(source) = find_source(ctx, organization_id, company_id, "document", &source_key)
+    else {
+        return Ok(0);
+    };
+    let target_status = crate::ai::evidence_dependency::target_version_status(change_kind)
+        .ok_or("invalid document evidence lifecycle transition")?;
+    let versions: Vec<AiEvidenceSourceVersion> = ctx
+        .db
+        .ai_evidence_source_version()
+        .ai_evidence_source_version_by_source()
+        .filter(&source.id)
+        .filter(|version| version_status_rank(&version.status) < version_status_rank(target_status))
+        .collect();
+    let count = versions.len();
+    for version in versions {
+        crate::ai::evidence_dependency::record_ai_evidence_source_change_inner(
+            ctx,
+            organization_id,
+            company_id,
+            version.id,
+            crate::ai::evidence_dependency::RecordAiEvidenceSourceChangeParams {
+                change_kind: change_kind.to_string(),
+                replacement_version_id: None,
+                reason: reason.to_string(),
+            },
+        )?;
+    }
+    Ok(count)
 }
 
 /// Split on UTF-8 character boundaries without changing the extracted text.

@@ -26,6 +26,10 @@ use crate::{
     },
     providers::llm::LlmMessage,
     retrieval_policy::optional_retrieval,
+    routes::{
+        evidence::{require_scoped_capability_grant, RAG_EVIDENCE_RETRIEVE_CAPABILITY},
+        passage_retrieval::{resolve_passage_hits, ResolvedPassage},
+    },
     state::AppState,
     stdb_embed::company_belongs_to_organization,
 };
@@ -72,26 +76,18 @@ fn default_limit() -> u64 {
     RAG_MAX_CONTEXT_CHUNKS
 }
 
-fn default_source_kind() -> String {
-    "memory".to_string()
-}
-
-fn default_source_trust() -> String {
-    "retrieved".to_string()
-}
-
 #[derive(Serialize, Clone, Debug)]
 pub struct RagSource {
-    #[serde(default = "default_source_kind")]
     pub kind: String,
-    #[serde(default = "default_source_trust")]
     pub trust: String,
-    pub content_type: String,
-    pub content_id: u64,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub entity_type: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub entity_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub source_kind: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub passage_id: Option<u64>,
     pub score: f32,
     pub text_snippet: String,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -100,6 +96,14 @@ pub struct RagSource {
     pub field: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub snapshot_at: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub source_key: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub source_version: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub passage_key: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub content_hash: Option<String>,
 }
 
 #[derive(Clone, Serialize)]
@@ -157,16 +161,60 @@ fn rag_text_evidence(
         }
     }
     for source in ranked {
-        evidence.add_ref(
-            "memory",
-            format!(
-                "{}:{}",
-                source.rag_source.content_type, source.rag_source.content_id
-            ),
-        );
+        if let Some(passage_id) = source.rag_source.passage_id {
+            evidence.add_ref(&source.rag_source.kind, passage_id.to_string());
+        }
     }
     evidence.add_user_text(query);
     evidence
+}
+
+/// A passage support ref is traceable only when the claim is an exact
+/// normalized excerpt of the server-resolved passage. This deliberately
+/// withholds paraphrases until the passage-aware semantic coverage checker is
+/// connected; mere co-occurrence with an ANN hit is never support.
+fn passage_claims_match_resolved_text(candidate: &str, ranked: &[RankedSource]) -> bool {
+    let Ok(value) = serde_json::from_str::<Value>(candidate) else {
+        return true;
+    };
+    let Some(claims) = value.get("claims").and_then(Value::as_array) else {
+        return true;
+    };
+    for claim in claims {
+        let claim_text = claim
+            .get("text")
+            .and_then(Value::as_str)
+            .unwrap_or_default()
+            .split_whitespace()
+            .collect::<Vec<_>>()
+            .join(" ");
+        let Some(supports) = claim.get("supportRefs").and_then(Value::as_array) else {
+            continue;
+        };
+        for support in supports {
+            if support.get("kind").and_then(Value::as_str) != Some("passage") {
+                continue;
+            }
+            let Some(passage_id) = support
+                .get("id")
+                .and_then(Value::as_str)
+                .and_then(|id| id.parse::<u64>().ok())
+            else {
+                return false;
+            };
+            let Some(source) = ranked
+                .iter()
+                .find(|source| source.rag_source.passage_id == Some(passage_id))
+            else {
+                return false;
+            };
+            let source_text = source.text.split_whitespace().collect::<Vec<_>>().join(" ");
+            if claim_text.is_empty() || !source_text.contains(&claim_text) {
+                return false;
+            }
+        }
+    }
+    true
 }
 
 /// §7.3: the candidate is not an answer until the gate has judged it. A
@@ -181,13 +229,13 @@ async fn finalize_rag_answer(
     ranked: &[RankedSource],
     query: &str,
 ) -> anyhow::Result<(String, TextAnswerVerification, TextAnswerProvenance)> {
-    let gated = gate_text_answer(
-        org_id,
-        company_id,
-        candidate,
-        &rag_text_evidence(snapshots, ranked, query),
-    )
-    .await?;
+    let mut evidence = rag_text_evidence(snapshots, ranked, query);
+    if !passage_claims_match_resolved_text(candidate, ranked) {
+        // A mismatched passage citation contaminates the complete candidate.
+        // Do not let an unrelated live-snapshot ref accidentally admit it.
+        evidence.refs.clear();
+    }
+    let gated = gate_text_answer(org_id, company_id, candidate, &evidence).await?;
     let answer = gated
         .released
         .clone()
@@ -259,7 +307,7 @@ const LIVE_SNAPSHOT_SYSTEM_SUFFIX: &str = "Answer using the provided ERP context
 
 const STRUCTURED_ANSWER_SUFFIX: &str = r#"Return only one JSON object with this shape:
 {"content":"complete answer text","claims":[{"text":"an exact, non-overlapping segment of content","supportRefs":[{"kind":"live_snapshot","id":"entity_type:entity_id"}],"passageSupport":[]}],"calculations":[]}
-The claim texts, concatenated in order, must cover all content. Use only support refs explicitly listed in the context. Do not cite display labels or snippets."#;
+The claim texts, concatenated in order, must cover all content. Use only support refs explicitly listed in the context. A claim supported by a passage must be an exact excerpt of that passage. Do not cite display labels or snippets."#;
 
 fn build_user_prompt(
     retrieved_context: &str,
@@ -319,18 +367,48 @@ fn live_snapshots_to_rag_sources(snapshots: &[LiveSnapshot]) -> Vec<RagSource> {
             RagSource {
                 kind: "live".to_string(),
                 trust: "authoritative".to_string(),
-                content_type: snapshot.entity_type.clone(),
-                content_id: snapshot.entity_id,
                 entity_type: Some(snapshot.entity_type.clone()),
                 entity_id: Some(snapshot.entity_id.to_string()),
+                source_kind: None,
+                passage_id: None,
                 score: 1.0,
                 text_snippet,
                 label: Some(snapshot.label.clone()),
                 field: None,
                 snapshot_at: Some(snapshot.snapshot_at.clone()),
+                source_key: None,
+                source_version: None,
+                passage_key: None,
+                content_hash: None,
             }
         })
         .collect()
+}
+
+fn passage_to_ranked(passage: ResolvedPassage) -> RankedSource {
+    let snippet = passage.text.chars().take(280).collect::<String>();
+    RankedSource {
+        label: format!("{} [{}]", passage.label, passage.passage_key),
+        text: passage.text,
+        score: passage.score,
+        rag_source: RagSource {
+            kind: "passage".to_string(),
+            trust: "persisted".to_string(),
+            entity_type: None,
+            entity_id: None,
+            source_kind: Some(passage.source_kind),
+            passage_id: Some(passage.passage_id),
+            score: passage.score,
+            text_snippet: snippet,
+            label: Some(passage.label),
+            field: None,
+            snapshot_at: None,
+            source_key: Some(passage.source_key),
+            source_version: Some(passage.source_version),
+            passage_key: Some(passage.passage_key),
+            content_hash: Some(passage.content_hash),
+        },
+    }
 }
 
 fn format_retrieved_context(sources: &[RankedSource]) -> String {
@@ -401,7 +479,18 @@ pub async fn post_rag(
 
     // Retrieve relevant company-scoped chunks (optionally filtered by content type)
     let include_types = normalized_include_types(req.include_types.as_deref());
-    let content_type_filter = (!include_types.is_empty()).then_some(include_types.as_slice());
+    // Passage points use one canonical resource kind. Apply the caller's
+    // source-kind filter after authoritative resolution, while still allowing
+    // the ANN query to return passage identifiers.
+    let mut vector_types = include_types.clone();
+    if !vector_types.is_empty()
+        && !vector_types
+            .iter()
+            .any(|kind| kind == "ai_evidence_passage")
+    {
+        vector_types.push("ai_evidence_passage".to_string());
+    }
+    let content_type_filter = (!vector_types.is_empty()).then_some(vector_types.as_slice());
     let mut retrieval_degraded = false;
     let company_result = match state.providers.embedder.embed(&req.query).await {
         Ok(query_vector) => {
@@ -496,9 +585,70 @@ pub async fn post_rag(
     };
 
     let live_snapshot_count = live_snapshots.len();
-    // Qdrant hits rank candidates only; prompt text and citations come from
-    // scoped authoritative snapshots.
-    let ranked: Vec<RankedSource> = Vec::new();
+    // Qdrant ranks immutable identifiers only. Before reading any passage text,
+    // re-check the acting-user grant and resolve each hit through the current
+    // persisted passage -> source-version -> source chain. An unavailable grant
+    // service or evidence catalog yields no document context.
+    let has_passage_candidates = company_hits
+        .iter()
+        .any(|hit| hit.record.resource_kind == "ai_evidence_passage");
+    let ranked = if has_passage_candidates {
+        match require_scoped_capability_grant(
+            &state,
+            &actor.identity_hex,
+            &actor.stdb_token,
+            org_id,
+            req.company_id,
+            RAG_EVIDENCE_RETRIEVE_CAPABILITY,
+        )
+        .await
+        {
+            Ok(()) => match resolve_passage_hits(
+                state.stdb.as_ref(),
+                org_id,
+                req.company_id,
+                &company_hits,
+            )
+            .await
+            {
+                Ok(passages) => passages
+                    .into_iter()
+                    .filter(|passage| {
+                        include_types.is_empty()
+                            || include_types
+                                .iter()
+                                .any(|kind| kind == "ai_evidence_passage")
+                            || include_types
+                                .iter()
+                                .any(|kind| kind == &passage.source_kind)
+                    })
+                    .map(passage_to_ranked)
+                    .collect(),
+                Err(error) => {
+                    retrieval_degraded = true;
+                    tracing::warn!(
+                        org_id,
+                        company_id = req.company_id,
+                        error = %error,
+                        "Persisted passage resolution unavailable; withholding vector candidates"
+                    );
+                    Vec::new()
+                }
+            },
+            Err(error) => {
+                retrieval_degraded = true;
+                tracing::warn!(
+                    org_id,
+                    company_id = req.company_id,
+                    error = %error,
+                    "Evidence retrieval grant unavailable; withholding vector candidates"
+                );
+                Vec::new()
+            }
+        }
+    } else {
+        Vec::new()
+    };
 
     if !has_grounded_context(&ranked, &live_snapshots) {
         tracing::info!(
@@ -555,11 +705,11 @@ pub async fn post_rag(
             )
         })
         .collect::<Vec<_>>();
-    allowed_supports.extend(ranked.iter().map(|source| {
-        format!(
-            "memory:{}:{}",
-            source.rag_source.content_type, source.rag_source.content_id
-        )
+    allowed_supports.extend(ranked.iter().filter_map(|source| {
+        source
+            .rag_source
+            .passage_id
+            .map(|passage_id| format!("{}:{passage_id}", source.rag_source.kind))
     }));
     let allowed_supports = allowed_supports.join(", ");
     let user_content =
@@ -866,32 +1016,27 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn a_server_resolved_memory_ref_can_ground_document_only_rag() {
+    async fn persisted_document_passage_can_ground_a_claim_and_lifecycle_removal_withholds_it() {
         use crate::orchestrator::text_answer_gate::TextAnswerOutcome;
+        use sha2::Digest;
 
-        let ranked = [RankedSource {
-            label: "Policy passage".into(),
-            text: "Returns require approval.".into(),
+        let passage_text = "Returns over 500 EUR require controller approval.";
+        let ranked = [passage_to_ranked(ResolvedPassage {
+            passage_id: 7,
+            source_kind: "document".into(),
+            source_key: "document:41".into(),
+            source_version: "v1-bbbbbbbbbbbbbbbb".into(),
+            passage_key: "chars-0".into(),
+            content_hash: format!("{:x}", sha2::Sha256::digest(passage_text.as_bytes())),
+            text: passage_text.into(),
+            label: "Returns policy".into(),
             score: 0.9,
-            rag_source: RagSource {
-                kind: "memory".into(),
-                trust: "retrieved".into(),
-                content_type: "policy".into(),
-                content_id: 7,
-                entity_type: None,
-                entity_id: None,
-                score: 0.9,
-                text_snippet: "Returns require approval.".into(),
-                label: Some("Policy passage".into()),
-                field: None,
-                snapshot_at: None,
-            },
-        }];
+        })];
         let candidate = json!({
-            "content": "Returns require approval.",
+            "content": passage_text,
             "claims": [{
-                "text": "Returns require approval.",
-                "supportRefs": [{"kind": "memory", "id": "policy:7"}],
+                "text": passage_text,
+                "supportRefs": [{"kind": "passage", "id": "7"}],
                 "passageSupport": []
             }],
             "calculations": []
@@ -904,9 +1049,49 @@ mod tests {
                 .unwrap();
 
         assert_eq!(verification.outcome, TextAnswerOutcome::Admitted);
-        assert_eq!(answer, "Returns require approval.");
-        assert_eq!(provenance.citations[0].id, "policy:7");
+        assert_eq!(answer, passage_text);
+        assert_eq!(provenance.citations[0].id, "7");
         assert!(!provenance.persisted);
+        assert_eq!(ranked[0].rag_source.trust, "persisted");
+        assert_eq!(
+            ranked[0].rag_source.source_key.as_deref(),
+            Some("document:41")
+        );
+        assert_eq!(ranked[0].rag_source.passage_key.as_deref(), Some("chars-0"));
+        let serialized_source = serde_json::to_value(&ranked[0].rag_source).unwrap();
+        assert_eq!(serialized_source["source_kind"], "document");
+        assert_eq!(serialized_source["passage_id"], 7);
+        assert!(serialized_source.get("content_type").is_none());
+        assert!(serialized_source.get("content_id").is_none());
+
+        let unrelated = json!({
+            "content": "Refunds never require approval.",
+            "claims": [{
+                "text": "Refunds never require approval.",
+                "supportRefs": [{"kind": "passage", "id": "7"}],
+                "passageSupport": []
+            }],
+            "calculations": []
+        })
+        .to_string();
+        let (answer, verification, provenance) =
+            finalize_rag_answer(1, 2, &unrelated, &[], &ranked, "What is the returns rule?")
+                .await
+                .unwrap();
+        assert_eq!(verification.outcome, TextAnswerOutcome::Blocked);
+        assert!(answer.contains("withheld"));
+        assert!(provenance.citations.is_empty());
+
+        // Revoked/deleted passages are removed by the authoritative resolver,
+        // so the same model candidate must not survive the answer gate without
+        // the server-known passage reference.
+        let (answer, verification, provenance) =
+            finalize_rag_answer(1, 2, &candidate, &[], &[], "What is the returns rule?")
+                .await
+                .unwrap();
+        assert_eq!(verification.outcome, TextAnswerOutcome::Blocked);
+        assert!(answer.contains("withheld"));
+        assert!(provenance.citations.is_empty());
     }
 
     #[test]

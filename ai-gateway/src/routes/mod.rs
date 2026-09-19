@@ -9,6 +9,7 @@ pub mod health;
 pub mod import;
 pub mod inventory;
 pub mod kaggle;
+mod passage_retrieval;
 pub mod policy;
 pub mod rag;
 pub mod report;

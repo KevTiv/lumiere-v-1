@@ -1124,7 +1124,6 @@
     "set_consolidation_company_rate": "erp.set_consolidation_company_rate",
     "set_contact_communication_preference": "erp.set_contact_communication_preference",
     "set_contact_segment_rules": "erp.set_contact_segment_rules",
-    "set_document_index_content": "erp.set_document_index_content",
     "set_document_retention": "erp.set_document_retention",
     "set_expense_allocations": "erp.set_expense_allocations",
     "set_expense_fraud_hold": "erp.set_expense_fraud_hold",

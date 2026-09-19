@@ -213,8 +213,6 @@ pub struct CreateDocumentParams {
     pub partner_id: Option<u64>,
     pub tag_ids: Vec<u64>,
     pub is_favorite: bool,
-    /// Optional extracted text / FTS body (capped server-side).
-    pub index_content: Option<String>,
     pub classification_id: Option<u64>,
     pub retention_days: Option<u32>,
     pub fiscal_kind: Option<String>,
@@ -682,13 +680,12 @@ pub fn create_document(
         folder_residency = folder.residency_region.clone();
     }
 
-    let provided_index_content = params.index_content.clone();
     let checksum = params.checksum.trim().to_lowercase();
     let index_content = Some(truncate_index_content(&build_default_index_content(
         &params.name,
         params.description.as_deref(),
         &params.file_name,
-        params.index_content.as_deref(),
+        None,
     )));
     let index_language = document_search_language_for_company(ctx, organization_id, company_id);
     let residency_region = params
@@ -775,26 +772,6 @@ pub fn create_document(
         current_version_id: Some(version.id),
         ..doc
     });
-
-    // A caller-provided index body is retained as user-reported evidence only;
-    // it is not treated as an inspected extraction of the object bytes.
-    if let (Some(company_id), Some(index_content)) = (company_id, provided_index_content) {
-        let extracted_content = truncate_index_content(&index_content);
-        if !extracted_content.is_empty() {
-            crate::ai::evidence_source::ingest_document_index_content(
-                ctx,
-                organization_id,
-                company_id,
-                doc_id,
-                &doc_name,
-                version.version_number,
-                &version.url,
-                version.checksum.as_deref(),
-                &extracted_content,
-                "user_reported",
-            )?;
-        }
-    }
 
     adjust_folder_document_count(ctx, folder_id, 1);
 
@@ -1160,6 +1137,17 @@ pub fn delete_document(
             None
         }
     });
+
+    if let Some(company_id) = company_id {
+        crate::ai::evidence_source::retire_document_evidence(
+            ctx,
+            organization_id,
+            company_id,
+            document_id,
+            "deleted",
+            "server-owned document blob was deleted",
+        )?;
+    }
 
     ctx.db.document().id().update(Document {
         is_deleted: true,

@@ -1,18 +1,21 @@
 // AI Chat Panel Types - Similar to v0/Zed IDE ACP
 
-export type CitationKind = "live" | "memory" | "activity" | "web"
-export type CitationTrust = "authoritative" | "retrieved"
+export type CitationKind = "live" | "passage" | "activity" | "web"
+export type CitationTrust = "authoritative" | "persisted" | "retrieved"
 
 export interface ChatMessageSourceRef {
-  /** Citation provenance; omitted = legacy memory embedding hit */
-  kind?: CitationKind
-  trust?: CitationTrust
+  kind: CitationKind
+  trust: CitationTrust
 
-  /** RAG / embedding content type or activity entity type */
-  content_type?: string
+  /** Canonical live-entity or persisted-passage identity. */
   entity_type?: string
-  content_id?: number
   entity_id?: string
+  source_kind?: string
+  source_key?: string
+  source_version?: string
+  passage_id?: number
+  passage_key?: string
+  content_hash?: string
 
   /** Optional field path from a live snapshot */
   field?: string

@@ -453,7 +453,6 @@ const REDUCER_PARAM_STRUCTS: Partial<Record<string, keyof OptionFieldMap & strin
   add_document_version: "AddDocumentVersionParams",
   update_document_folder: "UpdateDocumentFolderParams",
   update_document: "UpdateDocumentParams",
-  set_document_index_content: "SetDocumentIndexContentParams",
   set_document_retention: "SetDocumentRetentionParams",
   schedule_document_retention_purge: "ScheduleDocumentRetentionPurgeParams",
   apply_document_legal_hold: "ApplyDocumentLegalHoldParams",

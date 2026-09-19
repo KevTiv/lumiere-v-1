@@ -2190,16 +2190,6 @@
       "idempotency": "state_guarded",
       "semantic_kind": "command"
     },
-    "set_document_index_content": {
-      "client_facing": true,
-      "codec": {
-        "id": "spacetimedb-sats-json",
-        "version": 1
-      },
-      "evidence": "spacetimedb/src/documents/regional.rs:56 reducer body shows current-state or membership guard; session-exposed.",
-      "idempotency": "state_guarded",
-      "semantic_kind": "command"
-    },
     "set_document_retention": {
       "client_facing": true,
       "codec": {

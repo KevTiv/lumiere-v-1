@@ -503,6 +503,15 @@ pub(crate) fn record_ai_evidence_source_change_inner(
         severity,
         Some(change.id),
     )?;
+    for passage_id in &passage_ids {
+        crate::ai::intelligence::delete_search_embedding_inner(
+            ctx,
+            organization_id,
+            company_id,
+            "ai_evidence_passage",
+            *passage_id,
+        )?;
+    }
     let change_id = change.id;
     ctx.db
         .ai_evidence_source_change()

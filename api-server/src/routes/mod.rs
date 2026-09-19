@@ -41,6 +41,7 @@ pub fn domain_router() -> Router<Arc<AppState>> {
         .merge(ai_capabilities::router())
         .merge(ai_certifications::router())
         .merge(ai_evidence::router())
+        .merge(crate::evidence_ingestion::router())
         .merge(evidence_inspection::router())
         .merge(auth::router())
         .merge(session::router())

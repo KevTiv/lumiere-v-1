@@ -2567,13 +2567,13 @@ mod continuation_lineage_tests {
     #[test]
     fn continuation_rejects_forged_compaction_summary_and_cursor() {
         let context = context("knowledge:42:version:3");
-        let mut checkpoint = checkpoint(&context);
-        checkpoint.compaction_summary.current_node = "publish".to_string();
-        assert!(checkpoint.validate_continuation(&context).is_err());
+        let mut forged_summary = checkpoint(&context);
+        forged_summary.compaction_summary.current_node = "publish".to_string();
+        assert!(forged_summary.validate_continuation(&context).is_err());
 
-        let mut checkpoint = checkpoint(&context);
-        checkpoint.concurrency_version = 9;
-        assert!(checkpoint.validate_continuation(&context).is_err());
+        let mut forged_cursor = checkpoint(&context);
+        forged_cursor.concurrency_version = 9;
+        assert!(forged_cursor.validate_continuation(&context).is_err());
     }
 }
 

@@ -4498,10 +4498,6 @@
       "name": "set_contact_segment_rules",
       "shape_fingerprint": "sha256:d152e875fffa729f69fdaebf5a208141553bc0e10dd2a60df3d8862e0ab3a57e"
     },
-    "erp.set_document_index_content": {
-      "name": "set_document_index_content",
-      "shape_fingerprint": "sha256:03406ed2bd42928114c28a6a6c7f128b9ab13e746730127dc6506f90298fcbc3"
-    },
     "erp.set_document_retention": {
       "name": "set_document_retention",
       "shape_fingerprint": "sha256:2da9e6723fc850d32533e1bcc04322f83c31c98b1fca1490570397668ee3cd33"
@@ -5541,6 +5537,7 @@
     "erp.link_workos_user",
     "erp.mark_reset_token_used",
     "erp.run_core_audit_finalize_test",
+    "erp.set_document_index_content",
     "erp.store_sso_user_credential",
     "erp.store_user_credential",
     "erp.test_finalize_deletes_on_checksum_match",
@@ -5599,6 +5596,14 @@
       "current_operations_fingerprint": "sha256:ef7405f3da51da1e40be486c0aa71f3eff5911c07b024164705bac009a7b099d",
       "operation_count": 1382,
       "reason": "add AIH-13 to AIH-18 evidence, provenance, knowledge and reviewed knowledge-to-skill promotion reducers (source, version, passage, contribution, claim, decision, artifact component, dependency, source change, knowledge entry, promotion proposal and independent review) and record already-shipped governed-intelligence reducers (run review, program checkpoint, shadow events, authority rollback, pattern promotion) on top of the released v0.3.48 baseline; every existing operation shape is unchanged"
+    },
+    {
+      "previous_release": "v0.3.49",
+      "previous_ir_sha256": "sha256:3e9de49666988c0ce8f403206f1b43e2fc77b8b2b4eae5564e6bacb0d9db6883",
+      "previous_operations_fingerprint": "sha256:ef7405f3da51da1e40be486c0aa71f3eff5911c07b024164705bac009a7b099d",
+      "current_operations_fingerprint": "sha256:2aee1fca0a9d32659d7d4e82d1b303c4abebd4f544f645082f04aabff1dff7ca",
+      "operation_count": 1381,
+      "reason": "retire caller-supplied document index content and its session reducer; document evidence now comes only from server-owned blob ingestion"
     }
   ]
 }

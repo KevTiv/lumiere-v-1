@@ -87,23 +87,12 @@ pub async fn post_ingest() -> AppResult<StatusCode> {
     ))
 }
 
-pub async fn post_document() -> AppResult<StatusCode> {
-    Err(AppError::Unavailable(
-        "Document indexing is deferred until the authoritative bucket/FileVersion lifecycle is available"
-            .into(),
-    ))
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[tokio::test]
-    async fn activity_and_document_ingestion_are_unavailable() {
+    async fn activity_ingestion_is_unavailable() {
         assert!(matches!(post_ingest().await, Err(AppError::Unavailable(_))));
-        assert!(matches!(
-            post_document().await,
-            Err(AppError::Unavailable(_))
-        ));
     }
 }

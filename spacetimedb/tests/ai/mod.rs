@@ -61,7 +61,9 @@ pub fn run_ai_intelligence_events_tests(ctx: &ReducerContext) -> Result<(), Stri
     decision_events_test::test_record_decision_shadow_event_persists(ctx)
         .map_err(|e| format!("record_decision_shadow_event_persists: {e}"))?;
     decision_events_test::test_record_decision_shadow_event_records_failure_and_is_idempotent(ctx)
-        .map_err(|e| format!("record_decision_shadow_event_records_failure_and_is_idempotent: {e}"))?;
+        .map_err(|e| {
+            format!("record_decision_shadow_event_records_failure_and_is_idempotent: {e}")
+        })?;
     decision_events_test::test_record_decision_shadow_event_distinct_profiles_do_not_collide(ctx)
         .map_err(|e| format!("record_decision_shadow_event_distinct_profiles_do_not_collide: {e}"))?;
     decision_events_test::test_intelligence_event_status_fields_are_independent(ctx)
@@ -89,6 +91,8 @@ pub fn run_ai_evidence_provenance_tests(ctx: &ReducerContext) -> Result<(), Stri
         .map_err(|e| format!("correction_requires_review_and_recovers: {e}"))?;
     evidence_provenance_test::test_deletion_and_revocation_preserve_honest_history(ctx)
         .map_err(|e| format!("deletion_and_revocation_preserve_honest_history: {e}"))?;
+    evidence_provenance_test::test_document_blob_passage_claim_lifecycle(ctx)
+        .map_err(|e| format!("document_blob_passage_claim_lifecycle: {e}"))?;
     evidence_provenance_test::test_discretionary_dependencies_need_acknowledgement(ctx)
         .map_err(|e| format!("discretionary_dependencies_need_acknowledgement: {e}"))?;
     Ok(())

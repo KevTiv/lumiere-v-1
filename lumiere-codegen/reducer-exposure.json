@@ -3640,11 +3640,6 @@
       "reason": "invoked by an enumerated frontend BFF call site"
     },
     {
-      "name": "set_document_index_content",
-      "exposure": "session",
-      "reason": "invoked by an enumerated frontend BFF call site"
-    },
-    {
       "name": "set_document_retention",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"

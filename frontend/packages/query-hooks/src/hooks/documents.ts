@@ -260,21 +260,38 @@ export function useRecordDocumentView(organizationId: bigint) {
   })
 }
 
-export function useSetDocumentIndexContent(organizationId: bigint) {
+export function useIngestDocumentEvidence(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async ({
+      companyId,
       documentId,
-      params,
+      objectKey,
+      language,
     }: {
-      documentId: bigint | number | string
-      params: { content: string; language?: string }
+      companyId: bigint | number | string
+      documentId?: bigint | number | string
+      objectKey?: string
+      language?: string
     }) => {
-      const { urlPath, init } = stdbBffCommandPost("set_document_index_content", { documentId: toScalarU64(documentId), params: stdbParamsToJson(params as object, "SetDocumentIndexContentParams") })
-      const r = await apiFetch(urlPath, init)
+      const r = await apiFetch("/api/ai/evidence/ingestion/documents", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          companyId: Number(toScalarU64(companyId)),
+          ...(documentId !== undefined
+            ? { documentId: Number(toScalarU64(documentId)) }
+            : {}),
+          ...(objectKey ? { objectKey } : {}),
+          ...(language ? { language } : {}),
+        }),
+      })
       if (!r.ok) throw new Error(await parseCallErrorDocuments(r))
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['documents', rqBigIntKey(organizationId)] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['documents', rqBigIntKey(organizationId)] })
+      qc.invalidateQueries({ queryKey: ['ai-evidence'] })
+    },
   })
 }
 

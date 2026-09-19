@@ -27,6 +27,7 @@ use crate::{
 const ACTOR_GRANT_TIMEOUT: Duration = Duration::from_secs(3);
 const INSPECT_CAPABILITY: &str = "ai.evidence.inspect";
 const KNOWLEDGE_RETRIEVE_CAPABILITY: &str = "ai.knowledge.retrieve";
+pub(crate) const RAG_EVIDENCE_RETRIEVE_CAPABILITY: &str = "ai.knowledge.retrieve";
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
@@ -153,6 +154,34 @@ async fn require_actor_grant(
             "evidence inspection is not permitted".into(),
         ))
     }
+}
+
+/// Re-check a BFF-supplied acting user's exact capability before a route reads
+/// persisted evidence. The envelope must echo the same actor and tenant scope;
+/// an unavailable grant service fails closed.
+pub(crate) async fn require_scoped_capability_grant(
+    state: &AppState,
+    actor_identity: &str,
+    actor_token: &str,
+    organization_id: u64,
+    company_id: u64,
+    capability: &str,
+) -> AppResult<()> {
+    let actor = ActorCredentials {
+        identity: actor_identity.trim().to_string(),
+        token: actor_token.trim().to_string(),
+        organization_id,
+        company_id,
+    };
+    if ActorIdentity::parse(&actor.identity).is_none()
+        || actor.token.is_empty()
+        || actor.organization_id == 0
+        || actor.company_id == 0
+    {
+        return Err(AppError::Forbidden("acting-user context is invalid".into()));
+    }
+    require_actor_grant(state, &actor, capability).await?;
+    Ok(())
 }
 
 pub async fn post_inspect(

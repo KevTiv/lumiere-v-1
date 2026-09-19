@@ -308,6 +308,21 @@ pub(crate) async fn dispatch_ai_evidence_mutation(
     args: Value,
 ) -> Result<TrustedOperationContext, ApiError> {
     let (operation_id, id_parameter, params_type) = match reducer {
+        "record_ai_evidence_source" => (
+            "erp.record_ai_evidence_source",
+            None,
+            "RecordAiEvidenceSourceParams",
+        ),
+        "record_ai_evidence_source_version" => (
+            "erp.record_ai_evidence_source_version",
+            Some("source_id"),
+            "RecordAiEvidenceSourceVersionParams",
+        ),
+        "record_ai_evidence_passage" => (
+            "erp.record_ai_evidence_passage",
+            None,
+            "RecordAiEvidencePassageParams",
+        ),
         "record_ai_evidence_decision" => (
             "erp.record_ai_evidence_decision",
             None,
@@ -322,6 +337,11 @@ pub(crate) async fn dispatch_ai_evidence_mutation(
             "erp.review_ai_evidence_decision",
             Some("decision_id"),
             "ReviewAiEvidenceDecisionParams",
+        ),
+        "record_ai_evidence_source_change" => (
+            "erp.record_ai_evidence_source_change",
+            Some("source_version_id"),
+            "RecordAiEvidenceSourceChangeParams",
         ),
         _ => {
             return Err(ApiError::Forbidden(
@@ -362,6 +382,84 @@ pub(crate) async fn dispatch_ai_evidence_mutation(
         .as_array()
         .cloned()
         .ok_or_else(|| ApiError::Internal("evidence mutation arguments must be an array".into()))?;
+    let client = state.client_with_token(&session.stdb_token);
+    let context = TrustedOperationContext::from_session_with_placement(
+        session,
+        client,
+        contract.contract_operation_id,
+        &state.organization_placements,
+    )?;
+    let company_scope = validate_reducer_scope(contract, &args, context.organization_id())?;
+    let company_scope = authorize_reducer_company_scope(&context, company_scope).await?;
+    let context = context.with_company_scope(company_scope)?;
+    context.require_current_placement(&state.organization_placements)?;
+    let _ = execute_reducer_call(&context, contract, args).await?;
+    Ok(context)
+}
+
+/// Fixed semantic-index mutations used only after the trusted evidence route
+/// has persisted or revoked an authoritative passage.
+pub(crate) async fn dispatch_ai_evidence_search_mutation(
+    state: &AppState,
+    session: &ApiSession,
+    reducer: &'static str,
+    args: Value,
+) -> Result<TrustedOperationContext, ApiError> {
+    let (operation_id, signature_ok) = match reducer {
+        "upsert_search_embedding" => {
+            let contract = stdb_client::reducer_contract(reducer).ok_or_else(|| {
+                ApiError::Forbidden("search embedding reducer is absent from the contract".into())
+            })?;
+            (
+                "erp.upsert_search_embedding",
+                contract.params.len() == 3
+                    && contract.params[2].name == "params"
+                    && contract.params[2].kind == ScalarKind::Composite
+                    && contract.params[2].ref_target == Some("UpsertSearchEmbeddingParams"),
+            )
+        }
+        "request_embedding_job" => {
+            let contract = stdb_client::reducer_contract(reducer).ok_or_else(|| {
+                ApiError::Forbidden("embedding job reducer is absent from the contract".into())
+            })?;
+            (
+                "erp.request_embedding_job",
+                contract.params.len() == 5
+                    && contract.params[2].name == "content_type"
+                    && contract.params[2].kind == ScalarKind::String
+                    && contract.params[3].name == "content_id"
+                    && contract.params[3].kind == ScalarKind::UnsignedInteger
+                    && contract.params[4].name == "text"
+                    && contract.params[4].kind == ScalarKind::String,
+            )
+        }
+        _ => {
+            return Err(ApiError::Forbidden(
+                "reducer is not an admitted evidence search mutation".into(),
+            ));
+        }
+    };
+    let contract = stdb_client::reducer_contract(reducer).ok_or_else(|| {
+        ApiError::Forbidden("search embedding reducer is absent from the contract".into())
+    })?;
+    let signature_ok = signature_ok
+        && contract.name == reducer
+        && contract.contract_operation_id == operation_id
+        && contract.exposure == Exposure::Denied
+        && contract.organization_position == Some(0)
+        && contract.company_position == Some(1)
+        && contract.params[0].name == "organization_id"
+        && contract.params[0].kind == ScalarKind::UnsignedInteger
+        && contract.params[1].name == "company_id"
+        && contract.params[1].kind == ScalarKind::OptionalUnsignedInteger;
+    if !signature_ok {
+        return Err(ApiError::Forbidden(
+            "evidence search reducer contract no longer matches the admitted boundary".into(),
+        ));
+    }
+    let args = args.as_array().cloned().ok_or_else(|| {
+        ApiError::Internal("evidence search mutation arguments must be an array".into())
+    })?;
     let client = state.client_with_token(&session.stdb_token);
     let context = TrustedOperationContext::from_session_with_placement(
         session,

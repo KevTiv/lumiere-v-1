@@ -207,7 +207,6 @@ async fn main() -> anyhow::Result<()> {
         .route("/v1/import/preview", post(routes::import::post_preview))
         .route("/v1/context/search", post(routes::context::post_search))
         .route("/v1/context/ingest", post(routes::context::post_ingest))
-        .route("/v1/context/document", post(routes::context::post_document))
         .route("/v1/kaggle/search", post(routes::kaggle::post_search))
         .route("/v1/kaggle/download", post(routes::kaggle::post_download))
         .route("/v1/kaggle/status/:job_id", get(routes::kaggle::get_status))
