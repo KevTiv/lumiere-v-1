@@ -16,7 +16,7 @@ from typing import Any
 
 
 EXPECTED_TABLE_COUNT = 493
-APPLICATION_RELATION_COUNT = 487
+APPLICATION_RELATION_COUNT = 488
 PROTOCOL_RELATIONS = frozenset(
     {
         "organization_commit",
@@ -139,7 +139,7 @@ def validate_manifest(manifest: dict[str, Any], expected_table_count: int) -> No
         application = table_names - PROTOCOL_RELATIONS
         if len(application) != APPLICATION_RELATION_COUNT:
             fail(
-                "C0 requires 487 application relations + 5 protocol relations, "
+                "C0 requires 488 application relations + 5 protocol relations, "
                 f"found {len(application)} + {len(PROTOCOL_RELATIONS & table_names)}"
             )
 
