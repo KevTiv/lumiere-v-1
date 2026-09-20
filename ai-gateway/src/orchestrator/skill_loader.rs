@@ -11,6 +11,9 @@ pub struct GovernedRunRef {
     pub run_key: String,
     pub skill_id: u64,
     pub skill_config_id: Option<u64>,
+    /// Immutable routing-policy binding resolved from the active skill config
+    /// at run creation time. None means use the organization's default policy.
+    pub intelligence_policy_ref: Option<String>,
 }
 
 #[derive(Clone, Debug)]
@@ -66,6 +69,39 @@ fn row_string_list(row: &Value, key: &str) -> Vec<String> {
                 .collect()
         })
         .unwrap_or_default()
+}
+
+
+pub fn intelligence_policy_ref(config: &Value) -> Result<Option<String>> {
+    let Some(value) = config
+        .get("intelligencePolicyRef")
+        .or_else(|| config.get("intelligence_policy_ref"))
+    else {
+        return Ok(None);
+    };
+    if value.is_null() {
+        return Ok(None);
+    }
+    let reference = value
+        .as_str()
+        .context("intelligencePolicyRef must be a string")?
+        .trim();
+    if reference.is_empty() {
+        return Ok(None);
+    }
+    let (key, version) = reference
+        .rsplit_once('@')
+        .context("intelligencePolicyRef must use policy_key@version")?;
+    if key.trim().is_empty() {
+        anyhow::bail!("intelligencePolicyRef policy key must be nonempty");
+    }
+    let version = version
+        .parse::<u32>()
+        .context("intelligencePolicyRef version must be a positive integer")?;
+    if version == 0 {
+        anyhow::bail!("intelligencePolicyRef version must be positive");
+    }
+    Ok(Some(format!("{}@{}", key.trim(), version)))
 }
 
 pub async fn load_skill(
@@ -286,6 +322,7 @@ pub async fn create_run(
         run_key: run_key.to_string(),
         skill_id: skill.id,
         skill_config_id: skill.skill_config_id,
+        intelligence_policy_ref: intelligence_policy_ref(&skill.config_json)?,
     })
 }
 
@@ -562,12 +599,38 @@ mod tests {
             run_key: "run-42".to_string(),
             skill_id: 7,
             skill_config_id: Some(9),
+            intelligence_policy_ref: Some("finance-generation@2".to_string()),
         };
 
         assert_eq!(run.run_id, 42);
         assert_eq!(run.run_key, "run-42");
         assert_eq!(run.skill_id, 7);
         assert_eq!(run.skill_config_id, Some(9));
+        assert_eq!(
+            run.intelligence_policy_ref.as_deref(),
+            Some("finance-generation@2")
+        );
+    }
+
+    #[test]
+    fn intelligence_policy_ref_is_strict_and_versioned() {
+        assert_eq!(intelligence_policy_ref(&serde_json::json!({})).unwrap(), None);
+        assert_eq!(
+            intelligence_policy_ref(&serde_json::json!({
+                "intelligencePolicyRef": "generation-default@3"
+            }))
+            .unwrap()
+            .as_deref(),
+            Some("generation-default@3")
+        );
+        assert!(intelligence_policy_ref(&serde_json::json!({
+            "intelligencePolicyRef": "generation-default"
+        }))
+        .is_err());
+        assert!(intelligence_policy_ref(&serde_json::json!({
+            "intelligencePolicyRef": 7
+        }))
+        .is_err());
     }
 
     #[test]
