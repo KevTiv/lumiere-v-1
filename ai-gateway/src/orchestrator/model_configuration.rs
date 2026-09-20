@@ -217,7 +217,7 @@ pub(super) trait ModelConfigurationStore: Send + Sync {
     ) -> Result<Option<IntelligencePolicy>>;
 }
 
-pub(super) struct StdbModelConfigurationStore<'a> {
+pub(crate) struct StdbModelConfigurationStore<'a> {
     pub reader: &'a StdbClient,
 }
 
