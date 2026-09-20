@@ -16,11 +16,17 @@
 //! - **Nothing unverified is released.** `RequiresReview` and `Blocked`
 //!   withhold the candidate entirely; the caller gets the reason, not the text.
 //!
-//! What this does *not* establish: prose carries no passage citations, so no
-//! claim is checked against a source passage and no semantic claim-coverage
-//! check runs. The verification methods reported are therefore deterministic
-//! only, and an `admitted` outcome means "no traceability defect found", never
-//! domain approval.
+//! Passage-backed answers (`gate_text_answer_with_passages`, used by `/v1/rag`)
+//! add the checks the governed-program path applies to persisted evidence: a
+//! claim cites a passage only as `{"kind":"passage","id":"<id>"}`, the server
+//! binds that id to the full citation from the acting user's authorized
+//! catalog, and every passage-backed claim must be judged as supported by a
+//! semantic checker. No checker, or a failing one, requires review — retrieval
+//! alone is never support.
+//!
+//! What this does *not* establish: a model-assisted verdict is fallible and
+//! confers no domain approval, and a live-snapshot claim is checked only for
+//! traceability, not against the snapshot semantically.
 
 use std::collections::HashSet;
 
@@ -30,8 +36,12 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use super::answer_gate::{
-    collect_json_figures, extract_figures, AnswerProvenance, EvidenceGatedAnswerAdmission,
-    GatePolicy, GateScope, PassageCatalog, SourcePassage,
+    collect_json_figures, extract_figures, AnswerProvenance, ClaimVerification,
+    EvidenceGatedAnswerAdmission, GatePolicy, GateScope, PassageCatalog,
+};
+#[allow(unused_imports)] // the checker seam is also used by route tests
+pub(crate) use super::answer_gate::{
+    ClaimCoverageChecker, ClaimSupport, ClaimVerdict, PassageStatus, SourcePassage,
 };
 use super::governed_services::{
     qualified_content, AdmissionEvidence, AnswerAdmissionOutcome, VerificationMethod,
@@ -39,6 +49,7 @@ use super::governed_services::{
 use super::intelligence::{
     ClaimedCalculation, EvidenceRef, FinalDraft, MaterialClaim, PassageCitation,
 };
+use super::reviewed_claims::{ReviewedClaimResolver, ReviewedOutcome};
 use crate::providers::llm::LlmMessage;
 
 /// What the server itself established while producing an answer.
@@ -259,6 +270,31 @@ impl GatedTextAnswer {
         self.released.is_some()
     }
 
+    /// Whether any released claim rests on a durable, currently valid passage.
+    /// Those answers must carry inspectable provenance before release.
+    pub fn is_passage_backed(&self) -> bool {
+        self.released.is_some()
+            && self
+                .durable_provenance
+                .claims
+                .iter()
+                .any(|claim| !claim.passage_ids.is_empty())
+    }
+
+    /// Replace a released answer with a withheld verdict. The reason must be
+    /// generic: it is shown to the user and must never carry evidence content.
+    pub fn withhold(&mut self, reason: &str) {
+        self.released = None;
+        self.verification = TextAnswerVerification {
+            outcome: TextAnswerOutcome::RequiresReview,
+            methods: self.verification.methods.clone(),
+            limitations: Vec::new(),
+            reason: Some(reason.to_string()),
+        };
+        self.provenance.redact_for_withholding(reason);
+        self.durable_provenance = AnswerProvenance::default();
+    }
+
     /// What to show in place of a withheld candidate.
     pub fn withheld_notice(&self) -> String {
         match &self.verification.reason {
@@ -320,18 +356,198 @@ impl PassageCatalog for NoPassages {
     }
 }
 
-/// Judge a free-text candidate. Deterministic and side-effect free.
+/// The passages an acting user is authorized to see for one answer, held in
+/// memory for the length of one gate run. It is the *only* passage authority
+/// the gate consults: it cannot resolve a passage the server did not put in
+/// front of the model, in another organization or company, or in another
+/// version.
+struct AuthorizedPassageCatalog<'a> {
+    organization_id: u64,
+    company_id: u64,
+    passages: &'a [SourcePassage],
+}
+
+#[async_trait]
+impl PassageCatalog for AuthorizedPassageCatalog<'_> {
+    async fn source_passages(
+        &self,
+        organization_id: u64,
+        company_id: u64,
+        kind: &str,
+        source_key: &str,
+    ) -> Result<Vec<SourcePassage>> {
+        if organization_id != self.organization_id || company_id != self.company_id {
+            return Ok(Vec::new());
+        }
+        Ok(self
+            .passages
+            .iter()
+            .filter(|passage| passage.kind == kind && passage.source_key == source_key)
+            .cloned()
+            .collect())
+    }
+}
+
+/// The canonical model-facing reference for an authorized passage.
+pub const PASSAGE_REF_KIND: &str = "passage";
+
+fn passage_ref(passage: &SourcePassage) -> EvidenceRef {
+    EvidenceRef {
+        kind: PASSAGE_REF_KIND.to_string(),
+        id: passage.id.to_string(),
+    }
+}
+
+/// The complete citation for an authorized passage, taken from the server's
+/// own record. Nothing in it comes from the model.
+fn bound_citation(passage: &SourcePassage) -> PassageCitation {
+    PassageCitation {
+        kind: passage.kind.clone(),
+        id: passage.source_key.clone(),
+        source_version: passage.version.clone(),
+        passage_key: passage.passage_key.clone(),
+    }
+}
+
+/// A withheld candidate must not come back to the client through its own
+/// verdict. The gate's findings quote the claim they are about, and a claim
+/// checker's rationale or error may quote passage or provider text; none of
+/// that is verified, so withheld reasons keep only the category of failure.
+fn redact_withheld_reason(reason: &str, structured: &StructuredTextDraft) -> String {
+    const MARKER: &str = "[claim withheld]";
+    let mut texts: Vec<&str> = structured
+        .claims
+        .iter()
+        .map(|claim| claim.text.trim())
+        .chain(std::iter::once(structured.content.trim()))
+        .filter(|text| !text.is_empty())
+        .collect();
+    texts.sort_by_key(|text| std::cmp::Reverse(text.len()));
+    texts.dedup();
+    let mut redacted = reason.to_string();
+    for text in texts {
+        redacted = redacted.replace(text, MARKER);
+    }
+    redacted
+        .split("; ")
+        .map(|segment| {
+            if segment.starts_with("claim coverage check unavailable (") {
+                // The provider's error text is not for the client.
+                "claim coverage check unavailable".to_string()
+            } else if let Some(end) = segment.find(MARKER) {
+                // Drop a reviewer rationale trailing the quoted claim.
+                segment[..end + MARKER.len()].to_string()
+            } else {
+                segment.to_string()
+            }
+        })
+        .collect::<Vec<_>>()
+        .join("; ")
+}
+
+/// Judge a free-text candidate that cites no persisted passages.
+/// Deterministic and side-effect free.
 pub async fn gate_text_answer(
     organization_id: u64,
     company_id: u64,
     candidate: &str,
     evidence: &TextEvidence,
 ) -> Result<GatedTextAnswer> {
+    gate_candidate(
+        organization_id,
+        company_id,
+        candidate,
+        evidence,
+        &NoPassages,
+        &[],
+        false,
+        None,
+        None,
+    )
+    .await
+}
+
+/// Judge a candidate against the passages the acting user is authorized to see.
+///
+/// A claim cites a passage only as `{"kind":"passage","id":"<passage id>"}`.
+/// The server binds that id to the complete [`PassageCitation`] from
+/// `passages`; a model-supplied version, key, text or hash is never accepted,
+/// and an id outside `passages` blocks the candidate. Every passage-backed
+/// claim must then be judged as supported by `claim_checker`; with no checker,
+/// or one that fails, the answer requires review and is withheld. ANN
+/// retrieval alone never counts as support.
+pub(crate) async fn gate_text_answer_with_passages(
+    organization_id: u64,
+    company_id: u64,
+    candidate: &str,
+    evidence: &TextEvidence,
+    passages: &[SourcePassage],
+    claim_checker: Option<&dyn ClaimCoverageChecker>,
+) -> Result<GatedTextAnswer> {
+    gate_text_answer_with_passages_and_reviews(
+        organization_id,
+        company_id,
+        candidate,
+        evidence,
+        passages,
+        claim_checker,
+        None,
+    )
+    .await
+}
+
+/// [`gate_text_answer_with_passages`] that may also reuse an exact, current,
+/// human-reviewed claim in place of the semantic check. The server resolves
+/// the reviewed claim; the model's output never names one.
+#[allow(clippy::too_many_arguments)]
+pub(crate) async fn gate_text_answer_with_passages_and_reviews(
+    organization_id: u64,
+    company_id: u64,
+    candidate: &str,
+    evidence: &TextEvidence,
+    passages: &[SourcePassage],
+    claim_checker: Option<&dyn ClaimCoverageChecker>,
+    reviewed_claims: Option<&dyn ReviewedClaimResolver>,
+) -> Result<GatedTextAnswer> {
+    let catalog = AuthorizedPassageCatalog {
+        organization_id,
+        company_id,
+        passages,
+    };
+    gate_candidate(
+        organization_id,
+        company_id,
+        candidate,
+        evidence,
+        &catalog,
+        passages,
+        true,
+        claim_checker,
+        reviewed_claims,
+    )
+    .await
+}
+
+#[allow(clippy::too_many_arguments)]
+async fn gate_candidate(
+    organization_id: u64,
+    company_id: u64,
+    candidate: &str,
+    evidence: &TextEvidence,
+    catalog: &dyn PassageCatalog,
+    passages: &[SourcePassage],
+    bind_passages: bool,
+    claim_checker: Option<&dyn ClaimCoverageChecker>,
+    reviewed_claims: Option<&dyn ReviewedClaimResolver>,
+) -> Result<GatedTextAnswer> {
     let structured = match parse_candidate(candidate, evidence) {
         Ok(structured) => structured,
         Err(reason) => return Ok(blocked_text_answer(reason)),
     };
-    let known: HashSet<EvidenceRef> = evidence.refs.iter().cloned().collect();
+    let mut known: HashSet<EvidenceRef> = evidence.refs.iter().cloned().collect();
+    if bind_passages {
+        known.extend(passages.iter().map(passage_ref));
+    }
     if structured.claims.is_empty() && !structured.content.trim().is_empty() {
         return Ok(blocked_text_answer(
             "structured answer must identify at least one material claim",
@@ -355,16 +571,41 @@ pub async fn gate_text_answer(
     }
 
     let mut citations = Vec::new();
-    let mut claim_provenance = Vec::with_capacity(structured.claims.len());
-    let mut claim_limitations = Vec::new();
+    // Per claim: the non-passage support refs the gate reasons about, and the
+    // server-bound passage citations.
+    let mut run_supports: Vec<Vec<EvidenceRef>> = Vec::with_capacity(structured.claims.len());
+    let mut bound_supports: Vec<Vec<PassageCitation>> = Vec::with_capacity(structured.claims.len());
     for claim in &structured.claims {
         if claim.text.trim().is_empty() || !structured.content.contains(claim.text.trim()) {
             return Ok(blocked_text_answer(
                 "each structured claim must be nonempty and appear in answer content",
             ));
         }
+        if bind_passages && !claim.passage_support.is_empty() {
+            return Ok(blocked_text_answer(
+                "passage citations are bound by the server and cannot be supplied by the answer",
+            ));
+        }
+        let mut run = Vec::new();
+        let mut bound: Vec<PassageCitation> = Vec::new();
         for support in &claim.support_refs {
-            if !known.contains(support) {
+            if bind_passages && support.kind == PASSAGE_REF_KIND {
+                let Some(passage) = passages
+                    .iter()
+                    .find(|passage| passage.id != 0 && passage_ref(passage) == *support)
+                else {
+                    return Ok(blocked_text_answer(format!(
+                        "claim cites passage '{}' that is not authorized for this answer",
+                        support.id
+                    )));
+                };
+                let citation = bound_citation(passage);
+                if !bound.contains(&citation) {
+                    bound.push(citation);
+                }
+            } else if known.contains(support) {
+                run.push(support.clone());
+            } else {
                 return Ok(blocked_text_answer(format!(
                     "claim support '{}:{}' was not produced by this run",
                     support.kind, support.id
@@ -374,28 +615,10 @@ pub async fn gate_text_answer(
                 citations.push(support.clone());
             }
         }
-        let limitations = if claim.support_refs.is_empty() {
-            let limitation = format!("claim has no server-known support: {}", claim.text.trim());
-            claim_limitations.push(limitation.clone());
-            vec![limitation]
-        } else {
-            Vec::new()
-        };
-        claim_provenance.push(TextClaimProvenance {
-            text: claim.text.trim().to_string(),
-            support_refs: claim.support_refs.clone(),
-            passage_support: claim.passage_support.clone(),
-            verification_method: "deterministic",
-            verification_outcome: if claim.support_refs.is_empty() {
-                "unverified"
-            } else {
-                "traceable"
-            },
-            limitations,
-        });
+        run_supports.push(run);
+        bound_supports.push(bound);
     }
 
-    let catalog = NoPassages;
     let gate = EvidenceGatedAnswerAdmission {
         scope: GateScope {
             organization_id,
@@ -404,8 +627,9 @@ pub async fn gate_text_answer(
             required_applicability: Vec::new(),
         },
         policy: GatePolicy::default(),
-        catalog: &catalog,
-        claim_checker: None,
+        catalog,
+        claim_checker,
+        reviewed_claims,
     };
     let draft = FinalDraft {
         content: structured.content.clone(),
@@ -413,10 +637,19 @@ pub async fn gate_text_answer(
         claims: structured
             .claims
             .iter()
-            .map(|claim| MaterialClaim {
+            .zip(run_supports.iter().zip(&bound_supports))
+            .map(|(claim, (run, bound))| MaterialClaim {
                 text: claim.text.clone(),
-                support_refs: claim.support_refs.clone(),
-                supports: claim.passage_support.clone(),
+                support_refs: if bind_passages {
+                    run.clone()
+                } else {
+                    claim.support_refs.clone()
+                },
+                supports: if bind_passages {
+                    bound.clone()
+                } else {
+                    claim.passage_support.clone()
+                },
             })
             .collect(),
         calculations: structured.calculations.clone(),
@@ -430,6 +663,56 @@ pub async fn gate_text_answer(
             },
         )
         .await?;
+
+    let mut claim_limitations = Vec::new();
+    let mut claim_provenance = Vec::with_capacity(structured.claims.len());
+    for (index, claim) in structured.claims.iter().enumerate() {
+        let (verification_method, verification_outcome) = match durable_provenance
+            .claims
+            .get(index)
+            .map(|assessment| &assessment.verification)
+        {
+            Some(ClaimVerification::Model { support, .. }) => (
+                "model_assisted",
+                match support {
+                    ClaimSupport::Supported => "supported",
+                    ClaimSupport::Partial => "qualified",
+                    ClaimSupport::Unsupported => "unsupported",
+                },
+            ),
+            Some(ClaimVerification::HumanReviewed { outcome, .. }) => (
+                "human_reviewed",
+                match outcome {
+                    ReviewedOutcome::Supported => "supported",
+                    ReviewedOutcome::Qualified => "qualified",
+                },
+            ),
+            Some(ClaimVerification::ReviewRejected { .. }) => ("human_reviewed", "unsupported"),
+            Some(ClaimVerification::Unchecked) => ("none", "unverified"),
+            Some(ClaimVerification::Unresolved) => ("deterministic", "unresolved"),
+            Some(ClaimVerification::RunEvidence) => ("deterministic", "traceable"),
+            Some(ClaimVerification::NoSupportCited) | None => ("deterministic", "unverified"),
+        };
+        let limitations = if claim.support_refs.is_empty() {
+            let limitation = format!("claim has no server-known support: {}", claim.text.trim());
+            claim_limitations.push(limitation.clone());
+            vec![limitation]
+        } else {
+            Vec::new()
+        };
+        claim_provenance.push(TextClaimProvenance {
+            text: claim.text.trim().to_string(),
+            support_refs: claim.support_refs.clone(),
+            passage_support: if bind_passages {
+                bound_supports[index].clone()
+            } else {
+                claim.passage_support.clone()
+            },
+            verification_method,
+            verification_outcome,
+            limitations,
+        });
+    }
 
     let methods: Vec<&'static str> = report
         .methods
@@ -491,6 +774,7 @@ pub async fn gate_text_answer(
             durable_provenance,
         },
         AnswerAdmissionOutcome::RequiresReview { reason } => {
+            let reason = redact_withheld_reason(&reason, &structured);
             let mut provenance = provenance;
             provenance.redact_for_withholding("candidate withheld pending review");
             GatedTextAnswer {
@@ -506,6 +790,7 @@ pub async fn gate_text_answer(
             }
         }
         AnswerAdmissionOutcome::Blocked { reason } => {
+            let reason = redact_withheld_reason(&reason, &structured);
             let mut provenance = provenance;
             provenance.redact_for_withholding("candidate blocked by answer gate");
             GatedTextAnswer {
@@ -731,6 +1016,370 @@ mod tests {
             assert_eq!(gated.verification.outcome, TextAnswerOutcome::Blocked);
             assert!(gated.released.is_none());
         }
+    }
+
+    // ── persisted-passage claims ──────────────────────────────────────────────
+
+    const PASSAGE_BODY: &str = "Returns over 500 EUR require controller approval.";
+
+    fn passage(id: u64, body: &str) -> SourcePassage {
+        SourcePassage {
+            id,
+            kind: "policy".into(),
+            source_key: "returns".into(),
+            version: "2026".into(),
+            passage_key: format!("p{id}"),
+            content_hash: super::super::answer_gate::text_hash(body),
+            text: body.into(),
+            // Effective from the epoch: a dated passage admits cleanly.
+            effective_from_micros: Some(0),
+            effective_to_micros: None,
+            applicability: Vec::new(),
+            status: PassageStatus::Current,
+        }
+    }
+
+    struct Scripted(Result<ClaimSupport, &'static str>);
+
+    #[async_trait]
+    impl ClaimCoverageChecker for Scripted {
+        async fn check(
+            &self,
+            _claim: &str,
+            passages: &[&SourcePassage],
+        ) -> Result<super::super::answer_gate::ClaimVerdict> {
+            assert!(
+                !passages.is_empty(),
+                "a checker is only asked about cited passages"
+            );
+            match self.0 {
+                Ok(support) => Ok(super::super::answer_gate::ClaimVerdict {
+                    support,
+                    rationale: Some("the passage quoted: SECRET RATIONALE".into()),
+                }),
+                Err(error) => anyhow::bail!("{error} SECRET PROVIDER ERROR"),
+            }
+        }
+    }
+
+    fn passage_answer(text: &str, id: &str) -> String {
+        structured(text, "passage", id)
+    }
+
+    #[tokio::test]
+    async fn a_passage_reference_is_bound_to_the_servers_complete_citation() {
+        let passages = [passage(7, PASSAGE_BODY)];
+        let gated = gate_text_answer_with_passages(
+            1,
+            2,
+            &passage_answer("Large returns need controller sign-off.", "7"),
+            &TextEvidence::default(),
+            &passages,
+            Some(&Scripted(Ok(ClaimSupport::Supported))),
+        )
+        .await
+        .unwrap();
+        // A paraphrase is admitted only because the semantic check supported it.
+        assert_eq!(gated.verification.outcome, TextAnswerOutcome::Admitted);
+        assert_eq!(
+            gated.verification.methods,
+            vec!["deterministic", "model_assisted"]
+        );
+        assert!(gated.is_passage_backed());
+        let claim = &gated.provenance.claims[0];
+        assert_eq!(claim.verification_method, "model_assisted");
+        assert_eq!(claim.verification_outcome, "supported");
+        assert_eq!(
+            claim.passage_support,
+            vec![PassageCitation {
+                kind: "policy".into(),
+                id: "returns".into(),
+                source_version: "2026".into(),
+                passage_key: "p7".into(),
+            }]
+        );
+        assert_eq!(gated.provenance.citations[0].kind, "passage");
+        assert_eq!(gated.durable_provenance.claims[0].passage_ids, vec![7]);
+    }
+
+    #[tokio::test]
+    async fn the_model_cannot_supply_or_widen_passage_authority() {
+        let passages = [passage(7, PASSAGE_BODY)];
+        let checker = Scripted(Ok(ClaimSupport::Supported));
+        for candidate in [
+            // A passage the actor is not authorized for.
+            passage_answer("Large returns need sign-off.", "8"),
+            passage_answer("Large returns need sign-off.", "0"),
+            passage_answer("Large returns need sign-off.", "07"),
+            // A model-authored citation, even one naming an authorized passage.
+            json!({
+                "content": "Large returns need sign-off.",
+                "claims": [{
+                    "text": "Large returns need sign-off.",
+                    "supportRefs": [],
+                    "passageSupport": [{"kind": "policy", "id": "returns", "source_version": "2026", "passage_key": "p7"}]
+                }]
+            })
+            .to_string(),
+        ] {
+            let gated = gate_text_answer_with_passages(
+                1,
+                2,
+                &candidate,
+                &TextEvidence::default(),
+                &passages,
+                Some(&checker),
+            )
+            .await
+            .unwrap();
+            assert_eq!(gated.verification.outcome, TextAnswerOutcome::Blocked, "{candidate}");
+            assert!(gated.released.is_none());
+        }
+
+        // With no authorized passage at all, no reference can resolve.
+        let gated = gate_text_answer_with_passages(
+            1,
+            2,
+            &passage_answer("Large returns need sign-off.", "7"),
+            &TextEvidence::default(),
+            &[],
+            Some(&checker),
+        )
+        .await
+        .unwrap();
+        assert_eq!(gated.verification.outcome, TextAnswerOutcome::Blocked);
+    }
+
+    #[tokio::test]
+    async fn the_plain_gate_still_rejects_passage_references() {
+        // Publication and loop callers hold no passage catalog: a passage
+        // reference there was not produced by the run.
+        let gated = gate_text_answer(
+            1,
+            2,
+            &passage_answer("Large returns need sign-off.", "7"),
+            &evidence(json!({"a": 1})),
+        )
+        .await
+        .unwrap();
+        assert_eq!(gated.verification.outcome, TextAnswerOutcome::Blocked);
+    }
+
+    #[tokio::test]
+    async fn an_unsupported_or_unchecked_passage_claim_is_never_admitted() {
+        let passages = [passage(7, PASSAGE_BODY)];
+        let claim = "Refunds never require approval.";
+        let candidate = passage_answer(claim, "7");
+        let unsupported = Scripted(Ok(ClaimSupport::Unsupported));
+        let failing = Scripted(Err("reviewer timed out"));
+        let checkers: [Option<&dyn ClaimCoverageChecker>; 3] =
+            [Some(&unsupported), Some(&failing), None];
+        for checker in checkers {
+            let gated = gate_text_answer_with_passages(
+                1,
+                2,
+                &candidate,
+                &TextEvidence::default(),
+                &passages,
+                checker,
+            )
+            .await
+            .unwrap();
+            assert_eq!(
+                gated.verification.outcome,
+                TextAnswerOutcome::RequiresReview
+            );
+            assert!(gated.released.is_none());
+            assert!(!gated.is_passage_backed());
+            // Neither the candidate, the reviewer's rationale nor a provider
+            // error comes back through the verdict.
+            let verdict = serde_json::to_string(&json!({
+                "notice": gated.withheld_notice(),
+                "verification": gated.verification,
+                "provenance": gated.provenance,
+            }))
+            .unwrap();
+            for secret in [claim, "SECRET RATIONALE", "SECRET PROVIDER ERROR"] {
+                assert!(!verdict.contains(secret), "{secret}: {verdict}");
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn a_partly_supported_claim_is_qualified_not_admitted() {
+        let passages = [passage(7, PASSAGE_BODY)];
+        let gated = gate_text_answer_with_passages(
+            1,
+            2,
+            &passage_answer("Large returns need sign-off.", "7"),
+            &TextEvidence::default(),
+            &passages,
+            Some(&Scripted(Ok(ClaimSupport::Partial))),
+        )
+        .await
+        .unwrap();
+        assert_eq!(gated.verification.outcome, TextAnswerOutcome::Qualified);
+        assert!(gated
+            .released
+            .as_deref()
+            .unwrap()
+            .contains("partly supported"));
+    }
+
+    #[tokio::test]
+    async fn retrieval_alone_is_not_support() {
+        let passages = [passage(7, PASSAGE_BODY)];
+        let checker = Scripted(Ok(ClaimSupport::Supported));
+        // The passage was retrieved, but the answer cites nothing.
+        let uncited = json!({
+            "content": PASSAGE_BODY,
+            "claims": [{"text": PASSAGE_BODY, "supportRefs": []}]
+        })
+        .to_string();
+        for candidate in [uncited.as_str(), PASSAGE_BODY] {
+            let gated = gate_text_answer_with_passages(
+                1,
+                2,
+                candidate,
+                &TextEvidence::default(),
+                &passages,
+                Some(&checker),
+            )
+            .await
+            .unwrap();
+            assert_ne!(gated.verification.outcome, TextAnswerOutcome::Admitted);
+            assert!(gated.released.is_none());
+        }
+    }
+
+    #[tokio::test]
+    async fn stale_tampered_or_undated_passages_do_not_admit() {
+        let checker = Scripted(Ok(ClaimSupport::Supported));
+        let run = |passage: SourcePassage| {
+            let checker = &checker;
+            async move {
+                gate_text_answer_with_passages(
+                    1,
+                    2,
+                    &passage_answer("Large returns need sign-off.", "7"),
+                    &TextEvidence::default(),
+                    &[passage],
+                    Some(checker),
+                )
+                .await
+                .unwrap()
+            }
+        };
+
+        let mut tampered = passage(7, PASSAGE_BODY);
+        tampered.text = "Returns never need approval.".into();
+        assert_eq!(
+            run(tampered).await.verification.outcome,
+            TextAnswerOutcome::Blocked
+        );
+
+        let mut withdrawn = passage(7, PASSAGE_BODY);
+        withdrawn.status = PassageStatus::Withdrawn;
+        assert_eq!(
+            run(withdrawn).await.verification.outcome,
+            TextAnswerOutcome::Blocked
+        );
+
+        let mut superseded = passage(7, PASSAGE_BODY);
+        superseded.status = PassageStatus::Superseded;
+        let gated = run(superseded).await;
+        assert_eq!(
+            gated.verification.outcome,
+            TextAnswerOutcome::RequiresReview
+        );
+        assert!(!gated.is_passage_backed());
+
+        // Ingested documents carry no effective dates: released, but qualified.
+        let mut undated = passage(7, PASSAGE_BODY);
+        undated.effective_from_micros = None;
+        let gated = run(undated).await;
+        assert_eq!(gated.verification.outcome, TextAnswerOutcome::Qualified);
+        assert!(gated.is_passage_backed());
+    }
+
+    #[tokio::test]
+    async fn the_gate_only_resolves_passages_of_its_own_scope() {
+        let catalog = AuthorizedPassageCatalog {
+            organization_id: 1,
+            company_id: 2,
+            passages: &[passage(7, PASSAGE_BODY)],
+        };
+        assert_eq!(
+            catalog
+                .source_passages(1, 2, "policy", "returns")
+                .await
+                .unwrap()
+                .len(),
+            1
+        );
+        for (org, company, kind, key) in [
+            (9, 2, "policy", "returns"),
+            (1, 9, "policy", "returns"),
+            (1, 2, "invoice", "returns"),
+            (1, 2, "policy", "other"),
+        ] {
+            assert!(catalog
+                .source_passages(org, company, kind, key)
+                .await
+                .unwrap()
+                .is_empty());
+        }
+    }
+
+    #[test]
+    fn a_released_answer_can_be_withheld_without_leaking_its_claims() {
+        let mut gated = GatedTextAnswer {
+            released: Some("Secret released claim.".into()),
+            verification: TextAnswerVerification {
+                outcome: TextAnswerOutcome::Admitted,
+                methods: vec!["deterministic"],
+                limitations: Vec::new(),
+                reason: None,
+            },
+            provenance: TextAnswerProvenance {
+                claims: vec![TextClaimProvenance {
+                    text: "Secret released claim.".into(),
+                    support_refs: Vec::new(),
+                    passage_support: Vec::new(),
+                    verification_method: "deterministic",
+                    verification_outcome: "traceable",
+                    limitations: Vec::new(),
+                }],
+                citations: vec![EvidenceRef {
+                    kind: "passage".into(),
+                    id: "7".into(),
+                }],
+                calculations: Vec::new(),
+                persisted: true,
+                persistence_reason: None,
+                contribution_id: Some(3),
+                claim_ids: vec![4],
+            },
+            durable_provenance: AnswerProvenance::default(),
+        };
+        gated.withhold("evidence changed before release");
+        assert!(gated.released.is_none());
+        assert_eq!(
+            gated.verification.outcome,
+            TextAnswerOutcome::RequiresReview
+        );
+        let serialized = serde_json::to_string(&json!({
+            "notice": gated.withheld_notice(),
+            "verification": gated.verification,
+            "provenance": gated.provenance,
+        }))
+        .unwrap();
+        assert!(
+            !serialized.contains("Secret released claim"),
+            "{serialized}"
+        );
+        assert!(gated.provenance.claim_ids.is_empty());
+        assert!(!gated.provenance.persisted);
     }
 
     #[test]

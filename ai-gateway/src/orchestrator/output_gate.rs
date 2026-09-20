@@ -11,7 +11,9 @@ use serde::Serialize;
 use stdb_client::StdbClient;
 
 use super::{
-    evidence_recorder::{PublicationEvidenceScope, StdbEvidenceRecorder},
+    evidence_recorder::{
+        AnswerEvidenceRecorder, PublicationEvidenceScope, RunEvidenceScope, StdbEvidenceRecorder,
+    },
     intelligence::{ClaimedCalculation, EvidenceRef, PassageCitation},
     text_answer_gate::{gate_text_answer, GatedTextAnswer, TextEvidence},
 };
@@ -134,16 +136,32 @@ pub(crate) async fn persist_or_withhold_generated_output(
     }
 }
 
+/// Persist a released answer's claim provenance under its durable run, through
+/// the same recorder governed runs use. Returns the contribution and claim ids
+/// on success; any failure is an error the caller must treat as fail-closed.
+pub(crate) async fn record_run_answer_provenance(
+    gated: &GatedTextAnswer,
+    writer: &StdbClient,
+    reader: &StdbClient,
+    organization_id: u64,
+    company_id: u64,
+    run_id: u64,
+) -> Result<(u64, Vec<u64>)> {
+    let recorded = StdbEvidenceRecorder { writer, reader }
+        .record(
+            &RunEvidenceScope {
+                organization_id,
+                company_id,
+                run_id,
+            },
+            &gated.durable_provenance,
+        )
+        .await?;
+    Ok((recorded.contribution_id, recorded.claim_ids))
+}
+
 fn withhold_for_persistence(gated: &mut GatedTextAnswer, reason: &str) {
-    gated.released = None;
-    gated.verification = super::text_answer_gate::TextAnswerVerification {
-        outcome: super::text_answer_gate::TextAnswerOutcome::RequiresReview,
-        methods: gated.verification.methods.clone(),
-        limitations: Vec::new(),
-        reason: Some(reason.to_string()),
-    };
-    gated.provenance.redact_for_withholding(reason);
-    gated.durable_provenance = Default::default();
+    gated.withhold(reason);
 }
 
 #[cfg(test)]

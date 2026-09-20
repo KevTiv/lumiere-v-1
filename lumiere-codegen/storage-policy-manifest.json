@@ -2892,6 +2892,68 @@
       "postgres_access_path": "organization_index"
     },
     {
+      "table": "ai_workflow_generation",
+      "module": "ai",
+      "rationale": "Marks one workflow version as harness-generated and names the governed run that produced it, resolved from the run table server-side. Append-only; a clone writes its own row naming its parent version.",
+      "authoritative_resources": [],
+      "durability_class": "durable_history",
+      "organization_ownership": "direct",
+      "organization_column": "organization_id",
+      "company_ownership": "direct",
+      "company_column_path": [
+        "company_id"
+      ],
+      "company_column_nullable": false,
+      "aggregate": {
+        "kind": "root",
+        "parent": null
+      },
+      "primary_key": {
+        "strategy": "auto_increment",
+        "column": "id",
+        "version_strategy": "none"
+      },
+      "projection_mode": "append-history",
+      "hot_retention": "always",
+      "cooling_eligibility": "never",
+      "cooling_eligibility_source": "reviewed:hr-reuse/workflow-generation",
+      "dependency_behavior": "independent",
+      "hydration_policy": "not_applicable",
+      "delete_behavior": "append_only",
+      "postgres_access_path": "organization_partition"
+    },
+    {
+      "table": "ai_workflow_node_provenance",
+      "module": "ai",
+      "rationale": "Typed, version-bound staging of the accepted decisions and reviewed claims behind one generated workflow step, with the server-computed canonical node hash. A restage supersedes the earlier row; publication binds the step into ai_artifact_component.",
+      "authoritative_resources": [],
+      "durability_class": "durable_operational_state",
+      "organization_ownership": "direct",
+      "organization_column": "organization_id",
+      "company_ownership": "direct",
+      "company_column_path": [
+        "company_id"
+      ],
+      "company_column_nullable": false,
+      "aggregate": {
+        "kind": "root",
+        "parent": null
+      },
+      "primary_key": {
+        "strategy": "auto_increment",
+        "column": "id",
+        "version_strategy": "none"
+      },
+      "projection_mode": "upsert-current",
+      "hot_retention": "always",
+      "cooling_eligibility": "never",
+      "cooling_eligibility_source": "reviewed:hr-reuse/workflow-node-provenance",
+      "dependency_behavior": "independent",
+      "hydration_policy": "not_applicable",
+      "delete_behavior": "tombstone",
+      "postgres_access_path": "organization_index"
+    },
+    {
       "table": "amortization_line",
       "module": "accounting",
       "rationale": "Reviewed child aggregate: schedule_id references amortization_schedule.id.",

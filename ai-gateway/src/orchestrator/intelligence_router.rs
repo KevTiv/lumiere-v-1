@@ -12,6 +12,7 @@ use serde_json::json;
 use stdb_client::{ReducerCall, StdbClient};
 
 use super::{
+    answer_gate::{DecisionClaimCoverageChecker, SourcePassage},
     governed_program::{
         run_generation_only_program, GovernedProgramContext, GovernedProgramOutcome,
         StdbIntelligenceEventRecorder, StdbProgramCheckpointStore,
@@ -27,10 +28,10 @@ use super::{
         IntelligenceRole, IntelligenceRoute, IntelligenceRouteResolver, ModelProfile,
     },
     spend_admission::{spend_binding_for_profile, SpendAdmittedLlm, SpendLedger},
+    text_answer_gate::{gate_text_answer_with_passages_and_reviews, GatedTextAnswer, TextEvidence},
 };
 use crate::{
-    ai_agent::ResolvedAgentConfig,
-    orchestrator::skill_loader::GovernedRunRef,
+    ai_agent::ResolvedAgentConfig, orchestrator::skill_loader::GovernedRunRef,
     providers::llm::LlmCompletion,
 };
 
@@ -176,8 +177,7 @@ pub(crate) async fn generate_routed_for_run(
     if run_id == 0 {
         bail!("durable run_id is required for routed generation");
     }
-    let resolver =
-        IntelligenceRouteResolver::new(store, organization_id, agent, policy_ref)?;
+    let resolver = IntelligenceRouteResolver::new(store, organization_id, agent, policy_ref)?;
     let router = ConfiguredIntelligenceRouter::new(resolver);
     RoutedGenerationProvider::new(
         &router,
@@ -211,8 +211,9 @@ pub(crate) async fn run_catalogued_generation_surface(
     generation_instructions: Option<String>,
     generation_max_tokens: Option<u32>,
 ) -> Result<GovernedProgramOutcome> {
-    let catalog = governed_program_for_skill(skill_key)
-        .with_context(|| format!("skill '{skill_key}' is not registered in governed program catalog"))?;
+    let catalog = governed_program_for_skill(skill_key).with_context(|| {
+        format!("skill '{skill_key}' is not registered in governed program catalog")
+    })?;
     if run.program_ref.as_deref() != Some(catalog.program_ref) {
         bail!(
             "run program identity mismatch for '{skill_key}': expected {}, got {:?}",
@@ -255,6 +256,58 @@ pub(crate) async fn run_catalogued_generation_surface(
         &generation,
         Some(&checkpoint_store),
         &recorder,
+    )
+    .await
+}
+
+/// Judge one RAG candidate against the passages its actor is authorized to
+/// see. Passage-backed claims are checked for semantic support by a
+/// review-role model routed and spend-admitted like every other model call in
+/// the run. If that model cannot be routed or fails, the claim stays
+/// unchecked and the answer requires review — it is never admitted.
+#[allow(clippy::too_many_arguments)]
+pub(crate) async fn gate_rag_answer_with_review(
+    store: &super::model_configuration::StdbModelConfigurationStore<'_>,
+    ledger: &dyn SpendLedger,
+    organization_id: u64,
+    company_id: u64,
+    run: &GovernedRunRef,
+    agent: &ResolvedAgentConfig,
+    transport: &dyn LlmCompletion,
+    candidate: &str,
+    evidence: &TextEvidence,
+    passages: &[SourcePassage],
+    reviewed_claims: Option<&dyn super::reviewed_claims::ReviewedClaimResolver>,
+) -> Result<GatedTextAnswer> {
+    let resolver = IntelligenceRouteResolver::new(
+        store,
+        organization_id,
+        agent,
+        run.intelligence_policy_ref.as_deref(),
+    )?;
+    let router = ConfiguredIntelligenceRouter::new(resolver);
+    let reviewer = RoutedDecisionProvider::new(
+        &router,
+        transport,
+        ledger,
+        agent,
+        organization_id,
+        company_id,
+        run.run_id,
+        IntelligenceRole::Review,
+        &NoopShadowDecisionRecorder,
+    )?;
+    let checker = DecisionClaimCoverageChecker {
+        reviewer: &reviewer,
+    };
+    gate_text_answer_with_passages_and_reviews(
+        organization_id,
+        company_id,
+        candidate,
+        evidence,
+        passages,
+        Some(&checker),
+        reviewed_claims,
     )
     .await
 }

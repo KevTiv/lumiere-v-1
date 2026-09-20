@@ -191,10 +191,7 @@ pub async fn run_skill(state: &AppState, req: RunSkillRequest) -> Result<RunSkil
 
 /// Legacy bundled-skill runner. This is intentionally private so no harness
 /// adapter can bypass the typed governed admission boundary.
-async fn run_legacy_skill(
-    state: &AppState,
-    req: RunSkillRequest,
-) -> Result<RunSkillResponse> {
+async fn run_legacy_skill(state: &AppState, req: RunSkillRequest) -> Result<RunSkillResponse> {
     if req.org_id == 0 {
         anyhow::bail!("org_id is required");
     }
@@ -870,6 +867,10 @@ pub async fn run_skill_admitted(
         let claim_checker = DecisionClaimCoverageChecker {
             reviewer: &review_provider,
         };
+        // An exact, current, human-reviewed claim may stand in for the
+        // model-assisted check; the server resolves it, never the model.
+        let reviewed_claims =
+            super::reviewed_claims::StdbReviewedClaimResolver { rows: spend_reader };
         let answer_admission = EvidenceGatedAnswerAdmission {
             scope: GateScope {
                 organization_id: req.org_id,
@@ -880,6 +881,7 @@ pub async fn run_skill_admitted(
             policy: GatePolicy::default(),
             catalog: &passage_catalog,
             claim_checker: Some(&claim_checker),
+            reviewed_claims: Some(&reviewed_claims),
         };
         // AIH-14: persist the provenance of every answer the gate judges, so
         // it can be inspected claim by claim and invalidated with its sources.

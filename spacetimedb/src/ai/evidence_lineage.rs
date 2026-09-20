@@ -39,12 +39,16 @@ use crate::ai::evidence_common::{
     validate_text_list,
 };
 use crate::ai::evidence_dependency::{
-    escalate_dependents, link_dependency, require_dependencies_usable, DependentKind, Requirement,
-    Severity, UpstreamKind,
+    escalate_dependents, has_invalid_dependency, link_dependency, require_dependencies_usable,
+    DependentKind, Requirement, Severity, UpstreamKind,
 };
-use crate::ai::evidence_source::{ai_evidence_contribution, require_passage_referencable};
+use crate::ai::evidence_source::{
+    ai_evidence_contribution, require_passage_referencable, TEXT_PRESENT,
+};
+use crate::ai::workflow_provenance::require_component_matches_workflow_node;
 use crate::core::organization::require_company_in_organization;
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
+use crate::workflow::authorization::require_workflow_company_access;
 
 const MAX_STATEMENT_LEN: usize = 4_000;
 const MAX_RATIONALE_LEN: usize = 2_000;
@@ -124,6 +128,13 @@ pub struct AiEvidenceClaim {
     pub create_date: Timestamp,
     pub write_uid: Identity,
     pub write_date: Timestamp,
+    /// The person behind a `human_reviewed` verdict and when they gave it. Set
+    /// only by `review_ai_evidence_claim`; never inferred from `write_uid`,
+    /// which automated flags also move, or from audit text.
+    #[default(None::<Identity>)]
+    pub reviewer_uid: Option<Identity>,
+    #[default(None::<Timestamp>)]
+    pub reviewed_at: Option<Timestamp>,
 }
 
 #[derive(Clone)]
@@ -270,6 +281,9 @@ pub struct ReviewAiArtifactComponentLinksParams {
     /// confirmed | unresolved
     pub outcome: String,
     pub note: Option<String>,
+    /// The content hash the reviewer inspected. A confirmation restores the
+    /// links only for exactly this content; a workflow step must supply it.
+    pub expected_content_hash: Option<String>,
 }
 
 // ── Reducers ─────────────────────────────────────────────────────────────────
@@ -323,6 +337,8 @@ pub fn record_ai_evidence_claim(
         create_date: ctx.timestamp,
         write_uid: ctx.sender(),
         write_date: ctx.timestamp,
+        reviewer_uid: None,
+        reviewed_at: None,
     });
 
     for passage_id in &row.supporting_passage_ids {
@@ -384,8 +400,16 @@ pub fn record_ai_evidence_claim(
 }
 
 /// A human reviewer's verdict on a claim. This is the only path that records
-/// `human_reviewed`; it needs its own permission and replaces any earlier
-/// automated verdict without erasing it from the audit trail.
+/// `human_reviewed`. It needs its own permission, current company membership
+/// and independence from whoever created or proposed the claim, and it
+/// persists the reviewer and the time on the claim itself.
+///
+/// The earlier automated verdict is replaced on the row but not erased: its
+/// method, outcome and note go to the audit trail, and a model verdict is
+/// never relabelled as human review. A `supported` or `qualified` verdict
+/// re-checks that the claim is still grounded in current passages and that
+/// every dependency is usable; an `unsupported` verdict needs only that the
+/// claim is still live.
 #[reducer]
 pub fn review_ai_evidence_claim(
     ctx: &ReducerContext,
@@ -395,6 +419,7 @@ pub fn review_ai_evidence_claim(
     params: ReviewAiEvidenceClaimParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "ai_evidence_claim", "update")?;
+    require_reviewer_membership(ctx, organization_id, company_id)?;
     let claim = load_claim(ctx, organization_id, company_id, claim_id)?;
     require_one_of(
         "verification_outcome",
@@ -402,19 +427,30 @@ pub fn review_ai_evidence_claim(
         &["supported", "unsupported", "qualified"],
     )?;
     require_opt_len("verification_note", &params.verification_note, MAX_NOTE_LEN)?;
-    if claim.status == CLAIM_SUPERSEDED {
-        return Err("a superseded claim cannot be reviewed; review its revision".to_string());
+    if params.verification_outcome == "qualified"
+        && params
+            .verification_note
+            .as_deref()
+            .is_none_or(|note| note.trim().is_empty())
+    {
+        return Err("a qualified verdict must state its qualification in the note".to_string());
     }
-    if params.verification_outcome == "supported" {
+    require_claim_reviewable(ctx, &claim)?;
+    require_independent_of_claim(ctx, &claim)?;
+    if params.verification_outcome != "unsupported" {
         require_claim_grounding(&claim)?;
-        // A claim resting on withdrawn evidence cannot be re-blessed here.
+        require_claim_passages_current(ctx, &claim)?;
+        // A claim resting on withdrawn or unreaffirmed evidence cannot be
+        // re-blessed here.
         require_dependencies_usable(ctx, organization_id, DependentKind::Claim, claim_id)?;
     }
 
     let old = serde_json::json!({
         "verification_method": claim.verification_method,
         "verification_outcome": claim.verification_outcome,
+        "verification_note": claim.verification_note,
         "status": claim.status,
+        "reviewer_uid": claim.reviewer_uid.map(|id| id.to_hex().to_string()),
     });
     let status = if params.verification_outcome == "unsupported" {
         CLAIM_NEEDS_REVIEW.to_string()
@@ -428,6 +464,8 @@ pub fn review_ai_evidence_claim(
         status: status.clone(),
         write_uid: ctx.sender(),
         write_date: ctx.timestamp,
+        reviewer_uid: Some(ctx.sender()),
+        reviewed_at: Some(ctx.timestamp),
         ..claim
     });
 
@@ -445,6 +483,7 @@ pub fn review_ai_evidence_claim(
                     "verification_method": "human_reviewed",
                     "verification_outcome": params.verification_outcome,
                     "status": status,
+                    "reviewer_uid": ctx.sender().to_hex().to_string(),
                 })
                 .to_string(),
             ),
@@ -452,6 +491,8 @@ pub fn review_ai_evidence_claim(
                 "verification_method".to_string(),
                 "verification_outcome".to_string(),
                 "status".to_string(),
+                "reviewer_uid".to_string(),
+                "reviewed_at".to_string(),
             ],
             metadata: None,
         },
@@ -623,12 +664,14 @@ pub fn review_ai_evidence_decision(
     params: ReviewAiEvidenceDecisionParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "ai_evidence_decision", "update")?;
+    require_reviewer_membership(ctx, organization_id, company_id)?;
     let decision = load_decision(ctx, organization_id, company_id, decision_id)?;
     require_one_of("outcome", &params.outcome, &DECISION_REVIEW_OUTCOMES)?;
     require_opt_len("note", &params.note, MAX_NOTE_LEN)?;
     if decision.status != DECISION_PROPOSED && decision.status != DECISION_NEEDS_REVIEW {
         return Err(format!("a {} decision cannot be reviewed", decision.status));
     }
+    require_independent_of_decision(ctx, &decision)?;
 
     if params.outcome == "accepted" {
         for claim_id in &decision.adopted_claim_ids {
@@ -691,6 +734,25 @@ pub fn bind_ai_artifact_component(
     params: BindAiArtifactComponentParams,
 ) -> Result<(), String> {
     bind_ai_artifact_component_inner(ctx, organization_id, company_id, params)
+}
+
+/// Everything `bind_ai_artifact_component` checks before it writes, for a
+/// caller that must not write anything if the binding would be refused (a
+/// draft save or a publication). The binding itself still validates again.
+pub(crate) fn require_component_bindable(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    decision_ids: &[u64],
+    claim_ids: &[u64],
+) -> Result<(), String> {
+    if organization_id == 0 {
+        return Err("organization_id must be nonzero".to_string());
+    }
+    check_permission(ctx, organization_id, "ai_artifact_component", "create")?;
+    require_company_in_organization(ctx, organization_id, company_id)?;
+    validate_component_links(decision_ids, claim_ids)?;
+    require_bindable_links(ctx, organization_id, company_id, decision_ids, claim_ids)
 }
 
 pub(crate) fn bind_ai_artifact_component_inner(
@@ -780,6 +842,19 @@ pub fn revise_ai_artifact_component(
     component_id: u64,
     params: ReviseAiArtifactComponentParams,
 ) -> Result<(), String> {
+    revise_ai_artifact_component_inner(ctx, organization_id, company_id, component_id, params)
+        .map(|_| ())
+}
+
+/// Shared by the reducer and by governed artifact paths (workflow clone and
+/// restage) so a revision is validated by exactly one implementation.
+pub(crate) fn revise_ai_artifact_component_inner(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    component_id: u64,
+    params: ReviseAiArtifactComponentParams,
+) -> Result<AiArtifactComponent, String> {
     check_permission(ctx, organization_id, "ai_artifact_component", "create")?;
     let parent = load_component(ctx, organization_id, company_id, component_id)?;
     if !is_sha256_hex(&params.content_hash) {
@@ -886,7 +961,7 @@ pub fn revise_ai_artifact_component(
             ),
         },
     );
-    Ok(())
+    Ok(row)
 }
 
 /// A reviewer confirms (or refuses to confirm) that a component's links still
@@ -901,6 +976,7 @@ pub fn review_ai_artifact_component_links(
     params: ReviewAiArtifactComponentLinksParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "ai_artifact_component", "update")?;
+    require_reviewer_membership(ctx, organization_id, company_id)?;
     let component = load_component(ctx, organization_id, company_id, component_id)?;
     require_one_of("outcome", &params.outcome, &["confirmed", "unresolved"])?;
     require_opt_len("note", &params.note, MAX_NOTE_LEN)?;
@@ -909,6 +985,7 @@ pub fn review_ai_artifact_component_links(
     }
 
     let link_state = if params.outcome == "confirmed" {
+        require_confirmed_content(ctx, &component, params.expected_content_hash.as_deref())?;
         require_bindable_links(
             ctx,
             organization_id,
@@ -953,6 +1030,152 @@ pub fn review_ai_artifact_component_links(
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
+
+// ── Review independence and freshness ────────────────────────────────────────
+
+/// A reviewer must be an active member of the company they review in. A
+/// superuser's membership bypass is not enough: a review is the reviewer's own
+/// act in that company.
+fn require_reviewer_membership(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+) -> Result<(), String> {
+    require_company_in_organization(ctx, organization_id, company_id)?;
+    if require_workflow_company_access(ctx, organization_id, company_id, ctx.sender())? {
+        return Err(
+            "superuser membership bypass cannot be used for an evidence review".to_string(),
+        );
+    }
+    Ok(())
+}
+
+/// A claim that is superseded, or rests on evidence that is withdrawn, deleted
+/// or revoked, cannot be reviewed: there is nothing current to bless.
+fn require_claim_reviewable(ctx: &ReducerContext, claim: &AiEvidenceClaim) -> Result<(), String> {
+    if claim.status == CLAIM_SUPERSEDED
+        || ctx
+            .db
+            .ai_evidence_claim()
+            .ai_evidence_claim_by_org()
+            .filter(&claim.organization_id)
+            .any(|other| other.supersedes_claim_id == Some(claim.id))
+    {
+        return Err("a superseded claim cannot be reviewed; review its revision".to_string());
+    }
+    if has_invalid_dependency(ctx, claim.organization_id, DependentKind::Claim, claim.id) {
+        return Err(
+            "a claim resting on withdrawn or revoked evidence cannot be reviewed".to_string(),
+        );
+    }
+    Ok(())
+}
+
+/// Separation of duties: whoever created a claim, or whose contribution
+/// introduced it, cannot be the one to vouch for it.
+fn require_independent_of_claim(
+    ctx: &ReducerContext,
+    claim: &AiEvidenceClaim,
+) -> Result<(), String> {
+    require_independent(ctx, claim.create_uid, claim.contribution_id, "claim")
+}
+
+fn require_independent_of_decision(
+    ctx: &ReducerContext,
+    decision: &AiEvidenceDecision,
+) -> Result<(), String> {
+    require_independent(
+        ctx,
+        decision.create_uid,
+        decision.contribution_id,
+        "decision",
+    )
+}
+
+fn require_independent(
+    ctx: &ReducerContext,
+    creator: Identity,
+    contribution_id: Option<u64>,
+    what: &str,
+) -> Result<(), String> {
+    let reviewer = ctx.sender();
+    if creator == reviewer {
+        return Err(format!("the creator of a {what} cannot review it"));
+    }
+    let proposer = contribution_id
+        .and_then(|id| ctx.db.ai_evidence_contribution().id().find(&id))
+        .map(|contribution| contribution.contributor_uid);
+    if proposer == Some(reviewer) {
+        return Err(format!("the proposer of a {what} cannot review it"));
+    }
+    Ok(())
+}
+
+/// A claim may only be blessed while every passage it rests on is still
+/// present, current and in scope.
+fn require_claim_passages_current(
+    ctx: &ReducerContext,
+    claim: &AiEvidenceClaim,
+) -> Result<(), String> {
+    for passage_id in &claim.supporting_passage_ids {
+        // A superseded passage is judged by its dependency edge, which a
+        // reviewer must already have reaffirmed; a withdrawn, restricted or
+        // deleted one is never acceptable support.
+        let passage = require_passage_referencable(
+            ctx,
+            claim.organization_id,
+            claim.company_id,
+            *passage_id,
+            false,
+        )?;
+        if passage.status == "withdrawn" || passage.text_state != TEXT_PRESENT {
+            return Err(format!(
+                "Passage {passage_id} is {} / {} and cannot support a reviewed claim",
+                passage.status, passage.text_state
+            ));
+        }
+    }
+    Ok(())
+}
+
+/// A confirmation restores links for exactly the content the reviewer saw. A
+/// workflow step must name that hash, and it must still be the node's current
+/// content — a later edit moves the node to a new hash and needs its own review.
+fn require_confirmed_content(
+    ctx: &ReducerContext,
+    component: &AiArtifactComponent,
+    expected_content_hash: Option<&str>,
+) -> Result<(), String> {
+    if let Some(expected) = expected_content_hash {
+        if expected != component.content_hash {
+            return Err(
+                "the confirmed content hash does not match the component's content".to_string(),
+            );
+        }
+    } else if component.component_kind == "workflow_step" {
+        return Err("confirming a workflow step must name the content hash reviewed".to_string());
+    }
+    if component.component_kind == "workflow_step" {
+        require_component_matches_workflow_node(ctx, component)?;
+    }
+    Ok(())
+}
+
+/// Retire a component whose artifact part no longer exists (for example a
+/// deleted draft node) without deleting its history.
+pub(crate) fn supersede_component(ctx: &ReducerContext, component: AiArtifactComponent) {
+    if component.status == COMPONENT_CURRENT {
+        ctx.db
+            .ai_artifact_component()
+            .id()
+            .update(AiArtifactComponent {
+                status: COMPONENT_SUPERSEDED.to_string(),
+                write_uid: ctx.sender(),
+                write_date: ctx.timestamp,
+                ..component
+            });
+    }
+}
 
 pub(crate) fn load_claim(
     ctx: &ReducerContext,
@@ -1012,7 +1235,7 @@ pub(crate) fn load_component(
     Ok(component)
 }
 
-fn find_current_component(
+pub(crate) fn find_current_component(
     ctx: &ReducerContext,
     organization_id: u64,
     artifact_ref: &str,
@@ -1061,7 +1284,7 @@ fn decision_matches_params(
 
 /// Links a component may be newly bound to: accepted decisions and current
 /// claims. Anything else is a bibliography or stale work, not a justification.
-fn require_bindable_links(
+pub(crate) fn require_bindable_links(
     ctx: &ReducerContext,
     organization_id: u64,
     company_id: u64,
@@ -1081,6 +1304,33 @@ fn require_bindable_links(
         let claim = load_claim(ctx, organization_id, company_id, *claim_id)?;
         if claim.status != CLAIM_CURRENT {
             return Err(format!("Claim {claim_id} is {}", claim.status));
+        }
+    }
+    Ok(())
+}
+
+/// Claims linked to a governed artifact step must have been reviewed by a
+/// person and judged supported or explicitly qualified. A model's or a
+/// deterministic check's verdict is not a review, and an unsupported or
+/// unreviewed claim is not a justification.
+pub(crate) fn require_reviewed_claim_links(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    claim_ids: &[u64],
+) -> Result<(), String> {
+    for claim_id in claim_ids {
+        let claim = load_claim(ctx, organization_id, company_id, *claim_id)?;
+        if claim.verification_method != "human_reviewed"
+            || claim.reviewer_uid.is_none()
+            || !matches!(
+                claim.verification_outcome.as_str(),
+                "supported" | "qualified"
+            )
+        {
+            return Err(format!(
+                "Claim {claim_id} has not been reviewed by a person as supported or qualified"
+            ));
         }
     }
     Ok(())
@@ -1238,7 +1488,7 @@ fn validate_decision_params(params: &RecordAiEvidenceDecisionParams) -> Result<(
     Ok(())
 }
 
-fn validate_component_identity(
+pub(crate) fn validate_component_identity(
     artifact_ref: &str,
     component_key: &str,
     content_hash: &str,
@@ -1252,7 +1502,10 @@ fn validate_component_identity(
 }
 
 /// A component needs at least one decision; claims alone are a bibliography.
-fn validate_component_links(decision_ids: &[u64], claim_ids: &[u64]) -> Result<(), String> {
+pub(crate) fn validate_component_links(
+    decision_ids: &[u64],
+    claim_ids: &[u64],
+) -> Result<(), String> {
     if decision_ids.is_empty() {
         return Err(
             "a component must link to at least one decision; sources and claims alone are only a bibliography"

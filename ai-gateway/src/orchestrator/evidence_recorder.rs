@@ -121,6 +121,17 @@ pub(super) fn claim_record(assessment: &ClaimAssessment) -> ClaimRecord {
                 "traceable to server-produced run evidence; no durable passage binding".to_string(),
             ),
         },
+        // Never written: a reviewed claim is referenced by id, and only
+        // `review_ai_evidence_claim` can produce `human_reviewed`. This is the
+        // most conservative description should a caller ever ask.
+        ClaimVerification::HumanReviewed { .. } | ClaimVerification::ReviewRejected { .. } => {
+            ClaimRecord {
+                kind: "sourced_fact",
+                verification_method: "none",
+                verification_outcome: "unverified",
+                note: Some("an existing reviewed claim stands for this statement".to_string()),
+            }
+        }
         ClaimVerification::NoSupportCited => {
             unsupported("the answer cited no passage for this claim")
         }
@@ -154,6 +165,42 @@ pub(super) fn claim_record(assessment: &ClaimAssessment) -> ClaimRecord {
     }
 }
 
+/// What to do for one assessed claim: point at a claim a person already
+/// reviewed, or write a new one.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(super) enum ClaimPlan<'a> {
+    /// The answer stands on this existing claim; nothing is written.
+    Existing(u64),
+    Record {
+        record: ClaimRecord,
+        passages: &'a [u64],
+        assumptions: &'a [String],
+    },
+}
+
+pub(super) fn plan_claim(assessment: &ClaimAssessment) -> ClaimPlan<'_> {
+    if let ClaimVerification::HumanReviewed { claim_id, .. }
+    | ClaimVerification::ReviewRejected { claim_id } = &assessment.verification
+    {
+        return ClaimPlan::Existing(*claim_id);
+    }
+    let record = claim_record(assessment);
+    let sourced = record.kind == "sourced_fact";
+    ClaimPlan::Record {
+        passages: if sourced {
+            &assessment.passage_ids
+        } else {
+            &[]
+        },
+        assumptions: if sourced {
+            &assessment.assumptions
+        } else {
+            &[]
+        },
+        record,
+    }
+}
+
 pub(super) fn calculation_record(assessment: &CalculationAssessment) -> ClaimRecord {
     ClaimRecord {
         kind: "calculation",
@@ -171,7 +218,7 @@ pub(super) fn calculation_record(assessment: &CalculationAssessment) -> ClaimRec
     }
 }
 
-fn truncate_chars(text: &str, max: usize) -> String {
+pub(super) fn truncate_chars(text: &str, max: usize) -> String {
     if text.chars().count() <= max {
         text.trim().to_string()
     } else {
@@ -222,6 +269,7 @@ fn contribution_params_for(
 fn claim_params(
     statement: &str,
     passage_ids: &[u64],
+    assumptions: &[String],
     calculation_ref: Option<String>,
     contribution_id: u64,
     record: &ClaimRecord,
@@ -232,7 +280,7 @@ fn claim_params(
         "supporting_passage_ids": passage_ids,
         "contradicting_passage_ids": Vec::<u64>::new(),
         "calculation_ref": opt(calculation_ref),
-        "assumptions": Vec::<String>::new(),
+        "assumptions": assumptions,
         "contribution_id": opt(Some(contribution_id)),
         "verification_method": record.verification_method,
         "verification_outcome": record.verification_outcome,
@@ -333,6 +381,7 @@ impl StdbEvidenceRecorder<'_> {
         contribution_id: u64,
         statement: &str,
         passage_ids: &[u64],
+        assumptions: &[String],
         calculation_ref: Option<String>,
         record: &ClaimRecord,
     ) -> Result<u64> {
@@ -349,6 +398,7 @@ impl StdbEvidenceRecorder<'_> {
                     claim_params(
                         &statement,
                         passage_ids,
+                        assumptions,
                         calculation_ref,
                         contribution_id,
                         record
@@ -421,23 +471,28 @@ impl StdbEvidenceRecorder<'_> {
 
         let mut claim_ids = Vec::new();
         for assessment in provenance.claims.iter().take(MAX_CLAIMS_RECORDED) {
-            let record = claim_record(assessment);
-            let passages: &[u64] = if record.kind == "sourced_fact" {
-                &assessment.passage_ids
-            } else {
-                &[]
-            };
-            claim_ids.push(
-                self.record_one(
-                    scope,
-                    contribution_id,
-                    &assessment.text,
+            match plan_claim(assessment) {
+                // A person's review is referenced, never restated: the answer
+                // points at the reviewed claim itself, so this recorder cannot
+                // write (or overwrite) a `human_reviewed` claim.
+                ClaimPlan::Existing(claim_id) => claim_ids.push(claim_id),
+                ClaimPlan::Record {
+                    record,
                     passages,
-                    None,
-                    &record,
-                )
-                .await?,
-            );
+                    assumptions,
+                } => claim_ids.push(
+                    self.record_one(
+                        scope,
+                        contribution_id,
+                        &assessment.text,
+                        passages,
+                        assumptions,
+                        None,
+                        &record,
+                    )
+                    .await?,
+                ),
+            }
         }
         for (index, calculation) in provenance.calculations.iter().enumerate() {
             let record = calculation_record(calculation);
@@ -446,6 +501,7 @@ impl StdbEvidenceRecorder<'_> {
                     scope,
                     contribution_id,
                     &format!("Calculation: {}", calculation.label),
+                    &[],
                     &[],
                     Some(if agent_run_id.is_some() {
                         scope.calculation_ref(index)
@@ -540,12 +596,14 @@ impl FinalAnswerAdmission for RecordingAnswerAdmission<'_> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::orchestrator::reviewed_claims::ReviewedOutcome;
 
     fn assessment(passage_ids: Vec<u64>, verification: ClaimVerification) -> ClaimAssessment {
         ClaimAssessment {
             text: "The VAT rate is 20%.".into(),
             passage_ids,
             verification,
+            assumptions: vec![],
         }
     }
 
@@ -642,11 +700,96 @@ mod tests {
         assert_eq!(params["inspection_state"], "unverified_recollection");
 
         let record = claim_record(&assessment(vec![3, 4], ClaimVerification::Unchecked));
-        let claim = claim_params("A claim", &[3, 4], None, 5, &record);
+        let claim = claim_params("A claim", &[3, 4], &[], None, 5, &record);
         assert_eq!(claim["supporting_passage_ids"], json!([3, 4]));
         assert_eq!(claim["contribution_id"], json!({ "some": 5 }));
         assert_eq!(claim["calculation_ref"], json!({ "none": [] }));
         assert_eq!(claim["supersedes_claim_id"], json!({ "none": [] }));
+    }
+
+    #[test]
+    fn no_assessment_can_make_the_recorder_write_human_review() {
+        let verifications = [
+            ClaimVerification::RunEvidence,
+            ClaimVerification::NoSupportCited,
+            ClaimVerification::Unresolved,
+            ClaimVerification::Unchecked,
+            ClaimVerification::Model {
+                support: ClaimSupport::Supported,
+                rationale: Some("looks right".into()),
+            },
+            ClaimVerification::HumanReviewed {
+                claim_id: 40,
+                outcome: ReviewedOutcome::Supported,
+                reviewer_hex: "01".repeat(32),
+                reviewed_at_micros: Some(1),
+            },
+            ClaimVerification::ReviewRejected { claim_id: 41 },
+        ];
+        for verification in verifications {
+            for passages in [vec![], vec![7]] {
+                let assessment = assessment(passages, verification.clone());
+                match plan_claim(&assessment) {
+                    ClaimPlan::Record { record, .. } => {
+                        assert_ne!(record.verification_method, "human_reviewed");
+                        assert!(RECORDABLE_METHODS.contains(&record.verification_method));
+                    }
+                    ClaimPlan::Existing(_) => {}
+                }
+            }
+        }
+    }
+
+    /// Mirror of `RECORDABLE_VERIFICATION_METHODS` in the STDB module: the
+    /// only methods a recorder may write.
+    const RECORDABLE_METHODS: [&str; 3] = ["none", "deterministic", "model_assisted"];
+
+    #[test]
+    fn a_reviewed_claim_is_referenced_by_id_and_nothing_is_rewritten() {
+        let reviewed = assessment(
+            vec![7],
+            ClaimVerification::HumanReviewed {
+                claim_id: 40,
+                outcome: ReviewedOutcome::Qualified,
+                reviewer_hex: "01".repeat(32),
+                reviewed_at_micros: None,
+            },
+        );
+        assert_eq!(plan_claim(&reviewed), ClaimPlan::Existing(40));
+        let rejected = assessment(vec![7], ClaimVerification::ReviewRejected { claim_id: 41 });
+        assert_eq!(plan_claim(&rejected), ClaimPlan::Existing(41));
+    }
+
+    #[test]
+    fn new_claims_carry_their_assumption_identity_to_the_wire() {
+        let mut model = assessment(
+            vec![7],
+            ClaimVerification::Model {
+                support: ClaimSupport::Supported,
+                rationale: None,
+            },
+        );
+        model.assumptions = vec!["applicability:jurisdiction:US".into()];
+        let ClaimPlan::Record {
+            record,
+            passages,
+            assumptions,
+        } = plan_claim(&model)
+        else {
+            panic!("a model-checked claim is recorded");
+        };
+        let wire = claim_params("A claim", passages, assumptions, None, 5, &record);
+        assert_eq!(
+            wire["assumptions"],
+            json!(["applicability:jurisdiction:US"])
+        );
+        assert_eq!(wire["verification_method"], "model_assisted");
+        // Claims that cannot be reviewed as sourced facts carry none.
+        let unresolved = assessment(vec![], ClaimVerification::Unresolved);
+        let ClaimPlan::Record { assumptions, .. } = plan_claim(&unresolved) else {
+            panic!("recorded");
+        };
+        assert!(assumptions.is_empty());
     }
 
     #[test]
@@ -780,6 +923,7 @@ mod tests {
             policy: GatePolicy::default(),
             catalog,
             claim_checker: checker,
+            reviewed_claims: None,
         }
     }
 
@@ -1047,11 +1191,13 @@ mod tests {
                         support: ClaimSupport::Supported,
                         rationale: Some("matches the passage".into()),
                     },
+                    assumptions: vec![],
                 },
                 ClaimAssessment {
                     text: format!("Exports are exempt. ({key})"),
                     passage_ids: vec![],
                     verification: ClaimVerification::NoSupportCited,
+                    assumptions: vec![],
                 },
             ],
             calculations: vec![CalculationAssessment {

@@ -120,6 +120,20 @@ fn seed_decision(
         .max()
         .ok_or("presentation evidence decision missing")?;
     if accept {
+        // Acceptance needs a reviewer independent of the proposer; the suite
+        // runs as one sender, so the proposer is set on the row directly.
+        let proposed = ctx
+            .db
+            .ai_evidence_decision()
+            .id()
+            .find(&decision_id)
+            .ok_or("presentation evidence decision missing")?;
+        ctx.db.ai_evidence_decision().id().update(
+            crate::ai::evidence_lineage::AiEvidenceDecision {
+                create_uid: Identity::from_byte_array([9; 32]),
+                ..proposed
+            },
+        );
         review_ai_evidence_decision(
             ctx,
             organization_id,

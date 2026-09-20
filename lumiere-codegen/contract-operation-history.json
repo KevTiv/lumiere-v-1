@@ -418,6 +418,10 @@
       "name": "backfill_intercompany_organization_ownership",
       "shape_fingerprint": "sha256:48629ae97607aa0d8dec1ae6021bbdc79b995e0b2cd79df69c4d475022120442"
     },
+    "erp.begin_ai_workflow_generation": {
+      "name": "begin_ai_workflow_generation",
+      "shape_fingerprint": "sha256:772dc8890e630710099045e7d521e30ad77c860c528934a37a9b6a1fba48c4fd"
+    },
     "erp.begin_organization_reconstruction": {
       "name": "begin_organization_reconstruction",
       "shape_fingerprint": "sha256:5d949ea2c1e228a52df13c7524b6efcf16d20e68f0591adac96d5dbf36e0b121"
@@ -4374,6 +4378,10 @@
       "name": "run_workflow_migration_tests",
       "shape_fingerprint": "sha256:8d6eaea36c2f9b7f761cb6281443473c0922015c9f978f51725459dc481680e0"
     },
+    "erp.run_workflow_provenance_tests": {
+      "name": "run_workflow_provenance_tests",
+      "shape_fingerprint": "sha256:eb027f3be23b0a6e34419b8a6cae3bf99bc0ffed9cea20ff75b2def70226a748"
+    },
     "erp.run_workflow_runtime_tests": {
       "name": "run_workflow_runtime_tests",
       "shape_fingerprint": "sha256:1e1735d61a21517c67effd1e78e16a73a38333b57398f2e3556e24281bf9bfd5"
@@ -4637,6 +4645,10 @@
     "erp.solve_quality_alert": {
       "name": "solve_quality_alert",
       "shape_fingerprint": "sha256:b7fd62b04310f6b26cc7db4c84e3e0638bffd40927cf049ed9b2c1eb33fa319f"
+    },
+    "erp.stage_ai_workflow_node_provenance": {
+      "name": "stage_ai_workflow_node_provenance",
+      "shape_fingerprint": "sha256:1005d14474792df81f3f8401adf4b1744df76ded254bcbfc3c127c5536e70e8f"
     },
     "erp.stage_bank_statement_import": {
       "name": "stage_bank_statement_import",
@@ -5660,6 +5672,14 @@
       "current_operations_fingerprint": "sha256:5e80c2c5883a8f20c7ac213650d219897d4a7a38fabcaecfbd8de06e70b47886",
       "operation_count": 1393,
       "reason": "add durable governed-run lifecycle reducers with checked continuation, questions, steering, fork authorization, comparison and effect reconciliation on top of the released v0.3.50 baseline; preserve every existing operation shape"
+    },
+    {
+      "previous_release": "v0.3.51",
+      "previous_ir_sha256": "sha256:a4ec9f9c29077ee0fe103db04945099adb40f3692cca7978cd4374c73ce81319",
+      "previous_operations_fingerprint": "sha256:5e80c2c5883a8f20c7ac213650d219897d4a7a38fabcaecfbd8de06e70b47886",
+      "current_operations_fingerprint": "sha256:fcbf1cb8835cdbbdbeaab2554b1a99fe9ff307450d5af07d9c881561c17f0eb3",
+      "operation_count": 1396,
+      "reason": "add typed workflow provenance staging (begin_ai_workflow_generation, stage_ai_workflow_node_provenance) and its in-database test reducer on top of the released v0.3.51 baseline; preserve every existing operation shape"
     }
   ]
 }

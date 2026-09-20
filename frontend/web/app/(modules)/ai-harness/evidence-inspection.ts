@@ -1,9 +1,20 @@
-export type EvidenceTargetKind = 'decision' | 'claim'
+export type EvidenceTargetKind = 'decision' | 'claim' | 'workflow_step'
 
 export interface EvidenceInspectionView {
   targetKind: string
   targetId: number
   lineagePasses: boolean
+  /** Newest first: the target component and the versions it was edited or forked from. */
+  revisions: Array<{
+    id: number
+    artifactRef: string
+    componentKey: string
+    version: number
+    linkState: string
+    status: string
+    contentHash: string
+    parentComponentId: number | null
+  }>
   decisions: Array<{
     id: number
     title: string
@@ -18,6 +29,9 @@ export interface EvidenceInspectionView {
     verificationMethod: string
     verificationOutcome: string
     status: string
+    /** The person behind a human review, as persisted by the review reducer. */
+    reviewerUid: string | null
+    reviewedAtMicros: number | null
   }>
   passages: Array<{
     id: number
@@ -113,6 +127,26 @@ export function mapEvidenceInspection(payload: unknown): EvidenceInspectionView 
       verificationMethod: text(item.verificationMethod, 64),
       verificationOutcome: text(item.verificationOutcome, 64),
       status: text(item.status, 64),
+      reviewerUid: typeof item.reviewerUid === 'string' && /^[0-9a-f]{64}$/.test(item.reviewerUid)
+        ? item.reviewerUid
+        : null,
+      reviewedAtMicros: typeof item.reviewedAtMicros === 'number' && Number.isSafeInteger(item.reviewedAtMicros)
+        ? item.reviewedAtMicros
+        : null,
+    }]
+  })
+  const revisions = objects(root.revisions).flatMap((item) => {
+    const id = positiveId(item.id)
+    if (!id) return []
+    return [{
+      id,
+      artifactRef: text(item.artifactRef, 256),
+      componentKey: text(item.componentKey, 256),
+      version: positiveId(item.version) ?? 1,
+      linkState: text(item.linkState, 32),
+      status: text(item.status, 32),
+      contentHash: text(item.contentHash, 64),
+      parentComponentId: positiveId(item.parentComponentId),
     }]
   })
   const passages = objects(root.passages).flatMap((item) => {
@@ -155,6 +189,7 @@ export function mapEvidenceInspection(payload: unknown): EvidenceInspectionView 
     targetKind: text(root.targetKind, 64),
     targetId,
     lineagePasses: root.lineagePasses === true,
+    revisions,
     decisions,
     claims,
     passages,

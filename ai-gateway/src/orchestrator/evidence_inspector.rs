@@ -67,6 +67,29 @@ pub trait EvidenceRows: Send + Sync {
         let _ = (organization_id, company_id, actor);
         Ok(None)
     }
+    /// The current component of one workflow step, if it has one.
+    async fn workflow_step_component(
+        &self,
+        organization_id: u64,
+        company_id: u64,
+        workflow_version_id: u64,
+        node_key: &str,
+    ) -> Result<Option<Value>> {
+        let _ = (organization_id, company_id, workflow_version_id, node_key);
+        Ok(None)
+    }
+    /// Claims a person reviewed whose recorded statement is exactly
+    /// `statement`, in one organization and company. Bounded; used only to
+    /// look for a reusable review, never as authority by itself.
+    async fn human_reviewed_claims(
+        &self,
+        organization_id: u64,
+        company_id: u64,
+        statement: &str,
+    ) -> Result<Vec<Value>> {
+        let _ = (organization_id, company_id, statement);
+        Ok(Vec::new())
+    }
 }
 
 #[async_trait]
@@ -134,6 +157,53 @@ impl EvidenceRows for StdbClient {
         .context("load knowledge reviews")
     }
 
+    async fn workflow_step_component(
+        &self,
+        organization_id: u64,
+        company_id: u64,
+        workflow_version_id: u64,
+        node_key: &str,
+    ) -> Result<Option<Value>> {
+        // A node key is a stable key: anything else could not be stored, so it
+        // resolves to no step rather than reaching the query.
+        if !is_stable_key(node_key) {
+            return Ok(None);
+        }
+        let rows = self
+            .query_sql(&format!(
+                "SELECT * FROM ai_artifact_component WHERE organization_id = {organization_id} \
+                 AND artifact_ref = 'workflow-version:{workflow_version_id}' \
+                 AND component_key = 'node:{node_key}' AND status = 'current' LIMIT 2"
+            ))
+            .await
+            .context("load workflow step component")?;
+        Ok(rows
+            .into_iter()
+            .find(|row| number(row, "companyId") == Some(company_id)))
+    }
+
+    async fn human_reviewed_claims(
+        &self,
+        organization_id: u64,
+        company_id: u64,
+        statement: &str,
+    ) -> Result<Vec<Value>> {
+        // The statement is a plain string column, so it can be filtered in
+        // SQL; every other property is matched in Rust because `Option`
+        // columns cannot be.
+        if statement.trim().is_empty() || statement.chars().any(char::is_control) {
+            return Ok(Vec::new());
+        }
+        let literal = statement.replace('\'', "''");
+        self.query_sql(&format!(
+            "SELECT * FROM ai_evidence_claim WHERE organization_id = {organization_id} \
+             AND company_id = {company_id} AND verification_method = 'human_reviewed' \
+             AND statement = '{literal}' LIMIT 200"
+        ))
+        .await
+        .context("load human-reviewed claims")
+    }
+
     async fn knowledge_membership(
         &self,
         organization_id: u64,
@@ -159,6 +229,16 @@ impl EvidenceRows for StdbClient {
             department_id: number(membership, "departmentId").filter(|id| *id > 0),
         }))
     }
+}
+
+/// A stable key as the workflow module stores it: short, and made only of
+/// characters that need no escaping in a query.
+pub(super) fn is_stable_key(value: &str) -> bool {
+    !value.is_empty()
+        && value.len() <= 128
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_' | b'.' | b':'))
 }
 
 /// Who is looking. Resolved server-side by the caller; never model input.
@@ -197,7 +277,11 @@ impl ActorIdentity {
         Some(Self(bytes))
     }
 
-    fn sql_literal(self) -> String {
+    pub(super) fn to_hex(self) -> String {
+        self.sql_literal().trim_start_matches("0x").to_string()
+    }
+
+    pub(super) fn sql_literal(self) -> String {
         let mut hex = String::with_capacity(66);
         hex.push_str("0x");
         for byte in self.0 {
@@ -318,6 +402,10 @@ pub struct ClaimView {
     pub verification_outcome: String,
     pub supersedes_claim_id: Option<u64>,
     pub status: String,
+    /// The person behind a `human_reviewed` verdict, as persisted on the claim
+    /// by the review reducer, and when they gave it.
+    pub reviewer_uid: Option<String>,
+    pub reviewed_at_micros: Option<i64>,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, PartialEq, Eq)]
@@ -483,23 +571,50 @@ fn truncate_excerpt(text: &str) -> (String, bool) {
 
 // ── Row parsing ──────────────────────────────────────────────────────────────
 
-fn text(row: &Value, field: &str) -> Option<String> {
+pub(super) fn text(row: &Value, field: &str) -> Option<String> {
     row.get(field).and_then(Value::as_str).map(str::to_string)
 }
 
-fn number(row: &Value, field: &str) -> Option<u64> {
+pub(super) fn number(row: &Value, field: &str) -> Option<u64> {
     row.get(field).and_then(Value::as_u64)
 }
 
-fn identity(row: &Value, field: &str) -> Option<ActorIdentity> {
+pub(super) fn identity(row: &Value, field: &str) -> Option<ActorIdentity> {
     let value = row.get(field)?;
     value
         .as_str()
         .or_else(|| value.get("__identity__").and_then(Value::as_str))
-        .and_then(ActorIdentity::parse)
+        .and_then(parse_stored_identity)
 }
 
-fn strings(row: &Value, field: &str) -> Vec<String> {
+/// An identity as SpacetimeDB renders a stored `Identity` column. The database
+/// prints the 256-bit value without leading zeros, so about one identity in
+/// sixteen arrives with fewer than 64 hex digits. Left-pad those; anything that
+/// is not hex, or is longer than 64 digits, is still rejected. Trusted request
+/// headers keep the strict [`ActorIdentity::parse`].
+fn parse_stored_identity(value: &str) -> Option<ActorIdentity> {
+    let hex = value
+        .trim()
+        .strip_prefix("0x")
+        .or_else(|| value.trim().strip_prefix("0X"))
+        .unwrap_or(value.trim());
+    if hex.is_empty() || hex.len() > 64 || !hex.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+        return None;
+    }
+    ActorIdentity::parse(&format!("{hex:0>64}"))
+}
+
+/// An optional `Timestamp` column in microseconds: a bare number or the SATS
+/// timestamp wrapper.
+pub(super) fn micros(row: &Value, field: &str) -> Option<i64> {
+    let value = row.get(field)?;
+    value
+        .as_i64()
+        .or_else(|| value.get("microsSinceUnixEpoch")?.as_i64())
+        .or_else(|| value.get("__timestamp_micros_since_unix_epoch__")?.as_i64())
+}
+
+pub(super) fn strings(row: &Value, field: &str) -> Vec<String> {
     row.get(field)
         .and_then(Value::as_array)
         .map(|items| {
@@ -511,7 +626,7 @@ fn strings(row: &Value, field: &str) -> Vec<String> {
         .unwrap_or_default()
 }
 
-fn ids(row: &Value, field: &str) -> Vec<u64> {
+pub(super) fn ids(row: &Value, field: &str) -> Vec<u64> {
     row.get(field)
         .and_then(Value::as_array)
         .map(|items| items.iter().filter_map(Value::as_u64).collect())
@@ -582,6 +697,8 @@ fn claim_view(row: &Value) -> Result<ClaimView> {
         verification_outcome: required_text(row, "verificationOutcome")?,
         supersedes_claim_id: number(row, "supersedesClaimId"),
         status: required_text(row, "status")?,
+        reviewer_uid: identity(row, "reviewerUid").map(ActorIdentity::to_hex),
+        reviewed_at_micros: micros(row, "reviewedAt"),
     })
 }
 
@@ -822,6 +939,34 @@ pub async fn inspect(
         findings,
         lineage_passes,
     })
+}
+
+/// Inspect one step of a workflow version: the step's current component and,
+/// through its revisions, decisions, claims and passages. The step is found by
+/// version and stable node key, so a reviewer can start from the workflow
+/// rather than from an internal component id.
+pub async fn inspect_workflow_step(
+    rows: &dyn EvidenceRows,
+    viewer: Viewer,
+    workflow_version_id: u64,
+    node_key: &str,
+) -> Result<Inspection> {
+    let component = rows
+        .workflow_step_component(
+            viewer.organization_id,
+            viewer.company_id,
+            workflow_version_id,
+            node_key,
+        )
+        .await?
+        .filter(|row| owned_by(row, viewer))
+        .with_context(|| format!("workflow step {workflow_version_id}/{node_key} not found"))?;
+    inspect(
+        rows,
+        viewer,
+        InspectTarget::Component(required_id(&component)?),
+    )
+    .await
 }
 
 async fn source_of_version(rows: &dyn EvidenceRows, version_id: u64) -> Result<Option<Value>> {
@@ -1354,6 +1499,7 @@ mod tests {
         entries: Vec<Value>,
         versions: Vec<Value>,
         reviews: Vec<Value>,
+        steps: Vec<Value>,
         team_department_id: Option<u64>,
         has_active_membership: bool,
     }
@@ -1411,6 +1557,29 @@ mod tests {
                 .filter(|row| number(row, "versionId") == Some(version_id))
                 .cloned()
                 .collect())
+        }
+        async fn workflow_step_component(
+            &self,
+            organization_id: u64,
+            company_id: u64,
+            workflow_version_id: u64,
+            node_key: &str,
+        ) -> Result<Option<Value>> {
+            if !is_stable_key(node_key) {
+                return Ok(None);
+            }
+            Ok(self
+                .steps
+                .iter()
+                .find(|row| {
+                    number(row, "organizationId") == Some(organization_id)
+                        && number(row, "companyId") == Some(company_id)
+                        && text(row, "artifactRef").as_deref()
+                            == Some(&format!("workflow-version:{workflow_version_id}"))
+                        && text(row, "componentKey").as_deref() == Some(&format!("node:{node_key}"))
+                        && text(row, "status").as_deref() == Some("current")
+                })
+                .cloned())
         }
         async fn knowledge_membership(
             &self,
@@ -2111,5 +2280,210 @@ mod tests {
             Some(InspectTarget::Claim(2))
         );
         assert_eq!(InspectTarget::parse("answer", 3), None);
+    }
+
+    /// A generated workflow step is found by version and stable key, and its
+    /// chain reconstructs down to the source passage through its revisions,
+    /// with the human reviewer of the claim on the chain preserved.
+    #[tokio::test]
+    async fn a_workflow_step_reconstructs_to_the_source_passage_through_revisions() {
+        let mut rows = healthy();
+        for id in [1, 9] {
+            let row = rows
+                .tables
+                .get_mut(&("ai_artifact_component", id))
+                .expect("component");
+            row["artifactRef"] = json!(if id == 1 {
+                "workflow-version:42"
+            } else {
+                "workflow-version:41"
+            });
+            row["componentKey"] = json!("node:review");
+            row["componentKind"] = json!("workflow_step");
+        }
+        let step = rows.tables[&("ai_artifact_component", 1)].clone();
+        rows.steps.push(step);
+        let reviewer = "07".repeat(32);
+        let claim = rows
+            .tables
+            .get_mut(&("ai_evidence_claim", 3))
+            .expect("claim");
+        claim["reviewerUid"] = json!(reviewer);
+        claim["reviewedAt"] = json!(1_700_000_000_000_000_i64);
+
+        let inspection = inspect_workflow_step(&rows, VIEWER, 42, "review")
+            .await
+            .expect("the step inspects");
+        assert_eq!(inspection.target_kind, "component");
+        assert_eq!(
+            inspection
+                .revisions
+                .iter()
+                .map(|r| r.id)
+                .collect::<Vec<_>>(),
+            vec![1, 9],
+            "the revision chain is preserved"
+        );
+        assert_eq!(inspection.revisions[0].component_kind, "workflow_step");
+        assert_eq!(inspection.decisions[0].id, 2);
+        assert_eq!(inspection.claims[0].id, 3);
+        assert_eq!(
+            inspection.claims[0].reviewer_uid.as_deref(),
+            Some(reviewer.as_str())
+        );
+        assert_eq!(
+            inspection.claims[0].reviewed_at_micros,
+            Some(1_700_000_000_000_000)
+        );
+        assert_eq!(inspection.passages[0].id, 5);
+        assert!(inspection.passages[0].excerpt.is_some());
+        assert!(inspection.lineage_passes);
+    }
+
+    #[tokio::test]
+    async fn an_unknown_foreign_or_unsafe_workflow_step_reads_as_absent() {
+        let mut rows = healthy();
+        let row = rows
+            .tables
+            .get_mut(&("ai_artifact_component", 1))
+            .expect("component");
+        row["artifactRef"] = json!("workflow-version:42");
+        row["componentKey"] = json!("node:review");
+        let step = rows.tables[&("ai_artifact_component", 1)].clone();
+        rows.steps.push(step);
+
+        for (viewer, version, key) in [
+            (VIEWER, 43, "review"),
+            (VIEWER, 42, "other"),
+            (VIEWER, 42, "review' OR 1=1 --"),
+            (VIEWER, 42, ""),
+            (
+                Viewer {
+                    company_id: 11,
+                    ..VIEWER
+                },
+                42,
+                "review",
+            ),
+            (
+                Viewer {
+                    organization_id: 2,
+                    ..VIEWER
+                },
+                42,
+                "review",
+            ),
+        ] {
+            let error = inspect_workflow_step(&rows, viewer, version, key)
+                .await
+                .expect_err("must not resolve");
+            assert!(error.to_string().contains("not found"), "{error}");
+        }
+    }
+
+    /// Against a live module populated by `run_workflow_provenance_tests`.
+    #[tokio::test]
+    #[ignore = "needs a live SpacetimeDB module populated by run_workflow_provenance_tests"]
+    async fn live_workflow_step_reconstructs_through_its_revisions() {
+        let env = |name: &str| std::env::var(name).unwrap_or_else(|_| panic!("{name} is required"));
+        let client = StdbClient::new(env("STDB_URL"), env("STDB_MODULE"), env("STDB_TOKEN"));
+        let steps = client
+            .query_sql(
+                "SELECT * FROM ai_artifact_component WHERE component_kind = 'workflow_step' \
+                 AND status = 'current' AND link_state = 'linked'",
+            )
+            .await
+            .expect("components");
+        // The step with the longest ancestry: cloned and edited twice.
+        let mut best = None;
+        for step in &steps {
+            let (Some(version), Some(key)) = (
+                text(step, "artifactRef")
+                    .and_then(|r| r.strip_prefix("workflow-version:")?.parse::<u64>().ok()),
+                text(step, "componentKey")
+                    .and_then(|k| k.strip_prefix("node:").map(str::to_string)),
+            ) else {
+                continue;
+            };
+            let viewer = Viewer {
+                organization_id: number(step, "organizationId").unwrap(),
+                company_id: number(step, "companyId").unwrap(),
+                actor_identity: None,
+            };
+            let inspection = inspect_workflow_step(&client, viewer, version, &key)
+                .await
+                .unwrap();
+            if best
+                .as_ref()
+                .is_none_or(|(_, kept): &(Viewer, Inspection)| {
+                    inspection.revisions.len() > kept.revisions.len()
+                })
+            {
+                best = Some((viewer, inspection));
+            }
+        }
+        let (viewer, inspection) = best.expect("a linked workflow step");
+        assert!(
+            inspection.revisions.len() >= 3,
+            "{:?}",
+            inspection.revisions
+        );
+        assert!(inspection.revisions[0].component_kind == "workflow_step");
+        assert!(inspection
+            .revisions
+            .last()
+            .unwrap()
+            .parent_component_id
+            .is_none());
+        assert!(inspection.lineage_passes, "{:?}", inspection.findings);
+        assert_eq!(inspection.decisions[0].status, "accepted");
+        assert_eq!(inspection.claims[0].verification_method, "human_reviewed");
+        assert!(
+            inspection.claims[0].reviewer_uid.is_some(),
+            "the reviewer is persisted"
+        );
+        assert_eq!(inspection.passages[0].availability, Availability::Available);
+
+        // A sibling company sees nothing.
+        let sibling = Viewer {
+            company_id: viewer.company_id + 1_000_000,
+            ..viewer
+        };
+        let component = inspection.target_id;
+        assert!(
+            inspect(&client, sibling, InspectTarget::Component(component))
+                .await
+                .is_err()
+        );
+    }
+
+    #[test]
+    fn stored_identities_without_leading_zeros_still_parse() {
+        let padded = "0x0909090909090909090909090909090909090909090909090909090909090909";
+        let stripped = "0x909090909090909090909090909090909090909090909090909090909090909";
+        let row = json!({ "a": padded, "b": stripped, "c": "0xzz", "d": format!("0x{}", "1".repeat(65)) });
+        assert_eq!(
+            identity(&row, "a"),
+            identity(&row, "b"),
+            "the database drops leading zeros"
+        );
+        assert!(identity(&row, "a").is_some());
+        assert!(identity(&row, "c").is_none() && identity(&row, "d").is_none());
+        // Trusted request headers stay strict.
+        assert!(ActorIdentity::parse(stripped).is_none());
+        assert!(ActorIdentity::parse(padded).is_some());
+    }
+
+    #[test]
+    fn timestamps_parse_from_every_wrapper_the_client_produces() {
+        let row = json!({
+            "bare": 5, "wrapped": { "microsSinceUnixEpoch": 7 },
+            "raw": { "__timestamp_micros_since_unix_epoch__": 9 }, "none": null,
+        });
+        assert_eq!(micros(&row, "bare"), Some(5));
+        assert_eq!(micros(&row, "wrapped"), Some(7));
+        assert_eq!(micros(&row, "raw"), Some(9));
+        assert_eq!(micros(&row, "none"), None);
+        assert_eq!(micros(&row, "missing"), None);
     }
 }

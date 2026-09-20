@@ -10,9 +10,7 @@ use async_trait::async_trait;
 use serde_json::Value;
 
 use crate::{
-    harness::audit::PolicyDecision,
-    providers::llm::ToolCallRequest,
-    tools::types::ToolOutput,
+    harness::audit::PolicyDecision, providers::llm::ToolCallRequest, tools::types::ToolOutput,
 };
 
 #[derive(Clone, Debug)]

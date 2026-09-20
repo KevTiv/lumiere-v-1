@@ -72,7 +72,6 @@ fn row_string_list(row: &Value, key: &str) -> Vec<String> {
         .unwrap_or_default()
 }
 
-
 pub fn intelligence_policy_ref(config: &Value) -> Result<Option<String>> {
     let Some(value) = config
         .get("intelligencePolicyRef")
@@ -657,7 +656,10 @@ mod tests {
 
     #[test]
     fn intelligence_policy_ref_is_strict_and_versioned() {
-        assert_eq!(intelligence_policy_ref(&serde_json::json!({})).unwrap(), None);
+        assert_eq!(
+            intelligence_policy_ref(&serde_json::json!({})).unwrap(),
+            None
+        );
         assert_eq!(
             intelligence_policy_ref(&serde_json::json!({
                 "intelligencePolicyRef": "generation-default@3"

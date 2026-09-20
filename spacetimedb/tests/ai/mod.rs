@@ -4,6 +4,7 @@ pub mod decision_events_test;
 pub mod embedding_isolation_test;
 pub mod evidence_provenance_test;
 pub mod relational_integrity_test;
+pub mod workflow_provenance_test;
 
 use spacetimedb::ReducerContext;
 
@@ -73,29 +74,98 @@ pub fn run_ai_intelligence_events_tests(ctx: &ReducerContext) -> Result<(), Stri
     Ok(())
 }
 
+/// Runs every scenario and reports all failures together, so one broken
+/// fixture does not hide the state of the rest. Each scenario seeds its own
+/// organization, so a failure cannot corrupt a later one; any failure still
+/// fails (and rolls back) the whole reducer.
+fn run_scenarios(
+    scenarios: &[(&str, fn(&ReducerContext) -> Result<(), String>)],
+    ctx: &ReducerContext,
+) -> Result<(), String> {
+    let failures: Vec<String> = scenarios
+        .iter()
+        .filter_map(|(name, scenario)| scenario(ctx).err().map(|error| format!("{name}: {error}")))
+        .collect();
+    if failures.is_empty() {
+        Ok(())
+    } else {
+        Err(failures.join(" | "))
+    }
+}
+
 #[spacetimedb::reducer]
 pub fn run_ai_evidence_provenance_tests(ctx: &ReducerContext) -> Result<(), String> {
-    evidence_provenance_test::test_sources_round_trip_and_unknowns_stay_unknown(ctx)
-        .map_err(|e| format!("sources_round_trip_and_unknowns_stay_unknown: {e}"))?;
-    evidence_provenance_test::test_recollected_source_stays_unverified(ctx)
-        .map_err(|e| format!("recollected_source_stays_unverified: {e}"))?;
-    evidence_provenance_test::test_cross_scope_references_are_denied(ctx)
-        .map_err(|e| format!("cross_scope_references_are_denied: {e}"))?;
-    evidence_provenance_test::test_lineage_reconstructs_after_edit_and_fork(ctx)
-        .map_err(|e| format!("lineage_reconstructs_after_edit_and_fork: {e}"))?;
-    evidence_provenance_test::test_knowledge_is_approved_by_review_not_usage(ctx)
-        .map_err(|e| format!("knowledge_is_approved_by_review_not_usage: {e}"))?;
-    evidence_provenance_test::test_retraction_flags_dependents_and_blocks_reuse(ctx)
-        .map_err(|e| format!("retraction_flags_dependents_and_blocks_reuse: {e}"))?;
-    evidence_provenance_test::test_correction_requires_review_and_recovers(ctx)
-        .map_err(|e| format!("correction_requires_review_and_recovers: {e}"))?;
-    evidence_provenance_test::test_deletion_and_revocation_preserve_honest_history(ctx)
-        .map_err(|e| format!("deletion_and_revocation_preserve_honest_history: {e}"))?;
-    evidence_provenance_test::test_document_blob_passage_claim_lifecycle(ctx)
-        .map_err(|e| format!("document_blob_passage_claim_lifecycle: {e}"))?;
-    evidence_provenance_test::test_discretionary_dependencies_need_acknowledgement(ctx)
-        .map_err(|e| format!("discretionary_dependencies_need_acknowledgement: {e}"))?;
-    Ok(())
+    use evidence_provenance_test as t;
+    run_scenarios(
+        &[
+            (
+                "sources_round_trip_and_unknowns_stay_unknown",
+                t::test_sources_round_trip_and_unknowns_stay_unknown,
+            ),
+            ("recollected_source_stays_unverified", t::test_recollected_source_stays_unverified),
+            ("cross_scope_references_are_denied", t::test_cross_scope_references_are_denied),
+            (
+                "lineage_reconstructs_after_edit_and_fork",
+                t::test_lineage_reconstructs_after_edit_and_fork,
+            ),
+            (
+                "knowledge_is_approved_by_review_not_usage",
+                t::test_knowledge_is_approved_by_review_not_usage,
+            ),
+            (
+                "retraction_flags_dependents_and_blocks_reuse",
+                t::test_retraction_flags_dependents_and_blocks_reuse,
+            ),
+            (
+                "correction_requires_review_and_recovers",
+                t::test_correction_requires_review_and_recovers,
+            ),
+            (
+                "deletion_and_revocation_preserve_honest_history",
+                t::test_deletion_and_revocation_preserve_honest_history,
+            ),
+            (
+                "document_blob_passage_claim_lifecycle",
+                t::test_document_blob_passage_claim_lifecycle,
+            ),
+            (
+                "discretionary_dependencies_need_acknowledgement",
+                t::test_discretionary_dependencies_need_acknowledgement,
+            ),
+            (
+                "human_review_is_independent_persisted_and_auditable",
+                t::test_human_review_is_independent_persisted_and_auditable,
+            ),
+        ],
+        ctx,
+    )
+}
+
+/// Focused workflow-provenance suite: typed staging, atomic component binding,
+/// clone/edit ancestry, exact-hash reviewer confirmation and source-change
+/// flagging for harness-generated workflows.
+#[spacetimedb::reducer]
+pub fn run_workflow_provenance_tests(ctx: &ReducerContext) -> Result<(), String> {
+    use workflow_provenance_test as t;
+    run_scenarios(
+        &[
+            ("authority_is_server_resolved", t::test_authority_is_server_resolved),
+            ("generated_workflow_binds_every_step", t::test_generated_workflow_binds_every_step),
+            (
+                "invalid_provenance_blocks_and_leaves_no_bindings",
+                t::test_invalid_provenance_blocks_and_leaves_no_bindings,
+            ),
+            (
+                "clone_and_edit_preserve_ancestry_and_exact_hash_confirmation",
+                t::test_clone_and_edit_preserve_ancestry_and_exact_hash_confirmation,
+            ),
+            (
+                "source_revocation_flags_and_blocks_workflow_reuse",
+                t::test_source_revocation_flags_and_blocks_workflow_reuse,
+            ),
+        ],
+        ctx,
+    )
 }
 
 #[spacetimedb::reducer]
@@ -106,6 +176,7 @@ pub fn run_all_ai_tests(ctx: &ReducerContext) -> Result<(), String> {
     run_ai_capability_grants_tests(ctx)?;
     run_ai_intelligence_events_tests(ctx)?;
     run_ai_evidence_provenance_tests(ctx)?;
+    run_workflow_provenance_tests(ctx)?;
     log::info!("✅ run_all_ai_tests complete");
     Ok(())
 }

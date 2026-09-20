@@ -137,10 +137,23 @@ struct CaptureDecisionBody {
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 struct ReviewEvidenceBody {
     company_id: u64,
+    /// claim | decision | component
     kind: String,
     id: u64,
     outcome: String,
     note: Option<String>,
+    /// For a component confirmation: the exact content hash the reviewer
+    /// inspected. It binds the confirmation to that content; it is not
+    /// authority, and the reducer rechecks it against the step's current hash.
+    #[serde(default)]
+    expected_content_hash: Option<String>,
+}
+
+fn is_content_hash(value: &str) -> bool {
+    value.len() == 64
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
 }
 
 fn validate_positive_ids(name: &str, ids: &[u64], required: bool) -> Result<(), ApiError> {
@@ -430,15 +443,40 @@ async fn review_evidence(
             "review_ai_evidence_decision",
             json!({ "outcome": body.outcome, "note": body.note }),
         ),
-        "claim" | "decision" => {
+        "component" if matches!(body.outcome.as_str(), "confirmed" | "unresolved") => {
+            if body.outcome == "confirmed"
+                && !body
+                    .expected_content_hash
+                    .as_deref()
+                    .is_some_and(is_content_hash)
+            {
+                return Err(ApiError::BadRequest(
+                    "confirming a component needs the content hash reviewed".into(),
+                ));
+            }
+            (
+                "review_ai_artifact_component_links",
+                json!({
+                    "outcome": body.outcome,
+                    "note": body.note,
+                    "expected_content_hash": body.expected_content_hash,
+                }),
+            )
+        }
+        "claim" | "decision" | "component" => {
             return Err(ApiError::BadRequest("invalid review outcome".into()));
         }
         _ => {
             return Err(ApiError::BadRequest(
-                "kind must be claim or decision".into(),
+                "kind must be claim, decision or component".into(),
             ))
         }
     };
+    if body.kind != "component" && body.expected_content_hash.is_some() {
+        return Err(ApiError::BadRequest(
+            "expectedContentHash is only valid for a component".into(),
+        ));
+    }
     let context = TrustedOperationContext::for_resource_read(&state, &session)?;
     let company_id = resolve_membership_company_id(
         context.client(),
@@ -574,6 +612,29 @@ mod tests {
             validate_decision_body(&body),
             Err(ApiError::BadRequest(_))
         ));
+    }
+
+    #[test]
+    fn component_confirmation_names_the_exact_content_reviewed() {
+        assert!(is_content_hash(&"ab12".repeat(16)));
+        for invalid in [
+            "",
+            "abc",
+            &"AB12".repeat(16),
+            &"zz12".repeat(16),
+            &"a".repeat(65),
+        ] {
+            assert!(!is_content_hash(invalid), "{invalid}");
+        }
+        let request = json!({
+            "companyId": 9, "kind": "component", "id": 11, "outcome": "confirmed",
+            "note": "reviewed the edit", "expectedContentHash": "ab12".repeat(16),
+        });
+        let body: ReviewEvidenceBody = serde_json::from_value(request).expect("valid");
+        assert_eq!(
+            body.expected_content_hash.as_deref(),
+            Some("ab12".repeat(16).as_str())
+        );
     }
 
     #[test]

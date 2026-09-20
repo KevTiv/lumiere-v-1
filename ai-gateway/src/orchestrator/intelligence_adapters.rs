@@ -91,7 +91,7 @@ impl DecisionProvider for LlmDecisionAdapter<'_> {
             model: self.model.clone(),
             system,
             messages: vec![LlmMessage::text("user", request.question.clone())],
-            max_tokens: request.max_tokens.unwrap_or(self.max_tokens).min(self.max_tokens),
+            max_tokens: self.max_tokens,
             temperature: self.temperature,
             top_p: self.top_p,
             tools: vec![tool],
@@ -278,7 +278,10 @@ impl GenerationProvider for LlmGenerationAdapter<'_> {
             model: self.model.clone(),
             system,
             messages: vec![LlmMessage::text("user", request.objective.clone())],
-            max_tokens: request.max_tokens.unwrap_or(self.max_tokens).min(self.max_tokens),
+            max_tokens: request
+                .max_tokens
+                .unwrap_or(self.max_tokens)
+                .min(self.max_tokens),
             temperature: self.temperature,
             top_p: self.top_p,
             tools: Vec::new(),

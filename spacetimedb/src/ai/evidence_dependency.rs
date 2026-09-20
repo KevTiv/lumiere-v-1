@@ -732,6 +732,26 @@ pub(crate) fn require_dependencies_usable(
     }
 }
 
+/// Whether any edge `dependent` rests on is `invalid` — its evidence was
+/// retracted, revoked or deleted. Such a dependent can no longer be reviewed
+/// or reused, only replaced.
+pub(crate) fn has_invalid_dependency(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    dependent_kind: DependentKind,
+    dependent_id: u64,
+) -> bool {
+    ctx.db
+        .ai_evidence_dependency()
+        .ai_evidence_dependency_by_dependent()
+        .filter((
+            &organization_id,
+            &dependent_kind.as_str().to_string(),
+            &dependent_id,
+        ))
+        .any(|edge| edge.state == "invalid")
+}
+
 /// Walk forward from `upstream_ids`, escalating every reachable edge per the
 /// policy above and flagging each dependent record. Returns the number of
 /// edges that changed. Aborts (rolling the reducer back) past the edge cap.

@@ -17,12 +17,12 @@ use crate::{
         intelligence::EvidenceRef,
         intelligence_router::run_catalogued_generation_surface,
         model_configuration::StdbModelConfigurationStore,
-        skill_loader::{complete_run, create_generation_surface_run},
-        spend_admission::StdbSpendLedger,
         output_gate::{
             admit_structured_output, persist_or_withhold_generated_output, GeneratedOutputDraft,
             PublicationIdentity,
         },
+        skill_loader::{complete_run, create_generation_surface_run},
+        spend_admission::StdbSpendLedger,
         text_answer_gate::{TextAnswerProvenance, TextAnswerVerification, TextEvidence},
     },
     state::AppState,
@@ -351,10 +351,9 @@ async fn draft_actions_llm(
         agent.system_prompt
     );
 
-    let spend_reader = state
-        .spend_read_stdb
-        .as_deref()
-        .ok_or_else(|| DraftActionsError::other("spend_read_stdb is required for routed generation"))?;
+    let spend_reader = state.spend_read_stdb.as_deref().ok_or_else(|| {
+        DraftActionsError::other("spend_read_stdb is required for routed generation")
+    })?;
     let run_inputs = json!({
         "surface": "action_draft_generation",
         "query": req.query.clone(),
@@ -368,8 +367,7 @@ async fn draft_actions_llm(
         "action_draft_generation",
         agent.agent_id,
         req.team_member_id,
-        &serde_json::to_string(&run_inputs)
-            .map_err(|e| DraftActionsError::other(e.to_string()))?,
+        &serde_json::to_string(&run_inputs).map_err(|e| DraftActionsError::other(e.to_string()))?,
         &req.identity_hex,
     )
     .await
@@ -418,16 +416,17 @@ async fn draft_actions_llm(
                 Some(error.to_string()),
             )
             .await;
-            return Err(DraftActionsError::other(format!("LLM request failed: {error}")));
+            return Err(DraftActionsError::other(format!(
+                "LLM request failed: {error}"
+            )));
         }
     };
     let total_tokens = program
         .generation_input_tokens
         .saturating_add(program.generation_output_tokens);
-    let generated = program
-        .final_content
-        .as_deref()
-        .ok_or_else(|| DraftActionsError::other("governed action-draft generation produced no final content"))?;
+    let generated = program.final_content.as_deref().ok_or_else(|| {
+        DraftActionsError::other("governed action-draft generation produced no final content")
+    })?;
     let model_json: Value = match serde_json::from_str(clean_json_response(generated)) {
         Ok(value) => value,
         Err(error) => {

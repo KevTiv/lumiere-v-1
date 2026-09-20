@@ -343,6 +343,11 @@ pub(crate) async fn dispatch_ai_evidence_mutation(
             Some("source_version_id"),
             "RecordAiEvidenceSourceChangeParams",
         ),
+        "review_ai_artifact_component_links" => (
+            "erp.review_ai_artifact_component_links",
+            Some("component_id"),
+            "ReviewAiArtifactComponentLinksParams",
+        ),
         _ => {
             return Err(ApiError::Forbidden(
                 "reducer is not an admitted evidence mutation".into(),

@@ -15,6 +15,7 @@ import { Textarea } from "@lumiere/ui/components/textarea"
 
 import { companyRowsToSelectOptions } from "@/lib/form-lookup"
 import { mapEvidenceInspection, type EvidenceInspectionView, type EvidenceTargetKind } from "./evidence-inspection"
+import { EvidenceReviewQueuePanel } from "./evidence-review-queue-panel"
 
 interface EvidenceReviewerPanelProps {
   companies: Record<string, unknown>[]
@@ -43,6 +44,7 @@ export function EvidenceReviewerPanel({ companies }: EvidenceReviewerPanelProps)
   const [companyId, setCompanyId] = useState(() => companyOptions[0]?.value ?? "")
   const [kind, setKind] = useState<EvidenceTargetKind>("decision")
   const [targetId, setTargetId] = useState("")
+  const [nodeKey, setNodeKey] = useState("")
   const [request, setRequest] = useState<RequestState>({ status: "idle" })
   const [decisionTitle, setDecisionTitle] = useState("")
   const [adoptedClaims, setAdoptedClaims] = useState("")
@@ -58,12 +60,20 @@ export function EvidenceReviewerPanel({ companies }: EvidenceReviewerPanelProps)
     setRequest({ status: "idle" })
   }
 
-  const loadInspection = async () => {
+  const loadInspection = async (
+    override?: { kind: EvidenceTargetKind; id: number; nodeKey?: string },
+  ) => {
     const parsedCompanyId = Number(companyId)
-    const parsedTargetId = Number(targetId)
+    const inspectKind = override?.kind ?? kind
+    const parsedTargetId = override?.id ?? Number(targetId)
+    const inspectNodeKey = (override ? override.nodeKey : nodeKey.trim()) ?? ""
     if (!Number.isSafeInteger(parsedCompanyId) || parsedCompanyId <= 0
       || !Number.isSafeInteger(parsedTargetId) || parsedTargetId <= 0) {
       setRequest({ status: "error", message: "Choose a company and enter a positive record ID." })
+      return
+    }
+    if (inspectKind === "workflow_step" && !inspectNodeKey) {
+      setRequest({ status: "error", message: "Enter the workflow step's node key." })
       return
     }
 
@@ -72,7 +82,12 @@ export function EvidenceReviewerPanel({ companies }: EvidenceReviewerPanelProps)
       const response = await fetch("/api/ai/evidence/inspect", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ companyId: parsedCompanyId, kind, id: parsedTargetId }),
+        body: JSON.stringify({
+          companyId: parsedCompanyId,
+          kind: inspectKind,
+          id: parsedTargetId,
+          ...(inspectKind === "workflow_step" ? { nodeKey: inspectNodeKey } : {}),
+        }),
       })
       const payload = await response.json().catch(() => ({})) as Record<string, unknown>
       if (response.status === 401 || response.status === 403) {
@@ -228,12 +243,13 @@ export function EvidenceReviewerPanel({ companies }: EvidenceReviewerPanelProps)
                     <SelectGroup>
                       <SelectItem value="decision">Decision</SelectItem>
                       <SelectItem value="claim">Claim</SelectItem>
+                      <SelectItem value="workflow_step">Workflow step</SelectItem>
                     </SelectGroup>
                   </SelectContent>
                 </Select>
               </Field>
               <Field>
-                <FieldLabel htmlFor="evidence-target-id">Record ID</FieldLabel>
+                <FieldLabel htmlFor="evidence-target-id">{kind === "workflow_step" ? "Workflow version ID" : "Record ID"}</FieldLabel>
                 <Input
                   id="evidence-target-id"
                   inputMode="numeric"
@@ -243,8 +259,20 @@ export function EvidenceReviewerPanel({ companies }: EvidenceReviewerPanelProps)
                   onChange={(event) => changeTarget(() => setTargetId(event.target.value))}
                 />
               </Field>
+              {kind === "workflow_step" ? (
+                <Field>
+                  <FieldLabel htmlFor="evidence-node-key">Step node key</FieldLabel>
+                  <Input
+                    id="evidence-node-key"
+                    maxLength={128}
+                    value={nodeKey}
+                    disabled={isLoading}
+                    onChange={(event) => changeTarget(() => setNodeKey(event.target.value))}
+                  />
+                </Field>
+              ) : null}
             </FieldGroup>
-            <Button type="submit" disabled={isLoading || !companyId || !targetId}>
+            <Button type="submit" disabled={isLoading || !companyId || !targetId || (kind === "workflow_step" && !nodeKey.trim())}>
               <Search data-icon="inline-start" /> Inspect lineage
             </Button>
           </form>
@@ -271,6 +299,16 @@ export function EvidenceReviewerPanel({ companies }: EvidenceReviewerPanelProps)
       {mutation.status === "success" ? <Alert><CheckCircle2 /><AlertTitle>Saved</AlertTitle><AlertDescription>{mutation.message}</AlertDescription></Alert> : null}
       {mutation.status === "error" ? <Alert variant="destructive"><AlertCircle /><AlertTitle>Mutation rejected</AlertTitle><AlertDescription>{mutation.message}</AlertDescription></Alert> : null}
 
+      <EvidenceReviewQueuePanel
+        companyId={companyId}
+        onInspect={(target) => {
+          setKind(target.kind)
+          setTargetId(String(target.id))
+          if (target.nodeKey) setNodeKey(target.nodeKey)
+          void loadInspection(target)
+        }}
+      />
+
       {request.status === "idle" ? <EmptyReviewerState /> : null}
       {request.status === "loading" ? <ReviewerSkeleton /> : null}
       {request.status === "denied" ? (
@@ -280,7 +318,7 @@ export function EvidenceReviewerPanel({ companies }: EvidenceReviewerPanelProps)
         <Alert variant="destructive"><AlertCircle /><AlertTitle>Inspection unavailable</AlertTitle><AlertDescription>{request.message}</AlertDescription></Alert>
       ) : null}
       {request.status === "success" ? <InspectionResult inspection={request.data} /> : null}
-      {request.status === "success" ? (
+      {request.status === "success" && kind !== "workflow_step" ? (
         <Card>
           <CardHeader><CardTitle className="text-base">Record reviewer verdict</CardTitle><CardDescription>The authenticated reviewer and timestamp are recorded by the evidence reducer.</CardDescription></CardHeader>
           <CardContent>
@@ -333,12 +371,28 @@ function InspectionResult({ inspection }: { inspection: EvidenceInspectionView }
         {inspection.findings.length > 0 ? <CardContent><ul className="flex list-disc flex-col gap-1 pl-5 text-sm">{inspection.findings.map((finding, index) => <li key={`${finding.code}-${index}`}><span className="font-medium">{finding.code || finding.severity}:</span> {finding.message}</li>)}</ul></CardContent> : null}
       </Card>
 
+      {inspection.revisions.length > 0 ? (
+        <Card>
+          <CardHeader><CardTitle className="text-base">Step revisions</CardTitle><CardDescription>Newest first, following each edit or fork back to the original.</CardDescription></CardHeader>
+          <CardContent>
+            <ol className="flex flex-col gap-1 text-sm">
+              {inspection.revisions.map((revision) => (
+                <li key={revision.id} data-testid={`inspection-revision-${revision.id}`}>
+                  v{revision.version} · {revision.artifactRef} · {revision.componentKey} · {revision.linkState} · {revision.status}
+                  {revision.parentComponentId ? ` · from #${revision.parentComponentId}` : " · original"}
+                </li>
+              ))}
+            </ol>
+          </CardContent>
+        </Card>
+      ) : null}
+
       {inspection.decisions.map((decision) => (
         <Card key={decision.id}><CardHeader><CardTitle className="text-base">Decision #{decision.id}: {decision.title || "Untitled decision"}</CardTitle><CardDescription>{decision.status}</CardDescription></CardHeader><CardContent className="text-sm leading-relaxed">{decision.rationale || "No rationale recorded."}</CardContent></Card>
       ))}
 
       {inspection.claims.map((claim) => (
-        <Card key={claim.id}><CardHeader><CardTitle className="text-base">Claim #{claim.id}</CardTitle><CardDescription>{claim.kind} · {claim.verificationMethod} · {claim.verificationOutcome}</CardDescription></CardHeader><CardContent className="text-sm leading-relaxed">{claim.statement}</CardContent></Card>
+        <Card key={claim.id}><CardHeader><CardTitle className="text-base">Claim #{claim.id}</CardTitle><CardDescription>{claim.kind} · {claim.verificationMethod} · {claim.verificationOutcome}{claim.reviewerUid ? ` · reviewed by ${claim.reviewerUid.slice(0, 8)}…` : ""}</CardDescription></CardHeader><CardContent className="text-sm leading-relaxed">{claim.statement}</CardContent></Card>
       ))}
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">

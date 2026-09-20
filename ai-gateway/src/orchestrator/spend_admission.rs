@@ -39,7 +39,7 @@ use crate::providers::llm::{LlmCompletion, LlmMessage, LlmRequest, LlmResponse};
 /// Persistence operations needed for admission; implemented over SpacetimeDB
 /// in production and in memory for tests.
 #[async_trait]
-pub(super) trait SpendLedger: Send + Sync {
+pub(crate) trait SpendLedger: Send + Sync {
     async fn budget(
         &self,
         organization_id: u64,
@@ -85,7 +85,7 @@ pub(super) trait SpendLedger: Send + Sync {
 
 /// Writes through the gateway principal; reads through the dedicated
 /// `AI_SPEND_READ_STDB_TOKEN` principal.
-pub(super) struct StdbSpendLedger<'a> {
+pub(crate) struct StdbSpendLedger<'a> {
     pub writer: &'a StdbClient,
     pub reader: &'a StdbClient,
 }

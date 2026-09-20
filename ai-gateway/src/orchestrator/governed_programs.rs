@@ -18,8 +18,7 @@ use super::{
 pub(super) const REPORT_ANALYSIS_PROGRAM_REF: &str = "skill:report_analysis@1";
 pub(super) const RAG_GENERATION_PROGRAM_REF: &str = "skill:rag_generation@1";
 pub(super) const FORM_SUGGESTION_PROGRAM_REF: &str = "skill:form_suggestion@1";
-pub(super) const ACTION_DRAFT_GENERATION_PROGRAM_REF: &str =
-    "skill:action_draft_generation@1";
+pub(super) const ACTION_DRAFT_GENERATION_PROGRAM_REF: &str = "skill:action_draft_generation@1";
 
 pub(super) fn report_analysis_graph() -> DecisionGraph {
     DecisionGraph {
@@ -357,7 +356,7 @@ fn generation_surface_graph(format: &str) -> DecisionGraph {
     }
 }
 
-pub(super) struct GovernedProgramCatalogEntry {
+pub(crate) struct GovernedProgramCatalogEntry {
     pub program_ref: &'static str,
     pub graph: DecisionGraph,
     pub review_independence_key: &'static str,

@@ -16,10 +16,7 @@ use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 use stdb_client::{ReducerCall, StdbClient};
 
-use crate::{
-    harness::audit::PolicyDecision,
-    tools::types::ToolOutput,
-};
+use crate::{harness::audit::PolicyDecision, tools::types::ToolOutput};
 
 use super::{
     answer_gate::collect_json_figures,
@@ -106,7 +103,7 @@ pub(crate) enum GovernedProgramStop {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub(super) struct GovernedProgramTraceStep {
+pub(crate) struct GovernedProgramTraceStep {
     pub node_id: String,
     pub kind: String,
     pub summary: String,
@@ -799,7 +796,6 @@ fn reasoning_outcome_provider(_outcome: &ReasoningOutcome) -> &'static str {
 fn reasoning_outcome_model(_outcome: &ReasoningOutcome) -> &'static str {
     REASONING_OUTCOME_MODEL
 }
-
 
 struct UnreachableDecisionProvider;
 
@@ -3456,6 +3452,7 @@ mod threshold_gate_tests {
             policy: GatePolicy::default(),
             catalog: &catalog,
             claim_checker: None,
+            reviewed_claims: None,
         };
         let compute = BuiltinComputeService;
         let calibration = InMemoryCalibrationProfileStore::new();

@@ -26,12 +26,17 @@
 //! admit. A model-assisted pass records that it was model-assisted and
 //! confers no domain approval (§7.3).
 //!
-//! Known limits, tracked rather than hidden: catalog reads are scoped to
-//! the run's organization/company, not to the individual actor's grants;
-//! `VerificationMethod::HumanReviewed` is not produced until the reviewer
-//! workflow (AIH-18) exists.
+//! One exception to the model-assisted check: when a person has reviewed the
+//! *exact* claim on the *exact* current evidence (`reviewed_claims`), that
+//! review replaces only the semantic-support check for that claim and
+//! `VerificationMethod::HumanReviewed` is recorded. Every deterministic check
+//! above still runs, a qualified review cannot be admitted in full, and an
+//! unsupported one blocks. Only the server can nominate a reviewed claim.
+//!
+//! Known limit, tracked rather than hidden: catalog reads are scoped to the
+//! run's organization/company, not to the individual actor's grants.
 
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
 use anyhow::{Context, Result};
 use async_trait::async_trait;
@@ -45,14 +50,17 @@ use super::governed_services::{
 };
 use super::intelligence::{
     CalculationOp, ClaimedCalculation, DecisionKind, DecisionProvider, DecisionRequest,
-    DecisionTypeRef, EvidenceRef, FinalDraft, PassageCitation,
+    DecisionTypeRef, EvidenceRef, FinalDraft, MaterialClaim, PassageCitation,
+};
+use super::reviewed_claims::{
+    ReviewedClaimMatch, ReviewedClaimQuery, ReviewedClaimResolver, ReviewedOutcome,
 };
 use crate::tools::types::ToolOutput;
 
 // ── Source passages ─────────────────────────────────────────────────────────
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(super) enum PassageStatus {
+pub(crate) enum PassageStatus {
     Current,
     Superseded,
     Withdrawn,
@@ -71,7 +79,7 @@ impl PassageStatus {
 
 /// One passage of one source version, as recorded server-side.
 #[derive(Clone, Debug)]
-pub(super) struct SourcePassage {
+pub(crate) struct SourcePassage {
     /// Row id in `ai_evidence_passage`; `0` when unknown. Persisted claims
     /// reference passages by this id.
     pub id: u64,
@@ -119,7 +127,7 @@ pub(super) fn text_hash(text: &str) -> String {
 /// Server-side source of truth for passages. Implementations must scope
 /// every read to the given organization and company.
 #[async_trait]
-pub(super) trait PassageCatalog: Send + Sync {
+pub(crate) trait PassageCatalog: Send + Sync {
     /// Every recorded passage (all versions, all statuses) of one source.
     async fn source_passages(
         &self,
@@ -163,14 +171,14 @@ impl Default for GatePolicy {
 // ── Claim coverage (model-assisted) ─────────────────────────────────────────
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(super) enum ClaimSupport {
+pub(crate) enum ClaimSupport {
     Supported,
     Partial,
     Unsupported,
 }
 
 #[derive(Clone, Debug)]
-pub(super) struct ClaimVerdict {
+pub(crate) struct ClaimVerdict {
     pub support: ClaimSupport,
     pub rationale: Option<String>,
 }
@@ -194,6 +202,18 @@ pub(super) enum ClaimVerification {
         support: ClaimSupport,
         rationale: Option<String>,
     },
+    /// A person reviewed this exact claim on this exact evidence; that review
+    /// stood in for the semantic check. `claim_id` names the reviewed claim,
+    /// which is referenced rather than copied, so no recorder can restate it.
+    HumanReviewed {
+        claim_id: u64,
+        outcome: ReviewedOutcome,
+        reviewer_hex: String,
+        reviewed_at_micros: Option<i64>,
+    },
+    /// A person judged this exact claim unsupported. Reuse is refused and the
+    /// answer is blocked; a model verdict never overrides it.
+    ReviewRejected { claim_id: u64 },
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -203,6 +223,10 @@ pub(super) struct ClaimAssessment {
     /// superseded or withdrawn is never recorded as support for new work.
     pub passage_ids: Vec<u64>,
     pub verification: ClaimVerification,
+    /// The claim's assumption identity: the applicability the answer was
+    /// required to meet and the calculations its figures rest on. Recorded on
+    /// the claim so a review is bound to them.
+    pub assumptions: Vec<String>,
 }
 
 /// A stated calculation and whether it recomputed correctly.
@@ -223,7 +247,7 @@ pub(super) struct AnswerProvenance {
 /// Judges whether cited passage text supports one claim. Implementations
 /// are fallible by nature; the gate treats an error as "unchecked".
 #[async_trait]
-pub(super) trait ClaimCoverageChecker: Send + Sync {
+pub(crate) trait ClaimCoverageChecker: Send + Sync {
     async fn check(&self, claim: &str, passages: &[&SourcePassage]) -> Result<ClaimVerdict>;
 }
 
@@ -334,6 +358,9 @@ pub(super) struct EvidenceGatedAnswerAdmission<'a> {
     pub policy: GatePolicy,
     pub catalog: &'a dyn PassageCatalog,
     pub claim_checker: Option<&'a dyn ClaimCoverageChecker>,
+    /// Server-side lookup of exact, current, human-reviewed claims. `None`
+    /// means every claim takes the model-assisted check.
+    pub reviewed_claims: Option<&'a dyn ReviewedClaimResolver>,
 }
 
 #[async_trait]
@@ -453,11 +480,22 @@ impl EvidenceGatedAnswerAdmission<'_> {
 
         // 7. Claim coverage.
         let mut model_checked = false;
+        let mut human_reviewed = false;
         provenance.claims = self
-            .check_claims(draft, &resolved, &mut findings, &mut model_checked)
+            .check_claims(
+                draft,
+                &resolved,
+                &mut findings,
+                &mut model_checked,
+                &mut human_reviewed,
+            )
             .await;
         if model_checked {
             methods.push(VerificationMethod::ModelAssisted);
+        }
+        // Recorded only when the resolver actually matched a reviewed claim.
+        if human_reviewed {
+            methods.push(VerificationMethod::HumanReviewed);
         }
 
         Ok((report(findings.into_outcome(), methods), provenance))
@@ -645,15 +683,18 @@ impl EvidenceGatedAnswerAdmission<'_> {
         resolved: &HashMap<PassageCitation, SourcePassage>,
         findings: &mut Findings,
         model_checked: &mut bool,
+        human_reviewed: &mut bool,
     ) -> Vec<ClaimAssessment> {
         let mut assessments = Vec::with_capacity(draft.claims.len());
         let mut budget = self.policy.max_claims_model_checked;
         let mut unchecked = 0usize;
         for claim in &draft.claims {
+            let assumptions = self.claim_assumptions(draft, claim);
             let assess = |passage_ids: Vec<u64>, verification: ClaimVerification| ClaimAssessment {
                 text: claim.text.clone(),
                 passage_ids,
                 verification,
+                assumptions: assumptions.clone(),
             };
             if claim.supports.is_empty() && !claim.support_refs.is_empty() {
                 let all_known = claim
@@ -699,6 +740,65 @@ impl EvidenceGatedAnswerAdmission<'_> {
                 // Blocked finding, so there is nothing to show a model.
                 assessments.push(assess(passage_ids, ClaimVerification::Unresolved));
                 continue;
+            }
+            // A person's review of exactly this claim on exactly this evidence
+            // replaces the semantic check. The deterministic checks above have
+            // already run for the answer either way.
+            if let Some(resolver) = self.reviewed_claims {
+                if let Some(query) =
+                    self.reviewed_claim_query(claim, resolved, &passage_ids, &assumptions)
+                {
+                    match resolver.resolve(&query).await {
+                        Ok(ReviewedClaimMatch::Reusable(reviewed)) => {
+                            *human_reviewed = true;
+                            if reviewed.outcome == ReviewedOutcome::Qualified {
+                                findings.add(
+                                    Severity::Qualified,
+                                    format!(
+                                        "claim is only qualifiedly supported, per a person's review: {}{}",
+                                        claim.text,
+                                        reviewed
+                                            .note
+                                            .as_deref()
+                                            .map(|note| format!(" ({note})"))
+                                            .unwrap_or_default()
+                                    ),
+                                );
+                            }
+                            assessments.push(assess(
+                                passage_ids,
+                                ClaimVerification::HumanReviewed {
+                                    claim_id: reviewed.claim_id,
+                                    outcome: reviewed.outcome,
+                                    reviewer_hex: reviewed.reviewer_hex,
+                                    reviewed_at_micros: reviewed.reviewed_at_micros,
+                                },
+                            ));
+                            continue;
+                        }
+                        Ok(ReviewedClaimMatch::Rejected { claim_id }) => {
+                            findings.add(
+                                Severity::Blocked,
+                                format!(
+                                    "a reviewer judged this exact claim unsupported by its evidence: {}",
+                                    claim.text
+                                ),
+                            );
+                            assessments.push(assess(
+                                passage_ids,
+                                ClaimVerification::ReviewRejected { claim_id },
+                            ));
+                            continue;
+                        }
+                        Ok(ReviewedClaimMatch::NoMatch) => {}
+                        Err(error) => {
+                            // Reuse is an optimisation, never authority: if it
+                            // cannot be established the claim simply takes the
+                            // ordinary semantic check.
+                            tracing::warn!(error = %error, "reviewed-claim lookup unavailable");
+                        }
+                    }
+                }
             }
             let Some(checker) = self.claim_checker else {
                 unchecked += 1;
@@ -762,6 +862,76 @@ impl EvidenceGatedAnswerAdmission<'_> {
         }
         assessments
     }
+}
+
+impl EvidenceGatedAnswerAdmission<'_> {
+    /// The assumption identity of one claim: the answer's required
+    /// applicability plus a hash of each stated calculation the claim's own
+    /// material figures rest on. Both are server-derived; a review is bound to
+    /// them, so a change in either needs a new review.
+    fn claim_assumptions(&self, draft: &FinalDraft, claim: &MaterialClaim) -> Vec<String> {
+        let mut assumptions: BTreeSet<String> = self
+            .scope
+            .required_applicability
+            .iter()
+            .map(|tag| format!("applicability:{tag}"))
+            .collect();
+        let figures: Vec<Figure> = extract_figures(&claim.text)
+            .into_iter()
+            .filter(Figure::is_material)
+            .collect();
+        for calculation in &draft.calculations {
+            let mut pool = calculation.operands.clone();
+            pool.push(calculation.claimed_result);
+            if figures.iter().any(|figure| figure.grounded_in(&pool)) {
+                assumptions.insert(calculation_token(calculation));
+            }
+        }
+        assumptions.into_iter().collect()
+    }
+
+    /// The reviewed-claim lookup for one claim, or `None` when the claim is
+    /// not eligible: it must rest only on passages, every cited passage must
+    /// have resolved and still be current, and it must state at least one.
+    fn reviewed_claim_query(
+        &self,
+        claim: &MaterialClaim,
+        resolved: &HashMap<PassageCitation, SourcePassage>,
+        passage_ids: &[u64],
+        assumptions: &[String],
+    ) -> Option<ReviewedClaimQuery> {
+        if claim.supports.is_empty() || !claim.support_refs.is_empty() {
+            return None;
+        }
+        let all_current = claim.supports.iter().all(|support| {
+            resolved
+                .get(support)
+                .is_some_and(|passage| passage.status == PassageStatus::Current && passage.id != 0)
+        });
+        if !all_current || passage_ids.is_empty() {
+            return None;
+        }
+        Some(ReviewedClaimQuery {
+            organization_id: self.scope.organization_id,
+            company_id: self.scope.company_id,
+            statement: claim.text.clone(),
+            passage_ids: passage_ids.to_vec(),
+            assumptions: assumptions.to_vec(),
+        })
+    }
+}
+
+/// A stable identity for a stated calculation, independent of the run it was
+/// stated in, so the same arithmetic in a later answer has the same identity.
+fn calculation_token(calculation: &ClaimedCalculation) -> String {
+    let canonical = json!({
+        "label": calculation.label.trim(),
+        "op": calculation.op,
+        "operands": calculation.operands,
+        "claimed_result": calculation.claimed_result,
+    })
+    .to_string();
+    format!("calculation:sha256:{}", text_hash(&canonical))
 }
 
 fn rationale_suffix(verdict: &ClaimVerdict) -> String {
@@ -1227,6 +1397,7 @@ mod tests {
             policy: GatePolicy::default(),
             catalog,
             claim_checker: checker,
+            reviewed_claims: None,
         };
         gate.admit_with_report(
             draft,
@@ -1290,6 +1461,466 @@ mod tests {
                 VerificationMethod::ModelAssisted
             ]
         );
+    }
+
+    // ── Reviewed-claim reuse ────────────────────────────────────────────────
+
+    use crate::orchestrator::reviewed_claims::testkit::{claim_row, store, Rows};
+    use crate::orchestrator::reviewed_claims::StdbReviewedClaimResolver;
+
+    const REUSED_CLAIM: &str = "standard rate applies to goods";
+    const REUSED_TEXT: &str = "Standard rate applies to goods.";
+
+    /// One answer judged with a real resolver over in-memory evidence rows,
+    /// returning the provenance the gate learned as well as its decision.
+    async fn run_reviewed(
+        catalog: &MemoryCatalog,
+        checker: Option<&dyn ClaimCoverageChecker>,
+        rows: &Rows,
+        draft: &FinalDraft,
+        required: &[&str],
+    ) -> (AnswerAdmissionReport, AnswerProvenance) {
+        let resolver = StdbReviewedClaimResolver { rows };
+        let gate = EvidenceGatedAnswerAdmission {
+            scope: GateScope {
+                organization_id: 7,
+                company_id: 3,
+                as_of_micros: AS_OF,
+                required_applicability: required.iter().map(|s| s.to_string()).collect(),
+            },
+            policy: GatePolicy::default(),
+            catalog,
+            claim_checker: checker,
+            reviewed_claims: Some(&resolver),
+        };
+        let known: HashSet<EvidenceRef> = draft.citations.iter().cloned().collect();
+        gate.evaluate(
+            draft,
+            &AdmissionEvidence {
+                known: &known,
+                data_figures: &[],
+            },
+        )
+        .await
+        .unwrap()
+    }
+
+    fn reused_draft() -> FinalDraft {
+        draft(
+            REUSED_TEXT,
+            vec![claim(REUSED_CLAIM, vec![cite("2", "s1")])],
+        )
+    }
+
+    fn reused_catalog() -> MemoryCatalog {
+        MemoryCatalog(vec![passage("2", "s1", REUSED_TEXT)])
+    }
+
+    fn reviewed_rows(assumptions: &[&str]) -> Rows {
+        store(claim_row(REUSED_CLAIM, &[1], assumptions))
+    }
+
+    #[tokio::test]
+    async fn an_exact_human_review_replaces_only_the_semantic_check() {
+        // The model would have rejected this claim; the person's review stands.
+        let checker = FixedChecker(ClaimSupport::Unsupported, Mutex::new(0));
+        let rows = reviewed_rows(&["applicability:jurisdiction:US"]);
+        let (report, provenance) = run_reviewed(
+            &reused_catalog(),
+            Some(&checker),
+            &rows,
+            &reused_draft(),
+            &["jurisdiction:US"],
+        )
+        .await;
+        assert_eq!(report.outcome, AnswerAdmissionOutcome::Admitted);
+        assert_eq!(
+            report.methods,
+            vec![
+                VerificationMethod::Deterministic,
+                VerificationMethod::HumanReviewed
+            ]
+        );
+        assert_eq!(*checker.1.lock().unwrap(), 0, "no model call is needed");
+        match &provenance.claims[0].verification {
+            ClaimVerification::HumanReviewed {
+                claim_id,
+                outcome,
+                reviewer_hex,
+                ..
+            } => {
+                assert_eq!(*claim_id, 40);
+                assert_eq!(*outcome, ReviewedOutcome::Supported);
+                assert_eq!(reviewer_hex.len(), 64);
+            }
+            other => panic!("expected a reused human review, got {other:?}"),
+        }
+        assert_eq!(
+            provenance.claims[0].assumptions,
+            vec!["applicability:jurisdiction:US".to_string()]
+        );
+    }
+
+    #[tokio::test]
+    async fn deterministic_checks_still_run_when_a_review_is_reused() {
+        let rows = reviewed_rows(&["applicability:jurisdiction:US"]);
+        let required = ["jurisdiction:US"];
+
+        // Arithmetic is recomputed, so a wrong figure blocks despite the review.
+        let mut wrong = reused_draft();
+        wrong.calculations = vec![ClaimedCalculation {
+            label: "total".into(),
+            op: CalculationOp::Sum,
+            operands: vec![2.0, 3.0],
+            claimed_result: 9.0,
+        }];
+        let (report, _) = run_reviewed(&reused_catalog(), None, &rows, &wrong, &required).await;
+        assert!(matches!(
+            report.outcome,
+            AnswerAdmissionOutcome::Blocked { .. }
+        ));
+
+        // A tampered passage fails its hash check, and a withdrawn one is refused.
+        let mut tampered = reused_catalog();
+        tampered.0[0].text = "Something else entirely.".into();
+        let (report, _) = run_reviewed(&tampered, None, &rows, &reused_draft(), &required).await;
+        assert!(matches!(
+            report.outcome,
+            AnswerAdmissionOutcome::Blocked { .. }
+        ));
+        let mut withdrawn = reused_catalog();
+        withdrawn.0[0].status = PassageStatus::Withdrawn;
+        let (report, _) = run_reviewed(&withdrawn, None, &rows, &reused_draft(), &required).await;
+        assert!(matches!(
+            report.outcome,
+            AnswerAdmissionOutcome::Blocked { .. }
+        ));
+
+        // Figures the answer cannot trace still qualify it.
+        let ungrounded = draft(
+            "Standard rate applies to goods; the fee is 417.50.",
+            vec![claim(REUSED_CLAIM, vec![cite("2", "s1")])],
+        );
+        let (report, _) =
+            run_reviewed(&reused_catalog(), None, &rows, &ungrounded, &required).await;
+        assert!(matches!(
+            report.outcome,
+            AnswerAdmissionOutcome::Qualified { .. }
+        ));
+    }
+
+    #[tokio::test]
+    async fn a_qualified_review_is_never_admitted_in_full() {
+        let mut claim = claim_row(REUSED_CLAIM, &[1], &["applicability:jurisdiction:US"]);
+        claim["verificationOutcome"] = serde_json::json!("qualified");
+        claim["verificationNote"] = serde_json::json!("EU customers only");
+        let (report, provenance) = run_reviewed(
+            &reused_catalog(),
+            None,
+            &store(claim),
+            &reused_draft(),
+            &["jurisdiction:US"],
+        )
+        .await;
+        match report.outcome {
+            AnswerAdmissionOutcome::Qualified { limitations } => {
+                assert!(limitations.iter().any(|l| l.contains("EU customers only")));
+            }
+            other => panic!("a qualified review must stay qualified, got {other:?}"),
+        }
+        assert!(report.methods.contains(&VerificationMethod::HumanReviewed));
+        assert!(matches!(
+            provenance.claims[0].verification,
+            ClaimVerification::HumanReviewed {
+                outcome: ReviewedOutcome::Qualified,
+                ..
+            }
+        ));
+    }
+
+    #[tokio::test]
+    async fn an_unsupported_review_blocks_and_is_not_overridden_by_a_model() {
+        let mut claim = claim_row(REUSED_CLAIM, &[1], &["applicability:jurisdiction:US"]);
+        claim["verificationOutcome"] = serde_json::json!("unsupported");
+        claim["status"] = serde_json::json!("needs_review");
+        let checker = FixedChecker(ClaimSupport::Supported, Mutex::new(0));
+        let (report, provenance) = run_reviewed(
+            &reused_catalog(),
+            Some(&checker),
+            &store(claim),
+            &reused_draft(),
+            &["jurisdiction:US"],
+        )
+        .await;
+        assert!(matches!(
+            report.outcome,
+            AnswerAdmissionOutcome::Blocked { .. }
+        ));
+        assert_eq!(
+            *checker.1.lock().unwrap(),
+            0,
+            "the model is not asked to overrule a person"
+        );
+        assert!(!report.methods.contains(&VerificationMethod::HumanReviewed));
+        assert!(matches!(
+            provenance.claims[0].verification,
+            ClaimVerification::ReviewRejected { claim_id: 40 }
+        ));
+    }
+
+    /// Everything that is not an exact match falls back to the model-assisted
+    /// check and never records `HumanReviewed`.
+    async fn assert_falls_back_to_model(
+        catalog: MemoryCatalog,
+        rows: Rows,
+        draft: FinalDraft,
+        required: &[&str],
+        label: &str,
+    ) {
+        let checker = FixedChecker(ClaimSupport::Supported, Mutex::new(0));
+        let (report, provenance) =
+            run_reviewed(&catalog, Some(&checker), &rows, &draft, required).await;
+        assert_eq!(
+            *checker.1.lock().unwrap(),
+            1,
+            "{label}: the model check must run"
+        );
+        assert!(
+            !report.methods.contains(&VerificationMethod::HumanReviewed),
+            "{label}: no human review may be recorded"
+        );
+        assert!(matches!(
+            provenance.claims[0].verification,
+            ClaimVerification::Model { .. }
+        ));
+    }
+
+    #[tokio::test]
+    async fn changed_wording_support_source_or_applicability_need_a_new_review() {
+        let rows = || reviewed_rows(&["applicability:jurisdiction:US"]);
+        let required = ["jurisdiction:US"];
+
+        // Changed wording.
+        assert_falls_back_to_model(
+            reused_catalog(),
+            rows(),
+            draft(
+                REUSED_TEXT,
+                vec![claim(
+                    "the reduced rate applies to goods",
+                    vec![cite("2", "s1")],
+                )],
+            ),
+            &required,
+            "changed statement",
+        )
+        .await;
+
+        // Changed support set: the answer also cites a second passage.
+        let mut two = reused_catalog();
+        let mut second = passage("2", "s2", "Reduced rate applies to food.");
+        second.id = 2;
+        two.0.push(second);
+        assert_falls_back_to_model(
+            two,
+            rows(),
+            draft(
+                REUSED_TEXT,
+                vec![claim(REUSED_CLAIM, vec![cite("2", "s1"), cite("2", "s2")])],
+            ),
+            &required,
+            "changed support set",
+        )
+        .await;
+
+        // Changed source version: the passage now lives under a new id.
+        let mut moved = reused_catalog();
+        moved.0[0].id = 9;
+        assert_falls_back_to_model(
+            moved,
+            rows(),
+            reused_draft(),
+            &required,
+            "changed source version",
+        )
+        .await;
+
+        // Changed applicability: the answer now requires another jurisdiction.
+        let mut fr = reused_catalog();
+        fr.0[0].applicability = vec!["jurisdiction:FR".into()];
+        assert_falls_back_to_model(
+            fr,
+            rows(),
+            reused_draft(),
+            &["jurisdiction:FR"],
+            "changed applicability",
+        )
+        .await;
+
+        // A claim that also rests on run evidence is not the reviewed tuple.
+        let support = EvidenceRef {
+            kind: "named_resource".into(),
+            id: "reports.daily.v1".into(),
+        };
+        let mut mixed = reused_draft();
+        mixed.citations = vec![support.clone()];
+        mixed.claims[0].support_refs = vec![support];
+        assert_falls_back_to_model(reused_catalog(), rows(), mixed, &required, "mixed support")
+            .await;
+    }
+
+    #[tokio::test]
+    async fn changed_calculation_identity_needs_a_new_review() {
+        let calculation = |result: f64| ClaimedCalculation {
+            label: "vat".into(),
+            op: CalculationOp::Product,
+            operands: vec![100.0, 0.2],
+            claimed_result: result,
+        };
+        let statement = "The VAT due is 20.00.";
+        let with_calc = |claim_text: &str, calc: ClaimedCalculation| FinalDraft {
+            content: format!("{claim_text} (100 x 0.2)"),
+            claims: vec![claim(claim_text, vec![cite("2", "s1")])],
+            calculations: vec![calc],
+            ..Default::default()
+        };
+        let catalog = || {
+            MemoryCatalog(vec![passage(
+                "2",
+                "s1",
+                "VAT is 20 percent of the net price of 100.",
+            )])
+        };
+        let token = calculation_token(&calculation(20.0));
+        let reviewed = store(claim_row(
+            statement,
+            &[1],
+            &["applicability:jurisdiction:US", token.as_str()],
+        ));
+        let checker = FixedChecker(ClaimSupport::Unsupported, Mutex::new(0));
+        let (report, _) = run_reviewed(
+            &catalog(),
+            Some(&checker),
+            &reviewed,
+            &with_calc(statement, calculation(20.0)),
+            &["jurisdiction:US"],
+        )
+        .await;
+        assert!(
+            report.methods.contains(&VerificationMethod::HumanReviewed),
+            "the same statement, evidence and arithmetic reuses the review: {report:?}"
+        );
+
+        // Different arithmetic behind the same words is a different identity.
+        let changed = ClaimedCalculation {
+            operands: vec![100.0, 0.25],
+            claimed_result: 25.0,
+            ..calculation(20.0)
+        };
+        assert_ne!(calculation_token(&changed), token);
+        assert_falls_back_to_model(
+            catalog(),
+            store(claim_row(
+                statement,
+                &[1],
+                &["applicability:jurisdiction:US", token.as_str()],
+            )),
+            with_calc(statement, changed),
+            &["jurisdiction:US"],
+            "changed calculation",
+        )
+        .await;
+    }
+
+    #[tokio::test]
+    async fn revoked_evidence_or_an_unavailable_lookup_never_reuses_a_review() {
+        let required = ["jurisdiction:US"];
+        // Retracted or otherwise invalid required dependency.
+        let mut invalid = reviewed_rows(&["applicability:jurisdiction:US"]);
+        invalid.dependencies[0]["state"] = serde_json::json!("invalid");
+        assert_falls_back_to_model(
+            reused_catalog(),
+            invalid,
+            reused_draft(),
+            &required,
+            "revoked evidence",
+        )
+        .await;
+        // A claim flagged for review after a source correction.
+        let mut flagged = claim_row(REUSED_CLAIM, &[1], &["applicability:jurisdiction:US"]);
+        flagged["status"] = serde_json::json!("needs_review");
+        assert_falls_back_to_model(
+            reused_catalog(),
+            store(flagged),
+            reused_draft(),
+            &required,
+            "stale claim",
+        )
+        .await;
+        // A lookup that fails is only a missing optimisation.
+        let mut unavailable = reviewed_rows(&["applicability:jurisdiction:US"]);
+        unavailable.fail_lookup = true;
+        assert_falls_back_to_model(
+            reused_catalog(),
+            unavailable,
+            reused_draft(),
+            &required,
+            "lookup outage",
+        )
+        .await;
+    }
+
+    #[tokio::test]
+    async fn another_company_or_organization_review_is_never_reused() {
+        for (field, value) in [("companyId", 4), ("organizationId", 8)] {
+            let mut claim = claim_row(REUSED_CLAIM, &[1], &["applicability:jurisdiction:US"]);
+            claim[field] = serde_json::json!(value);
+            assert_falls_back_to_model(
+                reused_catalog(),
+                store(claim),
+                reused_draft(),
+                &["jurisdiction:US"],
+                field,
+            )
+            .await;
+        }
+    }
+
+    #[tokio::test]
+    async fn a_model_named_claim_id_is_ignored() {
+        // The draft's claim JSON carries an id the model invented. Nothing in
+        // the draft type can carry it, and with no server-side match the claim
+        // takes the ordinary model check.
+        let forged: MaterialClaim = serde_json::from_value(serde_json::json!({
+            "text": "the reduced rate applies to goods",
+            "supports": [cite("2", "s1")],
+            "claim_id": 40,
+            "reviewedClaimId": 40,
+        }))
+        .unwrap();
+        assert_falls_back_to_model(
+            reused_catalog(),
+            reviewed_rows(&["applicability:jurisdiction:US"]),
+            draft(REUSED_TEXT, vec![forged]),
+            &["jurisdiction:US"],
+            "model-named claim id",
+        )
+        .await;
+    }
+
+    #[tokio::test]
+    async fn without_a_resolver_every_claim_takes_the_model_check() {
+        let checker = FixedChecker(ClaimSupport::Supported, Mutex::new(0));
+        let report = run_gate(
+            &reused_catalog(),
+            Some(&checker),
+            &reused_draft(),
+            &["jurisdiction:US"],
+            &[],
+        )
+        .await;
+        assert_eq!(*checker.1.lock().unwrap(), 1);
+        assert!(!report.methods.contains(&VerificationMethod::HumanReviewed));
     }
 
     #[tokio::test]
@@ -1535,6 +2166,7 @@ mod tests {
             },
             catalog: &catalog,
             claim_checker: Some(&checker),
+            reviewed_claims: None,
         };
         let known = HashSet::new();
         let report = gate
@@ -1577,6 +2209,7 @@ mod tests {
             policy: GatePolicy::default(),
             catalog: &catalog,
             claim_checker: None,
+            reviewed_claims: None,
         };
         let data = [1234.5678, 0.125];
         let evidence = AdmissionEvidence {

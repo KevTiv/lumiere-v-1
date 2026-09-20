@@ -423,10 +423,9 @@ pub async fn post_suggest(
         agent.system_prompt
     );
 
-    let spend_reader = state
-        .spend_read_stdb
-        .as_deref()
-        .ok_or_else(|| AppError::Internal("spend_read_stdb is required for routed generation".into()))?;
+    let spend_reader = state.spend_read_stdb.as_deref().ok_or_else(|| {
+        AppError::Internal("spend_read_stdb is required for routed generation".into())
+    })?;
     let run_inputs = json!({
         "surface": "form_suggestion",
         "form_id": req.form_id.clone(),
@@ -496,10 +495,9 @@ pub async fn post_suggest(
     let total_tokens = program
         .generation_input_tokens
         .saturating_add(program.generation_output_tokens);
-    let generated = program
-        .final_content
-        .as_deref()
-        .ok_or_else(|| AppError::Internal("governed form generation produced no final content".into()))?;
+    let generated = program.final_content.as_deref().ok_or_else(|| {
+        AppError::Internal("governed form generation produced no final content".into())
+    })?;
     let text = generated;
     let model_json: Value = match serde_json::from_str(clean_json_response(text)) {
         Ok(value) => value,

@@ -5404,6 +5404,27 @@
       "idempotency": "request_guarded",
       "codec": { "id": "spacetimedb-sats-json", "version": 1 },
       "evidence": "spacetimedb/src/ai/run_lifecycle.rs: steering instruction and checked continuation are payload-bound"
+    },
+    "begin_ai_workflow_generation": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "state_guarded",
+      "codec": { "id": "spacetimedb-sats-json", "version": 1 },
+      "evidence": "spacetimedb/src/ai/workflow_provenance.rs: the run is resolved from the run table in the same organization and company, a retry naming the same run is a no-op and a different run is rejected"
+    },
+    "stage_ai_workflow_node_provenance": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "state_guarded",
+      "codec": { "id": "spacetimedb-sats-json", "version": 1 },
+      "evidence": "spacetimedb/src/ai/workflow_provenance.rs: identical restaging of a node's content and links is a no-op; changed content or links supersede the earlier row and revise the draft component"
+    },
+    "run_workflow_provenance_tests": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": { "id": "spacetimedb-sats-json", "version": 1 },
+      "evidence": "spacetimedb/tests/ai/mod.rs: test reducer executes the workflow provenance scenarios; retry classification is not applicable"
     }
   }
 }

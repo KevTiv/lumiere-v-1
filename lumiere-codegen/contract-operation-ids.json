@@ -1393,6 +1393,9 @@
     "record_ai_run_effect": "erp.record_ai_run_effect",
     "reply_ai_run_question": "erp.reply_ai_run_question",
     "resume_ai_run_checked": "erp.resume_ai_run_checked",
-    "steer_ai_run": "erp.steer_ai_run"
+    "steer_ai_run": "erp.steer_ai_run",
+    "begin_ai_workflow_generation": "erp.begin_ai_workflow_generation",
+    "run_workflow_provenance_tests": "erp.run_workflow_provenance_tests",
+    "stage_ai_workflow_node_provenance": "erp.stage_ai_workflow_node_provenance"
   }
 }

@@ -77,3 +77,38 @@ test('rejects malformed inspection envelopes', () => {
   assert.equal(mapEvidenceInspection({ targetId: 0 }), null)
   assert.equal(mapEvidenceInspection({ targetId: '4' }), null)
 })
+
+test('maps a workflow step through its revisions to the reviewer of its claim', () => {
+  const reviewer = 'd'.repeat(64)
+  const view = mapEvidenceInspection({
+    targetKind: 'component',
+    targetId: 7,
+    lineagePasses: true,
+    revisions: [
+      { id: 7, artifactRef: 'workflow-version:42', componentKey: 'node:review', version: 2, linkState: 'linked', status: 'current', contentHash: 'b'.repeat(64), parentComponentId: 4 },
+      { id: 4, artifactRef: 'workflow-version:41', componentKey: 'node:review', version: 1, linkState: 'linked', status: 'superseded', contentHash: 'a'.repeat(64) },
+    ],
+    claims: [{ id: 8, kind: 'sourced_fact', statement: 'Claim', verificationMethod: 'human_reviewed', verificationOutcome: 'supported', status: 'current', reviewerUid: reviewer, reviewedAtMicros: 1_700_000_000_000_000 }],
+    decisions: [{ id: 4, title: 'Adopt', rationale: 'Reason', status: 'accepted', adoptedClaimIds: [8] }],
+    passages: [{ id: 9, availability: 'available', excerpt: 'text', excerptTruncated: false, coordinates: [] }],
+  })
+
+  assert.ok(view)
+  assert.deepEqual(view.revisions.map((revision) => revision.id), [7, 4])
+  assert.equal(view.revisions[0]?.parentComponentId, 4)
+  assert.equal(view.revisions[1]?.parentComponentId, null)
+  assert.equal(view.claims[0]?.reviewerUid, reviewer)
+  assert.equal(view.claims[0]?.reviewedAtMicros, 1_700_000_000_000_000)
+})
+
+test('ignores a reviewer identity that is not a persisted identity', () => {
+  const view = mapEvidenceInspection({
+    targetKind: 'claim',
+    targetId: 8,
+    claims: [{ id: 8, reviewerUid: 'not an identity', reviewedAtMicros: '12' }],
+  })
+  assert.ok(view)
+  assert.equal(view.claims[0]?.reviewerUid, null)
+  assert.equal(view.claims[0]?.reviewedAtMicros, null)
+})
+

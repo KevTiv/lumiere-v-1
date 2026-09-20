@@ -380,6 +380,47 @@ mod tests {
     }
 
     #[test]
+    fn evidence_retrieval_is_its_own_grant_and_nothing_implies_it() {
+        // Roles holding the neighbouring evidence and knowledge capabilities
+        // (or a wildcard) receive no `ai.evidence.retrieve`: the grant table is
+        // exact-match, and nothing is seeded by default.
+        let rows = vec![
+            json!({"roleId": 1, "capabilityKey": "ai.evidence.inspect", "maxRows": 5, "maxBytes": 500}),
+            json!({"roleId": 1, "capabilityKey": "ai.knowledge.retrieve", "maxRows": 5, "maxBytes": 500}),
+            json!({"roleId": 1, "capabilityKey": "*", "maxRows": 5, "maxBytes": 500}),
+        ];
+        let grants = effective_grants(&[1], &rows);
+        assert!(grants
+            .iter()
+            .all(|grant| grant.capability_key != "ai.evidence.retrieve"));
+
+        // A role that does hold it carries its own bounds, unmerged with others.
+        let mut rows = rows;
+        rows.push(json!({"roleId": 1, "capabilityKey": "ai.evidence.retrieve", "maxRows": 3, "maxBytes": 2048}));
+        let grants = effective_grants(&[1], &rows);
+        let retrieve = grants
+            .iter()
+            .find(|grant| grant.capability_key == "ai.evidence.retrieve")
+            .expect("evidence retrieval grant");
+        assert_eq!((retrieve.max_rows, retrieve.max_bytes), (3, 2048));
+    }
+
+    #[test]
+    fn an_actor_with_no_current_role_has_no_grants() {
+        let rows = vec![
+            json!({"roleId": 1, "capabilityKey": "ai.evidence.retrieve", "maxRows": 3, "maxBytes": 2048}),
+        ];
+        // No membership, an inactive base role, or only an expired assignment
+        // leaves no role ids, so the grant rows are never consulted.
+        assert!(current_role_ids(&[], &[], &[json!({"id": 1})], 100).is_empty());
+        assert!(current_role_ids(&[json!({"roleId": 1})], &[], &[], 100).is_empty());
+        let expired =
+            vec![json!({"roleId": 1, "expiresAt": {"__timestamp_micros_since_unix_epoch__": 100}})];
+        assert!(current_role_ids(&[], &expired, &[json!({"id": 1})], 100).is_empty());
+        assert!(effective_grants(&[], &rows).is_empty());
+    }
+
+    #[test]
     fn legacy_grant_envelope_stays_grants_only() {
         let grant = CapabilityGrant {
             capability_key: "example".into(),

@@ -35,6 +35,7 @@ use crate::ai::knowledge_entry::{
     review_ai_knowledge_entry_version, set_ai_knowledge_entry_version_state,
     AiKnowledgeVersionContent, CreateAiKnowledgeEntryParams, ReviewAiKnowledgeEntryVersionParams,
 };
+use crate::core::audit::audit_log;
 use crate::core::organization::{company, create_company, CreateCompanyParams};
 use crate::documents::documents::{
     create_document, delete_document, document, CreateDocumentParams,
@@ -43,11 +44,15 @@ use crate::test_harness::{ensure_test_superuser, OrgFixture};
 
 // ── Fixtures ─────────────────────────────────────────────────────────────────
 
-fn hash(c: char) -> String {
+pub(super) fn hash(c: char) -> String {
     c.to_string().repeat(64)
 }
 
-fn expect_err<T>(result: Result<T, String>, needle: &str, label: &str) -> Result<(), String> {
+pub(super) fn expect_err<T>(
+    result: Result<T, String>,
+    needle: &str,
+    label: &str,
+) -> Result<(), String> {
     match result {
         Err(message) if message.to_lowercase().contains(&needle.to_lowercase()) => Ok(()),
         Err(message) => Err(format!(
@@ -59,7 +64,11 @@ fn expect_err<T>(result: Result<T, String>, needle: &str, label: &str) -> Result
     }
 }
 
-fn add_company(ctx: &ReducerContext, fixture: &OrgFixture, code: &str) -> Result<u64, String> {
+pub(super) fn add_company(
+    ctx: &ReducerContext,
+    fixture: &OrgFixture,
+    code: &str,
+) -> Result<u64, String> {
     let currency_id = ctx
         .db
         .company()
@@ -97,7 +106,7 @@ fn add_company(ctx: &ReducerContext, fixture: &OrgFixture, code: &str) -> Result
         .ok_or_else(|| "sibling company not found after create".to_string())
 }
 
-fn seed_chat_session(
+pub(super) fn seed_chat_session(
     ctx: &ReducerContext,
     organization_id: u64,
     company_id: u64,
@@ -119,10 +128,10 @@ fn seed_chat_session(
     )
 }
 
-struct Evidence {
-    source_id: u64,
-    version_id: u64,
-    passage_id: u64,
+pub(super) struct Evidence {
+    pub(super) source_id: u64,
+    pub(super) version_id: u64,
+    pub(super) passage_id: u64,
 }
 
 fn source_params(key: &str, scope: &str) -> RecordAiEvidenceSourceParams {
@@ -138,7 +147,7 @@ fn source_params(key: &str, scope: &str) -> RecordAiEvidenceSourceParams {
     }
 }
 
-fn version_params(label: &str) -> RecordAiEvidenceSourceVersionParams {
+pub(super) fn version_params(label: &str) -> RecordAiEvidenceSourceVersionParams {
     RecordAiEvidenceSourceVersionParams {
         version: label.into(),
         edition: Some("2nd".into()),
@@ -175,7 +184,7 @@ fn passage_params(
     }
 }
 
-fn version_id(ctx: &ReducerContext, source_id: u64, label: &str) -> Result<u64, String> {
+pub(super) fn version_id(ctx: &ReducerContext, source_id: u64, label: &str) -> Result<u64, String> {
     ctx.db
         .ai_evidence_source_version()
         .ai_evidence_source_version_by_source()
@@ -203,7 +212,7 @@ fn passage_id(
 }
 
 /// Source + inspected version + one passage, in `(org, company)`.
-fn seed_evidence(
+pub(super) fn seed_evidence(
     ctx: &ReducerContext,
     org: u64,
     company: u64,
@@ -230,7 +239,7 @@ fn seed_evidence(
     })
 }
 
-fn claim_params(passage_ids: Vec<u64>) -> RecordAiEvidenceClaimParams {
+pub(super) fn claim_params(passage_ids: Vec<u64>) -> RecordAiEvidenceClaimParams {
     RecordAiEvidenceClaimParams {
         kind: "sourced_fact".into(),
         statement: "Depreciation is straight line.".into(),
@@ -246,7 +255,7 @@ fn claim_params(passage_ids: Vec<u64>) -> RecordAiEvidenceClaimParams {
     }
 }
 
-fn latest_claim(ctx: &ReducerContext, org: u64) -> Result<u64, String> {
+pub(super) fn latest_claim(ctx: &ReducerContext, org: u64) -> Result<u64, String> {
     ctx.db
         .ai_evidence_claim()
         .ai_evidence_claim_by_org()
@@ -266,7 +275,7 @@ fn latest_decision(ctx: &ReducerContext, org: u64) -> Result<u64, String> {
         .ok_or_else(|| "no decision".to_string())
 }
 
-fn seed_claim(
+pub(super) fn seed_claim(
     ctx: &ReducerContext,
     org: u64,
     company: u64,
@@ -291,7 +300,14 @@ fn decision_params(adopted: Vec<u64>, supporting: Vec<u64>) -> RecordAiEvidenceD
     }
 }
 
-fn accept(ctx: &ReducerContext, org: u64, company: u64, decision_id: u64) -> Result<(), String> {
+pub(super) fn accept(
+    ctx: &ReducerContext,
+    org: u64,
+    company: u64,
+    decision_id: u64,
+) -> Result<(), String> {
+    // Acceptance needs a reviewer independent of the proposer.
+    hand_decision_to_another_creator(ctx, decision_id)?;
     review_ai_evidence_decision(
         ctx,
         org,
@@ -304,7 +320,7 @@ fn accept(ctx: &ReducerContext, org: u64, company: u64, decision_id: u64) -> Res
     )
 }
 
-fn seed_accepted_decision(
+pub(super) fn seed_accepted_decision(
     ctx: &ReducerContext,
     org: u64,
     company: u64,
@@ -349,7 +365,7 @@ fn component_id(
         .ok_or_else(|| format!("component {artifact}/{key} v{version} not found"))
 }
 
-fn change(kind: &str, replacement: Option<u64>) -> RecordAiEvidenceSourceChangeParams {
+pub(super) fn change(kind: &str, replacement: Option<u64>) -> RecordAiEvidenceSourceChangeParams {
     RecordAiEvidenceSourceChangeParams {
         change_kind: kind.into(),
         replacement_version_id: replacement,
@@ -415,6 +431,34 @@ fn review(
     kind: &str,
     outcome: &str,
 ) -> Result<(), String> {
+    // A knowledge review must come from someone who neither owns the entry
+    // nor proposed the version. The suite runs as one sender, so the owner
+    // and proposer are set on the rows directly.
+    let version = ctx
+        .db
+        .ai_knowledge_entry_version()
+        .id()
+        .find(&version_id)
+        .ok_or("knowledge version missing")?;
+    let entry = ctx
+        .db
+        .ai_knowledge_entry()
+        .id()
+        .find(&version.entry_id)
+        .ok_or("knowledge entry missing")?;
+    ctx.db
+        .ai_knowledge_entry()
+        .id()
+        .update(crate::ai::knowledge_entry::AiKnowledgeEntry {
+            owner_uid: other_identity(),
+            ..entry
+        });
+    ctx.db.ai_knowledge_entry_version().id().update(
+        crate::ai::knowledge_entry::AiKnowledgeEntryVersion {
+            create_uid: other_identity(),
+            ..version
+        },
+    );
     review_ai_knowledge_entry_version(
         ctx,
         org,
@@ -451,12 +495,85 @@ fn edges_for_dependent(
         .collect()
 }
 
-fn assert_eq_str(actual: &str, expected: &str, label: &str) -> Result<(), String> {
+pub(super) fn assert_eq_str(actual: &str, expected: &str, label: &str) -> Result<(), String> {
     if actual == expected {
         Ok(())
     } else {
         Err(format!("{label}: expected '{expected}', got '{actual}'"))
     }
+}
+
+/// A distinct actor for separation-of-duties fixtures. The suite runs as one
+/// authenticated sender, so an "other" creator is set on the row directly.
+pub(super) fn other_identity() -> Identity {
+    Identity::from_byte_array([9; 32])
+}
+
+pub(super) fn hand_claim_to_another_creator(
+    ctx: &ReducerContext,
+    claim_id: u64,
+) -> Result<(), String> {
+    let claim = ctx
+        .db
+        .ai_evidence_claim()
+        .id()
+        .find(&claim_id)
+        .ok_or("claim missing")?;
+    let contribution_id = claim.contribution_id;
+    ctx.db
+        .ai_evidence_claim()
+        .id()
+        .update(crate::ai::evidence_lineage::AiEvidenceClaim {
+            create_uid: other_identity(),
+            ..claim
+        });
+    reattribute_contribution(ctx, contribution_id)
+}
+
+/// A contribution made by this sender would also make them the proposer.
+fn reattribute_contribution(
+    ctx: &ReducerContext,
+    contribution_id: Option<u64>,
+) -> Result<(), String> {
+    let Some(id) = contribution_id else {
+        return Ok(());
+    };
+    let contribution = ctx
+        .db
+        .ai_evidence_contribution()
+        .id()
+        .find(&id)
+        .ok_or("contribution missing")?;
+    if contribution.contributor_uid == ctx.sender() {
+        ctx.db.ai_evidence_contribution().id().update(
+            crate::ai::evidence_source::AiEvidenceContribution {
+                contributor_uid: other_identity(),
+                ..contribution
+            },
+        );
+    }
+    Ok(())
+}
+
+pub(super) fn hand_decision_to_another_creator(
+    ctx: &ReducerContext,
+    decision_id: u64,
+) -> Result<(), String> {
+    let decision = ctx
+        .db
+        .ai_evidence_decision()
+        .id()
+        .find(&decision_id)
+        .ok_or("decision missing")?;
+    let contribution_id = decision.contribution_id;
+    ctx.db
+        .ai_evidence_decision()
+        .id()
+        .update(crate::ai::evidence_lineage::AiEvidenceDecision {
+            create_uid: other_identity(),
+            ..decision
+        });
+    reattribute_contribution(ctx, contribution_id)
 }
 
 // ── AIH-13 ───────────────────────────────────────────────────────────────────
@@ -1025,6 +1142,7 @@ pub fn test_lineage_reconstructs_after_edit_and_fork(ctx: &ReducerContext) -> Re
         "verification_method",
         "recording human_reviewed",
     )?;
+    hand_claim_to_another_creator(ctx, claim_id)?;
     review_ai_evidence_claim(
         ctx,
         org,
@@ -1280,6 +1398,7 @@ pub fn test_lineage_reconstructs_after_edit_and_fork(ctx: &ReducerContext) -> Re
         ReviewAiArtifactComponentLinksParams {
             outcome: "confirmed".into(),
             note: None,
+            expected_content_hash: None,
         },
     )?;
     assert_eq_str(
@@ -1300,6 +1419,7 @@ pub fn test_lineage_reconstructs_after_edit_and_fork(ctx: &ReducerContext) -> Re
         ReviewAiArtifactComponentLinksParams {
             outcome: "unresolved".into(),
             note: Some("code diverged".into()),
+            expected_content_hash: None,
         },
     )?;
     assert_eq_str(
@@ -1782,6 +1902,7 @@ pub fn test_retraction_flags_dependents_and_blocks_reuse(
             ReviewAiArtifactComponentLinksParams {
                 outcome: "confirmed".into(),
                 note: None,
+                expected_content_hash: None,
             },
         ),
         "cannot justify a component",
@@ -1799,6 +1920,7 @@ pub fn test_retraction_flags_dependents_and_blocks_reuse(
         "required dependency",
         "approving knowledge on retracted evidence",
     )?;
+    hand_claim_to_another_creator(ctx, chain.claim_id)?;
     expect_err(
         review_ai_evidence_claim(
             ctx,
@@ -1810,7 +1932,7 @@ pub fn test_retraction_flags_dependents_and_blocks_reuse(
                 verification_note: None,
             },
         ),
-        "required dependency",
+        "withdrawn or revoked",
         "re-blessing a claim on retracted evidence",
     )?;
 
@@ -1951,6 +2073,7 @@ pub fn test_correction_requires_review_and_recovers(ctx: &ReducerContext) -> Res
         Ok(())
     };
     reaffirm("claim", chain.claim_id)?;
+    hand_claim_to_another_creator(ctx, chain.claim_id)?;
     review_ai_evidence_claim(
         ctx,
         org,
@@ -1972,6 +2095,7 @@ pub fn test_correction_requires_review_and_recovers(ctx: &ReducerContext) -> Res
         ReviewAiArtifactComponentLinksParams {
             outcome: "confirmed".into(),
             note: None,
+            expected_content_hash: None,
         },
     )?;
     assert_eq_str(
@@ -2233,7 +2357,12 @@ pub fn test_document_blob_passage_claim_lifecycle(ctx: &ReducerContext) -> Resul
         .id()
         .find(&claim_id)
         .ok_or("claim missing after passage binding")?;
-    assert_eq_str(&claim.status, "supported", "passage-backed claim")?;
+    assert_eq_str(
+        &claim.verification_outcome,
+        "supported",
+        "passage-backed claim outcome",
+    )?;
+    assert_eq_str(&claim.status, "current", "passage-backed claim status")?;
 
     record_ai_evidence_source_change(
         ctx,
@@ -2436,5 +2565,229 @@ pub fn test_discretionary_dependencies_need_acknowledgement(
         "discretionary",
         "acknowledging a required edge",
     )?;
+    Ok(())
+}
+
+// ── Human review ─────────────────────────────────────────────────────────────
+
+/// A human verdict is the reviewer's own, independent act: it persists who
+/// reviewed and when, refuses the creator or proposer, refuses superseded or
+/// withdrawn claims, keeps the earlier automated verdict in the audit trail,
+/// and can never be written by a recorder.
+pub fn test_human_review_is_independent_persisted_and_auditable(
+    ctx: &ReducerContext,
+) -> Result<(), String> {
+    ensure_test_superuser(ctx)?;
+    let f = OrgFixture::seed_minimal(ctx)?;
+    let (org, company) = (f.organization_id, f.company_id);
+    let ev = seed_evidence(ctx, org, company, "review-src", "company")?;
+    let review = |outcome: &str, note: Option<&str>| ReviewAiEvidenceClaimParams {
+        verification_outcome: outcome.into(),
+        verification_note: note.map(str::to_string),
+    };
+
+    // The recorder path cannot write human_reviewed, whatever else it claims.
+    let mut forged = claim_params(vec![ev.passage_id]);
+    forged.verification_method = "human_reviewed".into();
+    expect_err(
+        record_ai_evidence_claim(ctx, org, company, forged),
+        "verification_method",
+        "recorder writing human_reviewed",
+    )?;
+    let mut model = claim_params(vec![ev.passage_id]);
+    model.verification_method = "model_assisted".into();
+    model.verification_note = Some("model rationale".into());
+    record_ai_evidence_claim(ctx, org, company, model)?;
+    let claim_id = latest_claim(ctx, org)?;
+    let stored = ctx
+        .db
+        .ai_evidence_claim()
+        .id()
+        .find(&claim_id)
+        .ok_or("claim")?;
+    assert_eq_str(
+        &stored.verification_method,
+        "model_assisted",
+        "recorded method",
+    )?;
+    if stored.reviewer_uid.is_some() || stored.reviewed_at.is_some() {
+        return Err("an automated claim carries reviewer identity".into());
+    }
+
+    // The creator cannot review their own claim.
+    expect_err(
+        review_ai_evidence_claim(ctx, org, company, claim_id, review("supported", None)),
+        "creator of a claim",
+        "self-review of a claim",
+    )?;
+
+    // Nor can the user whose contribution introduced it.
+    seed_chat_session(ctx, org, company, "review-session")?;
+    record_ai_evidence_contribution(
+        ctx,
+        org,
+        company,
+        RecordAiEvidenceContributionParams {
+            contributor_kind: "user".into(),
+            agent_run_id: None,
+            session_ref: "review-session".into(),
+            turn_ref: None,
+            event_ref: Some("review-event".into()),
+            introduced_kind: "concept".into(),
+            source_version_id: None,
+            inspection_state: "user_reported".into(),
+            is_secondary_quotation: false,
+            note: None,
+        },
+    )?;
+    let contribution_id = ctx
+        .db
+        .ai_evidence_contribution()
+        .iter()
+        .filter(|c| c.organization_id == org)
+        .map(|c| c.id)
+        .max()
+        .ok_or("contribution")?;
+    let claim = ctx
+        .db
+        .ai_evidence_claim()
+        .id()
+        .find(&claim_id)
+        .ok_or("claim")?;
+    ctx.db
+        .ai_evidence_claim()
+        .id()
+        .update(crate::ai::evidence_lineage::AiEvidenceClaim {
+            create_uid: other_identity(),
+            contribution_id: Some(contribution_id),
+            ..claim
+        });
+    expect_err(
+        review_ai_evidence_claim(ctx, org, company, claim_id, review("supported", None)),
+        "proposer of a claim",
+        "review by the contribution's proposer",
+    )?;
+
+    // Independent of both: a qualified verdict must say how it is qualified.
+    hand_claim_to_another_creator(ctx, claim_id)?;
+    let claim = ctx
+        .db
+        .ai_evidence_claim()
+        .id()
+        .find(&claim_id)
+        .ok_or("claim")?;
+    ctx.db
+        .ai_evidence_claim()
+        .id()
+        .update(crate::ai::evidence_lineage::AiEvidenceClaim {
+            contribution_id: None,
+            ..claim
+        });
+    expect_err(
+        review_ai_evidence_claim(ctx, org, company, claim_id, review("qualified", None)),
+        "qualification",
+        "qualified without a stated qualification",
+    )?;
+    review_ai_evidence_claim(
+        ctx,
+        org,
+        company,
+        claim_id,
+        review("supported", Some("checked against the passage")),
+    )?;
+    let reviewed = ctx
+        .db
+        .ai_evidence_claim()
+        .id()
+        .find(&claim_id)
+        .ok_or("claim")?;
+    assert_eq_str(
+        &reviewed.verification_method,
+        "human_reviewed",
+        "reviewed method",
+    )?;
+    assert_eq_str(
+        &reviewed.verification_outcome,
+        "supported",
+        "reviewed outcome",
+    )?;
+    if reviewed.reviewer_uid != Some(ctx.sender()) || reviewed.reviewed_at != Some(ctx.timestamp) {
+        return Err("the reviewer and review time were not persisted on the claim".into());
+    }
+    // The model verdict it replaced is preserved in audit history, not erased.
+    let audited = ctx
+        .db
+        .audit_log()
+        .iter()
+        .filter(|a| a.table_name == "ai_evidence_claim" && a.record_id == claim_id)
+        .filter_map(|a| a.old_values)
+        .any(|old| old.contains("model_assisted") && old.contains("model rationale"));
+    if !audited {
+        return Err("the prior automated verdict is missing from the audit trail".into());
+    }
+
+    // A decision cannot be accepted by its creator or proposer either.
+    record_ai_evidence_decision(ctx, org, company, decision_params(vec![claim_id], vec![]))?;
+    let decision_id = latest_decision(ctx, org)?;
+    expect_err(
+        review_ai_evidence_decision(
+            ctx,
+            org,
+            company,
+            decision_id,
+            ReviewAiEvidenceDecisionParams {
+                outcome: "accepted".into(),
+                note: None,
+            },
+        ),
+        "creator of a decision",
+        "self-acceptance of a decision",
+    )?;
+    accept(ctx, org, company, decision_id)?;
+
+    // A superseded revision cannot be reviewed; only its replacement can.
+    let mut revision = claim_params(vec![ev.passage_id]);
+    revision.supersedes_claim_id = Some(claim_id);
+    revision.statement = "Depreciation is straight line over five years.".into();
+    record_ai_evidence_claim(ctx, org, company, revision)?;
+    let revised_id = latest_claim(ctx, org)?;
+    hand_claim_to_another_creator(ctx, claim_id)?;
+    expect_err(
+        review_ai_evidence_claim(ctx, org, company, claim_id, review("supported", None)),
+        "superseded",
+        "reviewing a superseded claim",
+    )?;
+
+    // Review never crosses a tenant boundary: another organization's or a
+    // sibling company's claim is not this reviewer's to bless.
+    let foreign = OrgFixture::seed_minimal(ctx)?;
+    expect_err(
+        review_ai_evidence_claim(
+            ctx,
+            foreign.organization_id,
+            foreign.company_id,
+            revised_id,
+            review("supported", None),
+        ),
+        "does not belong",
+        "cross-organization review",
+    )?;
+    let sibling = add_company(ctx, &f, "REVIEW")?;
+    expect_err(
+        review_ai_evidence_claim(ctx, org, sibling, revised_id, review("supported", None)),
+        "does not belong",
+        "cross-company review",
+    )?;
+
+    // Withdrawn evidence makes the claim unreviewable, whatever the verdict.
+    hand_claim_to_another_creator(ctx, revised_id)?;
+    record_ai_evidence_source_change(ctx, org, company, ev.version_id, change("retracted", None))?;
+    for outcome in ["supported", "unsupported"] {
+        expect_err(
+            review_ai_evidence_claim(ctx, org, company, revised_id, review(outcome, Some("n"))),
+            "withdrawn or revoked",
+            "reviewing a claim on retracted evidence",
+        )?;
+    }
     Ok(())
 }
