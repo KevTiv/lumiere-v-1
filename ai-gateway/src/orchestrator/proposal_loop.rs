@@ -37,9 +37,9 @@ pub(super) struct ProposalLoopLimits {
 pub(super) enum ProposalLoopStop {
     /// `FinalAnswerAdmission` admitted the draft.
     CandidateAdmitted(String),
-    /// Admitted only for a named review, not as a validated final answer.
+    /// Withheld pending review. Raw draft content is intentionally discarded
+    /// at this boundary so callers cannot accidentally publish it.
     CandidateRequiresReview {
-        content: String,
         reason: String,
     },
     /// The draft failed shape/citation admission outright.
@@ -56,8 +56,7 @@ pub(super) enum ProposalLoopStop {
     /// No `GovernedProgram` exists yet to apply this (GP-08).
     ProgramPatchProposed(String),
     UnableToProgress(String),
-    /// Capability results stopped adding evidence (mirrors `run_loop`'s
-    /// `NoProgress`, AIH-22).
+    /// Capability results stopped adding evidence (AIH-22).
     NoProgress,
     /// `ReasoningProvider::reason` returned an error or an outcome that
     /// failed `ReasoningOutcome::validate_against`.
@@ -347,10 +346,7 @@ pub(super) async fn run_proposal_loop(
                         ))
                     }
                     AnswerAdmissionOutcome::RequiresReview { reason } => {
-                        ProposalLoopStop::CandidateRequiresReview {
-                            content: draft.content,
-                            reason,
-                        }
+                        ProposalLoopStop::CandidateRequiresReview { reason }
                     }
                     AnswerAdmissionOutcome::Blocked { reason } => {
                         ProposalLoopStop::CandidateBlocked { reason }
