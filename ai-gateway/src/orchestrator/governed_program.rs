@@ -120,6 +120,10 @@ pub(crate) struct GovernedProgramOutcome {
     pub trace: Vec<GovernedProgramTraceStep>,
     pub decision_calls: u32,
     pub capability_calls: u32,
+    pub generation_provider: Option<String>,
+    pub generation_model: Option<String>,
+    pub generation_input_tokens: u32,
+    pub generation_output_tokens: u32,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -1586,25 +1590,35 @@ impl GovernedProgramExecutor<'_> {
                             if let Some(next) = &node.next {
                                 current = next.clone();
                             } else {
-                                return Ok(outcome(
+                                let mut completed = outcome(
                                     GovernedProgramStop::Completed,
                                     Some(content),
                                     values,
                                     trace,
                                     decision_calls,
                                     capability_calls,
-                                ));
+                                );
+                                completed.generation_provider = Some(response.provider.clone());
+                                completed.generation_model = Some(response.model.clone());
+                                completed.generation_input_tokens = response.input_tokens;
+                                completed.generation_output_tokens = response.output_tokens;
+                                return Ok(completed);
                             }
                         }
                         Err(reason) => {
-                            return Ok(outcome(
+                            let mut review = outcome(
                                 GovernedProgramStop::ReviewRequired(reason),
-                                Some(response.content),
+                                Some(response.content.clone()),
                                 values,
                                 trace,
                                 decision_calls,
                                 capability_calls,
-                            ));
+                            );
+                            review.generation_provider = Some(response.provider.clone());
+                            review.generation_model = Some(response.model.clone());
+                            review.generation_input_tokens = response.input_tokens;
+                            review.generation_output_tokens = response.output_tokens;
+                            return Ok(review);
                         }
                     }
                 }
@@ -2612,6 +2626,10 @@ fn outcome(
         trace,
         decision_calls,
         capability_calls,
+        generation_provider: None,
+        generation_model: None,
+        generation_input_tokens: 0,
+        generation_output_tokens: 0,
     }
 }
 
