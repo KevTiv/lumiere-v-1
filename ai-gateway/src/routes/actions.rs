@@ -357,9 +357,9 @@ async fn draft_actions_llm(
         .ok_or_else(|| DraftActionsError::other("spend_read_stdb is required for routed generation"))?;
     let run_inputs = json!({
         "surface": "action_draft_generation",
-        "query": req.query,
-        "allowed_reducers": req.allowed_reducers,
-        "allowed_entity_types": req.allowed_entity_types,
+        "query": req.query.clone(),
+        "allowed_reducers": req.allowed_reducers.clone(),
+        "allowed_entity_types": req.allowed_entity_types.clone(),
     });
     let run_id = create_generation_surface_run(
         state.stdb.as_ref(),
