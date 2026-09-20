@@ -757,7 +757,7 @@ pub async fn post_rag(
         req.company_id,
         run.run_id,
         &agent,
-        None,
+        run.intelligence_policy_ref.as_deref(),
         state.providers.llm.as_ref(),
         GenerationRequest {
             objective: user_content,
