@@ -21,8 +21,12 @@ use crate::{
         format_live_context_block, resolve_snapshot_candidates, ActorCredentials, LiveSnapshot,
         SnapshotUiContext, RAG_MAX_LIVE_SNAPSHOTS,
     },
-    orchestrator::text_answer_gate::{
-        gate_text_answer, TextAnswerProvenance, TextAnswerVerification, TextEvidence,
+    orchestrator::{
+        intelligence_router::complete_routed_generation,
+        model_configuration::StdbModelConfigurationStore,
+        text_answer_gate::{
+            gate_text_answer, TextAnswerProvenance, TextAnswerVerification, TextEvidence,
+        },
     },
     providers::llm::LlmMessage,
     retrieval_policy::optional_retrieval,
@@ -715,21 +719,21 @@ pub async fn post_rag(
     let user_content =
         format!("{user_content}\n\nAllowed structured support refs: {allowed_supports}");
 
-    let llm_resp = state
-        .providers
-        .llm
-        .complete(crate::providers::llm::LlmRequest {
-            provider: agent.provider.clone(),
-            model: agent.model.clone(),
-            system: system_prompt,
-            messages: vec![LlmMessage::text("user", user_content)],
-            max_tokens: agent.max_tokens,
-            temperature: Some(agent.temperature),
-            top_p: Some(agent.top_p),
-            tools: Vec::new(),
-        })
-        .await
-        .map_err(|e| AppError::Internal(format!("LLM request failed: {e}")))?;
+    let model_store = StdbModelConfigurationStore {
+        reader: state.stdb.as_ref(),
+    };
+    let llm_resp = complete_routed_generation(
+        &model_store,
+        org_id,
+        &agent,
+        None,
+        state.providers.llm.as_ref(),
+        system_prompt,
+        vec![LlmMessage::text("user", user_content)],
+        agent.max_tokens,
+    )
+    .await
+    .map_err(|e| AppError::Internal(format!("LLM request failed: {e}")))?;
 
     let total_tokens = llm_resp.input_tokens + llm_resp.output_tokens;
     if total_tokens > 0 {
