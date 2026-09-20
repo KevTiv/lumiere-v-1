@@ -251,6 +251,7 @@ async fn run_legacy_skill(
             &triggered_by_hex,
         )
         .await?
+        .run_id
     } else {
         0
     };
@@ -685,8 +686,8 @@ pub async fn run_skill_admitted(
         (resume_run_id, run_key)
     } else {
         let run_key = Uuid::new_v4().to_string();
-        let run_id = if skill.id > 0 {
-            create_run(
+        if skill.id > 0 {
+            let run = create_run(
                 &stdb,
                 req.org_id,
                 req.company_id,
@@ -697,11 +698,11 @@ pub async fn run_skill_admitted(
                 &inputs_json,
                 &triggered_by_hex,
             )
-            .await?
+            .await?;
+            (run.run_id, run.run_key)
         } else {
-            0
-        };
-        (run_id, run_key)
+            (0, run_key)
+        }
     };
 
     let manifest = load_active_manifest(&stdb, req.org_id, &skill_key, req.skill_version)
