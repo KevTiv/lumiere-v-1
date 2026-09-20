@@ -988,6 +988,8 @@ pub async fn run_skill_admitted(
             objective: skill.prompt_template.clone(),
             bounded_state: governed_inputs,
             evidence: run_evidence,
+            generation_instructions: None,
+            generation_max_tokens: None,
         };
         if is_resume {
             checkpoint_store
