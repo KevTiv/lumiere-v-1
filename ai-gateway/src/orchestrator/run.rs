@@ -57,7 +57,7 @@ use super::{
 use crate::{
     ai_agent::{
         enforce_chargeable_limits, ensure_allowed_action, ensure_model_allowed,
-        ensure_within_budget, record_ai_spend, resolve_agent,
+        ensure_within_budget, resolve_agent,
     },
     harness::{
         data_scope_resolver::ResourceRegistry,
@@ -552,10 +552,6 @@ async fn run_legacy_skill(
             None,
         )
         .await?;
-    }
-
-    if tokens_used > 0 {
-        let _ = record_ai_spend(&stdb, req.org_id, agent.agent_id, tokens_used).await;
     }
 
     Ok(RunSkillResponse {
