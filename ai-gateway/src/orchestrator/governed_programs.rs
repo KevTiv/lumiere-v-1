@@ -318,7 +318,7 @@ pub(super) struct GovernedProgramCatalogEntry {
     pub reviewed_calls: Vec<PlannedToolCall>,
 }
 
-pub(super) fn governed_program_for_skill(skill_key: &str) -> Option<GovernedProgramCatalogEntry> {
+pub(crate) fn governed_program_for_skill(skill_key: &str) -> Option<GovernedProgramCatalogEntry> {
     match skill_key {
         "report_analysis" => Some(GovernedProgramCatalogEntry {
             program_ref: REPORT_ANALYSIS_PROGRAM_REF,
