@@ -72,6 +72,7 @@ pub struct FormSuggestRequest {
     pub document_job_id: Option<Value>,
     pub agent_id: Option<u64>,
     pub team_member_id: Option<u64>,
+    pub identity_hex: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -389,6 +390,9 @@ pub async fn post_suggest(
             "org_id and company_id are required".into(),
         ));
     }
+    if req.identity_hex.trim().is_empty() {
+        return Err(AppError::BadRequest("identity_hex is required".into()));
+    }
     if !non_empty(&req.form_id) || !non_empty(&req.entity_type) {
         return Err(AppError::BadRequest(
             "form_id and entity_type are required".into(),
@@ -438,7 +442,7 @@ pub async fn post_suggest(
         agent.agent_id,
         req.team_member_id,
         &serde_json::to_string(&run_inputs).map_err(|e| AppError::Internal(e.to_string()))?,
-        "0000000000000000000000000000000000000000000000000000000000000000",
+        &req.identity_hex,
     )
     .await
     .map_err(|e| AppError::Internal(e.to_string()))?;
