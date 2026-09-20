@@ -556,6 +556,21 @@ mod tests {
     }
 
     #[test]
+    fn governed_run_ref_preserves_canonical_identity() {
+        let run = GovernedRunRef {
+            run_id: 42,
+            run_key: "run-42".to_string(),
+            skill_id: 7,
+            skill_config_id: Some(9),
+        };
+
+        assert_eq!(run.run_id, 42);
+        assert_eq!(run.run_key, "run-42");
+        assert_eq!(run.skill_id, 7);
+        assert_eq!(run.skill_config_id, Some(9));
+    }
+
+    #[test]
     fn migrates_legacy_report_analysis_tools() {
         let mut skill = legacy_analytics_skill("report_analysis");
         migrate_legacy_analytics_tools(&mut skill);
