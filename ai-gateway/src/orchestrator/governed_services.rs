@@ -103,7 +103,7 @@ fn reason_summary(decision: &PolicyDecision) -> String {
 
 /// Authorization/policy admission for one capability proposal. The only
 /// production implementation (`PolicyBackedCapabilityAdmission`) delegates
-/// to the same `LoopPolicy` the direct-execution loop uses today.
+/// to the reviewed invocation policy compatibility interface.
 #[async_trait]
 pub(super) trait CapabilityAdmission: Send + Sync {
     async fn admit(
@@ -155,9 +155,9 @@ impl CapabilityAdmission for PolicyBackedCapabilityAdmission<'_> {
 }
 
 /// Executes one admitted capability proposal. The only production
-/// implementation (`ToolsBackedCapabilityExecutor`) delegates to the same
-/// `LoopTools` the direct-execution loop uses today — generated capability
-/// IR remains the only executable ERP vocabulary either way.
+/// implementation (`ToolsBackedCapabilityExecutor`) delegates to the
+/// authorized tool compatibility interface. Generated capability IR remains
+/// the only executable ERP vocabulary.
 #[async_trait]
 pub(super) trait CapabilityExecutor: Send + Sync {
     async fn execute(&self, proposal: &CapabilityProposal) -> Result<ToolOutput>;
