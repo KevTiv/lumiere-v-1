@@ -186,12 +186,12 @@ pub async fn run_skill(state: &AppState, req: RunSkillRequest) -> Result<RunSkil
     crate::harness::legacy_fence::ensure_legacy_orchestrator_allowed(skill_key)
         .map_err(|message| anyhow::anyhow!(message))?;
 
-    run_skill_unlocked(state, req).await
+    run_legacy_skill(state, req).await
 }
 
-/// Execute a bundled skill after a harness adapter has already enforced release
-/// and policy. Callers must not expose this on `/v1/skills/run`.
-pub async fn run_skill_unlocked(
+/// Legacy bundled-skill runner. This is intentionally private so no harness
+/// adapter can bypass the typed governed admission boundary.
+async fn run_legacy_skill(
     state: &AppState,
     req: RunSkillRequest,
 ) -> Result<RunSkillResponse> {
