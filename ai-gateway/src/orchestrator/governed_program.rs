@@ -2255,9 +2255,9 @@ fn data_figures_for_run(values: &HashMap<String, NodeValue>) -> Vec<f64> {
 
 /// Whether any `Capability`/`AcquireEvidence` node in `graph` names a
 /// capability the embedded generated-capability catalog advertises.
-/// Mirrors `agent_loop_adapters::run_recorded_loop`'s `generated_requested`
-/// check for the direct-execution loop — same reason: resolving actor
-/// grants (`generated_read::resolve_actor_grants`) requires real actor
+/// Resolve actor grants only when the typed graph actually references a
+/// generated capability. Resolving actor grants
+/// (`generated_read::resolve_actor_grants`) requires real actor
 /// credentials and a live HTTP round-trip to the API server, so a graph
 /// that never touches a generated capability should not have to pay for
 /// (or require) either.
