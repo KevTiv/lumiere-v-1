@@ -1260,7 +1260,8 @@ pub fn test_send_quotation_then_confirm(ctx: &ReducerContext) -> Result<(), Stri
     Ok(())
 }
 
-/// Partial validate with backorder creates residual picking and keeps reservation.
+/// Partial validate with backorder creates a linked residual picking that can be assigned and
+/// delivered without double-reserving the residual.
 pub fn test_partial_validate_creates_backorder(ctx: &ReducerContext) -> Result<(), String> {
     ensure_test_superuser(ctx)?;
     let fixture = OrgFixture::seed_minimal(ctx)?;
@@ -1381,17 +1382,59 @@ pub fn test_partial_validate_creates_backorder(ctx: &ReducerContext) -> Result<(
         return Err(format!("Expected backorder qty 6.0, got {bo_qty}"));
     }
 
-    let reserved: f64 = ctx
+    let reserved_qty = |ctx: &ReducerContext| -> f64 {
+        ctx.db
+            .stock_quant()
+            .quant_by_product()
+            .filter(&fixture.product_id)
+            .filter(|q| q.organization_id == org_id && q.company_id == company_id)
+            .map(|q| q.reserved_quantity)
+            .sum()
+    };
+    let reserved = reserved_qty(ctx);
+    if reserved.abs() > 1e-6 {
+        return Err(format!(
+            "Expected no reservation left on the done picking (backorder is unassigned), got {reserved}"
+        ));
+    }
+
+    let linked = ctx
         .db
-        .stock_quant()
-        .quant_by_product()
-        .filter(&fixture.product_id)
-        .filter(|q| q.organization_id == org_id && q.company_id == company_id)
-        .map(|q| q.reserved_quantity)
-        .sum();
+        .sale_order()
+        .id()
+        .find(&order.id)
+        .ok_or("Sale order not found after backorder")?;
+    if !linked.picking_ids.contains(&backorder.id) || linked.delivery_count != 2 {
+        return Err(format!(
+            "Expected backorder linked on sale order (count 2), got {:?} / {}",
+            linked.picking_ids, linked.delivery_count
+        ));
+    }
+
+    // Fulfil the remainder: the backorder must assign against real stock and complete the line.
+    let scope = CompanyScopeParams {
+        company_id: Some(company_id),
+    };
+    confirm_stock_picking(ctx, org_id, backorder.id, scope.clone())?;
+    assign_stock_picking(ctx, org_id, backorder.id, scope.clone())?;
+    let reserved = reserved_qty(ctx);
     if (reserved - 6.0).abs() > 1e-6 {
         return Err(format!(
-            "Expected residual reserved_quantity 6.0 after partial ship, got {reserved}"
+            "Expected backorder assignment to reserve 6.0 exactly once, got {reserved}"
+        ));
+    }
+    validate_stock_picking(ctx, org_id, backorder.id, scope)?;
+
+    let delivered: f64 = ctx
+        .db
+        .sale_order_line()
+        .order_line_by_order()
+        .filter(&order.id)
+        .map(|l| l.qty_delivered)
+        .sum();
+    if (delivered - 10.0).abs() > 1e-6 {
+        return Err(format!(
+            "Expected 10.0 delivered across both pickings, got {delivered}"
         ));
     }
 
