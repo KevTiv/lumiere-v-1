@@ -493,8 +493,28 @@ pub async fn post_suggest(
     };
     let total_tokens = llm_resp.input_tokens.saturating_add(llm_resp.output_tokens);
     let text = llm_resp.content.as_str();
-    let model_json: Value = serde_json::from_str(clean_json_response(text))
-        .map_err(|e| AppError::Internal(format!("Failed to parse form suggestion JSON: {}", e)))?;
+    let model_json: Value = match serde_json::from_str(clean_json_response(text)) {
+        Ok(value) => value,
+        Err(error) => {
+            let _ = complete_run(
+                state.stdb.as_ref(),
+                req.org_id,
+                req.company_id,
+                run_id,
+                "failed",
+                None,
+                None,
+                None,
+                1,
+                total_tokens,
+                Some(format!("invalid generated form JSON: {error}")),
+            )
+            .await;
+            return Err(AppError::Internal(format!(
+                "Failed to parse form suggestion JSON: {error}"
+            )));
+        }
+    };
 
     let suggestions = sanitize_suggestions(&req.fields, &model_json);
     let validation_notes = parse_validation_notes(&model_json);
