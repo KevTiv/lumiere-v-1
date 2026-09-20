@@ -12,11 +12,11 @@ use serde_json::json;
 use stdb_client::{ReducerCall, StdbClient};
 
 use super::{
-    decision_graph::DecisionGraph,
     governed_program::{
         run_generation_only_program, GovernedProgramContext, GovernedProgramOutcome,
-        IntelligenceEventRecorder, ProgramCheckpointStore,
+        StdbIntelligenceEventRecorder, StdbProgramCheckpointStore,
     },
+    governed_programs::governed_program_for_skill,
     intelligence::{
         decision_request_hash, DecisionProvider, DecisionRequest, DecisionResponse,
         DecisionTypeRef, GenerationProvider, GenerationRequest, GenerationResponse,
@@ -30,6 +30,7 @@ use super::{
 };
 use crate::{
     ai_agent::ResolvedAgentConfig,
+    orchestrator::skill_loader::GovernedRunRef,
     providers::llm::LlmCompletion,
 };
 
@@ -158,31 +159,39 @@ impl<'a> ConfiguredIntelligenceRouter<'a> {
     }
 }
 
-/// Execute one catalogued generation-only graph through the normal routed
-/// generation provider and the common GovernedProgramExecutor.
+/// Execute one catalogued generation surface through the normal routed
+/// generation provider and common GovernedProgramExecutor.
 #[allow(clippy::too_many_arguments)]
-pub(crate) async fn run_routed_generation_program(
+pub(crate) async fn run_catalogued_generation_surface(
     store: &super::model_configuration::StdbModelConfigurationStore<'_>,
     ledger: &dyn SpendLedger,
+    writer: &stdb_client::StdbClient,
+    reader: &stdb_client::StdbClient,
     organization_id: u64,
     company_id: u64,
-    run_id: u64,
+    run: &GovernedRunRef,
     agent: &ResolvedAgentConfig,
-    policy_ref: Option<&str>,
     transport: &dyn LlmCompletion,
-    graph: &DecisionGraph,
-    context: &GovernedProgramContext,
-    checkpoint_store: Option<&dyn ProgramCheckpointStore>,
-    recorder: &dyn IntelligenceEventRecorder,
+    skill_key: &str,
+    objective: String,
+    bounded_state: serde_json::Value,
+    generation_instructions: Option<String>,
+    generation_max_tokens: Option<u32>,
 ) -> Result<GovernedProgramOutcome> {
-    if run_id == 0 || context.run_id != run_id {
-        bail!("durable run identity mismatch for routed generation program");
+    let catalog = governed_program_for_skill(skill_key)
+        .with_context(|| format!("skill '{skill_key}' is not registered in governed program catalog"))?;
+    if run.program_ref.as_deref() != Some(catalog.program_ref) {
+        bail!(
+            "run program identity mismatch for '{skill_key}': expected {}, got {:?}",
+            catalog.program_ref,
+            run.program_ref
+        );
     }
     let resolver = IntelligenceRouteResolver::new(
         store,
         organization_id,
         agent,
-        policy_ref,
+        run.intelligence_policy_ref.as_deref(),
     )?;
     let router = ConfiguredIntelligenceRouter::new(resolver);
     let generation = RoutedGenerationProvider::new(
@@ -192,14 +201,27 @@ pub(crate) async fn run_routed_generation_program(
         agent,
         organization_id,
         company_id,
-        run_id,
+        run.run_id,
     );
+    let checkpoint_store = StdbProgramCheckpointStore { writer, reader };
+    let recorder = StdbIntelligenceEventRecorder { writer, reader };
+    let context = GovernedProgramContext {
+        organization_id,
+        company_id,
+        run_id: run.run_id,
+        program_ref: catalog.program_ref.to_string(),
+        objective,
+        bounded_state,
+        evidence: Vec::new(),
+        generation_instructions,
+        generation_max_tokens,
+    };
     run_generation_only_program(
-        graph,
-        context,
+        &catalog.graph,
+        &context,
         &generation,
-        checkpoint_store,
-        recorder,
+        Some(&checkpoint_store),
+        &recorder,
     )
     .await
 }
