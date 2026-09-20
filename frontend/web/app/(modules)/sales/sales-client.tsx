@@ -11,6 +11,7 @@ import {
   CsvImportModal,
   RuntimeFormModal,
   pickingRowActions,
+  runRecordActionForRows,
   workflowActionsToEntityActions,
   useRBAC,
   newSaleOrderForm,
@@ -134,7 +135,6 @@ import {
   useCreateLoyaltyCard,
   useReturnOrders,
   useReturnOrderLines,
-  useCreateReturnOrder,
   useSaleCommissions,
   useSaleOrdersToApprove,
   useSaleCommissionsPending,
@@ -261,17 +261,6 @@ function pickingIsFulfillment(row: Record<string, unknown>): boolean {
   return code === 'outgoing';
 }
 
-/** Runs a picking workflow action once per selected picking; failures are reported by the surface. */
-function runPickingAction(
-  action: { execute(pickingId: string): Promise<unknown> },
-  rows: Record<string, unknown>[],
-): void {
-  for (const row of rows) {
-    const id = pickingRowId(row);
-    if (id != null) action.execute(String(id)).catch(() => undefined);
-  }
-}
-
 function pickingRowId(row: Record<string, unknown>): string | number | bigint | null {
   const id = getRowField(row, 'id');
   if (id == null) return null;
@@ -329,6 +318,7 @@ const INLINE_ERROR_TRANSITIONS: ReadonlySet<string> = new Set([
   'sales.order-line.update',
   'inventory.picking.partial-validate',
   'inventory.picking.cancel',
+  'sales.return.create',
 ]);
 
 function returnOrderRowId(row: Record<string, unknown>): string | null {
@@ -404,6 +394,7 @@ function SalesClientLoaded({
   const [creditReturnOrderId, setCreditReturnOrderId] = useState<bigint | null>(null);
   const [creditReturnOrderError, setCreditReturnOrderError] = useState<string | null>(null);
   const [openReturnForm, setOpenReturnForm] = useState(false);
+  const [createReturnError, setCreateReturnError] = useState<string | null>(null);
 
   const { data: orders = [], isLoading: ordersLoading } = useSaleOrders(orgId, initialOrders);
   const { data: orderLines = [] } = useSaleOrderLines(
@@ -782,11 +773,11 @@ function SalesClientLoaded({
   const createPaymentMethod = useCreatePaymentMethod(orgId, operatingCompanyId);
   const createLoyaltyProgram = useCreateLoyaltyProgram(orgId, operatingCompanyId);
   const createLoyaltyCard = useCreateLoyaltyCard(orgId, operatingCompanyId);
-  const createReturnOrder = useCreateReturnOrder(orgId, operatingCompanyId);
   const returnOrderWorkflow = useReturnOrderWorkflow(
     orgId,
     operatingCompanyId,
     {
+      create: t('sales.returnOrders.actions.create'),
       confirm: t('sales.returnOrders.actions.confirm'),
       receive: t('sales.returnOrders.actions.receive'),
       exchange: t('sales.returnOrders.actions.createExchange', {
@@ -1300,14 +1291,14 @@ function SalesClientLoaded({
       pickingRowActions(t, {
         // Every selected picking qualifies (the toolbar requires it), so each one is run. The
         // workflow surface reports typed failures.
-        confirm: (rows) => runPickingAction(pickingWorkflow.confirm, rows),
-        assign: (rows) => runPickingAction(pickingWorkflow.assign, rows),
+        confirm: (rows) => runRecordActionForRows(pickingWorkflow.confirm, rows),
+        assign: (rows) => runRecordActionForRows(pickingWorkflow.assign, rows),
         'partial-validate': (rows) => {
           setPartialDeliveryError(null);
           setPartialDeliveryPicking(rows[0] as Record<string, unknown>);
         },
-        pack: (rows) => runPickingAction(pickingWorkflow.pack, rows),
-        validate: (rows) => runPickingAction(pickingWorkflow.validate, rows),
+        pack: (rows) => runRecordActionForRows(pickingWorkflow.pack, rows),
+        validate: (rows) => runRecordActionForRows(pickingWorkflow.validate, rows),
         cancel: (rows) => {
           setCancelPickingError(null);
           setCancelPickingTarget(rows[0] as Record<string, unknown>);
@@ -2571,7 +2562,12 @@ function SalesClientLoaded({
       await saleOrderLineWorkflow.update.execute({ lineId: String(lineId), params });
     } else if (action === 'createReturnOrder') {
       const params = toCreateReturnOrderParams(formData);
-      if (params) await createReturnOrder.mutateAsync(params);
+      if (params) {
+        await returnOrderWorkflow.create.execute(
+          { saleOrderId: params.saleOrderId != null ? String(params.saleOrderId) : undefined, params },
+          { navigateToNext: true },
+        );
+      }
     } else if (action === 'createPickingBatch') {
       const p = toCreatePickingBatchParams(formData);
       if (p) await createPickingBatch.mutateAsync(p);
@@ -2625,7 +2621,6 @@ function SalesClientLoaded({
     createPaymentMethod.isPending ||
     createLoyaltyProgram.isPending ||
     createLoyaltyCard.isPending ||
-    createReturnOrder.isPending ||
     returnOrderWorkflow.isPending ||
     importSaleOrderCsv.isPending ||
     importSaleOrderLineCsv.isPending ||
@@ -2962,14 +2957,27 @@ function SalesClientLoaded({
       ) : null}
       <FormModal
         open={openReturnForm}
-        onOpenChange={setOpenReturnForm}
+        onOpenChange={(open) => {
+          setOpenReturnForm(open);
+          if (!open) setCreateReturnError(null);
+        }}
         config={returnOrderFormConfig}
-        isPending={createReturnOrder.isPending}
+        closeOnSubmit={false}
+        submitError={createReturnError}
+        isPending={returnOrderWorkflow.isPending}
         onSubmit={async (formData) => {
+          setCreateReturnError(null);
           const params = toCreateReturnOrderParams(formData);
           if (!params) return;
-          await createReturnOrder.mutateAsync(params);
-          setOpenReturnForm(false);
+          try {
+            await returnOrderWorkflow.create.execute(
+              { saleOrderId: params.saleOrderId != null ? String(params.saleOrderId) : undefined, params },
+              { navigateToNext: true },
+            );
+            setOpenReturnForm(false);
+          } catch (e) {
+            setCreateReturnError(e instanceof Error ? e.message : String(e));
+          }
         }}
       />
       {creditReturnOrderId != null ? (

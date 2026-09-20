@@ -2,6 +2,7 @@ import assert from "node:assert/strict"
 import test from "node:test"
 
 import { pickingStepsToDone } from "../inventory/fulfillment"
+import { resolveRecordLocation } from "../core/record-ref"
 import {
   isReturnCancellable,
   isReturnConfirmable,
@@ -9,6 +10,9 @@ import {
   exchangeSourceReturnId,
   isReturnExchangeable,
   isReturnReceivable,
+  CREATE_RETURN_ORDER_AFFECTS,
+  createReturnOrderAction,
+  observeCreatedReturnOrder,
   observeConfirmedReturn,
   observeExchangeOrder,
   observeReturnCreditNote,
@@ -70,4 +74,40 @@ test("a picking is taken to done only through the steps it has not passed", () =
   assert.deepEqual(pickingStepsToDone({ state: "assigned" }), ["validate"])
   assert.deepEqual(pickingStepsToDone({ state: "done" }), [])
   assert.equal(pickingStepsToDone({ state: "cancel" }), undefined)
+})
+
+test("the newest return for the sale order is the one just created, and it can be opened", () => {
+  const observed = observeCreatedReturnOrder("5", [
+    { id: 11, saleOrderId: 5 },
+    { id: 14, saleOrderId: 5 },
+    { id: 15, saleOrderId: 6 },
+  ])
+  const ref = { resource: "return_order", id: "14", module: "sales" }
+  assert.equal(observed.outcome, "applied")
+  assert.deepEqual(observed.createdRecords, [ref])
+  assert.deepEqual(observed.next, ref)
+  assert.deepEqual(resolveRecordLocation(ref), { module: "sales", tab: "returns", filter: { id: "14" } })
+})
+
+test("a return raised without a sale order, or not yet visible, claims nothing", () => {
+  assert.deepEqual(observeCreatedReturnOrder(undefined, [{ id: 1, saleOrderId: 5 }]), {})
+  assert.deepEqual(observeCreatedReturnOrder("5", [{ id: 1, saleOrderId: 6 }]), {})
+  assert.deepEqual(observeCreatedReturnOrder("5", []), {})
+})
+
+test("creating a return is form-backed, offered against a confirmed order, and refreshes returns only", async () => {
+  let seen: unknown
+  const action = createReturnOrderAction<{ reason: string }>({
+    label: "New return",
+    execute: async (input) => {
+      seen = input
+      return { outcome: "applied", affectedResources: [] }
+    },
+  })
+  assert.equal(action.kind, "form")
+  assert.ok(action.canPresent({ state: "Sale" }))
+  assert.ok(!action.canPresent({ state: "Draft" }))
+  await action.execute({ saleOrderId: "5", params: { reason: "damaged" } })
+  assert.deepEqual(seen, { saleOrderId: "5", params: { reason: "damaged" } })
+  assert.deepEqual([...CREATE_RETURN_ORDER_AFFECTS], ["return-orders", "return-order-lines"])
 })

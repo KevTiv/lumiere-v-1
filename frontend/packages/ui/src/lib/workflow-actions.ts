@@ -48,3 +48,18 @@ export function workflowActionsToEntityActions(
     ]
   })
 }
+
+/**
+ * Runs a record action once per selected row, by the row's id. For toolbars whose selection gate
+ * already requires every row to qualify. Failures are reported by the workflow surface, so the
+ * rejection is only swallowed here to keep it from surfacing as an unhandled one.
+ */
+export function runRecordActionForRows(
+  action: { execute(recordId: string): Promise<unknown> },
+  rows: ReadonlyArray<Record<string, unknown>>,
+): void {
+  for (const row of rows) {
+    const id = row.id
+    if (id != null) action.execute(String(id)).catch(() => undefined)
+  }
+}

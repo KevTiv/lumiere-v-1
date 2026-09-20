@@ -39,9 +39,19 @@ export class WorkflowError extends Error {
     return this.kind === "stale_revision" || this.kind === "conflict" || this.kind === "not_found"
   }
 
+  /**
+   * The server refused the change. The API server reports every reducer rejection (state guard
+   * or input error alike) as one 422 with only a message, so a rejection can mean the record was
+   * changed since it was loaded. A rejected write changed nothing, so refetching is harmless; a
+   * check that failed on the client (no status) never reached the server and needs none.
+   */
+  get rejectedByServer(): boolean {
+    return this.kind === "validation" && this.status !== undefined
+  }
+
   /** Every failure after which the affected lists must be refetched. */
   get needsRefresh(): boolean {
-    return this.needsReadback || this.viewIsStale
+    return this.needsReadback || this.viewIsStale || this.rejectedByServer
   }
 }
 
@@ -49,15 +59,17 @@ const ALREADY_APPLIED = /\balready\b.*\b(confirmed|applied|processed|posted|done
 
 /**
  * Map an api-server failure (`{ "error": message }` with a stable status) to the taxonomy.
- * Until reducers emit machine codes, 409 message text is the only signal separating
- * `already_applied` from `conflict`.
+ * Until reducers emit machine codes, message text is the only signal separating
+ * `already_applied` from `conflict` (409) and from a plain rejection (422).
  */
 export function classifyHttpFailure(status: number, message: string): WorkflowErrorKind {
   if (status === 401 || status === 403) return "permission_denied"
   if (status === 404 || status === 410) return "not_found"
   if (status === 409) return ALREADY_APPLIED.test(message) ? "already_applied" : "conflict"
   if (status === 412) return "stale_revision"
-  if (status === 400 || status === 422) return "validation"
+  // The API server reports reducer rejections as 422 (never 409), so "already done" wording is the
+  // only signal that a replayed command had in fact been applied.
+  if (status === 400 || status === 422) return ALREADY_APPLIED.test(message) ? "already_applied" : "validation"
   // The server said the dependency is unavailable, so the write was not attempted.
   if (status === 502 || status === 503 || status === 504) return "retryable_transport"
   return "server_failure"

@@ -50,6 +50,7 @@ import { invalidateQueryResources } from "./workflow"
 import {
   ACCEPT_SALE_ORDER_QUOTATION_AFFECTS,
   CANCEL_SALE_ORDER_AFFECTS,
+  CREATE_RETURN_ORDER_AFFECTS,
   COMPUTE_SALE_ORDER_TOTALS_AFFECTS,
   CONFIRM_SALE_ORDER_AFFECTS,
   SALE_ORDER_LINE_AFFECTS,
@@ -755,20 +756,21 @@ export function useCreateInvoiceFromSaleOrder(organizationId: bigint) {
 
 // ── Return orders (RMA) ─────────────────────────────────────────────────────
 
+/** The one `create_return_order` invocation, shared by the mutation hook and the workflow action. */
+export async function createReturnOrderCommand(companyId: bigint, params: CreateReturnOrderParams): Promise<void> {
+  const json = stdbParamsToJson(params as object, "CreateReturnOrderParams")
+  const { urlPath, init } = stdbBffCommandPost("create_return_order", { companyId: companyId, params: json })
+  const r = await apiFetch(urlPath, init)
+  if (!r.ok) {
+    throw workflowErrorFromResponse(r.status, await r.text().catch(() => ""), "Failed to create return order")
+  }
+}
+
 export function useCreateReturnOrder(organizationId: bigint, companyId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, CreateReturnOrderParams>({
-    mutationFn: async (params) => {
-      const json = stdbParamsToJson(params as object, "CreateReturnOrderParams")
-      const { urlPath, init } = stdbBffCommandPost("create_return_order", { companyId: companyId, params: json })
-      const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error(await parseCallErrorSales(r))
-    },
-    onSuccess: () => {
-      const k = rqBigIntKey(organizationId)
-      void qc.invalidateQueries({ queryKey: ['return-orders', k] })
-      void qc.invalidateQueries({ queryKey: ['return-order-lines', k] })
-    },
+    mutationFn: (params) => createReturnOrderCommand(companyId, params),
+    onSuccess: () => invalidateQueryResources(qc, organizationId, CREATE_RETURN_ORDER_AFFECTS),
   })
 }
 

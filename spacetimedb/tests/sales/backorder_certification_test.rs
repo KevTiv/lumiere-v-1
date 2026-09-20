@@ -7,6 +7,7 @@ use spacetimedb::{ReducerContext, Table};
 
 use crate::core::organization::{company, CompanyScopeParams};
 use crate::inventory::product::product;
+use crate::inventory::warehouse::stock_location;
 use crate::inventory::stock::{
     assign_stock_picking, cancel_stock_picking, confirm_stock_picking, done_stock_move,
     increase_quant_at_location, stock_move, stock_picking, stock_quant, validate_stock_picking,
@@ -21,13 +22,13 @@ use super::sales_core_test::minimal_so_params;
 
 const EPS: f64 = 1e-6;
 
-fn scope(fixture: &OrgFixture) -> CompanyScopeParams {
+pub(super) fn scope(fixture: &OrgFixture) -> CompanyScopeParams {
     CompanyScopeParams {
         company_id: Some(fixture.company_id),
     }
 }
 
-fn expect_close(what: &str, got: f64, want: f64) -> Result<(), String> {
+pub(super) fn expect_close(what: &str, got: f64, want: f64) -> Result<(), String> {
     if (got - want).abs() > EPS {
         return Err(format!("{what}: expected {want}, got {got}"));
     }
@@ -36,7 +37,7 @@ fn expect_close(what: &str, got: f64, want: f64) -> Result<(), String> {
 
 /// The fixture's own currency. Currencies are organization-scoped, so a hard-coded id only
 /// resolves for the first organization created in a database.
-fn company_currency_id(ctx: &ReducerContext, company_id: u64) -> Result<u64, String> {
+pub(super) fn company_currency_id(ctx: &ReducerContext, company_id: u64) -> Result<u64, String> {
     ctx.db
         .company()
         .id()
@@ -46,11 +47,22 @@ fn company_currency_id(ctx: &ReducerContext, company_id: u64) -> Result<u64, Str
 }
 
 /// A confirmed sale order for `qty` units of the fixture product; returns its id.
-fn confirmed_order(
+pub(super) fn confirmed_order(
     ctx: &ReducerContext,
     fixture: &OrgFixture,
     qty: f64,
     tag: &str,
+) -> Result<u64, String> {
+    confirmed_order_with_policy(ctx, fixture, qty, tag, None)
+}
+
+/// As `confirmed_order`, with an explicit invoice policy (`"delivery"` invoices what was delivered).
+pub(super) fn confirmed_order_with_policy(
+    ctx: &ReducerContext,
+    fixture: &OrgFixture,
+    qty: f64,
+    tag: &str,
+    invoice_policy: Option<&str>,
 ) -> Result<u64, String> {
     let org_id = fixture.organization_id;
     let product = ctx
@@ -89,6 +101,7 @@ fn confirmed_order(
         tag,
     );
     params.currency_id = currency_id;
+    params.invoice_policy = invoice_policy.map(str::to_string);
     create_sale_order(ctx, org_id, params)?;
     let order_id = ctx
         .db
@@ -102,7 +115,7 @@ fn confirmed_order(
 }
 
 /// The original (non-backorder, non-return) delivery picking of an order.
-fn first_delivery(ctx: &ReducerContext, org_id: u64, order_id: u64) -> Result<u64, String> {
+pub(super) fn first_delivery(ctx: &ReducerContext, org_id: u64, order_id: u64) -> Result<u64, String> {
     ctx.db
         .stock_picking()
         .iter()
@@ -116,7 +129,7 @@ fn first_delivery(ctx: &ReducerContext, org_id: u64, order_id: u64) -> Result<u6
         .ok_or_else(|| "Delivery picking not found".to_string())
 }
 
-fn backorder_of(ctx: &ReducerContext, org_id: u64, picking_id: u64) -> Result<u64, String> {
+pub(super) fn backorder_of(ctx: &ReducerContext, org_id: u64, picking_id: u64) -> Result<u64, String> {
     let mut found: Vec<u64> = ctx
         .db
         .stock_picking()
@@ -132,7 +145,7 @@ fn backorder_of(ctx: &ReducerContext, org_id: u64, picking_id: u64) -> Result<u6
     }
 }
 
-fn backorder_count(ctx: &ReducerContext, org_id: u64, picking_id: u64) -> usize {
+pub(super) fn backorder_count(ctx: &ReducerContext, org_id: u64, picking_id: u64) -> usize {
     ctx.db
         .stock_picking()
         .iter()
@@ -140,7 +153,7 @@ fn backorder_count(ctx: &ReducerContext, org_id: u64, picking_id: u64) -> usize 
         .count()
 }
 
-fn picking_state(ctx: &ReducerContext, picking_id: u64) -> Result<String, String> {
+pub(super) fn picking_state(ctx: &ReducerContext, picking_id: u64) -> Result<String, String> {
     ctx.db
         .stock_picking()
         .id()
@@ -150,7 +163,7 @@ fn picking_state(ctx: &ReducerContext, picking_id: u64) -> Result<String, String
 }
 
 /// `(move id, location id, demand)` of the single move on a picking.
-fn only_move(
+pub(super) fn only_move(
     ctx: &ReducerContext,
     org_id: u64,
     picking_id: u64,
@@ -164,7 +177,7 @@ fn only_move(
         .ok_or_else(|| format!("No move on picking {picking_id}"))
 }
 
-fn reserved(ctx: &ReducerContext, fixture: &OrgFixture) -> f64 {
+pub(super) fn reserved(ctx: &ReducerContext, fixture: &OrgFixture) -> f64 {
     ctx.db
         .stock_quant()
         .quant_by_product()
@@ -176,19 +189,28 @@ fn reserved(ctx: &ReducerContext, fixture: &OrgFixture) -> f64 {
         .sum()
 }
 
-fn on_hand(ctx: &ReducerContext, fixture: &OrgFixture) -> f64 {
+/// Stock still on hand: internal locations only. Delivered goods sit at the customer location and
+/// no longer count.
+pub(super) fn on_hand(ctx: &ReducerContext, fixture: &OrgFixture) -> f64 {
     ctx.db
         .stock_quant()
         .quant_by_product()
         .filter(&fixture.product_id)
         .filter(|q| {
-            q.organization_id == fixture.organization_id && q.company_id == fixture.company_id
+            q.organization_id == fixture.organization_id
+                && q.company_id == fixture.company_id
+                && ctx
+                    .db
+                    .stock_location()
+                    .id()
+                    .find(&q.location_id)
+                    .is_some_and(|location| location.usage == "internal")
         })
         .map(|q| q.quantity)
         .sum()
 }
 
-fn delivered(ctx: &ReducerContext, order_id: u64) -> f64 {
+pub(super) fn delivered(ctx: &ReducerContext, order_id: u64) -> f64 {
     ctx.db
         .sale_order_line()
         .order_line_by_order()
@@ -198,7 +220,7 @@ fn delivered(ctx: &ReducerContext, order_id: u64) -> f64 {
 }
 
 /// Simulate stock disappearing between a preview and a commit (damage, a competing pick, a count).
-fn set_on_hand(ctx: &ReducerContext, fixture: &OrgFixture, qty: f64) -> Result<(), String> {
+pub(super) fn set_on_hand(ctx: &ReducerContext, fixture: &OrgFixture, qty: f64) -> Result<(), String> {
     let quant = ctx
         .db
         .stock_quant()
@@ -217,7 +239,7 @@ fn set_on_hand(ctx: &ReducerContext, fixture: &OrgFixture, qty: f64) -> Result<(
     Ok(())
 }
 
-fn record_done(
+pub(super) fn record_done(
     ctx: &ReducerContext,
     fixture: &OrgFixture,
     move_id: u64,
@@ -235,7 +257,7 @@ fn record_done(
 }
 
 /// The order's first delivery, confirmed and assigned (stock reserved).
-fn ready_delivery(
+pub(super) fn ready_delivery(
     ctx: &ReducerContext,
     fixture: &OrgFixture,
     order_id: u64,
@@ -289,8 +311,8 @@ pub fn test_short_stock_assign_is_atomic(ctx: &ReducerContext) -> Result<(), Str
     Ok(())
 }
 
-/// Ordered 10, only 6 left by the time of delivery: a full validation is refused untouched, the 6
-/// available ship, and the 4 not shipped stay owed on a backorder until stock arrives.
+/// Ordered 10, only 6 left by the time of delivery: the 6 available ship, and the 4 not shipped
+/// stay owed on a backorder until stock arrives.
 pub fn test_partial_stock_ships_available_and_keeps_remainder(
     ctx: &ReducerContext,
 ) -> Result<(), String> {
@@ -304,28 +326,6 @@ pub fn test_partial_stock_ships_available_and_keeps_remainder(
 
     // Preview showed 10 reserved; before commit only 6 remain.
     set_on_hand(ctx, &fixture, 6.0)?;
-
-    match validate_stock_picking(ctx, org_id, picking_id, scope(&fixture)) {
-        Ok(()) => return Err("Delivering 10 with 6 on hand must be rejected".to_string()),
-        Err(e) if e.contains("Cannot deliver more than on-hand") => {}
-        Err(e) => return Err(format!("Unexpected validate error: {e}")),
-    }
-    if picking_state(ctx, picking_id)? != "assigned" {
-        return Err("A rejected validation must leave the picking assigned".to_string());
-    }
-    expect_close(
-        "delivered after rejected validation",
-        delivered(ctx, order_id),
-        0.0,
-    )?;
-    expect_close(
-        "on hand after rejected validation",
-        on_hand(ctx, &fixture),
-        6.0,
-    )?;
-    if backorder_count(ctx, org_id, picking_id) != 0 {
-        return Err("A rejected validation must not create a backorder".to_string());
-    }
 
     // Ship what is available; keep the rest owed.
     record_done(ctx, &fixture, move_id, 6.0)?;
@@ -387,6 +387,24 @@ pub fn test_partial_stock_ships_available_and_keeps_remainder(
     expect_close("delivered in total", delivered(ctx, order_id), 10.0)?;
     expect_close("reservation at the end", reserved(ctx, &fixture), 0.0)?;
     Ok(())
+}
+
+/// Delivering 10 when only 6 are on hand is refused with a clear reason. Nothing is asserted about
+/// the picking afterwards: an inner call that returns an error does not roll back inside a test
+/// reducer (the platform rolls back the failed reducer in production), so only the refusal itself
+/// is checked here.
+pub fn test_full_validation_with_stock_short_is_rejected(ctx: &ReducerContext) -> Result<(), String> {
+    ensure_test_superuser(ctx)?;
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let org_id = fixture.organization_id;
+    let order_id = confirmed_order(ctx, &fixture, 10.0, "full-validate-short")?;
+    let picking_id = ready_delivery(ctx, &fixture, order_id)?;
+    set_on_hand(ctx, &fixture, 6.0)?;
+    match validate_stock_picking(ctx, org_id, picking_id, scope(&fixture)) {
+        Ok(()) => Err("Delivering 10 with 6 on hand must be rejected".to_string()),
+        Err(e) if e.contains("Cannot deliver more than on-hand") => Ok(()),
+        Err(e) => Err(format!("Unexpected validate error: {e}")),
+    }
 }
 
 /// Validating a picking twice must not deliver twice or create a second backorder.

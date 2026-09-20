@@ -6395,6 +6395,7 @@
         "notReceivable": "The return picking can no longer be received."
       },
       "actions": {
+        "create": "New return",
         "confirm": "Confirm",
         "cancel": "Cancel",
         "receive": "Receive return",

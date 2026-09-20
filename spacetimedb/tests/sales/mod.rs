@@ -3,6 +3,7 @@ pub mod backorder_certification_test;
 pub mod cancellation_test;
 pub mod commission_settle_test;
 pub mod gap_fixes_test;
+pub mod o2c_certification_test;
 pub mod oms_extensions_test;
 pub mod pos_order_finalize_test;
 pub mod sale_order_update_test;
@@ -226,11 +227,23 @@ pub fn run_sales_backorder_certification_tests(ctx: &ReducerContext) -> Result<(
     t::test_short_stock_assign_is_atomic(ctx).map_err(|e| format!("short_stock_assign_is_atomic: {e}"))?;
     t::test_partial_stock_ships_available_and_keeps_remainder(ctx)
         .map_err(|e| format!("partial_stock_ships_available_and_keeps_remainder: {e}"))?;
+    t::test_full_validation_with_stock_short_is_rejected(ctx)
+        .map_err(|e| format!("full_validation_with_stock_short_is_rejected: {e}"))?;
     t::test_duplicate_validation_rejected(ctx).map_err(|e| format!("duplicate_validation_rejected: {e}"))?;
     t::test_multi_delivery_backorder_chain(ctx).map_err(|e| format!("multi_delivery_backorder_chain: {e}"))?;
     t::test_cancel_backorder_releases_reservation(ctx)
         .map_err(|e| format!("cancel_backorder_releases_reservation: {e}"))?;
     t::test_cancel_unassigned_picking_keeps_other_reservation(ctx)
         .map_err(|e| format!("cancel_unassigned_picking_keeps_other_reservation: {e}"))?;
-    t::test_picking_cross_org_rejected(ctx).map_err(|e| format!("picking_cross_org_rejected: {e}"))
+    t::test_picking_cross_org_rejected(ctx).map_err(|e| format!("picking_cross_org_rejected: {e}"))?;
+    run_sales_o2c_certification_tests(ctx)
+}
+
+pub fn run_sales_o2c_certification_tests(ctx: &ReducerContext) -> Result<(), String> {
+    use o2c_certification_test as t;
+    t::test_delivery_policy_invoices_only_what_was_delivered(ctx)
+        .map_err(|e| format!("delivery_policy_invoices_only_what_was_delivered: {e}"))?;
+    t::test_ordered_policy_invoice_is_not_repeatable(ctx)
+        .map_err(|e| format!("ordered_policy_invoice_is_not_repeatable: {e}"))?;
+    t::test_invoice_cross_org_rejected(ctx).map_err(|e| format!("invoice_cross_org_rejected: {e}"))
 }

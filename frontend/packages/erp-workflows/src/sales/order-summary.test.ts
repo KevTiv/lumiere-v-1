@@ -18,7 +18,6 @@ const invoice = (state: string, total: number, residual: number, moveType = "Out
   amountTotal: total,
   amountResidual: residual,
 })
-
 test("delivery follows delivered vs ordered stock quantity and ignores services", () => {
   const d = (lines: RowValueMap[]) => summarizeOrderToCash(sale, { lines, moves: [] }).delivery
   assert.equal(d([line(10, 0)]), "pending")
@@ -118,4 +117,65 @@ test("vendor bills and other orders' documents never leak into an order", () => 
     [rows[1]!.deliverySummary, rows[1]!.invoiceSummary, rows[1]!.paymentSummary],
     ["pending", "posted", "paid"],
   )
+})
+
+test("an order walks from confirmed to paid with the balance following the money", () => {
+  const delivered = [line(10, 10)]
+  const step = (moves: RowValueMap[], lines = delivered) => summarizeOrderToCash(sale, { lines, moves })
+  const view = (moves: RowValueMap[], lines = delivered) => {
+    const s = step(moves, lines)
+    return [s.delivery, s.invoice, s.payment, s.outstanding]
+  }
+
+  assert.deepEqual(view([], [line(10, 0)]), ["pending", "none", "none", 0])
+  assert.deepEqual(view([], delivered), ["complete", "none", "none", 0])
+  assert.deepEqual(view([invoice("Draft", 500, 500)]), ["complete", "draft", "none", 0])
+  assert.deepEqual(view([invoice("Posted", 500, 500)]), ["complete", "posted", "unpaid", 500])
+  assert.deepEqual(view([invoice("Posted", 500, 200)]), ["complete", "posted", "partial", 200])
+  assert.deepEqual(view([invoice("Posted", 500, 0)]), ["complete", "posted", "paid", 0])
+})
+
+test("an overpaid invoice reads paid with no negative balance", () => {
+  const s = summarizeOrderToCash(sale, { lines: [], moves: [invoice("Posted", 100, -20)] })
+  assert.deepEqual([s.payment, s.outstanding], ["paid", 0])
+})
+
+test("an order billed per delivery owes the sum of what is still unpaid across its invoices", () => {
+  const s = summarizeOrderToCash(sale, {
+    lines: [line(10, 10)],
+    moves: [invoice("Posted", 400, 0), invoice("Posted", 600, 600)],
+  })
+  assert.deepEqual([s.invoice, s.payment, s.outstanding], ["posted", "partial", 600])
+})
+
+test("a second invoice still in draft does not hide the posted one", () => {
+  const s = summarizeOrderToCash(sale, {
+    lines: [line(10, 4)],
+    moves: [invoice("Posted", 400, 400), invoice("Draft", 600, 600)],
+  })
+  assert.deepEqual([s.invoice, s.payment, s.outstanding], ["posted", "unpaid", 400])
+})
+
+test("a partial credit note leaves the invoice open, and only a full one marks it credited", () => {
+  const posted = invoice("Posted", 100, 100)
+  const partial = summarizeOrderToCash(sale, { lines: [], moves: [posted, invoice("Posted", 30, 0, "OutRefund")] })
+  assert.equal(partial.invoice, "posted")
+  const full = summarizeOrderToCash(sale, { lines: [], moves: [posted, invoice("Posted", 100, 0, "OutRefund")] })
+  assert.equal(full.invoice, "credited")
+})
+
+test("a cancelled invoice that was replaced by a new draft reads as a draft, not as billed", () => {
+  const s = summarizeOrderToCash(sale, {
+    lines: [],
+    moves: [invoice("Cancel", 100, 100), invoice("Draft", 100, 100)],
+  })
+  assert.deepEqual([s.invoice, s.payment, s.outstanding], ["draft", "none", 0])
+})
+
+test("supplier bills on the same order never count as what the customer owes", () => {
+  const s = summarizeOrderToCash(sale, {
+    lines: [],
+    moves: [invoice("Posted", 100, 100), invoice("Posted", 900, 900, "InInvoice")],
+  })
+  assert.deepEqual([s.invoice, s.outstanding], ["posted", 100])
 })

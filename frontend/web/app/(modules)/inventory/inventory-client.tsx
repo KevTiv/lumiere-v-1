@@ -51,6 +51,7 @@ import {
   transfersTableConfig,
   transferDetailConfig,
   transferStatusBadges,
+  runRecordActionForRows,
   stockMovesTableConfig,
   EntityView,
   type TimeRangeValue,
@@ -68,6 +69,8 @@ import type {
 } from '@lumiere/ui';
 import { inventoryModuleConfig } from '@/lib/module-dashboard-configs';
 import { useInventoryModuleSubscription } from '@/lib/module-subscription-hooks';
+import { useWorkflowSurface } from '@/hooks/use-workflow-surface';
+import { usePickingWorkflow } from '@lumiere/query-hooks/hooks/picking-workflow';
 import { groupBy } from '@/lib/utils';
 import { InventoryOpsPanel } from './inventory-ops-panel';
 import {
@@ -119,11 +122,7 @@ import {
   useCreateStockMove,
   useConfirmStockMove,
   useAssignStockMove,
-  useConfirmStockPicking,
-  useAssignStockPicking,
   useAssignUserToPicking,
-  useValidateStockPicking,
-  useCancelStockPicking,
   useProcessInventoryAdjustment,
   useReserveStockQuant,
   useUnreserveStockQuant,
@@ -272,6 +271,7 @@ import {
 import {
   CheckCircle,
   ListChecks,
+  Package,
   Pencil,
   Plus,
   Trash2,
@@ -774,10 +774,25 @@ function InventoryClientLoaded({
   const doneStockMove = useDoneStockMove(orgId, operatingCompanyId);
   const cancelStockMove = useCancelStockMove(orgId, operatingCompanyId);
   const assignUserToPicking = useAssignUserToPicking(orgId, operatingCompanyId);
-  const confirmPicking = useConfirmStockPicking(orgId, operatingCompanyId);
-  const assignPicking = useAssignStockPicking(orgId, operatingCompanyId);
-  const validatePicking = useValidateStockPicking(orgId, operatingCompanyId);
-  const cancelPicking = useCancelStockPicking(orgId, operatingCompanyId);
+  const workflowSurface = useWorkflowSurface({ organizationId });
+  const pickingWorkflow = usePickingWorkflow(
+    orgId,
+    operatingCompanyId,
+    {
+      confirm: t('inventory.transferActions.confirm'),
+      assign: t('inventory.transferActions.assign'),
+      validate: t('inventory.transferActions.validate'),
+      // Partial delivery is a Sales fulfillment form; transfers only pack, validate in full or cancel.
+      partialValidate: t('sales.fulfillment.actions.partialValidate'),
+      pack: t('sales.fulfillment.actions.pack'),
+      cancel: t('inventory.transferActions.cancel'),
+    },
+    {
+      navigate: workflowSurface.navigate,
+      notify: workflowSurface.notify,
+      record: workflowSurface.record,
+    },
+  );
   const processAdjustment = useProcessInventoryAdjustment(orgId);
   const reserveQuant = useReserveStockQuant(orgId, operatingCompanyId);
   const unreserveQuant = useUnreserveStockQuant(orgId, operatingCompanyId);
@@ -1926,31 +1941,22 @@ function InventoryClientLoaded({
               actions: pickingRowActions(
                 t,
                 {
-                  confirm: (rows) => {
-                    const id = rows[0]?.id as ScalarId | undefined;
-                    if (id != null) void confirmPicking.mutateAsync(id);
-                  },
-                  assign: (rows) => {
-                    const id = rows[0]?.id as ScalarId | undefined;
-                    if (id != null) void assignPicking.mutateAsync(id);
-                  },
+                  // Every selected transfer qualifies (the toolbar requires it), so each one is run.
+                  confirm: (rows) => runRecordActionForRows(pickingWorkflow.confirm, rows),
+                  assign: (rows) => runRecordActionForRows(pickingWorkflow.assign, rows),
                   'assign-user': (rows) => {
                     const id = rows[0]?.id as ScalarId | undefined;
                     if (id != null) setAssignPickingId(id);
                   },
-                  validate: (rows) => {
-                    const id = rows[0]?.id as ScalarId | undefined;
-                    if (id != null) void validatePicking.mutateAsync(id);
-                  },
-                  cancel: (rows) => {
-                    const id = rows[0]?.id as ScalarId | undefined;
-                    if (id != null) void cancelPicking.mutateAsync(id);
-                  },
+                  pack: (rows) => runRecordActionForRows(pickingWorkflow.pack, rows),
+                  validate: (rows) => runRecordActionForRows(pickingWorkflow.validate, rows),
+                  cancel: (rows) => runRecordActionForRows(pickingWorkflow.cancel, rows),
                 },
                 {
                   confirm: CheckCircle,
                   assign: UserCircle2,
                   'assign-user': UserPlus,
+                  pack: Package,
                   validate: ListChecks,
                   cancel: XCircle,
                 },
@@ -3790,10 +3796,7 @@ function InventoryClientLoaded({
     stockQuantRecordSheet,
     transferRecordSheet,
     t,
-    confirmPicking,
-    assignPicking,
-    validatePicking,
-    cancelPicking,
+    pickingWorkflow,
     processAdjustment,
     reserveQuant,
     unreserveQuant,
@@ -4230,10 +4233,7 @@ function InventoryClientLoaded({
       doneStockMove,
       cancelStockMove,
       assignUserToPicking,
-      confirmPicking,
-      assignPicking,
-      validatePicking,
-      cancelPicking,
+      pickingWorkflow,
       processAdjustment,
       reserveQuant,
       unreserveQuant,

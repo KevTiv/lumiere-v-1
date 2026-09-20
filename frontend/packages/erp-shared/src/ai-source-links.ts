@@ -35,6 +35,7 @@ const SOURCE_ROUTE_MAP: Record<string, SourceRouteTarget> = {
 
   // Activity memory (context_worker entity_type)
   sale_order: { kind: "module_tab", module: "sales", tab: "orders" },
+  return_order: { kind: "module_tab", module: "sales", tab: "returns" },
   project_task: { kind: "module_tab", module: "projects", tab: "tasks" },
   project_project: { kind: "module_tab", module: "projects", tab: "projects" },
   hr_leave: { kind: "module_tab", module: "hr", tab: "leaves" },

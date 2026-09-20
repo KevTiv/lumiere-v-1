@@ -14,7 +14,7 @@ import type { ObservedTransition } from "../core/transition"
 import { defineWorkflow } from "../core/workflow"
 import { invoiceWorkflow } from "../accounting/invoice-to-payment"
 import { pickingWorkflow } from "../inventory/fulfillment"
-import { saleOrderWorkflow } from "./order-to-cash"
+import { isSaleOrderConfirmed, saleOrderWorkflow } from "./order-to-cash"
 
 export const returnOrderWorkflow = defineWorkflow({
   id: "sales.return",
@@ -22,6 +22,8 @@ export const returnOrderWorkflow = defineWorkflow({
   module: "sales",
 })
 
+/** `create_return_order` inserts the return and its lines; it does not touch stock or the order. */
+export const CREATE_RETURN_ORDER_AFFECTS = ["return-orders", "return-order-lines"] as const
 export const CONFIRM_RETURN_AFFECTS = ["return-orders", "return-order-lines", "stock-pickings", "stock-moves"] as const
 export const CANCEL_RETURN_AFFECTS = ["return-orders", "stock-pickings", "stock-moves"] as const
 /** Receiving validates the return picking: stock, the return, and the order's returned/invoiceable quantities move. */
@@ -62,6 +64,26 @@ export const isReturnCancellable = (row: RowValueMap) => ["draft", "confirmed"].
 export function returnPickingId(row: RowValueMap): string | undefined {
   const id = firstNonNullKey(row, "pickingId", "picking_id")
   return id == null ? undefined : String(id)
+}
+
+/**
+ * The newest return created for the sale order is the one just produced (the same convention as
+ * the exchange order). A return without a sale order cannot be told apart from others, so it
+ * claims nothing and the surface stays where it is.
+ */
+export function observeCreatedReturnOrder(
+  saleOrderId: string | undefined,
+  returns: readonly RowValueMap[],
+): ObservedTransition {
+  if (saleOrderId == null) return {}
+  const created = returns
+    .filter((row) => String(firstNonNullKey(row, "saleOrderId", "sale_order_id") ?? "") === saleOrderId)
+    .map(rowId)
+    .sort((a, b) => Number(a) - Number(b))
+    .at(-1)
+  if (!created) return {}
+  const ref = recordRef(returnOrderWorkflow.resource, created, returnOrderWorkflow.module)
+  return { outcome: "applied", createdRecords: [ref], next: ref }
 }
 
 /** A confirmed return produces its return picking; stay on the return, where receiving is the next step. */
@@ -142,6 +164,27 @@ export const exchangeReturnAction = (o: { label: string; execute: Execute<string
   returnAction("exchange", "immediate", isReturnExchangeable, o)
 export const cancelReturnAction = (o: { label: string; execute: Execute<string> }) =>
   returnAction("cancel", "destructive", isReturnCancellable, o)
+
+export interface CreateReturnOrderInput<TParams> {
+  /** The order being returned; absent for a return raised without one. */
+  saleOrderId?: string
+  params: TParams
+}
+
+/** Form-backed: the surface collects the customer, reason and lines, then dispatches them. */
+export function createReturnOrderAction<TParams>(options: {
+  label: string
+  execute: Execute<CreateReturnOrderInput<TParams>>
+}): WorkflowAction<RowValueMap, CreateReturnOrderInput<TParams>> {
+  return {
+    id: "sales.return.create",
+    label: options.label,
+    kind: "form",
+    // Offered against a delivered order; a return may also be raised from the returns tab.
+    canPresent: isSaleOrderConfirmed,
+    execute: options.execute,
+  }
+}
 
 export interface CreateReturnCreditNoteInput<TParams> {
   returnOrderId: string

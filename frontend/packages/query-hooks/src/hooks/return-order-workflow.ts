@@ -3,6 +3,7 @@ import { useQueryClient } from "@tanstack/react-query"
 import {
   CANCEL_RETURN_AFFECTS,
   CONFIRM_RETURN_AFFECTS,
+  CREATE_RETURN_ORDER_AFFECTS,
   CREDIT_NOTE_FROM_RETURN_AFFECTS,
   EXCHANGE_FROM_RETURN_AFFECTS,
   RECEIVE_RETURN_AFFECTS,
@@ -10,8 +11,10 @@ import {
   cancelReturnAction,
   confirmReturnAction,
   createReturnCreditNoteAction,
+  createReturnOrderAction,
   exchangeReturnAction,
   observeConfirmedReturn,
+  observeCreatedReturnOrder,
   observeExchangeOrder,
   observeReturnCreditNote,
   pickingStepsToDone,
@@ -19,11 +22,12 @@ import {
   rowId,
   type AnyWorkflowAction,
   type CreateReturnCreditNoteInput,
+  type CreateReturnOrderInput,
   type PickingStep,
   type RowValueMap,
   type TransitionSpec,
 } from "@lumiere/erp-workflows"
-import type { CreateCreditNoteFromReturnOrderParams } from "@lumiere/stdb/types"
+import type { CreateCreditNoteFromReturnOrderParams, CreateReturnOrderParams } from "@lumiere/stdb/types"
 
 import {
   assignStockPickingCommand,
@@ -36,12 +40,14 @@ import {
   confirmReturnOrderCommand,
   createCreditNoteFromReturnOrderCommand,
   createExchangeOrderFromReturnCommand,
+  createReturnOrderCommand,
   returnOrdersQueryOptions,
   saleOrdersQueryOptions,
 } from "./sales"
 import { useWorkflowRunner, type WorkflowSurfaceCallbacks } from "./workflow"
 
 export interface ReturnOrderWorkflowLabels {
+  create: string
   confirm: string
   receive: string
   exchange: string
@@ -52,6 +58,7 @@ export interface ReturnOrderWorkflowLabels {
 }
 
 type CreditNoteInput = CreateReturnCreditNoteInput<CreateCreditNoteFromReturnOrderParams>
+type CreateInput = CreateReturnOrderInput<CreateReturnOrderParams>
 
 /**
  * `sales.return` record workflow: RMA confirm → receive (return picking to done) → credit note,
@@ -74,6 +81,14 @@ export function useReturnOrderWorkflow(
       confirm: (id) => confirmStockPickingCommand(companyId, id),
       assign: (id) => assignStockPickingCommand(companyId, id),
       validate: (id) => validateStockPickingCommand(companyId, id),
+    }
+
+    const create: TransitionSpec<CreateInput> = {
+      id: "sales.return.create",
+      command: ({ params }) => createReturnOrderCommand(companyId, params),
+      affects: CREATE_RETURN_ORDER_AFFECTS,
+      observe: async ({ saleOrderId }) =>
+        observeCreatedReturnOrder(saleOrderId, await fresh<RowValueMap[]>(returnOrdersQueryOptions(organizationId))),
     }
 
     const confirm: TransitionSpec<string> = {
@@ -121,8 +136,20 @@ export function useReturnOrderWorkflow(
         observeReturnCreditNote(returnOrderId, await fresh<RowValueMap[]>(returnOrdersQueryOptions(organizationId))),
     }
 
-    return { confirm, receive, cancel, exchange, creditNote }
+    return { create, confirm, receive, cancel, exchange, creditNote }
   }, [qc, organizationId, companyId, labels.notReceivable])
+
+  const create = useMemo(
+    () =>
+      createReturnOrderAction<CreateReturnOrderParams>({
+        label: labels.create,
+        execute: (input, context) =>
+          runner.run(`sales.return.create:${input.saleOrderId ?? "none"}`, specs.create, input, {
+            navigateToNext: context?.navigateToNext,
+          }),
+      }),
+    [labels.create, runner, specs],
+  )
 
   const createCreditNote = useMemo(
     () =>
@@ -148,5 +175,5 @@ export function useReturnOrderWorkflow(
     ]
   }, [labels.confirm, labels.receive, labels.exchange, labels.cancel, runner, specs, createCreditNote])
 
-  return { actions, createCreditNote, isRunning: runner.isRunning, isPending: runner.isPending }
+  return { actions, create, createCreditNote, isRunning: runner.isRunning, isPending: runner.isPending }
 }

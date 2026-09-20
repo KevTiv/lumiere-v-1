@@ -7,6 +7,7 @@ import { WorkflowError } from "@lumiere/erp-workflows"
 import {
   cancelSaleOrderCommand,
   computeSaleOrderTotalsCommand,
+  createReturnOrderCommand,
   createSaleOrderLineCommand,
   deleteSaleOrderLineCommand,
   lockSaleOrderCommand,
@@ -122,5 +123,24 @@ describe("sale order lifecycle commands", () => {
       assert.equal(error.retryable, true)
       return true
     })
+  })
+
+  it("types a rejected return order instead of a generic failure", async () => {
+    respondWith(422, JSON.stringify({ error: "Return quantity exceeds the delivered quantity" }))
+    await assert.rejects(
+      createReturnOrderCommand(3n, { saleOrderId: 5n, partnerId: 1n, returnReason: undefined, lines: [] }),
+      (error: unknown) => {
+        assert.ok(error instanceof WorkflowError)
+        assert.equal(error.kind, "validation")
+        assert.match(error.message, /exceeds the delivered quantity/)
+        return true
+      },
+    )
+  })
+
+  it("creates a return through create_return_order", async () => {
+    const requests = respondWith(200, "{}")
+    await createReturnOrderCommand(3n, { saleOrderId: 5n, partnerId: 1n, returnReason: undefined, lines: [] })
+    assert.match(requests[0].url, /create_return_order/)
   })
 })

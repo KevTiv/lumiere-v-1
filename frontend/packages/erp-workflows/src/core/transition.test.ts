@@ -46,11 +46,11 @@ test("an accepted-but-unapplied command reports approval pending, not success", 
   assert.equal(fake.notices[0]?.kind, "info")
 })
 
-test("a failed command does not invalidate, notifies, and rethrows a typed error", async () => {
+test("a check that failed before reaching the server does not invalidate, notifies, and rethrows a typed error", async () => {
   const fake = createFakeCompletionPorts()
   await assert.rejects(
     completeTransition(
-      spec({ command: async () => { throw new WorkflowError("validation", "Order has expired", { status: 422 }) } }),
+      spec({ command: async () => { throw new WorkflowError("validation", "companyId is required") } }),
       "1",
       fake.ports,
     ),

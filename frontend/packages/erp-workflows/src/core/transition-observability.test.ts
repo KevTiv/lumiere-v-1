@@ -2,7 +2,7 @@ import assert from "node:assert/strict"
 import test from "node:test"
 
 import { createFakeCompletionPorts } from "../testing"
-import { WorkflowError, type WorkflowErrorKind } from "./errors"
+import { WorkflowError, workflowErrorFromResponse, type WorkflowErrorKind } from "./errors"
 import { recordRef } from "./record-ref"
 import { completeTransition, newCorrelationId, type TransitionSpec } from "./transition"
 
@@ -13,7 +13,6 @@ const failing = (kind: WorkflowErrorKind, status?: number): TransitionSpec<strin
   },
   affects: ["sale-orders"],
 })
-
 const succeeding = (overrides: Partial<TransitionSpec<string>> = {}): TransitionSpec<string> => ({
   id: "test.ok",
   command: async () => undefined,
@@ -115,4 +114,20 @@ test("a failing log sink never turns a finished transition into a failure", asyn
     assert.equal(e.kind, "validation")
     return true
   })
+})
+
+test("a stale session's rejected command refreshes the view it was working from", async () => {
+  const fake = createFakeCompletionPorts()
+  const spec: TransitionSpec<string> = {
+    id: "sales.order.confirm",
+    affects: ["sale-orders", "stock-pickings"],
+    command: async () => {
+      throw workflowErrorFromResponse(422, '{"error":"Sale order must be in Draft, Sent, or ToApprove"}', "x")
+    },
+  }
+  await assert.rejects(completeTransition(spec, "5", fake.ports))
+  assert.deepEqual(fake.invalidated, [["sale-orders", "stock-pickings"]])
+  assert.equal(fake.notices[0]?.refreshed, true)
+  assert.equal(fake.events[0]?.errorKind, "validation")
+  assert.equal(fake.events[0]?.refreshed, true)
 })
