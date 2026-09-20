@@ -5,10 +5,7 @@ use std::sync::Arc;
 use uuid::Uuid;
 
 use super::{
-    agent_loop::{LoopLimits, LoopStop},
-    agent_loop_adapters::{
-        run_finalization, run_recorded_loop, AuthorizedLoopTools, RunFinalization,
-    },
+    agent_loop_adapters::AuthorizedLoopTools,
     answer_gate::{
         DecisionClaimCoverageChecker, EvidenceBackedVerificationService,
         EvidenceGatedAnswerAdmission, GatePolicy, GateScope, StdbPassageCatalog,
@@ -53,11 +50,8 @@ use super::{
     run_review::{
         RunReviewDisposition, RunReviewProgram, RunReviewRecorder, StdbRunReviewRecorder,
     },
-    spend_admission::{spend_binding_from_agent, StdbSpendLedger},
-    text_answer_gate::{
-        evidence_from_transcript, gate_text_answer, TextAnswerOutcome, TextAnswerProvenance,
-        TextAnswerVerification, TextEvidence,
-    },
+    spend_admission::StdbSpendLedger,
+    text_answer_gate::{TextAnswerProvenance, TextAnswerVerification, TextEvidence},
 };
 use crate::{
     ai_agent::{
@@ -77,7 +71,7 @@ use crate::{
         complete_run, create_run, load_run_key, load_skill, resume_run, set_run_wait_state,
         LoadedSkill,
     },
-    providers::llm::{LlmMessage, LlmRequest},
+    providers::llm::LlmMessage,
     state::AppState,
     tools::{
         generated_read::{resolve_actor_grants, GeneratedReadTools},
@@ -590,7 +584,6 @@ pub struct AdmittedRunRequest {
     pub stdb_token: Option<String>,
     pub correlation_id: String,
     pub reviewed_calls: Vec<PlannedToolCall>,
-    pub llm_request: LlmRequest,
     pub max_steps: Option<u32>,
     /// Resume an existing governed run/checkpoint instead of creating a new run.
     pub resume_run_id: Option<u64>,
@@ -714,8 +707,6 @@ pub async fn run_skill_admitted(
         writer: &state.stdb,
         reader: spend_reader,
     };
-    let binding = spend_binding_from_agent(&agent, req.org_id, req.company_id, run_id)?;
-
     let registry = ToolRegistry::new();
     let view = registry.authorized_view(&agent, &manifest.allowed_tools);
 
@@ -1176,151 +1167,7 @@ pub async fn run_skill_admitted(
         });
     }
 
-    let limits = LoopLimits {
-        max_rounds: max_steps.max(1),
-        max_tool_calls: manifest.limits.max_tool_calls.max(1),
-        max_tokens: u64::from(agent.context_window),
-        max_unchanged_results: 3,
-    };
-
-    let mut direct_request = req.llm_request;
-    direct_request.system.push_str(
-        r#"
-
-For the final answer, return only JSON shaped as
-{"content":"complete answer text","claims":[{"text":"an exact non-overlapping segment of content","supportRefs":[{"kind":"tool_result","id":"exact tool_call_id"}],"passageSupport":[]}],"calculations":[]}.
-Claim texts concatenated in order must cover all content. Use only successful tool-result ids from this run. Never cite a display snippet or invent a support id."#,
-    );
-    let outcome = run_recorded_loop(
-        state.providers.llm.as_ref(),
-        &ledger,
-        binding,
-        &view,
-        &policy,
-        &tool_ctx,
-        direct_request,
-        limits,
-    )
-    .await?;
-
-    let (mut summary, mut verification, mut provenance, durable_provenance) = summarize_loop_stop(
-        req.org_id,
-        req.company_id,
-        &outcome.stop,
-        &outcome.transcript,
-    )
-    .await?;
-    let mut evidence_claim_ids = Vec::new();
-    if let (Some(provenance), Some(durable_provenance)) =
-        (provenance.as_mut(), durable_provenance.as_ref())
-    {
-        let transient_support_only = provenance
-            .claims
-            .iter()
-            .any(|claim| !claim.support_refs.is_empty() && claim.passage_support.is_empty());
-        if transient_support_only {
-            let reason = "run-evidence support has no durable passage binding and was not recorded";
-            withhold_direct_answer(&mut summary, &mut verification, provenance, reason);
-        } else {
-            let recorder = StdbEvidenceRecorder {
-                writer: state.stdb.as_ref(),
-                reader: spend_reader,
-            };
-            let scope = RunEvidenceScope {
-                organization_id: req.org_id,
-                company_id: req.company_id,
-                run_id,
-            };
-            match recorder.record(&scope, durable_provenance).await {
-                Ok(recorded) => {
-                    evidence_claim_ids = recorded.claim_ids.clone();
-                    provenance.mark_persisted(recorded.contribution_id, recorded.claim_ids);
-                }
-                Err(error) => {
-                    tracing::warn!(run_id, error = %error, "direct-loop provenance was not recorded");
-                    let reason = "answer provenance could not be recorded";
-                    withhold_direct_answer(&mut summary, &mut verification, provenance, reason);
-                }
-            }
-        }
-    }
-    let status = match run_finalization(&outcome.stop) {
-        RunFinalization::Wait { status, .. } => status.to_string(),
-        RunFinalization::Failed { error_code } => error_code.to_string(),
-    };
-
-    Ok(RunSkillResponse {
-        run_id,
-        run_key,
-        status,
-        summary,
-        artifacts: Vec::new(),
-        citations: Vec::new(),
-        steps: Vec::new(),
-        agent_id: agent.agent_id,
-        skill_key: skill.skill_key,
-        evidence_claim_ids,
-        verification,
-        provenance,
-    })
-}
-
-fn withhold_direct_answer(
-    summary: &mut String,
-    verification: &mut Option<TextAnswerVerification>,
-    provenance: &mut TextAnswerProvenance,
-    reason: &str,
-) {
-    *summary = format!("This answer could not be verified and was withheld: {reason}");
-    *verification = Some(TextAnswerVerification {
-        outcome: TextAnswerOutcome::RequiresReview,
-        methods: vec!["deterministic"],
-        limitations: Vec::new(),
-        reason: Some(reason.to_string()),
-    });
-    provenance.redact_for_withholding(reason);
-}
-
-/// What the direct-execution loop may return for how it stopped.
-///
-/// §7.3: a candidate final answer is not an answer until the gate has judged
-/// it. Run state is unchanged (the run still waits at `agent_settled`); what
-/// changes is that the raw candidate is never returned. It is released only
-/// when the gate admits it (limitations appended when qualified) and withheld
-/// otherwise. Other stops carry no candidate text.
-async fn summarize_loop_stop(
-    org_id: u64,
-    company_id: u64,
-    stop: &LoopStop,
-    transcript: &[crate::providers::llm::LlmMessage],
-) -> Result<(
-    String,
-    Option<TextAnswerVerification>,
-    Option<TextAnswerProvenance>,
-    Option<super::answer_gate::AnswerProvenance>,
-)> {
-    match stop {
-        LoopStop::CandidateFinal(answer) => {
-            let gated = gate_text_answer(
-                org_id,
-                company_id,
-                answer,
-                &evidence_from_transcript(transcript),
-            )
-            .await?;
-            let text = gated
-                .released
-                .clone()
-                .unwrap_or_else(|| gated.withheld_notice());
-            Ok((
-                text,
-                Some(gated.verification),
-                Some(gated.provenance),
-                Some(gated.durable_provenance),
-            ))
-        }
-        stop => Ok((format!("agent loop stopped: {stop:?}"), None, None, None)),
-    }
+    anyhow::bail!("governed program catalog invariant violated for skill '{skill_key}'")
 }
 
 async fn validate_resume_identity(
@@ -1585,116 +1432,6 @@ mod tests {
         assert!(reject_legacy_analytics_sql(&json!({"analysisSql": "SELECT 1"})).is_err());
         assert!(reject_legacy_analytics_sql(&json!({"sql": "SELECT 1"})).is_err());
         assert!(reject_legacy_analytics_sql(&json!({"query": "revenue"})).is_ok());
-    }
-    #[tokio::test]
-    async fn a_loop_candidate_is_never_returned_ungated() {
-        use crate::orchestrator::text_answer_gate::TextAnswerOutcome;
-        use crate::providers::llm::LlmMessage;
-
-        let candidate = LoopStop::CandidateFinal("Revenue was $88,888.88 last month.".into());
-
-        // No successful tool result: the candidate is withheld, and its text
-        // appears nowhere in what is returned.
-        let (summary, verification, _, _) = summarize_loop_stop(
-            1,
-            2,
-            &candidate,
-            &[LlmMessage::text("user", "How was revenue?")],
-        )
-        .await
-        .unwrap();
-        assert!(!summary.contains("88,888.88"), "{summary}");
-        assert!(summary.contains("withheld"), "{summary}");
-        assert_eq!(
-            verification.unwrap().outcome,
-            TextAnswerOutcome::RequiresReview
-        );
-
-        // Grounded in a tool result: structured support is released.
-        let structured_candidate = LoopStop::CandidateFinal(
-            json!({
-                "content": "Revenue was $88,888.88 last month.",
-                "claims": [{
-                    "text": "Revenue was $88,888.88 last month.",
-                    "supportRefs": [{"kind": "tool_result", "id": "call-1"}],
-                    "passageSupport": []
-                }],
-                "calculations": []
-            })
-            .to_string(),
-        );
-        let grounded = vec![
-            LlmMessage::text("user", "How was revenue?"),
-            LlmMessage::ToolResult {
-                tool_call_id: Some("call-1".into()),
-                name: "revenue".into(),
-                content: json!({ "summary": "ok", "data": { "total": 88888.88 } }).to_string(),
-            },
-        ];
-        let (mut summary, mut verification, provenance, _) =
-            summarize_loop_stop(1, 2, &structured_candidate, &grounded)
-                .await
-                .unwrap();
-        assert_eq!(summary, "Revenue was $88,888.88 last month.");
-        assert_eq!(
-            verification.as_ref().unwrap().outcome,
-            TextAnswerOutcome::Admitted
-        );
-        let mut provenance = provenance.unwrap();
-        assert!(!provenance.persisted);
-
-        // A post-gate persistence downgrade must scrub the candidate from the
-        // complete API response, not only replace its summary.
-        withhold_direct_answer(
-            &mut summary,
-            &mut verification,
-            &mut provenance,
-            "provenance recording failed",
-        );
-        let response = RunSkillResponse {
-            run_id: 1,
-            run_key: "run".into(),
-            status: "agent_settled".into(),
-            summary,
-            artifacts: Vec::new(),
-            citations: Vec::new(),
-            steps: Vec::new(),
-            agent_id: 1,
-            skill_key: "test".into(),
-            evidence_claim_ids: Vec::new(),
-            verification,
-            provenance: Some(provenance),
-        };
-        let serialized = serde_json::to_string(&response).unwrap();
-        assert!(!serialized.contains("88,888.88"), "{serialized}");
-
-        // A figure the tool never produced qualifies, with the caveat attached.
-        let mismatched = vec![
-            LlmMessage::text("user", "How was revenue?"),
-            LlmMessage::ToolResult {
-                tool_call_id: Some("call-1".into()),
-                name: "revenue".into(),
-                content: json!({ "summary": "ok", "data": { "total": 1000.5 } }).to_string(),
-            },
-        ];
-        let (summary, verification, _, _) =
-            summarize_loop_stop(1, 2, &structured_candidate, &mismatched)
-                .await
-                .unwrap();
-        assert!(summary.contains("Limitations of this answer:"), "{summary}");
-        assert_eq!(verification.unwrap().outcome, TextAnswerOutcome::Qualified);
-    }
-
-    #[tokio::test]
-    async fn non_answer_stops_carry_no_candidate_text_or_verdict() {
-        let (summary, verification, provenance, durable) =
-            summarize_loop_stop(1, 2, &LoopStop::RoundLimit, &[])
-                .await
-                .unwrap();
-        assert_eq!(summary, "agent loop stopped: RoundLimit");
-        assert!(verification.is_none());
-        assert!(provenance.is_none());
-        assert!(durable.is_none());
     }
 }
 
