@@ -727,8 +727,8 @@ pub async fn post_rag(
         .ok_or_else(|| AppError::Internal("spend_read_stdb is required for routed generation".into()))?;
     let run_inputs = json!({
         "surface": "rag_generation",
-        "query": req.query,
-        "include_types": req.include_types,
+        "query": req.query.clone(),
+        "include_types": req.include_types.clone(),
         "limit": req.limit,
     });
     let run_id = create_generation_surface_run(
