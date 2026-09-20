@@ -50,6 +50,12 @@ pub(super) struct GovernedProgramContext {
     pub objective: String,
     pub bounded_state: Value,
     pub evidence: Vec<EvidenceRef>,
+    /// Trusted per-run generation instructions supplied by the runtime surface,
+    /// not by the model. Generate nodes inherit this value.
+    pub generation_instructions: Option<String>,
+    /// Optional per-run generation ceiling applied in addition to the resolved
+    /// immutable model profile limit.
+    pub generation_max_tokens: Option<u32>,
 }
 
 impl GovernedProgramContext {
@@ -62,6 +68,9 @@ impl GovernedProgramContext {
         }
         if !self.bounded_state.is_object() {
             bail!("governed program bounded_state must be a JSON object");
+        }
+        if self.generation_max_tokens == Some(0) {
+            bail!("governed program generation_max_tokens must be positive when present");
         }
         for evidence in &self.evidence {
             evidence.validate()?;
@@ -1414,8 +1423,8 @@ impl GovernedProgramExecutor<'_> {
                                 dependency_json(&node, &values).into_iter().collect(),
                             ),
                             format: generate.format.clone(),
-                            instructions: None,
-                            max_tokens: None,
+                            instructions: context.generation_instructions.clone(),
+                            max_tokens: context.generation_max_tokens,
                         })
                         .await?;
                     let draft = FinalDraft {
@@ -2498,6 +2507,8 @@ mod continuation_lineage_tests {
                 kind: "knowledge_version".to_string(),
                 id: evidence_id.to_string(),
             }],
+            generation_instructions: None,
+            generation_max_tokens: None,
         }
     }
 
@@ -2739,6 +2750,8 @@ mod threshold_gate_tests {
             objective: "decide reorder urgency".to_string(),
             bounded_state: json!({"sku": "SKU-1"}),
             evidence: Vec::new(),
+            generation_instructions: None,
+            generation_max_tokens: None,
         }
     }
 
