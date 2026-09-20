@@ -22,8 +22,7 @@ use crate::{
         SnapshotUiContext, RAG_MAX_LIVE_SNAPSHOTS,
     },
     orchestrator::{
-        intelligence::{GenerationRequest},
-        intelligence_router::generate_routed_for_run,
+        intelligence_router::run_catalogued_generation_surface,
         model_configuration::StdbModelConfigurationStore,
         skill_loader::{complete_run, create_generation_surface_run},
         spend_admission::StdbSpendLedger,
@@ -750,30 +749,29 @@ pub async fn post_rag(
         writer: state.stdb.as_ref(),
         reader: spend_reader,
     };
-    let generation = generate_routed_for_run(
+    let program = run_catalogued_generation_surface(
         &model_store,
         &ledger,
+        state.stdb.as_ref(),
+        state.stdb.as_ref(),
         org_id,
         req.company_id,
-        run.run_id,
+        &run,
         &agent,
-        run.intelligence_policy_ref.as_deref(),
         state.providers.llm.as_ref(),
-        GenerationRequest {
-            objective: user_content,
-            context: json!({
-                "retrieved_context": retrieved_context,
-                "live_context": live_context,
-                "ui_context": ui_block,
-            }),
-            format: "schema-constrained grounded JSON answer".to_string(),
-            instructions: Some(system_prompt),
-            max_tokens: Some(agent.max_tokens),
-        },
+        "rag_generation",
+        user_content,
+        json!({
+            "retrieved_context": retrieved_context,
+            "live_context": live_context,
+            "ui_context": ui_block,
+        }),
+        Some(system_prompt),
+        Some(agent.max_tokens),
     )
     .await;
-    let llm_resp = match generation {
-        Ok(response) => response,
+    let program = match program {
+        Ok(outcome) => outcome,
         Err(error) => {
             let _ = complete_run(
                 state.stdb.as_ref(),
@@ -792,12 +790,18 @@ pub async fn post_rag(
             return Err(AppError::Internal(format!("LLM request failed: {error}")));
         }
     };
-    let total_tokens = llm_resp.input_tokens.saturating_add(llm_resp.output_tokens);
+    let total_tokens = program
+        .generation_input_tokens
+        .saturating_add(program.generation_output_tokens);
+    let generated = program
+        .final_content
+        .clone()
+        .ok_or_else(|| AppError::Internal("governed RAG generation produced no final content".into()))?;
 
     let (answer, verification, mut provenance) = match finalize_rag_answer(
         org_id,
         req.company_id,
-        &llm_resp.content,
+        &generated,
         &live_snapshots,
         &ranked,
         &req.query,
@@ -837,14 +841,14 @@ pub async fn post_rag(
         Some(answer.clone()),
         None,
         None,
-        1,
+        program.trace.len() as u32,
         total_tokens,
         None,
     )
     .await
     .map_err(|e| AppError::Internal(e.to_string()))?;
-    let provider = Some(llm_resp.provider.clone());
-    let model = Some(llm_resp.model.clone());
+    let provider = program.generation_provider.clone();
+    let model = program.generation_model.clone();
     let agent_id = Some(agent.agent_id);
 
     let mut sources: Vec<RagSource> = live_snapshots_to_rag_sources(&live_snapshots);
