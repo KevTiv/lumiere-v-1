@@ -1954,7 +1954,7 @@
       "predicates": [
         {
           "field": "is_active",
-          "op": "eq",
+          "operator": "eq",
           "value": true
         }
       ],
