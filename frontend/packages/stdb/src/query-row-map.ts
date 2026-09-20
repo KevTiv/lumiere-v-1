@@ -83,7 +83,10 @@ import type {
   ExpenseCardStatementLine,
   FieldPermission,
   FinancialReport,
+  FleetInspection,
+  FleetServiceRecord,
   FleetVehicle,
+  FleetVehicleServiceType,
   FormConfig,
   FormConfigField,
   FormFieldLabel,
@@ -421,6 +424,9 @@ export interface QueryRowMap {
   "financial-reports": FinancialReport
   "fiscal-years": AccountFiscalYear
   "fixed-assets": AccountAsset
+  "fleet-inspections": FleetInspection
+  "fleet-service-records": FleetServiceRecord
+  "fleet-service-types": FleetVehicleServiceType
   "fleet-vehicles": FleetVehicle
   "form-config-fields": FormConfigField
   "form-configs": FormConfig
