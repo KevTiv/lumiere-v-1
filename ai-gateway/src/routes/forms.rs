@@ -426,9 +426,9 @@ pub async fn post_suggest(
         .ok_or_else(|| AppError::Internal("spend_read_stdb is required for routed generation".into()))?;
     let run_inputs = json!({
         "surface": "form_suggestion",
-        "form_id": req.form_id,
-        "entity_type": req.entity_type,
-        "document_job_id": req.document_job_id,
+        "form_id": req.form_id.clone(),
+        "entity_type": req.entity_type.clone(),
+        "document_job_id": req.document_job_id.clone(),
     });
     let run_id = create_generation_surface_run(
         state.stdb.as_ref(),
