@@ -3732,6 +3732,26 @@ pub fn cancel_stock_picking(
         return Err("Cannot cancel a completed picking".to_string());
     }
 
+    // `assign_stock_picking` reserves each outbound move's quantity and marks the move
+    // "assigned", so only those moves hold a reservation. Release it here (as
+    // `cancel_sale_order` does) or the stock stays committed to a picking that will never ship.
+    // A move that was never assigned reserved nothing and must not release another picking's.
+    if picking.picking_code.as_deref() != Some("incoming") {
+        for move_record in ctx.db.stock_move().move_by_picking().filter(&picking_id) {
+            if move_record.state == "assigned" && product_requires_stock(ctx, move_record.product_id)
+            {
+                unreserve_quantity_at_location(
+                    ctx,
+                    organization_id,
+                    company_id,
+                    move_record.product_id,
+                    move_record.location_id,
+                    move_record.product_uom_qty,
+                )?;
+            }
+        }
+    }
+
     ctx.db.stock_picking().id().update(StockPicking {
         state: "cancel".to_string(),
         updated_at: ctx.timestamp,

@@ -879,7 +879,7 @@ pub fn test_order_confirm_cancel_releases_reservation(ctx: &ReducerContext) -> R
     Ok(())
 }
 
-fn minimal_so_params(
+pub(super) fn minimal_so_params(
     fixture: &OrgFixture,
     product_uom_id: u64,
     qty: f64,
