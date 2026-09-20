@@ -6350,7 +6350,8 @@
         "backorder": "Backorder"
       },
       "actions": {
-        "partialValidate": "Partial delivery…"
+        "partialValidate": "Partial delivery…",
+        "pack": "Pack"
       }
     },
     "returns": {
@@ -6850,6 +6851,7 @@
       "recalculateTotals": "Recalculate totals",
       "accrueCommission": "Accrue commission",
       "createInvoice": "Create invoice…",
+      "viewDeliveries": "View deliveries",
       "lockOrders": "Lock",
       "unlockOrders": "Unlock",
       "newPricelistItem": "New rule",

@@ -94,6 +94,7 @@ import {
 } from '@lumiere/erp-shared/csv-import-bundles';
 import {
   planPartialDelivery,
+  isSaleOrderConfirmed,
   withOrderCashSummary,
   type TransitionNotice,
 } from '@lumiere/erp-workflows';
@@ -175,11 +176,6 @@ import {
 import {
   useStockPickings,
   useStockMoves,
-  useConfirmStockPicking,
-  useAssignStockPicking,
-  useValidateStockPicking,
-  useCancelStockPicking,
-  useDoneStockMove,
 } from '@lumiere/query-hooks/hooks/inventory';
 import type { Warehouse, StockPicking } from '@lumiere/stdb/types';
 import { useContacts, useUsers, type Contact } from '@lumiere/query-hooks/hooks/crm';
@@ -199,6 +195,7 @@ import { useWorkflowSurface } from '@/hooks/use-workflow-surface';
 import { useSaleOrderWorkflow } from '@lumiere/query-hooks/hooks/sales-order-workflow';
 import { useReturnOrderWorkflow } from '@lumiere/query-hooks/hooks/return-order-workflow';
 import { useSaleOrderLineWorkflow } from '@lumiere/query-hooks/hooks/sale-order-line-workflow';
+import { usePickingWorkflow } from '@lumiere/query-hooks/hooks/picking-workflow';
 import { useModuleFilters } from '@/hooks/use-module-filters';
 import { downloadDocumentPdf } from '@lumiere/query-hooks/hooks/templates';
 import { useCreateDocument } from '@lumiere/query-hooks/hooks/documents';
@@ -264,6 +261,17 @@ function pickingIsFulfillment(row: Record<string, unknown>): boolean {
   return code === 'outgoing';
 }
 
+/** Runs a picking workflow action once per selected picking; failures are reported by the surface. */
+function runPickingAction(
+  action: { execute(pickingId: string): Promise<unknown> },
+  rows: Record<string, unknown>[],
+): void {
+  for (const row of rows) {
+    const id = pickingRowId(row);
+    if (id != null) action.execute(String(id)).catch(() => undefined);
+  }
+}
+
 function pickingRowId(row: Record<string, unknown>): string | number | bigint | null {
   const id = getRowField(row, 'id');
   if (id == null) return null;
@@ -319,6 +327,8 @@ const INLINE_ERROR_TRANSITIONS: ReadonlySet<string> = new Set([
   'sales.order.update',
   'sales.order-line.create',
   'sales.order-line.update',
+  'inventory.picking.partial-validate',
+  'inventory.picking.cancel',
 ]);
 
 function returnOrderRowId(row: Record<string, unknown>): string | null {
@@ -788,11 +798,19 @@ function SalesClientLoaded({
     workflowCallbacks,
   );
   const computeInvoiceTotals = useComputeInvoiceTotals(organizationId, operatingCompanyId);
-  const confirmPicking = useConfirmStockPicking(orgId, operatingCompanyId);
-  const assignPicking = useAssignStockPicking(orgId, operatingCompanyId);
-  const validatePicking = useValidateStockPicking(orgId, operatingCompanyId);
-  const cancelPicking = useCancelStockPicking(orgId, operatingCompanyId);
-  const doneStockMove = useDoneStockMove(orgId, operatingCompanyId);
+  const pickingWorkflow = usePickingWorkflow(
+    orgId,
+    operatingCompanyId,
+    {
+      confirm: t('inventory.transferActions.confirm'),
+      assign: t('inventory.transferActions.assign'),
+      validate: t('inventory.transferActions.validate'),
+      partialValidate: t('sales.fulfillment.actions.partialValidate'),
+      pack: t('sales.fulfillment.actions.pack'),
+      cancel: t('inventory.transferActions.cancel'),
+    },
+    workflowCallbacks,
+  );
 
   const csvFormConfig = useMemo(() => {
     if (!csvKind) return null;
@@ -1279,28 +1297,22 @@ function SalesClientLoaded({
   const pickingActions = useMemo(
     (): EntityTableConfig['actions'] =>
       pickingRowActions(t, {
-        confirm: (rows) => {
-          const id = pickingRowId(rows[0] as Record<string, unknown>);
-          if (id != null) void confirmPicking.mutateAsync(id);
-        },
-        assign: (rows) => {
-          const id = pickingRowId(rows[0] as Record<string, unknown>);
-          if (id != null) void assignPicking.mutateAsync(id);
-        },
+        // Every selected picking qualifies (the toolbar requires it), so each one is run. The
+        // workflow surface reports typed failures.
+        confirm: (rows) => runPickingAction(pickingWorkflow.confirm, rows),
+        assign: (rows) => runPickingAction(pickingWorkflow.assign, rows),
         'partial-validate': (rows) => {
           setPartialDeliveryError(null);
           setPartialDeliveryPicking(rows[0] as Record<string, unknown>);
         },
-        validate: (rows) => {
-          const id = pickingRowId(rows[0] as Record<string, unknown>);
-          if (id != null) void validatePicking.mutateAsync(id);
-        },
+        pack: (rows) => runPickingAction(pickingWorkflow.pack, rows),
+        validate: (rows) => runPickingAction(pickingWorkflow.validate, rows),
         cancel: (rows) => {
           setCancelPickingError(null);
           setCancelPickingTarget(rows[0] as Record<string, unknown>);
         },
       }),
-    [t, confirmPicking, assignPicking, validatePicking],
+    [t, pickingWorkflow],
   );
 
   const fulfillmentEntityConfig = useMemo((): EntityViewConfig => {
@@ -1406,6 +1418,17 @@ function SalesClientLoaded({
                   .execute({ orderId: String(r.id), signedBy })
                   .catch(() => undefined);
               }
+            },
+          },
+          {
+            id: 'view-deliveries',
+            label: t('sales.actions.viewDeliveries'),
+            requiresSelection: true,
+            // Only a confirmed order has fulfillment; the fulfillment tab lists its pickings and backorders.
+            isApplicable: (rows) => rows.length === 1 && isSaleOrderConfirmed(rows[0] as Record<string, unknown>),
+            onClick: (rows) => {
+              if (rows.length !== 1) return;
+              navigateToSalesTab('fulfillment', { saleId: String(rows[0]?.id) });
             },
           },
           {
@@ -1627,6 +1650,7 @@ function SalesClientLoaded({
     saleOrderWorkflow.lock,
     saleOrderWorkflow.unlock,
     saleOrderWorkflow.update,
+    navigateToSalesTab,
     applySalePromotion,
     applySaleOrderOptions,
     accrueSaleCommission,
@@ -2603,11 +2627,7 @@ function SalesClientLoaded({
     importSaleOrderCsv.isPending ||
     importSaleOrderLineCsv.isPending ||
     computeInvoiceTotals.isPending ||
-    confirmPicking.isPending ||
-    assignPicking.isPending ||
-    validatePicking.isPending ||
-    cancelPicking.isPending ||
-    doneStockMove.isPending;
+    pickingWorkflow.isPending;
 
   return (
     <>
@@ -2767,7 +2787,7 @@ function SalesClientLoaded({
           config={partialDeliveryFormConfig}
           closeOnSubmit={false}
           submitError={partialDeliveryError}
-          isPending={doneStockMove.isPending || validatePicking.isPending}
+          isPending={pickingWorkflow.isPending}
           onSubmit={async (formData) => {
             setPartialDeliveryError(null);
             if (assignedMovesForPartialDelivery.length === 0) {
@@ -2788,11 +2808,9 @@ function SalesClientLoaded({
                 setPartialDeliveryError(t(`sales.forms.partialDelivery.errors.${plan.error}`));
                 return;
               }
-              for (const { moveId, quantityDone } of plan.shortMoves) {
-                await doneStockMove.mutateAsync({ moveId, quantityDone });
-              }
-              await validatePicking.mutateAsync({
-                pickingId,
+              await pickingWorkflow.partialValidate.execute({
+                pickingId: String(pickingId),
+                shortMoves: plan.shortMoves,
                 createBackorder: formData.createBackorder === true,
               });
               setPartialDeliveryPicking(null);
@@ -2815,7 +2833,7 @@ function SalesClientLoaded({
           config={cancelPickingFormConfig}
           closeOnSubmit={false}
           submitError={cancelPickingError}
-          isPending={cancelPicking.isPending}
+          isPending={pickingWorkflow.isPending}
           onSubmit={async (formData) => {
             setCancelPickingError(null);
             if (formData.confirmCancel !== true) {
@@ -2825,7 +2843,7 @@ function SalesClientLoaded({
             const id = pickingRowId(cancelPickingTarget);
             if (id == null) return;
             try {
-              await cancelPicking.mutateAsync(id);
+              await pickingWorkflow.cancel.execute(String(id));
               setCancelPickingTarget(null);
             } catch (e) {
               setCancelPickingError(e instanceof Error ? e.message : String(e));

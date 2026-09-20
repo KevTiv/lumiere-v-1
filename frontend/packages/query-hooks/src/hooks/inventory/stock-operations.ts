@@ -155,6 +155,23 @@ export const validateStockPickingCommand = (companyId: bigint, pickingId: Scalar
     'Failed to validate stock picking',
   );
 
+/**
+ * Validate a picking after recording the quantities of short-shipped moves. Quantities go first
+ * and any failure stops before validation, so a picking is never validated on partial data.
+ * Recording a quantity sets it, so replaying after a failure is safe.
+ */
+export async function validateStockPickingWithQuantitiesCommand(
+  companyId: bigint,
+  input: {
+    pickingId: ScalarId;
+    shortMoves: ReadonlyArray<{ moveId: ScalarId; quantityDone: number }>;
+    createBackorder: boolean;
+  },
+): Promise<void> {
+  for (const move of input.shortMoves) await doneStockMoveCommand(companyId, move);
+  await validateStockPickingCommand(companyId, input.pickingId, input.createBackorder);
+}
+
 export const stockPickingsQueryOptions = (organizationId: bigint) => ({
   queryKey: ['stock-pickings', rqBigIntKey(organizationId)] as const,
   queryFn: () =>
@@ -520,20 +537,25 @@ export function useAssignStockMove(organizationId: bigint, companyId: bigint) {
   });
 }
 
+/** The one `done_stock_move` invocation, shared by the mutation hook and the picking workflow. */
+export async function doneStockMoveCommand(
+  companyId: bigint,
+  { moveId, quantityDone }: { moveId: ScalarId; quantityDone: number },
+): Promise<void> {
+  const { urlPath, init } = stdbBffCommandPost('done_stock_move', {
+    moveId: toScalarU64(moveId),
+    params: stdbParamsToJson({ companyId, quantityDone }, 'DoneStockMoveParams'),
+  });
+  const r = await apiFetch(urlPath, init);
+  if (!r.ok) {
+    throw workflowErrorFromResponse(r.status, await r.text().catch(() => ''), 'Failed to complete stock move');
+  }
+}
+
 export function useDoneStockMove(organizationId: bigint, companyId: bigint) {
   const qc = useQueryClient();
   return useMutation<void, Error, { moveId: ScalarId; quantityDone: number }>({
-    mutationFn: async ({ moveId, quantityDone }) => {
-      const { urlPath, init } = stdbBffCommandPost('done_stock_move', {
-        moveId: toScalarU64(moveId),
-        params: stdbParamsToJson(
-          { companyId, quantityDone },
-          'DoneStockMoveParams',
-        ),
-      });
-      const r = await apiFetch(urlPath, init);
-      if (!r.ok) throw new Error('Failed to complete stock move');
-    },
+    mutationFn: (input) => doneStockMoveCommand(companyId, input),
     onSuccess: () => invalidateInventoryQueries(qc, organizationId),
   });
 }
@@ -792,17 +814,22 @@ export function useStockPackages(
   });
 }
 
+/** The one `pack_stock_picking` invocation, shared by the mutation hook and the picking workflow. */
+export async function packStockPickingCommand(companyId: bigint, params: PackStockPickingParams): Promise<void> {
+  const { urlPath, init } = stdbBffCommandPost('pack_stock_picking', {
+    companyId: companyId,
+    params: stdbParamsToJson(params as object, 'PackStockPickingParams'),
+  });
+  const r = await apiFetch(urlPath, init);
+  if (!r.ok) {
+    throw workflowErrorFromResponse(r.status, await r.text().catch(() => ''), 'Failed to pack stock picking');
+  }
+}
+
 export function usePackStockPicking(organizationId: bigint, companyId: bigint) {
   const qc = useQueryClient();
   return useMutation<void, Error, PackStockPickingParams>({
-    mutationFn: async (params) => {
-      const { urlPath, init } = stdbBffCommandPost('pack_stock_picking', {
-        companyId: companyId,
-        params: stdbParamsToJson(params as object, 'PackStockPickingParams'),
-      });
-      const r = await apiFetch(urlPath, init);
-      if (!r.ok) throw new Error('Failed to pack stock picking');
-    },
+    mutationFn: (params) => packStockPickingCommand(companyId, params),
     onSuccess: () => invalidateInventoryQueries(qc, organizationId),
   });
 }

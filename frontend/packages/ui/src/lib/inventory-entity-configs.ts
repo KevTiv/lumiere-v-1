@@ -414,6 +414,7 @@ const PICKING_ACTION_ORDER: Array<{
   { id: "assign", labelKey: "inventory.transferActions.assign" },
   { id: "assign-user", labelKey: "inventory.transferActions.assignUser" },
   { id: "partial-validate", labelKey: "sales.fulfillment.actions.partialValidate" },
+  { id: "pack", labelKey: "sales.fulfillment.actions.pack" },
   { id: "validate", labelKey: "inventory.transferActions.validate" },
   { id: "cancel", labelKey: "inventory.transferActions.cancel", destructive: true },
 ]

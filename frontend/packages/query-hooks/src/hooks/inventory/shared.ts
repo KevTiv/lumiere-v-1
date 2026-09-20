@@ -2,7 +2,7 @@
 
 import { useQueryClient } from '@tanstack/react-query'
 import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
-import { PICKING_ORDER_RESOURCES } from "@lumiere/erp-workflows"
+import { INVENTORY_QUERY_RESOURCES, PICKING_ORDER_RESOURCES } from "@lumiere/erp-workflows"
 import { rqBigIntKey } from "../../http"
 import { invalidateQueryResources } from "../workflow"
 
@@ -81,32 +81,7 @@ export function invalidateInventoryQueries(
   qc: ReturnType<typeof useQueryClient>,
   organizationId: bigint,
 ) {
-  const orgKey = rqBigIntKey(organizationId)
-  void qc.invalidateQueries({ queryKey: ['products', orgKey] })
-  void qc.invalidateQueries({ queryKey: ['product-categories', orgKey] })
-  void qc.invalidateQueries({ queryKey: ['stock-locations', orgKey] })
-  void qc.invalidateQueries({ queryKey: ['stock-quants', orgKey] })
-  void qc.invalidateQueries({ queryKey: ['stock-pickings', orgKey] })
-  void qc.invalidateQueries({ queryKey: ['inventory-adjustments', orgKey] })
-  void qc.invalidateQueries({ queryKey: ['stock-production-lots', orgKey] })
-  void qc.invalidateQueries({ queryKey: ['warehouses', orgKey] })
-  void qc.invalidateQueries({ queryKey: ['quality-checks', orgKey] })
-  void qc.invalidateQueries({ queryKey: ['quality-alerts', orgKey] })
-  void qc.invalidateQueries({ queryKey: ['warehouse-3d-zones', orgKey] })
-  void qc.invalidateQueries({ queryKey: ['stock-cycle-counts', orgKey] })
-  void qc.invalidateQueries({ queryKey: ['warehouse-3d', orgKey] })
-  void qc.invalidateQueries({ queryKey: ['stock-inventories', orgKey] })
-  void qc.invalidateQueries({ queryKey: ['stock-moves', orgKey] })
-  void qc.invalidateQueries({ queryKey: ['stock-production-serials', orgKey] })
-  void qc.invalidateQueries({ queryKey: ['adjustment-reasons', orgKey] })
-  void qc.invalidateQueries({ queryKey: ['barcode-nomenclatures', orgKey] })
-  void qc.invalidateQueries({ queryKey: ['serial-lot-traceability', orgKey] })
-  void qc.invalidateQueries({ queryKey: ['stock-traceability-reports', orgKey] })
-  void qc.invalidateQueries({ queryKey: ['stock-packages', orgKey] })
-  void qc.invalidateQueries({ queryKey: ['inventory-exceptions', orgKey] })
-  void qc.invalidateQueries({ queryKey: ['inventory-exceptions-short-atp', orgKey] })
-  void qc.invalidateQueries({ queryKey: ['inventory-exceptions-expired-lots', orgKey] })
-  void qc.invalidateQueries({ queryKey: ['inventory-exceptions-open-qc', orgKey] })
+  void invalidateQueryResources(qc, organizationId, INVENTORY_QUERY_RESOURCES)
 }
 
 /**
