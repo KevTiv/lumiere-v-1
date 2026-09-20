@@ -69,8 +69,8 @@ use crate::{
         ActorCredentials,
     },
     orchestrator::skill_loader::{
-        complete_run, create_run, load_run_key, load_skill, resume_run, set_run_wait_state,
-        LoadedSkill,
+        complete_run, create_run, intelligence_policy_ref, load_run_key, load_skill, resume_run,
+        set_run_wait_state, LoadedSkill,
     },
     state::AppState,
     tools::{
@@ -759,16 +759,12 @@ pub async fn run_skill_admitted(
         let model_config_store = StdbModelConfigurationStore {
             reader: tool_ctx.stdb.as_ref(),
         };
-        let intelligence_policy_ref = skill
-            .config_json
-            .get("intelligencePolicyRef")
-            .or_else(|| skill.config_json.get("intelligence_policy_ref"))
-            .and_then(Value::as_str);
+        let intelligence_policy_ref = intelligence_policy_ref(&skill.config_json)?;
         let route_resolver = IntelligenceRouteResolver::new_governed(
             &model_config_store,
             req.org_id,
             &agent,
-            intelligence_policy_ref,
+            intelligence_policy_ref.as_deref(),
         )?;
         route_resolver
             .validate_review_independence(catalog.review_independence_key)
@@ -1507,11 +1503,7 @@ async fn synthesize_summary(
         company_id,
         run_id,
         agent,
-        skill
-            .config_json
-            .get("intelligencePolicyRef")
-            .or_else(|| skill.config_json.get("intelligence_policy_ref"))
-            .and_then(Value::as_str),
+        intelligence_policy_ref(&skill.config_json)?.as_deref(),
         state.providers.llm.as_ref(),
         GenerationRequest {
             objective: user,
