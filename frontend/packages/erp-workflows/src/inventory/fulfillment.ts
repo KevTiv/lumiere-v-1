@@ -95,6 +95,11 @@ export function pickingStateTag(row: RowValueMap): string {
   return typeof state === "string" ? state.toLowerCase() : ""
 }
 
+/** A picking that can still move stock: not yet done or cancelled. */
+export function isPickingOpen(row: RowValueMap): boolean {
+  return (OPEN_STATES as readonly string[]).includes(pickingStateTag(row))
+}
+
 export function isPickingActionApplicable(action: PickingActionId, row: RowValueMap): boolean {
   return APPLICABLE_STATES[action].includes(pickingStateTag(row))
 }

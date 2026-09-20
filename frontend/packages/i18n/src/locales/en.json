@@ -6228,6 +6228,7 @@
           "none": "Not started",
           "pending": "To deliver",
           "partial": "Partially delivered",
+          "short": "Delivered short",
           "complete": "Delivered"
         },
         "invoice": {

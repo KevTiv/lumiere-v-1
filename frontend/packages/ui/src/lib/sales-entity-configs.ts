@@ -46,7 +46,13 @@ const cashSummaryBadges = (
 })
 
 const deliverySummaryBadges = (t: TFunction) =>
-  cashSummaryBadges(t, "delivery", { none: "secondary", pending: "outline", partial: "outline", complete: "default" })
+  cashSummaryBadges(t, "delivery", {
+    none: "secondary",
+    pending: "outline",
+    partial: "outline",
+    short: "secondary",
+    complete: "default",
+  })
 const invoiceSummaryBadges = (t: TFunction) =>
   cashSummaryBadges(t, "invoice", { none: "secondary", draft: "outline", posted: "default", credited: "secondary" })
 const paymentSummaryBadges = (t: TFunction) =>

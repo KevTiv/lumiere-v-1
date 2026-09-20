@@ -29,6 +29,49 @@ test("delivery follows delivered vs ordered stock quantity and ignores services"
   assert.equal(summarizeOrderToCash({ id: 5, state: "Draft" }, { lines: [line(10, 0)], moves: [] }).delivery, "none")
 })
 
+test("a partial delivery with a delivery still open is partial; with none left it is short", () => {
+  const d = (pickings: RowValueMap[] | undefined, lines = [line(10, 6)]) =>
+    summarizeOrderToCash(sale, { lines, moves: [], pickings }).delivery
+  const done = { id: 1, saleId: 5, state: "done" }
+  assert.equal(d([done, { id: 2, saleId: 5, state: "confirmed" }]), "partial")
+  assert.equal(d([done, { id: 2, saleId: 5, state: "assigned" }]), "partial")
+  assert.equal(d([done, { id: 2, saleId: 5, state: "cancel" }]), "short")
+  assert.equal(d([done]), "short")
+})
+
+test("without the order's pickings a partial delivery stays partial", () => {
+  assert.equal(summarizeOrderToCash(sale, { lines: [line(10, 6)], moves: [] }).delivery, "partial")
+})
+
+test("a return picking does not count as a delivery still to come", () => {
+  const pickings = [
+    { id: 1, saleId: 5, state: "done" },
+    { id: 3, saleId: 5, state: "assigned", isReturn: true },
+  ]
+  assert.equal(summarizeOrderToCash(sale, { lines: [line(10, 6)], moves: [], pickings }).delivery, "short")
+})
+
+test("complete and pending do not depend on pickings", () => {
+  const cancelled = [{ id: 1, saleId: 5, state: "cancel" }]
+  assert.equal(summarizeOrderToCash(sale, { lines: [line(10, 10)], moves: [], pickings: cancelled }).delivery, "complete")
+  assert.equal(summarizeOrderToCash(sale, { lines: [line(10, 0)], moves: [], pickings: cancelled }).delivery, "pending")
+})
+
+test("withOrderCashSummary attributes each picking to its own order", () => {
+  const rows = withOrderCashSummary(
+    [sale, { id: 6, state: "Sale" }],
+    [line(10, 6), { orderId: 6, productUomQty: 10, qtyDelivered: 6 }],
+    [],
+    [
+      { id: 1, saleId: 5, state: "done" },
+      { id: 2, saleId: 5, state: "cancel" },
+      { id: 3, saleId: 6, state: "done" },
+      { id: 4, saleId: 6, state: "confirmed" },
+    ],
+  )
+  assert.deepEqual(rows.map((r) => r.deliverySummary), ["short", "partial"])
+})
+
 test("nothing invoiced yet has no invoice, payment or balance", () => {
   const s = summarizeOrderToCash(sale, { lines: [], moves: [] })
   assert.deepEqual([s.invoice, s.payment, s.outstanding], ["none", "none", 0])

@@ -2480,6 +2480,7 @@ function SalesClientLoaded({
         orders as Record<string, unknown>[],
         orderLines as unknown as Record<string, unknown>[],
         accountMoves as unknown as Record<string, unknown>[],
+        stockPickings as unknown as Record<string, unknown>[],
       ).map((row) => ({
         ...row,
         sheetTitle: saleOrderPrimaryLabel(row) || String(row.reference ?? row.id ?? ''),
@@ -2507,6 +2508,7 @@ function SalesClientLoaded({
       orders,
       orderLines,
       accountMoves,
+      stockPickings,
       pricelists,
       pricelistItems,
       deliveries,

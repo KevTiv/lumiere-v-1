@@ -8,9 +8,14 @@
 import { firstNonNullKey, type RowValueMap } from "@lumiere/erp-shared/row-values"
 import { isInvoiceLikeMoveType } from "../accounting/invoice-to-payment"
 import { normalizedTag, rowId } from "../core/row"
+import { isPickingOpen } from "../inventory/fulfillment"
 import { isSaleOrderConfirmed } from "./order-to-cash"
 
-export type DeliverySummary = "none" | "pending" | "partial" | "complete"
+/**
+ * `partial`: some delivered and a delivery is still open. `short`: some delivered and nothing is
+ * left to deliver (the remainder was cancelled), so the shortfall will not arrive on its own.
+ */
+export type DeliverySummary = "none" | "pending" | "partial" | "short" | "complete"
 export type InvoiceSummary = "none" | "draft" | "posted" | "credited"
 export type PaymentSummary = "none" | "unpaid" | "partial" | "paid"
 
@@ -34,14 +39,21 @@ function num(row: RowValueMap, ...keys: string[]): number {
   return Number.isFinite(value) ? value : 0
 }
 
-function summarizeDelivery(order: RowValueMap, lines: readonly RowValueMap[]): DeliverySummary {
+function summarizeDelivery(
+  order: RowValueMap,
+  lines: readonly RowValueMap[],
+  pickings?: readonly RowValueMap[],
+): DeliverySummary {
   if (!isSaleOrderConfirmed(order)) return "none"
   const stockLines = lines.filter((line) => !firstNonNullKey(line, "isService", "is_service"))
   const ordered = stockLines.reduce((sum, line) => sum + num(line, "productUomQty", "product_uom_qty"), 0)
   if (ordered <= 0) return "none"
   const delivered = stockLines.reduce((sum, line) => sum + num(line, "qtyDelivered", "qty_delivered"), 0)
   if (delivered + EPSILON >= ordered) return "complete"
-  return delivered > EPSILON ? "partial" : "pending"
+  if (delivered <= EPSILON) return "pending"
+  // Without the order's pickings the remainder's fate is unknown, so it stays "partial".
+  const deliveryStillOpen = pickings?.some((p) => isPickingOpen(p) && !firstNonNullKey(p, "isReturn", "is_return"))
+  return pickings && !deliveryStillOpen ? "short" : "partial"
 }
 
 function summarizeReceivable(moves: readonly RowValueMap[]): Receivable {
@@ -73,9 +85,9 @@ function summarizeReceivable(moves: readonly RowValueMap[]): Receivable {
 
 export function summarizeOrderToCash(
   order: RowValueMap,
-  related: { lines: readonly RowValueMap[]; moves: readonly RowValueMap[] },
+  related: { lines: readonly RowValueMap[]; moves: readonly RowValueMap[]; pickings?: readonly RowValueMap[] },
 ): OrderCashSummary {
-  return { delivery: summarizeDelivery(order, related.lines), ...summarizeReceivable(related.moves) }
+  return { delivery: summarizeDelivery(order, related.lines, related.pickings), ...summarizeReceivable(related.moves) }
 }
 
 function groupBy(rows: readonly RowValueMap[], ...keys: string[]): Map<string, RowValueMap[]> {
@@ -95,14 +107,17 @@ export function withOrderCashSummary<T extends RowValueMap>(
   orders: readonly T[],
   lines: readonly RowValueMap[],
   moves: readonly RowValueMap[],
+  pickings?: readonly RowValueMap[],
 ): Array<T & { deliverySummary: DeliverySummary; invoiceSummary: InvoiceSummary; paymentSummary: PaymentSummary; outstandingAmount: number }> {
   const linesByOrder = groupBy(lines, "orderId", "order_id")
   const movesByOrder = groupBy(moves, "saleOrderId", "sale_order_id")
+  const pickingsByOrder = pickings ? groupBy(pickings, "saleId", "sale_id") : undefined
   return orders.map((order) => {
     const id = rowId(order)
     const summary = summarizeOrderToCash(order, {
       lines: linesByOrder.get(id) ?? [],
       moves: movesByOrder.get(id) ?? [],
+      pickings: pickingsByOrder ? (pickingsByOrder.get(id) ?? []) : undefined,
     })
     return {
       ...order,
