@@ -188,6 +188,19 @@ pub(crate) async fn complete_routed_generation(
 
     let mut failures = Vec::new();
     for profile in profiles {
+        if !agent.allowed_models.is_empty()
+            && !agent
+                .allowed_models
+                .iter()
+                .any(|model| model.eq_ignore_ascii_case(&profile.model))
+        {
+            failures.push(format!(
+                "{} selects model '{}' outside agent allowed_models",
+                profile.reference.stable_ref(),
+                profile.model
+            ));
+            continue;
+        }
         for attempt_no in 0..=profile.max_retries {
             let request = LlmRequest {
                 provider: profile.provider.clone(),
