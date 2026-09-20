@@ -423,9 +423,48 @@ async fn draft_actions_llm(
         }
     };
     let total_tokens = llm_resp.input_tokens.saturating_add(llm_resp.output_tokens);
-    let model_json: Value = serde_json::from_str(clean_json_response(&llm_resp.content))
-        .map_err(|e| DraftActionsError::other(format!("failed to parse action draft JSON: {e}")))?;
-    let drafts = parse_llm_drafts(req, &entries, &model_json).map_err(DraftActionsError::other)?;
+    let model_json: Value = match serde_json::from_str(clean_json_response(&llm_resp.content)) {
+        Ok(value) => value,
+        Err(error) => {
+            let _ = complete_run(
+                state.stdb.as_ref(),
+                org_id,
+                req.company_id,
+                run_id,
+                "failed",
+                None,
+                None,
+                None,
+                1,
+                total_tokens,
+                Some(format!("invalid generated action draft JSON: {error}")),
+            )
+            .await;
+            return Err(DraftActionsError::other(format!(
+                "failed to parse action draft JSON: {error}"
+            )));
+        }
+    };
+    let drafts = match parse_llm_drafts(req, &entries, &model_json) {
+        Ok(drafts) => drafts,
+        Err(error) => {
+            let _ = complete_run(
+                state.stdb.as_ref(),
+                org_id,
+                req.company_id,
+                run_id,
+                "failed",
+                None,
+                None,
+                None,
+                1,
+                total_tokens,
+                Some(error.clone()),
+            )
+            .await;
+            return Err(DraftActionsError::other(error));
+        }
+    };
     complete_run(
         state.stdb.as_ref(),
         org_id,
