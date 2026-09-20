@@ -9,6 +9,10 @@ use crate::{
         resolve_agent,
     },
     error::{AppError, AppResult},
+    orchestrator::{
+        intelligence_router::complete_routed_generation,
+        model_configuration::StdbModelConfigurationStore,
+    },
     providers::llm::LlmMessage,
     state::AppState,
 };
@@ -415,21 +419,21 @@ pub async fn post_suggest(
         agent.system_prompt
     );
 
-    let llm_resp = state
-        .providers
-        .llm
-        .complete(crate::providers::llm::LlmRequest {
-            provider: agent.provider.clone(),
-            model: agent.model.clone(),
-            system,
-            messages: vec![LlmMessage::text("user", prompt)],
-            max_tokens: agent.max_tokens.min(FORM_SUGGEST_MAX_TOKENS),
-            temperature: Some(agent.temperature),
-            top_p: Some(agent.top_p),
-            tools: Vec::new(),
-        })
-        .await
-        .map_err(|e| AppError::Internal(format!("LLM request failed: {e}")))?;
+    let model_store = StdbModelConfigurationStore {
+        reader: state.stdb.as_ref(),
+    };
+    let llm_resp = complete_routed_generation(
+        &model_store,
+        req.org_id,
+        &agent,
+        None,
+        state.providers.llm.as_ref(),
+        system,
+        vec![LlmMessage::text("user", prompt)],
+        agent.max_tokens.min(FORM_SUGGEST_MAX_TOKENS),
+    )
+    .await
+    .map_err(|e| AppError::Internal(format!("LLM request failed: {e}")))?;
 
     let total_tokens = llm_resp.input_tokens + llm_resp.output_tokens;
     if total_tokens > 0 {
