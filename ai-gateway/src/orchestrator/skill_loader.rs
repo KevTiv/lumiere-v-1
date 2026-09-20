@@ -276,6 +276,44 @@ pub async fn create_run(
     Ok(run_id)
 }
 
+/// Resolve a system/bundled generation surface to a provisioned `ai_skill`
+/// and create a normal durable run for it. Runtime never provisions the skill;
+/// deployments must sync bundled skills first.
+#[allow(clippy::too_many_arguments)]
+pub async fn create_generation_surface_run(
+    stdb: &StdbClient,
+    org_id: u64,
+    company_id: u64,
+    skill_key: &str,
+    agent_id: u64,
+    team_member_id: Option<u64>,
+    inputs_json: &str,
+    triggered_by_hex: &str,
+) -> Result<u64> {
+    let skill = load_skill(stdb, org_id, company_id, skill_key).await?;
+    if skill.id == 0 {
+        anyhow::bail!(
+            "generation surface skill '{skill_key}' is not provisioned; sync bundled skills before serving this route"
+        );
+    }
+    if !skill.enabled {
+        anyhow::bail!("generation surface skill '{skill_key}' is disabled");
+    }
+    let run_key = uuid::Uuid::new_v4().to_string();
+    create_run(
+        stdb,
+        org_id,
+        company_id,
+        &skill,
+        agent_id,
+        team_member_id,
+        &run_key,
+        inputs_json,
+        triggered_by_hex,
+    )
+    .await
+}
+
 pub async fn complete_run(
     stdb: &StdbClient,
     org_id: u64,
