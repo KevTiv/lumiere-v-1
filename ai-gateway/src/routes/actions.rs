@@ -5,8 +5,8 @@ use serde_json::{json, Map, Value};
 
 use crate::{
     ai_agent::{
-        enforce_chargeable_limits, ensure_allowed_action, ensure_model_allowed, record_ai_spend,
-        resolve_agent, AgentLimitViolation,
+        enforce_chargeable_limits, ensure_allowed_action, ensure_model_allowed, resolve_agent,
+        AgentLimitViolation,
     },
     error::{AppError, AppResult},
     harness::snapshot::{
@@ -14,16 +14,17 @@ use crate::{
         EntityRef, LiveSnapshot,
     },
     orchestrator::{
-        intelligence::EvidenceRef,
-        intelligence_router::complete_routed_generation,
+        intelligence::{EvidenceRef, GenerationProvider, GenerationRequest},
+        intelligence_router::generate_routed_for_run,
         model_configuration::StdbModelConfigurationStore,
+        skill_loader::{complete_run, create_generation_surface_run},
+        spend_admission::StdbSpendLedger,
         output_gate::{
             admit_structured_output, persist_or_withhold_generated_output, GeneratedOutputDraft,
             PublicationIdentity,
         },
         text_answer_gate::{TextAnswerProvenance, TextAnswerVerification, TextEvidence},
     },
-    providers::llm::LlmMessage,
     state::AppState,
 };
 
@@ -350,36 +351,97 @@ async fn draft_actions_llm(
         agent.system_prompt
     );
 
+    let spend_reader = state
+        .spend_read_stdb
+        .as_deref()
+        .ok_or_else(|| DraftActionsError::other("spend_read_stdb is required for routed generation"))?;
+    let run_inputs = json!({
+        "surface": "action_draft_generation",
+        "query": req.query,
+        "allowed_reducers": req.allowed_reducers,
+        "allowed_entity_types": req.allowed_entity_types,
+    });
+    let run_id = create_generation_surface_run(
+        state.stdb.as_ref(),
+        org_id,
+        req.company_id,
+        "action_draft_generation",
+        agent.agent_id,
+        req.team_member_id,
+        &serde_json::to_string(&run_inputs)
+            .map_err(|e| DraftActionsError::other(e.to_string()))?,
+        &req.identity_hex,
+    )
+    .await
+    .map_err(|e| DraftActionsError::other(e.to_string()))?;
     let model_store = StdbModelConfigurationStore {
         reader: state.stdb.as_ref(),
     };
-    let llm_resp = complete_routed_generation(
+    let ledger = StdbSpendLedger {
+        writer: state.stdb.as_ref(),
+        reader: spend_reader,
+    };
+    let generation = generate_routed_for_run(
         &model_store,
+        &ledger,
         org_id,
+        req.company_id,
+        run_id,
         &agent,
         None,
         state.providers.llm.as_ref(),
-        system,
-        vec![LlmMessage::text("user", prompt)],
-        agent.max_tokens.min(ACTION_DRAFT_MAX_TOKENS),
+        GenerationRequest {
+            objective: prompt,
+            context: json!({
+                "allowed_reducers": entries.iter().map(|entry| entry.reducer_name).collect::<Vec<_>>(),
+                "grounded": grounding_snapshots.is_some(),
+            }),
+            format: "schema-constrained JSON action drafts".to_string(),
+            instructions: Some(system),
+            max_tokens: Some(agent.max_tokens.min(ACTION_DRAFT_MAX_TOKENS)),
+        },
+    )
+    .await;
+    let llm_resp = match generation {
+        Ok(response) => response,
+        Err(error) => {
+            let _ = complete_run(
+                state.stdb.as_ref(),
+                org_id,
+                req.company_id,
+                run_id,
+                "failed",
+                None,
+                None,
+                None,
+                0,
+                0,
+                Some(error.to_string()),
+            )
+            .await;
+            return Err(DraftActionsError::other(format!("LLM request failed: {error}")));
+        }
+    };
+    let total_tokens = llm_resp.input_tokens.saturating_add(llm_resp.output_tokens);
+    let model_json: Value = serde_json::from_str(clean_json_response(&llm_resp.content))
+        .map_err(|e| DraftActionsError::other(format!("failed to parse action draft JSON: {e}")))?;
+    let drafts = parse_llm_drafts(req, &entries, &model_json).map_err(DraftActionsError::other)?;
+    complete_run(
+        state.stdb.as_ref(),
+        org_id,
+        req.company_id,
+        run_id,
+        "completed",
+        Some(format!("generated {} action drafts", drafts.len())),
+        None,
+        None,
+        1,
+        total_tokens,
+        None,
     )
     .await
-    .map_err(|e| DraftActionsError::other(format!("LLM request failed: {e}")))?;
-
-    let total_tokens = llm_resp.input_tokens + llm_resp.output_tokens;
-    if total_tokens > 0 {
-        if let Err(e) = record_ai_spend(&state.stdb, org_id, agent.agent_id, total_tokens).await {
-            tracing::warn!(
-                agent_id = agent.agent_id,
-                error = %e,
-                "record_ai_spend failed"
-            );
-        }
-    }
-
-    let model_json: Value = serde_json::from_str(clean_json_response(&llm_resp.text))
-        .map_err(|e| DraftActionsError::other(format!("failed to parse action draft JSON: {e}")))?;
-    parse_llm_drafts(req, &entries, &model_json).map_err(DraftActionsError::other)
+    .map_err(|e| DraftActionsError::other(e.to_string()))?;
+    Ok(drafts)
 }
 
 fn non_empty(value: &str) -> bool {
