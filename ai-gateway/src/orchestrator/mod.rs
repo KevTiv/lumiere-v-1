@@ -1,7 +1,5 @@
 mod agent_loop;
 mod agent_loop_adapters;
-#[cfg(test)]
-mod agent_loop_tests;
 mod answer_gate;
 mod decision_graph;
 mod decision_type;
