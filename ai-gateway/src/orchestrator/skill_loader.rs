@@ -5,6 +5,14 @@ use stdb_client::StdbClient;
 
 use crate::skills::{compose_prompt, load_bundled_skill};
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct GovernedRunRef {
+    pub run_id: u64,
+    pub run_key: String,
+    pub skill_id: u64,
+    pub skill_config_id: Option<u64>,
+}
+
 #[derive(Clone, Debug)]
 pub struct LoadedSkill {
     pub id: u64,
@@ -222,7 +230,7 @@ pub async fn create_run(
     run_key: &str,
     inputs_json: &str,
     triggered_by_hex: &str,
-) -> Result<u64> {
+) -> Result<GovernedRunRef> {
     stdb.call_reducer(stdb_client::reducer_call!(
         "create_ai_agent_run",
         serde_json::json!([
@@ -273,7 +281,12 @@ pub async fn create_run(
     ))
     .await
     .context("initialize durable AI run lifecycle")?;
-    Ok(run_id)
+    Ok(GovernedRunRef {
+        run_id,
+        run_key: run_key.to_string(),
+        skill_id: skill.id,
+        skill_config_id: skill.skill_config_id,
+    })
 }
 
 /// Resolve a system/bundled generation surface to a provisioned `ai_skill`
@@ -289,7 +302,7 @@ pub async fn create_generation_surface_run(
     team_member_id: Option<u64>,
     inputs_json: &str,
     triggered_by_hex: &str,
-) -> Result<u64> {
+) -> Result<GovernedRunRef> {
     let skill = load_skill(stdb, org_id, company_id, skill_key).await?;
     if skill.id == 0 {
         anyhow::bail!(
