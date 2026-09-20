@@ -25,6 +25,7 @@ export const PROJECTS_WORKSPACE_RESOURCE_KEYS = [
   "capacity-forecast-by-employee",
   "project-baselines",
   "project-change-orders",
+  "project-timesheet-approvals",
   "project-earned-value-by-project",
   "project-subcontractor-costs",
   "project-revenue-schedules",

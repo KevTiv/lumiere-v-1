@@ -6,6 +6,8 @@ import {
   proposalTemplatesTableConfig,
   newProposalForm,
   posTerminalsAdminTableConfig,
+  fleetVehiclesTableConfig,
+  newFleetVehicleForm,
 } from "@lumiere/ui"
 import {
   buildAccountsTableConfig,
@@ -3198,6 +3200,26 @@ export const posModuleConfig = (t: TFunction): ModuleConfig => ({
       label: t("pos.admin.tabs.admin"),
       type: "entity",
       entityConfig: posTerminalsAdminTableConfig(t),
+    },
+  ],
+})
+
+// ─── Fleet ────────────────────────────────────────────────────────────────────
+
+export const fleetModuleConfig = (t: TFunction): ModuleConfig => ({
+  id: "fleet",
+  title: t("fleet.title"),
+  description: t("fleet.forms.newVehicle.description"),
+  defaultTab: "fleet-vehicles",
+  tabs: [
+    {
+      id: "fleet-vehicles",
+      label: t("fleet.subtitle"),
+      type: "entity",
+      entityConfig: fleetVehiclesTableConfig(t),
+      createForm: newFleetVehicleForm(t),
+      createLabel: t("fleet.create"),
+      createAction: "createFleetVehicle",
     },
   ],
 })

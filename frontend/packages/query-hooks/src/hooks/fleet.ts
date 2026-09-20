@@ -63,6 +63,7 @@ export function useCreateFleetVehicle(organizationId: bigint, companyId?: bigint
   })
 }
 
+
 export type UpdateVehiclePositionInput = {
   vehicleId: bigint | number | string
   latitude: number

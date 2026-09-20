@@ -107,6 +107,8 @@ export * from "./lib/pos-form-configs";
 export * from "./lib/pos-entity-configs";
 export * from "./lib/proposal-workspace-types";
 export * from "./lib/auth-form-configs";
+export * from "./lib/fleet-entity-configs";
+export * from "./lib/fleet-form-configs";
 export * from "./lib/iot-entity-configs";
 export * from "./lib/iot-form-configs";
 

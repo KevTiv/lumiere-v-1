@@ -181,6 +181,7 @@
     "pos": "Point of Sale",
     "manufacturing": "Manufacturing",
     "map": "Map",
+    "fleet": "Fleet",
     "helpdesk": "Helpdesk",
     "workflows": "Workflows",
     "documents": "Documents",
@@ -9751,12 +9752,41 @@
     "liveDataHint": "Live data from SpacetimeDB. Use fleet reducers to update GPS positions.",
     "emptyDataHint": "No live map pins yet — create fleet vehicles (with position), POS terminals, or warehouse geo to populate coordinates.",
     "fleet": {
-      "title": "Fleet vehicles",
+      "title": "Fleet",
+      "subtitle": "Vehicles",
       "empty": "No vehicles yet.",
-      "create": "Create vehicle",
+      "create": "Add vehicle",
       "updatePosition": "Update position",
       "selectVehicle": "Select vehicle",
-      "companyRequired": "Select an operating company before creating or updating fleet vehicles."
+      "companyRequired": "Select an operating company before creating or updating fleet vehicles.",
+      "table": {
+        "name": "Vehicle name",
+        "licensePlate": "License plate",
+        "vehicleType": "Type",
+        "driverName": "Driver",
+        "status": "Status",
+        "lastPosition": "Last position",
+        "odometer": "Odometer (km)",
+        "fuel": "Fuel level"
+      },
+      "status": {
+        "active": "Active",
+        "idle": "Idle",
+        "maintenance": "Maintenance",
+        "inactive": "Inactive"
+      },
+      "forms": {
+        "newVehicle": {
+          "title": "Add vehicle",
+          "description": "Register a new vehicle in the fleet.",
+          "section": "Vehicle details"
+        },
+        "editVehicle": {
+          "title": "Edit vehicle",
+          "description": "Update vehicle driver or service type.",
+          "section": "Vehicle details"
+        }
+      }
     }
   },
   "tasks": {
