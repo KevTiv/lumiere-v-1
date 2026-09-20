@@ -20,6 +20,21 @@ pub struct ModuleDraft {
     pub component_catalog_version: u32,
     /// Ordered pages in the module.
     pub pages: Vec<PageDefinition>,
+    /// Optional accepted-decision lineage for this immutable saved revision.
+    #[serde(default)]
+    pub evidence_binding: Option<EvidenceBindingIntent>,
+}
+
+/// Untrusted linkage intent validated again at the persistence boundary.
+#[derive(Clone, Debug, Deserialize, JsonSchema, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct EvidenceBindingIntent {
+    /// Membership-derived company intent as a canonical positive decimal.
+    pub company_id: String,
+    /// Accepted decisions that justify the definition.
+    pub decision_ids: Vec<String>,
+    /// Optional current claims linked directly for inspection.
+    pub claim_ids: Vec<String>,
 }
 
 /// A composed page and its ordered presentation nodes.

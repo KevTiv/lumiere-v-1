@@ -1,5 +1,6 @@
 use anyhow::{Context, Result};
 use serde_json::Value;
+use sha2::{Digest, Sha256};
 use stdb_client::StdbClient;
 
 use crate::skills::{compose_prompt, load_bundled_skill};
@@ -242,7 +243,37 @@ pub async fn create_run(
     .await
     .context("create_ai_agent_run")?;
 
-    lookup_run_id(stdb, run_key).await
+    let run_id = lookup_run_id(stdb, run_key).await?;
+    let checkpoint_hash = format!(
+        "{:x}",
+        Sha256::digest(serde_json::to_vec(&serde_json::json!({
+            "organization_id": org_id,
+            "company_id": company_id,
+            "run_id": run_id,
+            "skill_id": skill.id,
+            "agent_id": agent_id,
+            "team_member_id": team_member_id,
+            "run_key": run_key,
+            "inputs_json": inputs_json,
+            "triggered_by_hex": triggered_by_hex,
+        }))?)
+    );
+    stdb.call_reducer(stdb_client::reducer_call!(
+        "initialize_ai_run_lifecycle",
+        serde_json::json!([
+            org_id,
+            company_id,
+            run_id,
+            {
+                "checkpoint_hash": checkpoint_hash,
+                "cursor": 0,
+                "idempotency_key": format!("run-created:{run_id}"),
+            }
+        ]),
+    ))
+    .await
+    .context("initialize durable AI run lifecycle")?;
+    Ok(run_id)
 }
 
 pub async fn complete_run(
@@ -284,6 +315,76 @@ pub async fn complete_run(
 /// Park an open run in a non-terminal wait state. `status` must be a wait state
 /// the module accepts (`awaiting_approval` or `agent_settled`); a run already in
 /// that state replays without change.
+pub async fn resume_run(
+    stdb: &StdbClient,
+    org_id: u64,
+    company_id: u64,
+    run_id: u64,
+) -> Result<()> {
+    let row = stdb
+        .query_sql(&format!(
+            "SELECT checkpoint_hash, cursor, concurrency_version FROM ai_run_lifecycle_state \
+             WHERE organization_id = {org_id} AND company_id = {company_id} AND run_id = {run_id} LIMIT 1"
+        ))
+        .await
+        .context("load checked run continuation")?
+        .into_iter()
+        .next()
+        .context("run lifecycle is not initialized")?;
+    let checkpoint_hash = row
+        .get("checkpointHash")
+        .and_then(Value::as_str)
+        .context("run lifecycle checkpoint hash missing")?;
+    let cursor = row_u64(&row, "cursor") as u32;
+    let concurrency_version = row_u64(&row, "concurrencyVersion");
+    stdb.call_reducer(stdb_client::reducer_call!(
+        "resume_ai_run_checked",
+        serde_json::json!([
+            org_id,
+            company_id,
+            run_id,
+            {
+                "continuation": {
+                    "checkpoint_hash": checkpoint_hash,
+                    "cursor": cursor,
+                    "concurrency_version": concurrency_version,
+                },
+                "idempotency_key": format!("runtime-resume:{run_id}:{concurrency_version}"),
+            }
+        ]),
+    ))
+    .await
+    .context("resume governed ai_agent_run through checked lifecycle")?;
+    Ok(())
+}
+
+pub async fn load_run_key(
+    stdb: &StdbClient,
+    org_id: u64,
+    company_id: u64,
+    run_id: u64,
+) -> Result<String> {
+    let rows = stdb
+        .query_sql(&format!(
+            "SELECT run_key, status FROM ai_agent_run WHERE organization_id = {org_id}              AND company_id = {company_id} AND id = {run_id} LIMIT 1"
+        ))
+        .await
+        .context("load resumable ai_agent_run")?;
+    let row = rows.first().context("resumable run not found")?;
+    let status = row
+        .get("status")
+        .and_then(Value::as_str)
+        .context("resumable run status missing")?;
+    if !matches!(status, "running" | "awaiting_approval" | "agent_settled") {
+        anyhow::bail!("run status '{status}' is not resumable");
+    }
+    row.get("runKey")
+        .or_else(|| row.get("run_key"))
+        .and_then(Value::as_str)
+        .map(str::to_string)
+        .context("resumable run key missing")
+}
+
 pub async fn set_run_wait_state(
     stdb: &StdbClient,
     org_id: u64,

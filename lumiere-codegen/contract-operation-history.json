@@ -142,6 +142,10 @@
       "name": "add_workflow_human_task_comment",
       "shape_fingerprint": "sha256:7fe2eb4d4c384b9d26f86997d4161c070f33a3299212a1df165e3864543084b6"
     },
+    "erp.advance_ai_run_checkpoint": {
+      "name": "advance_ai_run_checkpoint",
+      "shape_fingerprint": "sha256:e15fdf4587527095645ec3ea69aad7e8372abe9cbd2dd115453846d129f0252b"
+    },
     "erp.advance_subscription_dunning": {
       "name": "advance_subscription_dunning",
       "shape_fingerprint": "sha256:d724ae524f8aecb34eb7817a4c0f2d11a71bbb434e7cde5066990ad4292ee56b"
@@ -212,7 +216,7 @@
     },
     "erp.apply_pending_expense_integration_intents": {
       "name": "apply_pending_expense_integration_intents",
-      "shape_fingerprint": "sha256:bec1fe26b7ba51433a96f53cdfe1c2dec3b22b07a5200e4ccfe872817c4b0c6c"
+      "shape_fingerprint": "sha256:5848172f6f16be9f6e2a6ffa9904b40426c3977bfd5f3ab41b7a1e8c35cfd51b"
     },
     "erp.apply_pending_hr_integration_intents": {
       "name": "apply_pending_hr_integration_intents",
@@ -330,6 +334,10 @@
       "name": "archive_payment_account",
       "shape_fingerprint": "sha256:659d9d25b37a2268fb492284c478c63f785fe903f3c1a652f8e590d717269b26"
     },
+    "erp.ask_ai_run_question": {
+      "name": "ask_ai_run_question",
+      "shape_fingerprint": "sha256:34c4701fcd91d7dc570520d03b9f9900cb5e90079dc761a10866f59c672e9b3a"
+    },
     "erp.assign_benefit_enrollment": {
       "name": "assign_benefit_enrollment",
       "shape_fingerprint": "sha256:08238be5d4ffff0cd13e95c993400b8127041e2512dfe293373827d4295f2d94"
@@ -382,6 +390,10 @@
       "name": "audit_manufacturing_data",
       "shape_fingerprint": "sha256:74c9d3c2fa8e3562af7aa35b9f630e99127d223294c420b5bc277d462c0669f7"
     },
+    "erp.authorize_ai_run_fork": {
+      "name": "authorize_ai_run_fork",
+      "shape_fingerprint": "sha256:f507ef45f869d2b9e5a795912cfcdae188fd76729cdf2b8b6af73b85aa28af9d"
+    },
     "erp.award_purchase_rfq_bid": {
       "name": "award_purchase_rfq_bid",
       "shape_fingerprint": "sha256:7e45fab9a23461190580a272bd8d715a476aedcd0abfb4d3b57994c775018e3c"
@@ -417,6 +429,10 @@
     "erp.bill_timesheets": {
       "name": "bill_timesheets",
       "shape_fingerprint": "sha256:a2a123c517df931d317783bb93afbd0fad7371d5737e4d70061209a99fbe9fb1"
+    },
+    "erp.bind_ai_artifact_component": {
+      "name": "bind_ai_artifact_component",
+      "shape_fingerprint": "sha256:7e3bb4d421a647cab48d87a32149bd4fb193f0f6a190db0dabb7a32656f049f8"
     },
     "erp.bind_password_reset_token": {
       "name": "bind_password_reset_token",
@@ -476,7 +492,7 @@
     },
     "erp.cancel_message_batch": {
       "name": "cancel_message_batch",
-      "shape_fingerprint": "sha256:93c133ece5077eff5205c8fc984aa50fc2fc05aa7d9f8e9504a2e5715a4b580d"
+      "shape_fingerprint": "sha256:48abbabe91a552949c1b2d77667b6417f97f48ba337671378181b89929e998b9"
     },
     "erp.cancel_payment": {
       "name": "cancel_payment",
@@ -550,13 +566,17 @@
       "name": "check_mo_availability",
       "shape_fingerprint": "sha256:47179d1ac938dda3e46befefa6fd5b7e655347f24b24342631e26e574d67c0b5"
     },
+    "erp.claim_ai_capability_execution": {
+      "name": "claim_ai_capability_execution",
+      "shape_fingerprint": "sha256:b0258ed27ba5c8ffd1f86c86d0f1611b9dd05d8b6c5ea74d8c9f6ed039d8f093"
+    },
     "erp.claim_ai_skill_certification": {
       "name": "claim_ai_skill_certification",
       "shape_fingerprint": "sha256:b43bd1bbaab2432f113ac15b8c4ee7f5780042fc64aea6445523dd6b0b2f8dc9"
     },
     "erp.claim_hub_with_token": {
       "name": "claim_hub_with_token",
-      "shape_fingerprint": "sha256:5f773f34a0186ea74f2c78561aec1fac6719a505c50dec091971c9b5a2edf8d2"
+      "shape_fingerprint": "sha256:dd51f85d90d3a948fd786d1e2f2e77d8e53d9f0ab7b09ff025aabef6b54d5c49"
     },
     "erp.claim_queue_job": {
       "name": "claim_queue_job",
@@ -649,6 +669,10 @@
     "erp.close_ticket": {
       "name": "close_ticket",
       "shape_fingerprint": "sha256:70bf14c86b5721f074f4c9204af7aafed69a98e10a9e5ad8c9638abd083d24c4"
+    },
+    "erp.compare_ai_runs_checked": {
+      "name": "compare_ai_runs_checked",
+      "shape_fingerprint": "sha256:e8875e8f81e8b2575a8ae578792ae83f41604167923143445510e2db9fbed62b"
     },
     "erp.complete_activity": {
       "name": "complete_activity",
@@ -826,6 +850,10 @@
       "name": "convert_purchase_requisition_to_po",
       "shape_fingerprint": "sha256:1065e9199b5420f9d4e646b79a7b7c7da4d7a7b8ed786e03bc2d1129c4e1e111"
     },
+    "erp.correct_ai_decision_case": {
+      "name": "correct_ai_decision_case",
+      "shape_fingerprint": "sha256:07e90af63394cbf609437d6a89a8626390a0487ee750d216b76ef4f31202ecd3"
+    },
     "erp.create_account_account": {
       "name": "create_account_account",
       "shape_fingerprint": "sha256:d17636904b820183bff4f7998f7e8ee6ab9b7469a2e2e943369a08ffacbb252b"
@@ -901,6 +929,10 @@
     "erp.create_ai_insight": {
       "name": "create_ai_insight",
       "shape_fingerprint": "sha256:925e19dd09922970461d2946e70fc77982cc0d5a16fce28bbd6a789c3258db00"
+    },
+    "erp.create_ai_knowledge_entry": {
+      "name": "create_ai_knowledge_entry",
+      "shape_fingerprint": "sha256:782e9ec2ac4c3fe43c97cb7a1168aa41215af40389ac8b3c3bed4f4503e066f8"
     },
     "erp.create_ai_reducer_allowlist": {
       "name": "create_ai_reducer_allowlist",
@@ -1364,7 +1396,7 @@
     },
     "erp.create_operational_message": {
       "name": "create_operational_message",
-      "shape_fingerprint": "sha256:cc1b717ef65873a9c0e95a410bcaeb7cc657229d5bc56b411c9e9efe328a5b83"
+      "shape_fingerprint": "sha256:a4fd0512c87e6bdef2c58afcb7023c807fc4b7ea5345bd4b9e022343dde130c5"
     },
     "erp.create_opportunity": {
       "name": "create_opportunity",
@@ -1906,6 +1938,10 @@
       "name": "delete_account_reconciliation_widget",
       "shape_fingerprint": "sha256:d2993c01a0b53d5921d2abafc367ba0a929029914eceab380735bcb1d4e41a3a"
     },
+    "erp.delete_ai_capability_role_grant": {
+      "name": "delete_ai_capability_role_grant",
+      "shape_fingerprint": "sha256:11e7ff10561232ec14a05b6d86533782075448d319db9450290725d89367b1e2"
+    },
     "erp.delete_ai_reducer_allowlist": {
       "name": "delete_ai_reducer_allowlist",
       "shape_fingerprint": "sha256:a6aee3ae7b35081442f54f187e2b0bc0517c7a89dd20008a53943829b81f04d3"
@@ -2302,6 +2338,10 @@
       "name": "fire_workflow_timer",
       "shape_fingerprint": "sha256:b3f00d7bf49306f59a745a7bb5a47f9ef665656904524c4fc777262cda8f356c"
     },
+    "erp.fork_ai_run_checked": {
+      "name": "fork_ai_run_checked",
+      "shape_fingerprint": "sha256:954af3c1bf9beb6bb563cfd14c21fb325db382257fd8660599660eb18934daca"
+    },
     "erp.generate_eu_vat_report": {
       "name": "generate_eu_vat_report",
       "shape_fingerprint": "sha256:d8bcfc18c9d60a4896480d2c564d9f0dc557f5f88dae12b54b46689edccdd9f8"
@@ -2606,9 +2646,21 @@
       "name": "init",
       "shape_fingerprint": "sha256:6c6931988a41f6aba1e5402481f996da9ce28a569be93ff84fe25c1ee93558d5"
     },
+    "erp.initialize_ai_run_lifecycle": {
+      "name": "initialize_ai_run_lifecycle",
+      "shape_fingerprint": "sha256:441101bbf7c888dfbf03fa8418aef6f863bf869bf26dbab200392e78eba7a581"
+    },
     "erp.initialize_default_form_configs": {
       "name": "initialize_default_form_configs",
       "shape_fingerprint": "sha256:40cfd7ca862b8c0523d6eea754b5e4d867400f57ad96b79340ab5ddef824aa73"
+    },
+    "erp.inspect_ai_evidence_source_version": {
+      "name": "inspect_ai_evidence_source_version",
+      "shape_fingerprint": "sha256:d00ff425cbce1ef6c01573742b37f3c03676e9961b6807af84d621829105a138"
+    },
+    "erp.interrupt_ai_run": {
+      "name": "interrupt_ai_run",
+      "shape_fingerprint": "sha256:2e62a765ac7b3ec70edcada471d0797b42254443d9f844a27743d3492451324b"
     },
     "erp.invalidate_workflow_human_task": {
       "name": "invalidate_workflow_human_task",
@@ -2730,6 +2782,10 @@
       "name": "move_stock_quant",
       "shape_fingerprint": "sha256:9d27f79ff300cf692d1e28f7b1cb04d171fd3929f81a0c32d844c840b21e801c"
     },
+    "erp.nominate_ai_knowledge_entry_version": {
+      "name": "nominate_ai_knowledge_entry_version",
+      "shape_fingerprint": "sha256:adf0f65a42beff13170e95e91aea5e14272bc960de0f5f388398c8e7b677142b"
+    },
     "erp.open_account_period": {
       "name": "open_account_period",
       "shape_fingerprint": "sha256:fcab87d692ba3c9944707e5c17714e5ae66e0d21737301c01bd1153c6fbbea0a"
@@ -2850,9 +2906,25 @@
       "name": "project_user_profile",
       "shape_fingerprint": "sha256:e2bed41bebcae2e5af6da2b8a383b7f780ec71b089065c4cedd76993b619b6d7"
     },
+    "erp.promote_ai_decision_pattern": {
+      "name": "promote_ai_decision_pattern",
+      "shape_fingerprint": "sha256:bc64da8a8a6cd23414674bdf47b1fc64e2cea6ede4d0febc2793d419763adca2"
+    },
     "erp.promote_ai_skill_version": {
       "name": "promote_ai_skill_version",
       "shape_fingerprint": "sha256:105d3e620bfefe71bff55091eff19d018fd2a500a7246584c5e9cf80f5c34944"
+    },
+    "erp.propose_ai_decision_pattern": {
+      "name": "propose_ai_decision_pattern",
+      "shape_fingerprint": "sha256:5d13f53417341d2963a783bc558a7dac132b0bad2e0889198c150c9497c07e45"
+    },
+    "erp.propose_ai_knowledge_entry_version": {
+      "name": "propose_ai_knowledge_entry_version",
+      "shape_fingerprint": "sha256:58128fa835756eb60cad67c08ba4acbd2fb3ea40c9e4141a4b631869d310a2c3"
+    },
+    "erp.propose_ai_knowledge_skill_promotion": {
+      "name": "propose_ai_knowledge_skill_promotion",
+      "shape_fingerprint": "sha256:047a225f62b14dfef36627ce86335148ceb16eb6053861121ceded4664868b83"
     },
     "erp.publish_form_configuration": {
       "name": "publish_form_configuration",
@@ -2930,6 +3002,10 @@
       "name": "reconcile_ai_provider_attempt",
       "shape_fingerprint": "sha256:4e459f9002ce56c056332829823f4364b0a95c2f8b9d718872426bb86d4aac22"
     },
+    "erp.reconcile_ai_run_effect": {
+      "name": "reconcile_ai_run_effect",
+      "shape_fingerprint": "sha256:01afae8315372b076fd9d910e487b32fe3c6373b991bb88ca1177365ccd2adbb"
+    },
     "erp.reconcile_payment_with_invoice": {
       "name": "reconcile_payment_with_invoice",
       "shape_fingerprint": "sha256:6345d3da1ed5816697431dc61bed725044a9c28c20fa028de42091e110fc8b75"
@@ -2938,9 +3014,77 @@
       "name": "record_ai_agent_run_policy_snapshot",
       "shape_fingerprint": "sha256:4e24461cc5be7cc1f60f52c5f0c6d69116f2d9715dc8f22229ac65f83066e967"
     },
+    "erp.record_ai_capability_execution_result": {
+      "name": "record_ai_capability_execution_result",
+      "shape_fingerprint": "sha256:5a4559d33f8cc3d8a978dfb7a4cfeacc64a2270b260e36ef7b64ad520019ab2e"
+    },
+    "erp.record_ai_decision_case": {
+      "name": "record_ai_decision_case",
+      "shape_fingerprint": "sha256:f8cd8c7ffb62414186d29fdec5fa403a3c501929a8f68dd19a3b32b9358608cd"
+    },
+    "erp.record_ai_decision_event": {
+      "name": "record_ai_decision_event",
+      "shape_fingerprint": "sha256:4f09a0f22c501981f1d75d9ca332ad95b258651e512129879aec45b48966e46c"
+    },
+    "erp.record_ai_decision_shadow_event": {
+      "name": "record_ai_decision_shadow_event",
+      "shape_fingerprint": "sha256:d18bb9c230cf6fa3fb66fa14fabfeb5cf301fc09ac159ca2e6c4dfd1d738f82a"
+    },
+    "erp.record_ai_deterministic_shadow_event": {
+      "name": "record_ai_deterministic_shadow_event",
+      "shape_fingerprint": "sha256:7229b3dbfa9aedf1af1beb619d7e4a3f577ab554a869d54ba3ce9e20c197e804"
+    },
+    "erp.record_ai_evidence_claim": {
+      "name": "record_ai_evidence_claim",
+      "shape_fingerprint": "sha256:0b57cf9b13c540bbecc8f946707d89c9e936416236836e0a89fa6c0e3084f054"
+    },
+    "erp.record_ai_evidence_contribution": {
+      "name": "record_ai_evidence_contribution",
+      "shape_fingerprint": "sha256:915b399341954fa5f5e21298ec96164a54d57e2781a5c534c9c92bec3d561e5a"
+    },
+    "erp.record_ai_evidence_decision": {
+      "name": "record_ai_evidence_decision",
+      "shape_fingerprint": "sha256:bc1fad453c79c4f9045a988fcec800769569b7c084d56fa46a29e5e9f3e1c7b9"
+    },
+    "erp.record_ai_evidence_passage": {
+      "name": "record_ai_evidence_passage",
+      "shape_fingerprint": "sha256:fc7e608bfd7198a11da1cb768a5f615e69d79d3a8b487d2096ec0b2985bf806b"
+    },
+    "erp.record_ai_evidence_source": {
+      "name": "record_ai_evidence_source",
+      "shape_fingerprint": "sha256:36976e36056bc5fc6842757998e11c9b0639241b960c39c0d90e74275a6c2034"
+    },
+    "erp.record_ai_evidence_source_change": {
+      "name": "record_ai_evidence_source_change",
+      "shape_fingerprint": "sha256:4c6ce970d7941bea9ab98959ee8a5058aa2b2fad0ed863fa7455711a6e938cb9"
+    },
+    "erp.record_ai_evidence_source_version": {
+      "name": "record_ai_evidence_source_version",
+      "shape_fingerprint": "sha256:fd1f0a54e98a74c96785849cbb4bd2e2579f1f099cece07938db18b794f35a35"
+    },
+    "erp.record_ai_graduation_authority_rollback": {
+      "name": "record_ai_graduation_authority_rollback",
+      "shape_fingerprint": "sha256:c309b5644c73f7637e854986df72ffce36f45cab69f88e2f1af7797077b7e6e5"
+    },
+    "erp.record_ai_program_checkpoint": {
+      "name": "record_ai_program_checkpoint",
+      "shape_fingerprint": "sha256:ef643d2325ff5222878795312a68f94f0a513615d0f82d7f8047a2493687bbd9"
+    },
     "erp.record_ai_provider_attempt_result": {
       "name": "record_ai_provider_attempt_result",
       "shape_fingerprint": "sha256:09db7ff12487a9b08d83e332fe016f5abd6c489c8ecef611fc58a8fcede78fe2"
+    },
+    "erp.record_ai_reasoning_event": {
+      "name": "record_ai_reasoning_event",
+      "shape_fingerprint": "sha256:f31715cfc6918f6eaa25bac30d31fa5782e223ffbe9776e2719ca0e4c2bf0cab"
+    },
+    "erp.record_ai_run_effect": {
+      "name": "record_ai_run_effect",
+      "shape_fingerprint": "sha256:24b216911536caef0f4f65340070899d76bc0f6c851d6e79e69c1fbce680ecbe"
+    },
+    "erp.record_ai_run_review": {
+      "name": "record_ai_run_review",
+      "shape_fingerprint": "sha256:628597bd05508fe6775403223b4362113e2e0442468931eab34eaa0f411a280e"
     },
     "erp.record_ai_spend": {
       "name": "record_ai_spend",
@@ -2988,7 +3132,7 @@
     },
     "erp.record_message_copied": {
       "name": "record_message_copied",
-      "shape_fingerprint": "sha256:6f43f86c3209687d2a0511de47c7c46012ad7e13801b75a23e92a9de9fc21551"
+      "shape_fingerprint": "sha256:30f54d4805aa8932bc631415ba31628a1fa518b28ae4b959c1066c2d4e75be64"
     },
     "erp.record_payroll_export_result": {
       "name": "record_payroll_export_result",
@@ -3093,6 +3237,22 @@
     "erp.refuse_leave": {
       "name": "refuse_leave",
       "shape_fingerprint": "sha256:fc49d28b5657a1f1d1c94049df6554969939ff489d5265079ad5068ffad977a5"
+    },
+    "erp.register_ai_calibration_profile": {
+      "name": "register_ai_calibration_profile",
+      "shape_fingerprint": "sha256:64b05a263b2191635ef4f1559e3eae4bb72870941f80a4a056b4f35222a0544a"
+    },
+    "erp.register_ai_decision_type": {
+      "name": "register_ai_decision_type",
+      "shape_fingerprint": "sha256:7e6a045a06d0374fda41236bb2b3e2c941bc7ca7cb4677713f64e3bcceb0f7e9"
+    },
+    "erp.register_ai_intelligence_policy": {
+      "name": "register_ai_intelligence_policy",
+      "shape_fingerprint": "sha256:66a98b4270470cac5a55138188b65ef8518c3f33ee9224d589bb2adc0f945df6"
+    },
+    "erp.register_ai_model_profile": {
+      "name": "register_ai_model_profile",
+      "shape_fingerprint": "sha256:c21e44f0b76278baddc7eaa6f08597a9c2c59d76763b53ef73848ff47883b2d6"
     },
     "erp.register_ai_skill_certification_runtime_profile": {
       "name": "register_ai_skill_certification_runtime_profile",
@@ -3210,6 +3370,10 @@
       "name": "replace_contact_categories",
       "shape_fingerprint": "sha256:a3413724fede12325724bcedb846b780e4c5df9dce912a72171fc06d5641c1d8"
     },
+    "erp.reply_ai_run_question": {
+      "name": "reply_ai_run_question",
+      "shape_fingerprint": "sha256:077ddf3a1ca5d74325e319cbc086a3bc926a1b80003b054b4dac4fc752b9d50d"
+    },
     "erp.request_ai_skill_certification": {
       "name": "request_ai_skill_certification",
       "shape_fingerprint": "sha256:8191146e81b74b3f2c24515ce0ce3771a698d8d0fc43f09b716b677401dc5b04"
@@ -3237,6 +3401,10 @@
     "erp.reset_leave_to_draft": {
       "name": "reset_leave_to_draft",
       "shape_fingerprint": "sha256:c7a13b03c787a0cad24105097f71e0263ec124fbb1115a4f6dec15c2e8c64f17"
+    },
+    "erp.resolve_ai_evidence_dependency": {
+      "name": "resolve_ai_evidence_dependency",
+      "shape_fingerprint": "sha256:4ebbec7da0acd9856f646fb0865d4cfe40f7fcd16e966834fa3027606c0b5e7b"
     },
     "erp.resolve_inventory_audit_violation": {
       "name": "resolve_inventory_audit_violation",
@@ -3270,6 +3438,10 @@
       "name": "restore_proposal_version",
       "shape_fingerprint": "sha256:4b2ba3d523146b998bec4f4f4684235362fe48818e901a867fca3a37773c1c73"
     },
+    "erp.resume_ai_run_checked": {
+      "name": "resume_ai_run_checked",
+      "shape_fingerprint": "sha256:5301f7bb2eb84963c29c8dc58f4a3a76041738b24a725a3b6c28945ccdebbc32"
+    },
     "erp.resume_subscription": {
       "name": "resume_subscription",
       "shape_fingerprint": "sha256:fc8e7757e737e3c77372adb791f4da210f15f0842a1ae1cf2dd1172f554dd374"
@@ -3298,6 +3470,26 @@
       "name": "reverse_sale_commission_settlement",
       "shape_fingerprint": "sha256:262236cf86c70013286c4489dffedabce647cf924fc77dd954beb8aa222a8d96"
     },
+    "erp.review_ai_artifact_component_links": {
+      "name": "review_ai_artifact_component_links",
+      "shape_fingerprint": "sha256:6c3626892fc08270c598b5251f10624a499a0efbd04d8c1ebb13ebc6feb8e1b5"
+    },
+    "erp.review_ai_evidence_claim": {
+      "name": "review_ai_evidence_claim",
+      "shape_fingerprint": "sha256:3fd3dd731d9d191c9e4a7179c9d13ee11b23fbbb4d7b745629bd93e369628180"
+    },
+    "erp.review_ai_evidence_decision": {
+      "name": "review_ai_evidence_decision",
+      "shape_fingerprint": "sha256:22489cc93d669b40eebbfb54d69bb58379d4e027b0aed20a3f1e16dfd8d1ad3e"
+    },
+    "erp.review_ai_knowledge_entry_version": {
+      "name": "review_ai_knowledge_entry_version",
+      "shape_fingerprint": "sha256:5c14cb0a5f4aa1845fbc452f8231c6d9d8bcfec2415e71a56026878e1b3cc039"
+    },
+    "erp.review_ai_knowledge_skill_promotion": {
+      "name": "review_ai_knowledge_skill_promotion",
+      "shape_fingerprint": "sha256:29842751a428bdcc600ccb6925f57bc9d7b5c5587a60cdd900970534a0ab26f5"
+    },
     "erp.review_message_batch": {
       "name": "review_message_batch",
       "shape_fingerprint": "sha256:2699545202ed4be2a1b62be3b16bb9c3221d4cc1c1664a62e911d0eac2f4b8a2"
@@ -3305,6 +3497,10 @@
     "erp.review_supplier_intake": {
       "name": "review_supplier_intake",
       "shape_fingerprint": "sha256:aea36f2d54825c4dadc6a4ae4eaae92b185c3f33daa87e40926e086da0257fef"
+    },
+    "erp.revise_ai_artifact_component": {
+      "name": "revise_ai_artifact_component",
+      "shape_fingerprint": "sha256:6dc2e06674980b054f13633eaf7a3276647b51a859157f71c9954fac46c80580"
     },
     "erp.revoke_delegated_admin_scope": {
       "name": "revoke_delegated_admin_scope",
@@ -3394,6 +3590,10 @@
       "name": "run_accounting_trial_balance_test",
       "shape_fingerprint": "sha256:d8e5a5332d74132ba28ab910c330b531a2de79e35900d8cbcaa6c5f4001c1f75"
     },
+    "erp.run_ai_capability_grants_tests": {
+      "name": "run_ai_capability_grants_tests",
+      "shape_fingerprint": "sha256:f0d1fbbed33ca6bfff84f385ac0d62f207f08604f700b5c4463761d1facd9345"
+    },
     "erp.run_ai_document_processing_job_document_relation_test": {
       "name": "run_ai_document_processing_job_document_relation_test",
       "shape_fingerprint": "sha256:630a2df238b02f569e73259fcbc6abb30a54657aaa81f42e84601a9d71607240"
@@ -3402,9 +3602,17 @@
       "name": "run_ai_embedding_org_isolation_test",
       "shape_fingerprint": "sha256:bd95b68fde4de891c0c0d1ce1912b6ca20c9497ce0355ff28dcee1b2ecd7cd6d"
     },
+    "erp.run_ai_evidence_provenance_tests": {
+      "name": "run_ai_evidence_provenance_tests",
+      "shape_fingerprint": "sha256:d0a1f659c512863f2fd9e9e5fc36288046760a7c9e5d258d4175334a54b27b29"
+    },
     "erp.run_ai_insight_org_scope_test": {
       "name": "run_ai_insight_org_scope_test",
       "shape_fingerprint": "sha256:e8a719684899e910da044dd33057e9571ae459d6ebba6e0af975311a7d7675a9"
+    },
+    "erp.run_ai_intelligence_events_tests": {
+      "name": "run_ai_intelligence_events_tests",
+      "shape_fingerprint": "sha256:2071b25e5137007b1b695f0c7974cd3d11b81b2d33bb373ff4a274c52f890a79"
     },
     "erp.run_all_accounting_tests": {
       "name": "run_all_accounting_tests",
@@ -4230,6 +4438,62 @@
       "name": "set_ai_agent_run_wait_state",
       "shape_fingerprint": "sha256:49d8b6218c9517822d06c6b66da945eb67000f28670d47f21576156f543cecc9"
     },
+    "erp.set_ai_calibration_profile_active": {
+      "name": "set_ai_calibration_profile_active",
+      "shape_fingerprint": "sha256:cead25b3f43a4aeebf72bb17b9ac9a31f3d66827621ed04be73a218e18519d08"
+    },
+    "erp.set_ai_capability_role_grant": {
+      "name": "set_ai_capability_role_grant",
+      "shape_fingerprint": "sha256:271fdafa07299307df39d8c5040c51d51392a29d5bec5d2652335ebda6ab3c37"
+    },
+    "erp.set_ai_decision_case_outcome": {
+      "name": "set_ai_decision_case_outcome",
+      "shape_fingerprint": "sha256:1ed824d692b1f85cf80e7656bdeff24fdaa357a65e35d368648bed97ec799947"
+    },
+    "erp.set_ai_decision_case_status": {
+      "name": "set_ai_decision_case_status",
+      "shape_fingerprint": "sha256:c4d1c5cb4e889f2b9ceaf7095a5b1f1954fe815946430d0429c809d52b22f92a"
+    },
+    "erp.set_ai_decision_case_verification": {
+      "name": "set_ai_decision_case_verification",
+      "shape_fingerprint": "sha256:dab5ea47ed71eed43af48fd4fd6d3477ac9ffba1e86c99fc17c4491cfe7ef67d"
+    },
+    "erp.set_ai_decision_pattern_status": {
+      "name": "set_ai_decision_pattern_status",
+      "shape_fingerprint": "sha256:e8db2eacb8446a29901571cedf38cfafe3afe9198a933ac19ded82a4daeca01b"
+    },
+    "erp.set_ai_decision_type_active": {
+      "name": "set_ai_decision_type_active",
+      "shape_fingerprint": "sha256:64603be2b1595581e850aa551db7435b36a0f3f5760c38aac5d1f58dd2307d45"
+    },
+    "erp.set_ai_evidence_passage_status": {
+      "name": "set_ai_evidence_passage_status",
+      "shape_fingerprint": "sha256:aa1349d00bcef83b9dcef24e5d7c5a325647c094b80af005d595af728bff00cf"
+    },
+    "erp.set_ai_intelligence_event_acceptance": {
+      "name": "set_ai_intelligence_event_acceptance",
+      "shape_fingerprint": "sha256:b5250d758d55ff080b97202549db9abfebdc455ccf25fd92c734000eab05e0a6"
+    },
+    "erp.set_ai_intelligence_event_escalation": {
+      "name": "set_ai_intelligence_event_escalation",
+      "shape_fingerprint": "sha256:595e245ea3c96b932e7aaace89dc5afdeae370c3f4678de01b414c6615ce1e5f"
+    },
+    "erp.set_ai_intelligence_event_verification": {
+      "name": "set_ai_intelligence_event_verification",
+      "shape_fingerprint": "sha256:8618afefa1dc3aa9658b4cb721806404828925f686661db4f300bbd08e12857e"
+    },
+    "erp.set_ai_intelligence_policy_active": {
+      "name": "set_ai_intelligence_policy_active",
+      "shape_fingerprint": "sha256:90a128967cdf427405cbca077447a8e7ffb9624eddd0a08ba35cab2295be472d"
+    },
+    "erp.set_ai_knowledge_entry_version_state": {
+      "name": "set_ai_knowledge_entry_version_state",
+      "shape_fingerprint": "sha256:b9b910a6b8aad7bb8c801ecf87d74e38a5d306cfd18b6ef922c284abcf6b7235"
+    },
+    "erp.set_ai_model_profile_active": {
+      "name": "set_ai_model_profile_active",
+      "shape_fingerprint": "sha256:fb6226ca493c32c7bbff36fbdffe0ebd9562c44c1f257bc33ece4046e9071a18"
+    },
     "erp.set_ai_reducer_allowlist_enabled": {
       "name": "set_ai_reducer_allowlist_enabled",
       "shape_fingerprint": "sha256:8520c8ec8141779c6b78e90834a4d45fc394cb165819668d16385167a50788c4"
@@ -4277,10 +4541,6 @@
     "erp.set_contact_segment_rules": {
       "name": "set_contact_segment_rules",
       "shape_fingerprint": "sha256:d152e875fffa729f69fdaebf5a208141553bc0e10dd2a60df3d8862e0ab3a57e"
-    },
-    "erp.set_document_index_content": {
-      "name": "set_document_index_content",
-      "shape_fingerprint": "sha256:03406ed2bd42928114c28a6a6c7f128b9ab13e746730127dc6506f90298fcbc3"
     },
     "erp.set_document_retention": {
       "name": "set_document_retention",
@@ -4413,6 +4673,10 @@
     "erp.start_workorder": {
       "name": "start_workorder",
       "shape_fingerprint": "sha256:e44796f87f20b6f0f90484f4539f62b986d9db1579aa8d6140fbd412c384db69"
+    },
+    "erp.steer_ai_run": {
+      "name": "steer_ai_run",
+      "shape_fingerprint": "sha256:3302454599842ce001fac8c2a1c6d817d52cc8b496c0e65e3ee57cdda2d73308"
     },
     "erp.stop_timesheet_timer": {
       "name": "stop_timesheet_timer",
@@ -5321,6 +5585,7 @@
     "erp.link_workos_user",
     "erp.mark_reset_token_used",
     "erp.run_core_audit_finalize_test",
+    "erp.set_document_index_content",
     "erp.store_sso_user_credential",
     "erp.store_user_credential",
     "erp.test_finalize_deletes_on_checksum_match",
@@ -5330,38 +5595,7 @@
     "erp.test_finalize_rejects_unregistered_caller",
     "erp.update_user_password"
   ],
-  "compatibility_exceptions": [
-    {
-      "operation_id": "erp.apply_pending_expense_integration_intents",
-      "previous_fingerprint": "sha256:bec1fe26b7ba51433a96f53cdfe1c2dec3b22b07a5200e4ccfe872817c4b0c6c",
-      "current_fingerprint": "sha256:5848172f6f16be9f6e2a6ffa9904b40426c3977bfd5f3ab41b7a1e8c35cfd51b",
-      "reason": "restrict the batch drain to the registered expense integration worker and retire session exposure"
-    },
-    {
-      "operation_id": "erp.cancel_message_batch",
-      "previous_fingerprint": "sha256:93c133ece5077eff5205c8fc984aa50fc2fc05aa7d9f8e9504a2e5715a4b580d",
-      "current_fingerprint": "sha256:48abbabe91a552949c1b2d77667b6417f97f48ba337671378181b89929e998b9",
-      "reason": "expose authenticated message-batch cancellation through trusted server context"
-    },
-    {
-      "operation_id": "erp.claim_hub_with_token",
-      "previous_fingerprint": "sha256:5f773f34a0186ea74f2c78561aec1fac6719a505c50dec091971c9b5a2edf8d2",
-      "current_fingerprint": "sha256:dd51f85d90d3a948fd786d1e2f2e77d8e53d9f0ab7b09ff025aabef6b54d5c49",
-      "reason": "issue a hashed post-pair hub credential through the registered IoT gateway and retire interactive session exposure"
-    },
-    {
-      "operation_id": "erp.create_operational_message",
-      "previous_fingerprint": "sha256:cc1b717ef65873a9c0e95a410bcaeb7cc657229d5bc56b411c9e9efe328a5b83",
-      "current_fingerprint": "sha256:a4fd0512c87e6bdef2c58afcb7023c807fc4b7ea5345bd4b9e022343dde130c5",
-      "reason": "expose authenticated operational-message creation through trusted server context"
-    },
-    {
-      "operation_id": "erp.record_message_copied",
-      "previous_fingerprint": "sha256:6f43f86c3209687d2a0511de47c7c46012ad7e13801b75a23e92a9de9fc21551",
-      "current_fingerprint": "sha256:30f54d4805aa8932bc631415ba31628a1fa518b28ae4b959c1066c2d4e75be64",
-      "reason": "expose authenticated message copy acknowledgement through trusted server context"
-    }
-  ],
+  "compatibility_exceptions": [],
   "revisions": [
     {
       "previous_release": "v0.3.33",
@@ -5394,6 +5628,38 @@
       "current_operations_fingerprint": "sha256:584b54b54c83392e0fdc6dfeebfca33d72f8af7c55823cbcbbde939c62d4ce40",
       "operation_count": 1327,
       "reason": "add run wait states and durable provider attempt reducers on top of the released v0.3.44 baseline; preserve existing operation baselines and compatibility exceptions"
+    },
+    {
+      "previous_release": "v0.3.47",
+      "previous_ir_sha256": "sha256:620d492a3cfd506e11661dae4e0641e279442ba384e36799dd01d669bec0b71d",
+      "previous_operations_fingerprint": "sha256:584b54b54c83392e0fdc6dfeebfca33d72f8af7c55823cbcbbde939c62d4ce40",
+      "current_operations_fingerprint": "sha256:541b8dc7b12a4abd662b604c48faa21fbd9cbb4d6a3d2086471ccd64f337cf60",
+      "operation_count": 1353,
+      "reason": "add durable GP-03 capability-execution recovery, GP-09 calibration profile registration, governed model/intelligence-policy config reducers, and the ai_capability_role_grant delete/set operations staged by prior harness work on this branch, on top of the released v0.3.47 baseline; preserve existing operation baselines and compatibility exceptions"
+    },
+    {
+      "previous_release": "v0.3.48",
+      "previous_ir_sha256": "sha256:a6488e3c53a0cbad15d1b2ba1ebe3452c041b567a07e9c6eeeae6852d18ee54e",
+      "previous_operations_fingerprint": "sha256:541b8dc7b12a4abd662b604c48faa21fbd9cbb4d6a3d2086471ccd64f337cf60",
+      "current_operations_fingerprint": "sha256:ef7405f3da51da1e40be486c0aa71f3eff5911c07b024164705bac009a7b099d",
+      "operation_count": 1382,
+      "reason": "add AIH-13 to AIH-18 evidence, provenance, knowledge and reviewed knowledge-to-skill promotion reducers (source, version, passage, contribution, claim, decision, artifact component, dependency, source change, knowledge entry, promotion proposal and independent review) and record already-shipped governed-intelligence reducers (run review, program checkpoint, shadow events, authority rollback, pattern promotion) on top of the released v0.3.48 baseline; every existing operation shape is unchanged"
+    },
+    {
+      "previous_release": "v0.3.49",
+      "previous_ir_sha256": "sha256:3e9de49666988c0ce8f403206f1b43e2fc77b8b2b4eae5564e6bacb0d9db6883",
+      "previous_operations_fingerprint": "sha256:ef7405f3da51da1e40be486c0aa71f3eff5911c07b024164705bac009a7b099d",
+      "current_operations_fingerprint": "sha256:2aee1fca0a9d32659d7d4e82d1b303c4abebd4f544f645082f04aabff1dff7ca",
+      "operation_count": 1381,
+      "reason": "retire caller-supplied document index content and its session reducer; document evidence now comes only from server-owned blob ingestion"
+    },
+    {
+      "previous_release": "v0.3.50",
+      "previous_ir_sha256": "sha256:1bd237851f97fadab4fd3e977cd1b154624de33404566ec9de33a2b0f67ec80a",
+      "previous_operations_fingerprint": "sha256:2aee1fca0a9d32659d7d4e82d1b303c4abebd4f544f645082f04aabff1dff7ca",
+      "current_operations_fingerprint": "sha256:5e80c2c5883a8f20c7ac213650d219897d4a7a38fabcaecfbd8de06e70b47886",
+      "operation_count": 1393,
+      "reason": "add durable governed-run lifecycle reducers with checked continuation, questions, steering, fork authorization, comparison and effect reconciliation on top of the released v0.3.50 baseline; preserve every existing operation shape"
     }
   ]
 }

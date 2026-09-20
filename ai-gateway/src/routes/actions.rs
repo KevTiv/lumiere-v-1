@@ -13,6 +13,14 @@ use crate::{
         fetch_authorized_live_snapshots, filter_entity_refs_by_allowed_types, ActorCredentials,
         EntityRef, LiveSnapshot,
     },
+    orchestrator::{
+        intelligence::EvidenceRef,
+        output_gate::{
+            admit_structured_output, persist_or_withhold_generated_output, GeneratedOutputDraft,
+            PublicationIdentity,
+        },
+        text_answer_gate::{TextAnswerProvenance, TextAnswerVerification, TextEvidence},
+    },
     providers::llm::LlmMessage,
     state::AppState,
 };
@@ -69,6 +77,12 @@ pub struct ActionDraft {
     pub warnings: Vec<String>,
     pub summary: String,
     pub elevated: bool,
+    /// Admission for the human-facing explanation only. Params remain an
+    /// advisory pending draft and are never execution authority.
+    pub explanation_verification: TextAnswerVerification,
+    /// Claim-level evidence selected for the explanation. This never grants
+    /// execution authority to the pending draft.
+    pub explanation_provenance: TextAnswerProvenance,
 }
 
 #[derive(Debug, Serialize)]
@@ -287,6 +301,17 @@ fn parse_llm_drafts(
             warnings,
             summary,
             elevated: entry.elevated,
+            explanation_verification: TextAnswerVerification {
+                outcome: crate::orchestrator::text_answer_gate::TextAnswerOutcome::RequiresReview,
+                methods: vec!["deterministic"],
+                limitations: Vec::new(),
+                reason: Some(
+                    "explanation admission is performed at the output boundary".to_string(),
+                ),
+            },
+            explanation_provenance: TextAnswerProvenance::withheld(
+                "explanation admission is performed at the output boundary",
+            ),
         });
     }
 
@@ -623,6 +648,15 @@ fn draft_actions_stub(req: &ActionDraftRequest) -> Result<Vec<ActionDraft>, Stri
             entry.reducer_name
         ),
         elevated: entry.elevated,
+        explanation_verification: TextAnswerVerification {
+            outcome: crate::orchestrator::text_answer_gate::TextAnswerOutcome::RequiresReview,
+            methods: vec!["deterministic"],
+            limitations: Vec::new(),
+            reason: Some("explanation admission is performed at the output boundary".to_string()),
+        },
+        explanation_provenance: TextAnswerProvenance::withheld(
+            "explanation admission is performed at the output boundary",
+        ),
     }])
 }
 
@@ -653,6 +687,63 @@ pub async fn post_draft(
 
     if let Some(ref snapshots) = grounding_snapshots {
         enrich_drafts_with_grounding(&mut drafts, snapshots);
+    }
+
+    // Gate the prose before it can cross the BFF and be persisted by the
+    // client as an action-draft explanation. Live snapshots are server-owned
+    // evidence; the user/model request is not.
+    let mut evidence = TextEvidence::default();
+    evidence.add_user_text(&req.query);
+    if let Some(snapshots) = grounding_snapshots.as_deref() {
+        for snapshot in snapshots {
+            evidence.add_ref(
+                "live_snapshot",
+                format!("{}:{}", snapshot.entity_type, snapshot.entity_id),
+            );
+            evidence.add_json(&snapshot.row);
+            for relation in &snapshot.relations {
+                for row in &relation.rows {
+                    evidence.add_json(row);
+                }
+            }
+        }
+    }
+    let support_refs: Vec<EvidenceRef> = evidence.refs.clone();
+    let publication_id = uuid::Uuid::new_v4();
+    for (index, draft) in drafts.iter_mut().enumerate() {
+        let structured =
+            GeneratedOutputDraft::single_claim(draft.summary.clone(), support_refs.clone());
+        let mut gated = admit_structured_output(
+            req.org_id.unwrap_or_default(),
+            req.company_id,
+            &structured,
+            &evidence,
+        )
+        .await
+        .map_err(|error| {
+            AppError::Internal(format!("action-draft explanation gate failed: {error}"))
+        })?;
+        persist_or_withhold_generated_output(
+            &mut gated,
+            state.stdb.as_ref(),
+            state.spend_read_stdb.as_deref(),
+            PublicationIdentity {
+                organization_id: req.org_id.unwrap_or_default(),
+                company_id: req.company_id,
+                session_ref: format!("action-draft:{publication_id}:{}", index + 1),
+                event_ref: "action_draft_explanation".to_string(),
+                note: "action-draft explanation admitted by the publication gate".to_string(),
+            },
+        )
+        .await;
+        draft.explanation_verification = gated.verification.clone();
+        draft.explanation_provenance = gated.provenance;
+        if let Some(released) = gated.released {
+            draft.summary = released;
+        } else {
+            draft.summary =
+                "Action draft explanation withheld pending evidence review.".to_string();
+        }
     }
 
     tracing::info!(

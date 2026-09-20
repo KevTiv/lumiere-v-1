@@ -31,8 +31,34 @@ use crate::{
         skill_registry::SkillRegistry,
         ActorCredentials,
     },
+    orchestrator::governed_bootstrap::{bootstrap_governed_intelligence, GovernedBootstrapResult},
     state::AppState,
 };
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GatewayGovernedBootstrapRequest {
+    pub org_id: u64,
+    pub intelligence_policy_ref: Option<String>,
+}
+
+pub async fn post_governed_bootstrap(
+    State(state): State<AppState>,
+    Json(req): Json<GatewayGovernedBootstrapRequest>,
+) -> AppResult<Json<GovernedBootstrapResult>> {
+    if req.org_id == 0 {
+        return Err(AppError::BadRequest("org_id is required".into()));
+    }
+    let result = bootstrap_governed_intelligence(
+        state.stdb.as_ref(),
+        state.stdb.as_ref(),
+        req.org_id,
+        req.intelligence_policy_ref.as_deref(),
+    )
+    .await
+    .map_err(|error| AppError::Internal(error.to_string()))?;
+    Ok(Json(result))
+}
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -192,6 +218,7 @@ pub struct GatewayGovernedLlmSkillRequest {
     pub agent_id: Option<u64>,
     pub team_member_id: Option<u64>,
     pub max_steps: Option<u32>,
+    pub resume_run_id: Option<u64>,
     pub stdb_token: String,
     pub identity_hex: Option<String>,
     #[serde(default)]
@@ -252,6 +279,7 @@ async fn run_llm_route(
             agent_id: req.agent_id,
             team_member_id: req.team_member_id,
             max_steps: req.max_steps,
+            resume_run_id: req.resume_run_id,
         },
         req.company_id,
         policy,

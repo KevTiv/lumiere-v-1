@@ -746,12 +746,12 @@ export function AIChatPanel({
                           <div className="font-medium text-foreground/80 mb-0.5">{t("aiChat.sources")}</div>
                           <ul className="space-y-0.5 list-disc list-inside">
                             {(message.sources as ChatMessageSourceRef[]).map((src, i) => {
-                              const scope = src.entity_type ?? src.content_type ?? "ref"
+                              const scope = src.entity_type ?? src.source_kind ?? "ref"
                               const idLabel =
                                 src.entity_id != null && String(src.entity_id) !== ""
                                   ? String(src.entity_id)
-                                  : src.content_id != null
-                                    ? String(src.content_id)
+                                  : src.passage_id != null
+                                    ? String(src.passage_id)
                                     : null
                               const citationLabel =
                                 src.label ??

@@ -4,22 +4,119 @@ use serde_json::{json, Value};
 use std::sync::Arc;
 use uuid::Uuid;
 
+use super::{
+    agent_loop::{LoopLimits, LoopStop},
+    agent_loop_adapters::{
+        run_finalization, run_recorded_loop, AuthorizedLoopTools, RunFinalization,
+    },
+    answer_gate::{
+        DecisionClaimCoverageChecker, EvidenceBackedVerificationService,
+        EvidenceGatedAnswerAdmission, GatePolicy, GateScope, StdbPassageCatalog,
+    },
+    decision_graph::{DecisionGraph, DecisionNode, GateCondition},
+    decision_type::{DecisionTypeRegistry, StdbDecisionTypeRegistry},
+    evidence_inspector::Viewer,
+    evidence_recorder::{
+        AnswerEvidenceRecorder, RecordingAnswerAdmission, RunEvidenceScope, StdbEvidenceRecorder,
+    },
+    governed_program::{
+        graph_requests_generated_capabilities, BuiltinComputeService, GovernedProgramContext,
+        GovernedProgramExecutor, GovernedProgramStop, StdbIntelligenceEventRecorder,
+        StdbProgramCheckpointStore,
+    },
+    governed_programs::governed_program_for_skill,
+    governed_services::{
+        GovernedCapabilityService, PolicyBackedCapabilityAdmission, StdbApprovalCoordinator,
+        StdbExecutionRecovery, ToolsBackedCapabilityExecutor,
+    },
+    graduation::{
+        production_deterministic_candidates, GovernedDecisionResolver,
+        StdbAuthorityRollbackRecorder, StdbDecisionResolutionPolicy, StdbDriftMonitor,
+        StdbModelShadowRecorder,
+    },
+    intelligence::EvidenceRef,
+    intelligence_router::{
+        ConfiguredIntelligenceRouter, NoopShadowDecisionRecorder, RoutedDecisionProvider,
+        RoutedGenerationProvider, RoutedReasoningProvider, StdbShadowDecisionRecorder,
+    },
+    invocation_policy::ReviewedInvocationPolicy,
+    knowledge_context::{compile_knowledge_context, knowledge_entry_keys, merge_into_inputs},
+    model_configuration::{
+        IntelligenceRole, IntelligenceRouteResolver, StdbModelConfigurationStore,
+    },
+    output_gate::{
+        admit_structured_output, persist_or_withhold_generated_output, GeneratedOutputDraft,
+        PublicationIdentity,
+    },
+    precedent::StdbPrecedentStore,
+    probabilistic::{CalibrationProfileStore, StdbCalibrationProfileStore},
+    run_review::{
+        RunReviewDisposition, RunReviewProgram, RunReviewRecorder, StdbRunReviewRecorder,
+    },
+    spend_admission::{spend_binding_from_agent, StdbSpendLedger},
+    text_answer_gate::{
+        evidence_from_transcript, gate_text_answer, TextAnswerOutcome, TextAnswerProvenance,
+        TextAnswerVerification, TextEvidence,
+    },
+};
 use crate::{
     ai_agent::{
         enforce_chargeable_limits, ensure_allowed_action, ensure_model_allowed,
         ensure_within_budget, record_ai_spend, resolve_agent,
     },
-    harness::ActorCredentials,
-    orchestrator::skill_loader::{complete_run, create_run, load_skill, LoadedSkill},
-    providers::llm::LlmMessage,
+    harness::{
+        data_scope_resolver::ResourceRegistry,
+        policy_engine::{
+            ExecutionMetadata, ExecutionPlan, PlannedToolCall, PolicyEngine, PolicyExecutionRequest,
+        },
+        release_registry::load_active_manifest,
+        skill_registry::SkillRegistry,
+        ActorCredentials,
+    },
+    orchestrator::skill_loader::{
+        complete_run, create_run, load_run_key, load_skill, resume_run, set_run_wait_state,
+        LoadedSkill,
+    },
+    providers::llm::{LlmMessage, LlmRequest},
     state::AppState,
     tools::{
+        generated_read::{resolve_actor_grants, GeneratedReadTools},
         registry::ToolRegistry,
         types::{SkillCitation, ToolContext},
     },
 };
 
 const DEFAULT_MAX_STEPS: u32 = 5;
+
+/// `key:value` scope tags a skill requires cited passages to apply to
+/// (`config_json.requiredApplicability`). Absent means no requirement. A
+/// present-but-malformed value is an error: silently dropping a required
+/// tag would make the gate more permissive than the skill's owner intended.
+fn required_applicability(config: &Value) -> Result<Vec<String>> {
+    let Some(raw) = config
+        .get("requiredApplicability")
+        .or_else(|| config.get("required_applicability"))
+    else {
+        return Ok(Vec::new());
+    };
+    let tags = raw
+        .as_array()
+        .context("requiredApplicability must be an array of 'key:value' strings")?;
+    tags.iter()
+        .map(|tag| {
+            let tag = tag
+                .as_str()
+                .filter(|tag| {
+                    tag.split_once(':')
+                        .is_some_and(|(k, v)| !k.is_empty() && !v.is_empty())
+                })
+                .with_context(|| {
+                    format!("requiredApplicability entry {tag} must be a 'key:value' string")
+                })?;
+            Ok(tag.to_string())
+        })
+        .collect()
+}
 
 #[derive(Debug, Deserialize)]
 pub struct RunSkillRequest {
@@ -65,6 +162,20 @@ pub struct RunSkillResponse {
     pub steps: Vec<RunSkillStepSummary>,
     pub agent_id: u64,
     pub skill_key: String,
+    /// Ids of the `ai_evidence_claim` rows recorded for this run's answer
+    /// (AIH-14), in order. Inspectable via `POST /v1/evidence/inspect`.
+    /// Omitted when the run recorded none.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub evidence_claim_ids: Vec<u64>,
+    /// The §7.3 verdict on a free-text candidate answer (direct-execution
+    /// loop). When present, `summary` is the gated text or a withheld notice,
+    /// never the raw candidate.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub verification: Option<TextAnswerVerification>,
+    /// Claim-level support, calculations, and durable recording state for a
+    /// direct-loop answer.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub provenance: Option<TextAnswerProvenance>,
 }
 
 pub async fn run_skill(state: &AppState, req: RunSkillRequest) -> Result<RunSkillResponse> {
@@ -332,8 +443,52 @@ pub async fn run_skill_unlocked(
         }
     }
 
-    let (summary, tokens_used) =
+    let (candidate_summary, tokens_used) =
         synthesize_summary(state, req.org_id, &agent, &skill, &query, &tool_payloads).await?;
+
+    // The classic loop is also a publication boundary. Tool payloads are
+    // server-produced; bind the generated prose explicitly to those exact
+    // results, then persist the gate's claim assessments before exposing the
+    // summary or its markdown artifact.
+    let mut summary_evidence = TextEvidence::default();
+    for (index, payload) in tool_payloads.iter().enumerate() {
+        summary_evidence.add_ref(
+            "run_tool_result",
+            format!("run:{run_id}:result:{}", index + 1),
+        );
+        if let Some(data) = payload.get("data") {
+            summary_evidence.add_json(data);
+        }
+    }
+    let summary_draft =
+        GeneratedOutputDraft::single_claim(candidate_summary, summary_evidence.refs.clone());
+    let mut gated_summary = admit_structured_output(
+        req.org_id,
+        req.company_id,
+        &summary_draft,
+        &summary_evidence,
+    )
+    .await?;
+    persist_or_withhold_generated_output(
+        &mut gated_summary,
+        state.stdb.as_ref(),
+        state.spend_read_stdb.as_deref(),
+        PublicationIdentity {
+            organization_id: req.org_id,
+            company_id: req.company_id,
+            session_ref: format!("run:{run_id}:classic_summary"),
+            event_ref: "classic_run_summary".to_string(),
+            note: "classic run summary admitted by the publication gate".to_string(),
+        },
+    )
+    .await;
+    let summary = gated_summary
+        .released
+        .clone()
+        .unwrap_or_else(|| gated_summary.withheld_notice());
+    let evidence_claim_ids = gated_summary.provenance.claim_ids.clone();
+    let verification = Some(gated_summary.verification.clone());
+    let provenance = Some(gated_summary.provenance.clone());
 
     let artifact = SkillArtifact {
         kind: "markdown".to_string(),
@@ -410,7 +565,851 @@ pub async fn run_skill_unlocked(
         steps,
         agent_id: agent.agent_id,
         skill_key: skill.skill_key,
+        evidence_claim_ids,
+        verification,
+        provenance,
     })
+}
+
+/// Request for a spend-admitted governed skill run.
+///
+/// The caller supplies pre-reviewed tool calls and the LLM request that drives
+/// the loop. H5c will insert a durable accepted-intent row before each provider
+/// dispatch; this entry point wires together the H5b spend layer, the H4 policy
+/// engine, and the H3 invocation seam.
+#[derive(Debug)]
+pub struct AdmittedRunRequest {
+    pub org_id: u64,
+    pub company_id: u64,
+    pub skill_key: String,
+    pub skill_version: u32,
+    pub inputs: Value,
+    pub agent_id: Option<u64>,
+    pub team_member_id: Option<u64>,
+    pub triggered_by_hex: Option<String>,
+    pub stdb_token: Option<String>,
+    pub correlation_id: String,
+    pub reviewed_calls: Vec<PlannedToolCall>,
+    pub llm_request: LlmRequest,
+    pub max_steps: Option<u32>,
+    /// Resume an existing governed run/checkpoint instead of creating a new run.
+    pub resume_run_id: Option<u64>,
+}
+
+/// Execute a skill run through the full H5b admission stack.
+///
+/// Requires `AppState::spend_read_stdb` to be present; returns an error when
+/// the state was started without spend-read support.
+pub async fn run_skill_admitted(
+    state: &AppState,
+    req: AdmittedRunRequest,
+) -> Result<RunSkillResponse> {
+    if req.org_id == 0 {
+        anyhow::bail!("org_id is required");
+    }
+    if req.company_id == 0 {
+        anyhow::bail!("company_id is required");
+    }
+    let skill_key = req.skill_key.trim().to_string();
+    if skill_key.is_empty() {
+        anyhow::bail!("skill_key is required");
+    }
+    let correlation_id = req.correlation_id.trim().to_string();
+    if correlation_id.is_empty() {
+        anyhow::bail!("correlation_id is required");
+    }
+    let governed_catalog = governed_program_for_skill(&skill_key);
+    let reviewed_calls = if req.reviewed_calls.is_empty() {
+        governed_catalog
+            .as_ref()
+            .map(|entry| entry.reviewed_calls.clone())
+            .context("reviewed_calls must be nonempty for non-governed admitted runs")?
+    } else {
+        req.reviewed_calls.clone()
+    };
+
+    // H5b: a paired read ledger is required for spend admission.
+    let spend_reader = state
+        .spend_read_stdb
+        .as_deref()
+        .context("spend_read_stdb is required for admitted runs (H5b)")?;
+
+    let actor = req
+        .stdb_token
+        .as_ref()
+        .zip(req.triggered_by_hex.as_ref())
+        .and_then(|(token, identity)| ActorCredentials::new(token.clone(), identity.clone()).ok());
+    let stdb = req
+        .stdb_token
+        .as_ref()
+        .filter(|t| !t.trim().is_empty())
+        .map(|token| state.stdb.with_token(token.clone()))
+        .unwrap_or_else(|| state.stdb.as_ref().clone());
+
+    let skill = load_skill(&stdb, req.org_id, req.company_id, &skill_key).await?;
+    if !skill.enabled {
+        anyhow::bail!("skill '{skill_key}' is disabled for this company");
+    }
+
+    let agent = resolve_agent(&stdb, req.org_id, req.agent_id, req.team_member_id).await?;
+    ensure_allowed_action(&agent, "skill_run")?;
+    ensure_model_allowed(&agent)?;
+    ensure_within_budget(&agent)?;
+
+    let inputs_json = serde_json::to_string(&req.inputs).context("serialize inputs")?;
+    let triggered_by_hex = req
+        .triggered_by_hex
+        .as_deref()
+        .filter(|s| !s.trim().is_empty())
+        .unwrap_or("0000000000000000000000000000000000000000000000000000000000000000")
+        .to_string();
+    let is_resume = req.resume_run_id.is_some();
+    let (run_id, run_key) = if let Some(resume_run_id) = req.resume_run_id {
+        validate_resume_identity(
+            &stdb,
+            req.org_id,
+            req.company_id,
+            resume_run_id,
+            skill.id,
+            agent.agent_id,
+            &inputs_json,
+        )
+        .await?;
+        let run_key = load_run_key(&stdb, req.org_id, req.company_id, resume_run_id).await?;
+        (resume_run_id, run_key)
+    } else {
+        let run_key = Uuid::new_v4().to_string();
+        let run_id = if skill.id > 0 {
+            create_run(
+                &stdb,
+                req.org_id,
+                req.company_id,
+                &skill,
+                agent.agent_id,
+                req.team_member_id,
+                &run_key,
+                &inputs_json,
+                &triggered_by_hex,
+            )
+            .await?
+        } else {
+            0
+        };
+        (run_id, run_key)
+    };
+
+    let manifest = load_active_manifest(&stdb, req.org_id, &skill_key, req.skill_version)
+        .await
+        .map_err(|message| anyhow::anyhow!(message))?;
+
+    let ledger = StdbSpendLedger {
+        writer: &state.stdb,
+        reader: spend_reader,
+    };
+    let binding = spend_binding_from_agent(&agent, req.org_id, req.company_id, run_id)?;
+
+    let registry = ToolRegistry::new();
+    let view = registry.authorized_view(&agent, &manifest.allowed_tools);
+
+    let max_steps = req
+        .max_steps
+        .unwrap_or(manifest.limits.max_steps)
+        .min(manifest.limits.max_steps);
+    let plan = ExecutionPlan {
+        named_resources: manifest.named_resources.clone(),
+        tool_calls: reviewed_calls.clone(),
+        steps: max_steps,
+        expected_rows: 0,
+        output_type: manifest.output_type.clone(),
+    };
+    let base = PolicyExecutionRequest {
+        skill: manifest.skill.clone(),
+        organization_id: req.org_id,
+        company_id: req.company_id,
+        correlation_id,
+        metadata: ExecutionMetadata::default(),
+        input: req.inputs.clone(),
+        plan,
+    };
+    let engine = PolicyEngine::new(
+        SkillRegistry::exact(manifest.clone()),
+        ResourceRegistry::built_in(),
+    );
+    let policy = ReviewedInvocationPolicy::new(engine, base, reviewed_calls)?;
+
+    let tool_ctx = ToolContext {
+        state: state.clone(),
+        stdb: Arc::new(stdb.clone()),
+        org_id: req.org_id,
+        company_id: req.company_id,
+        run_id,
+        skill_key: skill.skill_key.clone(),
+        config_json: skill.config_json.clone(),
+        inputs: req.inputs.clone(),
+        allowed_action_drafts: skill.allowed_action_drafts.clone(),
+        actor,
+    };
+
+    if let Some(catalog) = governed_catalog {
+        let model_config_store = StdbModelConfigurationStore {
+            reader: tool_ctx.stdb.as_ref(),
+        };
+        let intelligence_policy_ref = skill
+            .config_json
+            .get("intelligencePolicyRef")
+            .or_else(|| skill.config_json.get("intelligence_policy_ref"))
+            .and_then(Value::as_str);
+        let route_resolver = IntelligenceRouteResolver::new_governed(
+            &model_config_store,
+            req.org_id,
+            &agent,
+            intelligence_policy_ref,
+        )?;
+        route_resolver
+            .validate_review_independence(catalog.review_independence_key)
+            .await?;
+        let intelligence_router = ConfiguredIntelligenceRouter::new(route_resolver);
+        let shadow_recorder = StdbShadowDecisionRecorder {
+            writer: state.stdb.as_ref(),
+        };
+        let decision_provider = RoutedDecisionProvider::new(
+            &intelligence_router,
+            state.providers.llm.as_ref(),
+            &ledger,
+            &agent,
+            req.org_id,
+            req.company_id,
+            run_id,
+            IntelligenceRole::Decision,
+            &shadow_recorder,
+        )?;
+        let review_provider = RoutedDecisionProvider::new(
+            &intelligence_router,
+            state.providers.llm.as_ref(),
+            &ledger,
+            &agent,
+            req.org_id,
+            req.company_id,
+            run_id,
+            IntelligenceRole::Review,
+            &NoopShadowDecisionRecorder,
+        )?;
+        let generation_provider = RoutedGenerationProvider::new(
+            &intelligence_router,
+            state.providers.llm.as_ref(),
+            &ledger,
+            &agent,
+            req.org_id,
+            req.company_id,
+            run_id,
+        );
+        let reasoning_provider = RoutedReasoningProvider::new(
+            &intelligence_router,
+            state.providers.llm.as_ref(),
+            &ledger,
+            &agent,
+            req.org_id,
+            req.company_id,
+            run_id,
+        );
+
+        let decision_types = StdbDecisionTypeRegistry {
+            writer: state.stdb.as_ref(),
+            reader: tool_ctx.stdb.as_ref(),
+            organization_id: req.org_id,
+        };
+
+        let precedent = StdbPrecedentStore {
+            writer: state.stdb.as_ref(),
+            reader: tool_ctx.stdb.as_ref(),
+        };
+        let recorder = StdbIntelligenceEventRecorder {
+            writer: state.stdb.as_ref(),
+            reader: tool_ctx.stdb.as_ref(),
+        };
+
+        let graph = catalog.graph;
+        let generated_grants = if graph_requests_generated_capabilities(&graph)? {
+            resolve_actor_grants(&tool_ctx).await?
+        } else {
+            Vec::new()
+        };
+        let loop_tools = AuthorizedLoopTools {
+            view: &view,
+            generated: GeneratedReadTools::new(&generated_grants),
+            context: &tool_ctx,
+        };
+        let capability_admission = PolicyBackedCapabilityAdmission::new(&policy);
+        let capability_executor = ToolsBackedCapabilityExecutor::new(&loop_tools);
+        let recovery = StdbExecutionRecovery {
+            writer: state.stdb.as_ref(),
+            reader: spend_reader,
+            organization_id: req.org_id,
+            company_id: req.company_id,
+        };
+        let approvals = StdbApprovalCoordinator {
+            writer: state.stdb.as_ref(),
+            reader: spend_reader,
+            organization_id: req.org_id,
+            company_id: req.company_id,
+        };
+        let capabilities = GovernedCapabilityService::new(
+            &capability_admission,
+            &capability_executor,
+            &recovery,
+            &approvals,
+        );
+        // AIH-15: the §7.3 answer gate. Passages resolve against the
+        // server-side catalog; claim coverage is judged by the review-role
+        // provider (model-assisted, recorded as such, never approval).
+        let verification = EvidenceBackedVerificationService;
+        let passage_catalog = StdbPassageCatalog {
+            reader: spend_reader,
+        };
+        let claim_checker = DecisionClaimCoverageChecker {
+            reviewer: &review_provider,
+        };
+        let answer_admission = EvidenceGatedAnswerAdmission {
+            scope: GateScope {
+                organization_id: req.org_id,
+                company_id: req.company_id,
+                as_of_micros: chrono::Utc::now().timestamp_micros(),
+                required_applicability: required_applicability(&skill.config_json)?,
+            },
+            policy: GatePolicy::default(),
+            catalog: &passage_catalog,
+            claim_checker: Some(&claim_checker),
+        };
+        // AIH-14: persist the provenance of every answer the gate judges, so
+        // it can be inspected claim by claim and invalidated with its sources.
+        let evidence_recorder = StdbEvidenceRecorder {
+            writer: state.stdb.as_ref(),
+            reader: spend_reader,
+        };
+        let recording_admission = RecordingAnswerAdmission {
+            gate: &answer_admission,
+            recorder: &evidence_recorder,
+            scope: RunEvidenceScope {
+                organization_id: req.org_id,
+                company_id: req.company_id,
+                run_id,
+            },
+            recorded: std::sync::Mutex::new(Vec::new()),
+        };
+        let compute = BuiltinComputeService;
+        let calibration = StdbCalibrationProfileStore {
+            reader: tool_ctx.stdb.as_ref(),
+        };
+        validate_governed_runtime_configuration(req.org_id, &graph, &decision_types, &calibration)
+            .await?;
+        let deterministic_candidates = production_deterministic_candidates();
+        let decision_resolution_policy = StdbDecisionResolutionPolicy {
+            reader: tool_ctx.stdb.as_ref(),
+        };
+        let model_shadow_recorder = StdbModelShadowRecorder {
+            writer: state.stdb.as_ref(),
+        };
+        let drift_monitor = StdbDriftMonitor {
+            reader: tool_ctx.stdb.as_ref(),
+        };
+        let rollback_recorder = StdbAuthorityRollbackRecorder {
+            writer: state.stdb.as_ref(),
+        };
+        let decision_resolver = GovernedDecisionResolver {
+            policy: &decision_resolution_policy,
+            candidates: deterministic_candidates,
+            model: &decision_provider,
+            model_shadow_recorder: &model_shadow_recorder,
+            drift_monitor: Some(&drift_monitor),
+            rollback_recorder: Some(&rollback_recorder),
+        };
+        let checkpoint_store = StdbProgramCheckpointStore {
+            writer: state.stdb.as_ref(),
+            reader: tool_ctx.stdb.as_ref(),
+        };
+        let executor = GovernedProgramExecutor {
+            decision_provider: &decision_provider,
+            checkpoint_store: Some(&checkpoint_store),
+            decision_resolver: Some(&decision_resolver),
+            generation_provider: &generation_provider,
+            reasoning_provider: &reasoning_provider,
+            decision_types: &decision_types,
+            precedent: &precedent,
+            capabilities: &capabilities,
+            verification: &verification,
+            answer_admission: &recording_admission,
+            compute: &compute,
+            recorder: &recorder,
+            calibration: &calibration,
+        };
+        let mut governed_inputs = req.inputs.clone();
+        if let Some(object) = governed_inputs.as_object_mut() {
+            if object
+                .get("query")
+                .and_then(Value::as_str)
+                .is_none_or(|value| value.trim().is_empty())
+            {
+                let extracted = extract_query(&req.inputs);
+                let query = build_web_search_query(&skill_key, &req.inputs, &extracted)
+                    .or_else(|| (!extracted.trim().is_empty()).then_some(extracted));
+                if let Some(query) = query {
+                    object.insert("query".to_string(), Value::String(query));
+                }
+            }
+        }
+        // AIH-17: compile the approved knowledge the skill asks for. Entries
+        // are re-authorized and re-validated now, not trusted from when they
+        // were approved, and request inputs can never forge them.
+        let knowledge = compile_knowledge_context(
+            spend_reader,
+            Viewer {
+                organization_id: req.org_id,
+                company_id: req.company_id,
+                actor_identity: req
+                    .triggered_by_hex
+                    .as_deref()
+                    .and_then(super::evidence_inspector::ActorIdentity::parse),
+            },
+            &knowledge_entry_keys(&skill.config_json)?,
+        )
+        .await?;
+        merge_into_inputs(&mut governed_inputs, &knowledge);
+        let mut run_evidence = vec![EvidenceRef {
+            kind: "governed_run_step".to_string(),
+            id: format!("run:{run_id}:analytics"),
+        }];
+        run_evidence.extend(knowledge.evidence.iter().cloned());
+        let program_context = GovernedProgramContext {
+            organization_id: req.org_id,
+            company_id: req.company_id,
+            run_id,
+            program_ref: catalog.program_ref.to_string(),
+            objective: skill.prompt_template.clone(),
+            bounded_state: governed_inputs,
+            evidence: run_evidence,
+        };
+        if is_resume {
+            checkpoint_store
+                .validate_resume(&program_context, &graph)
+                .await?;
+            // This mutation happens only after the current actor, skill,
+            // bounded inputs, graph and knowledge/source dependencies have
+            // all been re-authorized and matched to the immutable checkpoint.
+            resume_run(&stdb, req.org_id, req.company_id, run_id).await?;
+        }
+        let program = executor.run(&graph, &program_context).await?;
+        let evidence_claim_ids = recording_admission
+            .recorded
+            .lock()
+            .map(|ids| ids.clone())
+            .unwrap_or_default();
+
+        let review = if matches!(&program.stop, GovernedProgramStop::Completed) {
+            let result = RunReviewProgram::new(&review_provider)
+                .review(&program_context.objective, &program)
+                .await?;
+            StdbRunReviewRecorder {
+                writer: state.stdb.as_ref(),
+            }
+            .record(
+                req.org_id,
+                req.company_id,
+                run_id,
+                catalog.program_ref,
+                &result,
+            )
+            .await?;
+            Some(result)
+        } else {
+            None
+        };
+
+        if let Some(review) = &review {
+            if review.disposition != RunReviewDisposition::Healthy {
+                set_run_wait_state(
+                    state.stdb.as_ref(),
+                    req.org_id,
+                    req.company_id,
+                    run_id,
+                    "agent_settled",
+                )
+                .await?;
+                let rationale = review
+                    .rationale
+                    .clone()
+                    .unwrap_or_else(|| format!("independent review: {:?}", review.disposition));
+                return Ok(RunSkillResponse {
+                    run_id,
+                    run_key,
+                    status: "agent_settled".to_string(),
+                    summary: rationale,
+                    artifacts: Vec::new(),
+                    citations: Vec::new(),
+                    steps: program
+                        .trace
+                        .into_iter()
+                        .enumerate()
+                        .map(|(index, step)| RunSkillStepSummary {
+                            step_no: (index + 1) as u32,
+                            tool: step.kind.to_string(),
+                            duration_ms: 0,
+                            summary: step.summary,
+                        })
+                        .collect(),
+                    agent_id: agent.agent_id,
+                    skill_key: skill.skill_key,
+                    evidence_claim_ids,
+                    verification: None,
+                    provenance: None,
+                });
+            }
+        }
+
+        let (status, summary, terminal_error) = match &program.stop {
+            GovernedProgramStop::Completed => (
+                "completed".to_string(),
+                program
+                    .final_content
+                    .clone()
+                    .unwrap_or_else(|| format!("governed {} completed", skill_key)),
+                None,
+            ),
+            GovernedProgramStop::EarlyStop(reason) => (
+                "completed".to_string(),
+                format!("governed program stopped deterministically: {reason:?}"),
+                None,
+            ),
+            GovernedProgramStop::PendingApproval {
+                capability,
+                reason,
+                draft_id,
+            } => {
+                set_run_wait_state(
+                    state.stdb.as_ref(),
+                    req.org_id,
+                    req.company_id,
+                    run_id,
+                    "awaiting_approval",
+                )
+                .await?;
+                let summary = match draft_id {
+                    Some(id) => format!("{capability} awaits approval (draft #{id}): {reason}"),
+                    None => format!("{capability} awaits approval: {reason}"),
+                };
+                ("awaiting_approval".to_string(), summary, None)
+            }
+            GovernedProgramStop::Clarification { prompt, .. } => {
+                set_run_wait_state(
+                    state.stdb.as_ref(),
+                    req.org_id,
+                    req.company_id,
+                    run_id,
+                    "agent_settled",
+                )
+                .await?;
+                ("agent_settled".to_string(), prompt.clone(), None)
+            }
+            GovernedProgramStop::ReviewRequired(reason) => {
+                set_run_wait_state(
+                    state.stdb.as_ref(),
+                    req.org_id,
+                    req.company_id,
+                    run_id,
+                    "agent_settled",
+                )
+                .await?;
+                ("agent_settled".to_string(), reason.clone(), None)
+            }
+            GovernedProgramStop::Denied(reason) | GovernedProgramStop::UnableToProgress(reason) => {
+                ("failed".to_string(), reason.clone(), Some(reason.clone()))
+            }
+        };
+
+        if matches!(status.as_str(), "completed" | "failed") {
+            complete_run(
+                state.stdb.as_ref(),
+                req.org_id,
+                req.company_id,
+                run_id,
+                &status,
+                Some(summary.clone()),
+                None,
+                None,
+                program.trace.len() as u32,
+                0,
+                terminal_error,
+            )
+            .await?;
+        }
+
+        return Ok(RunSkillResponse {
+            run_id,
+            run_key,
+            status,
+            summary,
+            artifacts: Vec::new(),
+            citations: Vec::new(),
+            steps: program
+                .trace
+                .into_iter()
+                .enumerate()
+                .map(|(index, step)| RunSkillStepSummary {
+                    step_no: (index + 1) as u32,
+                    tool: step.kind.to_string(),
+                    duration_ms: 0,
+                    summary: step.summary,
+                })
+                .collect(),
+            agent_id: agent.agent_id,
+            skill_key: skill.skill_key,
+            evidence_claim_ids,
+            verification: None,
+            provenance: None,
+        });
+    }
+
+    let limits = LoopLimits {
+        max_rounds: max_steps.max(1),
+        max_tool_calls: manifest.limits.max_tool_calls.max(1),
+        max_tokens: u64::from(agent.context_window),
+        max_unchanged_results: 3,
+    };
+
+    let mut direct_request = req.llm_request;
+    direct_request.system.push_str(
+        r#"
+
+For the final answer, return only JSON shaped as
+{"content":"complete answer text","claims":[{"text":"an exact non-overlapping segment of content","supportRefs":[{"kind":"tool_result","id":"exact tool_call_id"}],"passageSupport":[]}],"calculations":[]}.
+Claim texts concatenated in order must cover all content. Use only successful tool-result ids from this run. Never cite a display snippet or invent a support id."#,
+    );
+    let outcome = run_recorded_loop(
+        state.providers.llm.as_ref(),
+        &ledger,
+        binding,
+        &view,
+        &policy,
+        &tool_ctx,
+        direct_request,
+        limits,
+    )
+    .await?;
+
+    let (mut summary, mut verification, mut provenance, durable_provenance) = summarize_loop_stop(
+        req.org_id,
+        req.company_id,
+        &outcome.stop,
+        &outcome.transcript,
+    )
+    .await?;
+    let mut evidence_claim_ids = Vec::new();
+    if let (Some(provenance), Some(durable_provenance)) =
+        (provenance.as_mut(), durable_provenance.as_ref())
+    {
+        let transient_support_only = provenance
+            .claims
+            .iter()
+            .any(|claim| !claim.support_refs.is_empty() && claim.passage_support.is_empty());
+        if transient_support_only {
+            let reason = "run-evidence support has no durable passage binding and was not recorded";
+            withhold_direct_answer(&mut summary, &mut verification, provenance, reason);
+        } else {
+            let recorder = StdbEvidenceRecorder {
+                writer: state.stdb.as_ref(),
+                reader: spend_reader,
+            };
+            let scope = RunEvidenceScope {
+                organization_id: req.org_id,
+                company_id: req.company_id,
+                run_id,
+            };
+            match recorder.record(&scope, durable_provenance).await {
+                Ok(recorded) => {
+                    evidence_claim_ids = recorded.claim_ids.clone();
+                    provenance.mark_persisted(recorded.contribution_id, recorded.claim_ids);
+                }
+                Err(error) => {
+                    tracing::warn!(run_id, error = %error, "direct-loop provenance was not recorded");
+                    let reason = "answer provenance could not be recorded";
+                    withhold_direct_answer(&mut summary, &mut verification, provenance, reason);
+                }
+            }
+        }
+    }
+    let status = match run_finalization(&outcome.stop) {
+        RunFinalization::Wait { status, .. } => status.to_string(),
+        RunFinalization::Failed { error_code } => error_code.to_string(),
+    };
+
+    Ok(RunSkillResponse {
+        run_id,
+        run_key,
+        status,
+        summary,
+        artifacts: Vec::new(),
+        citations: Vec::new(),
+        steps: Vec::new(),
+        agent_id: agent.agent_id,
+        skill_key: skill.skill_key,
+        evidence_claim_ids,
+        verification,
+        provenance,
+    })
+}
+
+fn withhold_direct_answer(
+    summary: &mut String,
+    verification: &mut Option<TextAnswerVerification>,
+    provenance: &mut TextAnswerProvenance,
+    reason: &str,
+) {
+    *summary = format!("This answer could not be verified and was withheld: {reason}");
+    *verification = Some(TextAnswerVerification {
+        outcome: TextAnswerOutcome::RequiresReview,
+        methods: vec!["deterministic"],
+        limitations: Vec::new(),
+        reason: Some(reason.to_string()),
+    });
+    provenance.redact_for_withholding(reason);
+}
+
+/// What the direct-execution loop may return for how it stopped.
+///
+/// §7.3: a candidate final answer is not an answer until the gate has judged
+/// it. Run state is unchanged (the run still waits at `agent_settled`); what
+/// changes is that the raw candidate is never returned. It is released only
+/// when the gate admits it (limitations appended when qualified) and withheld
+/// otherwise. Other stops carry no candidate text.
+async fn summarize_loop_stop(
+    org_id: u64,
+    company_id: u64,
+    stop: &LoopStop,
+    transcript: &[crate::providers::llm::LlmMessage],
+) -> Result<(
+    String,
+    Option<TextAnswerVerification>,
+    Option<TextAnswerProvenance>,
+    Option<super::answer_gate::AnswerProvenance>,
+)> {
+    match stop {
+        LoopStop::CandidateFinal(answer) => {
+            let gated = gate_text_answer(
+                org_id,
+                company_id,
+                answer,
+                &evidence_from_transcript(transcript),
+            )
+            .await?;
+            let text = gated
+                .released
+                .clone()
+                .unwrap_or_else(|| gated.withheld_notice());
+            Ok((
+                text,
+                Some(gated.verification),
+                Some(gated.provenance),
+                Some(gated.durable_provenance),
+            ))
+        }
+        stop => Ok((format!("agent loop stopped: {stop:?}"), None, None, None)),
+    }
+}
+
+async fn validate_resume_identity(
+    stdb: &stdb_client::StdbClient,
+    org_id: u64,
+    company_id: u64,
+    run_id: u64,
+    skill_id: u64,
+    agent_id: u64,
+    expected_inputs_json: &str,
+) -> Result<()> {
+    let rows = stdb
+        .query_sql(&format!(
+            "SELECT * FROM ai_agent_run WHERE organization_id = {org_id}              AND company_id = {company_id} AND id = {run_id} LIMIT 1"
+        ))
+        .await
+        .context("load governed run resume identity")?;
+    let row = rows
+        .first()
+        .context("governed run to resume was not found")?;
+    let stored_skill_id = row
+        .get("skillId")
+        .or_else(|| row.get("skill_id"))
+        .and_then(Value::as_u64)
+        .unwrap_or_default();
+    let stored_agent_id = row
+        .get("agentId")
+        .or_else(|| row.get("agent_id"))
+        .and_then(Value::as_u64)
+        .unwrap_or_default();
+    let stored_inputs = row
+        .get("inputsJson")
+        .or_else(|| row.get("inputs_json"))
+        .and_then(Value::as_str)
+        .context("resumable run inputs missing")?;
+    if skill_id > 0 && stored_skill_id != skill_id {
+        anyhow::bail!("resume run skill identity does not match current skill");
+    }
+    if stored_agent_id != agent_id {
+        anyhow::bail!("resume run agent identity does not match current agent");
+    }
+    let stored_value: Value =
+        serde_json::from_str(stored_inputs).context("decode stored resume inputs")?;
+    let expected_value: Value =
+        serde_json::from_str(expected_inputs_json).context("decode expected resume inputs")?;
+    if stored_value != expected_value {
+        anyhow::bail!("resume run inputs do not match the original bounded state");
+    }
+    Ok(())
+}
+
+async fn validate_governed_runtime_configuration(
+    organization_id: u64,
+    graph: &DecisionGraph,
+    decision_types: &dyn DecisionTypeRegistry,
+    calibration: &dyn CalibrationProfileStore,
+) -> Result<()> {
+    for node in &graph.nodes {
+        let decision_type = match &node.kind {
+            DecisionNode::Choice(node) => Some(&node.decision_type),
+            DecisionNode::Score(node) => Some(&node.decision_type),
+            DecisionNode::Probability(node) => Some(&node.decision_type),
+            _ => None,
+        };
+        if let Some(reference) = decision_type {
+            decision_types
+                .get(&reference.name, reference.version)
+                .await?
+                .with_context(|| {
+                    format!(
+                        "governed DecisionType '{}@{}' is not provisioned; run governed bootstrap first",
+                        reference.name, reference.version
+                    )
+                })?;
+        }
+
+        if let DecisionNode::Gate(gate) = &node.kind {
+            for branch in &gate.branches {
+                if let GateCondition::ThresholdPolicy {
+                    calibration_profile: Some(reference),
+                    ..
+                } = &branch.condition
+                {
+                    calibration
+                        .get(organization_id, reference)
+                        .await?
+                        .with_context(|| {
+                            format!(
+                                "calibration profile '{}@{}' is not provisioned; run governed bootstrap first",
+                                reference.name, reference.version
+                            )
+                        })?;
+                }
+            }
+        }
+    }
+    Ok(())
 }
 
 fn resolve_allowed_tools(
@@ -529,11 +1528,165 @@ mod tests {
     use super::*;
 
     #[test]
+    fn required_applicability_parses_absent_valid_and_rejects_malformed() {
+        assert!(required_applicability(&json!({})).unwrap().is_empty());
+        assert_eq!(
+            required_applicability(&json!({"requiredApplicability": ["jurisdiction:US"]})).unwrap(),
+            vec!["jurisdiction:US".to_string()]
+        );
+        for bad in [
+            json!({"requiredApplicability": "jurisdiction:US"}),
+            json!({"requiredApplicability": ["jurisdiction"]}),
+            json!({"requiredApplicability": [7]}),
+        ] {
+            assert!(required_applicability(&bad).is_err());
+        }
+    }
+
+    #[tokio::test]
+    async fn governed_runtime_preflight_never_bootstraps_missing_calibration() {
+        let decision_types =
+            super::super::decision_type::InMemoryDecisionTypeRegistry::with_builtins();
+        let calibration = super::super::probabilistic::InMemoryCalibrationProfileStore::new();
+        let graph = super::super::governed_programs::report_analysis_graph();
+
+        let error =
+            validate_governed_runtime_configuration(9, &graph, &decision_types, &calibration)
+                .await
+                .unwrap_err();
+        assert!(error.to_string().contains("run governed bootstrap first"));
+
+        calibration
+            .register(super::super::probabilistic::CalibrationProfile {
+                profile_ref: super::super::probabilistic::CalibrationProfileRef {
+                    name: "report-attention".to_string(),
+                    version: 1,
+                },
+                breakpoints: vec![(0.0, 0.0), (0.35, 0.35), (0.65, 0.65), (1.0, 1.0)],
+            })
+            .unwrap();
+
+        validate_governed_runtime_configuration(9, &graph, &decision_types, &calibration)
+            .await
+            .unwrap();
+    }
+
+    #[test]
     fn rejects_legacy_sql_inputs() {
         assert!(reject_legacy_analytics_sql(&json!({"analysis_sql": "SELECT 1"})).is_err());
         assert!(reject_legacy_analytics_sql(&json!({"analysisSql": "SELECT 1"})).is_err());
         assert!(reject_legacy_analytics_sql(&json!({"sql": "SELECT 1"})).is_err());
         assert!(reject_legacy_analytics_sql(&json!({"query": "revenue"})).is_ok());
+    }
+    #[tokio::test]
+    async fn a_loop_candidate_is_never_returned_ungated() {
+        use crate::orchestrator::text_answer_gate::TextAnswerOutcome;
+        use crate::providers::llm::LlmMessage;
+
+        let candidate = LoopStop::CandidateFinal("Revenue was $88,888.88 last month.".into());
+
+        // No successful tool result: the candidate is withheld, and its text
+        // appears nowhere in what is returned.
+        let (summary, verification, _, _) = summarize_loop_stop(
+            1,
+            2,
+            &candidate,
+            &[LlmMessage::text("user", "How was revenue?")],
+        )
+        .await
+        .unwrap();
+        assert!(!summary.contains("88,888.88"), "{summary}");
+        assert!(summary.contains("withheld"), "{summary}");
+        assert_eq!(
+            verification.unwrap().outcome,
+            TextAnswerOutcome::RequiresReview
+        );
+
+        // Grounded in a tool result: structured support is released.
+        let structured_candidate = LoopStop::CandidateFinal(
+            json!({
+                "content": "Revenue was $88,888.88 last month.",
+                "claims": [{
+                    "text": "Revenue was $88,888.88 last month.",
+                    "supportRefs": [{"kind": "tool_result", "id": "call-1"}],
+                    "passageSupport": []
+                }],
+                "calculations": []
+            })
+            .to_string(),
+        );
+        let grounded = vec![
+            LlmMessage::text("user", "How was revenue?"),
+            LlmMessage::ToolResult {
+                tool_call_id: Some("call-1".into()),
+                name: "revenue".into(),
+                content: json!({ "summary": "ok", "data": { "total": 88888.88 } }).to_string(),
+            },
+        ];
+        let (mut summary, mut verification, provenance, _) =
+            summarize_loop_stop(1, 2, &structured_candidate, &grounded)
+                .await
+                .unwrap();
+        assert_eq!(summary, "Revenue was $88,888.88 last month.");
+        assert_eq!(
+            verification.as_ref().unwrap().outcome,
+            TextAnswerOutcome::Admitted
+        );
+        let mut provenance = provenance.unwrap();
+        assert!(!provenance.persisted);
+
+        // A post-gate persistence downgrade must scrub the candidate from the
+        // complete API response, not only replace its summary.
+        withhold_direct_answer(
+            &mut summary,
+            &mut verification,
+            &mut provenance,
+            "provenance recording failed",
+        );
+        let response = RunSkillResponse {
+            run_id: 1,
+            run_key: "run".into(),
+            status: "agent_settled".into(),
+            summary,
+            artifacts: Vec::new(),
+            citations: Vec::new(),
+            steps: Vec::new(),
+            agent_id: 1,
+            skill_key: "test".into(),
+            evidence_claim_ids: Vec::new(),
+            verification,
+            provenance: Some(provenance),
+        };
+        let serialized = serde_json::to_string(&response).unwrap();
+        assert!(!serialized.contains("88,888.88"), "{serialized}");
+
+        // A figure the tool never produced qualifies, with the caveat attached.
+        let mismatched = vec![
+            LlmMessage::text("user", "How was revenue?"),
+            LlmMessage::ToolResult {
+                tool_call_id: Some("call-1".into()),
+                name: "revenue".into(),
+                content: json!({ "summary": "ok", "data": { "total": 1000.5 } }).to_string(),
+            },
+        ];
+        let (summary, verification, _, _) =
+            summarize_loop_stop(1, 2, &structured_candidate, &mismatched)
+                .await
+                .unwrap();
+        assert!(summary.contains("Limitations of this answer:"), "{summary}");
+        assert_eq!(verification.unwrap().outcome, TextAnswerOutcome::Qualified);
+    }
+
+    #[tokio::test]
+    async fn non_answer_stops_carry_no_candidate_text_or_verdict() {
+        let (summary, verification, provenance, durable) =
+            summarize_loop_stop(1, 2, &LoopStop::RoundLimit, &[])
+                .await
+                .unwrap();
+        assert_eq!(summary, "agent loop stopped: RoundLimit");
+        assert!(verification.is_none());
+        assert!(provenance.is_none());
+        assert!(durable.is_none());
     }
 }
 

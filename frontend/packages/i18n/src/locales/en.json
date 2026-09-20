@@ -7845,19 +7845,6 @@
           "actionTakenPlaceholder": "e.g. Updated policy doc, notified finance…"
         }
       },
-      "reindexDocument": {
-        "title": "Reindex document",
-        "description": "Replace searchable text extracted for this document.",
-        "sections": {
-          "index": "Search index"
-        },
-        "fields": {
-          "content": "Index content",
-          "contentPlaceholder": "Paste extracted text or keywords…",
-          "language": "Language",
-          "languageHint": "e.g. en, pt-BR, ms (optional; pack default used if empty)"
-        }
-      },
       "setRetention": {
         "title": "Set retention",
         "description": "Classification and retention window for purge after delete.",

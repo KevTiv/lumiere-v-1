@@ -4,9 +4,7 @@ use spacetimedb::{reducer, ReducerContext, ScheduleAt, SpacetimeType, Table};
 
 use crate::core::privacy::data_classification;
 use crate::documents::documents::{document, document_version, Document};
-use crate::documents::pack_locale::{
-    compute_purge_after, document_search_language_for_company, truncate_index_content,
-};
+use crate::documents::pack_locale::compute_purge_after;
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 
 #[derive(Clone)]
@@ -24,12 +22,6 @@ pub struct DocumentRetentionPurgeJob {
 }
 
 #[derive(SpacetimeType, Clone, Debug)]
-pub struct SetDocumentIndexContentParams {
-    pub content: String,
-    pub language: Option<String>,
-}
-
-#[derive(SpacetimeType, Clone, Debug)]
 pub struct SetDocumentRetentionParams {
     pub classification_id: Option<u64>,
     pub retention_days: Option<u32>,
@@ -38,63 +30,6 @@ pub struct SetDocumentRetentionParams {
 #[derive(SpacetimeType, Clone, Debug)]
 pub struct ScheduleDocumentRetentionPurgeParams {
     pub delay_seconds: Option<u64>,
-}
-
-#[reducer]
-pub fn set_document_index_content(
-    ctx: &ReducerContext,
-    organization_id: u64,
-    document_id: u64,
-    params: SetDocumentIndexContentParams,
-) -> Result<(), String> {
-    check_permission(ctx, organization_id, "document", "write")?;
-
-    let doc = ctx
-        .db
-        .document()
-        .id()
-        .find(&document_id)
-        .ok_or("Document not found")?;
-    if doc.organization_id != organization_id {
-        return Err("Document does not belong to this organization".to_string());
-    }
-    if doc.is_deleted {
-        return Err("Cannot index a deleted document".to_string());
-    }
-
-    let content = truncate_index_content(&params.content);
-    if content.is_empty() {
-        return Err("index content must not be empty".to_string());
-    }
-
-    let language = params
-        .language
-        .or_else(|| document_search_language_for_company(ctx, organization_id, doc.company_id));
-
-    let company_id = doc.company_id;
-    ctx.db.document().id().update(Document {
-        index_content: Some(content),
-        index_language: language,
-        write_uid: ctx.sender(),
-        write_date: ctx.timestamp,
-        ..doc
-    });
-
-    write_audit_log_v2(
-        ctx,
-        organization_id,
-        AuditLogParams {
-            company_id,
-            table_name: "document",
-            record_id: document_id,
-            action: "UPDATE",
-            old_values: None,
-            new_values: Some("{\"index_content\":\"set\"}".to_string()),
-            changed_fields: vec!["index_content".to_string(), "index_language".to_string()],
-            metadata: None,
-        },
-    );
-    Ok(())
 }
 
 #[reducer]

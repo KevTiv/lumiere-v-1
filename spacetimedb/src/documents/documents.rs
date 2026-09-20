@@ -213,8 +213,6 @@ pub struct CreateDocumentParams {
     pub partner_id: Option<u64>,
     pub tag_ids: Vec<u64>,
     pub is_favorite: bool,
-    /// Optional extracted text / FTS body (capped server-side).
-    pub index_content: Option<String>,
     pub classification_id: Option<u64>,
     pub retention_days: Option<u32>,
     pub fiscal_kind: Option<String>,
@@ -687,7 +685,7 @@ pub fn create_document(
         &params.name,
         params.description.as_deref(),
         &params.file_name,
-        params.index_content.as_deref(),
+        None,
     )));
     let index_language = document_search_language_for_company(ctx, organization_id, company_id);
     let residency_region = params
@@ -1139,6 +1137,17 @@ pub fn delete_document(
             None
         }
     });
+
+    if let Some(company_id) = company_id {
+        crate::ai::evidence_source::retire_document_evidence(
+            ctx,
+            organization_id,
+            company_id,
+            document_id,
+            "deleted",
+            "server-owned document blob was deleted",
+        )?;
+    }
 
     ctx.db.document().id().update(Document {
         is_deleted: true,

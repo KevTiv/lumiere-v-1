@@ -1,7 +1,8 @@
 //! Policy-gated harness adapters for LLM-backed bundled skills.
 //!
-//! After release + NamedRead policy succeed, execution continues through
-//! `run_skill_unlocked` so tool/LLM behavior stays shared with the legacy body.
+//! After release + NamedRead policy succeed, migrated skills continue through
+//! the admitted typed governed-program runtime. The generic legacy loop remains
+//! only for skills not yet present in the GP-17 program catalog.
 
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -18,7 +19,8 @@ use super::{
     policy_engine::PolicyEngine,
 };
 use crate::{
-    orchestrator::run::{run_skill_unlocked, RunSkillOverrides, RunSkillRequest, RunSkillResponse},
+    orchestrator::run::{run_skill_admitted, AdmittedRunRequest, RunSkillResponse},
+    providers::llm::LlmRequest,
     state::AppState,
 };
 
@@ -51,6 +53,8 @@ pub struct GovernedLlmSkillInput {
     pub team_member_id: Option<u64>,
     #[serde(default)]
     pub max_steps: Option<u32>,
+    #[serde(default)]
+    pub resume_run_id: Option<u64>,
 }
 
 #[derive(Debug, Serialize)]
@@ -99,13 +103,36 @@ fn endpoints(skill_key: &str) -> Result<SkillEndpoints, String> {
 }
 
 fn green_manifest(skill_key: &str, resource: &str, output_type: &str) -> SkillManifest {
+    let (mut allowed_tools, mut allowed_capabilities) = match skill_key {
+        REPORT_ANALYSIS_SKILL_KEY => (
+            vec!["analytics_summary".to_string()],
+            vec![Capability::NamedRead],
+        ),
+        PROCESS_RESEARCH_SKILL_KEY => (
+            vec!["analytics_summary".to_string(), "erp_search".to_string()],
+            vec![Capability::NamedRead],
+        ),
+        PRICE_SEARCH_SKILL_KEY | SUPPLIER_DISCOVERY_SKILL_KEY => (
+            vec!["erp_search".to_string(), "web_search".to_string()],
+            vec![Capability::NamedRead, Capability::Network],
+        ),
+        _ => (Vec::new(), Vec::new()),
+    };
+    // The route-level release/policy fence remains a reviewed named read.
+    if !allowed_tools.iter().any(|tool| tool == NAMED_READ_TOOL) {
+        allowed_tools.push(NAMED_READ_TOOL.to_string());
+    }
+    if !allowed_capabilities.contains(&Capability::NamedRead) {
+        allowed_capabilities.push(Capability::NamedRead);
+    }
+
     SkillManifest {
         skill: SkillVersionRef::new(skill_key, LLM_BUNDLED_SKILL_VERSION),
         review: reviewed(),
         risk: RiskClass::Green,
         named_resources: vec![resource.to_string()],
-        allowed_tools: vec![NAMED_READ_TOOL.to_string()],
-        allowed_capabilities: vec![Capability::NamedRead],
+        allowed_tools,
+        allowed_capabilities,
         output_type: output_type.to_string(),
         limits: ExecutionLimits {
             max_rows: 200,
@@ -231,20 +258,37 @@ pub async fn run_governed_llm_skill(
     }
 
     let mut audit = outcome.audit;
-    let run = run_skill_unlocked(
+    let run = run_skill_admitted(
         state,
-        RunSkillRequest {
+        AdmittedRunRequest {
             org_id: organization_id,
             company_id,
             skill_key: skill_key.to_string(),
+            skill_version: LLM_BUNDLED_SKILL_VERSION,
             inputs: input.inputs,
             agent_id: input.agent_id,
             team_member_id: input.team_member_id,
             triggered_by_hex: Some(identity_hex.to_string()),
             stdb_token: Some(stdb_token.to_string()),
-            overrides: input.max_steps.map(|max_steps| RunSkillOverrides {
-                max_steps: Some(max_steps),
-            }),
+            correlation_id: uuid::Uuid::new_v4().to_string(),
+            // Catalogued governed programs derive their reviewed call plan
+            // server-side from the immutable graph catalog.
+            reviewed_calls: Vec::new(),
+            // This request is intentionally unused for GP-17 catalog entries.
+            // Role-specific Decision/Generation/Reasoning adapters construct
+            // their own typed provider requests inside the governed runtime.
+            llm_request: LlmRequest {
+                provider: "governed-program".to_string(),
+                model: "governed-program".to_string(),
+                system: String::new(),
+                messages: Vec::new(),
+                max_tokens: 1,
+                temperature: None,
+                top_p: None,
+                tools: Vec::new(),
+            },
+            max_steps: input.max_steps,
+            resume_run_id: input.resume_run_id,
         },
     )
     .await
@@ -259,4 +303,46 @@ pub async fn run_governed_llm_skill(
         run: Some(run),
         audit: audit.into_trail(),
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn gp17_manifests_authorize_catalog_runtime_tools() {
+        let process = process_research_manifest();
+        assert!(process
+            .allowed_tools
+            .iter()
+            .any(|tool| tool == "analytics_summary"));
+        assert!(process
+            .allowed_tools
+            .iter()
+            .any(|tool| tool == "erp_search"));
+        assert!(process
+            .allowed_capabilities
+            .contains(&Capability::NamedRead));
+
+        let supplier = supplier_discovery_manifest();
+        assert!(supplier
+            .allowed_tools
+            .iter()
+            .any(|tool| tool == "erp_search"));
+        assert!(supplier
+            .allowed_tools
+            .iter()
+            .any(|tool| tool == "web_search"));
+        assert!(supplier.allowed_capabilities.contains(&Capability::Network));
+
+        let price = price_search_manifest();
+        assert!(price.allowed_tools.iter().any(|tool| tool == "erp_search"));
+        assert!(price.allowed_tools.iter().any(|tool| tool == "web_search"));
+        assert!(
+            !price
+                .allowed_capabilities
+                .contains(&Capability::ActionExecute),
+            "first GP-17 price-search graph must remain non-executing"
+        );
+    }
 }
