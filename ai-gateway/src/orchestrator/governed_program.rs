@@ -1414,6 +1414,8 @@ impl GovernedProgramExecutor<'_> {
                                 dependency_json(&node, &values).into_iter().collect(),
                             ),
                             format: generate.format.clone(),
+                            instructions: None,
+                            max_tokens: None,
                         })
                         .await?;
                     let draft = FinalDraft {
