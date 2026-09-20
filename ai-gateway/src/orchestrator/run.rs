@@ -33,8 +33,9 @@ use super::{
     },
     intelligence::EvidenceRef,
     intelligence_router::{
-        ConfiguredIntelligenceRouter, NoopShadowDecisionRecorder, RoutedDecisionProvider,
-        RoutedGenerationProvider, RoutedReasoningProvider, StdbShadowDecisionRecorder,
+        complete_routed_generation, ConfiguredIntelligenceRouter, NoopShadowDecisionRecorder,
+        RoutedDecisionProvider, RoutedGenerationProvider, RoutedReasoningProvider,
+        StdbShadowDecisionRecorder,
     },
     invocation_policy::ReviewedInvocationPolicy,
     knowledge_context::{compile_knowledge_context, knowledge_entry_keys, merge_into_inputs},
@@ -1476,21 +1477,21 @@ async fn synthesize_summary(
         )
     };
 
-    let response = state
-        .providers
-        .llm
-        .complete(crate::providers::llm::LlmRequest {
-            provider: agent.provider.clone(),
-            model: agent.model.clone(),
-            system,
-            messages: vec![LlmMessage::text("user", user)],
-            max_tokens: agent.max_tokens.min(2048),
-            temperature: Some(agent.temperature),
-            top_p: Some(agent.top_p),
-            tools: Vec::new(),
-        })
-        .await
-        .context("skill synthesis LLM")?;
+    let model_store = StdbModelConfigurationStore {
+        reader: state.stdb.as_ref(),
+    };
+    let response = complete_routed_generation(
+        &model_store,
+        org_id,
+        agent,
+        None,
+        state.providers.llm.as_ref(),
+        system,
+        vec![LlmMessage::text("user", user)],
+        agent.max_tokens.min(2048),
+    )
+    .await
+    .context("skill synthesis LLM")?;
 
     let tokens_used = response.input_tokens.saturating_add(response.output_tokens);
     Ok((response.text.trim().to_string(), tokens_used))
