@@ -162,7 +162,7 @@ impl<'a> ConfiguredIntelligenceRouter<'a> {
 /// `RoutedGenerationProvider` instead.
 #[allow(clippy::too_many_arguments)]
 pub(crate) async fn complete_routed_generation(
-    store: &dyn super::model_configuration::ModelConfigurationStore,
+    store: &super::model_configuration::StdbModelConfigurationStore<'_>,
     organization_id: u64,
     agent: &ResolvedAgentConfig,
     policy_ref: Option<&str>,
