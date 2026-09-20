@@ -2,7 +2,9 @@
 
 import { useQueryClient } from '@tanstack/react-query'
 import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
+import { PICKING_ORDER_RESOURCES } from "@lumiere/erp-workflows"
 import { rqBigIntKey } from "../../http"
+import { invalidateQueryResources } from "../workflow"
 
 export function companyScopeParams(companyId: bigint): Record<string, unknown> {
   return stdbParamsToJson({ companyId }, 'CompanyScopeParams')
@@ -105,4 +107,16 @@ export function invalidateInventoryQueries(
   void qc.invalidateQueries({ queryKey: ['inventory-exceptions-short-atp', orgKey] })
   void qc.invalidateQueries({ queryKey: ['inventory-exceptions-expired-lots', orgKey] })
   void qc.invalidateQueries({ queryKey: ['inventory-exceptions-open-qc', orgKey] })
+}
+
+/**
+ * A picking transition also mutates the order that originated it (delivered/received qty,
+ * invoiceable qty, linked backorders), so the owning order lists must converge with it.
+ */
+export function invalidateFulfillmentQueries(
+  qc: ReturnType<typeof useQueryClient>,
+  organizationId: bigint,
+) {
+  invalidateInventoryQueries(qc, organizationId)
+  void invalidateQueryResources(qc, organizationId, PICKING_ORDER_RESOURCES)
 }

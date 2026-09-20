@@ -90,7 +90,21 @@ export interface EntityAction extends EntityPermissioned {
   variant?: "default" | "outline" | "ghost" | "destructive"
   /** If true, button is disabled when no rows are selected */
   requiresSelection?: boolean
+  /**
+   * Presentation-only state gate: when rows are selected and this returns false the button is
+   * disabled. Never a permission check — the server re-validates every command.
+   */
+  isApplicable?: (selectedRows: Record<string, unknown>[]) => boolean
+  /** Ask before running: the table shows this dialog and only calls `onClick` on confirm. */
+  confirm?: EntityActionConfirmation
   onClick: (selectedRows: Record<string, unknown>[]) => void
+}
+
+export interface EntityActionConfirmation {
+  title: string
+  description: string
+  confirmLabel: string
+  cancelLabel: string
 }
 
 // ─── Table view config ───────────────────────────────────────────────────────

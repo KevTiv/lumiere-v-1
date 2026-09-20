@@ -42,6 +42,8 @@ const SOURCE_ROUTE_MAP: Record<string, SourceRouteTarget> = {
   account_move: { kind: "module_tab", module: "accounting", tab: "journal-entries" },
   mrp_production: { kind: "module_tab", module: "manufacturing", tab: "orders" },
   purchase_order: { kind: "module_tab", module: "purchasing", tab: "orders" },
+  purchase_requisition: { kind: "module_tab", module: "purchasing", tab: "requisitions" },
+  stock_picking: { kind: "module_tab", module: "inventory", tab: "transfers" },
 }
 
 function normalizeSourceKey(raw?: string): string | undefined {
@@ -76,6 +78,13 @@ function resolveTarget(target: SourceRouteTarget, recordId?: string): string | u
     return `${target.prefix}/${encodeURIComponent(recordId)}`
   }
   return buildModuleTabHref(target.module, target.tab)
+}
+
+/** Owning module tab for a canonical table name; undefined for path-prefixed or unknown resources. */
+export function resolveErpResourceTarget(resource: string): { module: string; tab: string } | undefined {
+  const key = normalizeSourceKey(resource)
+  const target = key ? SOURCE_ROUTE_MAP[key] : undefined
+  return target?.kind === "module_tab" ? { module: target.module, tab: target.tab } : undefined
 }
 
 /**

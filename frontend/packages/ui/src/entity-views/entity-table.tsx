@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect } from "react"
 import { cn } from "../lib/utils"
-import type { EntityTableConfig } from "../lib/entity-view-types"
+import type { EntityAction, EntityTableConfig } from "../lib/entity-view-types"
 import { filterEntitySurface } from "../lib/entity-view-types"
 import { useRBAC } from "../lib/rbac-context"
 import {
@@ -15,6 +15,16 @@ import {
 } from "../components/table"
 import { Input } from "../components/input"
 import { Button } from "../components/button"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "../components/alert-dialog"
 import {
   Select,
   SelectContent,
@@ -41,7 +51,7 @@ import {
 } from "../components/empty"
 import { Skeleton } from "../components/skeleton"
 import { TooltipProvider } from "../components/tooltip"
-import { Search, ArrowUp, ArrowDown, ArrowUpDown, FileDown } from "lucide-react"
+import { Search, ArrowUp, ArrowDown, ArrowUpDown, FileDown, X } from "lucide-react"
 import {
   radixSelectControlledValue,
   radixSelectItemValue,
@@ -190,6 +200,12 @@ export function EntityTable({
 
   const rowKey = config.rowKey ?? "id"
 
+  // Filters with no toolbar control (e.g. `id` from a record link) would otherwise be invisible
+  // and impossible to clear.
+  const hiddenFilters = Object.entries(filters).filter(
+    ([key, value]) => value && value !== "__all__" && !config.filters?.some((f) => f.key === key),
+  )
+
   const filtered = useMemo(() => {
     let rows = data
 
@@ -239,6 +255,16 @@ export function EntityTable({
     })
   }
 
+  const [pendingConfirm, setPendingConfirm] = useState<{
+    action: EntityAction
+    rows: Record<string, unknown>[]
+  } | null>(null)
+
+  const runAction = (action: EntityAction) => {
+    if (action.confirm) setPendingConfirm({ action, rows: selectedRows })
+    else action.onClick(selectedRows)
+  }
+
   const hasActions = actions.length > 0
   const selectionToggleOnRowClick =
     config.rowSelectionToggleOnClick ??
@@ -286,6 +312,28 @@ export function EntityTable({
   return (
     <TooltipProvider>
       <div className={cn("space-y-4", className)} data-testid="entity-table">
+        {hiddenFilters.length > 0 && (
+          <div className="flex flex-wrap items-center gap-2" data-testid="entity-active-filters">
+            {hiddenFilters.map(([key, value]) => (
+              <Button
+                key={key}
+                variant="secondary"
+                size="sm"
+                aria-label={`Clear filter ${key}`}
+                data-testid={`entity-active-filter-${key}`}
+                onClick={() =>
+                  setFilters((prev) => {
+                    const { [key]: _removed, ...rest } = prev
+                    return rest
+                  })
+                }
+              >
+                {key}: {value}
+                <X className="ml-2 h-3 w-3" />
+              </Button>
+            ))}
+          </div>
+        )}
         {(config.searchable || (config.filters?.length ?? 0) > 0 || hasActions) && (
           <div className="flex flex-wrap items-center gap-3 rounded-xl border border-border bg-card p-3 shadow-xs">
             {config.searchable && (
@@ -352,8 +400,11 @@ export function EntityTable({
                     key={action.id}
                     variant={action.variant ?? "outline"}
                     size="sm"
-                    disabled={action.requiresSelection && selectedRows.length === 0}
-                    onClick={() => action.onClick(selectedRows)}
+                    disabled={
+                      (action.requiresSelection && selectedRows.length === 0) ||
+                      (selectedRows.length > 0 && action.isApplicable?.(selectedRows) === false)
+                    }
+                    onClick={() => runAction(action)}
                     data-testid={`entity-action-${action.id}`}
                   >
                     {Icon && <Icon className="mr-2 h-4 w-4" />}
@@ -561,6 +612,24 @@ export function EntityTable({
           </p>
         )}
       </div>
+      <AlertDialog open={pendingConfirm != null} onOpenChange={(open) => !open && setPendingConfirm(null)}>
+        <AlertDialogContent data-testid="entity-action-confirm">
+          <AlertDialogHeader>
+            <AlertDialogTitle>{pendingConfirm?.action.confirm?.title}</AlertDialogTitle>
+            <AlertDialogDescription>{pendingConfirm?.action.confirm?.description}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{pendingConfirm?.action.confirm?.cancelLabel}</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (pendingConfirm) pendingConfirm.action.onClick(pendingConfirm.rows)
+              }}
+            >
+              {pendingConfirm?.action.confirm?.confirmLabel}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </TooltipProvider>
   )
 }

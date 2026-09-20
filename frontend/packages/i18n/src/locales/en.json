@@ -5553,6 +5553,32 @@
         "Cancelled": "Cancelled"
       }
     },
+    "rfqs": {
+      "title": "RFQs",
+      "description": "Requests for quotation sent to vendors",
+      "searchPlaceholder": "Search RFQs",
+      "emptyMessage": "No RFQs yet. Create one from a purchase agreement.",
+      "columns": {
+        "name": "RFQ",
+        "state": "State",
+        "requisitionId": "Agreement",
+        "purchaseOrderId": "Purchase order",
+        "notes": "Notes"
+      }
+    },
+    "rfqBids": {
+      "title": "RFQ Bids",
+      "description": "Vendor bids to evaluate and award",
+      "searchPlaceholder": "Search bids",
+      "emptyMessage": "No bids yet.",
+      "columns": {
+        "rfqId": "RFQ",
+        "partnerId": "Vendor",
+        "priceUnit": "Unit price",
+        "amountTotal": "Total",
+        "state": "State"
+      }
+    },
     "purchaseAgreements": {
       "title": "Purchase Agreements",
       "description": "Blanket orders and purchase agreements",
@@ -6056,6 +6082,27 @@
       "vendorCreditFromReturn": "Vendor credit from return"
     }
   },
+  "erpWorkflow": {
+    "applied": "Done",
+    "approvalPending": "Sent for approval",
+    "confirm": {
+      "description": "This can't be undone.",
+      "confirm": "Confirm",
+      "dismiss": "Keep"
+    },
+    "errors": {
+      "validation": "Action not allowed",
+      "permission_denied": "You don't have permission",
+      "approval_required": "Approval required",
+      "stale_revision": "Record changed",
+      "conflict": "Conflict",
+      "already_applied": "Already applied",
+      "retryable_transport": "Service temporarily unavailable, try again",
+      "outcome_unknown": "Result unknown, check the record before retrying",
+      "not_found": "Record not found",
+      "server_failure": "Something went wrong"
+    }
+  },
   "sales": {
     "dashboard": {
       "ordersByState": "Orders by State",
@@ -6161,7 +6208,31 @@
         "amountResidual": "Outstanding",
         "invoiceStatus": "Invoice",
         "dateOrder": "Order Date",
-        "deliveryCount": "Deliveries"
+        "deliveryCount": "Deliveries",
+        "deliverySummary": "Delivery",
+        "invoiceSummary": "Invoicing",
+        "paymentSummary": "Payment",
+        "outstandingAmount": "Balance due"
+      },
+      "cashSummary": {
+        "delivery": {
+          "none": "Not started",
+          "pending": "To deliver",
+          "partial": "Partially delivered",
+          "complete": "Delivered"
+        },
+        "invoice": {
+          "none": "Not invoiced",
+          "draft": "Draft invoice",
+          "posted": "Invoiced",
+          "credited": "Credited"
+        },
+        "payment": {
+          "none": "—",
+          "unpaid": "Unpaid",
+          "partial": "Partially paid",
+          "paid": "Paid"
+        }
       },
       "filters": {
         "state": {
@@ -6308,6 +6379,9 @@
         "received": "Received",
         "refunded": "Refunded",
         "cancelled": "Cancelled"
+      },
+      "errors": {
+        "notReceivable": "The return picking can no longer be received."
       },
       "actions": {
         "confirm": "Confirm",
@@ -6735,11 +6809,11 @@
         "fields": {
           "orderedQty": "Ordered: {{qty}}",
           "createBackorder": "Create backorder for short quantities",
-          "createBackorderHint": "When short quantities are validated, create a new picking for the remainder (keeps reservation)."
+          "createBackorderHint": "When short quantities are validated, create a new picking for the remainder. Assign it later to reserve stock again."
         },
         "errors": {
           "noAssignedMoves": "No assigned move lines on this picking.",
-          "invalidQty": "Quantity must be between 0 and the ordered amount.",
+          "invalidQty": "Quantity must be greater than 0 and no more than the ordered amount.",
           "qtyRequired": "Enter a quantity for each move line."
         }
       },

@@ -26,6 +26,7 @@
     "@lumiere/contracts": "github:KevTiv/lumiere-contracts#v0.3.51&path:packages/contracts",
     "@lumiere/erp-session": "workspace:*",
     "@lumiere/erp-shared": "workspace:*",
+    "@lumiere/erp-workflows": "workspace:*",
     "@lumiere/i18n": "workspace:*",
     "@lumiere/stdb": "workspace:*",
     "@tanstack/react-query": "5.96.2",

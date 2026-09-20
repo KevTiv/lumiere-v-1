@@ -20,6 +20,7 @@ import {
   editProductForm,
   newProductVariantForm,
   assignUserToPickingForm,
+  pickingRowActions,
   newQualityCheckForm,
   newQualityPointForm,
   newQualityTeamForm,
@@ -1922,59 +1923,38 @@ function InventoryClientLoaded({
             ...tab.entityConfig,
             view: {
               ...v,
-              actions: [
+              actions: pickingRowActions(
+                t,
                 {
-                  id: 'confirm-picking',
-                  label: t('inventory.transferActions.confirm'),
-                  icon: CheckCircle,
-                  requiresSelection: true,
-                  onClick: (rows) => {
+                  confirm: (rows) => {
                     const id = rows[0]?.id as ScalarId | undefined;
                     if (id != null) void confirmPicking.mutateAsync(id);
                   },
-                },
-                {
-                  id: 'assign-picking',
-                  label: t('inventory.transferActions.assign'),
-                  icon: UserCircle2,
-                  requiresSelection: true,
-                  onClick: (rows) => {
+                  assign: (rows) => {
                     const id = rows[0]?.id as ScalarId | undefined;
                     if (id != null) void assignPicking.mutateAsync(id);
                   },
-                },
-                {
-                  id: 'assign-user-picking',
-                  label: t('inventory.transferActions.assignUser'),
-                  icon: UserPlus,
-                  requiresSelection: true,
-                  onClick: (rows) => {
+                  'assign-user': (rows) => {
                     const id = rows[0]?.id as ScalarId | undefined;
                     if (id != null) setAssignPickingId(id);
                   },
-                },
-                {
-                  id: 'validate-picking',
-                  label: t('inventory.transferActions.validate'),
-                  icon: ListChecks,
-                  requiresSelection: true,
-                  onClick: (rows) => {
+                  validate: (rows) => {
                     const id = rows[0]?.id as ScalarId | undefined;
                     if (id != null) void validatePicking.mutateAsync(id);
                   },
-                },
-                {
-                  id: 'cancel-picking',
-                  label: t('inventory.transferActions.cancel'),
-                  icon: XCircle,
-                  variant: 'destructive',
-                  requiresSelection: true,
-                  onClick: (rows) => {
+                  cancel: (rows) => {
                     const id = rows[0]?.id as ScalarId | undefined;
                     if (id != null) void cancelPicking.mutateAsync(id);
                   },
                 },
-              ],
+                {
+                  confirm: CheckCircle,
+                  assign: UserCircle2,
+                  'assign-user': UserPlus,
+                  validate: ListChecks,
+                  cancel: XCircle,
+                },
+              ),
             },
           },
         };

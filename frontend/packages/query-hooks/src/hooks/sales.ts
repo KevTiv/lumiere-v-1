@@ -46,17 +46,32 @@ import type {
 } from "@lumiere/stdb/types"
 
 import { finalizeUpdateSaleOrderParams } from "./sales-params-merge"
+import { invalidateQueryResources } from "./workflow"
+import {
+  CONFIRM_SALE_ORDER_AFFECTS,
+  CANCEL_RETURN_AFFECTS,
+  CONFIRM_RETURN_AFFECTS,
+  CREATE_INVOICE_FROM_SALE_ORDER_AFFECTS,
+  CREDIT_NOTE_FROM_RETURN_AFFECTS,
+  EXCHANGE_FROM_RETURN_AFFECTS,
+  WorkflowError,
+  workflowErrorFromResponse,
+} from "@lumiere/erp-workflows"
 
 // ── Reads ────────────────────────────────────────────────────────────────────
+
+export const saleOrdersQueryOptions = (organizationId: bigint) => ({
+  queryKey: ['sale-orders', rqBigIntKey(organizationId)] as const,
+  queryFn: () => fetchQueryList('/api/query/sale-orders', 'Failed to fetch sale orders'),
+  staleTime: 30_000,
+})
 
 export function useSaleOrders(
   organizationId: bigint,
   initialData?: SaleOrder[],
 ) {
   return useQuery<SaleOrder[]>({
-    queryKey: ['sale-orders', rqBigIntKey(organizationId)],
-    queryFn: () => fetchQueryList('/api/query/sale-orders', 'Failed to fetch sale orders'),
-    staleTime: 30_000,
+    ...saleOrdersQueryOptions(organizationId),
     initialData: coalesceQueryInitialData(initialData),
   })
 }
@@ -168,9 +183,7 @@ export function usePosLoyaltyCards(organizationId: bigint, initialData?: PosLoya
 
 export function useReturnOrders(organizationId: bigint, initialData?: ReturnOrder[]) {
   return useQuery<ReturnOrder[]>({
-    queryKey: ['return-orders', rqBigIntKey(organizationId)],
-    queryFn: () => fetchQueryList('/api/query/return-orders', 'Failed to fetch return orders'),
-    staleTime: 30_000,
+    ...returnOrdersQueryOptions(organizationId),
     initialData: coalesceQueryInitialData(initialData),
   })
 }
@@ -246,26 +259,26 @@ async function salesReducerError(r: Response, fallback: string): Promise<Error> 
   return new Error(body || fallback)
 }
 
+/** The one `confirm_sales_order` invocation, shared by the mutation hook and the workflow action. */
+export async function confirmSaleOrderCommand(
+  companyId: bigint | undefined,
+  orderId: bigint | number | string,
+): Promise<void> {
+  if (companyId == null || companyId === 0n) {
+    throw new WorkflowError("validation", "companyId is required to confirm a sale order")
+  }
+  const { urlPath, init } = stdbBffCommandPost("confirm_sales_order", { companyId: companyId, orderId: orderId })
+  const r = await apiFetch(urlPath, init)
+  if (!r.ok) {
+    throw workflowErrorFromResponse(r.status, await r.text().catch(() => ""), "Failed to confirm sale order")
+  }
+}
+
 export function useConfirmSaleOrder(organizationId: bigint, companyId?: bigint) {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async (orderId: bigint | number | string) => {
-      if (companyId == null || companyId === 0n) {
-        throw new Error("companyId is required to confirm a sale order")
-      }
-      const { urlPath, init } = stdbBffCommandPost("confirm_sales_order", { companyId: companyId, orderId: orderId })
-      const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw await salesReducerError(r, "Failed to confirm sale order")
-    },
-    onSuccess: () => {
-      const k = rqBigIntKey(organizationId)
-      qc.invalidateQueries({ queryKey: ['sale-orders', k] })
-      qc.invalidateQueries({ queryKey: ['sale-orders-to-approve', k] })
-      qc.invalidateQueries({ queryKey: ['sale-order-lines', k] })
-      qc.invalidateQueries({ queryKey: ['picking-batches', k] })
-      qc.invalidateQueries({ queryKey: ['stock-pickings', k] })
-      qc.invalidateQueries({ queryKey: ['stock-moves', k] })
-    },
+    mutationFn: (orderId: bigint | number | string) => confirmSaleOrderCommand(companyId, orderId),
+    onSuccess: () => invalidateQueryResources(qc, organizationId, CONFIRM_SALE_ORDER_AFFECTS),
   })
 }
 
@@ -372,15 +385,8 @@ export function useCreateExchangeOrderFromReturn(
 ) {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async (returnOrderId: bigint | number | string) => {
-      const { urlPath, init } = stdbBffCommandPost("create_exchange_order_from_return", { companyId: companyId, returnOrderId: toScalarU64(returnOrderId) })
-      const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error(await r.text().catch(() => "Failed to create exchange order"))
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["sale-orders", rqBigIntKey(organizationId)] })
-      qc.invalidateQueries({ queryKey: ["return-orders", rqBigIntKey(organizationId)] })
-    },
+    mutationFn: (returnOrderId: bigint | number | string) => createExchangeOrderFromReturnCommand(companyId, returnOrderId),
+    onSuccess: () => invalidateQueryResources(qc, organizationId, EXCHANGE_FROM_RETURN_AFFECTS),
   })
 }
 
@@ -647,40 +653,42 @@ export function useDeleteSaleOrderLine(organizationId: bigint) {
   })
 }
 
+type CreateInvoiceFromSaleOrderInput = {
+  orderId: bigint | number | string
+  params: import('@lumiere/stdb/types').CreateInvoiceFromSaleOrderParams
+}
+
+/** The one `create_invoice_from_sale_order` invocation, shared by the mutation hook and the workflow action. */
+export async function createInvoiceFromSaleOrderCommand({
+  orderId,
+  params,
+}: CreateInvoiceFromSaleOrderInput): Promise<void> {
+  const u64 = (v: bigint | number | string) => (typeof v === "bigint" ? v : BigInt(String(v)))
+  const encodedParams = stdbParamsToJson(
+    {
+      journalId: params.journalId,
+      defaultIncomeAccountId: params.defaultIncomeAccountId,
+      receivableLine: stdbParamsToJson(
+        params.receivableLine as object,
+        "AddAccountMoveLineParams",
+      ),
+      incomeLine: stdbParamsToJson(params.incomeLine as object, "AddAccountMoveLineParams"),
+      metadata: params.metadata,
+    } as object,
+    "CreateInvoiceFromSaleOrderParams",
+  )
+  const { urlPath, init } = stdbBffCommandPost("create_invoice_from_sale_order", { saleOrderId: u64(orderId), params: encodedParams })
+  const r = await apiFetch(urlPath, init)
+  if (!r.ok) {
+    throw workflowErrorFromResponse(r.status, await r.text().catch(() => ""), "Failed to create invoice")
+  }
+}
+
 export function useCreateInvoiceFromSaleOrder(organizationId: bigint) {
   const qc = useQueryClient()
-  return useMutation<
-    void,
-    Error,
-    {
-      orderId: bigint | number | string
-      params: import('@lumiere/stdb/types').CreateInvoiceFromSaleOrderParams
-    }
-  >({
-    mutationFn: async ({ orderId, params }) => {
-      const u64 = (v: bigint | number | string) => (typeof v === "bigint" ? v : BigInt(String(v)))
-      const encodedParams = stdbParamsToJson(
-        {
-          journalId: params.journalId,
-          defaultIncomeAccountId: params.defaultIncomeAccountId,
-          receivableLine: stdbParamsToJson(
-            params.receivableLine as object,
-            "AddAccountMoveLineParams",
-          ),
-          incomeLine: stdbParamsToJson(params.incomeLine as object, "AddAccountMoveLineParams"),
-          metadata: params.metadata,
-        } as object,
-        "CreateInvoiceFromSaleOrderParams",
-      )
-      const { urlPath, init } = stdbBffCommandPost("create_invoice_from_sale_order", { saleOrderId: u64(orderId), params: encodedParams })
-      const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error(await parseCallErrorSales(r))
-    },
-    onSuccess: () => {
-      const orgKey = rqBigIntKey(organizationId)
-      void qc.invalidateQueries({ queryKey: ['sale-orders', orgKey] })
-      void qc.invalidateQueries({ queryKey: ['account-moves', orgKey] })
-    },
+  return useMutation<void, Error, CreateInvoiceFromSaleOrderInput>({
+    mutationFn: createInvoiceFromSaleOrderCommand,
+    onSuccess: () => invalidateQueryResources(qc, organizationId, CREATE_INVOICE_FROM_SALE_ORDER_AFFECTS),
   })
 }
 
@@ -703,67 +711,75 @@ export function useCreateReturnOrder(organizationId: bigint, companyId: bigint) 
   })
 }
 
+async function returnOrderCommand(
+  reducer: "confirm_return_order" | "cancel_return_order" | "create_exchange_order_from_return",
+  companyId: bigint,
+  returnOrderId: bigint | number | string,
+  fallback: string,
+): Promise<void> {
+  const { urlPath, init } = stdbBffCommandPost(reducer, { companyId: companyId, returnOrderId: toScalarU64(returnOrderId) })
+  const r = await apiFetch(urlPath, init)
+  if (!r.ok) throw workflowErrorFromResponse(r.status, await r.text().catch(() => ""), fallback)
+}
+
+export const confirmReturnOrderCommand = (companyId: bigint, returnOrderId: bigint | number | string) =>
+  returnOrderCommand("confirm_return_order", companyId, returnOrderId, "Failed to confirm return order")
+export const cancelReturnOrderCommand = (companyId: bigint, returnOrderId: bigint | number | string) =>
+  returnOrderCommand("cancel_return_order", companyId, returnOrderId, "Failed to cancel return order")
+export const createExchangeOrderFromReturnCommand = (companyId: bigint, returnOrderId: bigint | number | string) =>
+  returnOrderCommand("create_exchange_order_from_return", companyId, returnOrderId, "Failed to create exchange order")
+
+type CreateCreditNoteFromReturnOrderInput = {
+  returnOrderId: bigint | number | string
+  params: CreateCreditNoteFromReturnOrderParams
+}
+
+export async function createCreditNoteFromReturnOrderCommand(
+  companyId: bigint,
+  { returnOrderId, params }: CreateCreditNoteFromReturnOrderInput,
+): Promise<void> {
+  const encodedParams = stdbParamsToJson(
+    {
+      journalId: params.journalId,
+      defaultIncomeAccountId: params.defaultIncomeAccountId,
+      receivableLine: stdbParamsToJson(params.receivableLine as object, "AddAccountMoveLineParams"),
+      incomeLine: stdbParamsToJson(params.incomeLine as object, "AddAccountMoveLineParams"),
+      metadata: params.metadata,
+    } as object,
+    "CreateCreditNoteFromReturnOrderParams",
+  )
+  const { urlPath, init } = stdbBffCommandPost("create_credit_note_from_return_order", { companyId: companyId, returnOrderId: toScalarU64(returnOrderId), params: encodedParams })
+  const r = await apiFetch(urlPath, init)
+  if (!r.ok) throw workflowErrorFromResponse(r.status, await r.text().catch(() => ""), "Failed to create credit note")
+}
+
+export const returnOrdersQueryOptions = (organizationId: bigint) => ({
+  queryKey: ['return-orders', rqBigIntKey(organizationId)] as const,
+  queryFn: () => fetchQueryList('/api/query/return-orders', 'Failed to fetch return orders'),
+  staleTime: 30_000,
+})
+
 export function useConfirmReturnOrder(organizationId: bigint, companyId: bigint) {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async (returnOrderId: bigint | number | string) => {
-      const { urlPath, init } = stdbBffCommandPost("confirm_return_order", { companyId: companyId, returnOrderId: toScalarU64(returnOrderId) })
-      const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error(await parseCallErrorSales(r))
-    },
-    onSuccess: () => {
-      const k = rqBigIntKey(organizationId)
-      void qc.invalidateQueries({ queryKey: ['return-orders', k] })
-      void qc.invalidateQueries({ queryKey: ['stock-pickings', k] })
-      void qc.invalidateQueries({ queryKey: ['stock-moves', k] })
-    },
+    mutationFn: (returnOrderId: bigint | number | string) => confirmReturnOrderCommand(companyId, returnOrderId),
+    onSuccess: () => invalidateQueryResources(qc, organizationId, CONFIRM_RETURN_AFFECTS),
   })
 }
 
 export function useCancelReturnOrder(organizationId: bigint, companyId: bigint) {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async (returnOrderId: bigint | number | string) => {
-      const { urlPath, init } = stdbBffCommandPost("cancel_return_order", { companyId: companyId, returnOrderId: toScalarU64(returnOrderId) })
-      const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error(await parseCallErrorSales(r))
-    },
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ['return-orders', rqBigIntKey(organizationId)] })
-    },
+    mutationFn: (returnOrderId: bigint | number | string) => cancelReturnOrderCommand(companyId, returnOrderId),
+    onSuccess: () => invalidateQueryResources(qc, organizationId, CANCEL_RETURN_AFFECTS),
   })
 }
 
 export function useCreateCreditNoteFromReturnOrder(organizationId: bigint, companyId: bigint) {
   const qc = useQueryClient()
-  return useMutation<
-    void,
-    Error,
-    { returnOrderId: bigint | number | string; params: CreateCreditNoteFromReturnOrderParams }
-  >({
-    mutationFn: async ({ returnOrderId, params }) => {
-      const encodedParams = stdbParamsToJson(
-        {
-          journalId: params.journalId,
-          defaultIncomeAccountId: params.defaultIncomeAccountId,
-          receivableLine: stdbParamsToJson(
-            params.receivableLine as object,
-            "AddAccountMoveLineParams",
-          ),
-          incomeLine: stdbParamsToJson(params.incomeLine as object, "AddAccountMoveLineParams"),
-          metadata: params.metadata,
-        } as object,
-        "CreateCreditNoteFromReturnOrderParams",
-      )
-      const { urlPath, init } = stdbBffCommandPost("create_credit_note_from_return_order", { companyId: companyId, returnOrderId: toScalarU64(returnOrderId), params: encodedParams })
-      const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error(await parseCallErrorSales(r))
-    },
-    onSuccess: () => {
-      const k = rqBigIntKey(organizationId)
-      void qc.invalidateQueries({ queryKey: ['return-orders', k] })
-      void qc.invalidateQueries({ queryKey: ['account-moves', k] })
-    },
+  return useMutation<void, Error, CreateCreditNoteFromReturnOrderInput>({
+    mutationFn: (input) => createCreditNoteFromReturnOrderCommand(companyId, input),
+    onSuccess: () => invalidateQueryResources(qc, organizationId, CREDIT_NOTE_FROM_RETURN_AFFECTS),
   })
 }
 

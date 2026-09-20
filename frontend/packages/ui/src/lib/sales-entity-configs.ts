@@ -33,6 +33,25 @@ const invoiceStatusBadges = (t: TFunction) => ({
   },
 }) as const
 
+/** Badge maps for the derived order-to-cash summary (`@lumiere/erp-workflows` order-summary). */
+const cashSummaryBadges = (
+  t: TFunction,
+  group: "delivery" | "invoice" | "payment",
+  variants: Record<string, "default" | "secondary" | "outline" | "destructive">,
+) => ({
+  badgeVariants: variants,
+  badgeLabels: Object.fromEntries(
+    Object.keys(variants).map((value) => [value, t(`sales.salesOrders.cashSummary.${group}.${value}`)]),
+  ),
+})
+
+const deliverySummaryBadges = (t: TFunction) =>
+  cashSummaryBadges(t, "delivery", { none: "secondary", pending: "outline", partial: "outline", complete: "default" })
+const invoiceSummaryBadges = (t: TFunction) =>
+  cashSummaryBadges(t, "invoice", { none: "secondary", draft: "outline", posted: "default", credited: "secondary" })
+const paymentSummaryBadges = (t: TFunction) =>
+  cashSummaryBadges(t, "payment", { none: "secondary", unpaid: "outline", partial: "outline", paid: "default" })
+
 const batchStateBadges = (t: TFunction) => ({
   badgeVariants: { Draft: "secondary", InProgress: "outline", Done: "default", Cancel: "destructive" },
   badgeLabels: {
@@ -89,6 +108,15 @@ export const saleOrderDetailConfig = (t: TFunction): EntityDetailConfig => ({
           type: "badge",
           ...invoiceStatusBadges(t),
         },
+      ],
+    },
+    {
+      id: "order-to-cash",
+      fields: [
+        { key: "deliverySummary", label: t("sales.salesOrders.columns.deliverySummary"), type: "badge", ...deliverySummaryBadges(t) },
+        { key: "invoiceSummary", label: t("sales.salesOrders.columns.invoiceSummary"), type: "badge", ...invoiceSummaryBadges(t) },
+        { key: "paymentSummary", label: t("sales.salesOrders.columns.paymentSummary"), type: "badge", ...paymentSummaryBadges(t) },
+        { key: "outstandingAmount", label: t("sales.salesOrders.columns.outstandingAmount"), type: "currency" },
       ],
     },
   ],
@@ -184,10 +212,22 @@ export const saleOrdersTableConfig = (
           align: "right",
         },
         {
-          key: "invoiceStatus",
-          label: t("sales.salesOrders.columns.invoiceStatus"),
+          key: "deliverySummary",
+          label: t("sales.salesOrders.columns.deliverySummary"),
           type: "badge",
-          ...invoiceStatusBadges(t),
+          ...deliverySummaryBadges(t),
+        },
+        {
+          key: "invoiceSummary",
+          label: t("sales.salesOrders.columns.invoiceSummary"),
+          type: "badge",
+          ...invoiceSummaryBadges(t),
+        },
+        {
+          key: "paymentSummary",
+          label: t("sales.salesOrders.columns.paymentSummary"),
+          type: "badge",
+          ...paymentSummaryBadges(t),
         },
         {
           key: "dateOrder",

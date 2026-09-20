@@ -275,6 +275,10 @@ export * from "./stock-3d/warehouse-3d-context";
 //   dynamic(() => import("@lumiere/ui/stock-3d/warehouse-viewer").then(m => m.WarehouseViewer), { ssr: false })
 
 export * from "./entity-views/entity-record-sheet";
+export * from "./entity-views/record-workflow-actions";
+export * from "./lib/workflow-actions";
+export * from "./lib/workflow-toast";
+export * from "./lib/module-url-filters";
 
 export * from "./pages/erp-command-palette";
 

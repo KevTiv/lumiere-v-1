@@ -27,6 +27,26 @@ import {
 } from "@lumiere/erp-shared/stdb-params-json"
 import { scalarToU64 as toScalarU64, type ScalarId } from "@lumiere/erp-shared/u64"
 import { invalidateStdbQueryResources } from "./stdb"
+import { invalidateQueryResources } from "./workflow"
+import {
+  APPLY_LANDED_COST_AFFECTS,
+  AWARD_RFQ_BID_AFFECTS,
+  CANCEL_PURCHASE_ORDER_AFFECTS,
+  CONFIRM_PURCHASE_RETURN_AFFECTS,
+  LANDED_COST_DRAFT_AFFECTS,
+  POST_LANDED_COST_AFFECTS,
+  RELEASE_BLANKET_AFFECTS,
+  SUPPLIER_INTAKE_TRANSITION_AFFECTS,
+  VENDOR_CREDIT_FROM_RETURN_AFFECTS,
+  CONFIRM_PURCHASE_ORDER_AFFECTS,
+  CONVERT_REQUISITION_AFFECTS,
+  CREATE_BILL_FROM_PURCHASE_ORDER_AFFECTS,
+  RECEIVE_PO_LINE_AFFECTS,
+  REQUISITION_TRANSITION_AFFECTS,
+  SEND_PURCHASE_ORDER_AFFECTS,
+  WorkflowError,
+  workflowErrorFromResponse,
+} from "@lumiere/erp-workflows"
 import { stbTimestampFromDate } from "@lumiere/erp-shared/stb-timestamp"
 import type {
   CreatePurchaseOrderParams,
@@ -38,6 +58,8 @@ import type {
   PurchaseOrder,
   PurchaseOrderLine,
   PurchaseRequisition,
+  PurchaseRfq,
+  PurchaseRfqBid,
   StockLandedCost,
   StockLandedCostLines,
   ResPartnerBank,
@@ -102,14 +124,18 @@ import { responseErrorMessage as parseCallErrorPo } from "@lumiere/api-client/re
 
 // ── Reads ────────────────────────────────────────────────────────────────────
 
+export const purchaseOrdersQueryOptions = (organizationId: bigint) => ({
+  queryKey: ['purchase-orders', rqBigIntKey(organizationId)] as const,
+  queryFn: () => fetchQueryList('/api/query/purchase-orders', 'Failed to fetch purchase orders'),
+  staleTime: 30_000,
+})
+
 export function usePurchaseOrders(
   organizationId: bigint,
   initialData?: PurchaseOrder[],
 ) {
   return useQuery<PurchaseOrder[]>({
-    queryKey: ['purchase-orders', rqBigIntKey(organizationId)],
-    queryFn: () => fetchQueryList('/api/query/purchase-orders', 'Failed to fetch purchase orders'),
-    staleTime: 30_000,
+    ...purchaseOrdersQueryOptions(organizationId),
     initialData: coalesceQueryInitialData(initialData),
   })
 }
@@ -169,13 +195,51 @@ export function usePurchaseOrderLines(
   })
 }
 
+export const purchaseRequisitionsQueryOptions = (organizationId: bigint) => ({
+  queryKey: ['purchase-requisitions', rqBigIntKey(organizationId)] as const,
+  queryFn: () => fetchQueryList('/api/query/purchase-requisitions', 'Failed to fetch purchase requisitions'),
+  staleTime: 30_000,
+})
+
 export function usePurchaseRequisitions(
   organizationId: bigint,
   initialData?: PurchaseRequisition[],
 ) {
   return useQuery<PurchaseRequisition[]>({
-    queryKey: ['purchase-requisitions', rqBigIntKey(organizationId)],
-    queryFn: () => fetchQueryList('/api/query/purchase-requisitions', 'Failed to fetch purchase requisitions'),
+    ...purchaseRequisitionsQueryOptions(organizationId),
+    initialData: coalesceQueryInitialData(initialData),
+  })
+}
+
+export const purchaseReturnsQueryOptions = (organizationId: bigint) => ({
+  queryKey: ['purchase-returns', rqBigIntKey(organizationId)] as const,
+  queryFn: () => fetchQueryList('/api/query/purchase-returns', 'Failed to fetch purchase returns'),
+  staleTime: 30_000,
+})
+
+export function usePurchaseReturns(
+  organizationId: bigint,
+  initialData?: Record<string, unknown>[],
+) {
+  return useQuery<Record<string, unknown>[]>({
+    ...purchaseReturnsQueryOptions(organizationId),
+    initialData: coalesceQueryInitialData(initialData),
+  })
+}
+
+export function usePurchaseRfqs(organizationId: bigint, initialData?: PurchaseRfq[]) {
+  return useQuery<PurchaseRfq[]>({
+    queryKey: ['purchase-rfqs', rqBigIntKey(organizationId)],
+    queryFn: () => fetchQueryList('/api/query/purchase-rfqs', 'Failed to fetch purchase RFQs'),
+    staleTime: 30_000,
+    initialData: coalesceQueryInitialData(initialData),
+  })
+}
+
+export function usePurchaseRfqBids(organizationId: bigint, initialData?: PurchaseRfqBid[]) {
+  return useQuery<PurchaseRfqBid[]>({
+    queryKey: ['purchase-rfq-bids', rqBigIntKey(organizationId)],
+    queryFn: () => fetchQueryList('/api/query/purchase-rfq-bids', 'Failed to fetch RFQ bids'),
     staleTime: 30_000,
     initialData: coalesceQueryInitialData(initialData),
   })
@@ -318,46 +382,288 @@ export function useAddPurchaseRequisitionLine(
   })
 }
 
+// ── Commands ─────────────────────────────────────────────────────────────────
+// One invocation per reducer, shared by the mutation hooks below and the procure-to-pay workflow
+// actions (`purchasing-workflow.ts`); failures are typed so surfaces can present them uniformly.
+
+async function purchaseOrderCommand(
+  reducer: "send_purchase_order" | "confirm_purchase_order" | "cancel_purchase_order",
+  orderId: bigint | number | string,
+  fallback: string,
+): Promise<void> {
+  const { urlPath, init } = stdbBffCommandPost(reducer, { orderId: toScalarU64(orderId) })
+  const r = await apiFetch(urlPath, init)
+  if (!r.ok) throw workflowErrorFromResponse(r.status, await r.text().catch(() => ""), fallback)
+}
+
+export const sendPurchaseOrderCommand = (orderId: bigint | number | string) =>
+  purchaseOrderCommand("send_purchase_order", orderId, "Failed to send purchase order")
+export const confirmPurchaseOrderCommand = (orderId: bigint | number | string) =>
+  purchaseOrderCommand("confirm_purchase_order", orderId, "Failed to confirm purchase order")
+export const cancelPurchaseOrderCommand = (orderId: bigint | number | string) =>
+  purchaseOrderCommand("cancel_purchase_order", orderId, "Failed to cancel purchase order")
+
+async function requisitionCommand(
+  reducer:
+    | "submit_purchase_requisition"
+    | "approve_purchase_requisition"
+    | "close_purchase_requisition"
+    | "cancel_purchase_requisition",
+  requisitionId: bigint | number | string,
+  fallback: string,
+): Promise<void> {
+  const { urlPath, init } = stdbBffCommandPost(reducer, { requisitionId: toScalarU64(requisitionId) })
+  const r = await apiFetch(urlPath, init)
+  if (!r.ok) throw workflowErrorFromResponse(r.status, await r.text().catch(() => ""), fallback)
+}
+
+export const submitPurchaseRequisitionCommand = (requisitionId: bigint | number | string) =>
+  requisitionCommand("submit_purchase_requisition", requisitionId, "Failed to submit purchase requisition")
+export const approvePurchaseRequisitionCommand = (requisitionId: bigint | number | string) =>
+  requisitionCommand("approve_purchase_requisition", requisitionId, "Failed to approve purchase requisition")
+export const closePurchaseRequisitionCommand = (requisitionId: bigint | number | string) =>
+  requisitionCommand("close_purchase_requisition", requisitionId, "Failed to close purchase requisition")
+export const cancelPurchaseRequisitionCommand = (requisitionId: bigint | number | string) =>
+  requisitionCommand("cancel_purchase_requisition", requisitionId, "Failed to cancel purchase requisition")
+
+export async function convertPurchaseRequisitionToPoCommand(
+  companyId: bigint | undefined,
+  requisitionId: ScalarId,
+): Promise<void> {
+  if (companyId == null || companyId === 0n) {
+    throw new WorkflowError("validation", "companyId is required to convert requisition to PO")
+  }
+  const { urlPath, init } = stdbBffCommandPost("convert_purchase_requisition_to_po", {
+    companyId: companyId,
+    requisitionId: toScalarU64(requisitionId),
+  })
+  const r = await apiFetch(urlPath, init)
+  if (!r.ok) {
+    throw workflowErrorFromResponse(r.status, await r.text().catch(() => ""), "Failed to convert requisition to PO")
+  }
+}
+
+export async function receivePurchaseOrderLineCommand({
+  lineId,
+  qty,
+  lotId,
+}: {
+  lineId: bigint | number | string
+  qty: number
+  lotId?: bigint | number | string | null
+}): Promise<void> {
+  const lotArg = lotId == null || lotId === "" ? null : toScalarU64(lotId)
+  const { urlPath, init } = stdbBffCommandPost("receive_po_line", { lineId: toScalarU64(lineId), qty: qty, lotId: lotArg })
+  const r = await apiFetch(urlPath, init)
+  if (!r.ok) {
+    throw workflowErrorFromResponse(r.status, await r.text().catch(() => ""), "Failed to receive purchase order line")
+  }
+}
+
+export async function awardPurchaseRfqBidCommand(
+  companyId: bigint,
+  { rfqId, bidId }: { rfqId: ScalarId; bidId: ScalarId },
+): Promise<void> {
+  const { urlPath, init } = stdbBffCommandPost("award_purchase_rfq_bid", {
+    companyId: companyId,
+    rfqId: toScalarU64(rfqId),
+    bidId: toScalarU64(bidId),
+  })
+  const r = await apiFetch(urlPath, init)
+  if (!r.ok) {
+    throw workflowErrorFromResponse(r.status, await r.text().catch(() => ""), "Failed to award RFQ bid")
+  }
+}
+
+type LandedCostReducer = "compute_landed_costs" | "post_landed_costs" | "cancel_landed_cost"
+
+async function landedCostCommand(reducer: LandedCostReducer, landedCostId: ScalarId, fallback: string): Promise<void> {
+  const { urlPath, init } = stdbBffCommandPost(reducer, { landedCostId: toScalarU64(landedCostId) })
+  const r = await apiFetch(urlPath, init)
+  if (!r.ok) throw workflowErrorFromResponse(r.status, await r.text().catch(() => ""), fallback)
+}
+
+export const computeLandedCostsCommand = (landedCostId: ScalarId) =>
+  landedCostCommand("compute_landed_costs", landedCostId, "Failed to compute landed costs")
+export const postLandedCostsCommand = (landedCostId: ScalarId) =>
+  landedCostCommand("post_landed_costs", landedCostId, "Failed to post landed costs")
+export const cancelLandedCostCommand = (landedCostId: ScalarId) =>
+  landedCostCommand("cancel_landed_cost", landedCostId, "Failed to cancel landed cost")
+
+export async function applyLandedCostsCommand(
+  companyId: bigint | undefined,
+  landedCostId: ScalarId,
+): Promise<void> {
+  if (companyId == null || companyId === 0n) {
+    throw new WorkflowError("validation", "companyId is required to apply landed costs")
+  }
+  const { urlPath, init } = stdbBffCommandPost("apply_landed_costs", {
+    companyId: companyId,
+    landedCostId: toScalarU64(landedCostId),
+  })
+  const r = await apiFetch(urlPath, init)
+  if (!r.ok) {
+    throw workflowErrorFromResponse(r.status, await r.text().catch(() => ""), "Failed to apply landed costs")
+  }
+}
+
+export async function reviewSupplierIntakeCommand({
+  intakeId,
+  notes,
+}: {
+  intakeId: ScalarId
+  notes?: string
+}): Promise<void> {
+  const { urlPath, init } = stdbBffCommandPost("review_supplier_intake", {
+    intakeId: toScalarU64(intakeId),
+    notes: notes ?? null,
+  })
+  const r = await apiFetch(urlPath, init)
+  if (!r.ok) {
+    throw workflowErrorFromResponse(r.status, await r.text().catch(() => ""), "Failed to review supplier intake")
+  }
+}
+
+export async function approveSupplierIntakeCommand({
+  intakeId,
+  partnerId,
+}: {
+  intakeId: ScalarId
+  partnerId: ScalarId
+}): Promise<void> {
+  if (partnerId === "" || Number(partnerId) <= 0) {
+    throw new WorkflowError("validation", "Link a vendor partner to the supplier intake before approving it")
+  }
+  const { urlPath, init } = stdbBffCommandPost("approve_supplier_intake", {
+    intakeId: toScalarU64(intakeId),
+    partnerId: toScalarU64(partnerId),
+  })
+  const r = await apiFetch(urlPath, init)
+  if (!r.ok) {
+    throw workflowErrorFromResponse(r.status, await r.text().catch(() => ""), "Failed to approve supplier intake")
+  }
+}
+
+export async function rejectSupplierIntakeCommand({
+  intakeId,
+  reason,
+}: {
+  intakeId: ScalarId
+  reason: string
+}): Promise<void> {
+  const { urlPath, init } = stdbBffCommandPost("reject_supplier_intake", {
+    intakeId: toScalarU64(intakeId),
+    rejectionReason: reason,
+  })
+  const r = await apiFetch(urlPath, init)
+  if (!r.ok) {
+    throw workflowErrorFromResponse(r.status, await r.text().catch(() => ""), "Failed to reject supplier intake")
+  }
+}
+
+export async function holdSupplierIntakeCommand({
+  intakeId,
+  reason,
+}: {
+  intakeId: ScalarId
+  reason: string
+}): Promise<void> {
+  const { urlPath, init } = stdbBffCommandPost("hold_supplier_intake", {
+    intakeId: toScalarU64(intakeId),
+    notes: reason,
+  })
+  const r = await apiFetch(urlPath, init)
+  if (!r.ok) {
+    throw workflowErrorFromResponse(r.status, await r.text().catch(() => ""), "Failed to hold supplier intake")
+  }
+}
+
+export async function confirmPurchaseReturnCommand(companyId: bigint, purchaseReturnId: ScalarId): Promise<void> {
+  const { urlPath, init } = stdbBffCommandPost("confirm_purchase_return", {
+    companyId: companyId,
+    purchaseReturnId: toScalarU64(purchaseReturnId),
+  })
+  const r = await apiFetch(urlPath, init)
+  if (!r.ok) {
+    throw workflowErrorFromResponse(r.status, await r.text().catch(() => ""), "Failed to confirm purchase return")
+  }
+}
+
+export type VendorCreditFromReturnParams = {
+  journalId: ScalarId
+  expenseAccountId: ScalarId
+  payableAccountId: ScalarId
+  metadata?: string | null
+}
+
+export async function createVendorCreditFromPurchaseReturnCommand(
+  companyId: bigint,
+  { purchaseReturnId, params }: { purchaseReturnId: ScalarId; params: VendorCreditFromReturnParams },
+): Promise<void> {
+  const encoded = stdbParamsToJson(
+    {
+      journalId: toScalarU64(params.journalId),
+      expenseAccountId: toScalarU64(params.expenseAccountId),
+      payableAccountId: toScalarU64(params.payableAccountId),
+      metadata: params.metadata ?? null,
+    },
+    "CreateVendorCreditFromPurchaseReturnParams",
+  )
+  const { urlPath, init } = stdbBffCommandPost("create_vendor_credit_from_purchase_return", {
+    companyId: companyId,
+    purchaseReturnId: toScalarU64(purchaseReturnId),
+    params: encoded,
+  })
+  const r = await apiFetch(urlPath, init)
+  if (!r.ok) {
+    throw workflowErrorFromResponse(r.status, await r.text().catch(() => ""), "Failed to create vendor credit")
+  }
+}
+
+export async function releaseBlanketToPoCommand(
+  companyId: bigint,
+  { blanketOrderId, params }: { blanketOrderId: ScalarId; params: ReleaseBlanketToPoParams },
+): Promise<void> {
+  const encoded = stdbParamsToJson({
+    idempotencyKey: params.idempotencyKey,
+    lines: params.lines,
+    notes: encodeOptionalString(params.notes),
+    datePlanned: optTs(params.datePlanned),
+    metadata: encodeOptionalString(params.metadata),
+  })
+  const { urlPath, init } = stdbBffCommandPost("release_blanket_to_po", {
+    companyId: companyId,
+    blanketOrderId: toScalarU64(blanketOrderId),
+    params: encoded,
+  })
+  const r = await apiFetch(urlPath, init)
+  if (!r.ok) {
+    throw workflowErrorFromResponse(r.status, await r.text().catch(() => ""), "Failed to release blanket order")
+  }
+}
+
 // Re-export cross-domain dependency so callers import from one place
 export function useSendPurchaseOrder(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async (orderId: bigint | number | string) => {
-      const { urlPath, init } = stdbBffCommandPost("send_purchase_order", { orderId: toScalarU64(orderId) })
-
-      const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error('Failed to send purchase order')
-    },
-    onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['purchase-orders', rqBigIntKey(organizationId)] }),
+    mutationFn: sendPurchaseOrderCommand,
+    onSuccess: () => invalidateQueryResources(qc, organizationId, SEND_PURCHASE_ORDER_AFFECTS),
   })
 }
 
 export function useConfirmPurchaseOrder(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async (orderId: bigint | number | string) => {
-      const { urlPath, init } = stdbBffCommandPost("confirm_purchase_order", { orderId: toScalarU64(orderId) })
-
-      const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error('Failed to confirm purchase order')
-    },
-    onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['purchase-orders', rqBigIntKey(organizationId)] }),
+    mutationFn: confirmPurchaseOrderCommand,
+    onSuccess: () => invalidateQueryResources(qc, organizationId, CONFIRM_PURCHASE_ORDER_AFFECTS),
   })
 }
 
 export function useCancelPurchaseOrder(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async (orderId: bigint | number | string) => {
-      const { urlPath, init } = stdbBffCommandPost("cancel_purchase_order", { orderId: toScalarU64(orderId) })
-
-      const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error('Failed to cancel purchase order')
-    },
-    onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['purchase-orders', rqBigIntKey(organizationId)] }),
+    mutationFn: cancelPurchaseOrderCommand,
+    onSuccess: () => invalidateQueryResources(qc, organizationId, CANCEL_PURCHASE_ORDER_AFFECTS),
   })
 }
 
@@ -409,30 +715,8 @@ export function useRemovePurchaseOrderLine(organizationId: bigint) {
 export function useReceivePurchaseOrderLine(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async ({
-      lineId,
-      qty,
-      lotId,
-    }: {
-      lineId: bigint | number | string
-      qty: number
-      lotId?: bigint | number | string | null
-    }) => {
-      const lotArg =
-        lotId == null || lotId === ""
-          ? null
-          : toScalarU64(lotId)
-      const { urlPath, init } = stdbBffCommandPost("receive_po_line", { lineId: toScalarU64(lineId), qty: qty, lotId: lotArg })
-
-      const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error('Failed to receive purchase order line')
-    },
-    onSuccess: async () => {
-      await Promise.all([
-        qc.invalidateQueries({ queryKey: ['purchase-orders', rqBigIntKey(organizationId)] }),
-        qc.invalidateQueries({ queryKey: ['purchase-order-lines', rqBigIntKey(organizationId)] }),
-      ])
-    },
+    mutationFn: receivePurchaseOrderLineCommand,
+    onSuccess: () => invalidateQueryResources(qc, organizationId, RECEIVE_PO_LINE_AFFECTS),
   })
 }
 
@@ -463,28 +747,16 @@ export function useInvoicePurchaseOrderLine(organizationId: bigint) {
 export function useSubmitPurchaseRequisition(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async (requisitionId: bigint | number | string) => {
-      const { urlPath, init } = stdbBffCommandPost("submit_purchase_requisition", { requisitionId: toScalarU64(requisitionId) })
-
-      const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error('Failed to submit purchase requisition')
-    },
-    onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['purchase-requisitions', rqBigIntKey(organizationId)] }),
+    mutationFn: submitPurchaseRequisitionCommand,
+    onSuccess: () => invalidateQueryResources(qc, organizationId, REQUISITION_TRANSITION_AFFECTS),
   })
 }
 
 export function useApprovePurchaseRequisition(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async (requisitionId: bigint | number | string) => {
-      const { urlPath, init } = stdbBffCommandPost("approve_purchase_requisition", { requisitionId: toScalarU64(requisitionId) })
-
-      const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error('Failed to approve purchase requisition')
-    },
-    onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['purchase-requisitions', rqBigIntKey(organizationId)] }),
+    mutationFn: approvePurchaseRequisitionCommand,
+    onSuccess: () => invalidateQueryResources(qc, organizationId, REQUISITION_TRANSITION_AFFECTS),
   })
 }
 
@@ -494,51 +766,24 @@ export function useConvertPurchaseRequisitionToPo(
 ) {
   const qc = useQueryClient()
   return useMutation<void, Error, ScalarId>({
-    mutationFn: async (requisitionId) => {
-      const cid = companyId != null ? Number(companyId) : undefined
-      if (cid == null || !Number.isFinite(cid)) {
-        throw new Error('companyId is required to convert requisition to PO')
-      }
-      const { urlPath, init } = stdbBffCommandPost("convert_purchase_requisition_to_po", { companyId: BigInt(cid), requisitionId: toScalarU64(requisitionId) })
-      const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error(await parseCallErrorPo(r))
-    },
-    onSuccess: async () => {
-      const k = rqBigIntKey(organizationId)
-      await Promise.all([
-        qc.invalidateQueries({ queryKey: ['purchase-requisitions', k] }),
-        qc.invalidateQueries({ queryKey: ['purchase-orders', k] }),
-        qc.invalidateQueries({ queryKey: ['purchase-orders-to-approve', k] }),
-      ])
-    },
+    mutationFn: (requisitionId) => convertPurchaseRequisitionToPoCommand(companyId, requisitionId),
+    onSuccess: () => invalidateQueryResources(qc, organizationId, CONVERT_REQUISITION_AFFECTS),
   })
 }
 
 export function useClosePurchaseRequisition(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async (requisitionId: bigint | number | string) => {
-      const { urlPath, init } = stdbBffCommandPost("close_purchase_requisition", { requisitionId: toScalarU64(requisitionId) })
-
-      const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error('Failed to close purchase requisition')
-    },
-    onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['purchase-requisitions', rqBigIntKey(organizationId)] }),
+    mutationFn: closePurchaseRequisitionCommand,
+    onSuccess: () => invalidateQueryResources(qc, organizationId, REQUISITION_TRANSITION_AFFECTS),
   })
 }
 
 export function useCancelPurchaseRequisition(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async (requisitionId: bigint | number | string) => {
-      const { urlPath, init } = stdbBffCommandPost("cancel_purchase_requisition", { requisitionId: toScalarU64(requisitionId) })
-
-      const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error('Failed to cancel purchase requisition')
-    },
-    onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['purchase-requisitions', rqBigIntKey(organizationId)] }),
+    mutationFn: cancelPurchaseRequisitionCommand,
+    onSuccess: () => invalidateQueryResources(qc, organizationId, REQUISITION_TRANSITION_AFFECTS),
   })
 }
 
@@ -734,71 +979,35 @@ export function useRemoveLandedCostLine(organizationId: bigint) {
 export function useComputeLandedCosts(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, ScalarId>({
-    mutationFn: async (landedCostId) => {
-      const { urlPath, init } = stdbBffCommandPost("compute_landed_costs", { landedCostId: toScalarU64(landedCostId) })
-
-      const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error('Failed to compute landed costs')
-    },
-    onSuccess: () => invalidateLandedAndPo(qc, organizationId),
+    mutationFn: computeLandedCostsCommand,
+    onSuccess: () => invalidateQueryResources(qc, organizationId, LANDED_COST_DRAFT_AFFECTS),
   })
 }
 
 export function usePostLandedCosts(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, ScalarId>({
-    mutationFn: async (landedCostId) => {
-      const { urlPath, init } = stdbBffCommandPost("post_landed_costs", { landedCostId: toScalarU64(landedCostId) })
-
-      const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error('Failed to post landed costs')
-    },
-    onSuccess: () => {
-      invalidateLandedAndPo(qc, organizationId)
-      invalidateStdbQueryResources(qc, organizationId, ["account-moves"])
-    },
+    mutationFn: postLandedCostsCommand,
+    onSuccess: () => invalidateQueryResources(qc, organizationId, POST_LANDED_COST_AFFECTS),
   })
 }
 
 export function useApplyLandedCosts(organizationId: bigint, companyId?: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, { landedCostId: ScalarId; companyId?: ScalarId }>({
-    mutationFn: async ({ landedCostId, companyId: rowCompany }) => {
-      const cid =
-        companyId != null
-          ? Number(companyId)
-          : rowCompany != null
-            ? Number(rowCompany)
-            : undefined
-      if (cid == null || !Number.isFinite(cid)) {
-        throw new Error('companyId is required to apply landed costs')
-      }
-      const { urlPath, init } = stdbBffCommandPost("apply_landed_costs", { companyId: BigInt(cid), landedCostId: toScalarU64(landedCostId) })
-
-      const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error('Failed to apply landed costs')
-    },
-    onSuccess: () => {
-      invalidateLandedAndPo(qc, organizationId)
-      void qc.invalidateQueries({ queryKey: ['stock-quants', rqBigIntKey(organizationId)] })
-    },
+    mutationFn: ({ landedCostId, companyId: rowCompany }) =>
+      applyLandedCostsCommand(companyId ?? (rowCompany != null ? BigInt(String(rowCompany)) : undefined), landedCostId),
+    onSuccess: () => invalidateQueryResources(qc, organizationId, APPLY_LANDED_COST_AFFECTS),
   })
 }
 
 export function useCancelLandedCost(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, ScalarId>({
-    mutationFn: async (landedCostId) => {
-      const { urlPath, init } = stdbBffCommandPost("cancel_landed_cost", { landedCostId: toScalarU64(landedCostId) })
-
-      const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error('Failed to cancel landed cost')
-    },
-    onSuccess: () => invalidateLandedAndPo(qc, organizationId),
+    mutationFn: cancelLandedCostCommand,
+    onSuccess: () => invalidateQueryResources(qc, organizationId, LANDED_COST_DRAFT_AFFECTS),
   })
 }
-
-// ── Supplier Intake ───────────────────────────────────────────────────────────
 
 export function useCreateSupplierIntake(organizationId: bigint) {
   const qc = useQueryClient()
@@ -854,91 +1063,71 @@ export function useSubmitSupplierIntake(organizationId: bigint) {
 export function useReviewSupplierIntake(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, { intakeId: ScalarId; reviewerNotes?: string }>({
-    mutationFn: async ({ intakeId, reviewerNotes }) => {
-      const { urlPath, init } = stdbBffCommandPost("review_supplier_intake", { intakeId: toScalarU64(intakeId), notes: reviewerNotes ?? null })
-
-      const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error('Failed to review supplier intake')
-    },
-    onSuccess: () => invalidateSupplierIntakes(qc, organizationId),
+    mutationFn: ({ intakeId, reviewerNotes }) => reviewSupplierIntakeCommand({ intakeId, notes: reviewerNotes }),
+    onSuccess: () => invalidateQueryResources(qc, organizationId, SUPPLIER_INTAKE_TRANSITION_AFFECTS),
   })
 }
 
 export function useApproveSupplierIntake(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, { intakeId: ScalarId; partnerId: ScalarId }>({
-    mutationFn: async ({ intakeId, partnerId }) => {
-      const { urlPath, init } = stdbBffCommandPost("approve_supplier_intake", { intakeId: toScalarU64(intakeId), partnerId: toScalarU64(partnerId) })
-
-      const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error('Failed to approve supplier intake')
-    },
-    onSuccess: () => invalidateSupplierIntakes(qc, organizationId),
+    mutationFn: approveSupplierIntakeCommand,
+    onSuccess: () => invalidateQueryResources(qc, organizationId, SUPPLIER_INTAKE_TRANSITION_AFFECTS),
   })
 }
 
 export function useRejectSupplierIntake(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, { intakeId: ScalarId; reason: string }>({
-    mutationFn: async ({ intakeId, reason }) => {
-      const { urlPath, init } = stdbBffCommandPost("reject_supplier_intake", { intakeId: toScalarU64(intakeId), rejectionReason: reason })
-
-      const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error('Failed to reject supplier intake')
-    },
-    onSuccess: () => invalidateSupplierIntakes(qc, organizationId),
+    mutationFn: rejectSupplierIntakeCommand,
+    onSuccess: () => invalidateQueryResources(qc, organizationId, SUPPLIER_INTAKE_TRANSITION_AFFECTS),
   })
 }
 
 export function useHoldSupplierIntake(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, { intakeId: ScalarId; reason: string }>({
-    mutationFn: async ({ intakeId, reason }) => {
-      const { urlPath, init } = stdbBffCommandPost("hold_supplier_intake", { intakeId: toScalarU64(intakeId), notes: reason })
-
-      const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error('Failed to hold supplier intake')
-    },
-    onSuccess: () => invalidateSupplierIntakes(qc, organizationId),
+    mutationFn: holdSupplierIntakeCommand,
+    onSuccess: () => invalidateQueryResources(qc, organizationId, SUPPLIER_INTAKE_TRANSITION_AFFECTS),
   })
 }
-
-// ── Bill Creation ─────────────────────────────────────────────────────────────
 
 export type CreateBillFromPurchaseOrderInput = {
   orderId: ScalarId
   params: import("@lumiere/stdb/types").CreateBillFromPurchaseOrderParams
 }
 
+/** The one `create_bill_from_purchase_order` invocation, shared by the mutation hook and the workflow action. */
+export async function createBillFromPurchaseOrderCommand({
+  orderId,
+  params,
+}: CreateBillFromPurchaseOrderInput): Promise<void> {
+  const u64 = (v: bigint | number | string) => (typeof v === "bigint" ? v : BigInt(String(v)))
+  const encodedParams = stdbParamsToJson(
+    {
+      journalId: params.journalId,
+      defaultExpenseAccountId: params.defaultExpenseAccountId,
+      invoiceDate: params.invoiceDate,
+      expenseLine: stdbParamsToJson(
+        params.expenseLine as object,
+        "AddAccountMoveLineParams",
+      ),
+      payableLine: stdbParamsToJson(params.payableLine as object, "AddAccountMoveLineParams"),
+    } as object,
+    "CreateBillFromPurchaseOrderParams",
+  )
+  const { urlPath, init } = stdbBffCommandPost("create_bill_from_purchase_order", { purchaseOrderId: u64(orderId), params: encodedParams })
+  const r = await apiFetch(urlPath, init)
+  if (!r.ok) {
+    throw workflowErrorFromResponse(r.status, await r.text().catch(() => ""), "Failed to create bill from purchase order")
+  }
+}
+
 export function useCreateBillFromPurchaseOrder(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, CreateBillFromPurchaseOrderInput>({
-    mutationFn: async ({ orderId, params }) => {
-      const u64 = (v: bigint | number | string) => (typeof v === "bigint" ? v : BigInt(String(v)))
-      const encodedParams = stdbParamsToJson(
-        {
-          journalId: params.journalId,
-          defaultExpenseAccountId: params.defaultExpenseAccountId,
-          invoiceDate: params.invoiceDate,
-          expenseLine: stdbParamsToJson(
-            params.expenseLine as object,
-            "AddAccountMoveLineParams",
-          ),
-          payableLine: stdbParamsToJson(params.payableLine as object, "AddAccountMoveLineParams"),
-        } as object,
-        "CreateBillFromPurchaseOrderParams",
-      )
-      const { urlPath, init } = stdbBffCommandPost("create_bill_from_purchase_order", { purchaseOrderId: u64(orderId), params: encodedParams })
-
-      const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error("Failed to create bill from purchase order")
-    },
-    onSuccess: () => {
-      const orgKey = rqBigIntKey(organizationId)
-      void qc.invalidateQueries({ queryKey: ["purchase-orders", orgKey] })
-      void qc.invalidateQueries({ queryKey: ["purchase-order-lines", orgKey] })
-      invalidateStdbQueryResources(qc, organizationId, ["account-moves"])
-    },
+    mutationFn: createBillFromPurchaseOrderCommand,
+    onSuccess: () => invalidateQueryResources(qc, organizationId, CREATE_BILL_FROM_PURCHASE_ORDER_AFFECTS),
   })
 }
 
@@ -1182,20 +1371,8 @@ export function useAwardPurchaseRfqBid(
 ) {
   const qc = useQueryClient()
   return useMutation<void, Error, { rfqId: ScalarId; bidId: ScalarId }>({
-    mutationFn: async ({ rfqId, bidId }) => {
-      const { urlPath, init } = stdbBffCommandPost("award_purchase_rfq_bid", { companyId: companyId, rfqId: toScalarU64(rfqId), bidId: toScalarU64(bidId) })
-      const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error(await parseCallErrorPo(r))
-    },
-    onSuccess: async () => {
-      const k = rqBigIntKey(organizationId)
-      await Promise.all([
-        qc.invalidateQueries({ queryKey: ["purchase-rfqs", k] }),
-        qc.invalidateQueries({ queryKey: ["purchase-rfq-bids", k] }),
-        qc.invalidateQueries({ queryKey: ["purchase-orders", k] }),
-        qc.invalidateQueries({ queryKey: ["purchase-order-lines", k] }),
-      ])
-    },
+    mutationFn: (input) => awardPurchaseRfqBidCommand(companyId, input),
+    onSuccess: () => invalidateQueryResources(qc, organizationId, AWARD_RFQ_BID_AFFECTS),
   })
 }
 
@@ -1262,19 +1439,8 @@ export function useConfirmPurchaseReturn(
 ) {
   const qc = useQueryClient()
   return useMutation<void, Error, ScalarId>({
-    mutationFn: async (purchaseReturnId) => {
-      const { urlPath, init } = stdbBffCommandPost("confirm_purchase_return", { companyId: companyId, purchaseReturnId: toScalarU64(purchaseReturnId) })
-      const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error(await parseCallErrorPo(r))
-    },
-    onSuccess: async () => {
-      const k = rqBigIntKey(organizationId)
-      await Promise.all([
-        qc.invalidateQueries({ queryKey: ["purchase-returns", k] }),
-        qc.invalidateQueries({ queryKey: ["stock-pickings", k] }),
-        qc.invalidateQueries({ queryKey: ["stock-moves", k] }),
-      ])
-    },
+    mutationFn: (purchaseReturnId) => confirmPurchaseReturnCommand(companyId, purchaseReturnId),
+    onSuccess: () => invalidateQueryResources(qc, organizationId, CONFIRM_PURCHASE_RETURN_AFFECTS),
   })
 }
 
@@ -1283,42 +1449,12 @@ export function useCreateVendorCreditFromPurchaseReturn(
   companyId: bigint,
 ) {
   const qc = useQueryClient()
-  return useMutation<
-    void,
-    Error,
-    {
-      purchaseReturnId: ScalarId
-      journalId: ScalarId
-      expenseAccountId: ScalarId
-      payableAccountId: ScalarId
-      metadata?: string | null
-    }
-  >({
-    mutationFn: async (params) => {
-      const encoded = stdbParamsToJson(
-        {
-          journalId: toScalarU64(params.journalId),
-          expenseAccountId: toScalarU64(params.expenseAccountId),
-          payableAccountId: toScalarU64(params.payableAccountId),
-          metadata: params.metadata ?? null,
-        },
-        "CreateVendorCreditFromPurchaseReturnParams",
-      )
-      const { urlPath, init } = stdbBffCommandPost("create_vendor_credit_from_purchase_return", { companyId: companyId, purchaseReturnId: toScalarU64(params.purchaseReturnId), params: encoded })
-      const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error(await parseCallErrorPo(r))
-    },
-    onSuccess: async () => {
-      const k = rqBigIntKey(organizationId)
-      await Promise.all([
-        qc.invalidateQueries({ queryKey: ["purchase-returns", k] }),
-      ])
-      invalidateStdbQueryResources(qc, organizationId, ["account-moves"])
-    },
+  return useMutation<void, Error, VendorCreditFromReturnParams & { purchaseReturnId: ScalarId }>({
+    mutationFn: ({ purchaseReturnId, ...params }) =>
+      createVendorCreditFromPurchaseReturnCommand(companyId, { purchaseReturnId, params }),
+    onSuccess: () => invalidateQueryResources(qc, organizationId, VENDOR_CREDIT_FROM_RETURN_AFFECTS),
   })
 }
-
-// ── Procurement advanced (Wave D) — creates via BFF; no QueryResourceKey lists yet ─
 
 export type CreatePurchaseBlanketOrderParams = {
   name: string
@@ -1446,32 +1582,10 @@ export function useCreatePurchaseBlanketOrder(
 
 export function useReleaseBlanketToPo(organizationId: bigint, companyId: bigint) {
   const qc = useQueryClient()
-  return useMutation<
-    void,
-    Error,
-    { blanketOrderId: ScalarId; params: ReleaseBlanketToPoParams }
-  >({
-    mutationFn: async ({ blanketOrderId, params }) => {
-      const encoded = stdbParamsToJson({
-        idempotencyKey: params.idempotencyKey,
-        lines: params.lines,
-        notes: encodeOptionalString(params.notes),
-        datePlanned: optTs(params.datePlanned),
-        metadata: encodeOptionalString(params.metadata),
-      })
-      const { urlPath, init } = stdbBffCommandPost("release_blanket_to_po", { companyId: companyId, blanketOrderId: toScalarU64(blanketOrderId), params: encoded })
-      const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error(await parseCallErrorPo(r))
-    },
-    onSuccess: () =>
-      invalidateResourceQueries(qc, organizationId, [
-        "purchase-orders",
-        "purchase-orders-to-approve",
-        "purchase-order-lines",
-        "purchase-blanket-orders",
-        "purchase-blanket-order-lines",
-        "purchase-blanket-releases",
-      ]),
+  return useMutation<void, Error, { blanketOrderId: ScalarId; params: ReleaseBlanketToPoParams }>({
+    mutationFn: (input) => releaseBlanketToPoCommand(companyId, input),
+    // Blanket reads are subscription-aware: skip refetching while the live subscription updates them.
+    onSuccess: () => invalidateResourceQueries(qc, organizationId, RELEASE_BLANKET_AFFECTS),
   })
 }
 

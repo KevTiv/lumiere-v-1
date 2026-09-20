@@ -10,6 +10,8 @@ import {
   FormModal,
   CsvImportModal,
   RuntimeFormModal,
+  pickingRowActions,
+  workflowActionsToEntityActions,
   useRBAC,
   newSaleOrderForm,
   newPricelistForm,
@@ -90,6 +92,11 @@ import {
   SALE_ORDER_IMPORT_BUNDLE,
   type SaleOrderLinkRow,
 } from '@lumiere/erp-shared/csv-import-bundles';
+import {
+  planPartialDelivery,
+  withOrderCashSummary,
+  type TransitionNotice,
+} from '@lumiere/erp-workflows';
 import { fetchQueryList } from '@lumiere/query-hooks/http';
 import {
   useSaleOrders,
@@ -100,7 +107,6 @@ import {
   useCreatePricelist,
   useCreatePricelistItem,
   useCreatePickingBatch,
-  useConfirmSaleOrder,
   useSendSaleOrderQuotation,
   useAcceptSaleOrderQuotation,
   useApplySalePromotion,
@@ -121,7 +127,6 @@ import {
   useCreateSaleOrderLine,
   useUpdateSaleOrderLine,
   useDeleteSaleOrderLine,
-  useCreateInvoiceFromSaleOrder,
   useImportSaleOrderCsv,
   useImportSaleOrderLineCsv,
   useDeliveryCarriers,
@@ -139,10 +144,6 @@ import {
   useReturnOrders,
   useReturnOrderLines,
   useCreateReturnOrder,
-  useConfirmReturnOrder,
-  useCancelReturnOrder,
-  useCreateCreditNoteFromReturnOrder,
-  useCreateExchangeOrderFromReturn,
   useSaleCommissions,
   useSaleOrdersToApprove,
   useSaleCommissionsPending,
@@ -204,6 +205,9 @@ import {
 import { useDefaultOperatingCompanyBigInt } from '@lumiere/query-hooks/hooks/use-operating-company';
 import { useCurrencies } from '@lumiere/query-hooks/hooks/settings';
 import { useModuleTab } from '@/hooks/use-module-tab';
+import { useWorkflowSurface } from '@/hooks/use-workflow-surface';
+import { useSaleOrderWorkflow } from '@lumiere/query-hooks/hooks/sales-order-workflow';
+import { useReturnOrderWorkflow } from '@lumiere/query-hooks/hooks/return-order-workflow';
 import { useModuleFilters } from '@/hooks/use-module-filters';
 import { downloadDocumentPdf } from '@lumiere/query-hooks/hooks/templates';
 import { useCreateDocument } from '@lumiere/query-hooks/hooks/documents';
@@ -269,10 +273,6 @@ function pickingIsFulfillment(row: Record<string, unknown>): boolean {
   return code === 'outgoing';
 }
 
-function pickingStateStr(row: Record<string, unknown>): string {
-  return enumTag(getRowField(row, 'state')).toLowerCase();
-}
-
 function pickingRowId(row: Record<string, unknown>): string | number | bigint | null {
   const id = getRowField(row, 'id');
   if (id == null) return null;
@@ -322,9 +322,10 @@ export function SalesClient(props: SalesClientProps) {
   return <SalesClientLoaded {...props} organizationId={props.organizationId} />;
 }
 
-function returnOrderState(row: Record<string, unknown>): string {
-  return String(row.state ?? '').toLowerCase();
-}
+const INLINE_ERROR_TRANSITIONS: ReadonlySet<string> = new Set([
+  'sales.order.create-invoice',
+  'sales.return.create-credit-note',
+]);
 
 function returnOrderRowId(row: Record<string, unknown>): string | null {
   const id = getRowField(row, 'id');
@@ -716,7 +717,27 @@ function SalesClientLoaded({
   const createPricelist = useCreatePricelist(orgId);
   const createPricelistItem = useCreatePricelistItem(orgId);
   const createPickingBatch = useCreatePickingBatch(orgId, operatingCompanyId);
-  const confirmSaleOrder = useConfirmSaleOrder(orgId, operatingCompanyId);
+  const workflowSurface = useWorkflowSurface();
+  const workflowCallbacks = {
+    navigate: workflowSurface.navigate,
+    notify: (notice: TransitionNotice) => {
+      // These forms render their own failure inline.
+      if (notice.kind === 'error' && INLINE_ERROR_TRANSITIONS.has(notice.transitionId)) return;
+      workflowSurface.notify(notice);
+      if (notice.kind === 'success' && notice.transitionId === 'sales.order.confirm') {
+        phCapture('sale_order_confirmed', { organization_id: organizationId });
+      }
+    },
+  };
+  const saleOrderWorkflow = useSaleOrderWorkflow(
+    orgId,
+    operatingCompanyId,
+    {
+      confirm: t('sales.actions.confirmSelected'),
+      createInvoice: t('sales.actions.createInvoice'),
+    },
+    workflowCallbacks,
+  );
   const sendSaleOrderQuotation = useSendSaleOrderQuotation(orgId);
   const acceptSaleOrderQuotation = useAcceptSaleOrderQuotation(orgId);
   const applySalePromotion = useApplySalePromotion(orgId);
@@ -737,7 +758,6 @@ function SalesClientLoaded({
   const createSaleOrderLine = useCreateSaleOrderLine(orgId);
   const updateSaleOrderLine = useUpdateSaleOrderLine(orgId, operatingCompanyId);
   const deleteSaleOrderLine = useDeleteSaleOrderLine(orgId);
-  const createInvoiceFromSaleOrder = useCreateInvoiceFromSaleOrder(orgId);
   const importSaleOrderCsv = useImportSaleOrderCsv(orgId, operatingCompanyId);
   const importSaleOrderLineCsv = useImportSaleOrderLineCsv(orgId, operatingCompanyId);
 
@@ -748,15 +768,20 @@ function SalesClientLoaded({
   const createLoyaltyProgram = useCreateLoyaltyProgram(orgId, operatingCompanyId);
   const createLoyaltyCard = useCreateLoyaltyCard(orgId, operatingCompanyId);
   const createReturnOrder = useCreateReturnOrder(orgId, operatingCompanyId);
-  const confirmReturnOrder = useConfirmReturnOrder(orgId, operatingCompanyId);
-  const cancelReturnOrder = useCancelReturnOrder(orgId, operatingCompanyId);
-  const createCreditNoteFromReturnOrder = useCreateCreditNoteFromReturnOrder(
+  const returnOrderWorkflow = useReturnOrderWorkflow(
     orgId,
     operatingCompanyId,
-  );
-  const createExchangeOrderFromReturn = useCreateExchangeOrderFromReturn(
-    orgId,
-    operatingCompanyId,
+    {
+      confirm: t('sales.returnOrders.actions.confirm'),
+      receive: t('sales.returnOrders.actions.receive'),
+      exchange: t('sales.returnOrders.actions.createExchange', {
+        defaultValue: 'Create exchange order',
+      }),
+      cancel: t('sales.returnOrders.actions.cancel'),
+      createCreditNote: t('sales.returnOrders.actions.createCreditNote'),
+      notReceivable: t('sales.returnOrders.errors.notReceivable'),
+    },
+    workflowCallbacks,
   );
   const computeInvoiceTotals = useComputeInvoiceTotals(organizationId, operatingCompanyId);
   const confirmPicking = useConfirmStockPicking(orgId, operatingCompanyId);
@@ -1248,67 +1273,29 @@ function SalesClientLoaded({
   }, [cancelPickingTarget, t]);
 
   const pickingActions = useMemo(
-    (): EntityTableConfig['actions'] => [
-      {
-        id: 'confirm-picking',
-        label: t('inventory.transferActions.confirm'),
-        requiresSelection: true,
-        onClick: (rows) => {
-          const row = rows[0] as Record<string, unknown> | undefined;
-          if (!row) return;
-          const id = pickingRowId(row);
+    (): EntityTableConfig['actions'] =>
+      pickingRowActions(t, {
+        confirm: (rows) => {
+          const id = pickingRowId(rows[0] as Record<string, unknown>);
           if (id != null) void confirmPicking.mutateAsync(id);
         },
-      },
-      {
-        id: 'assign-picking',
-        label: t('inventory.transferActions.assign'),
-        requiresSelection: true,
-        onClick: (rows) => {
-          const row = rows[0] as Record<string, unknown> | undefined;
-          if (!row) return;
-          const id = pickingRowId(row);
+        assign: (rows) => {
+          const id = pickingRowId(rows[0] as Record<string, unknown>);
           if (id != null) void assignPicking.mutateAsync(id);
         },
-      },
-      {
-        id: 'partial-validate-picking',
-        label: t('sales.fulfillment.actions.partialValidate'),
-        requiresSelection: true,
-        onClick: (rows) => {
-          const row = rows[0] as Record<string, unknown> | undefined;
-          if (!row) return;
-          if (pickingStateStr(row) !== 'assigned') return;
+        'partial-validate': (rows) => {
           setPartialDeliveryError(null);
-          setPartialDeliveryPicking(row);
+          setPartialDeliveryPicking(rows[0] as Record<string, unknown>);
         },
-      },
-      {
-        id: 'validate-picking',
-        label: t('inventory.transferActions.validate'),
-        requiresSelection: true,
-        onClick: (rows) => {
-          const row = rows[0] as Record<string, unknown> | undefined;
-          if (!row) return;
-          const id = pickingRowId(row);
+        validate: (rows) => {
+          const id = pickingRowId(rows[0] as Record<string, unknown>);
           if (id != null) void validatePicking.mutateAsync(id);
         },
-      },
-      {
-        id: 'cancel-picking',
-        label: t('inventory.transferActions.cancel'),
-        requiresSelection: true,
-        variant: 'destructive',
-        onClick: (rows) => {
-          const row = rows[0] as Record<string, unknown> | undefined;
-          if (!row) return;
-          const st = pickingStateStr(row);
-          if (st === 'done') return;
+        cancel: (rows) => {
           setCancelPickingError(null);
-          setCancelPickingTarget(row);
+          setCancelPickingTarget(rows[0] as Record<string, unknown>);
         },
-      },
-    ],
+      }),
     [t, confirmPicking, assignPicking, validatePicking],
   );
 
@@ -1332,91 +1319,40 @@ function SalesClientLoaded({
       view: {
         ...view,
         actions: [
-          {
-            id: 'confirm-return',
-            label: t('sales.returnOrders.actions.confirm'),
-            requiresSelection: true,
-            onClick: (rows) => {
-              for (const row of rows) {
-                if (returnOrderState(row) !== 'draft') continue;
-                const id = returnOrderRowId(row);
-                if (id != null) void confirmReturnOrder.mutateAsync(id);
-              }
+          // Legacy ids keep the existing e2e selectors while the actions run through the workflow seam.
+          ...workflowActionsToEntityActions(returnOrderWorkflow.actions, {
+            ids: {
+              'sales.return.confirm': 'confirm-return',
+              'sales.return.receive': 'receive-return',
+              'sales.return.exchange': 'create-exchange-order',
+              'sales.return.cancel': 'cancel-return',
             },
-          },
-          {
-            id: 'receive-return',
-            label: t('sales.returnOrders.actions.receive'),
-            requiresSelection: true,
-            onClick: (rows) => {
-              void (async () => {
-                for (const row of rows) {
-                  if (returnOrderState(row) !== 'confirmed') continue;
-                  const pickingId = row.pickingId ?? row.picking_id;
-                  if (pickingId == null) continue;
-                  await confirmPicking.mutateAsync(pickingId as string | number | bigint);
-                  await assignPicking.mutateAsync(pickingId as string | number | bigint);
-                  await validatePicking.mutateAsync(pickingId as string | number | bigint);
-                }
-              })();
+            confirmation: {
+              description: t('erpWorkflow.confirm.description'),
+              confirmLabel: t('erpWorkflow.confirm.confirm'),
+              cancelLabel: t('erpWorkflow.confirm.dismiss'),
             },
-          },
+          }),
           {
             id: 'create-return-credit-note',
             label: t('sales.returnOrders.actions.createCreditNote'),
             requiresSelection: true,
+            isApplicable: (rows) =>
+              rows.length === 1 && returnOrderWorkflow.createCreditNote.canPresent(rows[0] as Record<string, unknown>),
             onClick: (rows) => {
               if (rows.length !== 1) return;
               const row = rows[0] as Record<string, unknown>;
-              if (returnOrderState(row) !== 'received') return;
-              if (row.creditMoveId != null || row.credit_move_id != null) return;
+              if (!returnOrderWorkflow.createCreditNote.canPresent(row)) return;
               const id = returnOrderRowId(row);
               if (id == null) return;
               setCreditReturnOrderError(null);
               setCreditReturnOrderId(BigInt(id));
             },
           },
-          {
-            id: 'create-exchange-order',
-            label: t('sales.returnOrders.actions.createExchange', {
-              defaultValue: 'Create exchange order',
-            }),
-            requiresSelection: true,
-            onClick: (rows) => {
-              for (const row of rows) {
-                const st = returnOrderState(row);
-                if (st !== 'confirmed' && st !== 'received') continue;
-                const id = returnOrderRowId(row);
-                if (id != null) void createExchangeOrderFromReturn.mutateAsync(id);
-              }
-            },
-          },
-          {
-            id: 'cancel-return',
-            label: t('sales.returnOrders.actions.cancel'),
-            requiresSelection: true,
-            variant: 'destructive',
-            onClick: (rows) => {
-              for (const row of rows) {
-                const st = returnOrderState(row);
-                if (st === 'received' || st === 'refunded' || st === 'cancelled') continue;
-                const id = returnOrderRowId(row);
-                if (id != null) void cancelReturnOrder.mutateAsync(id);
-              }
-            },
-          },
         ],
       },
     };
-  }, [
-    t,
-    confirmReturnOrder,
-    cancelReturnOrder,
-    confirmPicking,
-    assignPicking,
-    validatePicking,
-    createExchangeOrderFromReturn,
-  ]);
+  }, [t, returnOrderWorkflow.actions, returnOrderWorkflow.createCreditNote]);
 
   const ordersEntityConfig = useMemo((): EntityViewConfig => {
     const base = saleOrdersTableConfig(t, {
@@ -1438,26 +1374,10 @@ function SalesClientLoaded({
             label: t('sales.csvImport.toolbarOrders'),
             onClick: () => setCsvKind('order'),
           },
-          {
-            id: 'confirm-orders',
-            label: t('sales.actions.confirmSelected'),
-            requiresSelection: true,
-            onClick: (rows) => {
-              for (const r of rows) {
-                const st = saleOrderState(r);
-                if (st === 'Draft' || st === 'Sent') {
-                  void confirmSaleOrder
-                    .mutateAsync(r.id as string | number | bigint)
-                    .then(() => {
-                      phCapture('sale_order_confirmed', { organization_id: organizationId });
-                    })
-                    .catch((e: unknown) => {
-                      window.alert(e instanceof Error ? e.message : String(e));
-                    });
-                }
-              }
-            },
-          },
+          // Legacy id keeps the existing e2e selector while the action runs through the workflow seam.
+          ...workflowActionsToEntityActions(saleOrderWorkflow.actions, {
+            ids: { 'sales.order.confirm': 'confirm-orders' },
+          }),
           {
             id: 'send-quotation',
             label: t('sales.actions.sendQuotation'),
@@ -1684,10 +1604,11 @@ function SalesClientLoaded({
             id: 'create-invoice',
             label: t('sales.actions.createInvoice'),
             requiresSelection: true,
+            isApplicable: (rows) =>
+              rows.length === 1 && saleOrderWorkflow.createInvoice.canPresent(rows[0] as Record<string, unknown>),
             onClick: (rows) => {
               if (rows.length !== 1) return;
-              const st = saleOrderState(rows[0] as Record<string, unknown>);
-              if (st !== 'Sale' && st !== 'Done') return;
+              if (!saleOrderWorkflow.createInvoice.canPresent(rows[0] as Record<string, unknown>)) return;
               const id = rows[0]?.id;
               if (id == null) return;
               setInvoiceOrderError(null);
@@ -1757,7 +1678,8 @@ function SalesClientLoaded({
     t,
     saleOrdersTableRuntime,
     openCreateSaleOrder,
-    confirmSaleOrder,
+    saleOrderWorkflow.actions,
+    saleOrderWorkflow.createInvoice,
     sendSaleOrderQuotation,
     acceptSaleOrderQuotation,
     applySalePromotion,
@@ -2587,14 +2509,18 @@ function SalesClientLoaded({
       updateSaleOrder,
       lockSaleOrder,
       unlockSaleOrder,
-      createInvoiceFromSaleOrder,
     ],
   );
 
   // Data keyed by tab id
   const data = useMemo(
     () => ({
-      orders: (orders as Record<string, unknown>[]).map((row) => ({
+      // Delivery / invoice / payment / balance are derived from canonical lines and invoices.
+      orders: withOrderCashSummary(
+        orders as Record<string, unknown>[],
+        orderLines as unknown as Record<string, unknown>[],
+        accountMoves as unknown as Record<string, unknown>[],
+      ).map((row) => ({
         ...row,
         sheetTitle: saleOrderPrimaryLabel(row) || String(row.reference ?? row.id ?? ''),
       })) as unknown as Record<string, unknown>[],
@@ -2620,6 +2546,7 @@ function SalesClientLoaded({
     [
       orders,
       orderLines,
+      accountMoves,
       pricelists,
       pricelistItems,
       deliveries,
@@ -2728,7 +2655,7 @@ function SalesClientLoaded({
     createPricelist.isPending ||
     createPricelistItem.isPending ||
     createPickingBatch.isPending ||
-    confirmSaleOrder.isPending ||
+    saleOrderWorkflow.isPending ||
     cancelSaleOrder.isPending ||
     computeSoTotals.isPending ||
     updatePricelist.isPending ||
@@ -2743,7 +2670,6 @@ function SalesClientLoaded({
     createSaleOrderLine.isPending ||
     updateSaleOrderLine.isPending ||
     deleteSaleOrderLine.isPending ||
-    createInvoiceFromSaleOrder.isPending ||
     createDeliveryCarrier.isPending ||
     createDeliveryPriceRule.isPending ||
     createShippingMethod.isPending ||
@@ -2751,9 +2677,7 @@ function SalesClientLoaded({
     createLoyaltyProgram.isPending ||
     createLoyaltyCard.isPending ||
     createReturnOrder.isPending ||
-    confirmReturnOrder.isPending ||
-    cancelReturnOrder.isPending ||
-    createCreditNoteFromReturnOrder.isPending ||
+    returnOrderWorkflow.isPending ||
     importSaleOrderCsv.isPending ||
     importSaleOrderLineCsv.isPending ||
     computeInvoiceTotals.isPending ||
@@ -2879,7 +2803,7 @@ function SalesClientLoaded({
           foldCustomFieldsIntoMetadata={false}
           closeOnSubmit={false}
           submitError={invoiceOrderError}
-          isPending={createInvoiceFromSaleOrder.isPending}
+          isPending={saleOrderWorkflow.isPending}
           onSubmit={async (formData) => {
             setInvoiceOrderError(null);
             const orderRow = (orders as Record<string, unknown>[]).find(
@@ -2897,10 +2821,10 @@ function SalesClientLoaded({
               return;
             }
             try {
-              await createInvoiceFromSaleOrder.mutateAsync({
-                orderId: invoiceOrderId,
-                params,
-              });
+              await saleOrderWorkflow.createInvoice.execute(
+                { orderId: String(invoiceOrderId), params },
+                { navigateToNext: true },
+              );
               setInvoiceOrderId(null);
             } catch (e) {
               setInvoiceOrderError(e instanceof Error ? e.message : String(e));
@@ -2931,21 +2855,19 @@ function SalesClientLoaded({
             const pickingId = pickingRowId(partialDeliveryPicking);
             if (pickingId == null) return;
             try {
-              for (const move of assignedMovesForPartialDelivery) {
-                const moveId = move.id as string | number | bigint;
-                const ordered = Number(move.productUomQty ?? move.product_uom_qty ?? 0);
-                const qty = Number(formData[`qty_${String(moveId)}`]);
-                if (!Number.isFinite(qty)) {
-                  setPartialDeliveryError(t('sales.forms.partialDelivery.errors.qtyRequired'));
-                  return;
-                }
-                if (qty < 0 || qty > ordered) {
-                  setPartialDeliveryError(t('sales.forms.partialDelivery.errors.invalidQty'));
-                  return;
-                }
-                if (qty > 0 && qty < ordered) {
-                  await doneStockMove.mutateAsync({ moveId, quantityDone: qty });
-                }
+              const plan = planPartialDelivery(
+                assignedMovesForPartialDelivery.map((move) => ({
+                  moveId: String(move.id),
+                  orderedQty: Number(move.productUomQty ?? move.product_uom_qty ?? 0),
+                })),
+                formData,
+              );
+              if (!plan.ok) {
+                setPartialDeliveryError(t(`sales.forms.partialDelivery.errors.${plan.error}`));
+                return;
+              }
+              for (const { moveId, quantityDone } of plan.shortMoves) {
+                await doneStockMove.mutateAsync({ moveId, quantityDone });
               }
               await validatePicking.mutateAsync({
                 pickingId,
@@ -3126,7 +3048,7 @@ function SalesClientLoaded({
           foldCustomFieldsIntoMetadata={false}
           closeOnSubmit={false}
           submitError={creditReturnOrderError}
-          isPending={createCreditNoteFromReturnOrder.isPending}
+          isPending={returnOrderWorkflow.isPending}
           onSubmit={async (formData) => {
             setCreditReturnOrderError(null);
             const params = toCreateCreditNoteFromReturnOrderParams(formData);
@@ -3135,10 +3057,10 @@ function SalesClientLoaded({
               return;
             }
             try {
-              await createCreditNoteFromReturnOrder.mutateAsync({
-                returnOrderId: creditReturnOrderId,
-                params,
-              });
+              await returnOrderWorkflow.createCreditNote.execute(
+                { returnOrderId: String(creditReturnOrderId), params },
+                { navigateToNext: true },
+              );
               setCreditReturnOrderId(null);
             } catch (e) {
               setCreditReturnOrderError(e instanceof Error ? e.message : String(e));

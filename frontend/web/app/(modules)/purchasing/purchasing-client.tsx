@@ -11,6 +11,7 @@ import {
   CsvImportModal,
   RuntimeFormModal,
   useRBAC,
+  workflowActionsToEntityActions,
   EntityView,
   newPurchaseOrderForm,
   editPurchaseOrderForm,
@@ -43,6 +44,9 @@ import {
   purchaseOrderStatusBadges,
   purchaseOrderLinesTableConfig,
   purchaseRequisitionsTableConfig,
+  purchaseRfqsTableConfig,
+  purchaseRfqBidsTableConfig,
+  purchaseReturnsTableConfig,
   csvImportForm,
   RecordChatterDialog,
   type TimeRangeValue,
@@ -57,9 +61,22 @@ import { purchasingModuleConfig } from "@/lib/module-dashboard-configs"
 import { usePurchasingModuleSubscription } from "@/lib/module-subscription-hooks"
 import { PurchasingOpsSod } from "./purchasing-ops-sod"
 import { PurchasingBlanketWorkspace } from "./purchasing-blanket-workspace"
+import {
+  PurchasingOperationDialogs,
+  type PurchasingOperationDialogRequest,
+} from "./purchasing-operation-dialogs"
+import { PurchasingConfigurationWorkspace } from "./purchasing-configuration-workspace"
+import type { PurchasingConfigurationKind } from "./purchasing-configuration"
+import {
+  PurchasingIntakeReasonDialog,
+  type PurchasingIntakeReasonKind,
+} from "./purchasing-intake-reason-dialog"
 import { RecordDocumentAttachments } from "../../../components/record-document-attachments"
 import { chatterTargetFromRow, type ChatterTarget } from "@/lib/record-chatter"
 import { groupBy } from "@/lib/utils"
+import { useWorkflowSurface } from "@/hooks/use-workflow-surface"
+import { usePurchasingWorkflow } from "@lumiere/query-hooks/hooks/purchasing-workflow"
+import { recordRef, type TransitionNotice } from "@lumiere/erp-workflows"
 import {
   usePurchaseOrders,
   usePurchaseOrdersToApprove,
@@ -67,24 +84,18 @@ import {
   usePurchaseOrderLinesOverBilled,
   usePurchaseOrderLines,
   usePurchaseRequisitions,
+  usePurchaseRfqs,
+  usePurchaseRfqBids,
+  usePurchaseReturns,
   type PurchaseOrder,
   type PurchaseOrderLine,
   type PurchaseRequisition,
   type ResPartnerBank,
   useCreatePurchaseOrder,
   useCreatePurchaseRequisition,
-  useSendPurchaseOrder,
-  useConfirmPurchaseOrder,
-  useCancelPurchaseOrder,
   useAddPurchaseOrderLine,
   useRemovePurchaseOrderLine,
-  useReceivePurchaseOrderLine,
   useInvoicePurchaseOrderLine,
-  useSubmitPurchaseRequisition,
-  useApprovePurchaseRequisition,
-  useConvertPurchaseRequisitionToPo,
-  useClosePurchaseRequisition,
-  useCancelPurchaseRequisition,
   useUpdatePurchaseOrder,
   useComputePurchaseOrderTotals,
   useComputePurchaseOrderLineTotals,
@@ -97,21 +108,12 @@ import {
   useDeleteLandedCost,
   useAddLandedCostLine,
   useRemoveLandedCostLine,
-  useComputeLandedCosts,
-  usePostLandedCosts,
-  useApplyLandedCosts,
-  useCancelLandedCost,
   // Supplier intake
   useSupplierIntakes,
   useSubmitSupplierIntake,
   useUpdateSupplierIntake,
-  useReviewSupplierIntake,
   useDeleteSupplierIntake,
-  useApproveSupplierIntake,
-  useRejectSupplierIntake,
-  useHoldSupplierIntake,
   // Bill creation
-  useCreateBillFromPurchaseOrder,
   useLockPurchaseOrder,
   useUnlockPurchaseOrder,
   useUpdatePurchaseOrderLine,
@@ -124,12 +126,8 @@ import {
   useDeletePartnerBank,
   useCreatePurchaseRfq,
   useAddPurchaseRfqBid,
-  useAwardPurchaseRfqBid,
   useCreatePurchaseReturn,
-  useConfirmPurchaseReturn,
-  useCreateVendorCreditFromPurchaseReturn,
   useCreatePurchaseBlanketOrder,
-  useReleaseBlanketToPo,
   usePurchaseBlanketOrders,
   usePurchaseBlanketOrderLines,
   usePurchaseBlanketReleases,
@@ -145,7 +143,7 @@ import {
 import { usePricelists, type ProductPricelist } from "@lumiere/query-hooks/hooks/sales"
 import type { Contact } from "@lumiere/query-hooks/hooks/crm"
 import { useAccountAccounts, useAccountJournals, useAccountPaymentTerms } from "@lumiere/query-hooks/hooks/accounting"
-import { useProducts, useUoms, useStockPickings } from "@lumiere/query-hooks/hooks/inventory"
+import { useProducts, useUoms, useStockPickings, useWarehouses } from "@lumiere/query-hooks/hooks/inventory"
 import { useDepartments, type HrDepartment } from "@lumiere/query-hooks/hooks/hr"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
 import { useRuntimeListConfig } from "@lumiere/ui/forms"
@@ -191,6 +189,16 @@ import {
   toUpdatePartnerBankParams,
 } from "@/lib/purchasing-partner-bank-params"
 
+/** Forms that render their own failure inline instead of a toast. */
+const INLINE_ERROR_TRANSITIONS: ReadonlySet<string> = new Set(["purchasing.order.create-bill"])
+
+/** Copy for the confirmation shown before destructive/confirm-kind workflow actions. */
+const WORKFLOW_CONFIRMATION = (t: (key: string) => string) => ({
+  description: t("erpWorkflow.confirm.description"),
+  confirmLabel: t("erpWorkflow.confirm.confirm"),
+  cancelLabel: t("erpWorkflow.confirm.dismiss"),
+})
+
 function poState(row: Record<string, unknown>): string {
   const v = row.state
   if (v != null && typeof v === "object" && "tag" in v) return String((v as { tag: string }).tag)
@@ -219,10 +227,12 @@ function accountInternalTypeTag(row: Record<string, unknown>): string {
   return String(v ?? "").toLowerCase()
 }
 
-function requisitionState(row: Record<string, unknown>): string {
-  const v = row.state
-  if (v != null && typeof v === "object" && "tag" in v) return String((v as { tag: string }).tag)
-  return String(v ?? "")
+function accountInternalGroupTag(row: Record<string, unknown>): string {
+  const v = row.internalGroup ?? row.internal_group
+  if (v != null && typeof v === "object" && "tag" in v) {
+    return String((v as { tag: string }).tag).toLowerCase()
+  }
+  return String(v ?? "").toLowerCase()
 }
 
 function landedCostState(row: Record<string, unknown>): string {
@@ -463,7 +473,7 @@ function PurchasingClientLoaded({
   })
   const moduleConfig = useMemo(() => purchasingModuleConfig(t), [t])
   const purchasingTabIds = useMemo(
-    () => [...moduleConfig.tabs.map((tab) => tab.id), "landed-costs", "supplier-intakes", "blanket-orders"],
+    () => [...moduleConfig.tabs.map((tab) => tab.id), "rfqs", "rfq-bids", "purchase-returns", "landed-costs", "supplier-intakes", "blanket-orders"],
     [moduleConfig],
   )
   const { activeTab, setActiveTab } = useModuleTab(
@@ -486,6 +496,17 @@ function PurchasingClientLoaded({
     kind: "create" | "release"
     token: number
   } | null>(null)
+  const [operationDialogRequest, setOperationDialogRequest] =
+    useState<PurchasingOperationDialogRequest | null>(null)
+  const [configurationActionRequest, setConfigurationActionRequest] = useState<{
+    kind: PurchasingConfigurationKind
+    token: number
+  } | null>(null)
+  const [intakeReasonRequest, setIntakeReasonRequest] = useState<{
+    kind: PurchasingIntakeReasonKind
+    row: Record<string, unknown>
+  } | null>(null)
+  const [intakeReasonError, setIntakeReasonError] = useState<string | null>(null)
 
   useEffect(() => {
     if (quickActionForm != null) {
@@ -507,6 +528,9 @@ function PurchasingClientLoaded({
   const { data: landedCosts = [] } = useLandedCosts(orgId)
   const { data: landedCostLines = [] } = useLandedCostLines(orgId)
   const { data: supplierIntakes = [] } = useSupplierIntakes(orgId)
+  const { data: rfqs = [] } = usePurchaseRfqs(orgId)
+  const { data: rfqBids = [] } = usePurchaseRfqBids(orgId)
+  const { data: purchaseReturns = [] } = usePurchaseReturns(orgId)
   const { data: partnerBanks = [] } = usePartnerBanks(orgId, initialPartnerBanks)
   const { data: departments = [] } = useDepartments(orgId, initialDepartments)
   const { data: accountJournals = [] } = useAccountJournals(orgId)
@@ -516,24 +540,53 @@ function PurchasingClientLoaded({
   const { data: blanketOrders = [] } = usePurchaseBlanketOrders(orgId)
   const { data: blanketOrderLines = [] } = usePurchaseBlanketOrderLines(orgId)
   const { data: blanketReleases = [] } = usePurchaseBlanketReleases(orgId)
+  const { data: warehouses = [] } = useWarehouses(orgId)
 
   const createPurchaseOrder = useCreatePurchaseOrder(orgId, { companyId: operatingCompanyId ?? undefined })
   const createPurchaseRequisition = useCreatePurchaseRequisition(orgId, { companyId: operatingCompanyId ?? undefined })
-  const sendPurchaseOrder = useSendPurchaseOrder(orgId)
-  const confirmPurchaseOrder = useConfirmPurchaseOrder(orgId)
-  const cancelPurchaseOrder = useCancelPurchaseOrder(orgId)
+  const workflowSurface = useWorkflowSurface()
+  const purchasingWorkflow = usePurchasingWorkflow(
+    orgId,
+    operatingCompanyId,
+    {
+      submitRequisition: t("purchasing.actions.submitSelected"),
+      approveRequisition: t("purchasing.actions.approveSelected"),
+      convertRequisition: t("purchasing.actions.convertToPo", { defaultValue: "Convert to PO" }),
+      closeRequisition: t("purchasing.actions.closeSelected"),
+      cancelRequisition: t("purchasing.actions.cancelRequisitions"),
+      sendOrder: t("purchasing.actions.sendSelected"),
+      confirmOrder: t("purchasing.actions.confirmSelected"),
+      cancelOrder: t("purchasing.actions.cancelSelected"),
+      createBill: t("purchasing.actions.createBillsFromSelected"),
+      receiveLine: t("purchasing.actions.receiveFullOpenQty"),
+      awardBid: t("purchasing.ops.awardRfqBid", { defaultValue: "Award RFQ bid" }),
+      reviewIntake: t("purchasing.actions.reviewSelected", { defaultValue: "Start review" }),
+      approveIntake: t("purchasing.actions.approveSelected"),
+      holdIntake: t("purchasing.actions.holdSelected"),
+      rejectIntake: t("purchasing.actions.rejectSelected"),
+      // Table row actions collect an operator-authored reason before executing.
+      holdIntakeReason: "",
+      rejectIntakeReason: "",
+      computeLandedCost: t("purchasing.actions.recalculateTotals"),
+      postLandedCost: t("purchasing.actions.postSelected"),
+      applyLandedCost: t("purchasing.actions.applySelected"),
+      cancelLandedCost: t("purchasing.actions.cancelSelected"),
+      confirmReturn: t("purchasing.ops.confirmPurchaseReturn", { defaultValue: "Confirm purchase return" }),
+      createVendorCredit: t("purchasing.ops.createVendorCredit", { defaultValue: "Create vendor credit" }),
+      releaseBlanket: t("purchasing.blanketOrders.release", { defaultValue: "Release to PO" }),
+    },
+    {
+      navigate: workflowSurface.navigate,
+      notify: (notice: TransitionNotice) => {
+        // The bill form renders its own failure inline.
+        if (notice.kind === "error" && INLINE_ERROR_TRANSITIONS.has(notice.transitionId)) return
+        workflowSurface.notify(notice)
+      },
+    },
+  )
   const addPurchaseOrderLine = useAddPurchaseOrderLine(orgId)
   const removePurchaseOrderLine = useRemovePurchaseOrderLine(orgId)
-  const receivePurchaseOrderLine = useReceivePurchaseOrderLine(orgId)
   const invoicePurchaseOrderLine = useInvoicePurchaseOrderLine(orgId)
-  const submitPurchaseRequisition = useSubmitPurchaseRequisition(orgId)
-  const approvePurchaseRequisition = useApprovePurchaseRequisition(orgId)
-  const convertPurchaseRequisitionToPo = useConvertPurchaseRequisitionToPo(
-    orgId,
-    operatingCompanyId ?? undefined,
-  )
-  const closePurchaseRequisition = useClosePurchaseRequisition(orgId)
-  const cancelPurchaseRequisition = useCancelPurchaseRequisition(orgId)
   const updatePurchaseOrder = useUpdatePurchaseOrder(orgId, operatingCompanyId ?? undefined)
   const computePoTotals = useComputePurchaseOrderTotals(orgId)
   const computePoLineTotals = useComputePurchaseOrderLineTotals(orgId)
@@ -544,24 +597,15 @@ function PurchasingClientLoaded({
   const deleteLandedCost = useDeleteLandedCost(orgId)
   const addLandedCostLine = useAddLandedCostLine(orgId)
   const removeLandedCostLine = useRemoveLandedCostLine(orgId)
-  const computeLandedCosts = useComputeLandedCosts(orgId)
-  const postLandedCosts = usePostLandedCosts(orgId)
-  const applyLandedCosts = useApplyLandedCosts(orgId, operatingCompanyId)
-  const cancelLandedCost = useCancelLandedCost(orgId)
 
   // Supplier intake mutations
   const submitSupplierIntake = useSubmitSupplierIntake(orgId)
   const updateSupplierIntake = useUpdateSupplierIntake(orgId)
-  const reviewSupplierIntake = useReviewSupplierIntake(orgId)
   const deleteSupplierIntake = useDeleteSupplierIntake(orgId)
-  const approveSupplierIntake = useApproveSupplierIntake(orgId)
-  const rejectSupplierIntake = useRejectSupplierIntake(orgId)
-  const holdSupplierIntake = useHoldSupplierIntake(orgId)
 
   // Additional PO operations
   const lockPurchaseOrder = useLockPurchaseOrder(orgId)
   const unlockPurchaseOrder = useUnlockPurchaseOrder(orgId)
-  const createBillFromPurchaseOrder = useCreateBillFromPurchaseOrder(orgId)
   const updatePurchaseOrderLine = useUpdatePurchaseOrderLine(orgId)
   const csvImports = usePurchasingCsvImportMutations(orgId, operatingCompanyId)
 
@@ -573,24 +617,16 @@ function PurchasingClientLoaded({
   const updatePartnerBank = useUpdatePartnerBank(orgId)
   const deletePartnerBank = useDeletePartnerBank(orgId)
 
-  // Wave C — RFQ / purchase returns (prompt-driven MVP)
+  // RFQ / purchase-return commands, presented through typed dialogs and list actions.
   const createPurchaseRfq = useCreatePurchaseRfq(orgId, operatingCompanyId)
   const addPurchaseRfqBid = useAddPurchaseRfqBid(orgId, operatingCompanyId)
-  const awardPurchaseRfqBid = useAwardPurchaseRfqBid(orgId, operatingCompanyId)
   const createPurchaseReturn = useCreatePurchaseReturn(orgId, operatingCompanyId)
-  const confirmPurchaseReturn = useConfirmPurchaseReturn(
-    orgId,
-    operatingCompanyId,
-  )
-  const createVendorCreditFromPurchaseReturn =
-    useCreateVendorCreditFromPurchaseReturn(orgId, operatingCompanyId)
 
-  // Wave D — procurement advanced (prompt-driven MVP)
+  // One-off advanced purchasing configuration commands.
   const createPurchaseBlanketOrder = useCreatePurchaseBlanketOrder(
     orgId,
     operatingCompanyId,
   )
-  const releaseBlanketToPo = useReleaseBlanketToPo(orgId, operatingCompanyId)
   const createPurchaseContract = useCreatePurchaseContract(
     orgId,
     operatingCompanyId,
@@ -621,97 +657,12 @@ function PurchasingClientLoaded({
     operatingCompanyId,
   )
 
-  const promptCreateRfqFromRequisition = async (requisitionId?: string) => {
-    if (!defaultCurrencyId) throw new Error("No active currency is available")
-    const reqId =
-      requisitionId ??
-      window
-        .prompt(
-          t("purchasing.ops.prompt.rfqRequisitionId", {
-            defaultValue: "Requisition id (optional, blank = standalone)",
-          }),
-          "",
-        )
-        ?.trim()
-    const productId = window
-      .prompt(
-        t("purchasing.ops.prompt.rfqProductId", {
-          defaultValue: "Product id for RFQ line",
-        }),
-      )
-      ?.trim()
-    const uomId = window
-      .prompt(
-        t("purchasing.ops.prompt.rfqUomId", {
-          defaultValue: "UoM id",
-        }),
-        "1",
-      )
-      ?.trim()
-    const qtyRaw = window
-      .prompt(
-        t("purchasing.ops.prompt.rfqQty", {
-          defaultValue: "Quantity",
-        }),
-        "1",
-      )
-      ?.trim()
-    if (!productId || !uomId || !qtyRaw) return
-    const qty = Number(qtyRaw)
-    if (!Number.isFinite(qty) || qty <= 0) {
-      throw new Error("Quantity must be a positive number")
-    }
-    await createPurchaseRfq.mutateAsync({
-      requisitionId: reqId ? BigInt(reqId) : null,
-      currencyId: BigInt(defaultCurrencyId),
-      notes: "RFQ from Purchasing Ops",
-      lines: [
-        {
-          productId: BigInt(productId),
-          productUom: BigInt(uomId),
-          productUomQty: qty,
-          name: null,
-          sequence: 10,
-        },
-      ],
-      metadata: null,
-    })
+  const openCreateRfqFromRequisition = async (requisitionId?: string) => {
+    setOperationDialogRequest({ kind: "create-rfq", requisitionId })
   }
 
-  const promptAddRfqBid = async () => {
-    if (!defaultCurrencyId) throw new Error("No active currency is available")
-    const rfqId = window
-      .prompt(
-        t("purchasing.ops.prompt.rfqId", { defaultValue: "RFQ id" }),
-      )
-      ?.trim()
-    const partnerId = window
-      .prompt(
-        t("purchasing.ops.prompt.bidVendorId", {
-          defaultValue: "Vendor partner id",
-        }),
-      )
-      ?.trim()
-    const priceRaw = window
-      .prompt(
-        t("purchasing.ops.prompt.bidPriceUnit", {
-          defaultValue: "Bid unit price",
-        }),
-        "0",
-      )
-      ?.trim()
-    if (!rfqId || !partnerId || priceRaw == null) return
-    const priceUnit = Number(priceRaw)
-    if (!Number.isFinite(priceUnit) || priceUnit < 0) {
-      throw new Error("price_unit must be non-negative")
-    }
-    await addPurchaseRfqBid.mutateAsync({
-      rfqId: BigInt(rfqId),
-      partnerId: BigInt(partnerId),
-      currencyId: BigInt(defaultCurrencyId),
-      priceUnit,
-      notes: null,
-    })
+  const openAddRfqBid = async () => {
+    setOperationDialogRequest({ kind: "add-rfq-bid" })
   }
 
   const promptAwardRfqBid = async () => {
@@ -724,122 +675,28 @@ function PurchasingClientLoaded({
       )
       ?.trim()
     if (!rfqId || !bidId) return
-    await awardPurchaseRfqBid.mutateAsync({
-      rfqId: BigInt(rfqId),
-      bidId: BigInt(bidId),
-    })
+    await purchasingWorkflow.awardBid.execute({ rfqId, bidId }, { navigateToNext: true })
   }
 
-  const promptCreatePurchaseReturn = async () => {
-    const poId = window
-      .prompt(
-        t("purchasing.ops.prompt.returnPoId", {
-          defaultValue: "Purchase order id (optional)",
-        }),
-        "",
-      )
-      ?.trim()
-    const partnerId = window
-      .prompt(
-        t("purchasing.ops.prompt.returnVendorId", {
-          defaultValue: "Vendor partner id",
-        }),
-      )
-      ?.trim()
-    const productId = window
-      .prompt(
-        t("purchasing.ops.prompt.returnProductId", {
-          defaultValue: "Product id",
-        }),
-      )
-      ?.trim()
-    const uomId = window
-      .prompt(
-        t("purchasing.ops.prompt.returnUomId", { defaultValue: "UoM id" }),
-        "1",
-      )
-      ?.trim()
-    const qtyRaw = window
-      .prompt(
-        t("purchasing.ops.prompt.returnQty", { defaultValue: "Qty to return" }),
-        "1",
-      )
-      ?.trim()
-    const priceRaw = window
-      .prompt(
-        t("purchasing.ops.prompt.returnPrice", {
-          defaultValue: "Unit price",
-        }),
-        "0",
-      )
-      ?.trim()
-    if (!partnerId || !productId || !uomId || !qtyRaw || priceRaw == null) return
-    await createPurchaseReturn.mutateAsync({
-      purchaseOrderId: poId ? BigInt(poId) : null,
-      partnerId: BigInt(partnerId),
-      returnReason: "Ops return",
-      lines: [
-        {
-          purchaseOrderLineId: null,
-          productId: BigInt(productId),
-          productUom: BigInt(uomId),
-          productUomQty: Number(qtyRaw),
-          priceUnit: Number(priceRaw),
-          toRefund: true,
-        },
-      ],
-    })
+  const openCreatePurchaseReturn = async () => {
+    setOperationDialogRequest({ kind: "create-purchase-return" })
   }
 
-  const promptConfirmPurchaseReturn = async () => {
-    const returnId = window
-      .prompt(
-        t("purchasing.ops.prompt.purchaseReturnId", {
-          defaultValue: "Purchase return id",
-        }),
-      )
-      ?.trim()
-    if (!returnId) return
-    await confirmPurchaseReturn.mutateAsync(BigInt(returnId))
+  const releaseBlanket = async (
+    blanketOrderId: bigint,
+    params: Parameters<typeof purchasingWorkflow.releaseBlanket.execute>[0]["params"],
+  ) => {
+    await purchasingWorkflow.releaseBlanket.execute(
+      { blanketOrderId: String(blanketOrderId), params },
+      { navigateToNext: true },
+    )
   }
 
-  const promptVendorCreditFromReturn = async () => {
-    const returnId = window
-      .prompt(
-        t("purchasing.ops.prompt.purchaseReturnId", {
-          defaultValue: "Purchase return id",
-        }),
-      )
-      ?.trim()
-    const journalId = window
-      .prompt(
-        t("purchasing.ops.prompt.creditJournalId", {
-          defaultValue: "Journal id",
-        }),
-      )
-      ?.trim()
-    const expenseAccountId = window
-      .prompt(
-        t("purchasing.ops.prompt.creditExpenseAccountId", {
-          defaultValue: "Expense account id",
-        }),
-      )
-      ?.trim()
-    const payableAccountId = window
-      .prompt(
-        t("purchasing.ops.prompt.creditPayableAccountId", {
-          defaultValue: "Payable account id",
-        }),
-      )
-      ?.trim()
-    if (!returnId || !journalId || !expenseAccountId || !payableAccountId) return
-    await createVendorCreditFromPurchaseReturn.mutateAsync({
-      purchaseReturnId: BigInt(returnId),
-      journalId: BigInt(journalId),
-      expenseAccountId: BigInt(expenseAccountId),
-      payableAccountId: BigInt(payableAccountId),
-      metadata: null,
-    })
+  const openPurchaseOrder = (purchaseOrderId: string) =>
+    workflowSurface.navigate(recordRef("purchase_order", purchaseOrderId, "purchasing"))
+
+  const openVendorCreditFromReturn = async () => {
+    setOperationDialogRequest({ kind: "create-vendor-credit" })
   }
 
   const openBlanketOrderCreate = async () => {
@@ -848,6 +705,17 @@ function PurchasingClientLoaded({
 
   const openBlanketRelease = async () => {
     setBlanketActionRequest((current) => ({ kind: "release", token: (current?.token ?? 0) + 1 }))
+  }
+
+  const openPurchaseReturns = async () => {
+    setActiveTab("purchase-returns")
+  }
+
+  const openPurchasingConfiguration = async (kind: PurchasingConfigurationKind) => {
+    setConfigurationActionRequest((current) => ({
+      kind,
+      token: (current?.token ?? 0) + 1,
+    }))
   }
 
   const promptCreatePurchaseContract = async () => {
@@ -1177,8 +1045,11 @@ function PurchasingClientLoaded({
   }, [accountJournals, t])
 
   const expenseAccountFieldOptions = useMemo(() => {
+    const expenseRows = (accountAccounts as Record<string, unknown>[]).filter(
+      (row) => accountInternalGroupTag(row) === "expense",
+    )
     const fromApi = accountAccountRowsToSelectOptions(
-      accountAccounts as Record<string, unknown>[],
+      expenseRows,
     )
     if (fromApi.length > 0) return fromApi
     return [
@@ -1400,6 +1271,44 @@ function PurchasingClientLoaded({
     [currencies],
   )
   const defaultCurrencyId = currencyFieldOptions[0]?.value ?? ""
+  const operationDialogOptions = useMemo(
+    () => ({
+      requisitions: (requisitions as Record<string, unknown>[]).map((row) => ({
+        value: String(row.id ?? ""),
+        label: String(row.name ?? row.origin ?? `Requisition ${String(row.id ?? "")}`),
+      })),
+      rfqs: (rfqs as Record<string, unknown>[]).map((row) => ({
+        value: String(row.id ?? ""),
+        label: String(row.name ?? `RFQ ${String(row.id ?? "")}`),
+      })),
+      vendors: vendorFieldOptions.filter((option) => option.value !== ""),
+      products: productFieldOptions.filter((option) => option.value !== ""),
+      uoms: uomFieldOptions.filter((option) => option.value !== ""),
+      purchaseOrders: (orders as Record<string, unknown>[]).map((row) => ({
+        value: String(row.id ?? ""),
+        label: String(row.name ?? `Purchase order ${String(row.id ?? "")}`),
+      })),
+      purchaseReturns: purchaseReturns.map((row) => ({
+        value: String(row.id ?? ""),
+        label: String(row.name ?? `Purchase return ${String(row.id ?? "")}`),
+      })),
+      journals: purchaseJournalFieldOptions.filter((option) => option.value !== ""),
+      expenseAccounts: expenseAccountFieldOptions.filter((option) => option.value !== ""),
+      payableAccounts: payableAccountFieldOptions.filter((option) => option.value !== ""),
+    }),
+    [
+      requisitions,
+      rfqs,
+      vendorFieldOptions,
+      productFieldOptions,
+      uomFieldOptions,
+      orders,
+      purchaseReturns,
+      purchaseJournalFieldOptions,
+      expenseAccountFieldOptions,
+      payableAccountFieldOptions,
+    ],
+  )
 
   const partnerBankFormConfig = useMemo(
     () =>
@@ -1554,45 +1463,15 @@ function PurchasingClientLoaded({
               })
             },
           },
-          {
-            id: "po-send",
-            label: t("purchasing.actions.sendSelected"),
-            requiresSelection: true,
-            onClick: (rows) => {
-              for (const r of rows) {
-                if (poState(r) === "Draft") {
-                  void sendPurchaseOrder.mutateAsync(r.id as string | number | bigint)
-                }
-              }
+          // Legacy ids keep the existing e2e selectors while the actions run through the workflow seam.
+          ...workflowActionsToEntityActions(purchasingWorkflow.orderActions, {
+            ids: {
+              "purchasing.order.send": "po-send",
+              "purchasing.order.confirm": "po-confirm",
+              "purchasing.order.cancel": "po-cancel",
             },
-          },
-          {
-            id: "po-confirm",
-            label: t("purchasing.actions.confirmSelected"),
-            requiresSelection: true,
-            onClick: (rows) => {
-              for (const r of rows) {
-                const st = poState(r)
-                if (st === "Sent" || st === "ToApprove" || st === "Draft") {
-                  void confirmPurchaseOrder.mutateAsync(r.id as string | number | bigint)
-                }
-              }
-            },
-          },
-          {
-            id: "po-cancel",
-            label: t("purchasing.actions.cancelSelected"),
-            requiresSelection: true,
-            variant: "destructive",
-            onClick: (rows) => {
-              for (const r of rows) {
-                const st = poState(r)
-                if (st !== "Done" && st !== "Cancelled") {
-                  void cancelPurchaseOrder.mutateAsync(r.id as string | number | bigint)
-                }
-              }
-            },
-          },
+            confirmation: WORKFLOW_CONFIRMATION(t),
+          }),
           {
             id: "po-recalc",
             label: t("purchasing.actions.recalculateTotals"),
@@ -1657,10 +1536,11 @@ function PurchasingClientLoaded({
             id: "po-create-bill",
             label: t("purchasing.actions.createBillsFromSelected"),
             requiresSelection: true,
+            isApplicable: (rows) =>
+              rows.length === 1 && purchasingWorkflow.createBill.canPresent(rows[0] as Record<string, unknown>),
             onClick: (rows) => {
               if (rows.length !== 1) return
-              const st = poState(rows[0] as Record<string, unknown>)
-              if (st !== "Purchase" && st !== "Done") return
+              if (!purchasingWorkflow.createBill.canPresent(rows[0] as Record<string, unknown>)) return
               const id = rows[0]?.id
               if (id == null) return
               setBillOrderError(null)
@@ -1675,16 +1555,14 @@ function PurchasingClientLoaded({
     purchaseOrdersTableRuntime,
     openCreatePurchaseOrder,
     editPurchaseOrderFormConfig,
-    sendPurchaseOrder,
-    confirmPurchaseOrder,
-    cancelPurchaseOrder,
+    purchasingWorkflow.orderActions,
+    purchasingWorkflow.createBill,
     computePoTotals,
     computePoLineTotals,
     updatePoReceiptStatus,
     updatePoInvoiceStatus,
     lockPurchaseOrder,
     unlockPurchaseOrder,
-    createBillFromPurchaseOrder,
     updatePurchaseOrderLine,
   ])
 
@@ -1831,17 +1709,12 @@ function PurchasingClientLoaded({
             id: "pol-receive-qty",
             label: t("purchasing.actions.receiveFullOpenQty"),
             requiresSelection: true,
+            isApplicable: (rows) => rows.length === 1 && purchasingWorkflow.receiveLine.canPresent(rows[0] as Record<string, unknown>),
             onClick: (rows) => {
-              const first = rows[0]
-              if (!first) return
-              const pq = Number(first.productQty ?? 0)
-              const qr = Number(first.qtyReceived ?? 0)
-              const maxRecv = Math.max(0, pq - qr)
-              if (maxRecv <= 0) return
-              void receivePurchaseOrderLine.mutateAsync({
-                lineId: first.id as string | number | bigint,
-                qty: maxRecv,
-              })
+              const first = rows[0] as Record<string, unknown> | undefined
+              const receiveLine = purchasingWorkflow.receiveLine
+              if (!first || !receiveLine.canPresent(first) || !receiveLine.prepare) return
+              void receiveLine.execute(receiveLine.prepare(first), { navigateToNext: true }).catch(() => undefined)
             },
           },
         ],
@@ -1854,7 +1727,7 @@ function PurchasingClientLoaded({
     receiveLineFormConfig,
     invoiceLineFormConfig,
     removePurchaseOrderLine,
-    receivePurchaseOrderLine
+    purchasingWorkflow.receiveLine,
   ])
 
   const requisitionsEntityConfig = useMemo((): EntityViewConfig => {
@@ -1865,46 +1738,17 @@ function PurchasingClientLoaded({
       view: {
         ...view,
         actions: [
-          {
-            id: "req-submit",
-            label: t("purchasing.actions.submitSelected"),
-            requiresSelection: true,
-            onClick: (rows) => {
-              for (const r of rows) {
-                if (requisitionState(r) === "Draft") {
-                  void submitPurchaseRequisition.mutateAsync(r.id as string | number | bigint)
-                }
-              }
+          // Legacy ids keep the existing e2e selectors while the actions run through the workflow seam.
+          ...workflowActionsToEntityActions(purchasingWorkflow.requisitionActions, {
+            ids: {
+              "purchasing.requisition.submit": "req-submit",
+              "purchasing.requisition.approve": "req-approve",
+              "purchasing.requisition.convert": "req-convert-po",
+              "purchasing.requisition.close": "req-close",
+              "purchasing.requisition.cancel": "req-cancel",
             },
-          },
-          {
-            id: "req-approve",
-            label: t("purchasing.actions.approveSelected"),
-            requiresSelection: true,
-            onClick: (rows) => {
-              for (const r of rows) {
-                if (requisitionState(r) === "InProgress") {
-                  void approvePurchaseRequisition.mutateAsync(r.id as string | number | bigint)
-                }
-              }
-            },
-          },
-          {
-            id: "req-convert-po",
-            label: t("purchasing.actions.convertToPo", {
-              defaultValue: "Convert to PO",
-            }),
-            requiresSelection: true,
-            onClick: (rows) => {
-              for (const r of rows) {
-                if (requisitionState(r) === "Approved") {
-                  void convertPurchaseRequisitionToPo.mutateAsync(
-                    r.id as string | number | bigint,
-                  )
-                }
-              }
-            },
-          },
+            confirmation: WORKFLOW_CONFIRMATION(t),
+          }),
           {
             id: "req-create-rfq",
             label: t("purchasing.actions.createRfq", {
@@ -1914,49 +1758,17 @@ function PurchasingClientLoaded({
             onClick: (rows) => {
               const first = rows[0]
               if (!first) return
-              void promptCreateRfqFromRequisition(String(first.id)).catch(
+              void openCreateRfqFromRequisition(String(first.id)).catch(
                 (e: unknown) => {
                   window.alert(e instanceof Error ? e.message : String(e))
                 },
               )
             },
           },
-          {
-            id: "req-close",
-            label: t("purchasing.actions.closeSelected"),
-            requiresSelection: true,
-            onClick: (rows) => {
-              for (const r of rows) {
-                void closePurchaseRequisition.mutateAsync(r.id as string | number | bigint)
-              }
-            },
-          },
-          {
-            id: "req-cancel",
-            label: t("purchasing.actions.cancelRequisitions"),
-            requiresSelection: true,
-            variant: "destructive",
-            onClick: (rows) => {
-              for (const r of rows) {
-                const st = requisitionState(r)
-                if (st !== "Closed" && st !== "Cancelled") {
-                  void cancelPurchaseRequisition.mutateAsync(r.id as string | number | bigint)
-                }
-              }
-            },
-          },
         ],
       },
     }
-  }, [
-    t,
-    submitPurchaseRequisition,
-    approvePurchaseRequisition,
-    convertPurchaseRequisitionToPo,
-    closePurchaseRequisition,
-    cancelPurchaseRequisition,
-    promptCreateRfqFromRequisition,
-  ])
+  }, [t, purchasingWorkflow.requisitionActions, openCreateRfqFromRequisition])
 
   const landedCostsEntityConfig = useMemo((): EntityViewConfig => {
     const view: EntityTableConfig = {
@@ -2001,53 +1813,16 @@ function PurchasingClientLoaded({
           onClick: () =>
             setQuickActionForm({ form: editLandedCostFormConfig, action: "updateLandedCost" }),
         },
-        {
-          id: "lc-compute",
-          label: t("purchasing.actions.recalculateTotals"),
-          requiresSelection: true,
-          onClick: (rows) => {
-            for (const r of rows) {
-              void computeLandedCosts.mutateAsync(r.id as string | number | bigint)
-            }
+        // Legacy ids keep the existing e2e selectors while the actions run through the workflow seam.
+        ...workflowActionsToEntityActions(purchasingWorkflow.landedCostActions, {
+          ids: {
+            "purchasing.landed-cost.compute": "lc-compute",
+            "purchasing.landed-cost.post": "lc-post",
+            "purchasing.landed-cost.apply": "lc-apply",
+            "purchasing.landed-cost.cancel": "lc-cancel",
           },
-        },
-        {
-          id: "lc-post",
-          label: t("purchasing.actions.postSelected"),
-          requiresSelection: true,
-          onClick: (rows) => {
-            for (const r of rows) {
-              if (landedCostState(r) !== "Cancelled") {
-                void postLandedCosts.mutateAsync(r.id as string | number | bigint)
-              }
-            }
-          },
-        },
-        {
-          id: "lc-apply",
-          label: t("purchasing.actions.applySelected"),
-          requiresSelection: true,
-          onClick: (rows) => {
-            for (const r of rows) {
-              void applyLandedCosts.mutateAsync({
-                landedCostId: r.id as string | number | bigint,
-              })
-            }
-          },
-        },
-        {
-          id: "lc-cancel",
-          label: t("purchasing.actions.cancelSelected"),
-          requiresSelection: true,
-          variant: "destructive",
-          onClick: (rows) => {
-            for (const r of rows) {
-              if (landedCostState(r) !== "Cancelled") {
-                void cancelLandedCost.mutateAsync(r.id as string | number | bigint)
-              }
-            }
-          },
-        },
+          confirmation: WORKFLOW_CONFIRMATION(t),
+        }),
         {
           id: "lc-delete",
           label: t("common.delete"),
@@ -2074,12 +1849,58 @@ function PurchasingClientLoaded({
     addLandedCostLineFormConfig,
     removeLandedCostLineFormConfig,
     editLandedCostFormConfig,
-    computeLandedCosts,
-    postLandedCosts,
-    applyLandedCosts,
-    cancelLandedCost,
+    purchasingWorkflow.landedCostActions,
     deleteLandedCost,
   ])
+
+  const rfqBidsEntityConfig = useMemo((): EntityViewConfig => {
+    const base = purchaseRfqBidsTableConfig(t)
+    const view = base.view as EntityTableConfig
+    return {
+      ...base,
+      view: {
+        ...view,
+        actions: [
+          ...workflowActionsToEntityActions([purchasingWorkflow.awardBid], {
+            ids: { "purchasing.rfq.award": "rfq-award-bid" },
+            confirmation: WORKFLOW_CONFIRMATION(t),
+          }),
+        ],
+      },
+    }
+  }, [t, purchasingWorkflow.awardBid])
+
+  const purchaseReturnsEntityConfig = useMemo((): EntityViewConfig => {
+    const base = purchaseReturnsTableConfig(t)
+    const view = base.view as EntityTableConfig
+    return {
+      ...base,
+      view: {
+        ...view,
+        actions: [
+          ...workflowActionsToEntityActions(purchasingWorkflow.purchaseReturnActions, {
+            ids: { "purchasing.return.confirm": "purchase-return-confirm" },
+            confirmation: WORKFLOW_CONFIRMATION(t),
+          }),
+          {
+            id: "purchase-return-vendor-credit",
+            label: t("purchasing.ops.createVendorCredit", { defaultValue: "Create vendor credit" }),
+            requiresSelection: true,
+            isApplicable: (rows) =>
+              rows.length === 1 && purchasingWorkflow.createVendorCredit.canPresent(rows[0]),
+            onClick: (rows) => {
+              const row = rows[0]
+              if (!row) return
+              setOperationDialogRequest({
+                kind: "create-vendor-credit",
+                purchaseReturnId: String(row.id ?? ""),
+              })
+            },
+          },
+        ],
+      },
+    }
+  }, [t, purchasingWorkflow.purchaseReturnActions, purchasingWorkflow.createVendorCredit])
 
   const supplierIntakesEntityConfig = useMemo((): EntityViewConfig => {
     const view: EntityTableConfig = {
@@ -2108,49 +1929,38 @@ function PurchasingClientLoaded({
           onClick: () =>
             setQuickActionForm({ form: editSupplierIntakeFormConfig, action: "updateSupplierIntake" }),
         },
-        {
-          id: "si-approve",
-          label: t("purchasing.actions.approveSelected"),
-          requiresSelection: true,
-          onClick: (rows) => {
-            for (const r of rows) {
-              if (supplierIntakeState(r) === "Approved") continue
-              const partnerRaw = r.partnerId ?? r.partner_id
-              if (partnerRaw == null || partnerRaw === "" || Number(partnerRaw) <= 0) continue
-              void approveSupplierIntake.mutateAsync({
-                intakeId: r.id as string | number | bigint,
-                partnerId: partnerRaw as string | number | bigint,
-              })
-            }
+        ...workflowActionsToEntityActions(
+          purchasingWorkflow.supplierIntakeActions.filter(
+            (action) =>
+              action.id !== "purchasing.supplier-intake.reject" &&
+              action.id !== "purchasing.supplier-intake.hold",
+          ),
+          {
+          ids: {
+            "purchasing.supplier-intake.approve": "si-approve",
           },
-        },
-        {
-          id: "si-reject",
-          label: t("purchasing.actions.rejectSelected"),
-          requiresSelection: true,
-          variant: "destructive",
-          onClick: (rows) => {
-            for (const r of rows) {
-              void rejectSupplierIntake.mutateAsync({
-                intakeId: r.id as string | number | bigint,
-                reason: "Rejected from purchasing UI",
-              })
-            }
+          confirmation: WORKFLOW_CONFIRMATION(t),
           },
-        },
-        {
-          id: "si-hold",
-          label: t("purchasing.actions.holdSelected"),
-          requiresSelection: true,
-          onClick: (rows) => {
-            for (const r of rows) {
-              void holdSupplierIntake.mutateAsync({
-                intakeId: r.id as string | number | bigint,
-                reason: "Held from purchasing UI",
-              })
-            }
-          },
-        },
+        ),
+        ...(["hold", "reject"] as const).map((kind) => {
+          const action = purchasingWorkflow.supplierIntakeActions.find(
+            (candidate) => candidate.id === `purchasing.supplier-intake.${kind}`,
+          )
+          return {
+            id: `si-${kind}`,
+            label: action?.label ?? kind,
+            requiresSelection: true,
+            variant: kind === "reject" ? ("destructive" as const) : undefined,
+            isApplicable: (rows: Record<string, unknown>[]) =>
+              rows.length === 1 && action != null && action.canPresent(rows[0]),
+            onClick: (rows: Record<string, unknown>[]) => {
+              const row = rows[0]
+              if (!row) return
+              setIntakeReasonError(null)
+              setIntakeReasonRequest({ kind, row })
+            },
+          }
+        }),
         {
           id: "si-delete",
           label: t("common.delete"),
@@ -2174,9 +1984,7 @@ function PurchasingClientLoaded({
     t,
     reviewSupplierIntakeFormConfig,
     editSupplierIntakeFormConfig,
-    approveSupplierIntake,
-    rejectSupplierIntake,
-    holdSupplierIntake,
+    purchasingWorkflow.supplierIntakeActions,
     deleteSupplierIntake,
   ])
 
@@ -2303,14 +2111,10 @@ function PurchasingClientLoaded({
               })
             },
             create_purchase_contract: () => {
-              void promptCreatePurchaseContract().catch((e: unknown) => {
-                window.alert(e instanceof Error ? e.message : String(e))
-              })
+              void openPurchasingConfiguration("contract")
             },
             create_purchasing_integration_intent: () => {
-              void promptCreateIntegrationIntent().catch((e: unknown) => {
-                window.alert(e instanceof Error ? e.message : String(e))
-              })
+              void openPurchasingConfiguration("integrationIntent")
             },
           }
           return {
@@ -2368,6 +2172,7 @@ function PurchasingClientLoaded({
     receiveLineFormConfig,
     setActiveTab,
     openBlanketOrderCreate,
+    openPurchasingConfiguration,
     dashboardTimeRange,
   ])
 
@@ -2474,18 +2279,28 @@ function PurchasingClientLoaded({
                 uoms={uoms as Record<string, unknown>[]}
                 currencies={currencies as Record<string, unknown>[]}
                 createBlanket={(params) => createPurchaseBlanketOrder.mutateAsync(params)}
-                releaseBlanket={(blanketOrderId, params) =>
-                  releaseBlanketToPo.mutateAsync({ blanketOrderId, params })
-                }
-                onOpenPurchaseOrder={(purchaseOrderId) => {
-                  if (typeof window !== "undefined") {
-                    window.location.assign(
-                      `/purchasing?tab=orders&recordId=${encodeURIComponent(purchaseOrderId)}`,
-                    )
-                  }
-                }}
+                releaseBlanket={releaseBlanket}
+                onOpenPurchaseOrder={openPurchaseOrder}
               />
             ),
+          },
+          {
+            id: "rfqs",
+            label: t("purchasing.rfqs.title"),
+            type: "entity",
+            entityConfig: purchaseRfqsTableConfig(t),
+          },
+          {
+            id: "rfq-bids",
+            label: t("purchasing.rfqBids.title"),
+            type: "entity",
+            entityConfig: rfqBidsEntityConfig,
+          },
+          {
+            id: "purchase-returns",
+            label: t("purchasing.purchaseReturns.title", { defaultValue: "Purchase returns" }),
+            type: "entity",
+            entityConfig: purchaseReturnsEntityConfig,
           },
           {
             id: "landed-costs",
@@ -2515,6 +2330,8 @@ function PurchasingClientLoaded({
       linesEntityConfig,
       requisitionsEntityConfig,
       landedCostsEntityConfig,
+      rfqBidsEntityConfig,
+      purchaseReturnsEntityConfig,
       supplierIntakesEntityConfig,
       landedCostFormConfig,
       supplierIntakeFormConfig,
@@ -2527,7 +2344,6 @@ function PurchasingClientLoaded({
       uoms,
       currencies,
       createPurchaseBlanketOrder,
-      releaseBlanketToPo,
       editPartnerBankFormConfig,
       deletePartnerBank,
       t,
@@ -2584,11 +2400,14 @@ function PurchasingClientLoaded({
       lines: enrichedLines,
       requisitions: requisitions as unknown as Record<string, unknown>[],
       vendors: vendors as unknown as Record<string, unknown>[],
+      rfqs: rfqs as unknown as Record<string, unknown>[],
+      "rfq-bids": rfqBids as unknown as Record<string, unknown>[],
+      "purchase-returns": purchaseReturns,
       "landed-costs": landedCosts as unknown as Record<string, unknown>[],
       "supplier-intakes": supplierIntakes as unknown as Record<string, unknown>[],
       "partner-banks": partnerBanks as unknown as Record<string, unknown>[],
     }),
-    [enrichedOrders, enrichedLines, requisitions, vendors, landedCosts, supplierIntakes, partnerBanks],
+    [enrichedOrders, enrichedLines, requisitions, vendors, rfqs, rfqBids, purchaseReturns, landedCosts, supplierIntakes, partnerBanks],
   )
 
   const handleFormSubmit = async (
@@ -2669,7 +2488,14 @@ function PurchasingClientLoaded({
     } else if (action === "receivePurchaseOrderLine") {
       const args = toReceivePoLineArgs(formData)
       if (args == null) return
-      await receivePurchaseOrderLine.mutateAsync(args)
+      await purchasingWorkflow.receiveLine.execute(
+        {
+          lineId: String(args.lineId),
+          qty: args.qty,
+          lotId: args.lotId == null ? undefined : String(args.lotId),
+        },
+        { navigateToNext: true },
+      )
     } else if (action === "invoicePurchaseOrderLine") {
       const args = toInvoicePoLineArgs(formData)
       if (args == null) return
@@ -2732,9 +2558,9 @@ function PurchasingClientLoaded({
     } else if (action === "reviewSupplierIntake") {
       const intakeId = formData.intakeId
       if (intakeId === "" || intakeId == null) return
-      await reviewSupplierIntake.mutateAsync({
-        intakeId: intakeId as string | number | bigint,
-        reviewerNotes: optionalFormString(formData.reviewerNotes),
+      await purchasingWorkflow.reviewIntake.execute({
+        intakeId: String(intakeId),
+        notes: optionalFormString(formData.reviewerNotes),
       })
     } else if (action === "updateSupplierIntake") {
       const intakeId = formData.intakeId
@@ -2762,18 +2588,10 @@ function PurchasingClientLoaded({
     createPurchaseOrder.isPending ||
     updatePurchaseOrder.isPending ||
     createPurchaseRequisition.isPending ||
-    sendPurchaseOrder.isPending ||
-    confirmPurchaseOrder.isPending ||
-    cancelPurchaseOrder.isPending ||
+    purchasingWorkflow.isPending ||
     addPurchaseOrderLine.isPending ||
     removePurchaseOrderLine.isPending ||
-    receivePurchaseOrderLine.isPending ||
     invoicePurchaseOrderLine.isPending ||
-    submitPurchaseRequisition.isPending ||
-    approvePurchaseRequisition.isPending ||
-    convertPurchaseRequisitionToPo.isPending ||
-    closePurchaseRequisition.isPending ||
-    cancelPurchaseRequisition.isPending ||
     computePoTotals.isPending ||
     computePoLineTotals.isPending ||
     createLandedCost.isPending ||
@@ -2781,20 +2599,11 @@ function PurchasingClientLoaded({
     deleteLandedCost.isPending ||
     addLandedCostLine.isPending ||
     removeLandedCostLine.isPending ||
-    computeLandedCosts.isPending ||
-    postLandedCosts.isPending ||
-    applyLandedCosts.isPending ||
-    cancelLandedCost.isPending ||
     submitSupplierIntake.isPending ||
     updateSupplierIntake.isPending ||
-    reviewSupplierIntake.isPending ||
     deleteSupplierIntake.isPending ||
-    approveSupplierIntake.isPending ||
-    rejectSupplierIntake.isPending ||
-    holdSupplierIntake.isPending ||
     lockPurchaseOrder.isPending ||
     unlockPurchaseOrder.isPending ||
-    createBillFromPurchaseOrder.isPending ||
     updatePurchaseOrderLine.isPending ||
     csvImports.importPurchaseOrder.isPending ||
     csvImports.importPurchaseOrderLine.isPending ||
@@ -2850,39 +2659,54 @@ function PurchasingClientLoaded({
               ? (ordersToApprove as Record<string, unknown>[])
               : undefined
           }
-          onCreatePurchaseRfq={() => promptCreateRfqFromRequisition()}
-          onAddPurchaseRfqBid={promptAddRfqBid}
+          onCreatePurchaseRfq={() => openCreateRfqFromRequisition()}
+          onAddPurchaseRfqBid={openAddRfqBid}
           onAwardPurchaseRfqBid={promptAwardRfqBid}
-          onCreatePurchaseReturn={promptCreatePurchaseReturn}
-          onConfirmPurchaseReturn={promptConfirmPurchaseReturn}
-          onCreateVendorCreditFromReturn={promptVendorCreditFromReturn}
+          onCreatePurchaseReturn={openCreatePurchaseReturn}
+          onConfirmPurchaseReturn={openPurchaseReturns}
+          onCreateVendorCreditFromReturn={openVendorCreditFromReturn}
           onCreateBlanketOrder={openBlanketOrderCreate}
           onReleaseBlanketToPo={openBlanketRelease}
-          onCreatePurchaseContract={promptCreatePurchaseContract}
-          onUpsertVendorScorecard={promptUpsertVendorScorecard}
-          onSetVendorRiskFlag={promptSetVendorRiskFlag}
-          onCreateConsignmentAgreement={promptCreateConsignmentAgreement}
-          onSetApprovalDelegate={promptSetApprovalDelegate}
-          onSetCommodityPriceIndex={promptSetCommodityPriceIndex}
-          onCreateIntegrationIntent={promptCreateIntegrationIntent}
+          onCreatePurchaseContract={() => openPurchasingConfiguration("contract")}
+          onUpsertVendorScorecard={() => openPurchasingConfiguration("scorecard")}
+          onSetVendorRiskFlag={() => openPurchasingConfiguration("riskFlag")}
+          onCreateConsignmentAgreement={() => openPurchasingConfiguration("consignment")}
+          onSetApprovalDelegate={() => openPurchasingConfiguration("approvalDelegate")}
+          onSetCommodityPriceIndex={() => openPurchasingConfiguration("commodityIndex")}
+          onCreateIntegrationIntent={() => openPurchasingConfiguration("integrationIntent")}
           onRecordIntegrationResult={promptRecordIntegrationResult}
         >
-          <PurchasingBlanketWorkspace
-            embedded
-            actionRequest={blanketActionRequest}
-            blanketOrders={blanketOrders as Record<string, unknown>[]}
-            blanketLines={blanketOrderLines as Record<string, unknown>[]}
-            blanketReleases={blanketReleases as Record<string, unknown>[]}
-            vendors={vendors as Record<string, unknown>[]}
-            products={products as Record<string, unknown>[]}
-            uoms={uoms as Record<string, unknown>[]}
-            currencies={currencies as Record<string, unknown>[]}
-            createBlanket={(params) => createPurchaseBlanketOrder.mutateAsync(params)}
-            releaseBlanket={(blanketOrderId, params) =>
-              releaseBlanketToPo.mutateAsync({ blanketOrderId, params })
-            }
-            onOpenPurchaseOrder={() => undefined}
-          />
+          <>
+            <PurchasingBlanketWorkspace
+              embedded
+              actionRequest={blanketActionRequest}
+              blanketOrders={blanketOrders as Record<string, unknown>[]}
+              blanketLines={blanketOrderLines as Record<string, unknown>[]}
+              blanketReleases={blanketReleases as Record<string, unknown>[]}
+              vendors={vendors as Record<string, unknown>[]}
+              products={products as Record<string, unknown>[]}
+              uoms={uoms as Record<string, unknown>[]}
+              currencies={currencies as Record<string, unknown>[]}
+              createBlanket={(params) => createPurchaseBlanketOrder.mutateAsync(params)}
+              releaseBlanket={releaseBlanket}
+              onOpenPurchaseOrder={openPurchaseOrder}
+            />
+            <PurchasingConfigurationWorkspace
+              embedded
+              actionRequest={configurationActionRequest}
+              vendors={vendors as Record<string, unknown>[]}
+              products={products as Record<string, unknown>[]}
+              warehouses={warehouses as Record<string, unknown>[]}
+              purchaseOrders={orders as Record<string, unknown>[]}
+              onCreateContract={(params) => createPurchaseContract.mutateAsync(params)}
+              onUpsertScorecard={(params) => upsertVendorScorecard.mutateAsync(params)}
+              onSetRiskFlag={(params) => setVendorRiskFlag.mutateAsync(params)}
+              onSetApprovalDelegate={(params) => setPurchaseApprovalDelegate.mutateAsync(params)}
+              onSetCommodityIndex={(params) => setCommodityPriceIndex.mutateAsync(params)}
+              onCreateConsignment={(params) => createConsignmentAgreement.mutateAsync(params)}
+              onCreateIntegrationIntent={(params) => createPurchasingIntegrationIntent.mutateAsync(params)}
+            />
+          </>
         </PurchasingOpsSod>
       )}
       <ModuleView
@@ -2904,6 +2728,53 @@ function PurchasingClientLoaded({
           if (target) setChatterTarget(target)
         }}
       />
+      <PurchasingOperationDialogs
+        request={operationDialogRequest}
+        defaultCurrencyId={defaultCurrencyId ? BigInt(defaultCurrencyId) : null}
+        options={operationDialogOptions}
+        t={t}
+        onDismiss={() => setOperationDialogRequest(null)}
+        onCreateRfq={(params) => createPurchaseRfq.mutateAsync(params)}
+        onAddRfqBid={(params) => addPurchaseRfqBid.mutateAsync(params)}
+        onCreatePurchaseReturn={(params) => createPurchaseReturn.mutateAsync(params)}
+        onCreateVendorCredit={(input) =>
+          purchasingWorkflow.createVendorCredit.execute(input, { navigateToNext: true })
+        }
+      />
+      {intakeReasonRequest ? (
+        <PurchasingIntakeReasonDialog
+          kind={intakeReasonRequest.kind}
+          open
+          pending={purchasingWorkflow.isPending}
+          error={intakeReasonError}
+          intakeLabel={String(
+            intakeReasonRequest.row.companyName ?? intakeReasonRequest.row.name ?? intakeReasonRequest.row.id ?? "",
+          )}
+          onOpenChange={(open) => {
+            if (!open) {
+              setIntakeReasonRequest(null)
+              setIntakeReasonError(null)
+            }
+          }}
+          onSubmit={async (reason) => {
+            const action = purchasingWorkflow.supplierIntakeActions.find(
+              (candidate) =>
+                candidate.id === `purchasing.supplier-intake.${intakeReasonRequest.kind}`,
+            )
+            if (!action) return
+            setIntakeReasonError(null)
+            try {
+              await action.execute({
+                intakeId: String(intakeReasonRequest.row.id ?? ""),
+                reason,
+              })
+              setIntakeReasonRequest(null)
+            } catch (error) {
+              setIntakeReasonError(error instanceof Error ? error.message : String(error))
+            }
+          }}
+        />
+      ) : null}
       {chatterTarget ? (
         <>
           <RecordChatterDialog
@@ -2976,7 +2847,7 @@ function PurchasingClientLoaded({
           foldCustomFieldsIntoMetadata={false}
           closeOnSubmit={false}
           submitError={billOrderError}
-          isPending={createBillFromPurchaseOrder.isPending}
+          isPending={purchasingWorkflow.isPending}
           onSubmit={async (formData) => {
             setBillOrderError(null)
             const orderRow = (orders as Record<string, unknown>[]).find(
@@ -2990,10 +2861,10 @@ function PurchasingClientLoaded({
               return
             }
             try {
-              await createBillFromPurchaseOrder.mutateAsync({
-                orderId: billOrderId,
-                params,
-              })
+              await purchasingWorkflow.createBill.execute(
+                { orderId: String(billOrderId), params },
+                { navigateToNext: true },
+              )
               setBillOrderId(null)
             } catch (e) {
               setBillOrderError(e instanceof Error ? e.message : String(e))

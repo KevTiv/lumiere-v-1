@@ -9,6 +9,7 @@ import {
 } from "@lumiere/query-hooks/erp-ai-selection-context"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "../components/tabs"
 import { Button } from "../components/button"
+import { useModuleUrlFilters } from "../lib/module-url-filters"
 import { DashboardGrid } from "./dashboard-grid"
 import { DashboardHeader, type TimeRangeValue } from "./dashboard-header"
 import { EntityView } from "../entity-views/entity-view"
@@ -53,7 +54,10 @@ interface ModuleViewProps {
   /** Dashboard time range — shown in header only on the dashboard tab. */
   dashboardTimeRange?: TimeRangeValue
   onDashboardTimeRangeChange?: (value: TimeRangeValue) => void
-  /** URL filters applied to the active entity tab (chart drill-down). */
+  /**
+   * Filters applied to the active entity tab. Defaults to the URL's `?filter=key:value` entries,
+   * so chart drill-downs and record links work in every module without per-client wiring.
+   */
   urlFilters?: Record<string, string>
   /**
    * Prefer SpacetimeDB form configuration (labels, visibility, custom fields) for create modals.
@@ -74,9 +78,11 @@ export function ModuleView({
   dataLoading,
   dashboardTimeRange,
   onDashboardTimeRangeChange,
-  urlFilters,
+  urlFilters: urlFiltersProp,
   runtimeForms,
 }: ModuleViewProps) {
+  const routeFilters = useModuleUrlFilters()
+  const urlFilters = urlFiltersProp ?? routeFilters
   const { checkPermission } = useRBAC()
   const { companyIds } = useErpSession()
   const aiReporter = useErpAiSelectionReporter()

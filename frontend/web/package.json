@@ -29,6 +29,7 @@
     "@lumiere/api-client": "workspace:*",
     "@lumiere/erp-session": "workspace:*",
     "@lumiere/erp-shared": "workspace:*",
+    "@lumiere/erp-workflows": "workspace:*",
     "@lumiere/i18n": "workspace:*",
     "@lumiere/presentation-core": "workspace:*",
     "@lumiere/query-hooks": "workspace:*",
