@@ -16,6 +16,10 @@ use super::{
 };
 
 pub(super) const REPORT_ANALYSIS_PROGRAM_REF: &str = "skill:report_analysis@1";
+pub(super) const RAG_GENERATION_PROGRAM_REF: &str = "skill:rag_generation@1";
+pub(super) const FORM_SUGGESTION_PROGRAM_REF: &str = "skill:form_suggestion@1";
+pub(super) const ACTION_DRAFT_GENERATION_PROGRAM_REF: &str =
+    "skill:action_draft_generation@1";
 
 pub(super) fn report_analysis_graph() -> DecisionGraph {
     DecisionGraph {
@@ -311,6 +315,48 @@ pub(super) fn consequential_mutation_reference_graph() -> DecisionGraph {
     }
 }
 
+pub(super) fn rag_generation_graph() -> DecisionGraph {
+    generation_surface_graph(
+        "schema-constrained grounded JSON answer from authorized retrieval and live ERP evidence",
+    )
+}
+
+pub(super) fn form_suggestion_graph() -> DecisionGraph {
+    generation_surface_graph(
+        "schema-constrained advisory ERP form suggestions using only the supplied field schema and authorized source context",
+    )
+}
+
+pub(super) fn action_draft_generation_graph() -> DecisionGraph {
+    generation_surface_graph(
+        "schema-constrained advisory ERP action draft proposals only; never execute reducers or imply mutation authority",
+    )
+}
+
+fn generation_surface_graph(format: &str) -> DecisionGraph {
+    DecisionGraph {
+        entry: "input".to_string(),
+        nodes: vec![
+            GraphNode {
+                id: "input".to_string(),
+                depends_on: Vec::new(),
+                next: Some("generate".to_string()),
+                kind: DecisionNode::Compute(ComputeNode {
+                    function_ref: "program_input".to_string(),
+                }),
+            },
+            GraphNode {
+                id: "generate".to_string(),
+                depends_on: vec!["input".to_string()],
+                next: None,
+                kind: DecisionNode::Generate(GenerateNode {
+                    format: format.to_string(),
+                }),
+            },
+        ],
+    }
+}
+
 pub(super) struct GovernedProgramCatalogEntry {
     pub program_ref: &'static str,
     pub graph: DecisionGraph,
@@ -346,6 +392,24 @@ pub(crate) fn governed_program_for_skill(skill_key: &str) -> Option<GovernedProg
             graph: price_search_graph(),
             review_independence_key: "RunReviewDisposition",
             reviewed_calls: vec![named_read_call("erp_search"), network_call("web_search")],
+        }),
+        "rag_generation" => Some(GovernedProgramCatalogEntry {
+            program_ref: RAG_GENERATION_PROGRAM_REF,
+            graph: rag_generation_graph(),
+            review_independence_key: "RunReviewDisposition",
+            reviewed_calls: Vec::new(),
+        }),
+        "form_suggestion" => Some(GovernedProgramCatalogEntry {
+            program_ref: FORM_SUGGESTION_PROGRAM_REF,
+            graph: form_suggestion_graph(),
+            review_independence_key: "RunReviewDisposition",
+            reviewed_calls: Vec::new(),
+        }),
+        "action_draft_generation" => Some(GovernedProgramCatalogEntry {
+            program_ref: ACTION_DRAFT_GENERATION_PROGRAM_REF,
+            graph: action_draft_generation_graph(),
+            review_independence_key: "RunReviewDisposition",
+            reviewed_calls: Vec::new(),
         }),
         _ => None,
     }
@@ -529,6 +593,38 @@ mod tests {
     #[test]
     fn consequential_mutation_reference_program_is_valid() {
         validate_graph(&consequential_mutation_reference_graph()).unwrap();
+    }
+
+    #[test]
+    fn generation_surface_programs_are_catalogued_and_valid() {
+        for (skill, expected_ref) in [
+            ("rag_generation", RAG_GENERATION_PROGRAM_REF),
+            ("form_suggestion", FORM_SUGGESTION_PROGRAM_REF),
+            (
+                "action_draft_generation",
+                ACTION_DRAFT_GENERATION_PROGRAM_REF,
+            ),
+        ] {
+            let entry = governed_program_for_skill(skill)
+                .unwrap_or_else(|| panic!("{skill} must be in the governed program catalog"));
+            assert_eq!(entry.program_ref, expected_ref);
+            assert!(
+                entry.reviewed_calls.is_empty(),
+                "generation-only surfaces must not gain capability authority"
+            );
+            validate_graph(&entry.graph).unwrap();
+            assert!(entry
+                .graph
+                .nodes
+                .iter()
+                .any(|node| matches!(node.kind, DecisionNode::Generate(_))));
+            assert!(!entry.graph.nodes.iter().any(|node| matches!(
+                node.kind,
+                DecisionNode::Capability(_)
+                    | DecisionNode::AcquireEvidence(_)
+                    | DecisionNode::RequireApproval(_)
+            )));
+        }
     }
 
     #[test]
