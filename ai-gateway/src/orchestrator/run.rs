@@ -31,9 +31,9 @@ use super::{
         StdbAuthorityRollbackRecorder, StdbDecisionResolutionPolicy, StdbDriftMonitor,
         StdbModelShadowRecorder,
     },
-    intelligence::EvidenceRef,
+    intelligence::{EvidenceRef, GenerationProvider, GenerationRequest},
     intelligence_router::{
-        complete_routed_generation, ConfiguredIntelligenceRouter, NoopShadowDecisionRecorder,
+        generate_routed_for_run, ConfiguredIntelligenceRouter, NoopShadowDecisionRecorder,
         RoutedDecisionProvider, RoutedGenerationProvider, RoutedReasoningProvider,
         StdbShadowDecisionRecorder,
     },
@@ -72,7 +72,6 @@ use crate::{
         complete_run, create_run, load_run_key, load_skill, resume_run, set_run_wait_state,
         LoadedSkill,
     },
-    providers::llm::LlmMessage,
     state::AppState,
     tools::{
         generated_read::{resolve_actor_grants, GeneratedReadTools},
@@ -438,8 +437,17 @@ async fn run_legacy_skill(
         }
     }
 
-    let (candidate_summary, tokens_used) =
-        synthesize_summary(state, req.org_id, &agent, &skill, &query, &tool_payloads).await?;
+    let (candidate_summary, tokens_used) = synthesize_summary(
+        state,
+        req.org_id,
+        req.company_id,
+        run_id,
+        &agent,
+        &skill,
+        &query,
+        &tool_payloads,
+    )
+    .await?;
 
     // The classic loop is also a publication boundary. Tool payloads are
     // server-produced; bind the generated prose explicitly to those exact
@@ -1439,6 +1447,8 @@ mod tests {
 async fn synthesize_summary(
     state: &AppState,
     org_id: u64,
+    company_id: u64,
+    run_id: u64,
     agent: &crate::ai_agent::ResolvedAgentConfig,
     skill: &LoadedSkill,
     query: &str,
@@ -1477,24 +1487,48 @@ async fn synthesize_summary(
         )
     };
 
+    if run_id == 0 {
+        anyhow::bail!(
+            "classic skill synthesis requires a durable run; sync the bundled skill before execution"
+        );
+    }
+    let spend_reader = state
+        .spend_read_stdb
+        .as_deref()
+        .context("spend_read_stdb is required for routed generation")?;
     let model_store = StdbModelConfigurationStore {
         reader: state.stdb.as_ref(),
     };
-    let response = complete_routed_generation(
+    let ledger = StdbSpendLedger {
+        writer: state.stdb.as_ref(),
+        reader: spend_reader,
+    };
+    let response = generate_routed_for_run(
         &model_store,
+        &ledger,
         org_id,
+        company_id,
+        run_id,
         agent,
-        None,
+        skill
+            .config_json
+            .get("intelligencePolicyRef")
+            .or_else(|| skill.config_json.get("intelligence_policy_ref"))
+            .and_then(Value::as_str),
         state.providers.llm.as_ref(),
-        system,
-        vec![LlmMessage::text("user", user)],
-        agent.max_tokens.min(2048),
+        GenerationRequest {
+            objective: user,
+            context: json!({"tool_results": tool_payloads}),
+            format: "concise grounded ERP skill summary".to_string(),
+            instructions: Some(system),
+            max_tokens: Some(agent.max_tokens.min(2048)),
+        },
     )
     .await
     .context("skill synthesis LLM")?;
 
     let tokens_used = response.input_tokens.saturating_add(response.output_tokens);
-    Ok((response.text.trim().to_string(), tokens_used))
+    Ok((response.content.trim().to_string(), tokens_used))
 }
 
 fn string_list_from_input(inputs: &Value, key: &str) -> Option<Vec<String>> {
