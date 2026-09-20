@@ -13,7 +13,7 @@ use std::time::Instant;
 use crate::{
     ai_agent::{
         agent_allows_live_read, enforce_chargeable_limits, ensure_allowed_action,
-        ensure_model_allowed, record_ai_spend, resolve_agent,
+        ensure_model_allowed, resolve_agent,
     },
     error::{AppError, AppResult},
     harness::{
@@ -22,13 +22,15 @@ use crate::{
         SnapshotUiContext, RAG_MAX_LIVE_SNAPSHOTS,
     },
     orchestrator::{
-        intelligence_router::complete_routed_generation,
+        intelligence::{GenerationProvider, GenerationRequest},
+        intelligence_router::generate_routed_for_run,
         model_configuration::StdbModelConfigurationStore,
+        skill_loader::{complete_run, create_generation_surface_run},
+        spend_admission::StdbSpendLedger,
         text_answer_gate::{
             gate_text_answer, TextAnswerProvenance, TextAnswerVerification, TextEvidence,
         },
     },
-    providers::llm::LlmMessage,
     retrieval_policy::optional_retrieval,
     routes::{
         evidence::{require_scoped_capability_grant, RAG_EVIDENCE_RETRIEVE_CAPABILITY},
@@ -719,37 +721,83 @@ pub async fn post_rag(
     let user_content =
         format!("{user_content}\n\nAllowed structured support refs: {allowed_supports}");
 
+    let spend_reader = state
+        .spend_read_stdb
+        .as_deref()
+        .ok_or_else(|| AppError::Internal("spend_read_stdb is required for routed generation".into()))?;
+    let run_inputs = json!({
+        "surface": "rag_generation",
+        "query": req.query,
+        "include_types": req.include_types,
+        "limit": req.limit,
+    });
+    let run_id = create_generation_surface_run(
+        state.stdb.as_ref(),
+        org_id,
+        req.company_id,
+        "rag_generation",
+        agent.agent_id,
+        req.team_member_id,
+        &serde_json::to_string(&run_inputs).map_err(|e| AppError::Internal(e.to_string()))?,
+        &req.identity_hex,
+    )
+    .await
+    .map_err(|e| AppError::Internal(e.to_string()))?;
     let model_store = StdbModelConfigurationStore {
         reader: state.stdb.as_ref(),
     };
-    let llm_resp = complete_routed_generation(
+    let ledger = StdbSpendLedger {
+        writer: state.stdb.as_ref(),
+        reader: spend_reader,
+    };
+    let generation = generate_routed_for_run(
         &model_store,
+        &ledger,
         org_id,
+        req.company_id,
+        run_id,
         &agent,
         None,
         state.providers.llm.as_ref(),
-        system_prompt,
-        vec![LlmMessage::text("user", user_content)],
-        agent.max_tokens,
+        GenerationRequest {
+            objective: user_content,
+            context: json!({
+                "retrieved_context": retrieved_context,
+                "live_context": live_context,
+                "ui_context": ui_block,
+            }),
+            format: "schema-constrained grounded JSON answer".to_string(),
+            instructions: Some(system_prompt),
+            max_tokens: Some(agent.max_tokens),
+        },
     )
-    .await
-    .map_err(|e| AppError::Internal(format!("LLM request failed: {e}")))?;
-
-    let total_tokens = llm_resp.input_tokens + llm_resp.output_tokens;
-    if total_tokens > 0 {
-        if let Err(e) = record_ai_spend(&state.stdb, org_id, agent.agent_id, total_tokens).await {
-            tracing::warn!(
-                agent_id = agent.agent_id,
-                error = %e,
-                "record_ai_spend failed"
-            );
+    .await;
+    let llm_resp = match generation {
+        Ok(response) => response,
+        Err(error) => {
+            let _ = complete_run(
+                state.stdb.as_ref(),
+                org_id,
+                req.company_id,
+                run_id,
+                "failed",
+                None,
+                None,
+                None,
+                0,
+                0,
+                Some(error.to_string()),
+            )
+            .await;
+            return Err(AppError::Internal(format!("LLM request failed: {error}")));
         }
-    }
+    };
+    let total_tokens = llm_resp.input_tokens.saturating_add(llm_resp.output_tokens);
 
     let (answer, verification, mut provenance) = finalize_rag_answer(
         org_id,
         req.company_id,
-        &llm_resp.text,
+        &llm_resp.content,
         &live_snapshots,
         &ranked,
         &req.query,
@@ -761,8 +809,23 @@ pub async fn post_rag(
     );
     let verification = Some(verification);
     let provenance = Some(provenance);
-    let provider = Some(llm_resp.provider);
-    let model = Some(llm_resp.model);
+    complete_run(
+        state.stdb.as_ref(),
+        org_id,
+        req.company_id,
+        run_id,
+        "completed",
+        Some(answer.clone()),
+        None,
+        None,
+        1,
+        total_tokens,
+        None,
+    )
+    .await
+    .map_err(|e| AppError::Internal(e.to_string()))?;
+    let provider = Some(llm_resp.provider.clone());
+    let model = Some(llm_resp.model.clone());
     let agent_id = Some(agent.agent_id);
 
     let mut sources: Vec<RagSource> = live_snapshots_to_rag_sources(&live_snapshots);
