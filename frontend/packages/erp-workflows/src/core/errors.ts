@@ -30,6 +30,19 @@ export class WorkflowError extends Error {
   get needsReadback(): boolean {
     return this.kind === "outcome_unknown" || this.kind === "already_applied"
   }
+
+  /**
+   * The command did not commit, but what the user was looking at is out of date (someone else
+   * changed the record, or it is gone). Refresh so they see the current state before deciding.
+   */
+  get viewIsStale(): boolean {
+    return this.kind === "stale_revision" || this.kind === "conflict" || this.kind === "not_found"
+  }
+
+  /** Every failure after which the affected lists must be refetched. */
+  get needsRefresh(): boolean {
+    return this.needsReadback || this.viewIsStale
+  }
 }
 
 const ALREADY_APPLIED = /\balready\b.*\b(confirmed|applied|processed|posted|done|validated|cancell?ed)\b/i

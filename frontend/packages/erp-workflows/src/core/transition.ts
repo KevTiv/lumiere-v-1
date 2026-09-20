@@ -1,4 +1,4 @@
-import { toWorkflowError, WorkflowError } from "./errors"
+import { toWorkflowError, type WorkflowError, type WorkflowErrorKind } from "./errors"
 import type { ErpRecordRef } from "./record-ref"
 import type { WorkflowOutcome, WorkflowResult } from "./result"
 
@@ -28,14 +28,46 @@ export interface TransitionSpec<TInput> {
 export interface TransitionNotice {
   kind: "success" | "info" | "error"
   transitionId: string
+  /** Identifies this run in the transition log; a retry gets a new one. */
+  correlationId: string
+  /** 1 for the first run, incremented on each retry. */
+  attempt: number
   result?: WorkflowResult
   error?: WorkflowError
+  /** The affected lists were refetched because the failure left the view out of date. */
+  refreshed?: boolean
+  /**
+   * Re-runs the same transition. Present only when re-issuing cannot duplicate the write
+   * (`retryable_transport`); an unknown outcome is never offered a retry.
+   */
+  retry?: () => Promise<WorkflowResult>
+}
+
+/**
+ * One line of the transition log. It carries identifiers and outcomes only, never the command's
+ * input, so it is safe to ship to an analytics/logging sink.
+ */
+export interface TransitionEvent {
+  correlationId: string
+  transitionId: string
+  /** The in-flight key of the run (`<transition>:<record id>`), set by the runner. */
+  runKey?: string
+  attempt: number
+  status: "applied" | "approval_pending" | "failed"
+  errorKind?: WorkflowErrorKind
+  httpStatus?: number
+  refreshed?: boolean
+  durationMs: number
+  affectedResources: readonly string[]
+  createdRecords?: ReadonlyArray<{ resource: string; id: string }>
 }
 
 /** Side effects a surface supplies; the completion path itself stays framework-free. */
 export interface CompletionPorts {
   invalidate(resources: readonly string[]): Promise<void>
   notify?(notice: TransitionNotice): void
+  /** Receives one event per run. A failing sink never affects the transition. */
+  record?(event: TransitionEvent): void
   /** Called with the record to open after success. Surfaces that do not navigate omit it. */
   navigate?(ref: ErpRecordRef): void
 }
@@ -43,6 +75,16 @@ export interface CompletionPorts {
 export interface CompleteOptions {
   /** Open `result.next` after success. */
   navigateToNext?: boolean
+  /** 1 for the first run; the runner increments it on a retry. */
+  attempt?: number
+}
+
+let idCounter = 0
+
+/** Unique per run; uses the platform UUID when present and a monotonic fallback otherwise. */
+export function newCorrelationId(): string {
+  const uuid = (globalThis as { crypto?: { randomUUID?: () => string } }).crypto?.randomUUID?.()
+  return uuid ?? `wf-${Date.now().toString(36)}-${(idCounter++).toString(36)}`
 }
 
 /**
@@ -55,15 +97,44 @@ export async function completeTransition<TInput>(
   ports: CompletionPorts,
   options: CompleteOptions = {},
 ): Promise<WorkflowResult> {
+  const correlationId = newCorrelationId()
+  const attempt = options.attempt ?? 1
+  const startedAt = Date.now()
+  const record = (event: Omit<TransitionEvent, "correlationId" | "transitionId" | "attempt" | "durationMs">) => {
+    try {
+      ports.record?.({
+        correlationId,
+        transitionId: spec.id,
+        attempt,
+        durationMs: Date.now() - startedAt,
+        ...event,
+      })
+    } catch {
+      // Observability must never turn a finished transition into a failure.
+    }
+  }
+
   try {
     await spec.command(input)
   } catch (raw) {
     const error = toWorkflowError(raw, { idempotent: spec.idempotent })
-    if (error.needsReadback) {
-      // The write may have landed: converge on canonical state even though we report failure.
-      await ports.invalidate(spec.affects).catch(() => undefined)
+    let refreshed = false
+    if (error.needsRefresh) {
+      // A write that may have landed, or a view someone else made stale: converge on canonical
+      // state even though we report failure.
+      refreshed = await ports.invalidate(spec.affects).then(
+        () => true,
+        () => false,
+      )
     }
-    ports.notify?.({ kind: "error", transitionId: spec.id, error })
+    record({
+      status: "failed",
+      errorKind: error.kind,
+      httpStatus: error.status,
+      refreshed,
+      affectedResources: spec.affects,
+    })
+    ports.notify?.({ kind: "error", transitionId: spec.id, correlationId, attempt, error, refreshed })
     throw error
   }
 
@@ -83,9 +154,16 @@ export async function completeTransition<TInput>(
     createdRecords: observed.createdRecords,
     next: observed.next,
   }
+  record({
+    status: result.outcome,
+    affectedResources,
+    createdRecords: result.createdRecords?.map(({ resource, id }) => ({ resource, id })),
+  })
   ports.notify?.({
     kind: result.outcome === "approval_pending" ? "info" : "success",
     transitionId: spec.id,
+    correlationId,
+    attempt,
     result,
   })
   if (options.navigateToNext && result.next) ports.navigate?.(result.next)

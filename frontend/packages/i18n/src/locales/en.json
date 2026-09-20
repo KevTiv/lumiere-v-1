@@ -6085,6 +6085,15 @@
   "erpWorkflow": {
     "applied": "Done",
     "approvalPending": "Sent for approval",
+    "retry": "Retry",
+    "refreshed": "The list was refreshed.",
+    "hints": {
+      "outcome_unknown": "We couldn't confirm whether this went through. Check the record before trying again.",
+      "already_applied": "This was already done.",
+      "stale_revision": "This record changed since you opened it. Review it before trying again.",
+      "conflict": "The record's current state doesn't allow this.",
+      "retryable_transport": "Nothing was changed."
+    },
     "confirm": {
       "description": "This can't be undone.",
       "confirm": "Confirm",

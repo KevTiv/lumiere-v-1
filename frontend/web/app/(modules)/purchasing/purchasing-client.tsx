@@ -544,7 +544,7 @@ function PurchasingClientLoaded({
 
   const createPurchaseOrder = useCreatePurchaseOrder(orgId, { companyId: operatingCompanyId ?? undefined })
   const createPurchaseRequisition = useCreatePurchaseRequisition(orgId, { companyId: operatingCompanyId ?? undefined })
-  const workflowSurface = useWorkflowSurface()
+  const workflowSurface = useWorkflowSurface({ organizationId })
   const purchasingWorkflow = usePurchasingWorkflow(
     orgId,
     operatingCompanyId,
@@ -577,6 +577,7 @@ function PurchasingClientLoaded({
     },
     {
       navigate: workflowSurface.navigate,
+    record: workflowSurface.record,
       notify: (notice: TransitionNotice) => {
         // The bill form renders its own failure inline.
         if (notice.kind === "error" && INLINE_ERROR_TRANSITIONS.has(notice.transitionId)) return

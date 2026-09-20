@@ -721,9 +721,10 @@ function SalesClientLoaded({
   const createPricelist = useCreatePricelist(orgId);
   const createPricelistItem = useCreatePricelistItem(orgId);
   const createPickingBatch = useCreatePickingBatch(orgId, operatingCompanyId);
-  const workflowSurface = useWorkflowSurface();
+  const workflowSurface = useWorkflowSurface({ organizationId });
   const workflowCallbacks = {
     navigate: workflowSurface.navigate,
+    record: workflowSurface.record,
     notify: (notice: TransitionNotice) => {
       // These forms render their own failure inline.
       if (notice.kind === 'error' && INLINE_ERROR_TRANSITIONS.has(notice.transitionId)) return;

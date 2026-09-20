@@ -1638,7 +1638,7 @@ function AccountingClientReady({
 
   const createAccountPayment = useCreateAccountPayment(organizationId)
   const cancelAccountPayment = useCancelAccountPayment(organizationId)
-  const workflowSurface = useWorkflowSurface()
+  const workflowSurface = useWorkflowSurface({ organizationId })
   const resolvePostingAccounts = useCallback(() => {
     const resolved = resolveDefaultCogsInventoryAccountIds(accounts as readonly Record<string, unknown>[])
     return resolved
@@ -1660,6 +1660,7 @@ function AccountingClientReady({
     },
     {
       navigate: workflowSurface.navigate,
+    record: workflowSurface.record,
       notify: (notice) => {
         // The register/reconcile dialogs render their own failure inline.
         if (notice.kind === "error" && notice.transitionId.startsWith("accounting.payment.re")) return

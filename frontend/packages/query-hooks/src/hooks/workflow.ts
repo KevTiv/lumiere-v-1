@@ -1,11 +1,12 @@
 import { useCallback, useMemo, useRef, useState } from "react"
 import { useQueryClient, type QueryClient } from "@tanstack/react-query"
 import {
-  completeTransition,
   createSingleFlight,
+  createTransitionRunner,
   type CompleteOptions,
   type CompletionPorts,
   type ErpRecordRef,
+  type TransitionEvent,
   type TransitionNotice,
   type TransitionSpec,
   type WorkflowResult,
@@ -33,11 +34,14 @@ export function invalidateQueryResources(
 export interface WorkflowSurfaceCallbacks {
   notify?(notice: TransitionNotice): void
   navigate?(ref: ErpRecordRef): void
+  /** Receives the transition log (identifiers and outcomes only, never command input). */
+  record?(event: TransitionEvent): void
 }
 
 /**
- * Runs transitions through the shared completion path (`completeTransition`) with React Query
- * invalidation as the invalidate port and one in-flight run per key.
+ * Runs transitions through the shared completion path (`createTransitionRunner`) with React Query
+ * invalidation as the invalidate port, one in-flight run per key, retry for safe failures, and
+ * the transition log.
  */
 export function useWorkflowRunner(organizationId: bigint, callbacks: WorkflowSurfaceCallbacks = {}) {
   const qc = useQueryClient()
@@ -51,8 +55,19 @@ export function useWorkflowRunner(organizationId: bigint, callbacks: WorkflowSur
       invalidate: (resources) => invalidateQueryResources(qc, organizationId, resources),
       notify: (notice) => callbacksRef.current.notify?.(notice),
       navigate: (ref) => callbacksRef.current.navigate?.(ref),
+      record: (event) => callbacksRef.current.record?.(event),
     }),
     [qc, organizationId],
+  )
+
+  const runner = useMemo(
+    () =>
+      createTransitionRunner(ports, {
+        flight,
+        onStart: () => setPendingRuns((n) => n + 1),
+        onSettle: () => setPendingRuns((n) => n - 1),
+      }),
+    [ports, flight],
   )
 
   const run = useCallback(
@@ -61,14 +76,8 @@ export function useWorkflowRunner(organizationId: bigint, callbacks: WorkflowSur
       spec: TransitionSpec<TInput>,
       input: TInput,
       options?: CompleteOptions,
-    ): Promise<WorkflowResult> =>
-      flight.run(key, () => {
-        setPendingRuns((n) => n + 1)
-        return completeTransition(spec, input, ports, options).finally(() =>
-          setPendingRuns((n) => n - 1),
-        )
-      }),
-    [flight, ports],
+    ): Promise<WorkflowResult> => runner.run(key, spec, input, options),
+    [runner],
   )
 
   return { run, isRunning: flight.isRunning, isPending: pendingRuns > 0 }
