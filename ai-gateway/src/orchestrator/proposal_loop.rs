@@ -1,49 +1,13 @@
-//! GP-04 (governed intelligence program): proposal-only loop mode.
+//! GP-04 (governed intelligence program): proposal-only reasoning loop.
 //!
-//! `run_proposal_loop` is a **second**, additive orchestration path
-//! alongside the existing `agent_loop::run_loop`. Per
-//! `governed-intelligence-program-migration.md`'s migration rule — "do not
-//! delete the current loop first; refactor it behind compatibility seams
-//! until proposal-only reasoning reaches parity" — `run_loop` is untouched
-//! and still owns production skill execution. Nothing in `run.rs` calls
-//! this module yet.
+//! Reasoning providers emit typed proposals. Capability proposals are routed
+//! through `GovernedCapabilityService`; they are never executed directly by
+//! the reasoning/model loop. Final drafts pass through `FinalAnswerAdmission`.
 //!
-//! The difference from `run_loop`:
-//!
-//! ```text
-//! run_loop:          LlmCompletion -> raw tool_calls -> direct execution
-//! run_proposal_loop: ReasoningProvider -> typed ReasoningOutcome -> GovernedCapabilityService
-//! ```
-//!
-//! A model-selected capability never executes directly here. It arrives as
-//! a `CapabilityProposal` (GP-01) and is routed through
-//! `GovernedCapabilityService` (GP-03) — the same authorization/policy,
-//! recovery and approval path `run_loop`'s direct execution uses under the
-//! hood, so this is not a second, looser execution path. A `FinalDraft`
-//! never becomes a candidate answer directly; it goes through
-//! `FinalAnswerAdmission` first.
-//!
-//! What this loop keeps, per GP-04's requirements: bounded state
-//! (`bounded_state` JSON, carried and grown round to round), model rounds,
-//! malformed-output handling (`ReasoningProvider::reason` returning `Err`
-//! is terminal, never retried silently), duplicate/non-progress detection
-//! (reusing `progress::ProgressTracker` against capability outputs exactly
-//! as `run_loop` does against tool outputs), and clarification proposals.
-//!
-//! What it does *not* own, per GP-04: capability execution (delegated to
-//! `GovernedCapabilityService`), authorization/policy authority (same),
-//! spend reservation/settlement (owned by whatever `LlmCompletion`/
-//! `ReasoningProvider` transport the caller supplies, e.g. `SpendAdmittedLlm`),
-//! approvals (delegated to `ApprovalCoordinator` via the capability
-//! service), mutation retry/reconciliation (delegated to
-//! `ExecutionRecovery`), evidence verification and final-answer admission
-//! (delegated to `FinalAnswerAdmission`), and precedent persistence (GP-06,
-//! not built yet — `precedent` is always empty here).
-//!
-//! `DecisionProposal` and `ProgramPatchProposal` have no consuming service
-//! yet (`DecisionStep`/`GovernedProgram` are GP-07/GP-08); this loop cannot
-//! act on either beyond recording and stopping. That is an explicit,
-//! visible stop reason, not a silent no-op or a fabricated acceptance.
+//! This loop owns only bounded reasoning state, rounds, non-progress detection,
+//! clarification, and proposal generation. Authorization, execution, recovery,
+//! approvals, verification, publication admission, and precedent persistence
+//! remain governed-runtime responsibilities.
 
 use anyhow::{bail, Result};
 use serde_json::{json, Value};
