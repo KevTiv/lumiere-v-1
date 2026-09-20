@@ -949,6 +949,7 @@
     "run_expenses_wave_f_test": "erp.run_expenses_wave_f_test",
     "run_expenses_wave_g_test": "erp.run_expenses_wave_g_test",
     "run_fleet_gap_fixes_test": "erp.run_fleet_gap_fixes_test",
+    "run_fleet_lifecycle_test": "erp.run_fleet_lifecycle_test",
     "run_fleet_relational_integrity_test": "erp.run_fleet_relational_integrity_test",
     "run_fleet_wave_a_test": "erp.run_fleet_wave_a_test",
     "run_forms_custom_field_invalid_model_test": "erp.run_forms_custom_field_invalid_model_test",

@@ -450,64 +450,66 @@ pub(crate) fn generated_restore_order(table: &str) -> Option<u32> {
         "deferred_revenue_line" => Some(437),
         "delivery_price_rule" => Some(438),
         "document_version" => Some(439),
-        "form_config_field" => Some(440),
-        "form_role_config" => Some(441),
-        "helpdesk_team_member" => Some(442),
-        "hr_expense_advance_application" => Some(443),
-        "hr_expense_allocation" => Some(444),
-        "hr_expense_policy_exception" => Some(445),
-        "hr_leave_allocation" => Some(446),
-        "hr_onboarding_template_item" => Some(447),
-        "import_job_error" => Some(448),
-        "import_job_record" => Some(449),
-        "mrp_bom_line" => Some(450),
-        "opportunity_line" => Some(451),
-        "pos_order_line" => Some(452),
-        "pos_payment" => Some(453),
-        "presentation_module_version" => Some(454),
-        "product_attribute_line" => Some(455),
-        "product_pricelist_item" => Some(456),
-        "project_rate_card_line" => Some(457),
-        "project_revenue_line" => Some(458),
-        "proposal_line_item" => Some(459),
-        "proposal_section" => Some(460),
-        "proposal_version" => Some(461),
-        "purchase_blanket_order_line" => Some(462),
-        "purchase_blanket_release" => Some(463),
-        "purchase_order_line" => Some(464),
-        "purchase_requisition_line" => Some(465),
-        "purchase_return_line" => Some(466),
-        "purchase_rfq_bid" => Some(467),
-        "purchase_rfq_line" => Some(468),
-        "return_order_line" => Some(469),
-        "sale_commission_plan_split" => Some(470),
-        "sale_order_line" => Some(471),
-        "sale_order_option" => Some(472),
-        "segment_member" => Some(473),
-        "stock_inventory_line" => Some(474),
-        "stock_landed_cost_allocation" => Some(475),
-        "stock_landed_cost_application" => Some(476),
-        "stock_move_line" => Some(477),
-        "stock_picking" => Some(478),
-        "subscription_bundle_item" => Some(479),
-        "subscription_line" => Some(480),
-        "subscription_usage_event" => Some(481),
-        "tax_deadline_reminder" => Some(482),
-        "workflow_calendar_version" => Some(483),
-        "workflow_decision_event" => Some(484),
-        "workflow_human_task_candidate" => Some(485),
-        "workflow_human_task_event" => Some(486),
-        "workflow_simulation_step" => Some(487),
-        "workflow_version" => Some(488),
-        "ai_knowledge_review" => Some(489),
-        "ai_knowledge_skill_promotion" => Some(490),
-        "form_field_label" => Some(491),
-        "workflow_calendar_exception" => Some(492),
+        "fleet_inspection" => Some(440),
+        "fleet_service_record" => Some(441),
+        "form_config_field" => Some(442),
+        "form_role_config" => Some(443),
+        "helpdesk_team_member" => Some(444),
+        "hr_expense_advance_application" => Some(445),
+        "hr_expense_allocation" => Some(446),
+        "hr_expense_policy_exception" => Some(447),
+        "hr_leave_allocation" => Some(448),
+        "hr_onboarding_template_item" => Some(449),
+        "import_job_error" => Some(450),
+        "import_job_record" => Some(451),
+        "mrp_bom_line" => Some(452),
+        "opportunity_line" => Some(453),
+        "pos_order_line" => Some(454),
+        "pos_payment" => Some(455),
+        "presentation_module_version" => Some(456),
+        "product_attribute_line" => Some(457),
+        "product_pricelist_item" => Some(458),
+        "project_rate_card_line" => Some(459),
+        "project_revenue_line" => Some(460),
+        "proposal_line_item" => Some(461),
+        "proposal_section" => Some(462),
+        "proposal_version" => Some(463),
+        "purchase_blanket_order_line" => Some(464),
+        "purchase_blanket_release" => Some(465),
+        "purchase_order_line" => Some(466),
+        "purchase_requisition_line" => Some(467),
+        "purchase_return_line" => Some(468),
+        "purchase_rfq_bid" => Some(469),
+        "purchase_rfq_line" => Some(470),
+        "return_order_line" => Some(471),
+        "sale_commission_plan_split" => Some(472),
+        "sale_order_line" => Some(473),
+        "sale_order_option" => Some(474),
+        "segment_member" => Some(475),
+        "stock_inventory_line" => Some(476),
+        "stock_landed_cost_allocation" => Some(477),
+        "stock_landed_cost_application" => Some(478),
+        "stock_move_line" => Some(479),
+        "stock_picking" => Some(480),
+        "subscription_bundle_item" => Some(481),
+        "subscription_line" => Some(482),
+        "subscription_usage_event" => Some(483),
+        "tax_deadline_reminder" => Some(484),
+        "workflow_calendar_version" => Some(485),
+        "workflow_decision_event" => Some(486),
+        "workflow_human_task_candidate" => Some(487),
+        "workflow_human_task_event" => Some(488),
+        "workflow_simulation_step" => Some(489),
+        "workflow_version" => Some(490),
+        "ai_knowledge_review" => Some(491),
+        "ai_knowledge_skill_promotion" => Some(492),
+        "form_field_label" => Some(493),
+        "workflow_calendar_exception" => Some(494),
         _ => None,
     }
 }
 
-pub(crate) const GENERATED_FINAL_RESTORE_ORDER: u32 = 492;
+pub(crate) const GENERATED_FINAL_RESTORE_ORDER: u32 = 494;
 
 pub(crate) fn apply_generated_reconstruction_row(
     ctx: &ReducerContext,
@@ -20453,6 +20455,98 @@ pub(crate) fn apply_generated_reconstruction_row(
                     if generated_id > desired_id {
                         break Err(format!(
                             "reconstruction sequence for document_version advanced past restored primary key {desired_id}"
+                        ));
+                    }
+                }
+            }
+        },
+        "fleet_inspection" => {
+            use crate::fleet::lifecycle::{fleet_inspection as _, FleetInspection};
+            let spacetimedb_sats::serde::SerdeWrapper(row) =
+                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<FleetInspection>>(row_json)
+                    .map_err(|error| format!("invalid canonical row JSON for fleet_inspection: {error}"))?;
+            if row.organization_id != organization_id {
+                return Err("reconstruction row belongs to a different organization".to_string());
+            }
+            let rows = ctx.db.fleet_inspection();
+            if let Some(existing) = rows.id().find(&row.id) {
+                let existing_json = serde_json::to_value(
+                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
+                )
+                .map_err(|error| format!("serialize existing fleet_inspection row: {error}"))?;
+                let incoming_json = serde_json::to_value(
+                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
+                )
+                .map_err(|error| format!("serialize incoming fleet_inspection row: {error}"))?;
+                if existing_json == incoming_json {
+                    Ok(GeneratedApplyOutcome::AlreadyPresent)
+                } else {
+                    Err("reconstruction primary-key conflict with different row data".to_string())
+                }
+            } else {
+                let desired_id = row.id;
+                loop {
+                    let spacetimedb_sats::serde::SerdeWrapper(candidate) =
+                        serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<FleetInspection>>(row_json)
+                            .map_err(|error| format!("invalid canonical row JSON for fleet_inspection: {error}"))?;
+                    let inserted = rows.insert(FleetInspection {
+                        id: 0,
+                        ..candidate
+                    });
+                    if inserted.id == desired_id {
+                        break Ok(GeneratedApplyOutcome::Inserted);
+                    }
+                    let generated_id = inserted.id;
+                    rows.id().delete(&generated_id);
+                    if generated_id > desired_id {
+                        break Err(format!(
+                            "reconstruction sequence for fleet_inspection advanced past restored primary key {desired_id}"
+                        ));
+                    }
+                }
+            }
+        },
+        "fleet_service_record" => {
+            use crate::fleet::lifecycle::{fleet_service_record as _, FleetServiceRecord};
+            let spacetimedb_sats::serde::SerdeWrapper(row) =
+                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<FleetServiceRecord>>(row_json)
+                    .map_err(|error| format!("invalid canonical row JSON for fleet_service_record: {error}"))?;
+            if row.organization_id != organization_id {
+                return Err("reconstruction row belongs to a different organization".to_string());
+            }
+            let rows = ctx.db.fleet_service_record();
+            if let Some(existing) = rows.id().find(&row.id) {
+                let existing_json = serde_json::to_value(
+                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
+                )
+                .map_err(|error| format!("serialize existing fleet_service_record row: {error}"))?;
+                let incoming_json = serde_json::to_value(
+                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
+                )
+                .map_err(|error| format!("serialize incoming fleet_service_record row: {error}"))?;
+                if existing_json == incoming_json {
+                    Ok(GeneratedApplyOutcome::AlreadyPresent)
+                } else {
+                    Err("reconstruction primary-key conflict with different row data".to_string())
+                }
+            } else {
+                let desired_id = row.id;
+                loop {
+                    let spacetimedb_sats::serde::SerdeWrapper(candidate) =
+                        serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<FleetServiceRecord>>(row_json)
+                            .map_err(|error| format!("invalid canonical row JSON for fleet_service_record: {error}"))?;
+                    let inserted = rows.insert(FleetServiceRecord {
+                        id: 0,
+                        ..candidate
+                    });
+                    if inserted.id == desired_id {
+                        break Ok(GeneratedApplyOutcome::Inserted);
+                    }
+                    let generated_id = inserted.id;
+                    rows.id().delete(&generated_id);
+                    if generated_id > desired_id {
+                        break Err(format!(
+                            "reconstruction sequence for fleet_service_record advanced past restored primary key {desired_id}"
                         ));
                     }
                 }
