@@ -619,11 +619,19 @@ pub async fn run_skill_admitted(
         anyhow::bail!("correlation_id is required");
     }
     let governed_catalog = governed_program_for_skill(&skill_key);
+    // The admitted harness boundary is governed-only. Falling through to the
+    // legacy direct-execution loop would let provider tool calls regain
+    // execution authority outside the typed DecisionGraph runtime.
+    if governed_catalog.is_none() {
+        anyhow::bail!(
+            "skill '{skill_key}' has no governed program; direct-execution admitted runs are disabled"
+        );
+    }
     let reviewed_calls = if req.reviewed_calls.is_empty() {
         governed_catalog
             .as_ref()
             .map(|entry| entry.reviewed_calls.clone())
-            .context("reviewed_calls must be nonempty for non-governed admitted runs")?
+            .context("governed program must declare reviewed calls")?
     } else {
         req.reviewed_calls.clone()
     };
