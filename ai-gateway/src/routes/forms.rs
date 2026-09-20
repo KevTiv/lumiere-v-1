@@ -5,15 +5,16 @@ use serde_json::{json, Map, Value};
 
 use crate::{
     ai_agent::{
-        enforce_chargeable_limits, ensure_allowed_action, ensure_model_allowed, record_ai_spend,
-        resolve_agent,
+        enforce_chargeable_limits, ensure_allowed_action, ensure_model_allowed, resolve_agent,
     },
     error::{AppError, AppResult},
     orchestrator::{
-        intelligence_router::complete_routed_generation,
+        intelligence::{GenerationProvider, GenerationRequest},
+        intelligence_router::generate_routed_for_run,
         model_configuration::StdbModelConfigurationStore,
+        skill_loader::{complete_run, create_generation_surface_run},
+        spend_admission::StdbSpendLedger,
     },
-    providers::llm::LlmMessage,
     state::AppState,
 };
 
@@ -419,35 +420,79 @@ pub async fn post_suggest(
         agent.system_prompt
     );
 
+    let spend_reader = state
+        .spend_read_stdb
+        .as_deref()
+        .ok_or_else(|| AppError::Internal("spend_read_stdb is required for routed generation".into()))?;
+    let run_inputs = json!({
+        "surface": "form_suggestion",
+        "form_id": req.form_id,
+        "entity_type": req.entity_type,
+        "document_job_id": req.document_job_id,
+    });
+    let run_id = create_generation_surface_run(
+        state.stdb.as_ref(),
+        req.org_id,
+        req.company_id,
+        "form_suggestion",
+        agent.agent_id,
+        req.team_member_id,
+        &serde_json::to_string(&run_inputs).map_err(|e| AppError::Internal(e.to_string()))?,
+        "0000000000000000000000000000000000000000000000000000000000000000",
+    )
+    .await
+    .map_err(|e| AppError::Internal(e.to_string()))?;
     let model_store = StdbModelConfigurationStore {
         reader: state.stdb.as_ref(),
     };
-    let llm_resp = complete_routed_generation(
+    let ledger = StdbSpendLedger {
+        writer: state.stdb.as_ref(),
+        reader: spend_reader,
+    };
+    let generation = generate_routed_for_run(
         &model_store,
+        &ledger,
         req.org_id,
+        req.company_id,
+        run_id,
         &agent,
         None,
         state.providers.llm.as_ref(),
-        system,
-        vec![LlmMessage::text("user", prompt)],
-        agent.max_tokens.min(FORM_SUGGEST_MAX_TOKENS),
+        GenerationRequest {
+            objective: prompt,
+            context: json!({
+                "form_id": req.form_id,
+                "entity_type": req.entity_type,
+                "field_count": req.fields.len(),
+            }),
+            format: "schema-constrained JSON form suggestions".to_string(),
+            instructions: Some(system),
+            max_tokens: Some(agent.max_tokens.min(FORM_SUGGEST_MAX_TOKENS)),
+        },
     )
-    .await
-    .map_err(|e| AppError::Internal(format!("LLM request failed: {e}")))?;
-
-    let total_tokens = llm_resp.input_tokens + llm_resp.output_tokens;
-    if total_tokens > 0 {
-        if let Err(e) = record_ai_spend(&state.stdb, req.org_id, agent.agent_id, total_tokens).await
-        {
-            tracing::warn!(
-                agent_id = agent.agent_id,
-                error = %e,
-                "record_ai_spend failed"
-            );
+    .await;
+    let llm_resp = match generation {
+        Ok(response) => response,
+        Err(error) => {
+            let _ = complete_run(
+                state.stdb.as_ref(),
+                req.org_id,
+                req.company_id,
+                run_id,
+                "failed",
+                None,
+                None,
+                None,
+                0,
+                0,
+                Some(error.to_string()),
+            )
+            .await;
+            return Err(AppError::Internal(format!("LLM request failed: {error}")));
         }
-    }
-
-    let text = llm_resp.text.as_str();
+    };
+    let total_tokens = llm_resp.input_tokens.saturating_add(llm_resp.output_tokens);
+    let text = llm_resp.content.as_str();
     let model_json: Value = serde_json::from_str(clean_json_response(text))
         .map_err(|e| AppError::Internal(format!("Failed to parse form suggestion JSON: {}", e)))?;
 
@@ -467,6 +512,22 @@ pub async fn post_suggest(
             field: None,
         });
     }
+
+    complete_run(
+        state.stdb.as_ref(),
+        req.org_id,
+        req.company_id,
+        run_id,
+        "completed",
+        Some(format!("generated {} form suggestions", suggestions.len())),
+        None,
+        None,
+        1,
+        total_tokens,
+        None,
+    )
+    .await
+    .map_err(|e| AppError::Internal(e.to_string()))?;
 
     Ok(Json(FormSuggestResponse {
         suggestions,
