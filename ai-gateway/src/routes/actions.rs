@@ -14,8 +14,8 @@ use crate::{
         EntityRef, LiveSnapshot,
     },
     orchestrator::{
-        intelligence::{EvidenceRef, GenerationRequest},
-        intelligence_router::generate_routed_for_run,
+        intelligence::EvidenceRef,
+        intelligence_router::run_catalogued_generation_surface,
         model_configuration::StdbModelConfigurationStore,
         skill_loader::{complete_run, create_generation_surface_run},
         spend_admission::StdbSpendLedger,
@@ -381,29 +381,28 @@ async fn draft_actions_llm(
         writer: state.stdb.as_ref(),
         reader: spend_reader,
     };
-    let generation = generate_routed_for_run(
+    let program = run_catalogued_generation_surface(
         &model_store,
         &ledger,
+        state.stdb.as_ref(),
+        state.stdb.as_ref(),
         org_id,
         req.company_id,
-        run.run_id,
+        &run,
         &agent,
-        run.intelligence_policy_ref.as_deref(),
         state.providers.llm.as_ref(),
-        GenerationRequest {
-            objective: prompt,
-            context: json!({
-                "allowed_reducers": entries.iter().map(|entry| entry.reducer_name).collect::<Vec<_>>(),
-                "grounded": grounding_snapshots.is_some(),
-            }),
-            format: "schema-constrained JSON action drafts".to_string(),
-            instructions: Some(system),
-            max_tokens: Some(agent.max_tokens.min(ACTION_DRAFT_MAX_TOKENS)),
-        },
+        "action_draft_generation",
+        prompt,
+        json!({
+            "allowed_reducers": entries.iter().map(|entry| entry.reducer_name).collect::<Vec<_>>(),
+            "grounded": grounding_snapshots.is_some(),
+        }),
+        Some(system),
+        Some(agent.max_tokens.min(ACTION_DRAFT_MAX_TOKENS)),
     )
     .await;
-    let llm_resp = match generation {
-        Ok(response) => response,
+    let program = match program {
+        Ok(outcome) => outcome,
         Err(error) => {
             let _ = complete_run(
                 state.stdb.as_ref(),
@@ -422,8 +421,14 @@ async fn draft_actions_llm(
             return Err(DraftActionsError::other(format!("LLM request failed: {error}")));
         }
     };
-    let total_tokens = llm_resp.input_tokens.saturating_add(llm_resp.output_tokens);
-    let model_json: Value = match serde_json::from_str(clean_json_response(&llm_resp.content)) {
+    let total_tokens = program
+        .generation_input_tokens
+        .saturating_add(program.generation_output_tokens);
+    let generated = program
+        .final_content
+        .as_deref()
+        .ok_or_else(|| DraftActionsError::other("governed action-draft generation produced no final content"))?;
+    let model_json: Value = match serde_json::from_str(clean_json_response(generated)) {
         Ok(value) => value,
         Err(error) => {
             let _ = complete_run(
@@ -474,7 +479,7 @@ async fn draft_actions_llm(
         Some(format!("generated {} action drafts", drafts.len())),
         None,
         None,
-        1,
+        program.trace.len() as u32,
         total_tokens,
         None,
     )
