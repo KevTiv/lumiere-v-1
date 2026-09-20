@@ -12,6 +12,11 @@ use serde_json::json;
 use stdb_client::{ReducerCall, StdbClient};
 
 use super::{
+    decision_graph::DecisionGraph,
+    governed_program::{
+        run_generation_only_program, GovernedProgramContext, GovernedProgramOutcome,
+        IntelligenceEventRecorder, ProgramCheckpointStore,
+    },
     intelligence::{
         decision_request_hash, DecisionProvider, DecisionRequest, DecisionResponse,
         DecisionTypeRef, GenerationProvider, GenerationRequest, GenerationResponse,
@@ -153,11 +158,10 @@ impl<'a> ConfiguredIntelligenceRouter<'a> {
     }
 }
 
-/// Execute one typed generation request through the normal durable routed
-/// generation provider. This is the shared entry point for HTTP generation
-/// surfaces after they have created a real `ai_agent_run`.
+/// Execute one catalogued generation-only graph through the normal routed
+/// generation provider and the common GovernedProgramExecutor.
 #[allow(clippy::too_many_arguments)]
-pub(crate) async fn generate_routed_for_run(
+pub(crate) async fn run_routed_generation_program(
     store: &super::model_configuration::StdbModelConfigurationStore<'_>,
     ledger: &dyn SpendLedger,
     organization_id: u64,
@@ -166,10 +170,13 @@ pub(crate) async fn generate_routed_for_run(
     agent: &ResolvedAgentConfig,
     policy_ref: Option<&str>,
     transport: &dyn LlmCompletion,
-    request: GenerationRequest,
-) -> Result<GenerationResponse> {
-    if run_id == 0 {
-        bail!("durable run_id is required for routed generation");
+    graph: &DecisionGraph,
+    context: &GovernedProgramContext,
+    checkpoint_store: Option<&dyn ProgramCheckpointStore>,
+    recorder: &dyn IntelligenceEventRecorder,
+) -> Result<GovernedProgramOutcome> {
+    if run_id == 0 || context.run_id != run_id {
+        bail!("durable run identity mismatch for routed generation program");
     }
     let resolver = IntelligenceRouteResolver::new(
         store,
@@ -178,7 +185,7 @@ pub(crate) async fn generate_routed_for_run(
         policy_ref,
     )?;
     let router = ConfiguredIntelligenceRouter::new(resolver);
-    RoutedGenerationProvider::new(
+    let generation = RoutedGenerationProvider::new(
         &router,
         transport,
         ledger,
@@ -186,8 +193,14 @@ pub(crate) async fn generate_routed_for_run(
         organization_id,
         company_id,
         run_id,
+    );
+    run_generation_only_program(
+        graph,
+        context,
+        &generation,
+        checkpoint_store,
+        recorder,
     )
-    .generate(request)
     .await
 }
 
