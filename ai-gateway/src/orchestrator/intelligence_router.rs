@@ -25,7 +25,7 @@ use super::{
 };
 use crate::{
     ai_agent::ResolvedAgentConfig,
-    providers::llm::{LlmCompletion, LlmMessage, LlmRequest, LlmResponse},
+    providers::llm::LlmCompletion,
 };
 
 /// Durable sink for GP-15 zero-authority shadow decision attempts. A shadow
@@ -153,26 +153,23 @@ impl<'a> ConfiguredIntelligenceRouter<'a> {
     }
 }
 
-/// Compatibility generation seam for advisory/prose HTTP surfaces that do
-/// not yet own a durable governed run.
-///
-/// Provider/model/fallback/retry selection is still policy-owned. Existing
-/// route-level rate limits and spend recording remain in place until these
-/// surfaces migrate to durable program runs, at which point callers should use
-/// `RoutedGenerationProvider` instead.
+/// Execute one typed generation request through the normal durable routed
+/// generation provider. This is the shared entry point for HTTP generation
+/// surfaces after they have created a real `ai_agent_run`.
 #[allow(clippy::too_many_arguments)]
-pub(crate) async fn complete_routed_generation(
+pub(crate) async fn generate_routed_for_run(
     store: &super::model_configuration::StdbModelConfigurationStore<'_>,
+    ledger: &dyn SpendLedger,
     organization_id: u64,
+    company_id: u64,
+    run_id: u64,
     agent: &ResolvedAgentConfig,
     policy_ref: Option<&str>,
     transport: &dyn LlmCompletion,
-    system: String,
-    messages: Vec<LlmMessage>,
-    max_tokens: u32,
-) -> Result<LlmResponse> {
-    if organization_id == 0 {
-        bail!("organization_id must be nonzero");
+    request: GenerationRequest,
+) -> Result<GenerationResponse> {
+    if run_id == 0 {
+        bail!("durable run_id is required for routed generation");
     }
     let resolver = IntelligenceRouteResolver::new(
         store,
@@ -181,52 +178,17 @@ pub(crate) async fn complete_routed_generation(
         policy_ref,
     )?;
     let router = ConfiguredIntelligenceRouter::new(resolver);
-    let route = router.route(IntelligenceRole::Generation, None).await?;
-    let mut profiles = Vec::with_capacity(1 + route.fallbacks.len());
-    profiles.push(route.primary);
-    profiles.extend(route.fallbacks);
-
-    let mut failures = Vec::new();
-    for profile in profiles {
-        if !agent.allowed_models.is_empty()
-            && !agent
-                .allowed_models
-                .iter()
-                .any(|model| model.eq_ignore_ascii_case(&profile.model))
-        {
-            failures.push(format!(
-                "{} selects model '{}' outside agent allowed_models",
-                profile.reference.stable_ref(),
-                profile.model
-            ));
-            continue;
-        }
-        for attempt_no in 0..=profile.max_retries {
-            let request = LlmRequest {
-                provider: profile.provider.clone(),
-                model: profile.model.clone(),
-                system: system.clone(),
-                messages: messages.clone(),
-                max_tokens: profile.max_tokens.min(max_tokens).max(1),
-                temperature: profile.temperature,
-                top_p: profile.top_p,
-                tools: Vec::new(),
-            };
-            match transport.complete(request).await {
-                Ok(response) => return Ok(response),
-                Err(error) => failures.push(format!(
-                    "{} attempt {}: {}",
-                    profile.reference.stable_ref(),
-                    attempt_no + 1,
-                    error
-                )),
-            }
-        }
-    }
-    bail!(
-        "all configured generation profiles failed: {}",
-        failures.join(" | ")
+    RoutedGenerationProvider::new(
+        &router,
+        transport,
+        ledger,
+        agent,
+        organization_id,
+        company_id,
+        run_id,
     )
+    .generate(request)
+    .await
 }
 
 fn role_scope(role: IntelligenceRole) -> u32 {
