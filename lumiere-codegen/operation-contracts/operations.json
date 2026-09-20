@@ -1760,6 +1760,26 @@
       "idempotency": "non_idempotent",
       "semantic_kind": "operator"
     },
+    "record_fleet_inspection": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/fleet/lifecycle.rs:260 reducer body uses a tenant-scoped client request id guard; session-exposed.",
+      "idempotency": "request_guarded",
+      "semantic_kind": "operator"
+    },
+    "record_fleet_service": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/fleet/lifecycle.rs:171 reducer body uses a tenant-scoped client request id guard; session-exposed.",
+      "idempotency": "request_guarded",
+      "semantic_kind": "operator"
+    },
     "record_google_drive_sync": {
       "client_facing": false,
       "codec": {

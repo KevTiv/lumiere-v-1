@@ -3571,6 +3571,16 @@
       },
       "evidence": "run_fleet_gap_fixes_test: IR schema/exposure is locked as a denied test reducer; no client retry semantics apply"
     },
+    "run_fleet_lifecycle_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "run_fleet_lifecycle_test: IR schema/exposure is locked as a denied test reducer; no client retry semantics apply"
+    },
     "run_fleet_relational_integrity_test": {
       "semantic_kind": "test",
       "client_facing": false,
