@@ -23,7 +23,10 @@ use super::{
     },
     spend_admission::{spend_binding_for_profile, SpendAdmittedLlm, SpendLedger},
 };
-use crate::{ai_agent::ResolvedAgentConfig, providers::llm::LlmCompletion};
+use crate::{
+    ai_agent::ResolvedAgentConfig,
+    providers::llm::{LlmCompletion, LlmMessage, LlmRequest, LlmResponse},
+};
 
 /// Durable sink for GP-15 zero-authority shadow decision attempts. A shadow
 /// result is recorded regardless of success/failure but never fed back into
@@ -148,6 +151,69 @@ impl<'a> ConfiguredIntelligenceRouter<'a> {
     ) -> Result<IntelligenceRoute> {
         self.resolver.resolve(role, decision_type).await
     }
+}
+
+/// Compatibility generation seam for advisory/prose HTTP surfaces that do
+/// not yet own a durable governed run.
+///
+/// Provider/model/fallback/retry selection is still policy-owned. Existing
+/// route-level rate limits and spend recording remain in place until these
+/// surfaces migrate to durable program runs, at which point callers should use
+/// `RoutedGenerationProvider` instead.
+#[allow(clippy::too_many_arguments)]
+pub(crate) async fn complete_routed_generation(
+    store: &dyn super::model_configuration::ModelConfigurationStore,
+    organization_id: u64,
+    agent: &ResolvedAgentConfig,
+    policy_ref: Option<&str>,
+    transport: &dyn LlmCompletion,
+    system: String,
+    messages: Vec<LlmMessage>,
+    max_tokens: u32,
+) -> Result<LlmResponse> {
+    if organization_id == 0 {
+        bail!("organization_id must be nonzero");
+    }
+    let resolver = IntelligenceRouteResolver::new(
+        store,
+        organization_id,
+        agent,
+        policy_ref,
+    )?;
+    let router = ConfiguredIntelligenceRouter::new(resolver);
+    let route = router.route(IntelligenceRole::Generation, None).await?;
+    let mut profiles = Vec::with_capacity(1 + route.fallbacks.len());
+    profiles.push(route.primary);
+    profiles.extend(route.fallbacks);
+
+    let mut failures = Vec::new();
+    for profile in profiles {
+        for attempt_no in 0..=profile.max_retries {
+            let request = LlmRequest {
+                provider: profile.provider.clone(),
+                model: profile.model.clone(),
+                system: system.clone(),
+                messages: messages.clone(),
+                max_tokens: profile.max_tokens.min(max_tokens).max(1),
+                temperature: profile.temperature,
+                top_p: profile.top_p,
+                tools: Vec::new(),
+            };
+            match transport.complete(request).await {
+                Ok(response) => return Ok(response),
+                Err(error) => failures.push(format!(
+                    "{} attempt {}: {}",
+                    profile.reference.stable_ref(),
+                    attempt_no + 1,
+                    error
+                )),
+            }
+        }
+    }
+    bail!(
+        "all configured generation profiles failed: {}",
+        failures.join(" | ")
+    )
 }
 
 fn role_scope(role: IntelligenceRole) -> u32 {
