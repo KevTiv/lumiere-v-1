@@ -1496,6 +1496,7 @@ async fn synthesize_summary(
         writer: state.stdb.as_ref(),
         reader: spend_reader,
     };
+    let intelligence_policy_ref = intelligence_policy_ref(&skill.config_json)?;
     let response = generate_routed_for_run(
         &model_store,
         &ledger,
@@ -1503,7 +1504,7 @@ async fn synthesize_summary(
         company_id,
         run_id,
         agent,
-        intelligence_policy_ref(&skill.config_json)?.as_deref(),
+        intelligence_policy_ref.as_deref(),
         state.providers.llm.as_ref(),
         GenerationRequest {
             objective: user,
