@@ -21,7 +21,6 @@ use super::{
 };
 use crate::{
     orchestrator::run::{run_skill_admitted, AdmittedRunRequest, RunSkillResponse},
-    providers::llm::LlmRequest,
     state::AppState,
 };
 
@@ -275,19 +274,6 @@ pub async fn run_governed_llm_skill(
             // Catalogued governed programs derive their reviewed call plan
             // server-side from the immutable graph catalog.
             reviewed_calls: Vec::new(),
-            // This request is intentionally unused for GP-17 catalog entries.
-            // Role-specific Decision/Generation/Reasoning adapters construct
-            // their own typed provider requests inside the governed runtime.
-            llm_request: LlmRequest {
-                provider: "governed-program".to_string(),
-                model: "governed-program".to_string(),
-                system: String::new(),
-                messages: Vec::new(),
-                max_tokens: 1,
-                temperature: None,
-                top_p: None,
-                tools: Vec::new(),
-            },
             max_steps: input.max_steps,
             resume_run_id: input.resume_run_id,
         },
