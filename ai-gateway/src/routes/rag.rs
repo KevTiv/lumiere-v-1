@@ -794,7 +794,7 @@ pub async fn post_rag(
     };
     let total_tokens = llm_resp.input_tokens.saturating_add(llm_resp.output_tokens);
 
-    let (answer, verification, mut provenance) = finalize_rag_answer(
+    let (answer, verification, mut provenance) = match finalize_rag_answer(
         org_id,
         req.company_id,
         &llm_resp.content,
@@ -803,7 +803,26 @@ pub async fn post_rag(
         &req.query,
     )
     .await
-    .map_err(|e| AppError::Internal(format!("answer gate failed: {e}")))?;
+    {
+        Ok(result) => result,
+        Err(error) => {
+            let _ = complete_run(
+                state.stdb.as_ref(),
+                org_id,
+                req.company_id,
+                run_id,
+                "failed",
+                None,
+                None,
+                None,
+                1,
+                total_tokens,
+                Some(format!("answer gate failed: {error}")),
+            )
+            .await;
+            return Err(AppError::Internal(format!("answer gate failed: {error}")));
+        }
+    };
     provenance.mark_not_persisted(
         "RAG provenance is response-scoped; it has not been recorded as reviewed knowledge",
     );
