@@ -267,6 +267,7 @@ pub async fn create_run(
     inputs_json: &str,
     triggered_by_hex: &str,
 ) -> Result<GovernedRunRef> {
+    let policy_ref = intelligence_policy_ref(&skill.config_json)?;
     stdb.call_reducer(stdb_client::reducer_call!(
         "create_ai_agent_run",
         serde_json::json!([
@@ -280,7 +281,11 @@ pub async fn create_run(
                 "run_key": run_key,
                 "inputs_json": inputs_json,
                 "triggered_by_hex": triggered_by_hex,
-                "metadata": serde_json::Value::Null,
+                "metadata": serde_json::json!({
+                    "intelligence_policy_ref": policy_ref,
+                    "skill_id": skill.id,
+                    "skill_config_id": skill.skill_config_id,
+                }).to_string(),
             }
         ]),
     ))
@@ -322,7 +327,7 @@ pub async fn create_run(
         run_key: run_key.to_string(),
         skill_id: skill.id,
         skill_config_id: skill.skill_config_id,
-        intelligence_policy_ref: intelligence_policy_ref(&skill.config_json)?,
+        intelligence_policy_ref: policy_ref,
     })
 }
 
