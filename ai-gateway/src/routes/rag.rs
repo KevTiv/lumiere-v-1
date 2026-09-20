@@ -22,7 +22,7 @@ use crate::{
         SnapshotUiContext, RAG_MAX_LIVE_SNAPSHOTS,
     },
     orchestrator::{
-        intelligence::{GenerationProvider, GenerationRequest},
+        intelligence::{GenerationRequest},
         intelligence_router::generate_routed_for_run,
         model_configuration::StdbModelConfigurationStore,
         skill_loader::{complete_run, create_generation_surface_run},
