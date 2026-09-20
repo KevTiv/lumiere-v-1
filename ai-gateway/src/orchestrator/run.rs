@@ -31,7 +31,7 @@ use super::{
         StdbAuthorityRollbackRecorder, StdbDecisionResolutionPolicy, StdbDriftMonitor,
         StdbModelShadowRecorder,
     },
-    intelligence::{EvidenceRef, GenerationProvider, GenerationRequest},
+    intelligence::{EvidenceRef, GenerationRequest},
     intelligence_router::{
         generate_routed_for_run, ConfiguredIntelligenceRouter, NoopShadowDecisionRecorder,
         RoutedDecisionProvider, RoutedGenerationProvider, RoutedReasoningProvider,
