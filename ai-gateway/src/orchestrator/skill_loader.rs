@@ -282,7 +282,7 @@ pub async fn create_run(
                 "inputs_json": inputs_json,
                 "triggered_by_hex": triggered_by_hex,
                 "metadata": serde_json::json!({
-                    "intelligence_policy_ref": policy_ref,
+                    "intelligence_policy_ref": policy_ref.clone(),
                     "skill_id": skill.id,
                     "skill_config_id": skill.skill_config_id,
                 }).to_string(),
