@@ -16,17 +16,22 @@ use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 use stdb_client::{ReducerCall, StdbClient};
 
-use crate::tools::types::ToolOutput;
+use crate::{
+    harness::audit::PolicyDecision,
+    tools::types::ToolOutput,
+};
 
 use super::{
     answer_gate::collect_json_figures,
     decision_graph::{
         validate_graph, DecisionGraph, DecisionNode, GateCondition, GraphNode, StopReason,
     },
-    decision_type::{admit_decision, DecisionTypeRegistry},
+    decision_type::{admit_decision, DecisionTypeRegistry, InMemoryDecisionTypeRegistry},
     governed_services::{
-        qualified_content, AdmissionEvidence, AnswerAdmissionOutcome, CapabilityStepOutcome,
-        FinalAnswerAdmission, GovernedCapabilityService, VerificationOutcome, VerificationService,
+        qualified_content, AdmissionEvidence, AnswerAdmissionOutcome, CapabilityAdmission,
+        CapabilityExecutor, CapabilityStepOutcome, FinalAnswerAdmission, GovernedCapabilityService,
+        InMemoryExecutionRecovery, RecordingApprovalCoordinator, ShapeOnlyVerificationService,
+        VerificationOutcome, VerificationService,
     },
     graduation::{DecisionResolutionContext, GovernedDecisionResolver},
     intelligence::{
@@ -36,13 +41,16 @@ use super::{
         ReasoningRequest,
     },
     precedent::{
-        summarize, DecisionCaseRecord, DecisionCaseStatus, PrecedentQuery, PrecedentStore,
+        summarize, DecisionCaseRecord, DecisionCaseStatus, InMemoryPrecedentStore, PrecedentQuery,
+        PrecedentStore,
     },
-    probabilistic::{CalibrationProfileStore, Confidence, GateDecision},
+    probabilistic::{
+        CalibrationProfileStore, Confidence, GateDecision, InMemoryCalibrationProfileStore,
+    },
 };
 
 #[derive(Clone, Debug)]
-pub(super) struct GovernedProgramContext {
+pub(crate) struct GovernedProgramContext {
     pub organization_id: u64,
     pub company_id: u64,
     pub run_id: u64,
@@ -80,7 +88,7 @@ impl GovernedProgramContext {
 }
 
 #[derive(Clone, Debug)]
-pub(super) enum GovernedProgramStop {
+pub(crate) enum GovernedProgramStop {
     Completed,
     EarlyStop(StopReason),
     Denied(String),
@@ -105,7 +113,7 @@ pub(super) struct GovernedProgramTraceStep {
 }
 
 #[derive(Clone, Debug)]
-pub(super) struct GovernedProgramOutcome {
+pub(crate) struct GovernedProgramOutcome {
     pub stop: GovernedProgramStop,
     pub final_content: Option<String>,
     pub outputs: HashMap<String, Value>,
@@ -190,7 +198,7 @@ pub(super) struct GovernedProgramCheckpoint {
 }
 
 #[async_trait]
-pub(super) trait ProgramCheckpointStore: Send + Sync {
+pub(crate) trait ProgramCheckpointStore: Send + Sync {
     async fn load(
         &self,
         context: &GovernedProgramContext,
@@ -205,7 +213,7 @@ pub(super) trait ProgramCheckpointStore: Send + Sync {
     ) -> Result<()>;
 }
 
-pub(super) struct StdbProgramCheckpointStore<'a> {
+pub(crate) struct StdbProgramCheckpointStore<'a> {
     pub writer: &'a StdbClient,
     pub reader: &'a StdbClient,
 }
@@ -478,7 +486,7 @@ impl ComputeService for BuiltinComputeService {
 /// judgment. None of the three implies the others, so none of the three
 /// setters implies the other two either.
 #[async_trait]
-pub(super) trait IntelligenceEventRecorder: Send + Sync {
+pub(crate) trait IntelligenceEventRecorder: Send + Sync {
     async fn record_decision(
         &self,
         context: &GovernedProgramContext,
@@ -584,7 +592,7 @@ impl IntelligenceEventRecorder for NoopIntelligenceEventRecorder {
 /// the table is public, so, like `StdbCalibrationProfileStore`, no
 /// dedicated read principal is needed; `writer` and `reader` may be the
 /// same client.
-pub(super) struct StdbIntelligenceEventRecorder<'a> {
+pub(crate) struct StdbIntelligenceEventRecorder<'a> {
     pub writer: &'a StdbClient,
     pub reader: &'a StdbClient,
 }
@@ -786,6 +794,122 @@ fn reasoning_outcome_provider(_outcome: &ReasoningOutcome) -> &'static str {
 
 fn reasoning_outcome_model(_outcome: &ReasoningOutcome) -> &'static str {
     REASONING_OUTCOME_MODEL
+}
+
+
+struct UnreachableDecisionProvider;
+
+#[async_trait]
+impl DecisionProvider for UnreachableDecisionProvider {
+    async fn decide(&self, _request: DecisionRequest) -> Result<DecisionResponse> {
+        bail!("generation-only governed program cannot execute decision nodes")
+    }
+}
+
+struct UnreachableReasoningProvider;
+
+#[async_trait]
+impl ReasoningProvider for UnreachableReasoningProvider {
+    async fn reason(&self, _request: ReasoningRequest) -> Result<ReasoningOutcome> {
+        bail!("generation-only governed program cannot execute reasoning nodes")
+    }
+}
+
+struct UnreachableCapabilityAdmission;
+
+#[async_trait]
+impl CapabilityAdmission for UnreachableCapabilityAdmission {
+    async fn admit(
+        &self,
+        _proposal: &CapabilityProposal,
+        _completed_calls: u32,
+    ) -> Result<PolicyDecision> {
+        bail!("generation-only governed program cannot admit capabilities")
+    }
+
+    async fn protect_output(
+        &self,
+        _proposal: &CapabilityProposal,
+        _completed_calls: u32,
+        _output: ToolOutput,
+    ) -> Result<ToolOutput> {
+        bail!("generation-only governed program cannot protect capability output")
+    }
+}
+
+struct UnreachableCapabilityExecutor;
+
+#[async_trait]
+impl CapabilityExecutor for UnreachableCapabilityExecutor {
+    async fn execute(&self, _proposal: &CapabilityProposal) -> Result<ToolOutput> {
+        bail!("generation-only governed program cannot execute capabilities")
+    }
+}
+
+/// Transitional admission for catalogued generation surfaces. It validates
+/// generated draft shape and allows the route's existing surface-specific
+/// parser/evidence gate to make the publication decision. Point 5 replaces
+/// this with the common durable evidence/publication admission path.
+struct GenerationSurfaceDraftAdmission;
+
+#[async_trait]
+impl FinalAnswerAdmission for GenerationSurfaceDraftAdmission {
+    async fn admit(
+        &self,
+        draft: &FinalDraft,
+        _known_evidence: &std::collections::HashSet<EvidenceRef>,
+    ) -> Result<AnswerAdmissionOutcome> {
+        match draft.validate() {
+            Ok(()) => Ok(AnswerAdmissionOutcome::Admitted),
+            Err(error) => Ok(AnswerAdmissionOutcome::Blocked {
+                reason: error.to_string(),
+            }),
+        }
+    }
+}
+
+/// Execute a catalogued compute/generate-only graph through the common
+/// GovernedProgramExecutor. Any accidental decision, reasoning, capability,
+/// or approval node fails closed through unreachable services.
+pub(crate) async fn run_generation_only_program(
+    graph: &DecisionGraph,
+    context: &GovernedProgramContext,
+    generation_provider: &dyn GenerationProvider,
+    checkpoint_store: Option<&dyn ProgramCheckpointStore>,
+    recorder: &dyn IntelligenceEventRecorder,
+) -> Result<GovernedProgramOutcome> {
+    let decision_provider = UnreachableDecisionProvider;
+    let reasoning_provider = UnreachableReasoningProvider;
+    let decision_types = InMemoryDecisionTypeRegistry::new();
+    let precedent = InMemoryPrecedentStore::new();
+    let admission = UnreachableCapabilityAdmission;
+    let capability_executor = UnreachableCapabilityExecutor;
+    let recovery = InMemoryExecutionRecovery::new();
+    let approvals = RecordingApprovalCoordinator;
+    let capabilities =
+        GovernedCapabilityService::new(&admission, &capability_executor, &recovery, &approvals);
+    let verification = ShapeOnlyVerificationService;
+    let answer_admission = GenerationSurfaceDraftAdmission;
+    let compute = BuiltinComputeService;
+    let calibration = InMemoryCalibrationProfileStore::new();
+
+    GovernedProgramExecutor {
+        decision_provider: &decision_provider,
+        checkpoint_store,
+        decision_resolver: None,
+        generation_provider,
+        reasoning_provider: &reasoning_provider,
+        decision_types: &decision_types,
+        precedent: &precedent,
+        capabilities: &capabilities,
+        verification: &verification,
+        answer_admission: &answer_admission,
+        compute: &compute,
+        recorder,
+        calibration: &calibration,
+    }
+    .run(graph, context)
+    .await
 }
 
 pub(super) struct GovernedProgramExecutor<'a> {
