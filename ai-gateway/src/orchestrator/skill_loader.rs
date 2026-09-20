@@ -14,6 +14,7 @@ pub struct GovernedRunRef {
     /// Immutable routing-policy binding resolved from the active skill config
     /// at run creation time. None means use the organization's default policy.
     pub intelligence_policy_ref: Option<String>,
+    pub program_ref: Option<String>,
 }
 
 #[derive(Clone, Debug)]
@@ -267,6 +268,34 @@ pub async fn create_run(
     inputs_json: &str,
     triggered_by_hex: &str,
 ) -> Result<GovernedRunRef> {
+    create_run_with_program_ref(
+        stdb,
+        org_id,
+        company_id,
+        skill,
+        agent_id,
+        team_member_id,
+        run_key,
+        inputs_json,
+        triggered_by_hex,
+        None,
+    )
+    .await
+}
+
+#[allow(clippy::too_many_arguments)]
+async fn create_run_with_program_ref(
+    stdb: &StdbClient,
+    org_id: u64,
+    company_id: u64,
+    skill: &LoadedSkill,
+    agent_id: u64,
+    team_member_id: Option<u64>,
+    run_key: &str,
+    inputs_json: &str,
+    triggered_by_hex: &str,
+    program_ref: Option<&str>,
+) -> Result<GovernedRunRef> {
     let policy_ref = intelligence_policy_ref(&skill.config_json)?;
     stdb.call_reducer(stdb_client::reducer_call!(
         "create_ai_agent_run",
@@ -285,6 +314,7 @@ pub async fn create_run(
                     "intelligence_policy_ref": policy_ref.clone(),
                     "skill_id": skill.id,
                     "skill_config_id": skill.skill_config_id,
+                    "program_ref": program_ref,
                 }).to_string(),
             }
         ]),
@@ -328,6 +358,7 @@ pub async fn create_run(
         skill_id: skill.id,
         skill_config_id: skill.skill_config_id,
         intelligence_policy_ref: policy_ref,
+        program_ref: program_ref.map(str::to_string),
     })
 }
 
@@ -354,8 +385,12 @@ pub async fn create_generation_surface_run(
     if !skill.enabled {
         anyhow::bail!("generation surface skill '{skill_key}' is disabled");
     }
+    let catalog = super::governed_programs::governed_program_for_skill(skill_key)
+        .with_context(|| format!(
+            "generation surface skill '{skill_key}' is not registered in the governed program catalog"
+        ))?;
     let run_key = uuid::Uuid::new_v4().to_string();
-    create_run(
+    create_run_with_program_ref(
         stdb,
         org_id,
         company_id,
@@ -365,6 +400,7 @@ pub async fn create_generation_surface_run(
         &run_key,
         inputs_json,
         triggered_by_hex,
+        Some(catalog.program_ref),
     )
     .await
 }
@@ -605,6 +641,7 @@ mod tests {
             skill_id: 7,
             skill_config_id: Some(9),
             intelligence_policy_ref: Some("finance-generation@2".to_string()),
+            program_ref: Some("skill:test@1".to_string()),
         };
 
         assert_eq!(run.run_id, 42);
@@ -615,6 +652,7 @@ mod tests {
             run.intelligence_policy_ref.as_deref(),
             Some("finance-generation@2")
         );
+        assert_eq!(run.program_ref.as_deref(), Some("skill:test@1"));
     }
 
     #[test]
