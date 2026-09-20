@@ -159,6 +159,39 @@ impl<'a> ConfiguredIntelligenceRouter<'a> {
     }
 }
 
+/// Execute one typed generation request through the durable routed provider.
+/// Retained for legacy skill summaries that do not yet have a catalogued graph.
+#[allow(clippy::too_many_arguments)]
+pub(crate) async fn generate_routed_for_run(
+    store: &super::model_configuration::StdbModelConfigurationStore<'_>,
+    ledger: &dyn SpendLedger,
+    organization_id: u64,
+    company_id: u64,
+    run_id: u64,
+    agent: &ResolvedAgentConfig,
+    policy_ref: Option<&str>,
+    transport: &dyn LlmCompletion,
+    request: GenerationRequest,
+) -> Result<GenerationResponse> {
+    if run_id == 0 {
+        bail!("durable run_id is required for routed generation");
+    }
+    let resolver =
+        IntelligenceRouteResolver::new(store, organization_id, agent, policy_ref)?;
+    let router = ConfiguredIntelligenceRouter::new(resolver);
+    RoutedGenerationProvider::new(
+        &router,
+        transport,
+        ledger,
+        agent,
+        organization_id,
+        company_id,
+        run_id,
+    )
+    .generate(request)
+    .await
+}
+
 /// Execute one catalogued generation surface through the normal routed
 /// generation provider and common GovernedProgramExecutor.
 #[allow(clippy::too_many_arguments)]
