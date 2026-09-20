@@ -91,7 +91,7 @@ impl DecisionProvider for LlmDecisionAdapter<'_> {
             model: self.model.clone(),
             system,
             messages: vec![LlmMessage::text("user", request.question.clone())],
-            max_tokens: self.max_tokens,
+            max_tokens: request.max_tokens.unwrap_or(self.max_tokens).min(self.max_tokens),
             temperature: self.temperature,
             top_p: self.top_p,
             tools: vec![tool],
@@ -260,11 +260,17 @@ impl<'a> LlmGenerationAdapter<'a> {
 impl GenerationProvider for LlmGenerationAdapter<'_> {
     async fn generate(&self, request: GenerationRequest) -> Result<GenerationResponse> {
         request.validate().context("invalid generation request")?;
+        let trusted_instructions = request
+            .instructions
+            .as_deref()
+            .filter(|value| !value.trim().is_empty())
+            .map(|value| format!("\nTrusted runtime instructions:\n{value}"))
+            .unwrap_or_default();
         let system = format!(
             "Generate {} content for the following objective. Output only the \
             content itself, with no preamble. This output is a draft: it remains \
             subject to evidence and publication gates before it may be presented \
-            as approved. objective: {}\ncontext: {}",
+            as approved.{trusted_instructions}\nobjective: {}\ncontext: {}",
             request.format, request.objective, request.context,
         );
         let llm_request = LlmRequest {
@@ -1108,6 +1114,8 @@ mod tests {
                 objective: "summarize Q3 sales".to_string(),
                 context: json!({"quarter": "Q3"}),
                 format: "prose".to_string(),
+                instructions: None,
+                max_tokens: None,
             })
             .await
             .unwrap();
@@ -1128,6 +1136,8 @@ mod tests {
                 objective: "summarize Q3 sales".to_string(),
                 context: json!({}),
                 format: "prose".to_string(),
+                instructions: None,
+                max_tokens: None,
             })
             .await;
         assert!(result.is_err());
@@ -1150,6 +1160,8 @@ mod tests {
                 objective: "summarize Q3 sales".to_string(),
                 context: json!({}),
                 format: "prose".to_string(),
+                instructions: None,
+                max_tokens: None,
             })
             .await;
         assert!(result.is_err());
