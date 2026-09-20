@@ -107,12 +107,8 @@ import {
   useCreatePricelist,
   useCreatePricelistItem,
   useCreatePickingBatch,
-  useSendSaleOrderQuotation,
-  useAcceptSaleOrderQuotation,
   useApplySalePromotion,
   useApplySaleOrderOptions,
-  useCancelSaleOrder,
-  useComputeSoTotals,
   useUpdatePricelist,
   useDeletePricelist,
   useDeletePricelistItem,
@@ -121,12 +117,6 @@ import {
   useCancelPickingBatch,
   usePricelistItems,
   // Additional sale order operations
-  useUpdateSaleOrder,
-  useLockSaleOrder,
-  useUnlockSaleOrder,
-  useCreateSaleOrderLine,
-  useUpdateSaleOrderLine,
-  useDeleteSaleOrderLine,
   useImportSaleOrderCsv,
   useImportSaleOrderLineCsv,
   useDeliveryCarriers,
@@ -208,6 +198,7 @@ import { useModuleTab } from '@/hooks/use-module-tab';
 import { useWorkflowSurface } from '@/hooks/use-workflow-surface';
 import { useSaleOrderWorkflow } from '@lumiere/query-hooks/hooks/sales-order-workflow';
 import { useReturnOrderWorkflow } from '@lumiere/query-hooks/hooks/return-order-workflow';
+import { useSaleOrderLineWorkflow } from '@lumiere/query-hooks/hooks/sale-order-line-workflow';
 import { useModuleFilters } from '@/hooks/use-module-filters';
 import { downloadDocumentPdf } from '@lumiere/query-hooks/hooks/templates';
 import { useCreateDocument } from '@lumiere/query-hooks/hooks/documents';
@@ -325,6 +316,9 @@ export function SalesClient(props: SalesClientProps) {
 const INLINE_ERROR_TRANSITIONS: ReadonlySet<string> = new Set([
   'sales.order.create-invoice',
   'sales.return.create-credit-note',
+  'sales.order.update',
+  'sales.order-line.create',
+  'sales.order-line.update',
 ]);
 
 function returnOrderRowId(row: Record<string, unknown>): string | null {
@@ -727,6 +721,9 @@ function SalesClientLoaded({
       if (notice.kind === 'success' && notice.transitionId === 'sales.order.confirm') {
         phCapture('sale_order_confirmed', { organization_id: organizationId });
       }
+      if (notice.kind === 'success' && notice.transitionId === 'sales.order.cancel') {
+        phCapture('sale_order_cancelled', { organization_id: organizationId });
+      }
     },
   };
   const saleOrderWorkflow = useSaleOrderWorkflow(
@@ -735,15 +732,28 @@ function SalesClientLoaded({
     {
       confirm: t('sales.actions.confirmSelected'),
       createInvoice: t('sales.actions.createInvoice'),
+      sendQuotation: t('sales.actions.sendQuotation'),
+      acceptQuotation: t('sales.actions.acceptQuotation', { defaultValue: 'Accept quotation' }),
+      cancel: t('sales.actions.cancelOrders'),
+      recalculateTotals: t('sales.actions.recalculateTotals'),
+      lock: t('sales.actions.lockOrders'),
+      unlock: t('sales.actions.unlockOrders'),
+      edit: t('sales.actions.editOrder'),
     },
     workflowCallbacks,
   );
-  const sendSaleOrderQuotation = useSendSaleOrderQuotation(orgId);
-  const acceptSaleOrderQuotation = useAcceptSaleOrderQuotation(orgId);
+  const saleOrderLineWorkflow = useSaleOrderLineWorkflow(
+    orgId,
+    operatingCompanyId,
+    {
+      create: t('sales.actions.newSaleOrderLine'),
+      update: t('sales.actions.editOrderLine', { defaultValue: 'Edit line' }),
+      delete: t('sales.actions.deleteOrderLines', { defaultValue: 'Delete lines' }),
+    },
+    workflowCallbacks,
+  );
   const applySalePromotion = useApplySalePromotion(orgId);
   const applySaleOrderOptions = useApplySaleOrderOptions(orgId);
-  const cancelSaleOrder = useCancelSaleOrder(orgId);
-  const computeSoTotals = useComputeSoTotals(orgId);
   const updatePricelist = useUpdatePricelist(orgId);
   const deletePricelist = useDeletePricelist(orgId);
   const deletePricelistItem = useDeletePricelistItem(orgId);
@@ -752,12 +762,6 @@ function SalesClientLoaded({
   const cancelPickingBatch = useCancelPickingBatch(orgId);
 
   // Additional sale order operations
-  const updateSaleOrder = useUpdateSaleOrder(orgId, operatingCompanyId);
-  const lockSaleOrder = useLockSaleOrder(orgId);
-  const unlockSaleOrder = useUnlockSaleOrder(orgId);
-  const createSaleOrderLine = useCreateSaleOrderLine(orgId);
-  const updateSaleOrderLine = useUpdateSaleOrderLine(orgId, operatingCompanyId);
-  const deleteSaleOrderLine = useDeleteSaleOrderLine(orgId);
   const importSaleOrderCsv = useImportSaleOrderCsv(orgId, operatingCompanyId);
   const importSaleOrderLineCsv = useImportSaleOrderLineCsv(orgId, operatingCompanyId);
 
@@ -1376,31 +1380,20 @@ function SalesClientLoaded({
           },
           // Legacy id keeps the existing e2e selector while the action runs through the workflow seam.
           ...workflowActionsToEntityActions(saleOrderWorkflow.actions, {
-            ids: { 'sales.order.confirm': 'confirm-orders' },
+            ids: {
+              'sales.order.confirm': 'confirm-orders',
+              'sales.order.send-quotation': 'send-quotation',
+            },
           }),
           {
-            id: 'send-quotation',
-            label: t('sales.actions.sendQuotation'),
-            requiresSelection: true,
-            onClick: (rows) => {
-              for (const r of rows) {
-                if (saleOrderState(r) === 'Draft') {
-                  void sendSaleOrderQuotation
-                    .mutateAsync(r.id as string | number | bigint)
-                    .catch((e: unknown) => {
-                      window.alert(e instanceof Error ? e.message : String(e));
-                    });
-                }
-              }
-            },
-          },
-          {
             id: 'accept-quotation',
-            label: t('sales.actions.acceptQuotation', { defaultValue: 'Accept quotation' }),
+            label: saleOrderWorkflow.acceptQuotation.label,
             requiresSelection: true,
+            isApplicable: (rows) =>
+              rows.some((r) => saleOrderWorkflow.acceptQuotation.canPresent(r as Record<string, unknown>)),
             onClick: (rows) => {
               for (const r of rows) {
-                if (saleOrderState(r) !== 'Sent') continue;
+                if (!saleOrderWorkflow.acceptQuotation.canPresent(r as Record<string, unknown>)) continue;
                 const signedBy =
                   window.prompt(
                     t('sales.actions.acceptQuotationPrompt', {
@@ -1408,14 +1401,10 @@ function SalesClientLoaded({
                     }),
                   )?.trim() ?? '';
                 if (!signedBy) continue;
-                void acceptSaleOrderQuotation
-                  .mutateAsync({
-                    orderId: r.id as string | number | bigint,
-                    signedBy,
-                  })
-                  .catch((e: unknown) => {
-                    window.alert(e instanceof Error ? e.message : String(e));
-                  });
+                // The workflow surface already reports the typed failure.
+                saleOrderWorkflow.acceptQuotation
+                  .execute({ orderId: String(r.id), signedBy })
+                  .catch(() => undefined);
               }
             },
           },
@@ -1499,48 +1488,17 @@ function SalesClientLoaded({
             onClick: (rows) => {
               if (rows.length !== 1) return;
               const r = rows[0] as Record<string, unknown>;
-              const st = saleOrderState(r);
-              if (st !== 'Draft' && st !== 'Sent') return;
+              if (!saleOrderWorkflow.update.canPresent(r)) return;
               setEditSaleOrderError(null);
               setEditSaleOrderTarget(r);
             },
           },
-          {
-            id: 'cancel-orders',
-            label: t('sales.actions.cancelOrders'),
-            requiresSelection: true,
-            variant: 'destructive',
-            onClick: (rows) => {
-              for (const r of rows) {
-                const st = saleOrderState(r);
-                if (st !== 'Done' && st !== 'Cancelled' && st !== 'Cancel') {
-                  void cancelSaleOrder
-                    .mutateAsync({
-                      orderId: r.id as string | number | bigint,
-                    })
-                    .then(() => {
-                      phCapture('sale_order_cancelled', { organization_id: organizationId });
-                    })
-                    .catch((e: unknown) => {
-                      window.alert(e instanceof Error ? e.message : String(e));
-                    });
-                }
-              }
-            },
-          },
-          {
-            id: 'recompute-totals',
-            label: t('sales.actions.recalculateTotals'),
-            requiresSelection: true,
-            onClick: (rows) => {
-              for (const r of rows) {
-                const st = saleOrderState(r);
-                if (st !== 'Cancelled' && st !== 'Cancel') {
-                  computeSoTotals.mutate(r.id as string | number | bigint);
-                }
-              }
-            },
-          },
+          ...workflowActionsToEntityActions([saleOrderWorkflow.cancel], {
+            ids: { 'sales.order.cancel': 'cancel-orders' },
+          }),
+          ...workflowActionsToEntityActions([saleOrderWorkflow.totals], {
+            ids: { 'sales.order.compute-totals': 'recompute-totals' },
+          }),
           {
             id: 'accrue-commission',
             label: t('sales.actions.accrueCommission', {
@@ -1651,26 +1609,9 @@ function SalesClientLoaded({
               })();
             },
           },
-          {
-            id: 'lock-orders',
-            label: t('sales.actions.lockOrders'),
-            requiresSelection: true,
-            onClick: (rows) => {
-              for (const r of rows) {
-                void lockSaleOrder.mutateAsync(r.id as string | number | bigint);
-              }
-            },
-          },
-          {
-            id: 'unlock-orders',
-            label: t('sales.actions.unlockOrders'),
-            requiresSelection: true,
-            onClick: (rows) => {
-              for (const r of rows) {
-                void unlockSaleOrder.mutateAsync(r.id as string | number | bigint);
-              }
-            },
-          },
+          ...workflowActionsToEntityActions([saleOrderWorkflow.lock, saleOrderWorkflow.unlock], {
+            ids: { 'sales.order.lock': 'lock-orders', 'sales.order.unlock': 'unlock-orders' },
+          }),
         ],
       },
     };
@@ -1680,16 +1621,16 @@ function SalesClientLoaded({
     openCreateSaleOrder,
     saleOrderWorkflow.actions,
     saleOrderWorkflow.createInvoice,
-    sendSaleOrderQuotation,
-    acceptSaleOrderQuotation,
+    saleOrderWorkflow.acceptQuotation,
+    saleOrderWorkflow.cancel,
+    saleOrderWorkflow.totals,
+    saleOrderWorkflow.lock,
+    saleOrderWorkflow.unlock,
+    saleOrderWorkflow.update,
     applySalePromotion,
     applySaleOrderOptions,
-    cancelSaleOrder,
-    computeSoTotals,
     accrueSaleCommission,
     applyOmnichannelAllocation,
-    lockSaleOrder,
-    unlockSaleOrder,
     orderLines,
     setCsvKind,
     organizationId,
@@ -2254,13 +2195,10 @@ function SalesClientLoaded({
                       variant: 'destructive' as const,
                       onClick: (rows) => {
                         for (const r of rows) {
-                          void deleteSaleOrderLine
-                            .mutateAsync(r.id as string | number | bigint)
-                            .catch((e: unknown) => {
-                              window.alert(
-                                e instanceof Error ? e.message : String(e),
-                              );
-                            });
+                          // The workflow surface already reports the typed failure.
+                          saleOrderLineWorkflow.remove
+                            .execute(String(r.id))
+                            .catch(() => undefined);
                         }
                       },
                     },
@@ -2505,10 +2443,7 @@ function SalesClientLoaded({
       createSalesIntegrationIntent,
       recordSalesIntegrationResult,
       scheduleSalesSlaEscalation,
-      // New mutations
-      updateSaleOrder,
-      lockSaleOrder,
-      unlockSaleOrder,
+      saleOrderLineWorkflow.remove,
     ],
   );
 
@@ -2601,18 +2536,12 @@ function SalesClientLoaded({
       const params = toCreateSaleOrderLineParams(formData);
       const orderId = formData.orderId;
       if (params == null || orderId === '' || orderId == null) return;
-      await createSaleOrderLine.mutateAsync({
-        orderId: orderId as string | number | bigint,
-        params,
-      });
+      await saleOrderLineWorkflow.create.execute({ orderId: String(orderId), params });
     } else if (action === 'updateSaleOrderLine') {
       const lineId = formData.lineId;
       const params = toUpdateSaleOrderLineParams(formData);
       if (params == null || lineId === '' || lineId == null) return;
-      await updateSaleOrderLine.mutateAsync({
-        lineId: lineId as string | number | bigint,
-        params,
-      });
+      await saleOrderLineWorkflow.update.execute({ lineId: String(lineId), params });
     } else if (action === 'createReturnOrder') {
       const params = toCreateReturnOrderParams(formData);
       if (params) await createReturnOrder.mutateAsync(params);
@@ -2656,20 +2585,13 @@ function SalesClientLoaded({
     createPricelistItem.isPending ||
     createPickingBatch.isPending ||
     saleOrderWorkflow.isPending ||
-    cancelSaleOrder.isPending ||
-    computeSoTotals.isPending ||
+    saleOrderLineWorkflow.isPending ||
     updatePricelist.isPending ||
     deletePricelist.isPending ||
     deletePricelistItem.isPending ||
     startPickingBatch.isPending ||
     completePickingBatch.isPending ||
     cancelPickingBatch.isPending ||
-    updateSaleOrder.isPending ||
-    lockSaleOrder.isPending ||
-    unlockSaleOrder.isPending ||
-    createSaleOrderLine.isPending ||
-    updateSaleOrderLine.isPending ||
-    deleteSaleOrderLine.isPending ||
     createDeliveryCarrier.isPending ||
     createDeliveryPriceRule.isPending ||
     createShippingMethod.isPending ||
@@ -2947,7 +2869,7 @@ function SalesClientLoaded({
           }
           closeOnSubmit={false}
           submitError={editSaleOrderError}
-          isPending={updateSaleOrder.isPending}
+          isPending={saleOrderWorkflow.isPending}
           onSubmit={async (formData) => {
             setEditSaleOrderError(null);
             const id = editSaleOrderTarget.id;
@@ -2980,8 +2902,8 @@ function SalesClientLoaded({
               } catch {
                 mergedMeta = metadata;
               }
-              await updateSaleOrder.mutateAsync({
-                orderId: id as string | number | bigint,
+              await saleOrderWorkflow.update.execute({
+                orderId: String(id),
                 params: {
                   clientOrderRef:
                     typeof formData.clientOrderRef === 'string'

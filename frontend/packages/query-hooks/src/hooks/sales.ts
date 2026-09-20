@@ -48,7 +48,14 @@ import type {
 import { finalizeUpdateSaleOrderParams } from "./sales-params-merge"
 import { invalidateQueryResources } from "./workflow"
 import {
+  ACCEPT_SALE_ORDER_QUOTATION_AFFECTS,
+  CANCEL_SALE_ORDER_AFFECTS,
+  COMPUTE_SALE_ORDER_TOTALS_AFFECTS,
   CONFIRM_SALE_ORDER_AFFECTS,
+  SALE_ORDER_LINE_AFFECTS,
+  SALE_ORDER_LOCK_AFFECTS,
+  UPDATE_SALE_ORDER_AFFECTS,
+  SEND_SALE_ORDER_QUOTATION_AFFECTS,
   CANCEL_RETURN_AFFECTS,
   CONFIRM_RETURN_AFFECTS,
   CREATE_INVOICE_FROM_SALE_ORDER_AFFECTS,
@@ -303,43 +310,49 @@ export function useRefreshSaleOrderPromiseDates(
   })
 }
 
+/** The one `send_sale_order_quotation` invocation, shared by the mutation hook and the workflow action. */
+export async function sendSaleOrderQuotationCommand(orderId: bigint | number | string): Promise<void> {
+  const { urlPath, init } = stdbBffCommandPost("send_sale_order_quotation", { orderId: orderId })
+  const r = await apiFetch(urlPath, init)
+  if (!r.ok) {
+    throw workflowErrorFromResponse(r.status, await r.text().catch(() => ""), "Failed to send quotation")
+  }
+}
+
 export function useSendSaleOrderQuotation(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async (orderId: bigint | number | string) => {
-      const { urlPath, init } = stdbBffCommandPost("send_sale_order_quotation", { orderId: orderId })
-      const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw await salesReducerError(r, "Failed to send quotation")
-    },
-    onSuccess: () => {
-      const k = rqBigIntKey(organizationId)
-      qc.invalidateQueries({ queryKey: ["sale-orders", k] })
-      qc.invalidateQueries({ queryKey: ["sale-orders-to-approve", k] })
-    },
+    mutationFn: sendSaleOrderQuotationCommand,
+    onSuccess: () => invalidateQueryResources(qc, organizationId, SEND_SALE_ORDER_QUOTATION_AFFECTS),
   })
+}
+
+export interface AcceptSaleOrderQuotationCommandInput {
+  orderId: bigint | number | string
+  signedBy: string
+  signature?: string | null
+}
+
+/** The one `accept_sale_order_quotation` invocation, shared by the mutation hook and the workflow action. */
+export async function acceptSaleOrderQuotationCommand(params: AcceptSaleOrderQuotationCommandInput): Promise<void> {
+  const { urlPath, init } = stdbBffCommandPost("accept_sale_order_quotation", { orderId: toScalarU64(params.orderId), params: stdbParamsToJson(
+      {
+        signedBy: params.signedBy,
+        signature: params.signature ?? null,
+      },
+      "AcceptSaleOrderQuotationParams",
+    ) })
+  const r = await apiFetch(urlPath, init)
+  if (!r.ok) {
+    throw workflowErrorFromResponse(r.status, await r.text().catch(() => ""), "Failed to accept quotation")
+  }
 }
 
 export function useAcceptSaleOrderQuotation(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async (params: {
-      orderId: bigint | number | string
-      signedBy: string
-      signature?: string | null
-    }) => {
-      const { urlPath, init } = stdbBffCommandPost("accept_sale_order_quotation", { orderId: toScalarU64(params.orderId), params: stdbParamsToJson(
-          {
-            signedBy: params.signedBy,
-            signature: params.signature ?? null,
-          },
-          "AcceptSaleOrderQuotationParams",
-        ) })
-      const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw await salesReducerError(r, "Failed to accept quotation")
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["sale-orders", rqBigIntKey(organizationId)] })
-    },
+    mutationFn: acceptSaleOrderQuotationCommand,
+    onSuccess: () => invalidateQueryResources(qc, organizationId, ACCEPT_SALE_ORDER_QUOTATION_AFFECTS),
   })
 }
 
@@ -390,42 +403,47 @@ export function useCreateExchangeOrderFromReturn(
   })
 }
 
+/** The one `cancel_sale_order` invocation, shared by the mutation hook and the workflow action. */
+export async function cancelSaleOrderCommand(params: {
+  orderId: bigint | number | string
+  reason?: string | null
+}): Promise<void> {
+  const { urlPath, init } = stdbBffCommandPost("cancel_sale_order", { orderId: params.orderId, reason: params.reason ?? null })
+  const r = await apiFetch(urlPath, init)
+  if (r.ok) return
+  const error = workflowErrorFromResponse(r.status, await r.text().catch(() => ""), "Failed to cancel sale order")
+  if (/invoic/i.test(error.message)) {
+    throw new WorkflowError(
+      error.kind,
+      `${error.message} — create an RMA and credit note instead of cancelling an invoiced order.`,
+      { status: error.status },
+    )
+  }
+  throw error
+}
+
 export function useCancelSaleOrder(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async (params: { orderId: bigint | number | string; reason?: string | null }) => {
-      const { urlPath, init } = stdbBffCommandPost("cancel_sale_order", { orderId: params.orderId, reason: params.reason ?? null })
-      const r = await apiFetch(urlPath, init)
-      if (!r.ok) {
-        const body = await r.text().catch(() => "")
-        const detail = body || "Failed to cancel sale order"
-        if (/invoic/i.test(detail)) {
-          throw new Error(
-            `${detail} — create an RMA and credit note instead of cancelling an invoiced order.`,
-          )
-        }
-        throw new Error(detail)
-      }
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['sale-orders', rqBigIntKey(organizationId)] })
-      qc.invalidateQueries({ queryKey: ['sale-order-lines', rqBigIntKey(organizationId)] })
-    },
+    mutationFn: cancelSaleOrderCommand,
+    onSuccess: () => invalidateQueryResources(qc, organizationId, CANCEL_SALE_ORDER_AFFECTS),
   })
+}
+
+/** The one `compute_so_totals` invocation, shared by the mutation hook and the workflow action. */
+export async function computeSaleOrderTotalsCommand(orderId: bigint | number | string): Promise<void> {
+  const { urlPath, init } = stdbBffCommandPost("compute_so_totals", { orderId: orderId })
+  const r = await apiFetch(urlPath, init)
+  if (!r.ok) {
+    throw workflowErrorFromResponse(r.status, await r.text().catch(() => ""), "Failed to recalculate order totals")
+  }
 }
 
 export function useComputeSoTotals(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async (orderId: bigint | number | string) => {
-      const { urlPath, init } = stdbBffCommandPost("compute_so_totals", { orderId: orderId })
-      const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error('Failed to recalculate order totals')
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['sale-orders', rqBigIntKey(organizationId)] })
-      qc.invalidateQueries({ queryKey: ['sale-order-lines', rqBigIntKey(organizationId)] })
-    },
+    mutationFn: computeSaleOrderTotalsCommand,
+    onSuccess: () => invalidateQueryResources(qc, organizationId, COMPUTE_SALE_ORDER_TOTALS_AFFECTS),
   })
 }
 
@@ -573,83 +591,126 @@ export function useCancelPickingBatch(organizationId: bigint) {
 
 // ── Sale Order Updates ───────────────────────────────────────────────────────
 
+export interface UpdateSaleOrderCommandInput {
+  orderId: bigint | number | string
+  params: Partial<UpdateSaleOrderParams>
+}
+
+/** The one `update_sale_order` invocation, shared by the mutation hook and the workflow action. */
+export async function updateSaleOrderCommand(
+  companyId: bigint,
+  { orderId, params }: UpdateSaleOrderCommandInput,
+): Promise<void> {
+  const { urlPath, init } = stdbBffCommandPost("update_sale_order", { companyId: companyId, orderId: toScalarU64(orderId), params: stdbParamsToJson(finalizeUpdateSaleOrderParams(params), "UpdateSaleOrderParams") })
+  const r = await apiFetch(urlPath, init)
+  if (!r.ok) {
+    throw workflowErrorFromResponse(r.status, await r.text().catch(() => ""), "Failed to update sale order")
+  }
+}
+
 export function useUpdateSaleOrder(organizationId: bigint, companyId: bigint) {
   const qc = useQueryClient()
-  return useMutation<void, Error, { orderId: bigint | number | string; params: Partial<UpdateSaleOrderParams> }>({
-    mutationFn: async ({ orderId, params }) => {
-      const { urlPath, init } = stdbBffCommandPost("update_sale_order", { companyId: companyId, orderId: toScalarU64(orderId), params: stdbParamsToJson(finalizeUpdateSaleOrderParams(params), "UpdateSaleOrderParams") })
-      const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error('Failed to update sale order')
-    },
-    onSuccess: async () => {
-      const orgKey = rqBigIntKey(organizationId)
-      await Promise.all([
-        qc.invalidateQueries({ queryKey: ['sale-orders', orgKey] }),
-        qc.invalidateQueries({ queryKey: ['sale-order-lines', orgKey] }),
-      ])
-    },
+  return useMutation<void, Error, UpdateSaleOrderCommandInput>({
+    mutationFn: (input) => updateSaleOrderCommand(companyId, input),
+    onSuccess: () => invalidateQueryResources(qc, organizationId, UPDATE_SALE_ORDER_AFFECTS),
   })
 }
+
+async function saleOrderLockCommand(
+  operation: "lock_sale_order" | "unlock_sale_order",
+  orderId: bigint | number | string,
+  fallback: string,
+): Promise<void> {
+  const { urlPath, init } = stdbBffCommandPost(operation, { orderId: toScalarU64(orderId) })
+  const r = await apiFetch(urlPath, init)
+  if (!r.ok) throw workflowErrorFromResponse(r.status, await r.text().catch(() => ""), fallback)
+}
+
+export const lockSaleOrderCommand = (orderId: bigint | number | string) =>
+  saleOrderLockCommand("lock_sale_order", orderId, "Failed to lock sale order")
+
+export const unlockSaleOrderCommand = (orderId: bigint | number | string) =>
+  saleOrderLockCommand("unlock_sale_order", orderId, "Failed to unlock sale order")
 
 export function useLockSaleOrder(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, bigint | number | string>({
-    mutationFn: async (orderId) => {
-      const { urlPath, init } = stdbBffCommandPost("lock_sale_order", { orderId: toScalarU64(orderId) })
-      const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error('Failed to lock sale order')
-    },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['sale-orders', rqBigIntKey(organizationId)] }),
+    mutationFn: lockSaleOrderCommand,
+    onSuccess: () => invalidateQueryResources(qc, organizationId, SALE_ORDER_LOCK_AFFECTS),
   })
 }
 
 export function useUnlockSaleOrder(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, bigint | number | string>({
-    mutationFn: async (orderId) => {
-      const { urlPath, init } = stdbBffCommandPost("unlock_sale_order", { orderId: toScalarU64(orderId) })
-      const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error('Failed to unlock sale order')
-    },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['sale-orders', rqBigIntKey(organizationId)] }),
+    mutationFn: unlockSaleOrderCommand,
+    onSuccess: () => invalidateQueryResources(qc, organizationId, SALE_ORDER_LOCK_AFFECTS),
   })
 }
 
 // ── Sale Order Line Management ──────────────────────────────────────────────
 
+export interface CreateSaleOrderLineCommandInput {
+  orderId: bigint | number | string
+  params: CreateSaleOrderLineParams
+}
+
+export interface UpdateSaleOrderLineCommandInput {
+  lineId: bigint | number | string
+  params: Record<string, unknown>
+}
+
+/** The one `create_sale_order_line` invocation, shared by the mutation hook and the workflow action. */
+export async function createSaleOrderLineCommand({ orderId, params }: CreateSaleOrderLineCommandInput): Promise<void> {
+  const { urlPath, init } = stdbBffCommandPost("create_sale_order_line", { orderId: toScalarU64(orderId), params: stdbParamsToJson(params as object, "CreateSaleOrderLineParams") })
+  const r = await apiFetch(urlPath, init)
+  if (!r.ok) {
+    throw workflowErrorFromResponse(r.status, await r.text().catch(() => ""), "Failed to create sale order line")
+  }
+}
+
+/** The one `update_sale_order_line` invocation, shared by the mutation hook and the workflow action. */
+export async function updateSaleOrderLineCommand(
+  companyId: bigint,
+  { lineId, params }: UpdateSaleOrderLineCommandInput,
+): Promise<void> {
+  const { urlPath, init } = stdbBffCommandPost("update_sale_order_line", { companyId: companyId, lineId: toScalarU64(lineId), params: stdbParamsToJson(params as object) })
+  const r = await apiFetch(urlPath, init)
+  if (!r.ok) {
+    throw workflowErrorFromResponse(r.status, await r.text().catch(() => ""), "Failed to update sale order line")
+  }
+}
+
+/** The one `delete_sale_order_line` invocation, shared by the mutation hook and the workflow action. */
+export async function deleteSaleOrderLineCommand(lineId: bigint | number | string): Promise<void> {
+  const { urlPath, init } = stdbBffCommandPost("delete_sale_order_line", { lineId: toScalarU64(lineId) })
+  const r = await apiFetch(urlPath, init)
+  if (!r.ok) {
+    throw workflowErrorFromResponse(r.status, await r.text().catch(() => ""), "Failed to delete sale order line")
+  }
+}
+
 export function useCreateSaleOrderLine(organizationId: bigint) {
   const qc = useQueryClient()
-  return useMutation<void, Error, { orderId: bigint | number | string; params: CreateSaleOrderLineParams }>({
-    mutationFn: async ({ orderId, params }) => {
-      const { urlPath, init } = stdbBffCommandPost("create_sale_order_line", { orderId: toScalarU64(orderId), params: stdbParamsToJson(params as object, "CreateSaleOrderLineParams") })
-      const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error('Failed to create sale order line')
-    },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['sale-order-lines', rqBigIntKey(organizationId)] }),
+  return useMutation<void, Error, CreateSaleOrderLineCommandInput>({
+    mutationFn: createSaleOrderLineCommand,
+    onSuccess: () => invalidateQueryResources(qc, organizationId, SALE_ORDER_LINE_AFFECTS),
   })
 }
 
 export function useUpdateSaleOrderLine(organizationId: bigint, companyId: bigint) {
   const qc = useQueryClient()
-  return useMutation<void, Error, { lineId: bigint | number | string; params: Record<string, unknown> }>({
-    mutationFn: async ({ lineId, params }) => {
-      const { urlPath, init } = stdbBffCommandPost("update_sale_order_line", { companyId: companyId, lineId: toScalarU64(lineId), params: stdbParamsToJson(params as object) })
-      const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error('Failed to update sale order line')
-    },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['sale-order-lines', rqBigIntKey(organizationId)] }),
+  return useMutation<void, Error, UpdateSaleOrderLineCommandInput>({
+    mutationFn: (input) => updateSaleOrderLineCommand(companyId, input),
+    onSuccess: () => invalidateQueryResources(qc, organizationId, SALE_ORDER_LINE_AFFECTS),
   })
 }
 
 export function useDeleteSaleOrderLine(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, bigint | number | string>({
-    mutationFn: async (lineId) => {
-      const { urlPath, init } = stdbBffCommandPost("delete_sale_order_line", { lineId: toScalarU64(lineId) })
-      const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error('Failed to delete sale order line')
-    },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['sale-order-lines', rqBigIntKey(organizationId)] }),
+    mutationFn: deleteSaleOrderLineCommand,
+    onSuccess: () => invalidateQueryResources(qc, organizationId, SALE_ORDER_LINE_AFFECTS),
   })
 }
 

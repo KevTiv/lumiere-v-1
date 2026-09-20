@@ -1,5 +1,5 @@
 import { firstNonNullKey, type RowValueMap } from "@lumiere/erp-shared/row-values"
-import type { WorkflowAction, WorkflowExecuteContext } from "../core/action"
+import { recordAction, type WorkflowAction, type WorkflowExecuteContext } from "../core/action"
 import { recordRef } from "../core/record-ref"
 import type { WorkflowResult } from "../core/result"
 import { rowId, variantTag } from "../core/row"
@@ -84,6 +84,135 @@ export function confirmSaleOrderAction(options: {
     kind: "immediate",
     canPresent: isSaleOrderConfirmable,
     prepare: rowId,
+    execute: options.execute,
+  }
+}
+
+/** `send_sale_order_quotation` moves a Draft order to Sent. */
+export const SEND_SALE_ORDER_QUOTATION_AFFECTS = ["sale-orders", "sale-orders-to-approve"] as const
+
+/** `accept_sale_order_quotation` records the signature on the order; the state stays Sent. */
+export const ACCEPT_SALE_ORDER_QUOTATION_AFFECTS = ["sale-orders"] as const
+
+/**
+ * Everything `cancel_sale_order` changes: the order and its lines, the open deliveries it
+ * cancels (with their moves and released reservations) and the commissions it reverses.
+ */
+export const CANCEL_SALE_ORDER_AFFECTS = [
+  "sale-orders",
+  "sale-orders-to-approve",
+  "sale-order-lines",
+  "sale-commissions",
+  "sale-commissions-pending",
+  "stock-pickings",
+  "stock-moves",
+  "stock-quants",
+] as const
+
+/** Presentation gates only: the reducers re-validate state, lines, expiry, lock and permission. */
+export const isSaleOrderSendable = (row: RowValueMap): boolean => saleOrderState(row) === "Draft"
+
+export const isSaleOrderAcceptable = (row: RowValueMap): boolean => saleOrderState(row) === "Sent"
+
+const NON_CANCELLABLE_STATES = new Set(["Done", "Cancelled", "Cancel"])
+
+/**
+ * Anything not finished or already cancelled. An invoiced order is still presented: the reducer
+ * refuses it and the surface explains that a return and credit note is the path instead.
+ */
+export const isSaleOrderCancellable = (row: RowValueMap): boolean => !NON_CANCELLABLE_STATES.has(saleOrderState(row))
+
+export function sendSaleOrderQuotationAction(options: {
+  label: string
+  execute(orderId: string, context?: WorkflowExecuteContext): Promise<WorkflowResult>
+}): WorkflowAction<RowValueMap, string> {
+  return recordAction("sales.order.send-quotation", "immediate", isSaleOrderSendable, options)
+}
+
+export function cancelSaleOrderAction(options: {
+  label: string
+  execute(orderId: string, context?: WorkflowExecuteContext): Promise<WorkflowResult>
+}): WorkflowAction<RowValueMap, string> {
+  return recordAction("sales.order.cancel", "destructive", isSaleOrderCancellable, options)
+}
+
+export interface AcceptSaleOrderQuotationInput {
+  orderId: string
+  signedBy: string
+  signature?: string | null
+}
+
+/** Form-backed: the surface collects who accepted (and optionally a signature) before dispatching. */
+export function acceptSaleOrderQuotationAction(options: {
+  label: string
+  execute(input: AcceptSaleOrderQuotationInput, context?: WorkflowExecuteContext): Promise<WorkflowResult>
+}): WorkflowAction<RowValueMap, AcceptSaleOrderQuotationInput> {
+  return {
+    id: "sales.order.accept-quotation",
+    label: options.label,
+    kind: "form",
+    canPresent: isSaleOrderAcceptable,
+    execute: options.execute,
+  }
+}
+
+/** `compute_so_totals` rewrites the order's amounts from its lines. */
+export const COMPUTE_SALE_ORDER_TOTALS_AFFECTS = ["sale-orders", "sale-order-lines"] as const
+
+/** `lock_sale_order` / `unlock_sale_order` only flip the order's `is_locked` flag. */
+export const SALE_ORDER_LOCK_AFFECTS = ["sale-orders"] as const
+
+/** `update_sale_order` edits header fields and can re-price lines (pricelist, warehouse). */
+export const UPDATE_SALE_ORDER_AFFECTS = ["sale-orders", "sale-order-lines"] as const
+
+export const isSaleOrderLocked = (row: RowValueMap): boolean =>
+  Boolean(firstNonNullKey(row, "isLocked", "is_locked"))
+
+/** Totals can be recomputed for any order that has not been cancelled. */
+export const isSaleOrderTotalsComputable = (row: RowValueMap): boolean =>
+  saleOrderState(row) !== "Cancelled" && saleOrderState(row) !== "Cancel"
+
+/** A locked order is offered unlock instead; finished or cancelled orders cannot be locked. */
+export const isSaleOrderLockable = (row: RowValueMap): boolean =>
+  !isSaleOrderLocked(row) && isSaleOrderCancellable(row)
+
+export const isSaleOrderUnlockable = isSaleOrderLocked
+
+/** Header edits are open to unlocked quotations (Draft or Sent). */
+export const isSaleOrderEditable = (row: RowValueMap): boolean => {
+  const state = saleOrderState(row)
+  return (state === "Draft" || state === "Sent") && !isSaleOrderLocked(row)
+}
+
+interface OrderRecordActionOptions {
+  label: string
+  execute(orderId: string, context?: WorkflowExecuteContext): Promise<WorkflowResult>
+}
+
+export const computeSaleOrderTotalsAction = (o: OrderRecordActionOptions) =>
+  recordAction("sales.order.compute-totals", "immediate", isSaleOrderTotalsComputable, o)
+
+export const lockSaleOrderAction = (o: OrderRecordActionOptions) =>
+  recordAction("sales.order.lock", "immediate", isSaleOrderLockable, o)
+
+export const unlockSaleOrderAction = (o: OrderRecordActionOptions) =>
+  recordAction("sales.order.unlock", "immediate", isSaleOrderUnlockable, o)
+
+export interface UpdateSaleOrderInput<TParams> {
+  orderId: string
+  params: TParams
+}
+
+/** Form-backed: the surface collects the header fields, then dispatches the changed params. */
+export function updateSaleOrderAction<TParams>(options: {
+  label: string
+  execute(input: UpdateSaleOrderInput<TParams>, context?: WorkflowExecuteContext): Promise<WorkflowResult>
+}): WorkflowAction<RowValueMap, UpdateSaleOrderInput<TParams>> {
+  return {
+    id: "sales.order.update",
+    label: options.label,
+    kind: "form",
+    canPresent: isSaleOrderEditable,
     execute: options.execute,
   }
 }

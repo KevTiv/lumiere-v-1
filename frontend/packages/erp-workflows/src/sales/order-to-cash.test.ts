@@ -2,7 +2,18 @@ import assert from "node:assert/strict"
 import test from "node:test"
 
 import {
+  ACCEPT_SALE_ORDER_QUOTATION_AFFECTS,
+  isSaleOrderEditable,
+  isSaleOrderLockable,
+  isSaleOrderTotalsComputable,
+  isSaleOrderUnlockable,
+  CANCEL_SALE_ORDER_AFFECTS,
+  cancelSaleOrderAction,
+  isSaleOrderAcceptable,
+  isSaleOrderCancellable,
   isSaleOrderConfirmable,
+  isSaleOrderSendable,
+  sendSaleOrderQuotationAction,
   isSaleOrderInvoiceable,
   observeConfirmedOrder,
   observeCreatedInvoice,
@@ -65,4 +76,65 @@ test("the newest invoice on the order is created and opened in Accounting", () =
 test("an order without a readback invoice yields no claims", () => {
   assert.deepEqual(observeCreatedInvoice("5", [{ id: 5, invoiceIds: [] }]), {})
   assert.deepEqual(observeCreatedInvoice("5", []), {})
+})
+
+test("only a draft quotation can be sent and only a sent one accepted", () => {
+  assert.ok(isSaleOrderSendable({ state: "Draft" }))
+  assert.ok(isSaleOrderSendable({ state: { tag: "Draft" } }))
+  assert.ok(!isSaleOrderSendable({ state: "Sent" }))
+  assert.ok(isSaleOrderAcceptable({ state: { tag: "Sent" } }))
+  assert.ok(!isSaleOrderAcceptable({ state: "Draft" }))
+  assert.ok(!isSaleOrderAcceptable({ state: "Sale" }))
+})
+
+test("cancel is offered until an order is done or cancelled, whichever spelling the state has", () => {
+  for (const state of ["Draft", "Sent", "Sale", "ToApprove"]) assert.ok(isSaleOrderCancellable({ state }), state)
+  for (const state of ["Done", "Cancelled", "Cancel"]) assert.ok(!isSaleOrderCancellable({ state }), state)
+  assert.ok(!isSaleOrderCancellable({ state: { tag: "Cancelled" } }))
+})
+
+test("cancel declares the deliveries, reservations and commissions it releases", () => {
+  for (const resource of ["stock-pickings", "stock-moves", "stock-quants", "sale-commissions"]) {
+    assert.ok((CANCEL_SALE_ORDER_AFFECTS as readonly string[]).includes(resource), resource)
+  }
+  assert.deepEqual([...ACCEPT_SALE_ORDER_QUOTATION_AFFECTS], ["sale-orders"])
+})
+
+test("send and cancel are record actions dispatched with the order id; cancel is destructive", async () => {
+  const seen: string[] = []
+  const execute = async (id: string) => {
+    seen.push(id)
+    return { outcome: "applied" as const, affectedResources: [] }
+  }
+  const send = sendSaleOrderQuotationAction({ label: "Send", execute })
+  const cancel = cancelSaleOrderAction({ label: "Cancel", execute })
+  assert.equal(send.kind, "immediate")
+  assert.equal(cancel.kind, "destructive")
+  await send.execute(send.prepare!({ id: 7, state: "Draft" }))
+  await cancel.execute(cancel.prepare!({ id: 8, state: "Sale" }))
+  assert.deepEqual(seen, ["7", "8"])
+})
+
+test("lock and unlock are mutually exclusive on the order's lock flag, in either field spelling", () => {
+  assert.ok(isSaleOrderLockable({ state: "Sale", isLocked: false }))
+  assert.ok(isSaleOrderLockable({ state: "Draft" }))
+  assert.ok(!isSaleOrderLockable({ state: "Sale", is_locked: true }))
+  assert.ok(isSaleOrderUnlockable({ state: "Sale", isLocked: true }))
+  assert.ok(!isSaleOrderUnlockable({ state: "Sale", isLocked: false }))
+  assert.ok(!isSaleOrderUnlockable({ state: "Sale" }))
+})
+
+test("finished and cancelled orders cannot be locked, and cancelled ones cannot recompute totals", () => {
+  for (const state of ["Done", "Cancelled", "Cancel"]) assert.ok(!isSaleOrderLockable({ state }), state)
+  assert.ok(isSaleOrderTotalsComputable({ state: "Sale" }))
+  assert.ok(isSaleOrderTotalsComputable({ state: "Done" }))
+  assert.ok(!isSaleOrderTotalsComputable({ state: { tag: "Cancelled" } }))
+  assert.ok(!isSaleOrderTotalsComputable({ state: "Cancel" }))
+})
+
+test("only an unlocked draft or sent order can have its header edited", () => {
+  assert.ok(isSaleOrderEditable({ state: "Draft", isLocked: false }))
+  assert.ok(isSaleOrderEditable({ state: { tag: "Sent" } }))
+  assert.ok(!isSaleOrderEditable({ state: "Draft", isLocked: true }))
+  assert.ok(!isSaleOrderEditable({ state: "Sale" }))
 })
