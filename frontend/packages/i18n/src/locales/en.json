@@ -9773,6 +9773,40 @@
           "description": "Update vehicle driver or service type.",
           "section": "Vehicle details"
         }
+      },
+      "lifecycle": {
+        "vehicle": "Vehicle",
+        "driver": "Driver",
+        "inspector": "Inspector",
+        "serviceType": "Service type",
+        "provider": "Provider",
+        "notes": "Notes",
+        "servicedAt": "Serviced at",
+        "inspectedAt": "Inspected at",
+        "outcome": "Outcome",
+        "assignments": {
+          "title": "Driver assignment",
+          "description": "Assign or unassign an active employee as the vehicle driver.",
+          "action": "Change driver",
+          "unassign": "No driver (unassign)"
+        },
+        "service": {
+          "title": "Service history",
+          "description": "Record maintenance performed on a fleet vehicle.",
+          "action": "Record service",
+          "empty": "No service records yet."
+        },
+        "inspections": {
+          "title": "Inspection history",
+          "description": "Record the result of a fleet vehicle inspection.",
+          "action": "Record inspection",
+          "empty": "No inspections yet."
+        },
+        "outcomes": {
+          "passed": "Passed",
+          "failed": "Failed",
+          "attentionRequired": "Attention required"
+        }
       }
     }
   },

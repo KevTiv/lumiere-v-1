@@ -1214,6 +1214,11 @@ export const ORG_SUBSCRIPTION_QUERY_DESCRIPTORS = {
     "predicates": [],
     "order_by": []
   },
+  "project-timesheet-approvals": {
+    "table": "project_timesheet_approval",
+    "predicates": [],
+    "order_by": []
+  },
   "projects": {
     "table": "project_project",
     "predicates": [],

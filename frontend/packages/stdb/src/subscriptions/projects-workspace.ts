@@ -25,7 +25,10 @@ export const PROJECTS_WORKSPACE_RESOURCE_KEYS = [
   "capacity-forecast-by-employee",
   "project-baselines",
   "project-change-orders",
-  "project-timesheet-approvals",
+  // Read through the authorized HTTP query until the next immutable contracts
+  // release publishes this resource in the generated frontend registry. Adding
+  // it to the live subscription batch before that pin moves would make column
+  // resolution dereference a missing registry entry.
   "project-earned-value-by-project",
   "project-subcontractor-costs",
   "project-revenue-schedules",

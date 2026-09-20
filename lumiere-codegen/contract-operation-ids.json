@@ -768,6 +768,8 @@
     "record_crm_provider_delivery": "erp.record_crm_provider_delivery",
     "record_cycle_count_line": "erp.record_cycle_count_line",
     "record_document_view": "erp.record_document_view",
+    "record_fleet_inspection": "erp.record_fleet_inspection",
+    "record_fleet_service": "erp.record_fleet_service",
     "record_generated_owner_report": "erp.record_generated_owner_report",
     "record_google_drive_sync": "erp.record_google_drive_sync",
     "record_google_drive_sync_error": "erp.record_google_drive_sync_error",

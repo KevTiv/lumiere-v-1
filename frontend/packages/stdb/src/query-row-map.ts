@@ -202,6 +202,7 @@ import type {
   ProjectSubcontractorCost,
   ProjectTask,
   ProjectTimesheet,
+  ProjectTimesheetApproval,
   Proposal,
   ProposalAnalysis,
   ProposalBidDecision,
@@ -528,6 +529,7 @@ export interface QueryRowMap {
   "project-revenue-lines": ProjectRevenueLine
   "project-revenue-schedules": ProjectRevenueSchedule
   "project-subcontractor-costs": ProjectSubcontractorCost
+  "project-timesheet-approvals": ProjectTimesheetApproval
   "projects": ProjectProject
   "proposal-analyses": ProposalAnalysis
   "proposal-bid-decisions": ProposalBidDecision

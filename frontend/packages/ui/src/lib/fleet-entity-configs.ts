@@ -24,3 +24,45 @@ export const fleetVehiclesTableConfig = (t: TFunction): EntityViewConfig => ({
     emptyMessage: t("fleet.empty"),
   },
 })
+
+export const fleetServiceRecordsTableConfig = (t: TFunction): EntityViewConfig => ({
+  id: "fleet-service-records-table",
+  title: t("fleet.lifecycle.service.title"),
+  description: t("fleet.lifecycle.service.description"),
+  view: {
+    mode: "table",
+    rowKey: "id",
+    searchable: true,
+    searchKeys: ["vehicle_id", "provider", "notes"],
+    columns: [
+      { key: "vehicle_id", label: t("fleet.lifecycle.vehicle"), type: "number" },
+      { key: "service_type_id", label: t("fleet.lifecycle.serviceType"), type: "number" },
+      { key: "serviced_at", label: t("fleet.lifecycle.servicedAt"), type: "datetime" },
+      { key: "odometer_km", label: t("fleet.table.odometer"), type: "number" },
+      { key: "provider", label: t("fleet.lifecycle.provider") },
+      { key: "notes", label: t("fleet.lifecycle.notes") },
+    ],
+    emptyMessage: t("fleet.lifecycle.service.empty"),
+  },
+})
+
+export const fleetInspectionsTableConfig = (t: TFunction): EntityViewConfig => ({
+  id: "fleet-inspections-table",
+  title: t("fleet.lifecycle.inspections.title"),
+  description: t("fleet.lifecycle.inspections.description"),
+  view: {
+    mode: "table",
+    rowKey: "id",
+    searchable: true,
+    searchKeys: ["vehicle_id", "outcome", "notes"],
+    columns: [
+      { key: "vehicle_id", label: t("fleet.lifecycle.vehicle"), type: "number" },
+      { key: "inspector_id", label: t("fleet.lifecycle.inspector"), type: "number" },
+      { key: "inspected_at", label: t("fleet.lifecycle.inspectedAt"), type: "datetime" },
+      { key: "outcome", label: t("fleet.lifecycle.outcome"), type: "badge" },
+      { key: "odometer_km", label: t("fleet.table.odometer"), type: "number" },
+      { key: "notes", label: t("fleet.lifecycle.notes") },
+    ],
+    emptyMessage: t("fleet.lifecycle.inspections.empty"),
+  },
+})
