@@ -14,7 +14,7 @@ use crate::{
         EntityRef, LiveSnapshot,
     },
     orchestrator::{
-        intelligence::{EvidenceRef, GenerationProvider, GenerationRequest},
+        intelligence::{EvidenceRef, GenerationRequest},
         intelligence_router::generate_routed_for_run,
         model_configuration::StdbModelConfigurationStore,
         skill_loader::{complete_run, create_generation_surface_run},
