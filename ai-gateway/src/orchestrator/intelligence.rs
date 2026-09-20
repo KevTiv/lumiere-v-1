@@ -220,6 +220,15 @@ pub struct GenerationRequest {
     pub objective: String,
     pub context: Value,
     pub format: String,
+    /// Trusted runtime instructions appended to the provider system prompt.
+    /// This carries surface-specific schema/grounding rules without allowing
+    /// workflow code to select a provider or model.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub instructions: Option<String>,
+    /// Optional surface cap. The effective provider limit is the minimum of
+    /// this value and the resolved immutable model profile limit.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max_tokens: Option<u32>,
 }
 
 impl GenerationRequest {
@@ -229,6 +238,9 @@ impl GenerationRequest {
         }
         if self.format.trim().is_empty() {
             bail!("generation format must be nonempty");
+        }
+        if self.max_tokens == Some(0) {
+            bail!("generation max_tokens must be positive when present");
         }
         Ok(())
     }
