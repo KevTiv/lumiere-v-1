@@ -286,6 +286,10 @@ mod tests {
             }],
             decision_calls: 0,
             capability_calls: 0,
+            generation_provider: None,
+            generation_model: None,
+            generation_input_tokens: 0,
+            generation_output_tokens: 0,
         };
         let result = deterministic_pre_review(&outcome).unwrap();
         assert_eq!(result.disposition, RunReviewDisposition::Defect);
@@ -317,6 +321,10 @@ mod tests {
             ],
             decision_calls: 1,
             capability_calls: 1,
+            generation_provider: None,
+            generation_model: None,
+            generation_input_tokens: 0,
+            generation_output_tokens: 0,
         };
         let result = RunReviewProgram::new(&Reviewer)
             .review("summarize", &outcome)
@@ -380,6 +388,10 @@ mod tests {
             }],
             decision_calls: 0,
             capability_calls: 0,
+            generation_provider: None,
+            generation_model: None,
+            generation_input_tokens: 0,
+            generation_output_tokens: 0,
         };
         let result = RunReviewProgram::new(&Reviewer)
             .review("summarize", &outcome)
