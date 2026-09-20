@@ -1,8 +1,9 @@
 //! Policy-gated harness adapters for LLM-backed bundled skills.
 //!
-//! After release + NamedRead policy succeed, migrated skills continue through
-//! the admitted typed governed-program runtime. The generic legacy loop remains
-//! only for skills not yet present in the GP-17 program catalog.
+//! After release + NamedRead policy succeed, bundled LLM skills continue
+//! through the admitted typed governed-program runtime. The admitted boundary
+//! fails closed when a skill is absent from the GP-17 program catalog; provider
+//! tool calls never regain direct execution authority.
 
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -308,6 +309,21 @@ pub async fn run_governed_llm_skill(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn every_bundled_llm_skill_has_a_governed_program() {
+        for skill in [
+            REPORT_ANALYSIS_SKILL_KEY,
+            PROCESS_RESEARCH_SKILL_KEY,
+            PRICE_SEARCH_SKILL_KEY,
+            SUPPLIER_DISCOVERY_SKILL_KEY,
+        ] {
+            assert!(
+                crate::orchestrator::governed_programs::governed_program_for_skill(skill).is_some(),
+                "{skill} must have a typed governed program; admitted direct-loop fallback is forbidden"
+            );
+        }
+    }
 
     #[test]
     fn gp17_manifests_authorize_catalog_runtime_tools() {
