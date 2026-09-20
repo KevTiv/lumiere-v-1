@@ -9,8 +9,7 @@ use crate::{
     },
     error::{AppError, AppResult},
     orchestrator::{
-        intelligence::{GenerationRequest},
-        intelligence_router::generate_routed_for_run,
+        intelligence_router::run_catalogued_generation_surface,
         model_configuration::StdbModelConfigurationStore,
         skill_loader::{complete_run, create_generation_surface_run},
         spend_admission::StdbSpendLedger,
@@ -453,30 +452,29 @@ pub async fn post_suggest(
         writer: state.stdb.as_ref(),
         reader: spend_reader,
     };
-    let generation = generate_routed_for_run(
+    let program = run_catalogued_generation_surface(
         &model_store,
         &ledger,
+        state.stdb.as_ref(),
+        state.stdb.as_ref(),
         req.org_id,
         req.company_id,
-        run.run_id,
+        &run,
         &agent,
-        run.intelligence_policy_ref.as_deref(),
         state.providers.llm.as_ref(),
-        GenerationRequest {
-            objective: prompt,
-            context: json!({
-                "form_id": req.form_id,
-                "entity_type": req.entity_type,
-                "field_count": req.fields.len(),
-            }),
-            format: "schema-constrained JSON form suggestions".to_string(),
-            instructions: Some(system),
-            max_tokens: Some(agent.max_tokens.min(FORM_SUGGEST_MAX_TOKENS)),
-        },
+        "form_suggestion",
+        prompt,
+        json!({
+            "form_id": req.form_id,
+            "entity_type": req.entity_type,
+            "field_count": req.fields.len(),
+        }),
+        Some(system),
+        Some(agent.max_tokens.min(FORM_SUGGEST_MAX_TOKENS)),
     )
     .await;
-    let llm_resp = match generation {
-        Ok(response) => response,
+    let program = match program {
+        Ok(outcome) => outcome,
         Err(error) => {
             let _ = complete_run(
                 state.stdb.as_ref(),
@@ -495,8 +493,14 @@ pub async fn post_suggest(
             return Err(AppError::Internal(format!("LLM request failed: {error}")));
         }
     };
-    let total_tokens = llm_resp.input_tokens.saturating_add(llm_resp.output_tokens);
-    let text = llm_resp.content.as_str();
+    let total_tokens = program
+        .generation_input_tokens
+        .saturating_add(program.generation_output_tokens);
+    let generated = program
+        .final_content
+        .as_deref()
+        .ok_or_else(|| AppError::Internal("governed form generation produced no final content".into()))?;
+    let text = generated;
     let model_json: Value = match serde_json::from_str(clean_json_response(text)) {
         Ok(value) => value,
         Err(error) => {
@@ -546,7 +550,7 @@ pub async fn post_suggest(
         Some(format!("generated {} form suggestions", suggestions.len())),
         None,
         None,
-        1,
+        program.trace.len() as u32,
         total_tokens,
         None,
     )
