@@ -20,6 +20,7 @@ import {
   chatActionsToMetadata,
   looksLikeActionDraftRequest,
   parseStoredChatActions,
+  parseStoredChatRunId,
   persistedDraftsToChatActions,
 } from "@lumiere/query-hooks/action-draft-intent"
 import {
@@ -163,6 +164,7 @@ function ErpAiChatPanel(props: Omit<ComponentProps<typeof AIChatPanel>, "onSendM
             : row.duration_ms != null
               ? Number(row.duration_ms)
               : undefined,
+        runId: parseStoredChatRunId(row.metadata),
       },
     }))
   }, [messagesQuery.data])
@@ -191,6 +193,7 @@ function ErpAiChatPanel(props: Omit<ComponentProps<typeof AIChatPanel>, "onSendM
       durationMs?: number
       model?: string | null
       actions?: ChatAction[]
+      runId?: number
     }) => {
       if (!sessionKey || !orgReady || operatingCompanyId == null || operatingCompanyId <= 0) return
       try {
@@ -210,12 +213,13 @@ function ErpAiChatPanel(props: Omit<ComponentProps<typeof AIChatPanel>, "onSendM
           model: args.model ?? null,
           duration_ms: args.durationMs ?? null,
           metadata:
-            args.actions?.length
+            args.actions?.length || args.runId != null
               ? chatActionsToMetadata(
-                  args.actions.filter(
+                  (args.actions ?? []).filter(
                     (action): action is Extract<ChatAction, { type: "draft" }> =>
                       action.type === "draft" && action.draft != null,
                   ),
+                  args.runId,
                 )
               : null,
         })
@@ -347,6 +351,7 @@ function ErpAiChatPanel(props: Omit<ComponentProps<typeof AIChatPanel>, "onSendM
         durationMs: Math.round(finished - started),
         model: out.model ?? null,
         actions: draftActions.length > 0 ? draftActions : undefined,
+        runId: out.run_id,
       })
 
       return {
@@ -456,6 +461,7 @@ function ErpAiChatPanel(props: Omit<ComponentProps<typeof AIChatPanel>, "onSendM
         durationMs: Math.round(finished - started),
         model: resolvedModel,
         actions: draftActions.length > 0 ? draftActions : undefined,
+        runId: resolvedRunId,
       })
 
       return {
