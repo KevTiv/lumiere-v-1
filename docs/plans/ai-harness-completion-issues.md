@@ -6,10 +6,27 @@ issue is independently mergeable behind compatible, generated contract changes;
 sequence follows the plan's "Suggested Implementation Order." Estimates are
 rough sizing (S/M/L), not commitments.
 
-**Plan revision:** 2026-09-12. AIH-13–19 add evidence and intellectual
-provenance requirements; all entries are planned, not verified by this revision.
-AIH-20–24 add interactive execution/recovery to base gates; AIH-25/26 are later
-specialist/extension admission. The advanced harness remains deferred from first core deployability. Milestone
+**Plan revision:** 2026-09-21. AIH-13–19 add evidence and intellectual
+provenance requirements; AIH-20–24 add interactive execution/recovery to base
+gates; AIH-25/26 are later specialist/extension admission.
+
+For post-H5 work, this issue list is interpreted through
+`governed-intelligence-program-architecture.md`,
+`governed-intelligence-program-migration.md`,
+`typed-decision-graph-and-run-review-plan.md`,
+`decision-precedent-memory-layer.md`, and
+`harness-decision-trace-replay-organizational-learning.md`.
+
+The governed PR45 runtime supplies the typed DecisionGraph, durable intelligence
+events, precedent, independent review, shadowing and deterministic-graduation
+substrate. The intelligence-compounding follow-on is tracked as HLEARN/IC work:
+structured explanation, provenance-labeled epistemic trace DAGs, independent
+learning review, reviewed TaskRecipe procedural memory, correction/promotion
+workflow, memory-lift shadow evaluation, and the user-facing reasoning notebook.
+These extend the governed runtime; they must not introduce a second execution
+authority or depend on private provider chain-of-thought.
+
+The advanced harness remains deferred from first core deployability. Milestone
 and gate ownership is in the completion plan; record implementation revision,
 test/run evidence and reviewer before marking any gate passed.
 
