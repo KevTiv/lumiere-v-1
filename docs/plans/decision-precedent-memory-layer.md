@@ -2,7 +2,7 @@
 
 **Status:** Architecture extension to the governed-program harness
 **Date:** 2026-09-17
-**Related:** `governed-intelligence-program-architecture.md`, `governed-intelligence-program-migration.md`, `intelligence-compounding-epistemic-trace.md`
+**Related:** `governed-intelligence-program-architecture.md`, `governed-intelligence-program-migration.md`, `harness-decision-trace-replay-organizational-learning.md`
 
 ## 1. Decision
 
