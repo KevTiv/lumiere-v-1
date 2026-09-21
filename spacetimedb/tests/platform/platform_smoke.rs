@@ -1401,8 +1401,14 @@ pub fn test_documents_wave_d_hold_ocr_drive_esign_presence(
         },
     )?;
     let doc_id = doc.id;
-    let doc_url = doc.url.clone().unwrap_or_default();
-    let doc_version_id = doc.current_version_id;
+    let current_doc = ctx
+        .db
+        .document()
+        .id()
+        .find(&doc_id)
+        .ok_or("wave d doc missing after version update")?;
+    let doc_url = current_doc.url.clone().unwrap_or_default();
+    let doc_version_id = current_doc.current_version_id;
 
     let del_err = delete_document(ctx, org_id, doc_id)
         .err()
