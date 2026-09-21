@@ -600,13 +600,17 @@ redaction.
   the canonical owner role the exact bounded `ai.evidence.inspect` capability;
   ordinary roles remain default-deny.
 
+The reviewer UI now completes the navigation surface: assistant answers carrying
+a durable run id expose an **Inspect run** link; the evidence reviewer resolves
+that run to its first persisted answer claim under the requested company scope,
+opens the existing claim lineage view, and exposes the authorized JSON run export.
+Persisted chat metadata retains the run id so the navigation survives reloads.
+
 Still open:
 
 - The newly extended live RAG/browser certification still requires an
   environment run with the real gateway/STDB/LLM/embedder stack before this
   end-to-end proof is marked executed.
-- A richer reviewer UI can surface the new run transcript/export actions
-  directly; the browser/API navigation contract is now present and tested.
 
 ---
 
