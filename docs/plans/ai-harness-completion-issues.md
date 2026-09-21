@@ -573,27 +573,40 @@ content and source metadata. Unit tests cover spoofed authority, expired/inactiv
 roles, mismatched actor scope, bounded excerpts and unavailable-content
 redaction.
 
+**Delivered — answer/run navigation, transcript and export coverage.**
+
+- Passage-backed RAG responses now expose the exact durable `run_id`, so an
+  answer can navigate to its run without newest-row discovery or client
+  inference.
+- `POST /v1/evidence/run` resolves that run in the acting user's current
+  organization/company, joins answer contributions by `agent_run_id`, joins
+  their persisted claims, and runs every claim through the existing evidence
+  inspector to reconstruct exact passage/version/source/author/review lineage.
+- The same response includes a bounded observable transcript from
+  `ai_agent_run_step`. It exposes tool name, step/order, input hash, row count,
+  duration and success/failure only; raw tool arguments and persisted
+  `output_summary` never leave the gateway.
+- `POST /v1/evidence/run/export` exports the same authorized/redacted contract
+  with a versioned export envelope. The API server exposes session-owned
+  `/ai/evidence/runs/inspect` and `/ai/evidence/runs/export` routes, and the
+  browser BFF has matching proxies. Export receives `no-store` plus an
+  attachment filename and cannot bypass the exact `ai.evidence.inspect` grant.
+- The live RAG E2E now follows answer → run → contribution/claims → passage
+  inspection and verifies the export contract and transcript redaction. The
+  focused gateway unit test separately pins that raw tool output cannot appear
+  in the transcript.
+- Workflow-step inspection and the bounded reviewer queue remain available
+  through the same inspector boundary. Production tenant bootstrap now grants
+  the canonical owner role the exact bounded `ai.evidence.inspect` capability;
+  ordinary roles remain default-deny.
+
 Still open:
 
-- Answer → foundation now works for governed-run answers: the run response
-  carries `evidenceClaimIds`, and each inspects down to passage, source and
-  author. The UI does not navigate from an answer or run to those claims, and a
-  *workflow step* has no path yet (no component is bound at save time).
-- A workflow step now has a path: `workflow_step` (version + node key)
-  resolves the step's current component and reconstructs decision, claim,
-  passage and source through its revisions, with the claim's persisted reviewer.
-  A bounded, company-scoped review queue (`POST /v1/evidence/review-queue`, same
-  exact `ai.evidence.inspect` grant) lists pending and flagged claims and
-  decisions, source and passage availability, automated result, creator and
-  proposer (so separation of duties is visible), affected workflow steps and
-  steps whose links need confirming; the reviewer screen can inspect and review
-  from it. The browser supplies only company intent, target, verdict, note and,
-  for a component confirmation, the exact content hash it saw.
-- The UI still omits export and cache integration.
-- Transcript and export paths are not covered, derived caches are not
-  invalidated, and no live authenticated browser → API server → gateway →
-  SpacetimeDB E2E was run. No default `ai.evidence.inspect` grant is seeded, so
-  deployments deny inspection until an authorized role grant is configured.
+- The newly extended live RAG/browser certification still requires an
+  environment run with the real gateway/STDB/LLM/embedder stack before this
+  end-to-end proof is marked executed.
+- A richer reviewer UI can surface the new run transcript/export actions
+  directly; the browser/API navigation contract is now present and tested.
 
 ---
 
