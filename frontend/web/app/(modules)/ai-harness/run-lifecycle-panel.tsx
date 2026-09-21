@@ -1,5 +1,7 @@
 "use client"
 
+import type { JsonObject } from "@lumiere/api-client/json-object"
+
 import { type FormEvent, useMemo, useState } from "react"
 import { AlertCircle, GitCompareArrows, MessagesSquare, PauseCircle, PlayCircle } from "lucide-react"
 import { Button } from "@lumiere/ui"
@@ -21,7 +23,7 @@ import {
 } from "./run-lifecycle"
 
 interface RunLifecyclePanelProps {
-  companies: Record<string, unknown>[]
+  companies: JsonObject[]
 }
 
 type CommandKind = "ask" | "reply" | "steer" | "interrupt" | "resume" | "fork" | "compare"
@@ -52,7 +54,7 @@ export function RunLifecyclePanel({ companies }: RunLifecyclePanelProps) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(lifecycleRequest(parsedCompanyId, intent)),
       })
-      const payload = await response.json().catch(() => ({})) as Record<string, unknown>
+      const payload = await response.json().catch(() => ({})) as JsonObject
       if (response.status === 401 || response.status === 403) {
         setRequest({ status: "denied", message: "This run is unavailable to the current session." })
         return
