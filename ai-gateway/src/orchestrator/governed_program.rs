@@ -2024,8 +2024,10 @@ impl GovernedProgramExecutor<'_> {
                                         capability_calls,
                                     ));
                                 }
-                                AnswerAdmissionOutcome::Blocked { reason } => {
-                                    if answer_reason_is_repairable(&reason)
+                                AnswerAdmissionOutcome::Blocked {
+                                    reason: block_reason,
+                                } => {
+                                    if answer_reason_is_repairable(&block_reason)
                                         && reasoning_attempt < reason.max_iterations
                                         && reasoning_attempt <= MAX_GENERATION_REPAIRS
                                     {
@@ -2034,19 +2036,19 @@ impl GovernedProgramExecutor<'_> {
                                             &node.id,
                                             "repair",
                                             reasoning_attempt,
-                                            reason.max_iterations,
-                                            &reason,
+                                            MAX_GENERATION_REPAIRS.min(reason.max_iterations),
+                                            &block_reason,
                                         );
                                         trace.push(GovernedProgramTraceStep {
                                             node_id: node.id.clone(),
                                             kind: "repair".to_string(),
-                                            summary: reason,
+                                            summary: block_reason,
                                         });
                                         current = node.id.clone();
                                         continue;
                                     }
                                     return Ok(outcome(
-                                        GovernedProgramStop::ReviewRequired(reason),
+                                        GovernedProgramStop::ReviewRequired(block_reason),
                                         Some(draft.content),
                                         values,
                                         trace,
