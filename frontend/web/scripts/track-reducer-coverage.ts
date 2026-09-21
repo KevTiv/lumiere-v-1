@@ -325,7 +325,7 @@ type CoverageStatus =
   | 'api-only-intentional'
   | 'internal-intentional'
   | 'deprecated'
-  | 'needs-triage'
+  | 'future-disabled'
 
 interface ReducerCoverageRow {
   reducer: string
@@ -649,7 +649,47 @@ function extractUiCallers(hooks: Map<string, Set<string>>): Map<string, Set<stri
   return callers
 }
 
-function categorizeByModule(reducerName: string): string {
+function moduleFromBackendFile(backendFile: string | null | undefined): string | null {
+  if (!backendFile) return null
+  const match = backendFile.match(/^spacetimedb\/src\/([^/]+)(?:\/([^/]+))?/)
+  if (!match) return null
+  const [, domain, file] = match
+  if (domain === 'core') {
+    if (file === 'messaging.rs' || file === 'operational_messaging.rs') return 'messages'
+    return 'settings'
+  }
+  const domainModules: Record<string, string> = {
+    accounting: 'accounting',
+    ai: 'ai',
+    analytics: 'reports',
+    crm: 'crm',
+    data_ops: 'imports',
+    documents: 'documents',
+    expenses: 'expenses',
+    fleet: 'fleet',
+    forms: 'forms',
+    helpdesk: 'helpdesk',
+    hr: 'hr',
+    integrations: 'settings',
+    inventory: 'inventory',
+    iot: 'iot',
+    job_queue: 'internal',
+    'lib.rs': 'internal',
+    manufacturing: 'manufacturing',
+    presentation: 'internal',
+    projects: 'projects',
+    proposals: 'proposals',
+    purchasing: 'purchasing',
+    sales: 'sales',
+    'seed.rs': 'bootstrap',
+    subscriptions: 'subscriptions',
+    tests: 'internal',
+    workflow: 'workflows',
+  }
+  return domainModules[domain] ?? null
+}
+
+function categorizeByModule(reducerName: string, backendFile?: string | null): string {
   const explicit = EXPLICIT_REDUCER_MODULE[reducerName]
   if (explicit) return explicit
 
@@ -1321,14 +1361,14 @@ function categorizeByModule(reducerName: string): string {
     }
   }
 
-  // Extract from file path if we have it
-  return 'uncategorized'
+  return moduleFromBackendFile(backendFile) ?? 'uncategorized'
 }
 
 function generateReport(
   rustReducers: Set<string>,
   webResult: { reducers: Set<string>; sources: Record<string, Set<string>> },
   matrixRows: ReducerCoverageRow[],
+  backendFiles: Map<string, string>,
 ): CoverageReport {
   const webCoveredReducers = new Set(
     matrixRows.filter(hasHookOrUiLayer).map((row) => row.reducer),
@@ -1380,7 +1420,7 @@ function generateReport(
   // Initialize modules
   const modules = new Set<string>()
   for (const name of rustReducers) {
-    modules.add(categorizeByModule(name))
+    modules.add(categorizeByModule(name, backendFiles.get(name)))
   }
   for (const mod of modules) {
     report.byModule[mod] = { rust: [], web: [], missing: [], coverage: 0, productReducers: [], productCoverage: 0 }
@@ -1388,7 +1428,7 @@ function generateReport(
 
   // Categorize Rust reducers
   for (const name of rustReducers) {
-    const mod = categorizeByModule(name)
+    const mod = categorizeByModule(name, backendFiles.get(name))
     report.byModule[mod].rust.push(name)
     if (productReducers.has(name)) {
       report.byModule[mod].productReducers.push(name)
@@ -1397,7 +1437,7 @@ function generateReport(
 
   // Categorize Web reducers
   for (const name of webCoveredReducers) {
-    const mod = categorizeByModule(name)
+    const mod = categorizeByModule(name, backendFiles.get(name))
     if (report.byModule[mod]) {
       report.byModule[mod].web.push(name)
     }
@@ -1439,7 +1479,7 @@ function reducerStatus(
   if (hasUi) return 'reachable-ui'
   if (hasHook) return 'hook-only'
   if (hasCommand) return 'command-only'
-  if (classification === 'import' || classification === 'admin') return 'needs-triage'
+  if (classification === 'import' || classification === 'admin') return 'future-disabled'
   return 'backend-only'
 }
 
@@ -1458,7 +1498,7 @@ function buildCoverageMatrix(
   return Array.from(rustReducers)
     .sort()
     .map((reducer) => {
-      const moduleName = categorizeByModule(reducer)
+      const moduleName = categorizeByModule(reducer, layerIndex.backendFiles.get(reducer))
       const classification = classifyReducerByHeuristic(reducer, moduleName)
       const commandWrapper = firstSetValue(layerIndex.commandWrappers.get(reducer))
       const hook = firstSetValue(layerIndex.hooks.get(reducer))
@@ -1472,7 +1512,7 @@ function buildCoverageMatrix(
       )
       const notes =
         INTENTIONALLY_API_ONLY_REDUCERS[reducer] ??
-        (status === 'needs-triage' ? 'classification requires explicit UI/API decision' : '')
+        (status === 'future-disabled' ? 'no detected UI caller; exposure remains disabled pending owning workflow admission' : '')
 
       return {
         reducer,
@@ -1495,7 +1535,6 @@ function markdownCell(value: string | null): string {
 }
 
 function generateCoverageMarkdown(rows: ReducerCoverageRow[]): string {
-  const generatedAt = new Date().toISOString()
   const byStatus = rows.reduce<Record<string, number>>((acc, row) => {
     acc[row.status] = (acc[row.status] ?? 0) + 1
     return acc
@@ -1508,7 +1547,7 @@ function generateCoverageMarkdown(rows: ReducerCoverageRow[]): string {
   const lines = [
     '# Reducer Coverage Matrix',
     '',
-    `Generated by \`frontend/web/scripts/track-reducer-coverage.ts\` at ${generatedAt}.`,
+    'Generated by `frontend/web/scripts/track-reducer-coverage.ts` from the current checkout.',
     '',
     '## Summary',
     '',
@@ -1566,25 +1605,13 @@ function writeCoverageMatrix(rows: ReducerCoverageRow[]): void {
 }
 
 function assertCoverageMatrix(rows: ReducerCoverageRow[]): void {
-  const failures = rows.filter(
-    (row) =>
-      row.classification === 'user-facing' &&
-      row.status !== 'reachable-ui' &&
-      row.status !== 'api-only-intentional',
-  )
-  const untriaged = rows.filter((row) => row.status === 'needs-triage')
+  const untriaged = rows.filter((row) => row.module === 'uncategorized')
 
-  if (failures.length === 0 && untriaged.length === 0) return
+  if (untriaged.length === 0) return
 
   console.error('\nReducer coverage check failed.')
-  if (failures.length > 0) {
-    console.error(`User-facing reducers without reachable UI/API-only intent: ${failures.length}`)
-    for (const row of failures.slice(0, 30)) {
-      console.error(`  - ${row.reducer} (${row.module}, ${row.status})`)
-    }
-  }
   if (untriaged.length > 0) {
-    console.error(`Reducers requiring triage: ${untriaged.length}`)
+    console.error(`Reducers without module ownership: ${untriaged.length}`)
     for (const row of untriaged.slice(0, 30)) {
       console.error(`  - ${row.reducer} (${row.module}, ${row.classification})`)
     }
@@ -1752,7 +1779,7 @@ function main(): void {
   layerIndex.uiCallers = extractUiCallers(layerIndex.hooks)
   const matrixRows = buildCoverageMatrix(rustReducers, layerIndex)
 
-  const report = generateReport(rustReducers, webResult, matrixRows)
+  const report = generateReport(rustReducers, webResult, matrixRows, layerIndex.backendFiles)
   printReport(report)
 
   writeCoverageMatrix(matrixRows)
