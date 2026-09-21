@@ -267,6 +267,7 @@ export function useAiMemoryRag() {
       return (await r.json()) as {
         answer: string
         sources: AiRagSource[]
+        run_id?: number
         agent_id?: number
         provider?: string
         model?: string
