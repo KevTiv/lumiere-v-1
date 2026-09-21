@@ -51,6 +51,7 @@ type SseMetadata = Pick<
 type RagBody = {
   answer: string
   sources: RagSource[]
+  run_id?: number
   retrieval_degraded?: boolean
   provider?: string
   model?: string
@@ -275,6 +276,64 @@ test.describe("AI RAG evidence access", { tag: "@p0" }, () => {
     // The embedding job runs asynchronously; ask until Qdrant serves the passage.
     const body = await askUntilGrounded(page)
     expectGroundedRelease(body)
+    expect(body.run_id, "released RAG answer exposes its durable run id").toBeGreaterThan(0)
+
+    // Navigate from the answer -> durable run -> contribution/claims -> exact
+    // evidence inspections. The transcript is deliberately redacted: it exposes
+    // input hashes and bounded result status, never raw tool arguments/results.
+    const runInspect = await page.request.post("/api/ai/evidence/runs/inspect", {
+      data: { companyId, runId: body.run_id },
+    })
+    expect(
+      runInspect.ok(),
+      `inspect run ${body.run_id}: ${runInspect.status()} ${await runInspect.text()}`,
+    ).toBeTruthy()
+    const runInspection = (await runInspect.json()) as {
+      runId: number
+      answer?: string
+      transcript: Array<{
+        inputHash: string
+        resultSummary: string
+        outputSummary?: unknown
+      }>
+      contributionIds: number[]
+      claimIds: number[]
+      claims: Array<{ targetKind: string; targetId: number; passages: unknown[] }>
+    }
+    expect(runInspection.runId).toBe(body.run_id)
+    expect(runInspection.answer).toBe(body.answer)
+    expect(runInspection.contributionIds.length).toBeGreaterThan(0)
+    expect(runInspection.claimIds).toEqual(expect.arrayContaining(body.provenance!.claimIds!))
+    expect(
+      runInspection.claims.some(
+        (claim) =>
+          claim.targetKind === "claim" &&
+          body.provenance!.claimIds!.includes(claim.targetId) &&
+          claim.passages.length > 0,
+      ),
+    ).toBe(true)
+    for (const step of runInspection.transcript) {
+      expect(step.inputHash.length).toBeGreaterThan(0)
+      expect(step.resultSummary.length).toBeGreaterThan(0)
+      expect(step.outputSummary).toBeUndefined()
+    }
+
+    const runExport = await page.request.post("/api/ai/evidence/runs/export", {
+      data: { companyId, runId: body.run_id },
+    })
+    expect(runExport.ok(), `export run ${body.run_id}: ${runExport.status()}`).toBeTruthy()
+    expect(runExport.headers()["content-disposition"]).toContain(
+      `lumiere-run-${body.run_id}-evidence.json`,
+    )
+    const exported = (await runExport.json()) as {
+      schemaVersion: number
+      kind: string
+      run: { runId: number; claimIds: number[] }
+    }
+    expect(exported.schemaVersion).toBe(1)
+    expect(exported.kind).toBe("lumiere_run_evidence_export")
+    expect(exported.run.runId).toBe(body.run_id)
+    expect(exported.run.claimIds).toEqual(expect.arrayContaining(body.provenance!.claimIds!))
 
     // The claim ids are durable and inspectable by an authorized actor.
     const claimId = body.provenance!.claimIds![0]
