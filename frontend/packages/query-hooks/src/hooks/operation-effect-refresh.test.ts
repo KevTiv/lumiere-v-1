@@ -28,8 +28,8 @@ test("cache refresh failure does not downgrade a canonically resolved effect", a
     wait: noWait,
   })
 
-  assert.equal(outcome.kind, "applied")
-  if (outcome.kind === "applied") {
+  assert.equal(outcome.kind, "converged")
+  if (outcome.kind === "converged") {
     assert.equal(outcome.ref.id, "77")
     assert.deepEqual(outcome.warnings, ["refresh-failed"])
   }
