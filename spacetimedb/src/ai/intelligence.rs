@@ -623,6 +623,28 @@ pub fn approve_document_processing_job(
             if !content.is_empty() {
                 if let Some(doc) = ctx.db.document().id().find(&doc_id) {
                     if doc.organization_id == organization_id && !doc.is_deleted {
+                        let current_version_id = doc
+                            .current_version_id
+                            .ok_or("linked document has no current server-owned version")?;
+                        if job
+                            .document_version_id
+                            .is_some_and(|version_id| version_id != current_version_id)
+                        {
+                            return Err(
+                                "processing job targets a stale document version".to_string()
+                            );
+                        }
+                        let version = ctx
+                            .db
+                            .document_version()
+                            .id()
+                            .find(&current_version_id)
+                            .ok_or("current document version not found")?;
+                        if version.document_id != doc_id || !version.is_current {
+                            return Err(
+                                "document version is not the current server-owned blob".to_string()
+                            );
+                        }
                         let language = document_search_language_for_company(
                             ctx,
                             organization_id,
@@ -661,13 +683,28 @@ pub fn approve_document_processing_job(
                             });
                         }
                         ctx.db.document().id().update(Document {
-                            index_content: Some(content),
+                            index_content: Some(content.clone()),
                             index_language: language.or(doc.index_language.clone()),
                             metadata: meta,
                             write_uid: ctx.sender(),
                             write_date: ctx.timestamp,
-                            ..doc
+                            ..doc.clone()
                         });
+                        let company_id = doc
+                            .company_id
+                            .ok_or("governed document evidence requires company scope")?;
+                        crate::ai::evidence_source::ingest_document_blob_content(
+                            ctx,
+                            organization_id,
+                            company_id,
+                            doc_id,
+                            &doc.name,
+                            version.version_number,
+                            &version.url,
+                            version.checksum.as_deref(),
+                            &content,
+                            "inspected",
+                        )?;
                         indexed_document_id = Some(doc_id);
                     }
                 }
@@ -871,18 +908,44 @@ pub fn delete_search_embedding(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "search_embedding", "delete")?;
     let operating_company_id = company_id_from_scope(ctx, organization_id, company_id)?;
+    if !delete_search_embedding_inner(
+        ctx,
+        organization_id,
+        operating_company_id,
+        &content_type,
+        content_id,
+    )? {
+        return Err("Embedding not found for this content".to_string());
+    }
+    Ok(())
+}
+
+pub(crate) fn delete_search_embedding_inner(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    operating_company_id: u64,
+    content_type: &str,
+    content_id: u64,
+) -> Result<bool, String> {
     let stored_company_id = Some(operating_company_id);
 
-    let existing = ctx
+    let Some(existing) = ctx
         .db
         .search_embedding()
         .embedding_by_content()
-        .filter(&content_type)
+        .filter(content_type)
         .find(|e| e.content_id == content_id && e.company_id == stored_company_id)
-        .ok_or("Embedding not found for this content")?;
+    else {
+        return Ok(false);
+    };
 
     ensure_embedding_in_org(organization_id, existing.organization_id)?;
 
+    let embedding_id = existing.id;
+    let fingerprint = existing
+        .embedding_hash
+        .clone()
+        .unwrap_or_else(|| "unfingerprinted".to_string());
     ctx.db.search_embedding().id().update(SearchEmbedding {
         sync_status: "deleted".to_string(),
         write_uid: ctx.sender(),
@@ -890,12 +953,39 @@ pub fn delete_search_embedding(
         ..existing
     });
 
+    let payload = format!(
+        r#"{{"operation":"delete","company_id":{},"content_type":"{}","content_id":{},"text":"","fingerprint":{}}}"#,
+        operating_company_id,
+        content_type,
+        content_id,
+        serde_json_escape(&fingerprint),
+    );
+    enqueue_job_internal(
+        ctx,
+        organization_id,
+        EnqueueJobParams {
+            company_id: Some(operating_company_id),
+            queue_name: "embedding".to_string(),
+            job_type: "delete_embedding".to_string(),
+            payload,
+            semantic_key: format!(
+                "embedding-delete:{content_type}:{content_id}:{fingerprint}:{embedding_id}"
+            ),
+            priority: 10,
+            max_attempts: 3,
+            available_at_micros: None,
+            correlation_id: format!("embedding-delete:{content_type}:{content_id}"),
+            causation_id: None,
+            metadata: None,
+        },
+    )?;
+
     log::info!(
         "Search embedding marked for deletion: content_type={}, content_id={}",
         content_type,
         content_id
     );
-    Ok(())
+    Ok(true)
 }
 
 /// Enqueue an embedding job for the AI Gateway worker to process.

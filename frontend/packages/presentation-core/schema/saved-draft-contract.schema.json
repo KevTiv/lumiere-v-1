@@ -57,6 +57,36 @@
         "version"
       ]
     },
+    "EvidenceBindingIntent": {
+      "description": "Untrusted linkage intent validated again at the persistence boundary.",
+      "type": "object",
+      "properties": {
+        "claimIds": {
+          "description": "Optional current claims linked directly for inspection.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "companyId": {
+          "description": "Membership-derived company intent as a canonical positive decimal.",
+          "type": "string"
+        },
+        "decisionIds": {
+          "description": "Accepted decisions that justify the definition.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "companyId",
+        "decisionIds",
+        "claimIds"
+      ]
+    },
     "ModuleDraft": {
       "description": "A draft module definition submitted for validation or publication.",
       "type": "object",
@@ -78,6 +108,18 @@
           "type": "integer",
           "format": "uint32",
           "minimum": 0
+        },
+        "evidenceBinding": {
+          "description": "Optional accepted-decision lineage for this immutable saved revision.",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/EvidenceBindingIntent"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
         },
         "moduleId": {
           "description": "Stable module identifier.",

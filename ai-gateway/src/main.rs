@@ -196,13 +196,21 @@ async fn main() -> anyhow::Result<()> {
         .route("/v1/skills", get(routes::skills::get_skills))
         .route("/v1/skills/run", post(routes::skills::post_run))
         .route("/v1/skills/sync", post(routes::skills::post_sync))
+        .route("/v1/evidence/inspect", post(routes::evidence::post_inspect))
+        .route(
+            "/v1/evidence/review-queue",
+            post(routes::evidence::post_review_queue),
+        )
+        .route(
+            "/v1/knowledge/retrieve",
+            post(routes::evidence::post_knowledge_retrieve),
+        )
         .route("/v1/forms/suggest", post(routes::forms::post_suggest))
         .route("/v1/forms/validate", post(routes::forms::post_validate))
         .route("/v1/import/analyze", post(routes::import::post_analyze))
         .route("/v1/import/preview", post(routes::import::post_preview))
         .route("/v1/context/search", post(routes::context::post_search))
         .route("/v1/context/ingest", post(routes::context::post_ingest))
-        .route("/v1/context/document", post(routes::context::post_document))
         .route("/v1/kaggle/search", post(routes::kaggle::post_search))
         .route("/v1/kaggle/download", post(routes::kaggle::post_download))
         .route("/v1/kaggle/status/:job_id", get(routes::kaggle::get_status))
@@ -222,6 +230,14 @@ async fn main() -> anyhow::Result<()> {
         .route(
             "/v1/skills/distributor/delivery-run-summary",
             post(routes::distributor::post_delivery_run_summary),
+        )
+        .route(
+            "/v1/harness/governed/bootstrap",
+            post(routes::harness_skills::post_governed_bootstrap),
+        )
+        .route(
+            "/v1/internal/harness/runs/lifecycle",
+            post(routes::run_lifecycle::post_run_lifecycle),
         )
         .route(
             "/v1/skills/import-mapping",

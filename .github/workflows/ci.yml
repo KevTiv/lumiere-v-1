@@ -134,7 +134,7 @@ jobs:
           PG_TLS_MODE: disable
         run: |
           python3 scripts/run-required-cargo-tests.py --locked -p api-server --lib cold_tier::finalization_worker:: -- --nocapture
-          python3 scripts/run-required-cargo-tests.py --locked -p api-server --lib cold_tier::ledger:: -- --nocapture
+          python3 scripts/run-required-cargo-tests.py --locked -p api-server --lib cold_tier::ledger:: -- --nocapture --test-threads=1
 
       - name: lumiere-codegen unit tests
         run: cargo test --locked -p lumiere-codegen
@@ -156,6 +156,9 @@ jobs:
 
       - name: api-server reducer contract tests
         run: python3 scripts/run-required-cargo-tests.py --locked -p api-server --lib commands::tests
+
+      - name: Deterministic graduation conformance
+        run: cargo test --locked -p ai-gateway --bin gateway deterministic_graduation_conformance_suite
 
       - name: ai-gateway unit tests
         run: cargo test --locked -p ai-gateway --bin gateway

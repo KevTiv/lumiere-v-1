@@ -29,12 +29,16 @@ export type AiMemoryContextHit = {
 }
 
 export type AiRagSource = {
-  kind?: string
-  trust?: string
-  content_type?: string
-  content_id?: number
+  kind: "live" | "passage" | "activity" | "web"
+  trust: "authoritative" | "persisted" | "retrieved"
   entity_type?: string
   entity_id?: string
+  source_kind?: string
+  source_key?: string
+  source_version?: string
+  passage_id?: number
+  passage_key?: string
+  content_hash?: string
   score?: number
   text_snippet: string
   label?: string
@@ -124,33 +128,6 @@ export function useAiMemoryIngest() {
       })
       if (!r.ok) throw new Error(await parseAiError(r))
       return (await r.json()) as { ingested: number }
-    },
-  })
-}
-
-export function useAiMemoryDocumentIngest() {
-  return useMutation({
-    mutationFn: async (args: {
-      doc_id: string
-      content: string
-      doc_type?: string
-      filename?: string
-      mime_type?: string
-    }) => {
-      const r = await apiFetch("/api/ai/context/document", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(args),
-      })
-      if (!r.ok) throw new Error(await parseAiError(r))
-      return (await r.json()) as {
-        ok: boolean
-        doc_id: string
-        chunks_embedded: number
-        extracted_text: string
-        structured_fields: unknown
-        stdb_job_id: number
-      }
     },
   })
 }

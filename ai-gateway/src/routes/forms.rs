@@ -5,11 +5,15 @@ use serde_json::{json, Map, Value};
 
 use crate::{
     ai_agent::{
-        enforce_chargeable_limits, ensure_allowed_action, ensure_model_allowed, record_ai_spend,
-        resolve_agent,
+        enforce_chargeable_limits, ensure_allowed_action, ensure_model_allowed, resolve_agent,
     },
     error::{AppError, AppResult},
-    providers::llm::LlmMessage,
+    orchestrator::{
+        intelligence_router::run_catalogued_generation_surface,
+        model_configuration::StdbModelConfigurationStore,
+        skill_loader::{complete_run, create_generation_surface_run},
+        spend_admission::StdbSpendLedger,
+    },
     state::AppState,
 };
 
@@ -67,6 +71,7 @@ pub struct FormSuggestRequest {
     pub document_job_id: Option<Value>,
     pub agent_id: Option<u64>,
     pub team_member_id: Option<u64>,
+    pub identity_hex: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -384,6 +389,9 @@ pub async fn post_suggest(
             "org_id and company_id are required".into(),
         ));
     }
+    if req.identity_hex.trim().is_empty() {
+        return Err(AppError::BadRequest("identity_hex is required".into()));
+    }
     if !non_empty(&req.form_id) || !non_empty(&req.entity_type) {
         return Err(AppError::BadRequest(
             "form_id and entity_type are required".into(),
@@ -415,37 +423,104 @@ pub async fn post_suggest(
         agent.system_prompt
     );
 
-    let llm_resp = state
-        .providers
-        .llm
-        .complete(crate::providers::llm::LlmRequest {
-            provider: agent.provider.clone(),
-            model: agent.model.clone(),
-            system,
-            messages: vec![LlmMessage::text("user", prompt)],
-            max_tokens: agent.max_tokens.min(FORM_SUGGEST_MAX_TOKENS),
-            temperature: Some(agent.temperature),
-            top_p: Some(agent.top_p),
-            tools: Vec::new(),
-        })
-        .await
-        .map_err(|e| AppError::Internal(format!("LLM request failed: {e}")))?;
-
-    let total_tokens = llm_resp.input_tokens + llm_resp.output_tokens;
-    if total_tokens > 0 {
-        if let Err(e) = record_ai_spend(&state.stdb, req.org_id, agent.agent_id, total_tokens).await
-        {
-            tracing::warn!(
-                agent_id = agent.agent_id,
-                error = %e,
-                "record_ai_spend failed"
-            );
+    let spend_reader = state.spend_read_stdb.as_deref().ok_or_else(|| {
+        AppError::Internal("spend_read_stdb is required for routed generation".into())
+    })?;
+    let run_inputs = json!({
+        "surface": "form_suggestion",
+        "form_id": req.form_id.clone(),
+        "entity_type": req.entity_type.clone(),
+        "document_job_id": req.document_job_id.clone(),
+    });
+    let run = create_generation_surface_run(
+        state.stdb.as_ref(),
+        req.org_id,
+        req.company_id,
+        "form_suggestion",
+        agent.agent_id,
+        req.team_member_id,
+        &serde_json::to_string(&run_inputs).map_err(|e| AppError::Internal(e.to_string()))?,
+        &req.identity_hex,
+    )
+    .await
+    .map_err(|e| AppError::Internal(e.to_string()))?;
+    let model_store = StdbModelConfigurationStore {
+        reader: state.stdb.as_ref(),
+    };
+    let ledger = StdbSpendLedger {
+        writer: state.stdb.as_ref(),
+        reader: spend_reader,
+    };
+    let program = run_catalogued_generation_surface(
+        &model_store,
+        &ledger,
+        state.stdb.as_ref(),
+        state.stdb.as_ref(),
+        req.org_id,
+        req.company_id,
+        &run,
+        &agent,
+        state.providers.llm.as_ref(),
+        "form_suggestion",
+        prompt,
+        json!({
+            "form_id": req.form_id,
+            "entity_type": req.entity_type,
+            "field_count": req.fields.len(),
+        }),
+        Some(system),
+        Some(agent.max_tokens.min(FORM_SUGGEST_MAX_TOKENS)),
+    )
+    .await;
+    let program = match program {
+        Ok(outcome) => outcome,
+        Err(error) => {
+            let _ = complete_run(
+                state.stdb.as_ref(),
+                req.org_id,
+                req.company_id,
+                run.run_id,
+                "failed",
+                None,
+                None,
+                None,
+                0,
+                0,
+                Some(error.to_string()),
+            )
+            .await;
+            return Err(AppError::Internal(format!("LLM request failed: {error}")));
         }
-    }
-
-    let text = llm_resp.text.as_str();
-    let model_json: Value = serde_json::from_str(clean_json_response(text))
-        .map_err(|e| AppError::Internal(format!("Failed to parse form suggestion JSON: {}", e)))?;
+    };
+    let total_tokens = program
+        .generation_input_tokens
+        .saturating_add(program.generation_output_tokens);
+    let generated = program.final_content.as_deref().ok_or_else(|| {
+        AppError::Internal("governed form generation produced no final content".into())
+    })?;
+    let text = generated;
+    let model_json: Value = match serde_json::from_str(clean_json_response(text)) {
+        Ok(value) => value,
+        Err(error) => {
+            let _ = complete_run(
+                state.stdb.as_ref(),
+                req.org_id,
+                req.company_id,
+                run.run_id,
+                "failed",
+                None,
+                None,
+                None,
+                1,
+                total_tokens,
+                Some(format!("invalid generated form JSON: {error}")),
+            )
+            .await;
+            return Err(AppError::Internal(format!(
+                "Failed to parse form suggestion JSON: {error}"
+            )));
+        }
+    };
 
     let suggestions = sanitize_suggestions(&req.fields, &model_json);
     let validation_notes = parse_validation_notes(&model_json);
@@ -463,6 +538,22 @@ pub async fn post_suggest(
             field: None,
         });
     }
+
+    complete_run(
+        state.stdb.as_ref(),
+        req.org_id,
+        req.company_id,
+        run.run_id,
+        "completed",
+        Some(format!("generated {} form suggestions", suggestions.len())),
+        None,
+        None,
+        program.trace.len() as u32,
+        total_tokens,
+        None,
+    )
+    .await
+    .map_err(|e| AppError::Internal(e.to_string()))?;
 
     Ok(Json(FormSuggestResponse {
         suggestions,

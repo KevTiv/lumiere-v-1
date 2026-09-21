@@ -9,9 +9,13 @@
 use sha2::{Digest, Sha256};
 use spacetimedb::{reducer, Identity, ReducerContext, Table, Timestamp};
 
+use crate::ai::evidence_lineage::{
+    bind_ai_artifact_component_inner, require_component_bindable, BindAiArtifactComponentParams,
+};
 use crate::core::audit::{audit_log, AuditLog};
 use crate::core::persistence::{record_organization_commit, OrganizationCommitInput, RowChange};
 use crate::helpers::check_permission;
+use crate::workflow::authorization::require_workflow_company_access;
 
 const PERMISSION_RESOURCE: &str = "presentation_module";
 const MAX_DEFINITION_BYTES: usize = 64 * 1024;
@@ -79,6 +83,22 @@ pub fn save_presentation_module(
     let prepared =
         lumiere_presentation_core::prepare_saved_draft(&definition_json, expected_revision)?;
     let owner = ctx.sender();
+    // Refuse an unbindable evidence binding before writing anything, so a
+    // refused save leaves no head, version or audit row behind.
+    if let Some(binding) = prepared.evidence_binding.as_ref() {
+        if require_workflow_company_access(ctx, organization_id, binding.company_id, owner)? {
+            return Err(
+                "superuser membership bypass cannot be used for evidence binding".to_string(),
+            );
+        }
+        require_component_bindable(
+            ctx,
+            organization_id,
+            binding.company_id,
+            &binding.decision_ids,
+            &binding.claim_ids,
+        )?;
+    }
     let scope_key = format!(
         "{organization_id}:{}:{}",
         owner.to_hex(),
@@ -175,6 +195,26 @@ pub fn save_presentation_module(
             created_at: ctx.timestamp,
             created_by: owner,
         });
+    if let Some(binding) = prepared.evidence_binding {
+        if require_workflow_company_access(ctx, organization_id, binding.company_id, owner)? {
+            return Err(
+                "superuser membership bypass cannot be used for evidence binding".to_string(),
+            );
+        }
+        bind_ai_artifact_component_inner(
+            ctx,
+            organization_id,
+            binding.company_id,
+            BindAiArtifactComponentParams {
+                artifact_ref: format!("presentation-module-version:{}", version.id),
+                component_key: "definition".to_string(),
+                component_kind: "document_section".to_string(),
+                content_hash: hash.clone(),
+                decision_ids: binding.decision_ids,
+                claim_ids: binding.claim_ids,
+            },
+        )?;
+    }
     let audit = ctx.db.audit_log().insert(AuditLog {
         id: 0,
         organization_id,

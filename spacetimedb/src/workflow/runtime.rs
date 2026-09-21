@@ -412,6 +412,9 @@ pub(crate) fn start_workflow_internal(
     if version.status != WorkflowVersionStatus::Published {
         return Err("only a published workflow version can start".to_string());
     }
+    // A harness-generated version whose provenance was flagged (a source was
+    // corrected or revoked) is not reusable until a reviewer re-confirms it.
+    crate::ai::workflow_provenance::require_version_provenance_current(ctx, &version)?;
     let definition_hash = version
         .content_hash
         .clone()

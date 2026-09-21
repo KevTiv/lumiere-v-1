@@ -1,8 +1,21 @@
 use anyhow::{Context, Result};
 use serde_json::Value;
+use sha2::{Digest, Sha256};
 use stdb_client::StdbClient;
 
 use crate::skills::{compose_prompt, load_bundled_skill};
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct GovernedRunRef {
+    pub run_id: u64,
+    pub run_key: String,
+    pub skill_id: u64,
+    pub skill_config_id: Option<u64>,
+    /// Immutable routing-policy binding resolved from the active skill config
+    /// at run creation time. None means use the organization's default policy.
+    pub intelligence_policy_ref: Option<String>,
+    pub program_ref: Option<String>,
+}
 
 #[derive(Clone, Debug)]
 pub struct LoadedSkill {
@@ -57,6 +70,38 @@ fn row_string_list(row: &Value, key: &str) -> Vec<String> {
                 .collect()
         })
         .unwrap_or_default()
+}
+
+pub fn intelligence_policy_ref(config: &Value) -> Result<Option<String>> {
+    let Some(value) = config
+        .get("intelligencePolicyRef")
+        .or_else(|| config.get("intelligence_policy_ref"))
+    else {
+        return Ok(None);
+    };
+    if value.is_null() {
+        return Ok(None);
+    }
+    let reference = value
+        .as_str()
+        .context("intelligencePolicyRef must be a string")?
+        .trim();
+    if reference.is_empty() {
+        return Ok(None);
+    }
+    let (key, version) = reference
+        .rsplit_once('@')
+        .context("intelligencePolicyRef must use policy_key@version")?;
+    if key.trim().is_empty() {
+        anyhow::bail!("intelligencePolicyRef policy key must be nonempty");
+    }
+    let version = version
+        .parse::<u32>()
+        .context("intelligencePolicyRef version must be a positive integer")?;
+    if version == 0 {
+        anyhow::bail!("intelligencePolicyRef version must be positive");
+    }
+    Ok(Some(format!("{}@{}", key.trim(), version)))
 }
 
 pub async fn load_skill(
@@ -221,7 +266,36 @@ pub async fn create_run(
     run_key: &str,
     inputs_json: &str,
     triggered_by_hex: &str,
-) -> Result<u64> {
+) -> Result<GovernedRunRef> {
+    create_run_with_program_ref(
+        stdb,
+        org_id,
+        company_id,
+        skill,
+        agent_id,
+        team_member_id,
+        run_key,
+        inputs_json,
+        triggered_by_hex,
+        None,
+    )
+    .await
+}
+
+#[allow(clippy::too_many_arguments)]
+async fn create_run_with_program_ref(
+    stdb: &StdbClient,
+    org_id: u64,
+    company_id: u64,
+    skill: &LoadedSkill,
+    agent_id: u64,
+    team_member_id: Option<u64>,
+    run_key: &str,
+    inputs_json: &str,
+    triggered_by_hex: &str,
+    program_ref: Option<&str>,
+) -> Result<GovernedRunRef> {
+    let policy_ref = intelligence_policy_ref(&skill.config_json)?;
     stdb.call_reducer(stdb_client::reducer_call!(
         "create_ai_agent_run",
         serde_json::json!([
@@ -235,14 +309,99 @@ pub async fn create_run(
                 "run_key": run_key,
                 "inputs_json": inputs_json,
                 "triggered_by_hex": triggered_by_hex,
-                "metadata": serde_json::Value::Null,
+                "metadata": serde_json::json!({
+                    "intelligence_policy_ref": policy_ref.clone(),
+                    "skill_id": skill.id,
+                    "skill_config_id": skill.skill_config_id,
+                    "program_ref": program_ref,
+                }).to_string(),
             }
         ]),
     ))
     .await
     .context("create_ai_agent_run")?;
 
-    lookup_run_id(stdb, run_key).await
+    let run_id = lookup_run_id(stdb, run_key).await?;
+    let checkpoint_hash = format!(
+        "{:x}",
+        Sha256::digest(serde_json::to_vec(&serde_json::json!({
+            "organization_id": org_id,
+            "company_id": company_id,
+            "run_id": run_id,
+            "skill_id": skill.id,
+            "agent_id": agent_id,
+            "team_member_id": team_member_id,
+            "run_key": run_key,
+            "inputs_json": inputs_json,
+            "triggered_by_hex": triggered_by_hex,
+        }))?)
+    );
+    stdb.call_reducer(stdb_client::reducer_call!(
+        "initialize_ai_run_lifecycle",
+        serde_json::json!([
+            org_id,
+            company_id,
+            run_id,
+            {
+                "checkpoint_hash": checkpoint_hash,
+                "cursor": 0,
+                "idempotency_key": format!("run-created:{run_id}"),
+            }
+        ]),
+    ))
+    .await
+    .context("initialize durable AI run lifecycle")?;
+    Ok(GovernedRunRef {
+        run_id,
+        run_key: run_key.to_string(),
+        skill_id: skill.id,
+        skill_config_id: skill.skill_config_id,
+        intelligence_policy_ref: policy_ref,
+        program_ref: program_ref.map(str::to_string),
+    })
+}
+
+/// Resolve a system/bundled generation surface to a provisioned `ai_skill`
+/// and create a normal durable run for it. Runtime never provisions the skill;
+/// deployments must sync bundled skills first.
+#[allow(clippy::too_many_arguments)]
+pub async fn create_generation_surface_run(
+    stdb: &StdbClient,
+    org_id: u64,
+    company_id: u64,
+    skill_key: &str,
+    agent_id: u64,
+    team_member_id: Option<u64>,
+    inputs_json: &str,
+    triggered_by_hex: &str,
+) -> Result<GovernedRunRef> {
+    let skill = load_skill(stdb, org_id, company_id, skill_key).await?;
+    if skill.id == 0 {
+        anyhow::bail!(
+            "generation surface skill '{skill_key}' is not provisioned; sync bundled skills before serving this route"
+        );
+    }
+    if !skill.enabled {
+        anyhow::bail!("generation surface skill '{skill_key}' is disabled");
+    }
+    let catalog = super::governed_programs::governed_program_for_skill(skill_key)
+        .with_context(|| format!(
+            "generation surface skill '{skill_key}' is not registered in the governed program catalog"
+        ))?;
+    let run_key = uuid::Uuid::new_v4().to_string();
+    create_run_with_program_ref(
+        stdb,
+        org_id,
+        company_id,
+        &skill,
+        agent_id,
+        team_member_id,
+        &run_key,
+        inputs_json,
+        triggered_by_hex,
+        Some(catalog.program_ref),
+    )
+    .await
 }
 
 pub async fn complete_run(
@@ -284,6 +443,76 @@ pub async fn complete_run(
 /// Park an open run in a non-terminal wait state. `status` must be a wait state
 /// the module accepts (`awaiting_approval` or `agent_settled`); a run already in
 /// that state replays without change.
+pub async fn resume_run(
+    stdb: &StdbClient,
+    org_id: u64,
+    company_id: u64,
+    run_id: u64,
+) -> Result<()> {
+    let row = stdb
+        .query_sql(&format!(
+            "SELECT checkpoint_hash, cursor, concurrency_version FROM ai_run_lifecycle_state \
+             WHERE organization_id = {org_id} AND company_id = {company_id} AND run_id = {run_id} LIMIT 1"
+        ))
+        .await
+        .context("load checked run continuation")?
+        .into_iter()
+        .next()
+        .context("run lifecycle is not initialized")?;
+    let checkpoint_hash = row
+        .get("checkpointHash")
+        .and_then(Value::as_str)
+        .context("run lifecycle checkpoint hash missing")?;
+    let cursor = row_u64(&row, "cursor") as u32;
+    let concurrency_version = row_u64(&row, "concurrencyVersion");
+    stdb.call_reducer(stdb_client::reducer_call!(
+        "resume_ai_run_checked",
+        serde_json::json!([
+            org_id,
+            company_id,
+            run_id,
+            {
+                "continuation": {
+                    "checkpoint_hash": checkpoint_hash,
+                    "cursor": cursor,
+                    "concurrency_version": concurrency_version,
+                },
+                "idempotency_key": format!("runtime-resume:{run_id}:{concurrency_version}"),
+            }
+        ]),
+    ))
+    .await
+    .context("resume governed ai_agent_run through checked lifecycle")?;
+    Ok(())
+}
+
+pub async fn load_run_key(
+    stdb: &StdbClient,
+    org_id: u64,
+    company_id: u64,
+    run_id: u64,
+) -> Result<String> {
+    let rows = stdb
+        .query_sql(&format!(
+            "SELECT run_key, status FROM ai_agent_run WHERE organization_id = {org_id}              AND company_id = {company_id} AND id = {run_id} LIMIT 1"
+        ))
+        .await
+        .context("load resumable ai_agent_run")?;
+    let row = rows.first().context("resumable run not found")?;
+    let status = row
+        .get("status")
+        .and_then(Value::as_str)
+        .context("resumable run status missing")?;
+    if !matches!(status, "running" | "awaiting_approval" | "agent_settled") {
+        anyhow::bail!("run status '{status}' is not resumable");
+    }
+    row.get("runKey")
+        .or_else(|| row.get("run_key"))
+        .and_then(Value::as_str)
+        .map(str::to_string)
+        .context("resumable run key missing")
+}
+
 pub async fn set_run_wait_state(
     stdb: &StdbClient,
     org_id: u64,
@@ -401,6 +630,52 @@ mod tests {
             allowed_action_drafts: vec![],
             source: SkillSource::Remote,
         }
+    }
+
+    #[test]
+    fn governed_run_ref_preserves_canonical_identity() {
+        let run = GovernedRunRef {
+            run_id: 42,
+            run_key: "run-42".to_string(),
+            skill_id: 7,
+            skill_config_id: Some(9),
+            intelligence_policy_ref: Some("finance-generation@2".to_string()),
+            program_ref: Some("skill:test@1".to_string()),
+        };
+
+        assert_eq!(run.run_id, 42);
+        assert_eq!(run.run_key, "run-42");
+        assert_eq!(run.skill_id, 7);
+        assert_eq!(run.skill_config_id, Some(9));
+        assert_eq!(
+            run.intelligence_policy_ref.as_deref(),
+            Some("finance-generation@2")
+        );
+        assert_eq!(run.program_ref.as_deref(), Some("skill:test@1"));
+    }
+
+    #[test]
+    fn intelligence_policy_ref_is_strict_and_versioned() {
+        assert_eq!(
+            intelligence_policy_ref(&serde_json::json!({})).unwrap(),
+            None
+        );
+        assert_eq!(
+            intelligence_policy_ref(&serde_json::json!({
+                "intelligencePolicyRef": "generation-default@3"
+            }))
+            .unwrap()
+            .as_deref(),
+            Some("generation-default@3")
+        );
+        assert!(intelligence_policy_ref(&serde_json::json!({
+            "intelligencePolicyRef": "generation-default"
+        }))
+        .is_err());
+        assert!(intelligence_policy_ref(&serde_json::json!({
+            "intelligencePolicyRef": 7
+        }))
+        .is_err());
     }
 
     #[test]

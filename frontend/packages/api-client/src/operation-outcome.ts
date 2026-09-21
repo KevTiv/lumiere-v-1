@@ -129,9 +129,10 @@ export async function decodeOperationDispatch(
     })
   }
 
+  const operationId = stringField(payload, "operationId", "operation_id")
   return {
     kind: "accepted",
-    operationId: stringField(payload, "operationId", "operation_id"),
-    correlationId,
+    ...(operationId === undefined ? {} : { operationId }),
+    ...(correlationId === undefined ? {} : { correlationId }),
   }
 }

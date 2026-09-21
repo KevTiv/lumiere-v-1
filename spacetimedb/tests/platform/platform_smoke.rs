@@ -38,8 +38,7 @@ use crate::documents::presence::{
     clear_document_presence, document_presence, update_document_presence,
 };
 use crate::documents::regional::{
-    purge_expired_documents, set_document_index_content, set_document_retention,
-    SetDocumentIndexContentParams, SetDocumentRetentionParams,
+    purge_expired_documents, set_document_retention, SetDocumentRetentionParams,
 };
 use crate::helpdesk::tickets::{
     create_helpdesk_stage, create_helpdesk_team, create_ticket, helpdesk_stage, helpdesk_team,
@@ -410,7 +409,6 @@ pub fn test_documents_create_rejects_empty_blob(ctx: &ReducerContext) -> Result<
             partner_id: None,
             tag_ids: vec![],
             is_favorite: false,
-            index_content: None,
             classification_id: None,
             retention_days: None,
             fiscal_kind: None,
@@ -478,7 +476,6 @@ pub fn test_documents_create_and_lock(ctx: &ReducerContext) -> Result<(), String
             partner_id: None,
             tag_ids: vec![],
             is_favorite: false,
-            index_content: None,
             classification_id: None,
             retention_days: None,
             fiscal_kind: None,
@@ -582,7 +579,6 @@ pub fn test_documents_folder_acl_blocks_write(ctx: &ReducerContext) -> Result<()
             partner_id: None,
             tag_ids: vec![],
             is_favorite: false,
-            index_content: None,
             classification_id: None,
             retention_days: None,
             fiscal_kind: None,
@@ -646,7 +642,6 @@ pub fn test_documents_company_isolation(ctx: &ReducerContext) -> Result<(), Stri
             partner_id: None,
             tag_ids: vec![],
             is_favorite: false,
-            index_content: None,
             classification_id: None,
             retention_days: None,
             fiscal_kind: None,
@@ -680,7 +675,6 @@ pub fn test_documents_company_isolation(ctx: &ReducerContext) -> Result<(), Stri
             partner_id: None,
             tag_ids: vec![],
             is_favorite: false,
-            index_content: None,
             classification_id: None,
             retention_days: None,
             fiscal_kind: None,
@@ -951,7 +945,6 @@ pub fn test_documents_wave_b_restore_and_folder_ops(ctx: &ReducerContext) -> Res
             partner_id: None,
             tag_ids: vec![],
             is_favorite: false,
-            index_content: None,
             classification_id: None,
             retention_days: None,
             fiscal_kind: None,
@@ -1167,7 +1160,6 @@ pub fn test_documents_wave_c_index_retention_fiscal(ctx: &ReducerContext) -> Res
             partner_id: None,
             tag_ids: vec![],
             is_favorite: false,
-            index_content: None,
             classification_id: None,
             retention_days: None,
             fiscal_kind: Some("nfe_xml".to_string()),
@@ -1199,7 +1191,6 @@ pub fn test_documents_wave_c_index_retention_fiscal(ctx: &ReducerContext) -> Res
             partner_id: None,
             tag_ids: vec![],
             is_favorite: false,
-            index_content: Some("extra extract token".to_string()),
             classification_id: None,
             retention_days: Some(30),
             fiscal_kind: Some("tax_invoice_pdf".to_string()),
@@ -1233,7 +1224,6 @@ pub fn test_documents_wave_c_index_retention_fiscal(ctx: &ReducerContext) -> Res
             partner_id: None,
             tag_ids: vec![],
             is_favorite: false,
-            index_content: Some("extra extract token".to_string()),
             classification_id: None,
             retention_days: Some(30),
             fiscal_kind: Some("tax_invoice_pdf".to_string()),
@@ -1252,10 +1242,7 @@ pub fn test_documents_wave_c_index_retention_fiscal(ctx: &ReducerContext) -> Res
         .index_content
         .as_deref()
         .ok_or("expected default index_content")?;
-    if !index.contains("Wave C Indexed")
-        || !index.contains("searchable body phrase")
-        || !index.contains("extra extract token")
-    {
+    if !index.contains("Wave C Indexed") || !index.contains("searchable body phrase") {
         return Err(format!("index_content incomplete: {index}"));
     }
     if doc.index_language.as_deref() != Some("en") {
@@ -1278,25 +1265,6 @@ pub fn test_documents_wave_c_index_retention_fiscal(ctx: &ReducerContext) -> Res
             "expected retention_days 30, got {:?}",
             doc.retention_days
         ));
-    }
-
-    set_document_index_content(
-        ctx,
-        org_id,
-        doc.id,
-        SetDocumentIndexContentParams {
-            content: "reindexed unique phrase xyzzy".to_string(),
-            language: Some("en".to_string()),
-        },
-    )?;
-    let reindexed = ctx
-        .db
-        .document()
-        .id()
-        .find(&doc.id)
-        .ok_or("doc gone after reindex")?;
-    if reindexed.index_content.as_deref() != Some("reindexed unique phrase xyzzy") {
-        return Err("reindex did not replace index_content".to_string());
     }
 
     set_document_retention(
@@ -1359,7 +1327,6 @@ pub fn test_documents_wave_d_hold_ocr_drive_esign_presence(
             partner_id: None,
             tag_ids: vec![],
             is_favorite: false,
-            index_content: None,
             classification_id: None,
             retention_days: Some(7),
             fiscal_kind: None,
@@ -1434,8 +1401,14 @@ pub fn test_documents_wave_d_hold_ocr_drive_esign_presence(
         },
     )?;
     let doc_id = doc.id;
-    let doc_url = doc.url.clone().unwrap_or_default();
-    let doc_version_id = doc.current_version_id;
+    let current_doc = ctx
+        .db
+        .document()
+        .id()
+        .find(&doc_id)
+        .ok_or("wave d doc missing after version update")?;
+    let doc_url = current_doc.url.clone().unwrap_or_default();
+    let doc_version_id = current_doc.current_version_id;
 
     let del_err = delete_document(ctx, org_id, doc_id)
         .err()
@@ -2292,7 +2265,6 @@ pub fn test_documents_folder_fk_rejects_cross_org(ctx: &ReducerContext) -> Resul
             partner_id: None,
             tag_ids: vec![],
             is_favorite: false,
-            index_content: None,
             classification_id: None,
             retention_days: None,
             fiscal_kind: None,
@@ -2322,7 +2294,6 @@ pub fn test_documents_folder_fk_rejects_cross_org(ctx: &ReducerContext) -> Resul
             partner_id: None,
             tag_ids: vec![],
             is_favorite: false,
-            index_content: None,
             classification_id: None,
             retention_days: None,
             fiscal_kind: None,
@@ -2359,7 +2330,6 @@ pub fn test_documents_upload_rejects_oversized_and_disallowed_mimetype(
             partner_id: None,
             tag_ids: vec![],
             is_favorite: false,
-            index_content: None,
             classification_id: None,
             retention_days: None,
             fiscal_kind: None,

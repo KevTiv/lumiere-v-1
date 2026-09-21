@@ -10,6 +10,10 @@ use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use sha2::{Digest, Sha256};
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
+use crate::ai::workflow_provenance::{
+    carry_generation_to_clone, enforce_on_publish as enforce_provenance_on_publish,
+    retire_node_provenance,
+};
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 
 const MAX_CONDITION_INSTRUCTIONS: usize = 64;
@@ -613,6 +617,7 @@ pub fn delete_workflow_node(
         ctx.db.workflow_edge().id().delete(&edge.id);
     }
     ctx.db.workflow_node().id().delete(&node.id);
+    retire_node_provenance(ctx, &version, &node.node_key);
     advance_draft_revision(ctx, &version)?;
     audit_definition_change(
         ctx,
@@ -747,6 +752,9 @@ pub fn publish_workflow_version(
     validate_workflow_graph(&version.snapshot_fields, &nodes, &edges)
         .map_err(|errors| format!("workflow graph is invalid: {}", errors.join("; ")))?;
     let content_hash = canonical_definition_hash(&workflow, &version, &nodes, &edges)?;
+    // A harness-generated draft publishes only with complete, current
+    // provenance; a failed binding returns Err and rolls the publication back.
+    enforce_provenance_on_publish(ctx, &version, &nodes)?;
 
     ctx.db.workflow_version().id().update(WorkflowVersion {
         status: WorkflowVersionStatus::Published,
@@ -844,6 +852,8 @@ pub fn clone_workflow_version_to_draft(
             ..source_edge
         });
     }
+
+    carry_generation_to_clone(ctx, &source, &draft)?;
 
     audit_definition_change(
         ctx,
@@ -1224,6 +1234,17 @@ pub fn canonical_definition_hash(
     Ok(format!("sha256:{digest:x}"))
 }
 
+/// Canonical SHA-256 (lowercase hex, no prefix) of one node's executable
+/// content. Database IDs, revisions, lifecycle status, actors and timestamps
+/// are excluded, exactly as in [`canonical_definition_hash`], so a provenance
+/// binding follows the step's content rather than its row.
+pub(crate) fn canonical_node_hash(node: &WorkflowNode) -> Result<String, String> {
+    let mut bytes = Vec::with_capacity(256);
+    put_string(&mut bytes, "lumiere.workflow-node");
+    encode_node(&mut bytes, node)?;
+    Ok(format!("{:x}", Sha256::digest(bytes)))
+}
+
 /// Validate one typed condition program against the version's snapshot allowlist.
 pub fn validate_condition_program(
     program: &ConditionProgram,
@@ -1326,7 +1347,7 @@ fn load_version(
     Ok(version)
 }
 
-fn load_draft(
+pub(crate) fn load_draft(
     ctx: &ReducerContext,
     organization_id: u64,
     workflow_version_id: u64,
@@ -1363,7 +1384,10 @@ fn advance_draft_revision(ctx: &ReducerContext, version: &WorkflowVersion) -> Re
     Ok(())
 }
 
-fn nodes_for_version(ctx: &ReducerContext, workflow_version_id: u64) -> Vec<WorkflowNode> {
+pub(crate) fn nodes_for_version(
+    ctx: &ReducerContext,
+    workflow_version_id: u64,
+) -> Vec<WorkflowNode> {
     ctx.db
         .workflow_node()
         .workflow_node_by_version()

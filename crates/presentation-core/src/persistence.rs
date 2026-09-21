@@ -25,6 +25,16 @@ pub struct PreparedDraft {
     pub application_contract: String,
     /// Component-catalog pin carried by the definition.
     pub component_catalog_version: u32,
+    /// Evidence lineage requested for this immutable revision.
+    pub evidence_binding: Option<PreparedEvidenceBinding>,
+}
+
+/// Parsed evidence IDs safe for reducer use after canonical wire validation.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct PreparedEvidenceBinding {
+    pub company_id: u64,
+    pub decision_ids: Vec<u64>,
+    pub claim_ids: Vec<u64>,
 }
 
 /// Parse and structurally validate a draft before it is placed in a persistence envelope.
@@ -55,6 +65,47 @@ pub fn prepare_saved_draft(
     let catalog = structural_catalog(&definition);
     validate_module_draft(&definition, &catalog, &limits())
         .map_err(|diagnostics| format!("invalid module definition: {diagnostics:?}"))?;
+    let evidence_binding = if let Some(binding) = definition.evidence_binding.as_ref() {
+        let parse_ids = |ids: &[String]| -> Result<Vec<u64>, String> {
+            let parsed = ids
+                .iter()
+                .map(|id| {
+                    if id.is_empty() || id.starts_with('0') {
+                        return Err("evidence IDs must be canonical positive decimals".into());
+                    }
+                    id.parse::<u64>()
+                        .ok()
+                        .filter(|parsed| *parsed > 0 && parsed.to_string() == *id)
+                        .ok_or_else(|| "evidence IDs must be canonical positive decimals".into())
+                })
+                .collect::<Result<Vec<_>, String>>()?;
+            if parsed
+                .iter()
+                .collect::<std::collections::HashSet<_>>()
+                .len()
+                != parsed.len()
+            {
+                return Err("evidence IDs must be unique".into());
+            }
+            Ok(parsed)
+        };
+        let company_id = parse_ids(std::slice::from_ref(&binding.company_id))?[0];
+        let decision_ids = parse_ids(&binding.decision_ids)?;
+        let claim_ids = parse_ids(&binding.claim_ids)?;
+        if decision_ids.is_empty()
+            || binding.decision_ids.len() > 64
+            || binding.claim_ids.len() > 64
+        {
+            return Err("invalid evidence binding".into());
+        }
+        Some(PreparedEvidenceBinding {
+            company_id,
+            decision_ids,
+            claim_ids,
+        })
+    } else {
+        None
+    };
 
     definition.base_revision = None;
     let definition_json = serde_json::to_string(&definition)
@@ -67,6 +118,7 @@ pub fn prepare_saved_draft(
         schema_version: definition.schema_version,
         application_contract: definition.application_contract.clone(),
         component_catalog_version: definition.component_catalog_version,
+        evidence_binding,
         definition_json,
     })
 }
@@ -228,5 +280,25 @@ mod tests {
         assert_eq!(first.definition_json, second.definition_json);
         assert_eq!(first.module_key, "collections");
         assert_eq!(first.application_contract, "contracts-v1");
+    }
+
+    #[test]
+    fn validates_and_preserves_save_time_evidence_binding() {
+        let mut value = draft();
+        value["evidenceBinding"] = json!({
+            "companyId": "7",
+            "decisionIds": ["11", "12"],
+            "claimIds": ["3"]
+        });
+        let prepared = prepare_saved_draft(&serde_json::to_string(&value).unwrap(), None).unwrap();
+        let binding = prepared.evidence_binding.expect("evidence binding");
+        assert_eq!(binding.company_id, 7);
+        assert_eq!(binding.decision_ids, vec![11, 12]);
+        assert!(prepared.definition_json.contains("\"evidenceBinding\""));
+
+        value["evidenceBinding"]["decisionIds"] = json!([]);
+        assert!(prepare_saved_draft(&serde_json::to_string(&value).unwrap(), None).is_err());
+        value["evidenceBinding"]["decisionIds"] = json!(["11", "11"]);
+        assert!(prepare_saved_draft(&serde_json::to_string(&value).unwrap(), None).is_err());
     }
 }

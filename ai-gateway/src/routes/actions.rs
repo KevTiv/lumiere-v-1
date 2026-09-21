@@ -5,15 +5,26 @@ use serde_json::{json, Map, Value};
 
 use crate::{
     ai_agent::{
-        enforce_chargeable_limits, ensure_allowed_action, ensure_model_allowed, record_ai_spend,
-        resolve_agent, AgentLimitViolation,
+        enforce_chargeable_limits, ensure_allowed_action, ensure_model_allowed, resolve_agent,
+        AgentLimitViolation,
     },
     error::{AppError, AppResult},
     harness::snapshot::{
         fetch_authorized_live_snapshots, filter_entity_refs_by_allowed_types, ActorCredentials,
         EntityRef, LiveSnapshot,
     },
-    providers::llm::LlmMessage,
+    orchestrator::{
+        intelligence::EvidenceRef,
+        intelligence_router::run_catalogued_generation_surface,
+        model_configuration::StdbModelConfigurationStore,
+        output_gate::{
+            admit_structured_output, persist_or_withhold_generated_output, GeneratedOutputDraft,
+            PublicationIdentity,
+        },
+        skill_loader::{complete_run, create_generation_surface_run},
+        spend_admission::StdbSpendLedger,
+        text_answer_gate::{TextAnswerProvenance, TextAnswerVerification, TextEvidence},
+    },
     state::AppState,
 };
 
@@ -69,6 +80,12 @@ pub struct ActionDraft {
     pub warnings: Vec<String>,
     pub summary: String,
     pub elevated: bool,
+    /// Admission for the human-facing explanation only. Params remain an
+    /// advisory pending draft and are never execution authority.
+    pub explanation_verification: TextAnswerVerification,
+    /// Claim-level evidence selected for the explanation. This never grants
+    /// execution authority to the pending draft.
+    pub explanation_provenance: TextAnswerProvenance,
 }
 
 #[derive(Debug, Serialize)]
@@ -287,6 +304,17 @@ fn parse_llm_drafts(
             warnings,
             summary,
             elevated: entry.elevated,
+            explanation_verification: TextAnswerVerification {
+                outcome: crate::orchestrator::text_answer_gate::TextAnswerOutcome::RequiresReview,
+                methods: vec!["deterministic"],
+                limitations: Vec::new(),
+                reason: Some(
+                    "explanation admission is performed at the output boundary".to_string(),
+                ),
+            },
+            explanation_provenance: TextAnswerProvenance::withheld(
+                "explanation admission is performed at the output boundary",
+            ),
         });
     }
 
@@ -323,36 +351,140 @@ async fn draft_actions_llm(
         agent.system_prompt
     );
 
-    let llm_resp = state
-        .providers
-        .llm
-        .complete(crate::providers::llm::LlmRequest {
-            provider: agent.provider.clone(),
-            model: agent.model.clone(),
-            system,
-            messages: vec![LlmMessage::text("user", prompt)],
-            max_tokens: agent.max_tokens.min(ACTION_DRAFT_MAX_TOKENS),
-            temperature: Some(agent.temperature),
-            top_p: Some(agent.top_p),
-            tools: Vec::new(),
-        })
-        .await
-        .map_err(|e| DraftActionsError::other(format!("LLM request failed: {e}")))?;
-
-    let total_tokens = llm_resp.input_tokens + llm_resp.output_tokens;
-    if total_tokens > 0 {
-        if let Err(e) = record_ai_spend(&state.stdb, org_id, agent.agent_id, total_tokens).await {
-            tracing::warn!(
-                agent_id = agent.agent_id,
-                error = %e,
-                "record_ai_spend failed"
-            );
+    let spend_reader = state.spend_read_stdb.as_deref().ok_or_else(|| {
+        DraftActionsError::other("spend_read_stdb is required for routed generation")
+    })?;
+    let run_inputs = json!({
+        "surface": "action_draft_generation",
+        "query": req.query.clone(),
+        "allowed_reducers": req.allowed_reducers.clone(),
+        "allowed_entity_types": req.allowed_entity_types.clone(),
+    });
+    let run = create_generation_surface_run(
+        state.stdb.as_ref(),
+        org_id,
+        req.company_id,
+        "action_draft_generation",
+        agent.agent_id,
+        req.team_member_id,
+        &serde_json::to_string(&run_inputs).map_err(|e| DraftActionsError::other(e.to_string()))?,
+        &req.identity_hex,
+    )
+    .await
+    .map_err(|e| DraftActionsError::other(e.to_string()))?;
+    let model_store = StdbModelConfigurationStore {
+        reader: state.stdb.as_ref(),
+    };
+    let ledger = StdbSpendLedger {
+        writer: state.stdb.as_ref(),
+        reader: spend_reader,
+    };
+    let program = run_catalogued_generation_surface(
+        &model_store,
+        &ledger,
+        state.stdb.as_ref(),
+        state.stdb.as_ref(),
+        org_id,
+        req.company_id,
+        &run,
+        &agent,
+        state.providers.llm.as_ref(),
+        "action_draft_generation",
+        prompt,
+        json!({
+            "allowed_reducers": entries.iter().map(|entry| entry.reducer_name).collect::<Vec<_>>(),
+            "grounded": grounding_snapshots.is_some(),
+        }),
+        Some(system),
+        Some(agent.max_tokens.min(ACTION_DRAFT_MAX_TOKENS)),
+    )
+    .await;
+    let program = match program {
+        Ok(outcome) => outcome,
+        Err(error) => {
+            let _ = complete_run(
+                state.stdb.as_ref(),
+                org_id,
+                req.company_id,
+                run.run_id,
+                "failed",
+                None,
+                None,
+                None,
+                0,
+                0,
+                Some(error.to_string()),
+            )
+            .await;
+            return Err(DraftActionsError::other(format!(
+                "LLM request failed: {error}"
+            )));
         }
-    }
-
-    let model_json: Value = serde_json::from_str(clean_json_response(&llm_resp.text))
-        .map_err(|e| DraftActionsError::other(format!("failed to parse action draft JSON: {e}")))?;
-    parse_llm_drafts(req, &entries, &model_json).map_err(DraftActionsError::other)
+    };
+    let total_tokens = program
+        .generation_input_tokens
+        .saturating_add(program.generation_output_tokens);
+    let generated = program.final_content.as_deref().ok_or_else(|| {
+        DraftActionsError::other("governed action-draft generation produced no final content")
+    })?;
+    let model_json: Value = match serde_json::from_str(clean_json_response(generated)) {
+        Ok(value) => value,
+        Err(error) => {
+            let _ = complete_run(
+                state.stdb.as_ref(),
+                org_id,
+                req.company_id,
+                run.run_id,
+                "failed",
+                None,
+                None,
+                None,
+                1,
+                total_tokens,
+                Some(format!("invalid generated action draft JSON: {error}")),
+            )
+            .await;
+            return Err(DraftActionsError::other(format!(
+                "failed to parse action draft JSON: {error}"
+            )));
+        }
+    };
+    let drafts = match parse_llm_drafts(req, &entries, &model_json) {
+        Ok(drafts) => drafts,
+        Err(error) => {
+            let _ = complete_run(
+                state.stdb.as_ref(),
+                org_id,
+                req.company_id,
+                run.run_id,
+                "failed",
+                None,
+                None,
+                None,
+                1,
+                total_tokens,
+                Some(error.clone()),
+            )
+            .await;
+            return Err(DraftActionsError::other(error));
+        }
+    };
+    complete_run(
+        state.stdb.as_ref(),
+        org_id,
+        req.company_id,
+        run.run_id,
+        "completed",
+        Some(format!("generated {} action drafts", drafts.len())),
+        None,
+        None,
+        program.trace.len() as u32,
+        total_tokens,
+        None,
+    )
+    .await
+    .map_err(|e| DraftActionsError::other(e.to_string()))?;
+    Ok(drafts)
 }
 
 fn non_empty(value: &str) -> bool {
@@ -623,6 +755,15 @@ fn draft_actions_stub(req: &ActionDraftRequest) -> Result<Vec<ActionDraft>, Stri
             entry.reducer_name
         ),
         elevated: entry.elevated,
+        explanation_verification: TextAnswerVerification {
+            outcome: crate::orchestrator::text_answer_gate::TextAnswerOutcome::RequiresReview,
+            methods: vec!["deterministic"],
+            limitations: Vec::new(),
+            reason: Some("explanation admission is performed at the output boundary".to_string()),
+        },
+        explanation_provenance: TextAnswerProvenance::withheld(
+            "explanation admission is performed at the output boundary",
+        ),
     }])
 }
 
@@ -653,6 +794,63 @@ pub async fn post_draft(
 
     if let Some(ref snapshots) = grounding_snapshots {
         enrich_drafts_with_grounding(&mut drafts, snapshots);
+    }
+
+    // Gate the prose before it can cross the BFF and be persisted by the
+    // client as an action-draft explanation. Live snapshots are server-owned
+    // evidence; the user/model request is not.
+    let mut evidence = TextEvidence::default();
+    evidence.add_user_text(&req.query);
+    if let Some(snapshots) = grounding_snapshots.as_deref() {
+        for snapshot in snapshots {
+            evidence.add_ref(
+                "live_snapshot",
+                format!("{}:{}", snapshot.entity_type, snapshot.entity_id),
+            );
+            evidence.add_json(&snapshot.row);
+            for relation in &snapshot.relations {
+                for row in &relation.rows {
+                    evidence.add_json(row);
+                }
+            }
+        }
+    }
+    let support_refs: Vec<EvidenceRef> = evidence.refs.clone();
+    let publication_id = uuid::Uuid::new_v4();
+    for (index, draft) in drafts.iter_mut().enumerate() {
+        let structured =
+            GeneratedOutputDraft::single_claim(draft.summary.clone(), support_refs.clone());
+        let mut gated = admit_structured_output(
+            req.org_id.unwrap_or_default(),
+            req.company_id,
+            &structured,
+            &evidence,
+        )
+        .await
+        .map_err(|error| {
+            AppError::Internal(format!("action-draft explanation gate failed: {error}"))
+        })?;
+        persist_or_withhold_generated_output(
+            &mut gated,
+            state.stdb.as_ref(),
+            state.spend_read_stdb.as_deref(),
+            PublicationIdentity {
+                organization_id: req.org_id.unwrap_or_default(),
+                company_id: req.company_id,
+                session_ref: format!("action-draft:{publication_id}:{}", index + 1),
+                event_ref: "action_draft_explanation".to_string(),
+                note: "action-draft explanation admitted by the publication gate".to_string(),
+            },
+        )
+        .await;
+        draft.explanation_verification = gated.verification.clone();
+        draft.explanation_provenance = gated.provenance;
+        if let Some(released) = gated.released {
+            draft.summary = released;
+        } else {
+            draft.summary =
+                "Action draft explanation withheld pending evidence review.".to_string();
+        }
     }
 
     tracing::info!(

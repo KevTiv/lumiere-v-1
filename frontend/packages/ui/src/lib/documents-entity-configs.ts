@@ -30,7 +30,6 @@ export const documentsTableConfig = (t: TFunction): EntityViewConfig => ({
       "fileName",
       "resName",
       "description",
-      "indexContent",
       "fiscalKind",
       "residencyRegion",
     ],

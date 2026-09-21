@@ -58,26 +58,17 @@ function ensureAiChatSessionKey(): string {
 }
 
 function mapRagSourceToChatSource(s: AiRagSource): ChatMessageSourceRef {
-  const kind =
-    s.kind === "live" || s.kind === "memory" || s.kind === "activity" || s.kind === "web"
-      ? s.kind
-      : s.content_type === "org_activity"
-        ? "activity"
-        : "memory"
-  const trust =
-    s.trust === "authoritative" || s.trust === "retrieved"
-      ? s.trust
-      : kind === "live"
-        ? "authoritative"
-        : "retrieved"
-
   return {
-    kind,
-    trust,
-    content_type: s.content_type,
-    content_id: s.content_id,
+    kind: s.kind,
+    trust: s.trust,
     entity_type: s.entity_type,
     entity_id: s.entity_id,
+    source_kind: s.source_kind,
+    source_key: s.source_key,
+    source_version: s.source_version,
+    passage_id: s.passage_id,
+    passage_key: s.passage_key,
+    content_hash: s.content_hash,
     label: s.label,
     field: s.field,
     score: s.score,
@@ -86,10 +77,10 @@ function mapRagSourceToChatSource(s: AiRagSource): ChatMessageSourceRef {
     url: s.url,
     fetched_at: s.fetched_at,
     href: s.url ?? resolveAiSourceHref({
-      content_type: s.content_type,
-      content_id: s.content_id,
       entity_type: s.entity_type,
       entity_id: s.entity_id,
+      source_kind: s.source_kind,
+      source_key: s.source_key,
     }),
   }
 }

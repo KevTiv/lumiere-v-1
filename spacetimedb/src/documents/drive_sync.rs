@@ -265,7 +265,6 @@ pub fn sync_external_file_to_document(
             partner_id: None,
             tag_ids: vec![],
             is_favorite: false,
-            index_content: None,
             classification_id: None,
             retention_days: None,
             fiscal_kind: None,

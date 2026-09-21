@@ -1078,7 +1078,6 @@ function categorizeByModule(reducerName: string): string {
     unlock_document: 'documents',
     add_document_version: 'documents',
     record_document_view: 'documents',
-    set_document_index_content: 'documents',
     set_document_retention: 'documents',
     purge_expired_documents: 'documents',
     schedule_document_retention_purge: 'documents',

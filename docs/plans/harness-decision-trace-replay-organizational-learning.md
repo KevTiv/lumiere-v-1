@@ -2,7 +2,7 @@
 
 **Status:** Proposed — architecture and certification plan 2026-09-13  
 **Tracks:** `ai-harness`, `decision-trace`, `execution-events`, `corrections`, `replay`, `fork`, `comparison`, `experience-cases`, `organization-learning`, `recipes`, `skills`, `evals`, `provenance`, `web-research`, `human-feedback`  
-**Related:** [agent-control-plane-model-routing-plan.md](./agent-control-plane-model-routing-plan.md) · [work-program-security-provenance-plan.md](./work-program-security-provenance-plan.md) · [harness-security-residency-sandbox-certification.md](./harness-security-residency-sandbox-certification.md) · [adversarial-business-invariant-certification.md](./adversarial-business-invariant-certification.md) · [erp-workflow-integration-program.md](./erp-workflow-integration-program.md)
+**Related:** [agent-control-plane-model-routing-plan.md](./agent-control-plane-model-routing-plan.md) · [work-program-security-provenance-plan.md](./work-program-security-provenance-plan.md) · [harness-security-residency-sandbox-certification.md](./harness-security-residency-sandbox-certification.md) · [adversarial-business-invariant-certification.md](./adversarial-business-invariant-certification.md) · [erp-workflow-integration-program.md](./erp-workflow-integration-program.md) · [governed-intelligence-program-architecture.md](./governed-intelligence-program-architecture.md) · [governed-intelligence-program-migration.md](./governed-intelligence-program-migration.md) · [decision-precedent-memory-layer.md](./decision-precedent-memory-layer.md) · [typed-decision-graph-and-run-review-plan.md](./typed-decision-graph-and-run-review-plan.md)
 
 ---
 
@@ -105,6 +105,11 @@ This plan does **not**:
 13. **Compaction preserves references, not reasoning.** Session compaction retains objective, decisions, evidence/source refs, corrections, open questions, effect state, and budgets.
 14. **No learning from rejected unsafe execution.** Policy-denied or security-violating proposals may generate safety fixtures, but cannot become reusable action logic.
 15. **Regression beats anecdote.** Promoted changes must be tested against historical ExperienceCases and adversarial certification sets.
+16. **Provenance classes remain distinct.** Deterministic/runtime-observed, provider-reported, reviewer-derived, and user-supplied artifacts are never presented as the same source.
+17. **Provider-private chain-of-thought is neither required nor inferred.** Provider-visible summaries/structured explanation may be retained only as explicit provider output.
+18. **Procedural memory is reviewed.** No model explanation, correction, or repeated behavior becomes a reusable TaskRecipe without configured review/promotion.
+19. **Current state dominates memory.** Current authoritative facts, policy, authorization, and DecisionType contracts override stale precedent, recipes, or historical practice.
+20. **Learning lift is measurable.** With/without-memory and smaller/frontier provider comparisons must use the same versioned decision snapshot when evaluating whether organizational memory closes capability gaps.
 
 ---
 
@@ -121,6 +126,7 @@ AgentRun
  ├── policy/capability snapshot refs
  ├── runtime/model/provider refs
  ├── DecisionRecords
+ ├── EpistemicTraceNodes
  ├── ToolInvocations
  ├── Dataset/Evidence refs
  ├── ExternalSource refs
@@ -246,6 +252,28 @@ Why A was flagged:
 
 ---
 
+### 6.1 Structured decision explanation
+
+For bounded typed decisions, prefer a schema-validated explanation artifact over an unstructured rationale string:
+
+```ts
+interface DecisionExplanation {
+  summary: string
+  factors: readonly DecisionFactor[]
+  alternatives: readonly DecisionAlternative[]
+  uncertainties: readonly DecisionUncertainty[]
+  assumptions: readonly string[]
+  evidenceRefs: readonly EvidenceRef[]
+  followUpChecks: readonly string[]
+}
+```
+
+This is deliberate provider output and may be generated even when the underlying provider exposes no private reasoning trace. It must remain bounded, evidence-linked where material, and non-authoritative. A legacy `rationaleSummary` may be derived from it for compatibility.
+
+The governed typed-decision runtime should link this artifact to the existing intelligence-event/provider-attempt identity instead of treating it as a separate model call.
+
+---
+
 ## 7. Decision alternatives
 
 Store only meaningful summarized alternatives.
@@ -261,6 +289,25 @@ interface DecisionAlternative {
 ```
 
 This allows inspection and comparison without requiring raw internal deliberation.
+
+---
+
+### 7.1 Epistemic provenance
+
+Every observable trace node declares its source:
+
+```ts
+type EpistemicSource =
+  | "deterministic-runtime"
+  | "provider-reported"
+  | "harness-observed"
+  | "reviewer-derived"
+  | "user-provided"
+```
+
+Trace nodes form an append-only DAG over stable run/DecisionGraph node identities. They may reference evidence, provider attempts, intelligence events, capability receipts, corrections, and review findings.
+
+The graph records what can be observed and audited; it does not reconstruct hidden chain-of-thought.
 
 ---
 
@@ -1092,23 +1139,30 @@ High-impact heuristics require stronger review and regression evaluation.
 
 ---
 
-## 30. Recipes
+## 30. Recipes / procedural memory
 
-Recipes capture repeated work patterns.
+Recipes capture repeated **reviewed** work patterns and are the canonical procedural-memory unit for future bounded context.
 
 ```text
-objective class
-required capabilities
+task/objective class + applicability
+useful evidence / evidence requirements
+typed decision points
+preferred capabilities
 analysis program/work graph
-input schema
-output schema
+known failure modes
+useful checks / escalation conditions
+input/output schema
 presentation conventions
 verification requirements
+source DecisionCase / trace / review refs
+version + review status
 ```
 
-Recipes never contain permission grants, live dataset handles, or tenant secrets.
+A versioned `TaskRecipe` is compact procedural guidance, not a historical transcript and not a permission grant.
 
-Fresh authorization/data acquisition occurs on every reuse.
+The context compiler may retrieve compatible reviewed recipes alongside DecisionCase precedent using tenant scope, task type, DecisionType/version, material constraints, policy/evidence compatibility, review quality, freshness, and supersession state.
+
+Current facts, current policy, current authorization, and STDB business invariants always dominate recipe guidance. Fresh authorization/data acquisition occurs on every reuse.
 
 ---
 
@@ -2321,10 +2375,20 @@ Actual API shape should follow generated application-contract conventions rather
 ### HLEARN-00 — trace schema + decision graph
 
 - [ ] extend append-only execution events with stable decision/tool/evidence/source refs;
-- [ ] define `AgentRun`, `DecisionRecord`, `ClaimRecord`, `ToolInvocationTrace`;
-- [ ] build run graph materialization/query path;
-- [ ] explicitly prohibit hidden chain-of-thought persistence;
-- [ ] attach policy/capability/runtime/model refs.
+- [ ] reuse PR45 `AiIntelligenceEvent`, DecisionGraph node identity, provider-attempt, evidence and run IDs as correlation anchors rather than creating duplicate audit identities;
+- [ ] define `AgentRun`, `DecisionRecord`, `ClaimRecord`, `ToolInvocationTrace` and provenance-labeled `EpistemicTraceNode`/edge contracts;
+- [ ] build append-only trace DAG materialization/query path;
+- [ ] explicitly prohibit hidden chain-of-thought persistence/reconstruction;
+- [ ] attach policy/capability/runtime/model refs and deterministic hashing/idempotency.
+
+### HLEARN-00A — structured explanation + governed learning review
+
+- [ ] replace durable reliance on free-text rationale with bounded factors/alternatives/uncertainties/assumptions/evidence/follow-up checks;
+- [ ] extend DecisionType metadata with required explanation shape;
+- [ ] normalize provider-visible summaries without claiming private chain-of-thought;
+- [ ] extend independent `RunReviewProgram` with a separate optional learning assessment;
+- [ ] persist validated/rejected insight refs, failure/reuse candidates, and missing-check findings;
+- [ ] keep run-health disposition separate from learning promotion.
 
 ### HLEARN-01 — source/evidence review surface
 
@@ -2367,13 +2431,16 @@ Actual API shape should follow generated application-contract conventions rather
 - [ ] acceptance/rejection;
 - [ ] reusable-as-eval flags.
 
-### HLEARN-06 — candidate-runtime regression evaluation
+### HLEARN-06 — candidate-runtime + memory-lift regression evaluation
 
 - [ ] replay ExperienceCases against candidate harness/model/recipe versions;
+- [ ] run no-memory vs precedent-only vs precedent+TaskRecipe comparisons over identical snapshots;
+- [ ] compare smaller/local and frontier provider profiles with identical reviewed memory;
+- [ ] score verified decision quality, evidence selection, correction/defect rate, abstention/escalation quality, cost and latency;
 - [ ] multi-dimensional scores;
 - [ ] hard-block security/policy regressions;
 - [ ] regression reports;
-- [ ] promotion thresholds.
+- [ ] promotion/routing thresholds remain policy-owned and reviewed.
 
 ### HLEARN-07 — organization pattern detection
 
@@ -2391,13 +2458,15 @@ Actual API shape should follow generated application-contract conventions rather
 - [ ] context compiler retrieval;
 - [ ] precedence rules.
 
-### HLEARN-09 — recipe/skill/policy promotion
+### HLEARN-09 — TaskRecipe / skill / policy promotion
 
-- [ ] pattern→recipe candidate;
-- [ ] recipe→skill draft;
+- [ ] reviewed trace/case pattern→versioned TaskRecipe candidate;
+- [ ] require reviewed source trace/case/review refs before TaskRecipe promotion;
+- [ ] record recipe retrieval/material-use refs for future lift evaluation;
+- [ ] recipe→skill draft only after regression evidence justifies executable reuse;
 - [ ] policy-candidate routing to explicit policy/workflow configuration;
 - [ ] ADV/HSEC certification binding;
-- [ ] revocation/rollback.
+- [ ] append-only supersession + revocation/rollback.
 
 ### HLEARN-10 — tailored toolset/product discovery
 
@@ -2413,6 +2482,8 @@ Actual API shape should follow generated application-contract conventions rather
 
 ```text
 HLEARN-00 trace schema + decision graph
+   ↓
+HLEARN-00A structured explanation + learning review
    ↓
 HLEARN-01 source/evidence review
    ↓
@@ -2524,6 +2595,12 @@ This plan is successful when:
 - organization intelligence remains tenant isolated, versioned, reviewable, revocable, and residency/retention governed;
 - future runs can retrieve a bounded set of applicable reviewed organization intelligence;
 - frequently successful workflows can mature into recipes/skills/native features without creating arbitrary unreviewed tool surfaces.
+- provider-visible explanation is captured as explicit structured output without claiming private chain-of-thought;
+- every observable reasoning artifact retains deterministic/provider/reviewer/user provenance;
+- reviewed TaskRecipe procedural memory can be retrieved beside DecisionCase precedent while remaining subordinate to current state/policy/authorization;
+- user corrections can feed reviewed learning candidates without rewriting historical runs;
+- independent learning review can validate or reject reusable insights separately from run-health disposition;
+- shadow/regression evaluation can quantify memory lift and whether smaller models approach larger-model quality for a bounded task class.
 
 ---
 
@@ -2548,9 +2625,12 @@ Interpretation:
 - INT defines what valid ERP work means;
 - ADV proves business invariants cannot be broken;
 - HSEC proves the harness cannot widen authority or mishandle data;
-- HLEARN makes harness behavior inspectable/correctable and allows safe organization-specific improvement over time.
+- the PR45 governed-program architecture supplies the typed DecisionGraph, DecisionType, durable intelligence-event, precedent, independent-review, shadow, and deterministic-graduation substrate;
+- HLEARN builds the inspectable/correctable/replayable intelligence-compounding layer over those governed identities.
 
-No HLEARN feature may weaken the layers below it.
+For post-H5 implementation, HLEARN must be interpreted through `governed-intelligence-program-architecture.md`, `governed-intelligence-program-migration.md`, `decision-precedent-memory-layer.md`, and `typed-decision-graph-and-run-review-plan.md`.
+
+No HLEARN feature may weaken the layers below it or introduce a second workflow/execution authority.
 
 ---
 

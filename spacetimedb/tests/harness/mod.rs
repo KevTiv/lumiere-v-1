@@ -31,11 +31,39 @@ mod presentation;
 /// Persisted presentation draft revision and tenant-isolation acceptance gate.
 #[spacetimedb::reducer]
 pub fn run_presentation_draft_tests(ctx: &spacetimedb::ReducerContext) -> Result<(), String> {
-    presentation::test_presentation_module_revision_round_trip(ctx)?;
-    presentation::test_presentation_module_rejects_invalid_payload(ctx)?;
-    presentation::test_presentation_module_owner_scope_isolated(ctx)?;
-    presentation::test_presentation_module_rejects_inactive_cross_org_actor(ctx)?;
-    Ok(())
+    // Every scenario runs and all failures are reported together; any failure
+    // still fails (and rolls back) the whole reducer.
+    let scenarios: [(&str, fn(&spacetimedb::ReducerContext) -> Result<(), String>); 5] = [
+        (
+            "revision_round_trip",
+            presentation::test_presentation_module_revision_round_trip,
+        ),
+        (
+            "save_binds_evidence_atomically",
+            presentation::test_presentation_save_binds_evidence_atomically,
+        ),
+        (
+            "rejects_invalid_payload",
+            presentation::test_presentation_module_rejects_invalid_payload,
+        ),
+        (
+            "owner_scope_isolated",
+            presentation::test_presentation_module_owner_scope_isolated,
+        ),
+        (
+            "rejects_inactive_cross_org_actor",
+            presentation::test_presentation_module_rejects_inactive_cross_org_actor,
+        ),
+    ];
+    let failures: Vec<String> = scenarios
+        .iter()
+        .filter_map(|(name, scenario)| scenario(ctx).err().map(|error| format!("{name}: {error}")))
+        .collect();
+    if failures.is_empty() {
+        Ok(())
+    } else {
+        Err(failures.join(" | "))
+    }
 }
 use std::time::Duration;
 
