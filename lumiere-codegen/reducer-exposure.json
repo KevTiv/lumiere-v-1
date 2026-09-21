@@ -3115,6 +3115,16 @@
       "reason": "invoked by an enumerated frontend BFF call site"
     },
     {
+      "name": "record_fleet_inspection",
+      "exposure": "session",
+      "reason": "reviewed Fleet lifecycle write guarded by permission and organization/company ownership checks"
+    },
+    {
+      "name": "record_fleet_service",
+      "exposure": "session",
+      "reason": "reviewed Fleet lifecycle write guarded by permission and organization/company ownership checks"
+    },
+    {
       "name": "record_inventory_integration_result",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
@@ -4159,6 +4169,11 @@
       "name": "update_fiscal_year",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
+    },
+    {
+      "name": "update_fleet_vehicle",
+      "exposure": "session",
+      "reason": "reviewed Fleet assignment write guarded by permission and organization/company ownership checks"
     },
     {
       "name": "update_form_field",

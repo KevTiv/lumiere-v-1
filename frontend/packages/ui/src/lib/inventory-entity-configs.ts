@@ -1,6 +1,10 @@
 import type { TFunction } from "i18next"
 import { createElement } from "react"
-import type { EntityDetailConfig, EntityViewConfig } from "./entity-view-types"
+import {
+  isPickingActionApplicableToAll,
+  type PickingActionId,
+} from "@lumiere/erp-workflows"
+import type { EntityAction, EntityDetailConfig, EntityViewConfig } from "./entity-view-types"
 
 // ── Badge maps ────────────────────────────────────────────────────────────────
 const productTypeBadges = (t: TFunction) => ({
@@ -396,6 +400,49 @@ export type TransfersTableConfigOptions = {
 }
 
 // ── Transfers (pickings) ──────────────────────────────────────────────────────
+
+export type PickingActionHandlers = Partial<
+  Record<PickingActionId, (rows: Record<string, unknown>[]) => void>
+>
+
+const PICKING_ACTION_ORDER: Array<{
+  id: PickingActionId
+  labelKey: string
+  destructive?: boolean
+}> = [
+  { id: "confirm", labelKey: "inventory.transferActions.confirm" },
+  { id: "assign", labelKey: "inventory.transferActions.assign" },
+  { id: "assign-user", labelKey: "inventory.transferActions.assignUser" },
+  { id: "partial-validate", labelKey: "sales.fulfillment.actions.partialValidate" },
+  { id: "pack", labelKey: "sales.fulfillment.actions.pack" },
+  { id: "validate", labelKey: "inventory.transferActions.validate" },
+  { id: "cancel", labelKey: "inventory.transferActions.cancel", destructive: true },
+]
+
+/**
+ * The one picking action list for every surface that operates a picking. Each surface supplies
+ * only the handlers it supports; state gating and labels are shared.
+ */
+export const pickingRowActions = (
+  t: TFunction,
+  handlers: PickingActionHandlers,
+  icons: Partial<Record<PickingActionId, EntityAction["icon"]>> = {},
+): EntityAction[] =>
+  PICKING_ACTION_ORDER.flatMap(({ id, labelKey, destructive }) => {
+    const handler = handlers[id]
+    if (!handler) return []
+    return [
+      {
+        id: `${id}-picking`,
+        label: t(labelKey),
+        icon: icons[id],
+        variant: destructive ? ("destructive" as const) : undefined,
+        requiresSelection: true,
+        isApplicable: (rows: Record<string, unknown>[]) => isPickingActionApplicableToAll(id, rows),
+        onClick: handler,
+      },
+    ]
+  })
 export const transfersTableConfig = (
   t: TFunction,
   options?: TransfersTableConfigOptions,

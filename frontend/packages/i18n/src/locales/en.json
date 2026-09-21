@@ -181,6 +181,7 @@
     "pos": "Point of Sale",
     "manufacturing": "Manufacturing",
     "map": "Map",
+    "fleet": "Fleet",
     "helpdesk": "Helpdesk",
     "workflows": "Workflows",
     "documents": "Documents",
@@ -5552,6 +5553,32 @@
         "Cancelled": "Cancelled"
       }
     },
+    "rfqs": {
+      "title": "RFQs",
+      "description": "Requests for quotation sent to vendors",
+      "searchPlaceholder": "Search RFQs",
+      "emptyMessage": "No RFQs yet. Create one from a purchase agreement.",
+      "columns": {
+        "name": "RFQ",
+        "state": "State",
+        "requisitionId": "Agreement",
+        "purchaseOrderId": "Purchase order",
+        "notes": "Notes"
+      }
+    },
+    "rfqBids": {
+      "title": "RFQ Bids",
+      "description": "Vendor bids to evaluate and award",
+      "searchPlaceholder": "Search bids",
+      "emptyMessage": "No bids yet.",
+      "columns": {
+        "rfqId": "RFQ",
+        "partnerId": "Vendor",
+        "priceUnit": "Unit price",
+        "amountTotal": "Total",
+        "state": "State"
+      }
+    },
     "purchaseAgreements": {
       "title": "Purchase Agreements",
       "description": "Blanket orders and purchase agreements",
@@ -6055,6 +6082,36 @@
       "vendorCreditFromReturn": "Vendor credit from return"
     }
   },
+  "erpWorkflow": {
+    "applied": "Done",
+    "approvalPending": "Sent for approval",
+    "retry": "Retry",
+    "refreshed": "The list was refreshed.",
+    "hints": {
+      "outcome_unknown": "We couldn't confirm whether this went through. Check the record before trying again.",
+      "already_applied": "This was already done.",
+      "stale_revision": "This record changed since you opened it. Review it before trying again.",
+      "conflict": "The record's current state doesn't allow this.",
+      "retryable_transport": "Nothing was changed."
+    },
+    "confirm": {
+      "description": "This can't be undone.",
+      "confirm": "Confirm",
+      "dismiss": "Keep"
+    },
+    "errors": {
+      "validation": "Action not allowed",
+      "permission_denied": "You don't have permission",
+      "approval_required": "Approval required",
+      "stale_revision": "Record changed",
+      "conflict": "Conflict",
+      "already_applied": "Already applied",
+      "retryable_transport": "Service temporarily unavailable, try again",
+      "outcome_unknown": "Result unknown, check the record before retrying",
+      "not_found": "Record not found",
+      "server_failure": "Something went wrong"
+    }
+  },
   "sales": {
     "dashboard": {
       "ordersByState": "Orders by State",
@@ -6160,7 +6217,32 @@
         "amountResidual": "Outstanding",
         "invoiceStatus": "Invoice",
         "dateOrder": "Order Date",
-        "deliveryCount": "Deliveries"
+        "deliveryCount": "Deliveries",
+        "deliverySummary": "Delivery",
+        "invoiceSummary": "Invoicing",
+        "paymentSummary": "Payment",
+        "outstandingAmount": "Balance due"
+      },
+      "cashSummary": {
+        "delivery": {
+          "none": "Not started",
+          "pending": "To deliver",
+          "partial": "Partially delivered",
+          "short": "Delivered short",
+          "complete": "Delivered"
+        },
+        "invoice": {
+          "none": "Not invoiced",
+          "draft": "Draft invoice",
+          "posted": "Invoiced",
+          "credited": "Credited"
+        },
+        "payment": {
+          "none": "—",
+          "unpaid": "Unpaid",
+          "partial": "Partially paid",
+          "paid": "Paid"
+        }
       },
       "filters": {
         "state": {
@@ -6278,7 +6360,8 @@
         "backorder": "Backorder"
       },
       "actions": {
-        "partialValidate": "Partial delivery…"
+        "partialValidate": "Partial delivery…",
+        "pack": "Pack"
       }
     },
     "returns": {
@@ -6308,7 +6391,11 @@
         "refunded": "Refunded",
         "cancelled": "Cancelled"
       },
+      "errors": {
+        "notReceivable": "The return picking can no longer be received."
+      },
       "actions": {
+        "create": "New return",
         "confirm": "Confirm",
         "cancel": "Cancel",
         "receive": "Receive return",
@@ -6734,11 +6821,11 @@
         "fields": {
           "orderedQty": "Ordered: {{qty}}",
           "createBackorder": "Create backorder for short quantities",
-          "createBackorderHint": "When short quantities are validated, create a new picking for the remainder (keeps reservation)."
+          "createBackorderHint": "When short quantities are validated, create a new picking for the remainder. Assign it later to reserve stock again."
         },
         "errors": {
           "noAssignedMoves": "No assigned move lines on this picking.",
-          "invalidQty": "Quantity must be between 0 and the ordered amount.",
+          "invalidQty": "Quantity must be greater than 0 and no more than the ordered amount.",
           "qtyRequired": "Enter a quantity for each move line."
         }
       },
@@ -6775,6 +6862,7 @@
       "recalculateTotals": "Recalculate totals",
       "accrueCommission": "Accrue commission",
       "createInvoice": "Create invoice…",
+      "viewDeliveries": "View deliveries",
       "lockOrders": "Lock",
       "unlockOrders": "Unlock",
       "newPricelistItem": "New rule",
@@ -9738,12 +9826,75 @@
     "liveDataHint": "Live data from SpacetimeDB. Use fleet reducers to update GPS positions.",
     "emptyDataHint": "No live map pins yet — create fleet vehicles (with position), POS terminals, or warehouse geo to populate coordinates.",
     "fleet": {
-      "title": "Fleet vehicles",
+      "title": "Fleet",
+      "subtitle": "Vehicles",
       "empty": "No vehicles yet.",
-      "create": "Create vehicle",
+      "create": "Add vehicle",
       "updatePosition": "Update position",
       "selectVehicle": "Select vehicle",
-      "companyRequired": "Select an operating company before creating or updating fleet vehicles."
+      "companyRequired": "Select an operating company before creating or updating fleet vehicles.",
+      "table": {
+        "name": "Vehicle name",
+        "licensePlate": "License plate",
+        "vehicleType": "Type",
+        "driverName": "Driver",
+        "status": "Status",
+        "lastPosition": "Last position",
+        "odometer": "Odometer (km)",
+        "fuel": "Fuel level"
+      },
+      "status": {
+        "active": "Active",
+        "idle": "Idle",
+        "maintenance": "Maintenance",
+        "inactive": "Inactive"
+      },
+      "forms": {
+        "newVehicle": {
+          "title": "Add vehicle",
+          "description": "Register a new vehicle in the fleet.",
+          "section": "Vehicle details"
+        },
+        "editVehicle": {
+          "title": "Edit vehicle",
+          "description": "Update vehicle driver or service type.",
+          "section": "Vehicle details"
+        }
+      },
+      "lifecycle": {
+        "vehicle": "Vehicle",
+        "driver": "Driver",
+        "inspector": "Inspector",
+        "serviceType": "Service type",
+        "provider": "Provider",
+        "notes": "Notes",
+        "servicedAt": "Serviced at",
+        "inspectedAt": "Inspected at",
+        "outcome": "Outcome",
+        "assignments": {
+          "title": "Driver assignment",
+          "description": "Assign or unassign an active employee as the vehicle driver.",
+          "action": "Change driver",
+          "unassign": "No driver (unassign)"
+        },
+        "service": {
+          "title": "Service history",
+          "description": "Record maintenance performed on a fleet vehicle.",
+          "action": "Record service",
+          "empty": "No service records yet."
+        },
+        "inspections": {
+          "title": "Inspection history",
+          "description": "Record the result of a fleet vehicle inspection.",
+          "action": "Record inspection",
+          "empty": "No inspections yet."
+        },
+        "outcomes": {
+          "passed": "Passed",
+          "failed": "Failed",
+          "attentionRequired": "Attention required"
+        }
+      }
     }
   },
   "tasks": {

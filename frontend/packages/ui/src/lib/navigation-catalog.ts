@@ -32,6 +32,7 @@ import {
   Sparkles,
   Store,
   TrendingUp,
+  Truck,
   UserCheck,
   Users,
 } from "lucide-react"
@@ -93,6 +94,7 @@ export function buildNavGroups(t: (key: string) => string): NavGroup[] {
         { label: t("nav.pos"), href: "/pos", icon: ShoppingCart, resource: "module:pos" },
         { label: t("nav.manufacturing"), href: "/manufacturing", icon: Factory, resource: "module:manufacturing" },
         { label: t("nav.map"), href: "/map", icon: MapIcon, resource: "module:map" },
+        { label: t("nav.fleet"), href: "/fleet", icon: Truck, resource: "module:fleet" },
         { label: t("nav.helpdesk"), href: "/helpdesk", icon: HelpCircle, resource: "module:helpdesk" },
         { label: t("nav.workflows"), href: "/workflows", icon: GitBranch, resource: "module:workflows" },
       ],

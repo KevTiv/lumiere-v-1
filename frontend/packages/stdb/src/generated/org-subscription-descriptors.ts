@@ -576,6 +576,42 @@ export const ORG_SUBSCRIPTION_QUERY_DESCRIPTORS = {
     "predicates": [],
     "order_by": []
   },
+  "fleet-inspections": {
+    "table": "fleet_inspection",
+    "predicates": [],
+    "order_by": [
+      {
+        "field": "inspected_at",
+        "direction": "desc"
+      }
+    ]
+  },
+  "fleet-service-records": {
+    "table": "fleet_service_record",
+    "predicates": [],
+    "order_by": [
+      {
+        "field": "serviced_at",
+        "direction": "desc"
+      }
+    ]
+  },
+  "fleet-service-types": {
+    "table": "fleet_vehicle_service_type",
+    "predicates": [
+      {
+        "field": "is_active",
+        "operator": "eq",
+        "value": true
+      }
+    ],
+    "order_by": [
+      {
+        "field": "name",
+        "direction": "asc"
+      }
+    ]
+  },
   "fleet-vehicles": {
     "table": "fleet_vehicle",
     "predicates": [],
@@ -1211,6 +1247,11 @@ export const ORG_SUBSCRIPTION_QUERY_DESCRIPTORS = {
   },
   "project-subcontractor-costs": {
     "table": "project_subcontractor_cost",
+    "predicates": [],
+    "order_by": []
+  },
+  "project-timesheet-approvals": {
+    "table": "project_timesheet_approval",
     "predicates": [],
     "order_by": []
   },

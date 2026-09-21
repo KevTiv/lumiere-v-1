@@ -3,6 +3,8 @@ import { readFileSync } from "node:fs"
 import { fileURLToPath } from "node:url"
 import { describe, it } from "node:test"
 
+import { RELEASE_BLANKET_AFFECTS } from "@lumiere/erp-workflows"
+
 const SOURCE = readFileSync(
   fileURLToPath(new URL("./purchasing.ts", import.meta.url)),
   "utf8",
@@ -38,7 +40,9 @@ describe("blanket purchase subscription plumbing", () => {
       "purchase-blanket-orders",
       "purchase-blanket-order-lines",
     ])
-    assert.deepEqual(invalidatedResources("useReleaseBlanketToPo"), [
+    // Release invalidates the workflow's declared resources, subscription-aware.
+    assert.match(hookBody("useReleaseBlanketToPo"), /invalidateResourceQueries\(qc, organizationId, RELEASE_BLANKET_AFFECTS\)/)
+    assert.deepEqual([...RELEASE_BLANKET_AFFECTS], [
       "purchase-orders",
       "purchase-orders-to-approve",
       "purchase-order-lines",

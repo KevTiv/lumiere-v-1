@@ -1,5 +1,6 @@
 //! Fleet domain test suite — invoke via `run_all_fleet_tests` reducer.
 pub mod gap_fixes_test;
+pub mod lifecycle_test;
 pub mod relational_integrity_test;
 pub mod wave_a_test;
 
@@ -33,9 +34,19 @@ pub fn run_fleet_gap_fixes_test(ctx: &ReducerContext) -> Result<(), String> {
 }
 
 #[spacetimedb::reducer]
+pub fn run_fleet_lifecycle_test(ctx: &ReducerContext) -> Result<(), String> {
+    lifecycle_test::test_history_is_immutable_and_idempotent(ctx)
+        .map_err(|e| format!("history_is_immutable_and_idempotent: {e}"))?;
+    lifecycle_test::test_history_rejects_invalid_scope_and_values(ctx)
+        .map_err(|e| format!("history_rejects_invalid_scope_and_values: {e}"))?;
+    Ok(())
+}
+
+#[spacetimedb::reducer]
 pub fn run_all_fleet_tests(ctx: &ReducerContext) -> Result<(), String> {
     run_fleet_wave_a_test(ctx)?;
     run_fleet_relational_integrity_test(ctx)?;
     run_fleet_gap_fixes_test(ctx)?;
+    run_fleet_lifecycle_test(ctx)?;
     Ok(())
 }

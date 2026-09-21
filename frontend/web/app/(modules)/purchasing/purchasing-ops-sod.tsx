@@ -47,14 +47,14 @@ export interface PurchasingOpsSodProps {
   /** Server-bounded `purchase-orders-to-approve` when available; else client filter. */
   ordersToApprove?: Record<string, unknown>[]
   orders: Record<string, unknown>[]
-  /** Wave C — RFQ / purchase returns (prompt-driven MVP). */
+  /** RFQ and purchase-return form/list entry points. */
   onCreatePurchaseRfq?: () => Promise<void>
   onAddPurchaseRfqBid?: () => Promise<void>
   onAwardPurchaseRfqBid?: () => Promise<void>
   onCreatePurchaseReturn?: () => Promise<void>
   onConfirmPurchaseReturn?: () => Promise<void>
   onCreateVendorCreditFromReturn?: () => Promise<void>
-  /** Wave D advanced — prompt-driven creates (no QueryResourceKey lists yet). */
+  /** One-off advanced purchasing configuration forms. */
   onCreateBlanketOrder?: () => Promise<void>
   onReleaseBlanketToPo?: () => Promise<void>
   onCreatePurchaseContract?: () => Promise<void>
