@@ -18,6 +18,13 @@ use stdb_client::{ReducerCall, StdbClient};
 
 use crate::{harness::audit::PolicyDecision, tools::types::ToolOutput};
 
+const MAX_EVIDENCE_RERETRIEVALS: u32 = 2;
+const MAX_GENERATION_REPAIRS: u32 = 2;
+const MAX_REASON_REPLANS: u32 = 1;
+const MAX_POLL_ATTEMPTS: u32 = 4;
+const POLL_BASE_BACKOFF_MS: u64 = 50;
+const POLL_MAX_BACKOFF_MS: u64 = 400;
+
 use super::{
     answer_gate::collect_json_figures,
     decision_graph::{
@@ -933,6 +940,75 @@ struct DecisionExecution {
     review_reason: Option<String>,
 }
 
+fn answer_reason_needs_retrieval(reason: &str) -> bool {
+    let reason = reason.to_ascii_lowercase();
+    ["evidence", "citation", "source", "support", "ground"]
+        .iter()
+        .any(|needle| reason.contains(needle))
+}
+
+fn answer_reason_is_repairable(reason: &str) -> bool {
+    let reason = reason.to_ascii_lowercase();
+    !["forbidden", "denied", "revoked", "withdrawn", "out of scope", "unauthorized"]
+        .iter()
+        .any(|needle| reason.contains(needle))
+}
+
+fn recovery_evidence_node(graph: &DecisionGraph, target: &str) -> Option<String> {
+    graph.nodes.iter().find_map(|node| match &node.kind {
+        DecisionNode::AcquireEvidence(acquire)
+            if acquire.affects.iter().any(|affected| affected == target) =>
+        {
+            Some(node.id.clone())
+        }
+        _ => None,
+    })
+}
+
+fn push_recovery_diagnostic(
+    evidence_overlays: &mut HashMap<String, Vec<Value>>,
+    node_id: &str,
+    kind: &str,
+    attempt: u32,
+    limit: u32,
+    reason: &str,
+) {
+    evidence_overlays
+        .entry(node_id.to_string())
+        .or_default()
+        .push(json!({
+            "recovery_diagnostic": {
+                "kind": kind,
+                "attempt": attempt,
+                "limit": limit,
+                "reason": reason,
+            }
+        }));
+}
+
+fn reserve_recovery_attempt(
+    counters: &mut HashMap<String, u32>,
+    key: String,
+    limit: u32,
+) -> Option<u32> {
+    let count = counters.entry(key).or_default();
+    if *count >= limit {
+        return None;
+    }
+    *count = count.saturating_add(1);
+    Some(*count)
+}
+
+fn poll_backoff_ms(attempt: u32) -> u64 {
+    if attempt <= 1 {
+        return 0;
+    }
+    let exponent = attempt.saturating_sub(2).min(8);
+    POLL_BASE_BACKOFF_MS
+        .saturating_mul(1_u64 << exponent)
+        .min(POLL_MAX_BACKOFF_MS)
+}
+
 fn graph_hash(graph: &DecisionGraph) -> String {
     let mut canonical = graph
         .nodes
@@ -1312,6 +1388,7 @@ impl GovernedProgramExecutor<'_> {
                             "declared capability node '{}' in {}",
                             node.id, context.program_ref
                         )),
+                        poll: false,
                     };
                     match self
                         .capabilities
@@ -1389,6 +1466,7 @@ impl GovernedProgramExecutor<'_> {
                         capability: acquire.capability.clone(),
                         arguments,
                         rationale: Some("conditional evidence acquisition".to_string()),
+                        poll: false,
                     };
                     match self
                         .capabilities
@@ -1402,7 +1480,7 @@ impl GovernedProgramExecutor<'_> {
                         CapabilityStepOutcome::Executed(output)
                         | CapabilityStepOutcome::Replayed(output) => {
                             let count = evidence_acquisitions.entry(node.id.clone()).or_default();
-                            if *count >= 1 {
+                            if *count >= MAX_EVIDENCE_RERETRIEVALS {
                                 return Ok(outcome(
                                     GovernedProgramStop::EarlyStop(
                                         StopReason::InsufficientEvidence,
@@ -1543,8 +1621,13 @@ impl GovernedProgramExecutor<'_> {
                         .generation_provider
                         .generate(GenerationRequest {
                             objective: context.objective.clone(),
-                            context: Value::Object(
-                                dependency_json(&node, &values).into_iter().collect(),
+                            context: state_for_node_with_evidence(
+                                &node,
+                                &values,
+                                &Value::Object(
+                                    dependency_json(&node, &values).into_iter().collect(),
+                                ),
+                                &evidence_overlays,
                             ),
                             format: generate.format.clone(),
                             instructions: context.generation_instructions.clone(),
@@ -1576,8 +1659,61 @@ impl GovernedProgramExecutor<'_> {
                             qualified_content(&response.content, &limitations),
                             "generated answer admitted with limitations",
                         )),
-                        AnswerAdmissionOutcome::RequiresReview { reason }
-                        | AnswerAdmissionOutcome::Blocked { reason } => Err(reason),
+                        AnswerAdmissionOutcome::RequiresReview { reason } => {
+                            if answer_reason_needs_retrieval(&reason) {
+                                if let Some(acquire_node) = recovery_evidence_node(graph, &node.id) {
+                                    let used = evidence_acquisitions
+                                        .get(&acquire_node)
+                                        .copied()
+                                        .unwrap_or_default();
+                                    if used < MAX_EVIDENCE_RERETRIEVALS {
+                                        push_recovery_diagnostic(
+                                            &mut evidence_overlays,
+                                            &node.id,
+                                            "re_retrieval",
+                                            used.saturating_add(1),
+                                            MAX_EVIDENCE_RERETRIEVALS,
+                                            &reason,
+                                        );
+                                        trace.push(GovernedProgramTraceStep {
+                                            node_id: node.id.clone(),
+                                            kind: "re_retrieval".to_string(),
+                                            summary: reason.clone(),
+                                        });
+                                        current = acquire_node;
+                                        continue;
+                                    }
+                                }
+                            }
+                            Err(reason)
+                        }
+                        AnswerAdmissionOutcome::Blocked { reason } => {
+                            if answer_reason_is_repairable(&reason) {
+                                let key = format!("__repair__:{}", node.id);
+                                if let Some(attempt) = reserve_recovery_attempt(
+                                    &mut reason_iterations,
+                                    key,
+                                    MAX_GENERATION_REPAIRS,
+                                ) {
+                                    push_recovery_diagnostic(
+                                        &mut evidence_overlays,
+                                        &node.id,
+                                        "repair",
+                                        attempt,
+                                        MAX_GENERATION_REPAIRS,
+                                        &reason,
+                                    );
+                                    trace.push(GovernedProgramTraceStep {
+                                        node_id: node.id.clone(),
+                                        kind: "repair".to_string(),
+                                        summary: reason.clone(),
+                                    });
+                                    current = node.id.clone();
+                                    continue;
+                                }
+                            }
+                            Err(reason)
+                        },
                     };
                     match admitted {
                         Ok((content, summary)) => {
@@ -1634,9 +1770,15 @@ impl GovernedProgramExecutor<'_> {
                         ));
                     }
                     *count += 1;
+                    let reasoning_attempt = *count;
                     let request = ReasoningRequest {
                         objective: context.objective.clone(),
-                        bounded_state: state_for_node(&node, &values, &context.bounded_state),
+                        bounded_state: state_for_node_with_evidence(
+                            &node,
+                            &values,
+                            &context.bounded_state,
+                            &evidence_overlays,
+                        ),
                         precedent: Vec::new(),
                         allowed_proposal_kinds: reason.allowed_proposal_kinds.clone(),
                         remaining_rounds: reason.max_iterations - *count + 1,
@@ -1656,6 +1798,40 @@ impl GovernedProgramExecutor<'_> {
                         .await?;
                     match reasoning_outcome {
                         ReasoningOutcome::CapabilityProposal(proposal) => {
+                            if proposal.poll {
+                                let key = format!("__poll__:{}", proposal.capability);
+                                let Some(attempt) = reserve_recovery_attempt(
+                                    &mut reason_iterations,
+                                    key,
+                                    MAX_POLL_ATTEMPTS,
+                                ) else {
+                                    return Ok(outcome(
+                                        GovernedProgramStop::UnableToProgress(format!(
+                                            "polling budget exhausted for capability '{}'",
+                                            proposal.capability
+                                        )),
+                                        None,
+                                        values,
+                                        trace,
+                                        decision_calls,
+                                        capability_calls,
+                                    ));
+                                };
+                                let backoff_ms = poll_backoff_ms(attempt);
+                                trace.push(GovernedProgramTraceStep {
+                                    node_id: node.id.clone(),
+                                    kind: "polling".to_string(),
+                                    summary: format!(
+                                        "poll attempt {attempt}/{MAX_POLL_ATTEMPTS}; backoff={backoff_ms}ms"
+                                    ),
+                                });
+                                if backoff_ms > 0 {
+                                    tokio::time::sleep(std::time::Duration::from_millis(
+                                        backoff_ms,
+                                    ))
+                                    .await;
+                                }
+                            }
                             capability_calls += 1;
                             match self
                                 .capabilities
@@ -1811,8 +1987,63 @@ impl GovernedProgramExecutor<'_> {
                                         capability_calls,
                                     ));
                                 }
-                                AnswerAdmissionOutcome::RequiresReview { reason }
-                                | AnswerAdmissionOutcome::Blocked { reason } => {
+                                AnswerAdmissionOutcome::RequiresReview { reason } => {
+                                    if answer_reason_needs_retrieval(&reason) {
+                                        if let Some(acquire_node) =
+                                            recovery_evidence_node(graph, &node.id)
+                                        {
+                                            let used = evidence_acquisitions
+                                                .get(&acquire_node)
+                                                .copied()
+                                                .unwrap_or_default();
+                                            if used < MAX_EVIDENCE_RERETRIEVALS {
+                                                push_recovery_diagnostic(
+                                                    &mut evidence_overlays,
+                                                    &node.id,
+                                                    "re_retrieval",
+                                                    used.saturating_add(1),
+                                                    MAX_EVIDENCE_RERETRIEVALS,
+                                                    &reason,
+                                                );
+                                                trace.push(GovernedProgramTraceStep {
+                                                    node_id: node.id.clone(),
+                                                    kind: "re_retrieval".to_string(),
+                                                    summary: reason,
+                                                });
+                                                current = acquire_node;
+                                                continue;
+                                            }
+                                        }
+                                    }
+                                    return Ok(outcome(
+                                        GovernedProgramStop::ReviewRequired(reason),
+                                        Some(draft.content),
+                                        values,
+                                        trace,
+                                        decision_calls,
+                                        capability_calls,
+                                    ));
+                                }
+                                AnswerAdmissionOutcome::Blocked { reason } => {
+                                    if answer_reason_is_repairable(&reason)
+                                        && reasoning_attempt < reason.max_iterations
+                                    {
+                                        push_recovery_diagnostic(
+                                            &mut evidence_overlays,
+                                            &node.id,
+                                            "repair",
+                                            reasoning_attempt,
+                                            reason.max_iterations,
+                                            &reason,
+                                        );
+                                        trace.push(GovernedProgramTraceStep {
+                                            node_id: node.id.clone(),
+                                            kind: "repair".to_string(),
+                                            summary: reason,
+                                        });
+                                        current = node.id.clone();
+                                        continue;
+                                    }
                                     return Ok(outcome(
                                         GovernedProgramStop::ReviewRequired(reason),
                                         Some(draft.content),
@@ -1825,6 +2056,30 @@ impl GovernedProgramExecutor<'_> {
                             }
                         }
                         ReasoningOutcome::UnableToProgress(unable) => {
+                            let key = format!("__replan__:{}", node.id);
+                            if reasoning_attempt < reason.max_iterations {
+                                if let Some(attempt) = reserve_recovery_attempt(
+                                    &mut reason_iterations,
+                                    key,
+                                    MAX_REASON_REPLANS,
+                                ) {
+                                    push_recovery_diagnostic(
+                                        &mut evidence_overlays,
+                                        &node.id,
+                                        "replan",
+                                        attempt,
+                                        MAX_REASON_REPLANS,
+                                        &unable.reason,
+                                    );
+                                    trace.push(GovernedProgramTraceStep {
+                                        node_id: node.id.clone(),
+                                        kind: "replan".to_string(),
+                                        summary: unable.reason,
+                                    });
+                                    current = node.id.clone();
+                                    continue;
+                                }
+                            }
                             return Ok(outcome(
                                 GovernedProgramStop::UnableToProgress(unable.reason),
                                 None,
@@ -1863,6 +2118,7 @@ impl GovernedProgramExecutor<'_> {
                             "explicit approval gate '{}' for capability '{}'",
                             node.id, approval.capability
                         )),
+                        poll: false,
                     };
                     let request = match self
                         .capabilities
