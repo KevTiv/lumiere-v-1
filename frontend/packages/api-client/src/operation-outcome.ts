@@ -51,7 +51,7 @@ export class OperationRequestError extends Error {
   }
 }
 
-type JsonObject = Record<string, unknown>
+type JsonObject = JsonObject
 
 function stringField(payload: JsonObject, ...keys: string[]): string | undefined {
   for (const key of keys) {
