@@ -2,7 +2,8 @@
 
 **Status:** Authoritative extension to `governed-intelligence-program-architecture.md`
 **Date:** 2026-09-17
-**Purpose:** Move Lumiere from a safe agent harness toward typed organizational decision software where AI supplies bounded judgments and code owns composition, consequences, review, and graduation to deterministic behavior.
+**Purpose:** Move Lumiere from a safe agent harness toward typed organizational decision software where AI supplies bounded judgments and code owns composition, consequences, review, intelligence compounding, and graduation to deterministic behavior.
+**Related:** `intelligence-compounding-epistemic-trace.md`
 
 ## 1. Core rule
 
@@ -14,6 +15,8 @@ Code computes deterministic facts.
 Program IR composes decisions.
 Policy gates consequences.
 Independent review checks outcomes.
+Observable decision artifacts are captured with provenance.
+Reviewed learning compounds into future bounded context.
 Repeated stable judgments graduate out of AI.
 ```
 
@@ -247,10 +250,14 @@ decision_type_version
 policy_version
 capability_contract_version
 precedent_snapshot_ref
+task_recipe_snapshot_ref(s)
 provider_profile_version
+intelligence_event_ref
 ```
 
-Policy/version changes can invalidate or reduce the weight of older precedents.
+Policy/version changes can invalidate or reduce the weight of older precedents or recipes.
+
+Reviewed `TaskRecipe` procedural memory may accompany DecisionCase precedent when task type, DecisionType/version, material constraints, policy/evidence schema and tenant scope are compatible. Recipes guide decomposition/evidence/checks; they never determine current disposition or authorization.
 
 ## 10. Independent RunReviewProgram
 
@@ -277,6 +284,8 @@ Healthy / ReviewRequired / Defect / IncidentCandidate
 The reviewer must not rely on hidden chain-of-thought from the executing provider. It consumes observable decisions, evidence, program state, capability receipts and outcomes.
 
 Where practical, route review through a different provider/profile than the executor so systematic provider errors are easier to detect.
+
+Review may additionally emit a separate `RunLearningAssessment` over the provenance-labeled epistemic trace. It may validate/reject insights, identify reusable/failure patterns and missing checks, and propose TaskRecipe/DecisionPattern candidates. Review disposition and learning promotion remain separate decisions.
 
 ## 11. Counterfactual / shadow execution
 
@@ -306,6 +315,8 @@ Compare:
 - human correction;
 - cost/latency;
 - precedent lift;
+- TaskRecipe/procedural-memory lift;
+- evidence-selection quality;
 - policy disagreement.
 
 ## 12. AI -> deterministic graduation
@@ -329,8 +340,8 @@ Graduation lifecycle:
 
 ```text
 AI DecisionNode
-  ↓ repeated verified low-entropy outcomes
-DecisionPattern candidate
+  ↓ reviewed trace + repeated verified low-entropy outcomes
+TaskRecipe / DecisionPattern candidate
   ↓ fixtures/evals/human review
 shadow deterministic implementation
   ↓ comparison against live decisions/outcomes
@@ -341,22 +352,25 @@ Graduation must be reversible/versioned. Historical cases remain immutable.
 
 ## 13. Trust and organization controls
 
-For every decision/program run, operators should be able to inspect:
+For every decision/program run, operators should be able to inspect a provenance-aware reasoning notebook built from observable artifacts:
 
 - which decision type/version ran;
 - deterministic facts used;
 - evidence acquired and why;
 - precedents retrieved/used;
+- TaskRecipe guidance retrieved/used;
 - provider/model/profile;
 - probability/confidence + calibration status;
 - gates/thresholds that converted signals to disposition;
 - policy/version bindings;
 - capability receipts/effects;
 - approvals/corrections;
-- independent run-review result;
+- provider-reported factors, alternatives, assumptions and uncertainty where explicitly returned;
+- user/operator corrections;
+- independent run-review and learning-review results;
 - shadow disagreements where enabled.
 
-This is observable organizational reasoning, not hidden chain-of-thought.
+Each item must identify whether it was deterministic/runtime observed, provider reported, reviewer derived or user supplied. This is observable organizational reasoning, not hidden chain-of-thought.
 
 ## 14. Migration sequence
 
@@ -412,7 +426,15 @@ This is observable organizational reasoning, not hidden chain-of-thought.
 - require fixtures/evals/review;
 - shadow deterministic candidate before promotion.
 
-### TDG-09 — Jev admission
+### TDG-09 — intelligence compounding integration
+
+- implement the `IC-01` through `IC-09` workstream from `intelligence-compounding-epistemic-trace.md`;
+- attach epistemic trace nodes to typed graph node identities and existing intelligence events;
+- extend RunReviewProgram with learning assessment without giving it execution authority;
+- retrieve reviewed TaskRecipe memory through the context compiler;
+- measure memory lift through existing zero-authority shadow infrastructure.
+
+### TDG-10 — Jev admission
 
 - map Jev to `Choice` / `Score` / `Probability` nodes through `DecisionProvider`;
 - use the same DecisionType and graph contracts as Mistral/Gemini;
@@ -433,4 +455,8 @@ This extension is adopted when:
 8. an independent RunReviewProgram can flag a run without execution authority;
 9. shadow decision paths cannot mutate business state;
 10. a repeated stable decision can be promoted to a reviewed deterministic candidate;
-11. Jev can later satisfy the same DecisionGraph nodes without changing program semantics.
+11. provider-visible structured explanations can be correlated to typed graph nodes without claiming hidden chain-of-thought;
+12. reviewed trace artifacts can promote into versioned TaskRecipe procedural memory;
+13. context compilation can combine current facts, precedent and TaskRecipe guidance while preserving current-policy precedence;
+14. shadow runs can measure memory lift and smaller-vs-frontier provider quality over identical snapshots;
+15. Jev can later satisfy the same DecisionGraph nodes without changing program semantics.
