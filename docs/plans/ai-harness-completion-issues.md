@@ -783,9 +783,14 @@ and payload-bound idempotency key; replays succeed only for the identical comman
 Steering increments a durable revision and forces a fresh checked checkpoint
 before resume. The authenticated BFF/UI exposes inspect, ask, reply and steer
 without accepting browser-supplied authority, while the gateway independently
-rechecks the actor token and `ai.run.lifecycle` grant. Still open: timeout policy,
-fine-grained dependency scheduling (a required question currently blocks the run),
-live authenticated restart/reconnect E2E, and production capability provisioning.
+rechecks the actor token and `ai.run.lifecycle` grant. Production owner-role
+provisioning now happens during canonical organization bootstrap: the active
+full-access owner receives exact, bounded `ai.evidence.retrieve`,
+`ai.evidence.inspect`, `ai.knowledge.retrieve` and `ai.run.lifecycle` grants.
+The baseline is idempotent, contains no wildcard AI grant, and ordinary roles
+remain default-deny until the existing audited grant reducer explicitly provisions
+them. Still open: timeout policy, fine-grained dependency scheduling (a required
+question currently blocks the run), and live authenticated restart/reconnect E2E.
 
 ---
 
