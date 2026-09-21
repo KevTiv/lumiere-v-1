@@ -924,6 +924,7 @@ mod tests {
                     capability: "erp.search".to_string(),
                     arguments: json!({"q": "PO-42"}),
                     rationale: None,
+                    poll: false,
                 })),
                 Ok(ReasoningOutcome::FinalDraft(FinalDraft {
                     content: "PO-42 was found.".to_string(),
@@ -1084,6 +1085,7 @@ mod tests {
                     capability: "erp.mutate".to_string(),
                     arguments: json!({}),
                     rationale: None,
+                    poll: false,
                 },
             ))]),
         };
@@ -1133,6 +1135,7 @@ mod tests {
                     capability: format!("erp.search_{i}"),
                     arguments: json!({"q": "same"}),
                     rationale: None,
+                    poll: false,
                 },
             )));
         }
@@ -1278,6 +1281,7 @@ mod tests {
                     capability: format!("erp.search_{i}"),
                     arguments: json!({"q": format!("q{i}")}),
                     rationale: None,
+                    poll: false,
                 },
             )));
         }
