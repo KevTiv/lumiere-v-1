@@ -1,3 +1,5 @@
+import type { JsonObject } from '@lumiere/api-client/json-object'
+
 export interface ContinuationView {
   runId: number
   checkpointHash: string
@@ -34,8 +36,8 @@ export interface RunLifecycleView {
 
 export type LifecycleIntent =
   | { kind: 'inspect'; runId: number }
-  | { kind: 'ask'; continuation: ContinuationView; questionKey: string; prompt: string; responseSchemaJson: Record<string, unknown>; required: boolean; idempotencyKey: string }
-  | { kind: 'reply'; continuation: ContinuationView; questionId: number; expectedQuestionRevision: number; answer: Record<string, unknown>; idempotencyKey: string }
+  | { kind: 'ask'; continuation: ContinuationView; questionKey: string; prompt: string; responseSchemaJson: JsonObject; required: boolean; idempotencyKey: string }
+  | { kind: 'reply'; continuation: ContinuationView; questionId: number; expectedQuestionRevision: number; answer: JsonObject; idempotencyKey: string }
   | { kind: 'steer'; continuation: ContinuationView; instruction: string; idempotencyKey: string }
   | { kind: 'interrupt'; continuation: ContinuationView; reason: string; idempotencyKey: string }
   | { kind: 'resume'; continuation: ContinuationView; idempotencyKey: string }
@@ -45,9 +47,9 @@ export type LifecycleIntent =
 const MAX_TEXT = 2_000
 const MAX_ITEMS = 100
 
-function record(value: unknown): Record<string, unknown> | null {
+function record(value: unknown): JsonObject | null {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
-    ? value as Record<string, unknown>
+    ? value as JsonObject
     : null
 }
 
