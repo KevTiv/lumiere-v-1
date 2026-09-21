@@ -531,8 +531,14 @@ Still open, so AIH-15 must not be marked complete:
   second test) and was not run here.
 - Catalog reads are scoped to organization/company, not the acting user's
   grants ("current access" is not per-actor yet).
-- No bounded further-retrieval loop on conflict/missing evidence; the gate
-  qualifies, reviews or blocks but does not re-retrieve.
+- **Bounded recovery is now wired on governed-program answer paths.** Missing
+  or conflicting evidence findings can route back through the graph's declared
+  `AcquireEvidence` node at most twice; the acquisition counter and evidence
+  overlays are checkpointed, so restart/resume cannot reset the allowance.
+  Each acquisition invalidates the declared affected/downstream values before
+  re-evaluation. If the graph has no declared evidence-acquisition path, or the
+  allowance is exhausted, the answer remains review/blocked rather than
+  inventing a retrieval path.
 - Generated contract artifacts were regenerated with the AIH-13/14/17/18
   work and the storage-policy check now passes against a fresh schema
   snapshot (492/492 tables).
@@ -835,6 +841,23 @@ forbidden operation and a violated available domain invariant yield actionable
 diagnostics. Repairs create new versions; persistent errors or exhausted repair
 budgets stop/require review and never publish a failing candidate.
 
+**Status — runtime repair mechanics delivered; validator taxonomy remains partial.**
+The governed executor now feeds answer-gate failures back as bounded recovery
+diagnostics rather than blindly retrying. Generation nodes allow at most two
+repair attempts; reasoning nodes can repair only inside their declared
+`max_iterations` and are additionally capped at two repair rounds. Every revised
+candidate is sent through the normal answer admission gate again. Authorization
+and source-validity failures (`denied`, `forbidden`, `revoked`,
+`withdrawn`, `out of scope`, `unauthorized`) are explicitly non-repairable
+and fail closed. Recovery diagnostics are carried in the existing checkpointed
+evidence overlays, so resume sees the prior failure/attempt rather than starting
+a fresh budget.
+
+Still open for the full AIH-21 acceptance gate: standardizing the same typed
+diagnostic vocabulary across every generated-contract/domain/component
+validator and proving schema/reference/domain-invariant fixtures end to end.
+
+
 ---
 
 ### AIH-22 — Non-progress detection
@@ -869,9 +892,20 @@ evidence, stall past the allowance, different calls with identical empty
 results, fingerprint normalization, the loop-level non-progress stop with its
 recorded events, and bounded polling still reaching a candidate answer.
 
-**Still open:** a per-tool polling policy with attempt, time and backoff bounds
-(the capability contract carries no polling metadata, so one bounded allowance
-stands in), bounded replan, and routing to an admitted question handler.
+**Delivered — explicit polling and bounded replan.** A
+`CapabilityProposal` now carries an explicit `poll` intent. Polling is bounded
+per capability (not prompt, arguments, model or provider) to four attempts with
+capped 0/50/100/200 ms backoff, still consuming the ordinary capability-call
+budget and passing through fresh admission/authorization/spend checks. Identical
+calls continue to use execution recovery rather than bypassing idempotency.
+Generic unchanged-result detection does not misclassify an admitted poll; the
+poll's own independent limit terminates it. The production executor stores poll
+attempts in the checkpointed reasoning counters, while the compatibility loop
+stores them in bounded recovery state. Unable-to-progress receives at most one
+bounded replan and cannot reset retrieval/repair/poll budgets.
+
+**Still open:** routing non-progress to the admitted durable-question handler
+where policy prefers clarification over stop.
 
 ---
 
@@ -896,9 +930,15 @@ hashes and rejects stale parents; resume reauthorizes the actor, skill, inputs,
 graph, knowledge and source dependencies before changing run state. New runs also
 initialize a private lifecycle continuation, and the runtime resume bridge loads
 that continuation and calls the checked reducer rather than directly changing a
-wait state. Required durable questions and uncertain effects block resume. Full
-continuation manifests still do not include every approval, candidate, progress
-and budget component, and automatic recovery/rebuild on mismatch remains open.
+wait state. Required durable questions and uncertain effects block resume. Recovery
+state for the newly bounded paths is now restart-safe without a parallel
+manifest: evidence re-retrieval uses checkpointed `evidence_acquisitions`;
+repair/replan/poll attempts use checkpointed `reason_iterations`; and recovery
+diagnostics/acquired evidence use checkpointed `evidence_overlays`. A resumed
+run therefore cannot regain attempts by changing provider/model or reconnecting.
+Full continuation manifests still do not include every approval, candidate,
+general task-budget/progress component, and automatic rebuild for arbitrary
+manifest mismatch remains open.
 
 ---
 
