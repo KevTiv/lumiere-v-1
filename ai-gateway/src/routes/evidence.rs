@@ -568,6 +568,26 @@ mod route_tests {
     }
 
     #[test]
+    fn run_transcript_never_exposes_raw_tool_output() {
+        let step = redacted_step(&json!({
+            "id": 1,
+            "stepNo": 2,
+            "toolName": "erp.search",
+            "inputHash": "abc123",
+            "outputSummary": "customer secret should never leave the gateway",
+            "outputRowCount": 3,
+            "durationMs": 17,
+            "errorMessage": null
+        }))
+        .expect("redacted step");
+        let encoded = serde_json::to_value(step).expect("serialize");
+        assert_eq!(encoded["resultSummary"], "3 row(s)");
+        assert_eq!(encoded["inputHash"], "abc123");
+        assert!(encoded.get("outputSummary").is_none());
+        assert!(!encoded.to_string().contains("customer secret"));
+    }
+
+    #[test]
     fn actor_scope_is_header_only_and_fail_closed() {
         let actor = ActorCredentials::from_headers(&actor_headers()).expect("actor context");
         assert_eq!(actor.identity, "a".repeat(64));
