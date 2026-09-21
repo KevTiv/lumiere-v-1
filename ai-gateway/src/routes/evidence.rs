@@ -419,18 +419,23 @@ async fn inspect_run(
         company_id: actor.company_id,
         actor_identity: ActorIdentity::parse(&actor.identity),
     };
-    let mut claim_ids = Vec::new();
-    for contribution_id in &contribution_ids {
-        let rows = state
-            .stdb
-            .query_sql(&format!(
-                "SELECT * FROM ai_evidence_claim WHERE organization_id = {} AND company_id = {} AND contribution_id = {}",
-                actor.organization_id, actor.company_id, contribution_id
-            ))
-            .await
-            .map_err(|error| AppError::Internal(error.to_string()))?;
-        claim_ids.extend(rows.iter().filter_map(|row| row_u64(row, "id", "id")));
-    }
+    let contribution_set = contribution_ids.iter().copied().collect::<std::collections::BTreeSet<_>>();
+    let claim_rows = state
+        .stdb
+        .query_sql(&format!(
+            "SELECT * FROM ai_evidence_claim WHERE organization_id = {} AND company_id = {}",
+            actor.organization_id, actor.company_id
+        ))
+        .await
+        .map_err(|error| AppError::Internal(error.to_string()))?;
+    let mut claim_ids = claim_rows
+        .iter()
+        .filter(|row| {
+            row_u64(row, "contributionId", "contribution_id")
+                .is_some_and(|id| contribution_set.contains(&id))
+        })
+        .filter_map(|row| row_u64(row, "id", "id"))
+        .collect::<Vec<_>>();
     claim_ids.sort_unstable();
     claim_ids.dedup();
 
