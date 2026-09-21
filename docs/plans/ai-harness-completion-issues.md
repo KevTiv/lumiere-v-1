@@ -496,8 +496,11 @@ Still open, so AIH-15 must not be marked complete:
   answers still stand alone and never depend on evidence access. Document
   passages carry no effective dates, so their answers release as `qualified`.
   The live browser → gateway → Qdrant → answer-gate proof
-  (`ai-rag-evidence-access.spec.ts`) needs a real LLM and embedder and must be
-  run against a stack that has them.
+  (`ai-rag-evidence-access.spec.ts`) is now strict about provider-backed execution:
+  a grounded release must report non-degraded semantic retrieval, a routed LLM
+  provider/model, actor-authorized passage sources and durable passage-backed
+  claim ids. It remains an environment certification gate and must be run against
+  a stack with a real LLM and embedder before this live proof is marked complete.
 - **Publication adapters now use the full answer admission boundary.** Reports,
   action explanations, saved artifacts and classic-run summaries construct
   explicit material claims and pass them through
