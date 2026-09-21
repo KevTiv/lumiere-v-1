@@ -6,7 +6,7 @@ The authoritative restructuring for post-H5 harness work is documented in:
 - `governed-intelligence-program-migration.md`
 - `decision-precedent-memory-layer.md`
 - `typed-decision-graph-and-run-review-plan.md`
-- `intelligence-compounding-epistemic-trace.md`
+- `harness-decision-trace-replay-organizational-learning.md`
 
 Existing harness/control-plane/model-routing plans must be interpreted through those documents where older language assumes a generic tool-calling LLM loop is the universal runtime, provider output owns execution, uncertainty is collapsed directly into actions, raw transcript history substitutes for governed decision memory, or private chain-of-thought is required for useful reasoning observability.
 
