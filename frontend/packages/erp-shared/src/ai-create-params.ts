@@ -1,3 +1,5 @@
+import type { JsonObject } from "@lumiere/api-client/json-object"
+
 /**
  * Maps AI module form / gateway payloads to SpacetimeDB Create*Params types.
  */
@@ -235,7 +237,7 @@ export function toCreateAiInsightParams(
 }
 
 export function toCreateAiKnowledgeEntryParams(
-  formData: Record<string, unknown>,
+  formData: JsonObject,
 ): CreateAiKnowledgeEntryParams | null {
   const entryKey = requiredTrimmedString(field(formData, "entryKey", "entry_key"))
   const kind = requiredTrimmedString(field(formData, "kind", "kind"))
