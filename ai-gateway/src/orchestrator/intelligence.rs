@@ -293,6 +293,11 @@ pub struct CapabilityProposal {
     pub capability: String,
     pub arguments: Value,
     pub rationale: Option<String>,
+    /// Runtime-owned retry semantics remain bounded even when a provider asks
+    /// to poll. This flag never grants capability authority; admission,
+    /// authorization and spend checks still run on every attempt.
+    #[serde(default)]
+    pub poll: bool,
 }
 
 impl CapabilityProposal {
