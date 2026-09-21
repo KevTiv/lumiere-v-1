@@ -11,7 +11,7 @@ use std::{sync::Arc, time::Duration};
 use axum::{
     body::Body,
     extract::State,
-    http::{header::CACHE_CONTROL, HeaderMap, HeaderValue, Request, StatusCode},
+    http::{header::{CACHE_CONTROL, CONTENT_DISPOSITION}, HeaderMap, HeaderValue, Request, StatusCode},
     middleware::{self, Next},
     response::{IntoResponse, Response},
     routing::post,
@@ -52,6 +52,14 @@ struct InspectEvidenceBody {
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 struct ReviewQueueBody {
     company_id: u64,
+}
+
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+struct RunEvidenceBody {
+    company_id: u64,
+    run_id: u64,
 }
 
 fn is_stable_node_key(value: &str) -> bool {
@@ -149,6 +157,57 @@ async fn inspect_evidence(
     .await
 }
 
+async fn inspect_run_evidence(
+    State(state): State<Arc<AppState>>,
+    org: OrgSession,
+    Json(body): Json<RunEvidenceBody>,
+) -> Result<Response, ApiError> {
+    if body.company_id == 0 || body.run_id == 0 {
+        return Err(ApiError::BadRequest(
+            "companyId and runId must be positive integers".into(),
+        ));
+    }
+    forward_evidence_read(
+        &state,
+        org,
+        body.company_id,
+        "/v1/evidence/run",
+        json!({ "runId": body.run_id }),
+        "Run evidence inspection",
+    )
+    .await
+}
+
+async fn export_run_evidence(
+    State(state): State<Arc<AppState>>,
+    org: OrgSession,
+    Json(body): Json<RunEvidenceBody>,
+) -> Result<Response, ApiError> {
+    if body.company_id == 0 || body.run_id == 0 {
+        return Err(ApiError::BadRequest(
+            "companyId and runId must be positive integers".into(),
+        ));
+    }
+    let run_id = body.run_id;
+    let mut response = forward_evidence_read(
+        &state,
+        org,
+        body.company_id,
+        "/v1/evidence/run/export",
+        json!({ "runId": run_id }),
+        "Run evidence export",
+    )
+    .await?;
+    response.headers_mut().insert(
+        CONTENT_DISPOSITION,
+        HeaderValue::from_str(&format!(
+            "attachment; filename=\"lumiere-run-{run_id}-evidence.json\""
+        ))
+        .map_err(|error| ApiError::Internal(error.to_string()))?,
+    );
+    Ok(response)
+}
+
 /// The reviewer's queue for the caller's own company: pending and flagged
 /// claims and decisions, their sources and affected workflow steps.
 async fn review_queue(
@@ -244,6 +303,8 @@ async fn no_store(request: Request<Body>, next: Next) -> Response {
 pub fn router() -> Router<Arc<AppState>> {
     Router::new()
         .route("/ai/evidence/inspect", post(inspect_evidence))
+        .route("/ai/evidence/runs/inspect", post(inspect_run_evidence))
+        .route("/ai/evidence/runs/export", post(export_run_evidence))
         .route("/ai/evidence/review-queue", post(review_queue))
         .route_layer(middleware::from_fn(no_store))
 }
@@ -324,6 +385,27 @@ mod tests {
                 validate_body(&invalid),
                 Err(ApiError::BadRequest(_))
             ));
+        }
+    }
+
+    #[test]
+    fn run_inspection_accepts_only_company_and_run_intent() {
+        assert!(serde_json::from_value::<RunEvidenceBody>(json!({
+            "companyId": 9,
+            "runId": 42
+        }))
+        .is_ok());
+        for extra in [
+            json!({ "organizationId": 7 }),
+            json!({ "actorIdentity": "forged" }),
+            json!({ "includeRawToolOutput": true }),
+            json!({ "grants": [INSPECT_CAPABILITY] }),
+        ] {
+            let mut body = json!({ "companyId": 9, "runId": 42 });
+            body.as_object_mut()
+                .expect("request object")
+                .extend(extra.as_object().expect("extra object").clone());
+            assert!(serde_json::from_value::<RunEvidenceBody>(body).is_err());
         }
     }
 
