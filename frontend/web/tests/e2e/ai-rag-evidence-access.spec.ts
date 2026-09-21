@@ -43,12 +43,17 @@ type RagSource = {
   text_snippet?: string
 }
 
-type SseMetadata = Pick<RagBody, "verification" | "provenance"> & { sources: RagSource[] }
+type SseMetadata = Pick<
+  RagBody,
+  "verification" | "provenance" | "provider" | "model" | "retrieval_degraded"
+> & { sources: RagSource[] }
 
 type RagBody = {
   answer: string
   sources: RagSource[]
   retrieval_degraded?: boolean
+  provider?: string
+  model?: string
   verification?: { outcome: string; reason?: string }
   provenance?: {
     persisted: boolean
@@ -207,6 +212,9 @@ test.describe("AI RAG evidence access", { tag: "@p0" }, () => {
   function expectGroundedRelease(body: RagBody) {
     expect(ownPassages(body).length, "the ingested passage is cited as a source").toBeGreaterThan(0)
     expect(RELEASED, body.verification?.reason).toContain(body.verification?.outcome)
+    expect(body.retrieval_degraded).toBe(false)
+    expect(body.provider, "a live routed LLM provider handled generation").toBeTruthy()
+    expect(body.model, "the live generation model is recorded").toBeTruthy()
     expect(body.answer).not.toContain("supportRefs")
     expect(body.provenance?.persisted).toBe(true)
     expect(body.provenance?.contributionId).toBeGreaterThan(0)
@@ -315,6 +323,9 @@ test.describe("AI RAG evidence access", { tag: "@p0" }, () => {
 
     const { deltas, metadata } = sse!
     expect(deltas.length).toBeGreaterThan(0)
+    expect(metadata.retrieval_degraded).toBe(false)
+    expect(metadata.provider, "stream metadata records the live routed LLM provider").toBeTruthy()
+    expect(metadata.model, "stream metadata records the live generation model").toBeTruthy()
     expect(metadata.provenance?.persisted).toBe(true)
     expect(metadata.provenance?.claimIds?.length ?? 0).toBeGreaterThan(0)
     expect(
