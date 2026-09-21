@@ -778,7 +778,8 @@ mod tests {
     use crate::orchestrator::agent_loop::{LoopPolicy, LoopTools};
     use crate::orchestrator::governed_services::{
         InMemoryExecutionRecovery, PolicyBackedCapabilityAdmission, RecordingApprovalCoordinator,
-        ShapeOnlyFinalAnswerAdmission, ToolsBackedCapabilityExecutor,
+        DeterministicFinalAnswerAdmission, ShapeOnlyFinalAnswerAdmission,
+        ToolsBackedCapabilityExecutor,
     };
     use crate::orchestrator::intelligence::{
         CapabilityProposal, DecisionKind, DecisionProposal, DecisionTypeRef, EvidenceRef,
@@ -1161,6 +1162,250 @@ mod tests {
         .unwrap();
 
         assert!(matches!(outcome.stop, ProposalLoopStop::NoProgress));
+    }
+
+    #[tokio::test]
+    async fn missing_evidence_gets_one_bounded_retrieval_round_then_admits() {
+        let policy = AllowPolicy;
+        let tools = StubTools {
+            outputs: Mutex::new(vec![output("PO-42 found")]),
+        };
+        let admission = PolicyBackedCapabilityAdmission::new(&policy);
+        let executor = ToolsBackedCapabilityExecutor::new(&tools);
+        let recovery = InMemoryExecutionRecovery::new();
+        let approvals = RecordingApprovalCoordinator;
+        let capabilities =
+            GovernedCapabilityService::new(&admission, &executor, &recovery, &approvals);
+        let final_answer = DeterministicFinalAnswerAdmission;
+        let recorder = RecordingRecorder::new();
+
+        let citation = EvidenceRef {
+            kind: "capability_output".to_string(),
+            id: "erp.search".to_string(),
+        };
+        let reasoner = ScriptedReasoner {
+            outcomes: Mutex::new(vec![
+                Ok(ReasoningOutcome::FinalDraft(FinalDraft {
+                    content: "needs evidence".to_string(),
+                    citations: vec![],
+                    ..Default::default()
+                })),
+                Ok(ReasoningOutcome::CapabilityProposal(CapabilityProposal {
+                    capability: "erp.search".to_string(),
+                    arguments: json!({"q": "PO-42"}),
+                    rationale: Some("retrieve missing evidence".to_string()),
+                    poll: false,
+                })),
+                Ok(ReasoningOutcome::FinalDraft(FinalDraft {
+                    content: "PO-42 was found.".to_string(),
+                    citations: vec![citation],
+                    ..Default::default()
+                })),
+            ]),
+        };
+
+        let outcome = run_proposal_loop(
+            9,
+            &reasoner,
+            &capabilities,
+            &final_answer,
+            &recorder,
+            "find PO-42".to_string(),
+            json!({}),
+            vec![
+                PROPOSAL_KIND_CAPABILITY.to_string(),
+                PROPOSAL_KIND_FINAL_DRAFT.to_string(),
+            ],
+            limits(),
+        )
+        .await
+        .unwrap();
+
+        assert!(matches!(outcome.stop, ProposalLoopStop::CandidateAdmitted(_)));
+        assert_eq!(outcome.state["recovery"]["retrieval_attempts"], 1);
+        assert_eq!(
+            outcome.state["recovery"]["diagnostics"][0]["kind"],
+            "re_retrieval"
+        );
+    }
+
+    #[tokio::test]
+    async fn blocked_candidate_is_repaired_within_shared_round_budget() {
+        let policy = AllowPolicy;
+        let tools = StubTools {
+            outputs: Mutex::new(vec![output("PO-42 found")]),
+        };
+        let admission = PolicyBackedCapabilityAdmission::new(&policy);
+        let executor = ToolsBackedCapabilityExecutor::new(&tools);
+        let recovery = InMemoryExecutionRecovery::new();
+        let approvals = RecordingApprovalCoordinator;
+        let capabilities =
+            GovernedCapabilityService::new(&admission, &executor, &recovery, &approvals);
+        let final_answer = DeterministicFinalAnswerAdmission;
+        let recorder = RecordingRecorder::new();
+        let citation = EvidenceRef {
+            kind: "capability_output".to_string(),
+            id: "erp.search".to_string(),
+        };
+
+        let reasoner = ScriptedReasoner {
+            outcomes: Mutex::new(vec![
+                Ok(ReasoningOutcome::FinalDraft(FinalDraft {
+                    content: "fabricated first draft".to_string(),
+                    citations: vec![citation.clone()],
+                    ..Default::default()
+                })),
+                Ok(ReasoningOutcome::CapabilityProposal(CapabilityProposal {
+                    capability: "erp.search".to_string(),
+                    arguments: json!({"q": "PO-42"}),
+                    rationale: Some("repair with actual evidence".to_string()),
+                    poll: false,
+                })),
+                Ok(ReasoningOutcome::FinalDraft(FinalDraft {
+                    content: "repaired".to_string(),
+                    citations: vec![citation],
+                    ..Default::default()
+                })),
+            ]),
+        };
+
+        let outcome = run_proposal_loop(
+            9,
+            &reasoner,
+            &capabilities,
+            &final_answer,
+            &recorder,
+            "answer".to_string(),
+            json!({}),
+            vec![
+                PROPOSAL_KIND_CAPABILITY.to_string(),
+                PROPOSAL_KIND_FINAL_DRAFT.to_string(),
+            ],
+            limits(),
+        )
+        .await
+        .unwrap();
+
+        assert!(matches!(outcome.stop, ProposalLoopStop::CandidateAdmitted(_)));
+        assert_eq!(outcome.state["recovery"]["repair_attempts"], 1);
+    }
+
+    #[tokio::test]
+    async fn explicit_polling_has_independent_attempt_budget() {
+        let policy = AllowPolicy;
+        let tools = StubTools {
+            outputs: Mutex::new(vec![output("still pending")]),
+        };
+        let admission = PolicyBackedCapabilityAdmission::new(&policy);
+        let executor = ToolsBackedCapabilityExecutor::new(&tools);
+        let recovery = InMemoryExecutionRecovery::new();
+        let approvals = RecordingApprovalCoordinator;
+        let capabilities =
+            GovernedCapabilityService::new(&admission, &executor, &recovery, &approvals);
+        let final_answer = ShapeOnlyFinalAnswerAdmission;
+        let recorder = RecordingRecorder::new();
+
+        let mut scripted = Vec::new();
+        for cursor in 0..5 {
+            scripted.push(Ok(ReasoningOutcome::CapabilityProposal(
+                CapabilityProposal {
+                    capability: "erp.status".to_string(),
+                    arguments: json!({"cursor": cursor}),
+                    rationale: Some("poll status".to_string()),
+                    poll: true,
+                },
+            )));
+        }
+        let reasoner = ScriptedReasoner {
+            outcomes: Mutex::new(scripted),
+        };
+        let outcome = run_proposal_loop(
+            9,
+            &reasoner,
+            &capabilities,
+            &final_answer,
+            &recorder,
+            "wait for status".to_string(),
+            json!({}),
+            vec![PROPOSAL_KIND_CAPABILITY.to_string()],
+            ProposalLoopLimits {
+                max_rounds: 6,
+                max_capability_calls: 6,
+                max_unchanged_results: 0,
+            },
+        )
+        .await
+        .unwrap();
+
+        assert!(matches!(
+            outcome.stop,
+            ProposalLoopStop::UnableToProgress(ref reason)
+                if reason.contains("polling budget exhausted")
+        ));
+        assert_eq!(
+            outcome.state["recovery"]["polls"]["erp.status"]["attempts"],
+            MAX_POLL_ATTEMPTS
+        );
+    }
+
+    #[tokio::test]
+    async fn unable_to_progress_gets_only_one_bounded_replan() {
+        let policy = AllowPolicy;
+        let tools = StubTools {
+            outputs: Mutex::new(vec![output("PO-42 found")]),
+        };
+        let admission = PolicyBackedCapabilityAdmission::new(&policy);
+        let executor = ToolsBackedCapabilityExecutor::new(&tools);
+        let recovery = InMemoryExecutionRecovery::new();
+        let approvals = RecordingApprovalCoordinator;
+        let capabilities =
+            GovernedCapabilityService::new(&admission, &executor, &recovery, &approvals);
+        let final_answer = DeterministicFinalAnswerAdmission;
+        let recorder = RecordingRecorder::new();
+
+        let citation = EvidenceRef {
+            kind: "capability_output".to_string(),
+            id: "erp.search".to_string(),
+        };
+        let reasoner = ScriptedReasoner {
+            outcomes: Mutex::new(vec![
+                Ok(ReasoningOutcome::UnableToProgress(UnableToProgress {
+                    reason: "first approach failed".to_string(),
+                    last_step_no: 1,
+                })),
+                Ok(ReasoningOutcome::CapabilityProposal(CapabilityProposal {
+                    capability: "erp.search".to_string(),
+                    arguments: json!({"q": "PO-42"}),
+                    rationale: Some("bounded replan".to_string()),
+                    poll: false,
+                })),
+                Ok(ReasoningOutcome::FinalDraft(FinalDraft {
+                    content: "recovered".to_string(),
+                    citations: vec![citation],
+                    ..Default::default()
+                })),
+            ]),
+        };
+
+        let outcome = run_proposal_loop(
+            9,
+            &reasoner,
+            &capabilities,
+            &final_answer,
+            &recorder,
+            "recover".to_string(),
+            json!({}),
+            vec![
+                PROPOSAL_KIND_CAPABILITY.to_string(),
+                PROPOSAL_KIND_FINAL_DRAFT.to_string(),
+            ],
+            limits(),
+        )
+        .await
+        .unwrap();
+
+        assert!(matches!(outcome.stop, ProposalLoopStop::CandidateAdmitted(_)));
+        assert_eq!(outcome.state["recovery"]["replan_attempts"], 1);
     }
 
     #[tokio::test]
