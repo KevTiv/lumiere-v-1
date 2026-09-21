@@ -4,7 +4,7 @@
 **Date:** 2026-09-17
 **Supersedes:** model-first / generic-agent-loop assumptions in future harness work
 **Preserves:** generated ERP capability authority, Casbin/STDB authority, per-call policy, spend admission, approval stops, durable run events, evidence/verification contracts
-**Extends:** `decision-precedent-memory-layer.md` and `typed-decision-graph-and-run-review-plan.md`
+**Extends:** `decision-precedent-memory-layer.md`, `typed-decision-graph-and-run-review-plan.md`, and `intelligence-compounding-epistemic-trace.md`
 
 ## 1. Decision
 
@@ -32,6 +32,7 @@ capability()        -> governed ERP execution
 verify()            -> evidence/result validation
 approval()          -> human/policy-controlled transition
 run_review()        -> independent post-run review
+trace_learning()     -> provenance-labeled observable reasoning artifacts
 ```
 
 The key boundary is:
@@ -43,6 +44,8 @@ Program IR composes.
 Policy gates consequences.
 Governed runtime executes and verifies.
 Independent review judges the completed run.
+Observable artifacts accumulate.
+Reviewed learning compounds into future bounded context.
 ```
 
 A future Jev/System-One provider implements the same `DecisionProvider` contract used by Mistral/Gemini and maps only to typed decision nodes.
@@ -85,7 +88,11 @@ immutable trace + outcome
       ↓
 RunReviewProgram
       ↓
-DecisionCase / correction / pattern / graduation signals
+EpistemicTraceGraph + learning assessment
+      ↓
+DecisionCase / TaskRecipe / correction / pattern
+      ↓
+shadow evaluation / deterministic graduation
 ```
 
 ## 3. Non-negotiable invariants
@@ -111,6 +118,12 @@ DecisionCase / correction / pattern / graduation signals
 19. Shadow/counterfactual paths never mutate live business state.
 20. Stable repeated decisions should be candidates for reviewed deterministic graduation instead of permanent model dependence.
 21. Run review consumes observable traces/evidence/outcomes, never hidden chain-of-thought.
+22. Provider-reported explanation, harness observation, reviewer derivation and user correction are distinct provenance classes and must never be conflated.
+23. Provider-private chain-of-thought is neither required nor assumed; the harness captures only provider-visible output and observable runtime artifacts.
+24. Procedural memory may inform future requests but never grants current authorization, approval, or execution authority.
+25. Only reviewed learning may be promoted into durable `TaskRecipe` procedural memory.
+26. User/operator corrections are append-only learning evidence and never rewrite historical events or cases.
+27. Raw transcripts are not procedural memory; durable learning is compact, typed, provenance-linked and versioned.
 
 ## 4. Intelligence and decision primitives
 
@@ -124,6 +137,8 @@ pub trait DecisionProvider: Send + Sync {
 ```
 
 `DecisionRequest` contains bounded state, explicit typed questions, candidate values, optional precedent context, decision type/version, and evidence refs.
+
+`DecisionResponse` should converge on a bounded `DecisionExplanation` contract containing an explicit summary, material factors, considered alternatives, uncertainties, assumptions, evidence refs and useful follow-up checks. These fields are deliberate provider output, not reconstructed private chain-of-thought, and remain subject to evidence/verification rules.
 
 Initial implementation uses Mistral/Gemini through `LlmDecisionAdapter`; Jev later implements the same contract.
 
@@ -211,12 +226,13 @@ Provider confidence and calibrated confidence are distinct. Thresholds belong to
 
 ## 8. Decision precedent and institutional memory
 
-Decision memory is separate from knowledge and execution memory.
+Decision memory is separate from knowledge, execution and procedural memory.
 
 ```text
-KnowledgeMemory  -> facts, documents, policies, sources
-DecisionMemory   -> prior cases, corrections, outcomes, patterns
-ExecutionMemory  -> runs, capability traces, artifacts, recipes
+KnowledgeMemory   -> facts, documents, policies, sources
+DecisionMemory    -> prior cases, corrections, outcomes, patterns
+ExecutionMemory   -> runs, capability traces, artifacts
+ProceduralMemory  -> reviewed TaskRecipe problem-solving patterns
 ```
 
 Precedent retrieval is DecisionType/version aware and considers tenant/company scope, policy version, material constraints, context/entity shape, verification/outcome quality, recency, review status, and supersession/rejection state.
@@ -224,6 +240,8 @@ Precedent retrieval is DecisionType/version aware and considers tenant/company s
 Historical approval/authorization never becomes current authority.
 
 Repeated stable decision clusters may become reviewed `DecisionPattern`s and later deterministic program/policy/native ERP behavior.
+
+Reviewed trace patterns may separately become versioned `TaskRecipe`s describing useful evidence, decision points, checks, capabilities, failure modes and escalation patterns for a task class. Recipes are compact procedural context, not transcript replay, and remain subordinate to current facts, policy and authorization.
 
 ## 9. ReasoningStep
 
@@ -250,13 +268,15 @@ IncidentCandidate
 
 Where practical, route review through a different provider/profile from execution.
 
+Review may additionally emit a separate `RunLearningAssessment` that validates or rejects trace insights, identifies reusable/failure patterns and missing checks, and proposes learning candidates. A healthy run is not automatically a promotable learning example; promotion requires explicit review.
+
 ## 11. Shadowing and counterfactuals
 
 Shadow evaluation may compare providers, candidate policy versions, and deterministic DecisionPattern candidates over the same versioned decision snapshot.
 
 Shadows cannot change control flow or business state.
 
-Measure calibration, verified outcome, correction rate, cost/latency, precedent lift and policy disagreement.
+Measure calibration, verified outcome, correction rate, cost/latency, precedent lift, TaskRecipe lift and policy disagreement. Counterfactuals should support with/without-memory comparisons and smaller/frontier model comparisons over the same versioned snapshot.
 
 ## 12. Deterministic graduation
 
@@ -286,6 +306,14 @@ AI decision
 
 Graduation is versioned and reversible.
 
+### 12.1 Intelligence compounding
+
+The detailed learning substrate is defined in `intelligence-compounding-epistemic-trace.md`.
+
+Every governed run may emit an append-only epistemic trace DAG linking deterministic facts, provider-reported factors/alternatives/uncertainties, evidence acquisition, capability results, user corrections and reviewer findings to their real provenance. Reviewed traces may produce `TaskRecipe` procedural memory and `DecisionPattern` candidates.
+
+The context compiler may inject compatible reviewed recipes alongside DecisionCase precedent. Current authoritative state and policy always dominate memory. The same shadow infrastructure must measure whether precedent/recipes improve quality enough for smaller or cheaper providers to satisfy a decision class.
+
 ## 13. What happens to `agent_loop.rs`
 
 Retain bounded transcript/state, model rounds, malformed proposal handling, duplicate/non-progress detection, proposal construction, clarification and planning/replanning.
@@ -296,7 +324,7 @@ Existing direct-execution behavior may survive temporarily through a compatibili
 
 ## 14. Migration authority
 
-Execution sequence is defined in `governed-intelligence-program-migration.md`, now spanning intelligence seams, proposal-only reasoning, precedent, DecisionType registry, typed DecisionGraph IR, probabilistic state, conditional evidence, parallel decision batches, independent run review, shadow/counterfactual evaluation, deterministic graduation and Jev admission.
+Execution sequence is defined in `governed-intelligence-program-migration.md`, now spanning intelligence seams, proposal-only reasoning, precedent, DecisionType registry, typed DecisionGraph IR, probabilistic state, conditional evidence, parallel decision batches, independent run review, epistemic trace capture, reviewed procedural memory, memory-lift shadow evaluation, deterministic graduation and Jev admission.
 
 ## 15. Acceptance criteria
 
@@ -313,4 +341,8 @@ The architecture is adopted when:
 9. independent RunReviewProgram can flag a run without execution authority;
 10. shadows cannot mutate business state;
 11. repeated stable decisions can be surfaced and shadowed as deterministic candidates;
-12. Jev can later satisfy the same DecisionGraph nodes without changing program semantics.
+12. Jev can later satisfy the same DecisionGraph nodes without changing program semantics;
+13. typed provider explanations can capture evidence-linked factors, alternatives and uncertainty without claiming hidden chain-of-thought;
+14. observable reasoning artifacts are persisted with explicit provenance and correlated to the governed run/graph node;
+15. only independently reviewed material can enter versioned TaskRecipe procedural memory;
+16. shadow evaluation can measure precedent/recipe lift and compare smaller versus frontier model profiles over the same decision snapshot.
