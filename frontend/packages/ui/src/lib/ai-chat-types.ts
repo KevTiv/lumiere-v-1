@@ -46,6 +46,7 @@ export interface ChatMessage {
     model?: string
     tokens?: number
     duration?: number
+    runId?: number
   }
 }
 
