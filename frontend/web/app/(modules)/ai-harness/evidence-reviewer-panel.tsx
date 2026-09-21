@@ -4,7 +4,7 @@ import type { JsonObject } from "@lumiere/api-client/json-object"
 
 import { type FormEvent, useEffect, useMemo, useRef, useState } from "react"
 import { useSearchParams } from "next/navigation"
-import { AlertCircle, BookOpenCheck, Building2, CheckCircle2, MessageSquarePlus, Search, ShieldX } from "lucide-react"
+import { AlertCircle, BookOpenCheck, Building2, CheckCircle2, Download, MessageSquarePlus, Search, ShieldX } from "lucide-react"
 import { Button } from "@lumiere/ui"
 import { Alert, AlertDescription, AlertTitle } from "@lumiere/ui/components/alert"
 import { Badge } from "@lumiere/ui/components/badge"
@@ -45,6 +45,7 @@ function parseIds(value: string): number[] | null {
 export function EvidenceReviewerPanel({ companies }: EvidenceReviewerPanelProps) {
   const searchParams = useSearchParams()
   const companyOptions = useMemo(() => companyRowsToSelectOptions(companies), [companies])
+  const linkedRunId = Number(searchParams.get("runId"))
   const [companyId, setCompanyId] = useState(() => companyOptions[0]?.value ?? "")
   const [kind, setKind] = useState<EvidenceTargetKind>("decision")
   const [targetId, setTargetId] = useState("")
@@ -181,6 +182,28 @@ export function EvidenceReviewerPanel({ companies }: EvidenceReviewerPanelProps)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams])
 
+  const exportLinkedRun = async () => {
+    const parsedCompanyId = Number(companyId)
+    if (!Number.isSafeInteger(linkedRunId) || linkedRunId <= 0
+      || !Number.isSafeInteger(parsedCompanyId) || parsedCompanyId <= 0) return
+    const response = await fetch("/api/ai/evidence/runs/export", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ companyId: parsedCompanyId, runId: linkedRunId }),
+    })
+    if (!response.ok) {
+      setRequest({ status: "error", message: "The authorized run export could not be created." })
+      return
+    }
+    const blob = await response.blob()
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement("a")
+    link.href = url
+    link.download = `lumiere-run-${linkedRunId}-evidence.json`
+    link.click()
+    URL.revokeObjectURL(url)
+  }
+
   const inspect = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     void loadInspection()
@@ -263,6 +286,11 @@ export function EvidenceReviewerPanel({ companies }: EvidenceReviewerPanelProps)
         <p className="text-sm text-muted-foreground">
           Inspect a decision or claim and trace it back to reviewed passages and attributed sources.
         </p>
+        {Number.isSafeInteger(linkedRunId) && linkedRunId > 0 ? (
+          <Button type="button" variant="outline" className="mt-2 w-fit" onClick={() => void exportLinkedRun()}>
+            <Download data-icon="inline-start" /> Export run #{linkedRunId}
+          </Button>
+        ) : null}
       </div>
 
       <Card>
