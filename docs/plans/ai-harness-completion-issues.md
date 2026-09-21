@@ -698,8 +698,17 @@ re-review, revocation, deletion and discretionary acknowledgement.
 
 Still open:
 
-- No derived cache actually consults the watermark: the Qdrant/semantic index
-  and any cached answers are not invalidated by a source change yet.
+- Qdrant/semantic invalidation is now wired from the authoritative source-change
+  transaction: each affected passage marks its `search_embedding` row
+  `deleted` and durably enqueues an `embedding`/`delete_embedding` job.
+  The gateway worker re-resolves that tombstone in the same org/company scope
+  before deleting the Qdrant point. A stale point cannot leak during propagation:
+  passage-backed RAG always resolves the Qdrant identifier through current STDB
+  passage/source state and release-time authorization before text or an answer is
+  disclosed. The current RAG serving path has no reusable answer cache (browser
+  calls are no-store/mutation-style; chat messages are durable history), so there
+  is no second answer-cache layer to invalidate. The source-change id remains the
+  watermark contract for future derived caches.
 - Blocking *execution* is enforced only where these reducers are the path
   (approval, binding, link confirmation); the gateway inspector reports the
   decision but publication/action-draft execution does not call it (AIH-15
