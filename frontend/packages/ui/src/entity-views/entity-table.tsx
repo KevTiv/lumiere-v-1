@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect } from "react"
 import { cn } from "../lib/utils"
-import type { EntityAction, EntityTableConfig } from "../lib/entity-view-types"
+import type { EntityAction, EntityRow, EntityTableConfig } from "../lib/entity-view-types"
 import { filterEntitySurface } from "../lib/entity-view-types"
 import { useRBAC } from "../lib/rbac-context"
 import {
@@ -71,21 +71,21 @@ type SortDirection = "asc" | "desc"
 
 interface EntityTableProps {
   config: EntityTableConfig
-  data: Record<string, unknown>[]
+  data: EntityRow[]
   /** Row key value highlighted as the ERP AI focus target */
   aiFocusRowKey?: string
-  onRowClick?: (row: Record<string, unknown>) => void
+  onRowClick?: (row: EntityRow) => void
   className?: string
   isLoading?: boolean
   /** URL or parent-provided filters applied on mount (e.g. chart drill-down). */
   initialFilters?: Record<string, string>
 }
 
-function rowFilterValue(row: Record<string, unknown>, key: string): string {
+function rowFilterValue(row: EntityRow, key: string): string {
   const val = row[key]
   if (val == null) return ""
   if (typeof val === "object" && !Array.isArray(val)) {
-    const obj = val as Record<string, unknown>
+    const obj = val as EntityRow
     if ("tag" in obj && typeof obj.tag === "string") return obj.tag
     if ("some" in obj) return rowFilterValue({ [key]: obj.some }, key)
   }
@@ -97,7 +97,7 @@ function csvCellValue(value: unknown): string | number {
   if (typeof value === "string" || typeof value === "number") return value
   if (typeof value === "boolean") return value ? "Yes" : "No"
   if (typeof value === "object" && !Array.isArray(value)) {
-    const obj = value as Record<string, unknown>
+    const obj = value as EntityRow
     if ("tag" in obj && typeof obj.tag === "string") return obj.tag
     if ("some" in obj) return csvCellValue(obj.some)
     const d = formatTimestampLike(value)
@@ -257,7 +257,7 @@ export function EntityTable({
 
   const [pendingConfirm, setPendingConfirm] = useState<{
     action: EntityAction
-    rows: Record<string, unknown>[]
+    rows: EntityRow[]
   } | null>(null)
 
   const runAction = (action: EntityAction) => {
@@ -271,7 +271,7 @@ export function EntityTable({
     (hasActions && actions.some((a) => a.requiresSelection === true))
   const rowsAreInteractive = Boolean(onRowClick || selectionToggleOnRowClick)
 
-  const activateRow = (key: string, row: Record<string, unknown>) => {
+  const activateRow = (key: string, row: EntityRow) => {
     if (selectionToggleOnRowClick) toggleRow(key)
     onRowClick?.(row)
   }

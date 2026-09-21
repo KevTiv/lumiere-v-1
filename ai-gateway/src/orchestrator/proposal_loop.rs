@@ -574,7 +574,10 @@ fn consume_recovery_attempt(
         "limit": limit,
         "reason": reason,
     });
-    match recovery.get_mut("diagnostics").and_then(Value::as_array_mut) {
+    match recovery
+        .get_mut("diagnostics")
+        .and_then(Value::as_array_mut)
+    {
         Some(items) => items.push(diagnostic),
         None => {
             recovery.insert("diagnostics".to_string(), json!([diagnostic]));
@@ -592,9 +595,16 @@ fn reason_needs_retrieval(reason: &str) -> bool {
 
 fn reason_is_repairable(reason: &str) -> bool {
     let reason = reason.to_ascii_lowercase();
-    !["forbidden", "denied", "revoked", "withdrawn", "out of scope", "unauthorized"]
-        .iter()
-        .any(|needle| reason.contains(needle))
+    ![
+        "forbidden",
+        "denied",
+        "revoked",
+        "withdrawn",
+        "out of scope",
+        "unauthorized",
+    ]
+    .iter()
+    .any(|needle| reason.contains(needle))
 }
 
 fn reserve_poll_attempt(
@@ -777,9 +787,9 @@ mod tests {
     use crate::harness::manifest::SkillVersionRef;
     use crate::orchestrator::agent_loop::{LoopPolicy, LoopTools};
     use crate::orchestrator::governed_services::{
-        InMemoryExecutionRecovery, PolicyBackedCapabilityAdmission, RecordingApprovalCoordinator,
-        DeterministicFinalAnswerAdmission, ShapeOnlyFinalAnswerAdmission,
-        ToolsBackedCapabilityExecutor,
+        DeterministicFinalAnswerAdmission, InMemoryExecutionRecovery,
+        PolicyBackedCapabilityAdmission, RecordingApprovalCoordinator,
+        ShapeOnlyFinalAnswerAdmission, ToolsBackedCapabilityExecutor,
     };
     use crate::orchestrator::intelligence::{
         CapabilityProposal, DecisionKind, DecisionProposal, DecisionTypeRef, EvidenceRef,
@@ -1221,7 +1231,10 @@ mod tests {
         .await
         .unwrap();
 
-        assert!(matches!(outcome.stop, ProposalLoopStop::CandidateAdmitted(_)));
+        assert!(matches!(
+            outcome.stop,
+            ProposalLoopStop::CandidateAdmitted(_)
+        ));
         assert_eq!(outcome.state["recovery"]["retrieval_attempts"], 1);
         assert_eq!(
             outcome.state["recovery"]["diagnostics"][0]["kind"],
@@ -1286,7 +1299,10 @@ mod tests {
         .await
         .unwrap();
 
-        assert!(matches!(outcome.stop, ProposalLoopStop::CandidateAdmitted(_)));
+        assert!(matches!(
+            outcome.stop,
+            ProposalLoopStop::CandidateAdmitted(_)
+        ));
         assert_eq!(outcome.state["recovery"]["repair_attempts"], 1);
     }
 
@@ -1404,7 +1420,10 @@ mod tests {
         .await
         .unwrap();
 
-        assert!(matches!(outcome.stop, ProposalLoopStop::CandidateAdmitted(_)));
+        assert!(matches!(
+            outcome.stop,
+            ProposalLoopStop::CandidateAdmitted(_)
+        ));
         assert_eq!(outcome.state["recovery"]["replan_attempts"], 1);
     }
 

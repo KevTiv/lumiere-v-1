@@ -1,4 +1,5 @@
 import { useMemo } from "react"
+import type { QueryRow } from "../http"
 import type { CreateSaleOrderLineParams } from "@lumiere/stdb/types"
 import {
   SALE_ORDER_LINE_AFFECTS,
@@ -25,7 +26,7 @@ export interface SaleOrderLineWorkflowLabels {
 }
 
 type CreateInput = CreateSaleOrderLineInput<CreateSaleOrderLineParams>
-type UpdateInput = UpdateSaleOrderLineInput<Record<string, unknown>>
+type UpdateInput = UpdateSaleOrderLineInput<QueryRow>
 
 /**
  * `sales.order-line` record workflow. Each transition also invalidates `sale-orders`: the
@@ -74,7 +75,7 @@ export function useSaleOrderLineWorkflow(
 
   const update = useMemo(
     () =>
-      updateSaleOrderLineAction<Record<string, unknown>>({
+      updateSaleOrderLineAction<QueryRow>({
         label: labels.update,
         execute: (input) => runner.run(`sales.order-line.update:${input.lineId}`, updateSpec, input),
       }),

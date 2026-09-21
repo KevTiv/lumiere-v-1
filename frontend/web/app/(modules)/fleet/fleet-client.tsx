@@ -2,7 +2,7 @@
 
 import { useMemo } from "react"
 import { useTranslation } from "@lumiere/i18n"
-import { ModuleView, MissingOrganization } from "@lumiere/ui"
+import { ModuleView, MissingOrganization, type EntityRow } from "@lumiere/ui"
 import { fleetModuleConfig } from "@/lib/module-dashboard-configs"
 import { useFleetModuleSubscription } from "@/lib/module-subscription-hooks"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
@@ -47,16 +47,16 @@ function FleetClientLoaded({ initialVehicles, organizationId }: FleetClientLoade
   const recordService = useRecordFleetService(orgId, company ?? undefined)
   const recordInspection = useRecordFleetInspection(orgId, company ?? undefined)
 
-  const belongsToCompany = (row: Record<string, unknown>, allowOrganizationWide = false) => {
+  const belongsToCompany = (row: EntityRow, allowOrganizationWide = false) => {
     if (company == null) return true
     const rowCompany = row.company_id ?? row.companyId
     if (allowOrganizationWide && rowCompany == null) return true
     return String(rowCompany ?? "") === company.toString()
   }
-  const vehicleRows = (vehicles as unknown as Record<string, unknown>[]).filter((row) =>
+  const vehicleRows = (vehicles as unknown as EntityRow[]).filter((row) =>
     belongsToCompany(row),
   )
-  const employeeRows = (employees as unknown as Record<string, unknown>[]).filter((row) =>
+  const employeeRows = (employees as unknown as EntityRow[]).filter((row) =>
     belongsToCompany(row),
   )
   const serviceTypeRows = serviceTypes.filter((row) => belongsToCompany(row, true))
@@ -64,8 +64,8 @@ function FleetClientLoaded({ initialVehicles, organizationId }: FleetClientLoade
   const inspectionRows = inspections.filter((row) => belongsToCompany(row))
 
   const moduleConfig = useMemo(() => {
-    const rowId = (row: Record<string, unknown>) => String(row.id ?? "")
-    const rowLabel = (row: Record<string, unknown>, fallback: string) =>
+    const rowId = (row: EntityRow) => String(row.id ?? "")
+    const rowLabel = (row: EntityRow, fallback: string) =>
       String(row.name ?? row.display_name ?? row.displayName ?? fallback)
     return fleetModuleConfig(t, {
       vehicles: vehicleRows.map((row) => ({ value: rowId(row), label: rowLabel(row, `Vehicle ${rowId(row)}`) })),

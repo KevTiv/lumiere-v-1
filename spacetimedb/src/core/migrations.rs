@@ -9,6 +9,7 @@ use std::collections::BTreeSet;
 
 use spacetimedb::{Identity, ReducerContext, Table, Timestamp};
 
+use crate::ai::capability_grants::provision_owner_ai_capability_grants;
 use crate::accounting::fiscal_periods::{
     accounting_ownership_backfill_issue, accounting_ownership_backfill_run,
     AccountingOwnershipBackfillIssue, AccountingOwnershipBackfillRun,
@@ -17,7 +18,7 @@ use crate::core::auth::{password_reset_token, user_credential};
 use crate::core::cold_tier_identity::cold_tier_service_identity;
 use crate::core::country_pack::{country_pack_definition, country_pack_tax_rule};
 use crate::core::organization::organization;
-use crate::core::permissions::{sod_conflict_rule, SodConflictRule};
+use crate::core::permissions::{role, sod_conflict_rule, Role, SodConflictRule};
 use crate::core::reference::{country, currency};
 use crate::core::users::{
     find_user_profile_for_identity, find_user_profile_for_organization, user_organization,
@@ -911,6 +912,34 @@ fn seed_pending_global_migrations_for_organization(ctx: &ReducerContext, organiz
         ctx,
         organization_id,
     );
+    if let Err(error) = backfill_owner_ai_capability_grants_for_organization(ctx, organization_id) {
+        log::warn!(
+            "Owner AI capability grant backfill skipped for organization {organization_id}: {error}"
+        );
+    }
+}
+
+/// Repair the exact owner AI grant baseline for a pre-existing tenant.
+/// Selection is deterministic and restricted to the same active, system,
+/// full-access role shape used by tenant bootstrap.
+pub(crate) fn backfill_owner_ai_capability_grants_for_organization(
+    ctx: &ReducerContext,
+    organization_id: u64,
+) -> Result<(), String> {
+    let owner_role: Role = ctx
+        .db
+        .role()
+        .iter()
+        .filter(|candidate| {
+            candidate.organization_id == organization_id
+                && candidate.is_active
+                && candidate.is_system
+                && candidate.name.eq_ignore_ascii_case("owner")
+                && candidate.permissions.iter().any(|permission| permission == "*:*")
+        })
+        .min_by_key(|candidate| candidate.id)
+        .ok_or_else(|| "active system owner role with full access was not found".to_string())?;
+    provision_owner_ai_capability_grants(ctx, organization_id, &owner_role)
 }
 
 /// Apply pending migrations for one organization.

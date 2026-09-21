@@ -5615,7 +5615,8 @@
       }
     },
     "blanketOrders": {
-      "tab": "Blanket orders"
+      "tab": "Blanket orders",
+      "release": "Release blanket order"
     },
     "vendors": {
       "title": "Vendors",
@@ -5679,6 +5680,7 @@
       }
     },
     "actions": {
+      "reviewSelected": "Review selected",
       "sendSelected": "Send",
       "confirmSelected": "Confirm",
       "cancelSelected": "Cancel",
@@ -5723,6 +5725,22 @@
       "noLines": "No lines yet."
     },
     "forms": {
+      "purchaseReturn": {
+        "title": "New purchase return",
+        "description": "Return received products to a vendor."
+      },
+      "rfq": {
+        "title": "New request for quotation",
+        "description": "Request pricing from vendors for a purchase requirement."
+      },
+      "rfqBid": {
+        "title": "New RFQ bid",
+        "description": "Record a vendor bid for a request for quotation."
+      },
+      "vendorCredit": {
+        "title": "New vendor credit",
+        "description": "Create a vendor credit from an eligible purchase return."
+      },
       "newPartnerBank": {
         "title": "New vendor bank account",
         "description": "Register a bank account for a partner / vendor",
@@ -6025,6 +6043,7 @@
       "createIntent": "Create customs/e-invoice intent",
       "createPurchaseReturn": "Create purchase return",
       "createRfq": "Create RFQ",
+      "createVendorCredit": "Create vendor credit",
       "noPendingApproval": "No pending approval request for this order.",
       "openInWorkflow": "Open in Workflow",
       "prompt": {
@@ -6080,6 +6099,32 @@
       "toApproveTitle": "Purchase orders awaiting approval",
       "upsertScorecard": "Upsert vendor scorecard",
       "vendorCreditFromReturn": "Vendor credit from return"
+    },
+    "purchaseReturns": {
+      "title": "Purchase returns",
+      "description": "Vendor returns and their refund status",
+      "emptyMessage": "No purchase returns found.",
+      "searchPlaceholder": "Search purchase returns…",
+      "filters": {
+        "state": {
+          "label": "Status"
+        }
+      },
+      "states": {
+        "draft": "Draft",
+        "confirmed": "Confirmed",
+        "refunded": "Refunded"
+      },
+      "columns": {
+        "name": "Reference",
+        "purchaseOrderId": "Purchase order",
+        "partnerId": "Vendor",
+        "state": "Status",
+        "returnReason": "Return reason",
+        "pickingId": "Receipt",
+        "creditMoveId": "Vendor credit",
+        "createDate": "Created"
+      }
     }
   },
   "erpWorkflow": {
@@ -9894,6 +9939,77 @@
           "failed": "Failed",
           "attentionRequired": "Attention required"
         }
+      }
+    }
+  },
+  "fleet": {
+    "title": "Fleet",
+    "subtitle": "Vehicles",
+    "empty": "No vehicles yet.",
+    "create": "Add vehicle",
+    "updatePosition": "Update position",
+    "selectVehicle": "Select vehicle",
+    "companyRequired": "Select an operating company before creating or updating fleet vehicles.",
+    "table": {
+      "name": "Vehicle name",
+      "licensePlate": "License plate",
+      "vehicleType": "Type",
+      "driverName": "Driver",
+      "status": "Status",
+      "lastPosition": "Last position",
+      "odometer": "Odometer (km)",
+      "fuel": "Fuel level"
+    },
+    "status": {
+      "active": "Active",
+      "idle": "Idle",
+      "maintenance": "Maintenance",
+      "inactive": "Inactive"
+    },
+    "forms": {
+      "newVehicle": {
+        "title": "Add vehicle",
+        "description": "Register a new vehicle in the fleet.",
+        "section": "Vehicle details"
+      },
+      "editVehicle": {
+        "title": "Edit vehicle",
+        "description": "Update vehicle driver or service type.",
+        "section": "Vehicle details"
+      }
+    },
+    "lifecycle": {
+      "vehicle": "Vehicle",
+      "driver": "Driver",
+      "inspector": "Inspector",
+      "serviceType": "Service type",
+      "provider": "Provider",
+      "notes": "Notes",
+      "servicedAt": "Serviced at",
+      "inspectedAt": "Inspected at",
+      "outcome": "Outcome",
+      "assignments": {
+        "title": "Driver assignment",
+        "description": "Assign or unassign an active employee as the vehicle driver.",
+        "action": "Change driver",
+        "unassign": "No driver (unassign)"
+      },
+      "service": {
+        "title": "Service history",
+        "description": "Record maintenance performed on a fleet vehicle.",
+        "action": "Record service",
+        "empty": "No service records yet."
+      },
+      "inspections": {
+        "title": "Inspection history",
+        "description": "Record the result of a fleet vehicle inspection.",
+        "action": "Record inspection",
+        "empty": "No inspections yet."
+      },
+      "outcomes": {
+        "passed": "Passed",
+        "failed": "Failed",
+        "attentionRequired": "Attention required"
       }
     }
   },

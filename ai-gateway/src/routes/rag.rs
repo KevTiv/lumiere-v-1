@@ -1371,6 +1371,7 @@ mod tests {
             answer: release.answer.clone(),
             sources,
             retrieval_degraded: false,
+            run_id: None,
             agent_id: Some(1),
             provider: Some("test".into()),
             model: Some("test".into()),

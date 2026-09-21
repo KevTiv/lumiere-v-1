@@ -16,7 +16,7 @@ import { stdbBffCommandPost } from "@lumiere/stdb/commands"
 
 import { useQuery, useMutation, useQueryClient, type QueryClient } from '@tanstack/react-query'
 
-import { apiFetch, fetchQueryList, coalesceQueryInitialData, rqBigIntKey } from "../http"
+import { apiFetch, fetchQueryList, coalesceQueryInitialData, rqBigIntKey, type QueryRow } from "../http"
 import { invalidateResourceQueries, useSubscriptionAwareQuery } from "../subscription-query"
 import { withCompanyScope } from "@lumiere/erp-shared/org-scoped"
 import {
@@ -219,9 +219,9 @@ export const purchaseReturnsQueryOptions = (organizationId: bigint) => ({
 
 export function usePurchaseReturns(
   organizationId: bigint,
-  initialData?: Record<string, unknown>[],
+  initialData?: QueryRow[],
 ) {
-  return useQuery<Record<string, unknown>[]>({
+  return useQuery<QueryRow[]>({
     ...purchaseReturnsQueryOptions(organizationId),
     initialData: coalesceQueryInitialData(initialData),
   })

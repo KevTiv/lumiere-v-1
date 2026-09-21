@@ -464,6 +464,7 @@ export function AIChatPanel({
           metadata: {
             duration: Math.round(t1 - t0),
             runId: reply.runId,
+            companyId: context?.companyId,
           },
         }
         setMessages((prev) =>
@@ -483,6 +484,7 @@ export function AIChatPanel({
           metadata: {
             duration: Math.round(t1 - t0),
             runId: reply.runId,
+            companyId: context?.companyId,
           },
         }
       } else {
@@ -852,7 +854,7 @@ export function AIChatPanel({
                         )}
                         {message.role === "assistant" && message.metadata?.runId != null ? (
                           <a
-                            href={`/ai-harness?runId=${message.metadata.runId}${context?.companyId ? `&companyId=${context.companyId}` : ""}`}
+                            href={`/ai-harness?runId=${message.metadata.runId}${message.metadata.companyId ? `&companyId=${message.metadata.companyId}` : ""}`}
                             className="text-[9px] text-primary hover:underline"
                           >
                             Inspect run

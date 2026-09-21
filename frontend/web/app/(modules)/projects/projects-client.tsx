@@ -25,7 +25,7 @@ import {
   projectsCsvImportForm,
   ImportAssistantWizard,
 } from "@lumiere/ui"
-import type { EntityViewConfig, FormConfig, ModuleConfig, ProjectsCsvImportKind } from "@lumiere/ui"
+import type { EntityRow, EntityViewConfig, FormConfig, ModuleConfig, ProjectsCsvImportKind } from "@lumiere/ui"
 import {
   projectsParamsToJson,
   toCreateProjectParams,
@@ -1129,7 +1129,7 @@ function ProjectsClientLoaded({
       timesheets: timesheets as unknown as Record<string, unknown>[],
       "rate-cards": rateCards as unknown as Record<string, unknown>[],
       resources: employees as unknown as Record<string, unknown>[],
-      "timesheet-approvals": timesheetApprovals as unknown as Record<string, unknown>[],
+      "timesheet-approvals": timesheetApprovals as unknown as EntityRow[],
     }),
     [projects, tasks, timesheets, rateCards, employees, timesheetApprovals],
   )

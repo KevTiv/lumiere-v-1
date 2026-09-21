@@ -4,7 +4,7 @@ import {
   isPickingActionApplicableToAll,
   type PickingActionId,
 } from "@lumiere/erp-workflows"
-import type { EntityAction, EntityDetailConfig, EntityViewConfig } from "./entity-view-types"
+import type { EntityAction, EntityDetailConfig, EntityRow, EntityViewConfig } from "./entity-view-types"
 
 // ── Badge maps ────────────────────────────────────────────────────────────────
 const productTypeBadges = (t: TFunction) => ({
@@ -103,7 +103,7 @@ const locationTypeBadges = (t: TFunction) => ({
 
 export type ProductsTableConfigOptions = {
   /** Combined default code + name for dense lists (optional). */
-  formatProductDisplayName?: (row: Record<string, unknown>) => string
+  formatProductDisplayName?: (row: EntityRow) => string
   /** Empty-state CTA — wired by the module client (opens create form). */
   onEmptyAction?: () => void
 }
@@ -244,7 +244,7 @@ export const productsTableConfig = (
     sortable: true,
     ...(formatName
       ? {
-          render: (_value: unknown, row: Record<string, unknown>) => {
+          render: (_value: unknown, row: EntityRow) => {
             const formatted = formatName(row).trim()
             const fallback = String(row.name ?? "").trim()
             const shown = formatted || fallback
@@ -402,7 +402,7 @@ export type TransfersTableConfigOptions = {
 // ── Transfers (pickings) ──────────────────────────────────────────────────────
 
 export type PickingActionHandlers = Partial<
-  Record<PickingActionId, (rows: Record<string, unknown>[]) => void>
+  Record<PickingActionId, (rows: EntityRow[]) => void>
 >
 
 const PICKING_ACTION_ORDER: Array<{
@@ -438,7 +438,7 @@ export const pickingRowActions = (
         icon: icons[id],
         variant: destructive ? ("destructive" as const) : undefined,
         requiresSelection: true,
-        isApplicable: (rows: Record<string, unknown>[]) => isPickingActionApplicableToAll(id, rows),
+        isApplicable: (rows: EntityRow[]) => isPickingActionApplicableToAll(id, rows),
         onClick: handler,
       },
     ]

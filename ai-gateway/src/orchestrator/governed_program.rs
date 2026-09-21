@@ -25,6 +25,29 @@ const MAX_POLL_ATTEMPTS: u32 = 4;
 const POLL_BASE_BACKOFF_MS: u64 = 50;
 const POLL_MAX_BACKOFF_MS: u64 = 400;
 
+fn evidence_reretrievals_used(acquisitions: u32) -> u32 {
+    acquisitions.saturating_sub(1)
+}
+
+fn evidence_acquisition_budget_exhausted(acquisitions: u32) -> bool {
+    evidence_reretrievals_used(acquisitions) >= MAX_EVIDENCE_RERETRIEVALS
+}
+
+#[cfg(test)]
+mod evidence_reretrieval_budget_tests {
+    use super::*;
+
+    #[test]
+    fn initial_acquisition_does_not_consume_a_reretrieval() {
+        assert_eq!(evidence_reretrievals_used(0), 0);
+        assert_eq!(evidence_reretrievals_used(1), 0);
+        assert_eq!(evidence_reretrievals_used(2), 1);
+        assert_eq!(evidence_reretrievals_used(3), 2);
+        assert!(!evidence_acquisition_budget_exhausted(2));
+        assert!(evidence_acquisition_budget_exhausted(3));
+    }
+}
+
 use super::{
     answer_gate::collect_json_figures,
     decision_graph::{
@@ -949,9 +972,16 @@ fn answer_reason_needs_retrieval(reason: &str) -> bool {
 
 fn answer_reason_is_repairable(reason: &str) -> bool {
     let reason = reason.to_ascii_lowercase();
-    !["forbidden", "denied", "revoked", "withdrawn", "out of scope", "unauthorized"]
-        .iter()
-        .any(|needle| reason.contains(needle))
+    ![
+        "forbidden",
+        "denied",
+        "revoked",
+        "withdrawn",
+        "out of scope",
+        "unauthorized",
+    ]
+    .iter()
+    .any(|needle| reason.contains(needle))
 }
 
 fn recovery_evidence_node(graph: &DecisionGraph, target: &str) -> Option<String> {
@@ -1480,7 +1510,7 @@ impl GovernedProgramExecutor<'_> {
                         CapabilityStepOutcome::Executed(output)
                         | CapabilityStepOutcome::Replayed(output) => {
                             let count = evidence_acquisitions.entry(node.id.clone()).or_default();
-                            if *count >= MAX_EVIDENCE_RERETRIEVALS {
+                            if evidence_acquisition_budget_exhausted(*count) {
                                 return Ok(outcome(
                                     GovernedProgramStop::EarlyStop(
                                         StopReason::InsufficientEvidence,
@@ -1661,11 +1691,13 @@ impl GovernedProgramExecutor<'_> {
                         )),
                         AnswerAdmissionOutcome::RequiresReview { reason } => {
                             if answer_reason_needs_retrieval(&reason) {
-                                if let Some(acquire_node) = recovery_evidence_node(graph, &node.id) {
-                                    let used = evidence_acquisitions
+                                if let Some(acquire_node) = recovery_evidence_node(graph, &node.id)
+                                {
+                                    let acquisitions = evidence_acquisitions
                                         .get(&acquire_node)
                                         .copied()
                                         .unwrap_or_default();
+                                    let used = evidence_reretrievals_used(acquisitions);
                                     if used < MAX_EVIDENCE_RERETRIEVALS {
                                         push_recovery_diagnostic(
                                             &mut evidence_overlays,
@@ -1713,7 +1745,7 @@ impl GovernedProgramExecutor<'_> {
                                 }
                             }
                             Err(reason)
-                        },
+                        }
                     };
                     match admitted {
                         Ok((content, summary)) => {
@@ -1992,10 +2024,11 @@ impl GovernedProgramExecutor<'_> {
                                         if let Some(acquire_node) =
                                             recovery_evidence_node(graph, &node.id)
                                         {
-                                            let used = evidence_acquisitions
+                                            let acquisitions = evidence_acquisitions
                                                 .get(&acquire_node)
                                                 .copied()
                                                 .unwrap_or_default();
+                                            let used = evidence_reretrievals_used(acquisitions);
                                             if used < MAX_EVIDENCE_RERETRIEVALS {
                                                 push_recovery_diagnostic(
                                                     &mut evidence_overlays,
@@ -3865,5 +3898,4 @@ mod threshold_gate_tests {
             assert!(!answer_reason_is_repairable(denied), "{denied}");
         }
     }
-
 }

@@ -1,7 +1,7 @@
 import { canPresentToAny, type AnyWorkflowAction } from "@lumiere/erp-workflows"
-import type { EntityAction, EntityActionConfirmation } from "./entity-view-types"
+import type { EntityAction, EntityActionConfirmation, EntityRow } from "./entity-view-types"
 
-type Row = Record<string, unknown>
+type Row = EntityRow
 
 /**
  * Render workflow actions as table toolbar actions. State gating comes from `canPresent`;
@@ -56,7 +56,7 @@ export function workflowActionsToEntityActions(
  */
 export function runRecordActionForRows(
   action: { execute(recordId: string): Promise<unknown> },
-  rows: ReadonlyArray<Record<string, unknown>>,
+  rows: ReadonlyArray<EntityRow>,
 ): void {
   for (const row of rows) {
     const id = row.id

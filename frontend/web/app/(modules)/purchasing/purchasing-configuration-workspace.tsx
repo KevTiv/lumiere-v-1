@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useRef, useState } from "react"
-import { Button, Input, Label } from "@lumiere/ui"
+import { Button, Input, Label, type EntityRow } from "@lumiere/ui"
 import { stbTimestampFromDate } from "@lumiere/erp-shared/stb-timestamp"
 import {
   buildPurchasingConfigurationSubmission,
@@ -11,7 +11,7 @@ import {
   type PurchasingConfigurationValues,
 } from "./purchasing-configuration"
 
-type Row = Record<string, unknown>
+type Row = EntityRow
 
 export interface PurchasingConfigurationWorkspaceProps {
   vendors: Row[]

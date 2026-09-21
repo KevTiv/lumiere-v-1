@@ -3,6 +3,11 @@ import type { Action, PermissionCheckResult, Resource } from "./rbac-types"
 
 export type FieldWidth = "full" | "1/2" | "1/3" | "2/3" | "1/4"
 
+/** Canonical structural row accepted by generic entity surfaces. */
+export interface EntityRow {
+  [field: string]: unknown
+}
+
 /** Optional RBAC gate for entity UI surfaces (columns, fields, actions). */
 export interface EntitySurfacePermission {
   resource: Resource
@@ -68,7 +73,7 @@ export interface EntityColumn extends EntityPermissioned {
   /** Map raw value → display label for type="badge" */
   badgeLabels?: Record<string, string>
   /** Override rendering entirely */
-  render?: (value: unknown, row: Record<string, unknown>) => ReactNode
+  render?: (value: unknown, row: EntityRow) => ReactNode
 }
 
 // ─── Filter ─────────────────────────────────────────────────────────────────
@@ -94,10 +99,10 @@ export interface EntityAction extends EntityPermissioned {
    * Presentation-only state gate: when rows are selected and this returns false the button is
    * disabled. Never a permission check — the server re-validates every command.
    */
-  isApplicable?: (selectedRows: Record<string, unknown>[]) => boolean
+  isApplicable?: (selectedRows: EntityRow[]) => boolean
   /** Ask before running: the table shows this dialog and only calls `onClick` on confirm. */
   confirm?: EntityActionConfirmation
-  onClick: (selectedRows: Record<string, unknown>[]) => void
+  onClick: (selectedRows: EntityRow[]) => void
 }
 
 export interface EntityActionConfirmation {
@@ -146,7 +151,7 @@ export interface EntityDetailField extends EntityPermissioned {
   width?: FieldWidth
   badgeVariants?: Record<string, string>
   badgeLabels?: Record<string, string>
-  render?: (value: unknown, record: Record<string, unknown>) => ReactNode
+  render?: (value: unknown, record: EntityRow) => ReactNode
 }
 
 export interface EntityDetailSection {
@@ -167,7 +172,7 @@ export interface EntityBoardCardConfig {
   titleKey: string
   fields?: EntityColumn[]
   footerFields?: EntityColumn[]
-  render?: (row: Record<string, unknown>) => ReactNode
+  render?: (row: EntityRow) => ReactNode
 }
 
 export interface EntityBoardConfig {

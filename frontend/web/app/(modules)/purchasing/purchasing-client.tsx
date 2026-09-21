@@ -55,7 +55,7 @@ import {
   previousPeriodMs,
   timeRangeToMs,
 } from "@lumiere/ui"
-import type { EntityViewConfig, EntityTableConfig, EntityRecordSheetConfig, FormConfig, ModuleConfig } from "@lumiere/ui"
+import type { EntityRow, EntityViewConfig, EntityTableConfig, EntityRecordSheetConfig, FormConfig, ModuleConfig } from "@lumiere/ui"
 import type { Product, Uom } from "@lumiere/stdb/types"
 import { purchasingModuleConfig } from "@/lib/module-dashboard-configs"
 import { usePurchasingModuleSubscription } from "@/lib/module-subscription-hooks"
@@ -227,7 +227,7 @@ function accountInternalTypeTag(row: Record<string, unknown>): string {
   return String(v ?? "").toLowerCase()
 }
 
-function accountInternalGroupTag(row: Record<string, unknown>): string {
+function accountInternalGroupTag(row: EntityRow): string {
   const v = row.internalGroup ?? row.internal_group
   if (v != null && typeof v === "object" && "tag" in v) {
     return String((v as { tag: string }).tag).toLowerCase()
@@ -504,7 +504,7 @@ function PurchasingClientLoaded({
   } | null>(null)
   const [intakeReasonRequest, setIntakeReasonRequest] = useState<{
     kind: PurchasingIntakeReasonKind
-    row: Record<string, unknown>
+    row: EntityRow
   } | null>(null)
   const [intakeReasonError, setIntakeReasonError] = useState<string | null>(null)
 
@@ -1046,7 +1046,7 @@ function PurchasingClientLoaded({
   }, [accountJournals, t])
 
   const expenseAccountFieldOptions = useMemo(() => {
-    const expenseRows = (accountAccounts as Record<string, unknown>[]).filter(
+    const expenseRows = (accountAccounts as EntityRow[]).filter(
       (row) => accountInternalGroupTag(row) === "expense",
     )
     const fromApi = accountAccountRowsToSelectOptions(
@@ -1274,18 +1274,18 @@ function PurchasingClientLoaded({
   const defaultCurrencyId = currencyFieldOptions[0]?.value ?? ""
   const operationDialogOptions = useMemo(
     () => ({
-      requisitions: (requisitions as Record<string, unknown>[]).map((row) => ({
+      requisitions: (requisitions as EntityRow[]).map((row) => ({
         value: String(row.id ?? ""),
         label: String(row.name ?? row.origin ?? `Requisition ${String(row.id ?? "")}`),
       })),
-      rfqs: (rfqs as Record<string, unknown>[]).map((row) => ({
+      rfqs: (rfqs as EntityRow[]).map((row) => ({
         value: String(row.id ?? ""),
         label: String(row.name ?? `RFQ ${String(row.id ?? "")}`),
       })),
       vendors: vendorFieldOptions.filter((option) => option.value !== ""),
       products: productFieldOptions.filter((option) => option.value !== ""),
       uoms: uomFieldOptions.filter((option) => option.value !== ""),
-      purchaseOrders: (orders as Record<string, unknown>[]).map((row) => ({
+      purchaseOrders: (orders as EntityRow[]).map((row) => ({
         value: String(row.id ?? ""),
         label: String(row.name ?? `Purchase order ${String(row.id ?? "")}`),
       })),
@@ -1538,10 +1538,10 @@ function PurchasingClientLoaded({
             label: t("purchasing.actions.createBillsFromSelected"),
             requiresSelection: true,
             isApplicable: (rows) =>
-              rows.length === 1 && purchasingWorkflow.createBill.canPresent(rows[0] as Record<string, unknown>),
+              rows.length === 1 && purchasingWorkflow.createBill.canPresent(rows[0] as EntityRow),
             onClick: (rows) => {
               if (rows.length !== 1) return
-              if (!purchasingWorkflow.createBill.canPresent(rows[0] as Record<string, unknown>)) return
+              if (!purchasingWorkflow.createBill.canPresent(rows[0] as EntityRow)) return
               const id = rows[0]?.id
               if (id == null) return
               setBillOrderError(null)
@@ -1710,9 +1710,9 @@ function PurchasingClientLoaded({
             id: "pol-receive-qty",
             label: t("purchasing.actions.receiveFullOpenQty"),
             requiresSelection: true,
-            isApplicable: (rows) => rows.length === 1 && purchasingWorkflow.receiveLine.canPresent(rows[0] as Record<string, unknown>),
+            isApplicable: (rows) => rows.length === 1 && purchasingWorkflow.receiveLine.canPresent(rows[0] as EntityRow),
             onClick: (rows) => {
-              const first = rows[0] as Record<string, unknown> | undefined
+              const first = rows[0] as EntityRow | undefined
               const receiveLine = purchasingWorkflow.receiveLine
               if (!first || !receiveLine.canPresent(first) || !receiveLine.prepare) return
               void receiveLine.execute(receiveLine.prepare(first), { navigateToNext: true }).catch(() => undefined)
@@ -1952,9 +1952,9 @@ function PurchasingClientLoaded({
             label: action?.label ?? kind,
             requiresSelection: true,
             variant: kind === "reject" ? ("destructive" as const) : undefined,
-            isApplicable: (rows: Record<string, unknown>[]) =>
+            isApplicable: (rows: EntityRow[]) =>
               rows.length === 1 && action != null && action.canPresent(rows[0]),
-            onClick: (rows: Record<string, unknown>[]) => {
+            onClick: (rows: EntityRow[]) => {
               const row = rows[0]
               if (!row) return
               setIntakeReasonError(null)
@@ -2401,8 +2401,8 @@ function PurchasingClientLoaded({
       lines: enrichedLines,
       requisitions: requisitions as unknown as Record<string, unknown>[],
       vendors: vendors as unknown as Record<string, unknown>[],
-      rfqs: rfqs as unknown as Record<string, unknown>[],
-      "rfq-bids": rfqBids as unknown as Record<string, unknown>[],
+      rfqs: rfqs as unknown as EntityRow[],
+      "rfq-bids": rfqBids as unknown as EntityRow[],
       "purchase-returns": purchaseReturns,
       "landed-costs": landedCosts as unknown as Record<string, unknown>[],
       "supplier-intakes": supplierIntakes as unknown as Record<string, unknown>[],
@@ -2681,13 +2681,13 @@ function PurchasingClientLoaded({
             <PurchasingBlanketWorkspace
               embedded
               actionRequest={blanketActionRequest}
-              blanketOrders={blanketOrders as Record<string, unknown>[]}
-              blanketLines={blanketOrderLines as Record<string, unknown>[]}
-              blanketReleases={blanketReleases as Record<string, unknown>[]}
-              vendors={vendors as Record<string, unknown>[]}
-              products={products as Record<string, unknown>[]}
-              uoms={uoms as Record<string, unknown>[]}
-              currencies={currencies as Record<string, unknown>[]}
+              blanketOrders={blanketOrders as EntityRow[]}
+              blanketLines={blanketOrderLines as EntityRow[]}
+              blanketReleases={blanketReleases as EntityRow[]}
+              vendors={vendors as EntityRow[]}
+              products={products as EntityRow[]}
+              uoms={uoms as EntityRow[]}
+              currencies={currencies as EntityRow[]}
               createBlanket={(params) => createPurchaseBlanketOrder.mutateAsync(params)}
               releaseBlanket={releaseBlanket}
               onOpenPurchaseOrder={openPurchaseOrder}
@@ -2695,10 +2695,10 @@ function PurchasingClientLoaded({
             <PurchasingConfigurationWorkspace
               embedded
               actionRequest={configurationActionRequest}
-              vendors={vendors as Record<string, unknown>[]}
-              products={products as Record<string, unknown>[]}
-              warehouses={warehouses as Record<string, unknown>[]}
-              purchaseOrders={orders as Record<string, unknown>[]}
+              vendors={vendors as EntityRow[]}
+              products={products as EntityRow[]}
+              warehouses={warehouses as EntityRow[]}
+              purchaseOrders={orders as EntityRow[]}
               onCreateContract={(params) => createPurchaseContract.mutateAsync(params)}
               onUpsertScorecard={(params) => upsertVendorScorecard.mutateAsync(params)}
               onSetRiskFlag={(params) => setVendorRiskFlag.mutateAsync(params)}

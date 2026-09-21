@@ -47,6 +47,7 @@ export interface ChatMessage {
     tokens?: number
     duration?: number
     runId?: number
+    companyId?: number
   }
 }
 

@@ -58,6 +58,7 @@ import {
   timeRangeToMs,
 } from '@lumiere/ui';
 import type {
+  EntityRow,
   EntityViewConfig,
   EntityTableConfig,
   EntityRecordSheetConfig,
@@ -1295,13 +1296,13 @@ function SalesClientLoaded({
         assign: (rows) => runRecordActionForRows(pickingWorkflow.assign, rows),
         'partial-validate': (rows) => {
           setPartialDeliveryError(null);
-          setPartialDeliveryPicking(rows[0] as Record<string, unknown>);
+          setPartialDeliveryPicking(rows[0] as EntityRow);
         },
         pack: (rows) => runRecordActionForRows(pickingWorkflow.pack, rows),
         validate: (rows) => runRecordActionForRows(pickingWorkflow.validate, rows),
         cancel: (rows) => {
           setCancelPickingError(null);
-          setCancelPickingTarget(rows[0] as Record<string, unknown>);
+          setCancelPickingTarget(rows[0] as EntityRow);
         },
       }),
     [t, pickingWorkflow],
@@ -1346,7 +1347,7 @@ function SalesClientLoaded({
             label: t('sales.returnOrders.actions.createCreditNote'),
             requiresSelection: true,
             isApplicable: (rows) =>
-              rows.length === 1 && returnOrderWorkflow.createCreditNote.canPresent(rows[0] as Record<string, unknown>),
+              rows.length === 1 && returnOrderWorkflow.createCreditNote.canPresent(rows[0] as EntityRow),
             onClick: (rows) => {
               if (rows.length !== 1) return;
               const row = rows[0] as Record<string, unknown>;
@@ -1394,10 +1395,10 @@ function SalesClientLoaded({
             label: saleOrderWorkflow.acceptQuotation.label,
             requiresSelection: true,
             isApplicable: (rows) =>
-              rows.some((r) => saleOrderWorkflow.acceptQuotation.canPresent(r as Record<string, unknown>)),
+              rows.some((r) => saleOrderWorkflow.acceptQuotation.canPresent(r as EntityRow)),
             onClick: (rows) => {
               for (const r of rows) {
-                if (!saleOrderWorkflow.acceptQuotation.canPresent(r as Record<string, unknown>)) continue;
+                if (!saleOrderWorkflow.acceptQuotation.canPresent(r as EntityRow)) continue;
                 const signedBy =
                   window.prompt(
                     t('sales.actions.acceptQuotationPrompt', {
@@ -1417,7 +1418,7 @@ function SalesClientLoaded({
             label: t('sales.actions.viewDeliveries'),
             requiresSelection: true,
             // Only a confirmed order has fulfillment; the fulfillment tab lists its pickings and backorders.
-            isApplicable: (rows) => rows.length === 1 && isSaleOrderConfirmed(rows[0] as Record<string, unknown>),
+            isApplicable: (rows) => rows.length === 1 && isSaleOrderConfirmed(rows[0] as EntityRow),
             onClick: (rows) => {
               if (rows.length !== 1) return;
               navigateToSalesTab('fulfillment', { saleId: String(rows[0]?.id) });
@@ -1578,10 +1579,10 @@ function SalesClientLoaded({
             label: t('sales.actions.createInvoice'),
             requiresSelection: true,
             isApplicable: (rows) =>
-              rows.length === 1 && saleOrderWorkflow.createInvoice.canPresent(rows[0] as Record<string, unknown>),
+              rows.length === 1 && saleOrderWorkflow.createInvoice.canPresent(rows[0] as EntityRow),
             onClick: (rows) => {
               if (rows.length !== 1) return;
-              if (!saleOrderWorkflow.createInvoice.canPresent(rows[0] as Record<string, unknown>)) return;
+              if (!saleOrderWorkflow.createInvoice.canPresent(rows[0] as EntityRow)) return;
               const id = rows[0]?.id;
               if (id == null) return;
               setInvoiceOrderError(null);
@@ -2468,10 +2469,10 @@ function SalesClientLoaded({
     () => ({
       // Delivery / invoice / payment / balance are derived from canonical lines and invoices.
       orders: withOrderCashSummary(
-        orders as Record<string, unknown>[],
-        orderLines as unknown as Record<string, unknown>[],
-        accountMoves as unknown as Record<string, unknown>[],
-        stockPickings as unknown as Record<string, unknown>[],
+        orders as EntityRow[],
+        orderLines as unknown as EntityRow[],
+        accountMoves as unknown as EntityRow[],
+        stockPickings as unknown as EntityRow[],
       ).map((row) => ({
         ...row,
         sheetTitle: saleOrderPrimaryLabel(row) || String(row.reference ?? row.id ?? ''),

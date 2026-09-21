@@ -74,6 +74,61 @@ pub struct RunEvidenceInspection {
     pub claims: Vec<Inspection>,
 }
 
+#[derive(Clone, Copy)]
+enum RunResponseShape {
+    Inspection,
+    Export,
+}
+
+fn serialized_run_size(
+    inspection: &RunEvidenceInspection,
+    shape: RunResponseShape,
+) -> AppResult<usize> {
+    let encoded = match shape {
+        RunResponseShape::Inspection => serde_json::to_vec(inspection),
+        RunResponseShape::Export => serde_json::to_vec(&json!({
+            "schemaVersion": 1,
+            "kind": "lumiere_run_evidence_export",
+            "run": inspection,
+        })),
+    }
+    .map_err(|error| AppError::Internal(error.to_string()))?;
+    Ok(encoded.len())
+}
+
+/// Reduce optional run detail until the exact response envelope fits the
+/// actor's byte grant. The required run identity and counters are never
+/// silently truncated; an impossibly small grant fails closed.
+fn enforce_run_byte_bound(
+    inspection: &mut RunEvidenceInspection,
+    max_bytes: u64,
+    shape: RunResponseShape,
+) -> AppResult<()> {
+    let fits = |inspection: &RunEvidenceInspection| {
+        serialized_run_size(inspection, shape).map(|size| size as u64 <= max_bytes)
+    };
+    while !inspection.claims.is_empty() && !fits(inspection)? {
+        inspection.claims.pop();
+        inspection.claim_ids.pop();
+    }
+    while !inspection.transcript.is_empty() && !fits(inspection)? {
+        inspection.transcript.pop();
+    }
+    while !inspection.contribution_ids.is_empty() && !fits(inspection)? {
+        inspection.contribution_ids.pop();
+    }
+    if !fits(inspection)? {
+        inspection.answer = None;
+        inspection.error_message = None;
+    }
+    if !fits(inspection)? {
+        return Err(AppError::Forbidden(
+            "evidence response exceeds the acting user's grant".into(),
+        ));
+    }
+    Ok(())
+}
+
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct InspectRequest {
@@ -370,11 +425,12 @@ async fn inspect_run(
     state: &AppState,
     actor: &ActorCredentials,
     run_id: u64,
+    shape: RunResponseShape,
 ) -> AppResult<RunEvidenceInspection> {
     if run_id == 0 {
         return Err(AppError::BadRequest("runId is required".into()));
     }
-    let _grant = require_actor_grant_bounds(state, actor, INSPECT_CAPABILITY).await?;
+    let grant = require_actor_grant_bounds(state, actor, INSPECT_CAPABILITY).await?;
     let runs = state
         .stdb
         .query_sql(&format!(
@@ -400,7 +456,10 @@ async fn inspect_run(
         .filter_map(redacted_step)
         .collect::<Vec<_>>();
     transcript.sort_by_key(|step| (step.step_no, step.id));
-    transcript.truncate(MAX_RUN_TRANSCRIPT_STEPS);
+    let mut remaining_rows =
+        usize::try_from(grant.max_rows.saturating_sub(1)).unwrap_or(usize::MAX);
+    transcript.truncate(MAX_RUN_TRANSCRIPT_STEPS.min(remaining_rows));
+    remaining_rows = remaining_rows.saturating_sub(transcript.len());
 
     let contributions = state
         .stdb
@@ -417,13 +476,18 @@ async fn inspect_run(
         .collect::<Vec<_>>();
     contribution_ids.sort_unstable();
     contribution_ids.dedup();
+    contribution_ids.truncate(remaining_rows);
+    remaining_rows = remaining_rows.saturating_sub(contribution_ids.len());
 
     let viewer = Viewer {
         organization_id: actor.organization_id,
         company_id: actor.company_id,
         actor_identity: ActorIdentity::parse(&actor.identity),
     };
-    let contribution_set = contribution_ids.iter().copied().collect::<std::collections::BTreeSet<_>>();
+    let contribution_set = contribution_ids
+        .iter()
+        .copied()
+        .collect::<std::collections::BTreeSet<_>>();
     let claim_rows = state
         .stdb
         .query_sql(&format!(
@@ -442,7 +506,7 @@ async fn inspect_run(
         .collect::<Vec<_>>();
     claim_ids.sort_unstable();
     claim_ids.dedup();
-    claim_ids.truncate(MAX_RUN_CLAIMS);
+    claim_ids.truncate(MAX_RUN_CLAIMS.min(remaining_rows));
 
     let mut claims = Vec::with_capacity(claim_ids.len());
     for claim_id in &claim_ids {
@@ -452,7 +516,7 @@ async fn inspect_run(
         claims.push(inspection);
     }
 
-    Ok(RunEvidenceInspection {
+    let mut inspection = RunEvidenceInspection {
         run_id,
         status: row_text(&run, "status", "status").unwrap_or_else(|| "unknown".into()),
         answer: row_text(&run, "summary", "summary"),
@@ -463,7 +527,9 @@ async fn inspect_run(
         contribution_ids,
         claim_ids,
         claims,
-    })
+    };
+    enforce_run_byte_bound(&mut inspection, grant.max_bytes, shape)?;
+    Ok(inspection)
 }
 
 pub async fn post_run_inspect(
@@ -472,12 +538,11 @@ pub async fn post_run_inspect(
     Json(req): Json<RunInspectionRequest>,
 ) -> AppResult<Response> {
     let actor = ActorCredentials::from_headers(&headers)?;
-    let inspection = inspect_run(&state, &actor, req.run_id).await?;
+    let inspection = inspect_run(&state, &actor, req.run_id, RunResponseShape::Inspection).await?;
     let mut response = Json(inspection).into_response();
-    response.headers_mut().insert(
-        CACHE_CONTROL,
-        HeaderValue::from_static("no-store"),
-    );
+    response
+        .headers_mut()
+        .insert(CACHE_CONTROL, HeaderValue::from_static("no-store"));
     Ok(response)
 }
 
@@ -487,17 +552,16 @@ pub async fn post_run_export(
     Json(req): Json<RunInspectionRequest>,
 ) -> AppResult<Response> {
     let actor = ActorCredentials::from_headers(&headers)?;
-    let inspection = inspect_run(&state, &actor, req.run_id).await?;
+    let inspection = inspect_run(&state, &actor, req.run_id, RunResponseShape::Export).await?;
     let mut response = Json(json!({
         "schemaVersion": 1,
         "kind": "lumiere_run_evidence_export",
         "run": inspection,
     }))
     .into_response();
-    response.headers_mut().insert(
-        CACHE_CONTROL,
-        HeaderValue::from_static("no-store"),
-    );
+    response
+        .headers_mut()
+        .insert(CACHE_CONTROL, HeaderValue::from_static("no-store"));
     Ok(response)
 }
 
@@ -590,6 +654,57 @@ mod route_tests {
         assert_eq!(encoded["inputHash"], "abc123");
         assert!(encoded.get("outputSummary").is_none());
         assert!(!encoded.to_string().contains("customer secret"));
+    }
+
+    #[test]
+    fn run_export_is_trimmed_to_the_exact_byte_grant() {
+        let mut inspection = RunEvidenceInspection {
+            run_id: 11,
+            status: "completed".to_string(),
+            answer: Some("sensitive answer".repeat(50)),
+            step_count: 1,
+            tokens_used: 20,
+            error_message: None,
+            transcript: vec![RunTranscriptStep {
+                id: 1,
+                step_no: 1,
+                tool_name: "erp.search".to_string(),
+                input_hash: "abc123".to_string(),
+                result_summary: "3 row(s)".to_string(),
+                output_row_count: Some(3),
+                duration_ms: 17,
+                error: false,
+            }],
+            contribution_ids: vec![7, 8],
+            claim_ids: vec![],
+            claims: vec![],
+        };
+        let minimal = RunEvidenceInspection {
+            run_id: 11,
+            status: "completed".to_string(),
+            answer: None,
+            step_count: 1,
+            tokens_used: 20,
+            error_message: None,
+            transcript: vec![],
+            contribution_ids: vec![],
+            claim_ids: vec![],
+            claims: vec![],
+        };
+        let max_bytes = serialized_run_size(&minimal, RunResponseShape::Export)
+            .expect("serialize minimal export") as u64;
+
+        enforce_run_byte_bound(&mut inspection, max_bytes, RunResponseShape::Export)
+            .expect("trim export");
+
+        assert!(inspection.answer.is_none());
+        assert!(inspection.transcript.is_empty());
+        assert!(inspection.contribution_ids.is_empty());
+        assert!(
+            serialized_run_size(&inspection, RunResponseShape::Export)
+                .expect("serialize bounded export") as u64
+                <= max_bytes
+        );
     }
 
     #[test]

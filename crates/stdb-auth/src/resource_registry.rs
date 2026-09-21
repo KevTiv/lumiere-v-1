@@ -47,7 +47,10 @@ mod tests {
             .expect("project timesheet approvals must be registered");
 
         assert_eq!(entry.table, "project_timesheet_approval");
-        assert!(entry.mandatory.iter().any(|field| field == "organization_id"));
+        assert!(entry
+            .mandatory
+            .iter()
+            .any(|field| field == "organization_id"));
     }
 
     #[test]
@@ -59,7 +62,10 @@ mod tests {
         ] {
             let entry = registry_get(resource).expect("Fleet resource must be registered");
             assert_eq!(entry.table, table);
-            assert!(entry.mandatory.iter().any(|field| field == "organization_id"));
+            assert!(entry
+                .mandatory
+                .iter()
+                .any(|field| field == "organization_id"));
             assert!(entry.mandatory.iter().any(|field| field == "company_id"));
         }
     }

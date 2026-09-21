@@ -11,7 +11,10 @@ use std::{sync::Arc, time::Duration};
 use axum::{
     body::Body,
     extract::State,
-    http::{header::{CACHE_CONTROL, CONTENT_DISPOSITION}, HeaderMap, HeaderValue, Request, StatusCode},
+    http::{
+        header::{CACHE_CONTROL, CONTENT_DISPOSITION},
+        HeaderMap, HeaderValue, Request, StatusCode,
+    },
     middleware::{self, Next},
     response::{IntoResponse, Response},
     routing::post,
@@ -53,7 +56,6 @@ struct InspectEvidenceBody {
 struct ReviewQueueBody {
     company_id: u64,
 }
-
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
