@@ -2027,6 +2027,7 @@ impl GovernedProgramExecutor<'_> {
                                 AnswerAdmissionOutcome::Blocked { reason } => {
                                     if answer_reason_is_repairable(&reason)
                                         && reasoning_attempt < reason.max_iterations
+                                        && reasoning_attempt <= MAX_GENERATION_REPAIRS
                                     {
                                         push_recovery_diagnostic(
                                             &mut evidence_overlays,
