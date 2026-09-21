@@ -236,6 +236,7 @@ export function toCreateAiInsightParams(
   }
 }
 
+/** Map non-executable reviewed knowledge content into the generated STDB contract. */
 export function toCreateAiKnowledgeEntryParams(
   formData: JsonObject,
 ): CreateAiKnowledgeEntryParams | null {
