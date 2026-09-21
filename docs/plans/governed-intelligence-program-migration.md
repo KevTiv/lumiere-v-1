@@ -2,7 +2,7 @@
 
 **Status:** Execution companion to `governed-intelligence-program-architecture.md`
 **Date:** 2026-09-17
-**Extends:** `decision-precedent-memory-layer.md`, `typed-decision-graph-and-run-review-plan.md`, and `intelligence-compounding-epistemic-trace.md`
+**Extends:** `decision-precedent-memory-layer.md`, `typed-decision-graph-and-run-review-plan.md`, and `harness-decision-trace-replay-organizational-learning.md`
 
 ## Purpose
 
@@ -311,7 +311,7 @@ For each workflow:
 
 ## Intelligence-compounding follow-on workstream
 
-Detailed contracts and acceptance criteria live in `intelligence-compounding-epistemic-trace.md`. This workstream extends the landed governed runtime; it must not create a parallel orchestration path.
+Detailed contracts and acceptance criteria live in `harness-decision-trace-replay-organizational-learning.md`. This workstream extends the landed governed runtime; it must not create a parallel orchestration path.
 
 ### IC-01 — structured explanation contracts
 
