@@ -1,5 +1,7 @@
 "use client"
 
+import type { JsonObject } from "@lumiere/api-client/json-object"
+
 import { type FormEvent, useMemo, useRef, useState } from "react"
 import { AlertCircle, BookOpenCheck, Building2, CheckCircle2, MessageSquarePlus, Search, ShieldX } from "lucide-react"
 import { Button } from "@lumiere/ui"
@@ -18,7 +20,7 @@ import { mapEvidenceInspection, type EvidenceInspectionView, type EvidenceTarget
 import { EvidenceReviewQueuePanel } from "./evidence-review-queue-panel"
 
 interface EvidenceReviewerPanelProps {
-  companies: Record<string, unknown>[]
+  companies: JsonObject[]
 }
 
 type RequestState =
@@ -89,7 +91,7 @@ export function EvidenceReviewerPanel({ companies }: EvidenceReviewerPanelProps)
           ...(inspectKind === "workflow_step" ? { nodeKey: inspectNodeKey } : {}),
         }),
       })
-      const payload = await response.json().catch(() => ({})) as Record<string, unknown>
+      const payload = await response.json().catch(() => ({})) as JsonObject
       if (response.status === 401 || response.status === 403) {
         setRequest({
           status: "denied",
@@ -150,7 +152,7 @@ export function EvidenceReviewerPanel({ companies }: EvidenceReviewerPanelProps)
           supersedesDecisionId: null,
         }),
       })
-      const payload = await response.json().catch(() => ({})) as Record<string, unknown>
+      const payload = await response.json().catch(() => ({})) as JsonObject
       if (!response.ok) throw new Error(typeof payload.error === "string" ? payload.error : "The decision could not be captured.")
       const decisionId = Number(payload.decisionId)
       if (!Number.isSafeInteger(decisionId) || decisionId <= 0) throw new Error("The captured decision response was incomplete.")
@@ -178,7 +180,7 @@ export function EvidenceReviewerPanel({ companies }: EvidenceReviewerPanelProps)
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ companyId: parsedCompanyId, kind, id: parsedTargetId, outcome: reviewOutcome, note: reviewNote.trim() || null }),
       })
-      const payload = await response.json().catch(() => ({})) as Record<string, unknown>
+      const payload = await response.json().catch(() => ({})) as JsonObject
       if (!response.ok) throw new Error(typeof payload.error === "string" ? payload.error : "The review could not be recorded.")
       setReviewNote("")
       setMutation({ status: "success", message: `${kind === "decision" ? "Decision" : "Claim"} review recorded.` })
