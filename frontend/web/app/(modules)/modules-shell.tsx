@@ -351,6 +351,7 @@ function ErpAiChatPanel(props: Omit<ComponentProps<typeof AIChatPanel>, "onSendM
 
       return {
         content: assistantText,
+        runId: out.run_id,
         sources,
         actions: draftActions.length > 0 ? draftActions : undefined,
       }
@@ -398,6 +399,7 @@ function ErpAiChatPanel(props: Omit<ComponentProps<typeof AIChatPanel>, "onSendM
       let content = ""
       let sources: ChatMessageSourceRef[] = []
       let resolvedModel: string | null = null
+      let resolvedRunId: number | undefined
 
       const processEvent = (raw: string) => {
         const lines = raw.split(/\r?\n/)
@@ -413,9 +415,11 @@ function ErpAiChatPanel(props: Omit<ComponentProps<typeof AIChatPanel>, "onSendM
           const parsed = JSON.parse(data) as {
             sources?: AiRagSource[]
             model?: string
+            run_id?: number
           }
           sources = (parsed.sources ?? []).map(mapRagSourceToChatSource)
           resolvedModel = parsed.model ?? null
+          resolvedRunId = parsed.run_id
           handlers.onSources(sources)
         }
       }
@@ -456,6 +460,7 @@ function ErpAiChatPanel(props: Omit<ComponentProps<typeof AIChatPanel>, "onSendM
 
       return {
         content,
+        runId: resolvedRunId,
         sources,
         actions: draftActions.length > 0 ? draftActions : undefined,
       }
