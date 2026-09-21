@@ -198,6 +198,14 @@ async fn main() -> anyhow::Result<()> {
         .route("/v1/skills/sync", post(routes::skills::post_sync))
         .route("/v1/evidence/inspect", post(routes::evidence::post_inspect))
         .route(
+            "/v1/evidence/run",
+            post(routes::evidence::post_run_inspect),
+        )
+        .route(
+            "/v1/evidence/run/export",
+            post(routes::evidence::post_run_export),
+        )
+        .route(
             "/v1/evidence/review-queue",
             post(routes::evidence::post_review_queue),
         )
