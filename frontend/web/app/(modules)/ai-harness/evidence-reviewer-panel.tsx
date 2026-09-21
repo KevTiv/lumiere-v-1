@@ -66,9 +66,9 @@ export function EvidenceReviewerPanel({ companies }: EvidenceReviewerPanelProps)
   }
 
   const loadInspection = async (
-    override?: { kind: EvidenceTargetKind; id: number; nodeKey?: string },
+    override?: { kind: EvidenceTargetKind; id: number; nodeKey?: string; companyId?: number },
   ) => {
-    const parsedCompanyId = Number(companyId)
+    const parsedCompanyId = override?.companyId ?? Number(companyId)
     const inspectKind = override?.kind ?? kind
     const parsedTargetId = override?.id ?? Number(targetId)
     const inspectNodeKey = (override ? override.nodeKey : nodeKey.trim()) ?? ""
@@ -168,7 +168,7 @@ export function EvidenceReviewerPanel({ companies }: EvidenceReviewerPanelProps)
         }
         setKind("claim")
         setTargetId(String(claimId))
-        await loadInspection({ kind: "claim", id: claimId })
+        await loadInspection({ kind: "claim", id: claimId, companyId: selectedCompanyId })
       } catch {
         if (!cancelled) {
           setRequest({ status: "error", message: "The run evidence inspection is unavailable." })
