@@ -3,7 +3,7 @@
 **Status:** Authoritative extension to `governed-intelligence-program-architecture.md`
 **Date:** 2026-09-17
 **Purpose:** Move Lumiere from a safe agent harness toward typed organizational decision software where AI supplies bounded judgments and code owns composition, consequences, review, intelligence compounding, and graduation to deterministic behavior.
-**Related:** `intelligence-compounding-epistemic-trace.md`
+**Related:** `harness-decision-trace-replay-organizational-learning.md`
 
 ## 1. Core rule
 
@@ -428,7 +428,7 @@ Each item must identify whether it was deterministic/runtime observed, provider 
 
 ### TDG-09 — intelligence compounding integration
 
-- implement the `IC-01` through `IC-09` workstream from `intelligence-compounding-epistemic-trace.md`;
+- implement the `IC-01` through `IC-09` workstream from `harness-decision-trace-replay-organizational-learning.md`;
 - attach epistemic trace nodes to typed graph node identities and existing intelligence events;
 - extend RunReviewProgram with learning assessment without giving it execution authority;
 - retrieve reviewed TaskRecipe memory through the context compiler;
