@@ -3817,4 +3817,51 @@ mod threshold_gate_tests {
             "{reason}"
         );
     }
+
+    #[test]
+    fn recovery_attempts_are_strictly_bounded() {
+        let mut counters = HashMap::new();
+        assert_eq!(
+            reserve_recovery_attempt(&mut counters, "repair".to_string(), 2),
+            Some(1)
+        );
+        assert_eq!(
+            reserve_recovery_attempt(&mut counters, "repair".to_string(), 2),
+            Some(2)
+        );
+        assert_eq!(
+            reserve_recovery_attempt(&mut counters, "repair".to_string(), 2),
+            None
+        );
+        assert_eq!(counters.get("repair"), Some(&2));
+    }
+
+    #[test]
+    fn polling_backoff_is_capped_and_attempt_bounded() {
+        let backoffs = (1..=MAX_POLL_ATTEMPTS)
+            .map(poll_backoff_ms)
+            .collect::<Vec<_>>();
+        assert_eq!(backoffs, vec![0, 50, 100, 200]);
+        assert!(backoffs.iter().all(|delay| *delay <= POLL_MAX_BACKOFF_MS));
+        assert_eq!(backoffs.iter().sum::<u64>(), 350);
+    }
+
+    #[test]
+    fn recovery_classification_never_repairs_authorization_failures() {
+        assert!(answer_reason_needs_retrieval(
+            "claim is missing supporting evidence"
+        ));
+        assert!(answer_reason_is_repairable(
+            "citation does not resolve to a recorded passage"
+        ));
+        for denied in [
+            "source access denied",
+            "evidence was revoked",
+            "source is out of scope",
+            "unauthorized",
+        ] {
+            assert!(!answer_reason_is_repairable(denied), "{denied}");
+        }
+    }
+
 }
