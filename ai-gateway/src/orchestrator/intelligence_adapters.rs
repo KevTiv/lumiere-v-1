@@ -383,6 +383,7 @@ impl ReasoningProvider for AgentLoopReasoner<'_> {
                 capability: required_str(args, "capability")?,
                 arguments: args.get("arguments").cloned().unwrap_or_else(|| json!({})),
                 rationale: optional_str(args, "rationale"),
+                poll: args.get("poll").and_then(Value::as_bool).unwrap_or(false),
             }),
             TOOL_PROPOSE_PROGRAM_PATCH => {
                 ReasoningOutcome::ProgramPatchProposal(ProgramPatchProposal {
@@ -487,6 +488,10 @@ fn reasoning_tool_specs(request: &ReasoningRequest) -> Vec<ToolSpec> {
                         "proposed_score": {"type": "number"},
                         "proposed_probability": {"type": "number", "minimum": 0.0, "maximum": 1.0},
                         "rationale": {"type": "string"},
+                        "poll": {
+                            "type": "boolean",
+                            "description": "Set only for an intentional status poll. Polling remains separately attempt/time/backoff bounded and consumes the normal capability budget."
+                        },
                     },
                     "required": ["decision_type_name", "decision_type_version", "kind"],
                     "additionalProperties": false,
