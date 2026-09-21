@@ -2,7 +2,8 @@
 
 import type { JsonObject } from "@lumiere/api-client/json-object"
 
-import { type FormEvent, useMemo, useRef, useState } from "react"
+import { type FormEvent, useEffect, useMemo, useRef, useState } from "react"
+import { useSearchParams } from "next/navigation"
 import { AlertCircle, BookOpenCheck, Building2, CheckCircle2, MessageSquarePlus, Search, ShieldX } from "lucide-react"
 import { Button } from "@lumiere/ui"
 import { Alert, AlertDescription, AlertTitle } from "@lumiere/ui/components/alert"
@@ -42,6 +43,7 @@ function parseIds(value: string): number[] | null {
 }
 
 export function EvidenceReviewerPanel({ companies }: EvidenceReviewerPanelProps) {
+  const searchParams = useSearchParams()
   const companyOptions = useMemo(() => companyRowsToSelectOptions(companies), [companies])
   const [companyId, setCompanyId] = useState(() => companyOptions[0]?.value ?? "")
   const [kind, setKind] = useState<EvidenceTargetKind>("decision")
@@ -118,6 +120,66 @@ export function EvidenceReviewerPanel({ companies }: EvidenceReviewerPanelProps)
       setRequest({ status: "error", message: "The evidence inspection service is unavailable." })
     }
   }
+
+  useEffect(() => {
+    const runId = Number(searchParams.get("runId"))
+    const requestedCompanyId = Number(searchParams.get("companyId"))
+    if (!Number.isSafeInteger(runId) || runId <= 0) return
+    const selectedCompanyId =
+      Number.isSafeInteger(requestedCompanyId) && requestedCompanyId > 0
+        ? requestedCompanyId
+        : Number(companyId)
+    if (!Number.isSafeInteger(selectedCompanyId) || selectedCompanyId <= 0) return
+
+    if (String(selectedCompanyId) !== companyId) {
+      setCompanyId(String(selectedCompanyId))
+    }
+    let cancelled = false
+    void (async () => {
+      setRequest({ status: "loading" })
+      try {
+        const response = await fetch("/api/ai/evidence/runs/inspect", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ companyId: selectedCompanyId, runId }),
+        })
+        const payload = await response.json().catch(() => ({})) as JsonObject
+        if (cancelled) return
+        if (!response.ok) {
+          setRequest({
+            status: response.status === 401 || response.status === 403 ? "denied" : "error",
+            message:
+              typeof payload.error === "string"
+                ? payload.error
+                : "The run evidence inspection could not be loaded.",
+          })
+          return
+        }
+        const claimIds = Array.isArray(payload.claimIds)
+          ? payload.claimIds.filter(
+              (value): value is number => Number.isSafeInteger(value) && Number(value) > 0,
+            )
+          : []
+        const claimId = claimIds[0]
+        if (!claimId) {
+          setRequest({ status: "error", message: "This run has no persisted answer claims." })
+          return
+        }
+        setKind("claim")
+        setTargetId(String(claimId))
+        await loadInspection({ kind: "claim", id: claimId })
+      } catch {
+        if (!cancelled) {
+          setRequest({ status: "error", message: "The run evidence inspection is unavailable." })
+        }
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+    // Run deep links are intentionally resolved once per URL/company selection.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams])
 
   const inspect = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
