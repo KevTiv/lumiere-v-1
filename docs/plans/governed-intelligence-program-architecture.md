@@ -4,7 +4,7 @@
 **Date:** 2026-09-17
 **Supersedes:** model-first / generic-agent-loop assumptions in future harness work
 **Preserves:** generated ERP capability authority, Casbin/STDB authority, per-call policy, spend admission, approval stops, durable run events, evidence/verification contracts
-**Extends:** `decision-precedent-memory-layer.md`, `typed-decision-graph-and-run-review-plan.md`, and `intelligence-compounding-epistemic-trace.md`
+**Extends:** `decision-precedent-memory-layer.md`, `typed-decision-graph-and-run-review-plan.md`, and `harness-decision-trace-replay-organizational-learning.md`
 
 ## 1. Decision
 
@@ -308,7 +308,7 @@ Graduation is versioned and reversible.
 
 ### 12.1 Intelligence compounding
 
-The detailed learning substrate is defined in `intelligence-compounding-epistemic-trace.md`.
+The detailed learning substrate is defined in `harness-decision-trace-replay-organizational-learning.md`.
 
 Every governed run may emit an append-only epistemic trace DAG linking deterministic facts, provider-reported factors/alternatives/uncertainties, evidence acquisition, capability results, user corrections and reviewer findings to their real provenance. Reviewed traces may produce `TaskRecipe` procedural memory and `DecisionPattern` candidates.
 
