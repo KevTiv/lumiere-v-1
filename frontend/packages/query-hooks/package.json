@@ -12,6 +12,7 @@
     "./ai-ui-context": "./src/ai-ui-context.ts",
     "./action-draft-intent": "./src/action-draft-intent.ts",
     "./erp-ai-selection-context": "./src/erp-ai-selection-context.tsx",
+    "./hooks/crm": "./src/hooks/crm-public.ts",
     "./hooks/hr": "./src/hooks/hr/index.ts",
     "./hooks/inventory": "./src/hooks/inventory/index.ts",
     "./hooks/accounting": "./src/hooks/accounting/index.ts",
