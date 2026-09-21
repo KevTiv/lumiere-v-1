@@ -77,15 +77,14 @@ test("a picking transition refreshes stock and the orders that originated it", (
   assert.equal(new Set(INVENTORY_QUERY_RESOURCES).size, INVENTORY_QUERY_RESOURCES.length, "no duplicates")
 })
 
-test("validating with a backorder links the newest backorder picking, keeping the sales context", () => {
+test("validating with a backorder links the unique immediate child, keeping the sales context", () => {
   const observed = observeValidatedPicking("5", [
     { id: 5, saleId: 2, state: "done" },
-    { id: 8, backorderId: 5, saleId: 2 },
     { id: 9, backorderId: 5, saleId: 2 },
     { id: 10, backorderId: 6 },
   ])
   assert.equal(observed.outcome, "applied")
-  assert.deepEqual(observed.createdRecords?.map((r) => r.id), ["9", "8"])
+  assert.deepEqual(observed.createdRecords?.map((r) => r.id), ["9"])
   assert.deepEqual(observed.createdRecords?.[0], { resource: "stock_picking", id: "9", module: "inventory", context: "sales" })
   assert.equal(observed.next, undefined)
 })
@@ -93,6 +92,18 @@ test("validating with a backorder links the newest backorder picking, keeping th
 test("validating in full claims no created record, and an unknown picking claims nothing", () => {
   assert.deepEqual(observeValidatedPicking("5", [{ id: 5, state: "done" }]), { outcome: "applied" })
   assert.deepEqual(observeValidatedPicking("5", []), {})
+})
+
+test("multiple immediate backorders are an invariant failure", () => {
+  assert.throws(
+    () =>
+      observeValidatedPicking("5", [
+        { id: 5, state: "done" },
+        { id: 8, backorderId: 5 },
+        { id: 9, backorderId: 5 },
+      ]),
+    /has 2 immediate backorders/,
+  )
 })
 
 test("pack is an immediate record action; partial validation is form-backed and gated on assigned", async () => {

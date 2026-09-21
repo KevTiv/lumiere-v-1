@@ -211,18 +211,40 @@ export function observeReturnVendorCredit(returnId: string, returns: readonly Ro
 /** Blanket order states are plain lowercase strings; only a draft blanket can be released. */
 export const isBlanketReleasable = (row: RowValueMap) => String(firstNonNullKey(row, "state") ?? "") === "draft"
 
-const BLANKET_ORIGIN = /^blanket:(\d+)$/
-
-/** `release_blanket_to_po` stamps the PO `origin` with `blanket:<id>`; the newest such PO is the release just made. */
-export function observeBlanketRelease(blanketOrderId: string, orders: readonly RowValueMap[]): ObservedTransition {
-  const created = orders
-    .filter((row) => BLANKET_ORIGIN.exec(String(firstNonNullKey(row, "origin") ?? ""))?.[1] === blanketOrderId)
-    .map(rowId)
-    .sort((a, b) => Number(a) - Number(b))
-    .at(-1)
-  if (!created) return {}
-  const ref = recordRef(purchaseOrderWorkflow.resource, created, purchaseOrderWorkflow.module)
+/** Resolve the reducer's persisted, idempotent blanket-release identity. */
+export function resolveBlanketReleaseEffect(
+  blanketOrderId: string,
+  idempotencyKey: string,
+  releases: readonly RowValueMap[],
+): ObservedTransition | undefined {
+  const matched = releases.filter((row) => {
+    const blanket = firstNonNullKey(row, "blanketOrderId", "blanket_order_id")
+    const key = firstNonNullKey(row, "idempotencyKey", "idempotency_key")
+    return blanket != null && String(blanket) === blanketOrderId && String(key ?? "") === idempotencyKey
+  })
+  if (matched.length === 0) return undefined
+  if (matched.length > 1) {
+    throw new Error(`Expected one blanket release for ${blanketOrderId}/${idempotencyKey}, found ${matched.length}`)
+  }
+  const purchaseOrderId = firstNonNullKey(matched[0]!, "purchaseOrderId", "purchase_order_id")
+  if (purchaseOrderId == null) {
+    throw new Error(`Blanket release ${blanketOrderId}/${idempotencyKey} has no purchase order`)
+  }
+  const ref = recordRef(purchaseOrderWorkflow.resource, purchaseOrderId as string | number | bigint, purchaseOrderWorkflow.module)
   return { outcome: "applied", createdRecords: [ref], next: ref }
+}
+
+/** A missing post-dispatch release row is an unresolved outcome, never implicit success. */
+export function observeBlanketRelease(
+  blanketOrderId: string,
+  idempotencyKey: string,
+  releases: readonly RowValueMap[],
+): ObservedTransition {
+  const observed = resolveBlanketReleaseEffect(blanketOrderId, idempotencyKey, releases)
+  if (!observed) {
+    throw new Error(`Expected one blanket release for ${blanketOrderId}/${idempotencyKey}, found none`)
+  }
+  return observed
 }
 
 export interface ReleaseBlanketInput<TParams> {

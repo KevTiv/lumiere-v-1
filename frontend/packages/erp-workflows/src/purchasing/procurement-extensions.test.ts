@@ -70,15 +70,21 @@ test("a confirmed return opens its return picking and a vendor credit opens in a
   assert.deepEqual(observeReturnVendorCredit("2", [{ id: 2, credit_move_id: null }]), {})
 })
 
-test("only draft blankets release, and the newest PO stamped blanket:<id> is the release", () => {
+test("only draft blankets release, and the exact persisted release key resolves its PO", () => {
   assert.ok(isBlanketReleasable({ state: "draft" }))
   assert.ok(!isBlanketReleasable({ state: "closed" }))
-  const observed = observeBlanketRelease("7", [
-    { id: 10, origin: "blanket:7" },
-    { id: 12, origin: "blanket:7" },
-    { id: 13, origin: "blanket:70" },
-    { id: 14, origin: "requisition:7" },
+  const observed = observeBlanketRelease("7", "release-2", [
+    { id: 10, blanketOrderId: 7, idempotencyKey: "release-1", purchaseOrderId: 11 },
+    { id: 12, blanketOrderId: 7, idempotencyKey: "release-2", purchaseOrderId: 13 },
+    { id: 14, blanketOrderId: 70, idempotencyKey: "release-2", purchaseOrderId: 15 },
   ])
-  assert.deepEqual(observed.next, { resource: "purchase_order", id: "12", module: "purchasing" })
-  assert.deepEqual(observeBlanketRelease("8", []), {})
+  assert.deepEqual(observed.next, { resource: "purchase_order", id: "13", module: "purchasing" })
+  assert.throws(() => observeBlanketRelease("8", "release-2", []), /found none/)
+  assert.throws(
+    () => observeBlanketRelease("7", "release-2", [
+      { id: 12, blanketOrderId: 7, idempotencyKey: "release-2", purchaseOrderId: 13 },
+      { id: 13, blanketOrderId: 7, idempotencyKey: "release-2", purchaseOrderId: 14 },
+    ]),
+    /found 2/,
+  )
 })

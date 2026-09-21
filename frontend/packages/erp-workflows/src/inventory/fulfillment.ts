@@ -169,19 +169,29 @@ export function pickingStepsToDone(row: RowValueMap): readonly PickingStep[] | u
 }
 
 /**
- * Where a validated picking's short-shipped remainder went: the backorder picking the reducer
- * created (linked by `backorder_id`), newest first. A validation without a backorder claims nothing.
+ * Resolve the validated picking's unique immediate backorder by its stable parent key. A picking
+ * has zero or one immediate backorder; multiple linked rows are an invariant failure rather than a
+ * reason to choose one by recency.
  */
-export function observeValidatedPicking(pickingId: string, pickings: readonly RowValueMap[]): ObservedTransition {
+export function observeValidatedPicking(
+  pickingId: string,
+  pickings: readonly RowValueMap[],
+): ObservedTransition {
   const source = pickings.find((row) => rowId(row) === pickingId)
-  const backorders = pickings
-    .filter((row) => String(firstNonNullKey(row, "backorderId", "backorder_id") ?? "") === pickingId)
-    .sort((a, b) => Number(rowId(b)) - Number(rowId(a)))
+  const backorders = pickings.filter(
+    (row) => String(firstNonNullKey(row, "backorderId", "backorder_id") ?? "") === pickingId,
+  )
+
+  if (backorders.length > 1) {
+    throw new Error(`Picking ${pickingId} has ${backorders.length} immediate backorders`)
+  }
   if (backorders.length === 0) return source ? { outcome: "applied" } : {}
+
   const context = firstNonNullKey(source ?? {}, "saleId", "sale_id") != null ? "sales" : undefined
+  const backorder = backorders[0]!
   return {
     outcome: "applied",
-    createdRecords: backorders.map((row) => recordRef(pickingWorkflow.resource, rowId(row), pickingWorkflow.module, context)),
+    createdRecords: [recordRef(pickingWorkflow.resource, rowId(backorder), pickingWorkflow.module, context)],
   }
 }
 

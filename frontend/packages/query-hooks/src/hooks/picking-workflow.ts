@@ -54,7 +54,7 @@ export function usePickingWorkflow(
       extra: Pick<TransitionSpec<string>, "observe"> = {},
     ): TransitionSpec<string> => ({ id, command, affects: PICKING_TRANSITION_AFFECTS, ...extra })
 
-    // A backorder is a new picking, so a validation reads pickings back to link it.
+    // Resolve the zero-or-one immediate backorder by its stable parent key after validation.
     const observeValidation = async (pickingId: string) =>
       observeValidatedPicking(
         pickingId,

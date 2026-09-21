@@ -33,8 +33,6 @@ import {
   createBillFromPurchaseOrderAction,
   createVendorCreditFromReturnAction,
   holdSupplierIntakeAction,
-  observeAwardedRfq,
-  observeBlanketRelease,
   observeConfirmedPurchaseOrder,
   observeConfirmedPurchaseReturn,
   observeConvertedRequisition,
@@ -42,6 +40,8 @@ import {
   observeReceivedLine,
   observeReturnVendorCredit,
   observeSentPurchaseOrder,
+  resolveAwardedRfqEffect,
+  resolveBlanketReleaseEffect,
   postLandedCostAction,
   receivePurchaseLineAction,
   rejectSupplierIntakeAction,
@@ -60,6 +60,7 @@ import {
   type RowValueMap,
   type SupplierIntakeReasonInput,
   type TransitionSpec,
+  type ObservedTransition,
 } from "@lumiere/erp-workflows"
 
 import { stockMovesQueryOptions } from "./inventory/stock-operations"
@@ -80,7 +81,9 @@ import {
   createVendorCreditFromPurchaseReturnCommand,
   holdSupplierIntakeCommand,
   postLandedCostsCommand,
+  purchaseBlanketReleasesQueryOptions,
   purchaseOrdersQueryOptions,
+  purchaseRfqsQueryOptions,
   purchaseRequisitionsQueryOptions,
   purchaseReturnsQueryOptions,
   receivePurchaseOrderLineCommand,
@@ -155,6 +158,49 @@ export function usePurchasingWorkflow(
       return companyId
     }
 
+    const awardReadbacks = new Map<string, ObservedTransition>()
+    const blanketReadbacks = new Map<string, ObservedTransition>()
+
+    const exactEffect = async (options: {
+      read: () => Promise<RowValueMap[]>
+      resolve: (rows: readonly RowValueMap[]) => ObservedTransition | undefined
+      dispatch: () => Promise<void>
+      missing: string
+    }): Promise<ObservedTransition> => {
+      let before: RowValueMap[]
+      try {
+        before = await options.read()
+      } catch (cause) {
+        throw new WorkflowError("retryable_transport", "Canonical effect pre-read failed", { cause })
+      }
+
+      let existing: ObservedTransition | undefined
+      try {
+        existing = options.resolve(before)
+      } catch (cause) {
+        throw new WorkflowError("conflict", cause instanceof Error ? cause.message : String(cause), { cause })
+      }
+      if (existing) return existing
+
+      let ambiguousDispatch: unknown
+      try {
+        await options.dispatch()
+      } catch (error) {
+        if (error instanceof WorkflowError && error.kind !== "outcome_unknown") throw error
+        ambiguousDispatch = error
+      }
+
+      try {
+        const observed = options.resolve(await options.read())
+        if (observed) return observed
+      } catch (cause) {
+        throw new WorkflowError("outcome_unknown", options.missing, { cause })
+      }
+
+      if (ambiguousDispatch) throw ambiguousDispatch
+      throw new WorkflowError("outcome_unknown", options.missing)
+    }
+
     const idSpec = (
       id: string,
       command: (id: string) => Promise<void>,
@@ -203,9 +249,24 @@ export function usePurchasingWorkflow(
 
       awardBid: typed<AwardRfqBidInput>({
         id: "purchasing.rfq.award",
-        command: (input) => awardPurchaseRfqBidCommand(requireCompany("award an RFQ bid"), input),
         affects: AWARD_RFQ_BID_AFFECTS,
-        observe: async ({ rfqId }) => observeAwardedRfq(rfqId, await orders()),
+        command: async (input) => {
+          const key = `${input.rfqId}:${input.bidId}`
+          const read = () => fresh<RowValueMap[]>(purchaseRfqsQueryOptions(organizationId))
+          awardReadbacks.set(key, await exactEffect({
+            read,
+            resolve: (rows) => resolveAwardedRfqEffect(input.rfqId, input.bidId, rows),
+            dispatch: () => awardPurchaseRfqBidCommand(requireCompany("award an RFQ bid"), input),
+            missing: `RFQ ${input.rfqId} has no awarded purchase order`,
+          }))
+        },
+        observe: async (input) => {
+          const key = `${input.rfqId}:${input.bidId}`
+          const observed = awardReadbacks.get(key)
+          awardReadbacks.delete(key)
+          if (!observed) throw new WorkflowError("outcome_unknown", `RFQ ${input.rfqId} readback was lost`)
+          return observed
+        },
       }),
 
       reviewIntake: typed<ReviewSupplierIntakeInput>({
@@ -256,9 +317,24 @@ export function usePurchasingWorkflow(
 
       releaseBlanket: typed<ReleaseInput>({
         id: "purchasing.blanket.release",
-        command: (input) => releaseBlanketToPoCommand(requireCompany("release a blanket order"), input),
         affects: RELEASE_BLANKET_AFFECTS,
-        observe: async ({ blanketOrderId }) => observeBlanketRelease(blanketOrderId, await orders()),
+        command: async (input) => {
+          const key = `${input.blanketOrderId}:${input.params.idempotencyKey}`
+          const read = () => fresh<RowValueMap[]>(purchaseBlanketReleasesQueryOptions(organizationId))
+          blanketReadbacks.set(key, await exactEffect({
+            read,
+            resolve: (rows) => resolveBlanketReleaseEffect(input.blanketOrderId, input.params.idempotencyKey, rows),
+            dispatch: () => releaseBlanketToPoCommand(requireCompany("release a blanket order"), input),
+            missing: `Blanket release ${key} was not visible`,
+          }))
+        },
+        observe: async (input) => {
+          const key = `${input.blanketOrderId}:${input.params.idempotencyKey}`
+          const observed = blanketReadbacks.get(key)
+          blanketReadbacks.delete(key)
+          if (!observed) throw new WorkflowError("outcome_unknown", `Blanket release ${key} readback was lost`)
+          return observed
+        },
       }),
     }
   }, [qc, organizationId, companyId])

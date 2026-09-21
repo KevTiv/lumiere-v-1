@@ -1,4 +1,4 @@
-import { toWorkflowError, type WorkflowError, type WorkflowErrorKind } from "./errors"
+import { WorkflowError, toWorkflowError, type WorkflowErrorKind } from "./errors"
 import type { ErpRecordRef } from "./record-ref"
 import type { WorkflowOutcome, WorkflowResult } from "./result"
 
@@ -144,8 +144,26 @@ export async function completeTransition<TInput>(
   let observed: ObservedTransition = {}
   try {
     observed = (await spec.observe?.(input)) ?? {}
-  } catch {
-    // The command succeeded; a failed readback must not turn success into failure.
+  } catch (cause) {
+    // The command was accepted, but without a trustworthy canonical readback we cannot claim
+    // its business effect or navigate to a resulting record. In particular, never swallow a
+    // duplicate-effect invariant and quietly relabel the transition as applied.
+    const error = new WorkflowError("outcome_unknown", "Canonical effect readback failed", { cause })
+    record({
+      status: "failed",
+      errorKind: error.kind,
+      refreshed: true,
+      affectedResources,
+    })
+    ports.notify?.({
+      kind: "error",
+      transitionId: spec.id,
+      correlationId,
+      attempt,
+      error,
+      refreshed: true,
+    })
+    throw error
   }
 
   const result: WorkflowResult = {

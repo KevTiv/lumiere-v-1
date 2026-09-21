@@ -227,11 +227,15 @@ export function usePurchaseReturns(
   })
 }
 
+export const purchaseRfqsQueryOptions = (organizationId: bigint) => ({
+  queryKey: ['purchase-rfqs', rqBigIntKey(organizationId)] as const,
+  queryFn: () => fetchQueryList('/api/query/purchase-rfqs', 'Failed to fetch purchase RFQs'),
+  staleTime: 30_000,
+})
+
 export function usePurchaseRfqs(organizationId: bigint, initialData?: PurchaseRfq[]) {
   return useQuery<PurchaseRfq[]>({
-    queryKey: ['purchase-rfqs', rqBigIntKey(organizationId)],
-    queryFn: () => fetchQueryList('/api/query/purchase-rfqs', 'Failed to fetch purchase RFQs'),
-    staleTime: 30_000,
+    ...purchaseRfqsQueryOptions(organizationId),
     initialData: coalesceQueryInitialData(initialData),
   })
 }
@@ -292,6 +296,12 @@ export function usePurchaseBlanketOrderLines(organizationId: bigint, initialData
 }
 
 /** Subscription-aware blanket release list with an HTTP fallback. */
+export const purchaseBlanketReleasesQueryOptions = (organizationId: bigint) => ({
+  queryKey: ['purchase-blanket-releases', rqBigIntKey(organizationId)] as const,
+  queryFn: () => fetchQueryList('/api/query/purchase-blanket-releases', 'Failed to fetch blanket releases'),
+  staleTime: 30_000,
+})
+
 export function usePurchaseBlanketReleases(organizationId: bigint, initialData?: PurchaseBlanketRelease[]) {
   return useSubscriptionAwareQuery("purchase-blanket-releases", organizationId, { initialData })
 }

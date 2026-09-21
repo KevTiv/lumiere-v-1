@@ -18,7 +18,6 @@ import {
   observeCreatedBill,
   observeReceivedLine,
   observeSentPurchaseOrder,
-  poSourceRfqId,
   purchaseLineOpenQty,
   receivePurchaseLineAction,
 } from "./procure-to-pay"
@@ -85,18 +84,17 @@ test("a converted requisition opens the newest PO it produced", () => {
   assert.deepEqual(observeConvertedRequisition("3", [{ id: 3, purchase_ids: [] }]), {})
 })
 
-test("the PO an RFQ award created is found by its rfq_id stamp, newest first", () => {
-  assert.equal(poSourceRfqId({ metadata: '{"rfq_id":4,"awarded_bid_id":2}' }), "4")
-  assert.equal(poSourceRfqId({ metadata: "not json" }), undefined)
-  assert.equal(poSourceRfqId({}), undefined)
-  const observed = observeAwardedRfq("4", [
-    { id: 10, metadata: '{"rfq_id":4}' },
-    { id: 12, metadata: '{"rfq_id":4}' },
-    { id: 13, metadata: '{"rfq_id":5}' },
-    { id: 14, metadata: null },
-  ])
+test("the PO an RFQ award created is resolved from the RFQ's exact awarded bid relation", () => {
+  const observed = observeAwardedRfq("4", "2", [{ id: 4, awardedBidId: 2, purchaseOrderId: 12 }])
   assert.deepEqual(observed.next, { resource: "purchase_order", id: "12", module: "purchasing" })
-  assert.deepEqual(observeAwardedRfq("99", []), {})
+  assert.throws(() => observeAwardedRfq("4", "3", [{ id: 4, awardedBidId: 2, purchaseOrderId: 12 }]), /found none/)
+  assert.throws(
+    () => observeAwardedRfq("4", "2", [
+      { id: 4, awardedBidId: 2, purchaseOrderId: 12 },
+      { id: 4, awardedBidId: 2, purchaseOrderId: 13 },
+    ]),
+    /Expected one RFQ 4, found 2/,
+  )
 })
 
 test("the vendor bill is the last entry of the order's invoice ids and opens in accounting", () => {

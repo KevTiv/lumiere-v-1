@@ -163,28 +163,31 @@ export function observeConvertedRequisition(
   return { outcome: "applied", createdRecords: [order], next: order }
 }
 
-/** The RFQ an awarded PO came from: `award_purchase_rfq_bid` stamps `metadata.rfq_id`. */
-export function poSourceRfqId(order: RowValueMap): string | undefined {
-  const metadata = firstNonNullKey(order, "metadata")
-  if (typeof metadata !== "string") return undefined
-  try {
-    const id = (JSON.parse(metadata) as { rfq_id?: unknown }).rfq_id
-    return id == null ? undefined : String(id)
-  } catch {
-    return undefined
-  }
+/** Resolve the immutable RFQ award relation written by `award_purchase_rfq_bid`. */
+export function resolveAwardedRfqEffect(
+  rfqId: string,
+  bidId: string,
+  rfqs: readonly RowValueMap[],
+): ObservedTransition | undefined {
+  const matched = rfqs.filter((row) => rowId(row) === rfqId)
+  if (matched.length > 1) throw new Error(`Expected one RFQ ${rfqId}, found ${matched.length}`)
+  const rfq = matched[0]
+  if (!rfq) return undefined
+  const awardedBidId = firstNonNullKey(rfq, "awardedBidId", "awarded_bid_id")
+  const purchaseOrderId = firstNonNullKey(rfq, "purchaseOrderId", "purchase_order_id")
+  if (awardedBidId == null || String(awardedBidId) !== bidId || purchaseOrderId == null) return undefined
+  const order = orderRef(purchaseOrderId as string | number | bigint)
+  return { outcome: "applied", createdRecords: [order], next: order }
 }
 
-/** The newest PO stamped with this RFQ is the one the award just created. */
-export function observeAwardedRfq(rfqId: string, orders: readonly RowValueMap[]): ObservedTransition {
-  const created = orders
-    .filter((row) => poSourceRfqId(row) === rfqId)
-    .map(rowId)
-    .sort((a, b) => Number(a) - Number(b))
-    .at(-1)
-  if (!created) return {}
-  const order = orderRef(created)
-  return { outcome: "applied", createdRecords: [order], next: order }
+export function observeAwardedRfq(
+  rfqId: string,
+  bidId: string,
+  rfqs: readonly RowValueMap[],
+): ObservedTransition {
+  const observed = resolveAwardedRfqEffect(rfqId, bidId, rfqs)
+  if (!observed) throw new Error(`Expected one purchase order for RFQ ${rfqId} bid ${bidId}, found none`)
+  return observed
 }
 
 /** The reducer appends the new bill to the PO's `invoice_ids`: the last entry is the bill this command produced. */
