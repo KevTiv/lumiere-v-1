@@ -12,9 +12,9 @@
   },
   "lumiere_contracts": {
     "package": "lumiere-contracts",
-    "version": "0.3.51",
-    "tag": "v0.3.51",
-    "revision": "0e700f24967b9daa156a69364484f386fc515ae7",
+    "version": "0.3.52",
+    "tag": "v0.3.52",
+    "revision": "8f89b7a42f04763f9c907d93a805a6f2b2c83066",
     "repository": "ssh://git@github.com/KevTiv/lumiere-contracts.git"
   },
   "operation_history": {
@@ -51,7 +51,7 @@
   "minimum_client_contract": {
     "version": "ir-v2",
     "ir_version": 2,
-    "generated_contract_release": "0.3.51"
+    "generated_contract_release": "0.3.52"
   },
   "deployment": {
     "config_generation": 2,
