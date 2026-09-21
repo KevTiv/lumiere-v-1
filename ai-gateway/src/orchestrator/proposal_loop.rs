@@ -22,7 +22,15 @@ use super::intelligence::{
     ReasoningRequest,
 };
 use super::progress::{Progress, ProgressTracker, MAX_UNCHANGED_RESULTS};
-use crate::tools::types::ToolOutput;
+use crate::tools::types::{hash_tool_input, ToolOutput};
+
+const MAX_RERETRIEVAL_ATTEMPTS: u32 = 2;
+const MAX_REPAIR_ATTEMPTS: u32 = 2;
+const MAX_REPLAN_ATTEMPTS: u32 = 1;
+const MAX_POLL_ATTEMPTS: u32 = 4;
+const MAX_POLL_WINDOW_MS: u64 = 5_000;
+const POLL_BASE_BACKOFF_MS: u64 = 50;
+const POLL_MAX_BACKOFF_MS: u64 = 400;
 
 #[derive(Clone, Copy, Debug)]
 pub(super) struct ProposalLoopLimits {
@@ -175,6 +183,53 @@ pub(super) async fn run_proposal_loop(
                     .await;
                 }
 
+                if proposal.poll {
+                    match reserve_poll_attempt(&mut state, &proposal) {
+                        Ok(poll) => {
+                            record(
+                                recorder,
+                                &mut event_step,
+                                "polling",
+                                Some(proposal.capability.clone()),
+                                json!({
+                                    "attempt": poll.attempt,
+                                    "backoff_ms": poll.backoff_ms,
+                                    "elapsed_ms": poll.elapsed_ms,
+                                }),
+                                "bounded poll attempt admitted",
+                                None,
+                            )
+                            .await?;
+                            if poll.backoff_ms > 0 {
+                                tokio::time::sleep(std::time::Duration::from_millis(
+                                    poll.backoff_ms,
+                                ))
+                                .await;
+                            }
+                        }
+                        Err(reason) => {
+                            record(
+                                recorder,
+                                &mut event_step,
+                                "polling",
+                                Some(proposal.capability.clone()),
+                                json!({}),
+                                "polling budget exhausted",
+                                Some(reason.clone()),
+                            )
+                            .await?;
+                            return finish(
+                                recorder,
+                                &mut event_step,
+                                state,
+                                ProposalLoopStop::UnableToProgress(reason),
+                                round,
+                            )
+                            .await;
+                        }
+                    }
+                }
+
                 let step_outcome = capabilities
                     .run(run_id, &proposal, capability_calls_used)
                     .await?;
@@ -200,13 +255,17 @@ pub(super) async fn run_proposal_loop(
                             Progress::New => false,
                             Progress::Unchanged { consecutive }
                             | Progress::Stalled { consecutive } => {
-                                let stalled = consecutive > limits.max_unchanged_results;
+                                let stalled =
+                                    !proposal.poll && consecutive > limits.max_unchanged_results;
                                 record(
                                     recorder,
                                     &mut event_step,
                                     "progress",
                                     Some(proposal.capability.clone()),
-                                    json!({"consecutive_unchanged": consecutive}),
+                                    json!({
+                                        "consecutive_unchanged": consecutive,
+                                        "explicit_poll": proposal.poll,
+                                    }),
                                     "capability result repeated known evidence",
                                     stalled.then(|| "no new evidence".to_string()),
                                 )
@@ -346,9 +405,51 @@ pub(super) async fn run_proposal_loop(
                         ))
                     }
                     AnswerAdmissionOutcome::RequiresReview { reason } => {
+                        if reason_needs_retrieval(&reason)
+                            && consume_recovery_attempt(
+                                &mut state,
+                                "retrieval_attempts",
+                                MAX_RERETRIEVAL_ATTEMPTS,
+                                "re_retrieval",
+                                &reason,
+                            )
+                        {
+                            record(
+                                recorder,
+                                &mut event_step,
+                                "re_retrieval",
+                                None,
+                                json!({"reason": reason}),
+                                "answer gate requested bounded evidence re-retrieval",
+                                None,
+                            )
+                            .await?;
+                            continue;
+                        }
                         ProposalLoopStop::CandidateRequiresReview { reason }
                     }
                     AnswerAdmissionOutcome::Blocked { reason } => {
+                        if reason_is_repairable(&reason)
+                            && consume_recovery_attempt(
+                                &mut state,
+                                "repair_attempts",
+                                MAX_REPAIR_ATTEMPTS,
+                                "repair",
+                                &reason,
+                            )
+                        {
+                            record(
+                                recorder,
+                                &mut event_step,
+                                "repair",
+                                None,
+                                json!({"reason": reason}),
+                                "answer gate requested bounded candidate repair",
+                                None,
+                            )
+                            .await?;
+                            continue;
+                        }
                         ProposalLoopStop::CandidateBlocked { reason }
                     }
                 };
@@ -370,6 +471,25 @@ pub(super) async fn run_proposal_loop(
                 return finish(recorder, &mut event_step, state, stop, round).await;
             }
             ReasoningOutcome::UnableToProgress(unable) => {
+                if consume_recovery_attempt(
+                    &mut state,
+                    "replan_attempts",
+                    MAX_REPLAN_ATTEMPTS,
+                    "replan",
+                    &unable.reason,
+                ) {
+                    record(
+                        recorder,
+                        &mut event_step,
+                        "replan",
+                        None,
+                        json!({"last_step_no": unable.last_step_no, "reason": unable.reason}),
+                        "bounded replan requested after unable-to-progress",
+                        None,
+                    )
+                    .await?;
+                    continue;
+                }
                 record(
                     recorder,
                     &mut event_step,
@@ -400,6 +520,143 @@ pub(super) async fn run_proposal_loop(
         limits.max_rounds,
     )
     .await
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct PollAttempt {
+    attempt: u32,
+    elapsed_ms: u64,
+    backoff_ms: u64,
+}
+
+fn now_millis() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis()
+        .try_into()
+        .unwrap_or(u64::MAX)
+}
+
+fn recovery_state(state: &mut Value) -> &mut serde_json::Map<String, Value> {
+    let object = state
+        .as_object_mut()
+        .expect("bounded state is validated as an object before recovery");
+    if !object.get("recovery").is_some_and(Value::is_object) {
+        object.insert("recovery".to_string(), json!({}));
+    }
+    object
+        .get_mut("recovery")
+        .and_then(Value::as_object_mut)
+        .expect("recovery state is an object")
+}
+
+fn consume_recovery_attempt(
+    state: &mut Value,
+    counter: &str,
+    limit: u32,
+    kind: &str,
+    reason: &str,
+) -> bool {
+    let recovery = recovery_state(state);
+    let used = recovery
+        .get(counter)
+        .and_then(Value::as_u64)
+        .unwrap_or_default() as u32;
+    if used >= limit {
+        return false;
+    }
+    let next = used.saturating_add(1);
+    recovery.insert(counter.to_string(), json!(next));
+    let diagnostic = json!({
+        "kind": kind,
+        "attempt": next,
+        "limit": limit,
+        "reason": reason,
+    });
+    match recovery.get_mut("diagnostics").and_then(Value::as_array_mut) {
+        Some(items) => items.push(diagnostic),
+        None => {
+            recovery.insert("diagnostics".to_string(), json!([diagnostic]));
+        }
+    }
+    true
+}
+
+fn reason_needs_retrieval(reason: &str) -> bool {
+    let reason = reason.to_ascii_lowercase();
+    ["evidence", "citation", "source", "support", "ground"]
+        .iter()
+        .any(|needle| reason.contains(needle))
+}
+
+fn reason_is_repairable(reason: &str) -> bool {
+    let reason = reason.to_ascii_lowercase();
+    !["forbidden", "denied", "revoked", "withdrawn", "out of scope", "unauthorized"]
+        .iter()
+        .any(|needle| reason.contains(needle))
+}
+
+fn reserve_poll_attempt(
+    state: &mut Value,
+    proposal: &super::intelligence::CapabilityProposal,
+) -> std::result::Result<PollAttempt, String> {
+    let fingerprint = hash_tool_input(&json!({
+        "capability": proposal.capability,
+        "arguments": proposal.arguments,
+    }));
+    let now = now_millis();
+    let recovery = recovery_state(state);
+    if !recovery.get("polls").is_some_and(Value::is_object) {
+        recovery.insert("polls".to_string(), json!({}));
+    }
+    let polls = recovery
+        .get_mut("polls")
+        .and_then(Value::as_object_mut)
+        .expect("poll state is an object");
+    let poll = polls.entry(fingerprint).or_insert_with(|| {
+        json!({
+            "attempts": 0,
+            "started_at_ms": now,
+        })
+    });
+    let poll = poll
+        .as_object_mut()
+        .ok_or_else(|| "poll recovery state is malformed".to_string())?;
+    let attempts = poll
+        .get("attempts")
+        .and_then(Value::as_u64)
+        .unwrap_or_default() as u32;
+    let started_at = poll
+        .get("started_at_ms")
+        .and_then(Value::as_u64)
+        .unwrap_or(now);
+    let elapsed_ms = now.saturating_sub(started_at);
+    if attempts >= MAX_POLL_ATTEMPTS || elapsed_ms > MAX_POLL_WINDOW_MS {
+        return Err(format!(
+            "polling budget exhausted after {attempts} attempts / {elapsed_ms}ms"
+        ));
+    }
+    let attempt = attempts.saturating_add(1);
+    poll.insert("attempts".to_string(), json!(attempt));
+    let exponent = attempt.saturating_sub(1).min(8);
+    let backoff_ms = if attempt <= 1 {
+        0
+    } else {
+        POLL_BASE_BACKOFF_MS
+            .saturating_mul(1_u64 << exponent)
+            .min(POLL_MAX_BACKOFF_MS)
+    };
+    if elapsed_ms.saturating_add(backoff_ms) > MAX_POLL_WINDOW_MS {
+        return Err(format!(
+            "polling time budget exhausted before attempt {attempt}"
+        ));
+    }
+    Ok(PollAttempt {
+        attempt,
+        elapsed_ms,
+        backoff_ms,
+    })
 }
 
 fn merge_evidence(
