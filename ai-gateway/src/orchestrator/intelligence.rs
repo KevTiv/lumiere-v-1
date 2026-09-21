@@ -799,6 +799,7 @@ mod tests {
             capability: "erp.search".to_string(),
             arguments: json!({}),
             rationale: None,
+            poll: false,
         });
         assert!(outcome.validate_against(&request).is_err());
 
