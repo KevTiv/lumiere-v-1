@@ -1,2 +1,2 @@
-/** Opaque JSON object for transport/parsing boundaries; domain code should decode to named types. */
+/** Opaque JSON object permitted only at transport/parsing boundaries. */
 export type JsonObject = Record<string, unknown>
