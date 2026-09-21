@@ -13,13 +13,14 @@ use axum::{
     response::{IntoResponse, Response},
     Json,
 };
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
+use serde_json::{json, Value};
 
 use crate::{
     error::{AppError, AppResult},
     orchestrator::evidence_inspector::{
         inspect, inspect_workflow_step, retrieve_reusable_knowledge, ActorIdentity, InspectTarget,
-        KnowledgeRetrieval, Viewer,
+        Inspection, KnowledgeRetrieval, Viewer,
     },
     orchestrator::review_queue::{build_queue, DEFAULT_QUEUE_LIMIT},
     state::AppState,
@@ -33,6 +34,43 @@ const KNOWLEDGE_RETRIEVE_CAPABILITY: &str = "ai.knowledge.retrieve";
 /// reuse): holding one never implies the other, and neither is seeded by
 /// default.
 pub(crate) const RAG_EVIDENCE_RETRIEVE_CAPABILITY: &str = "ai.evidence.retrieve";
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct RunInspectionRequest {
+    pub run_id: u64,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RunTranscriptStep {
+    pub id: u64,
+    pub step_no: u64,
+    pub tool_name: String,
+    /// Raw tool arguments are never exposed; only their persisted hash.
+    pub input_hash: String,
+    /// Result payloads stay private. This bounded status is enough to reconstruct
+    /// the observable run without exporting sensitive tool output.
+    pub result_summary: String,
+    pub output_row_count: Option<u64>,
+    pub duration_ms: u64,
+    pub error: bool,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RunEvidenceInspection {
+    pub run_id: u64,
+    pub status: String,
+    pub answer: Option<String>,
+    pub step_count: u64,
+    pub tokens_used: u64,
+    pub error_message: Option<String>,
+    pub transcript: Vec<RunTranscriptStep>,
+    pub contribution_ids: Vec<u64>,
+    pub claim_ids: Vec<u64>,
+    pub claims: Vec<Inspection>,
+}
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
@@ -289,6 +327,167 @@ pub async fn post_inspect(
     response
         .headers_mut()
         .insert(CACHE_CONTROL, HeaderValue::from_static("no-store"));
+    Ok(response)
+}
+
+fn row_u64(row: &Value, camel: &str, snake: &str) -> Option<u64> {
+    row.get(camel)
+        .or_else(|| row.get(snake))
+        .and_then(|value| value.as_u64().or_else(|| value.as_str()?.parse().ok()))
+}
+
+fn row_text(row: &Value, camel: &str, snake: &str) -> Option<String> {
+    row.get(camel)
+        .or_else(|| row.get(snake))
+        .and_then(Value::as_str)
+        .map(str::to_string)
+}
+
+fn redacted_step(row: &Value) -> Option<RunTranscriptStep> {
+    let row_count = row_u64(row, "outputRowCount", "output_row_count");
+    let error_message = row_text(row, "errorMessage", "error_message");
+    Some(RunTranscriptStep {
+        id: row_u64(row, "id", "id")?,
+        step_no: row_u64(row, "stepNo", "step_no")?,
+        tool_name: row_text(row, "toolName", "tool_name")?,
+        input_hash: row_text(row, "inputHash", "input_hash")?,
+        result_summary: if error_message.is_some() {
+            "tool failed".to_string()
+        } else if let Some(count) = row_count {
+            format!("{count} row(s)")
+        } else {
+            "completed".to_string()
+        },
+        output_row_count: row_count,
+        duration_ms: row_u64(row, "durationMs", "duration_ms").unwrap_or_default(),
+        error: error_message.is_some(),
+    })
+}
+
+async fn inspect_run(
+    state: &AppState,
+    actor: &ActorCredentials,
+    run_id: u64,
+) -> AppResult<RunEvidenceInspection> {
+    if run_id == 0 {
+        return Err(AppError::BadRequest("runId is required".into()));
+    }
+    let _grant = require_actor_grant_bounds(state, actor, INSPECT_CAPABILITY).await?;
+    let runs = state
+        .stdb
+        .query_sql(&format!(
+            "SELECT * FROM ai_agent_run WHERE organization_id = {} AND company_id = {} AND id = {} LIMIT 1",
+            actor.organization_id, actor.company_id, run_id
+        ))
+        .await
+        .map_err(|error| AppError::Internal(error.to_string()))?;
+    let run = runs
+        .into_iter()
+        .next()
+        .ok_or_else(|| AppError::NotFound("run not found".into()))?;
+
+    let mut transcript = state
+        .stdb
+        .query_sql(&format!(
+            "SELECT * FROM ai_agent_run_step WHERE organization_id = {} AND run_id = {}",
+            actor.organization_id, run_id
+        ))
+        .await
+        .map_err(|error| AppError::Internal(error.to_string()))?
+        .iter()
+        .filter_map(redacted_step)
+        .collect::<Vec<_>>();
+    transcript.sort_by_key(|step| (step.step_no, step.id));
+
+    let contributions = state
+        .stdb
+        .query_sql(&format!(
+            "SELECT * FROM ai_evidence_contribution WHERE organization_id = {} AND company_id = {} AND agent_run_id = {}",
+            actor.organization_id, actor.company_id, run_id
+        ))
+        .await
+        .map_err(|error| AppError::Internal(error.to_string()))?;
+    let mut contribution_ids = contributions
+        .iter()
+        .filter_map(|row| row_u64(row, "id", "id"))
+        .collect::<Vec<_>>();
+    contribution_ids.sort_unstable();
+    contribution_ids.dedup();
+
+    let viewer = Viewer {
+        organization_id: actor.organization_id,
+        company_id: actor.company_id,
+        actor_identity: ActorIdentity::parse(&actor.identity),
+    };
+    let mut claim_ids = Vec::new();
+    for contribution_id in &contribution_ids {
+        let rows = state
+            .stdb
+            .query_sql(&format!(
+                "SELECT * FROM ai_evidence_claim WHERE organization_id = {} AND company_id = {} AND contribution_id = {}",
+                actor.organization_id, actor.company_id, contribution_id
+            ))
+            .await
+            .map_err(|error| AppError::Internal(error.to_string()))?;
+        claim_ids.extend(rows.iter().filter_map(|row| row_u64(row, "id", "id")));
+    }
+    claim_ids.sort_unstable();
+    claim_ids.dedup();
+
+    let mut claims = Vec::with_capacity(claim_ids.len());
+    for claim_id in &claim_ids {
+        let inspection = inspect(state.stdb.as_ref(), viewer, InspectTarget::Claim(*claim_id))
+            .await
+            .map_err(|error| AppError::Internal(error.to_string()))?;
+        claims.push(inspection);
+    }
+
+    Ok(RunEvidenceInspection {
+        run_id,
+        status: row_text(&run, "status", "status").unwrap_or_else(|| "unknown".into()),
+        answer: row_text(&run, "summary", "summary"),
+        step_count: row_u64(&run, "stepCount", "step_count").unwrap_or_default(),
+        tokens_used: row_u64(&run, "tokensUsed", "tokens_used").unwrap_or_default(),
+        error_message: row_text(&run, "errorMessage", "error_message"),
+        transcript,
+        contribution_ids,
+        claim_ids,
+        claims,
+    })
+}
+
+pub async fn post_run_inspect(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Json(req): Json<RunInspectionRequest>,
+) -> AppResult<Response> {
+    let actor = ActorCredentials::from_headers(&headers)?;
+    let inspection = inspect_run(&state, &actor, req.run_id).await?;
+    let mut response = Json(inspection).into_response();
+    response.headers_mut().insert(
+        CACHE_CONTROL,
+        HeaderValue::from_static("no-store"),
+    );
+    Ok(response)
+}
+
+pub async fn post_run_export(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Json(req): Json<RunInspectionRequest>,
+) -> AppResult<Response> {
+    let actor = ActorCredentials::from_headers(&headers)?;
+    let inspection = inspect_run(&state, &actor, req.run_id).await?;
+    let mut response = Json(json!({
+        "schemaVersion": 1,
+        "kind": "lumiere_run_evidence_export",
+        "run": inspection,
+    }))
+    .into_response();
+    response.headers_mut().insert(
+        CACHE_CONTROL,
+        HeaderValue::from_static("no-store"),
+    );
     Ok(response)
 }
 
