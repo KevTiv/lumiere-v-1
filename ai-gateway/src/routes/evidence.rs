@@ -29,6 +29,8 @@ use crate::{
 const ACTOR_GRANT_TIMEOUT: Duration = Duration::from_secs(3);
 const INSPECT_CAPABILITY: &str = "ai.evidence.inspect";
 const KNOWLEDGE_RETRIEVE_CAPABILITY: &str = "ai.knowledge.retrieve";
+const MAX_RUN_TRANSCRIPT_STEPS: usize = 200;
+const MAX_RUN_CLAIMS: usize = 100;
 /// Exact authority to have persisted evidence passages placed in a RAG answer.
 /// Deliberately distinct from `ai.knowledge.retrieve` (reviewed knowledge
 /// reuse): holding one never implies the other, and neither is seeded by
@@ -398,17 +400,19 @@ async fn inspect_run(
         .filter_map(redacted_step)
         .collect::<Vec<_>>();
     transcript.sort_by_key(|step| (step.step_no, step.id));
+    transcript.truncate(MAX_RUN_TRANSCRIPT_STEPS);
 
     let contributions = state
         .stdb
         .query_sql(&format!(
-            "SELECT * FROM ai_evidence_contribution WHERE organization_id = {} AND company_id = {} AND agent_run_id = {}",
-            actor.organization_id, actor.company_id, run_id
+            "SELECT * FROM ai_evidence_contribution WHERE organization_id = {} AND company_id = {}",
+            actor.organization_id, actor.company_id
         ))
         .await
         .map_err(|error| AppError::Internal(error.to_string()))?;
     let mut contribution_ids = contributions
         .iter()
+        .filter(|row| row_u64(row, "agentRunId", "agent_run_id") == Some(run_id))
         .filter_map(|row| row_u64(row, "id", "id"))
         .collect::<Vec<_>>();
     contribution_ids.sort_unstable();
@@ -438,6 +442,7 @@ async fn inspect_run(
         .collect::<Vec<_>>();
     claim_ids.sort_unstable();
     claim_ids.dedup();
+    claim_ids.truncate(MAX_RUN_CLAIMS);
 
     let mut claims = Vec::with_capacity(claim_ids.len());
     for claim_id in &claim_ids {
