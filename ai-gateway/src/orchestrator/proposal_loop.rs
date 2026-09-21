@@ -990,12 +990,19 @@ mod tests {
         let final_answer = ShapeOnlyFinalAnswerAdmission;
         let recorder = RecordingRecorder::new();
 
+        let uncited = FinalDraft {
+            content: "an uncited answer".to_string(),
+            citations: vec![],
+            ..Default::default()
+        };
         let reasoner = ScriptedReasoner {
-            outcomes: Mutex::new(vec![Ok(ReasoningOutcome::FinalDraft(FinalDraft {
-                content: "an uncited answer".to_string(),
-                citations: vec![],
-                ..Default::default()
-            }))]),
+            // Two bounded re-retrieval requests are allowed before the same
+            // admission result becomes terminal review.
+            outcomes: Mutex::new(vec![
+                Ok(ReasoningOutcome::FinalDraft(uncited.clone())),
+                Ok(ReasoningOutcome::FinalDraft(uncited.clone())),
+                Ok(ReasoningOutcome::FinalDraft(uncited)),
+            ]),
         };
 
         let outcome = run_proposal_loop(
@@ -1442,13 +1449,17 @@ mod tests {
         let final_answer = ShapeOnlyFinalAnswerAdmission;
         let recorder = RecordingRecorder::new();
 
+        let unable = UnableToProgress {
+            reason: "no further evidence available".to_string(),
+            last_step_no: 1,
+        };
         let reasoner = ScriptedReasoner {
-            outcomes: Mutex::new(vec![Ok(ReasoningOutcome::UnableToProgress(
-                UnableToProgress {
-                    reason: "no further evidence available".to_string(),
-                    last_step_no: 1,
-                },
-            ))]),
+            // One bounded replan is permitted; the repeated outcome is then
+            // surfaced as the terminal stop.
+            outcomes: Mutex::new(vec![
+                Ok(ReasoningOutcome::UnableToProgress(unable.clone())),
+                Ok(ReasoningOutcome::UnableToProgress(unable)),
+            ]),
         };
 
         let outcome = run_proposal_loop(
