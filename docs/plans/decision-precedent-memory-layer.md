@@ -2,7 +2,7 @@
 
 **Status:** Architecture extension to the governed-program harness
 **Date:** 2026-09-17
-**Related:** `governed-intelligence-program-architecture.md`, `governed-intelligence-program-migration.md`
+**Related:** `governed-intelligence-program-architecture.md`, `governed-intelligence-program-migration.md`, `intelligence-compounding-epistemic-trace.md`
 
 ## 1. Decision
 
@@ -39,15 +39,16 @@ STDB/business rules remain authoritative
 
 ## 2. Memory model
 
-Keep three distinct memory classes:
+Keep four distinct memory classes:
 
 ```text
-KnowledgeMemory  -> facts, documents, policies, source passages
-DecisionMemory   -> cases, crossroads, corrections, outcomes, precedent patterns
-ExecutionMemory  -> program runs, capability traces, artifacts, recipes
+KnowledgeMemory   -> facts, documents, policies, source passages
+DecisionMemory    -> cases, crossroads, corrections, outcomes, precedent patterns
+ExecutionMemory   -> program runs, capability traces, artifacts
+ProceduralMemory  -> reviewed TaskRecipe problem-solving patterns
 ```
 
-They may reference each other but must not collapse into one generic vector-memory store.
+They may reference each other but must not collapse into one generic vector-memory store. Procedural memory is derived from reviewed observable traces/corrections; it is not raw transcript replay and is never current authority.
 
 ## 3. Canonical records
 
@@ -143,6 +144,8 @@ verification/admission
 
 Providers receive compact facts and outcomes, not raw historical transcripts.
 
+The context compiler may additionally retrieve reviewed TaskRecipe guidance using task type, DecisionType/version, material constraints, policy/evidence compatibility, review quality and freshness. Structural filters run before semantic similarity.
+
 ## 6. Decision patterns and graduation
 
 Repeated stable cases may be promoted into a reviewed `DecisionPattern`:
@@ -177,6 +180,31 @@ when stable enough: deterministic branch / policy / native ERP feature
 
 A repeated AI decision should graduate out of AI when deterministic semantics are justified.
 
+### 6.1 TaskRecipe procedural memory
+
+Repeated reviewed traces may also produce a versioned `TaskRecipe` when the reusable value is *how to approach the task* rather than a single repeated decision.
+
+```rust
+pub struct TaskRecipe {
+    pub key: TaskRecipeKey,
+    pub version: u32,
+    pub organization_id: OrganizationId,
+    pub task_type: String,
+    pub applicability: ApplicabilityRule,
+    pub useful_evidence: Vec<EvidenceRequirement>,
+    pub decision_points: Vec<DecisionTypeRef>,
+    pub preferred_capabilities: Vec<CapabilityRef>,
+    pub known_failure_modes: Vec<String>,
+    pub useful_checks: Vec<String>,
+    pub source_case_refs: Vec<DecisionCaseId>,
+    pub source_trace_refs: Vec<TraceNodeRef>,
+    pub review_refs: Vec<RunReviewRef>,
+    pub status: TaskRecipeStatus,
+}
+```
+
+A recipe may guide evidence selection, checks, decision decomposition and escalation, but cannot authorize an action or override current facts/policy.
+
 ## 7. Reasoning integration
 
 `ReasoningStep` may consume precedent summaries, but cannot mutate precedent or treat it as executable authority.
@@ -189,7 +217,7 @@ DecisionProposal
 ProgramPatchProposal
 ```
 
-The governed runtime records which precedent refs materially influenced the accepted proposal.
+The governed runtime records which precedent refs materially influenced the accepted proposal. It should likewise record which TaskRecipe refs were supplied/materially used so memory lift can be evaluated.
 
 ## 8. Events and observability
 
@@ -204,6 +232,11 @@ DecisionCaseCorrected
 DecisionPatternProposed
 DecisionPatternPromoted
 DecisionPatternSuperseded
+TaskRecipeProposed
+TaskRecipePromoted
+TaskRecipeSuperseded
+UserCorrectionRecorded
+LearningCandidateReviewed
 ```
 
 Measure:
@@ -215,7 +248,10 @@ Measure:
 - approval rate;
 - outcome quality;
 - stale/superseded precedent usage;
-- pattern graduation candidates.
+- pattern graduation candidates;
+- TaskRecipe hit/use rate;
+- quality/correction lift with and without procedural memory;
+- smaller-vs-frontier model lift under identical reviewed memory.
 
 ## 9. Safety and governance rules
 
@@ -229,6 +265,11 @@ Measure:
 8. Precedent summaries must preserve material constraints and outcome provenance.
 9. Pattern promotion is reviewed and versioned.
 10. Deterministic graduation must go through normal ERP/product governance.
+11. Only reviewed trace/case material may be promoted into durable TaskRecipe procedural memory.
+12. Provider-reported explanation and reviewer-derived interpretation retain distinct provenance.
+13. User/operator corrections are append-only and never rewrite original cases or traces.
+14. Current facts, policy and authorization always dominate TaskRecipe guidance.
+15. Procedural memory must remain compact/versioned; raw transcripts are not reusable authority.
 
 ## 10. Acceptance criteria
 
@@ -240,4 +281,7 @@ The layer is admitted when:
 4. precedent cannot bypass authorization/policy/approval;
 5. shadow/eval runs can compare decision quality with and without precedent;
 6. repeated stable decisions can be proposed for pattern promotion;
-7. reviewed patterns can later be converted into deterministic program/policy changes without embedding provider-specific semantics.
+7. reviewed patterns can later be converted into deterministic program/policy changes without embedding provider-specific semantics;
+8. reviewed observable traces can produce versioned TaskRecipe procedural memory without storing raw transcripts as authority;
+9. TaskRecipe retrieval is tenant-scoped and subordinate to current facts/policy/authorization;
+10. shadow/eval runs can measure decision quality and correction lift with/without recipes and across smaller/frontier model profiles.
