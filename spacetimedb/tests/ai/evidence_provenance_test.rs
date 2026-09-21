@@ -29,6 +29,9 @@ use crate::ai::evidence_source::{
     RecordAiEvidenceContributionParams, RecordAiEvidencePassageParams,
     RecordAiEvidenceSourceParams, RecordAiEvidenceSourceVersionParams,
 };
+use crate::ai::intelligence::{
+    search_embedding, upsert_search_embedding, UpsertSearchEmbeddingParams,
+};
 use crate::ai::knowledge_entry::{
     ai_knowledge_entry, ai_knowledge_entry_version, create_ai_knowledge_entry,
     nominate_ai_knowledge_entry_version, propose_ai_knowledge_entry_version,
@@ -37,6 +40,7 @@ use crate::ai::knowledge_entry::{
 };
 use crate::core::audit::audit_log;
 use crate::core::organization::{company, create_company, CreateCompanyParams};
+use crate::core::queue::queue_job;
 use crate::documents::documents::{
     create_document, delete_document, document, CreateDocumentParams,
 };
@@ -2145,6 +2149,32 @@ pub fn test_deletion_and_revocation_preserve_honest_history(
     let (org, company) = (f.organization_id, f.company_id);
 
     let revoked = seed_evidence(ctx, org, company, "revoked-src", "company")?;
+
+    // Qdrant is derived state. Seed the authoritative semantic row exactly as
+    // the ingestion path does; a source change must tombstone it and enqueue a
+    // delete job before the reducer can commit.
+    upsert_search_embedding(
+        ctx,
+        org,
+        Some(company),
+        UpsertSearchEmbeddingParams {
+            content_type: "ai_evidence_passage".into(),
+            content_id: revoked.passage_id,
+            text: "Passage p1 of revoked-src.".into(),
+            embedding: vec![],
+            embedding_hash: Some(hash('e')),
+            metadata: None,
+        },
+    )?;
+    let semantic_before = ctx
+        .db
+        .search_embedding()
+        .embedding_by_content()
+        .filter(&"ai_evidence_passage".to_string())
+        .find(|row| row.content_id == revoked.passage_id && row.company_id == Some(company))
+        .ok_or("semantic row missing before revocation")?;
+    assert_eq_str(&semantic_before.sync_status, "pending", "semantic row before revocation")?;
+
     record_ai_evidence_source_change(
         ctx,
         org,
@@ -2152,6 +2182,36 @@ pub fn test_deletion_and_revocation_preserve_honest_history(
         revoked.version_id,
         change("access_revoked", None),
     )?;
+
+    let semantic_after = ctx
+        .db
+        .search_embedding()
+        .id()
+        .find(&semantic_before.id)
+        .ok_or("semantic row missing after revocation")?;
+    assert_eq_str(
+        &semantic_after.sync_status,
+        "deleted",
+        "source change must invalidate the semantic index row",
+    )?;
+    let delete_job = ctx
+        .db
+        .queue_job()
+        .queue_job_by_queue()
+        .filter(&"embedding".to_string())
+        .find(|job| {
+            job.organization_id == org
+                && job.company_id == Some(company)
+                && job.job_type == "delete_embedding"
+                && job.payload.contains(&format!(
+                    "\"content_id\":{}",
+                    revoked.passage_id
+                ))
+        })
+        .ok_or("source change did not enqueue Qdrant deletion")?;
+    if !delete_job.payload.contains("\"operation\":\"delete\"") {
+        return Err("embedding invalidation job is not a delete operation".to_string());
+    }
     let revoked_passage = ctx
         .db
         .ai_evidence_passage()
