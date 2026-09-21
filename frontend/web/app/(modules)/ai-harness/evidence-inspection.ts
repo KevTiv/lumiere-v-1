@@ -1,3 +1,5 @@
+import type { JsonObject } from '@lumiere/api-client/json-object'
+
 export type EvidenceTargetKind = 'decision' | 'claim' | 'workflow_step'
 
 export interface EvidenceInspectionView {
@@ -57,9 +59,9 @@ export interface EvidenceInspectionView {
 
 const MAX_EXCERPT_CHARS = 1_000
 
-function record(value: unknown): Record<string, unknown> | null {
+function record(value: unknown): JsonObject | null {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
-    ? value as Record<string, unknown>
+    ? value as JsonObject
     : null
 }
 
@@ -92,7 +94,7 @@ function strings(value: unknown, maxItems = 64): string[] {
     .map((item) => item.slice(0, 256))
 }
 
-function objects(value: unknown): Record<string, unknown>[] {
+function objects(value: unknown): JsonObject[] {
   if (!Array.isArray(value)) return []
   return value.flatMap((item) => {
     const parsed = record(item)
