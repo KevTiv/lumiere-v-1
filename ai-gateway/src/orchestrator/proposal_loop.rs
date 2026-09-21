@@ -638,7 +638,7 @@ fn reserve_poll_attempt(
     }
     let attempt = attempts.saturating_add(1);
     poll.insert("attempts".to_string(), json!(attempt));
-    let exponent = attempt.saturating_sub(1).min(8);
+    let exponent = attempt.saturating_sub(2).min(8);
     let backoff_ms = if attempt <= 1 {
         0
     } else {
