@@ -1,3 +1,5 @@
+import type { JsonObject } from '@lumiere/api-client/json-object'
+
 /** The reviewer's queue as the screen may trust it: bounded, and blind to anything the server redacted. */
 
 export interface QueuePassageView {
@@ -68,9 +70,9 @@ const MAX_ITEMS = 50
 const HEX_IDENTITY = /^[0-9a-f]{64}$/
 const CONTENT_HASH = /^[0-9a-f]{64}$/
 
-function record(value: unknown): Record<string, unknown> | null {
+function record(value: unknown): JsonObject | null {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
-    ? value as Record<string, unknown>
+    ? value as JsonObject
     : null
 }
 
@@ -94,7 +96,7 @@ function ids(value: unknown): number[] {
   })
 }
 
-function objects(value: unknown): Record<string, unknown>[] {
+function objects(value: unknown): JsonObject[] {
   if (!Array.isArray(value)) return []
   return value.slice(0, MAX_ITEMS).flatMap((item) => {
     const parsed = record(item)
@@ -221,13 +223,13 @@ export function buildReviewRequest(
   companyId: number,
   target: QueueReviewTarget,
   note: string,
-): Record<string, unknown> | null {
+): JsonObject | null {
   if (!Number.isSafeInteger(companyId) || companyId <= 0 || target.id <= 0) return null
   const trimmed = note.trim()
   if (target.kind === 'claim' && target.outcome === 'qualified' && trimmed.length === 0) {
     return null
   }
-  const body: Record<string, unknown> = {
+  const body: JsonObject = {
     companyId,
     kind: target.kind,
     id: target.id,
