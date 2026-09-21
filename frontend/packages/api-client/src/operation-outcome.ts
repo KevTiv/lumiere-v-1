@@ -1,3 +1,5 @@
+import type { JsonObject } from "./json-object"
+
 export type OperationRetryDisposition =
   | "never"
   | "refresh"
@@ -50,8 +52,6 @@ export class OperationRequestError extends Error {
     this.correlationId = args.correlationId
   }
 }
-
-type JsonObject = JsonObject
 
 function stringField(payload: JsonObject, ...keys: string[]): string | undefined {
   for (const key of keys) {
