@@ -65,6 +65,20 @@
       "change_constructors": ["upsert_stdb_row"]
     },
     {
+      "source": "spacetimedb/src/fleet/lifecycle.rs",
+      "function": "record_fleet_inspection",
+      "operation": "record_fleet_inspection",
+      "operation_id": "erp.record_fleet_inspection",
+      "change_constructors": ["upsert_stdb_row"]
+    },
+    {
+      "source": "spacetimedb/src/fleet/lifecycle.rs",
+      "function": "record_fleet_service",
+      "operation": "record_fleet_service",
+      "operation_id": "erp.record_fleet_service",
+      "change_constructors": ["upsert_stdb_row"]
+    },
+    {
       "source": "spacetimedb/src/forms/mod.rs",
       "function": "publish_form_configuration",
       "operation": "publish_form_configuration",

@@ -148,25 +148,6 @@ fn latest_odometer(vehicle: &FleetVehicle, value: Option<f64>) -> Option<f64> {
     }
 }
 
-fn commit(
-    ctx: &ReducerContext,
-    organization_id: u64,
-    operation_id: &str,
-    correlation_id: String,
-    changes: Vec<RowChange>,
-) -> Result<(), String> {
-    record_organization_commit(
-        ctx,
-        OrganizationCommitInput {
-            organization_id,
-            operation_id: operation_id.into(),
-            correlation_id,
-            changes,
-        },
-    )?;
-    Ok(())
-}
-
 #[reducer]
 pub fn record_fleet_service(
     ctx: &ReducerContext,
@@ -236,24 +217,27 @@ pub fn record_fleet_service(
             metadata: None,
         },
     );
-    commit(
+    record_organization_commit(
         ctx,
-        organization_id,
-        "erp.record_fleet_service",
-        request_id.unwrap_or_else(|| format!("fleet-service:{}", row.id)),
-        vec![
-            RowChange::upsert_stdb_row(
-                "fleet_service_record",
-                serde_json::json!({"id": row.id}),
-                &row,
-            )?,
-            RowChange::upsert_stdb_row(
-                "fleet_vehicle",
-                serde_json::json!({"id": vehicle.id}),
-                &vehicle,
-            )?,
-        ],
-    )
+        OrganizationCommitInput {
+            organization_id,
+            operation_id: "erp.record_fleet_service".into(),
+            correlation_id: request_id.unwrap_or_else(|| format!("fleet-service:{}", row.id)),
+            changes: vec![
+                RowChange::upsert_stdb_row(
+                    "fleet_service_record",
+                    serde_json::json!({"id": row.id}),
+                    &row,
+                )?,
+                RowChange::upsert_stdb_row(
+                    "fleet_vehicle",
+                    serde_json::json!({"id": vehicle.id}),
+                    &vehicle,
+                )?,
+            ],
+        },
+    )?;
+    Ok(())
 }
 
 #[reducer]
@@ -322,22 +306,25 @@ pub fn record_fleet_inspection(
             metadata: None,
         },
     );
-    commit(
+    record_organization_commit(
         ctx,
-        organization_id,
-        "erp.record_fleet_inspection",
-        request_id.unwrap_or_else(|| format!("fleet-inspection:{}", row.id)),
-        vec![
-            RowChange::upsert_stdb_row(
-                "fleet_inspection",
-                serde_json::json!({"id": row.id}),
-                &row,
-            )?,
-            RowChange::upsert_stdb_row(
-                "fleet_vehicle",
-                serde_json::json!({"id": vehicle.id}),
-                &vehicle,
-            )?,
-        ],
-    )
+        OrganizationCommitInput {
+            organization_id,
+            operation_id: "erp.record_fleet_inspection".into(),
+            correlation_id: request_id.unwrap_or_else(|| format!("fleet-inspection:{}", row.id)),
+            changes: vec![
+                RowChange::upsert_stdb_row(
+                    "fleet_inspection",
+                    serde_json::json!({"id": row.id}),
+                    &row,
+                )?,
+                RowChange::upsert_stdb_row(
+                    "fleet_vehicle",
+                    serde_json::json!({"id": vehicle.id}),
+                    &vehicle,
+                )?,
+            ],
+        },
+    )?;
+    Ok(())
 }
