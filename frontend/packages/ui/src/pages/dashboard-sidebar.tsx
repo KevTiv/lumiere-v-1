@@ -18,12 +18,15 @@ import {
   LogOut,
 } from "lucide-react"
 import { buildNavGroups, type NavGroup } from "../lib/navigation-catalog"
+import { isFirstOrgSurfaceAdmitted } from "../lib/product-surface-catalog"
 
 interface DashboardSidebarProps {
   forceCollapsed?: boolean
   onOpenJournal?: () => void
   onOpenNotebook?: () => void
   onOpenAIChat?: () => void
+  /** Apply the fail-closed first-test-organization product admission profile. */
+  firstOrgProfile?: boolean
   /** Optional nav badge counts keyed by href (e.g. pending AI approvals). */
   navBadges?: Record<string, number>
   /** When set, shows a sidebar control that calls this handler (typically clears session + redirects). */
@@ -35,17 +38,24 @@ export function DashboardSidebar({
   onOpenJournal,
   onOpenNotebook,
   onOpenAIChat,
+  firstOrgProfile = false,
   navBadges,
   onSignOut,
 }: DashboardSidebarProps) {
   const [collapsed, setCollapsed] = useState(false)
-  const { checkPermission, currentUser, roles } = useRBAC()
+  const { checkPermission, currentUser, roles, isAdmin } = useRBAC()
   const pathname = usePathname()
   const router = useRouter()
   const { t } = useTranslation()
   const isCollapsed = forceCollapsed || collapsed
 
-  const navGroups = useMemo((): NavGroup[] => buildNavGroups(t), [t])
+  const userIsAdmin = isAdmin()
+  const navGroups = useMemo(
+    (): NavGroup[] => buildNavGroups(t, { firstOrgProfile, isAdmin: userIsAdmin }),
+    [firstOrgProfile, t, userIsAdmin],
+  )
+  const quickActionIsVisible = (surfaceId: string) =>
+    !firstOrgProfile || isFirstOrgSurfaceAdmitted(surfaceId, userIsAdmin)
 
   const isActive = (href: string) => pathname === href || pathname.startsWith(href + "/")
 
@@ -157,7 +167,7 @@ export function DashboardSidebar({
       </nav>
 
       <div className="flex flex-col gap-1.5 border-t border-sidebar-border px-2 py-2">
-        {onOpenJournal && (
+        {onOpenJournal && quickActionIsVisible("journal") && (
           <button
             type="button"
             onClick={onOpenJournal}
@@ -176,7 +186,7 @@ export function DashboardSidebar({
           </button>
         )}
 
-        {onOpenNotebook && (
+        {onOpenNotebook && quickActionIsVisible("notebook") && (
           <button
             type="button"
             onClick={onOpenNotebook}
@@ -195,7 +205,7 @@ export function DashboardSidebar({
           </button>
         )}
 
-        {onOpenAIChat && (
+        {onOpenAIChat && quickActionIsVisible("ai-assistant") && (
           <button
             type="button"
             onClick={onOpenAIChat}

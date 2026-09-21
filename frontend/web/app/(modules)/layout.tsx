@@ -1,6 +1,11 @@
 import { redirect } from 'next/navigation'
 import { headers } from 'next/headers'
 import { getBrowserStdbSession, hasAuthenticatedIdentity } from '@/lib/browser-session'
+import {
+  isFirstOrgPathAdmitted,
+  isFirstTestOrganization,
+  sessionIsOrganizationAdmin,
+} from '@/lib/first-org-exposure'
 import ModulesShell from './modules-shell'
 
 function normalizeCallbackPath(value: string | null) {
@@ -19,8 +24,8 @@ export default async function ModulesLayout({
   children: React.ReactNode
 }>) {
   const session = await getBrowserStdbSession()
+  const headersList = await headers()
   if (!hasAuthenticatedIdentity(session)) {
-    const headersList = await headers()
     const callbackUrl = normalizeCallbackPath(
       headersList.get('x-next-url') ??
         headersList.get('x-invoke-path') ??
@@ -32,5 +37,14 @@ export default async function ModulesLayout({
   if (!session?.organizationId) {
     redirect('/onboarding')
   }
-  return <ModulesShell>{children}</ModulesShell>
+
+  const firstOrgProfile = isFirstTestOrganization(session.organizationId)
+  if (firstOrgProfile) {
+    const pathname = headersList.get('x-lumiere-pathname')
+    if (!pathname || !isFirstOrgPathAdmitted(pathname, sessionIsOrganizationAdmin(session))) {
+      redirect('/first-org-unavailable')
+    }
+  }
+
+  return <ModulesShell firstOrgProfile={firstOrgProfile}>{children}</ModulesShell>
 }
