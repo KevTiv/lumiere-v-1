@@ -482,7 +482,13 @@ function ErpAiChatPanel(props: Omit<ComponentProps<typeof AIChatPanel>, "onSendM
   )
 }
 
-function ModulesContent({ children }: { children: ReactNode }) {
+function ModulesContent({
+  children,
+  firstOrgProfile,
+}: {
+  children: ReactNode
+  firstOrgProfile: boolean
+}) {
   const [isAIChatOpen, setIsAIChatOpen] = useState(false)
   const [isAIChatDocked, setIsAIChatDocked] = useState(false)
   const [isNotebookOpen, setIsNotebookOpen] = useState(false)
@@ -509,6 +515,7 @@ function ModulesContent({ children }: { children: ReactNode }) {
     <ErpAiChatControllerProvider open={openAiChat}>
       <div className="flex h-screen overflow-hidden bg-muted/30 text-foreground">
         <DashboardSidebar
+          firstOrgProfile={firstOrgProfile}
           forceCollapsed={isAIChatDocked || isNotebookOpen}
           navBadges={navBadges}
           onOpenJournal={() => setIsJournalOpen(true)}
@@ -545,6 +552,7 @@ function ModulesContent({ children }: { children: ReactNode }) {
         <JournalPanel open={isJournalOpen} onClose={() => setIsJournalOpen(false)} />
 
         <ErpCommandPalette
+          firstOrgProfile={firstOrgProfile}
           onOpenAIChat={openAiChat}
           onOpenNotebook={() => setIsNotebookOpen(true)}
           onOpenJournal={() => setIsJournalOpen(true)}
@@ -554,11 +562,17 @@ function ModulesContent({ children }: { children: ReactNode }) {
   )
 }
 
-export default function ModulesShell({ children }: { children: ReactNode }) {
+export default function ModulesShell({
+  children,
+  firstOrgProfile = false,
+}: {
+  children: ReactNode
+  firstOrgProfile?: boolean
+}) {
   return (
     <Suspense fallback={null}>
       <ErpAiRouteContextProvider>
-        <ModulesContent>{children}</ModulesContent>
+        <ModulesContent firstOrgProfile={firstOrgProfile}>{children}</ModulesContent>
       </ErpAiRouteContextProvider>
     </Suspense>
   )
