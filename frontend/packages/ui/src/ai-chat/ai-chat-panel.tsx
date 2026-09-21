@@ -55,6 +55,7 @@ interface Size {
 
 interface ChatReply {
   content: string
+  runId?: number
   sources?: ChatMessageSourceRef[]
   actions?: ChatAction[]
 }
@@ -462,6 +463,7 @@ export function AIChatPanel({
                 : undefined,
           metadata: {
             duration: Math.round(t1 - t0),
+            runId: reply.runId,
           },
         }
         setMessages((prev) =>
@@ -480,6 +482,7 @@ export function AIChatPanel({
           actions: reply.actions && reply.actions.length > 0 ? reply.actions : undefined,
           metadata: {
             duration: Math.round(t1 - t0),
+            runId: reply.runId,
           },
         }
       } else {
@@ -847,6 +850,14 @@ export function AIChatPanel({
                             Use in form
                           </button>
                         )}
+                        {message.role === "assistant" && message.metadata?.runId != null ? (
+                          <a
+                            href={`/ai-harness?runId=${message.metadata.runId}${context?.companyId ? `&companyId=${context.companyId}` : ""}`}
+                            className="text-[9px] text-primary hover:underline"
+                          >
+                            Inspect run
+                          </a>
+                        ) : null}
                         {message.metadata?.tokens != null ? (
                           <span className="text-[9px] text-muted-foreground">
                             {message.metadata.tokens}t
