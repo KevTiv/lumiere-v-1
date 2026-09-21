@@ -22,7 +22,7 @@ use super::intelligence::{
     ReasoningRequest,
 };
 use super::progress::{Progress, ProgressTracker, MAX_UNCHANGED_RESULTS};
-use crate::tools::types::{hash_tool_input, ToolOutput};
+use crate::tools::types::ToolOutput;
 
 const MAX_RERETRIEVAL_ATTEMPTS: u32 = 2;
 const MAX_REPAIR_ATTEMPTS: u32 = 2;
@@ -601,10 +601,9 @@ fn reserve_poll_attempt(
     state: &mut Value,
     proposal: &super::intelligence::CapabilityProposal,
 ) -> std::result::Result<PollAttempt, String> {
-    let fingerprint = hash_tool_input(&json!({
-        "capability": proposal.capability,
-        "arguments": proposal.arguments,
-    }));
+    // Polling is bounded per capability, not per arguments/model/provider, so
+    // superficial argument edits cannot reset the poll budget.
+    let fingerprint = proposal.capability.trim().to_string();
     let now = now_millis();
     let recovery = recovery_state(state);
     if !recovery.get("polls").is_some_and(Value::is_object) {
