@@ -2,11 +2,11 @@
 
 **Status:** Execution companion to `governed-intelligence-program-architecture.md`
 **Date:** 2026-09-17
-**Extends:** `decision-precedent-memory-layer.md` and `typed-decision-graph-and-run-review-plan.md`
+**Extends:** `decision-precedent-memory-layer.md`, `typed-decision-graph-and-run-review-plan.md`, and `intelligence-compounding-epistemic-trace.md`
 
 ## Purpose
 
-Convert the landed bounded-agent harness into a governed typed-decision runtime while preserving useful H3-H5 infrastructure and removing execution authority from the model loop.
+Convert the landed bounded-agent harness into a governed typed-decision runtime while preserving useful H3-H5 infrastructure, removing execution authority from the model loop, and adding a reviewed intelligence-compounding layer over observable reasoning artifacts.
 
 This is a restructuring sequence, not a rewrite.
 
@@ -23,7 +23,8 @@ Retain as first-class infrastructure:
 - run/step event persistence;
 - generated capability registry and policy filtering;
 - approval/draft semantics;
-- evidence/provenance and answer-admission work.
+- evidence/provenance and answer-admission work;
+- durable decision/reasoning events, RunReviewProgram, precedent, shadowing and deterministic-graduation seams as the substrate for epistemic trace and procedural memory.
 
 ## Migration rule
 
@@ -56,6 +57,8 @@ Program IR composes.
 Policy gates consequences.
 Governed runtime executes and verifies.
 Independent review judges the completed run.
+Observable artifacts accumulate.
+Reviewed learning compounds into future bounded context.
 ```
 
 ## Work packages
@@ -91,7 +94,9 @@ Requirements:
 - malformed typed outputs fail closed;
 - adapter outputs cannot directly execute capabilities;
 - provider confidence remains untrusted metadata;
-- provider attempts and usage remain durable.
+- provider attempts and usage remain durable;
+- adapters normalize provider-visible reasoning/explanation into bounded structured fields when available;
+- no adapter claims access to private chain-of-thought.
 
 ### GP-03 — shared governed execution services
 
@@ -125,6 +130,8 @@ Remove capability execution, authorization/policy authority, spend reservation/s
 ### GP-05 — durable decision/reasoning events
 
 Persist typed decision/reasoning requests, outputs, verification, escalation, acceptance/rejection, and provider-attempt links.
+
+These events remain the canonical provider-call audit records. The later epistemic trace layer references them rather than duplicating spend/execution authority.
 
 ### GP-06 — decision precedent foundation
 
@@ -239,6 +246,8 @@ Review checks objective satisfaction, unsupported claims, branch/capability erro
 
 Where practical, route review through a different provider/profile from execution.
 
+The intelligence-compounding workstream later extends review with a separate learning assessment. Run-health disposition and learning promotion must remain distinct.
+
 Review isolation is policy-owned and supports three levels through DecisionType override JSON:
 
 - `requireDistinctReviewProfile`: fail closed if Decision and Review resolve to the same immutable profile ref;
@@ -300,6 +309,73 @@ For each workflow:
 9. enable RunReviewProgram according to risk;
 10. identify deterministic-graduation candidates.
 
+## Intelligence-compounding follow-on workstream
+
+Detailed contracts and acceptance criteria live in `intelligence-compounding-epistemic-trace.md`. This workstream extends the landed governed runtime; it must not create a parallel orchestration path.
+
+### IC-01 — structured explanation contracts
+
+- replace durable reliance on free-text `rationale` with bounded factors, alternatives, uncertainties, assumptions, evidence refs and follow-up checks;
+- extend DecisionType metadata with required explanation shape;
+- normalize provider-visible summaries without claiming private chain-of-thought;
+- retain a compatibility mapping for legacy rationale fields.
+
+### IC-02 — epistemic trace persistence
+
+- persist append-only trace DAG nodes/edges;
+- correlate run, graph node, intelligence event, provider attempt and evidence refs;
+- record explicit provenance: deterministic runtime, provider reported, harness observed, reviewer derived, user provided;
+- add deterministic hashing/idempotency, validation state and size bounds.
+
+### IC-03 — trace emission integration
+
+- emit deterministic facts, evidence requests/acquisitions, provider-reported factors/alternatives/uncertainties, capability results and corrections;
+- ensure trace recording has zero execution authority;
+- keep `AiIntelligenceEvent` as the canonical provider-call audit record.
+
+### IC-04 — learning review
+
+- extend `RunReviewProgram` with optional `RunLearningAssessment`;
+- validate/reject trace insights and identify reusable/failure patterns and missing checks;
+- apply deterministic pre-review where possible;
+- reuse the existing independent review-isolation policy.
+
+### IC-05 — TaskRecipe procedural memory
+
+- add versioned, tenant-scoped reviewed `TaskRecipe` records;
+- encode useful evidence, decision points, capabilities, checks, failure modes and escalation patterns;
+- require reviewed source traces/cases;
+- keep corrections/supersessions append-only.
+
+### IC-06 — context compiler integration
+
+- retrieve compatible DecisionCase precedent + reviewed TaskRecipe guidance;
+- apply structural/version/policy filters before semantic similarity;
+- bound recipe count/size;
+- record which recipes materially influenced the provider request;
+- current facts and policy always dominate memory.
+
+### IC-07 — correction and promotion workflow
+
+- capture user/operator corrections as first-class trace events;
+- connect them to DecisionCase corrections and recipe/pattern candidates;
+- require reviewed promotion/supersession;
+- never promote automatically from frequency alone.
+
+### IC-08 — memory-lift shadow evaluation
+
+- compare no-memory, precedent-only and precedent+recipe variants over the same decision snapshot;
+- compare smaller/local and frontier provider profiles with identical memory;
+- persist verified quality, correction, evidence-selection, defect, cost and latency metrics;
+- feed empirical results into routing and deterministic-graduation decisions without giving shadows authority.
+
+### IC-09 — reasoning notebook surface
+
+- expose provenance-aware observable reasoning to users/operators;
+- render deterministic facts, evidence, provider-reported factors, alternatives, uncertainty, actions, verification and review;
+- never label reviewer-derived or harness-derived material as verbatim provider thought;
+- preserve normal tenant/access controls for referenced artifacts.
+
 ### GP-18 — Jev/System-One admission
 
 When Jev API access/stability is sufficient:
@@ -322,7 +398,11 @@ When Jev API access/stability is sufficient:
 - exposing the full capability catalog by default;
 - treating provider probabilities as calibrated truth;
 - allowing model output to override deterministic hard stops;
-- using raw transcript history as organizational decision memory.
+- using raw transcript history as organizational decision memory;
+- reconstructing or claiming access to private provider chain-of-thought;
+- allowing unreviewed model explanation to become procedural memory;
+- letting TaskRecipe memory grant current authorization, approval or execution authority;
+- adding a second workflow runtime for learning/trace capture.
 
 ## Review gate
 
@@ -364,6 +444,17 @@ verify
 approval
 run_review
 ```
+
+The intelligence-compounding layer may observe those primitives and persist/retrieve reviewed learning through:
+
+```text
+structured_explanation
+trace_observation
+learning_review
+recipe_retrieval
+```
+
+These are evidence/memory services, not provider-owned workflow primitives.
 
 No new `ReasoningStep` may directly call an ERP executor. No model output may directly own disposition when the program can derive disposition from typed signals and explicit policy gates.
 
