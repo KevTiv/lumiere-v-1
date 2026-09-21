@@ -1,5 +1,7 @@
 "use client"
 
+import type { JsonObject } from "@lumiere/api-client/json-object"
+
 import { useCallback, useEffect, useState } from "react"
 import { AlertCircle, CheckCircle2, ClipboardCheck, RefreshCw, ShieldX } from "lucide-react"
 import { Button } from "@lumiere/ui"
@@ -71,7 +73,7 @@ export function EvidenceReviewQueuePanel({ companyId, onInspect }: EvidenceRevie
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ companyId: parsedCompanyId }),
       })
-      const payload = await response.json().catch(() => ({})) as Record<string, unknown>
+      const payload = await response.json().catch(() => ({})) as JsonObject
       if (response.status === 401 || response.status === 403) {
         setState({
           status: "denied",
@@ -112,7 +114,7 @@ export function EvidenceReviewQueuePanel({ companyId, onInspect }: EvidenceRevie
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       })
-      const payload = await response.json().catch(() => ({})) as Record<string, unknown>
+      const payload = await response.json().catch(() => ({})) as JsonObject
       if (!response.ok) {
         throw new Error(typeof payload.error === "string" ? payload.error : "The review could not be recorded.")
       }
