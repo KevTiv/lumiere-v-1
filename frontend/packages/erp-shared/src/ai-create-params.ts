@@ -8,6 +8,7 @@ import type {
   CreateAiAgentRunParams,
   CreateAiChatSessionParams,
   CreateAiInsightParams,
+  CreateAiKnowledgeEntryParams,
   CreateAiSkillParams,
   CreateAiTeamMemberParams,
   InsightSeverity,
@@ -230,6 +231,42 @@ export function toCreateAiInsightParams(
       return Math.min(255, Math.max(0, Math.trunc(num(v))))
     })(),
     metadata: optionalTrimmedString(field(formData, "metadata", "metadata")),
+  }
+}
+
+export function toCreateAiKnowledgeEntryParams(
+  formData: Record<string, unknown>,
+): CreateAiKnowledgeEntryParams | null {
+  const entryKey = requiredTrimmedString(field(formData, "entryKey", "entry_key"))
+  const kind = requiredTrimmedString(field(formData, "kind", "kind"))
+  const shareScope = requiredTrimmedString(field(formData, "shareScope", "share_scope"))
+  const title = requiredTrimmedString(field(formData, "title", "title"))
+  const body = requiredTrimmedString(field(formData, "body", "body"))
+  if (!entryKey || !kind || !shareScope || !title || !body) return null
+
+  const bigintArray = (raw: unknown): bigint[] =>
+    stringArrayFromForm(raw)
+      .map((value) => optionalBigIntU64(value))
+      .filter((value): value is bigint => value !== undefined)
+
+  return {
+    entryKey,
+    kind,
+    domainTags: stringArrayFromForm(field(formData, "domainTags", "domain_tags")),
+    shareScope,
+    teamRef: optionalTrimmedString(field(formData, "teamRef", "team_ref")),
+    content: {
+      title,
+      body,
+      applicability: stringArrayFromForm(field(formData, "applicability", "applicability")),
+      sourcePassageIds: bigintArray(field(formData, "sourcePassageIds", "source_passage_ids")),
+      claimIds: bigintArray(field(formData, "claimIds", "claim_ids")),
+      decisionIds: bigintArray(field(formData, "decisionIds", "decision_ids")),
+      relatedEntryIds: bigintArray(field(formData, "relatedEntryIds", "related_entry_ids")),
+      nominationSignal: optionalTrimmedString(
+        field(formData, "nominationSignal", "nomination_signal"),
+      ),
+    },
   }
 }
 
