@@ -85,6 +85,8 @@ Fleet is the clearest route/domain mismatch. STDB Fleet, frontend command/read/q
 
 ## 4. Operation inventory finding
 
+> **COV-00A acceptance candidate (base `b4e23eff69a5a1cba62e07ca9866bb5eb649c9d2`):** the refreshed full-contract census is recorded in [`../operation-classification-census.md`](../operation-classification-census.md) with machine-readable evidence in [`../evidence/cov-00a-operation-census.json`](../evidence/cov-00a-operation-census.json). It classifies 1,399 operations, reconciles 1,187 Rust reducer rows, and reports zero unowned client-facing or review-required rows. The historical finding below is retained to explain why the full-contract ratchet replaced the reducer-only denominator.
+
 The generated `docs/reducer-coverage-matrix.md` currently records:
 
 | Reducer coverage state | Count |
