@@ -1,7 +1,7 @@
 # COV-02A seed and persona inventory
 
 **Package:** `COV-02A`
-**Disposition:** `REVIEW` — inventory candidate; deterministic fixture implementation remains COV-02B
+**Disposition:** `ACCEPTED` — inventory baseline consumed by COV-02B
 **Audited base:** `d5ccc751ab5cadf8ab5463a45d6e2b3617dd53a8`
 **Machine evidence:** [`../evidence/cov-02-seed-persona-inventory.json`](../evidence/cov-02-seed-persona-inventory.json)
 **Ratchet:** [`../../scripts/validate-cov02-seed-inventory.py`](../../scripts/validate-cov02-seed-inventory.py)
@@ -24,18 +24,18 @@ This path is useful local infrastructure, but it is not the COV-02 acceptance pa
 
 ## Inventory result
 
-- five current authorities are classified by their actual strength;
+- six current authorities are classified by their actual strength, including the COV-02B manifest;
 - all 22 COV-03..24 owners have explicit seed coverage and remaining gaps;
 - 21 modules have partial baseline rows;
 - IoT has no owned device/telemetry/alert fixture and is absent;
-- only the organization-administrator persona is partial;
-- the other six required shared personas are absent, although a suite-local provisioning primitive exists.
+- all seven required personas are now defined in the versioned manifest;
+- runtime provisioning, login, permission behavior, and independent-rerun evidence remain COV-02C work.
 
 The current useful pieces are retained: synthetic ERP baseline records, the documented dev reducer invocation, the browser-admin credential bridge, least-privilege actor creation logic, and the Phase 0 fixture invariants. None is promoted into a second mutation or authorization authority.
 
-## Smallest next implementation slice
+## COV-02B implementation result
 
-`COV-02B` should create one versioned fixture manifest and deterministic orchestration with:
+`COV-02B` supplies one versioned fixture manifest and deterministic orchestration with:
 
 1. an explicit organization key, with no arbitrary first-row fallback;
 2. seven named personas and least-privilege grants;
@@ -44,8 +44,8 @@ The current useful pieces are retained: synthetic ERP baseline records, the docu
 5. synthetic stable keys and expected values suitable for independent E2E assertions;
 6. clear separation between fixture setup and the operator transition a browser spec claims to prove.
 
-Existing `seed_dev_data` may remain the documented dev baseline while COV-02B composes deterministic identities and health checks around it. Product onboarding paths must still be exercised through their canonical operations when onboarding itself is under test.
+Existing `seed_dev_data` remains the documented dev baseline while COV-02B composes deterministic identities and health checks around it. Product onboarding paths must still be exercised through their canonical operations when onboarding itself is under test.
 
 ## Acceptance boundary
 
-This slice does not execute a disposable full stack, create personas, change seed data, certify module lifecycle coverage, or close COV-02. It only makes the existing authorities and implementation gap machine-checkable.
+The inventory and implementation do not certify module lifecycle coverage or close COV-02. COV-02C must execute the fixture on a disposable stack, prove all persona logins and permission boundaries, add the missing IoT baseline, capture health, and prove an independent rerun.

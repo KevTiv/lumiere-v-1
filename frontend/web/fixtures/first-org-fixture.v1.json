@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "fixture_key": "lumiere-first-org-v1",
+  "organization": {"name": "Lumiere Demo Corp", "code": "DEMO"},
+  "company": {"name": "Lumiere Technologies Inc.", "code": "LTI"},
+  "password_env": "E2E_FIRST_ORG_PERSONA_PASSWORD",
+  "personas": [
+    {"key": "organization-admin", "email": "test@email.com", "role_name": "admin", "managed_role": false, "permissions": ["*:*"], "job_title": "Fixture organization administrator"},
+    {"key": "finance-accounting", "email": "fixture.finance@example.test", "role_name": "fixture-finance-accounting", "managed_role": true, "permissions": ["organization:read", "account_move:*", "account_payment:*", "account_journal:read", "account_bank_statement:*", "report:read", "hr_expense_sheet:approve", "hr_expense_sheet:post"], "job_title": "Fixture finance and accounting actor"},
+    {"key": "sales-crm", "email": "fixture.sales@example.test", "role_name": "fixture-sales-crm", "managed_role": true, "permissions": ["organization:read", "contact:*", "lead:*", "opportunity:*", "sale_order:*"], "job_title": "Fixture sales and CRM actor"},
+    {"key": "warehouse-manufacturing", "email": "fixture.warehouse@example.test", "role_name": "fixture-warehouse-manufacturing", "managed_role": true, "permissions": ["organization:read", "product:read", "stock_picking:*", "stock_move:*", "stock_quant:read", "mrp_bom:*", "mrp_production:*", "mrp_workorder:*"], "job_title": "Fixture warehouse and manufacturing actor"},
+    {"key": "purchasing", "email": "fixture.purchasing@example.test", "role_name": "fixture-purchasing", "managed_role": true, "permissions": ["organization:read", "purchase_order:*", "purchase_requisition:*", "supplier_intake_request:*"], "job_title": "Fixture purchasing actor"},
+    {"key": "hr-project", "email": "fixture.hr-project@example.test", "role_name": "fixture-hr-project", "managed_role": true, "permissions": ["organization:read", "hr_employee:read", "hr_leave:*", "hr_expense:*", "project_project:*", "project_task:*", "project_timesheet:*"], "job_title": "Fixture HR and project actor"},
+    {"key": "limited-read-only", "email": "fixture.reader@example.test", "role_name": "fixture-limited-read-only", "managed_role": true, "permissions": ["organization:read"], "job_title": "Fixture limited read-only actor"}
+  ],
+  "module_health": [
+    {"id": "COV-03", "table": "contact", "required": true},
+    {"id": "COV-04", "table": "sale_order", "required": true},
+    {"id": "COV-05", "table": "purchase_order", "required": true},
+    {"id": "COV-06", "table": "warehouse", "required": true},
+    {"id": "COV-07", "table": "mrp_production", "required": true},
+    {"id": "COV-08", "table": "account_move", "required": true},
+    {"id": "COV-09", "table": "hr_employee", "required": true},
+    {"id": "COV-10", "table": "project_project", "required": true},
+    {"id": "COV-11", "table": "expense_sheet", "required": true},
+    {"id": "COV-12", "table": "subscription", "required": true},
+    {"id": "COV-13", "table": "pos_config", "required": true},
+    {"id": "COV-14", "table": "helpdesk_ticket", "required": true},
+    {"id": "COV-15", "table": "fleet_vehicle", "required": true},
+    {"id": "COV-16", "table": "iot_device", "required": false},
+    {"id": "COV-17", "table": "proposal", "required": true},
+    {"id": "COV-18", "table": "document", "required": true},
+    {"id": "COV-19", "table": "calendar_event", "required": true},
+    {"id": "COV-20", "table": "financial_report", "required": true},
+    {"id": "COV-21", "table": "workflow", "required": true},
+    {"id": "COV-22", "table": "form_config", "required": true},
+    {"id": "COV-23", "table": "organization_settings", "required": true},
+    {"id": "COV-24", "table": "sale_order", "required": true}
+  ]
+}

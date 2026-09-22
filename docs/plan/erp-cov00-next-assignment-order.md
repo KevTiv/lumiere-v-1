@@ -65,11 +65,15 @@ Known browser suites using direct BFF lifecycle transitions must be classified a
 
 ### COV-02A
 
-Current disposition: `REVIEW` inventory candidate. The five existing fixture authorities, seven required personas, and all COV-03..24 module gaps are recorded in [`erp-cov02a-seed-persona-inventory-status.md`](./erp-cov02a-seed-persona-inventory-status.md). This inventory does not promote the dev demo seed into product-onboarding or operator-path proof.
+Current disposition: `ACCEPTED`; the inventory baseline has been consumed by COV-02B. The six classified fixture authorities, seven required personas, and all COV-03..24 module gaps are recorded in [`erp-cov02a-seed-persona-inventory-status.md`](./erp-cov02a-seed-persona-inventory-status.md). This inventory does not promote the dev demo seed into product-onboarding or operator-path proof.
 
 ### COV-02B
 
-Implement the smallest shared fixture authority: one versioned manifest, explicit organization selection, seven named least-privilege personas, and scoped seed-health readback. Reuse the existing documented dev seed and actor-provisioning primitives where valid; remove the arbitrary first-organization fallback and do not create raw database setup or a second authorization owner.
+Current disposition: `REVIEW` implementation candidate. The versioned manifest, explicit organization selection, seven named personas, deterministic role/membership provisioning, and 22-owner health report are implemented without a second authorization owner. Full-stack execution evidence remains outstanding.
+
+### COV-02C
+
+Execute the fixture on a disposable full stack, capture the health report, verify all persona logins and representative permission/SoD boundaries, add the missing IoT baseline, and prove a clear/reseed independent rerun. Fixture setup is not operator-path proof for module lifecycles.
 
 ## First implementation convergence
 

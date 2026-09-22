@@ -19,6 +19,7 @@ EXPECTED_AUTHORITIES = {
     "browser-admin-bootstrap",
     "pretenant-actor-helper",
     "phase0-fixture-spec",
+    "first-org-fixture-manifest",
 }
 EXPECTED_PERSONAS = {
     "organization-admin",
@@ -29,15 +30,14 @@ EXPECTED_PERSONAS = {
     "hr-project",
     "limited-read-only",
 }
-VALID_PERSONA_STATUSES = {"partial", "absent"}
+VALID_PERSONA_STATUSES = {"defined", "partial", "absent"}
 VALID_SEED_STATUSES = {"partial", "absent"}
 REQUIRED_NEXT_CONTROLS = {
-    "explicit-org-key",
-    "versioned-manifest",
-    "named-personas",
-    "least-privilege-grants",
-    "seed-health-readback",
-    "no-arbitrary-org-fallback",
+    "disposable-stack-execution",
+    "persona-login-proof",
+    "seed-health-capture",
+    "iot-baseline",
+    "independent-rerun",
 }
 
 
@@ -142,8 +142,8 @@ def validate_inventory(inventory: dict[str, Any], failures: list[str]) -> None:
         if module.get("seed_status") not in VALID_SEED_STATUSES:
             failures.append(f"{module_id}: invalid seed_status")
         require_list(module, "gaps", module_id, failures)
-        if module.get("next_package") != "COV-02B":
-            failures.append(f"{module_id}: next_package must be COV-02B")
+        if module.get("next_package") != "COV-02C":
+            failures.append(f"{module_id}: next_package must be COV-02C")
         for index, evidence in enumerate(require_list(module, "evidence", module_id, failures)):
             if not isinstance(evidence, dict):
                 failures.append(f"{module_id}: evidence must be an object")
@@ -154,8 +154,8 @@ def validate_inventory(inventory: dict[str, Any], failures: list[str]) -> None:
     if not isinstance(next_slice, dict):
         failures.append("minimum_next_slice must be an object")
     else:
-        if next_slice.get("id") != "COV-02B":
-            failures.append("minimum_next_slice id must be COV-02B")
+        if next_slice.get("id") != "COV-02C":
+            failures.append("minimum_next_slice id must be COV-02C")
         require_text(next_slice, "objective", "minimum_next_slice", failures)
         controls = set(require_list(next_slice, "required_controls", "minimum_next_slice", failures))
         if controls != REQUIRED_NEXT_CONTROLS:
@@ -172,8 +172,8 @@ def main() -> int:
 
     if inventory.get("version") != 1:
         failures.append("inventory version must be 1")
-    if inventory.get("status") != "inventory-candidate":
-        failures.append("inventory status must be inventory-candidate")
+    if inventory.get("status") != "implementation-candidate":
+        failures.append("inventory status must be implementation-candidate")
     require_text(inventory, "audited_base", "inventory", failures)
     require_text(inventory, "scope", "inventory", failures)
     validate_inventory(inventory, failures)

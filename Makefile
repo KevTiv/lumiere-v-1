@@ -98,14 +98,14 @@ E2E_DOMAIN_TEST_REDUCERS := \
 .PHONY: \
 	help help-e2e \
 	setup check check-env check-env-prod build validate-subscriptions \
-	start stop publish publish-clear test call-tests logs seed-test-user \
+	start stop publish publish-clear test call-tests logs seed-test-user seed-first-org-personas \
 	generate-stdb-ts-sdk generate-stdb-rust-sdk schema-snapshot \
 	e2e-smoke e2e-smoke-setup e2e-smoke-test e2e-playwright-only \
 	e2e-wipe-local-stdb e2e-single e2e-single-test e2e-p2p e2e-mvp-golden \
 	e2e-crm-isolation e2e-dx-test e2e-web-dev e2e-single-running \
 	e2e-pretenant pretenant-cert-stdb pretenant-cert-native \
 	init-stack docker-dev docker-dev-iot \
-	codegen check-codegen check-codegen-pinned check-contract-ir check-operation-history check-release-compatibility check-tenant-ownership check-storage-policy check-c2-commit-coverage check-cov00c-correctness-census check-cov00d-evidence-matrix check-cov02-seed-inventory check-reducer-contracts-drift check-contracts-source-drift check-contracts-drift check-c9-isolation-matrix lint-trusted-route-boundaries \
+	codegen check-codegen check-codegen-pinned check-contract-ir check-operation-history check-release-compatibility check-tenant-ownership check-storage-policy check-c2-commit-coverage check-cov00c-correctness-census check-cov00d-evidence-matrix check-cov02-seed-inventory check-cov02-first-org-fixture check-reducer-contracts-drift check-contracts-source-drift check-contracts-drift check-c9-isolation-matrix lint-trusted-route-boundaries \
 	clean-contracts-live-staging generate-presentation-schemas generate-presentation-contracts lint-reducer-call-literals api-server-run \
 	lint-no-magic-fk-zero lint-accounting-as-unknown-as lint-accounting-currency-refs \
 	publish-cloud publish-cloud-clear call-tests-cloud logs-cloud \
@@ -191,6 +191,7 @@ help:
 	$(call print-command,local-test,Clear then republish and run core reducer tests.)
 	$(call print-command,local-logs,Tail logs for the local module.)
 	$(call print-command,seed-test-user,Seed the browser test user after fixture seeding.)
+	$(call print-command,seed-first-org-personas,Seed all seven named first-org personas and verify fixture health.)
 	@printf "\nCode generation\n"
 	$(call print-command,module-generate-ts,Regenerate TypeScript client bindings from the module.)
 	$(call print-command,module-generate-rust,Regenerate Rust API-server bindings and apply keyword fixes.)
@@ -288,6 +289,9 @@ logs:
 
 seed-test-user:
 	cd frontend/web && pnpm run seed-test-user
+
+seed-first-org-personas:
+	cd frontend/web && pnpm run seed-first-org-personas
 
 # ── End-to-end integration workflows ─────────────────────────────────────────
 #
@@ -434,7 +438,7 @@ e2e-smoke-setup:
 		echo "[e2e] Seeding browser test user through the running API server..."; \
 		cd "$$ROOT/frontend/web"; \
 		set -a; [ ! -f "$$ROOT/frontend/web/.env.local" ] || . "$$ROOT/frontend/web/.env.local"; set +a; \
-		LUMIERE_API_SERVER_URL="http://127.0.0.1:$(E2E_API_PORT)" STDB_SERVER_TOKEN="$$E2E_STDB_TOKEN" STDB_MODULE="$(E2E_DB)" NEXT_PUBLIC_STDB_MODULE="$(E2E_DB)" STDB_HOST="$$E2E_STDB_HOST" NEXT_PUBLIC_STDB_HOST="$$E2E_STDB_HOST" pnpm run seed-test-user; \
+		LUMIERE_API_SERVER_URL="http://127.0.0.1:$(E2E_API_PORT)" STDB_SERVER_TOKEN="$$E2E_STDB_TOKEN" STDB_MODULE="$(E2E_DB)" NEXT_PUBLIC_STDB_MODULE="$(E2E_DB)" STDB_HOST="$$E2E_STDB_HOST" NEXT_PUBLIC_STDB_HOST="$$E2E_STDB_HOST" pnpm run seed-first-org-personas; \
 		cd "$$ROOT"; \
 		{ \
 			printf "export E2E_STDB_TOKEN=%q\n" "$$E2E_STDB_TOKEN"; \
@@ -879,7 +883,7 @@ e2e-smoke:
 		echo "[e2e] Seeding browser test user through the running API server..."; \
 		cd "$$ROOT/frontend/web"; \
 		set -a; [ ! -f "$$ROOT/frontend/web/.env.local" ] || . "$$ROOT/frontend/web/.env.local"; set +a; \
-		LUMIERE_API_SERVER_URL="http://127.0.0.1:$(E2E_API_PORT)" STDB_SERVER_TOKEN="$$E2E_STDB_TOKEN" STDB_MODULE="$(E2E_DB)" NEXT_PUBLIC_STDB_MODULE="$(E2E_DB)" STDB_HOST="$$E2E_STDB_HOST" NEXT_PUBLIC_STDB_HOST="$$E2E_STDB_HOST" pnpm run seed-test-user; \
+		LUMIERE_API_SERVER_URL="http://127.0.0.1:$(E2E_API_PORT)" STDB_SERVER_TOKEN="$$E2E_STDB_TOKEN" STDB_MODULE="$(E2E_DB)" NEXT_PUBLIC_STDB_MODULE="$(E2E_DB)" STDB_HOST="$$E2E_STDB_HOST" NEXT_PUBLIC_STDB_HOST="$$E2E_STDB_HOST" pnpm run seed-first-org-personas; \
 		cd "$$ROOT"; \
 		if curl -fsS "http://127.0.0.1:$(E2E_WEB_PORT)" >/dev/null 2>&1; then \
 			echo "[e2e] Stopping existing Next.js on :$(E2E_WEB_PORT)..."; \
@@ -1000,6 +1004,9 @@ check-cov00d-evidence-matrix:
 
 check-cov02-seed-inventory:
 	@python3 scripts/validate-cov02-seed-inventory.py
+
+check-cov02-first-org-fixture:
+	@node frontend/web/scripts/seed-test-user.mjs --check-manifest
 
 check-release-compatibility:
 	python3 scripts/verify-release-manifest.py
