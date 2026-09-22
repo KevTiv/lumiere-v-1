@@ -112,6 +112,8 @@ export interface AIChatConfig {
   onApproveActionDraft?: (draft: ChatActionDraftPayload) => Promise<void>
   onRejectActionDraft?: (draft: ChatActionDraftPayload, reason?: string) => Promise<void>
   onUpdateActionDraft?: (draft: ChatActionDraftPayload) => Promise<void>
+  /** User asserts they're relying on a cited passage as evidence (AIH-13/14). */
+  onCiteSource?: (args: { messageId: string; source: ChatMessageSourceRef }) => Promise<void>
 }
 
 export interface ContextProvider {

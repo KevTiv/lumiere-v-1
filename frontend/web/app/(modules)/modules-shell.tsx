@@ -39,6 +39,7 @@ import {
   useUpdateAiActionDraftParams,
 } from "@lumiere/query-hooks/hooks/ai-action-drafts"
 import { useApprovalInboxCount } from "@lumiere/query-hooks/hooks/approvals"
+import { useRecordEvidenceContribution } from "@lumiere/query-hooks/hooks/ai-evidence-contributions"
 import { useCompanies } from "@lumiere/query-hooks/hooks/organization-company"
 import { useOperatingCompanyId } from "@lumiere/query-hooks/hooks/use-operating-company"
 import { ErpAiRouteContextProvider, ErpAiChatControllerProvider, useErpAiRouteContext } from "@/lib/erp-ai-context"
@@ -124,6 +125,7 @@ function ErpAiChatPanel(props: Omit<ComponentProps<typeof AIChatPanel>, "onSendM
   const updateActionDraft = useUpdateAiActionDraftParams(orgId, operatingCompanyId ?? 0)
   const createSession = useCreateAiChatSession(orgId, operatingCompanyId)
   const appendMessage = useAppendAiChatMessage(orgId, operatingCompanyId)
+  const citeSource = useRecordEvidenceContribution(orgId)
   const messagesQuery = useAiChatMessages(orgId, sessionKey, orgReady && operatingCompanyId != null)
   const companiesQuery = useCompanies(orgId, orgReady)
 
@@ -304,8 +306,30 @@ function ErpAiChatPanel(props: Omit<ComponentProps<typeof AIChatPanel>, "onSendM
           companyId: draft.companyId,
         })
       },
+      onCiteSource: async ({ messageId, source }: { messageId: string; source: ChatMessageSourceRef }) => {
+        if (!sessionKey || operatingCompanyId == null || operatingCompanyId <= 0 || source.passage_id == null) {
+          throw new Error("Chat session or passage reference is not ready")
+        }
+        await citeSource.mutateAsync({
+          companyId: operatingCompanyId,
+          sessionRef: sessionKey,
+          turnRef: messageId,
+          eventRef: `cite:${messageId}:${source.passage_id}`,
+          introducedKind: "source_version",
+          passageId: source.passage_id,
+          inspectionState: "user_reported",
+        })
+      },
     }),
-    [approveActionDraft, props.config, rejectActionDraft, updateActionDraft],
+    [
+      approveActionDraft,
+      citeSource,
+      operatingCompanyId,
+      props.config,
+      rejectActionDraft,
+      sessionKey,
+      updateActionDraft,
+    ],
   )
 
   const onSendMessage = useCallback(

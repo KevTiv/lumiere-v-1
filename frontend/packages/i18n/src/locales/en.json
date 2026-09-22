@@ -9641,6 +9641,10 @@
     "sourceMemory": "Memory",
     "sourceActivity": "Activity",
     "sourceAsOf": "Data as of {{time}}",
+    "citeSource": "Cite as evidence",
+    "citeSourcePending": "Citing…",
+    "citeSourceDone": "Cited",
+    "citeSourceError": "Couldn't cite — try again",
     "selectionContext": "AI context",
     "placeholder": "Ask anything... @ for commands",
     "hints": {
