@@ -145,7 +145,7 @@ These are **source/evidence floors, not certification awards**. `U3` below means
 | COV | Surface | Current evidence floor | Existing evidence | Main gap to next class |
 | --- | --- | --- | --- | --- |
 | COV-03 | CRM | **U3** | concrete CRM route/forms; sales-persona opportunity conversion; exact tenant/company/opportunity sale-order identity; replay no-redispatch; limited-reader denial | direct downstream record navigation; lost-response/stale-write recovery; broader CRM adversarial consolidation |
-| COV-04 | Sales | **U3** | quote/order/invoice/returns domain + UI; lead-to-cash, invoice-flow, returns specs | U4 retry/lost-response/concurrency + canonical downstream links; downstream payment blocker |
+| COV-04 | Sales | **U3** | quote/order/invoice/returns domain + UI; sales-persona order confirmation; canonical in-place order result; complete linked-picking set; stale replay and limited-reader denial | record-filter focus after navigation; full lost-response/concurrency consolidation; invoice/RMA producer-owned effect identity; downstream payment blocker |
 | COV-05 | Purchasing | **U3** | supplier/PO/receipt/bill surfaces; P2P + purchasing specs | stale approval/reference mutation/adversarial certification and direct result links |
 | COV-06 | Inventory / WMS | **U2** | product/location/stock command/query/UI breadth; inventory module/mutation specs; fulfillment participates in O2C | one operator-complete receiving/transfer/count/lot lifecycle + concurrency/stale-stock proof |
 | COV-07 | Manufacturing / Quality | **U2** | MRP domain, module route, mutation and manufacturing smoke coverage | seeded BOM → MO → consume → produce → quality/cost/close browser lifecycle |

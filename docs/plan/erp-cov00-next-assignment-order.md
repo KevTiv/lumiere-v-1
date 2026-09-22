@@ -81,7 +81,11 @@ Current disposition: `ACCEPTED` for the bounded opportunity-to-sale-order slice.
 
 ### COV-04
 
-Next bounded assignment: converge one Sales quotation/order operator transition using the accepted `sales-crm` persona. Reuse the canonical Sales reducer and persisted downstream identity, prove representative allow/deny behavior and replay or stale-write handling, and keep fulfillment/invoicing expansion out of the slice unless it is the chosen stable effect.
+Current disposition: `ACCEPTED` for the bounded sale-order confirmation slice. The `sales-crm` persona now confirms through the existing Sales UI, readback keeps the in-place sale order as the stable result while reporting every exact `stock_picking.sale_id` effect, stale replay is rejected without changing the effect set, and the limited reader is denied. This does not promote the complete Sales lifecycle to U4/U5; see [`erp-cov04-sales-order-confirmation-status.md`](./erp-cov04-sales-order-confirmation-status.md).
+
+### COV-05
+
+Next bounded assignment: converge one Purchasing order transition with the accepted `purchasing` persona. Prefer a same-record state transition or an effect with a released durable identity, prove representative allow/deny and stale/replay behavior, and do not use newest-row or ID-delta discovery for receipts or vendor bills.
 
 ## First implementation convergence
 
