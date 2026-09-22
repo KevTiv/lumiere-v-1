@@ -136,6 +136,15 @@ budget and records why. Exhausted org/run budgets deny all fallback; with both u
 clear audit reason rather than silently using Ollama for a tool-calling
 skill.
 
+**Amendment (Ollama tool calling opt-in):** the "no tool-calling requirement"
+statement above described the *default*, not a hard platform limit. An
+operator may now set `OLLAMA_SUPPORTS_TOOL_CALLING=true` to let an
+Ollama-provider agent's legacy profile satisfy tool-calling roles — this is an
+explicit, off-by-default flag, not an implicit fallback; the "run fails with a
+clear audit reason" behavior above still applies whenever the flag is unset.
+See `ai-gateway/src/providers/llm.rs` (`complete_ollama`) and
+`ai-gateway/src/orchestrator/model_configuration.rs` (`ModelProfile::legacy`).
+
 ---
 
 ### AIH-6 — Migrate skills off `run_skill_unlocked` onto `agent_loop.rs`

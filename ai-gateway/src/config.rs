@@ -49,6 +49,11 @@ pub struct Config {
     pub ollama_embed_model: String,
     pub ollama_vision_model: String,
     pub ollama_llm_model: String,
+    /// Explicit opt-in for Ollama tool calling in the reasoning/review/decision
+    /// roles. Off by default: Ollama models otherwise stay on the legacy
+    /// single-shot (no tools) path documented in
+    /// `docs/plans/ai-harness-completion-issues.md`.
+    pub ollama_supports_tool_calling: bool,
     pub mistral_api_key: Option<String>,
     pub google_api_key: Option<String>,
     pub gemini_embed_model: String,
@@ -177,6 +182,9 @@ impl Config {
                 .unwrap_or_else(|_| "llava".to_string()),
             ollama_llm_model: std::env::var("OLLAMA_LLM_MODEL")
                 .unwrap_or_else(|_| "llama3.2".to_string()),
+            ollama_supports_tool_calling: std::env::var("OLLAMA_SUPPORTS_TOOL_CALLING")
+                .map(|v| matches!(v.trim().to_ascii_lowercase().as_str(), "1" | "true" | "yes"))
+                .unwrap_or(false),
             mistral_api_key: std::env::var("MISTRAL_API_KEY").ok(),
             google_api_key,
             gemini_embed_model: std::env::var("GEMINI_EMBED_MODEL")

@@ -142,6 +142,7 @@ services:
       OLLAMA_URL: ${OLLAMA_URL:-http://host.docker.internal:11434}
       OLLAMA_EMBED_MODEL: ${OLLAMA_EMBED_MODEL:-nomic-embed-text}
       OLLAMA_LLM_MODEL: ${OLLAMA_LLM_MODEL:-llama3.2}
+      OLLAMA_SUPPORTS_TOOL_CALLING: ${OLLAMA_SUPPORTS_TOOL_CALLING:-false}
     ports:
       - "8080:8080"
     volumes:

@@ -687,9 +687,15 @@ pub async fn post_rag(
     let company_hit_count = company_hits.len();
     let org_hit_count = org_hits.len();
 
-    let agent = resolve_agent(&state.stdb, org_id, req.agent_id, req.team_member_id)
-        .await
-        .map_err(|e| AppError::BadRequest(e.to_string()))?;
+    let agent = resolve_agent(
+        &state.stdb,
+        org_id,
+        req.agent_id,
+        req.team_member_id,
+        state.config.ollama_supports_tool_calling,
+    )
+    .await
+    .map_err(|e| AppError::BadRequest(e.to_string()))?;
 
     let allowed_types =
         (!req.allowed_entity_types.is_empty()).then_some(req.allowed_entity_types.as_slice());

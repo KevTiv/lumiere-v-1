@@ -106,7 +106,12 @@ only after generator, verifier, history and drift evidence is recorded.
   state.
 - Kong is transport/proxy configuration; provider/model/instance selection and
   recorded reasoning remain explicit.
-- Ollama remains explicit single-shot only for this stack.
+- Ollama stays single-shot only by default. An operator may opt an
+  organization's agent into tool-calling roles (Decision/Reasoning/Review) via
+  the explicit `OLLAMA_SUPPORTS_TOOL_CALLING` process flag; this never changes
+  implicitly with the configured model and is off unless set. See
+  `ai-gateway/src/orchestrator/model_configuration.rs` (`ModelProfile::legacy`)
+  and `ai-gateway/src/providers/llm.rs` (`complete_ollama`).
 
 ## Pilot and migration order
 
