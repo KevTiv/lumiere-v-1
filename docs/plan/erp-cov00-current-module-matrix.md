@@ -29,6 +29,8 @@ Lumière's T0 gap is no longer mainly backend breadth. The repository already co
 
 No audited T0 surface can be called U4 or U5 yet under the parity definition.
 
+> **COV-00D acceptance candidate (base `ed4987d3d99a89c2a3f2a7cddc8ca212548b1831`):** the per-owner lifecycle calibration is recorded in [`erp-cov00d-evidence-calibration-status.md`](./erp-cov00d-evidence-calibration-status.md) with machine-readable evidence in [`../evidence/cov-00d-lifecycle-evidence.json`](../evidence/cov-00d-lifecycle-evidence.json). All 22 COV-03..24 owners are covered; only one principal operator dimension is currently proven and no exact-effect/recovery dimension is complete, so every first-org surface remains at `review`.
+
 ## 3. Current surface census
 
 The current `frontend/web/app/(modules)` tree exposes 31 top-level route families:

@@ -255,6 +255,9 @@ jobs:
       - name: Enforce COV correctness ownership census
         run: pnpm cov-correctness:check
 
+      - name: Enforce COV lifecycle evidence matrix
+        run: pnpm cov-evidence:check
+
       - name: Typecheck
         run: pnpm typecheck
 

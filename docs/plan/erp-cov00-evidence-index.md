@@ -7,6 +7,7 @@ The audit uses current source and existing accepted evidence rather than histori
 - [`erp-cov00-current-module-matrix.md`](./erp-cov00-current-module-matrix.md) — current route/module/operation census and U-level evidence floors.
 - [`erp-cov00-correctness-evidence-defect-register.md`](./erp-cov00-correctness-evidence-defect-register.md) — source-level correctness/evidence defects and D/A/O/E proof model.
 - [`erp-cov00c-correctness-census-status.md`](./erp-cov00c-correctness-census-status.md) and [`../evidence/cov-00c-correctness-defects.json`](../evidence/cov-00c-correctness-defects.json) — current owned defect census, downstream gates, and source ratchets.
+- [`erp-cov00d-evidence-calibration-status.md`](./erp-cov00d-evidence-calibration-status.md) and [`../evidence/cov-00d-lifecycle-evidence.json`](../evidence/cov-00d-lifecycle-evidence.json) — per-owner D/A/O/E calibration, missing-proof assignments, and promotion/admission ratchet.
 - [`erp-cov00-review-handoff.md`](./erp-cov00-review-handoff.md) — closure cards COV-00A through COV-00D.
 - [`erp-module-usability-parity-cov00-status.md`](./erp-module-usability-parity-cov00-status.md) — current REVIEW status and blockers.
 - [`erp-cov00-next-assignment-order.md`](./erp-cov00-next-assignment-order.md) — dependency/order guidance for follow-up agents.
@@ -86,6 +87,6 @@ Examples requiring explicit calibration:
 - COV-00A current operation/disposition artifact + unclassified-operation ratchet — integrated acceptance candidate.
 - COV-00B first-org exposure manifest + Fleet route decision — integrated acceptance candidate.
 - COV-00C complete defect ownership census + launch/downstream gates — integrated acceptance candidate.
-- COV-00D module primary-lifecycle D/A/O/E matrix + corrected test/evidence claims.
+- COV-00D module primary-lifecycle D/A/O/E matrix + corrected test/evidence claims — integrated acceptance candidate.
 
 COV-00 acceptance means the remaining work is truthfully owned and measurable. It does not mean the runtime defects themselves are already fixed; those stay blocking on their downstream U4/U5 and COV-27 gates.

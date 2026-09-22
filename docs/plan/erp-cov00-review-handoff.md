@@ -4,6 +4,7 @@
 **Evidence:** [`erp-cov00-current-module-matrix.md`](./erp-cov00-current-module-matrix.md)  
 **Correctness/evidence register:** [`erp-cov00-correctness-evidence-defect-register.md`](./erp-cov00-correctness-evidence-defect-register.md)  
 **COV-00C machine census:** [`../evidence/cov-00c-correctness-defects.json`](../evidence/cov-00c-correctness-defects.json)
+**COV-00D evidence matrix:** [`../evidence/cov-00d-lifecycle-evidence.json`](../evidence/cov-00d-lifecycle-evidence.json)
 **Audited base:** `afa23b702fc4c47623697d2fcb81733f2dd71c14`
 
 This handoff exists because COV-00 must not be marked ACCEPTED while the operation census, first-test-org exposure denominator, correctness-defect ownership, and evidence-claim calibration remain incomplete.
@@ -58,6 +59,8 @@ COV-00C closes when every discovered current-tree defect in these classes is own
 ### COV-00D — evidence claim calibration
 
 Owner: audit/test metadata/evidence matrix.
+
+**Current disposition:** acceptance candidate. All COV-03..24 owners have a machine-checked `D/A/O/E` row with concrete evidence, missing proof, downstream packages, and launch admission reconciled to the product surface catalog. See [`erp-cov00d-evidence-calibration-status.md`](./erp-cov00d-evidence-calibration-status.md).
 
 Every intended T0 module primary lifecycle must be scored across four independent dimensions:
 

@@ -6,16 +6,17 @@
 **Primary evidence:** [`erp-cov00-current-module-matrix.md`](./erp-cov00-current-module-matrix.md)  
 **Correctness/evidence register:** [`erp-cov00-correctness-evidence-defect-register.md`](./erp-cov00-correctness-evidence-defect-register.md)  
 **COV-00C machine census:** [`../evidence/cov-00c-correctness-defects.json`](../evidence/cov-00c-correctness-defects.json)
+**COV-00D evidence matrix:** [`../evidence/cov-00d-lifecycle-evidence.json`](../evidence/cov-00d-lifecycle-evidence.json)
 **Closure handoff:** [`erp-cov00-review-handoff.md`](./erp-cov00-review-handoff.md)
 
-The source/module census plus COV-00A/B/C acceptance candidates are integrated, but COV-00 cannot be marked accepted until COV-00D and coordinator review are complete.
+The source/module census plus COV-00A/B/C/D acceptance candidates are integrated, but COV-00 cannot be marked accepted until coordinator review is complete.
 
 Closure-card disposition:
 
 - `COV-00A`: integrated acceptance candidate with zero unowned/review-required client-facing operations and a source ratchet;
 - `COV-00B`: integrated acceptance candidate with one first-org route/navigation authority and explicit Fleet ownership;
 - `COV-00C`: integrated acceptance candidate with an 11-class owned defect manifest and narrow source ratchets; open runtime rows remain downstream launch blockers;
-- `COV-00D`: calibrate primary-lifecycle evidence across `D/A/O/E` (domain invariant / API integration / operator transition / exact effect+recovery), so direct-BFF browser setup and heuristic readback cannot be counted as stronger proof than they provide.
+- `COV-00D`: integrated acceptance candidate with all 22 COV-03..24 owners scored independently across `D/A/O/E`, direct-BFF/latest-helper overclaims rejected, and promotion/admission tied to complete applicable evidence.
 
 Current runtime disposition after ownership classification:
 
