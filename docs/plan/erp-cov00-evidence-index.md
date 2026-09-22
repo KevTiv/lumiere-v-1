@@ -6,6 +6,7 @@ The audit uses current source and existing accepted evidence rather than histori
 
 - [`erp-cov00-current-module-matrix.md`](./erp-cov00-current-module-matrix.md) — current route/module/operation census and U-level evidence floors.
 - [`erp-cov00-correctness-evidence-defect-register.md`](./erp-cov00-correctness-evidence-defect-register.md) — source-level correctness/evidence defects and D/A/O/E proof model.
+- [`erp-cov00c-correctness-census-status.md`](./erp-cov00c-correctness-census-status.md) and [`../evidence/cov-00c-correctness-defects.json`](../evidence/cov-00c-correctness-defects.json) — current owned defect census, downstream gates, and source ratchets.
 - [`erp-cov00-review-handoff.md`](./erp-cov00-review-handoff.md) — closure cards COV-00A through COV-00D.
 - [`erp-module-usability-parity-cov00-status.md`](./erp-module-usability-parity-cov00-status.md) — current REVIEW status and blockers.
 - [`erp-cov00-next-assignment-order.md`](./erp-cov00-next-assignment-order.md) — dependency/order guidance for follow-up agents.
@@ -33,8 +34,8 @@ The audit uses current source and existing accepted evidence rather than histori
 
 - `api-server/src/routes/operations.rs` and `api-server/src/commands.rs` — authenticated generated-operation/trusted-context authority is strong, but generic successful dispatch currently yields transport acceptance rather than authoritative business-effect disposition.
 - `frontend/packages/query-hooks/src/hooks/ai-action-drafts.ts` — production newest/highest-id correlation after draft creation; must be replaced by stable request/effect identity.
-- `frontend/web/tests/e2e/helpers.ts` — current opportunity→sale-order helper can choose newest among multiple matches and fall back to weaker identity when exact relation data is unavailable.
-- `frontend/packages/ui/src/forms/form-modal.tsx` — can close/toast success when `onSubmit` is absent.
+- `frontend/web/tests/e2e/helpers-exact-sale-order.ts` — current opportunity→sale-order helper enforces exact 0..1 identity; other latest/highest helpers remain classified under COV-D09.
+- `frontend/packages/ui/src/forms/form-modal.tsx` — missing-submit false success is repaired and guarded.
 - `frontend/packages/ui/src/forms/runtime-form-modal.tsx` — runtime-config failure can fall back to static form and still submit.
 - `frontend/packages/api-client/src/create-client.ts`, `frontend/packages/query-hooks/src/http.ts`, and `frontend/web/lib/server-query.ts` — `AllowEmpty` paths can collapse non-OK/failure into `[]`; COV-00C must classify critical usages.
 - `frontend/packages/ui/src/lib/stored-dashboard-resolver.ts` — malformed domains can broaden to all rows; unknown operators can pass; missing timestamps/measures weaken period/aggregate semantics.
@@ -78,13 +79,13 @@ Examples requiring explicit calibration:
 - Projects: domain SoD evidence is stronger than current browser operator proof.
 - IoT: lifecycle BFF proof is stronger than current operator-path proof.
 - Proposals: conversion/lifecycle BFF proof is stronger than current operator-path proof.
-- CRM→Sales: operator transition is comparatively strong, while exact effect/recovery remains partial until strict 0..1 `opportunity_id` correlation replaces newest/fallback lookup.
+- CRM→Sales: strict 0..1 `opportunity_id` correlation and replay proof are present; direct-navigation and complete stale/denied/lost-response UI evidence remain for COV-01/COV-00D review.
 
 ## COV-00 closure evidence still required
 
-- COV-00A current operation/disposition artifact + unclassified-operation ratchet.
-- COV-00B first-org exposure manifest + Fleet route decision.
-- COV-00C complete defect ownership census + launch/downstream gates.
+- COV-00A current operation/disposition artifact + unclassified-operation ratchet — integrated acceptance candidate.
+- COV-00B first-org exposure manifest + Fleet route decision — integrated acceptance candidate.
+- COV-00C complete defect ownership census + launch/downstream gates — integrated acceptance candidate.
 - COV-00D module primary-lifecycle D/A/O/E matrix + corrected test/evidence claims.
 
 COV-00 acceptance means the remaining work is truthfully owned and measurable. It does not mean the runtime defects themselves are already fixed; those stay blocking on their downstream U4/U5 and COV-27 gates.

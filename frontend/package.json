@@ -10,6 +10,7 @@
     "type-debt:self-test": "node scripts/check-opaque-record-ratchet.mjs --self-test",
     "operation-transport:check": "node scripts/check-browser-operation-transport.mjs",
     "operation-transport:self-test": "node scripts/check-browser-operation-transport.mjs --self-test",
+    "cov-correctness:check": "python3 ../scripts/validate-cov00c-correctness-census.py",
     "web": "pnpm --filter ./web dev",
     "mobile": "pnpm --filter mobile start",
     "stdb:generate": "spacetime generate --lang typescript --out-dir packages/stdb/src/generated --module-path ../spacetimedb",

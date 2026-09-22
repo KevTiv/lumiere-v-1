@@ -252,6 +252,9 @@ jobs:
       - name: Enforce immutable browser operation transport
         run: pnpm operation-transport:check
 
+      - name: Enforce COV correctness ownership census
+        run: pnpm cov-correctness:check
+
       - name: Typecheck
         run: pnpm typecheck
 

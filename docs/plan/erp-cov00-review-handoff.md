@@ -3,6 +3,7 @@
 **State:** REVIEW  
 **Evidence:** [`erp-cov00-current-module-matrix.md`](./erp-cov00-current-module-matrix.md)  
 **Correctness/evidence register:** [`erp-cov00-correctness-evidence-defect-register.md`](./erp-cov00-correctness-evidence-defect-register.md)  
+**COV-00C machine census:** [`../evidence/cov-00c-correctness-defects.json`](../evidence/cov-00c-correctness-defects.json)
 **Audited base:** `afa23b702fc4c47623697d2fcb81733f2dd71c14`
 
 This handoff exists because COV-00 must not be marked ACCEPTED while the operation census, first-test-org exposure denominator, correctness-defect ownership, and evidence-claim calibration remain incomplete.
@@ -36,6 +37,8 @@ Owner: product/navigation/config audit only.
 ### COV-00C — correctness defect census and ownership
 
 Owner: audit/classification; runtime fixes remain with COV-01/UX/module/GOV owners.
+
+**Current disposition:** acceptance candidate. The 11-class manifest owns every current defect class and ratchets the `AllowEmpty`, runtime-form, latest-helper, direct-BFF evidence, and semantic-dispatch inventories. Open runtime rows remain blocking at their downstream gates.
 
 Use `erp-cov00-correctness-evidence-defect-register.md` as the initial source register and expand it from current-tree evidence.
 
