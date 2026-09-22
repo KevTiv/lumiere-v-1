@@ -69,11 +69,15 @@ Current disposition: `ACCEPTED`; the inventory baseline has been consumed by COV
 
 ### COV-02B
 
-Current disposition: `REVIEW` implementation candidate. The versioned manifest, explicit organization selection, seven named personas, deterministic role/membership provisioning, and 22-owner health report are implemented without a second authorization owner. Full-stack execution evidence remains outstanding.
+Current disposition: `ACCEPTED`. The versioned manifest, explicit organization selection, seven named personas, deterministic role/membership provisioning, and 22-owner health report reuse the existing authorization owners and were executed by COV-02C.
 
 ### COV-02C
 
-Execute the fixture on a disposable full stack, capture the health report, verify all persona logins and representative permission/SoD boundaries, add the missing IoT baseline, and prove a clear/reseed independent rerun. Fixture setup is not operator-path proof for module lifecycles.
+Current disposition: `ACCEPTED`. The dedicated stack produced healthy seven-persona and 22-owner readback, all seven browser logins passed, all six managed roles were denied role administration, IoT gained its required baseline, and a PostgreSQL recreation plus STDB clear/reseed passed independently. Fixture setup remains distinct from module operator-path proof.
+
+### COV-03
+
+Next bounded assignment: converge one CRM opportunity operator transition. Reuse the accepted `sales-crm` persona, canonical workflow/result owners, persisted opportunity/conversion readback, exact effect identity, representative allow/deny behavior, and one browser rerun. Do not broaden into Sales or add a parallel transition authority.
 
 ## First implementation convergence
 

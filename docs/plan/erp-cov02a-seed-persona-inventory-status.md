@@ -25,11 +25,10 @@ This path is useful local infrastructure, but it is not the COV-02 acceptance pa
 ## Inventory result
 
 - six current authorities are classified by their actual strength, including the COV-02B manifest;
-- all 22 COV-03..24 owners have explicit seed coverage and remaining gaps;
-- 21 modules have partial baseline rows;
-- IoT has no owned device/telemetry/alert fixture and is absent;
-- all seven required personas are now defined in the versioned manifest;
-- runtime provisioning, login, permission behavior, and independent-rerun evidence remain COV-02C work.
+- all 22 COV-03..24 owners have partial baseline rows and explicit remaining lifecycle gaps;
+- IoT now has an owned hub/device, telemetry sample, and unresolved stale-device alert;
+- all seven required personas are provisioned and login-proven;
+- COV-02C captured healthy 7-persona/22-owner readback, representative non-admin denial, and a clean independent rerun.
 
 The current useful pieces are retained: synthetic ERP baseline records, the documented dev reducer invocation, the browser-admin credential bridge, least-privilege actor creation logic, and the Phase 0 fixture invariants. None is promoted into a second mutation or authorization authority.
 
@@ -48,4 +47,4 @@ Existing `seed_dev_data` remains the documented dev baseline while COV-02B compo
 
 ## Acceptance boundary
 
-The inventory and implementation do not certify module lifecycle coverage or close COV-02. COV-02C must execute the fixture on a disposable stack, prove all persona logins and permission boundaries, add the missing IoT baseline, capture health, and prove an independent rerun.
+COV-02 is accepted as the shared runtime fixture foundation. It does not certify any module lifecycle: domain-specific grants, separation of duties, exact effect identity, recovery, and operator transitions remain with COV-03 through COV-24.

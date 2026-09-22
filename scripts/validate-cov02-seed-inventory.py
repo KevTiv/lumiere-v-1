@@ -30,14 +30,14 @@ EXPECTED_PERSONAS = {
     "hr-project",
     "limited-read-only",
 }
-VALID_PERSONA_STATUSES = {"defined", "partial", "absent"}
-VALID_SEED_STATUSES = {"partial", "absent"}
+VALID_PERSONA_STATUSES = {"login-proven"}
+VALID_SEED_STATUSES = {"partial"}
 REQUIRED_NEXT_CONTROLS = {
-    "disposable-stack-execution",
-    "persona-login-proof",
-    "seed-health-capture",
-    "iot-baseline",
-    "independent-rerun",
+    "operator-transition",
+    "canonical-readback",
+    "exact-effect-identity",
+    "permission-allow-deny",
+    "browser-rerun",
 }
 
 
@@ -142,20 +142,54 @@ def validate_inventory(inventory: dict[str, Any], failures: list[str]) -> None:
         if module.get("seed_status") not in VALID_SEED_STATUSES:
             failures.append(f"{module_id}: invalid seed_status")
         require_list(module, "gaps", module_id, failures)
-        if module.get("next_package") != "COV-02C":
-            failures.append(f"{module_id}: next_package must be COV-02C")
+        if module.get("next_package") != module_id:
+            failures.append(f"{module_id}: next_package must return to its module owner")
         for index, evidence in enumerate(require_list(module, "evidence", module_id, failures)):
             if not isinstance(evidence, dict):
                 failures.append(f"{module_id}: evidence must be an object")
             else:
                 validate_evidence(evidence, f"{module_id}/evidence[{index}]", failures)
 
+    runtime_evidence = inventory.get("runtime_evidence")
+    if not isinstance(runtime_evidence, dict):
+        failures.append("runtime_evidence must be an object")
+    else:
+        health = runtime_evidence.get("health")
+        browser = runtime_evidence.get("browser")
+        rerun = runtime_evidence.get("independent_rerun")
+        if not isinstance(health, dict) or health.get("healthy") is not True:
+            failures.append("runtime health must be captured as healthy")
+        elif (
+            health.get("fixture_key") != "lumiere-first-org-v1"
+            or health.get("persona_count") != 7
+            or health.get("module_count") != 22
+            or health.get("required_module_count") != 22
+            or health.get("missing_required_modules") != 0
+        ):
+            failures.append("runtime health denominator does not match the accepted fixture")
+        if not isinstance(browser, dict):
+            failures.append("browser runtime evidence must be an object")
+        else:
+            spec = browser.get("spec")
+            if not isinstance(spec, str) or not (REPO_ROOT / spec).is_file():
+                failures.append("browser runtime evidence must reference the checked-in persona spec")
+            if (
+                browser.get("tests_passed") != 13
+                or browser.get("persona_login_tests") != 7
+                or browser.get("managed_role_denial_tests") != 6
+            ):
+                failures.append("browser runtime counts do not match the accepted persona proof")
+        if not isinstance(rerun, dict) or not all(
+            rerun.get(field) is True for field in ("cleared_stdb", "recreated_postgres", "healthy")
+        ) or rerun.get("browser_tests_passed") != 13:
+            failures.append("independent clear/reseed rerun evidence is incomplete")
+
     next_slice = inventory.get("minimum_next_slice")
     if not isinstance(next_slice, dict):
         failures.append("minimum_next_slice must be an object")
     else:
-        if next_slice.get("id") != "COV-02C":
-            failures.append("minimum_next_slice id must be COV-02C")
+        if next_slice.get("id") != "COV-03":
+            failures.append("minimum_next_slice id must be COV-03")
         require_text(next_slice, "objective", "minimum_next_slice", failures)
         controls = set(require_list(next_slice, "required_controls", "minimum_next_slice", failures))
         if controls != REQUIRED_NEXT_CONTROLS:
@@ -172,8 +206,8 @@ def main() -> int:
 
     if inventory.get("version") != 1:
         failures.append("inventory version must be 1")
-    if inventory.get("status") != "implementation-candidate":
-        failures.append("inventory status must be implementation-candidate")
+    if inventory.get("status") != "accepted-runtime-foundation":
+        failures.append("inventory status must be accepted-runtime-foundation")
     require_text(inventory, "audited_base", "inventory", failures)
     require_text(inventory, "scope", "inventory", failures)
     validate_inventory(inventory, failures)

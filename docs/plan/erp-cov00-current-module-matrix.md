@@ -172,7 +172,7 @@ These are **source/evidence floors, not certification awards**. `U3` below means
 No row is promoted to U4/U5 by this audit because the following shared gates remain open:
 
 - COV-01 common operation outcome/error/record-ref/readback seam depends on COH-02;
-- COV-02 reproducible first-test-org seed/persona fixture does not yet exist as the shared authority;
+- COV-02 now supplies the accepted reproducible first-test-org seed/persona authority; module-specific permission, SoD, lifecycle, and recovery proof remains open;
 - COV-25 cross-module relation/navigation consistency has not been audited/closed;
 - COV-26 common loading/empty/error/denied/responsive/accessibility/reconnect proof has not run;
 - COV-27 all-module integrated certification/launch manifest has not run;
@@ -235,8 +235,8 @@ The census changes the implementation order from broad greenfield module work to
    Create the first-org route/navigation denominator and explicitly classify AI/internal/showcase surfaces; settle Fleet `/map` ownership.
 3. **COV-01 — typed workflow result/readback boundary** after COH-02.  
    Migrate one representative lifecycle and reuse it everywhere.
-4. **COV-02 — shared seed/persona pack.**  
-   Include at least sales/purchasing/inventory/accounting, employee/payroll, project/timesheet, documents/messages, POS/MRP/Helpdesk/Fleet/IoT configuration and representative open/completed records.
+4. **COV-02 — shared seed/persona pack (`ACCEPTED`).**
+   Reuse the versioned seven-persona/22-owner foundation and its required IoT baseline; do not count it as module lifecycle evidence.
 
 ### First module lanes after the shared boundary
 

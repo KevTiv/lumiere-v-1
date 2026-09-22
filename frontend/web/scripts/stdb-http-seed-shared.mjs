@@ -97,7 +97,8 @@ export function resolveStdbToken(host) {
 
   const local = isLocalStdbHost(host)
   const iss = jwtIssuerUnsafe(t)
-  if (local && iss && iss.includes('auth.spacetimedb.com')) {
+  const preflightVerified = process.env['STDB_TOKEN_PREFLIGHT_VERIFIED'] === '1'
+  if (local && iss && iss.includes('auth.spacetimedb.com') && !preflightVerified) {
     throw new Error(
       `STDB_SERVER_TOKEN is a maincloud login JWT, but NEXT_PUBLIC_STDB_HOST targets a local server (${host}). ` +
         'SpacetimeDB tokens are not portable between clusters.\n' +

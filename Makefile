@@ -389,7 +389,7 @@ e2e-smoke-setup:
 		else \
 			echo "[e2e] Seeding smoke fixture (seed_dev_data)..."; \
 			cd "$$ROOT/frontend/web"; \
-			STDB_SERVER_TOKEN="$$E2E_STDB_TOKEN" STDB_MODULE="$(E2E_DB)" NEXT_PUBLIC_STDB_MODULE="$(E2E_DB)" STDB_HOST="$$E2E_STDB_HOST" NEXT_PUBLIC_STDB_HOST="$$E2E_STDB_HOST" pnpm run e2e-seed-fixture; \
+			STDB_TOKEN_PREFLIGHT_VERIFIED=1 STDB_SERVER_TOKEN="$$E2E_STDB_TOKEN" STDB_MODULE="$(E2E_DB)" NEXT_PUBLIC_STDB_MODULE="$(E2E_DB)" STDB_HOST="$$E2E_STDB_HOST" NEXT_PUBLIC_STDB_HOST="$$E2E_STDB_HOST" pnpm run e2e-seed-fixture; \
 			cd "$$ROOT"; \
 			echo "$$CUR_STDB_HASH" >"$$STDB_HASH_FILE"; \
 		fi; \
@@ -438,7 +438,7 @@ e2e-smoke-setup:
 		echo "[e2e] Seeding browser test user through the running API server..."; \
 		cd "$$ROOT/frontend/web"; \
 		set -a; [ ! -f "$$ROOT/frontend/web/.env.local" ] || . "$$ROOT/frontend/web/.env.local"; set +a; \
-		LUMIERE_API_SERVER_URL="http://127.0.0.1:$(E2E_API_PORT)" STDB_SERVER_TOKEN="$$E2E_STDB_TOKEN" STDB_MODULE="$(E2E_DB)" NEXT_PUBLIC_STDB_MODULE="$(E2E_DB)" STDB_HOST="$$E2E_STDB_HOST" NEXT_PUBLIC_STDB_HOST="$$E2E_STDB_HOST" pnpm run seed-first-org-personas; \
+		LUMIERE_API_SERVER_URL="http://127.0.0.1:$(E2E_API_PORT)" STDB_TOKEN_PREFLIGHT_VERIFIED=1 STDB_SERVER_TOKEN="$$E2E_STDB_TOKEN" STDB_MODULE="$(E2E_DB)" NEXT_PUBLIC_STDB_MODULE="$(E2E_DB)" STDB_HOST="$$E2E_STDB_HOST" NEXT_PUBLIC_STDB_HOST="$$E2E_STDB_HOST" pnpm run seed-first-org-personas; \
 		cd "$$ROOT"; \
 		{ \
 			printf "export E2E_STDB_TOKEN=%q\n" "$$E2E_STDB_TOKEN"; \
@@ -848,7 +848,7 @@ e2e-smoke:
 		echo "[e2e] Seeding smoke fixture (seed_dev_data)..."; \
 		cd "$$ROOT/frontend/web"; \
 		E2E_STDB_TOKEN="$$STDB_SERVER_TOKEN"; \
-		STDB_SERVER_TOKEN="$$E2E_STDB_TOKEN" STDB_MODULE="$(E2E_DB)" NEXT_PUBLIC_STDB_MODULE="$(E2E_DB)" STDB_HOST="$$E2E_STDB_HOST" NEXT_PUBLIC_STDB_HOST="$$E2E_STDB_HOST" pnpm run e2e-seed-fixture; \
+		STDB_TOKEN_PREFLIGHT_VERIFIED=1 STDB_SERVER_TOKEN="$$E2E_STDB_TOKEN" STDB_MODULE="$(E2E_DB)" NEXT_PUBLIC_STDB_MODULE="$(E2E_DB)" STDB_HOST="$$E2E_STDB_HOST" NEXT_PUBLIC_STDB_HOST="$$E2E_STDB_HOST" pnpm run e2e-seed-fixture; \
 		cd "$$ROOT"; \
 		if curl -fsS "http://127.0.0.1:$(E2E_API_PORT)/health" >/dev/null 2>&1; then \
 			echo "[e2e] Stopping existing api-server on :$(E2E_API_PORT) for e2e env..."; \
@@ -883,7 +883,7 @@ e2e-smoke:
 		echo "[e2e] Seeding browser test user through the running API server..."; \
 		cd "$$ROOT/frontend/web"; \
 		set -a; [ ! -f "$$ROOT/frontend/web/.env.local" ] || . "$$ROOT/frontend/web/.env.local"; set +a; \
-		LUMIERE_API_SERVER_URL="http://127.0.0.1:$(E2E_API_PORT)" STDB_SERVER_TOKEN="$$E2E_STDB_TOKEN" STDB_MODULE="$(E2E_DB)" NEXT_PUBLIC_STDB_MODULE="$(E2E_DB)" STDB_HOST="$$E2E_STDB_HOST" NEXT_PUBLIC_STDB_HOST="$$E2E_STDB_HOST" pnpm run seed-first-org-personas; \
+		LUMIERE_API_SERVER_URL="http://127.0.0.1:$(E2E_API_PORT)" STDB_TOKEN_PREFLIGHT_VERIFIED=1 STDB_SERVER_TOKEN="$$E2E_STDB_TOKEN" STDB_MODULE="$(E2E_DB)" NEXT_PUBLIC_STDB_MODULE="$(E2E_DB)" STDB_HOST="$$E2E_STDB_HOST" NEXT_PUBLIC_STDB_HOST="$$E2E_STDB_HOST" pnpm run seed-first-org-personas; \
 		cd "$$ROOT"; \
 		if curl -fsS "http://127.0.0.1:$(E2E_WEB_PORT)" >/dev/null 2>&1; then \
 			echo "[e2e] Stopping existing Next.js on :$(E2E_WEB_PORT)..."; \

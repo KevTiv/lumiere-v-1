@@ -27,7 +27,7 @@
     {"id": "COV-13", "table": "pos_config", "required": true},
     {"id": "COV-14", "table": "helpdesk_ticket", "required": true},
     {"id": "COV-15", "table": "fleet_vehicle", "required": true},
-    {"id": "COV-16", "table": "iot_device", "required": false},
+    {"id": "COV-16", "table": "iot_device", "required": true},
     {"id": "COV-17", "table": "proposal", "required": true},
     {"id": "COV-18", "table": "document", "required": true},
     {"id": "COV-19", "table": "calendar_event", "required": true},

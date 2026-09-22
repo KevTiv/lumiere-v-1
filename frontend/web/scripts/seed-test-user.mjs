@@ -45,6 +45,8 @@ import {
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url))
 const FIXTURE_PATH = resolve(SCRIPT_DIR, '../fixtures/first-org-fixture.v1.json')
+const SATS_NONE = { none: [] }
+const satsSome = (value) => ({ some: value })
 const EXPECTED_PERSONA_KEYS = [
   'organization-admin',
   'finance-accounting',
@@ -68,7 +70,7 @@ const EXPECTED_MODULE_HEALTH = [
   ['COV-13', 'pos_config', true],
   ['COV-14', 'helpdesk_ticket', true],
   ['COV-15', 'fleet_vehicle', true],
-  ['COV-16', 'iot_device', false],
+  ['COV-16', 'iot_device', true],
   ['COV-17', 'proposal', true],
   ['COV-18', 'document', true],
   ['COV-19', 'calendar_event', true],
@@ -150,6 +152,8 @@ function sqlSnakeToCamel(s) {
 }
 
 function unwrapSats(v) {
+  if (Array.isArray(v) && v.length === 2 && v[0] === 0) return unwrapSats(v[1])
+  if (Array.isArray(v) && v.length === 2 && v[0] === 1) return undefined
   if (v !== null && typeof v === 'object' && !Array.isArray(v)) {
     if ('some' in v) return unwrapSats(v.some)
     if ('none' in v) return undefined
@@ -320,11 +324,11 @@ async function ensurePersonaRole(host, moduleName, adminToken, orgId, persona, f
       orgId,
       {
         name: persona.role_name,
-        description: `COV-02 fixture role for ${persona.key}`,
-        parent_id: null,
+        description: satsSome(`COV-02 fixture role for ${persona.key}`),
+        parent_id: SATS_NONE,
         permissions: persona.permissions,
         is_active: true,
-        metadata: JSON.stringify({ fixture_key: fixtureKey, persona: persona.key }),
+        metadata: satsSome(JSON.stringify({ fixture_key: fixtureKey, persona: persona.key })),
       },
     ])
     role = await resolveRole(host, moduleName, adminToken, orgId, persona.role_name)
@@ -335,7 +339,12 @@ async function ensurePersonaRole(host, moduleName, adminToken, orgId, persona, f
   if (persona.managed_role && JSON.stringify(actualPermissions) !== JSON.stringify(persona.permissions)) {
     await callStdbReducer(host, moduleName, adminToken, 'update_role', [
       Number(role.id),
-      { name: null, description: null, permissions: persona.permissions, is_active: true },
+      {
+        name: SATS_NONE,
+        description: SATS_NONE,
+        permissions: satsSome(persona.permissions),
+        is_active: satsSome(true),
+      },
     ])
   }
   if (!persona.managed_role && !actualPermissions.includes('*:*')) {
@@ -350,7 +359,7 @@ async function ensureRoleAssignment(host, moduleName, adminToken, identityForRed
       identityForReducer,
       roleId,
       orgId,
-      { expires_at_micros: null, metadata: null },
+      { expires_at_micros: SATS_NONE, metadata: SATS_NONE },
     ])
     console.log(`[seed-test-user] assign_role OK (${personaKey}, org_id=${orgId}, role_id=${roleId}).`)
   } catch (e) {
@@ -405,13 +414,13 @@ async function ensureMembership(host, moduleName, adminToken, identityForReducer
       orgId,
       {
         role_name: persona.role_name,
-        company_id: companyId,
-        job_title: persona.job_title,
-        department_id: null,
-        employee_id: null,
+        company_id: satsSome(companyId),
+        job_title: satsSome(persona.job_title),
+        department_id: SATS_NONE,
+        employee_id: SATS_NONE,
         is_active: true,
         is_default: true,
-        metadata: JSON.stringify({ fixture_key: fixtureKey, persona: persona.key }),
+        metadata: satsSome(JSON.stringify({ fixture_key: fixtureKey, persona: persona.key })),
       },
     ])
     console.log(`[seed-test-user] add_org_member OK (${persona.key}, org_id=${orgId}).`)
