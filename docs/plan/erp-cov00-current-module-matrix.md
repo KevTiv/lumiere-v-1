@@ -144,7 +144,7 @@ These are **source/evidence floors, not certification awards**. `U3` below means
 
 | COV | Surface | Current evidence floor | Existing evidence | Main gap to next class |
 | --- | --- | --- | --- | --- |
-| COV-03 | CRM | **U3** | concrete CRM route/forms; lead/opportunity mutations; contact identity UI; lead-to-cash and CRM isolation/stage specs | direct downstream record navigation; shared outcome semantics; stale/retry/adversarial consolidation |
+| COV-03 | CRM | **U3** | concrete CRM route/forms; sales-persona opportunity conversion; exact tenant/company/opportunity sale-order identity; replay no-redispatch; limited-reader denial | direct downstream record navigation; lost-response/stale-write recovery; broader CRM adversarial consolidation |
 | COV-04 | Sales | **U3** | quote/order/invoice/returns domain + UI; lead-to-cash, invoice-flow, returns specs | U4 retry/lost-response/concurrency + canonical downstream links; downstream payment blocker |
 | COV-05 | Purchasing | **U3** | supplier/PO/receipt/bill surfaces; P2P + purchasing specs | stale approval/reference mutation/adversarial certification and direct result links |
 | COV-06 | Inventory / WMS | **U2** | product/location/stock command/query/UI breadth; inventory module/mutation specs; fulfillment participates in O2C | one operator-complete receiving/transfer/count/lot lifecycle + concurrency/stale-stock proof |

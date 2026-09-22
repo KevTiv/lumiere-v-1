@@ -1,4 +1,6 @@
 import { expect, test } from "@playwright/test"
+import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
+import { stdbBffCommandPost } from "@lumiere/stdb/commands"
 
 import { matchesOperationResponse } from "./operation-response"
 import {
@@ -8,6 +10,8 @@ import {
   expectNoAppError,
   expectSeededText,
   fetchDefaultCompanyId,
+  fetchFirstPricelistId,
+  fetchFirstWarehouseId,
   fetchOpportunityIdByName,
   fetchSaleOrderIdByOpportunityId,
   fetchSaleOrderIdsByOpportunityId,
@@ -15,6 +19,7 @@ import {
   gotoModule,
   openEntityCreate,
   selectEntityRowByText,
+  signIn,
   smokeName,
   submitForm,
   waitForBffQueryMinRows,
@@ -23,13 +28,21 @@ import {
   waitForSaleOrderLineExists,
 } from "./helpers"
 
-test.describe("COV-01d opportunity → sale-order effect certification", { tag: "@p0" }, () => {
-  test("operator conversion resolves one exact order and replay does not redispatch", async ({ page }) => {
+const PERSONA_PASSWORD = process.env.E2E_FIRST_ORG_PERSONA_PASSWORD ?? "Password123$"
+
+test.describe("COV-01d/COV-03 opportunity → sale-order effect certification", { tag: ["@p0", "@cov03", "@unauthenticated"] }, () => {
+  test("sales persona resolves one exact order, replay does not redispatch, and reader is denied", async ({ browser }) => {
     test.setTimeout(180_000)
+
+    const salesContext = await browser.newContext({ storageState: { cookies: [], origins: [] } })
+    const page = await salesContext.newPage()
+    await signIn(page, "fixture.sales@example.test", PERSONA_PASSWORD)
 
     const leadName = smokeName("cov01d-lead")
     const opportunityName = `${leadName} - Opportunity`
     const companyId = await fetchDefaultCompanyId(page)
+    const pricelistId = await fetchFirstPricelistId(page)
+    const warehouseId = await fetchFirstWarehouseId(page)
 
     // Setup stays on the normal CRM operator path so the conversion is tested
     // with the same persisted opportunity shape a first-org user sees.
@@ -132,5 +145,30 @@ test.describe("COV-01d opportunity → sale-order effect certification", { tag: 
     const replayIds = await fetchSaleOrderIdsByOpportunityId(page, opportunityId, companyId)
     expect(replayIds).toEqual([orderId])
     await expectNoAppError(page)
+
+    const readerContext = await browser.newContext({ storageState: { cookies: [], origins: [] } })
+    const readerPage = await readerContext.newPage()
+    try {
+      await signIn(readerPage, "fixture.reader@example.test", PERSONA_PASSWORD)
+      const { urlPath, init } = stdbBffCommandPost("convert_opportunity_to_sale_order", {
+        companyId,
+        opportunityId,
+        params: stdbParamsToJson(
+          { pricelistId: BigInt(pricelistId), warehouseId: BigInt(warehouseId) },
+          "ConvertOpportunityParams",
+        ),
+      })
+      const denial = await readerPage.request.post(urlPath, {
+        headers: { "Content-Type": "application/json" },
+        data: JSON.parse(String(init.body)),
+      })
+      expect(denial.status()).toBe(403)
+      expect(await fetchSaleOrderIdsByOpportunityId(page, opportunityId, companyId)).toEqual([
+        orderId,
+      ])
+    } finally {
+      await readerContext.close()
+      await salesContext.close()
+    }
   })
 })

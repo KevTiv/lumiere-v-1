@@ -77,7 +77,11 @@ Current disposition: `ACCEPTED`. The dedicated stack produced healthy seven-pers
 
 ### COV-03
 
-Next bounded assignment: converge one CRM opportunity operator transition. Reuse the accepted `sales-crm` persona, canonical workflow/result owners, persisted opportunity/conversion readback, exact effect identity, representative allow/deny behavior, and one browser rerun. Do not broaden into Sales or add a parallel transition authority.
+Current disposition: `ACCEPTED` for the bounded opportunity-to-sale-order slice. The `sales-crm` persona now drives the existing UI transition, canonical readback enforces exactly one tenant/company/opportunity-linked sale order, replay does not redispatch, and the limited reader is denied by the named operation boundary. This does not promote all CRM recovery or navigation evidence to U4/U5; see [`erp-cov03-crm-opportunity-convergence-status.md`](./erp-cov03-crm-opportunity-convergence-status.md).
+
+### COV-04
+
+Next bounded assignment: converge one Sales quotation/order operator transition using the accepted `sales-crm` persona. Reuse the canonical Sales reducer and persisted downstream identity, prove representative allow/deny behavior and replay or stale-write handling, and keep fulfillment/invoicing expansion out of the slice unless it is the chosen stable effect.
 
 ## First implementation convergence
 
