@@ -4,7 +4,10 @@
 //! Given a component, decision, claim or knowledge version, this assembles the
 //! persisted chain a reviewer needs — exact passage and version, original
 //! author, introducing contribution, adaptations, validation outcome and
-//! dependency state — and lists every reason the chain needs review.
+//! dependency state — and lists every reason the chain needs review. A source
+//! may also be inspected directly by id, without first knowing a claim that
+//! cites it: its versions, their lifecycle history and every passage recorded
+//! against it, re-authorized the same way.
 //!
 //! # Access
 //!
@@ -88,6 +91,31 @@ pub trait EvidenceRows: Send + Sync {
         statement: &str,
     ) -> Result<Vec<Value>> {
         let _ = (organization_id, company_id, statement);
+        Ok(Vec::new())
+    }
+    /// Every version of a source, newest and oldest alike.
+    async fn source_versions_of(&self, source_id: u64) -> Result<Vec<Value>> {
+        let _ = source_id;
+        Ok(Vec::new())
+    }
+    /// Passages recorded against a source's stable `(source_kind, source_key)`,
+    /// scoped to the source's own organization/company — never the viewer's,
+    /// so an organization-scoped source's passages are found under whichever
+    /// company ingested them.
+    async fn passages_of_source(
+        &self,
+        organization_id: u64,
+        company_id: u64,
+        source_kind: &str,
+        source_key: &str,
+    ) -> Result<Vec<Value>> {
+        let _ = (organization_id, company_id, source_kind, source_key);
+        Ok(Vec::new())
+    }
+    /// Lifecycle changes (correction, supersession, retraction, access
+    /// revocation, deletion) recorded against one source version.
+    async fn source_changes_of_version(&self, source_version_id: u64) -> Result<Vec<Value>> {
+        let _ = source_version_id;
         Ok(Vec::new())
     }
 }
@@ -229,6 +257,46 @@ impl EvidenceRows for StdbClient {
             department_id: number(membership, "departmentId").filter(|id| *id > 0),
         }))
     }
+
+    async fn source_versions_of(&self, source_id: u64) -> Result<Vec<Value>> {
+        self.query_sql(&format!(
+            "SELECT * FROM ai_evidence_source_version WHERE source_id = {source_id}"
+        ))
+        .await
+        .context("load source versions")
+    }
+
+    async fn passages_of_source(
+        &self,
+        organization_id: u64,
+        company_id: u64,
+        source_kind: &str,
+        source_key: &str,
+    ) -> Result<Vec<Value>> {
+        if source_kind.trim().is_empty()
+            || source_kind.chars().any(char::is_control)
+            || source_key.trim().is_empty()
+            || source_key.chars().any(char::is_control)
+        {
+            return Ok(Vec::new());
+        }
+        let kind = source_kind.replace('\'', "''");
+        let key = source_key.replace('\'', "''");
+        self.query_sql(&format!(
+            "SELECT * FROM ai_evidence_passage WHERE organization_id = {organization_id} \
+             AND company_id = {company_id} AND source_kind = '{kind}' AND source_key = '{key}'"
+        ))
+        .await
+        .context("load source passages")
+    }
+
+    async fn source_changes_of_version(&self, source_version_id: u64) -> Result<Vec<Value>> {
+        self.query_sql(&format!(
+            "SELECT * FROM ai_evidence_source_change WHERE source_version_id = {source_version_id}"
+        ))
+        .await
+        .context("load source version changes")
+    }
 }
 
 /// A stable key as the workflow module stores it: short, and made only of
@@ -298,6 +366,9 @@ pub enum InspectTarget {
     Decision(u64),
     Claim(u64),
     KnowledgeVersion(u64),
+    /// An `ai_evidence_source` id, inspected directly rather than reached
+    /// through a claim/decision/component that cites it.
+    Source(u64),
 }
 
 impl InspectTarget {
@@ -307,6 +378,7 @@ impl InspectTarget {
             "decision" => Some(Self::Decision(id)),
             "claim" => Some(Self::Claim(id)),
             "knowledge_version" => Some(Self::KnowledgeVersion(id)),
+            "source" => Some(Self::Source(id)),
             _ => None,
         }
     }
@@ -317,6 +389,7 @@ impl InspectTarget {
             Self::Decision(_) => "decision",
             Self::Claim(_) => "claim",
             Self::KnowledgeVersion(_) => "knowledge_version",
+            Self::Source(_) => "source",
         }
     }
 
@@ -325,7 +398,8 @@ impl InspectTarget {
             Self::Component(id)
             | Self::Decision(id)
             | Self::Claim(id)
-            | Self::KnowledgeVersion(id) => id,
+            | Self::KnowledgeVersion(id)
+            | Self::Source(id) => id,
         }
     }
 }
@@ -345,6 +419,9 @@ pub struct Inspection {
     pub source_versions: Vec<SourceVersionView>,
     pub sources: Vec<SourceView>,
     pub contributions: Vec<ContributionView>,
+    /// Lifecycle history for the inspected source's versions. Empty unless
+    /// `target_kind == "source"`.
+    pub source_changes: Vec<SourceChangeView>,
     pub dependencies: Vec<DependencyView>,
     pub findings: Vec<Finding>,
     /// False while any blocking finding exists. A bibliography with no
@@ -470,6 +547,17 @@ pub struct SourceView {
     pub authors: Vec<String>,
     pub author_organization: Option<String>,
     pub scope: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct SourceChangeView {
+    pub id: u64,
+    pub source_version_id: u64,
+    /// corrected | superseded | retracted | access_revoked | deleted
+    pub change_kind: String,
+    pub replacement_version_id: Option<u64>,
+    pub reason: String,
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
@@ -719,6 +807,17 @@ fn contribution_view(row: &Value) -> Result<ContributionView> {
     })
 }
 
+fn source_change_view(row: &Value) -> Result<SourceChangeView> {
+    Ok(SourceChangeView {
+        id: required_id(row)?,
+        source_version_id: number(row, "sourceVersionId")
+            .context("change missing sourceVersionId")?,
+        change_kind: required_text(row, "changeKind")?,
+        replacement_version_id: number(row, "replacementVersionId"),
+        reason: required_text(row, "reason")?,
+    })
+}
+
 fn dependency_view(row: &Value) -> Result<DependencyView> {
     Ok(DependencyView {
         dependent_kind: required_text(row, "dependentKind")?,
@@ -748,6 +847,9 @@ pub async fn inspect(
 
     // Roots.
     match target {
+        InspectTarget::Source(id) => {
+            return inspect_source(rows, viewer, id).await;
+        }
         InspectTarget::Component(id) => {
             let mut cursor = Some(id);
             while let Some(current) = cursor {
@@ -935,9 +1037,77 @@ pub async fn inspect(
         source_versions,
         sources,
         contributions,
+        source_changes: Vec::new(),
         dependencies,
         findings,
         lineage_passes,
+    })
+}
+
+/// Inspect an evidence source directly by id: itself, every version, their
+/// lifecycle history and every passage recorded against it. Unlike the other
+/// targets this is not a publishable lineage chain, so `findings` is always
+/// empty and `lineage_passes` is always true.
+async fn inspect_source(rows: &dyn EvidenceRows, viewer: Viewer, id: u64) -> Result<Inspection> {
+    let row = rows
+        .row("ai_evidence_source", id)
+        .await?
+        .with_context(|| format!("source {id} not found"))?;
+    if number(&row, "organizationId") != Some(viewer.organization_id) {
+        bail!("source {id} not found");
+    }
+    let view = source_view(&row, viewer)?;
+    if view.out_of_scope {
+        bail!("source {id} not found");
+    }
+    let source_kind = text(&row, "sourceKind").unwrap_or_default();
+    let source_key = text(&row, "sourceKey").unwrap_or_default();
+    let source_company_id = number(&row, "companyId").unwrap_or(viewer.company_id);
+
+    let mut source_versions: Vec<SourceVersionView> = Vec::new();
+    let mut source_changes: Vec<SourceChangeView> = Vec::new();
+    for version_row in rows.source_versions_of(id).await? {
+        if number(&version_row, "organizationId") != Some(viewer.organization_id) {
+            continue;
+        }
+        let version_view = source_version_view(&version_row)?;
+        for change_row in rows.source_changes_of_version(version_view.id).await? {
+            source_changes.push(source_change_view(&change_row)?);
+        }
+        source_versions.push(version_view);
+    }
+
+    let mut passages: Vec<PassageView> = Vec::new();
+    for passage_row in rows
+        .passages_of_source(
+            viewer.organization_id,
+            source_company_id,
+            &source_kind,
+            &source_key,
+        )
+        .await?
+    {
+        let passage_id = required_id(&passage_row)?;
+        let text_state =
+            text(&passage_row, "textState").unwrap_or_else(|| "tombstoned".to_string());
+        let availability = passage_availability(true, &text_state);
+        passages.push(passage_view(&passage_row, passage_id, availability));
+    }
+
+    Ok(Inspection {
+        target_kind: "source".to_string(),
+        target_id: id,
+        revisions: Vec::new(),
+        decisions: Vec::new(),
+        claims: Vec::new(),
+        passages,
+        source_versions,
+        sources: vec![view],
+        contributions: Vec::new(),
+        source_changes,
+        dependencies: Vec::new(),
+        findings: Vec::new(),
+        lineage_passes: true,
     })
 }
 
@@ -1502,6 +1672,9 @@ mod tests {
         steps: Vec<Value>,
         team_department_id: Option<u64>,
         has_active_membership: bool,
+        source_versions: Vec<Value>,
+        source_passages: Vec<Value>,
+        source_changes: Vec<Value>,
     }
 
     #[async_trait]
@@ -1590,6 +1763,41 @@ mod tests {
             Ok(self.has_active_membership.then_some(KnowledgeMembership {
                 department_id: self.team_department_id,
             }))
+        }
+        async fn source_versions_of(&self, source_id: u64) -> Result<Vec<Value>> {
+            Ok(self
+                .source_versions
+                .iter()
+                .filter(|row| number(row, "sourceId") == Some(source_id))
+                .cloned()
+                .collect())
+        }
+        async fn passages_of_source(
+            &self,
+            organization_id: u64,
+            company_id: u64,
+            source_kind: &str,
+            source_key: &str,
+        ) -> Result<Vec<Value>> {
+            Ok(self
+                .source_passages
+                .iter()
+                .filter(|row| {
+                    number(row, "organizationId") == Some(organization_id)
+                        && number(row, "companyId") == Some(company_id)
+                        && text(row, "sourceKind").as_deref() == Some(source_kind)
+                        && text(row, "sourceKey").as_deref() == Some(source_key)
+                })
+                .cloned()
+                .collect())
+        }
+        async fn source_changes_of_version(&self, source_version_id: u64) -> Result<Vec<Value>> {
+            Ok(self
+                .source_changes
+                .iter()
+                .filter(|row| number(row, "sourceVersionId") == Some(source_version_id))
+                .cloned()
+                .collect())
         }
     }
 
@@ -1815,6 +2023,62 @@ mod tests {
             .findings
             .iter()
             .any(|f| f.code == "passage_out_of_scope"));
+    }
+
+    #[tokio::test]
+    async fn a_source_is_inspected_directly_with_its_versions_changes_and_passages() {
+        let mut rows = healthy();
+        rows.source_versions
+            .push(rows.tables[&("ai_evidence_source_version", 6)].clone());
+        let mut passage = rows.tables[&("ai_evidence_passage", 5)].clone();
+        passage["sourceKind"] = json!("book");
+        passage["sourceKey"] = json!("isbn-1");
+        rows.source_passages.push(passage);
+        rows.source_changes.push(json!({
+            "id": 20, "organizationId": 1, "companyId": 10, "sourceVersionId": 6,
+            "changeKind": "corrected", "replacementVersionId": Value::Null,
+            "reason": "typo fixed in the second edition"
+        }));
+
+        let inspection = inspect(&rows, VIEWER, InspectTarget::Source(4))
+            .await
+            .unwrap();
+
+        assert_eq!(inspection.target_kind, "source");
+        assert_eq!(inspection.target_id, 4);
+        assert_eq!(inspection.sources.len(), 1);
+        assert!(!inspection.sources[0].out_of_scope);
+        assert_eq!(inspection.sources[0].title.as_deref(), Some("A Book"));
+        assert_eq!(inspection.source_versions.len(), 1);
+        assert_eq!(inspection.source_versions[0].id, 6);
+        assert_eq!(inspection.source_changes.len(), 1);
+        assert_eq!(inspection.source_changes[0].change_kind, "corrected");
+        assert_eq!(inspection.source_changes[0].source_version_id, 6);
+        assert_eq!(inspection.passages.len(), 1);
+        assert_eq!(inspection.passages[0].availability, Availability::Available);
+        assert_eq!(
+            inspection.passages[0].excerpt.as_deref(),
+            Some("The full text of the passage.")
+        );
+        // A bare source is not a publishable lineage chain.
+        assert!(inspection.decisions.is_empty());
+        assert!(inspection.claims.is_empty());
+        assert!(inspection.findings.is_empty());
+        assert!(inspection.lineage_passes);
+    }
+
+    #[tokio::test]
+    async fn an_out_of_scope_source_id_is_reported_absent() {
+        let mut rows = healthy();
+        // Same organization, but a company-scoped source of another company.
+        let mut source = rows.tables[&("ai_evidence_source", 4)].clone();
+        source["companyId"] = json!(11);
+        rows.tables.insert(("ai_evidence_source", 4), source);
+
+        let error = inspect(&rows, VIEWER, InspectTarget::Source(4))
+            .await
+            .unwrap_err();
+        assert!(error.to_string().contains("source 4 not found"));
     }
 
     #[tokio::test]
@@ -2278,6 +2542,10 @@ mod tests {
         assert_eq!(
             InspectTarget::parse("claim", 2),
             Some(InspectTarget::Claim(2))
+        );
+        assert_eq!(
+            InspectTarget::parse("source", 4),
+            Some(InspectTarget::Source(4))
         );
         assert_eq!(InspectTarget::parse("answer", 3), None);
     }

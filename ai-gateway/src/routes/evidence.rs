@@ -37,7 +37,7 @@ pub(crate) const RAG_EVIDENCE_RETRIEVE_CAPABILITY: &str = "ai.evidence.retrieve"
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct InspectRequest {
-    /// component | decision | claim | knowledge_version | workflow_step
+    /// component | decision | claim | knowledge_version | workflow_step | source
     pub kind: String,
     /// For `workflow_step`, the workflow version id.
     pub id: u64,

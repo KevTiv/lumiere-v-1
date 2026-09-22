@@ -37,7 +37,7 @@ const COMPANY_HEADER: &str = "x-lumiere-company-id";
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 struct InspectEvidenceBody {
     company_id: u64,
-    /// component | decision | claim | knowledge_version | workflow_step
+    /// component | decision | claim | knowledge_version | workflow_step | source
     kind: String,
     /// For `workflow_step`, the workflow version id.
     id: u64,
@@ -70,10 +70,11 @@ fn validate_body(body: &InspectEvidenceBody) -> Result<(), ApiError> {
     }
     if !matches!(
         body.kind.as_str(),
-        "component" | "decision" | "claim" | "knowledge_version" | "workflow_step"
+        "component" | "decision" | "claim" | "knowledge_version" | "workflow_step" | "source"
     ) {
         return Err(ApiError::BadRequest(
-            "kind must be component, decision, claim, knowledge_version or workflow_step".into(),
+            "kind must be component, decision, claim, knowledge_version, workflow_step or source"
+                .into(),
         ));
     }
     match (body.kind.as_str(), body.node_key.as_deref()) {
@@ -294,8 +295,15 @@ mod tests {
             node_key: None,
         };
         assert!(validate_body(&body).is_ok());
-        let invalid = InspectEvidenceBody {
+        let valid_source = InspectEvidenceBody {
             kind: "source".into(),
+            company_id: body.company_id,
+            id: body.id,
+            node_key: None,
+        };
+        assert!(validate_body(&valid_source).is_ok());
+        let invalid = InspectEvidenceBody {
+            kind: "answer".into(),
             ..body
         };
         assert!(matches!(
