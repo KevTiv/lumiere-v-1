@@ -9,7 +9,7 @@ import {
 } from "@lumiere/query-hooks/erp-ai-selection-context"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "../components/tabs"
 import { Button } from "../components/button"
-import { useModuleUrlFilters } from "../lib/module-url-filters"
+import { useClearModuleUrlFilter, useModuleUrlFilters } from "../lib/module-url-filters"
 import { DashboardGrid } from "./dashboard-grid"
 import { DashboardHeader, type TimeRangeValue } from "./dashboard-header"
 import { EntityView } from "../entity-views/entity-view"
@@ -82,6 +82,7 @@ export function ModuleView({
   runtimeForms,
 }: ModuleViewProps) {
   const routeFilters = useModuleUrlFilters()
+  const clearRouteFilter = useClearModuleUrlFilter()
   const urlFilters = urlFiltersProp ?? routeFilters
   const { checkPermission } = useRBAC()
   const { companyIds } = useErpSession()
@@ -182,6 +183,7 @@ export function ModuleView({
                   data={data[tab.id] ?? []}
                   isLoading={dataLoading?.[tab.id]}
                   initialFilters={activeTab === tab.id ? urlFilters : undefined}
+                  onInitialFilterClear={clearRouteFilter}
                   boardColumns={entityBoardContext?.[tab.id]?.columns}
                   onBoardMove={entityBoardContext?.[tab.id]?.onMove}
                   boardFilterItem={entityBoardContext?.[tab.id]?.filterItem}

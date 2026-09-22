@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test"
 import type { Page } from "@playwright/test"
 import { stdbBffCommandPost } from "@lumiere/stdb/commands"
 
-import { fetchDefaultCompanyId, signIn, smokeName } from "./helpers"
+import { activeTabEntityTable, fetchDefaultCompanyId, signIn, smokeName } from "./helpers"
 import {
   addLaptopLine,
   confirmOrderViaUi,
@@ -23,6 +23,25 @@ async function confirmRequest(page: Page, companyId: number, orderId: number) {
   })
 }
 
+function isCanonicalOrderUrl(url: URL, orderId: number): boolean {
+  return (
+    url.pathname === "/sales" &&
+    url.searchParams.get("tab") === "orders" &&
+    url.searchParams.getAll("filter").length === 1 &&
+    url.searchParams.get("filter") === `id:${orderId}`
+  )
+}
+
+async function expectCanonicalOrderFocus(page: Page, orderId: number) {
+  await expect(page).toHaveURL((url) => isCanonicalOrderUrl(url, orderId))
+  await expect(page.getByTestId("module-tab-sales-orders")).toHaveAttribute("aria-selected", "true")
+
+  const table = activeTabEntityTable(page)
+  await expect(table.getByTestId(`entity-row-${orderId}`)).toBeVisible()
+  await expect(table.locator('[data-testid^="entity-row-"]')).toHaveCount(1)
+  await expect(table.getByTestId("entity-active-filter-id")).toContainText(`id: ${orderId}`)
+}
+
 test.describe("COV-04 sale-order confirmation", { tag: ["@p0", "@cov04", "@unauthenticated"] }, () => {
   test("sales persona confirms the canonical order once and reader is denied", async ({ browser, page }) => {
     test.setTimeout(180_000)
@@ -41,6 +60,24 @@ test.describe("COV-04 sale-order confirmation", { tag: ["@p0", "@cov04", "@unaut
     try {
       await signIn(salesPage, "fixture.sales@example.test", PERSONA_PASSWORD)
       await confirmOrderViaUi(salesPage, orderId)
+      await expectCanonicalOrderFocus(salesPage, orderId)
+
+      await salesPage.reload({ waitUntil: "domcontentloaded" })
+      await expectCanonicalOrderFocus(salesPage, orderId)
+
+      await salesPage.goBack()
+      await expect(salesPage).toHaveURL((url) => {
+        return (
+          url.pathname === "/sales" &&
+          url.searchParams.get("tab") === "orders" &&
+          url.searchParams.getAll("filter").length === 0
+        )
+      })
+      await expect(salesPage.getByTestId("module-tab-sales-orders")).toHaveAttribute(
+        "aria-selected",
+        "true",
+      )
+      await expect(activeTabEntityTable(salesPage).getByTestId("entity-active-filter-id")).toHaveCount(0)
 
       const confirmedPickings = await fetchOrderPickings(page, orderId)
       expect(confirmedPickings).toHaveLength(1)
