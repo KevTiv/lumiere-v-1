@@ -1,9 +1,10 @@
 # COV-00 current module and operation census
 
-**Status:** REVIEW — evidence audit complete; acceptance blockers are explicit below  
+**Status:** ACCEPTED — coordinator-reviewed audit/classification baseline; downstream runtime blockers remain
 **Program:** [`erp-module-usability-parity-ledger.md`](./erp-module-usability-parity-ledger.md)  
 **Semantic authority:** [`../plans/erp-module-usability-parity-program.md`](../plans/erp-module-usability-parity-program.md)  
 **Audited base:** `afa23b702fc4c47623697d2fcb81733f2dd71c14` (`main`, 2026-09-17 audit)  
+**Accepted evidence revision:** `4f797db650ae82318ab0f477670d14aee9d5d0cd`
 **Contracts baseline:** `lumiere-contracts` v0.3.46  
 
 ## 1. Method and limits
@@ -271,16 +272,16 @@ These are work-package weights, not elapsed-time estimates. The upper bound appl
 - T0/admin/AI/internal classification for the visible route families;
 - current evidence-floor U-level for every COV-03..24 owner;
 - exact shared blockers preventing U4/U5 claims;
-- explicit Fleet/Map ownership mismatch;
+- resolved Fleet/Map product ownership decision;
 - operation-coverage drift finding;
 - test-evidence quality distinction;
-- first-org exposure-manifest gap;
+- authoritative first-org exposure denominator;
 - revised execution ordering and evidence-based planning envelope.
 
-### Still required before `COV-00` can be marked ACCEPTED
+### Acceptance result
 
-- COV-00A regenerated current operation census with zero `needs-triage`/unowned user-facing operations;
-- COV-00B authoritative first-org exposure/navigation manifest;
-- coordinator review of those two artifacts on the integrated tree.
+- COV-00A through COV-00D were coordinator-reviewed and accepted at evidence revision `4f797db650ae82318ab0f477670d14aee9d5d0cd`;
+- the nine open/partial COV-00C runtime classes remain blockers only for their named downstream U4/U5 and COV-27 gates;
+- every COV-owned first-org surface remains `review` until its own acceptance package supplies complete applicable evidence.
 
-Until then the correct ledger state is **REVIEW**, not ACCEPTED. The findings are sufficient to begin non-conflicting preparation, but dependent broad module implementation should not invent operation classifications or exposure policy locally.
+The accepted coordinator record is [`erp-cov00-coordinator-acceptance.md`](./erp-cov00-coordinator-acceptance.md). Dependent module work must reuse the accepted operation classifications and exposure policy rather than redefining them locally.

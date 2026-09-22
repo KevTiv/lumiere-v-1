@@ -29,6 +29,8 @@ Status values follow the coordination program: `TODO`, `ACTIVE`, `REVIEW`, `BLOC
 | `COV-01` | 1.5 | COV-00, COH-02 | shared ERP workflow/UI boundary | Align the common module workflow result/error/record-ref/navigation surface with INT-00 and COH typed outcomes. Migrate one representative action without inventing new business semantics. | A command executes through generated contract → typed outcome → invalidation/readback → stable record ref/navigation; stale/denied/replay/outcome-unknown have shared UX semantics. |
 | `COV-02` | 2x | COV-00 | seed/test fixtures | Build/reconcile a reproducible first-test-org seed pack and role/persona fixture set spanning every intended T0 module. Prefer canonical reducers/import/onboarding paths where those are product behavior. | Disposable full stack can create the seed deterministically; all U5 specs share the same org/company/personas/reference data; no module needs hand-edited DB setup. |
 
+> **COV-00 status: ACCEPTED.** Coordinator acceptance is recorded in [`erp-cov00-coordinator-acceptance.md`](./erp-cov00-coordinator-acceptance.md) against evidence revision `4f797db650ae82318ab0f477670d14aee9d5d0cd`. This accepts the current census and ownership denominators only; downstream runtime defects, U4/U5 promotion, and first-org admission remain governed by their named packages and gates.
+
 ## 3. Core commercial and supply-chain modules
 
 | ID | Est. | Depends | Module | T0 primary scope | Acceptance gate |

@@ -9,7 +9,8 @@ The audit uses current source and existing accepted evidence rather than histori
 - [`erp-cov00c-correctness-census-status.md`](./erp-cov00c-correctness-census-status.md) and [`../evidence/cov-00c-correctness-defects.json`](../evidence/cov-00c-correctness-defects.json) — current owned defect census, downstream gates, and source ratchets.
 - [`erp-cov00d-evidence-calibration-status.md`](./erp-cov00d-evidence-calibration-status.md) and [`../evidence/cov-00d-lifecycle-evidence.json`](../evidence/cov-00d-lifecycle-evidence.json) — per-owner D/A/O/E calibration, missing-proof assignments, and promotion/admission ratchet.
 - [`erp-cov00-review-handoff.md`](./erp-cov00-review-handoff.md) — closure cards COV-00A through COV-00D.
-- [`erp-module-usability-parity-cov00-status.md`](./erp-module-usability-parity-cov00-status.md) — current REVIEW status and blockers.
+- [`erp-cov00-coordinator-acceptance.md`](./erp-cov00-coordinator-acceptance.md) — coordinator answers, accepted evidence revision, validation record, and non-promotion boundary.
+- [`erp-module-usability-parity-cov00-status.md`](./erp-module-usability-parity-cov00-status.md) — accepted audit-package status and downstream blocker boundary.
 - [`erp-cov00-next-assignment-order.md`](./erp-cov00-next-assignment-order.md) — dependency/order guidance for follow-up agents.
 - [`erp-cov00-findings.md`](./erp-cov00-findings.md) — concise headline findings.
 
@@ -82,11 +83,13 @@ Examples requiring explicit calibration:
 - Proposals: conversion/lifecycle BFF proof is stronger than current operator-path proof.
 - CRM→Sales: strict 0..1 `opportunity_id` correlation and replay proof are present; direct-navigation and complete stale/denied/lost-response UI evidence remain for COV-01/COV-00D review.
 
-## COV-00 closure evidence still required
+## COV-00 closure evidence
 
-- COV-00A current operation/disposition artifact + unclassified-operation ratchet — integrated acceptance candidate.
-- COV-00B first-org exposure manifest + Fleet route decision — integrated acceptance candidate.
-- COV-00C complete defect ownership census + launch/downstream gates — integrated acceptance candidate.
-- COV-00D module primary-lifecycle D/A/O/E matrix + corrected test/evidence claims — integrated acceptance candidate.
+- COV-00A current operation/disposition artifact + unclassified-operation ratchet — accepted.
+- COV-00B first-org exposure manifest + Fleet route decision — accepted.
+- COV-00C complete defect ownership census + launch/downstream gates — accepted as census/ownership evidence.
+- COV-00D module primary-lifecycle D/A/O/E matrix + corrected test/evidence claims — accepted as calibrated evidence.
 
 COV-00 acceptance means the remaining work is truthfully owned and measurable. It does not mean the runtime defects themselves are already fixed; those stay blocking on their downstream U4/U5 and COV-27 gates.
+
+Coordinator review accepted the four integrated artifacts at evidence revision `4f797db650ae82318ab0f477670d14aee9d5d0cd`; see [`erp-cov00-coordinator-acceptance.md`](./erp-cov00-coordinator-acceptance.md).

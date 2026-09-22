@@ -1,22 +1,23 @@
 # COV-00 ledger status
 
 **Package:** `COV-00`  
-**Status:** `REVIEW`  
-**Audited base:** `afa23b702fc4c47623697d2fcb81733f2dd71c14`  
+**Status:** `ACCEPTED`
+**Accepted evidence revision:** `4f797db650ae82318ab0f477670d14aee9d5d0cd`
 **Primary evidence:** [`erp-cov00-current-module-matrix.md`](./erp-cov00-current-module-matrix.md)  
 **Correctness/evidence register:** [`erp-cov00-correctness-evidence-defect-register.md`](./erp-cov00-correctness-evidence-defect-register.md)  
 **COV-00C machine census:** [`../evidence/cov-00c-correctness-defects.json`](../evidence/cov-00c-correctness-defects.json)
 **COV-00D evidence matrix:** [`../evidence/cov-00d-lifecycle-evidence.json`](../evidence/cov-00d-lifecycle-evidence.json)
 **Closure handoff:** [`erp-cov00-review-handoff.md`](./erp-cov00-review-handoff.md)
+**Coordinator acceptance:** [`erp-cov00-coordinator-acceptance.md`](./erp-cov00-coordinator-acceptance.md)
 
-The source/module census plus COV-00A/B/C/D acceptance candidates are integrated, but COV-00 cannot be marked accepted until coordinator review is complete.
+The source/module census plus COV-00A/B/C/D were reconciled on the accepted evidence revision. COV-00 is accepted as an audit/classification package; this does not close its downstream runtime findings or certify any module for U4/U5 or first-org admission.
 
 Closure-card disposition:
 
-- `COV-00A`: integrated acceptance candidate with zero unowned/review-required client-facing operations and a source ratchet;
-- `COV-00B`: integrated acceptance candidate with one first-org route/navigation authority and explicit Fleet ownership;
-- `COV-00C`: integrated acceptance candidate with an 11-class owned defect manifest and narrow source ratchets; open runtime rows remain downstream launch blockers;
-- `COV-00D`: integrated acceptance candidate with all 22 COV-03..24 owners scored independently across `D/A/O/E`, direct-BFF/latest-helper overclaims rejected, and promotion/admission tied to complete applicable evidence.
+- `COV-00A`: accepted with zero unowned/review-required client-facing operations and a source ratchet;
+- `COV-00B`: accepted with one first-org route/navigation authority and explicit Fleet ownership;
+- `COV-00C`: accepted as an 11-class owned defect census with narrow source ratchets; open runtime rows remain downstream launch blockers;
+- `COV-00D`: accepted with all 22 COV-03..24 owners scored independently across `D/A/O/E`, direct-BFF/latest-helper overclaims rejected, and promotion/admission tied to complete applicable evidence.
 
 Current runtime disposition after ownership classification:
 
@@ -29,4 +30,4 @@ Current runtime disposition after ownership classification:
 - certification helpers that choose newest/highest ids weaken exact-effect evidence;
 - the COV-01 reference vocabulary now calls exact post-read `converged`, not authoritative `Applied`; broader action migration remains open.
 
-After COV-00A..D are integrated and reviewed, update the main parity ledger row to `ACCEPTED` with the exact evidence revision. Runtime fixes discovered by COV-00C are not required merely to close the census, but they remain blockers for the affected module's U4/U5 promotion and COV-27 launch admission.
+The main parity ledger records `ACCEPTED` at the exact evidence revision. Runtime fixes discovered by COV-00C were not required merely to close the census, but they remain blockers for the affected module's U4/U5 promotion and COV-27 launch admission.

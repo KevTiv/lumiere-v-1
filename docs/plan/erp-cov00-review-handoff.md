@@ -1,13 +1,13 @@
 # COV-00 review handoff
 
-**State:** REVIEW  
+**State:** ACCEPTED
 **Evidence:** [`erp-cov00-current-module-matrix.md`](./erp-cov00-current-module-matrix.md)  
 **Correctness/evidence register:** [`erp-cov00-correctness-evidence-defect-register.md`](./erp-cov00-correctness-evidence-defect-register.md)  
 **COV-00C machine census:** [`../evidence/cov-00c-correctness-defects.json`](../evidence/cov-00c-correctness-defects.json)
 **COV-00D evidence matrix:** [`../evidence/cov-00d-lifecycle-evidence.json`](../evidence/cov-00d-lifecycle-evidence.json)
-**Audited base:** `afa23b702fc4c47623697d2fcb81733f2dd71c14`
+**Accepted evidence revision:** `4f797db650ae82318ab0f477670d14aee9d5d0cd`
 
-This handoff exists because COV-00 must not be marked ACCEPTED while the operation census, first-test-org exposure denominator, correctness-defect ownership, and evidence-claim calibration remain incomplete.
+This handoff records the four closure cards reviewed by the coordinator. The decision and its limits are recorded in [`erp-cov00-coordinator-acceptance.md`](./erp-cov00-coordinator-acceptance.md).
 
 ## Closure cards
 
@@ -87,7 +87,7 @@ Known examples that must appear in the calibrated matrix include CRM→Sales, HR
 
 ## Coordinator acceptance
 
-COV-00 can move from REVIEW to ACCEPTED when COV-00A through COV-00D are integrated and the coordinator can answer these questions without source archaeology:
+COV-00 moved from REVIEW to ACCEPTED after COV-00A through COV-00D were integrated at evidence revision `4f797db650ae82318ab0f477670d14aee9d5d0cd`. The coordinator answered these questions without additional source archaeology:
 
 1. Is every current operation intentionally owned and exposed/not exposed?
 2. Is every first-test-org route intentionally admitted and tied to a COV/admin gate?

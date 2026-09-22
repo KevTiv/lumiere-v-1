@@ -72,4 +72,4 @@ This slice is source and evidence calibration. It does not repair the runtime de
 
 ## COV-00 disposition
 
-COV-00A through COV-00D are now integrated acceptance candidates. COV-00 remains `REVIEW` until the coordinator reviews the four artifacts together and records the accepted evidence revision in the program ledger.
+COV-00A through COV-00D were integrated and coordinator-reviewed. COV-00 is `ACCEPTED` at evidence revision `4f797db650ae82318ab0f477670d14aee9d5d0cd`; this does not promote any lifecycle row or repair its missing evidence.
