@@ -181,7 +181,7 @@ impl Config {
             ollama_vision_model: std::env::var("OLLAMA_VISION_MODEL")
                 .unwrap_or_else(|_| "llava".to_string()),
             ollama_llm_model: std::env::var("OLLAMA_LLM_MODEL")
-                .unwrap_or_else(|_| "llama3.2".to_string()),
+                .unwrap_or_else(|_| "gemma4:e2b-mlx".to_string()),
             ollama_supports_tool_calling: std::env::var("OLLAMA_SUPPORTS_TOOL_CALLING")
                 .map(|v| matches!(v.trim().to_ascii_lowercase().as_str(), "1" | "true" | "yes"))
                 .unwrap_or(false),
