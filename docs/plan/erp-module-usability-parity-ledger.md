@@ -31,6 +31,8 @@ Status values follow the coordination program: `TODO`, `ACTIVE`, `REVIEW`, `BLOC
 
 > **COV-00 status: ACCEPTED.** Coordinator acceptance is recorded in [`erp-cov00-coordinator-acceptance.md`](./erp-cov00-coordinator-acceptance.md) against evidence revision `4f797db650ae82318ab0f477670d14aee9d5d0cd`. This accepts the current census and ownership denominators only; downstream runtime defects, U4/U5 promotion, and first-org admission remain governed by their named packages and gates.
 
+> **COV-02A status: REVIEW.** The existing seed/persona authorities and all COV-03..24 fixture gaps are inventoried in [`erp-cov02a-seed-persona-inventory-status.md`](./erp-cov02a-seed-persona-inventory-status.md). COV-02 remains open until COV-02B supplies the versioned explicit-org manifest, seven named personas, and scoped seed-health readback.
+
 ## 3. Core commercial and supply-chain modules
 
 | ID | Est. | Depends | Module | T0 primary scope | Acceptance gate |

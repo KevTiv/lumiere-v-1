@@ -63,6 +63,14 @@ E exact effect identity + replay/lost-response recovery
 
 Known browser suites using direct BFF lifecycle transitions must be classified accurately, not discarded. Setup/fixture calls are acceptable; the exact transition claimed as operator proof must be user-driven.
 
+### COV-02A
+
+Current disposition: `REVIEW` inventory candidate. The five existing fixture authorities, seven required personas, and all COV-03..24 module gaps are recorded in [`erp-cov02a-seed-persona-inventory-status.md`](./erp-cov02a-seed-persona-inventory-status.md). This inventory does not promote the dev demo seed into product-onboarding or operator-path proof.
+
+### COV-02B
+
+Implement the smallest shared fixture authority: one versioned manifest, explicit organization selection, seven named least-privilege personas, and scoped seed-health readback. Reuse the existing documented dev seed and actor-provisioning primitives where valid; remove the arbitrary first-organization fallback and do not create raw database setup or a second authorization owner.
+
 ## First implementation convergence
 
 Prioritize closing U4/U5 gaps on CRM/Sales/Purchasing/Accounting before adding new backend breadth, but migrate the reference cross-module action through COV-01 first so module agents inherit a proven outcome/readback pattern.

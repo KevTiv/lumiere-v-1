@@ -105,7 +105,7 @@ E2E_DOMAIN_TEST_REDUCERS := \
 	e2e-crm-isolation e2e-dx-test e2e-web-dev e2e-single-running \
 	e2e-pretenant pretenant-cert-stdb pretenant-cert-native \
 	init-stack docker-dev docker-dev-iot \
-	codegen check-codegen check-codegen-pinned check-contract-ir check-operation-history check-release-compatibility check-tenant-ownership check-storage-policy check-c2-commit-coverage check-cov00c-correctness-census check-cov00d-evidence-matrix check-reducer-contracts-drift check-contracts-source-drift check-contracts-drift check-c9-isolation-matrix lint-trusted-route-boundaries \
+	codegen check-codegen check-codegen-pinned check-contract-ir check-operation-history check-release-compatibility check-tenant-ownership check-storage-policy check-c2-commit-coverage check-cov00c-correctness-census check-cov00d-evidence-matrix check-cov02-seed-inventory check-reducer-contracts-drift check-contracts-source-drift check-contracts-drift check-c9-isolation-matrix lint-trusted-route-boundaries \
 	clean-contracts-live-staging generate-presentation-schemas generate-presentation-contracts lint-reducer-call-literals api-server-run \
 	lint-no-magic-fk-zero lint-accounting-as-unknown-as lint-accounting-currency-refs \
 	publish-cloud publish-cloud-clear call-tests-cloud logs-cloud \
@@ -997,6 +997,9 @@ check-cov00c-correctness-census:
 
 check-cov00d-evidence-matrix:
 	@python3 scripts/validate-cov00d-evidence-matrix.py
+
+check-cov02-seed-inventory:
+	@python3 scripts/validate-cov02-seed-inventory.py
 
 check-release-compatibility:
 	python3 scripts/verify-release-manifest.py

@@ -1,0 +1,86 @@
+{
+  "version": 1,
+  "audited_base": "d5ccc751ab5cadf8ab5463a45d6e2b3617dd53a8",
+  "status": "inventory-candidate",
+  "scope": "Current seed and persona authorities only; this artifact does not certify a disposable first-org fixture or any module lifecycle.",
+  "authorities": [
+    {
+      "id": "dev-demo-seed",
+      "classification": "dev-only-direct-insert",
+      "path": "spacetimedb/src/seed.rs",
+      "markers": ["pub fn seed_dev_data", "require_dev_reducers_enabled()?", "ctx.db.organization().insert"],
+      "reusable_for": ["synthetic baseline records", "local module rendering", "selected stable E2E prerequisites"],
+      "limits": ["direct table insertion is not product onboarding proof", "organization-name guard is not a versioned fixture identity", "one owner and one admin role do not form the required persona set"]
+    },
+    {
+      "id": "e2e-seed-wrapper",
+      "classification": "elevated-dev-reducer-call",
+      "path": "frontend/web/scripts/e2e-seed-fixture.mjs",
+      "markers": ["dev_promote_caller_superuser", "'seed_dev_data'"],
+      "reusable_for": ["repeatable local invocation of the dev seed"],
+      "limits": ["no versioned fixture manifest", "no scoped health report", "requires dev-only elevated authority"]
+    },
+    {
+      "id": "browser-admin-bootstrap",
+      "classification": "single-admin-credential",
+      "path": "frontend/web/scripts/seed-test-user.mjs",
+      "markers": ["const TEST_EMAIL = 'test@email.com'", "role_name: 'admin'", "SELECT id, name FROM organization LIMIT 1"],
+      "reusable_for": ["one local browser administrator session"],
+      "limits": ["arbitrary first-row fallback is not deterministic", "fixed shared credential is not a multi-persona pack", "no denied or separation-of-duties actor"]
+    },
+    {
+      "id": "pretenant-actor-helper",
+      "classification": "suite-local-persona-primitive",
+      "path": "frontend/web/tests/e2e/pretenant-support.ts",
+      "markers": ["export async function provisionActor", "callReducerBff(ownerPage, \"create_role\"", "callReducerBff(ownerPage, \"assign_role\""],
+      "reusable_for": ["synthetic least-privilege actors inside pre-tenant specs"],
+      "limits": ["not a shared named COV-02 fixture", "uses compatibility reducer setup", "created actors are scenario-local rather than seed-health asserted"]
+    },
+    {
+      "id": "phase0-fixture-spec",
+      "classification": "planned-only",
+      "path": "docs/plans/phase-0-e2e-fixture-spec.md",
+      "markers": ["## Baseline Fixture", "owner_alpha", "viewer_alpha"],
+      "reusable_for": ["fixture invariants and synthetic-data constraints"],
+      "limits": ["the named baseline and personas are not implemented as a shared fixture"]
+    }
+  ],
+  "personas": [
+    {"key": "organization-admin", "status": "partial", "evidence_authorities": ["browser-admin-bootstrap"], "gap": "Replace the fixed one-admin bootstrap with a named versioned persona bound to an explicit fixture organization."},
+    {"key": "finance-accounting", "status": "absent", "evidence_authorities": ["pretenant-actor-helper"], "gap": "Provision a shared least-privilege finance actor and an independent approver."},
+    {"key": "sales-crm", "status": "absent", "evidence_authorities": ["pretenant-actor-helper"], "gap": "Provision a shared Sales/CRM actor with explicit grants and denial controls."},
+    {"key": "warehouse-manufacturing", "status": "absent", "evidence_authorities": ["pretenant-actor-helper"], "gap": "Provision warehouse and manufacturing grants without owner wildcard permissions."},
+    {"key": "purchasing", "status": "absent", "evidence_authorities": ["pretenant-actor-helper"], "gap": "Provision requester and independent purchasing approver semantics."},
+    {"key": "hr-project", "status": "absent", "evidence_authorities": ["pretenant-actor-helper"], "gap": "Provision an HR/project actor with sensitive-data scope and self-approval denial."},
+    {"key": "limited-read-only", "status": "absent", "evidence_authorities": ["pretenant-actor-helper"], "gap": "Provision a stable restricted reader for denied, masking, and revoked-access tests."}
+  ],
+  "modules": [
+    {"id": "COV-03", "surface": "CRM", "seed_status": "partial", "evidence": [{"path": "spacetimedb/src/seed.rs", "markers": ["let contact_acme = ctx.db.contact().insert", "// ── 2.3 Opportunity Stages"]}], "gaps": ["shared Sales/CRM persona", "versioned open and converted lifecycle records", "seed health queries"], "next_package": "COV-02B"},
+    {"id": "COV-04", "surface": "Sales", "seed_status": "partial", "evidence": [{"path": "spacetimedb/src/seed.rs", "markers": ["let so1 = ctx.db.sale_order().insert"]}], "gaps": ["shared Sales persona", "deterministic quotation/order/fulfillment identities", "canonical health assertions"], "next_package": "COV-02B"},
+    {"id": "COV-05", "surface": "Purchasing", "seed_status": "partial", "evidence": [{"path": "spacetimedb/src/seed.rs", "markers": ["let po1 = ctx.db.purchase_order().insert"]}], "gaps": ["requester and independent approver personas", "deterministic requisition/RFQ/receipt/bill chain", "SoD health assertions"], "next_package": "COV-02B"},
+    {"id": "COV-06", "surface": "Inventory / WMS", "seed_status": "partial", "evidence": [{"path": "spacetimedb/src/seed.rs", "markers": ["let wh = ctx.db.warehouse().insert", "ctx.db.stock_picking().insert"]}], "gaps": ["warehouse persona", "stable lot/serial/count/backorder scenarios", "cross-company denial fixture"], "next_package": "COV-02B"},
+    {"id": "COV-07", "surface": "Manufacturing / Quality", "seed_status": "partial", "evidence": [{"path": "spacetimedb/src/seed.rs", "markers": ["let manufacturing_order = ctx.db.mrp_production().insert"]}], "gaps": ["manufacturing persona", "versioned BOM-to-finished-stock scenario", "quality and cost health assertions"], "next_package": "COV-02B"},
+    {"id": "COV-08", "surface": "Accounting / Finance / Assets", "seed_status": "partial", "evidence": [{"path": "spacetimedb/src/seed.rs", "markers": ["let invoice1 = ctx.db.account_move().insert", "let tax_vat_sales = ctx.db.account_tax().insert"]}], "gaps": ["finance actor and independent approver", "expected minor-unit calculation manifest", "closed-period and cross-company controls"], "next_package": "COV-02B"},
+    {"id": "COV-09", "surface": "HR / Payroll", "seed_status": "partial", "evidence": [{"path": "spacetimedb/src/seed.rs", "markers": ["let emp_alex = ctx.db.hr_employee().insert", "let payroll_structure = ctx.db.hr_payroll_structure().insert"]}], "gaps": ["HR/project persona", "sensitive-data reader and denied actor", "employee-to-pay stable scenario"] , "next_package": "COV-02B"},
+    {"id": "COV-10", "surface": "Projects / Tasks", "seed_status": "partial", "evidence": [{"path": "spacetimedb/src/seed.rs", "markers": ["let proj_crm = ctx.db.project_project().insert", "ctx.db.project_timesheet().insert"]}], "gaps": ["HR/project persona", "approver identity", "stable project-to-billing references"] , "next_package": "COV-02B"},
+    {"id": "COV-11", "surface": "Expenses", "seed_status": "partial", "evidence": [{"path": "spacetimedb/src/seed.rs", "markers": ["let exp_sheet = ctx.db.expense_sheet().insert"]}], "gaps": ["employee submitter and independent finance approver", "receipt document fixture", "duplicate reimbursement control"] , "next_package": "COV-02B"},
+    {"id": "COV-12", "surface": "Subscriptions", "seed_status": "partial", "evidence": [{"path": "spacetimedb/src/seed.rs", "markers": ["let subscription_acme = ctx.db.subscription().insert"]}], "gaps": ["versioned billing-cycle clock inputs", "idempotency keys and expected invoice links", "finance persona"] , "next_package": "COV-02B"},
+    {"id": "COV-13", "surface": "POS", "seed_status": "partial", "evidence": [{"path": "spacetimedb/src/seed.rs", "markers": ["let pos_config_frontdesk = ctx.db.pos_config().insert", "let pos_order_demo = ctx.db.pos_order().insert"]}], "gaps": ["cashier persona", "open-session golden path rather than history-only rows", "reconnect and duplicate-payment controls"] , "next_package": "COV-02B"},
+    {"id": "COV-14", "surface": "Helpdesk", "seed_status": "partial", "evidence": [{"path": "spacetimedb/src/seed.rs", "markers": ["let hd_team = ctx.db.helpdesk_team().insert", "ctx.db.helpdesk_ticket().insert"]}], "gaps": ["support operator persona", "requester visibility fixture", "SLA/reopen/notification identities"] , "next_package": "COV-02B"},
+    {"id": "COV-15", "surface": "Fleet", "seed_status": "partial", "evidence": [{"path": "spacetimedb/src/seed.rs", "markers": ["ctx.db.fleet_vehicle().insert"]}], "gaps": ["fleet operator persona", "driver/service/inspection/fuel linked records", "cross-company vehicle denial"] , "next_package": "COV-02B"},
+    {"id": "COV-16", "surface": "IoT", "seed_status": "absent", "evidence": [{"path": "spacetimedb/src/seed.rs", "markers": ["iot_device_ids: vec![]"]}], "gaps": ["owned device identity", "telemetry and stale-alert fixture", "device actor and cross-company denial"] , "next_package": "COV-02B"},
+    {"id": "COV-17", "surface": "Proposals", "seed_status": "partial", "evidence": [{"path": "spacetimedb/src/seed.rs", "markers": ["let proposal = ctx.db.proposal().insert"]}], "gaps": ["author and independent reviewer personas", "stable source-document and conversion references", "stale review fixture"] , "next_package": "COV-02B"},
+    {"id": "COV-18", "surface": "Documents / Knowledge", "seed_status": "partial", "evidence": [{"path": "spacetimedb/src/seed.rs", "markers": ["ctx.db.document().insert", "ctx.db.knowledge_article().insert"]}], "gaps": ["document owner/reviewer personas", "version/blob/retention lifecycle fixture", "linked business-record health checks"] , "next_package": "COV-02B"},
+    {"id": "COV-19", "surface": "Calendar + Messages / Communications", "seed_status": "partial", "evidence": [{"path": "spacetimedb/src/seed.rs", "markers": ["ctx.db.calendar_event().insert", "let message = ctx.db.mail_message().insert"]}], "gaps": ["sender/approver/recipient personas", "synthetic consent and opt-out identities", "provider-status and record-link health checks"] , "next_package": "COV-02B"},
+    {"id": "COV-20", "surface": "Reports / Analytics", "seed_status": "partial", "evidence": [{"path": "spacetimedb/src/seed.rs", "markers": ["let report_template = ctx.db.report_template().insert", "let trial_balance_report = ctx.db.financial_report().insert"]}], "gaps": ["versioned expected totals", "source-error and partial-state fixture", "restricted reporting persona"] , "next_package": "COV-02B"},
+    {"id": "COV-21", "surface": "Approvals / Workflow automation", "seed_status": "partial", "evidence": [{"path": "spacetimedb/src/seed.rs", "markers": ["let sales_workflow_id = seed_published_workflow", "start_workflow("]}], "gaps": ["requester and independent approver personas", "stale/replay/timer scenarios", "candidate-role health checks"] , "next_package": "COV-02B"},
+    {"id": "COV-22", "surface": "Imports / Data Ops + Forms / Templates", "seed_status": "partial", "evidence": [{"path": "spacetimedb/src/seed.rs", "markers": ["let form_config = ctx.db.form_config().insert"]}], "gaps": ["versioned import files and expected hashes", "mapping/preview/error/replay fixtures", "form/template author and consumer personas"] , "next_package": "COV-02B"},
+    {"id": "COV-23", "surface": "Organization / Company / Settings / Auth", "seed_status": "partial", "evidence": [{"path": "spacetimedb/src/seed.rs", "markers": ["let owner_role = ctx.db.role().insert"]}, {"path": "frontend/web/scripts/seed-test-user.mjs", "markers": ["role_name: 'admin'"]}], "gaps": ["explicit organization key with no first-row fallback", "seven shared personas", "revocation/company-switch/recovery fixture"] , "next_package": "COV-02B"},
+    {"id": "COV-24", "surface": "Distributor workspace", "seed_status": "partial", "evidence": [{"path": "spacetimedb/src/seed.rs", "markers": ["// ── Phase 5 distributor read-only controls"]}], "gaps": ["named distributor operator", "stable sale/stock/collection/exception scenario", "workspace health report"] , "next_package": "COV-02B"}
+  ],
+  "minimum_next_slice": {
+    "id": "COV-02B",
+    "objective": "Create one versioned first-org fixture manifest and deterministic orchestration for explicit organization selection, seven named personas, and scoped seed-health readback without replacing canonical product operations.",
+    "required_controls": ["explicit-org-key", "versioned-manifest", "named-personas", "least-privilege-grants", "seed-health-readback", "no-arbitrary-org-fallback"]
+  }
+}

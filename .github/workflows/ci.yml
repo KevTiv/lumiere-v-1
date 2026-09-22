@@ -258,6 +258,9 @@ jobs:
       - name: Enforce COV lifecycle evidence matrix
         run: pnpm cov-evidence:check
 
+      - name: Enforce COV seed and persona inventory
+        run: pnpm cov-seed-inventory:check
+
       - name: Typecheck
         run: pnpm typecheck
 
