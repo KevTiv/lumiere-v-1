@@ -82,6 +82,30 @@ export async function addLaptopLine(page: Page, orderId: number, quantity: strin
   await waitForSaleOrderLineExists(page, orderId)
 }
 
+/** Add a line for an arbitrary product (by exact name) to an order through the Order Lines tab. */
+export async function addSaleOrderLine(
+  page: Page,
+  orderId: number,
+  productName: string,
+  quantity: string,
+  priceUnit = "10",
+): Promise<void> {
+  await openEntityCreate(page, "/sales", "sales", "order-lines", "add-sale-order-line")
+  await chooseSelectOptionByLabel(page, "orderId", await fetchSaleOrderSelectLabel(page, orderId))
+  await page.getByTestId("form-field-productId").click()
+  await page.getByRole("option", { name: productName }).click()
+  await chooseFirstEnabledOption(page, "uomId")
+  await fillField(page, "quantity", quantity)
+  await fillField(page, "priceUnit", priceUnit)
+  await Promise.all([
+    page.waitForResponse((res) => matchesOperationResponse(res, "create_sale_order_line") && res.ok(), {
+      timeout: 30_000,
+    }),
+    submitForm(page, "add-sale-order-line"),
+  ])
+  await waitForSaleOrderLineExists(page, orderId)
+}
+
 export interface PickingSnapshot {
   id: number
   state: string

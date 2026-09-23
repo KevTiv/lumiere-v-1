@@ -106,10 +106,10 @@ export async function findProductIdByName(
   return id
 }
 
-/** Create a lot-tracked product (`tracking: "lot"`). The dev seed has no such product by default. */
-export async function createLotTrackedProductFixture(
+async function createTrackedProductFixture(
   page: Page,
   name: string,
+  tracking: "lot" | "serial",
 ): Promise<number> {
   const categoriesRes = await page.request.get("/api/query/product-categories")
   if (!categoriesRes.ok()) throw new Error("Failed to query product categories")
@@ -140,7 +140,7 @@ export async function createLotTrackedProductFixture(
         standardPrice: 10,
         listPrice: 20,
         currencyId,
-        tracking: "lot",
+        tracking,
         defaultCode: name,
       },
       "CreateProductParams",
@@ -153,6 +153,22 @@ export async function createLotTrackedProductFixture(
   expect(response.ok()).toBe(true)
 
   return findProductIdByName(page, name)
+}
+
+/** Create a lot-tracked product (`tracking: "lot"`). The dev seed has no such product by default. */
+export async function createLotTrackedProductFixture(
+  page: Page,
+  name: string,
+): Promise<number> {
+  return createTrackedProductFixture(page, name, "lot")
+}
+
+/** Create a serial-tracked product (`tracking: "serial"`). The dev seed has no such product by default. */
+export async function createSerialTrackedProductFixture(
+  page: Page,
+  name: string,
+): Promise<number> {
+  return createTrackedProductFixture(page, name, "serial")
 }
 
 export async function createStockProductionLotFixture(
@@ -260,6 +276,102 @@ export async function setStockProductionLotLocked(
     data: JSON.parse(String(init.body)),
   })
   expect(response.ok()).toBe(true)
+}
+
+/** Create a free serial for a serial-tracked product. */
+export async function createStockProductionSerialFixture(
+  page: Page,
+  companyId: number,
+  productId: number,
+  name: string,
+): Promise<number> {
+  const { urlPath, init } = stdbBffCommandPost("create_stock_production_serial", {
+    params: stdbParamsToJson(
+      {
+        companyId,
+        name,
+        productId,
+        productVariantId: null,
+        lotId: null,
+        ref: null,
+        note: null,
+        expirationDate: null,
+        useDate: null,
+        removalDate: null,
+        alertDate: null,
+        productQty: 1,
+        locationId: null,
+        packageId: null,
+        ownerId: null,
+        state: "free",
+        isScrap: false,
+        isLocked: false,
+        warrantyExpiration: null,
+        warrantyStart: null,
+        lastMaintenance: null,
+        nextMaintenance: null,
+        maintenanceCount: 0,
+        metadata: null,
+      },
+      "CreateStockProductionSerialParams",
+    ),
+  })
+  const response = await page.request.post(urlPath, {
+    headers: { "Content-Type": "application/json" },
+    data: JSON.parse(String(init.body)),
+  })
+  expect(response.ok()).toBe(true)
+
+  let serialId = 0
+  await expect
+    .poll(
+      async () => {
+        const query = await page.request.get("/api/query/stock-production-serials")
+        if (!query.ok()) return 0
+        const payload = (await query.json()) as {
+          data?: Array<Record<string, unknown>>
+        }
+        const matches = (payload.data ?? []).filter(
+          (row) =>
+            String(row.name ?? "") === name &&
+            scalarQueryId(row.productId ?? row.product_id) === productId,
+        )
+        if (matches.length !== 1) return 0
+        serialId = scalarQueryId(matches[0]?.id) ?? 0
+        return serialId
+      },
+      { timeout: 30_000 },
+    )
+    .toBeGreaterThan(0)
+  return serialId
+}
+
+function variantTagValue(value: unknown): string {
+  if (value != null && typeof value === "object" && "tag" in value) {
+    return String((value as { tag: string }).tag)
+  }
+  return String(value ?? "")
+}
+
+export interface SerialSnapshot {
+  id: number
+  state: string
+}
+
+export async function fetchSerialById(
+  page: Page,
+  serialId: number,
+): Promise<SerialSnapshot | undefined> {
+  const response = await page.request.get("/api/query/stock-production-serials")
+  if (!response.ok()) return undefined
+  const payload = (await response.json()) as {
+    data?: Array<Record<string, unknown>>
+  }
+  const row = (payload.data ?? []).find(
+    (candidate) => scalarQueryId(candidate.id) === serialId,
+  )
+  if (!row) return undefined
+  return { id: serialId, state: variantTagValue(row.state).toLowerCase() }
 }
 
 export async function createStockQuantFixture(
