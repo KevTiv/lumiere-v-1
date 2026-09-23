@@ -830,8 +830,11 @@ fn pay_11a_conflicting_statement_replay_does_not_mutate(ctx: &ReducerContext) ->
 
 fn pay_11b_conflicting_statement_replay_fails_closed(ctx: &ReducerContext) -> Result<(), String> {
     let (_, replay) = replay_with_different_payload(ctx)?;
-    if replay.is_ok() {
-        return Err("idempotency key replay with a different payload was accepted silently".to_string());
+    match replay {
+        Err(error) if error.contains("idempotency key already used with different") => Ok(()),
+        Err(error) => Err(format!("unexpected statement replay conflict: {error}")),
+        Ok(()) => {
+            Err("idempotency key replay with a different payload was accepted silently".to_string())
+        }
     }
-    Ok(())
 }
