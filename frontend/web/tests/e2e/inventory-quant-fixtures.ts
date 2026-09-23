@@ -11,6 +11,7 @@ import {
   gotoModule,
   scalarQueryId,
   selectEntityRowById,
+  selectModuleTab,
   submitForm,
 } from "./helpers"
 
@@ -262,6 +263,50 @@ export async function moveQuantViaInventoryUi(
     ),
     submitForm(page, "move-stock-quant"),
   ])
+}
+
+/**
+ * Drive one bounded cycle count end-to-end through the wizard UI: create plan →
+ * start session → record exactly one line → validate → post adjustments.
+ * The wizard auto-advances to the newest plan it created at the chosen
+ * location, so this only targets the newest one at that location.
+ */
+export async function runCycleCountToPostedViaWizardUi(
+  page: Page,
+  params: {
+    locationId: number
+    productId: number
+    uomId: number
+    countedQty: number
+  },
+): Promise<void> {
+  await gotoModule(page, "/inventory", "inventory")
+  await selectModuleTab(page, "inventory", "cycle-wizard")
+
+  await page.locator("#cc-loc").selectOption(String(params.locationId))
+  await page.getByTestId("cycle-wizard-create-plan").click()
+
+  await expect(page.getByTestId("cycle-wizard-start-session")).toBeEnabled({
+    timeout: 30_000,
+  })
+  await page.getByTestId("cycle-wizard-start-session").click()
+
+  await expect(page.locator("#cc-prod")).toBeVisible({ timeout: 30_000 })
+  await page.locator("#cc-prod").selectOption(String(params.productId))
+  await page.locator("#cc-rec-loc").selectOption(String(params.locationId))
+  await page.locator("#cc-qty").fill(String(params.countedQty))
+  await page.locator("#cc-uom").selectOption(String(params.uomId))
+  await page.getByTestId("cycle-wizard-record-line").click()
+
+  await expect(page.getByTestId("cycle-wizard-validate")).toBeEnabled({
+    timeout: 30_000,
+  })
+  await page.getByTestId("cycle-wizard-validate").click()
+
+  await expect(page.getByTestId("cycle-wizard-post")).toBeEnabled({
+    timeout: 30_000,
+  })
+  await page.getByTestId("cycle-wizard-post").click()
 }
 
 export async function expectCanonicalQuantFocus(
