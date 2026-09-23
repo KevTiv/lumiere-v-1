@@ -295,12 +295,7 @@ fn pay_01_interleaved_allocations_never_exceed_payment(ctx: &ReducerContext) -> 
         return Err("second cashier allocation exceeded the available payment".to_string());
     }
     require_minor_eq("net allocated", from_minor(net_allocated_minor(ctx, payment), CENTS), 8_000, CENTS)?;
-    require_minor_eq(
-        "invoice A residual",
-        invoice_residual(ctx, invoice_a)?,
-        0,
-        CENTS,
-    )?;
+    require_minor_eq("invoice A residual", invoice_residual(ctx, invoice_a)?, 0, CENTS)?;
     require_minor_eq("invoice B residual", invoice_residual(ctx, invoice_b)?, 5_000, CENTS)?;
     require_minor_eq("unapplied", unapplied(ctx, payment)?, 2_000, CENTS)?;
 
