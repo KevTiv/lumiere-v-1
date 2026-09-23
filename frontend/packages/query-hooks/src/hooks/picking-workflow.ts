@@ -117,8 +117,12 @@ export function usePickingWorkflow(
   }, [qc, organizationId, companyId])
 
   const actions = useMemo(() => {
-    const byId = (id: string, spec: TransitionSpec<string>) => (pickingId: string) =>
-      runner.run(`${id}:${pickingId}`, spec, pickingId)
+    const byId =
+      (id: string, spec: TransitionSpec<string>) =>
+      (pickingId: string, context?: { navigateToNext?: boolean }) =>
+        runner.run(`${id}:${pickingId}`, spec, pickingId, {
+          navigateToNext: context?.navigateToNext,
+        })
     return {
       confirm: confirmPickingAction({ label: labels.confirm, execute: byId("inventory.picking.confirm", specs.confirm) }),
       assign: assignPickingAction({ label: labels.assign, execute: byId("inventory.picking.assign", specs.assign) }),
