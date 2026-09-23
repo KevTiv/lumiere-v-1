@@ -142,6 +142,7 @@
       "invoice_date",
       "invoice_date_due",
       "invoice_partner_display_name",
+      "sale_order_id",
       "amount_untaxed",
       "amount_tax",
       "amount_total",
@@ -5148,7 +5149,10 @@
       "company_id",
       "date_order",
       "opportunity_id",
-      "picking_ids"
+      "picking_ids",
+      "invoice_ids",
+      "invoice_count",
+      "invoice_status"
     ],
     "mandatory": [
       "id",

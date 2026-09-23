@@ -136,7 +136,10 @@ static HTTP_SQL_INCLUDED_COLUMNS: Lazy<HashMap<String, HashSet<String>>> = Lazy:
     );
     m.insert(
         "sale-orders".to_string(),
-        ["picking_ids"].into_iter().map(String::from).collect(),
+        ["picking_ids", "invoice_ids"]
+            .into_iter()
+            .map(String::from)
+            .collect(),
     );
     m
 });
@@ -816,12 +819,25 @@ mod tests {
     }
 
     #[test]
-    fn resolve_http_sql_columns_includes_metadata_for_account_moves() {
+    fn resolve_http_sql_columns_includes_workflow_links_for_account_moves() {
         let cols = resolve_http_sql_columns("account-moves", None).expect("account-moves columns");
-        assert!(
-            cols.iter().any(|c| c == "metadata"),
-            "expected metadata in account-moves projection, got: {cols:?}"
-        );
+        for field in ["metadata", "sale_order_id"] {
+            assert!(
+                cols.iter().any(|column| column == field),
+                "expected {field} in account-moves projection, got: {cols:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn resolve_http_sql_columns_includes_invoice_readback_for_sale_orders() {
+        let cols = resolve_http_sql_columns("sale-orders", None).expect("sale-orders columns");
+        for field in ["invoice_ids", "invoice_count", "invoice_status"] {
+            assert!(
+                cols.iter().any(|column| column == field),
+                "expected {field} in sale-orders projection, got: {cols:?}"
+            );
+        }
     }
 
     #[test]
