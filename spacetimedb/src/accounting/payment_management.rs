@@ -383,28 +383,28 @@ fn validate_payment_transaction_invariants(
     Ok(())
 }
 
-fn validate_committed_post_replay(
+fn validate_committed_payment_ledger_effect(
     ctx: &ReducerContext,
     transaction: &PaymentTransaction,
 ) -> Result<(), String> {
     let account_payment_id = transaction
         .account_payment_id
-        .ok_or("posted payment transaction has no linked ledger payment")?;
+        .ok_or("payment transaction has no linked ledger payment")?;
     let payment = ctx
         .db
         .account_payment()
         .id()
         .find(&account_payment_id)
-        .ok_or("posted payment transaction ledger payment is missing")?;
+        .ok_or("payment transaction ledger payment is missing")?;
     let move_id = payment
         .move_id
-        .ok_or("posted payment transaction ledger payment has no move")?;
+        .ok_or("payment transaction ledger payment has no move")?;
     let move_record = ctx
         .db
         .account_move()
         .id()
         .find(&move_id)
-        .ok_or("posted payment transaction ledger move is missing")?;
+        .ok_or("payment transaction ledger move is missing")?;
     let expected_payment_type = match transaction.direction {
         PaymentDirection::Inbound => PaymentType::InBound,
         PaymentDirection::Outbound => PaymentType::OutBound,
