@@ -68,9 +68,11 @@ test("CSV-03 also requires an explicit format for otherwise inferable slash date
   const rows = statementImportRows([
     "date,amount,reference",
     "13/02/2026,125.50,TX-006",
+    "2/13/2026,50.00,TX-006B",
   ].join("\n"))
 
   assert.equal(rows[0].date, undefined)
+  assert.equal(rows[1].date, undefined)
 })
 
 test("CSV-03 keeps ISO statement dates accepted", () => {
