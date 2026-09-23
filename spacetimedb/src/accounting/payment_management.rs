@@ -1081,7 +1081,7 @@ pub fn post_payment_transaction_impl(
         return Err("Payment transaction belongs to a different organization".to_string());
     }
     if transaction.status == PaymentTransactionStatus::Posted {
-        return validate_committed_post_replay(ctx, &transaction);
+        return validate_committed_payment_ledger_effect(ctx, &transaction);
     }
     if transaction.status != PaymentTransactionStatus::Draft {
         return Err("Only draft transactions can be posted".to_string());
