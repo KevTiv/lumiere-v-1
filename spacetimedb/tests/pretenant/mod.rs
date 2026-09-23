@@ -65,10 +65,6 @@ pub const KNOWN_DEFECTS: &[(&str, &str)] = &[
         "a number change under the same phone identity id silently redirects an approved recipient",
     ),
     (
-        "PAY-03",
-        "post_payment_transaction retry after a committed post returns an error instead of an idempotent success",
-    ),
-    (
         "PAY-05",
         "reverse_payment_transaction retry after a committed reversal returns an error instead of an idempotent success",
     ),
