@@ -2214,6 +2214,9 @@ pub fn reverse_payment_transaction_impl(
             "Payment transaction belongs to a different organization or company".to_string(),
         );
     }
+    if original.status == PaymentTransactionStatus::Reversed {
+        return validate_committed_reversal_replay(ctx, &original, &params);
+    }
     if original.status != PaymentTransactionStatus::Posted {
         return Err("Only posted transactions can be reversed".to_string());
     }
