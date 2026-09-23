@@ -198,7 +198,12 @@ export function usePurchasingWorkflow(
 
       receiveLine: typed<ReceiveRunInput>({
         id: "purchasing.line.receive",
-        command: ({ receiptTarget: _receiptTarget, ...input }) => receivePurchaseOrderLineCommand(input),
+        command: (input) =>
+          receivePurchaseOrderLineCommand({
+            lineId: input.lineId,
+            qty: input.qty,
+            lotId: input.lotId,
+          }),
         affects: RECEIVE_PO_LINE_AFFECTS,
         observe: async ({ lineId, receiptTarget }) =>
           observeReceivedLine(
