@@ -448,6 +448,16 @@ pub fn stage_bank_statement_import(
             metadata: None,
         },
     );
+    record_result(
+        ctx,
+        organization_id,
+        company_id,
+        "stage_bank_statement_import",
+        idempotency_key,
+        payload_fingerprint,
+        "bank_statement_import",
+        import.id,
+    );
     Ok(())
 }
 
