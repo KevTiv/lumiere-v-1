@@ -422,7 +422,7 @@ fn validate_committed_payment_ledger_effect(
         || move_record.company_id != transaction.company_id
         || move_record.state != AccountMoveState::Posted
     {
-        return Err("posted payment transaction ledger effect is inconsistent".to_string());
+        return Err("payment transaction ledger effect is inconsistent".to_string());
     }
 
     Ok(())
