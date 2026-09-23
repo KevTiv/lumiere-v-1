@@ -87,7 +87,7 @@ async function rowById(table: string, id: number): Promise<Row> {
 
 test.describe.configure({ mode: "serial" })
 
-test.describe("AI human review and workflow provenance", { tag: "@p0" }, () => {
+test.describe("AI human review and workflow provenance", () => {
   test.setTimeout(420_000)
 
   const tag = randomUUID().slice(0, 8)
@@ -151,7 +151,7 @@ test.describe("AI human review and workflow provenance", { tag: "@p0" }, () => {
     }
   }
 
-  test("independent review, workflow publication and component inspection", async ({ page }) => {
+  test("independent review, workflow publication and component inspection", { tag: "@p0" }, async ({ page }) => {
     await page.goto("/overview")
     await expect(page).not.toHaveURL(/\/sign-in(?:\?|$)/)
     organizationId = await fetchSessionOrganizationId(page)
@@ -556,7 +556,7 @@ test.describe("AI human review and workflow provenance", { tag: "@p0" }, () => {
     })
   })
 
-  test("a fresh run reuses an exact reviewed claim and nothing else", async ({ page }) => {
+  test("a fresh run reuses an exact reviewed claim and nothing else", { tag: ["@p0", "@ai-live"] }, async ({ page }) => {
     test.setTimeout(600_000)
     await page.goto("/overview")
     await expect(page).not.toHaveURL(/\/sign-in(?:\?|$)/)
@@ -605,7 +605,6 @@ test.describe("AI human review and workflow provenance", { tag: "@p0" }, () => {
         partner_id: none,
         tag_ids: [],
         is_favorite: false,
-        index_content: none,
         classification_id: none,
         retention_days: none,
         fiscal_kind: none,
