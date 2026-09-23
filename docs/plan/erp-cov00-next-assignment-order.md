@@ -89,6 +89,12 @@ Current disposition: `IMPLEMENTED` for the three-slice first-adoption chain; run
 
 The original Lane-B first-adoption path (PO → receipt → vendor bill) is now implemented without newest-row/id-delta effect discovery. Full COV-05 remains open. Next bounded Purchasing work should target three-way-match rejection/recovery or partial receipt/backorder billing; bill posting/payment belongs with COV-08 Accounting.
 
+### COV-06
+
+Current disposition: `IMPLEMENTED` for the bounded stock-picking lifecycle slice; runtime acceptance is pending. The existing `warehouse-manufacturing` persona drives one exact picking through Inventory confirm → assign → validate. Each transition requires canonical same-id state readback, validation requires the source picking to be `done`, the original move-id set must complete without replacement, stale transitions are rejected, and the limited reader remains denied. See [`erp-cov06a-picking-lifecycle-status.md`](./erp-cov06a-picking-lifecycle-status.md).
+
+Next bounded Inventory work should target partial validation/backorder identity or one internal-transfer quant convergence path. Do not expand this slice into cycle counts, lots/serials, quality or replenishment.
+
 ## First implementation convergence
 
 Prioritize closing U4/U5 gaps on CRM/Sales/Purchasing/Accounting before adding new backend breadth, but migrate the reference cross-module action through COV-01 first so module agents inherit a proven outcome/readback pattern.
