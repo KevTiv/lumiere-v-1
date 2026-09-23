@@ -219,7 +219,8 @@ Legend — Class: **C** covered, **P** partial, **N** not covered, **B** blocked
 | Reversal/chargeback after settlement | supplier reversal (P1-PAY-03), partial allocation reversal (ACC-RI-004) | full customer settlement + immutability + retry | STDB | yes | — | PAY-04 | P |
 | Monetary precision (0.01, large, many small, 0/3-decimal) | — | all | native + STDB | yes | — | `money.rs`, PAY-08, PAY-09 | N |
 | Statement staging fixtures | invalid row + identical retry (E2E) | negative/zero/NaN/inf/missing/duplicate/out-of-order/huge; conflicting replay | STDB | yes | — | PAY-10, PAY-11A, PAY-11B | P |
-| CSV BOM/delimiter/localized decimals | BOM stripped in parser (untested) | parser tests | web unit | no (parser file-private) | parser extraction | CSV-01..04 (documented) | N |
+| CSV UTF-8 BOM | extracted statement parser strips BOM before header parsing and idempotency hashing | — | web unit | yes | — | CSV-01 | C |
+| CSV delimiter/localized decimals | current parser behavior only | focused parser fixtures | web unit | no | CSV-01 extraction | CSV-02..04 | N |
 
 ### Frontend IR (all require the IR stack)
 
