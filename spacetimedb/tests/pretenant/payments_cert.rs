@@ -441,32 +441,79 @@ fn pay_05_reversal_retry_is_idempotent_success(ctx: &ReducerContext) -> Result<(
     retry.map_err(|error| format!("reversal retry after committed reversal failed: {error}"))
 }
 
-/// Invoice 100, payment 120: 100 allocated, 20 stays explicit unapplied, no write-off.
-fn pay_06_overpayment_stays_explicit_unapplied(ctx: &ReducerContext) -> Result<(), String> {
+/// Invoice A is 100 and invoice B is 50. A 120 payment cannot be forced into A:
+/// 100 settles A, the 20 overage remains explicit unapplied credit, and that credit can
+/// then be intentionally allocated as a partial payment to B without any write-off.
+fn pay_06_overpayment_and_partial_multi_invoice_are_explicit(
+    ctx: &ReducerContext,
+) -> Result<(), String> {
     let w = setup("wallet", wallet(ctx, "pay06"))?;
-    let (invoice_id, line_id) = setup("invoice", invoice(ctx, &w, 100.0))?;
+    let (invoice_a, line_a) = setup("invoice A", invoice(ctx, &w, 100.0))?;
+    let (invoice_b, line_b) = setup("invoice B", invoice(ctx, &w, 50.0))?;
     let payment = setup("receipt", posted_receipt(ctx, &w, "PAY06-REF", 120.0))?;
-    if allocate(ctx, &w, payment, line_id, 120.0, "pay06-over").is_ok() {
-        return Err("allocation beyond the invoice residual was accepted".to_string());
+
+    if allocate(ctx, &w, payment, line_a, 120.0, "pay06-over").is_ok() {
+        return Err("allocation beyond invoice A residual was accepted".to_string());
     }
-    allocate(ctx, &w, payment, line_id, 100.0, "pay06-exact")?;
+    if ctx
+        .db
+        .payment_reconciliation()
+        .iter()
+        .any(|row| row.payment_transaction_id == payment)
+    {
+        return Err("rejected over-allocation persisted a reconciliation".to_string());
+    }
+
+    allocate(ctx, &w, payment, line_a, 100.0, "pay06-invoice-a")?;
+    require_minor_eq("invoice A residual", invoice_residual(ctx, invoice_a)?, 0, CENTS)?;
+    require_minor_eq(
+        "unapplied customer credit after invoice A",
+        unapplied(ctx, payment)?,
+        2_000,
+        CENTS,
+    )?;
+
+    let after_invoice_a: Vec<_> = ctx
+        .db
+        .payment_reconciliation()
+        .iter()
+        .filter(|row| row.payment_transaction_id == payment)
+        .collect();
+    if after_invoice_a.len() != 1
+        || after_invoice_a
+            .iter()
+            .any(|row| to_minor(row.write_off_amount, CENTS) != 0 || row.write_off_move_id.is_some())
+    {
+        return Err("invoice A allocation produced an implicit write-off".to_string());
+    }
+
+    allocate(ctx, &w, payment, line_b, 20.0, "pay06-invoice-b-partial")?;
     let rows: Vec<_> = ctx
         .db
         .payment_reconciliation()
         .iter()
-        .filter(|r| r.payment_transaction_id == payment)
+        .filter(|row| row.payment_transaction_id == payment)
         .collect();
-    if rows.len() != 1 || rows.iter().any(|r| to_minor(r.write_off_amount, CENTS) != 0 || r.write_off_move_id.is_some()) {
-        return Err("overpayment produced an implicit write-off or extra allocation".to_string());
+    if rows.len() != 2
+        || rows
+            .iter()
+            .any(|row| to_minor(row.write_off_amount, CENTS) != 0 || row.write_off_move_id.is_some())
+    {
+        return Err("multi-invoice allocation produced an implicit write-off or wrong row count".to_string());
     }
-    require_minor_eq("invoice residual", invoice_residual(ctx, invoice_id)?, 0, CENTS)?;
-    require_minor_eq("unapplied customer credit", unapplied(ctx, payment)?, 2_000, CENTS)?;
+    if net_allocated_minor(ctx, payment) != 12_000 {
+        return Err("multi-invoice allocations did not consume the exact payment amount".to_string());
+    }
+
+    require_minor_eq("invoice B residual", invoice_residual(ctx, invoice_b)?, 3_000, CENTS)?;
+    require_minor_eq("unapplied after invoice B partial", unapplied(ctx, payment)?, 0, CENTS)?;
+
     let settlement = ctx
         .db
         .payment_transaction()
         .id()
         .find(&payment)
-        .map(|t| t.settlement_amount)
+        .map(|transaction| transaction.settlement_amount)
         .ok_or("transaction missing")?;
     require_minor_eq("settlement unchanged", settlement, 12_000, CENTS)
 }
