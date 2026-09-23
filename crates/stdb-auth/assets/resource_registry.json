@@ -142,6 +142,7 @@
       "invoice_date",
       "invoice_date_due",
       "invoice_partner_display_name",
+      "sale_order_id",
       "amount_untaxed",
       "amount_tax",
       "amount_total",
@@ -5148,7 +5149,10 @@
       "company_id",
       "date_order",
       "opportunity_id",
-      "picking_ids"
+      "picking_ids",
+      "invoice_ids",
+      "invoice_count",
+      "invoice_status"
     ],
     "mandatory": [
       "id",
@@ -5371,6 +5375,7 @@
     "default_restricted": [
       "state",
       "product_id",
+      "product_uom_qty",
       "company_id",
       "picking_id"
     ],
@@ -5410,6 +5415,7 @@
       "sale_id",
       "picking_code",
       "is_return",
+      "backorder_id",
       "picking_type_id",
       "location_id",
       "location_dest_id"
