@@ -278,7 +278,7 @@ Registered in `KNOWN_DEFECTS` / `expectKnownDefect()`; runtime confirmation reco
 | `COMM-15` | (Playwright-only; not yet executed against a running stack) Batch approval retry by the same approver returns an error instead of an idempotent success. |
 | `AG-IDEMP-01` | (Playwright-only; not yet executed against a running stack) AI draft approval retry after commit returns an error instead of idempotent success. |
 
-Additional documented findings (not executed as tests): `MONEY-PRECISION`, `CSV-01..04`, `REC-01`.
+Additional documented findings (not executed as tests): `MONEY-PRECISION`, `CSV-02..04`, `REC-01`.
 
 ## Phase 5 — Mobile/network resilience
 
