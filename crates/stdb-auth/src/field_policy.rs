@@ -841,6 +841,25 @@ mod tests {
     }
 
     #[test]
+    fn resolve_http_sql_columns_includes_ordered_quantity_for_stock_moves() {
+        let cols = resolve_http_sql_columns("stock-moves", None).expect("stock-moves columns");
+        assert!(
+            cols.iter().any(|column| column == "product_uom_qty"),
+            "expected product_uom_qty in stock-moves projection, got: {cols:?}"
+        );
+    }
+
+    #[test]
+    fn resolve_http_sql_columns_includes_backorder_identity_for_stock_pickings() {
+        let cols =
+            resolve_http_sql_columns("stock-pickings", None).expect("stock-pickings columns");
+        assert!(
+            cols.iter().any(|column| column == "backorder_id"),
+            "expected backorder_id in stock-pickings projection, got: {cols:?}"
+        );
+    }
+
+    #[test]
     fn selective_accounting_field_policies_keep_company_scope_metadata() {
         for resource in ["account-accounts", "account-journals", "account-taxes"] {
             let mut access = field_access(&[&format!("{resource}:read")]);

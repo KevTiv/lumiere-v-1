@@ -5375,6 +5375,7 @@
     "default_restricted": [
       "state",
       "product_id",
+      "product_uom_qty",
       "company_id",
       "picking_id"
     ],
@@ -5414,6 +5415,7 @@
       "sale_id",
       "picking_code",
       "is_return",
+      "backorder_id",
       "picking_type_id",
       "location_id",
       "location_dest_id"
