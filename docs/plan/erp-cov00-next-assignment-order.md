@@ -91,9 +91,9 @@ The original Lane-B first-adoption path (PO → receipt → vendor bill) is now 
 
 ### COV-06
 
-Current disposition: `IMPLEMENTED` for the bounded stock-picking lifecycle slice; runtime acceptance is pending. The existing `warehouse-manufacturing` persona drives one exact picking through Inventory confirm → assign → validate. Each transition requires canonical same-id state readback, validation requires the source picking to be `done`, the original move-id set must complete without replacement, stale transitions are rejected, and the limited reader remains denied. See [`erp-cov06a-picking-lifecycle-status.md`](./erp-cov06a-picking-lifecycle-status.md).
+Current disposition: `IMPLEMENTED` for two bounded Inventory slices; runtime acceptance is pending. COV-06a drives one exact picking through Inventory confirm → assign → validate with canonical same-id state readback and stable move identity. COV-06b partially validates an assigned picking, snapshots the source-owned `backorder_ids` relation before dispatch, requires exactly one new child id, verifies the child's `backorder_id` points to the source, and preserves stale/deny effect sets. See [`erp-cov06a-picking-lifecycle-status.md`](./erp-cov06a-picking-lifecycle-status.md) and [`erp-cov06b-picking-backorder-status.md`](./erp-cov06b-picking-backorder-status.md).
 
-Next bounded Inventory work should target partial validation/backorder identity or one internal-transfer quant convergence path. Do not expand this slice into cycle counts, lots/serials, quality or replenishment.
+Next bounded Inventory work should certify one internal-transfer path with exact source/destination quant convergence. Do not expand into cycle counts, lots/serials, quality or replenishment.
 
 ## First implementation convergence
 
