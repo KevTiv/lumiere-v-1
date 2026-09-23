@@ -172,9 +172,9 @@ reproduced end-to-end through the ledger. Not changed in this PR. Pre-tenant pos
 envelope only if tenant limits stay below 1e9 major units per payment; otherwise a blocker requiring
 integer minor units/decimal.
 
-**Statement CSV parsing is client-side** (`payment-operations-panel.tsx`, file-private, not
-unit-testable without extraction). Server staging cases are PAY-10/11. Client findings (documented,
-not executed here):
+**Statement CSV parsing is client-side** and now extracted to
+`frontend/web/lib/statement-import-csv.ts` for focused unit certification. Server staging cases are
+PAY-10/11. Remaining client findings are tracked explicitly below:
 
 - `CSV-01` `parseStatementAmount("1.234,56")` → `1.23456` (European thousands + decimal comma misparsed silently).
 - `CSV-02` fixed on the parser-certification stack: quoted US grouped integers such as `"1,234"` and `"1,234,567"` parse as 1234 and 1234567, while ordinary decimal-comma values such as `12,34` retain decimal semantics.
