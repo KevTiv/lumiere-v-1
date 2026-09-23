@@ -23,23 +23,11 @@ export interface QuantSnapshot {
   reservedQuantity: number
 }
 
-async function postCommand(
-  page: Page,
-  reducer: string,
-  input: Record<string, unknown>,
-) {
-  const { urlPath, init } = stdbBffCommandPost(reducer as never, input as never)
-  return page.request.post(urlPath, {
-    headers: { "Content-Type": "application/json" },
-    data: JSON.parse(String(init.body)),
-  })
-}
-
 export async function createInternalLocation(
   page: Page,
   name: string,
 ): Promise<number> {
-  const response = await postCommand(page, "create_stock_location", {
+  const { urlPath, init } = stdbBffCommandPost("create_stock_location", {
     params: stdbParamsToJson(
       {
         name,
@@ -67,6 +55,10 @@ export async function createInternalLocation(
       },
       "CreateStockLocationParams",
     ),
+  })
+  const response = await page.request.post(urlPath, {
+    headers: { "Content-Type": "application/json" },
+    data: JSON.parse(String(init.body)),
   })
   expect(response.ok()).toBe(true)
 
@@ -120,7 +112,7 @@ export async function createStockQuantFixture(
   marker: string,
   quantity = 3,
 ): Promise<number> {
-  const response = await postCommand(page, "create_stock_quant", {
+  const { urlPath, init } = stdbBffCommandPost("create_stock_quant", {
     params: stdbParamsToJson(
       {
         companyId,
@@ -148,6 +140,10 @@ export async function createStockQuantFixture(
       },
       "CreateStockQuantParams",
     ),
+  })
+  const response = await page.request.post(urlPath, {
+    headers: { "Content-Type": "application/json" },
+    data: JSON.parse(String(init.body)),
   })
   expect(response.ok()).toBe(true)
 
