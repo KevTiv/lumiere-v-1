@@ -81,17 +81,20 @@ export function statementImportRows(csvData: string) {
   })
 }
 
-export function statementImportIdempotencyKey(
+export async function statementImportIdempotencyKey(
   companyId: bigint,
   journalId: bigint,
   currencyId: bigint,
   csvData: string,
-): string {
-  let hash = 2_166_136_261
+): Promise<string> {
   const normalizedCsv = normalizeCsvSource(csvData).replace(/\r\n/g, "\n").trim()
   const source = `${companyId}:${journalId}:${currencyId}:${normalizedCsv}`
-  for (let index = 0; index < source.length; index += 1) {
-    hash = Math.imul(hash ^ source.charCodeAt(index), 16_777_619)
-  }
-  return `statement-csv-${(hash >>> 0).toString(16)}`
+  const digest = await globalThis.crypto.subtle.digest(
+    "SHA-256",
+    new TextEncoder().encode(source),
+  )
+  const hex = Array.from(new Uint8Array(digest), (byte) =>
+    byte.toString(16).padStart(2, "0"),
+  ).join("")
+  return `statement-csv-sha256-${hex}`
 }
