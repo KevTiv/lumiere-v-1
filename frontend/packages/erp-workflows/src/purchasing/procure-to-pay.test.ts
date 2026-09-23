@@ -21,6 +21,7 @@ import {
   poSourceRfqId,
   purchaseLineOpenQty,
   receivePurchaseLineAction,
+  resolveOpenReceiptTarget,
 } from "./procure-to-pay"
 
 test("requisition actions follow Draft → InProgress → Approved, including enum-shaped state", () => {
@@ -116,16 +117,38 @@ test("receiving needs open quantity and defaults the row dispatch to all of it",
   assert.deepEqual(action.prepare?.({ id: 8, productQty: 10, qtyReceived: 4 }), { lineId: "8", qty: 6 })
 })
 
-test("the receipt just validated is the newest done move's picking for that line", () => {
-  const observed = observeReceivedLine("8", [
-    { purchaseLineId: 8, isDone: true, pickingId: 30 },
-    { purchaseLineId: 8, isDone: true, pickingId: 33 },
-    { purchaseLineId: 8, isDone: false, pickingId: 34 },
-    { purchaseLineId: 9, isDone: true, pickingId: 40 },
-  ])
-  assert.deepEqual(observed.next, { resource: "stock_picking", id: "33", module: "inventory", context: "purchasing" })
-  // A service line has no move, so the user stays where they are.
-  assert.deepEqual(observeReceivedLine("8", []), { outcome: "applied" })
+test("receipt correlation captures one open move before dispatch and never chooses newest", () => {
+  const before = [
+    { id: 100, purchaseLineId: 8, state: "draft", isDone: false, pickingId: 30 },
+    { id: 101, purchaseLineId: 9, state: "draft", isDone: false, pickingId: 40 },
+  ]
+  const target = resolveOpenReceiptTarget("8", before)
+  assert.deepEqual(target, { moveId: "100", pickingId: "30" })
+
+  const after = [
+    { id: 100, purchaseLineId: 8, state: "done", isDone: true, pickingId: 30 },
+    // A higher id done move for the same line must not steal the result identity.
+    { id: 109, purchaseLineId: 8, state: "done", isDone: true, pickingId: 33 },
+  ]
+  const observed = observeReceivedLine("8", target, after)
+  assert.deepEqual(observed.next, {
+    resource: "stock_picking",
+    id: "30",
+    module: "inventory",
+    context: "purchasing",
+  })
+
+  // Ambiguous open relations are unresolved, not reduced to first/latest.
+  assert.equal(
+    resolveOpenReceiptTarget("8", [
+      { id: 100, purchaseLineId: 8, state: "draft", pickingId: 30 },
+      { id: 102, purchaseLineId: 8, state: "assigned", pickingId: 31 },
+    ]),
+    undefined,
+  )
+
+  // A service line has no stock move, so the user stays where they are.
+  assert.deepEqual(observeReceivedLine("8", undefined, []), { outcome: "applied" })
 })
 
 test("an RFQ award prepares the bid's rfq and id and only offers submitted bids", () => {
