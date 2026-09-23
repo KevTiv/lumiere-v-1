@@ -83,3 +83,47 @@ test("CSV-03 keeps ISO statement dates accepted", () => {
 
   assert.notEqual(rows[0].date, undefined)
 })
+
+
+function legacyFnvStatementKey(
+  companyId: bigint,
+  journalId: bigint,
+  currencyId: bigint,
+  csvData: string,
+): string {
+  let hash = 2_166_136_261
+  const source = `${companyId}:${journalId}:${currencyId}:${csvData.replace(/\r\n/g, "\n").trim()}`
+  for (let index = 0; index < source.length; index += 1) {
+    hash = Math.imul(hash ^ source.charCodeAt(index), 16_777_619)
+  }
+  return `statement-csv-${(hash >>> 0).toString(16)}`
+}
+
+test("CSV-04 separates distinct statement files that collide under the legacy 32-bit key", async () => {
+  const csvA = [
+    "date,amount,reference",
+    "2026-07-01,76303,TX-76303",
+  ].join("\n")
+  const csvB = [
+    "date,amount,reference",
+    "2026-07-01,86018,TX-86018",
+  ].join("\n")
+
+  assert.equal(
+    legacyFnvStatementKey(1n, 2n, 3n, csvA),
+    legacyFnvStatementKey(1n, 2n, 3n, csvB),
+  )
+
+  const keyA = await statementImportIdempotencyKey(1n, 2n, 3n, csvA)
+  const keyB = await statementImportIdempotencyKey(1n, 2n, 3n, csvB)
+  assert.notEqual(keyA, keyB)
+  assert.match(keyA, /^statement-csv-sha256-[0-9a-f]{64}$/)
+  assert.match(keyB, /^statement-csv-sha256-[0-9a-f]{64}$/)
+})
+
+test("CSV-04 statement identity remains scoped by company, journal, and currency", async () => {
+  const base = await statementImportIdempotencyKey(1n, 2n, 3n, CSV)
+  assert.notEqual(base, await statementImportIdempotencyKey(9n, 2n, 3n, CSV))
+  assert.notEqual(base, await statementImportIdempotencyKey(1n, 9n, 3n, CSV))
+  assert.notEqual(base, await statementImportIdempotencyKey(1n, 2n, 9n, CSV))
+})
