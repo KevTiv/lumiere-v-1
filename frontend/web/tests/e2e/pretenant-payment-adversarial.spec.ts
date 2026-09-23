@@ -35,7 +35,6 @@ import {
   browserPost,
   callRaw,
   callRawOk,
-  expectKnownDefect,
   loseNextResponse,
   openActorPages,
   openOwnerPages,
