@@ -75,6 +75,7 @@ import { usePickingWorkflow } from '@lumiere/query-hooks/hooks/picking-workflow'
 import { useStockQuantWorkflow } from '@lumiere/query-hooks/hooks/stock-quant-workflow';
 import { useQualityCheckFailWorkflow } from '@lumiere/query-hooks/hooks/quality-check-fail-workflow';
 import { useReplenishmentExecutionWorkflow } from '@lumiere/query-hooks/hooks/replenishment-execution-workflow';
+import { useSerialReserveWorkflow } from '@lumiere/query-hooks/hooks/serial-reserve-workflow';
 import { planPartialDelivery } from '@lumiere/erp-workflows';
 import { groupBy } from '@/lib/utils';
 import { InventoryOpsPanel } from './inventory-ops-panel';
@@ -1042,6 +1043,7 @@ function InventoryClientLoaded({
   );
   const useSerial = useUseSerial(orgId, operatingCompanyId);
   const blockSerial = useBlockSerial(orgId, operatingCompanyId);
+  const reserveSerial = useSerialReserveWorkflow(orgId, workflowSurface);
   const createStockProductionLot = useCreateStockProductionLot(
     orgId,
     operatingCompanyId,
@@ -3074,7 +3076,11 @@ function InventoryClientLoaded({
                       locationId: undefined,
                       packageId: undefined,
                       ownerId: undefined,
-                      state: 'available',
+                      // The serial lifecycle only recognizes "free" as the
+                      // initial state (reserve_serial/use_serial/etc. all
+                      // check for it verbatim) — "available" left every
+                      // UI-created serial permanently unreservable.
+                      state: 'free',
                       isScrap: false,
                       isLocked: false,
                       warrantyExpiration: undefined,
@@ -3084,6 +3090,20 @@ function InventoryClientLoaded({
                       maintenanceCount: 0,
                       metadata: undefined,
                     });
+                  },
+                },
+                {
+                  id: 'reserve-serial',
+                  label: t('inventory.productionSerials.actions.reserve'),
+                  icon: ListChecks,
+                  requiresSelection: true,
+                  onClick: (rows) => {
+                    const id = rows[0]?.id as ScalarId | undefined;
+                    if (id != null)
+                      void reserveSerial.reserve(
+                        { serialId: String(id) },
+                        { navigateToNext: true },
+                      );
                   },
                 },
                 {
