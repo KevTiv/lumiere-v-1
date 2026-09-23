@@ -2115,6 +2115,74 @@ pub fn allocate_payment_transaction(
 
 // ── Reversal reducers ─────────────────────────────────────────────────────────
 
+fn validate_committed_reversal_replay(
+    ctx: &ReducerContext,
+    original: &PaymentTransaction,
+    params: &ReversePaymentTransactionParams,
+) -> Result<(), String> {
+    let reversals: Vec<_> = ctx
+        .db
+        .payment_reversal()
+        .reversal_by_original()
+        .filter(&original.id)
+        .collect();
+    let [reversal] = reversals.as_slice() else {
+        return Err(format!(
+            "reversed payment transaction has {} reversal records",
+            reversals.len()
+        ));
+    };
+
+    let original_account_payment_id = original
+        .account_payment_id
+        .ok_or("reversed payment transaction has no original ledger payment")?;
+    if reversal.organization_id != original.organization_id
+        || reversal.company_id != original.company_id
+        || reversal.original_transaction_id != original.id
+        || reversal.original_account_payment_id != original_account_payment_id
+    {
+        return Err("reversal record does not match the original payment transaction".to_string());
+    }
+    if reversal.reason != params.reason || reversal.metadata != params.metadata {
+        return Err("reversal retry payload differs from the committed reversal".to_string());
+    }
+
+    validate_committed_payment_ledger_effect(ctx, original)?;
+
+    let correcting = ctx
+        .db
+        .payment_transaction()
+        .id()
+        .find(&reversal.correcting_transaction_id)
+        .ok_or("reversal correcting payment transaction is missing")?;
+    let expected_direction = match original.direction {
+        PaymentDirection::Inbound => PaymentDirection::Outbound,
+        PaymentDirection::Outbound => PaymentDirection::Inbound,
+    };
+    if correcting.organization_id != original.organization_id
+        || correcting.company_id != original.company_id
+        || correcting.payment_account_id != original.payment_account_id
+        || correcting.direction != expected_direction
+        || correcting.partner_type != original.partner_type
+        || correcting.partner_id != original.partner_id
+        || correcting.currency_id != original.currency_id
+        || (correcting.gross_external_amount - original.gross_external_amount).abs()
+            > RECONCILIATION_EPSILON
+        || (correcting.settlement_amount - original.settlement_amount).abs()
+            > RECONCILIATION_EPSILON
+        || (correcting.net_account_amount - original.net_account_amount).abs()
+            > RECONCILIATION_EPSILON
+        || correcting.status != PaymentTransactionStatus::Posted
+        || correcting.source_entity.as_deref() != Some("reversal")
+        || correcting.source_entity_id != Some(original.id)
+        || correcting.account_payment_id != Some(reversal.correcting_account_payment_id)
+    {
+        return Err("reversal correcting payment transaction is inconsistent".to_string());
+    }
+
+    validate_committed_payment_ledger_effect(ctx, &correcting)
+}
+
 /// Reverse a posted payment transaction. Creates a compensating transaction,
 /// ledger payment, and reversal record without mutating the original.
 #[reducer]
