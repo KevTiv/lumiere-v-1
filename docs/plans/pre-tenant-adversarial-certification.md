@@ -179,8 +179,7 @@ PAY-10/11. Remaining client findings are tracked explicitly below:
 - `CSV-01` `parseStatementAmount("1.234,56")` → `1.23456` (European thousands + decimal comma misparsed silently).
 - `CSV-02` fixed on the parser-certification stack: quoted US grouped integers such as `"1,234"` and `"1,234,567"` parse as 1234 and 1234567, while ordinary decimal-comma values such as `12,34` retain decimal semantics.
 - `CSV-03` fixed on the parser-certification stack: numeric slash dates are rejected without an explicit date-format/locale contract, so DD/MM and MM/DD are never silently reinterpreted. ISO `YYYY-MM-DD` remains accepted.
-- `CSV-04` the import idempotency key is a 32-bit hash of the file; combined with PAY-11B a collision
-  silently drops a different statement.
+- `CSV-04` fixed on the parser-certification stack: statement import identity now uses full SHA-256 over company/journal/currency scope plus normalized CSV content. A real pair that collides under the legacy 32-bit FNV key is certified to produce distinct SHA-256 identities.
 
 ## Coverage matrix
 
