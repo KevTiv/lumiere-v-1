@@ -222,7 +222,7 @@ Legend — Class: **C** covered, **P** partial, **N** not covered, **B** blocked
 | CSV US thousands grouping | `"1,234"` and multi-group integers parse as grouping; decimal-comma values remain decimals | — | web unit | yes | CSV-BOM extraction | CSV-02 | C |
 | CSV ambiguous slash dates | numeric slash dates fail closed without an explicit format/locale; ISO remains accepted | — | web unit | yes | parser extraction | CSV-03 | C |
 | CSV statement import identity | SHA-256 over scoped normalized CSV; certified against a legacy FNV-32 collision pair | — | web unit | yes | parser extraction | CSV-04 | C |
-| CSV mixed European separators | current parser behavior only | focused locale parser fixture/policy | web unit | no | parser extraction | CSV-01 | N |
+| CSV mixed European separators | canonical grouped-decimal forms parse correctly; decimal-comma and US mixed-separator regressions remain covered | — | web unit | yes | parser extraction | CSV-01 | C |
 
 ### Frontend IR (all require the IR stack)
 
