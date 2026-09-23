@@ -979,10 +979,24 @@ function InventoryClientLoaded({
     return withDefaultsFromRow(editProductForm(t), editProductRow);
   }, [t, editProductRow]);
 
+  const qcLocationOptions = useMemo(() => {
+    const opts = locations.map((loc) => ({
+      value: String(loc.id),
+      label: String(loc.completeName ?? loc.name ?? loc.id),
+    }));
+    return [
+      { value: '', label: t('inventory.forms.editWarehouse.fields.qcStockLocNone') },
+      ...opts,
+    ];
+  }, [locations, t]);
+
   const editWarehouseModalConfig = useMemo(() => {
-    if (!editWarehouseRow) return editWarehouseForm(t);
-    return withDefaultsFromRow(editWarehouseForm(t), editWarehouseRow);
-  }, [t, editWarehouseRow]);
+    const base = mergeSelectOptionsForFields(editWarehouseForm(t), {
+      whQcStockLocId: qcLocationOptions,
+    });
+    if (!editWarehouseRow) return base;
+    return withDefaultsFromRow(base, editWarehouseRow);
+  }, [t, editWarehouseRow, qcLocationOptions]);
 
   // 3D viewer — use first warehouse found (or 0n as a no-op before warehouses load)
   const firstWarehouseId = warehouses[0]?.id
@@ -4809,9 +4823,24 @@ function InventoryClientLoaded({
         onSubmit={async (fd) => {
           if (!editWarehouseRow) return;
           const id = editWarehouseRow.id as ScalarId;
+          // whQcStockLocId is not yet part of the generated UpdateWarehouseParams
+          // TS shape (pending an @lumiere/contracts release); pre-encode its SATS
+          // option wrapper by hand so stdbParamsToJson passes it through as-is
+          // regardless of whether the generated option-fields list knows about it.
+          const qcStockLocRaw = fd.whQcStockLocId;
+          const whQcStockLocId =
+            qcStockLocRaw == null || String(qcStockLocRaw).trim() === ''
+              ? { none: [] }
+              : { some: Number(qcStockLocRaw) };
           await updateWarehouse.mutateAsync({
             warehouseId: id,
             params: {
+              // Cast: whQcStockLocId is not yet part of the generated
+              // UpdateWarehouseParams TS shape (pending an @lumiere/contracts
+              // release); the pre-encoded SATS option wrapper above still
+              // reaches the server correctly since stdbParamsToJson passes an
+              // already-wrapped { some }/{ none } value through unchanged.
+              ...({ whQcStockLocId } as Record<string, unknown>),
               name:
                 fd.name != null && String(fd.name).trim() !== ''
                   ? String(fd.name)

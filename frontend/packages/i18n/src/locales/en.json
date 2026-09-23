@@ -5038,6 +5038,9 @@
           "crossdock": "Cross-dock",
           "buyToResupply": "Buy to resupply",
           "manufactureToResupply": "Manufacture to resupply",
+          "qcStockLocId": "Quality control location",
+          "qcStockLocPlaceholder": "Select a location…",
+          "qcStockLocNone": "Not configured",
           "metadata": "Metadata (JSON)"
         }
       },

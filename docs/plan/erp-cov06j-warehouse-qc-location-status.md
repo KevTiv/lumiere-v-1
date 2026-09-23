@@ -5,6 +5,8 @@
 **Stacked base:** PR #72 / `codex/cov06i-serial-reserve-lifecycle`
 **Operator proof:** native domain test only — no browser proof in this slice (see blocker below)
 
+> **Correction (COV-06k):** the "frontend wiring blocked" conclusion below was wrong. `stdbParamsToJson` passes through an already-hand-encoded SATS option value before consulting the generated option-fields registry — an established codebase convention — so the UI did not need to wait for an `@lumiere/contracts` release. See [`erp-cov06k-warehouse-qc-location-ui-status.md`](./erp-cov06k-warehouse-qc-location-ui-status.md) for the actual UI wiring and browser proof.
+
 ## Bounded path
 
 ```text
