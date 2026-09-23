@@ -10,6 +10,7 @@ import {
   fetchFirstUomId,
   fillField,
   gotoModule,
+  openEntityCreate,
   scalarQueryId,
   selectEntityRowById,
   selectModuleTab,
@@ -109,7 +110,7 @@ export async function findProductIdByName(
 async function createTrackedProductFixture(
   page: Page,
   name: string,
-  tracking: "lot" | "serial",
+  tracking: "lot" | "serial" | "none",
 ): Promise<number> {
   const categoriesRes = await page.request.get("/api/query/product-categories")
   if (!categoriesRes.ok()) throw new Error("Failed to query product categories")
@@ -169,6 +170,15 @@ export async function createSerialTrackedProductFixture(
   name: string,
 ): Promise<number> {
   return createTrackedProductFixture(page, name, "serial")
+}
+
+/** Create an untracked product. The dev seed's laptop is untracked too, but a fresh
+ * product avoids sharing on-hand quants with other specs/fixtures. */
+export async function createProductFixture(
+  page: Page,
+  name: string,
+): Promise<number> {
+  return createTrackedProductFixture(page, name, "none")
 }
 
 export async function createStockProductionLotFixture(
@@ -577,6 +587,60 @@ export async function runCycleCountToPostedViaWizardUi(
     timeout: 30_000,
   })
   await page.getByTestId("cycle-wizard-post").click()
+}
+
+/** Create a quality check for a product through the Quality checks tab's create form. */
+export async function createQualityCheckViaUi(
+  page: Page,
+  productName: string,
+  name: string,
+): Promise<void> {
+  await openEntityCreate(page, "/inventory", "inventory", "quality", "new-quality-check")
+  await fillField(page, "name", name)
+  await page.getByTestId("form-field-productId").click()
+  await page.getByRole("option", { name: productName }).click()
+  await Promise.all([
+    page.waitForResponse(
+      (response) =>
+        matchesOperationResponse(response, "create_quality_check") &&
+        response.ok(),
+      { timeout: 30_000 },
+    ),
+    submitForm(page, "new-quality-check"),
+  ])
+}
+
+/**
+ * Fail a quality check through the Quality checks tab's row action. The action
+ * prompts for a quarantine location id then a failure reason, in that order.
+ */
+export async function failQualityCheckViaUi(
+  page: Page,
+  checkId: number,
+  quarantineLocationId: number,
+  reason: string,
+): Promise<void> {
+  await gotoModule(page, "/inventory", "inventory")
+  await selectModuleTab(page, "inventory", "quality")
+  await selectEntityRowById(page, checkId)
+
+  const prompts = [String(quarantineLocationId), reason]
+  page.once("dialog", async (dialog) => {
+    await dialog.accept(prompts.shift() ?? "")
+    page.once("dialog", async (nextDialog) => {
+      await nextDialog.accept(prompts.shift() ?? "")
+    })
+  })
+
+  await Promise.all([
+    page.waitForResponse(
+      (response) =>
+        matchesOperationResponse(response, "fail_quality_check") &&
+        response.ok(),
+      { timeout: 30_000 },
+    ),
+    page.getByTestId("entity-action-fail-check").click(),
+  ])
 }
 
 export async function expectCanonicalQuantFocus(

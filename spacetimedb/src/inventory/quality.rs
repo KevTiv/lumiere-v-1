@@ -737,18 +737,37 @@ fn resolve_quality_source_location(
         }
     }
 
-    ctx.db
+    // No picking-tied candidate (or it has no stock): resolve across every on-hand
+    // location for this product/lot. More than one location is ambiguous — fail
+    // closed rather than quarantining stock at whichever the iterator visits first.
+    let mut candidate_locations: Vec<u64> = ctx
+        .db
         .stock_quant()
         .quant_by_product()
         .filter(&product_id)
-        .find(|q| {
+        .filter(|q| {
             q.organization_id == organization_id
                 && q.company_id == company_id
                 && q.lot_id == lot_id
                 && q.quantity > 0.0
         })
         .map(|q| q.location_id)
-        .ok_or_else(|| format!("No on-hand quant for product {} to quarantine", product_id))
+        .collect();
+    candidate_locations.sort_unstable();
+    candidate_locations.dedup();
+
+    match candidate_locations.len() {
+        0 => Err(format!(
+            "No on-hand quant for product {} to quarantine",
+            product_id
+        )),
+        1 => Ok(candidate_locations[0]),
+        _ => Err(format!(
+            "Product {} has on-hand stock at {} locations — pass failure_location_id to disambiguate",
+            product_id,
+            candidate_locations.len()
+        )),
+    }
 }
 
 // ══════════════════════════════════════════════════════════════════════════════

@@ -4845,6 +4845,7 @@
       "pass": "Pass check",
       "fail": "Fail check",
       "failReason": "Reason for failure:",
+      "quarantineLocationPrompt": "Quarantine location ID",
       "confirmDeleteCheck": "Delete this quality check?",
       "startCheck": "Start check",
       "linkDevice": "Link IoT device…",
