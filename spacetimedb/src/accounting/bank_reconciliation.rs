@@ -346,14 +346,34 @@ pub fn stage_bank_statement_import(
     if journal.company_id != company_id {
         return Err("Journal does not belong to the specified company".to_string());
     }
+
+    let payload_fingerprint = format!(
+        "journal_id={journal_id};currency_id={currency_id};params={params:?}"
+    );
+    if replayed_result(
+        ctx,
+        organization_id,
+        company_id,
+        "stage_bank_statement_import",
+        &params.idempotency_key,
+        &payload_fingerprint,
+    )?
+    .is_some()
+    {
+        return Ok(());
+    }
     if ctx.db.bank_statement_import().iter().any(|import| {
         import.organization_id == organization_id
             && import.company_id == company_id
             && import.idempotency_key == params.idempotency_key
     }) {
-        return Ok(());
+        return Err(
+            "statement import exists without an idempotency receipt; replay cannot be verified"
+                .to_string(),
+        );
     }
 
+    let idempotency_key = params.idempotency_key.clone();
     let mut invalid_rows = 0_u32;
     let mut staged_lines = Vec::with_capacity(params.rows.len());
     for row in params.rows {
