@@ -128,6 +128,12 @@ test.describe("Bank statement CSV staging", { tag: ["@phase-1", "@accounting"] }
     const invalidImport = invalidWorkspace.imports.find((row) => String(field(row, "idempotencyKey", "idempotency_key")) === invalidKey)
     expect(field(invalidImport ?? {}, "state")).toBe("needs_review")
     expect(idOf(field(invalidImport ?? {}, "invalidRows", "invalid_rows"))).toBe(1)
+    const invalidLines = invalidWorkspace.lines.filter(
+      (line) => idOf(field(line, "importId", "import_id")) === idOf(field(invalidImport ?? {}, "id")),
+    )
+    expect(invalidLines).toHaveLength(1)
+    expect(field(invalidLines[0], "amount")).toBe(35)
+    expect(field(invalidLines[0], "reference")).toBeUndefined()
 
     await stage(validKey, [{ row_number: 2, date: some(timestamp("2026-07-01T00:00:00.000Z")), amount: some(125.5), reference: some(marker), description: some("Customer transfer") }])
     let validImport: QueryRow | undefined
