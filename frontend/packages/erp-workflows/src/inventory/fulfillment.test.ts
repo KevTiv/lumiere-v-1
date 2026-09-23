@@ -5,6 +5,7 @@ import {
   INVENTORY_QUERY_RESOURCES,
   PICKING_ORDER_RESOURCES,
   PICKING_TRANSITION_AFFECTS,
+  observePickingState,
   observeValidatedPicking,
   packPickingAction,
   partialValidatePickingAction,
@@ -77,6 +78,21 @@ test("a picking transition refreshes stock and the orders that originated it", (
   assert.equal(new Set(INVENTORY_QUERY_RESOURCES).size, INVENTORY_QUERY_RESOURCES.length, "no duplicates")
 })
 
+test("confirm and assign require the same picking id at the expected state", () => {
+  assert.deepEqual(
+    observePickingState("5", "confirmed", [{ id: 5, state: "confirmed" }]),
+    {
+      outcome: "applied",
+      next: { resource: "stock_picking", id: "5", module: "inventory" },
+    },
+  )
+  assert.deepEqual(
+    observePickingState("5", "assigned", [{ id: 5, state: "confirmed" }]),
+    {},
+  )
+  assert.deepEqual(observePickingState("5", "done", [{ id: 6, state: "done" }]), {})
+})
+
 test("validating with a backorder links the newest backorder picking, keeping the sales context", () => {
   const observed = observeValidatedPicking("5", [
     { id: 5, saleId: 2, state: "done" },
@@ -87,11 +103,20 @@ test("validating with a backorder links the newest backorder picking, keeping th
   assert.equal(observed.outcome, "applied")
   assert.deepEqual(observed.createdRecords?.map((r) => r.id), ["9", "8"])
   assert.deepEqual(observed.createdRecords?.[0], { resource: "stock_picking", id: "9", module: "inventory", context: "sales" })
-  assert.equal(observed.next, undefined)
+  assert.deepEqual(observed.next, {
+    resource: "stock_picking",
+    id: "5",
+    module: "inventory",
+    context: "sales",
+  })
 })
 
-test("validating in full claims no created record, and an unknown picking claims nothing", () => {
-  assert.deepEqual(observeValidatedPicking("5", [{ id: 5, state: "done" }]), { outcome: "applied" })
+test("validating in full requires done state and returns the same picking", () => {
+  assert.deepEqual(observeValidatedPicking("5", [{ id: 5, state: "done" }]), {
+    outcome: "applied",
+    next: { resource: "stock_picking", id: "5", module: "inventory" },
+  })
+  assert.deepEqual(observeValidatedPicking("5", [{ id: 5, state: "assigned" }]), {})
   assert.deepEqual(observeValidatedPicking("5", []), {})
 })
 
