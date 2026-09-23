@@ -52,8 +52,9 @@ use crate::inventory::quality::{
     create_quality_check, fail_quality_check, quality_check, CreateQualityCheckParams,
 };
 use crate::inventory::replenishment::{
-    create_replenishment_rule, execute_replenishment_rule, replenishment_rule,
-    CreateReplenishmentRuleParams,
+    cancel_replenishment_run, create_replenishment_rule, execute_replenishment_rule,
+    replenishment_rule, replenishment_run_job, run_scheduled_replenishment,
+    schedule_replenishment_run, CreateReplenishmentRuleParams, ReplenishmentRunJob,
 };
 use crate::inventory::stock::{
     apply_validated_move_to_quants, assign_stock_picking, confirm_stock_picking, create_stock_move,
@@ -1766,6 +1767,241 @@ pub fn test_replenishment_creates_draft_po(ctx: &ReducerContext) -> Result<(), S
     if !meta.contains("buy") {
         return Err(format!("expected demand_type buy in metadata, got {meta}"));
     }
+    Ok(())
+}
+
+/// `next_run` was previously an inert timestamp: nothing consumed it. This
+/// proves the actual recurring schedule: scheduling a rule creates one job,
+/// firing that job (simulating the scheduler's own dispatch — delete-then-
+/// invoke, matching how SpacetimeDB actually runs a scheduled reducer) both
+/// executes the rule and reschedules exactly one new job, and cancelling
+/// removes it. Scheduling an already-scheduled rule fails closed.
+pub fn test_replenishment_scheduled_run_reschedules(ctx: &ReducerContext) -> Result<(), String> {
+    ensure_test_superuser(ctx)?;
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let org_id = fixture.organization_id;
+    let company_id = fixture.company_id;
+    let product = ctx
+        .db
+        .product()
+        .id()
+        .find(&fixture.product_id)
+        .ok_or("product")?;
+
+    create_contact(
+        ctx,
+        org_id,
+        CreateContactParams {
+            name: "Sched Replen Vendor".to_string(),
+            type_: "contact".to_string(),
+            email: None,
+            phone: None,
+            mobile: None,
+            company_id: Some(company_id),
+            is_customer: false,
+            is_vendor: true,
+            is_employee: false,
+            is_prospect: false,
+            is_partner: false,
+            customer_rank: 0,
+            supplier_rank: 1,
+            display_name: Some("Sched Replen Vendor".to_string()),
+            first_name: None,
+            last_name: None,
+            title: None,
+            email_secondary: None,
+            fax: None,
+            website: None,
+            street: None,
+            street2: None,
+            city: None,
+            state_code: None,
+            zip: None,
+            country_code: None,
+            tax_id: None,
+            company_registry: None,
+            industry: None,
+            employees_count: None,
+            annual_revenue: None,
+            description: None,
+            salesperson_id: None,
+            assigned_user_id: None,
+            parent_id: None,
+            user_id: None,
+            color: None,
+            metadata: Some(r#"{"test":"sched-replen"}"#.to_string()),
+        },
+    )?;
+    let vendor_id = ctx
+        .db
+        .contact()
+        .iter()
+        .find(|c| c.organization_id == org_id && c.display_name == "Sched Replen Vendor")
+        .map(|c| c.id)
+        .ok_or("vendor")?;
+
+    create_product_supplier_info(
+        ctx,
+        org_id,
+        CreateProductSupplierInfoParams {
+            partner_id: vendor_id,
+            product_tmpl_id: Some(fixture.product_id),
+            product_id: Some(fixture.product_id),
+            min_qty: 1.0,
+            price: 12.0,
+            currency_id: 1,
+            delay: 3,
+            sequence: 1,
+            product_name: None,
+            product_code: None,
+            date_start: None,
+            date_end: None,
+        },
+    )?;
+
+    create_stock_location(
+        ctx,
+        org_id,
+        CreateStockLocationParams {
+            name: "Sched Replen Empty Dest".to_string(),
+            usage: "internal".to_string(),
+            location_category: "internal".to_string(),
+            parent_path: "/".to_string(),
+            child_left: 0,
+            child_right: 0,
+            scrap_location: false,
+            return_location: false,
+            active: true,
+            posx: 0.0,
+            posy: 0.0,
+            posz: 0.0,
+            cyclic_inventory_frequency: 0,
+            location_id: None,
+            complete_name: Some("Sched Replen Empty Dest".to_string()),
+            valuation_in_account_id: None,
+            valuation_out_account_id: None,
+            comment: None,
+            barcode: None,
+            last_inventory_date: None,
+            next_inventory_date: None,
+            metadata: Some(r#"{"test":"sched-replen-empty-dest"}"#.to_string()),
+        },
+    )?;
+    let empty_dest_location_id = ctx
+        .db
+        .stock_location()
+        .iter()
+        .find(|l| l.organization_id == org_id && l.name == "Sched Replen Empty Dest")
+        .map(|l| l.id)
+        .ok_or("empty dest location missing")?;
+
+    create_replenishment_rule(
+        ctx,
+        org_id,
+        company_id,
+        CreateReplenishmentRuleParams {
+            product_id: fixture.product_id,
+            location_id: empty_dest_location_id,
+            warehouse_id: Some(fixture.warehouse_id),
+            uom_id: product.uom_id,
+            product_min_qty: 10.0,
+            product_max_qty: 20.0,
+            qty_multiple: 5.0,
+            lead_days: 2,
+            route_id: None,
+            trigger: "auto".to_string(),
+            group_id: None,
+            active: true,
+            last_run: None,
+            next_run: None,
+            metadata: None,
+        },
+    )?;
+    let rule_id = ctx
+        .db
+        .replenishment_rule()
+        .iter()
+        .find(|r| r.organization_id == org_id && r.product_id == fixture.product_id)
+        .map(|r| r.id)
+        .ok_or("rule missing")?;
+
+    // Scheduling an already-scheduled rule fails closed.
+    schedule_replenishment_run(ctx, org_id, company_id, rule_id)?;
+    match schedule_replenishment_run(ctx, org_id, company_id, rule_id) {
+        Err(msg) if msg.to_lowercase().contains("already") => {}
+        Err(msg) => return Err(format!("Expected duplicate-schedule rejection, got: {msg}")),
+        Ok(()) => return Err("duplicate scheduling was accepted".into()),
+    }
+
+    let jobs_before: Vec<_> = ctx
+        .db
+        .replenishment_run_job()
+        .replenishment_run_job_by_rule()
+        .filter(&rule_id)
+        .collect();
+    if jobs_before.len() != 1 {
+        return Err(format!(
+            "expected exactly one scheduled job, got {}",
+            jobs_before.len()
+        ));
+    }
+    let job = jobs_before[0].clone();
+    let job_id = job.scheduled_id;
+
+    // Simulate the scheduler's own dispatch: the job row is gone by the time
+    // the reducer body runs (SpacetimeDB deletes it after invoking the
+    // reducer for a real fire, but the row must not exist to test that this
+    // reducer's own reschedule is a fresh insert, not a mutation of the same row).
+    ctx.db.replenishment_run_job().scheduled_id().delete(&job_id);
+    run_scheduled_replenishment(ctx, job)?;
+
+    let rule_after = ctx
+        .db
+        .replenishment_rule()
+        .id()
+        .find(&rule_id)
+        .ok_or("rule after scheduled run")?;
+    if rule_after.last_run.is_none() {
+        return Err("expected last_run stamped by the scheduled run".into());
+    }
+    let meta = rule_after.metadata.unwrap_or_default();
+    if !meta.contains("buy") {
+        return Err(format!("expected demand_type buy in metadata, got {meta}"));
+    }
+
+    let jobs_after: Vec<_> = ctx
+        .db
+        .replenishment_run_job()
+        .replenishment_run_job_by_rule()
+        .filter(&rule_id)
+        .collect();
+    if jobs_after.len() != 1 {
+        return Err(format!(
+            "expected exactly one rescheduled job, got {}",
+            jobs_after.len()
+        ));
+    }
+    if jobs_after[0].scheduled_id == job_id {
+        return Err("reschedule reused the old job id instead of inserting a new one".into());
+    }
+
+    cancel_replenishment_run(ctx, org_id, company_id, rule_id)?;
+    let jobs_cancelled: Vec<_> = ctx
+        .db
+        .replenishment_run_job()
+        .replenishment_run_job_by_rule()
+        .filter(&rule_id)
+        .collect();
+    if !jobs_cancelled.is_empty() {
+        return Err(format!(
+            "expected no scheduled jobs after cancel, got {}",
+            jobs_cancelled.len()
+        ));
+    }
+
+    // Cancelling an unscheduled rule is a no-op success, not an error.
+    cancel_replenishment_run(ctx, org_id, company_id, rule_id)?;
+
     Ok(())
 }
 
