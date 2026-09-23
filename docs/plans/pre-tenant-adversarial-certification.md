@@ -221,7 +221,8 @@ Legend — Class: **C** covered, **P** partial, **N** not covered, **B** blocked
 | CSV UTF-8 BOM | extracted statement parser strips BOM before header parsing and idempotency hashing | — | web unit | yes | — | CSV-BOM | C |
 | CSV US thousands grouping | `"1,234"` and multi-group integers parse as grouping; decimal-comma values remain decimals | — | web unit | yes | CSV-BOM extraction | CSV-02 | C |
 | CSV ambiguous slash dates | numeric slash dates fail closed without an explicit format/locale; ISO remains accepted | — | web unit | yes | parser extraction | CSV-03 | C |
-| CSV mixed European separators / hash collisions | current parser behavior only | focused parser fixtures and stronger identity | web unit | no | parser extraction | CSV-01, CSV-04 | N |
+| CSV statement import identity | SHA-256 over scoped normalized CSV; certified against a legacy FNV-32 collision pair | — | web unit | yes | parser extraction | CSV-04 | C |
+| CSV mixed European separators | current parser behavior only | focused locale parser fixture/policy | web unit | no | parser extraction | CSV-01 | N |
 
 ### Frontend IR (all require the IR stack)
 
