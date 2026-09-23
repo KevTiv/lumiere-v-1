@@ -295,7 +295,12 @@ fn pay_01_interleaved_allocations_never_exceed_payment(ctx: &ReducerContext) -> 
         return Err("second cashier allocation exceeded the available payment".to_string());
     }
     require_minor_eq("net allocated", from_minor(net_allocated_minor(ctx, payment), CENTS), 8_000, CENTS)?;
-    require_minor_eq("invoice A residual", invoice_residual(ctx, invoice_a)?, 0, CENTS)?;
+    require_minor_eq(
+        "invoice A residual",
+        invoice_residual(ctx, invoice_a)?,
+        0,
+        CENTS,
+    )?;
     require_minor_eq("invoice B residual", invoice_residual(ctx, invoice_b)?, 5_000, CENTS)?;
     require_minor_eq("unapplied", unapplied(ctx, payment)?, 2_000, CENTS)?;
 
@@ -499,14 +504,26 @@ fn pay_06_overpayment_and_partial_multi_invoice_are_explicit(
             .iter()
             .any(|row| to_minor(row.write_off_amount, CENTS) != 0 || row.write_off_move_id.is_some())
     {
-        return Err("multi-invoice allocation produced an implicit write-off or wrong row count".to_string());
+        return Err(
+            "multi-invoice allocation produced an implicit write-off or wrong row count".to_string(),
+        );
     }
     if net_allocated_minor(ctx, payment) != 12_000 {
         return Err("multi-invoice allocations did not consume the exact payment amount".to_string());
     }
 
-    require_minor_eq("invoice B residual", invoice_residual(ctx, invoice_b)?, 3_000, CENTS)?;
-    require_minor_eq("unapplied after invoice B partial", unapplied(ctx, payment)?, 0, CENTS)?;
+    require_minor_eq(
+        "invoice B residual",
+        invoice_residual(ctx, invoice_b)?,
+        3_000,
+        CENTS,
+    )?;
+    require_minor_eq(
+        "unapplied after invoice B partial",
+        unapplied(ctx, payment)?,
+        0,
+        CENTS,
+    )?;
 
     let settlement = ctx
         .db
