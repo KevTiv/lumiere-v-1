@@ -27,6 +27,7 @@ The slice reuses the existing Purchasing UI, typed workflow runner, generated op
 - the purchasing persona performs the principal confirmation through the visible UI;
 - readback requires the same PO id to reach `Purchase`;
 - receipt identity is derived from every non-return inbound `stock_picking.purchase_id == orderId` effect;
+- the default `stock-pickings` query projection exposes `purchase_id`, so canonical receipt readback can actually resolve that relation;
 - stale confirmation must return 422 and preserve the exact receipt set;
 - the limited reader must return 403 and preserve the same PO state and receipt set;
 - the workflow result must navigate to `/purchasing?tab=orders&filter=id:<orderId>`.
