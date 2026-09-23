@@ -177,7 +177,7 @@ unit-testable without extraction). Server staging cases are PAY-10/11. Client fi
 not executed here):
 
 - `CSV-01` `parseStatementAmount("1.234,56")` → `1.23456` (European thousands + decimal comma misparsed silently).
-- `CSV-02` `parseStatementAmount("1,234")` → `1.234` (US thousands separator read as decimal comma).
+- `CSV-02` fixed on the parser-certification stack: quoted US grouped integers such as `"1,234"` and `"1,234,567"` parse as 1234 and 1234567, while ordinary decimal-comma values such as `12,34` retain decimal semantics.
 - `CSV-03` `NN/NN/YYYY` is always read as DD/MM; US exports are silently mis-dated.
 - `CSV-04` the import idempotency key is a 32-bit hash of the file; combined with PAY-11B a collision
   silently drops a different statement.
