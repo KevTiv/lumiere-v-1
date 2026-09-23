@@ -7,6 +7,7 @@ import { matchesOperationResponse } from "./operation-response"
 import {
   activeTabEntityTable,
   chooseSelectOptionByLabel,
+  fetchFirstUomId,
   fillField,
   gotoModule,
   scalarQueryId,
@@ -105,6 +106,162 @@ export async function findProductIdByName(
   return id
 }
 
+/** Create a lot-tracked product (`tracking: "lot"`). The dev seed has no such product by default. */
+export async function createLotTrackedProductFixture(
+  page: Page,
+  name: string,
+): Promise<number> {
+  const categoriesRes = await page.request.get("/api/query/product-categories")
+  if (!categoriesRes.ok()) throw new Error("Failed to query product categories")
+  const categories = (await categoriesRes.json()) as {
+    data?: Array<Record<string, unknown>>
+  }
+  const categoryId = scalarQueryId(categories.data?.[0]?.id)
+  if (categoryId == null) throw new Error("No product category in seed data")
+
+  const uomId = await fetchFirstUomId(page)
+
+  const currenciesRes = await page.request.get("/api/bootstrap/currencies")
+  if (!currenciesRes.ok()) throw new Error("Failed to query currencies")
+  const currencies = (await currenciesRes.json()) as {
+    data?: Array<Record<string, unknown>>
+  }
+  const currencyId = scalarQueryId(currencies.data?.[0]?.id)
+  if (currencyId == null) throw new Error("No currency in seed data")
+
+  const { urlPath, init } = stdbBffCommandPost("create_product", {
+    params: stdbParamsToJson(
+      {
+        name,
+        categId: categoryId,
+        type: "storable",
+        uomId,
+        uomPoId: uomId,
+        standardPrice: 10,
+        listPrice: 20,
+        currencyId,
+        tracking: "lot",
+        defaultCode: name,
+      },
+      "CreateProductParams",
+    ),
+  })
+  const response = await page.request.post(urlPath, {
+    headers: { "Content-Type": "application/json" },
+    data: JSON.parse(String(init.body)),
+  })
+  expect(response.ok()).toBe(true)
+
+  return findProductIdByName(page, name)
+}
+
+export async function createStockProductionLotFixture(
+  page: Page,
+  companyId: number,
+  productId: number,
+  name: string,
+): Promise<number> {
+  const { urlPath, init } = stdbBffCommandPost("create_stock_production_lot", {
+    params: stdbParamsToJson(
+      {
+        companyId,
+        name,
+        productId,
+        productVariantId: null,
+        ref: null,
+        note: null,
+        expirationDate: null,
+        useDate: null,
+        removalDate: null,
+        alertDate: null,
+        productQty: 0,
+        locationId: null,
+        packageId: null,
+        ownerId: null,
+        isScrap: false,
+        isLocked: false,
+        metadata: null,
+      },
+      "CreateStockProductionLotParams",
+    ),
+  })
+  const response = await page.request.post(urlPath, {
+    headers: { "Content-Type": "application/json" },
+    data: JSON.parse(String(init.body)),
+  })
+  expect(response.ok()).toBe(true)
+
+  let lotId = 0
+  await expect
+    .poll(
+      async () => {
+        const query = await page.request.get("/api/query/stock-production-lots")
+        if (!query.ok()) return 0
+        const payload = (await query.json()) as {
+          data?: Array<Record<string, unknown>>
+        }
+        const matches = (payload.data ?? []).filter(
+          (row) =>
+            String(row.name ?? "") === name &&
+            scalarQueryId(row.productId ?? row.product_id) === productId,
+        )
+        if (matches.length !== 1) return 0
+        lotId = scalarQueryId(matches[0]?.id) ?? 0
+        return lotId
+      },
+      { timeout: 30_000 },
+    )
+    .toBeGreaterThan(0)
+  return lotId
+}
+
+export interface LotSnapshot {
+  id: number
+  locationId: number | undefined
+  isLocked: boolean
+}
+
+export async function fetchLotById(
+  page: Page,
+  lotId: number,
+): Promise<LotSnapshot | undefined> {
+  const response = await page.request.get("/api/query/stock-production-lots")
+  if (!response.ok()) return undefined
+  const payload = (await response.json()) as {
+    data?: Array<Record<string, unknown>>
+  }
+  const row = (payload.data ?? []).find(
+    (candidate) => scalarQueryId(candidate.id) === lotId,
+  )
+  if (!row) return undefined
+  const locationId = scalarQueryId(row.locationId ?? row.location_id)
+  return {
+    id: lotId,
+    locationId: locationId ?? undefined,
+    isLocked: Boolean(row.isLocked ?? row.is_locked ?? false),
+  }
+}
+
+export async function setStockProductionLotLocked(
+  page: Page,
+  companyId: number,
+  lotId: number,
+  isLocked: boolean,
+): Promise<void> {
+  const { urlPath, init } = stdbBffCommandPost("update_stock_production_lot", {
+    lotId,
+    params: stdbParamsToJson(
+      { companyId, isLocked },
+      "UpdateStockProductionLotParams",
+    ),
+  })
+  const response = await page.request.post(urlPath, {
+    headers: { "Content-Type": "application/json" },
+    data: JSON.parse(String(init.body)),
+  })
+  expect(response.ok()).toBe(true)
+}
+
 export async function createStockQuantFixture(
   page: Page,
   companyId: number,
@@ -112,6 +269,7 @@ export async function createStockQuantFixture(
   locationId: number,
   marker: string,
   quantity = 3,
+  lotId: number | null = null,
 ): Promise<number> {
   const { urlPath, init } = stdbBffCommandPost("create_stock_quant", {
     params: stdbParamsToJson(
@@ -120,7 +278,7 @@ export async function createStockQuantFixture(
         productId,
         productVariantId: null,
         locationId,
-        lotId: null,
+        lotId,
         packageId: null,
         ownerId: null,
         quantity,

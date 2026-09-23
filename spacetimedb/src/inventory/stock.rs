@@ -15,7 +15,7 @@ use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 use crate::inventory::inventory_close::assert_inventory_writable;
 use crate::inventory::product::product;
 use crate::inventory::tracking::{
-    stock_production_lot, stock_production_serial, StockProductionSerial,
+    stock_production_lot, stock_production_serial, StockProductionLot, StockProductionSerial,
 };
 use crate::inventory::warehouse::{stock_location, warehouse};
 use crate::inventory::warehouse_operations::warehouse_task;
@@ -2219,6 +2219,13 @@ pub fn move_stock_quant(
         return Err("Cannot move more than available quantity (unreserve first)".to_string());
     }
 
+    // A lot-tracked quant carries its lot's org/company/product/lock/expiry
+    // integrity into every relocation, not just reservation and picking
+    // validate — otherwise a locked or expired lot could be moved freely.
+    if let Some(lot_id) = src.lot_id {
+        ensure_lot_for_product(ctx, organization_id, company_id, src.product_id, lot_id)?;
+    }
+
     let qty = params.quantity;
     let eps = 1e-9_f64;
 
@@ -2338,6 +2345,22 @@ pub fn move_stock_quant(
 
     if dest_id.is_none() && is_emptying_src {
         destination_quant_id = Some(quant_id);
+    }
+
+    // The lot's own denormalized location is only unambiguous when this move
+    // empties the lot's entire presence at the source location. A partial
+    // move leaves the lot present at both locations, so the field is left
+    // untouched rather than overwritten with a guess.
+    if is_emptying_src {
+        if let Some(lot_id) = src.lot_id {
+            if let Some(lot) = ctx.db.stock_production_lot().id().find(&lot_id) {
+                ctx.db.stock_production_lot().id().update(StockProductionLot {
+                    location_id: Some(params.dest_location_id),
+                    write_date: ctx.timestamp,
+                    ..lot
+                });
+            }
+        }
     }
 
     write_audit_log_v2(

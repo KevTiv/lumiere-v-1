@@ -57,11 +57,11 @@ use crate::inventory::replenishment::{
 };
 use crate::inventory::stock::{
     apply_validated_move_to_quants, assign_stock_picking, confirm_stock_picking, create_stock_move,
-    create_stock_picking, create_stock_quant, increase_quant_at_location,
+    create_stock_picking, create_stock_quant, increase_quant_at_location, move_stock_quant,
     reserve_quantity_at_location, reserve_stock_quant, resolve_warehouse_stock_location,
     stock_move, stock_picking, stock_quant, to_product_stock_qty, validate_stock_picking,
     CreateStockMoveParams, CreateStockPickingParams, CreateStockQuantParams,
-    StockQuantReserveParams,
+    MoveStockQuantParams, StockQuantReserveParams,
 };
 use crate::inventory::tracking::{
     create_stock_production_lot, create_stock_production_serial, stock_production_lot,
@@ -1090,6 +1090,151 @@ pub fn test_expired_lot_blocked_on_reserve(ctx: &ReducerContext) -> Result<(), S
         Err(msg) => Err(format!("Expected expired-lot error, got: {msg}")),
         Ok(()) => Err("expiry block failed: reserved expired lot".into()),
     }
+}
+
+/// Lot-tracked quant move: a full relocation carries the lot's own denormalized
+/// `location_id` to the destination, and a locked lot blocks the move entirely
+/// rather than silently relocating quarantined stock.
+pub fn test_lot_tracked_quant_move(ctx: &ReducerContext) -> Result<(), String> {
+    ensure_test_superuser(ctx)?;
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let org_id = fixture.organization_id;
+    let company_id = fixture.company_id;
+    let product_id = create_tracked_product(ctx, &fixture, "lot", "LOT-MOVE")?;
+
+    let destination_id = ctx
+        .db
+        .stock_location()
+        .iter()
+        .find(|location| {
+            location.organization_id == org_id
+                && location.company_id == Some(company_id)
+                && location.id != fixture.location_id
+                && location.active
+        })
+        .map(|location| location.id)
+        .ok_or("No second active fixture location for lot move test")?;
+
+    create_stock_production_lot(
+        ctx,
+        org_id,
+        CreateStockProductionLotParams {
+            company_id: Some(company_id),
+            name: "LOT-MOVE-A".to_string(),
+            product_id,
+            product_variant_id: None,
+            ref_: None,
+            note: None,
+            expiration_date: None,
+            use_date: None,
+            removal_date: None,
+            alert_date: None,
+            product_qty: 4.0,
+            location_id: Some(fixture.location_id),
+            package_id: None,
+            owner_id: None,
+            is_scrap: false,
+            is_locked: false,
+            metadata: None,
+        },
+    )?;
+    let lot = ctx
+        .db
+        .stock_production_lot()
+        .iter()
+        .find(|l| l.organization_id == org_id && l.name == "LOT-MOVE-A")
+        .ok_or("lot missing")?;
+    let lot_id = lot.id;
+
+    let quant_id = create_quant(
+        ctx,
+        org_id,
+        company_id,
+        product_id,
+        fixture.location_id,
+        4.0,
+        Some(lot_id),
+    )?;
+
+    // A locked lot blocks the move entirely: quarantined stock cannot be
+    // relocated by a raw quant move any more than it can be reserved.
+    ctx.db
+        .stock_production_lot()
+        .id()
+        .update(StockProductionLot {
+            is_locked: true,
+            ..lot.clone()
+        });
+    match move_stock_quant(
+        ctx,
+        org_id,
+        quant_id,
+        MoveStockQuantParams {
+            company_id: Some(company_id),
+            dest_location_id: destination_id,
+            quantity: 4.0,
+        },
+    ) {
+        Err(msg) if msg.to_lowercase().contains("locked") => {}
+        Err(msg) => return Err(format!("Expected locked-lot error, got: {msg}")),
+        Ok(()) => return Err("locked-lot move was accepted".into()),
+    }
+    let quant_after_locked = ctx
+        .db
+        .stock_quant()
+        .id()
+        .find(&quant_id)
+        .ok_or("quant missing after locked-move attempt")?;
+    if quant_after_locked.location_id != fixture.location_id {
+        return Err("locked-lot move relocated the quant despite failing".into());
+    }
+
+    ctx.db
+        .stock_production_lot()
+        .id()
+        .update(StockProductionLot {
+            is_locked: false,
+            ..lot
+        });
+
+    move_stock_quant(
+        ctx,
+        org_id,
+        quant_id,
+        MoveStockQuantParams {
+            company_id: Some(company_id),
+            dest_location_id: destination_id,
+            quantity: 4.0,
+        },
+    )?;
+
+    let moved_quant = ctx
+        .db
+        .stock_quant()
+        .id()
+        .find(&quant_id)
+        .ok_or("quant missing after full lot move")?;
+    if moved_quant.location_id != destination_id || moved_quant.lot_id != Some(lot_id) {
+        return Err(format!(
+            "expected quant {quant_id} at location {destination_id} with lot {lot_id}, got location {} lot {:?}",
+            moved_quant.location_id, moved_quant.lot_id
+        ));
+    }
+
+    let lot_after_move = ctx
+        .db
+        .stock_production_lot()
+        .id()
+        .find(&lot_id)
+        .ok_or("lot missing after move")?;
+    if lot_after_move.location_id != Some(destination_id) {
+        return Err(format!(
+            "expected lot {lot_id} location to follow its emptied source to {destination_id}, got {:?}",
+            lot_after_move.location_id
+        ));
+    }
+
+    Ok(())
 }
 
 /// FEFO: soft reserve prefers the lot that expires sooner.
