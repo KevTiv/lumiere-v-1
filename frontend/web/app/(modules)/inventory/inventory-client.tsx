@@ -72,6 +72,7 @@ import { inventoryModuleConfig } from '@/lib/module-dashboard-configs';
 import { useInventoryModuleSubscription } from '@/lib/module-subscription-hooks';
 import { useWorkflowSurface } from '@/hooks/use-workflow-surface';
 import { usePickingWorkflow } from '@lumiere/query-hooks/hooks/picking-workflow';
+import { useStockQuantWorkflow } from '@lumiere/query-hooks/hooks/stock-quant-workflow';
 import { planPartialDelivery } from '@lumiere/erp-workflows';
 import { groupBy } from '@/lib/utils';
 import { InventoryOpsPanel } from './inventory-ops-panel';
@@ -129,7 +130,6 @@ import {
   useReserveStockQuant,
   useUnreserveStockQuant,
   useWarehouse3D,
-  useMoveStockItem3D,
   useOrgUsers,
   // Quality management
   useCreateQualityCheck,
@@ -452,6 +452,8 @@ function InventoryClientLoaded({
     unknown
   > | null>(null);
   const [assignPickingId, setAssignPickingId] = useState<ScalarId | null>(null);
+  const [moveQuantRow, setMoveQuantRow] = useState<Record<string, unknown> | null>(null);
+  const [moveQuantError, setMoveQuantError] = useState<string | null>(null);
   const [partialTransferPicking, setPartialTransferPicking] =
     useState<Record<string, unknown> | null>(null);
   const [partialTransferError, setPartialTransferError] = useState<string | null>(null);
@@ -798,6 +800,15 @@ function InventoryClientLoaded({
   const cancelStockMove = useCancelStockMove(orgId, operatingCompanyId);
   const assignUserToPicking = useAssignUserToPicking(orgId, operatingCompanyId);
   const workflowSurface = useWorkflowSurface({ organizationId });
+  const stockQuantWorkflow = useStockQuantWorkflow(
+    orgId,
+    operatingCompanyId,
+    {
+      navigate: workflowSurface.navigate,
+      notify: workflowSurface.notify,
+      record: workflowSurface.record,
+    },
+  );
   const pickingWorkflow = usePickingWorkflow(
     orgId,
     operatingCompanyId,
@@ -981,7 +992,6 @@ function InventoryClientLoaded({
     slots,
     items: warehouseItems,
   } = useWarehouse3D(orgId, operatingCompanyId, firstWarehouseId);
-  const moveStockItem = useMoveStockItem3D(orgId, operatingCompanyId);
 
   // Quality management hooks
   const createQualityCheck = useCreateQualityCheck(orgId, operatingCompanyId);
@@ -1297,6 +1307,70 @@ function InventoryClientLoaded({
     return map;
   }, [locations]);
 
+  const moveQuantFormConfig = useMemo((): FormConfig | null => {
+    if (!moveQuantRow) return null;
+    const sourceLocationId = String(
+      moveQuantRow.locationId ?? moveQuantRow.location_id ?? '',
+    );
+    const targetOptions = locations
+      .filter((location) => {
+        const row = location as Record<string, unknown>;
+        const active = row.active !== false;
+        return active && String(row.id ?? '') !== sourceLocationId;
+      })
+      .map((location) => ({
+        value: String(location.id),
+        label: String(location.completeName ?? location.name ?? location.id),
+      }));
+    const available = Number(
+      moveQuantRow.availableQuantity ??
+        moveQuantRow.available_quantity ??
+        moveQuantRow.quantity ??
+        0,
+    );
+    return {
+      id: 'move-stock-quant',
+      title: t('inventory.forms.newTransfer.title'),
+      description: t('inventory.forms.newTransfer.description'),
+      submitLabel: t('common.save'),
+      cancelLabel: t('common.cancel'),
+      sections: [
+        {
+          id: 'move-stock-quant',
+          fields: [
+            {
+              id: 'targetLocationId',
+              name: 'targetLocationId',
+              type: 'select',
+              label: t('inventory.forms.newTransfer.fields.locationDestId'),
+              required: true,
+              width: 'full',
+              options:
+                targetOptions.length > 0
+                  ? targetOptions
+                  : [
+                      {
+                        value: '',
+                        label: t('common.lookup.noStockMoves'),
+                        disabled: true,
+                      },
+                    ],
+            },
+            {
+              id: 'quantity',
+              name: 'quantity',
+              type: 'number',
+              label: t('inventory.stockOnHand.columns.availableQuantity'),
+              required: true,
+              width: '1/2',
+              defaultValue: Math.min(1, Math.max(available, 0)),
+            },
+          ],
+        },
+      ],
+    };
+  }, [moveQuantRow, locations, t]);
+
   const productsEntityConfig = useMemo((): EntityViewConfig => {
     const base = productsTableConfig(t, {
       formatProductDisplayName: inventoryProductPrimaryLabel,
@@ -1328,6 +1402,29 @@ function InventoryClientLoaded({
           ...view.emptyState,
           onAction: openCreateStockQuant,
         },
+        actions: [
+          ...(view.actions ?? []),
+          {
+            id: 'move-stock-quant',
+            label: t('inventory.forms.newTransfer.title'),
+            icon: Route,
+            requiresSelection: true,
+            isApplicable: (rows) =>
+              rows.length === 1 &&
+              Number(
+                rows[0]?.availableQuantity ??
+                  rows[0]?.available_quantity ??
+                  rows[0]?.quantity ??
+                  0,
+              ) > 0,
+            onClick: (rows) => {
+              const first = rows[0] as Record<string, unknown> | undefined;
+              if (!first) return;
+              setMoveQuantError(null);
+              setMoveQuantRow(first);
+            },
+          },
+        ],
       },
     };
   }, [t, openCreateStockQuant]);
@@ -1895,11 +1992,13 @@ function InventoryClientLoaded({
                 warehouses[0]?.name ? String(warehouses[0].name) : undefined
               }
               onMoveItem={(itemId, targetSlotId) => {
-                moveStockItem.mutate({
-                  quantId: BigInt(itemId),
-                  targetLocationId: BigInt(targetSlotId),
-                  quantity: 1,
-                });
+                void stockQuantWorkflow
+                  .move({
+                    quantId: String(itemId),
+                    targetLocationId: String(targetSlotId),
+                    quantity: 1,
+                  })
+                  .catch(() => undefined);
               }}
             />
           </div>
@@ -1911,7 +2010,7 @@ function InventoryClientLoaded({
       slots,
       warehouseItems,
       warehouses,
-      moveStockItem,
+      stockQuantWorkflow,
       t,
       isMounted,
       warehouse3dZoneFormConfig,
@@ -4314,7 +4413,7 @@ function InventoryClientLoaded({
       processAdjustment,
       reserveQuant,
       unreserveQuant,
-      moveStockItem,
+      stockQuantWorkflow,
       createQualityCheck,
       passQualityCheck,
       failQualityCheck,
@@ -4697,6 +4796,52 @@ function InventoryClientLoaded({
           });
         }}
       />
+      {moveQuantRow != null && moveQuantFormConfig ? (
+        <FormModal
+          key={`move-quant-${String(moveQuantRow.id ?? '')}`}
+          open
+          onOpenChange={(open) => {
+            if (!open) {
+              setMoveQuantRow(null);
+              setMoveQuantError(null);
+            }
+          }}
+          config={moveQuantFormConfig}
+          closeOnSubmit={false}
+          submitError={moveQuantError}
+          isPending={stockQuantWorkflow.isPending}
+          onSubmit={async (formData) => {
+            setMoveQuantError(null);
+            const quantId = moveQuantRow.id;
+            const targetLocationId = formData.targetLocationId;
+            const quantity = Number(formData.quantity);
+            if (
+              quantId == null ||
+              targetLocationId == null ||
+              targetLocationId === '' ||
+              !Number.isFinite(quantity)
+            ) {
+              setMoveQuantError(t('common.validation.required'));
+              return;
+            }
+            try {
+              await stockQuantWorkflow.move(
+                {
+                  quantId: String(quantId),
+                  targetLocationId: String(targetLocationId),
+                  quantity,
+                },
+                { navigateToNext: true },
+              );
+              setMoveQuantRow(null);
+            } catch (error) {
+              setMoveQuantError(
+                error instanceof Error ? error.message : String(error),
+              );
+            }
+          }}
+        />
+      ) : null}
       {partialTransferPicking != null && partialTransferFormConfig ? (
         <FormModal
           key={`partial-transfer-${String(partialTransferPicking.id ?? '')}`}
