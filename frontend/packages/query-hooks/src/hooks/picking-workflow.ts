@@ -5,6 +5,7 @@ import {
   assignPickingAction,
   cancelPickingAction,
   confirmPickingAction,
+  observePickingState,
   observeValidatedPicking,
   packPickingAction,
   partialValidatePickingAction,
@@ -69,8 +70,36 @@ export function usePickingWorkflow(
     }
 
     return {
-      confirm: transition("inventory.picking.confirm", (id) => confirmStockPickingCommand(companyId, id)),
-      assign: transition("inventory.picking.assign", (id) => assignStockPickingCommand(companyId, id)),
+      confirm: transition(
+        "inventory.picking.confirm",
+        (id) => confirmStockPickingCommand(companyId, id),
+        {
+          observe: async (id) =>
+            observePickingState(
+              id,
+              "confirmed",
+              (await qc.fetchQuery({
+                ...stockPickingsQueryOptions(organizationId),
+                staleTime: 0,
+              })) as unknown as RowValueMap[],
+            ),
+        },
+      ),
+      assign: transition(
+        "inventory.picking.assign",
+        (id) => assignStockPickingCommand(companyId, id),
+        {
+          observe: async (id) =>
+            observePickingState(
+              id,
+              "assigned",
+              (await qc.fetchQuery({
+                ...stockPickingsQueryOptions(organizationId),
+                staleTime: 0,
+              })) as unknown as RowValueMap[],
+            ),
+        },
+      ),
       validate: transition("inventory.picking.validate", (id) => validateStockPickingCommand(companyId, id), {
         observe: observeValidation,
       }),
