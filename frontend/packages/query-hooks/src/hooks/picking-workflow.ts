@@ -176,7 +176,18 @@ export function usePickingWorkflow(
         },
       }),
     }
-  }, [labels.confirm, labels.assign, labels.validate, labels.pack, labels.cancel, labels.partialValidate, runner, specs])
+  }, [
+    labels.confirm,
+    labels.assign,
+    labels.validate,
+    labels.pack,
+    labels.cancel,
+    labels.partialValidate,
+    runner,
+    specs,
+    qc,
+    organizationId,
+  ])
 
   return { ...actions, isRunning: runner.isRunning, isPending: runner.isPending }
 }
