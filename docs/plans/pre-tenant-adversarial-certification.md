@@ -275,7 +275,6 @@ Registered in `KNOWN_DEFECTS` / `expectKnownDefect()`; runtime confirmation reco
 | `COMM-13` | `create_message_batch` does not scope candidate contacts/identities to the calling organization. |
 | `COMM-14` | A number change under the same identity id silently redirects an approved recipient. |
 | `COMM-15` | (Playwright-only; not yet executed against a running stack) Batch approval retry by the same approver returns an error instead of an idempotent success. |
-| `PAY-03` | `post_payment_transaction` retry after commit returns an error instead of idempotent success. |
 | `PAY-05` | `reverse_payment_transaction` retry after commit returns an error instead of idempotent success. |
 | `PAY-11B` | `stage_bank_statement_import` silently accepts a replayed idempotency key with a different payload. |
 | `AG-IDEMP-01` | (Playwright-only; not yet executed against a running stack) AI draft approval retry after commit returns an error instead of idempotent success. |
