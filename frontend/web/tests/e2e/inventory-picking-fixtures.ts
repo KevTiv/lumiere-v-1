@@ -1,13 +1,16 @@
 import { expect } from "@playwright/test"
 import type { Page } from "@playwright/test"
 
+import { matchesOperationResponse } from "./operation-response"
 import {
   activeTabEntityTable,
+  clickEntityActionAndWaitForReducer,
+  fillField,
   gotoModule,
   scalarQueryId,
   selectEntityRowById,
+  submitForm,
 } from "./helpers"
-import { clickEntityActionAndWaitForReducer } from "./helpers"
 
 export interface PickingMoveState {
   id: number
@@ -110,4 +113,73 @@ export async function expectCanonicalPickingFocus(
   await expect(table.getByTestId("entity-active-filter-id")).toContainText(
     `id: ${pickingId}`,
   )
+}
+
+
+export async function fetchPickingBackorderIds(
+  page: Page,
+  pickingId: number,
+): Promise<number[]> {
+  const response = await page.request.get("/api/query/stock-pickings")
+  if (!response.ok()) return []
+
+  const payload = (await response.json()) as {
+    data?: Array<Record<string, unknown>>
+  }
+  const picking = (payload.data ?? []).find(
+    (row) => scalarQueryId(row.id) === pickingId,
+  )
+  const raw = picking?.backorderIds ?? picking?.backorder_ids
+  if (!Array.isArray(raw)) return []
+  return raw
+    .flatMap((value) => {
+      const id = scalarQueryId(value)
+      return id == null ? [] : [id]
+    })
+    .sort((a, b) => a - b)
+}
+
+export async function fetchPickingBackorderParentId(
+  page: Page,
+  pickingId: number,
+): Promise<number | null> {
+  const response = await page.request.get("/api/query/stock-pickings")
+  if (!response.ok()) return null
+
+  const payload = (await response.json()) as {
+    data?: Array<Record<string, unknown>>
+  }
+  const picking = (payload.data ?? []).find(
+    (row) => scalarQueryId(row.id) === pickingId,
+  )
+  return scalarQueryId(picking?.backorderId ?? picking?.backorder_id) ?? null
+}
+
+export async function partialValidatePickingViaInventoryUi(
+  page: Page,
+  pickingId: number,
+  moveId: number,
+  quantityDone: number,
+): Promise<void> {
+  await gotoModule(page, "/inventory", "inventory")
+  await page.getByTestId("module-tab-inventory-transfers").click()
+  await selectEntityRowById(page, pickingId)
+  await page.getByTestId("entity-action-partial-validate-picking").click()
+  await expect(
+    page.getByTestId("form-modal-partial-delivery-validate"),
+  ).toBeVisible({ timeout: 15_000 })
+
+  await fillField(page, `qty_${moveId}`, String(quantityDone))
+
+  await Promise.all([
+    page.waitForResponse(
+      (response) =>
+        matchesOperationResponse(
+          response,
+          "validate_stock_picking_backorder",
+        ) && response.ok(),
+      { timeout: 30_000 },
+    ),
+    submitForm(page, "partial-delivery-validate"),
+  ])
 }
