@@ -39,6 +39,7 @@ import {
   observeConfirmedPurchaseReturn,
   observeConvertedRequisition,
   observeCreatedBill,
+  purchaseOrderInvoiceIds,
   observeReceivedLine,
   observeReturnVendorCredit,
   observeSentPurchaseOrder,
@@ -125,6 +126,7 @@ export interface PurchasingWorkflowLabels {
 }
 
 type BillInput = CreateBillFromPurchaseOrderInput<CreateBillFromPurchaseOrderParams>
+type BillRunInput = BillInput & { invoiceIdsBefore: string[] }
 type ReceiveRunInput = ReceivePurchaseLineInput & { receiptTarget?: ReceiptTarget }
 type VendorCreditInput = CreateVendorCreditInput<VendorCreditFromReturnParams>
 type ReleaseInput = ReleaseBlanketInput<ReleaseBlanketToPoParams>
@@ -189,11 +191,16 @@ export function usePurchasingWorkflow(
       ),
       cancelOrder: idSpec("purchasing.order.cancel", cancelPurchaseOrderCommand, CANCEL_PURCHASE_ORDER_AFFECTS),
 
-      createBill: typed<BillInput>({
+      createBill: typed<BillRunInput>({
         id: "purchasing.order.create-bill",
-        command: createBillFromPurchaseOrderCommand,
+        command: (input) =>
+          createBillFromPurchaseOrderCommand({
+            orderId: input.orderId,
+            params: input.params,
+          }),
         affects: CREATE_BILL_FROM_PURCHASE_ORDER_AFFECTS,
-        observe: async ({ orderId }) => observeCreatedBill(orderId, await orders()),
+        observe: async ({ orderId, invoiceIdsBefore }) =>
+          observeCreatedBill(orderId, invoiceIdsBefore, await orders()),
       }),
 
       receiveLine: typed<ReceiveRunInput>({
@@ -328,7 +335,20 @@ export function usePurchasingWorkflow(
       /** Form-backed or row-dispatched-with-a-form actions: the surface collects input, then calls `execute`. */
       createBill: createBillFromPurchaseOrderAction<CreateBillFromPurchaseOrderParams>({
         label: labels.createBill,
-        execute: bind(specs.createBill, (i) => i.orderId),
+        execute: async (input, context) => {
+          const currentOrders = await orders()
+          const invoiceIdsBefore = purchaseOrderInvoiceIds(input.orderId, currentOrders)
+          if (!invoiceIdsBefore) {
+            throw new WorkflowError("validation", "Purchase order is unavailable for bill readback")
+          }
+          const runInput: BillRunInput = { ...input, invoiceIdsBefore }
+          return runner.run(
+            `${specs.createBill.id}:${input.orderId}`,
+            specs.createBill,
+            runInput,
+            { navigateToNext: context?.navigateToNext },
+          )
+        },
       }),
       /** Row dispatch receives the full open quantity; capture exact receipt identity before dispatch. */
       receiveLine: receivePurchaseLineAction({
