@@ -1080,8 +1080,12 @@ pub fn post_payment_transaction_impl(
     if transaction.organization_id != organization_id {
         return Err("Payment transaction belongs to a different organization".to_string());
     }
-    if transaction.status != PaymentTransactionStatus::Draft {
-        return Err("Only draft transactions can be posted".to_string());
+    match transaction.status {
+        PaymentTransactionStatus::Posted => {
+            return validate_committed_post_replay(ctx, &transaction);
+        }
+        PaymentTransactionStatus::Draft => {}
+        _ => return Err("Only draft transactions can be posted".to_string()),
     }
 
     let account = ctx
