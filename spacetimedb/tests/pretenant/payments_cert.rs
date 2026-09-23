@@ -35,7 +35,7 @@ pub const CASES: &[CertCase] = &[
     ("PAY-03", pay_03_post_retry_is_idempotent_success),
     ("PAY-04", pay_04_reversal_retry_is_single_compensation),
     ("PAY-05", pay_05_reversal_retry_is_idempotent_success),
-    ("PAY-06", pay_06_overpayment_stays_explicit_unapplied),
+    ("PAY-06", pay_06_overpayment_and_partial_multi_invoice_are_explicit),
     ("PAY-07", pay_07_reference_duplicate_scope),
     ("PAY-08", pay_08_many_small_allocations_reconcile_exactly),
     ("PAY-09", pay_09_large_values_settle_exactly),
