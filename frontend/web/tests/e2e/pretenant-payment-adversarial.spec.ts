@@ -204,11 +204,19 @@ test.describe("Pre-tenant payment adversarial", { tag: pretenantTags("@payments"
     const lineB = await receivableLineId(page, s, 5_000, "pt-pay06-invoice-b")
     const payment = await postedReceipt(page, s, 12_000, "pt-pay06-receipt")
 
-    const over = await callReducerBffResult(page, "allocate_payment_transaction", allocationArgs(s, payment, lineA, 12_000, `pt-pay06-over-${payment}`))
+    const over = await callReducerBffResult(
+      page,
+      "allocate_payment_transaction",
+      allocationArgs(s, payment, lineA, 12_000, `pt-pay06-over-${payment}`),
+    )
     expect(over.ok).toBe(false)
     expect(await allocations(page, payment)).toHaveLength(0)
 
-    await callReducerBff(page, "allocate_payment_transaction", allocationArgs(s, payment, lineA, 10_000, `pt-pay06-invoice-a-${payment}`))
+    await callReducerBff(
+      page,
+      "allocate_payment_transaction",
+      allocationArgs(s, payment, lineA, 10_000, `pt-pay06-invoice-a-${payment}`),
+    )
     await expect.poll(() => netAllocatedMinor(page, payment)).toBe(10_000)
 
     const [invoiceARow] = await allocations(page, payment)
@@ -221,7 +229,11 @@ test.describe("Pre-tenant payment adversarial", { tag: pretenantTags("@payments"
     const settlementMinor = toMinor(field(transaction, "settlementAmount", "settlement_amount"))
     expect(settlementMinor - (await netAllocatedMinor(page, payment))).toBe(2_000)
 
-    await callReducerBff(page, "allocate_payment_transaction", allocationArgs(s, payment, lineB, 2_000, `pt-pay06-invoice-b-${payment}`))
+    await callReducerBff(
+      page,
+      "allocate_payment_transaction",
+      allocationArgs(s, payment, lineB, 2_000, `pt-pay06-invoice-b-${payment}`),
+    )
     await expect.poll(() => netAllocatedMinor(page, payment)).toBe(12_000)
 
     const rows = await allocations(page, payment)
