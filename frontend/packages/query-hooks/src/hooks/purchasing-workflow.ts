@@ -336,7 +336,10 @@ export function usePurchasingWorkflow(
       createBill: createBillFromPurchaseOrderAction<CreateBillFromPurchaseOrderParams>({
         label: labels.createBill,
         execute: async (input, context) => {
-          const currentOrders = await orders()
+          const currentOrders = (await qc.fetchQuery({
+            ...purchaseOrdersQueryOptions(organizationId),
+            staleTime: 0,
+          })) as RowValueMap[]
           const invoiceIdsBefore = purchaseOrderInvoiceIds(input.orderId, currentOrders)
           if (!invoiceIdsBefore) {
             throw new WorkflowError("validation", "Purchase order is unavailable for bill readback")
