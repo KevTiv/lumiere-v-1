@@ -85,8 +85,40 @@ test.describe("Bank statement CSV staging", { tag: ["@phase-1", "@accounting"] }
       { file_name: some(`${idempotencyKey}.csv`), idempotency_key: idempotencyKey, opening_balance: 0, rows },
     ])
 
-    await stage(invalidKey, [{ row_number: 2, date: none, amount: some(35), reference: none, description: some("Missing date") }])
-    await stage(invalidKey, [{ row_number: 2, date: none, amount: some(35), reference: none, description: some("Missing date") }])
+    const invalidRows = [
+      {
+        row_number: 2,
+        date: none,
+        amount: some(35),
+        reference: none,
+        description: some("Missing date"),
+      },
+    ]
+    await stage(invalidKey, invalidRows)
+    await stage(invalidKey, invalidRows)
+
+    const conflict = await callReducerBffResult(page, "stage_bank_statement_import", [
+      organizationId,
+      scope.companyId,
+      scope.journalId,
+      scope.currencyId,
+      {
+        file_name: some(`${invalidKey}.csv`),
+        idempotency_key: invalidKey,
+        opening_balance: 0,
+        rows: [
+          {
+            row_number: 2,
+            date: none,
+            amount: some(99),
+            reference: some("TAMPERED"),
+            description: some("Changed retry"),
+          },
+        ],
+      },
+    ])
+    expect(conflict.ok).toBe(false)
+    expect(conflict.error).toMatch(/idempotency key already used with different/i)
 
     await expect.poll(async () => {
       const workspace = await importWorkspace(page, scope.companyId)
