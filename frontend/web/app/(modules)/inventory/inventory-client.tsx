@@ -20,6 +20,7 @@ import {
   editProductForm,
   newProductVariantForm,
   assignUserToPickingForm,
+  buildPartialDeliveryForm,
   pickingRowActions,
   newQualityCheckForm,
   newQualityPointForm,
@@ -71,6 +72,7 @@ import { inventoryModuleConfig } from '@/lib/module-dashboard-configs';
 import { useInventoryModuleSubscription } from '@/lib/module-subscription-hooks';
 import { useWorkflowSurface } from '@/hooks/use-workflow-surface';
 import { usePickingWorkflow } from '@lumiere/query-hooks/hooks/picking-workflow';
+import { planPartialDelivery } from '@lumiere/erp-workflows';
 import { groupBy } from '@/lib/utils';
 import { InventoryOpsPanel } from './inventory-ops-panel';
 import {
@@ -450,6 +452,9 @@ function InventoryClientLoaded({
     unknown
   > | null>(null);
   const [assignPickingId, setAssignPickingId] = useState<ScalarId | null>(null);
+  const [partialTransferPicking, setPartialTransferPicking] =
+    useState<Record<string, unknown> | null>(null);
+  const [partialTransferError, setPartialTransferError] = useState<string | null>(null);
   const [assignQualityAlertId, setAssignQualityAlertId] =
     useState<ScalarId | null>(null);
   const [solveQualityAlertId, setSolveQualityAlertId] =
@@ -1236,6 +1241,51 @@ function InventoryClientLoaded({
     return map;
   }, [products]);
 
+  const assignedMovesForPartialTransfer = useMemo(() => {
+    if (!partialTransferPicking) return [];
+    const pickingId = String(partialTransferPicking.id ?? '');
+    return (stockMoves as Record<string, unknown>[]).filter((move) => {
+      const movePickingId = String(move.pickingId ?? move.picking_id ?? '');
+      const rawState = move.state;
+      const state =
+        rawState != null && typeof rawState === 'object' && 'tag' in rawState
+          ? String((rawState as { tag: string }).tag).toLowerCase()
+          : String(rawState ?? '').toLowerCase();
+      return movePickingId === pickingId && state === 'assigned';
+    });
+  }, [partialTransferPicking, stockMoves]);
+
+  const partialTransferFormConfig = useMemo(() => {
+    if (!partialTransferPicking) return null;
+    const pickingName = String(
+      partialTransferPicking.name ??
+        partialTransferPicking.origin ??
+        partialTransferPicking.id ??
+        '',
+    );
+    return buildPartialDeliveryForm(
+      t,
+      pickingName,
+      assignedMovesForPartialTransfer.map((move) => {
+        const moveId = String(move.id ?? '');
+        const productId = String(move.productId ?? move.product_id ?? '');
+        return {
+          moveId,
+          productLabel:
+            productLabelById.get(productId) ?? `Product ${productId}`,
+          orderedQty: Number(
+            move.productUomQty ?? move.product_uom_qty ?? 0,
+          ),
+        };
+      }),
+    );
+  }, [
+    partialTransferPicking,
+    assignedMovesForPartialTransfer,
+    productLabelById,
+    t,
+  ]);
+
   const locationLabelById = useMemo(() => {
     const map = new Map<string, string>();
     for (const location of locations) {
@@ -1964,6 +2014,12 @@ function InventoryClientLoaded({
                     runPickingWorkflowActionForRows(pickingWorkflow.confirm, rows),
                   assign: (rows) =>
                     runPickingWorkflowActionForRows(pickingWorkflow.assign, rows),
+                  'partial-validate': (rows) => {
+                    const first = rows[0] as Record<string, unknown> | undefined;
+                    if (!first) return;
+                    setPartialTransferError(null);
+                    setPartialTransferPicking(first);
+                  },
                   'assign-user': (rows) => {
                     const id = rows[0]?.id as ScalarId | undefined;
                     if (id != null) setAssignPickingId(id);
@@ -4641,6 +4697,63 @@ function InventoryClientLoaded({
           });
         }}
       />
+      {partialTransferPicking != null && partialTransferFormConfig ? (
+        <FormModal
+          key={`partial-transfer-${String(partialTransferPicking.id ?? '')}`}
+          open
+          onOpenChange={(open) => {
+            if (!open) {
+              setPartialTransferPicking(null);
+              setPartialTransferError(null);
+            }
+          }}
+          config={partialTransferFormConfig}
+          closeOnSubmit={false}
+          submitError={partialTransferError}
+          isPending={pickingWorkflow.isPending}
+          onSubmit={async (formData) => {
+            setPartialTransferError(null);
+            if (assignedMovesForPartialTransfer.length === 0) {
+              setPartialTransferError(
+                t('sales.forms.partialDelivery.errors.noAssignedMoves'),
+              );
+              return;
+            }
+            const pickingId = partialTransferPicking.id;
+            if (pickingId == null) return;
+            const plan = planPartialDelivery(
+              assignedMovesForPartialTransfer.map((move) => ({
+                moveId: String(move.id),
+                orderedQty: Number(
+                  move.productUomQty ?? move.product_uom_qty ?? 0,
+                ),
+              })),
+              formData,
+            );
+            if (!plan.ok) {
+              setPartialTransferError(
+                t(`sales.forms.partialDelivery.errors.${plan.error}`),
+              );
+              return;
+            }
+            try {
+              await pickingWorkflow.partialValidate.execute(
+                {
+                  pickingId: String(pickingId),
+                  shortMoves: plan.shortMoves,
+                  createBackorder: formData.createBackorder === true,
+                },
+                { navigateToNext: true },
+              );
+              setPartialTransferPicking(null);
+            } catch (error) {
+              setPartialTransferError(
+                error instanceof Error ? error.message : String(error),
+              );
+            }
+          }}
+        />
+      ) : null}
       <FormModal
         key={
           assignPickingId != null
