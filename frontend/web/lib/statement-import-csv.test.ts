@@ -23,11 +23,11 @@ test("CSV-01 strips a leading UTF-8 BOM before parsing statement headers", () =>
   assert.equal(withBom[0].description, "Customer transfer")
 })
 
-test("CSV-01 BOM normalization preserves statement import idempotency identity", () => {
+test("CSV-01 BOM normalization preserves statement import idempotency identity", async () => {
   const args = [1n, 2n, 3n] as const
   assert.equal(
-    statementImportIdempotencyKey(...args, `\uFEFF${CSV}`),
-    statementImportIdempotencyKey(...args, CSV),
+    await statementImportIdempotencyKey(...args, `\uFEFF${CSV}`),
+    await statementImportIdempotencyKey(...args, CSV),
   )
 })
 
