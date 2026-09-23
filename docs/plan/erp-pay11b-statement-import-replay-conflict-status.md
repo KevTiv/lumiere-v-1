@@ -52,7 +52,7 @@ make check-codegen-pinned
 
 # Against a freshly published local stack:
 spacetime call <db> run_accounting_payment_management_test --server local --no-config
-make e2e-single E2E_ONLY_SPEC=bank-statement-import.spec.ts
+make e2e-single E2E_SPEC=bank-statement-import.spec.ts E2E_GREP=
 ```
 
 Do not mark PAY-11B accepted until the native/in-module, contract and focused
