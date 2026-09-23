@@ -85,9 +85,9 @@ Current disposition: `ACCEPTED` for the bounded sale-order confirmation slice. T
 
 ### COV-05
 
-Current disposition: `IMPLEMENTED` for the bounded PO-confirmation slice; runtime acceptance is pending. The accepted `purchasing` persona drives the existing UI confirmation, the same PO id is the stable result, inbound receipts are correlated only through exact `stock_picking.purchase_id`, stale replay must preserve the exact effect set, and the limited reader remains denied. See [`erp-cov05-purchase-order-confirmation-status.md`](./erp-cov05-purchase-order-confirmation-status.md).
+Current disposition: `IMPLEMENTED` for two bounded slices; runtime acceptance is pending. COV-05a confirms the PO through the purchasing persona and correlates inbound receipts through exact `stock_picking.purchase_id`. COV-05b receives one stock line through the real UI, captures the exact open `stock_move.purchase_line_id` relation before dispatch, and requires that same move/picking identity after validation. Both slices preserve stale/deny effect sets. See [`erp-cov05-purchase-order-confirmation-status.md`](./erp-cov05-purchase-order-confirmation-status.md) and [`erp-cov05b-purchase-receipt-status.md`](./erp-cov05b-purchase-receipt-status.md).
 
-Next bounded Purchasing assignment: certify receipt and/or vendor-bill creation from the confirmed PO using released durable relations. Do not use newest-row or ID-delta discovery.
+Next bounded Purchasing assignment: certify vendor-bill creation from the received PO. Remove the current `invoice_ids.at(-1)` semantic readback and use a released exact PO→bill relation; do not use newest-row or ID-delta discovery.
 
 ## First implementation convergence
 
