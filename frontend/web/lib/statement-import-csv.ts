@@ -35,7 +35,7 @@ function parseStatementDate(value: string): Date | undefined {
     return Number.isNaN(date.getTime()) ? undefined : date
   }
 
-  if (/^\d{2}\/\d{2}\/\d{4}$/.test(value)) {
+  if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(value)) {
     return undefined
   }
 
