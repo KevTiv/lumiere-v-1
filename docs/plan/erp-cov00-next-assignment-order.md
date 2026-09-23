@@ -85,9 +85,9 @@ Current disposition: `ACCEPTED` for the bounded sale-order confirmation slice. T
 
 ### COV-05
 
-Current disposition: `IMPLEMENTED` for two bounded slices; runtime acceptance is pending. COV-05a confirms the PO through the purchasing persona and correlates inbound receipts through exact `stock_picking.purchase_id`. COV-05b receives one stock line through the real UI, captures the exact open `stock_move.purchase_line_id` relation before dispatch, and requires that same move/picking identity after validation. Both slices preserve stale/deny effect sets. See [`erp-cov05-purchase-order-confirmation-status.md`](./erp-cov05-purchase-order-confirmation-status.md) and [`erp-cov05b-purchase-receipt-status.md`](./erp-cov05b-purchase-receipt-status.md).
+Current disposition: `IMPLEMENTED` for the three-slice first-adoption chain; runtime acceptance is pending. COV-05a confirms the PO and correlates inbound receipts through exact `stock_picking.purchase_id`. COV-05b captures the exact open `stock_move.purchase_line_id` identity before receipt and requires the same move/picking after validation. COV-05c snapshots the durable `purchase_order.invoice_ids` relation before bill dispatch and accepts exactly one new `account_move` id after readback. All slices preserve stale/deny effect sets. See [`erp-cov05-purchase-order-confirmation-status.md`](./erp-cov05-purchase-order-confirmation-status.md), [`erp-cov05b-purchase-receipt-status.md`](./erp-cov05b-purchase-receipt-status.md), and [`erp-cov05c-vendor-bill-status.md`](./erp-cov05c-vendor-bill-status.md).
 
-Next bounded Purchasing assignment: certify vendor-bill creation from the received PO. Remove the current `invoice_ids.at(-1)` semantic readback and use a released exact PO→bill relation; do not use newest-row or ID-delta discovery.
+The original Lane-B first-adoption path (PO → receipt → vendor bill) is now implemented without newest-row/id-delta effect discovery. Full COV-05 remains open. Next bounded Purchasing work should target three-way-match rejection/recovery or partial receipt/backorder billing; bill posting/payment belongs with COV-08 Accounting.
 
 ## First implementation convergence
 
