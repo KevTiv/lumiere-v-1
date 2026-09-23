@@ -221,7 +221,8 @@ Legend — Class: **C** covered, **P** partial, **N** not covered, **B** blocked
 | Statement staging fixtures | invalid row + identical retry (E2E) | negative/zero/NaN/inf/missing/duplicate/out-of-order/huge; conflicting replay | STDB | yes | — | PAY-10, PAY-11A, PAY-11B | P |
 | CSV UTF-8 BOM | extracted statement parser strips BOM before header parsing and idempotency hashing | — | web unit | yes | — | CSV-BOM | C |
 | CSV US thousands grouping | `"1,234"` and multi-group integers parse as grouping; decimal-comma values remain decimals | — | web unit | yes | CSV-BOM extraction | CSV-02 | C |
-| CSV mixed European separators / ambiguous dates / hash collisions | current parser behavior only | focused parser fixtures and stronger identity | web unit | no | parser extraction | CSV-01, CSV-03, CSV-04 | N |
+| CSV ambiguous slash dates | numeric slash dates fail closed without an explicit format/locale; ISO remains accepted | — | web unit | yes | parser extraction | CSV-03 | C |
+| CSV mixed European separators / hash collisions | current parser behavior only | focused parser fixtures and stronger identity | web unit | no | parser extraction | CSV-01, CSV-04 | N |
 
 ### Frontend IR (all require the IR stack)
 
