@@ -9,6 +9,7 @@ use spacetimedb::{reducer, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::core::organization::require_company_in_organization;
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
+use crate::inventory::stock::require_location_in_org;
 use serde_json;
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -242,6 +243,7 @@ pub struct UpdateWarehouseParams {
     pub sequence: Option<i32>,
     pub partner_id: Option<u64>,
     pub resupply_wh_ids: Option<Vec<u64>>,
+    pub wh_qc_stock_loc_id: Option<u64>,
     pub metadata: Option<String>,
 }
 
@@ -523,6 +525,10 @@ pub fn update_warehouse(
         return Err("Warehouse does not belong to this company".to_string());
     }
 
+    if let Some(qc_loc) = params.wh_qc_stock_loc_id {
+        require_location_in_org(ctx, organization_id, qc_loc)?;
+    }
+
     ctx.db.warehouse().id().update(Warehouse {
         name: params.name.unwrap_or_else(|| warehouse.name.clone()),
         code: params.code.unwrap_or_else(|| warehouse.code.clone()),
@@ -546,6 +552,7 @@ pub fn update_warehouse(
         resupply_wh_ids: params
             .resupply_wh_ids
             .unwrap_or_else(|| warehouse.resupply_wh_ids.clone()),
+        wh_qc_stock_loc_id: params.wh_qc_stock_loc_id.or(warehouse.wh_qc_stock_loc_id),
         metadata: params.metadata.or(warehouse.metadata),
         updated_at: ctx.timestamp,
         ..warehouse
