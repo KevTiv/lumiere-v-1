@@ -2222,37 +2222,32 @@ pub fn move_stock_quant(
     let qty = params.quantity;
     let eps = 1e-9_f64;
 
-    // Find an existing quant at destination with the same product / variant / lot / package / owner.
-    let mut dest_id: Option<u64> = None;
-    for q in ctx
+    // Resolve at most one existing destination quant with the same stock identity.
+    // Duplicate compatible quants are an invariant violation: never choose by iteration order.
+    let mut matching_destinations = ctx
         .db
         .stock_quant()
         .quant_by_product()
         .filter(&src.product_id)
-    {
-        if q.organization_id != organization_id || q.company_id != company_id {
-            continue;
-        }
-        if q.location_id != params.dest_location_id {
-            continue;
-        }
-        if q.product_variant_id != src.product_variant_id {
-            continue;
-        }
-        if q.lot_id != src.lot_id {
-            continue;
-        }
-        if q.package_id != src.package_id {
-            continue;
-        }
-        if q.owner_id != src.owner_id {
-            continue;
-        }
-        dest_id = Some(q.id);
-        break;
+        .filter(|q| {
+            q.organization_id == organization_id
+                && q.company_id == company_id
+                && q.location_id == params.dest_location_id
+                && q.product_variant_id == src.product_variant_id
+                && q.lot_id == src.lot_id
+                && q.package_id == src.package_id
+                && q.owner_id == src.owner_id
+        });
+    let dest_id = matching_destinations.next().map(|q| q.id);
+    if matching_destinations.next().is_some() {
+        return Err(format!(
+            "Multiple destination quants match source quant {} at location {}",
+            quant_id, params.dest_location_id
+        ));
     }
 
     let is_emptying_src = (src.quantity - qty).abs() <= eps;
+    let mut destination_quant_id = dest_id;
 
     match dest_id {
         Some(did) => {
@@ -2309,7 +2304,7 @@ pub fn move_stock_quant(
                 ..src.clone()
             });
 
-            ctx.db.stock_quant().insert(StockQuant {
+            let inserted_destination = ctx.db.stock_quant().insert(StockQuant {
                 id: 0,
                 organization_id: src.organization_id,
                 product_id: src.product_id,
@@ -2337,7 +2332,12 @@ pub fn move_stock_quant(
                 accounting_entry_ids: src.accounting_entry_ids.clone(),
                 metadata: src.metadata.clone(),
             });
+            destination_quant_id = Some(inserted_destination.id);
         }
+    }
+
+    if dest_id.is_none() && is_emptying_src {
+        destination_quant_id = Some(quant_id);
     }
 
     write_audit_log_v2(
@@ -2386,8 +2386,14 @@ pub fn move_stock_quant(
             RowChange::delete("stock_quant", serde_json::json!({"id": quant_id})),
         ));
     }
-    if let Some(destination_id) = dest_id {
-        if let Some(destination_after) = ctx.db.stock_quant().id().find(&destination_id) {
+    if let Some(destination_id) = destination_quant_id {
+        if destination_id != quant_id {
+            let destination_after = ctx
+                .db
+                .stock_quant()
+                .id()
+                .find(&destination_id)
+                .ok_or("Destination quant disappeared before commit recording")?;
             changed_quants.push((
                 destination_after.id,
                 RowChange::upsert_stdb_row(
@@ -2397,31 +2403,6 @@ pub fn move_stock_quant(
                 )?,
             ));
         }
-    } else if !is_emptying_src {
-        let destination_after = ctx
-            .db
-            .stock_quant()
-            .iter()
-            .filter(|quant| {
-                quant.organization_id == organization_id
-                    && quant.company_id == company_id
-                    && quant.product_id == src.product_id
-                    && quant.location_id == params.dest_location_id
-                    && quant.product_variant_id == src.product_variant_id
-                    && quant.lot_id == src.lot_id
-                    && quant.package_id == src.package_id
-                    && quant.owner_id == src.owner_id
-            })
-            .max_by_key(|quant| quant.id)
-            .ok_or("Destination quant disappeared before commit recording")?;
-        changed_quants.push((
-            destination_after.id,
-            RowChange::upsert_stdb_row(
-                "stock_quant",
-                serde_json::json!({"id": destination_after.id}),
-                &destination_after,
-            )?,
-        ));
     }
     changed_quants.sort_by_key(|(id, _)| *id);
     record_organization_commit(
