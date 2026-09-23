@@ -392,6 +392,24 @@ export function InventoryClient(props: InventoryClientProps) {
   );
 }
 
+function runPickingWorkflowActionForRows(
+  action: {
+    execute(
+      recordId: string,
+      context?: { navigateToNext?: boolean },
+    ): Promise<unknown>;
+  },
+  rows: ReadonlyArray<{ id?: unknown }>,
+): void {
+  const navigateToNext = rows.length === 1;
+  for (const row of rows) {
+    if (row.id == null) continue;
+    action
+      .execute(String(row.id), { navigateToNext })
+      .catch(() => undefined);
+  }
+}
+
 function InventoryClientLoaded({
   initialProducts,
   initialStockQuants,
@@ -1942,14 +1960,17 @@ function InventoryClientLoaded({
                 t,
                 {
                   // Every selected transfer qualifies (the toolbar requires it), so each one is run.
-                  confirm: (rows) => runRecordActionForRows(pickingWorkflow.confirm, rows),
-                  assign: (rows) => runRecordActionForRows(pickingWorkflow.assign, rows),
+                  confirm: (rows) =>
+                    runPickingWorkflowActionForRows(pickingWorkflow.confirm, rows),
+                  assign: (rows) =>
+                    runPickingWorkflowActionForRows(pickingWorkflow.assign, rows),
                   'assign-user': (rows) => {
                     const id = rows[0]?.id as ScalarId | undefined;
                     if (id != null) setAssignPickingId(id);
                   },
                   pack: (rows) => runRecordActionForRows(pickingWorkflow.pack, rows),
-                  validate: (rows) => runRecordActionForRows(pickingWorkflow.validate, rows),
+                  validate: (rows) =>
+                    runPickingWorkflowActionForRows(pickingWorkflow.validate, rows),
                   cancel: (rows) => runRecordActionForRows(pickingWorkflow.cancel, rows),
                 },
                 {
