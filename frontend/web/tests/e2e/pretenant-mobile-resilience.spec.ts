@@ -159,9 +159,7 @@ test.describe("Pre-tenant mobile and network resilience", { tag: pretenantTags("
     expect(await ledgerPaymentId(page, transactionId)).toBeGreaterThan(0)
     await expect.poll(() => auditCount(page, "payment_transaction", transactionId, "POST")).toBe(1)
 
-    await expectKnownDefect("PAY-03", "post retry after a lost committed response returns an error", () => {
-      expect(retry.status).toBe(200)
-    })
+    expect(retry.status).toBe(200)
   })
 
   test("M-03 approval with lost response then retry approves once", async ({ page, browser }) => {
