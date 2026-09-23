@@ -319,8 +319,8 @@ pub struct StageBankStatementImportParams {
 
 // ── Reducers ─────────────────────────────────────────────────────────────────
 
-/// Stage parsed statement rows for review. Repeating the same payload for the
-/// same company is a no-op, which makes client and network retries safe.
+/// Stage parsed statement rows for review. Repeating the exact payload for the
+/// same company/key is a no-op; reusing the key with different input fails closed.
 #[spacetimedb::reducer]
 pub fn stage_bank_statement_import(
     ctx: &ReducerContext,
