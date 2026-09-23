@@ -161,3 +161,94 @@ export async function confirmPurchaseOrderViaUi(
   )
   await waitForPurchaseOrderState(page, orderId, "Purchase")
 }
+
+
+export async function fetchPurchaseOrderLineIds(
+  page: Page,
+  orderId: number,
+): Promise<number[]> {
+  const response = await page.request.get("/api/query/purchase-order-lines")
+  if (!response.ok()) return []
+
+  const payload = (await response.json()) as {
+    data?: Array<Record<string, unknown>>
+  }
+  return (payload.data ?? [])
+    .filter(
+      (row) => scalarQueryId(row.orderId ?? row.order_id) === orderId,
+    )
+    .flatMap((row) => {
+      const id = scalarQueryId(row.id)
+      return id == null ? [] : [id]
+    })
+    .sort((a, b) => a - b)
+}
+
+export interface PurchaseReceiptMoveSnapshot {
+  id: number
+  pickingId: number
+  state: string
+  isDone: boolean
+}
+
+export async function fetchPurchaseLineReceiptMoves(
+  page: Page,
+  lineId: number,
+): Promise<PurchaseReceiptMoveSnapshot[]> {
+  const response = await page.request.get("/api/query/stock-moves")
+  if (!response.ok()) return []
+
+  const payload = (await response.json()) as {
+    data?: Array<Record<string, unknown>>
+  }
+  return (payload.data ?? [])
+    .filter(
+      (row) =>
+        scalarQueryId(row.purchaseLineId ?? row.purchase_line_id) === lineId,
+    )
+    .flatMap((row) => {
+      const id = scalarQueryId(row.id)
+      const pickingId = scalarQueryId(row.pickingId ?? row.picking_id)
+      if (id == null || pickingId == null) return []
+      return [
+        {
+          id,
+          pickingId,
+          state: String(row.state ?? "").toLowerCase(),
+          isDone: Boolean(row.isDone ?? row.is_done),
+        },
+      ]
+    })
+    .sort((a, b) => a.id - b.id)
+}
+
+export async function fetchPurchaseLineReceivedQty(
+  page: Page,
+  lineId: number,
+): Promise<number | undefined> {
+  const response = await page.request.get("/api/query/purchase-order-lines")
+  if (!response.ok()) return undefined
+
+  const payload = (await response.json()) as {
+    data?: Array<Record<string, unknown>>
+  }
+  const row = (payload.data ?? []).find(
+    (candidate) => scalarQueryId(candidate.id) === lineId,
+  )
+  if (!row) return undefined
+  return Number(row.qtyReceived ?? row.qty_received ?? 0)
+}
+
+export async function receivePurchaseLineViaUi(
+  page: Page,
+  lineId: number,
+): Promise<void> {
+  await gotoModule(page, "/purchasing", "purchasing")
+  await selectModuleTab(page, "purchasing", "lines")
+  await selectEntityRowById(page, lineId)
+  await clickEntityActionAndWaitForReducer(
+    page,
+    "entity-action-pol-receive-qty",
+    "receive_po_line",
+  )
+}
