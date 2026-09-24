@@ -198,7 +198,7 @@ Legend — Class: **C** covered, **P** partial, **N** not covered, **B** blocked
 | Out-of-order callbacks (delivered→sent/failed, failed→delivered, dup sent, delivered before sent) | monotonic transitions plus stale-sent absorption/receipt are certified | — | STDB + state machine | yes | — | COMM-04, COMM-05, SM-01 | C |
 | Ambiguous outbound timeout | — | all | api-server worker + E2E | no | outbound dispatch capability | COMM-OUT-01 (gated) | B |
 | Consent race (opt-out after preview) | preview exclusion plus approval-time revalidation | — | STDB + two-session E2E | yes | — | COMM-06, COMM-06-E2E | C |
-| Phone identity changes before dispatch | — | archive and number-change paths | STDB | yes | — | COMM-07, COMM-14 | N |
+| Phone identity changes before dispatch | approval revalidates exact active recipient identity and preview timestamp | — | STDB | yes | — | COMM-07, COMM-14 | C |
 | Template change after approval | — | immutability proof | STDB | yes | — | COMM-08, COMM-09 | N |
 | Contact merge with active provider conversation | merge UI (`crm-duplicate-merge.spec.ts`) | timeline continuity | STDB | yes | — | COMM-10 | P |
 | Independent approval | single actor lifecycle (P1-MSG-02) | creator denial, approver, retry, simultaneous | STDB + two-session E2E | yes | — | COMM-11, COMM-11-E2E a–d | N |
