@@ -12,6 +12,7 @@
     "test:unit": "node --import tsx --test next-config.test.ts tests/e2e/operation-response.test.ts lib/api-server-forward.test.ts lib/server-query.test.ts lib/form-lookup.test.ts lib/statement-import-csv.test.ts lib/crm-update-params.test.ts lib/expenses-coverage-create-params.test.ts lib/purchasing-coverage-create-params.test.ts app/api/ai/_lib/ai-privacy-policy.test.ts app/api/ai/_lib/indexing-gates.test.ts \"app/api/ai/runs/lifecycle/contract.test.ts\" \"app/(modules)/ai-harness/evidence-inspection.test.ts\" \"app/(modules)/ai-harness/evidence-review-queue.test.ts\" \"app/(modules)/ai-harness/run-lifecycle.test.ts\" \"app/(modules)/presentation-preview/draft-state.test.ts\"",
     "test:e2e": "playwright test",
     "test:e2e:p0": "playwright test --grep @p0 --grep-invert @dev-fixture",
+    "test:e2e:pretenant": "playwright test --grep @pretenant",
     "test:e2e:full": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "analyze:coverage": "tsx scripts/track-reducer-coverage.ts && python3 ../../scripts/generate-operation-census.py",
