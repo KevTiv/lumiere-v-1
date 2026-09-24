@@ -35,11 +35,11 @@ The shared accounting guard is applied to:
 - payment gross / settlement / net amounts at create, update and post invariant
   validation;
 - payment fee and fee-tax amounts;
-- allocation and write-off amounts;
+- allocation and write-off amounts, including their combined economic effect;
 - new allocations against legacy payment transactions;
 - bank statement opening balance;
-- staged statement row amounts;
-- statement approval revalidation for opening balance and row amounts.
+- staged statement row amounts, valid-row movement totals and derived closing balance;
+- statement approval revalidation for opening balance, row amounts, movement total and closing balance.
 
 Exact idempotent replays are checked before the new-effect boundary where
 appropriate, so adding the cap does not turn a previously committed exact retry
@@ -57,8 +57,9 @@ integer-minor-unit or decimal representation migration.
 - PAY-09 now settles at the production cap to the cent, rejects over-cap / NaN /
   infinity payment amounts, rejects non-finite allocation/write-off inputs, and
   asserts no rejected reconciliation persists;
-- PAY-10 now treats over-cap statement rows as review-invalid and rejects an
-  over-cap opening balance without persisting an import;
+- PAY-10 now treats over-cap statement rows as review-invalid and rejects
+  over-cap opening balances, aggregate movements and derived closing balances
+  without persisting an import;
 - native money tests exercise the production guard directly and run the exact
   minor-unit admission model through the same 1e9 cap.
 
