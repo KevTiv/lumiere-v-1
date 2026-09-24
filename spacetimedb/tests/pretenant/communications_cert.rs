@@ -192,6 +192,32 @@ fn seed_template(ctx: &ReducerContext, org: u64, key: &str) -> Result<u64, Strin
         .ok_or_else(|| format!("template {key} missing"))
 }
 
+fn seed_contact_template(ctx: &ReducerContext, org: u64, key: &str) -> Result<u64, String> {
+    create_message_template(
+        ctx,
+        org,
+        CreateMessageTemplateParams {
+            company_id: None,
+            key: key.to_string(),
+            name: format!("{key} contact"),
+            locale: "en".to_string(),
+            subject: Some("Hello {{customer_name}}".to_string()),
+            body_template: "Hello {{customer_name}}, this is an operational message.".to_string(),
+            allowed_variables: vec!["customer_name".to_string()],
+            applicable_channels: vec![MessageChannel::Sms, MessageChannel::WhatsApp],
+            retention_classification: "operational".to_string(),
+            metadata: None,
+        },
+    )?;
+    ctx.db
+        .message_template()
+        .message_template_by_key()
+        .filter((&org, &key.to_string()))
+        .map(|t| t.id)
+        .max()
+        .ok_or_else(|| format!("contact template {key} missing"))
+}
+
 fn seed_contact_batch(
     ctx: &ReducerContext,
     org: u64,
