@@ -35,36 +35,7 @@ pub type CertCase = (&'static str, fn(&ReducerContext) -> Result<(), String>);
 
 /// Case id → pre-tenant blocker. Every entry must be documented in the plan's
 /// "Known defects" table (enforced by a native unit test below).
-pub const KNOWN_DEFECTS: &[(&str, &str)] = &[
-    (
-        "COMM-05",
-        "stale-but-valid provider status callback is rejected with an error instead of being absorbed; the webhook returns non-2xx and the provider retries",
-    ),
-    (
-        "COMM-06",
-        "message batch approval does not revalidate consent; a contact who opted out after preview remains an approved recipient",
-    ),
-    (
-        "COMM-07",
-        "message batch approval does not revalidate the snapshotted phone identity; an archived recipient identity remains approved",
-    ),
-    (
-        "COMM-09",
-        "contact message batches are approved without rendered content, so approved content is not immutable",
-    ),
-    (
-        "COMM-11",
-        "message batch creator can satisfy their own approval; no independent-approval rule",
-    ),
-    (
-        "COMM-13",
-        "create_message_batch does not scope candidate contacts or phone identities to the calling organization",
-    ),
-    (
-        "COMM-14",
-        "a number change under the same phone identity id silently redirects an approved recipient",
-    ),
-];
+pub const KNOWN_DEFECTS: &[(&str, &str)] = &[];
 
 pub fn setup<T>(what: &str, result: Result<T, String>) -> Result<T, String> {
     result.map_err(|error| format!("SETUP {what}: {error}"))
