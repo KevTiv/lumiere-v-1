@@ -860,22 +860,31 @@ pub fn create_message_batch(
     let channel = params.channel.clone();
     let subject_model = params.subject_model.clone();
 
-    let mut included: Vec<u64> = vec![];
+    let mut included = Vec::new();
     let mut excluded: u64 = 0;
     let mut sample: Vec<u64> = vec![];
 
     for contact_id in &params.candidate_contact_ids {
-        let (can_receive, phone_id) = contact_can_receive(ctx, *contact_id, &channel);
-        if can_receive {
-            included.push(*contact_id);
-            if sample.len() < 3 {
-                if let Some(pid) = phone_id {
-                    sample.push(pid);
-                }
-            }
-        } else {
+        let Some(recipient) = resolve_message_recipient(
+            ctx,
+            organization_id,
+            params.company_id,
+            *contact_id,
+            &channel,
+        )? else {
             excluded += 1;
+            continue;
+        };
+        let variables = contact_batch_variables(&template, &recipient)?;
+        let rendered_subject = render_subject(&template, &variables)?;
+        let rendered_body = render_template(&template, &variables)?;
+        if rendered_body.trim().is_empty() {
+            return Err("Contact batch rendered body cannot be empty".to_string());
         }
+        if sample.len() < 3 {
+            sample.push(recipient.phone_identity_id);
+        }
+        included.push((recipient, variables, rendered_subject, rendered_body));
     }
 
     let batch = ctx.db.message_batch().insert(MessageBatch {
@@ -900,35 +909,31 @@ pub fn create_message_batch(
         metadata: params.metadata,
     });
 
-    // Create child operational messages in draft state.
-    for contact_id in included {
-        let (_, phone_identity_id) = contact_can_receive(ctx, contact_id, &batch.channel);
-        if let Some(phone_id) = phone_identity_id {
-            let _ = ctx.db.operational_message().insert(OperationalMessage {
-                id: 0,
-                organization_id,
-                company_id: batch.company_id,
-                message_batch_id: batch.id,
-                template_id: batch.template_id,
-                contact_id,
-                phone_identity_id: phone_id,
-                channel: batch.channel.clone(),
-                status: OperationalMessageStatus::Draft,
-                subject_model: batch.subject_model.clone(),
-                subject_id: 0,
-                rendered_subject: None,
-                rendered_body: String::new(),
-                variable_hash: String::new(),
-                copied_at: None,
-                queued_at: None,
-                sent_at: None,
-                failed_at: None,
-                failure_reason: None,
-                created_at: ctx.timestamp,
-                created_by: ctx.sender(),
-                metadata: None,
-            });
-        }
+    for (recipient, variables, rendered_subject, rendered_body) in included {
+        ctx.db.operational_message().insert(OperationalMessage {
+            id: 0,
+            organization_id,
+            company_id: batch.company_id,
+            message_batch_id: batch.id,
+            template_id: batch.template_id,
+            contact_id: recipient.contact_id,
+            phone_identity_id: recipient.phone_identity_id,
+            channel: batch.channel.clone(),
+            status: OperationalMessageStatus::Draft,
+            subject_model: batch.subject_model.clone(),
+            subject_id: 0,
+            rendered_subject,
+            rendered_body,
+            variable_hash: hash_variables(&variables),
+            copied_at: None,
+            queued_at: None,
+            sent_at: None,
+            failed_at: None,
+            failure_reason: None,
+            created_at: ctx.timestamp,
+            created_by: ctx.sender(),
+            metadata: None,
+        });
     }
 
     write_audit_log_v2(
