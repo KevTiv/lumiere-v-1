@@ -246,15 +246,13 @@ test.describe("Pre-tenant communications adversarial", { tag: pretenantTags("@co
     )
     requireNotPermissionDenied(approval, "approver")
 
-    await expectKnownDefect("COMM-06", "approval does not revalidate consent", async () => {
-      const targeted = (await children(page, batchId)).some(
-        (row) =>
-          idOf(field(row, "contactId", "contact_id")) === contactId &&
-          ["draft", "queued", "copied"].includes(tagOf(field(row, "status"))),
-      )
-      const approved = (await batchStatus(page, batchId)) === "approved"
-      expect(approved && targeted, "approved batch must not target an opted-out contact").toBe(false)
-    })
+    const targeted = (await children(page, batchId)).some(
+      (row) =>
+        idOf(field(row, "contactId", "contact_id")) === contactId &&
+        ["draft", "queued", "copied"].includes(tagOf(field(row, "status"))),
+    )
+    const approved = (await batchStatus(page, batchId)) === "approved"
+    expect(approved && targeted, "approved batch must not target an opted-out contact").toBe(false)
   })
 
   test("COMM-OUT-01 ambiguous outbound provider timeout yields one provider-visible intent", { tag: CAPABILITY_PENDING }, async ({ page }) => {
