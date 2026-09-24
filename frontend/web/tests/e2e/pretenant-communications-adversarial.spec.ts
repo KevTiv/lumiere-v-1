@@ -231,9 +231,7 @@ test.describe("Pre-tenant communications adversarial", { tag: pretenantTags("@co
     await expect.poll(() => auditCount(page, "message_batch", batchId, "APPROVE")).toBe(1)
     expect(await batchStatus(page, batchId)).toBe("approved")
 
-    await expectKnownDefect("COMM-15", "approval retry by the approver returns an error", () => {
-      expect(retry.ok, `retry should be an idempotent success: ${retry.error}`).toBe(true)
-    })
+    expect(retry.ok, `retry should be an idempotent success: ${retry.error}`).toBe(true)
   })
 
   test("COMM-06-E2E opt-out between preview and approval is revalidated", async ({ page, browser }) => {
