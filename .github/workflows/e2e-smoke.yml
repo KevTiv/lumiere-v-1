@@ -229,6 +229,15 @@ jobs:
           restore-keys: |
             next-compiler-v1-${{ runner.os }}-node22-${{ hashFiles('frontend/pnpm-lock.yaml', 'frontend/web/next.config.*', 'frontend/web/tsconfig.json') }}-
 
+      - name: Run BASE-05 pretenant static/native gates
+        if: matrix.config.suite == 'pretenant'
+        run: |
+          cargo check --locked --manifest-path spacetimedb/Cargo.toml --tests
+          make pretenant-cert-native
+          make check-codegen-pinned
+          cd frontend/web
+          pnpm typecheck
+
       - name: Run make e2e-smoke
         env:
           E2E_SUITE: ${{ matrix.config.suite }}
