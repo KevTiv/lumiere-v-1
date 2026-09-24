@@ -210,7 +210,7 @@ Legend — Class: **C** covered, **P** partial, **N** not covered, **B** blocked
 |------|-------------------|------------------|-----------|---------------|--------------|----------------|-------|
 | Concurrent allocation 80/50 on 100 | single allocation + retry (ACC-RI-004) | interleaving + true concurrency | STDB + E2E | yes | — | PAY-01, SM-02, PAY-01-E2E | P |
 | Allocation retry after commit | ACC-RI-004 receipts/audit | — | STDB | yes | — | reused | C |
-| Post retry after lost response | — | single effect, idempotent success | STDB + E2E | yes | — | PAY-02, PAY-03, PAY-02-E2E, M-02 | N |
+| Post retry after lost response | committed replay validates the original ledger effect; native + browser assertions require one effect and success | — | STDB + E2E | yes | — | PAY-02, PAY-03, PAY-02-E2E, M-02 | C |
 | Reversal retry | — | single compensation, idempotent success | STDB | yes | — | PAY-04, PAY-05 | N |
 | Statement approval retry | `bank-statement-import.spec.ts` (approve twice) | — | E2E | yes | — | reused | C |
 | Duplicate refs: same account / normalized variant / distinct account / cross-company forgery | `payment_management_test`, P1-PAY-02 | cross-organization scope | STDB | yes | — | PAY-07 | P |
