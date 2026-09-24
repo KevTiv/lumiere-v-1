@@ -9,10 +9,11 @@ on:
   workflow_dispatch:
     inputs:
       suite:
-        description: "Playwright suite (p0 = critical smoke, full = all tests)"
+        description: "Playwright suite (p0 = critical smoke, pretenant = adversarial certification, full = all tests)"
         type: choice
         options:
           - p0
+          - pretenant
           - full
         default: p0
       clear_db:
