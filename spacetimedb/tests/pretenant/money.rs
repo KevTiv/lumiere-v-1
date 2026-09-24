@@ -64,8 +64,9 @@ pub const CERT_SEEDS: &[u64] = &[1, 42, 1337, 20_260_912, 0xDEAD_BEEF];
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::accounting::money::PILOT_MAX_MAJOR_UNITS;
 
-    /// Mirror of the private production constant; the source check below keeps it honest.
+    /// Mirror of the private production reconciliation epsilon; the source check below keeps it honest.
     const RECONCILIATION_EPSILON: f64 = 0.000_001;
     const PAYMENT_MANAGEMENT_SOURCE: &str =
         include_str!("../../src/accounting/payment_management.rs");
@@ -156,24 +157,27 @@ mod tests {
         out
     }
 
-    /// Safe envelope: zero-, two- and three-decimal currencies up to 1e8 major units.
+    /// Pilot envelope: zero-, two- and three-decimal currencies through the
+    /// production admission cap.
     #[test]
-    fn f64_admission_matches_exact_minor_units_inside_safe_envelope() {
+    fn f64_admission_matches_exact_minor_units_inside_pilot_envelope() {
+        let max_major = PILOT_MAX_MAJOR_UNITS as u64;
+        assert_eq!(max_major, 1_000_000_000);
         for decimals in [0, 2, 3] {
-            let result = run_envelope(decimals, 100_000_000, 2_000);
+            let result = run_envelope(decimals, max_major, 2_000);
             assert_eq!(
                 result.diverged,
                 0,
-                "f64 admission diverged from exact minor units inside the safe envelope: {:?} ({} trials)",
+                "f64 admission diverged from exact minor units inside the pilot envelope: {:?} ({} trials)",
                 result.first,
                 result.trials
             );
         }
     }
 
-    /// Outside the envelope the representation is not exact. This test asserts the
-    /// divergence exists so the plan's blocker cannot silently go stale; when money moves
-    /// to integer minor units / decimals, invert it into a blocking exactness test.
+    /// Far outside the enforced pilot envelope the representation is not exact.
+    /// Keep this characterization so removing/raising the cap requires an explicit
+    /// representation decision instead of silently widening f64 admission.
     #[test]
     fn f64_admission_diverges_beyond_ten_billion_major_units() {
         let result = run_envelope(2, 1_000_000_000_000, 2_000);
