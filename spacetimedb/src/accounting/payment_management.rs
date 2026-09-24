@@ -2014,6 +2014,7 @@ pub fn allocate_payment_transaction(
 
     let residual_before = move_line.amount_residual.abs();
     let target_reduction = params.allocated_amount + params.write_off_amount;
+    validate_pilot_money_amount("allocation plus write-off", target_reduction)?;
     if target_reduction > residual_before + RECONCILIATION_EPSILON {
         return Err("allocation and write-off exceed the target residual".to_string());
     }
