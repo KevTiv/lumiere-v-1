@@ -1,6 +1,6 @@
 # BASE-05 — integrated pre-tenant certification
 
-Status: **IN PROGRESS — local integrated lanes green; clean CI rerun pending**
+Status: **ACCEPTED — integrated browser certification closed 2026-09-24**
 
 Current tip: PR #89 (`codex/base05-pretenant-integrated-certification`), stacked on
 BASE-03 PR #88 and BASE-04 PR #87.
@@ -71,8 +71,23 @@ respectively, when run without the gateway.
 
 The original PR run `36041321175` is retained as failure evidence: it exposed
 the selector expansion bug and five P0 fixture/expectation failures. It is not
-acceptance evidence. Promotion remains pending a clean-database PR rerun of
-both integrated lanes.
+acceptance evidence.
+
+## Clean CI acceptance evidence — 2026-09-24
+
+GitHub Actions run `36054658413` certified executable commit
+`065c45f2f7c93cb5996378a90f723cc3f9b92308` on PR #89:
+
+| Job | Job id | Result |
+| --- | --- | --- |
+| `Playwright smoke (pretenant)` | `107818604455` | 27 passed, 17 skipped, 0 failed (44 discovered; 26 runtime passes plus setup; 2.8m browser time) |
+| `Playwright smoke (p0)` | `107818604390` | 89 passed, 9 skipped, 0 failed (98 discovered; 88 runtime passes plus setup; 19.5m browser time) |
+| `E2E gate` | `107832330657` | passed |
+
+The same SHA also passed frontend contracts, i18n, and semantic-index checks.
+The pre-tenant job ran the static/native/codegen gates before its clean browser
+stack. All skips match the capability-gated and live-AI prerequisites listed
+below; none are counted as executed certification.
 
 ## Capability-gated scope still outside this stack
 
