@@ -2,6 +2,7 @@ import { expect, test, type Page } from "@playwright/test"
 
 import {
   callReducerBff,
+  callReducerOwner,
   fetchDefaultCompanyId,
   fetchSessionOrganizationId,
   scalarQueryId,
@@ -87,7 +88,8 @@ test.describe("IoT HTTP company isolation", { tag: "@p0" }, () => {
       [defaultCompanyId, defaultSerial],
       [branchCompanyId, branchSerial],
     ] as const) {
-      await callReducerBff(page, "register_iot_hub", [
+      const callReducer = companyId === defaultCompanyId ? callReducerBff.bind(null, page) : callReducerOwner
+      await callReducer("register_iot_hub", [
         organizationId,
         companyId,
         {
@@ -98,7 +100,7 @@ test.describe("IoT HTTP company isolation", { tag: "@p0" }, () => {
           metadata: none,
         },
       ])
-      await callReducerBff(page, "generate_hub_pairing_token", [organizationId, companyId])
+      await callReducer("generate_hub_pairing_token", [organizationId, companyId])
     }
 
     const defaultHub = await waitForRow(

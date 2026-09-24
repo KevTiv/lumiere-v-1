@@ -133,10 +133,10 @@ help-legacy:
 	@echo "  call-tests           Call run_all_core_tests on local"
 	@echo "  logs                 Tail logs from local"
 	@echo "  seed-test-user       Provision test@email.com + admin org (run e2e-seed-fixture first if DB was cleared)"
-	@echo "  e2e-smoke            Full stack: setup + Playwright (E2E_SUITE=full|p0, default full)"
+	@echo "  e2e-smoke            Full stack: setup + Playwright (E2E_SUITE=full|p0|pretenant, default full)"
 	@echo "  e2e-smoke-setup      STDB + publish + seed + api-server only (writes .tmp/e2e/env.sh; module=$(E2E_STDB_MODULE))"
 	@echo "  e2e-wipe-local-stdb  Stop local SpacetimeDB and delete ~/.local/share/spacetime/data (destructive)"
-	@echo "  e2e-smoke-test       Pre-build Next.js, start web, Playwright (requires setup; E2E_SUITE=full|p0)"
+	@echo "  e2e-smoke-test       Pre-build Next.js, start web, Playwright (requires setup; E2E_SUITE=full|p0|pretenant)"
 	@echo "  e2e-playwright-only  Playwright only when STDB, api-server, and Next.js are already running"
 	@echo "  e2e-single           setup + one Playwright spec (E2E_SPEC, E2E_GREP, E2E_WORKERS=1)"
 	@echo "  e2e-single-test      one spec; matching local Next builds are reused (--workers=1)"
@@ -215,7 +215,7 @@ help:
 
 help-e2e:
 	@printf "E2E commands (all use local SpacetimeDB and write logs under .tmp/e2e):\n"
-	$(call print-command,e2e-smoke,Full setup and Playwright run; E2E_SUITE=full|p0.)
+	$(call print-command,e2e-smoke,Full setup and Playwright run; E2E_SUITE=full|p0|pretenant.)
 	$(call print-command,e2e-smoke-setup,Database publish plus reducer checks fixture seed and API only.)
 	$(call print-command,e2e-smoke-test,Build web and run Playwright; requires e2e-smoke-setup.)
 	$(call print-command,e2e-playwright-only,Run Playwright against already-running services.)
@@ -543,9 +543,9 @@ e2e-smoke-test:
 		done; \
 		echo "[e2e] Running Playwright ($${E2E_SUITE:-full} suite, workers=$$E2E_WORKERS)..."; \
 		pnpm exec playwright install chromium; \
-		PW_ARGS=(--workers "$E2E_WORKERS"); \
-		if [ "${E2E_SUITE:-full}" = "p0" ]; then PW_ARGS+=(--grep @p0 --grep-invert @dev-fixture); fi; \
-		if [ "${E2E_SUITE:-full}" = "pretenant" ]; then PW_ARGS+=(--grep @pretenant); fi; \
+		PW_ARGS=(--workers "$$E2E_WORKERS"); \
+		if [ "$${E2E_SUITE:-full}" = "p0" ]; then PW_ARGS+=(--grep @p0 --grep-invert @dev-fixture); fi; \
+		if [ "$${E2E_SUITE:-full}" = "pretenant" ]; then PW_ARGS+=(--grep @pretenant); fi; \
 		PORT="" \
 		PLAYWRIGHT_PORT="$(E2E_WEB_PORT)" \
 		PLAYWRIGHT_BASE_URL="http://127.0.0.1:$(E2E_WEB_PORT)" \
@@ -749,9 +749,9 @@ e2e-playwright-only:
 		cd "$$ROOT/frontend/web"; \
 		set -a; [ ! -f "$$ROOT/frontend/web/.env.local" ] || . "$$ROOT/frontend/web/.env.local"; set +a; \
 		E2E_PNPM_SCRIPT="test:e2e"; \
-		if [ "${E2E_SUITE:-full}" = "p0" ]; then E2E_PNPM_SCRIPT="test:e2e:p0"; fi; \
-		if [ "${E2E_SUITE:-full}" = "pretenant" ]; then E2E_PNPM_SCRIPT="test:e2e:pretenant"; fi; \
-		PW_ARGS=(--workers "$E2E_WORKERS"); \
+		if [ "$${E2E_SUITE:-full}" = "p0" ]; then E2E_PNPM_SCRIPT="test:e2e:p0"; fi; \
+		if [ "$${E2E_SUITE:-full}" = "pretenant" ]; then E2E_PNPM_SCRIPT="test:e2e:pretenant"; fi; \
+		PW_ARGS=(--workers "$$E2E_WORKERS"); \
 		if [ -n "$$E2E_ONLY_SPEC" ]; then PW_ARGS+=("tests/e2e/$$E2E_ONLY_SPEC"); fi; \
 		if [ -n "$$E2E_GREP" ]; then PW_ARGS+=(--grep "$$E2E_GREP"); fi; \
 		echo "[e2e] Running Playwright only ($${E2E_SUITE:-full} suite)..."; \
@@ -930,6 +930,7 @@ e2e-smoke:
 		pnpm exec playwright install chromium; \
 		PW_ARGS=(--workers "$$E2E_WORKERS"); \
 		if [ "$${E2E_SUITE:-full}" = "p0" ]; then PW_ARGS+=(--grep @p0 --grep-invert @dev-fixture); fi; \
+		if [ "$${E2E_SUITE:-full}" = "pretenant" ]; then PW_ARGS+=(--grep @pretenant); fi; \
 		PORT="" \
 		PLAYWRIGHT_PORT="$(E2E_WEB_PORT)" \
 		PLAYWRIGHT_BASE_URL="http://127.0.0.1:$(E2E_WEB_PORT)" \

@@ -30,8 +30,9 @@ import {
  *
  *   E2E_CLEAR_DB=1 make e2e-single E2E_SPEC=ai-human-review-provenance.spec.ts
  *
- * The first describe needs no model. The reuse test needs the real gateway
- * (Qdrant + embedder + chat LLM) and fails, never skips, without it:
+ * The first case needs the gateway but no model. The reuse case also needs
+ * Qdrant, an embedder, and a chat LLM. `E2E_REQUIRE_AI=1` makes either missing
+ * prerequisite blocking; other lanes record an explicit skip.
  *
  *   E2E_CLEAR_DB=1 make e2e-single E2E_SPEC=ai-human-review-provenance.spec.ts E2E_GREP="workflow publication"
  */
@@ -115,6 +116,14 @@ test.describe("AI human review and workflow provenance", { tag: "@p0" }, () => {
     await page.getByRole("button", { name: "Refresh" }).click()
   }
 
+  async function requireGateway(page: Page, prerequisite: string) {
+    if (await isAiGatewayAvailable(page)) return
+    if (process.env.E2E_REQUIRE_AI === "1") {
+      throw new Error(`E2E_REQUIRE_AI=1 but ${prerequisite} is unavailable`)
+    }
+    test.skip(true, `requires ${prerequisite}`)
+  }
+
   async function membershipRoleId(page: Page): Promise<number> {
     const res = await page.request.get("/api/query/user-organization")
     expect(res.ok(), `user-organization query: ${res.status()}`).toBeTruthy()
@@ -154,6 +163,7 @@ test.describe("AI human review and workflow provenance", { tag: "@p0" }, () => {
   test("independent review, workflow publication and component inspection", async ({ page }) => {
     await page.goto("/overview")
     await expect(page).not.toHaveURL(/\/sign-in(?:\?|$)/)
+    await requireGateway(page, "the ai-gateway evidence service")
     organizationId = await fetchSessionOrganizationId(page)
     companyId = await fetchDefaultCompanyId(page)
     roleId = await membershipRoleId(page)
@@ -560,9 +570,7 @@ test.describe("AI human review and workflow provenance", { tag: "@p0" }, () => {
     test.setTimeout(600_000)
     await page.goto("/overview")
     await expect(page).not.toHaveURL(/\/sign-in(?:\?|$)/)
-    if (!(await isAiGatewayAvailable(page))) {
-      throw new Error("the fresh-run reuse test requires the ai-gateway (Qdrant + STDB + LLM); it never skips")
-    }
+    await requireGateway(page, "the live ai-gateway (Qdrant + STDB + LLM)")
     organizationId = await fetchSessionOrganizationId(page)
     companyId = await fetchDefaultCompanyId(page)
     roleId = await membershipRoleId(page)
@@ -605,7 +613,6 @@ test.describe("AI human review and workflow provenance", { tag: "@p0" }, () => {
         partner_id: none,
         tag_ids: [],
         is_favorite: false,
-        index_content: none,
         classification_id: none,
         retention_days: none,
         fiscal_kind: none,

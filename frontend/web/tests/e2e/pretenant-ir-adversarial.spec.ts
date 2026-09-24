@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test"
+import { encodeIdentity } from "@lumiere/stdb/stdb-params-json"
 
 import { callReducerBff, fetchSessionOrganizationId } from "./helpers"
 import {
@@ -13,10 +14,12 @@ import {
   CAPABILITY_PENDING,
   openActorPages,
   openOwnerPages,
+  none,
   pendingContract,
   pretenantTags,
   provisionActor,
   requireCapability,
+  some,
 } from "./pretenant-support"
 
 test.describe("Pre-tenant presentation IR adversarial", { tag: pretenantTags("@presentation-ir") }, () => {
@@ -73,16 +76,22 @@ test.describe("Pre-tenant presentation IR adversarial", { tag: pretenantTags("@p
   test("IR-02 sensitive field permission revoked reauthorizes saved draft", async ({ page, browser }) => {
     await requireCapability(page, CAPABILITIES.presentationFieldRevocation)
     const organizationId = await fetchSessionOrganizationId(page)
-    const actor = await provisionActor(page, "ir02-field", ["account-moves:read"])
+    const actor = await provisionActor(page, "ir02-field", [
+      "account-moves:read",
+      "presentation_module:write",
+    ])
     const session = await openActorPages(browser, [actor])
     try {
       const actorPage = session.pages[0]
       const options = await presentationOptions(actorPage)
-      expect(options.fields.length).toBeGreaterThan(1)
+      expect(options.fields.length).toBeGreaterThan(2)
       const moduleKey = presentationModuleKey("pt-ir02-field")
+      const definition = presentationDefinition(moduleKey, "Field revocation", options)
+      const collection = (definition.pages as Array<{ nodes: Array<{ fields: string[] }> }>)[0].nodes[0]
+      collection.fields = [options.fields[0], options.fields[2]]
       const response = await savePresentationDraft(
         actorPage,
-        presentationDefinition(moduleKey, "Field revocation", options),
+        definition,
         null,
       )
       expect(response.status(), await response.text()).toBe(200)
@@ -122,7 +131,10 @@ test.describe("Pre-tenant presentation IR adversarial", { tag: pretenantTags("@p
 
   test("IR-02 resource permission revoked reauthorizes saved draft", async ({ page, browser }) => {
     await requireCapability(page, CAPABILITIES.presentationSavedDrafts)
-    const actor = await provisionActor(page, "ir02-resource", ["account-moves:read"])
+    const actor = await provisionActor(page, "ir02-resource", [
+      "account-moves:read",
+      "presentation_module:write",
+    ])
     const session = await openActorPages(browser, [actor])
     try {
       const actorPage = session.pages[0]
@@ -137,7 +149,12 @@ test.describe("Pre-tenant presentation IR adversarial", { tag: pretenantTags("@p
 
       await callReducerBff(page, "update_role", [
         actor.roleId,
-        { name: null, description: null, permissions: ["organization:read"], is_active: null },
+        {
+          name: none,
+          description: none,
+          permissions: some(["organization:read", "presentation_module:write"]),
+          is_active: none,
+        },
       ])
 
       const denied = await presentationDraft(actorPage, moduleKey)
@@ -146,10 +163,10 @@ test.describe("Pre-tenant presentation IR adversarial", { tag: pretenantTags("@p
       await callReducerBff(page, "update_role", [
         actor.roleId,
         {
-          name: null,
-          description: null,
-          permissions: ["organization:read", "account-moves:read"],
-          is_active: null,
+          name: none,
+          description: none,
+          permissions: some(["organization:read", "account-moves:read", "presentation_module:write"]),
+          is_active: none,
         },
       ])
 
@@ -163,7 +180,10 @@ test.describe("Pre-tenant presentation IR adversarial", { tag: pretenantTags("@p
   test("IR-02 company membership removed prevents saved draft reopen", async ({ page, browser }) => {
     await requireCapability(page, CAPABILITIES.presentationMembershipRevocation)
     const organizationId = await fetchSessionOrganizationId(page)
-    const actor = await provisionActor(page, "ir02-membership", ["account-moves:read"])
+    const actor = await provisionActor(page, "ir02-membership", [
+      "account-moves:read",
+      "presentation_module:write",
+    ])
     const session = await openActorPages(browser, [actor])
     try {
       const actorPage = session.pages[0]
@@ -177,7 +197,7 @@ test.describe("Pre-tenant presentation IR adversarial", { tag: pretenantTags("@p
       expect(response.status(), await response.text()).toBe(200)
 
       await callReducerBff(page, "remove_user_from_organization", [
-        actor.identityHex,
+        encodeIdentity(actor.identityHex),
         organizationId,
       ])
 

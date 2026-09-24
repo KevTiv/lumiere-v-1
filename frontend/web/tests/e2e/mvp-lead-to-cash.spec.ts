@@ -464,12 +464,6 @@ test.describe("MVP lead-to-cash workflow", { tag: "@p0" }, () => {
     await page.getByTestId("module-tab-sales-orders").click()
     await selectEntityRowById(page, orderId)
     await waitForEntityActionEnabled(page, "entity-action-confirm-orders")
-    const alertMessages: string[] = []
-    const onDialog = async (dialog: import("@playwright/test").Dialog) => {
-      alertMessages.push(dialog.message())
-      await dialog.accept()
-    }
-    page.once("dialog", onDialog)
     const confirmResponse = page.waitForResponse(
       (res) => matchesOperationResponse(res, "confirm_sales_order"),
       { timeout: 30_000 },
@@ -477,8 +471,10 @@ test.describe("MVP lead-to-cash workflow", { tag: "@p0" }, () => {
     await page.getByTestId("entity-action-confirm-orders").click()
     const response = await confirmResponse
     expect(response.ok()).toBe(false)
-    await expect.poll(() => alertMessages.length, { timeout: 10_000 }).toBe(1)
-    expect(alertMessages[0]).toMatch(/insufficient|available quantity|stock/i)
+    await expect(page.locator("[data-sonner-toast]")).toContainText(
+      /insufficient|available quantity|stock/i,
+      { timeout: 10_000 },
+    )
 
     await page.reload({ waitUntil: "domcontentloaded" })
     await expect
