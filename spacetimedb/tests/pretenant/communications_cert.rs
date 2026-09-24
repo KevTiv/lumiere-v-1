@@ -880,6 +880,13 @@ fn comm_09_contact_batch_approves_rendered_content(ctx: &ReducerContext) -> Resu
             )
         })
         .collect::<Vec<_>>();
+    let message_id = before
+        .first()
+        .map(|message| message.id)
+        .ok_or("contact batch has no child message")?;
+    if record_message_copied(ctx, s.org, message_id).is_ok() {
+        return Err("batch child was copied before independent approval".to_string());
+    }
 
     setup(
         "template edit",
