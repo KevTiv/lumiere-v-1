@@ -12,7 +12,9 @@ use crate::core::users::find_user_profile_for_organization;
 use crate::crm::contacts::{contact, Contact};
 use crate::crm::require_single_company_crm_scope;
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
-use crate::types::{ContactIdentityKind, ContactVerificationState};
+use crate::types::{
+    ContactIdentityKind, ContactVerificationState, OperationalMessageStatus,
+};
 
 // ── Tables ────────────────────────────────────────────────────────────────────
 
