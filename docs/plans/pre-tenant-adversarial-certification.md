@@ -195,7 +195,7 @@ Legend — Class: **C** covered, **P** partial, **N** not covered, **B** blocked
 | Event id reused across kinds; conflicting delivery replay | exact/conflicting event receipt semantics are certified | — | STDB | yes | — | COMM-01 | C |
 | Duplicate delivered callback (new event id) | distinct callback ids converge to one terminal effect | — | STDB | yes | — | COMM-02 | C |
 | Same provider message id across two messages | provider message ownership collision rejects | — | STDB | yes | — | COMM-03 | C |
-| Out-of-order callbacks (delivered→sent/failed, failed→delivered, dup sent, delivered before sent) | — | all | STDB + state machine | yes | — | COMM-04, COMM-05, SM-01 | N |
+| Out-of-order callbacks (delivered→sent/failed, failed→delivered, dup sent, delivered before sent) | monotonic transitions plus stale-sent absorption/receipt are certified | — | STDB + state machine | yes | — | COMM-04, COMM-05, SM-01 | C |
 | Ambiguous outbound timeout | — | all | api-server worker + E2E | no | outbound dispatch capability | COMM-OUT-01 (gated) | B |
 | Consent race (opt-out after preview) | preview exclusion (P1-MSG-02, core test) | revalidation at approval | STDB + two-session E2E | yes | — | COMM-06, COMM-06-E2E | P |
 | Phone identity changes before dispatch | — | archive and number-change paths | STDB | yes | — | COMM-07, COMM-14 | N |
