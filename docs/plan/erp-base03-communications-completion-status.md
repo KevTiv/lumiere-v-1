@@ -74,6 +74,8 @@ resume/stale-client semantics remain explicit.
 - invoice-reminder recipient resolution now uses the same organization/company
   rules;
 - approval requires batch children to remain unapproved `Draft` intents;
+- `record_message_copied` rejects pending/rejected batch children until the
+  parent batch has independent approval;
 - the pre-tenant native known-defect registry is empty after these repairs;
 - COMM-11/15/06 browser expected-failure wrappers are now blocking assertions;
 - the ordinary operational-messaging E2E uses a separately provisioned approver
