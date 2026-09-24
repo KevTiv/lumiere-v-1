@@ -382,9 +382,8 @@ pub fn stage_bank_statement_import(
         let validation_error = match (row.date, row.amount) {
             (None, _) => Some("date is required".to_string()),
             (_, None) => Some("amount is required".to_string()),
-            (_, Some(amount)) if !amount.is_finite() => Some("amount must be finite".to_string()),
             (_, Some(0.0)) => Some("amount must not be zero".to_string()),
-            _ => None,
+            (_, Some(amount)) => validate_pilot_money_amount("statement amount", amount).err(),
         };
         if validation_error.is_some() {
             invalid_rows += 1;
