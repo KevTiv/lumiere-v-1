@@ -2,7 +2,7 @@
 
 Status: **IMPLEMENTATION COMPLETE — acceptance proof pending**
 
-Current tip: `codex/base04-money-pilot-envelope`, stacked on PR #86.
+Current tip: PR #87 (`codex/base04-money-pilot-envelope`), stacked on PR #86.
 
 ## Delivered stack
 
