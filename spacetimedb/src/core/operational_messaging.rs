@@ -1003,7 +1003,9 @@ fn validate_message_batch_for_approval(
             .id()
             .find(&message.phone_identity_id)
             .ok_or("Batch recipient phone identity no longer exists")?;
-        if identity.updated_at > message.created_at {
+        if identity.updated_at.to_micros_since_unix_epoch()
+            > message.created_at.to_micros_since_unix_epoch()
+        {
             return Err(
                 "Batch recipient phone identity changed after preview; create a new batch".to_string(),
             );
