@@ -372,9 +372,6 @@ fn validate_payment_transaction_invariants(
         validate_pilot_money_amount("payment fee tax amount", fee.tax_amount)?;
     }
 
-    validate_pilot_money_amount("gross_external_amount", gross)?;
-    validate_pilot_money_amount("settlement_amount", settlement)?;
-    validate_pilot_money_amount("net_account_amount", net)?;
     if gross <= 0.0 {
         return Err("gross_external_amount must be positive".to_string());
     }
