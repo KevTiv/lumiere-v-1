@@ -880,6 +880,9 @@ pub fn create_payment_transaction(
         &params.evidence_document_ids,
     )?;
 
+    validate_pilot_money_amount("gross_external_amount", params.gross_external_amount)?;
+    validate_pilot_money_amount("settlement_amount", params.settlement_amount)?;
+    validate_pilot_money_amount("net_account_amount", params.net_account_amount)?;
     if params.gross_external_amount <= 0.0 {
         return Err("gross_external_amount must be positive".to_string());
     }
