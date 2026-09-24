@@ -64,7 +64,7 @@ pub const CERT_SEEDS: &[u64] = &[1, 42, 1337, 20_260_912, 0xDEAD_BEEF];
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::accounting::money::PILOT_MAX_MAJOR_UNITS;
+    use crate::accounting::money::{validate_pilot_money_amount, PILOT_MAX_MAJOR_UNITS};
 
     /// Mirror of the private production reconciliation epsilon; the source check below keeps it honest.
     const RECONCILIATION_EPSILON: f64 = 0.000_001;
@@ -81,6 +81,26 @@ mod tests {
     }
 
     #[test]
+    fn production_pilot_money_guard_rejects_non_finite_and_out_of_envelope_values() {
+        for amount in [
+            f64::NAN,
+            f64::INFINITY,
+            f64::NEG_INFINITY,
+            PILOT_MAX_MAJOR_UNITS + 0.01,
+            -(PILOT_MAX_MAJOR_UNITS + 0.01),
+        ] {
+            assert!(
+                validate_pilot_money_amount("amount", amount).is_err(),
+                "production pilot guard accepted {amount}"
+            );
+        }
+        for amount in [-PILOT_MAX_MAJOR_UNITS, 0.0, PILOT_MAX_MAJOR_UNITS] {
+            validate_pilot_money_amount("amount", amount)
+                .unwrap_or_else(|error| panic!("production pilot guard rejected {amount}: {error}"));
+        }
+    }
+
+    #[test]
     fn f64_accumulation_requires_minor_unit_rounding() {
         let mut sum = 0.0_f64;
         for _ in 0..100 {
@@ -92,9 +112,9 @@ mod tests {
         assert_eq!(to_minor(0.1 + 0.2, 2), to_minor(0.3, 2));
     }
 
-    /// Characterises the pre-tenant blocker documented as MONEY-PRECISION in the plan:
-    /// from ~1e10 major units the absolute epsilon is below f64 resolution, so admission
-    /// comparisons silently become exact float comparisons.
+    /// Characterises why the pilot admission cap exists: from ~1e10 major units
+    /// the absolute epsilon is below f64 resolution, so allocation comparisons
+    /// silently become exact float comparisons.
     #[test]
     fn reconciliation_epsilon_is_below_f64_resolution_from_ten_billion() {
         assert!(ulp(1.0e9) < RECONCILIATION_EPSILON);
