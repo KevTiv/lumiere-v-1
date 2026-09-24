@@ -193,7 +193,7 @@ Legend — Class: **C** covered, **P** partial, **N** not covered, **B** blocked
 | Exact inbound replay, conflicting inbound replay, cross account/org/company, inactive principal | `deferred_test::test_crm_whatsapp_inbox` | — | STDB | yes | — | reused | C |
 | Webhook signature/freshness/metadata stripping | `whatsapp_webhooks.rs` tests | — | api-server | yes | — | reused | C |
 | Event id reused across kinds; conflicting delivery replay | exact/conflicting event receipt semantics are certified | — | STDB | yes | — | COMM-01 | C |
-| Duplicate delivered callback (new event id) | exact delivery replay only | single-effect proof | STDB | yes | — | COMM-02 | P |
+| Duplicate delivered callback (new event id) | distinct callback ids converge to one terminal effect | — | STDB | yes | — | COMM-02 | C |
 | Same provider message id across two messages | — | all | STDB | yes | — | COMM-03 | N |
 | Out-of-order callbacks (delivered→sent/failed, failed→delivered, dup sent, delivered before sent) | — | all | STDB + state machine | yes | — | COMM-04, COMM-05, SM-01 | N |
 | Ambiguous outbound timeout | — | all | api-server worker + E2E | no | outbound dispatch capability | COMM-OUT-01 (gated) | B |
