@@ -18,8 +18,8 @@ use super::{
     },
     governed_program::{
         graph_requests_generated_capabilities, BuiltinComputeService, GovernedProgramContext,
-        GovernedProgramExecutor, GovernedProgramStop, StdbIntelligenceEventRecorder,
-        StdbProgramCheckpointStore,
+        GovernedProgramExecutor, GovernedProgramStop, GovernedProgramTraceStep,
+        StdbIntelligenceEventRecorder, StdbProgramCheckpointStore,
     },
     governed_programs::governed_program_for_skill,
     governed_services::{
@@ -75,8 +75,8 @@ use crate::{
     state::AppState,
     tools::{
         generated_read::{resolve_actor_grants, GeneratedReadTools},
-        registry::ToolRegistry,
-        types::{SkillCitation, ToolContext},
+        registry::{persist_step, ToolRegistry},
+        types::{hash_tool_input, SkillCitation, ToolContext},
     },
 };
 
@@ -654,6 +654,11 @@ pub async fn run_skill_admitted(
     if !skill.enabled {
         anyhow::bail!("skill '{skill_key}' is disabled for this company");
     }
+    if skill.id == 0 {
+        anyhow::bail!(
+            "governed skill '{skill_key}' must be provisioned before execution so its run can be persisted"
+        );
+    }
 
     let agent = resolve_agent(&stdb, req.org_id, req.agent_id, req.team_member_id).await?;
     ensure_allowed_action(&agent, "skill_run")?;
@@ -1003,6 +1008,18 @@ pub async fn run_skill_admitted(
             resume_run(&stdb, req.org_id, req.company_id, run_id).await?;
         }
         let program = executor.run(&graph, &program_context).await?;
+        let trace_step_offset =
+            load_run_step_count(state.stdb.as_ref(), req.org_id, req.company_id, run_id).await?;
+        let durable_step_count = persist_governed_trace(
+            state.stdb.as_ref(),
+            req.org_id,
+            req.company_id,
+            run_id,
+            catalog.program_ref,
+            trace_step_offset,
+            &program.trace,
+        )
+        .await?;
         let evidence_claim_ids = recording_admission
             .recorded
             .lock()
@@ -1055,7 +1072,7 @@ pub async fn run_skill_admitted(
                         .into_iter()
                         .enumerate()
                         .map(|(index, step)| RunSkillStepSummary {
-                            step_no: (index + 1) as u32,
+                            step_no: trace_step_offset + (index + 1) as u32,
                             tool: step.kind.to_string(),
                             duration_ms: 0,
                             summary: step.summary,
@@ -1140,7 +1157,7 @@ pub async fn run_skill_admitted(
                 Some(summary.clone()),
                 None,
                 None,
-                program.trace.len() as u32,
+                durable_step_count,
                 0,
                 terminal_error,
             )
@@ -1159,7 +1176,7 @@ pub async fn run_skill_admitted(
                 .into_iter()
                 .enumerate()
                 .map(|(index, step)| RunSkillStepSummary {
-                    step_no: (index + 1) as u32,
+                    step_no: trace_step_offset + (index + 1) as u32,
                     tool: step.kind.to_string(),
                     duration_ms: 0,
                     summary: step.summary,
@@ -1174,6 +1191,71 @@ pub async fn run_skill_admitted(
     }
 
     anyhow::bail!("governed program catalog invariant violated for skill '{skill_key}'")
+}
+
+async fn load_run_step_count(
+    stdb: &stdb_client::StdbClient,
+    org_id: u64,
+    company_id: u64,
+    run_id: u64,
+) -> Result<u32> {
+    let rows = stdb
+        .query_sql(&format!(
+            "SELECT step_count FROM ai_agent_run WHERE organization_id = {org_id} \
+             AND company_id = {company_id} AND id = {run_id} LIMIT 1"
+        ))
+        .await
+        .context("load governed run step count")?;
+    let row = rows
+        .first()
+        .context("governed run was not found before trace persistence")?;
+    let count = row
+        .get("stepCount")
+        .or_else(|| row.get("step_count"))
+        .and_then(|value| value.as_u64().or_else(|| value.as_i64()?.try_into().ok()))
+        .context("governed run step count is invalid")?;
+    u32::try_from(count).context("governed run step count exceeds u32")
+}
+
+async fn persist_governed_trace(
+    stdb: &stdb_client::StdbClient,
+    org_id: u64,
+    company_id: u64,
+    run_id: u64,
+    program_ref: &str,
+    step_offset: u32,
+    trace: &[GovernedProgramTraceStep],
+) -> Result<u32> {
+    let mut step_count = step_offset;
+    for step in trace {
+        step_count = step_count
+            .checked_add(1)
+            .context("governed run step count overflow")?;
+        let identity = json!({
+            "program_ref": program_ref,
+            "node_id": step.node_id,
+            "kind": step.kind,
+        });
+        let output_summary =
+            serde_json::to_string(step).context("serialize governed trace step")?;
+        persist_step(
+            stdb,
+            org_id,
+            company_id,
+            run_id,
+            step_count,
+            &format!("governed_program:{}", step.kind),
+            &hash_tool_input(&identity),
+            &output_summary,
+            None,
+            None,
+            0,
+            None,
+        )
+        .await
+        .with_context(|| format!("persist governed trace node '{}'", step.node_id))?;
+    }
+    Ok(step_count)
 }
 
 async fn validate_resume_identity(

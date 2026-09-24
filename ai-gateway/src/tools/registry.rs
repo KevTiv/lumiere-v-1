@@ -619,7 +619,7 @@ mod generated_registry_tests {
     }
 }
 
-async fn persist_step(
+pub(crate) async fn persist_step(
     stdb: &stdb_client::StdbClient,
     org_id: u64,
     company_id: u64,
@@ -643,7 +643,7 @@ async fn persist_step(
                 "step_no": step_no,
                 "tool_name": tool_name,
                 "input_hash": input_hash,
-                "output_summary": output_summary.chars().take(8000).collect::<String>(),
+                "output_summary": bounded_step_summary(output_summary),
                 "output_row_count": output_row_count,
                 "citations_json": citations_json,
                 "duration_ms": duration_ms,
@@ -653,4 +653,29 @@ async fn persist_step(
     ))
     .await?;
     Ok(())
+}
+
+fn bounded_step_summary(summary: &str) -> String {
+    const MAX_BYTES: usize = 8_000;
+    if summary.len() <= MAX_BYTES {
+        return summary.to_string();
+    }
+    let mut end = MAX_BYTES;
+    while !summary.is_char_boundary(end) {
+        end -= 1;
+    }
+    summary[..end].to_string()
+}
+
+#[cfg(test)]
+mod step_persistence_tests {
+    use super::bounded_step_summary;
+
+    #[test]
+    fn step_summary_bound_is_utf8_safe_and_measured_in_bytes() {
+        let summary = format!("{}é", "a".repeat(7_999));
+        let bounded = bounded_step_summary(&summary);
+        assert_eq!(bounded.len(), 7_999);
+        assert!(bounded.is_char_boundary(bounded.len()));
+    }
 }
