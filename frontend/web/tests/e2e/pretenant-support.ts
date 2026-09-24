@@ -58,6 +58,42 @@ export const CAPABILITIES = {
       "Requires PR #25 personal frontend module draft save/reopen (stacked on #13 and #19).",
     probes: [{ kind: "route", method: "GET", path: "/api/presentation/drafts" }],
   },
+  presentationFieldRevocation: {
+    id: "presentation-field-revocation",
+    prerequisite:
+      "Requires saved presentation drafts plus mutable role field-permission controls.",
+    probes: [
+      { kind: "route", method: "GET", path: "/api/presentation/drafts" },
+      { kind: "reducer", pattern: /^grant_field_permission$/ },
+    ],
+  },
+  presentationMembershipRevocation: {
+    id: "presentation-membership-revocation",
+    prerequisite:
+      "Requires saved presentation drafts plus organization-membership removal.",
+    probes: [
+      { kind: "route", method: "GET", path: "/api/presentation/drafts" },
+      { kind: "reducer", pattern: /^remove_user_from_organization$/ },
+    ],
+  },
+  presentationResourceToggle: {
+    id: "presentation-resource-toggle",
+    prerequisite:
+      "Requires a runtime control that can disable a presentation resource after a draft is saved.",
+    probes: [
+      { kind: "route", method: "GET", path: "/api/presentation/drafts" },
+      { kind: "reducer", pattern: /^(set|update)_presentation_resource_(active|enabled)$/ },
+    ],
+  },
+  presentationOperationToggle: {
+    id: "presentation-operation-toggle",
+    prerequisite:
+      "Requires a runtime control that can remove/disable a presentation operation or capability.",
+    probes: [
+      { kind: "route", method: "GET", path: "/api/presentation/drafts" },
+      { kind: "reducer", pattern: /^(set|update)_presentation_(operation|capability)_(active|enabled)$/ },
+    ],
+  },
   presentationCompanySwitch: {
     id: "presentation-company-switch",
     prerequisite:
