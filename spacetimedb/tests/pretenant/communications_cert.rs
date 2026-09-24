@@ -860,14 +860,58 @@ fn comm_08_rendered_content_immutable_after_template_edit(ctx: &ReducerContext) 
 /// Approval must bind to concrete rendered content, not to a mutable template reference.
 fn comm_09_contact_batch_approves_rendered_content(ctx: &ReducerContext) -> Result<(), String> {
     let s = setup("batch scenario", batch_scenario(ctx, "comm09", "+12025550191"))?;
-    let unrendered = children(ctx, s.batch_id)
+    let before = children(ctx, s.batch_id);
+    if before.iter().any(|m| m.rendered_body.trim().is_empty()) {
+        return Err("contact batch has no rendered content to approve".to_string());
+    }
+    let template_id = before
+        .first()
+        .map(|message| message.template_id)
+        .ok_or("contact batch has no rendered message")?;
+    let snapshot = before
         .iter()
-        .filter(|m| m.rendered_body.trim().is_empty())
-        .count();
-    if unrendered > 0 {
-        return Err(format!(
-            "{unrendered} batch recipient(s) have no rendered content to approve"
-        ));
+        .map(|m| {
+            (
+                m.id,
+                m.rendered_subject.clone(),
+                m.rendered_body.clone(),
+                m.variable_hash.clone(),
+            )
+        })
+        .collect::<Vec<_>>();
+
+    setup(
+        "template edit",
+        update_message_template(
+            ctx,
+            s.org,
+            template_id,
+            UpdateMessageTemplateParams {
+                name: None,
+                subject: Some("CHANGED {{customer_name}}".to_string()),
+                body_template: Some("CHANGED {{customer_name}}".to_string()),
+                allowed_variables: None,
+                applicable_channels: None,
+                active: None,
+                review_state: None,
+                metadata: None,
+            },
+        ),
+    )?;
+
+    let after = children(ctx, s.batch_id)
+        .iter()
+        .map(|m| {
+            (
+                m.id,
+                m.rendered_subject.clone(),
+                m.rendered_body.clone(),
+                m.variable_hash.clone(),
+            )
+        })
+        .collect::<Vec<_>>();
+    if snapshot != after {
+        return Err("template edit changed previewed contact-batch content".to_string());
     }
     Ok(())
 }
@@ -1017,6 +1061,9 @@ fn comm_13_batch_recipients_are_org_scoped(ctx: &ReducerContext) -> Result<(), S
             metadata: None,
         },
     );
+    if result.is_ok() {
+        return Err("foreign recipient injection was silently accepted".to_string());
+    }
     let leaked = ctx
         .db
         .operational_message()
@@ -1026,8 +1073,17 @@ fn comm_13_batch_recipients_are_org_scoped(ctx: &ReducerContext) -> Result<(), S
         .count();
     if leaked > 0 {
         return Err(format!(
-            "organization B created {leaked} message intent(s) for organization A's contact (batch result: {result:?})"
+            "organization B created {leaked} message intent(s) for organization A's contact"
         ));
+    }
+    let foreign_batch = ctx
+        .db
+        .message_batch()
+        .message_batch_by_org()
+        .filter(&foreign_org)
+        .any(|batch| batch.template_id == template_id);
+    if foreign_batch {
+        return Err("rejected foreign recipient injection still persisted a batch".to_string());
     }
     Ok(())
 }
