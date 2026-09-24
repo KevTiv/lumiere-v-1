@@ -333,6 +333,7 @@ test.describe("Operational messaging", { tag: ["@phase-1", "@operational-messagi
 
   test("P1-MSG-02 previews eligible recipients only, then approves and cancels the batch with audit evidence", async ({
     page,
+    browser,
   }) => {
     test.setTimeout(120_000)
 
