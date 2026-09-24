@@ -13,7 +13,6 @@ import {
   auditCount,
   callRaw,
   callRawOk,
-  expectKnownDefect,
   field,
   idOf,
   none,
