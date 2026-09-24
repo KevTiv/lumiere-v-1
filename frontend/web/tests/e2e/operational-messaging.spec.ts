@@ -7,6 +7,7 @@ import {
   fetchSessionOrganizationId,
   smokeName,
 } from "./helpers"
+import { provisionActor, withActor } from "./pretenant-support"
 
 type QueryRow = Record<string, unknown>
 
