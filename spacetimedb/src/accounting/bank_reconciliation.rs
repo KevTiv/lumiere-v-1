@@ -508,6 +508,11 @@ pub fn approve_bank_statement_import(
         return Err("Statement import has no rows".to_string());
     }
     let total_amount = lines.iter().filter_map(|line| line.amount).sum::<f64>();
+    validate_pilot_money_amount("statement total amount", total_amount)?;
+    validate_pilot_money_amount(
+        "statement closing balance",
+        import.opening_balance + total_amount,
+    )?;
     let metadata = format!(r#"{{"bank_statement_import_id":{import_id}}}"#);
     create_account_bank_statement(
         ctx,
