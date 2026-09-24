@@ -1253,6 +1253,8 @@ pub fn create_payment_fee(
     if transaction.status != PaymentTransactionStatus::Draft {
         return Err("Fees can only be added to draft transactions".to_string());
     }
+    validate_pilot_money_amount("payment fee amount", params.amount)?;
+    validate_pilot_money_amount("payment fee tax amount", params.tax_amount)?;
     if params.amount < 0.0 {
         return Err("Fee amount must be non-negative".to_string());
     }
