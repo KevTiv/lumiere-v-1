@@ -25,7 +25,7 @@ E2E_STDB_MODULE    ?= lumiere-v1-local-e2e
 # Local E2E ports. e2e-smoke-test pre-builds Next.js and starts next start; Makefile starts api-server.
 E2E_WEB_PORT       ?= 3100
 E2E_API_PORT       ?= 8082
-# Playwright suite: full (default) or p0 (test:e2e:p0)
+# Playwright suite: full (default), p0, or pretenant.
 E2E_SUITE          ?= full
 # Single-spec iteration (e2e-single-test / e2e-single)
 E2E_SPEC           ?= mvp-lead-to-cash.spec.ts
@@ -543,8 +543,9 @@ e2e-smoke-test:
 		done; \
 		echo "[e2e] Running Playwright ($${E2E_SUITE:-full} suite, workers=$$E2E_WORKERS)..."; \
 		pnpm exec playwright install chromium; \
-		PW_ARGS=(--workers "$$E2E_WORKERS"); \
-		if [ "$${E2E_SUITE:-full}" = "p0" ]; then PW_ARGS+=(--grep @p0 --grep-invert @dev-fixture); fi; \
+		PW_ARGS=(--workers "$E2E_WORKERS"); \
+		if [ "${E2E_SUITE:-full}" = "p0" ]; then PW_ARGS+=(--grep @p0 --grep-invert @dev-fixture); fi; \
+		if [ "${E2E_SUITE:-full}" = "pretenant" ]; then PW_ARGS+=(--grep @pretenant); fi; \
 		PORT="" \
 		PLAYWRIGHT_PORT="$(E2E_WEB_PORT)" \
 		PLAYWRIGHT_BASE_URL="http://127.0.0.1:$(E2E_WEB_PORT)" \
@@ -748,8 +749,9 @@ e2e-playwright-only:
 		cd "$$ROOT/frontend/web"; \
 		set -a; [ ! -f "$$ROOT/frontend/web/.env.local" ] || . "$$ROOT/frontend/web/.env.local"; set +a; \
 		E2E_PNPM_SCRIPT="test:e2e"; \
-		if [ "$${E2E_SUITE:-full}" = "p0" ]; then E2E_PNPM_SCRIPT="test:e2e:p0"; fi; \
-		PW_ARGS=(--workers "$$E2E_WORKERS"); \
+		if [ "${E2E_SUITE:-full}" = "p0" ]; then E2E_PNPM_SCRIPT="test:e2e:p0"; fi; \
+		if [ "${E2E_SUITE:-full}" = "pretenant" ]; then E2E_PNPM_SCRIPT="test:e2e:pretenant"; fi; \
+		PW_ARGS=(--workers "$E2E_WORKERS"); \
 		if [ -n "$$E2E_ONLY_SPEC" ]; then PW_ARGS+=("tests/e2e/$$E2E_ONLY_SPEC"); fi; \
 		if [ -n "$$E2E_GREP" ]; then PW_ARGS+=(--grep "$$E2E_GREP"); fi; \
 		echo "[e2e] Running Playwright only ($${E2E_SUITE:-full} suite)..."; \
