@@ -231,9 +231,7 @@ test.describe("Pre-tenant mobile and network resilience", { tag: pretenantTags("
     expect(loss.lost()).toBe(true)
     const retry = await browserPost(page, url, [organizationId, companyId, draftId])
     await expect.poll(() => auditCount(page, "ai_action_draft", draftId, "EXECUTE")).toBe(1)
-    await expectKnownDefect("AG-IDEMP-01", "AI draft approval retry after a lost committed response returns an error", () => {
-      expect(retry.status).toBe(200)
-    })
+    expect(retry.status).toBe(200)
   })
 
   test("M-06 resumed stale client cannot re-approve or allocate against changed state", async ({ page, browser }) => {
