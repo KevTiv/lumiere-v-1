@@ -364,6 +364,14 @@ fn validate_payment_transaction_invariants(
     net: f64,
     fees: &[PaymentFee],
 ) -> Result<(), String> {
+    validate_pilot_money_amount("gross_external_amount", gross)?;
+    validate_pilot_money_amount("settlement_amount", settlement)?;
+    validate_pilot_money_amount("net_account_amount", net)?;
+    for fee in fees {
+        validate_pilot_money_amount("payment fee amount", fee.amount)?;
+        validate_pilot_money_amount("payment fee tax amount", fee.tax_amount)?;
+    }
+
     if gross <= 0.0 {
         return Err("gross_external_amount must be positive".to_string());
     }
