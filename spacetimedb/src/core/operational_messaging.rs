@@ -726,12 +726,17 @@ pub fn create_invoice_reminder_batch(
             excluded += 1;
             continue;
         }
-        let (can_receive, phone_identity_id) =
-            contact_can_receive(ctx, contact_id, &params.channel);
-        let Some(phone_identity_id) = phone_identity_id.filter(|_| can_receive) else {
+        let Some(recipient) = resolve_message_recipient(
+            ctx,
+            organization_id,
+            params.company_id,
+            contact_id,
+            &params.channel,
+        )? else {
             excluded += 1;
             continue;
         };
+        let phone_identity_id = recipient.phone_identity_id;
         if sample.len() < 3 {
             sample.push(phone_identity_id);
         }
