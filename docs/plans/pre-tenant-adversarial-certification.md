@@ -162,15 +162,16 @@ never a blind resend.
 Accounting remains the sole ledger source of truth; every case asserts ledger rows (ledger payment,
 move residuals, clearing residual) rather than operational rows alone.
 
-**Money representation.** Operational amounts are `f64`; admission uses an absolute
-`RECONCILIATION_EPSILON = 1e-6`. The native model (`money.rs`) shows exact agreement with integer
-minor units for 0-, 2- and 3-decimal currencies up to 1e8 major units, and demonstrates that from
-~1e10 major units the epsilon is below f64 resolution so admission becomes exact float comparison
-(`MONEY-PRECISION`). The in-module PAY-09 case (a 12,345,678,901.23 payment settled by two
-allocations) passes on `main`, so the divergence is proven for the admission rule in isolation, not yet
-reproduced end-to-end through the ledger. Not changed in this PR. Pre-tenant position: acceptable for the SME pilot
-envelope only if tenant limits stay below 1e9 major units per payment; otherwise a blocker requiring
-integer minor units/decimal.
+**Money representation.** Operational amounts remain `f64`, but the pilot boundary is now explicit
+and enforced: every payment/import monetary input used by BASE-04 must be finite and satisfy
+`|amount| <= 1_000_000_000` major units. Allocation admission still uses
+`RECONCILIATION_EPSILON = 1e-6`. The native model (`money.rs`) now compares that production cap
+against integer minor units for 0-, 2- and 3-decimal currencies and finds no admission divergence
+through the cap. PAY-09 settles a payment exactly at the cap to the cent and rejects over-cap/NaN/∞
+payment/allocation inputs; PAY-10 applies the same boundary to statement rows and opening balances.
+The native characterization still demonstrates divergence far beyond the cap (~1e10+), so raising or
+removing the pilot limit requires an explicit integer-minor-unit/decimal representation change rather
+than silently widening `f64` admission.
 
 **Statement CSV parsing is client-side** and now extracted to
 `frontend/web/lib/statement-import-csv.ts` for focused unit certification. Server staging cases are
