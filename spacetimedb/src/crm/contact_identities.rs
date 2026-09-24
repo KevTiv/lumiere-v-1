@@ -6,6 +6,7 @@
 use sha2::{Digest, Sha256};
 use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
+use crate::core::operational_messaging::operational_message;
 use crate::core::organization::require_company_in_organization;
 use crate::core::users::find_user_profile_for_organization;
 use crate::crm::contacts::{contact, Contact};
