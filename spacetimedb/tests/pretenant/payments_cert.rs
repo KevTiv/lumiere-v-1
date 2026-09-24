@@ -823,6 +823,57 @@ fn pay_10_statement_staging_fixture_matrix(ctx: &ReducerContext) -> Result<(), S
         return Err("rejected opening balance still persisted a statement import".to_string());
     }
 
+    let oversized_total_key = "pay10-total-over-limit";
+    let oversized_total = stage_bank_statement_import(
+        ctx,
+        scope.org,
+        scope.company,
+        scope.journal_id,
+        scope.currency_id,
+        StageBankStatementImportParams {
+            file_name: Some(format!("{oversized_total_key}.csv")),
+            idempotency_key: oversized_total_key.to_string(),
+            opening_balance: 0.0,
+            rows: vec![
+                statement_row(ctx, 2, true, Some(600_000_000.0), Some("REF-TOTAL-A")),
+                statement_row(ctx, 3, true, Some(600_000_000.0), Some("REF-TOTAL-B")),
+            ],
+        },
+    );
+    if oversized_total.is_ok() {
+        return Err("oversized statement movement total was accepted".to_string());
+    }
+    if !staged_imports(ctx, &scope, oversized_total_key).is_empty() {
+        return Err("rejected statement movement total still persisted an import".to_string());
+    }
+
+    let oversized_closing_key = "pay10-closing-over-limit";
+    let oversized_closing = stage_bank_statement_import(
+        ctx,
+        scope.org,
+        scope.company,
+        scope.journal_id,
+        scope.currency_id,
+        StageBankStatementImportParams {
+            file_name: Some(format!("{oversized_closing_key}.csv")),
+            idempotency_key: oversized_closing_key.to_string(),
+            opening_balance: 900_000_000.0,
+            rows: vec![statement_row(
+                ctx,
+                2,
+                true,
+                Some(200_000_000.0),
+                Some("REF-CLOSING"),
+            )],
+        },
+    );
+    if oversized_closing.is_ok() {
+        return Err("oversized statement closing balance was accepted".to_string());
+    }
+    if !staged_imports(ctx, &scope, oversized_closing_key).is_empty() {
+        return Err("rejected statement closing balance still persisted an import".to_string());
+    }
+
     let huge: Vec<_> = (1..=2_000)
         .map(|n| statement_row(ctx, n, true, Some(0.01 * f64::from(n)), Some("REF-HUGE")))
         .collect();
