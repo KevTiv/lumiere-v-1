@@ -717,7 +717,7 @@ fn batch_scenario(ctx: &ReducerContext, tag: &str, phone: &str) -> Result<BatchS
     let company = fixture.company_id;
     let contact_id = seed_contact(ctx, org, company, &format!("{tag} recipient"))?;
     let identity_id = add_primary_phone(ctx, org, contact_id, phone)?;
-    let template_id = seed_template(ctx, org, &format!("{tag}-template"))?;
+    let template_id = seed_contact_template(ctx, org, &format!("{tag}-template"))?;
     let created = seed_contact_batch(ctx, org, company, template_id, vec![contact_id], tag)?;
     if created.recipient_count != 1 || children(ctx, created.id).len() != 1 {
         return Err("expected one previewed recipient".to_string());
