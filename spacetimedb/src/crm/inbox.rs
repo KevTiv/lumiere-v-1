@@ -959,7 +959,7 @@ pub fn record_crm_provider_delivery(
         .id()
         .update(CrmConversationMessage {
             status: params.status.clone(),
-            provider_message_id: Some(params.provider_message_id),
+            provider_message_id: Some(params.provider_message_id.clone()),
             operational_message_id: Some(params.operational_message_id),
             metadata: None,
             ..message
