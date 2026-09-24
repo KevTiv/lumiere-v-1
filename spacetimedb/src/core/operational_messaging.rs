@@ -275,38 +275,95 @@ fn channel_allowed(template: &MessageTemplate, channel: &MessageChannel) -> bool
     template.applicable_channels.contains(channel)
 }
 
-fn contact_can_receive(
+struct ResolvedMessageRecipient {
+    contact_id: u64,
+    phone_identity_id: u64,
+    display_name: String,
+}
+
+fn resolve_message_recipient(
     ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: Option<u64>,
     contact_id: u64,
     channel: &MessageChannel,
-) -> (bool, Option<u64>) {
-    let prefs: Vec<ContactCommunicationPreference> = ctx
+) -> Result<Option<ResolvedMessageRecipient>, String> {
+    let contact_row = ctx
+        .db
+        .contact()
+        .id()
+        .find(&contact_id)
+        .ok_or("Contact not found")?;
+    if contact_row.organization_id != organization_id {
+        return Err("Contact does not belong to this organization".to_string());
+    }
+    if contact_row.deleted_at.is_some() || contact_row.merge_target_id.is_some() {
+        return Ok(None);
+    }
+    if company_id.is_some() && contact_row.company_id != company_id {
+        return Err("Contact does not belong to this company".to_string());
+    }
+
+    let opted_out = ctx
         .db
         .contact_communication_preference()
         .preference_by_contact()
         .filter(&contact_id)
-        .collect();
-    let opted_out = prefs.iter().any(|p| p.channel == *channel && !p.opted_in);
+        .any(|preference| {
+            preference.organization_id == organization_id
+                && preference.company_id == contact_row.company_id
+                && preference.channel == *channel
+                && !preference.opted_in
+        });
     if opted_out {
-        return (false, None);
+        return Ok(None);
     }
 
-    let identity_id = ctx
+    let identity = ctx
         .db
         .contact_phone_identity()
-        .iter()
-        .find(|i| {
-            i.contact_id == contact_id
-                && i.kind == crate::types::ContactIdentityKind::Primary
-                && i.archived_at.is_none()
-                && i.verification_state != ContactVerificationState::OptedOut
+        .contact_phone_identity_by_contact()
+        .filter(&contact_id)
+        .filter(|identity| {
+            identity.organization_id == organization_id
+                && identity.company_id == contact_row.company_id
+                && identity.kind == crate::types::ContactIdentityKind::Primary
+                && identity.archived_at.is_none()
+                && identity.verification_state != ContactVerificationState::OptedOut
         })
-        .map(|i| i.id);
+        .min_by_key(|identity| (!identity.is_preferred, identity.id));
 
-    match identity_id {
-        Some(id) => (true, Some(id)),
-        None => (false, None),
+    Ok(identity.map(|identity| ResolvedMessageRecipient {
+        contact_id,
+        phone_identity_id: identity.id,
+        display_name: if contact_row.display_name.trim().is_empty() {
+            contact_row.name
+        } else {
+            contact_row.display_name
+        },
+    }))
+}
+
+fn contact_batch_variables(
+    template: &MessageTemplate,
+    recipient: &ResolvedMessageRecipient,
+) -> Result<Vec<MessageTemplateVariable>, String> {
+    let mut variables = Vec::with_capacity(template.allowed_variables.len());
+    for key in &template.allowed_variables {
+        let value = match key.as_str() {
+            "customer_name" | "contact_name" | "recipient_name" => recipient.display_name.clone(),
+            other => {
+                return Err(format!(
+                    "Contact batch template variable '{other}' is not supported"
+                ))
+            }
+        };
+        variables.push(MessageTemplateVariable {
+            key: key.clone(),
+            value,
+        });
     }
+    Ok(variables)
 }
 
 fn invoice_reminder_variables(
