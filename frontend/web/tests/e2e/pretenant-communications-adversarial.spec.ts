@@ -190,10 +190,8 @@ test.describe("Pre-tenant communications adversarial", { tag: pretenantTags("@co
     })
     requireNotPermissionDenied(selfApproval.result, "creator")
 
-    await expectKnownDefect("COMM-11", "batch creator can approve their own batch", async () => {
-      expect(selfApproval.result.ok, "creator self-approval must be rejected").toBe(false)
-      expect(await batchStatus(page, selfApproval.batchId)).toBe("pendingapproval")
-    })
+    expect(selfApproval.result.ok, "creator self-approval must be rejected").toBe(false)
+    expect(await batchStatus(page, selfApproval.batchId)).toBe("pendingapproval")
   })
 
   test("COMM-11-E2E simultaneous independent approvals execute once", async ({ page, browser }) => {
