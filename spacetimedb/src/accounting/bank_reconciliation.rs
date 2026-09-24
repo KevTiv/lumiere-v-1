@@ -391,6 +391,17 @@ pub fn stage_bank_statement_import(
         staged_lines.push((row, validation_error));
     }
 
+    let staged_total = staged_lines
+        .iter()
+        .filter(|(_, validation_error)| validation_error.is_none())
+        .filter_map(|(row, _)| row.amount)
+        .sum::<f64>();
+    validate_pilot_money_amount("statement total amount", staged_total)?;
+    validate_pilot_money_amount(
+        "statement closing balance",
+        params.opening_balance + staged_total,
+    )?;
+
     let total_rows = staged_lines.len() as u32;
     let import = ctx.db.bank_statement_import().insert(BankStatementImport {
         id: 0,
