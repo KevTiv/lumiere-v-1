@@ -576,7 +576,7 @@ pub fn test_pricelist_company_scope(ctx: &ReducerContext) -> Result<(), String> 
         CreatePricelistParams {
             company_id: Some(company_a),
             name: "Company A Pricelist".to_string(),
-            currency_id: 1,
+            currency_id: fixture.currency_id,
             discount_policy: DiscountPolicy::WithDiscount,
         },
     )?;
