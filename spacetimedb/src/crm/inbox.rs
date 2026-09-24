@@ -975,7 +975,7 @@ pub fn record_crm_provider_delivery(
                 operational.sent_at
             },
             failed_at: (params.status == "failed").then_some(ctx.timestamp),
-            failure_reason: params.failure_reason,
+            failure_reason: params.failure_reason.clone(),
             ..operational
         });
     record_provider_delivery_receipt(ctx, organization_id, conversation.id, &params);
