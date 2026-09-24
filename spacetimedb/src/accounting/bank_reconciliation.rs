@@ -529,6 +529,7 @@ pub fn approve_bank_statement_import(
     for line in lines {
         let date = line.date.ok_or("Staged import line is missing date")?;
         let amount = line.amount.ok_or("Staged import line is missing amount")?;
+        validate_pilot_money_amount("statement amount", amount)?;
         create_account_bank_statement_line(
             ctx,
             organization_id,
