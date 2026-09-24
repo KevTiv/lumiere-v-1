@@ -217,7 +217,7 @@ Legend — Class: **C** covered, **P** partial, **N** not covered, **B** blocked
 | Overpayment → explicit unapplied | — | all | STDB + E2E | yes | — | PAY-06, PAY-06-E2E | N |
 | Provider payer mismatch → manual review | — | all | STDB | no | payer identity on `PaymentTransaction` | PAY-PAYER-01 (gated) | B |
 | Reversal/chargeback after settlement | supplier reversal (P1-PAY-03), partial allocation reversal (ACC-RI-004) | full customer settlement + immutability + retry | STDB | yes | — | PAY-04 | P |
-| Monetary precision (0.01, large, many small, 0/3-decimal) | — | all | native + STDB | yes | — | `money.rs`, PAY-08, PAY-09 | N |
+| Monetary precision / pilot envelope | exact minor-unit model through 1e9; many-small/split allocations; at-cap ledger settlement; non-finite/over-cap rejection | — | native + STDB | yes | — | `money.rs`, PAY-08, PAY-09, PAY-10 | C |
 | Statement staging fixtures | invalid row + identical retry (E2E) | negative/zero/NaN/inf/missing/duplicate/out-of-order/huge; conflicting replay | STDB | yes | — | PAY-10, PAY-11A, PAY-11B | P |
 | CSV UTF-8 BOM | extracted statement parser strips BOM before header parsing and idempotency hashing | — | web unit | yes | — | CSV-BOM | C |
 | CSV US thousands grouping | `"1,234"` and multi-group integers parse as grouping; decimal-comma values remain decimals | — | web unit | yes | CSV-BOM extraction | CSV-02 | C |
