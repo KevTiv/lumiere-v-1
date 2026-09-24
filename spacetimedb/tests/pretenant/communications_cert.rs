@@ -1101,37 +1101,49 @@ fn comm_13_batch_recipients_are_org_scoped(ctx: &ReducerContext) -> Result<(), S
 fn comm_14_recipient_number_change_invalidates_approval(ctx: &ReducerContext) -> Result<(), String> {
     let previewed = "+12025550141";
     let s = setup("batch scenario", batch_scenario(ctx, "comm14", previewed))?;
-    setup(
-        "change number",
-        update_contact_identity(
-            ctx,
-            s.org,
-            s.identity_id,
-            UpdateContactIdentityParams {
-                company_id: None,
-                raw_value: Some("+12025550142".to_string()),
-                is_preferred: None,
-                verification_state: None,
-                metadata: None,
-            },
-        ),
-    )?;
-    let approval = approve(ctx, s.org, s.batch_id);
-    approval_rejection_must_mention(&approval, &["identity", "recipient", "phone", "number", "changed"])?;
-    let approved = batch(ctx, s.batch_id)?.status == MessageBatchStatus::Approved;
+    let change = update_contact_identity(
+        ctx,
+        s.org,
+        s.identity_id,
+        UpdateContactIdentityParams {
+            company_id: None,
+            raw_value: Some("+12025550142".to_string()),
+            is_preferred: None,
+            verification_state: None,
+            metadata: None,
+        },
+    );
+    match change {
+        Err(error)
+            if error.contains("active message intent")
+                || error.contains("re-preview")
+                || error.contains("phone number") => {}
+        Err(error) => {
+            return Err(format!(
+                "number change was rejected for an unrelated reason: {error}"
+            ))
+        }
+        Ok(()) => {
+            return Err(
+                "phone number changed in place while an active batch still referenced the identity"
+                    .to_string(),
+            )
+        }
+    }
+
     let current = ctx
         .db
         .contact_phone_identity()
         .id()
         .find(&s.identity_id)
         .map(|identity| identity.normalized_e164);
-    let targeted = children(ctx, s.batch_id)
-        .iter()
-        .any(|m| m.phone_identity_id == s.identity_id && is_active_intent(&m.status));
-    if approved && targeted && current.as_deref() != Some(previewed) {
+    if current.as_deref() != Some(previewed) {
         return Err(format!(
-            "approved batch now resolves to {current:?} instead of the previewed {previewed}"
+            "rejected number change still mutated identity to {current:?}"
         ));
+    }
+    if batch(ctx, s.batch_id)?.status != MessageBatchStatus::PendingApproval {
+        return Err("rejected number change mutated batch approval state".to_string());
     }
     Ok(())
 }
