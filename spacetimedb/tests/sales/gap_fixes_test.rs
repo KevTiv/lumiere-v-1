@@ -2,6 +2,7 @@
 use spacetimedb::{ReducerContext, Table};
 
 use crate::core::organization::{company, create_company, CreateCompanyParams};
+use crate::core::reference::{create_currency, currency, CreateCurrencyParams};
 use crate::inventory::product::product;
 use crate::sales::oms_extensions::create_exchange_order_from_return;
 use crate::sales::pricelists::{create_pricelist, product_pricelist, CreatePricelistParams};
@@ -133,7 +134,7 @@ pub fn test_lock_blocks_update(ctx: &ReducerContext) -> Result<(), String> {
     let fixture = OrgFixture::seed_minimal(ctx)?;
     let org_id = fixture.organization_id;
     let company_id = fixture.company_id;
-    let order_id = seed_so(ctx, &fixture, "Lock PL", 1.0, 10.0, None, 1)?;
+    let order_id = seed_so(ctx, &fixture, "Lock PL", 1.0, 10.0, None, fixture.currency_id)?;
 
     lock_sale_order(ctx, org_id, order_id)?;
     let locked = ctx
@@ -216,7 +217,7 @@ pub fn test_update_and_delete_sale_order_line(ctx: &ReducerContext) -> Result<()
     ensure_test_superuser(ctx)?;
     let fixture = OrgFixture::seed_minimal(ctx)?;
     let org_id = fixture.organization_id;
-    let order_id = seed_so(ctx, &fixture, "LineEdit PL", 2.0, 25.0, None, 1)?;
+    let order_id = seed_so(ctx, &fixture, "LineEdit PL", 2.0, 25.0, None, fixture.currency_id)?;
     let line_id = ctx
         .db
         .sale_order_line()
@@ -307,8 +308,36 @@ pub fn test_update_and_delete_sale_order_line(ctx: &ReducerContext) -> Result<()
 pub fn test_fx_snapshot_fail_closed(ctx: &ReducerContext) -> Result<(), String> {
     ensure_test_superuser(ctx)?;
     let fixture = OrgFixture::seed_minimal(ctx)?;
-    // currency_id 2 vs company currency 1 — no rate seeded → fail closed
-    let order_id = seed_so(ctx, &fixture, "FX Fail PL", 1.0, 10.0, None, 2)?;
+    create_currency(
+        ctx,
+        fixture.organization_id,
+        "FXT".to_string(),
+        CreateCurrencyParams {
+            name: "Fixture FX Currency".to_string(),
+            symbol: "¤".to_string(),
+            decimal_places: 2,
+            rounding_factor: 0.01,
+            position: "before".to_string(),
+            active: true,
+            metadata: Some(r#"{"test":"sales-fx-fail-closed"}"#.to_string()),
+        },
+    )?;
+    let fx_currency_id = ctx
+        .db
+        .currency()
+        .iter()
+        .find(|row| row.organization_id == fixture.organization_id && row.code == "FXT")
+        .map(|row| row.id)
+        .ok_or("fixture FX currency missing")?;
+    let order_id = seed_so(
+        ctx,
+        &fixture,
+        "FX Fail PL",
+        1.0,
+        10.0,
+        None,
+        fx_currency_id,
+    )?;
     let err = confirm_sales_order(ctx, fixture.organization_id, fixture.company_id, order_id);
     match err {
         Err(msg) if msg.to_lowercase().contains("exchange rate") => Ok(()),
@@ -322,7 +351,7 @@ pub fn test_dropship_confirm_creates_po(ctx: &ReducerContext) -> Result<(), Stri
     let fixture = OrgFixture::seed_minimal(ctx)?;
     let org_id = fixture.organization_id;
     let company_id = fixture.company_id;
-    let order_id = seed_so(ctx, &fixture, "Dropship PL", 1.0, 10.0, Some(true), 1)?;
+    let order_id = seed_so(ctx, &fixture, "Dropship PL", 1.0, 10.0, Some(true), fixture.currency_id)?;
 
     // Ensure product has a seller/vendor if required by dropship helper — may fail closed.
     match confirm_sales_order(ctx, org_id, company_id, order_id) {
@@ -365,7 +394,7 @@ pub fn test_company_isolation_on_confirm(ctx: &ReducerContext) -> Result<(), Str
         CreateCompanyParams {
             name: "Sales Iso Company B".to_string(),
             code: format!("SO-CB-{}", company_a),
-            currency_id: 1,
+            currency_id: fixture_a.currency_id,
             fiscal_year_end_month: 12,
             fiscal_year_end_day: 31,
             is_parent: false,
@@ -389,7 +418,7 @@ pub fn test_company_isolation_on_confirm(ctx: &ReducerContext) -> Result<(), Str
         .max()
         .ok_or("company B missing")?;
 
-    let order_id = seed_so(ctx, &fixture_a, "Iso PL", 1.0, 10.0, None, 1)?;
+    let order_id = seed_so(ctx, &fixture_a, "Iso PL", 1.0, 10.0, None, fixture_a.currency_id)?;
 
     // Same org, wrong company must fail company guard.
     let err = confirm_sales_order(ctx, org_id, company_b, order_id);
@@ -412,7 +441,7 @@ pub fn test_pricelist_company_scope(ctx: &ReducerContext) -> Result<(), String> 
         CreateCompanyParams {
             name: "Sales Pricelist Company B".to_string(),
             code: format!("SO-PL-CB-{}", company_a),
-            currency_id: 1,
+            currency_id: fixture.currency_id,
             fiscal_year_end_month: 12,
             fiscal_year_end_day: 31,
             is_parent: false,
@@ -449,7 +478,7 @@ pub fn test_pricelist_company_scope(ctx: &ReducerContext) -> Result<(), String> 
         CreatePricelistParams {
             company_id: Some(company_b),
             name: "Company B Pricelist".to_string(),
-            currency_id: 1,
+            currency_id: fixture.currency_id,
             discount_policy: DiscountPolicy::WithDiscount,
         },
     )?;
@@ -467,7 +496,7 @@ pub fn test_pricelist_company_scope(ctx: &ReducerContext) -> Result<(), String> 
         partner_invoice_id: fixture.partner_id,
         partner_shipping_id: fixture.partner_id,
         pricelist_id,
-        currency_id: 1,
+        currency_id: fixture.currency_id,
         warehouse_id: fixture.warehouse_id,
         order_lines: vec![CreateSaleOrderLineParams {
             product_id: fixture.product_id,
@@ -581,7 +610,7 @@ pub fn test_exchange_order_from_return(ctx: &ReducerContext) -> Result<(), Strin
     let fixture = OrgFixture::seed_minimal(ctx)?;
     let org_id = fixture.organization_id;
     let company_id = fixture.company_id;
-    let order_id = seed_so(ctx, &fixture, "Exchange PL", 1.0, 10.0, None, 1)?;
+    let order_id = seed_so(ctx, &fixture, "Exchange PL", 1.0, 10.0, None, fixture.currency_id)?;
     confirm_sales_order(ctx, org_id, company_id, order_id)?;
 
     let sol_id = ctx
