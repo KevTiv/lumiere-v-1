@@ -1766,6 +1766,8 @@ pub fn allocate_payment_transaction(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "payment_reconciliation", "create")?;
     require_company_in_organization(ctx, organization_id, params.company_id)?;
+    validate_pilot_money_amount("allocated amount", params.allocated_amount)?;
+    validate_pilot_money_amount("write-off amount", params.write_off_amount)?;
     if params.allocated_amount <= 0.0 {
         return Err("allocated amount must be positive".to_string());
     }
