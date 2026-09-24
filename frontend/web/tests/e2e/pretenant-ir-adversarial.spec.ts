@@ -11,12 +11,12 @@ import {
 import {
   CAPABILITIES,
   CAPABILITY_PENDING,
+  openActorPages,
   openOwnerPages,
   pendingContract,
   pretenantTags,
   provisionActor,
   requireCapability,
-  withActor,
 } from "./pretenant-support"
 
 test.describe("Pre-tenant presentation IR adversarial", { tag: pretenantTags("@presentation-ir") }, () => {
@@ -74,8 +74,9 @@ test.describe("Pre-tenant presentation IR adversarial", { tag: pretenantTags("@p
     await requireCapability(page, CAPABILITIES.presentationFieldRevocation)
     const organizationId = await fetchSessionOrganizationId(page)
     const actor = await provisionActor(page, "ir02-field", ["account-moves:read"])
-
-    const created = await withActor(browser, actor, async (actorPage) => {
+    const session = await openActorPages(browser, [actor])
+    try {
+      const actorPage = session.pages[0]
       const options = await presentationOptions(actorPage)
       expect(options.fields.length).toBeGreaterThan(1)
       const moduleKey = presentationModuleKey("pt-ir02-field")
@@ -85,112 +86,107 @@ test.describe("Pre-tenant presentation IR adversarial", { tag: pretenantTags("@p
         null,
       )
       expect(response.status(), await response.text()).toBe(200)
-      return { moduleKey, options }
-    })
 
-    await callReducerBff(page, "grant_field_permission", [
-      organizationId,
-      {
-        subject: { tag: "Role", value: actor.roleId },
-        resource: "account-moves",
-        action: { tag: "Read" },
-        allowed_fields: [created.options.fields[0]],
-      },
-    ])
+      await callReducerBff(page, "grant_field_permission", [
+        organizationId,
+        {
+          subject: { tag: "Role", value: actor.roleId },
+          resource: "account-moves",
+          action: { tag: "Read" },
+          allowed_fields: [options.fields[0]],
+        },
+      ])
 
-    await withActor(browser, actor, async (actorPage) => {
-      const denied = await presentationDraft(actorPage, created.moduleKey)
+      const denied = await presentationDraft(actorPage, moduleKey)
       expect(denied.status(), await denied.text()).toBe(422)
-    })
 
-    await callReducerBff(page, "grant_field_permission", [
-      organizationId,
-      {
-        subject: { tag: "Role", value: actor.roleId },
-        resource: "account-moves",
-        action: { tag: "Read" },
-        allowed_fields: created.options.fields,
-      },
-    ])
+      await callReducerBff(page, "grant_field_permission", [
+        organizationId,
+        {
+          subject: { tag: "Role", value: actor.roleId },
+          resource: "account-moves",
+          action: { tag: "Read" },
+          allowed_fields: options.fields,
+        },
+      ])
 
-    await withActor(browser, actor, async (actorPage) => {
-      const restored = await presentationDraft(actorPage, created.moduleKey)
+      const restored = await presentationDraft(actorPage, moduleKey)
       expect(restored.status(), await restored.text()).toBe(200)
       const body = (await restored.json()) as { revision: string; definition: { title: string } }
       expect(body.revision).toBe("1")
       expect(body.definition.title).toBe("Field revocation")
-    })
+    } finally {
+      await session.close()
+    }
   })
 
   test("IR-02 resource permission revoked reauthorizes saved draft", async ({ page, browser }) => {
     await requireCapability(page, CAPABILITIES.presentationSavedDrafts)
     const actor = await provisionActor(page, "ir02-resource", ["account-moves:read"])
-
-    const moduleKey = await withActor(browser, actor, async (actorPage) => {
+    const session = await openActorPages(browser, [actor])
+    try {
+      const actorPage = session.pages[0]
       const options = await presentationOptions(actorPage)
-      const key = presentationModuleKey("pt-ir02-resource")
+      const moduleKey = presentationModuleKey("pt-ir02-resource")
       const response = await savePresentationDraft(
         actorPage,
-        presentationDefinition(key, "Resource revocation", options),
+        presentationDefinition(moduleKey, "Resource revocation", options),
         null,
       )
       expect(response.status(), await response.text()).toBe(200)
-      return key
-    })
 
-    await callReducerBff(page, "update_role", [
-      actor.roleId,
-      { name: null, description: null, permissions: ["organization:read"], is_active: null },
-    ])
+      await callReducerBff(page, "update_role", [
+        actor.roleId,
+        { name: null, description: null, permissions: ["organization:read"], is_active: null },
+      ])
 
-    await withActor(browser, actor, async (actorPage) => {
       const denied = await presentationDraft(actorPage, moduleKey)
       expect([403, 422]).toContain(denied.status())
-    })
 
-    await callReducerBff(page, "update_role", [
-      actor.roleId,
-      {
-        name: null,
-        description: null,
-        permissions: ["organization:read", "account-moves:read"],
-        is_active: null,
-      },
-    ])
+      await callReducerBff(page, "update_role", [
+        actor.roleId,
+        {
+          name: null,
+          description: null,
+          permissions: ["organization:read", "account-moves:read"],
+          is_active: null,
+        },
+      ])
 
-    await withActor(browser, actor, async (actorPage) => {
       const restored = await presentationDraft(actorPage, moduleKey)
       expect(restored.status(), await restored.text()).toBe(200)
-    })
+    } finally {
+      await session.close()
+    }
   })
 
   test("IR-02 company membership removed prevents saved draft reopen", async ({ page, browser }) => {
     await requireCapability(page, CAPABILITIES.presentationMembershipRevocation)
     const organizationId = await fetchSessionOrganizationId(page)
     const actor = await provisionActor(page, "ir02-membership", ["account-moves:read"])
-
-    const moduleKey = await withActor(browser, actor, async (actorPage) => {
+    const session = await openActorPages(browser, [actor])
+    try {
+      const actorPage = session.pages[0]
       const options = await presentationOptions(actorPage)
-      const key = presentationModuleKey("pt-ir02-membership")
+      const moduleKey = presentationModuleKey("pt-ir02-membership")
       const response = await savePresentationDraft(
         actorPage,
-        presentationDefinition(key, "Membership revocation", options),
+        presentationDefinition(moduleKey, "Membership revocation", options),
         null,
       )
       expect(response.status(), await response.text()).toBe(200)
-      return key
-    })
 
-    await callReducerBff(page, "remove_user_from_organization", [
-      actor.identityHex,
-      organizationId,
-    ])
+      await callReducerBff(page, "remove_user_from_organization", [
+        actor.identityHex,
+        organizationId,
+      ])
 
-    await withActor(browser, actor, async (actorPage) => {
       const denied = await presentationDraft(actorPage, moduleKey)
       expect(denied.status()).not.toBe(200)
       expect([401, 403]).toContain(denied.status())
-    })
+    } finally {
+      await session.close()
+    }
   })
 
   test("IR-02 resource disabled after save reauthorizes at reopen", { tag: CAPABILITY_PENDING }, async ({ page }) => {
