@@ -268,11 +268,9 @@ Legend — Class: **C** covered, **P** partial, **N** not covered, **B** blocked
 
 ## Known defects (pre-tenant blockers)
 
-Registered in `KNOWN_DEFECTS` / `expectKnownDefect()`; runtime confirmation recorded in the validation log.
-
-| Case | Blocker |
-|------|---------|
-| `AG-IDEMP-01` | (Playwright-only; not yet executed against a running stack) AI draft approval retry after commit returns an error instead of idempotent success. |
+No pre-tenant defect is currently registered in `KNOWN_DEFECTS` or wrapped by
+`expectKnownDefect()`. Any newly observed invariant failure is blocking until it is classified and
+recorded explicitly.
 
 Additional documented findings (not executed as tests): `REC-01`.
 
