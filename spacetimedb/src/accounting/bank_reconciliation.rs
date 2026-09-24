@@ -338,6 +338,7 @@ pub fn stage_bank_statement_import(
     if params.rows.is_empty() {
         return Err("statement import must contain at least one row".to_string());
     }
+    validate_pilot_money_amount("opening balance", params.opening_balance)?;
     let journal = ctx
         .db
         .account_journal()
