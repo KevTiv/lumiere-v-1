@@ -953,6 +953,71 @@ pub fn create_message_batch(
     Ok(())
 }
 
+fn validate_message_batch_for_approval(
+    ctx: &ReducerContext,
+    batch: &MessageBatch,
+) -> Result<(), String> {
+    let messages: Vec<_> = ctx
+        .db
+        .operational_message()
+        .operational_message_by_batch()
+        .filter(&batch.id)
+        .collect();
+    if messages.len() as u64 != batch.recipient_count {
+        return Err("Batch recipient snapshot no longer matches its message intents".to_string());
+    }
+
+    for message in messages {
+        if message.organization_id != batch.organization_id
+            || message.company_id != batch.company_id
+            || message.template_id != batch.template_id
+            || message.channel != batch.channel
+        {
+            return Err("Batch recipient message is outside the approved batch scope".to_string());
+        }
+        if !matches!(
+            message.status,
+            OperationalMessageStatus::Draft
+                | OperationalMessageStatus::Queued
+                | OperationalMessageStatus::Copied
+        ) {
+            return Err("Batch recipient message is already in a terminal delivery state".to_string());
+        }
+        if message.rendered_body.trim().is_empty() {
+            return Err("Batch recipient has no rendered content to approve".to_string());
+        }
+
+        let current = resolve_message_recipient(
+            ctx,
+            batch.organization_id,
+            batch.company_id,
+            message.contact_id,
+            &batch.channel,
+        )?
+        .ok_or(
+            "Batch recipient consent or phone identity is no longer eligible; create a new batch",
+        )?;
+        if current.phone_identity_id != message.phone_identity_id {
+            return Err(
+                "Batch recipient phone identity changed after preview; create a new batch".to_string(),
+            );
+        }
+        let identity = ctx
+            .db
+            .contact_phone_identity()
+            .id()
+            .find(&message.phone_identity_id)
+            .ok_or("Batch recipient phone identity no longer exists")?;
+        if identity.updated_at > message.created_at {
+            return Err(
+                "Batch recipient phone identity changed after preview; create a new batch".to_string(),
+            );
+        }
+    }
+
+    Ok(())
+}
+
 /// Approve or reject a message batch. Bulk copy/send remains blocked until approved.
 #[reducer]
 pub fn review_message_batch(
@@ -977,8 +1042,28 @@ pub fn review_message_batch(
     if batch.organization_id != organization_id {
         return Err("Batch belongs to a different organization".to_string());
     }
+
+    if params.approved
+        && batch.status == MessageBatchStatus::Approved
+        && batch.approved_by == Some(ctx.sender())
+    {
+        return Ok(());
+    }
+    if !params.approved
+        && batch.status == MessageBatchStatus::Rejected
+        && batch.rejected_by == Some(ctx.sender())
+    {
+        return Ok(());
+    }
     if batch.status != MessageBatchStatus::PendingApproval {
         return Err("Batch is not pending approval".to_string());
+    }
+
+    if params.approved {
+        validate_message_batch_for_approval(ctx, &batch)?;
+        if batch.created_by == ctx.sender() {
+            return Err("Batch creator cannot approve their own batch".to_string());
+        }
     }
 
     let (new_status, approved_by, approved_at, rejected_by, rejected_at) = if params.approved {
