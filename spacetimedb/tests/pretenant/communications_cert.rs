@@ -15,8 +15,9 @@ use crate::accounting_tests::helpers::create_balanced_customer_invoice;
 use crate::core::operational_messaging::{
     cancel_message_batch, contact_communication_preference, create_invoice_reminder_batch,
     create_message_batch, create_message_template, message_batch, message_template,
-    operational_message, review_message_batch, set_contact_communication_preference,
-    update_message_template, CreateInvoiceReminderBatchParams, CreateMessageBatchParams,
+    operational_message, record_message_copied, review_message_batch,
+    set_contact_communication_preference, update_message_template,
+    CreateInvoiceReminderBatchParams, CreateMessageBatchParams,
     CreateMessageTemplateParams, MessageBatch, OperationalMessage, ReviewMessageBatchParams,
     UpdateMessageTemplateParams,
 };
