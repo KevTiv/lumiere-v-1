@@ -214,7 +214,7 @@ Legend — Class: **C** covered, **P** partial, **N** not covered, **B** blocked
 | Reversal retry | durable reversal receipt validates one coherent compensation; exact retry succeeds and conflicting payload fails closed | — | STDB | yes | — | PAY-04, PAY-05 | C |
 | Statement approval retry | `bank-statement-import.spec.ts` (approve twice) | — | E2E | yes | — | reused | C |
 | Duplicate refs: same account / normalized variant / distinct account / cross-company forgery | `payment_management_test`, P1-PAY-02 | cross-organization scope | STDB | yes | — | PAY-07 | P |
-| Overpayment → explicit unapplied | — | all | STDB + E2E | yes | — | PAY-06, PAY-06-E2E | N |
+| Overpayment → explicit unapplied | over-allocation rejects; unapplied credit remains explicit and can settle a second invoice without write-off | — | STDB + E2E | yes | — | PAY-06, PAY-06-E2E | C |
 | Provider payer mismatch → manual review | — | all | STDB | no | payer identity on `PaymentTransaction` | PAY-PAYER-01 (gated) | B |
 | Reversal/chargeback after settlement | supplier reversal (P1-PAY-03), partial allocation reversal (ACC-RI-004) | full customer settlement + immutability + retry | STDB | yes | — | PAY-04 | P |
 | Monetary precision / pilot envelope | exact minor-unit model through 1e9; many-small/split allocations; at-cap ledger settlement; non-finite/over-cap rejection | — | native + STDB | yes | — | `money.rs`, PAY-08, PAY-09, PAY-10 | C |
