@@ -133,7 +133,7 @@ test.describe("Bank statement CSV staging", { tag: ["@phase-1", "@accounting"] }
     )
     expect(invalidLines).toHaveLength(1)
     expect(field(invalidLines[0], "amount")).toBe(35)
-    expect(field(invalidLines[0], "reference")).toBeUndefined()
+    expect(field(invalidLines[0], "reference")).toBeNull()
 
     await stage(validKey, [{ row_number: 2, date: some(timestamp("2026-07-01T00:00:00.000Z")), amount: some(125.5), reference: some(marker), description: some("Customer transfer") }])
     let validImport: QueryRow | undefined
