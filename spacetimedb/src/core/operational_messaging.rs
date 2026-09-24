@@ -537,11 +537,18 @@ pub fn create_operational_message(
     let status = params.status.clone();
     let subject_model = params.subject_model.clone();
 
-    let (can_receive, phone_identity_id) = contact_can_receive(ctx, params.contact_id, &channel);
-    if !can_receive {
-        return Err("Contact cannot receive messages on this channel".to_string());
+    let recipient = resolve_message_recipient(
+        ctx,
+        organization_id,
+        params.company_id,
+        params.contact_id,
+        &channel,
+    )?
+    .ok_or("Contact cannot receive messages on this channel")?;
+    if recipient.phone_identity_id != params.phone_identity_id {
+        return Err("Selected phone identity is not the current eligible recipient identity".to_string());
     }
-    let phone_identity_id = phone_identity_id.unwrap_or(params.phone_identity_id);
+    let phone_identity_id = recipient.phone_identity_id;
 
     let rendered_body = if params.rendered_body.is_empty() {
         render_template(&template, &params.variables)?
