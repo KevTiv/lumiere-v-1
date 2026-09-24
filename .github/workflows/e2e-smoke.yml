@@ -67,7 +67,11 @@ jobs:
               configs='[{"suite":"full","clear_db":"1"}]'
               ;;
             pull_request)
-              configs='[{"suite":"p0","clear_db":"0"}]'
+              if [ "${{ github.head_ref }}" = "codex/base05-pretenant-integrated-certification" ]; then
+                configs='[{"suite":"p0","clear_db":"0"},{"suite":"pretenant","clear_db":"1"}]'
+              else
+                configs='[{"suite":"p0","clear_db":"0"}]'
+              fi
               ;;
             schedule)
               configs='[{"suite":"full","clear_db":"1"}]'
