@@ -1,8 +1,9 @@
 # GOV-00 governed execution status
 
-Status: **REVIEW — implementation complete; live persisted-run acceptance pending**
+Status: **ACCEPTED — authenticated browser-to-durable-run certification closed 2026-09-25**
 
 Implementation revision: `9de0ee4cc`
+Live acceptance repair revision: `37f04df87`
 
 ## Authoritative executor
 
@@ -43,7 +44,7 @@ No new loop, reducer, generated contract, or contract release was introduced.
 
 ## Validation
 
-- `cargo test --locked -p ai-gateway --bin gateway`: **584 passed, 6 ignored, 0 failed**.
+- `cargo test --locked -p ai-gateway --bin gateway`: **596 passed, 6 ignored, 0 failed**.
   The six ignored tests already declare live SpacetimeDB/Qdrant prerequisites.
 - `pnpm --dir frontend/web test:unit`: **80 passed, 0 failed**.
 - `pnpm --dir frontend/web typecheck`: passed.
@@ -53,18 +54,32 @@ The first sandboxed full gateway run had one loopback-bind `EPERM`; the same
 suite passed outside the filesystem/process sandbox, confirming an environment
 restriction rather than a product failure.
 
-## Remaining acceptance proof
+## Live acceptance proof — 2026-09-25
 
-Do not mark GOV-00 accepted until an integrated stack with a provisioned
-`report_analysis` skill, governed runtime bootstrap, spend-read identity and
-working configured provider executes the authenticated HTTP route and verifies:
+The dedicated live stack used isolated database
+`lumiere-v1-gov00-cert-20260925`, a provisioned `report_analysis` release,
+governed runtime bootstrap, a distinct spend/read identity, and the configured
+local Ollama provider. The permanent focused Playwright case
+`gov00-governed-execution.spec.ts` passed through real browser authentication
+and the Next.js BFF.
 
-1. the response carries a nonzero durable run id;
-2. the scoped `ai_agent_run` exists with the expected organization, company,
-   skill and actor-derived execution context;
-3. ordered `ai_agent_run_step` rows exist for that run and agree with its
-   `step_count`; and
-4. a forged JSON authority field and a missing trusted actor header both fail.
+- Playwright: **2 passed, 0 failed** (authentication setup plus GOV-00 case).
+- The BFF response returned nonzero run id `17`, status `agent_settled`, skill
+  `report_analysis`, and ordered steps `1, 2, 3`. The low-confidence settlement
+  was the configured policy outcome, not an execution error.
+- Durable readback found `ai_agent_run(17)` in organization `264`, company
+  `267`, with the signed-in browser actor, `step_count = 3`, and exactly three
+  ordered `ai_agent_run_step` rows.
+- The same run persisted one succeeded `ai_capability_execution`, four
+  `ai_intelligence_event` rows including the typed decision, and one observed
+  `ai_decision_case`.
+- Missing trusted actor headers returned `403`; forged JSON authority returned
+  `422`. Unit coverage also keeps browser authority out of the trusted BFF
+  contract and rejects authority in the gateway JSON body.
 
-No compatible local AI gateway was listening on `127.0.0.1:8080` during this
-implementation run, so live HTTP-to-SpacetimeDB persistence was not executed.
+The live trail repaired only adapter/runtime incompatibilities exposed by this
+canonical path: unsupported SpacetimeDB SQL constructs, nested SATS option
+encoding, governed-resource binding and input shape, bounded Rust-side
+analytics aggregation, Ollama single-tool structured output, confidence
+requirements, and durable decision/precedent recording. No alternate executor
+or browser-supplied authority was introduced.
