@@ -164,12 +164,12 @@
     "approve_ai_action_draft": {
       "semantic_kind": "command",
       "client_facing": true,
-      "idempotency": "non_idempotent",
+      "idempotency": "idempotent",
       "codec": {
         "id": "spacetimedb-sats-json",
         "version": 1
       },
-      "evidence": "spacetimedb/src/ai/action_drafts.rs: body inserts or appends a new effect without a replay guard"
+      "evidence": "spacetimedb/src/ai/action_drafts.rs: an already-approved draft returns success only for the original approver after the committed execution state is present"
     },
     "approve_document_processing_job": {
       "semantic_kind": "command",
