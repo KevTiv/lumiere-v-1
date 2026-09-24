@@ -1785,6 +1785,7 @@ pub fn allocate_payment_transaction(
     {
         return Err("payment transaction does not match organization and company".to_string());
     }
+    validate_pilot_money_amount("payment settlement amount", transaction.settlement_amount)?;
     let payload_fingerprint = format!("{params:?}");
     if replayed_result(
         ctx,
