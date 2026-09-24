@@ -29,7 +29,6 @@ import {
 } from "./payment-fixtures"
 import {
   CAPABILITIES,
-  CAPABILITY_PENDING,
   auditCount,
   browserPost,
   callRaw,
@@ -39,7 +38,6 @@ import {
   none,
   openActorPages,
   openOwnerPages,
-  pendingContract,
   pollRow,
   pretenantTags,
   provisionActor,
