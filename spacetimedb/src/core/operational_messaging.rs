@@ -630,6 +630,20 @@ pub fn record_message_copied(
     if message.organization_id != organization_id {
         return Err("Message belongs to a different organization".to_string());
     }
+    if message.message_batch_id != 0 {
+        let batch = ctx
+            .db
+            .message_batch()
+            .id()
+            .find(&message.message_batch_id)
+            .ok_or("Message batch not found for operational message")?;
+        if batch.organization_id != organization_id {
+            return Err("Message batch belongs to a different organization".to_string());
+        }
+        if batch.status != MessageBatchStatus::Approved {
+            return Err("Batch message cannot be copied before independent approval".to_string());
+        }
+    }
     if message.status != OperationalMessageStatus::Draft
         && message.status != OperationalMessageStatus::Queued
     {
