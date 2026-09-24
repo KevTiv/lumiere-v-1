@@ -630,6 +630,14 @@ fn pay_09_pilot_money_boundary_is_enforced(ctx: &ReducerContext) -> Result<(), S
         if create_receipt(ctx, &w, reference, amount).is_ok() {
             return Err(format!("out-of-envelope payment {reference} was accepted"));
         }
+        if ctx.db.payment_transaction().iter().any(|transaction| {
+            transaction.organization_id == w.org()
+                && transaction.external_reference.as_deref() == Some(reference)
+        }) {
+            return Err(format!(
+                "rejected out-of-envelope payment {reference} still persisted"
+            ));
+        }
     }
 
     let (_, invalid_line) = setup("invalid allocation invoice", invoice(ctx, &w, 100.0))?;
