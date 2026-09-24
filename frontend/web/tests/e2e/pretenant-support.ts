@@ -34,6 +34,7 @@ const REDUCER_NAMES_PATH = path.resolve(path.dirname(fileURLToPath(import.meta.u
 
 type Probe =
   | { kind: "route"; method: "GET" | "POST"; path: string }
+  | { kind: "ai-gateway" }
   | { kind: "reducer"; pattern: RegExp }
   | { kind: "source"; path: string; contains?: string }
 
@@ -78,12 +79,18 @@ export const CAPABILITIES = {
   agentLoop: {
     id: "agent-loop",
     prerequisite: "Requires H4 bounded agent loop and event persistence (PR #23).",
-    probes: [{ kind: "source", path: "ai-gateway/src/orchestrator/agent_loop.rs" }],
+    probes: [
+      { kind: "source", path: "ai-gateway/src/orchestrator/agent_loop.rs" },
+      { kind: "ai-gateway" },
+    ],
   },
   agentPolicy: {
     id: "agent-per-call-policy",
     prerequisite: "Requires H5a per-call policy enforcement and approval stops (PR #24).",
-    probes: [{ kind: "source", path: "ai-gateway/src/orchestrator/invocation_policy.rs" }],
+    probes: [
+      { kind: "source", path: "ai-gateway/src/orchestrator/invocation_policy.rs" },
+      { kind: "ai-gateway" },
+    ],
   },
   agentBudgetPersistence: {
     id: "agent-budget-persistence",
@@ -92,6 +99,7 @@ export const CAPABILITIES = {
     probes: [
       { kind: "source", path: "spacetimedb/src/ai/spend.rs" },
       { kind: "reducer", pattern: /^reserve_ai_spend$/ },
+      { kind: "ai-gateway" },
     ],
   },
   outboundProviderDispatch: {
@@ -126,6 +134,12 @@ async function probeSucceeds(page: Page, probe: Probe): Promise<boolean> {
         maxRedirects: 0,
       })
       return response.status() !== 404
+    }
+    case "ai-gateway": {
+      const response = await page.request.get("/api/ai/health", { failOnStatusCode: false })
+      if (!response.ok()) return false
+      const body = (await response.json().catch(() => ({}))) as { ok?: boolean; status?: string }
+      return body.ok === true || body.status === "ok"
     }
     case "reducer":
       return generatedReducerNames().some((name) => probe.pattern.test(name))
