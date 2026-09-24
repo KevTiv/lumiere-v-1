@@ -114,7 +114,7 @@ with a pointer to this plan; it never silently passes. There are no unconditiona
 | Concern | Canonical owner | Other representations / gaps |
 |---------|-----------------|------------------------------|
 | Message intent | `OperationalMessage` | User-authored outbound `CrmConversationMessage` rows are intents without an `OperationalMessage` until a provider callback links them. |
-| Recipient snapshot | `OperationalMessage.contact_id` + `phone_identity_id` | Stored **by reference**: `update_contact_identity` changes `normalized_e164` under the same id (COMM-14). No value/hash snapshot. |
+| Recipient snapshot | `OperationalMessage.contact_id` + `phone_identity_id` + preview timestamp | Approval re-resolves the current org/company-scoped recipient and rejects archived/replaced/updated identities; number changes under the same id invalidate the preview. |
 | Channel | `OperationalMessage.channel` | Duplicated on `MessageBatch` and `CrmConversation`; scope checks compare them. |
 | Provider attempt | **none** | No attempt table; no outbound dispatch exists on `main` or any open PR. |
 | Provider message id | `CrmConversationMessage.provider_message_id` | Org-scoped uniqueness by scan (no unique index); relies on serialized reducers. |
@@ -122,8 +122,8 @@ with a pointer to this plan; it never silently passes. There are no unconditiona
 | Delivery status | `OperationalMessage.status` (intent) and `CrmConversationMessage.status` (timeline) | Two representations updated together; SM-01 asserts they agree. |
 | Conversation | `CrmConversation` (`external_thread_id` binding by trusted principal) | — |
 | Timeline entry | `CrmConversationMessage` | `MailMessage` chatter is separate; invoice reminders do not appear on the invoice chatter. |
-| Consent | `ContactCommunicationPreference` (contact/company/channel) | Also `ContactPhoneIdentity.verification_state = OptedOut` and `core::privacy::PrivacyConsent`; `contact_can_receive` reads only the first two and does not scope by organization (COMM-13). |
-| Approval | `MessageBatch.approved_by/at` | No independence rule (COMM-11), no content binding (COMM-09), no revalidation (COMM-06/07/14). |
+| Consent | `ContactCommunicationPreference` (contact/company/channel) | Recipient resolution is organization/company scoped and rechecked at approval; opted-out preferences or identities invalidate the preview. `core::privacy::PrivacyConsent` remains a separate privacy subsystem. |
+| Approval | `MessageBatch.approved_by/at` | Creator self-approval denies; rendered child content and recipient eligibility are revalidated before first approval; same-approver committed retry is idempotent. |
 | Audit | `audit_log` via `write_audit_log_v2` | Messaging, inbox and payment reducers do not record organization commits (see Phase 8). |
 
 ### Canonical rules decided by this suite
@@ -140,8 +140,9 @@ with a pointer to this plan; it never silently passes. There are no unconditiona
 6. **Recipient identity is an immutable snapshot.** If the snapshotted identity is archived or its
    number changes, approval/dispatch fails closed; a new batch (re-resolution) must be approved
    (COMM-07, COMM-14).
-7. **Approved content is immutable.** Approval binds rendered content; template edits never change
-   rendered messages (COMM-08 holds for invoice reminders; COMM-09 fails for contact batches).
+7. **Approved content is immutable.** Approval binds rendered content; invoice-reminder and generic
+   contact batches render before approval and later template edits never change the snapshot
+   (COMM-08, COMM-09).
 8. **Merge keeps one timeline.** After A→B merge, provider events continue on the same conversation
    under B; events still addressed to A fail closed (the webhook adapter must resolve
    `merge_target_id`) (COMM-10).
@@ -202,7 +203,7 @@ Legend — Class: **C** covered, **P** partial, **N** not covered, **B** blocked
 | Template/content immutability | invoice and contact batches snapshot rendered content before approval; later template edits do not mutate it | — | STDB | yes | — | COMM-08, COMM-09 | C |
 | Contact merge with active provider conversation | existing thread is retained under merge target and stale source events reject | — | STDB + E2E | yes | — | COMM-10, crm-duplicate-merge.spec.ts | C |
 | Independent approval | creator denial, independent approver, same-approver retry and simultaneous approval single-effect are blocking | — | STDB + two-session E2E | yes | — | COMM-11, COMM-11-E2E, COMM-15, M-03 | C |
-| Batch/consent tenancy | `crm-read-isolation.spec.ts` (reads) | mutation and recipient scoping | STDB | yes | — | COMM-12, COMM-13 | P |
+| Batch/consent tenancy | foreign batch/consent mutations and cross-organization/company recipient injection reject before effect | — | STDB | yes | — | COMM-12, COMM-13 | C |
 
 ### Payments
 
@@ -271,14 +272,6 @@ Registered in `KNOWN_DEFECTS` / `expectKnownDefect()`; runtime confirmation reco
 
 | Case | Blocker |
 |------|---------|
-| `COMM-05` | Stale-but-valid provider status callback is rejected with an error; the webhook returns non-2xx and the provider retries. |
-| `COMM-06` | Batch approval does not revalidate consent; a contact who opted out after preview remains an approved recipient. |
-| `COMM-07` | Batch approval does not revalidate the snapshotted identity; an archived recipient identity remains approved. |
-| `COMM-09` | Contact message batches are approved without rendered content, so approved content is not immutable. |
-| `COMM-11` | A batch creator can approve their own batch; no independent-approval rule. |
-| `COMM-13` | `create_message_batch` does not scope candidate contacts/identities to the calling organization. |
-| `COMM-14` | A number change under the same identity id silently redirects an approved recipient. |
-| `COMM-15` | (Playwright-only; not yet executed against a running stack) Batch approval retry by the same approver returns an error instead of an idempotent success. |
 | `AG-IDEMP-01` | (Playwright-only; not yet executed against a running stack) AI draft approval retry after commit returns an error instead of idempotent success. |
 
 Additional documented findings (not executed as tests): `REC-01`.
@@ -307,8 +300,8 @@ error — no screenshot assertions.
   every step (net allocated, ≤ settlement, per-invoice residual, tenant scope).
 
 Every failure message includes `seed=<n> step=<n>`. Contact/opt-out/merge/permission operations are
-certified by the deterministic COMM cases; extending SM-01 with those operations is follow-up once
-COMM-06/07/13/14 are fixed (otherwise every seed stops at the known defect).
+certified by the deterministic COMM cases. Extending SM-01 with those operations remains optional
+state-machine hardening; it is no longer blocked by a known communications defect.
 
 ## Phase 7 — Synthetic personas
 
