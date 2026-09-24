@@ -483,6 +483,7 @@ pub fn approve_bank_statement_import(
     if import.approved_statement_id.is_some() {
         return Ok(());
     }
+    validate_pilot_money_amount("opening balance", import.opening_balance)?;
     if import.invalid_rows > 0 {
         return Err("Correct invalid rows before approving this statement import".to_string());
     }
