@@ -374,6 +374,7 @@ pub fn stage_bank_statement_import(
         );
     }
 
+    validate_pilot_money_amount("opening balance", params.opening_balance)?;
     let idempotency_key = params.idempotency_key.clone();
     let mut invalid_rows = 0_u32;
     let mut staged_lines = Vec::with_capacity(params.rows.len());
