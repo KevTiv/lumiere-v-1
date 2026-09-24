@@ -181,9 +181,7 @@ test.describe("Pre-tenant mobile and network resilience", { tag: pretenantTags("
       await session.close()
     }
     await expect.poll(() => auditCount(page, "message_batch", batchId, "APPROVE")).toBe(1)
-    await expectKnownDefect("COMM-15", "approval retry after a lost committed response returns an error", () => {
-      expect(retry.status).toBe(200)
-    })
+    expect(retry.status).toBe(200)
   })
 
   test("M-04 IR draft save with lost response creates one revision", { tag: CAPABILITY_PENDING }, async ({ page }) => {
