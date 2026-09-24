@@ -2,7 +2,7 @@
 
 Status: **IMPLEMENTATION COMPLETE — acceptance proof pending**
 
-Current tip: `codex/base03-communications-correctness`, stacked on BASE-04 PR #87.
+Current tip: PR #88 (`codex/base03-communications-correctness`), stacked on BASE-04 PR #87.
 
 ## Closed defects
 
