@@ -66,6 +66,9 @@ pub struct LlmRequest {
     pub temperature: Option<f64>,
     pub top_p: Option<f64>,
     pub tools: Vec<ToolSpec>,
+    /// Allow one exact schema response without native provider tool calls.
+    /// Typed intelligence adapters opt in; agent-loop requests do not.
+    pub single_shot_tool: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -187,7 +190,6 @@ impl LlmClient {
                 .collect::<Vec<_>>());
             payload["tool_choice"] = json!("auto");
         }
-
         payload
     }
 
@@ -217,10 +219,13 @@ impl LlmClient {
     }
 
     async fn complete_ollama(&self, req: &LlmRequest) -> Result<LlmResponse> {
-        if !req.tools.is_empty() {
+        if !req.tools.is_empty() && !req.single_shot_tool {
             anyhow::bail!(
                 "Ollama tool calling is not admitted; select the explicit single-shot path"
             );
+        }
+        if req.single_shot_tool && req.tools.len() != 1 {
+            anyhow::bail!("Ollama single-shot completion requires exactly one output schema");
         }
 
         let url = format!("{}/api/chat", self.ollama_url.trim_end_matches('/'));
@@ -233,7 +238,7 @@ impl LlmClient {
         let mut messages = vec![json!({"role": "system", "content": req.system})];
         messages.extend(req.messages.iter().map(openai_message));
 
-        let body = json!({
+        let mut body = json!({
             "model": model,
             "stream": false,
             "messages": messages,
@@ -242,6 +247,13 @@ impl LlmClient {
                 "num_predict": req.max_tokens,
             }
         });
+        if let Some(tool) = req.tools.first().filter(|_| req.single_shot_tool) {
+            // Thinking tokens can exhaust the bounded response before Ollama
+            // emits the schema-constrained content. This path requests one
+            // typed value, not model-authored chain-of-thought.
+            body["think"] = json!(false);
+            body["format"] = tool.parameters.clone();
+        }
 
         let resp = self
             .http
@@ -259,6 +271,24 @@ impl LlmClient {
 
         let parsed: OllamaChatResponse = resp.json().await.context("parse Ollama response")?;
         let text = parsed.message.and_then(|m| m.content).unwrap_or_default();
+        let tool_calls = if let Some(tool) = req.tools.first().filter(|_| req.single_shot_tool) {
+            match serde_json::from_str::<serde_json::Value>(&text) {
+                Ok(arguments) => vec![ToolCallRequest {
+                    id: None,
+                    name: tool.name.clone(),
+                    arguments,
+                    arguments_error: None,
+                }],
+                Err(error) => vec![ToolCallRequest {
+                    id: None,
+                    name: tool.name.clone(),
+                    arguments: serde_json::Value::Null,
+                    arguments_error: Some(format!("invalid single-shot JSON: {error}")),
+                }],
+            }
+        } else {
+            Vec::new()
+        };
 
         Ok(LlmResponse {
             text,
@@ -266,7 +296,7 @@ impl LlmClient {
             output_tokens: parsed.eval_count.unwrap_or(0) as u32,
             model,
             provider: "ollama".to_string(),
-            tool_calls: Vec::new(),
+            tool_calls,
         })
     }
 
@@ -618,6 +648,7 @@ mod tests {
             temperature: Some(0.2),
             top_p: Some(0.9),
             tools,
+            single_shot_tool: false,
         }
     }
 

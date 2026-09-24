@@ -28,7 +28,10 @@ use async_trait::async_trait;
 use serde_json::{json, Value};
 use stdb_client::{ReducerCall, StdbClient};
 
-use super::intelligence::{DecisionTypeRef, PrecedentSummaryRef};
+use super::{
+    intelligence::{DecisionTypeRef, PrecedentSummaryRef},
+    skill_loader::sats_option,
+};
 
 /// Mirrors `decision-precedent-memory-layer.md`'s `DecisionCaseStatus`.
 /// Ordering here is not `Ord`-derived on purpose: `Rejected`/`Superseded`
@@ -286,6 +289,7 @@ impl PrecedentStore for StdbPrecedentStore<'_> {
         if case.request_hash.trim().is_empty() || case.context_fingerprint.trim().is_empty() {
             bail!("request_hash and context_fingerprint are required");
         }
+        let (confidence, provider_attempt_id) = decision_case_sats_options(&case);
         self.writer
             .call_reducer(ReducerCall::from_name("record_ai_decision_case", json!([
                     case.organization_id,
@@ -301,8 +305,8 @@ impl PrecedentStore for StdbPrecedentStore<'_> {
                         "context_fingerprint": case.context_fingerprint.clone(),
                         "material_constraints_json": serde_json::to_string(&case.material_constraints)?,
                         "selected_json": serde_json::to_string(&case.selected)?,
-                        "confidence": case.confidence,
-                        "provider_attempt_id": case.provider_attempt_id,
+                        "confidence": confidence,
+                        "provider_attempt_id": provider_attempt_id,
                         "precedent_refs": case.precedent_refs.clone(),
                     }
                 ])))
@@ -323,6 +327,13 @@ impl PrecedentStore for StdbPrecedentStore<'_> {
             .and_then(|row| row_u64(row, "id"))
             .context("recorded decision case not found after reducer")
     }
+}
+
+fn decision_case_sats_options(case: &DecisionCaseRecord) -> (Value, Value) {
+    (
+        sats_option(case.confidence.map(Value::from)),
+        sats_option(case.provider_attempt_id.map(Value::from)),
+    )
 }
 
 fn decode_case(row: &Value) -> Result<Option<DecisionCaseRecord>> {
@@ -620,6 +631,30 @@ mod tests {
             policy: policy(),
             now_micros: 1_000_000_000_000,
         }
+    }
+
+    #[test]
+    fn durable_decision_case_composite_options_use_sats_encoding() {
+        let mut record = case(
+            0,
+            1,
+            1,
+            DecisionCaseStatus::Observed,
+            json!({"sku": "A1"}),
+            1_000_000_000_000,
+        );
+        record.provider_attempt_id = Some(42);
+
+        let (confidence, provider_attempt_id) = decision_case_sats_options(&record);
+
+        assert_eq!(confidence, json!({ "some": 0.7 }));
+        assert_eq!(provider_attempt_id, json!({ "some": 42 }));
+
+        record.confidence = None;
+        record.provider_attempt_id = None;
+        let (confidence, provider_attempt_id) = decision_case_sats_options(&record);
+        assert_eq!(confidence, json!({ "none": [] }));
+        assert_eq!(provider_attempt_id, json!({ "none": [] }));
     }
 
     #[tokio::test]

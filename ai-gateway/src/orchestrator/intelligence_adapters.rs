@@ -95,6 +95,7 @@ impl DecisionProvider for LlmDecisionAdapter<'_> {
             temperature: self.temperature,
             top_p: self.top_p,
             tools: vec![tool],
+            single_shot_tool: true,
         };
 
         let response = self.transport.complete(llm_request).await?;
@@ -165,11 +166,11 @@ fn decision_tool_spec(request: &DecisionRequest) -> ToolSpec {
                 "type": "string",
                 "enum": request.candidates,
             });
-            vec!["choice"]
+            vec!["choice", "confidence"]
         }
         DecisionKind::Score => {
             properties["score"] = json!({"type": "number"});
-            vec!["score"]
+            vec!["score", "confidence"]
         }
         DecisionKind::Probability => {
             properties["probability"] = json!({
@@ -177,7 +178,7 @@ fn decision_tool_spec(request: &DecisionRequest) -> ToolSpec {
                 "minimum": 0.0,
                 "maximum": 1.0,
             });
-            vec!["probability"]
+            vec!["probability", "confidence"]
         }
     };
     ToolSpec {
@@ -285,6 +286,7 @@ impl GenerationProvider for LlmGenerationAdapter<'_> {
             temperature: self.temperature,
             top_p: self.top_p,
             tools: Vec::new(),
+            single_shot_tool: false,
         };
         let response = self.transport.complete(llm_request).await?;
         if !response.tool_calls.is_empty() {
@@ -357,6 +359,7 @@ impl ReasoningProvider for AgentLoopReasoner<'_> {
             temperature: self.temperature,
             top_p: self.top_p,
             tools,
+            single_shot_tool: true,
         };
 
         let response = self.transport.complete(llm_request).await?;

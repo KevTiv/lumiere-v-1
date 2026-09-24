@@ -582,6 +582,7 @@ mod tests {
             temperature: None,
             top_p: None,
             tools: Vec::new(),
+            single_shot_tool: false,
         }
     }
 

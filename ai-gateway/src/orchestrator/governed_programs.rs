@@ -3,7 +3,14 @@
 //! Known ERP workflows belong here as explicit typed graphs. Providers never
 //! author these graphs at runtime.
 
-use crate::harness::{manifest::Capability, policy_engine::PlannedToolCall};
+use crate::harness::{
+    governed_llm_skills::{
+        PRICE_SEARCH_RESOURCE, PROCESS_RESEARCH_RESOURCE, REPORT_ANALYSIS_RESOURCE,
+        SUPPLIER_DISCOVERY_RESOURCE,
+    },
+    manifest::Capability,
+    policy_engine::PlannedToolCall,
+};
 
 use super::{
     decision_graph::{
@@ -369,28 +376,37 @@ pub(crate) fn governed_program_for_skill(skill_key: &str) -> Option<GovernedProg
             program_ref: REPORT_ANALYSIS_PROGRAM_REF,
             graph: report_analysis_graph(),
             review_independence_key: "ReportAttentionNeed",
-            reviewed_calls: vec![named_read_call("analytics_summary")],
+            reviewed_calls: vec![named_read_call(
+                "analytics_summary",
+                REPORT_ANALYSIS_RESOURCE,
+            )],
         }),
         "process_research" => Some(GovernedProgramCatalogEntry {
             program_ref: "skill:process_research@1",
             graph: process_research_graph(),
             review_independence_key: "RunReviewDisposition",
             reviewed_calls: vec![
-                named_read_call("analytics_summary"),
-                named_read_call("erp_search"),
+                named_read_call("analytics_summary", PROCESS_RESEARCH_RESOURCE),
+                named_read_call("erp_search", PROCESS_RESEARCH_RESOURCE),
             ],
         }),
         "supplier_discovery" => Some(GovernedProgramCatalogEntry {
             program_ref: "skill:supplier_discovery@1",
             graph: supplier_discovery_graph(),
             review_independence_key: "RunReviewDisposition",
-            reviewed_calls: vec![named_read_call("erp_search"), network_call("web_search")],
+            reviewed_calls: vec![
+                named_read_call("erp_search", SUPPLIER_DISCOVERY_RESOURCE),
+                network_call("web_search"),
+            ],
         }),
         "price_search" => Some(GovernedProgramCatalogEntry {
             program_ref: "skill:price_search@1",
             graph: price_search_graph(),
             review_independence_key: "RunReviewDisposition",
-            reviewed_calls: vec![named_read_call("erp_search"), network_call("web_search")],
+            reviewed_calls: vec![
+                named_read_call("erp_search", PRICE_SEARCH_RESOURCE),
+                network_call("web_search"),
+            ],
         }),
         "rag_generation" => Some(GovernedProgramCatalogEntry {
             program_ref: RAG_GENERATION_PROGRAM_REF,
@@ -414,11 +430,11 @@ pub(crate) fn governed_program_for_skill(skill_key: &str) -> Option<GovernedProg
     }
 }
 
-fn named_read_call(tool_name: &str) -> PlannedToolCall {
+fn named_read_call(tool_name: &str, named_resource: &str) -> PlannedToolCall {
     PlannedToolCall {
         tool_name: tool_name.to_string(),
         capability: Capability::NamedRead,
-        named_resource: None,
+        named_resource: Some(named_resource.to_string()),
     }
 }
 
@@ -632,6 +648,25 @@ mod tests {
             let entry = governed_program_for_skill(skill).unwrap();
             validate_graph(&entry.graph).unwrap();
             assert!(!entry.reviewed_calls.is_empty());
+        }
+    }
+
+    #[test]
+    fn governed_named_reads_bind_their_reviewed_release_resource() {
+        for (skill, resource) in [
+            ("report_analysis", REPORT_ANALYSIS_RESOURCE),
+            ("process_research", PROCESS_RESEARCH_RESOURCE),
+            ("supplier_discovery", SUPPLIER_DISCOVERY_RESOURCE),
+            ("price_search", PRICE_SEARCH_RESOURCE),
+        ] {
+            let entry = governed_program_for_skill(skill).unwrap();
+            for call in entry
+                .reviewed_calls
+                .iter()
+                .filter(|call| call.capability == Capability::NamedRead)
+            {
+                assert_eq!(call.named_resource.as_deref(), Some(resource));
+            }
         }
     }
 }
