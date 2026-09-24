@@ -200,7 +200,7 @@ Legend — Class: **C** covered, **P** partial, **N** not covered, **B** blocked
 | Consent race (opt-out after preview) | preview exclusion plus approval-time revalidation | — | STDB + two-session E2E | yes | — | COMM-06, COMM-06-E2E | C |
 | Phone identity changes before dispatch | approval revalidates exact active recipient identity and preview timestamp | — | STDB | yes | — | COMM-07, COMM-14 | C |
 | Template/content immutability | invoice and contact batches snapshot rendered content before approval; later template edits do not mutate it | — | STDB | yes | — | COMM-08, COMM-09 | C |
-| Contact merge with active provider conversation | merge UI (`crm-duplicate-merge.spec.ts`) | timeline continuity | STDB | yes | — | COMM-10 | P |
+| Contact merge with active provider conversation | existing thread is retained under merge target and stale source events reject | — | STDB + E2E | yes | — | COMM-10, crm-duplicate-merge.spec.ts | C |
 | Independent approval | single actor lifecycle (P1-MSG-02) | creator denial, approver, retry, simultaneous | STDB + two-session E2E | yes | — | COMM-11, COMM-11-E2E a–d | N |
 | Batch/consent tenancy | `crm-read-isolation.spec.ts` (reads) | mutation and recipient scoping | STDB | yes | — | COMM-12, COMM-13 | P |
 
