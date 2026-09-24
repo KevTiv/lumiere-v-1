@@ -105,9 +105,11 @@ The following remain explicit prerequisite skips rather than BASE-05 passes:
 These skips must be visible in the final run evidence and are not counted as
 certified capabilities.
 
-## Promotion rule
+## Promotion decision
 
-Do not mark BASE-05 `ACCEPTED` until the clean-database pre-tenant run and P0
-run have completed and every failure/skip is classified. Record the exact run
-id, pass/fail/skip counts, and remaining prerequisite skips here before
-promotion.
+The promotion rule is satisfied by clean GitHub Actions run `36054658413` on
+executable revision `065c45f2f7c93cb5996378a90f723cc3f9b92308`. Both browser
+lanes completed, every skip is classified above, and the exact pass/fail/skip
+counts are recorded. Reviewer: Codex coordinator evidence review on PR #89
+(not human approval). Contracts remained pinned at immutable release
+`v0.3.53`; no contract publication was required.

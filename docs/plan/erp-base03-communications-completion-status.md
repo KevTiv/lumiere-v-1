@@ -1,8 +1,9 @@
 # BASE-03 — communications correctness completion
 
-Status: **IMPLEMENTATION COMPLETE — acceptance proof pending**
+Status: **ACCEPTED — integrated correctness certification closed 2026-09-24**
 
-Current tip: PR #88 (`codex/base03-communications-correctness`), stacked on BASE-04 PR #87.
+Implementation tip: PR #88 (`codex/base03-communications-correctness`), stacked on BASE-04 PR #87.
+Acceptance head: PR #89, revision `9d0e92c7e3edbd2555a529f44da967fd1a7d6ad8`.
 
 ## Closed defects
 
@@ -91,8 +92,7 @@ resume/stale-client semantics remain explicit.
 
 ## BASE-03 acceptance
 
-Do not mark BASE-03 `ACCEPTED` until all relevant proofs have passed on the
-integrated stack:
+BASE-03 acceptance requires these proofs on the integrated stack:
 
 ```bash
 cargo check --locked --manifest-path spacetimedb/Cargo.toml --tests
@@ -115,6 +115,23 @@ cd frontend/web
 pnpm typecheck
 ```
 
-No additional BASE-03 product-code blocker is currently identified. Any failure
-from these gates must be classified as a BASE-03 regression or a BASE-05
-harness/environment issue before promotion.
+## Integrated acceptance evidence — 2026-09-24
+
+- GitHub Actions run `36054658413` certified executable revision
+  `065c45f2f7c93cb5996378a90f723cc3f9b92308`: cargo test compilation,
+  `pretenant-cert-native` (7 passed), pinned-contract checks, and frontend
+  typecheck passed before the browser run.
+- The same clean pre-tenant job executed
+  `run_core_operational_messaging_test` and the complete `@pretenant` browser
+  lane: 27 passed, 17 capability/prerequisite skips, 0 failed. This includes
+  the communications adversarial cases and M-03/M-06 resilience cases.
+- The ordinary operational-messaging workflow was rerun on the integrated
+  stack at acceptance head `9d0e92c7e3edbd2555a529f44da967fd1a7d6ad8`:
+  4 passed (setup plus P1-MSG-01/02/03), 0 skipped, 0 failed.
+- Contracts remained pinned at immutable release `v0.3.53`; no contract
+  publication was required by this closeout.
+- Reviewer: Codex coordinator evidence review on PR #89 (not human approval).
+
+Remaining deferrals are unchanged: outbound provider dispatch (`COMM-OUT-01`)
+and reconstruction coverage (`REC-01`) remain capability/program work outside
+BASE-03. No additional BASE-03 product-code blocker is identified.
