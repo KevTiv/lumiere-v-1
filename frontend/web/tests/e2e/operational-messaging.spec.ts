@@ -396,13 +396,14 @@ test.describe("Operational messaging", { tag: ["@phase-1", "@operational-messagi
     )
     expect(enumName(rowValue(children[0] ?? {}, "status"))).toBe("draft")
 
-    // The current local fixture has one authenticated actor. This covers lifecycle transitions;
-    // independent-approver enforcement needs a second role/session fixture before it can be E2E-proven.
-    await callRawReducer(page, "review_message_batch", [
-      organizationId,
-      batchId,
-      { approved: true, reason: some("E2E batch approval") },
-    ])
+    const approver = await provisionActor(page, `${marker}-approver`, ["message_batch:approve"])
+    await withActor(browser, approver, (approverPage) =>
+      callRawReducer(approverPage, "review_message_batch", [
+        organizationId,
+        batchId,
+        { approved: true, reason: some("E2E batch approval") },
+      ]),
+    )
 
     await expect
       .poll(async () => {
