@@ -545,7 +545,7 @@ pub fn create_operational_message(
         &channel,
     )?
     .ok_or("Contact cannot receive messages on this channel")?;
-    if recipient.phone_identity_id != params.phone_identity_id {
+    if params.phone_identity_id != 0 && recipient.phone_identity_id != params.phone_identity_id {
         return Err("Selected phone identity is not the current eligible recipient identity".to_string());
     }
     let phone_identity_id = recipient.phone_identity_id;
