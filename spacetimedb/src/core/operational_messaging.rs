@@ -975,13 +975,8 @@ fn validate_message_batch_for_approval(
         {
             return Err("Batch recipient message is outside the approved batch scope".to_string());
         }
-        if !matches!(
-            message.status,
-            OperationalMessageStatus::Draft
-                | OperationalMessageStatus::Queued
-                | OperationalMessageStatus::Copied
-        ) {
-            return Err("Batch recipient message is already in a terminal delivery state".to_string());
+        if message.status != OperationalMessageStatus::Draft {
+            return Err("Batch recipient message is no longer an unapproved draft".to_string());
         }
         if message.rendered_body.trim().is_empty() {
             return Err("Batch recipient has no rendered content to approve".to_string());
