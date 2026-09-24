@@ -19,7 +19,7 @@ Current tip: PR #87 (`codex/base04-money-pilot-envelope`), stacked on PR #86.
 - #84 — canonical CSV-03 slash dates fail closed without explicit format/locale;
 - #85 — canonical CSV-04 SHA-256 statement import identity;
 - #86 — canonical CSV-01 European grouped-decimal parsing;
-- this branch — enforced pilot money envelope and BASE-04 closure.
+- #87 — enforced pilot money envelope and BASE-04 closure.
 
 ## Money boundary decision
 
