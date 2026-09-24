@@ -671,7 +671,15 @@ pub fn test_unknown_product_so_line_fail_closed(ctx: &ReducerContext) -> Result<
     let ghost_product_id = 9_000_041u64;
     let ghost_name = format!("Product {ghost_product_id}");
 
-    let order_id = seed_so(ctx, &fixture, "R1 Ghost PL", 1.0, 10.0, None, 1)?;
+    let order_id = seed_so(
+        ctx,
+        &fixture,
+        "R1 Ghost PL",
+        1.0,
+        10.0,
+        None,
+        fixture.currency_id,
+    )?;
     let lines_before = ctx
         .db
         .sale_order_line()
