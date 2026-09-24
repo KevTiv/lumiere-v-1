@@ -14,6 +14,7 @@ use crate::accounting::journal_entries::{
     account_move, account_move_line, insert_draft_account_move_line,
     is_receivable_or_payable_line_type, AccountMove, AccountMoveLine,
 };
+use crate::accounting::money::validate_pilot_money_amount;
 use crate::accounting::payments::{
     account_payment, insert_balanced_payment_lines_and_post, payment_line_params, AccountPayment,
 };
