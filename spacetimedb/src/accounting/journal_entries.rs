@@ -452,16 +452,21 @@ fn compute_invoice_totals_internal(
     let mut amount_residual = 0.0f64;
 
     for line in lines {
-        if line.tax_line_id.is_some() || line.tax_group_id.is_some() {
-            amount_tax += line.price_total.abs();
-        } else {
-            amount_untaxed += line.price_subtotal.abs();
+        let is_counterpart =
+            is_receivable_or_payable_line_type(line.account_internal_type.as_deref());
+        if is_counterpart {
+            // The AR/AP balance is the invoice face value. Summing every debit and credit would
+            // count the balanced invoice twice and make a wholly unpaid invoice look partially
+            // paid as soon as it is posted.
+            amount_total += line.balance.abs();
+            amount_residual += line.amount_residual.abs();
+            continue;
         }
 
-        amount_total += line.balance.abs();
-        // Open residual is AR/AP only — P&L lines must not inflate invoice residual (A3).
-        if is_receivable_or_payable_line_type(line.account_internal_type.as_deref()) {
-            amount_residual += line.amount_residual.abs();
+        if line.tax_line_id.is_some() || line.tax_group_id.is_some() {
+            amount_tax += line.price_total.abs();
+        } else if !line.exclude_from_invoice_tab {
+            amount_untaxed += line.price_subtotal.abs();
         }
     }
 
