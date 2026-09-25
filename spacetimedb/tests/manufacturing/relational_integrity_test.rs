@@ -7,6 +7,9 @@ use spacetimedb::{ReducerContext, Table};
 
 use crate::core::persistence::{organization_commit, organization_row_change};
 use crate::inventory::product::product;
+use crate::inventory::quality::{
+    create_workorder_quality_check, fail_workorder_quality_check, pass_quality_check, quality_check,
+};
 use crate::inventory::stock::{stock_move, stock_quant};
 use crate::inventory::warehouse::warehouse;
 use crate::manufacturing::bill_of_materials::{
@@ -25,6 +28,48 @@ use crate::manufacturing::work_centers::{
 };
 use crate::test_harness::{ensure_test_superuser, OrgFixture};
 use crate::types::{BomType, MoState, WorkorderState};
+
+pub fn test_workorder_quality_gate(ctx: &ReducerContext) -> Result<(), String> {
+    ensure_test_superuser(ctx)?;
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let center = create_test_workcenter(ctx, &fixture, "COV-07E Workcenter", true)?;
+    let production = create_test_production(ctx, &fixture, "COV-07E-MO")?;
+    confirm_manufacturing_order(ctx, fixture.organization_id, fixture.company_id, production.id)?;
+    start_manufacturing_order(ctx, fixture.organization_id, fixture.company_id, production.id)?;
+    let wo = create_test_workorder(ctx, &fixture, production.id, center.id, "COV-07E Quality")?;
+    start_workorder(ctx, fixture.organization_id, fixture.company_id, wo.id)?;
+    create_workorder_quality_check(ctx, fixture.organization_id, fixture.company_id, wo.id, "Output inspection".to_string())?;
+    let checks: Vec<_> = ctx.db.quality_check().iter().filter(|check| check.workorder_id == Some(wo.id)).collect();
+    if checks.len() != 1 || checks[0].production_id != Some(production.id) {
+        return Err("required check did not link exact workorder and MO".to_string());
+    }
+    let check_id = checks[0].id;
+    if create_workorder_quality_check(ctx, fixture.organization_id, fixture.company_id, wo.id, "Replay".to_string()).is_ok()
+        || finish_workorder(ctx, fixture.organization_id, fixture.company_id, wo.id).is_ok() {
+        return Err("pending check or creation replay escaped gate".to_string());
+    }
+    pass_quality_check(ctx, fixture.organization_id, fixture.company_id, check_id, None, None, None)?;
+    if pass_quality_check(ctx, fixture.organization_id, fixture.company_id, check_id, None, None, None).is_ok() {
+        return Err("quality pass replay succeeded".to_string());
+    }
+    let after_pass = ctx.db.mrp_workorder().id().find(&wo.id).ok_or("workorder missing")?;
+    if after_pass.check_ids != vec![check_id] || after_pass.quality_check_todo || after_pass.quality_check_fail
+        || after_pass.quality_state.as_deref() != Some("pass") {
+        return Err("quality pass projection mismatch".to_string());
+    }
+    finish_workorder(ctx, fixture.organization_id, fixture.company_id, wo.id)?;
+
+    let failed = create_test_workorder(ctx, &fixture, production.id, center.id, "COV-07E Failed")?;
+    start_workorder(ctx, fixture.organization_id, fixture.company_id, failed.id)?;
+    create_workorder_quality_check(ctx, fixture.organization_id, fixture.company_id, failed.id, "Failure inspection".to_string())?;
+    let failed_check = ctx.db.quality_check().iter().find(|check| check.workorder_id == Some(failed.id)).ok_or("failed check missing")?;
+    fail_workorder_quality_check(ctx, fixture.organization_id, fixture.company_id, failed_check.id, "Inspection failed".to_string())?;
+    if finish_workorder(ctx, fixture.organization_id, fixture.company_id, failed.id).is_ok()
+        || fail_workorder_quality_check(ctx, fixture.organization_id, fixture.company_id, failed_check.id, "Replay".to_string()).is_ok() {
+        return Err("failed quality permitted finish or replay".to_string());
+    }
+    Ok(())
+}
 
 fn create_test_workcenter(
     ctx: &ReducerContext,
