@@ -2516,6 +2516,17 @@ pub fn create_stock_move(
     organization_id: u64,
     params: CreateStockMoveParams,
 ) -> Result<(), String> {
+    create_stock_move_internal(ctx, organization_id, params).map(|_| ())
+}
+
+/// Internal stock-move creation owner for reducers that need the exact inserted
+/// row identity in the same transaction. Callers must use this returned row;
+/// rediscovering a just-created move by "latest"/max id is forbidden.
+pub(crate) fn create_stock_move_internal(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    params: CreateStockMoveParams,
+) -> Result<StockMove, String> {
     check_permission(ctx, organization_id, "stock_move", "create")?;
 
     let company_id = company_id_from_scope(ctx, organization_id, params.company_id)?;
@@ -2664,7 +2675,7 @@ pub fn create_stock_move(
         },
     );
 
-    Ok(())
+    Ok(move_record)
 }
 
 #[reducer]
