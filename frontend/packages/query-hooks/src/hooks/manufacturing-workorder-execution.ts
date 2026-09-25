@@ -76,14 +76,14 @@ export interface ProductivityEffectRef extends CanonicalRecordRef {
   readonly workcenterId: string
 }
 
-interface ProductivitySnapshot {
+export interface ProductivitySnapshot {
   readonly workorderTimeIds: readonly string[]
   readonly workorderDuration: number
   readonly workcenterProductivityIds: readonly string[]
   readonly workcenterProductiveTime: number
 }
 
-interface FinishSnapshot {
+export interface FinishSnapshot {
   readonly workorderTimeIds: readonly string[]
   readonly workorderDuration: number
   readonly workcenterCount: number
@@ -448,30 +448,25 @@ export function useLogWorkcenterProductivity(
       }
 
       const beforeRows = await readExecutionRows()
+      const beforeWorkorder = exactRow(
+        beforeRows.workorders,
+        (row) => parseStrictU64(row.id) === workorderId,
+      )
+      const companyId = parseStrictU64(
+        beforeWorkorder?.companyId ?? beforeWorkorder?.company_id,
+      )
+      if (companyId == null || companyId === 0n) {
+        throw new Error("Workorder company scope is invalid")
+      }
       const beforeContext = resolveExecutionContext(
         beforeRows.workorders,
         beforeRows.productions,
         beforeRows.workcenters,
         workorderId,
-        BigInt(
-          parseStrictU64(
-            beforeRows.workorders.find(
-              (row) => parseStrictU64(row.id) === workorderId,
-            )?.companyId ??
-              beforeRows.workorders.find(
-                (row) => parseStrictU64(row.id) === workorderId,
-              )?.company_id,
-          ) ?? 0n,
-        ),
+        companyId,
       )
       if (!beforeContext || beforeContext.workcenterId !== workcenterId) {
         throw new Error("Workorder/workcenter execution context is invalid")
-      }
-      const companyId = parseStrictU64(
-        beforeContext.workorder.companyId ?? beforeContext.workorder.company_id,
-      )
-      if (companyId == null || companyId === 0n) {
-        throw new Error("Workorder company scope is invalid")
       }
 
       const beforeTimeIds = parseIdList(
