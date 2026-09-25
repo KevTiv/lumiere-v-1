@@ -1,7 +1,11 @@
 import { expect, test, type Page } from "@playwright/test"
 import { toCreateBomParams, toCreateMrpProductionParams } from "@lumiere/erp-shared/manufacturing-create-params"
 import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
-import { resolveManufacturingMaterialEffect } from "@lumiere/query-hooks/hooks/manufacturing-material-consumption"
+import {
+  resolveManufacturingMaterialEffect,
+  type ManufacturingBomLineProjection,
+  type ManufacturingStockMoveProjection,
+} from "@lumiere/query-hooks/hooks/manufacturing-material-consumption"
 import { stdbBffCommandPost } from "@lumiere/stdb/commands"
 
 import {
@@ -74,7 +78,7 @@ async function fetchUntrackedProduct(page: Page): Promise<{
   const product = products.find((row) => {
     const id = scalarQueryId(row.id)
     const uomId = scalarQueryId(row.uomId ?? row.uom_id)
-    const tracking = String(row.tracking ?? "").toLowerCase()
+    const tracking = stateTag(row.tracking).toLowerCase()
     const type = String(row.type ?? row.type_ ?? "").toLowerCase()
     return (
       id != null &&
@@ -305,8 +309,8 @@ async function fetchMaterialEffect(
 ) {
   const [orders, bomLines, moves] = await Promise.all([
     queryRows<ManufacturingOrderRow>(page, "mrp-productions"),
-    queryRows(page, "mrp-bom-lines"),
-    queryRows(page, "stock-moves"),
+    queryRows<ManufacturingBomLineProjection>(page, "mrp-bom-lines"),
+    queryRows<ManufacturingStockMoveProjection>(page, "stock-moves"),
   ])
   return resolveManufacturingMaterialEffect(
     orders,
