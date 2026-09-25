@@ -9,9 +9,9 @@ import { useMutation, useQueryClient, type QueryClient } from "@tanstack/react-q
 import { apiFetch, fetchQueryList, rqBigIntKey } from "../http"
 import { invalidateResourceQueries } from "../subscription-query"
 import {
+  AmbiguousOperationEffectError,
   executeOperationWithCanonicalReadback,
   requireResolvedOperationEffect,
-  resolveUniqueEffect,
   type CanonicalRecordRef,
   type ResolvedOperationEffectOutcome,
 } from "./operation-effect"
@@ -125,7 +125,13 @@ function exactRow<Row>(
   rows: readonly Row[],
   matches: (row: Row) => boolean,
 ): Row | null {
-  return resolveUniqueEffect(rows, matches, (row) => row)
+  const matched = rows.filter(matches)
+  if (matched.length > 1) {
+    throw new AmbiguousOperationEffectError(
+      `Expected one canonical row, found ${matched.length}`,
+    )
+  }
+  return matched[0] ?? null
 }
 
 function sameNumber(left: number, right: number): boolean {
