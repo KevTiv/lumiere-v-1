@@ -122,7 +122,12 @@ export function ManufacturingRowDialog({
       })
     }
     if (entity === "workorders") {
-      return manufacturingWorkorderRowActionForm(t, { recordId: id, state })
+      const workcenterId = String(row.workcenterId ?? row.workcenter_id ?? "")
+      return manufacturingWorkorderRowActionForm(t, {
+        recordId: id,
+        state,
+        workcenterId,
+      })
     }
     if (entity === "workcenters") {
       return manufacturingWorkcenterRowActionForm(t, {
