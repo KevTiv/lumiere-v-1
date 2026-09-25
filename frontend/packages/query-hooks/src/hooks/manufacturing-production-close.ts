@@ -98,7 +98,7 @@ export interface ManufacturingFinishedEffectRef extends CanonicalRecordRef {
   readonly destinationQuantId: string
 }
 
-interface DestinationQuantSnapshot {
+export interface DestinationQuantSnapshot {
   readonly id?: bigint
   readonly quantity: number
 }
