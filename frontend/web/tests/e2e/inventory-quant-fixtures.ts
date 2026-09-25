@@ -894,3 +894,43 @@ export async function fetchWarehouseQcLocationId(
     scalarQueryId(row.whQcStockLocId ?? row.wh_qc_stock_loc_id) ?? undefined
   )
 }
+
+/** Mark a serial in use through the Serial numbers tab's row action. */
+export async function useSerialViaUi(page: Page, serialId: number): Promise<void> {
+  await gotoModule(page, "/inventory", "inventory")
+  await selectModuleTab(page, "inventory", "serials")
+  await selectEntityRowById(page, serialId)
+
+  await Promise.all([
+    page.waitForResponse(
+      (response) =>
+        matchesOperationResponse(response, "use_serial") && response.ok(),
+      { timeout: 30_000 },
+    ),
+    page.getByTestId("entity-action-use-serial").click(),
+  ])
+}
+
+/** Block a serial through its detail modal (row click → Block → reason form). */
+export async function blockSerialViaUi(
+  page: Page,
+  serialId: number,
+  reason: string,
+): Promise<void> {
+  await gotoModule(page, "/inventory", "inventory")
+  await selectModuleTab(page, "inventory", "serials")
+  await selectEntityRowById(page, serialId)
+  await page.getByTestId("serial-detail-block-button").click()
+  await expect(page.getByTestId("form-modal-block-serial")).toBeVisible({
+    timeout: 15_000,
+  })
+  await fillField(page, "reason", reason)
+  await Promise.all([
+    page.waitForResponse(
+      (response) =>
+        matchesOperationResponse(response, "block_serial") && response.ok(),
+      { timeout: 30_000 },
+    ),
+    submitForm(page, "block-serial"),
+  ])
+}

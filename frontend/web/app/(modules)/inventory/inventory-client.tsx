@@ -76,6 +76,8 @@ import { useStockQuantWorkflow } from '@lumiere/query-hooks/hooks/stock-quant-wo
 import { useQualityCheckFailWorkflow } from '@lumiere/query-hooks/hooks/quality-check-fail-workflow';
 import { useReplenishmentExecutionWorkflow } from '@lumiere/query-hooks/hooks/replenishment-execution-workflow';
 import { useSerialReserveWorkflow } from '@lumiere/query-hooks/hooks/serial-reserve-workflow';
+import { useSerialUseWorkflow } from '@lumiere/query-hooks/hooks/serial-use-workflow';
+import { useSerialBlockWorkflow } from '@lumiere/query-hooks/hooks/serial-block-workflow';
 import { planPartialDelivery } from '@lumiere/erp-workflows';
 import { groupBy } from '@/lib/utils';
 import { InventoryOpsPanel } from './inventory-ops-panel';
@@ -157,8 +159,6 @@ import {
   useAddRuleToNomenclature,
   useRemoveRuleFromNomenclature,
   useCreateAdjustmentReason,
-  useUseSerial,
-  useBlockSerial,
   useCreateStockProductionLot,
   useCreateStockProductionSerial,
   useCreateTraceabilityRecord,
@@ -1055,8 +1055,8 @@ function InventoryClientLoaded({
     orgId,
     operatingCompanyId,
   );
-  const useSerial = useUseSerial(orgId, operatingCompanyId);
-  const blockSerial = useBlockSerial(orgId, operatingCompanyId);
+  const useSerial = useSerialUseWorkflow(orgId, workflowSurface);
+  const blockSerial = useSerialBlockWorkflow(orgId, workflowSurface);
   const reserveSerial = useSerialReserveWorkflow(orgId, workflowSurface);
   const createStockProductionLot = useCreateStockProductionLot(
     orgId,
@@ -3127,7 +3127,11 @@ function InventoryClientLoaded({
                   requiresSelection: true,
                   onClick: (rows) => {
                     const id = rows[0]?.id as ScalarId | undefined;
-                    if (id != null) void useSerial.mutateAsync(id);
+                    if (id != null)
+                      void useSerial.markInUse(
+                        { serialId: String(id) },
+                        { navigateToNext: true },
+                      );
                   },
                 },
                 {
@@ -4630,6 +4634,7 @@ function InventoryClientLoaded({
               type="button"
               variant="destructive"
               size="sm"
+              data-testid="serial-detail-block-button"
               onClick={() => {
                 const id = selectedSerialRow.id as ScalarId;
                 setBlockSerialId(id);
@@ -4659,12 +4664,12 @@ function InventoryClientLoaded({
         isPending={isFormMutationPending}
         onSubmit={async (fd) => {
           if (blockSerialId == null) return;
-          await blockSerial.mutateAsync({
-            serialId: blockSerialId,
+          await blockSerial.block({
+            serialId: String(blockSerialId),
             reason:
               fd.reason != null && String(fd.reason).trim() !== ''
                 ? String(fd.reason).trim()
-                : null,
+                : undefined,
           });
           setBlockSerialId(null);
           setSelectedSerialRow(null);

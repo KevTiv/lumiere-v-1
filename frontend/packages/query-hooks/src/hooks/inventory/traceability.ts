@@ -233,40 +233,40 @@ export async function reserveSerialCommand(serialId: ScalarId): Promise<void> {
   }
 }
 
-export function useBlockSerial(organizationId: bigint, _companyId?: bigint) {
-  const qc = useQueryClient();
-  return useMutation<
-    void,
-    Error,
-    { serialId: ScalarId; reason?: string | null }
-  >({
-    mutationFn: async ({ serialId, reason }) => {
-      const { urlPath, init } = stdbBffCommandPost('block_serial', {
-        serialId: toScalarU64(serialId),
-        reason: reason ?? null,
-      });
-      const r = await apiFetch(urlPath, init);
-      if (!r.ok) throw new Error('Failed to block serial');
-    },
-    onSuccess: () => invalidateInventoryQueries(qc, organizationId),
+/** Underlying command for the `inventory.serial.block` workflow (`useSerialBlockWorkflow`). */
+export async function blockSerialCommand(
+  serialId: ScalarId,
+  reason?: string | null,
+): Promise<void> {
+  const { urlPath, init } = stdbBffCommandPost('block_serial', {
+    serialId: toScalarU64(serialId),
+    reason: reason ?? null,
   });
+  const r = await apiFetch(urlPath, init);
+  if (!r.ok) {
+    throw workflowErrorFromResponse(
+      r.status,
+      await r.text().catch(() => ''),
+      'Failed to block serial',
+    );
+  }
 }
 
 // ── Quality Management ───────────────────────────────────────────────────────
 
-
-export function useUseSerial(organizationId: bigint, _companyId?: bigint) {
-  const qc = useQueryClient();
-  return useMutation<void, Error, ScalarId>({
-    mutationFn: async (serialId) => {
-      const { urlPath, init } = stdbBffCommandPost('use_serial', {
-        serialId: toScalarU64(serialId),
-      });
-      const r = await apiFetch(urlPath, init);
-      if (!r.ok) throw new Error('Failed to mark serial in use');
-    },
-    onSuccess: () => invalidateInventoryQueries(qc, organizationId),
+/** Underlying command for the `inventory.serial.use` workflow (`useSerialUseWorkflow`). */
+export async function useSerialCommand(serialId: ScalarId): Promise<void> {
+  const { urlPath, init } = stdbBffCommandPost('use_serial', {
+    serialId: toScalarU64(serialId),
   });
+  const r = await apiFetch(urlPath, init);
+  if (!r.ok) {
+    throw workflowErrorFromResponse(
+      r.status,
+      await r.text().catch(() => ''),
+      'Failed to mark serial in use',
+    );
+  }
 }
 
 export function useCreateTraceabilityRecord(
