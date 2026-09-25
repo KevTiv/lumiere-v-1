@@ -14,14 +14,17 @@ function moActionRadioOptions(t: TFunction, state: string): RadioField["options"
   if (state === "Confirmed" || state === "Planned") {
     o.push({ value: "start", label: t("manufacturing.rowActions.start") })
   }
-  if (state === "Progress" || state === "InProgress" || state === "ToClose") {
+  if (state === "Progress" || state === "InProgress") {
     o.push({ value: "produce", label: t("manufacturing.rowActions.recordOutput") })
     o.push({ value: "consume", label: t("manufacturing.rowActions.consumeMaterials") })
-    o.push({ value: "finish", label: t("manufacturing.rowActions.finish") })
     o.push({
       value: "create_workorder",
       label: t("manufacturing.rowActions.addWorkorder"),
     })
+  }
+  if (state === "ToClose") {
+    o.push({ value: "consume", label: t("manufacturing.rowActions.consumeMaterials") })
+    o.push({ value: "finish", label: t("manufacturing.rowActions.finish") })
   }
   if (state !== "Done" && state !== "Cancelled") {
     o.push({ value: "cancel", label: t("manufacturing.rowActions.cancel") })
