@@ -544,7 +544,12 @@ e2e-smoke-test:
 		echo "[e2e] Running Playwright ($${E2E_SUITE:-full} suite, workers=$$E2E_WORKERS)..."; \
 		pnpm exec playwright install chromium; \
 		PW_ARGS=(--workers "$$E2E_WORKERS"); \
-		if [ "$${E2E_SUITE:-full}" = "p0" ]; then PW_ARGS+=(--grep @p0 --grep-invert @dev-fixture); fi; \
+		if [ "$${E2E_SUITE:-full}" = "p0" ]; then \
+			PW_ARGS+=(--grep @p0); \
+			if [ "$${E2E_REQUIRE_AI:-0}" = "1" ]; then PW_ARGS+=(--grep-invert @dev-fixture); else PW_ARGS+=(--grep-invert "@dev-fixture|@ai-live"); fi; \
+		elif [ "$${E2E_REQUIRE_AI:-0}" != "1" ]; then \
+			PW_ARGS+=(--grep-invert @ai-live); \
+		fi; \
 		PORT="" \
 		PLAYWRIGHT_PORT="$(E2E_WEB_PORT)" \
 		PLAYWRIGHT_BASE_URL="http://127.0.0.1:$(E2E_WEB_PORT)" \
@@ -927,7 +932,12 @@ e2e-smoke:
 		echo "[e2e] Running Playwright ($${E2E_SUITE:-full} suite, workers=$$E2E_WORKERS)..."; \
 		pnpm exec playwright install chromium; \
 		PW_ARGS=(--workers "$$E2E_WORKERS"); \
-		if [ "$${E2E_SUITE:-full}" = "p0" ]; then PW_ARGS+=(--grep @p0 --grep-invert @dev-fixture); fi; \
+		if [ "$${E2E_SUITE:-full}" = "p0" ]; then \
+			PW_ARGS+=(--grep @p0); \
+			if [ "$${E2E_REQUIRE_AI:-0}" = "1" ]; then PW_ARGS+=(--grep-invert @dev-fixture); else PW_ARGS+=(--grep-invert "@dev-fixture|@ai-live"); fi; \
+		elif [ "$${E2E_REQUIRE_AI:-0}" != "1" ]; then \
+			PW_ARGS+=(--grep-invert @ai-live); \
+		fi; \
 		PORT="" \
 		PLAYWRIGHT_PORT="$(E2E_WEB_PORT)" \
 		PLAYWRIGHT_BASE_URL="http://127.0.0.1:$(E2E_WEB_PORT)" \
