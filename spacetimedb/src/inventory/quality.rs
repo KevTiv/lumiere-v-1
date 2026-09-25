@@ -419,7 +419,7 @@ pub fn create_workorder_quality_check(
     if wo.state != crate::types::WorkorderState::Progress {
         return Err("Work order must be in Progress to require quality".to_string());
     }
-    if !wo.check_ids.is_empty() || ctx.db.quality_check().quality_check_by_workorder().filter(&Some(workorder_id)).any(|check| {
+    if !wo.check_ids.is_empty() || ctx.db.quality_check().quality_check_by_workorder().filter(Some(workorder_id)).any(|check| {
         check.organization_id == organization_id
             && check.company_id == company_id
             && check.workorder_id == Some(workorder_id)

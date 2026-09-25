@@ -1522,7 +1522,7 @@ pub fn finish_workorder(
         return Err("Work order must be in Progress state to finish".to_string());
     }
 
-    let linked_checks: Vec<_> = ctx.db.quality_check().quality_check_by_workorder().filter(&Some(workorder_id)).filter(|check| {
+    let linked_checks: Vec<_> = ctx.db.quality_check().quality_check_by_workorder().filter(Some(workorder_id)).filter(|check| {
         check.organization_id == organization_id
             && check.company_id == company_id
             && check.workorder_id == Some(workorder_id)
