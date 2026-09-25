@@ -470,10 +470,17 @@ export function useFinishManufacturingOrder(
           productId,
           destinationLocationId,
         )
+        const producedQty = numeric(before.qtyProduced ?? before.qty_produced)
+        if (producedQty == null) {
+          throw new Error("Completed manufacturing order quantity is invalid")
+        }
         const existing = await readFinishedEffect(
           manufacturingOrderId,
           companyId,
-          currentQuant,
+          {
+            id: currentQuant.id,
+            quantity: currentQuant.quantity - producedQty,
+          },
         )
         if (!existing) {
           throw new Error("Completed manufacturing order has unresolved finished-goods effect")
