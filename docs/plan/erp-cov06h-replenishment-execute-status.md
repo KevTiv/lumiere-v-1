@@ -5,6 +5,8 @@
 **Stacked base:** PR #70 / `codex/cov06g-quality-fail-quarantine`
 **Operator proof:** [`../../frontend/web/tests/e2e/cov06h-replenishment-execute.spec.ts`](../../frontend/web/tests/e2e/cov06h-replenishment-execute.spec.ts)
 
+> **Extended by COV-06m:** this slice's typed workflow only checked purchase orders for its outcome, so a rule that took the internal-transfer path (no vendor configured) would report no outcome at all for a successful execution — a false negative, not just missing coverage. See [`erp-cov06m-replenishment-transfer-demand-status.md`](./erp-cov06m-replenishment-transfer-demand-status.md).
+
 ## Bounded path
 
 ```text
