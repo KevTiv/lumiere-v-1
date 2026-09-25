@@ -105,6 +105,32 @@ Current disposition: `IMPLEMENTED` for COV-07a through COV-07c; runtime acceptan
 Next bounded Manufacturing work is COV-07d: one exact work-order execution path (parent relation → Start → productivity/workcenter effect → Finish → same workorder Done), with stale/replay/deny preservation. Keep quality, scrap/byproducts, and full costing separate.
 
 
+## Maintainability convergence rule
+
+The remaining COV implementation must converge on the codebase's strongest existing patterns rather than add parallel conventions. Treat this as an implementation constraint for every new bounded slice:
+
+- consequential mutations use one canonical operation path: generated command dispatch, exact cache-independent readback, explicit affected resources, and typed unresolved/rejected outcomes; transport acceptance alone is never business success;
+- a workflow that declares canonical observation must fail closed as `outcome_unknown` when that observation itself fails; never silently downgrade failed readback to `applied`;
+- effect identity comes from stable primary keys or owned relations. Do not add newest/highest-row, first-match, global child-scan, or id-delta discovery;
+- decode/normalize transport/query shapes at a shared boundary where practical. New feature code should not introduce fresh `Record<string, unknown>` casts or duplicate camelCase/snake_case projection adapters unless the boundary genuinely cannot express the type yet;
+- domain invariants have one owner. Cross-domain workflows call that owner's operation/helper rather than reproducing its bookkeeping locally;
+- UI action availability may mirror server policy for presentation, but the server remains authoritative. Prefer server/contract-derived action capability as those surfaces become available rather than creating another independent transition map;
+- extract shared infrastructure only after at least two concrete consumers need the same behavior. Do not generalize domain-specific effect verification merely to reduce line count;
+- each bounded slice should remove or leave unchanged local convention count. If it needs a new convention, document why the existing generated-command, operation-effect, workflow, or domain-helper seams cannot own it.
+
+### Agent coordination
+
+Use bounded Luna-style tracks with isolated file ownership. A worker may investigate or implement one concern, but the coordinator reviews every diff and its tests before integration. Do not let parallel agents invent competing abstractions.
+
+For the remaining ERP sequence, assign work in this order:
+
+1. **Correctness seam first** — remove false-success, ambiguous identity, stale retry, and parser/input-normalization defects in the touched workflow.
+2. **Reuse second** — move the repaired path onto an existing shared operation/workflow/domain seam when one already exists.
+3. **Feature breadth third** — only then add the next operator-visible lifecycle step.
+4. **Ratchet** — add focused native/unit/browser evidence so later slices cannot reintroduce the older convention.
+
+COV-07d and later Manufacturing slices must therefore build on COV-07a–c's exact-readback protocol rather than the older raw `apiFetch + response.ok + invalidate` mutation style. Work-order execution should be the next migration point: exact workorder id, parent-MO relation, canonical state/effect observation, stale/replay/deny preservation, and no duplicated stock/workcenter bookkeeping.
+
 ## First implementation convergence
 
 Prioritize closing U4/U5 gaps on CRM/Sales/Purchasing/Accounting before adding new backend breadth, but migrate the reference cross-module action through COV-01 first so module agents inherit a proven outcome/readback pattern.
