@@ -844,3 +844,53 @@ export async function expectCanonicalSerialFocus(
   await expect(table.getByTestId(`entity-row-${serialId}`)).toBeVisible()
   await expect(table.locator('[data-testid^="entity-row-"]')).toHaveCount(1)
 }
+
+/**
+ * Set (or clear, when `locationName` is undefined) a warehouse's QC location
+ * through the Warehouses tab's edit form.
+ */
+export async function setWarehouseQcLocationViaUi(
+  page: Page,
+  warehouseId: number,
+  locationName: string | undefined,
+): Promise<void> {
+  await gotoModule(page, "/inventory", "inventory")
+  await selectModuleTab(page, "inventory", "warehouses")
+  await selectEntityRowById(page, warehouseId)
+  await page.getByTestId("entity-action-edit-warehouse").click()
+  await expect(page.getByTestId("form-modal-edit-warehouse")).toBeVisible({
+    timeout: 15_000,
+  })
+  await chooseSelectOptionByLabel(
+    page,
+    "whQcStockLocId",
+    locationName ?? "Not configured",
+  )
+  await Promise.all([
+    page.waitForResponse(
+      (response) =>
+        matchesOperationResponse(response, "update_warehouse") &&
+        response.ok(),
+      { timeout: 30_000 },
+    ),
+    submitForm(page, "edit-warehouse"),
+  ])
+}
+
+export async function fetchWarehouseQcLocationId(
+  page: Page,
+  warehouseId: number,
+): Promise<number | undefined> {
+  const response = await page.request.get("/api/query/warehouses")
+  if (!response.ok()) return undefined
+  const payload = (await response.json()) as {
+    data?: Array<Record<string, unknown>>
+  }
+  const row = (payload.data ?? []).find(
+    (candidate) => scalarQueryId(candidate.id) === warehouseId,
+  )
+  if (!row) return undefined
+  return (
+    scalarQueryId(row.whQcStockLocId ?? row.wh_qc_stock_loc_id) ?? undefined
+  )
+}
