@@ -17,9 +17,9 @@ use crate::manufacturing::bill_of_materials::{
 };
 use crate::manufacturing::manufacturing_orders::{
     confirm_manufacturing_order, consume_mo_materials, create_manufacturing_order,
-    create_workorder, finish_manufacturing_order, mrp_production, mrp_workorder,
-    produce_manufacturing_order, start_manufacturing_order, start_workorder, finish_workorder, CreateMrpProductionParams,
-    CreateWorkorderParams, MrpProduction, MrpWorkorder,
+    create_workorder, finish_manufacturing_order, finish_workorder, mrp_production, mrp_workorder,
+    produce_manufacturing_order, start_manufacturing_order, start_workorder,
+    CreateMrpProductionParams, CreateWorkorderParams, MrpProduction, MrpWorkorder,
 };
 use crate::manufacturing::work_centers::{
     create_loss_category, create_workcenter, log_workcenter_productivity, mrp_loss_category,
