@@ -27,6 +27,7 @@ pub fn run_all_inventory_tests(ctx: &ReducerContext) -> Result<(), String> {
     run_inventory_lot_validate_test(ctx)?;
     run_inventory_expired_lot_test(ctx)?;
     run_inventory_fefo_test(ctx)?;
+    run_inventory_lot_move_test(ctx)?;
     run_inventory_serial_id_validate_test(ctx)?;
     run_inventory_replenishment_demand_test(ctx)?;
     run_inventory_qc_quarantine_test(ctx)?;
@@ -142,6 +143,11 @@ pub fn run_inventory_expired_lot_test(ctx: &ReducerContext) -> Result<(), String
 #[spacetimedb::reducer]
 pub fn run_inventory_fefo_test(ctx: &ReducerContext) -> Result<(), String> {
     gap_fixes_test::test_fefo_prefers_earlier_expiry(ctx).map_err(|e| format!("fefo: {e}"))
+}
+
+#[spacetimedb::reducer]
+pub fn run_inventory_lot_move_test(ctx: &ReducerContext) -> Result<(), String> {
+    gap_fixes_test::test_lot_tracked_quant_move(ctx).map_err(|e| format!("lot_move: {e}"))
 }
 
 #[spacetimedb::reducer]
