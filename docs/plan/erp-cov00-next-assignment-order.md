@@ -104,6 +104,8 @@ Current disposition: `IMPLEMENTED` for COV-07a through COV-07d; runtime acceptan
 
 Next bounded Manufacturing work is COV-07e: one production/workorder-linked quality gate with exact pass/fail effect, completion gating, and stale/replay/deny preservation. The backend gate and persisted test are implemented on `codex/cov07e-manufacturing-quality-gate`; contract release, UI readback, browser denial/replay, and runtime acceptance remain pending. See [`erp-cov07e-manufacturing-quality-gate-status.md`](./erp-cov07e-manufacturing-quality-gate-status.md). Keep scrap/byproducts and full costing separate.
 
+COV-07f now implements one bounded post-production scrap backend path, stacked on COV-07e. It records exact MO-owned scrap move identity and moves an untracked finished quantity to a designated scrap location; contract/UI and runtime certification remain pending. See [`erp-cov07f-finished-output-scrap-status.md`](./erp-cov07f-finished-output-scrap-status.md). Byproducts, tracked scrap, and full costing remain separate.
+
 
 ## First implementation convergence
 

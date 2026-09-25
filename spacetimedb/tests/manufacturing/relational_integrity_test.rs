@@ -11,14 +11,14 @@ use crate::inventory::quality::{
     create_workorder_quality_check, fail_workorder_quality_check, pass_quality_check, quality_check,
 };
 use crate::inventory::stock::{stock_move, stock_quant};
-use crate::inventory::warehouse::warehouse;
+use crate::inventory::warehouse::{create_stock_location, stock_location, warehouse, CreateStockLocationParams};
 use crate::manufacturing::bill_of_materials::{
     create_bom, mrp_bom, mrp_bom_line, BomLineInput, CreateBomParams, MrpBomLine,
 };
 use crate::manufacturing::manufacturing_orders::{
     confirm_manufacturing_order, consume_mo_materials, create_manufacturing_order,
     create_workorder, finish_manufacturing_order, mrp_production, mrp_workorder,
-    produce_manufacturing_order, start_manufacturing_order, start_workorder, finish_workorder, CreateMrpProductionParams,
+    produce_manufacturing_order, scrap_finished_manufacturing_output, start_manufacturing_order, start_workorder, finish_workorder, CreateMrpProductionParams,
     CreateWorkorderParams, MrpProduction, MrpWorkorder,
 };
 use crate::manufacturing::work_centers::{
@@ -28,6 +28,63 @@ use crate::manufacturing::work_centers::{
 };
 use crate::test_harness::{ensure_test_superuser, OrgFixture};
 use crate::types::{BomType, MoState, WorkorderState};
+
+pub fn test_finished_output_scrap_exact_effect(ctx: &ReducerContext) -> Result<(), String> {
+    ensure_test_superuser(ctx)?;
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let mo = create_test_production(ctx, &fixture, "COV-07F-SCRAP")?;
+    create_stock_location(ctx, fixture.organization_id, CreateStockLocationParams {
+        name: "COV-07F Scrap".to_string(),
+        usage: "inventory".to_string(),
+        location_category: "scrap".to_string(),
+        parent_path: "/".to_string(),
+        child_left: 0, child_right: 0, scrap_location: true, return_location: false,
+        active: true, posx: 0.0, posy: 0.0, posz: 0.0,
+        cyclic_inventory_frequency: 0, location_id: None, complete_name: None,
+        valuation_in_account_id: None, valuation_out_account_id: None,
+        comment: None, barcode: None, last_inventory_date: None, next_inventory_date: None,
+        metadata: None,
+    })?;
+    let scrap_location_id = ctx.db.stock_location().iter()
+        .find(|loc| loc.organization_id == fixture.organization_id && loc.name == "COV-07F Scrap")
+        .ok_or("scrap location missing")?.id;
+    if scrap_finished_manufacturing_output(ctx, fixture.organization_id, fixture.company_id, mo.id, scrap_location_id, 0.25, "one".to_string()).is_ok() {
+        return Err("draft MO permitted scrap".to_string());
+    }
+    confirm_manufacturing_order(ctx, fixture.organization_id, fixture.company_id, mo.id)?;
+    start_manufacturing_order(ctx, fixture.organization_id, fixture.company_id, mo.id)?;
+    produce_manufacturing_order(ctx, fixture.organization_id, fixture.company_id, mo.id, 1.0)?;
+    finish_manufacturing_order(ctx, fixture.organization_id, fixture.company_id, mo.id)?;
+    let source = ctx.db.stock_quant().quant_by_product().filter(&mo.product_id)
+        .find(|q| q.organization_id == fixture.organization_id && q.company_id == fixture.company_id
+            && q.location_id == mo.location_dest_id && q.lot_id.is_none())
+        .ok_or("source quant missing")?;
+    let before = source.quantity;
+    scrap_finished_manufacturing_output(ctx, fixture.organization_id, fixture.company_id, mo.id, scrap_location_id, 0.25, "one".to_string())?;
+    let effects: Vec<_> = ctx.db.stock_move().iter()
+        .filter(|mv| mv.production_id == Some(mo.id) && mv.scrapped).collect();
+    if effects.len() != 1 || !effects[0].is_done || effects[0].state != "done"
+        || (effects[0].quantity_done - 0.25).abs() > 1e-9
+        || effects[0].location_id != mo.location_dest_id
+        || effects[0].location_dest_id != scrap_location_id {
+        return Err("scrap move did not converge to one exact MO-owned effect".to_string());
+    }
+    let source_after = ctx.db.stock_quant().id().find(&source.id).ok_or("source quant missing after scrap")?;
+    let dest: Vec<_> = ctx.db.stock_quant().quant_by_product().filter(&mo.product_id)
+        .filter(|q| q.organization_id == fixture.organization_id && q.company_id == fixture.company_id && q.location_id == scrap_location_id).collect();
+    if (source_after.quantity - (before - 0.25)).abs() > 1e-9 || dest.len() != 1
+        || (dest[0].quantity - 0.25).abs() > 1e-9 {
+        return Err("scrap quants did not converge exactly".to_string());
+    }
+    if scrap_finished_manufacturing_output(ctx, fixture.organization_id, fixture.company_id, mo.id, scrap_location_id, 0.25, "one".to_string()).is_ok()
+        || scrap_finished_manufacturing_output(ctx, fixture.organization_id, fixture.company_id, mo.id, scrap_location_id, 0.8, "two".to_string()).is_ok() {
+        return Err("scrap replay or over-production scrap was accepted".to_string());
+    }
+    if ctx.db.stock_move().iter().filter(|mv| mv.production_id == Some(mo.id) && mv.scrapped).count() != 1 {
+        return Err("rejected scrap changed the effect set".to_string());
+    }
+    Ok(())
+}
 
 pub fn test_workorder_quality_gate(ctx: &ReducerContext) -> Result<(), String> {
     ensure_test_superuser(ctx)?;
