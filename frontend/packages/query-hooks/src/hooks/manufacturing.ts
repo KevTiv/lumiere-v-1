@@ -8,6 +8,7 @@ import { apiFetch, fetchQueryList, rqBigIntKey } from "../http"
 import { withCompanyScope } from "@lumiere/erp-shared/org-scoped"
 import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
 import { useConfirmManufacturingOrder } from "./manufacturing-order-confirmation"
+import { useConsumeMoMaterials, useStartManufacturingOrder } from "./manufacturing-material-consumption"
 import type {
   CreateBomParams,
   CreateMrpProductionParams,
@@ -178,22 +179,6 @@ export function useCreateWorkcenter(organizationId: bigint, companyId?: bigint) 
   })
 }
 
-export function useStartManufacturingOrder(organizationId: bigint, companyId: bigint) {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: async (productionId: string | number | bigint) => {
-      if (!companyId) throw new Error("Active company required")
-      const { urlPath, init } = stdbBffCommandPost("start_manufacturing_order", { companyId: companyId, moId: productionId })
-      const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error('Failed to start manufacturing order')
-    },
-    onSuccess: () => {
-      invalidateMrpProductions(qc, organizationId)
-      invalidateMrpWorkorders(qc, organizationId)
-    },
-  })
-}
-
 export function useFinishManufacturingOrder(organizationId: bigint, companyId: bigint) {
   const qc = useQueryClient()
   return useMutation({
@@ -326,23 +311,6 @@ export function useProduceManufacturingOrder(organizationId: bigint, companyId: 
     onSuccess: () => {
       invalidateMrpProductions(qc, organizationId)
       // Producing posts stock moves — refresh quants.
-      void qc.invalidateQueries({ queryKey: ['stock-quants', rqBigIntKey(organizationId)] })
-    },
-  })
-}
-
-export function useConsumeMoMaterials(organizationId: bigint, companyId: bigint) {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: async (moId: string | number | bigint) => {
-      if (!companyId) throw new Error("Active company required")
-      const { urlPath, init } = stdbBffCommandPost("consume_mo_materials", { companyId: companyId, moId: moId })
-      const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error(await parseCallError(r))
-    },
-    onSuccess: () => {
-      invalidateMrpProductions(qc, organizationId)
-      // Consumption moves material stock — refresh quants.
       void qc.invalidateQueries({ queryKey: ['stock-quants', rqBigIntKey(organizationId)] })
     },
   })
@@ -601,6 +569,7 @@ export function useManufacturingMutations(organizationId: bigint, companyId: big
 export type ManufacturingMutations = ReturnType<typeof useManufacturingMutations>
 
 export { useConfirmManufacturingOrder }
+export { useConsumeMoMaterials, useStartManufacturingOrder }
 
 // ── Types (re-exported so client components import from one place) ────────────
 export type {
