@@ -11,14 +11,14 @@ import type {
   AccountTaxQueryRow,
 } from "@lumiere/stdb/resource-reads"
 import { createStdbSdk } from "@lumiere/stdb/sdk"
-import { apiFetch } from "../../http"
+import { apiFetch, fetchQueryList } from "../../http"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import {
   paymentParamsToJson,
   type ClearablePatch,
 } from "@lumiere/erp-shared/accounting-create-params"
 import { stdbParamsToJson, encodeOptionalU64 } from "@lumiere/erp-shared/stdb-params-json"
-import { scalarToU64 as toScalarU64 } from "@lumiere/erp-shared/u64"
+import { parseStrictU64, scalarToU64 as toScalarU64 } from "@lumiere/erp-shared/u64"
 import type {
   AccountFiscalYear,
   AccountPeriod,
@@ -64,6 +64,40 @@ import {
 import { stdbInvalidationFor } from "@lumiere/contracts/stdb-reducer-invalidation"
 
 import { responseErrorMessage as parseCallError } from "@lumiere/api-client/response-error"
+import { AmbiguousOperationEffectError, type CanonicalRecordRef } from "../operation-effect"
+
+export interface ClosedPeriodProjection {
+  readonly id?: unknown
+  readonly organizationId?: unknown
+  readonly organization_id?: unknown
+  readonly companyId?: unknown
+  readonly company_id?: unknown
+  readonly state?: unknown
+}
+
+function periodState(value: unknown): string {
+  if (typeof value === "string") return value.toLowerCase()
+  if (value && typeof value === "object" && !Array.isArray(value) && "tag" in value) {
+    return String((value as { tag?: unknown }).tag ?? "").toLowerCase()
+  }
+  return ""
+}
+
+export function resolveClosedPeriodEffect(
+  rows: readonly ClosedPeriodProjection[],
+  organizationId: bigint,
+  companyId: bigint,
+  periodId: bigint,
+): CanonicalRecordRef | null {
+  const matches = rows.filter((row) => parseStrictU64(row.id) === periodId)
+  if (matches.length > 1) throw new AmbiguousOperationEffectError(`Expected one account period, found ${matches.length}`)
+  const row = matches[0]
+  if (!row
+    || parseStrictU64(row.organizationId ?? row.organization_id) !== organizationId
+    || parseStrictU64(row.companyId ?? row.company_id) !== companyId
+    || periodState(row.state) !== "closed") return null
+  return { resource: "account-periods", id: periodId.toString() }
+}
 export function useAccountFiscalYears(
   organizationId: bigint,
   options?: { staleTime?: number; enabled?: boolean; initialData?: AccountFiscalYear[] },
@@ -208,6 +242,10 @@ export function useCloseAccountPeriod(organizationId: number, companyId: bigint)
       const { urlPath, init } = stdbBffCommandPost("close_account_period", { companyId: companyId, periodId: periodId })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
+      const rows = await fetchQueryList("/api/query/account-periods", "Failed to read closed period")
+      const effect = resolveClosedPeriodEffect(rows, BigInt(organizationId), companyId, periodId)
+      if (!effect) throw new Error("Closed period did not read back exactly")
+      return effect
     },
     onSuccess: () => invalidateAccountPeriodQueries(qc, organizationId),
   })
