@@ -15,6 +15,9 @@ use crate::inventory::stock::{
     require_product_in_org, stock_picking, stock_quant,
 };
 use crate::inventory::warehouse::warehouse;
+use crate::manufacturing::manufacturing_orders::{
+    mrp_workorder, require_workorder_execution_scope, MrpWorkorder,
+};
 use serde_json;
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -27,6 +30,7 @@ use serde_json;
     index(accessor = quality_check_by_org, btree(columns = [organization_id])),
     index(accessor = quality_check_by_product, btree(columns = [product_id])),
     index(accessor = quality_check_by_picking, btree(columns = [picking_id])),
+    index(accessor = quality_check_by_workorder, btree(columns = [workorder_id])),
     index(accessor = quality_check_by_state, btree(columns = [quality_state]))
 )]
 pub struct QualityCheck {
@@ -397,6 +401,146 @@ pub fn create_quality_check(
     Ok(())
 }
 
+/// Attach one required quality check to an executing, company-owned workorder.
+#[spacetimedb::reducer]
+pub fn create_workorder_quality_check(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    workorder_id: u64,
+    name: String,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "quality_check", "create")?;
+    check_permission(ctx, organization_id, "mrp_workorder", "write")?;
+    if name.trim().is_empty() {
+        return Err("Check name cannot be empty".to_string());
+    }
+    let (wo, mo) = require_workorder_execution_scope(ctx, organization_id, company_id, workorder_id)?;
+    if wo.state != crate::types::WorkorderState::Progress {
+        return Err("Work order must be in Progress to require quality".to_string());
+    }
+    if !wo.check_ids.is_empty() || ctx.db.quality_check().quality_check_by_workorder().filter(&Some(workorder_id)).any(|check| {
+        check.organization_id == organization_id
+            && check.company_id == company_id
+            && check.workorder_id == Some(workorder_id)
+    }) {
+        return Err("Work order already has a quality check".to_string());
+    }
+    let row = ctx.db.quality_check().insert(QualityCheck {
+        id: 0,
+        organization_id,
+        name,
+        title: None,
+        quality_state: "none".to_string(),
+        status: "draft".to_string(),
+        product_id: Some(mo.product_id),
+        product_variant_id: None,
+        picking_id: None,
+        move_line_id: None,
+        lot_id: mo.lot_producing_id,
+        team_id: None,
+        user_id: None,
+        company_id,
+        warning_message: None,
+        alert_message: None,
+        note: None,
+        is_failed: false,
+        failure_location_id: None,
+        control_point_id: None,
+        workorder_id: Some(workorder_id),
+        production_id: Some(mo.id),
+        qty_tested: mo.product_qty,
+        qty_failed: 0.0,
+        measure: None,
+        measure_success: None,
+        norm_unit: None,
+        tolerance_min: None,
+        tolerance_max: None,
+        picture: None,
+        picture_fail: None,
+        component_id: None,
+        operation_id: wo.operation_id,
+        test_type: "pass_fail".to_string(),
+        feedback: None,
+        is_late: false,
+        check_date: None,
+        create_date: ctx.timestamp,
+        write_date: ctx.timestamp,
+        metadata: None,
+    });
+    ctx.db.mrp_workorder().id().update(MrpWorkorder {
+        check_ids: vec![row.id],
+        quality_check_todo: true,
+        quality_state: Some("none".to_string()),
+        write_date: ctx.timestamp,
+        ..wo
+    });
+    write_audit_log_v2(ctx, organization_id, AuditLogParams {
+        company_id: Some(company_id), table_name: "quality_check", record_id: row.id,
+        action: "CREATE", old_values: None,
+        new_values: Some(serde_json::json!({"workorder_id": workorder_id, "production_id": mo.id}).to_string()),
+        changed_fields: vec!["workorder_id".to_string(), "production_id".to_string()], metadata: None,
+    });
+    Ok(())
+}
+
+fn sync_workorder_quality(ctx: &ReducerContext, check: &QualityCheck, state: &str) -> Result<(), String> {
+    let Some(workorder_id) = check.workorder_id else { return Ok(()); };
+    let (wo, mo) = require_workorder_execution_scope(ctx, check.organization_id, check.company_id, workorder_id)?;
+    if wo.state != crate::types::WorkorderState::Progress {
+        return Err("Work order must be in Progress for quality disposition".to_string());
+    }
+    if check.production_id != Some(mo.id) || !wo.check_ids.contains(&check.id) {
+        return Err("Quality check does not match workorder ownership".to_string());
+    }
+    ctx.db.mrp_workorder().id().update(MrpWorkorder {
+        quality_check_todo: false,
+        quality_check_fail: state == "fail",
+        quality_state: Some(state.to_string()),
+        write_date: ctx.timestamp,
+        ..wo
+    });
+    Ok(())
+}
+
+/// Record an in-process manufacturing failure without moving unproduced stock.
+#[spacetimedb::reducer]
+pub fn fail_workorder_quality_check(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    check_id: u64,
+    note: String,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "quality_check", "write")?;
+    let check = ctx.db.quality_check().id().find(&check_id).ok_or("Quality check not found")?;
+    if check.organization_id != organization_id || check.company_id != company_id {
+        return Err("Quality check does not belong to this company".to_string());
+    }
+    if check.workorder_id.is_none() || check.production_id.is_none() {
+        return Err("Quality check is not linked to manufacturing".to_string());
+    }
+    if check.status == "completed" {
+        return Err("Check is already completed".to_string());
+    }
+    if note.trim().is_empty() {
+        return Err("Failure note is required".to_string());
+    }
+    sync_workorder_quality(ctx, &check, "fail")?;
+    ctx.db.quality_check().id().update(QualityCheck {
+        quality_state: "fail".to_string(), status: "completed".to_string(),
+        is_failed: true, note: Some(note), check_date: Some(ctx.timestamp),
+        write_date: ctx.timestamp, ..check
+    });
+    write_audit_log_v2(ctx, organization_id, AuditLogParams {
+        company_id: Some(company_id), table_name: "quality_check", record_id: check_id,
+        action: "UPDATE", old_values: None,
+        new_values: Some(serde_json::json!({"quality_state": "fail", "status": "completed"}).to_string()),
+        changed_fields: vec!["quality_state".to_string(), "status".to_string()], metadata: None,
+    });
+    Ok(())
+}
+
 #[spacetimedb::reducer]
 pub fn start_quality_check(
     ctx: &ReducerContext,
@@ -494,6 +638,8 @@ pub fn pass_quality_check(
         "pass".to_string()
     };
 
+    sync_workorder_quality(ctx, &record, &new_quality_state)?;
+
     ctx.db.quality_check().id().update(QualityCheck {
         quality_state: new_quality_state.clone(),
         status: "completed".to_string(),
@@ -566,6 +712,10 @@ pub fn fail_quality_check(
         return Err("Check is already completed".to_string());
     }
 
+    if record.workorder_id.is_some() {
+        return Err("Use fail_workorder_quality_check for in-process manufacturing".to_string());
+    }
+
     if qty_failed <= 0.0 {
         return Err("qty_failed must be positive to quarantine stock".to_string());
     }
@@ -601,6 +751,8 @@ pub fn fail_quality_check(
         resolved_qc_location,
         qty_failed,
     )?;
+
+    sync_workorder_quality(ctx, &record, "fail")?;
 
     ctx.db.quality_check().id().update(QualityCheck {
         quality_state: "fail".to_string(),

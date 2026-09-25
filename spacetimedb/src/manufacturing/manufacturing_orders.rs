@@ -10,6 +10,7 @@ use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Times
 use crate::core::organization::{company_id_from_scope, require_company_in_organization};
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 use crate::inventory::product::product;
+use crate::inventory::quality::quality_check;
 use crate::inventory::stock::{
     create_stock_move, create_stock_move_internal, done_stock_move, stock_move, stock_quant,
     CreateStockMoveParams, DoneStockMoveParams, StockMove, StockQuant,
@@ -956,6 +957,18 @@ pub fn finish_manufacturing_order(
         return Err("Manufacturing order already owns a finished-goods move".to_string());
     }
 
+    let workorders: Vec<_> = ctx.db.mrp_workorder().mrp_workorder_by_production().filter(&mo.id).collect();
+    let mut authoritative_ids: Vec<_> = workorders.iter().map(|wo| wo.id).collect();
+    authoritative_ids.sort_unstable();
+    let mut owned_ids = mo.workorder_ids.clone();
+    owned_ids.sort_unstable();
+    if authoritative_ids != owned_ids || workorders.iter().any(|wo| {
+        wo.organization_id != organization_id || wo.company_id != company_id
+            || wo.state != WorkorderState::Done || wo.quality_check_todo || wo.quality_check_fail
+    }) {
+        return Err("Manufacturing order has unfinished or quality-blocked workorders".to_string());
+    }
+
     if let Some(bom_id) = mo.bom_id {
         let bom_line_count = ctx
             .db
@@ -1509,6 +1522,28 @@ pub fn finish_workorder(
         return Err("Work order must be in Progress state to finish".to_string());
     }
 
+    let linked_checks: Vec<_> = ctx.db.quality_check().quality_check_by_workorder().filter(&Some(workorder_id)).filter(|check| {
+        check.organization_id == organization_id
+            && check.company_id == company_id
+            && check.workorder_id == Some(workorder_id)
+    }).collect();
+    let mut linked_ids: Vec<_> = linked_checks.iter().map(|check| check.id).collect();
+    linked_ids.sort_unstable();
+    let mut owned_ids = wo.check_ids.clone();
+    owned_ids.sort_unstable();
+    if linked_ids != owned_ids {
+        return Err("Work order quality relation is inconsistent".to_string());
+    }
+    if linked_checks.iter().any(|check| {
+        check.production_id != Some(wo.production_id)
+            || check.product_id != Some(wo.product_id)
+            || check.status != "completed"
+            || check.quality_state != "pass"
+            || check.is_failed
+    }) || wo.quality_check_todo || wo.quality_check_fail {
+        return Err("Work order requires passing quality checks before finish".to_string());
+    }
+
     let productivity_rows: Vec<_> = ctx
         .db
         .mrp_workcenter_productivity()
@@ -1596,4 +1631,3 @@ pub fn finish_workorder(
     log::info!("Work order finished: id={}", workorder_id);
     Ok(())
 }
-
