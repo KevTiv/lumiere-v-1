@@ -282,22 +282,38 @@ fn upsert_stock_quant(
     product_id: u64,
     location_id: u64,
     qty_delta: f64,
-) -> Result<(), String> {
-    if let Some(existing) = ctx.db.stock_quant().iter().find(|q| {
-        q.organization_id == organization_id
-            && q.company_id == company_id
-            && q.product_id == product_id
-            && q.location_id == location_id
-            && q.lot_id.is_none()
-            && q.package_id.is_none()
-            && q.owner_id.is_none()
-    }) {
+) -> Result<StockQuant, String> {
+    let matches: Vec<_> = ctx
+        .db
+        .stock_quant()
+        .iter()
+        .filter(|q| {
+            q.organization_id == organization_id
+                && q.company_id == company_id
+                && q.product_id == product_id
+                && q.location_id == location_id
+                && q.lot_id.is_none()
+                && q.package_id.is_none()
+                && q.owner_id.is_none()
+        })
+        .collect();
+
+    if matches.len() > 1 {
+        return Err(format!(
+            "Ambiguous stock quant identity for product {} at location {}: found {} rows",
+            product_id,
+            location_id,
+            matches.len()
+        ));
+    }
+
+    if let Some(existing) = matches.into_iter().next() {
         let new_quantity = existing.quantity + qty_delta;
         let new_available = new_quantity - existing.reserved_quantity;
         let new_value = new_quantity * existing.cost;
         let inventory_diff_quantity = existing.available_quantity - new_available;
 
-        ctx.db.stock_quant().id().update(StockQuant {
+        let updated = StockQuant {
             quantity: new_quantity,
             available_quantity: new_available,
             value: new_value,
@@ -306,8 +322,9 @@ fn upsert_stock_quant(
             user_id: Some(ctx.sender()),
             inventory_date: Some(ctx.timestamp),
             ..existing
-        });
-        return Ok(());
+        };
+        ctx.db.stock_quant().id().update(updated.clone());
+        return Ok(updated);
     }
 
     let product = ctx
@@ -321,7 +338,7 @@ fn upsert_stock_quant(
     let quantity = qty_delta;
     let value = quantity * cost;
 
-    ctx.db.stock_quant().insert(StockQuant {
+    Ok(ctx.db.stock_quant().insert(StockQuant {
         id: 0,
         organization_id,
         product_id,
@@ -348,9 +365,7 @@ fn upsert_stock_quant(
         currency_id: Some(product.currency_id),
         accounting_entry_ids: Vec::new(),
         metadata: None,
-    });
-
-    Ok(())
+    }))
 }
 
 // ============================================================================
