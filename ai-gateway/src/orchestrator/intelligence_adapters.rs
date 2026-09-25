@@ -33,7 +33,10 @@ use super::intelligence::{
     PROPOSAL_KIND_PROGRAM_PATCH,
 };
 use super::model_configuration::ModelProfile;
-use crate::providers::llm::{LlmCompletion, LlmMessage, LlmRequest, ToolCallRequest, ToolSpec};
+use crate::providers::llm::{
+    normalize_provider, CompletionTermination, LlmCompletion, LlmMessage, LlmRequest, LlmResponse,
+    ThinkingMode, ToolCallRequest, ToolSpec,
+};
 
 const DECISION_TOOL: &str = "submit_decision";
 const TOOL_UNABLE_TO_PROGRESS: &str = "report_unable_to_progress";
@@ -96,9 +99,11 @@ impl DecisionProvider for LlmDecisionAdapter<'_> {
             top_p: self.top_p,
             tools: vec![tool],
             single_shot_tool: true,
+            thinking: ThinkingMode::Disabled,
         };
 
         let response = self.transport.complete(llm_request).await?;
+        ensure_complete_response(&response, "decision")?;
         let call = single_call(&response.tool_calls, DECISION_TOOL)?;
         let args = object_arguments(call)?;
 
@@ -287,8 +292,10 @@ impl GenerationProvider for LlmGenerationAdapter<'_> {
             top_p: self.top_p,
             tools: Vec::new(),
             single_shot_tool: false,
+            thinking: ThinkingMode::ProviderDefault,
         };
         let response = self.transport.complete(llm_request).await?;
+        ensure_complete_response(&response, "generation")?;
         if !response.tool_calls.is_empty() {
             bail!("generation response must not include tool calls");
         }
@@ -360,9 +367,15 @@ impl ReasoningProvider for AgentLoopReasoner<'_> {
             top_p: self.top_p,
             tools,
             single_shot_tool: true,
+            thinking: if normalize_provider(&self.provider) == "ollama" {
+                ThinkingMode::Enabled
+            } else {
+                ThinkingMode::ProviderDefault
+            },
         };
 
-        let response = self.transport.complete(llm_request).await?;
+        let response =
+            complete_reasoning_with_bounded_fallback(self.transport, llm_request).await?;
         if response.tool_calls.len() != 1 {
             bail!(
                 "reasoning response must contain exactly one tool call, got {}",
@@ -421,6 +434,45 @@ impl ReasoningProvider for AgentLoopReasoner<'_> {
             .validate_against(&request)
             .context("provider returned a malformed or unadmitted reasoning outcome")?;
         Ok(outcome)
+    }
+}
+
+/// Ollama currently applies one generation ceiling to thinking and final
+/// content. If a thinking channel consumes that ceiling before any structured
+/// outcome exists, one explicit non-thinking call is allowed. When the
+/// transport is `SpendAdmittedLlm`, this second call necessarily receives its
+/// own reservation and durable provider attempt. No other failure is retried
+/// here, and the provider router remains responsible for configured retries.
+async fn complete_reasoning_with_bounded_fallback(
+    transport: &dyn LlmCompletion,
+    mut request: LlmRequest,
+) -> Result<LlmResponse> {
+    let response = transport.complete(request.clone()).await?;
+    if response.thinking_exhausted_before_content() && request.thinking == ThinkingMode::Enabled {
+        request.thinking = ThinkingMode::Disabled;
+        let fallback = transport.complete(request).await?;
+        ensure_complete_response(&fallback, "reasoning fallback")?;
+        return Ok(fallback);
+    }
+    ensure_complete_response(&response, "reasoning")?;
+    Ok(response)
+}
+
+fn ensure_complete_response(response: &LlmResponse, kind: &str) -> Result<()> {
+    match response.termination {
+        CompletionTermination::Length if response.thinking_observed => bail!(
+            "{kind} completion exhausted its output budget in provider thinking before a complete result"
+        ),
+        CompletionTermination::Length => {
+            bail!("{kind} completion exhausted its output budget before a complete result")
+        }
+        CompletionTermination::Filtered => bail!(
+            "{kind} completion was filtered by the provider ({})",
+            response.provider_done_reason.as_deref().unwrap_or("filtered")
+        ),
+        CompletionTermination::Complete
+        | CompletionTermination::ToolCall
+        | CompletionTermination::Unknown => Ok(()),
     }
 }
 
@@ -761,6 +813,7 @@ mod tests {
     struct ScriptedLlm {
         responses: Mutex<Vec<Result<LlmResponse, String>>>,
         last_request: Mutex<Option<LlmRequest>>,
+        requests: Mutex<Vec<LlmRequest>>,
     }
 
     impl ScriptedLlm {
@@ -768,14 +821,20 @@ mod tests {
             Self {
                 responses: Mutex::new(responses.into_iter().map(Ok).rev().collect()),
                 last_request: Mutex::new(None),
+                requests: Mutex::new(Vec::new()),
             }
+        }
+
+        fn requests(&self) -> Vec<LlmRequest> {
+            self.requests.lock().unwrap().clone()
         }
     }
 
     #[async_trait]
     impl LlmCompletion for ScriptedLlm {
         async fn complete(&self, req: LlmRequest) -> Result<LlmResponse> {
-            *self.last_request.lock().unwrap() = Some(req);
+            *self.last_request.lock().unwrap() = Some(req.clone());
+            self.requests.lock().unwrap().push(req);
             match self.responses.lock().unwrap().pop() {
                 Some(Ok(response)) => Ok(response),
                 Some(Err(message)) => Err(anyhow::anyhow!(message)),
@@ -792,6 +851,9 @@ mod tests {
             model: "mistral-large-latest".to_string(),
             provider: "mistral".to_string(),
             tool_calls: Vec::new(),
+            termination: CompletionTermination::Complete,
+            provider_done_reason: Some("stop".to_string()),
+            thinking_observed: false,
         }
     }
 
@@ -1115,6 +1177,121 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn ollama_reasoner_retries_thinking_starvation_once_without_thinking() {
+        let mut exhausted = base_response();
+        exhausted.provider = "ollama".to_string();
+        exhausted.model = "gemma4:e2b-mlx".to_string();
+        exhausted.termination = CompletionTermination::Length;
+        exhausted.provider_done_reason = Some("length".to_string());
+        exhausted.thinking_observed = true;
+        exhausted.output_tokens = 1024;
+
+        let mut completed = base_response();
+        completed.provider = "ollama".to_string();
+        completed.model = "gemma4:e2b-mlx".to_string();
+        completed.tool_calls = vec![tool_call(
+            TOOL_PROPOSE_CAPABILITY,
+            json!({"capability": "erp.search", "arguments": {"q": "PO-42"}}),
+        )];
+        let transport = ScriptedLlm::new(vec![exhausted, completed]);
+        let reasoner = AgentLoopReasoner::new(
+            &transport,
+            "ollama".to_string(),
+            "gemma4:e2b-mlx".to_string(),
+        );
+
+        let outcome = reasoner
+            .reason(reasoning_request(vec![PROPOSAL_KIND_CAPABILITY]))
+            .await
+            .unwrap();
+
+        assert!(matches!(outcome, ReasoningOutcome::CapabilityProposal(_)));
+        let requests = transport.requests();
+        assert_eq!(requests.len(), 2);
+        assert_eq!(requests[0].thinking, ThinkingMode::Enabled);
+        assert_eq!(requests[1].thinking, ThinkingMode::Disabled);
+        assert_eq!(requests[0].tools.len(), 2);
+        assert_eq!(requests[1].tools.len(), 2);
+    }
+
+    #[tokio::test]
+    async fn ollama_reasoner_does_not_retry_malformed_structured_output() {
+        let mut malformed = base_response();
+        malformed.provider = "ollama".to_string();
+        malformed.model = "gemma4:e2b-mlx".to_string();
+        let mut call = tool_call(TOOL_PROPOSE_CAPABILITY, Value::Null);
+        call.arguments_error = Some("invalid multi-outcome envelope".to_string());
+        malformed.tool_calls = vec![call];
+        let transport = ScriptedLlm::new(vec![malformed]);
+        let reasoner = AgentLoopReasoner::new(
+            &transport,
+            "ollama".to_string(),
+            "gemma4:e2b-mlx".to_string(),
+        );
+
+        let error = reasoner
+            .reason(reasoning_request(vec![PROPOSAL_KIND_CAPABILITY]))
+            .await
+            .unwrap_err();
+
+        assert!(error.to_string().contains("malformed arguments"));
+        assert_eq!(transport.requests().len(), 1);
+    }
+
+    #[tokio::test]
+    async fn ollama_reasoner_stops_after_one_exhausted_fallback() {
+        let exhausted = || {
+            let mut response = base_response();
+            response.provider = "ollama".to_string();
+            response.model = "gemma4:e2b-mlx".to_string();
+            response.termination = CompletionTermination::Length;
+            response.provider_done_reason = Some("length".to_string());
+            response.thinking_observed = true;
+            response
+        };
+        let transport = ScriptedLlm::new(vec![exhausted(), exhausted()]);
+        let reasoner = AgentLoopReasoner::new(
+            &transport,
+            "ollama".to_string(),
+            "gemma4:e2b-mlx".to_string(),
+        );
+
+        let error = reasoner
+            .reason(reasoning_request(vec![PROPOSAL_KIND_CAPABILITY]))
+            .await
+            .unwrap_err();
+
+        assert!(error
+            .to_string()
+            .contains("reasoning fallback completion exhausted"));
+        assert_eq!(transport.requests().len(), 2);
+    }
+
+    #[tokio::test]
+    async fn ollama_reasoner_fails_closed_when_thinking_control_is_rejected() {
+        let transport = ScriptedLlm {
+            responses: Mutex::new(vec![Err(
+                "Ollama rejected the requested thinking control".to_string()
+            )]),
+            last_request: Mutex::new(None),
+            requests: Mutex::new(Vec::new()),
+        };
+        let reasoner = AgentLoopReasoner::new(
+            &transport,
+            "ollama".to_string(),
+            "gemma4:e2b-mlx".to_string(),
+        );
+
+        let error = reasoner
+            .reason(reasoning_request(vec![PROPOSAL_KIND_CAPABILITY]))
+            .await
+            .unwrap_err();
+
+        assert!(error.to_string().contains("thinking control"));
+        assert_eq!(transport.requests().len(), 1);
+    }
+
+    #[tokio::test]
     async fn generation_adapter_returns_text_content() {
         let mut response = base_response();
         response.text = "Draft summary of the quarter.".to_string();
@@ -1188,6 +1365,7 @@ mod tests {
         let transport = ScriptedLlm {
             responses: Mutex::new(vec![Err("provider timeout".to_string())]),
             last_request: Mutex::new(None),
+            requests: Mutex::new(Vec::new()),
         };
         let adapter = LlmDecisionAdapter::new(
             &transport,
