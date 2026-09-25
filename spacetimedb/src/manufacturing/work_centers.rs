@@ -10,7 +10,7 @@ use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Times
 use crate::core::organization::company_id_from_scope;
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 use crate::manufacturing::relations::{
-    require_workorder_in_company, validate_positive_capacity, validate_positive_duration,
+    validate_positive_capacity, validate_positive_duration,
 };
 use crate::manufacturing::manufacturing_orders::{
     mrp_workorder, require_workorder_execution_scope,
