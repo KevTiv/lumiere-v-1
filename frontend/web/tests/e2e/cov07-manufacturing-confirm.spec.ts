@@ -79,28 +79,23 @@ async function createSetupBomViaUi(page: Page): Promise<BomRow> {
   ])
   expect(response.ok()).toBe(true)
 
-  return expect
+  let createdBom: BomRow | undefined
+  await expect
     .poll(
       async () => {
         const created = (await fetchBomRows(page)).filter((row) => {
           const id = scalarQueryId(row.id)
           return id != null && !before.has(id)
         })
-        return created.length === 1 ? created[0] : undefined
+        createdBom = created.length === 1 ? created[0] : undefined
+        return created.length
       },
       { timeout: 30_000 },
     )
-    .not.toBeUndefined()
-    .then(async () => {
-      const created = (await fetchBomRows(page)).filter((row) => {
-        const id = scalarQueryId(row.id)
-        return id != null && !before.has(id)
-      })
-      if (created.length !== 1) {
-        throw new Error(`expected exactly one setup BOM, found ${created.length}`)
-      }
-      return created[0]!
-    })
+    .toBe(1)
+
+  if (!createdBom) throw new Error("setup BOM disappeared after creation")
+  return createdBom
 }
 
 async function fetchFirstStockPicking(page: Page): Promise<{
@@ -149,15 +144,13 @@ async function fetchFirstStockPicking(page: Page): Promise<{
   return { pickingTypeId, locationSrcId, locationDestId }
 }
 
-async function postTypedCommand(
+async function postPreparedCommand(
   page: Page,
-  reducer: "create_manufacturing_order" | "confirm_manufacturing_order",
-  args: Record<string, unknown>,
+  command: { urlPath: string; init: RequestInit },
 ) {
-  const { urlPath, init } = stdbBffCommandPost(reducer, args)
-  return page.request.post(urlPath, {
+  return page.request.post(command.urlPath, {
     headers: { "Content-Type": "application/json" },
-    data: JSON.parse(String(init.body)),
+    data: JSON.parse(String(command.init.body)),
   })
 }
 
@@ -237,12 +230,11 @@ test.describe(
         metadata: undefined,
       }
 
-      const createResponse = await postTypedCommand(
+      const createResponse = await postPreparedCommand(
         page,
-        "create_manufacturing_order",
-        {
+        stdbBffCommandPost("create_manufacturing_order", {
           params: stdbParamsToJson(params, "CreateMrpProductionParams"),
-        },
+        }),
       )
       expect(createResponse.ok()).toBe(true)
 
@@ -338,13 +330,12 @@ test.describe(
             bomId,
           })
 
-        const stale = await postTypedCommand(
+        const stale = await postPreparedCommand(
           warehousePage,
-          "confirm_manufacturing_order",
-          {
+          stdbBffCommandPost("confirm_manufacturing_order", {
             companyId: BigInt(companyId),
             moId: BigInt(moId),
-          },
+          }),
         )
         expect(stale.status()).toBe(422)
 
@@ -360,13 +351,12 @@ test.describe(
           "fixture.reader@example.test",
           PERSONA_PASSWORD,
         )
-        const denied = await postTypedCommand(
+        const denied = await postPreparedCommand(
           readerPage,
-          "confirm_manufacturing_order",
-          {
+          stdbBffCommandPost("confirm_manufacturing_order", {
             companyId: BigInt(companyId),
             moId: BigInt(moId),
-          },
+          }),
         )
         expect(denied.status()).toBe(403)
 
