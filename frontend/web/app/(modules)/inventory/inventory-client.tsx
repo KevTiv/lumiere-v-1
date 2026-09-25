@@ -74,6 +74,7 @@ import { useWorkflowSurface } from '@/hooks/use-workflow-surface';
 import { usePickingWorkflow } from '@lumiere/query-hooks/hooks/picking-workflow';
 import { useStockQuantWorkflow } from '@lumiere/query-hooks/hooks/stock-quant-workflow';
 import { useQualityCheckFailWorkflow } from '@lumiere/query-hooks/hooks/quality-check-fail-workflow';
+import { useReplenishmentExecutionWorkflow } from '@lumiere/query-hooks/hooks/replenishment-execution-workflow';
 import { planPartialDelivery } from '@lumiere/erp-workflows';
 import { groupBy } from '@/lib/utils';
 import { InventoryOpsPanel } from './inventory-ops-panel';
@@ -192,7 +193,6 @@ import {
   useDeleteQualityAlertReason,
   useAddMemberToQualityTeam,
   useRemoveMemberFromQualityTeam,
-  useExecuteReplenishmentRule,
   useCreateStockQuant,
   useUpdateStockQuantQuantity,
   useUpdateStockProductionLot,
@@ -1128,9 +1128,10 @@ function InventoryClientLoaded({
   const deleteQualityAlertReason = useDeleteQualityAlertReason(orgId);
   const addMemberToQualityTeam = useAddMemberToQualityTeam(orgId);
   const removeMemberFromQualityTeam = useRemoveMemberFromQualityTeam(orgId);
-  const executeReplenishmentRule = useExecuteReplenishmentRule(
+  const executeReplenishmentRule = useReplenishmentExecutionWorkflow(
     orgId,
-    selectedOperatingCompanyId,
+    operatingCompanyId,
+    workflowSurface,
   );
   const createStockQuant = useCreateStockQuant(orgId, {
     companyId: operatingCompanyId ?? undefined,
@@ -3497,10 +3498,13 @@ function InventoryClientLoaded({
                       ) {
                         return;
                       }
-                      void executeReplenishmentRule.mutateAsync({
-                        ruleId: id,
-                        idempotencyKey: globalThis.crypto.randomUUID(),
-                      });
+                      void executeReplenishmentRule.execute(
+                        {
+                          ruleId: String(id),
+                          idempotencyKey: globalThis.crypto.randomUUID(),
+                        },
+                        { navigateToNext: true },
+                      );
                     }
                   },
                 },

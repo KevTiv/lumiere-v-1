@@ -1132,33 +1132,25 @@ export function useCancelWarehouseTask(
 // ── Product Operations ───────────────────────────────────────────────────────
 
 
-export function useExecuteReplenishmentRule(
-  organizationId: bigint,
-  companyId?: bigint | null,
-) {
-  const qc = useQueryClient();
-  return useMutation<void, Error, { ruleId: ScalarId; idempotencyKey: string }>({
-    mutationFn: async ({ ruleId, idempotencyKey }) => {
-      if (companyId == null || companyId <= 0n) {
-        throw new Error('A selected company is required');
-      }
-      const { urlPath, init } = stdbBffCommandPost(
-        'execute_replenishment_rule',
-        {
-          companyId,
-          ruleId: toScalarU64(ruleId),
-          idempotencyKey,
-        },
-      );
-      const r = await apiFetch(urlPath, init);
-      if (!r.ok) throw new Error('Failed to execute replenishment rule');
-    },
-    onSuccess: () => {
-      const orgKey = rqBigIntKey(organizationId);
-      void qc.invalidateQueries({ queryKey: ['replenishment-rules', orgKey] });
-      void qc.invalidateQueries({ queryKey: ['stock-quants', orgKey] });
-    },
+/** Underlying command for the `inventory.replenishment.execute` workflow (`useReplenishmentExecutionWorkflow`). */
+export async function executeReplenishmentRuleCommand(
+  companyId: bigint,
+  ruleId: ScalarId,
+  idempotencyKey: string,
+): Promise<void> {
+  const { urlPath, init } = stdbBffCommandPost('execute_replenishment_rule', {
+    companyId,
+    ruleId: toScalarU64(ruleId),
+    idempotencyKey,
   });
+  const r = await apiFetch(urlPath, init);
+  if (!r.ok) {
+    throw workflowErrorFromResponse(
+      r.status,
+      await r.text().catch(() => ''),
+      'Failed to execute replenishment rule',
+    );
+  }
 }
 
 

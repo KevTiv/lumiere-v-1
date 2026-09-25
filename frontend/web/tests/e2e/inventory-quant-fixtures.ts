@@ -6,6 +6,7 @@ import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
 import { matchesOperationResponse } from "./operation-response"
 import {
   activeTabEntityTable,
+  chooseFirstEnabledOption,
   chooseSelectOptionByLabel,
   fetchFirstUomId,
   fillField,
@@ -663,4 +664,95 @@ export async function expectCanonicalQuantFocus(
   const table = activeTabEntityTable(page)
   await expect(table.getByTestId(`entity-row-${quantId}`)).toBeVisible()
   await expect(table.locator('[data-testid^="entity-row-"]')).toHaveCount(1)
+}
+
+/** Create a product's vendor supplier info directly (fixture setup, not the certified action). */
+export async function createProductSupplierInfoFixture(
+  page: Page,
+  productId: number,
+  partnerId: number,
+  currencyId: number,
+  minQty: number,
+  price: number,
+): Promise<void> {
+  const { urlPath, init } = stdbBffCommandPost("create_product_supplier_info", {
+    params: stdbParamsToJson(
+      {
+        partnerId,
+        productTmplId: null,
+        productId,
+        minQty,
+        price,
+        currencyId,
+        delay: 3,
+        sequence: 1,
+        productName: null,
+        productCode: null,
+        dateStart: null,
+        dateEnd: null,
+      },
+      "CreateProductSupplierInfoParams",
+    ),
+  })
+  const response = await page.request.post(urlPath, {
+    headers: { "Content-Type": "application/json" },
+    data: JSON.parse(String(init.body)),
+  })
+  expect(response.ok()).toBe(true)
+}
+
+/** Create a replenishment rule through the Replenishment tab's create form. */
+export async function createReplenishmentRuleViaUi(
+  page: Page,
+  productName: string,
+  locationName: string,
+  minQty: string,
+  maxQty: string,
+): Promise<void> {
+  await openEntityCreate(
+    page,
+    "/inventory",
+    "inventory",
+    "replenishment",
+    "new-replenishment-rule",
+  )
+  await page.getByTestId("form-field-productId").click()
+  await page.getByRole("option", { name: productName }).click()
+  await chooseSelectOptionByLabel(page, "locationId", locationName)
+  await chooseFirstEnabledOption(page, "uomId")
+  await fillField(page, "minQty", minQty)
+  await fillField(page, "maxQty", maxQty)
+  await Promise.all([
+    page.waitForResponse(
+      (response) =>
+        matchesOperationResponse(response, "create_replenishment_rule") &&
+        response.ok(),
+      { timeout: 30_000 },
+    ),
+    submitForm(page, "new-replenishment-rule"),
+  ])
+}
+
+/** Execute a replenishment rule through its row action, accepting the confirm dialog. */
+export async function executeReplenishmentRuleViaUi(
+  page: Page,
+  ruleId: number,
+): Promise<void> {
+  await gotoModule(page, "/inventory", "inventory")
+  await selectModuleTab(page, "inventory", "replenishment")
+  await selectEntityRowById(page, ruleId)
+
+  page.once("dialog", (dialog) => {
+    void dialog.accept()
+  })
+
+  await Promise.all([
+    page.waitForResponse(
+      (response) =>
+        matchesOperationResponse(response, "execute_replenishment_rule") &&
+        response.ok(),
+      { timeout: 30_000 },
+    ),
+    page.getByTestId("entity-action-execute-replenishment-rule").click(),
+  ])
 }

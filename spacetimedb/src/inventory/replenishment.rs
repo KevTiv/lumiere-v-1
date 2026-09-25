@@ -301,17 +301,23 @@ fn create_buy_demand(
         },
     )?;
 
-    let order = ctx
-        .db
-        .purchase_order()
-        .iter()
-        .filter(|o| {
-            o.organization_id == organization_id
-                && o.company_id == company_id
-                && o.partner_ref == Some(format!("RPL-{}", rule.id))
-        })
-        .max_by_key(|o| o.id)
+    // Same open-only scope as the dedup check above: a prior done/cancelled PO
+    // sharing this partner_ref must not count against the one just created.
+    let mut matching_orders = ctx.db.purchase_order().iter().filter(|o| {
+        o.organization_id == organization_id
+            && o.company_id == company_id
+            && o.partner_ref == Some(format!("RPL-{}", rule.id))
+            && !matches!(o.state, PoState::Done | PoState::Cancelled)
+    });
+    let order = matching_orders
+        .next()
         .ok_or("Draft PO missing after replenishment create")?;
+    if matching_orders.next().is_some() {
+        return Err(format!(
+            "Multiple purchase orders match replenishment rule {} — cannot identify the created draft",
+            rule.id
+        ));
+    }
 
     add_purchase_order_line(
         ctx,
@@ -441,13 +447,23 @@ fn create_transfer_demand(
         },
     )?;
 
-    let picking = ctx
-        .db
-        .stock_picking()
-        .iter()
-        .filter(|p| p.organization_id == organization_id && p.name == picking_name)
-        .max_by_key(|p| p.id)
+    // Same open-only scope as the dedup check above: a prior done/cancelled
+    // picking sharing this name must not count against the one just created.
+    let mut matching_pickings = ctx.db.stock_picking().iter().filter(|p| {
+        p.organization_id == organization_id
+            && p.name == picking_name
+            && p.state != "done"
+            && p.state != "cancel"
+    });
+    let picking = matching_pickings
+        .next()
         .ok_or("Internal transfer picking missing after replenishment create")?;
+    if matching_pickings.next().is_some() {
+        return Err(format!(
+            "Multiple internal transfer pickings match replenishment rule {} — cannot identify the created one",
+            rule.id
+        ));
+    }
 
     create_stock_move(
         ctx,
