@@ -151,6 +151,21 @@ export async function submitManufacturingRowAction(
       await m.startWo.mutateAsync(woId)
       return
     }
+    if (action === "log_productivity") {
+      const workcenterId = idFrom(values, ["woWorkcenterId"])
+      if (!workcenterId) throw new Error("Work center ID is required")
+      const params = toCreateWorkcenterProductivityParams({
+        logWorkorderId: woId,
+        logDuration: values.woLogDuration,
+        logDescription: values.woLogDescription,
+      })
+      if (!params) throw new Error("Productivity duration is required")
+      await m.logProductivity.mutateAsync({
+        workcenterId,
+        params,
+      })
+      return
+    }
     if (action === "finish") {
       await m.finishWo.mutateAsync(woId)
       return
