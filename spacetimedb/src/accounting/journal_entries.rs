@@ -2818,7 +2818,17 @@ pub fn reconcile_payment_with_invoice(
         return Err("Payment has no receivable/payable lines to reconcile".to_string());
     }
 
+    let invoice_amount: f64 = invoice_lines.iter().map(|l| l.amount_residual.abs()).sum();
     let payment_amount: f64 = payment_lines.iter().map(|l| l.amount_residual.abs()).sum();
+
+    // A settled side cannot apply any value. Reject the stale command before
+    // rewriting matching metadata, move timestamps, sale totals, or audit rows.
+    if invoice_amount <= 0.01 {
+        return Err("Invoice is already reconciled".to_string());
+    }
+    if payment_amount <= 0.01 {
+        return Err("Payment is already fully applied".to_string());
+    }
 
     let mut remaining_payment = payment_amount;
 

@@ -108,6 +108,21 @@ COV-07f now implements one bounded post-production scrap backend path, stacked o
 
 COV-07g now implements authoritative BOM byproducts and exact untracked byproduct output at MO completion, stacked on COV-07f. Contract/UI and runtime certification remain pending. See [`erp-cov07g-bom-byproduct-output-status.md`](./erp-cov07g-bom-byproduct-output-status.md). Tracked byproducts and full accounting valuation remain separate.
 
+### COV-08
+
+Current disposition: `IMPLEMENTED` for COV-08a; runtime acceptance is pending.
+The existing generated reconciliation operation now has exact same-ID workflow
+readback, and the reducer rejects a fully settled invoice/payment replay before
+any move, line, sale-total, timestamp, or audit mutation. The persisted domain
+test snapshots both moves and all affected lines; the browser path adds 422
+stale replay, 403 reader denial, and unchanged-effect proof. Generated contract
+delta is expected to be empty because this slice adds no operation or resource
+shape. See [`erp-cov08a-invoice-payment-reconcile-status.md`](./erp-cov08a-invoice-payment-reconcile-status.md).
+
+Next bounded Finance work is COV-08b: one exact bank-statement reconciliation
+path. The full remaining-stack completion card and ordered COV-08..27 targets
+are recorded in [`erp-cov08-27-stacked-acceptance-plan.md`](./erp-cov08-27-stacked-acceptance-plan.md).
+
 
 ## First implementation convergence
 
