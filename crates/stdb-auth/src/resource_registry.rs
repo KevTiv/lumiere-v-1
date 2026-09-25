@@ -69,4 +69,14 @@ mod tests {
             assert!(entry.mandatory.iter().any(|field| field == "company_id"));
         }
     }
+
+    #[test]
+    fn stock_picking_projection_exposes_purchase_receipt_identity() {
+        let entry = registry_get("stock-pickings").expect("stock pickings must be registered");
+
+        assert!(entry
+            .default_restricted
+            .iter()
+            .any(|field| field == "purchase_id"));
+    }
 }
