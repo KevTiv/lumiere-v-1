@@ -97,6 +97,14 @@ COV-06n gives `ReplenishmentRule.next_run` an actual consumer: a new `Replenishm
 
 COV-06's stock-movement lineage (picking lifecycle, backorder, quant transfer, cycle-count, lot move, serial-tracked picking, quality fail, replenishment buy/transfer demand + scheduler, serial reserve/use/block, warehouse QC location) is now closed for its originally scoped set. Remaining gaps: the "no demand needed" outcome is uncertified (though the workflow already reports it correctly as no-outcome); and the scheduler's own UI (schedule/cancel a rule's auto-run, once `replenishment_run_job` is a registered query resource) is the next natural slice — COV-06o. None of the COV-06h through COV-06n browser proofs or `run_all_inventory_tests` have been run against a live stack yet; that first runtime pass should happen before adding much more to this lineage.
 
+
+### COV-07
+
+Current disposition: `IMPLEMENTED` for COV-07a; runtime acceptance is pending. The first Manufacturing slice keeps the existing row-action UI but moves Draft → Confirmed onto exact canonical readback of the same company-scoped MO id. The focused browser proof starts from a BOM-backed Draft order, drives Confirm as the warehouse persona, requires the same MO id and BOM link after convergence, rejects a stale direct replay, and denies the limited reader without changing canonical state. No component moves, work orders, production output, quality, costing, or close effects are claimed by this slice; `confirm_manufacturing_order` does not create them. See [`erp-cov07a-mo-confirmation-status.md`](./erp-cov07a-mo-confirmation-status.md).
+
+Next bounded Manufacturing work is COV-07b: Confirmed → Progress plus BOM material consumption, with exact `move_raw_ids` ownership, exact stock-move product/quantity/location readback, idempotent repeat, and stale/deny effect-set preservation.
+
+
 ## First implementation convergence
 
 Prioritize closing U4/U5 gaps on CRM/Sales/Purchasing/Accounting before adding new backend breadth, but migrate the reference cross-module action through COV-01 first so module agents inherit a proven outcome/readback pattern.

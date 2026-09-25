@@ -7,6 +7,7 @@ import { useQuery, useMutation, useQueryClient, type QueryClient } from '@tansta
 import { apiFetch, fetchQueryList, rqBigIntKey } from "../http"
 import { withCompanyScope } from "@lumiere/erp-shared/org-scoped"
 import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
+import { useConfirmManufacturingOrder } from "./manufacturing-order-confirmation"
 import type {
   CreateBomParams,
   CreateMrpProductionParams,
@@ -174,22 +175,6 @@ export function useCreateWorkcenter(organizationId: bigint, companyId?: bigint) 
     },
     onSuccess: () =>
       qc.invalidateQueries({ queryKey: ['mrp-workcenters', rqBigIntKey(organizationId)] }),
-  })
-}
-
-export function useConfirmManufacturingOrder(organizationId: bigint, companyId: bigint) {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: async (productionId: string | number | bigint) => {
-      if (!companyId) throw new Error("Active company required")
-      const { urlPath, init } = stdbBffCommandPost("confirm_manufacturing_order", { companyId: companyId, moId: productionId })
-      const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error('Failed to confirm manufacturing order')
-    },
-    onSuccess: () => {
-      invalidateMrpProductions(qc, organizationId)
-      invalidateMrpWorkorders(qc, organizationId)
-    },
   })
 }
 
@@ -614,6 +599,8 @@ export function useManufacturingMutations(organizationId: bigint, companyId: big
 }
 
 export type ManufacturingMutations = ReturnType<typeof useManufacturingMutations>
+
+export { useConfirmManufacturingOrder }
 
 // ── Types (re-exported so client components import from one place) ────────────
 export type {
