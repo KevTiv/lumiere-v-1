@@ -282,22 +282,38 @@ fn upsert_stock_quant(
     product_id: u64,
     location_id: u64,
     qty_delta: f64,
-) -> Result<(), String> {
-    if let Some(existing) = ctx.db.stock_quant().iter().find(|q| {
-        q.organization_id == organization_id
-            && q.company_id == company_id
-            && q.product_id == product_id
-            && q.location_id == location_id
-            && q.lot_id.is_none()
-            && q.package_id.is_none()
-            && q.owner_id.is_none()
-    }) {
+) -> Result<StockQuant, String> {
+    let matches: Vec<_> = ctx
+        .db
+        .stock_quant()
+        .iter()
+        .filter(|q| {
+            q.organization_id == organization_id
+                && q.company_id == company_id
+                && q.product_id == product_id
+                && q.location_id == location_id
+                && q.lot_id.is_none()
+                && q.package_id.is_none()
+                && q.owner_id.is_none()
+        })
+        .collect();
+
+    if matches.len() > 1 {
+        return Err(format!(
+            "Ambiguous stock quant identity for product {} at location {}: found {} rows",
+            product_id,
+            location_id,
+            matches.len()
+        ));
+    }
+
+    if let Some(existing) = matches.into_iter().next() {
         let new_quantity = existing.quantity + qty_delta;
         let new_available = new_quantity - existing.reserved_quantity;
         let new_value = new_quantity * existing.cost;
         let inventory_diff_quantity = existing.available_quantity - new_available;
 
-        ctx.db.stock_quant().id().update(StockQuant {
+        let updated = StockQuant {
             quantity: new_quantity,
             available_quantity: new_available,
             value: new_value,
@@ -306,8 +322,9 @@ fn upsert_stock_quant(
             user_id: Some(ctx.sender()),
             inventory_date: Some(ctx.timestamp),
             ..existing
-        });
-        return Ok(());
+        };
+        ctx.db.stock_quant().id().update(updated.clone());
+        return Ok(updated);
     }
 
     let product = ctx
@@ -321,7 +338,7 @@ fn upsert_stock_quant(
     let quantity = qty_delta;
     let value = quantity * cost;
 
-    ctx.db.stock_quant().insert(StockQuant {
+    Ok(ctx.db.stock_quant().insert(StockQuant {
         id: 0,
         organization_id,
         product_id,
@@ -348,9 +365,7 @@ fn upsert_stock_quant(
         currency_id: Some(product.currency_id),
         accounting_entry_ids: Vec::new(),
         metadata: None,
-    });
-
-    Ok(())
+    }))
 }
 
 // ============================================================================
@@ -656,15 +671,29 @@ pub fn produce_manufacturing_order(
 
     let mo = require_mo_in_company(ctx, organization_id, company_id, mo_id)?;
 
-    if qty_producing <= 0.0 {
-        return Err("Quantity must be greater than 0".to_string());
+    if mo.state != MoState::Progress {
+        return Err("Manufacturing order must be in Progress state to record output".to_string());
+    }
+    if !qty_producing.is_finite() || qty_producing <= 0.0 {
+        return Err("Quantity must be a finite number greater than 0".to_string());
+    }
+
+    let remaining_qty = (mo.product_qty - mo.qty_produced).max(0.0);
+    if remaining_qty <= 1e-9 {
+        return Err("Manufacturing order has no remaining quantity to produce".to_string());
+    }
+    if qty_producing > remaining_qty + 1e-9 {
+        return Err(format!(
+            "Quantity {} exceeds remaining manufacturing quantity {}",
+            qty_producing, remaining_qty
+        ));
     }
 
     let new_qty_produced = mo.qty_produced + qty_producing;
-    let new_state = if new_qty_produced >= mo.product_qty {
+    let new_state = if (new_qty_produced - mo.product_qty).abs() <= 1e-9 {
         MoState::ToClose
     } else {
-        mo.state.clone()
+        MoState::Progress
     };
 
     ctx.db.mrp_production().id().update(MrpProduction {
@@ -689,7 +718,11 @@ pub fn produce_manufacturing_order(
                 serde_json::json!({ "qty_producing": qty_producing, "qty_produced": new_qty_produced })
                     .to_string(),
             ),
-            changed_fields: vec!["qty_producing".to_string(), "qty_produced".to_string()],
+            changed_fields: vec![
+                "qty_producing".to_string(),
+                "qty_produced".to_string(),
+                "state".to_string(),
+            ],
             metadata: None,
         },
     );
@@ -907,232 +940,199 @@ pub fn finish_manufacturing_order(
 
     let mo = require_mo_in_company(ctx, organization_id, company_id, mo_id)?;
 
-    match mo.state {
-        MoState::Progress | MoState::ToClose => {
-            require_lot_when_tracked(
-                &mo.product_tracking,
-                mo.lot_producing_id,
-                &format!("MO {} finish", mo.id),
-            )?;
-            let dest_location_id = get_stock_location(&mo);
-            let finished_qty = if mo.qty_produced > 0.0 {
-                mo.qty_produced
-            } else {
-                mo.product_qty
-            };
-
-            create_stock_move(
-                ctx,
-                organization_id,
-                CreateStockMoveParams {
-                    company_id: Some(company_id),
-                    name: format!("MO {} finished product {}", mo.id, mo.product_id),
-                    product_id: mo.product_id,
-                    product_tmpl_id: mo.product_tmpl_id,
-                    product_uom: mo.product_uom_id,
-                    product_uom_qty: finished_qty,
-                    location_id: mo.location_src_id,
-                    location_dest_id: dest_location_id,
-                    date_expected: ctx.timestamp,
-                    move_type: "direct".to_string(),
-                    priority: "normal".to_string(),
-                    reference: Some(format!("MO/{}", mo.id)),
-                    sequence: (mo.move_finished_count + 1) as i32,
-                    origin: Some(format!("MO {}", mo.id)),
-                    note: None,
-                    date: Some(ctx.timestamp),
-                    date_deadline: None,
-                    picking_id: None,
-                    picking_type_id: Some(mo.picking_type_id),
-                    partner_id: None,
-                    product_variant_id: None,
-                    group_id: None,
-                    rule_id: None,
-                    procure_method: "make_to_stock".to_string(),
-                    price_unit: 0.0,
-                    scrapped: false,
-                    to_refund: false,
-                    propagate_cancel: true,
-                    delay_alert: false,
-                    product_packaging_id: None,
-                    product_packaging_qty: 0.0,
-                    warehouse_id: Some(mo.warehouse_id),
-                    production_id: Some(mo.id),
-                    raw_material_production_id: None,
-                    unbuild_id: None,
-                    consume_unbuild_id: None,
-                    cost_share: 0.0,
-                    is_subcontract: false,
-                    purchase_line_id: None,
-                    need_release: false,
-                    release_ready: false,
-                    propagation_cancel: false,
-                    has_tracking: false,
-                    inventory_id: None,
-                    sale_line_id: None,
-                    lot_id: mo.lot_producing_id,
-                    serial_id: None,
-                    package_id: None,
-                    result_package_id: None,
-                    owner_id: None,
-                    package_level_id: None,
-                    product_type: None,
-                    metadata: None,
-                },
-            )?;
-
-            let finished_move_id = ctx
-                .db
-                .stock_move()
-                .iter()
-                .filter(|m| m.production_id == Some(mo.id) && m.product_id == mo.product_id)
-                .max_by_key(|m| m.id)
-                .map(|m| m.id)
-                .ok_or("Failed to locate created finished move")?;
-
-            let finished_move = ctx
-                .db
-                .stock_move()
-                .id()
-                .find(&finished_move_id)
-                .ok_or("Finished move not found")?;
-            if finished_move.state == "draft" {
-                ctx.db.stock_move().id().update(StockMove {
-                    state: "assigned".to_string(),
-                    is_assigned: true,
-                    write_uid: ctx.sender(),
-                    write_date: ctx.timestamp,
-                    ..finished_move
-                });
-            }
-
-            done_stock_move(
-                ctx,
-                organization_id,
-                finished_move_id,
-                DoneStockMoveParams {
-                    company_id: Some(company_id),
-                    quantity_done: finished_qty,
-                },
-            )?;
-            upsert_stock_quant(
-                ctx,
-                organization_id,
-                company_id,
-                mo.product_id,
-                dest_location_id,
-                finished_qty,
-            )?;
-
-            // Auto-consume raw materials if consume_mo_materials was not called separately
-            let prod_source_location = get_production_location(&mo);
-            if mo.move_raw_ids.is_empty() {
-                // No raw moves exist yet — deduct component stock directly from BOM
-                if let Some(bom_id) = mo.bom_id {
-                    let bom_lines: Vec<_> = ctx
-                        .db
-                        .mrp_bom_line()
-                        .mrp_bom_line_by_bom()
-                        .filter(&bom_id)
-                        .collect();
-                    for line in bom_lines {
-                        let required_qty = line.product_qty * mo.product_qty.max(1.0);
-                        upsert_stock_quant(
-                            ctx,
-                            organization_id,
-                            company_id,
-                            line.product_id,
-                            prod_source_location,
-                            -required_qty,
-                        )?;
-                    }
-                }
-            } else {
-                // Raw moves exist — mark any not yet done as done and deduct stock
-                for raw_move_id in &mo.move_raw_ids {
-                    if let Some(raw_move) = ctx.db.stock_move().id().find(raw_move_id) {
-                        if raw_move.state != "done" {
-                            let qty = if raw_move.quantity_done > 0.0 {
-                                raw_move.quantity_done
-                            } else {
-                                raw_move.product_uom_qty
-                            };
-                            let component_product_id = raw_move.product_id;
-                            let component_location_id = raw_move.location_id;
-                            if raw_move.state == "draft" {
-                                ctx.db.stock_move().id().update(StockMove {
-                                    state: "assigned".to_string(),
-                                    is_assigned: true,
-                                    write_uid: ctx.sender(),
-                                    write_date: ctx.timestamp,
-                                    ..raw_move
-                                });
-                            }
-                            // done_stock_move re-fetches the move internally.
-                            // Fail closed: propagate errors rather than silently
-                            // skipping stock deductions for failed moves.
-                            done_stock_move(
-                                ctx,
-                                organization_id,
-                                *raw_move_id,
-                                DoneStockMoveParams {
-                                    company_id: Some(company_id),
-                                    quantity_done: qty,
-                                },
-                            )?;
-                            upsert_stock_quant(
-                                ctx,
-                                organization_id,
-                                company_id,
-                                component_product_id,
-                                component_location_id,
-                                -qty,
-                            )?;
-                        }
-                    }
-                }
-            }
-
-            let mut finished_ids = mo.move_finished_ids.clone();
-            finished_ids.push(finished_move_id);
-
-            ctx.db.mrp_production().id().update(MrpProduction {
-                state: MoState::Done,
-                date_finished: Some(ctx.timestamp),
-                move_finished_ids: finished_ids,
-                move_finished_count: mo.move_finished_count + 1,
-                write_uid: ctx.sender(),
-                write_date: ctx.timestamp,
-                ..mo
-            });
-
-            write_audit_log_v2(
-                ctx,
-                organization_id,
-                AuditLogParams {
-                    company_id: Some(company_id),
-                    table_name: "mrp_production",
-                    record_id: mo_id,
-                    action: "UPDATE",
-                    old_values: None,
-                    new_values: Some(serde_json::json!({ "state": "done" }).to_string()),
-                    changed_fields: vec![
-                        "state".to_string(),
-                        "date_finished".to_string(),
-                        "move_finished_ids".to_string(),
-                    ],
-                    metadata: None,
-                },
-            );
-
-            log::info!("Manufacturing order finished: id={}", mo_id);
-            Ok(())
-        }
-        _ => Err("Manufacturing order must be in Progress or ToClose state to finish".to_string()),
+    if mo.state != MoState::ToClose {
+        return Err("Manufacturing order must be in ToClose state to finish".to_string());
     }
+    if (mo.qty_produced - mo.product_qty).abs() > 1e-9 {
+        return Err(format!(
+            "Produced quantity {} must equal planned quantity {} before finish",
+            mo.qty_produced, mo.product_qty
+        ));
+    }
+    if !mo.move_finished_ids.is_empty() {
+        return Err("Manufacturing order already owns a finished-goods move".to_string());
+    }
+
+    if let Some(bom_id) = mo.bom_id {
+        let bom_line_count = ctx
+            .db
+            .mrp_bom_line()
+            .mrp_bom_line_by_bom()
+            .filter(&bom_id)
+            .count();
+        if bom_line_count > 0 && mo.move_raw_ids.is_empty() {
+            return Err(
+                "Manufacturing materials must be consumed before finishing this order".to_string(),
+            );
+        }
+    }
+
+    for raw_move_id in &mo.move_raw_ids {
+        let raw_move = ctx
+            .db
+            .stock_move()
+            .id()
+            .find(raw_move_id)
+            .ok_or_else(|| format!("Raw material move {} not found", raw_move_id))?;
+        if raw_move.organization_id != organization_id
+            || raw_move.company_id != company_id
+            || raw_move.production_id != Some(mo.id)
+            || raw_move.state != "done"
+            || !raw_move.is_done
+        {
+            return Err(format!(
+                "Raw material move {} is not a completed effect of this manufacturing order",
+                raw_move_id
+            ));
+        }
+    }
+
+    require_lot_when_tracked(
+        &mo.product_tracking,
+        mo.lot_producing_id,
+        &format!("MO {} finish", mo.id),
+    )?;
+
+    let dest_location_id = get_stock_location(&mo);
+    let finished_qty = mo.qty_produced;
+
+    let created_move = create_stock_move_internal(
+        ctx,
+        organization_id,
+        CreateStockMoveParams {
+            company_id: Some(company_id),
+            name: format!("MO {} finished product {}", mo.id, mo.product_id),
+            product_id: mo.product_id,
+            product_tmpl_id: mo.product_tmpl_id,
+            product_uom: mo.product_uom_id,
+            product_uom_qty: finished_qty,
+            location_id: mo.location_src_id,
+            location_dest_id: dest_location_id,
+            date_expected: ctx.timestamp,
+            move_type: "direct".to_string(),
+            priority: "normal".to_string(),
+            reference: Some(format!("MO/{}", mo.id)),
+            sequence: 1,
+            origin: Some(format!("MO {}", mo.id)),
+            note: None,
+            date: Some(ctx.timestamp),
+            date_deadline: None,
+            picking_id: None,
+            picking_type_id: Some(mo.picking_type_id),
+            partner_id: None,
+            product_variant_id: None,
+            group_id: None,
+            rule_id: None,
+            procure_method: "make_to_stock".to_string(),
+            price_unit: 0.0,
+            scrapped: false,
+            to_refund: false,
+            propagate_cancel: true,
+            delay_alert: false,
+            product_packaging_id: None,
+            product_packaging_qty: 0.0,
+            warehouse_id: Some(mo.warehouse_id),
+            production_id: Some(mo.id),
+            raw_material_production_id: None,
+            unbuild_id: None,
+            consume_unbuild_id: None,
+            cost_share: 0.0,
+            is_subcontract: false,
+            purchase_line_id: None,
+            need_release: false,
+            release_ready: false,
+            propagation_cancel: false,
+            has_tracking: false,
+            inventory_id: None,
+            sale_line_id: None,
+            lot_id: mo.lot_producing_id,
+            serial_id: None,
+            package_id: None,
+            result_package_id: None,
+            owner_id: None,
+            package_level_id: None,
+            product_type: None,
+            metadata: None,
+        },
+    )?;
+    let finished_move_id = created_move.id;
+
+    ctx.db.stock_move().id().update(StockMove {
+        state: "assigned".to_string(),
+        is_assigned: true,
+        write_uid: ctx.sender(),
+        write_date: ctx.timestamp,
+        ..created_move
+    });
+
+    done_stock_move(
+        ctx,
+        organization_id,
+        finished_move_id,
+        DoneStockMoveParams {
+            company_id: Some(company_id),
+            quantity_done: finished_qty,
+        },
+    )?;
+
+    let finished_move = ctx
+        .db
+        .stock_move()
+        .id()
+        .find(&finished_move_id)
+        .ok_or("Finished move disappeared before completion")?;
+    ctx.db.stock_move().id().update(StockMove {
+        state: "done".to_string(),
+        is_done: true,
+        is_assigned: false,
+        write_uid: ctx.sender(),
+        write_date: ctx.timestamp,
+        ..finished_move
+    });
+
+    upsert_stock_quant(
+        ctx,
+        organization_id,
+        company_id,
+        mo.product_id,
+        dest_location_id,
+        finished_qty,
+    )?;
+
+    let finished_ids = vec![finished_move_id];
+    ctx.db.mrp_production().id().update(MrpProduction {
+        state: MoState::Done,
+        date_finished: Some(ctx.timestamp),
+        move_finished_count: finished_ids.len() as u32,
+        move_finished_ids: finished_ids,
+        write_uid: ctx.sender(),
+        write_date: ctx.timestamp,
+        ..mo
+    });
+
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "mrp_production",
+            record_id: mo_id,
+            action: "UPDATE",
+            old_values: None,
+            new_values: Some(serde_json::json!({ "state": "done" }).to_string()),
+            changed_fields: vec![
+                "state".to_string(),
+                "date_finished".to_string(),
+                "move_finished_ids".to_string(),
+            ],
+            metadata: None,
+        },
+    );
+
+    log::info!("Manufacturing order finished: id={}", mo_id);
+    Ok(())
 }
 
-/// Cancel a manufacturing order
 #[reducer]
 pub fn cancel_manufacturing_order(
     ctx: &ReducerContext,

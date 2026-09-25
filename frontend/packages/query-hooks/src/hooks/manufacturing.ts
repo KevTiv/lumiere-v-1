@@ -9,6 +9,7 @@ import { withCompanyScope } from "@lumiere/erp-shared/org-scoped"
 import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
 import { useConfirmManufacturingOrder } from "./manufacturing-order-confirmation"
 import { useConsumeMoMaterials, useStartManufacturingOrder } from "./manufacturing-material-consumption"
+import { useFinishManufacturingOrder, useProduceManufacturingOrder } from "./manufacturing-production-close"
 import type {
   CreateBomParams,
   CreateMrpProductionParams,
@@ -179,24 +180,6 @@ export function useCreateWorkcenter(organizationId: bigint, companyId?: bigint) 
   })
 }
 
-export function useFinishManufacturingOrder(organizationId: bigint, companyId: bigint) {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: async (productionId: string | number | bigint) => {
-      if (!companyId) throw new Error("Active company required")
-      const { urlPath, init } = stdbBffCommandPost("finish_manufacturing_order", { companyId: companyId, moId: productionId })
-      const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error('Failed to finish manufacturing order')
-    },
-    onSuccess: () => {
-      invalidateMrpProductions(qc, organizationId)
-      invalidateMrpWorkorders(qc, organizationId)
-      // Finishing an MO posts finished-goods stock moves — refresh inventory quants.
-      void qc.invalidateQueries({ queryKey: ['stock-quants', rqBigIntKey(organizationId)] })
-    },
-  })
-}
-
 export function useCancelManufacturingOrder(organizationId: bigint, companyId: bigint) {
   const qc = useQueryClient()
   return useMutation({
@@ -294,23 +277,6 @@ export function useCheckMoAvailability(organizationId: bigint, companyId: bigint
     onSuccess: () => {
       invalidateMrpProductions(qc, organizationId)
       // Availability check may move stock reservations.
-      void qc.invalidateQueries({ queryKey: ['stock-quants', rqBigIntKey(organizationId)] })
-    },
-  })
-}
-
-export function useProduceManufacturingOrder(organizationId: bigint, companyId: bigint) {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: async ({ moId, qty }: { moId: string | number | bigint; qty: number }) => {
-      if (!companyId) throw new Error("Active company required")
-      const { urlPath, init } = stdbBffCommandPost("produce_manufacturing_order", { companyId: companyId, moId: moId, qtyProducing: qty })
-      const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error(await parseCallError(r))
-    },
-    onSuccess: () => {
-      invalidateMrpProductions(qc, organizationId)
-      // Producing posts stock moves — refresh quants.
       void qc.invalidateQueries({ queryKey: ['stock-quants', rqBigIntKey(organizationId)] })
     },
   })
@@ -570,6 +536,7 @@ export type ManufacturingMutations = ReturnType<typeof useManufacturingMutations
 
 export { useConfirmManufacturingOrder }
 export { useConsumeMoMaterials, useStartManufacturingOrder }
+export { useFinishManufacturingOrder, useProduceManufacturingOrder }
 
 // ── Types (re-exported so client components import from one place) ────────────
 export type {
