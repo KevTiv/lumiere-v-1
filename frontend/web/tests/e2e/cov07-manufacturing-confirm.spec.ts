@@ -190,7 +190,7 @@ test.describe(
     }) => {
       test.setTimeout(180_000)
 
-      await signIn(page, "test@email.com", PERSONA_PASSWORD)
+      await signIn(page)
       const companyId = await fetchDefaultCompanyId(page)
       const warehouseId = await fetchFirstWarehouseId(page)
       const bom = await createSetupBomViaUi(page)
