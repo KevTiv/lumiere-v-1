@@ -16,6 +16,7 @@ pub fn run_all_manufacturing_tests(ctx: &ReducerContext) -> Result<(), String> {
     run_manufacturing_productivity_relational_integrity_test(ctx)?;
     run_manufacturing_consume_materials_cross_org_component_test(ctx)?;
     run_manufacturing_consume_materials_exact_effect_test(ctx)?;
+    run_manufacturing_production_close_exact_effect_test(ctx)?;
     log::info!("✅ run_all_manufacturing_tests complete");
     Ok(())
 }
@@ -50,6 +51,14 @@ pub fn run_manufacturing_consume_materials_exact_effect_test(
 ) -> Result<(), String> {
     relational_integrity_test::test_consume_materials_exact_effect_and_replay(ctx)
         .map_err(|e| format!("consume_materials_exact_effect: {e}"))
+}
+
+#[spacetimedb::reducer]
+pub fn run_manufacturing_production_close_exact_effect_test(
+    ctx: &ReducerContext,
+) -> Result<(), String> {
+    relational_integrity_test::test_production_output_and_finish_exact_effect(ctx)
+        .map_err(|e| format!("production_close_exact_effect: {e}"))
 }
 
 #[spacetimedb::reducer]
