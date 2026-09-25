@@ -1,11 +1,13 @@
 //! Persisted relational-integrity tests for work orders and productivity logs.
 
+use std::collections::HashSet;
 use std::time::Duration;
 
 use spacetimedb::{ReducerContext, Table};
 
 use crate::core::persistence::{organization_commit, organization_row_change};
 use crate::inventory::product::product;
+use crate::inventory::stock::{stock_move, stock_quant};
 use crate::inventory::warehouse::warehouse;
 use crate::manufacturing::bill_of_materials::{
     create_bom, mrp_bom, mrp_bom_line, BomLineInput, CreateBomParams, MrpBomLine,
@@ -559,5 +561,254 @@ pub fn test_consume_materials_rejects_cross_org_component(
     }
 
     log::info!("test_consume_materials_rejects_cross_org_component passed");
+    Ok(())
+}
+
+
+/// COV-07b: material consumption owns an exact raw-move set, closes every
+/// consumed move, reports the true move count, and is idempotent on replay.
+pub fn test_consume_materials_exact_effect_and_replay(
+    ctx: &ReducerContext,
+) -> Result<(), String> {
+    ensure_test_superuser(ctx)?;
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let product = ctx
+        .db
+        .product()
+        .id()
+        .find(&fixture.product_id)
+        .ok_or("fixture product missing")?;
+    let warehouse = ctx
+        .db
+        .warehouse()
+        .id()
+        .find(&fixture.warehouse_id)
+        .ok_or("fixture warehouse missing")?;
+
+    let before_bom_ids: HashSet<u64> = ctx
+        .db
+        .mrp_bom()
+        .mrp_bom_by_org()
+        .filter(&fixture.organization_id)
+        .map(|bom| bom.id)
+        .collect();
+
+    create_bom(
+        ctx,
+        fixture.organization_id,
+        CreateBomParams {
+            company_id: Some(fixture.company_id),
+            type_: BomType::Manufacture,
+            product_id: fixture.product_id,
+            product_qty: 1.0,
+            product_uom_id: product.uom_id,
+            ready_to_produce: "all_available".to_string(),
+            consumption: "flexible".to_string(),
+            sequence: 10,
+            lines: vec![
+                BomLineInput {
+                    product_id: fixture.product_id,
+                    product_qty: 1.0,
+                    product_uom_id: product.uom_id,
+                    sequence: 10,
+                    manual_consumption: false,
+                    attachments_count: 0,
+                    operation_id: None,
+                    child_bom_id: None,
+                    bom_product_template_attribute_value_ids: vec![],
+                    possible_bom_product_template_attribute_value_ids: vec![],
+                    metadata: Some(r#"{"cov":"07b","line":1}"#.to_string()),
+                },
+                BomLineInput {
+                    product_id: fixture.product_id,
+                    product_qty: 0.5,
+                    product_uom_id: product.uom_id,
+                    sequence: 20,
+                    manual_consumption: false,
+                    attachments_count: 0,
+                    operation_id: None,
+                    child_bom_id: None,
+                    bom_product_template_attribute_value_ids: vec![],
+                    possible_bom_product_template_attribute_value_ids: vec![],
+                    metadata: Some(r#"{"cov":"07b","line":2}"#.to_string()),
+                },
+            ],
+            picking_type_id: Some(warehouse.pick_type_id),
+            location_src_id: Some(warehouse.lot_stock_id),
+            location_dest_id: Some(warehouse.lot_stock_id),
+            warehouse_id: Some(warehouse.id),
+            routing_id: None,
+            metadata: Some(r#"{"cov":"07b"}"#.to_string()),
+        },
+    )?;
+
+    let created_boms: Vec<_> = ctx
+        .db
+        .mrp_bom()
+        .mrp_bom_by_org()
+        .filter(&fixture.organization_id)
+        .filter(|bom| !before_bom_ids.contains(&bom.id))
+        .collect();
+    if created_boms.len() != 1 {
+        return Err(format!(
+            "expected exactly one COV-07b BOM, got {}",
+            created_boms.len()
+        ));
+    }
+    let bom = &created_boms[0];
+
+    create_manufacturing_order(
+        ctx,
+        fixture.organization_id,
+        CreateMrpProductionParams {
+            company_id: Some(fixture.company_id),
+            product_id: fixture.product_id,
+            product_qty: 2.0,
+            product_uom_id: product.uom_id,
+            date_planned_start: ctx.timestamp,
+            date_planned_finished: ctx.timestamp + Duration::from_secs(3_600),
+            location_src_id: warehouse.lot_stock_id,
+            location_dest_id: warehouse.lot_stock_id,
+            warehouse_id: warehouse.id,
+            picking_type_id: warehouse.pick_type_id,
+            consumption: Some("flexible".to_string()),
+            bom_id: Some(bom.id),
+            routing_id: None,
+            proc_group_id: None,
+            procurement_group_id: None,
+            date_deadline: None,
+            origin: Some("COV-07B-EXACT-MATERIALS".to_string()),
+            responsible_user_id: None,
+            metadata: Some(r#"{"cov":"07b"}"#.to_string()),
+        },
+    )?;
+
+    let productions: Vec<_> = ctx
+        .db
+        .mrp_production()
+        .mrp_production_by_org()
+        .filter(&fixture.organization_id)
+        .filter(|production| {
+            production.origin.as_deref() == Some("COV-07B-EXACT-MATERIALS")
+        })
+        .collect();
+    if productions.len() != 1 {
+        return Err(format!(
+            "expected exactly one COV-07b MO, got {}",
+            productions.len()
+        ));
+    }
+    let mo_id = productions[0].id;
+
+    confirm_manufacturing_order(ctx, fixture.organization_id, fixture.company_id, mo_id)?;
+    start_manufacturing_order(ctx, fixture.organization_id, fixture.company_id, mo_id)?;
+    consume_mo_materials(ctx, fixture.organization_id, fixture.company_id, mo_id)?;
+
+    let consumed = ctx
+        .db
+        .mrp_production()
+        .id()
+        .find(&mo_id)
+        .ok_or("COV-07b MO missing after consumption")?;
+    if consumed.move_raw_ids.len() != 2 || consumed.move_raw_count != 2 {
+        return Err(format!(
+            "raw move relation/count mismatch: ids={:?} count={}",
+            consumed.move_raw_ids, consumed.move_raw_count
+        ));
+    }
+    let unique_ids: HashSet<_> = consumed.move_raw_ids.iter().copied().collect();
+    if unique_ids.len() != consumed.move_raw_ids.len() {
+        return Err("raw move relation contains duplicate ids".to_string());
+    }
+
+    let mut quantities = Vec::new();
+    for move_id in &consumed.move_raw_ids {
+        let move_row = ctx
+            .db
+            .stock_move()
+            .id()
+            .find(move_id)
+            .ok_or_else(|| format!("raw move {move_id} missing"))?;
+        if move_row.production_id != Some(mo_id)
+            || move_row.product_id != fixture.product_id
+            || move_row.product_uom != product.uom_id
+            || move_row.location_id != warehouse.lot_stock_id
+            || move_row.location_dest_id != warehouse.lot_stock_id
+            || move_row.state != "done"
+            || !move_row.is_done
+            || move_row.is_assigned
+            || (move_row.quantity_done - move_row.product_uom_qty).abs() > 1e-9
+        {
+            return Err(format!("raw move {} did not converge exactly", move_id));
+        }
+        quantities.push(move_row.product_uom_qty);
+    }
+    quantities.sort_by(|a, b| a.total_cmp(b));
+    if quantities != vec![1.0, 2.0] {
+        return Err(format!("unexpected raw move quantities: {quantities:?}"));
+    }
+
+    let quant_after_first = ctx
+        .db
+        .stock_quant()
+        .iter()
+        .find(|quant| {
+            quant.organization_id == fixture.organization_id
+                && quant.company_id == fixture.company_id
+                && quant.product_id == fixture.product_id
+                && quant.location_id == warehouse.lot_stock_id
+                && quant.lot_id.is_none()
+                && quant.package_id.is_none()
+                && quant.owner_id.is_none()
+        })
+        .map(|quant| quant.quantity)
+        .ok_or("component quant missing after first consumption")?;
+
+    let raw_ids_after_first = consumed.move_raw_ids.clone();
+    consume_mo_materials(ctx, fixture.organization_id, fixture.company_id, mo_id)?;
+
+    let replayed = ctx
+        .db
+        .mrp_production()
+        .id()
+        .find(&mo_id)
+        .ok_or("COV-07b MO missing after replay")?;
+    if replayed.move_raw_ids != raw_ids_after_first || replayed.move_raw_count != 2 {
+        return Err("material replay changed the exact raw-move effect set".to_string());
+    }
+    let move_count = ctx
+        .db
+        .stock_move()
+        .iter()
+        .filter(|move_row| move_row.production_id == Some(mo_id))
+        .count();
+    if move_count != 2 {
+        return Err(format!(
+            "material replay created duplicate stock moves: {move_count}"
+        ));
+    }
+
+    let quant_after_replay = ctx
+        .db
+        .stock_quant()
+        .iter()
+        .find(|quant| {
+            quant.organization_id == fixture.organization_id
+                && quant.company_id == fixture.company_id
+                && quant.product_id == fixture.product_id
+                && quant.location_id == warehouse.lot_stock_id
+                && quant.lot_id.is_none()
+                && quant.package_id.is_none()
+                && quant.owner_id.is_none()
+        })
+        .map(|quant| quant.quantity)
+        .ok_or("component quant missing after replay")?;
+    if (quant_after_replay - quant_after_first).abs() > 1e-9 {
+        return Err(format!(
+            "material replay changed component quantity: {quant_after_first} -> {quant_after_replay}"
+        ));
+    }
+
+    log::info!("test_consume_materials_exact_effect_and_replay passed");
     Ok(())
 }
