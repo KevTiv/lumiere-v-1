@@ -117,9 +117,14 @@ E2E_CLEAR_DB=1 make e2e-smoke
 # P0 only (includes both MVP golden specs; excludes @dev-fixture):
 E2E_CLEAR_DB=1 E2E_SUITE=p0 make e2e-smoke
 
-# CI profile — fail if ai-gateway is down:
-E2E_REQUIRE_AI=1 E2E_CLEAR_DB=1 make e2e-single E2E_SPEC=mvp-ai-rag.spec.ts
+# Live-AI certification — include @ai-live and fail if ai-gateway is down:
+E2E_REQUIRE_AI=1 E2E_CLEAR_DB=1 make e2e-single E2E_SPEC=ai-rag-evidence-access.spec.ts
 ```
+
+The ordinary `e2e-smoke` profile does not provision Qdrant, `ai-gateway`, an
+embedder, or a chat provider, so it excludes `@ai-live`. Those tests remain P0
+certification cases and fail closed when run explicitly with
+`E2E_REQUIRE_AI=1`; a non-AI smoke run is not evidence that live AI passed.
 
 Smoke Playwright runs use `E2E_WORKERS=1` by default (serial) so tests share one api-server reliably.
 
