@@ -168,20 +168,41 @@ export function pickingStepsToDone(row: RowValueMap): readonly PickingStep[] | u
   return STEPS_FROM_STATE[pickingStateTag(row)]
 }
 
+/** Exact same-record readback for confirm/assign/validate transitions. */
+export function observePickingState(
+  pickingId: string,
+  expectedState: "confirmed" | "assigned" | "done",
+  pickings: readonly RowValueMap[],
+): ObservedTransition {
+  const picking = pickings.find((row) => rowId(row) === pickingId)
+  if (!picking || pickingStateTag(picking) !== expectedState) return {}
+  return {
+    outcome: "applied",
+    next: recordRef(pickingWorkflow.resource, pickingId, pickingWorkflow.module),
+  }
+}
+
 /**
  * Where a validated picking's short-shipped remainder went: the backorder picking the reducer
  * created (linked by `backorder_id`), newest first. A validation without a backorder claims nothing.
  */
 export function observeValidatedPicking(pickingId: string, pickings: readonly RowValueMap[]): ObservedTransition {
   const source = pickings.find((row) => rowId(row) === pickingId)
+  if (!source || pickingStateTag(source) !== "done") return {}
+
   const backorders = pickings
     .filter((row) => String(firstNonNullKey(row, "backorderId", "backorder_id") ?? "") === pickingId)
     .sort((a, b) => Number(rowId(b)) - Number(rowId(a)))
-  if (backorders.length === 0) return source ? { outcome: "applied" } : {}
-  const context = firstNonNullKey(source ?? {}, "saleId", "sale_id") != null ? "sales" : undefined
+  const context = firstNonNullKey(source, "saleId", "sale_id") != null ? "sales" : undefined
   return {
     outcome: "applied",
-    createdRecords: backorders.map((row) => recordRef(pickingWorkflow.resource, rowId(row), pickingWorkflow.module, context)),
+    createdRecords:
+      backorders.length > 0
+        ? backorders.map((row) =>
+            recordRef(pickingWorkflow.resource, rowId(row), pickingWorkflow.module, context),
+          )
+        : undefined,
+    next: recordRef(pickingWorkflow.resource, pickingId, pickingWorkflow.module, context),
   }
 }
 
