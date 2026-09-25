@@ -1310,57 +1310,119 @@ pub(crate) fn quarantine_quantity(
         });
     }
 
-    if let Some(dest) = ctx
+    // Resolve at most one existing destination quant with the same stock identity.
+    // Duplicate compatible quants are an invariant violation: never merge into
+    // whichever one the iterator visits first.
+    let mut matching_destinations = ctx
         .db
         .stock_quant()
         .quant_by_product()
         .filter(&product_id)
-        .find(|q| {
+        .filter(|q| {
             q.organization_id == organization_id
                 && q.company_id == company_id
                 && q.location_id == quarantine_location_id
                 && q.lot_id == lot_id
-        })
-    {
-        let dq = dest.quantity + qty;
-        // Quarantined stock is never ATP-available even if co-located.
-        ctx.db.stock_quant().id().update(StockQuant {
-            quantity: dq,
-            available_quantity: 0.0,
-            reserved_quantity: 0.0,
-            value: dq * dest.cost,
-            ..dest
         });
-    } else {
-        ctx.db.stock_quant().insert(StockQuant {
-            id: 0,
-            organization_id,
-            product_id,
-            product_variant_id: src.product_variant_id,
-            location_id: quarantine_location_id,
-            lot_id,
-            package_id: src.package_id,
-            owner_id: src.owner_id,
-            company_id,
-            quantity: qty,
-            reserved_quantity: 0.0,
-            available_quantity: 0.0,
-            in_date: Some(ctx.timestamp),
-            inventory_quantity: qty,
-            inventory_diff_quantity: 0.0,
-            inventory_quantity_set: true,
-            is_outdated: false,
-            user_id: Some(ctx.sender()),
-            inventory_date: Some(ctx.timestamp),
-            cost: src.cost,
-            value: qty * src.cost,
-            cost_method: src.cost_method.clone(),
-            accounting_date: None,
-            currency_id: src.currency_id,
-            accounting_entry_ids: vec![],
-            metadata: Some(r#"{"quarantine":true}"#.to_string()),
-        });
+    let dest_id = matching_destinations.next().map(|q| q.id);
+    if matching_destinations.next().is_some() {
+        return Err(format!(
+            "Multiple destination quants match product {} at quarantine location {}",
+            product_id, quarantine_location_id
+        ));
     }
+
+    let destination_quant_id = match dest_id {
+        Some(did) => {
+            let dest = ctx
+                .db
+                .stock_quant()
+                .id()
+                .find(&did)
+                .ok_or("Quarantine destination quant disappeared")?;
+            let dq = dest.quantity + qty;
+            // Quarantined stock is never ATP-available even if co-located.
+            ctx.db.stock_quant().id().update(StockQuant {
+                quantity: dq,
+                available_quantity: 0.0,
+                reserved_quantity: 0.0,
+                value: dq * dest.cost,
+                ..dest
+            });
+            did
+        }
+        None => {
+            let inserted = ctx.db.stock_quant().insert(StockQuant {
+                id: 0,
+                organization_id,
+                product_id,
+                product_variant_id: src.product_variant_id,
+                location_id: quarantine_location_id,
+                lot_id,
+                package_id: src.package_id,
+                owner_id: src.owner_id,
+                company_id,
+                quantity: qty,
+                reserved_quantity: 0.0,
+                available_quantity: 0.0,
+                in_date: Some(ctx.timestamp),
+                inventory_quantity: qty,
+                inventory_diff_quantity: 0.0,
+                inventory_quantity_set: true,
+                is_outdated: false,
+                user_id: Some(ctx.sender()),
+                inventory_date: Some(ctx.timestamp),
+                cost: src.cost,
+                value: qty * src.cost,
+                cost_method: src.cost_method.clone(),
+                accounting_date: None,
+                currency_id: src.currency_id,
+                accounting_entry_ids: vec![],
+                metadata: Some(r#"{"quarantine":true}"#.to_string()),
+            });
+            inserted.id
+        }
+    };
+
+    // Capture the exact quant outcomes: the source tombstone is retained when
+    // the quarantine empties it, mirroring move_stock_quant's commit shape.
+    let mut changed_quants: Vec<RowChange> = Vec::with_capacity(2);
+    if let Some(source_after) = ctx.db.stock_quant().id().find(&src.id) {
+        changed_quants.push(RowChange::upsert_stdb_row(
+            "stock_quant",
+            serde_json::json!({"id": source_after.id}),
+            &source_after,
+        )?);
+    } else {
+        changed_quants.push(RowChange::delete(
+            "stock_quant",
+            serde_json::json!({"id": src.id}),
+        ));
+    }
+    let destination_after = ctx
+        .db
+        .stock_quant()
+        .id()
+        .find(&destination_quant_id)
+        .ok_or("Quarantine destination quant disappeared before commit recording")?;
+    changed_quants.push(RowChange::upsert_stdb_row(
+        "stock_quant",
+        serde_json::json!({"id": destination_after.id}),
+        &destination_after,
+    )?);
+
+    record_organization_commit(
+        ctx,
+        OrganizationCommitInput {
+            organization_id,
+            operation_id: "erp.quarantine_quantity".to_string(),
+            correlation_id: format!(
+                "stock-quant:{}:quarantine-to:{}",
+                src.id, quarantine_location_id
+            ),
+            changes: changed_quants,
+        },
+    )?;
 
     Ok(())
 }

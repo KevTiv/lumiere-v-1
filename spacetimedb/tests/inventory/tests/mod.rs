@@ -164,7 +164,11 @@ pub fn run_inventory_replenishment_demand_test(ctx: &ReducerContext) -> Result<(
 #[spacetimedb::reducer]
 pub fn run_inventory_qc_quarantine_test(ctx: &ReducerContext) -> Result<(), String> {
     gap_fixes_test::test_quality_fail_quarantines_from_atp(ctx)
-        .map_err(|e| format!("qc_quarantine: {e}"))
+        .map_err(|e| format!("qc_quarantine: {e}"))?;
+    gap_fixes_test::test_quality_fail_ambiguous_source_rejected(ctx)
+        .map_err(|e| format!("qc_ambiguous_source: {e}"))?;
+    gap_fixes_test::test_quality_fail_ambiguous_destination_rejected(ctx)
+        .map_err(|e| format!("qc_ambiguous_destination: {e}"))
 }
 
 #[spacetimedb::reducer]

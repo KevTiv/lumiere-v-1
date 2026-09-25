@@ -1917,6 +1917,234 @@ pub fn test_quality_fail_quarantines_from_atp(ctx: &ReducerContext) -> Result<()
     }
 }
 
+/// A quality check with no picking to disambiguate, and on-hand stock for the same
+/// product at two different locations, must fail closed rather than quarantining
+/// whichever location the iterator visits first.
+pub fn test_quality_fail_ambiguous_source_rejected(ctx: &ReducerContext) -> Result<(), String> {
+    ensure_test_superuser(ctx)?;
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let org_id = fixture.organization_id;
+    let company_id = fixture.company_id;
+    let product_id = fixture.product_id;
+
+    // Isolate the ambiguity: exactly the two quants this test creates should
+    // be on-hand candidates for this product.
+    if let Some(seed_quant) = ctx.db.stock_quant().iter().find(|q| {
+        q.organization_id == org_id
+            && q.product_id == product_id
+            && q.location_id == fixture.location_id
+            && q.metadata.as_deref() == Some(r#"{"harness":"minimal"}"#)
+    }) {
+        ctx.db.stock_quant().id().delete(&seed_quant.id);
+    }
+
+    let second_location_id = ctx
+        .db
+        .stock_location()
+        .iter()
+        .find(|location| {
+            location.organization_id == org_id
+                && location.company_id == Some(company_id)
+                && location.id != fixture.location_id
+                && location.active
+        })
+        .map(|location| location.id)
+        .ok_or("No second active fixture location for ambiguity test")?;
+
+    create_quant(ctx, org_id, company_id, product_id, fixture.location_id, 5.0, None)?;
+    create_quant(ctx, org_id, company_id, product_id, second_location_id, 5.0, None)?;
+
+    create_quality_check(
+        ctx,
+        org_id,
+        company_id,
+        CreateQualityCheckParams {
+            name: "QC-AMBIG-SRC".to_string(),
+            test_type: "passfail".to_string(),
+            product_id: Some(product_id),
+            product_variant_id: None,
+            picking_id: None,
+            move_line_id: None,
+            lot_id: None,
+            team_id: None,
+            user_id: None,
+            control_point_id: None,
+            qty_tested: 5.0,
+            tolerance_min: None,
+            tolerance_max: None,
+            norm_unit: None,
+            metadata: None,
+        },
+    )?;
+    let check_id = ctx
+        .db
+        .quality_check()
+        .iter()
+        .find(|c| c.organization_id == org_id && c.name == "QC-AMBIG-SRC")
+        .map(|c| c.id)
+        .ok_or("quality check missing")?;
+
+    let src_before: Vec<(u64, f64)> = ctx
+        .db
+        .stock_quant()
+        .iter()
+        .filter(|q| q.organization_id == org_id && q.product_id == product_id)
+        .map(|q| (q.id, q.quantity))
+        .collect();
+
+    // No explicit failure_location_id: the fallback must refuse to guess between
+    // the two on-hand locations rather than quarantining an arbitrary one.
+    match fail_quality_check(
+        ctx,
+        org_id,
+        company_id,
+        check_id,
+        2.0,
+        None,
+        None,
+        None,
+    ) {
+        Err(msg) if msg.to_lowercase().contains("locations") => {}
+        Err(msg) => return Err(format!("Expected ambiguous-location error, got: {msg}")),
+        Ok(()) => return Err("ambiguous source location was accepted".into()),
+    }
+
+    let src_after: Vec<(u64, f64)> = ctx
+        .db
+        .stock_quant()
+        .iter()
+        .filter(|q| q.organization_id == org_id && q.product_id == product_id)
+        .map(|q| (q.id, q.quantity))
+        .collect();
+    if src_before != src_after {
+        return Err("ambiguous source rejection mutated a quant".into());
+    }
+
+    Ok(())
+}
+
+/// Two compatible quants already present at the quarantine destination must fail
+/// closed rather than being merged into whichever one the iterator visits first.
+pub fn test_quality_fail_ambiguous_destination_rejected(
+    ctx: &ReducerContext,
+) -> Result<(), String> {
+    ensure_test_superuser(ctx)?;
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let org_id = fixture.organization_id;
+    let company_id = fixture.company_id;
+    let product_id = fixture.product_id;
+
+    create_stock_location(
+        ctx,
+        org_id,
+        CreateStockLocationParams {
+            name: "QC Ambiguous Destination".to_string(),
+            usage: "internal_qc".to_string(),
+            location_category: "qc".to_string(),
+            parent_path: "/".to_string(),
+            child_left: 0,
+            child_right: 0,
+            scrap_location: false,
+            return_location: false,
+            active: true,
+            posx: 0.0,
+            posy: 0.0,
+            posz: 0.0,
+            cyclic_inventory_frequency: 0,
+            location_id: None,
+            complete_name: Some("QC Ambiguous Destination".to_string()),
+            valuation_in_account_id: None,
+            valuation_out_account_id: None,
+            comment: None,
+            barcode: None,
+            last_inventory_date: None,
+            next_inventory_date: None,
+            metadata: Some(r#"{"test":"qc-ambig-dest"}"#.to_string()),
+        },
+    )?;
+    let qc_loc = ctx
+        .db
+        .stock_location()
+        .iter()
+        .find(|l| l.organization_id == org_id && l.name == "QC Ambiguous Destination")
+        .map(|l| l.id)
+        .ok_or("qc location missing")?;
+
+    let source_quant_id =
+        create_quant(ctx, org_id, company_id, product_id, fixture.location_id, 5.0, None)?;
+    // Two compatible destination quants already at the quarantine location.
+    create_quant(ctx, org_id, company_id, product_id, qc_loc, 1.0, None)?;
+    create_quant(ctx, org_id, company_id, product_id, qc_loc, 1.0, None)?;
+
+    create_quality_check(
+        ctx,
+        org_id,
+        company_id,
+        CreateQualityCheckParams {
+            name: "QC-AMBIG-DST".to_string(),
+            test_type: "passfail".to_string(),
+            product_id: Some(product_id),
+            product_variant_id: None,
+            picking_id: None,
+            move_line_id: None,
+            lot_id: None,
+            team_id: None,
+            user_id: None,
+            control_point_id: None,
+            qty_tested: 5.0,
+            tolerance_min: None,
+            tolerance_max: None,
+            norm_unit: None,
+            metadata: None,
+        },
+    )?;
+    let check_id = ctx
+        .db
+        .quality_check()
+        .iter()
+        .find(|c| c.organization_id == org_id && c.name == "QC-AMBIG-DST")
+        .map(|c| c.id)
+        .ok_or("quality check missing")?;
+
+    let source_before = ctx
+        .db
+        .stock_quant()
+        .id()
+        .find(&source_quant_id)
+        .ok_or("source quant missing before ambiguous destination test")?;
+
+    match fail_quality_check(
+        ctx,
+        org_id,
+        company_id,
+        check_id,
+        2.0,
+        None,
+        None,
+        Some(qc_loc),
+    ) {
+        Err(msg) if msg.contains("Multiple destination quants") => {}
+        Err(msg) => {
+            return Err(format!(
+                "Expected duplicate destination rejection, got: {msg}"
+            ))
+        }
+        Ok(()) => return Err("duplicate destination quants were accepted".into()),
+    }
+
+    let source_after = ctx
+        .db
+        .stock_quant()
+        .id()
+        .find(&source_quant_id)
+        .ok_or("source quant missing after ambiguous destination test")?;
+    if (source_after.quantity - source_before.quantity).abs() > 0.001 {
+        return Err("ambiguous destination rejection mutated the source quant".into());
+    }
+
+    Ok(())
+}
+
 /// Wave release creates pick tasks; validate blocked until tasks done; complete needs done pickings.
 pub fn test_wave_release_orchestrates_tasks(ctx: &ReducerContext) -> Result<(), String> {
     ensure_test_superuser(ctx)?;

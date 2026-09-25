@@ -73,6 +73,7 @@ import { useInventoryModuleSubscription } from '@/lib/module-subscription-hooks'
 import { useWorkflowSurface } from '@/hooks/use-workflow-surface';
 import { usePickingWorkflow } from '@lumiere/query-hooks/hooks/picking-workflow';
 import { useStockQuantWorkflow } from '@lumiere/query-hooks/hooks/stock-quant-workflow';
+import { useQualityCheckFailWorkflow } from '@lumiere/query-hooks/hooks/quality-check-fail-workflow';
 import { planPartialDelivery } from '@lumiere/erp-workflows';
 import { groupBy } from '@/lib/utils';
 import { InventoryOpsPanel } from './inventory-ops-panel';
@@ -134,7 +135,6 @@ import {
   // Quality management
   useCreateQualityCheck,
   usePassQualityCheck,
-  useFailQualityCheck,
   useCreateQualityAlert,
   useAssignQualityAlert,
   useCancelQualityAlert,
@@ -996,7 +996,11 @@ function InventoryClientLoaded({
   // Quality management hooks
   const createQualityCheck = useCreateQualityCheck(orgId, operatingCompanyId);
   const passQualityCheck = usePassQualityCheck(orgId, operatingCompanyId);
-  const failQualityCheck = useFailQualityCheck(orgId, operatingCompanyId);
+  const failQualityCheck = useQualityCheckFailWorkflow(
+    orgId,
+    operatingCompanyId ?? 0n,
+    workflowSurface,
+  );
   const createQualityAlert = useCreateQualityAlert(orgId, operatingCompanyId);
   const assignQualityAlert = useAssignQualityAlert(orgId, operatingCompanyId);
   const cancelQualityAlert = useCancelQualityAlert(orgId, operatingCompanyId);
@@ -3205,22 +3209,56 @@ function InventoryClientLoaded({
                   variant: 'destructive',
                   requiresSelection: true,
                   onClick: (rows) => {
-                    const id = rows[0]?.id as ScalarId | undefined;
+                    const row = rows[0] as Record<string, unknown> | undefined;
+                    const id = row?.id as ScalarId | undefined;
+                    const productId = row?.productId ?? row?.product_id;
+                    const companyId = row?.companyId ?? row?.company_id;
+                    const lotId = row?.lotId ?? row?.lot_id;
+                    const quarantineWarehouse = (
+                      warehouses as Record<string, unknown>[]
+                    ).find(
+                      (w) =>
+                        (w.whQcStockLocId ?? w.wh_qc_stock_loc_id) != null,
+                    );
+                    const configuredQuarantineLocationId =
+                      quarantineWarehouse?.whQcStockLocId ??
+                      quarantineWarehouse?.wh_qc_stock_loc_id;
+                    // No warehouse in this org has a configured QC location yet
+                    // (wh_qc_stock_loc_id is create-only, never set by seed data
+                    // or update_warehouse) — ask the operator which location the
+                    // failed stock quarantines to.
+                    const quarantineLocationId =
+                      configuredQuarantineLocationId ??
+                      promptScalarId(
+                        t('inventory.qualityActions.quarantineLocationPrompt'),
+                      );
                     const reason =
                       typeof window !== 'undefined'
                         ? window.prompt(
                             t('inventory.qualityActions.failReason'),
                           )
                         : null;
-                    if (id != null) {
-                      void failQualityCheck.mutateAsync({
-                        checkId: id,
-                        qtyFailed: 1,
-                        note:
-                          reason && reason.trim() !== '' ? reason.trim() : null,
-                        pictureFail: null,
-                        failureLocationId: null,
-                      });
+                    if (
+                      id != null &&
+                      productId != null &&
+                      companyId != null &&
+                      quarantineLocationId != null
+                    ) {
+                      void failQualityCheck.fail(
+                        {
+                          checkId: String(id),
+                          productId: String(productId),
+                          lotId: lotId != null ? String(lotId) : undefined,
+                          companyId: String(companyId),
+                          quarantineLocationId: String(quarantineLocationId),
+                          qtyFailed: 1,
+                          note:
+                            reason && reason.trim() !== ''
+                              ? reason.trim()
+                              : undefined,
+                        },
+                        { navigateToNext: true },
+                      );
                     }
                   },
                 },
