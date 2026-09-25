@@ -12,7 +12,11 @@ use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 use crate::manufacturing::relations::{
     require_workorder_in_company, validate_positive_capacity, validate_positive_duration,
 };
-use crate::types::WorkingState;
+use crate::manufacturing::manufacturing_orders::{
+    mrp_workorder, require_workorder_execution_scope,
+};
+
+use crate::types::{WorkingState, WorkorderState};
 use serde_json;
 
 // ── Tables ───────────────────────────────────────────────────────────────────
@@ -521,22 +525,20 @@ pub fn log_workcenter_productivity(
         return Err("Work center is inactive".to_string());
     }
 
-    // Derive company from the workcenter — never trust a parallel caller argument.
     let company_id = wc.company_id;
-
-    // Validate workorder belongs to the same company as the workcenter.
-    let workorder = require_workorder_in_company(
+    let (workorder, _mo) = require_workorder_execution_scope(
         ctx,
         organization_id,
         company_id,
         params.workorder_id,
-        "productivity workorder",
     )?;
     if workorder.workcenter_id != workcenter_id {
         return Err("productivity workorder does not belong to this work center".to_string());
     }
+    if workorder.state != WorkorderState::Progress {
+        return Err("productivity can only be logged while the workorder is in Progress".to_string());
+    }
 
-    // Validate loss_id against the authoritative loss category table (MFG-009).
     if let Some(lid) = params.loss_id {
         let cat = ctx
             .db
@@ -577,17 +579,32 @@ pub fn log_workcenter_productivity(
             metadata: params.metadata,
         });
 
-    // Update work center productivity tracking
     let mut prod_ids = wc.productivity_ids.clone();
     prod_ids.push(productivity.id);
     let productive_time = wc.productive_time + params.duration;
-
     ctx.db.mrp_workcenter().id().update(MrpWorkcenter {
         productivity_ids: prod_ids,
         productive_time,
         write_uid: ctx.sender(),
         write_date: ctx.timestamp,
         ..wc
+    });
+
+    let mut time_ids = workorder.time_ids.clone();
+    time_ids.push(productivity.id);
+    let duration = workorder.duration + params.duration;
+    let duration_percent = if workorder.duration_expected > 0.0 {
+        (duration / workorder.duration_expected * 100.0).min(100.0)
+    } else {
+        0.0
+    };
+    ctx.db.mrp_workorder().id().update(crate::manufacturing::manufacturing_orders::MrpWorkorder {
+        time_ids,
+        duration,
+        duration_percent,
+        write_uid: ctx.sender(),
+        write_date: ctx.timestamp,
+        ..workorder
     });
 
     write_audit_log_v2(
@@ -645,6 +662,10 @@ pub fn complete_productivity_log(
 
     if log_entry.organization_id != organization_id {
         return Err("Log does not belong to this organization".to_string());
+    }
+
+    if log_entry.date_end.is_some() {
+        return Err("Productivity log is already completed".to_string());
     }
 
     // Derive company from the log entry for audit attribution.
