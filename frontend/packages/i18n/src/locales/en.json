@@ -4499,7 +4499,8 @@
         "blocked": "Blocked"
       },
       "actions": {
-        "markInUse": "Mark in use (reserved → in use)"
+        "markInUse": "Mark in use (reserved → in use)",
+        "reserve": "Reserve (free → reserved)"
       }
     },
     "qualityAlerts": {

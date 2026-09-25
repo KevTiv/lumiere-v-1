@@ -756,3 +756,91 @@ export async function executeReplenishmentRuleViaUi(
     page.getByTestId("entity-action-execute-replenishment-rule").click(),
   ])
 }
+
+/** Create a serial through the Serial numbers tab's row action (prompts: name, then product id). */
+export async function createSerialViaUi(
+  page: Page,
+  productId: number,
+  name: string,
+): Promise<void> {
+  await gotoModule(page, "/inventory", "inventory")
+  await selectModuleTab(page, "inventory", "serials")
+
+  const prompts = [name, String(productId)]
+  page.once("dialog", async (dialog) => {
+    await dialog.accept(prompts.shift() ?? "")
+    page.once("dialog", async (nextDialog) => {
+      await nextDialog.accept(prompts.shift() ?? "")
+    })
+  })
+
+  await Promise.all([
+    page.waitForResponse(
+      (response) =>
+        matchesOperationResponse(response, "create_stock_production_serial") &&
+        response.ok(),
+      { timeout: 30_000 },
+    ),
+    page.getByTestId("entity-action-create-serial").click(),
+  ])
+}
+
+export async function fetchSerialIdByName(
+  page: Page,
+  name: string,
+): Promise<number> {
+  const response = await page.request.get("/api/query/stock-production-serials")
+  if (!response.ok()) throw new Error("Failed to query serials")
+  const payload = (await response.json()) as {
+    data?: Array<Record<string, unknown>>
+  }
+  const matches = (payload.data ?? []).filter(
+    (row) => String(row.name ?? "") === name,
+  )
+  if (matches.length !== 1) {
+    throw new Error(`Expected one serial named ${name}, got ${matches.length}`)
+  }
+  const id = scalarQueryId(matches[0]?.id)
+  if (id == null) throw new Error(`Serial ${name} has no id`)
+  return id
+}
+
+/** Reserve a serial through the Serial numbers tab's row action. */
+export async function reserveSerialViaUi(
+  page: Page,
+  serialId: number,
+): Promise<void> {
+  await gotoModule(page, "/inventory", "inventory")
+  await selectModuleTab(page, "inventory", "serials")
+  await selectEntityRowById(page, serialId)
+
+  await Promise.all([
+    page.waitForResponse(
+      (response) =>
+        matchesOperationResponse(response, "reserve_serial") && response.ok(),
+      { timeout: 30_000 },
+    ),
+    page.getByTestId("entity-action-reserve-serial").click(),
+  ])
+}
+
+export async function expectCanonicalSerialFocus(
+  page: Page,
+  serialId: number,
+): Promise<void> {
+  await expect(page).toHaveURL((url) => {
+    return (
+      url.pathname === "/inventory" &&
+      url.searchParams.get("tab") === "serials" &&
+      url.searchParams.getAll("filter").length === 1 &&
+      url.searchParams.get("filter") === `id:${serialId}`
+    )
+  })
+  await expect(
+    page.getByTestId("module-tab-inventory-serials"),
+  ).toHaveAttribute("aria-selected", "true")
+
+  const table = activeTabEntityTable(page)
+  await expect(table.getByTestId(`entity-row-${serialId}`)).toBeVisible()
+  await expect(table.locator('[data-testid^="entity-row-"]')).toHaveCount(1)
+}
