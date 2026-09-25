@@ -11,8 +11,8 @@ use crate::core::organization::{company_id_from_scope, require_company_in_organi
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 use crate::inventory::product::product;
 use crate::inventory::stock::{
-    create_stock_move, done_stock_move, stock_move, stock_quant, CreateStockMoveParams,
-    DoneStockMoveParams, StockMove, StockQuant,
+    create_stock_move, create_stock_move_internal, done_stock_move, stock_move, stock_quant,
+    CreateStockMoveParams, DoneStockMoveParams, StockMove, StockQuant,
 };
 use crate::manufacturing::bill_of_materials::mrp_bom_line;
 use crate::manufacturing::relations::{
@@ -757,7 +757,7 @@ pub fn consume_mo_materials(
                 &format!("MO {} consume component {}", mo.id, line.product_id),
             )?;
 
-            create_stock_move(
+            let created_move = create_stock_move_internal(
                 ctx,
                 organization_id,
                 CreateStockMoveParams {
@@ -816,22 +816,8 @@ pub fn consume_mo_materials(
                     metadata: None,
                 },
             )?;
-
-            let move_id = ctx
-                .db
-                .stock_move()
-                .iter()
-                .filter(|m| m.production_id == Some(mo.id) && m.product_id == line.product_id)
-                .max_by_key(|m| m.id)
-                .map(|m| m.id)
-                .ok_or("Failed to locate created raw material move")?;
-
-            let move_row = ctx
-                .db
-                .stock_move()
-                .id()
-                .find(&move_id)
-                .ok_or("Raw move not found")?;
+            let move_id = created_move.id;
+            let move_row = created_move;
             if move_row.state == "draft" {
                 ctx.db.stock_move().id().update(StockMove {
                     state: "assigned".to_string(),
@@ -865,8 +851,8 @@ pub fn consume_mo_materials(
     }
 
     ctx.db.mrp_production().id().update(MrpProduction {
+        move_raw_count: created_move_ids.len() as u32,
         move_raw_ids: created_move_ids,
-        move_raw_count: mo.move_raw_count + 1,
         write_uid: ctx.sender(),
         write_date: ctx.timestamp,
         ..mo
