@@ -837,6 +837,25 @@ pub fn consume_mo_materials(
                     quantity_done: required_qty,
                 },
             )?;
+
+            // Manufacturing raw moves have no picking validation step. The
+            // quantity effect is applied below in this reducer, so close the
+            // exact move here instead of leaving consumed material "assigned".
+            let consumed_move = ctx
+                .db
+                .stock_move()
+                .id()
+                .find(&move_id)
+                .ok_or("Raw move disappeared before completion")?;
+            ctx.db.stock_move().id().update(StockMove {
+                state: "done".to_string(),
+                is_done: true,
+                is_assigned: false,
+                write_uid: ctx.sender(),
+                write_date: ctx.timestamp,
+                ..consumed_move
+            });
+
             upsert_stock_quant(
                 ctx,
                 organization_id,
