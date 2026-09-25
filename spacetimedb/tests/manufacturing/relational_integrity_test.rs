@@ -14,9 +14,9 @@ use crate::manufacturing::bill_of_materials::{
 };
 use crate::manufacturing::manufacturing_orders::{
     confirm_manufacturing_order, consume_mo_materials, create_manufacturing_order,
-    create_workorder, finish_manufacturing_order, mrp_production, mrp_workorder,
-    produce_manufacturing_order, start_manufacturing_order, CreateMrpProductionParams,
-    CreateWorkorderParams, MrpProduction, MrpWorkorder,
+    create_workorder, finish_manufacturing_order, finish_workorder, mrp_production, mrp_workorder,
+    produce_manufacturing_order, start_manufacturing_order, start_workorder,
+    CreateMrpProductionParams, CreateWorkorderParams, MrpProduction, MrpWorkorder,
 };
 use crate::manufacturing::work_centers::{
     create_loss_category, create_workcenter, log_workcenter_productivity, mrp_loss_category,
@@ -24,7 +24,7 @@ use crate::manufacturing::work_centers::{
     CreateWorkcenterProductivityParams, MrpLossCategory, MrpWorkcenter,
 };
 use crate::test_harness::{ensure_test_superuser, OrgFixture};
-use crate::types::{BomType, MoState};
+use crate::types::{BomType, MoState, WorkorderState};
 
 fn create_test_workcenter(
     ctx: &ReducerContext,
@@ -1022,5 +1022,276 @@ pub fn test_production_output_and_finish_exact_effect(
     }
 
     log::info!("test_production_output_and_finish_exact_effect passed");
+    Ok(())
+}
+
+
+/// COV-07d: one MO-owned workorder executes through Start → productivity →
+/// Finish with the same exact parent/workcenter/productivity relations.
+pub fn test_workorder_execution_exact_effect(
+    ctx: &ReducerContext,
+) -> Result<(), String> {
+    ensure_test_superuser(ctx)?;
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let workcenter =
+        create_test_workcenter(ctx, &fixture, "COV-07D Workcenter", true)?;
+    let production = create_test_production(ctx, &fixture, "COV-07D-MO")?;
+
+    confirm_manufacturing_order(
+        ctx,
+        fixture.organization_id,
+        fixture.company_id,
+        production.id,
+    )?;
+    start_manufacturing_order(
+        ctx,
+        fixture.organization_id,
+        fixture.company_id,
+        production.id,
+    )?;
+
+    let workorder = create_test_workorder(
+        ctx,
+        &fixture,
+        production.id,
+        workcenter.id,
+        "COV-07D Primary",
+    )?;
+    let pending = create_test_workorder(
+        ctx,
+        &fixture,
+        production.id,
+        workcenter.id,
+        "COV-07D Pending",
+    )?;
+
+    let parent_after_create = ctx
+        .db
+        .mrp_production()
+        .id()
+        .find(&production.id)
+        .ok_or("parent MO missing after workorder create")?;
+    if !parent_after_create.workorder_ids.contains(&workorder.id)
+        || !parent_after_create.workorder_ids.contains(&pending.id)
+    {
+        return Err("parent MO does not own created workorders".to_string());
+    }
+
+    let center_after_create = ctx
+        .db
+        .mrp_workcenter()
+        .id()
+        .find(&workcenter.id)
+        .ok_or("workcenter missing after workorder create")?;
+    let mut expected_order_ids = vec![workorder.id, pending.id];
+    expected_order_ids.sort_unstable();
+    if center_after_create.order_ids != expected_order_ids
+        || center_after_create.workorder_count != 2
+        || center_after_create.workorder_pending_count != 2
+        || center_after_create.workorder_progress_count != 0
+    {
+        return Err(format!(
+            "workcenter create projection mismatch: ids={:?} total={} pending={} progress={}",
+            center_after_create.order_ids,
+            center_after_create.workorder_count,
+            center_after_create.workorder_pending_count,
+            center_after_create.workorder_progress_count
+        ));
+    }
+
+    if log_workcenter_productivity(
+        ctx,
+        fixture.organization_id,
+        workcenter.id,
+        productivity_params(pending.id, None),
+    )
+    .is_ok()
+    {
+        return Err("productivity logging accepted a Pending workorder".to_string());
+    }
+    if productivity_count(ctx, workcenter.id) != 0 {
+        return Err("rejected Pending productivity persisted a log".to_string());
+    }
+
+    start_workorder(
+        ctx,
+        fixture.organization_id,
+        fixture.company_id,
+        workorder.id,
+    )?;
+
+    let started = ctx
+        .db
+        .mrp_workorder()
+        .id()
+        .find(&workorder.id)
+        .ok_or("workorder missing after start")?;
+    if started.state != WorkorderState::Progress || !started.is_user_working {
+        return Err("workorder did not converge to Progress".to_string());
+    }
+
+    let center_after_start = ctx
+        .db
+        .mrp_workcenter()
+        .id()
+        .find(&workcenter.id)
+        .ok_or("workcenter missing after start")?;
+    if center_after_start.workorder_progress_count != 1
+        || center_after_start.workorder_pending_count != 1
+        || center_after_start.workorder_count != 2
+    {
+        return Err("workcenter state counts did not converge after start".to_string());
+    }
+
+    if start_workorder(
+        ctx,
+        fixture.organization_id,
+        fixture.company_id,
+        workorder.id,
+    )
+    .is_ok()
+    {
+        return Err("stale workorder Start replay was accepted".to_string());
+    }
+
+    let duration = 2.5;
+    log_workcenter_productivity(
+        ctx,
+        fixture.organization_id,
+        workcenter.id,
+        CreateWorkcenterProductivityParams {
+            workorder_id: workorder.id,
+            loss_id: None,
+            description: Some("COV-07d exact productivity".to_string()),
+            duration,
+            metadata: Some(r#"{"cov":"07d"}"#.to_string()),
+        },
+    )?;
+
+    let logs: Vec<_> = ctx
+        .db
+        .mrp_workcenter_productivity()
+        .mrp_productivity_by_workorder()
+        .filter(&workorder.id)
+        .collect();
+    if logs.len() != 1 {
+        return Err(format!(
+            "expected exactly one productivity effect, got {}",
+            logs.len()
+        ));
+    }
+    let log = &logs[0];
+    if log.organization_id != fixture.organization_id
+        || log.company_id != fixture.company_id
+        || log.workcenter_id != workcenter.id
+        || log.workorder_id != workorder.id
+        || (log.duration - duration).abs() > 1e-9
+        || log.date_end.is_some()
+    {
+        return Err("productivity effect did not match exact workorder scope".to_string());
+    }
+
+    let workorder_after_log = ctx
+        .db
+        .mrp_workorder()
+        .id()
+        .find(&workorder.id)
+        .ok_or("workorder missing after productivity")?;
+    if workorder_after_log.time_ids != vec![log.id]
+        || (workorder_after_log.duration - duration).abs() > 1e-9
+    {
+        return Err(format!(
+            "workorder productivity relation mismatch: ids={:?} duration={}",
+            workorder_after_log.time_ids, workorder_after_log.duration
+        ));
+    }
+
+    let center_after_log = ctx
+        .db
+        .mrp_workcenter()
+        .id()
+        .find(&workcenter.id)
+        .ok_or("workcenter missing after productivity")?;
+    if !center_after_log.productivity_ids.contains(&log.id)
+        || (center_after_log.productive_time - duration).abs() > 1e-9
+    {
+        return Err("workcenter productivity relation/time mismatch".to_string());
+    }
+
+    finish_workorder(
+        ctx,
+        fixture.organization_id,
+        fixture.company_id,
+        workorder.id,
+    )?;
+
+    let finished = ctx
+        .db
+        .mrp_workorder()
+        .id()
+        .find(&workorder.id)
+        .ok_or("workorder missing after finish")?;
+    if finished.state != WorkorderState::Done
+        || finished.time_ids != vec![log.id]
+        || (finished.duration - duration).abs() > 1e-9
+        || (finished.progress - 100.0).abs() > 1e-9
+        || !finished.is_produced
+        || finished.is_user_working
+        || finished.date_finished.is_none()
+    {
+        return Err("finished workorder did not preserve exact productivity effect".to_string());
+    }
+
+    let completed_log = ctx
+        .db
+        .mrp_workcenter_productivity()
+        .id()
+        .find(&log.id)
+        .ok_or("productivity log missing after finish")?;
+    if completed_log.date_end.is_none() {
+        return Err("finish did not close the workorder productivity log".to_string());
+    }
+
+    let center_after_finish = ctx
+        .db
+        .mrp_workcenter()
+        .id()
+        .find(&workcenter.id)
+        .ok_or("workcenter missing after finish")?;
+    if center_after_finish.order_ids != expected_order_ids
+        || center_after_finish.workorder_count != 2
+        || center_after_finish.workorder_progress_count != 0
+        || center_after_finish.workorder_pending_count != 1
+        || !center_after_finish.productivity_ids.contains(&log.id)
+        || (center_after_finish.productive_time - duration).abs() > 1e-9
+    {
+        return Err("workcenter projections changed incorrectly after finish".to_string());
+    }
+
+    if finish_workorder(
+        ctx,
+        fixture.organization_id,
+        fixture.company_id,
+        workorder.id,
+    )
+    .is_ok()
+    {
+        return Err("stale workorder Finish replay was accepted".to_string());
+    }
+
+    let replayed = ctx
+        .db
+        .mrp_workorder()
+        .id()
+        .find(&workorder.id)
+        .ok_or("workorder missing after replay")?;
+    if replayed.time_ids != vec![log.id]
+        || (replayed.duration - duration).abs() > 1e-9
+        || replayed.state != WorkorderState::Done
+    {
+        return Err("Finish replay changed workorder productivity effect".to_string());
+    }
+
+    log::info!("test_workorder_execution_exact_effect passed");
     Ok(())
 }

@@ -21,6 +21,9 @@ use crate::manufacturing::relations::{
     require_routing_workcenter_in_company, require_warehouse_for_manufacturing,
     validate_positive_duration, validate_positive_qty,
 };
+use crate::manufacturing::work_centers::{
+    mrp_workcenter, mrp_workcenter_productivity, MrpWorkcenter,
+};
 use crate::types::{ConsumptionMode, MoState, WorkorderState};
 use serde_json;
 
@@ -1175,6 +1178,105 @@ pub fn cancel_manufacturing_order(
     }
 }
 
+fn require_workorder_parent(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    wo: &MrpWorkorder,
+) -> Result<MrpProduction, String> {
+    let mo = require_mo_in_company(ctx, organization_id, company_id, wo.production_id)?;
+    if !mo.workorder_ids.contains(&wo.id) {
+        return Err(format!(
+            "Manufacturing order {} does not own workorder {}",
+            mo.id, wo.id
+        ));
+    }
+    Ok(mo)
+}
+
+pub(crate) fn require_workorder_execution_scope(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    workorder_id: u64,
+) -> Result<(MrpWorkorder, MrpProduction), String> {
+    require_company_in_organization(ctx, organization_id, company_id)?;
+    let wo = ctx
+        .db
+        .mrp_workorder()
+        .id()
+        .find(&workorder_id)
+        .ok_or("Work order not found")?;
+    if wo.organization_id != organization_id {
+        return Err("Work order does not belong to this organization".to_string());
+    }
+    if wo.company_id != company_id {
+        return Err("Record does not belong to this company".to_string());
+    }
+    let mo = require_workorder_parent(ctx, organization_id, company_id, &wo)?;
+    if mo.state != MoState::Progress && mo.state != MoState::ToClose {
+        return Err("Parent manufacturing order must be in Progress or ToClose".to_string());
+    }
+    Ok((wo, mo))
+}
+
+pub(crate) fn sync_workcenter_workorder_projection(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    workcenter_id: u64,
+) -> Result<(), String> {
+    let wc = ctx
+        .db
+        .mrp_workcenter()
+        .id()
+        .find(&workcenter_id)
+        .ok_or("Work center not found")?;
+    if wc.organization_id != organization_id || wc.company_id != company_id {
+        return Err("Work center does not match workorder scope".to_string());
+    }
+
+    let rows: Vec<_> = ctx
+        .db
+        .mrp_workorder()
+        .mrp_workorder_by_workcenter()
+        .filter(&workcenter_id)
+        .collect();
+    if rows
+        .iter()
+        .any(|wo| wo.organization_id != organization_id || wo.company_id != company_id)
+    {
+        return Err("Work center has cross-scope workorder rows".to_string());
+    }
+
+    let mut order_ids: Vec<u64> = rows.iter().map(|wo| wo.id).collect();
+    order_ids.sort_unstable();
+    let ready = rows
+        .iter()
+        .filter(|wo| wo.state == WorkorderState::Ready)
+        .count() as u32;
+    let progress = rows
+        .iter()
+        .filter(|wo| wo.state == WorkorderState::Progress)
+        .count() as u32;
+    let pending = rows
+        .iter()
+        .filter(|wo| wo.state == WorkorderState::Pending)
+        .count() as u32;
+
+    ctx.db.mrp_workcenter().id().update(MrpWorkcenter {
+        order_ids,
+        workorder_count: rows.len() as u32,
+        workorder_ready_count: ready,
+        workorder_progress_count: progress,
+        workorder_pending_count: pending,
+        write_uid: ctx.sender(),
+        write_date: ctx.timestamp,
+        ..wc
+    });
+    Ok(())
+}
+
 // ============================================================================
 // REDUCERS: WORK ORDER
 // ============================================================================
@@ -1297,6 +1399,7 @@ pub fn create_workorder(
         write_date: ctx.timestamp,
         ..mo
     });
+    sync_workcenter_workorder_projection(ctx, organization_id, company_id, wo.workcenter_id)?;
 
     write_audit_log_v2(
         ctx,
@@ -1332,24 +1435,27 @@ pub fn start_workorder(
     workorder_id: u64,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "mrp_workorder", "write")?;
-    require_company_in_organization(ctx, organization_id, company_id)?;
-
-    let wo = ctx
-        .db
-        .mrp_workorder()
-        .id()
-        .find(&workorder_id)
-        .ok_or("Work order not found")?;
-
-    if wo.organization_id != organization_id {
-        return Err("Work order does not belong to this organization".to_string());
-    }
-    if wo.company_id != company_id {
-        return Err("Record does not belong to this company".to_string());
-    }
+    let (wo, _mo) =
+        require_workorder_execution_scope(ctx, organization_id, company_id, workorder_id)?;
 
     match wo.state {
         WorkorderState::Pending | WorkorderState::Ready => {
+            if let Some(blocker_id) = wo.blocked_by_workorder_id {
+                let blocker = ctx
+                    .db
+                    .mrp_workorder()
+                    .id()
+                    .find(&blocker_id)
+                    .ok_or("Blocker workorder not found")?;
+                if blocker.production_id != wo.production_id
+                    || blocker.company_id != company_id
+                    || blocker.state != WorkorderState::Done
+                {
+                    return Err("Blocking workorder must be Done before start".to_string());
+                }
+            }
+
+            let workcenter_id = wo.workcenter_id;
             ctx.db.mrp_workorder().id().update(MrpWorkorder {
                 state: WorkorderState::Progress,
                 date_start: Some(ctx.timestamp),
@@ -1358,6 +1464,12 @@ pub fn start_workorder(
                 write_date: ctx.timestamp,
                 ..wo
             });
+            sync_workcenter_workorder_projection(
+                ctx,
+                organization_id,
+                company_id,
+                workcenter_id,
+            )?;
 
             write_audit_log_v2(
                 ctx,
@@ -1390,61 +1502,98 @@ pub fn finish_workorder(
     workorder_id: u64,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "mrp_workorder", "write")?;
-    require_company_in_organization(ctx, organization_id, company_id)?;
+    let (wo, _mo) =
+        require_workorder_execution_scope(ctx, organization_id, company_id, workorder_id)?;
 
-    let wo = ctx
+    if wo.state != WorkorderState::Progress {
+        return Err("Work order must be in Progress state to finish".to_string());
+    }
+
+    let productivity_rows: Vec<_> = ctx
         .db
-        .mrp_workorder()
-        .id()
-        .find(&workorder_id)
-        .ok_or("Work order not found")?;
-
-    if wo.organization_id != organization_id {
-        return Err("Work order does not belong to this organization".to_string());
+        .mrp_workcenter_productivity()
+        .mrp_productivity_by_workorder()
+        .filter(&workorder_id)
+        .collect();
+    if productivity_rows.iter().any(|row| {
+        row.organization_id != organization_id
+            || row.company_id != company_id
+            || row.workcenter_id != wo.workcenter_id
+    }) {
+        return Err("Work order has invalid productivity scope".to_string());
     }
-    if wo.company_id != company_id {
-        return Err("Record does not belong to this company".to_string());
+
+    let mut authoritative_ids: Vec<u64> = productivity_rows.iter().map(|row| row.id).collect();
+    authoritative_ids.sort_unstable();
+    let mut owned_ids = wo.time_ids.clone();
+    owned_ids.sort_unstable();
+    if authoritative_ids != owned_ids {
+        return Err("Work order productivity relation is inconsistent".to_string());
     }
 
-    match wo.state {
-        WorkorderState::Progress => {
-            let duration = wo.duration + 1.0; // Simplified
-            let progress = 100.0;
+    let duration: f64 = productivity_rows.iter().map(|row| row.duration).sum();
+    let duration_percent = if wo.duration_expected > 0.0 {
+        (duration / wo.duration_expected * 100.0).min(100.0)
+    } else {
+        100.0
+    };
 
-            ctx.db.mrp_workorder().id().update(MrpWorkorder {
-                state: WorkorderState::Done,
-                date_finished: Some(ctx.timestamp),
-                duration,
-                progress,
-                is_user_working: false,
-                is_produced: true,
-                write_uid: ctx.sender(),
-                write_date: ctx.timestamp,
-                ..wo
-            });
-
-            write_audit_log_v2(
-                ctx,
-                organization_id,
-                AuditLogParams {
-                    company_id: Some(company_id),
-                    table_name: "mrp_workorder",
-                    record_id: workorder_id,
-                    action: "UPDATE",
-                    old_values: None,
-                    new_values: Some(serde_json::json!({ "state": "done" }).to_string()),
-                    changed_fields: vec![
-                        "state".to_string(),
-                        "date_finished".to_string(),
-                        "is_produced".to_string(),
-                    ],
-                    metadata: None,
-                },
-            );
-
-            log::info!("Work order finished: id={}", workorder_id);
-            Ok(())
+    for productivity in productivity_rows {
+        if productivity.date_end.is_none() {
+            ctx.db
+                .mrp_workcenter_productivity()
+                .id()
+                .update(crate::manufacturing::work_centers::MrpWorkcenterProductivity {
+                    date_end: Some(ctx.timestamp),
+                    write_uid: ctx.sender(),
+                    write_date: ctx.timestamp,
+                    ..productivity
+                });
         }
-        _ => Err("Work order must be in Progress state to finish".to_string()),
     }
+
+    let workcenter_id = wo.workcenter_id;
+    ctx.db.mrp_workorder().id().update(MrpWorkorder {
+        state: WorkorderState::Done,
+        date_finished: Some(ctx.timestamp),
+        duration,
+        duration_percent,
+        progress: 100.0,
+        is_user_working: false,
+        is_produced: true,
+        write_uid: ctx.sender(),
+        write_date: ctx.timestamp,
+        ..wo
+    });
+    sync_workcenter_workorder_projection(
+        ctx,
+        organization_id,
+        company_id,
+        workcenter_id,
+    )?;
+
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "mrp_workorder",
+            record_id: workorder_id,
+            action: "UPDATE",
+            old_values: None,
+            new_values: Some(serde_json::json!({ "state": "done", "duration": duration }).to_string()),
+            changed_fields: vec![
+                "state".to_string(),
+                "date_finished".to_string(),
+                "duration".to_string(),
+                "progress".to_string(),
+                "is_produced".to_string(),
+            ],
+            metadata: None,
+        },
+    );
+
+    log::info!("Work order finished: id={}", workorder_id);
+    Ok(())
 }
+
