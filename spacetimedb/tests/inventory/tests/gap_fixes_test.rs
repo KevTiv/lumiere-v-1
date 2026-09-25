@@ -3114,6 +3114,90 @@ pub fn test_consignment_excluded_from_atp(ctx: &ReducerContext) -> Result<(), St
     }
 }
 
+/// `update_warehouse` can configure `wh_qc_stock_loc_id` after creation — the
+/// only reducer that could set it previously was `create_warehouse`, so a
+/// warehouse's QC location could never be configured retroactively, leaving
+/// `fail_quality_check`'s own warehouse-lookup fallback permanently dead for
+/// any already-created warehouse. An out-of-org location must still be
+/// rejected without mutating the warehouse.
+pub fn test_update_warehouse_qc_location(ctx: &ReducerContext) -> Result<(), String> {
+    ensure_test_superuser(ctx)?;
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let org_id = fixture.organization_id;
+    let company_id = fixture.company_id;
+
+    let other_org = OrgFixture::seed_minimal(ctx)?;
+
+    fn base_update_params() -> UpdateWarehouseParams {
+        UpdateWarehouseParams {
+            name: None,
+            code: None,
+            active: None,
+            reception_steps: None,
+            delivery_steps: None,
+            manufacture_steps: None,
+            buy_to_resupply: None,
+            manufacture_to_resupply: None,
+            crossdock: None,
+            sequence: None,
+            partner_id: None,
+            resupply_wh_ids: None,
+            wh_qc_stock_loc_id: None,
+            metadata: None,
+        }
+    }
+
+    match update_warehouse(
+        ctx,
+        org_id,
+        company_id,
+        fixture.warehouse_id,
+        UpdateWarehouseParams {
+            wh_qc_stock_loc_id: Some(other_org.location_id),
+            ..base_update_params()
+        },
+    ) {
+        Err(msg) if msg.to_lowercase().contains("organization") => {}
+        Err(msg) => return Err(format!("Expected cross-org location rejection, got: {msg}")),
+        Ok(()) => return Err("cross-org QC location was accepted".into()),
+    }
+    let warehouse_after_rejected = ctx
+        .db
+        .warehouse()
+        .id()
+        .find(&fixture.warehouse_id)
+        .ok_or("warehouse missing after rejected update")?;
+    if warehouse_after_rejected.wh_qc_stock_loc_id.is_some() {
+        return Err("rejected cross-org QC location update still set a value".into());
+    }
+
+    update_warehouse(
+        ctx,
+        org_id,
+        company_id,
+        fixture.warehouse_id,
+        UpdateWarehouseParams {
+            wh_qc_stock_loc_id: Some(fixture.location_id),
+            ..base_update_params()
+        },
+    )?;
+
+    let warehouse_after = ctx
+        .db
+        .warehouse()
+        .id()
+        .find(&fixture.warehouse_id)
+        .ok_or("warehouse missing after update")?;
+    if warehouse_after.wh_qc_stock_loc_id != Some(fixture.location_id) {
+        return Err(format!(
+            "expected wh_qc_stock_loc_id {}, got {:?}",
+            fixture.location_id, warehouse_after.wh_qc_stock_loc_id
+        ));
+    }
+
+    Ok(())
+}
+
 /// Cross-dock creates outbound picking from inbound dest when warehouse.crossdock.
 pub fn test_cross_dock_creates_outbound(ctx: &ReducerContext) -> Result<(), String> {
     ensure_test_superuser(ctx)?;
@@ -3139,6 +3223,7 @@ pub fn test_cross_dock_creates_outbound(ctx: &ReducerContext) -> Result<(), Stri
             sequence: None,
             partner_id: None,
             resupply_wh_ids: None,
+            wh_qc_stock_loc_id: None,
             metadata: None,
         },
     )?;
@@ -4482,6 +4567,7 @@ pub fn test_multi_wh_promise_atp(ctx: &ReducerContext) -> Result<(), String> {
             sequence: None,
             partner_id: None,
             resupply_wh_ids: Some(vec![wh_b.id]),
+            wh_qc_stock_loc_id: None,
             metadata: None,
         },
     )?;
