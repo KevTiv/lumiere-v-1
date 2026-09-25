@@ -1,8 +1,9 @@
 /// Payment registration and invoice reconciliation domain tests.
 use spacetimedb::{ReducerContext, Table};
 
-use crate::accounting::journal_entries::account_move;
-use crate::accounting::journal_entries::account_move_line;
+use crate::accounting::journal_entries::{
+    account_move, account_move_line, reconcile_payment_with_invoice,
+};
 use crate::accounting::payments::{
     account_payment, cancel_payment, create_payment, post_payment, register_payment_on_invoice,
     CreatePaymentParams,
@@ -154,6 +155,92 @@ pub fn test_payment_reconciles_invoice(ctx: &ReducerContext) -> Result<(), Strin
             "Invoice residual should be near zero after register, got {}",
             invoice.amount_residual
         ));
+    }
+
+    let before_invoice = (
+        invoice.amount_residual,
+        invoice.payment_state.clone(),
+        invoice.write_date,
+    );
+    let payment_move = ctx
+        .db
+        .account_move()
+        .id()
+        .find(&payment_move_id)
+        .ok_or("Payment move not found after reconcile")?;
+    let before_payment = (
+        payment_move.amount_residual,
+        payment_move.payment_state.clone(),
+        payment_move.write_date,
+    );
+    let before_lines: Vec<_> = ctx
+        .db
+        .account_move_line()
+        .iter()
+        .filter(|line| line.move_id == invoice_move_id || line.move_id == payment_move_id)
+        .map(|line| {
+            (
+                line.id,
+                line.amount_residual,
+                line.amount_residual_currency,
+                line.matching_number.clone(),
+                line.is_matching,
+                line.write_date,
+            )
+        })
+        .collect();
+
+    match reconcile_payment_with_invoice(ctx, org_id, payment_move_id, invoice_move_id) {
+        Err(error) if error.contains("already reconciled") => {}
+        Err(error) => return Err(format!("unexpected reconciliation replay error: {error}")),
+        Ok(()) => return Err("stale reconciliation replay unexpectedly succeeded".to_string()),
+    }
+
+    let after_invoice = ctx
+        .db
+        .account_move()
+        .id()
+        .find(&invoice_move_id)
+        .ok_or("Invoice not found after stale replay")?;
+    let after_payment = ctx
+        .db
+        .account_move()
+        .id()
+        .find(&payment_move_id)
+        .ok_or("Payment move not found after stale replay")?;
+    if before_invoice
+        != (
+            after_invoice.amount_residual,
+            after_invoice.payment_state,
+            after_invoice.write_date,
+        )
+        || before_payment
+            != (
+                after_payment.amount_residual,
+                after_payment.payment_state,
+                after_payment.write_date,
+            )
+    {
+        return Err("stale reconciliation replay changed a canonical move".to_string());
+    }
+    let after_lines: Vec<_> = ctx
+        .db
+        .account_move_line()
+        .iter()
+        .filter(|line| line.move_id == invoice_move_id || line.move_id == payment_move_id)
+        .map(|line| {
+            (
+                line.id,
+                line.amount_residual,
+                line.amount_residual_currency,
+                line.matching_number.clone(),
+                line.is_matching,
+                line.write_date,
+            )
+        })
+        .collect();
+    if before_lines != after_lines {
+        return Err("stale reconciliation replay changed canonical move lines".to_string());
     }
 
     Ok(())
