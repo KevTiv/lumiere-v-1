@@ -5377,7 +5377,9 @@
       "product_id",
       "product_uom_qty",
       "company_id",
-      "picking_id"
+      "picking_id",
+      "purchase_line_id",
+      "is_done"
     ],
     "mandatory": [
       "id",
