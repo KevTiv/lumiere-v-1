@@ -73,15 +73,19 @@ test("response-lost failures still converge on canonical state", async () => {
   assert.deepEqual(fake.invalidated, [["sale-orders", "stock-pickings"]])
 })
 
-test("a failing readback does not turn a committed command into a failure", async () => {
+test("a failing canonical readback cannot be reported as applied", async () => {
   const fake = createFakeCompletionPorts()
-  const result = await completeTransition(
-    spec({ observe: async () => { throw new Error("readback failed") } }),
-    "1",
-    fake.ports,
+  await assert.rejects(
+    completeTransition(
+      spec({ observe: async () => { throw new Error("readback failed") } }),
+      "1",
+      fake.ports,
+    ),
+    (error: unknown) =>
+      error instanceof WorkflowError && error.kind === "outcome_unknown",
   )
-  assert.equal(result.outcome, "applied")
-  assert.equal(result.next, undefined)
+  assert.equal(fake.notices[0]?.kind, "error")
+  assert.equal(fake.notices[0]?.error?.kind, "outcome_unknown")
 })
 
 test("single-flight collapses concurrent runs and releases afterwards", async () => {
