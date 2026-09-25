@@ -6,14 +6,15 @@ use std::time::Duration;
 use spacetimedb::{ReducerContext, Table};
 
 use crate::core::persistence::{organization_commit, organization_row_change};
-use crate::inventory::product::product;
+use crate::inventory::product::{create_product, product, CreateProductParams};
 use crate::inventory::quality::{
     create_workorder_quality_check, fail_workorder_quality_check, pass_quality_check, quality_check,
 };
 use crate::inventory::stock::{stock_move, stock_quant};
 use crate::inventory::warehouse::{create_stock_location, stock_location, warehouse, CreateStockLocationParams};
 use crate::manufacturing::bill_of_materials::{
-    create_bom, mrp_bom, mrp_bom_line, BomLineInput, CreateBomParams, MrpBomLine,
+    create_bom, create_bom_byproduct, mrp_bom, mrp_bom_byproduct, mrp_bom_line, BomLineInput,
+    CreateBomByproductParams, CreateBomParams, MrpBomLine,
 };
 use crate::manufacturing::manufacturing_orders::{
     confirm_manufacturing_order, consume_mo_materials, create_manufacturing_order,
@@ -28,6 +29,130 @@ use crate::manufacturing::work_centers::{
 };
 use crate::test_harness::{ensure_test_superuser, OrgFixture};
 use crate::types::{BomType, MoState, WorkorderState};
+
+pub fn test_bom_byproduct_output_exact_effect(ctx: &ReducerContext) -> Result<(), String> {
+    ensure_test_superuser(ctx)?;
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let primary = ctx.db.product().id().find(&fixture.product_id).ok_or("primary product missing")?;
+    create_product(ctx, fixture.organization_id, CreateProductParams {
+        name: "COV-07G Byproduct".to_string(),
+        categ_id: primary.categ_id,
+        type_: "storable".to_string(),
+        uom_id: primary.uom_id,
+        uom_po_id: primary.uom_po_id,
+        standard_price: 2.0,
+        list_price: 3.0,
+        currency_id: fixture.currency_id,
+        default_code: Some("COV-07G-BYPRODUCT".to_string()),
+        barcode: None,
+        description: None,
+        sale_ok: Some(false),
+        purchase_ok: Some(false),
+        display_name: None,
+        cost_method: None,
+        valuation: None,
+        volume: None,
+        weight: None,
+        can_be_expensed: None,
+        available_in_pos: None,
+        invoicing_policy: None,
+        expense_policy: None,
+        priority: None,
+        is_published: None,
+        description_purchase: None,
+        description_sale: None,
+        service_type: None,
+        service_tracking: None,
+        image_1920_url: None,
+        image_128_url: None,
+        color: None,
+        responsible_id: None,
+        pricelist_id: None,
+        description_picking: None,
+        description_pickingout: None,
+        description_pickingin: None,
+        location_id: None,
+        warehouse_id: Some(fixture.warehouse_id),
+        tracking: None,
+        has_configurable_attributes: None,
+        taxes_id: None,
+        supplier_taxes_id: None,
+        route_ids: None,
+        route_from_categ_ids: None,
+        property_account_income_id: None,
+        property_account_expense_id: None,
+        variant_attribute_ids: None,
+        attribute_line_ids: None,
+        metadata: None,
+    })?;
+    let byproduct_id = ctx.db.product().product_by_org().filter(&fixture.organization_id)
+        .find(|p| p.default_code.as_deref() == Some("COV-07G-BYPRODUCT"))
+        .ok_or("byproduct missing")?.id;
+    create_bom(ctx, fixture.organization_id, CreateBomParams {
+        company_id: Some(fixture.company_id),
+        type_: BomType::Manufacture,
+        product_id: fixture.product_id,
+        product_qty: 1.0,
+        product_uom_id: primary.uom_id,
+        ready_to_produce: "all_available".to_string(),
+        consumption: "flexible".to_string(),
+        sequence: 10,
+        lines: vec![],
+        picking_type_id: None,
+        location_src_id: Some(fixture.location_id),
+        location_dest_id: Some(fixture.location_id),
+        warehouse_id: Some(fixture.warehouse_id),
+        routing_id: None,
+        metadata: None,
+    })?;
+    let bom = ctx.db.mrp_bom().mrp_bom_by_product().filter(&fixture.product_id)
+        .find(|b| b.organization_id == fixture.organization_id && b.company_id == fixture.company_id)
+        .ok_or("BOM missing")?;
+    create_bom_byproduct(ctx, fixture.organization_id, bom.id, CreateBomByproductParams {
+        product_id: byproduct_id,
+        product_qty: 0.5,
+        product_uom_id: primary.uom_id,
+        cost_share: 20.0,
+        sequence: 2,
+        metadata: None,
+    })?;
+    if create_bom_byproduct(ctx, fixture.organization_id, bom.id, CreateBomByproductParams {
+        product_id: byproduct_id, product_qty: 0.5, product_uom_id: primary.uom_id,
+        cost_share: 20.0, sequence: 2, metadata: None,
+    }).is_ok() {
+        return Err("duplicate BOM byproduct was accepted".to_string());
+    }
+    let definition = ctx.db.mrp_bom_byproduct().mrp_bom_byproduct_by_bom().filter(&bom.id)
+        .next().ok_or("byproduct definition missing")?;
+    let owned = ctx.db.mrp_bom().id().find(&bom.id).ok_or("BOM disappeared")?;
+    if owned.byproduct_ids != vec![definition.id] || definition.product_id != byproduct_id {
+        return Err("BOM byproduct ownership mismatch".to_string());
+    }
+
+    let mo = create_test_production_with_bom(ctx, &fixture, "COV-07G-OUTPUT", Some(bom.id))?;
+    confirm_manufacturing_order(ctx, fixture.organization_id, fixture.company_id, mo.id)?;
+    start_manufacturing_order(ctx, fixture.organization_id, fixture.company_id, mo.id)?;
+    produce_manufacturing_order(ctx, fixture.organization_id, fixture.company_id, mo.id, 1.0)?;
+    finish_manufacturing_order(ctx, fixture.organization_id, fixture.company_id, mo.id)?;
+    let finished = ctx.db.mrp_production().id().find(&mo.id).ok_or("MO missing after finish")?;
+    if finished.move_finished_ids.len() != 2 || finished.move_finished_count != 2 {
+        return Err("MO did not own primary and byproduct moves".to_string());
+    }
+    let byproduct_moves: Vec<_> = finished.move_finished_ids.iter().filter_map(|id| ctx.db.stock_move().id().find(id))
+        .filter(|mv| mv.product_id == byproduct_id).collect();
+    if byproduct_moves.len() != 1 || byproduct_moves[0].production_id != Some(mo.id)
+        || !byproduct_moves[0].is_done || (byproduct_moves[0].quantity_done - 0.5).abs() > 1e-9
+        || (byproduct_moves[0].cost_share - 20.0).abs() > 1e-9 {
+        return Err("exact byproduct move mismatch".to_string());
+    }
+    let quants: Vec<_> = ctx.db.stock_quant().quant_by_product().filter(&byproduct_id)
+        .filter(|q| q.organization_id == fixture.organization_id && q.company_id == fixture.company_id
+            && q.location_id == fixture.location_id).collect();
+    if quants.len() != 1 || (quants[0].quantity - 0.5).abs() > 1e-9 {
+        return Err("byproduct quant did not converge exactly".to_string());
+    }
+    Ok(())
+}
 
 pub fn test_finished_output_scrap_exact_effect(ctx: &ReducerContext) -> Result<(), String> {
     ensure_test_superuser(ctx)?;
@@ -172,6 +297,15 @@ fn create_test_production(
     fixture: &OrgFixture,
     origin: &str,
 ) -> Result<MrpProduction, String> {
+    create_test_production_with_bom(ctx, fixture, origin, None)
+}
+
+fn create_test_production_with_bom(
+    ctx: &ReducerContext,
+    fixture: &OrgFixture,
+    origin: &str,
+    bom_id: Option<u64>,
+) -> Result<MrpProduction, String> {
     let product = ctx
         .db
         .product()
@@ -200,7 +334,7 @@ fn create_test_production(
             warehouse_id: warehouse.id,
             picking_type_id: warehouse.pick_type_id,
             consumption: None,
-            bom_id: None,
+            bom_id,
             routing_id: None,
             proc_group_id: None,
             procurement_group_id: None,

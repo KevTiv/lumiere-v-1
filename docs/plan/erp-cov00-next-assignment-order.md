@@ -106,6 +106,8 @@ Next bounded Manufacturing work is COV-07e: one production/workorder-linked qual
 
 COV-07f now implements one bounded post-production scrap backend path, stacked on COV-07e. It records exact MO-owned scrap move identity and moves an untracked finished quantity to a designated scrap location; contract/UI and runtime certification remain pending. See [`erp-cov07f-finished-output-scrap-status.md`](./erp-cov07f-finished-output-scrap-status.md). Byproducts, tracked scrap, and full costing remain separate.
 
+COV-07g now implements authoritative BOM byproducts and exact untracked byproduct output at MO completion, stacked on COV-07f. Contract/UI and runtime certification remain pending. See [`erp-cov07g-bom-byproduct-output-status.md`](./erp-cov07g-bom-byproduct-output-status.md). Tracked byproducts and full accounting valuation remain separate.
+
 
 ## First implementation convergence
 
