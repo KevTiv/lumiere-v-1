@@ -1245,20 +1245,47 @@ pub fn reconcile_account_bank_statement_line(
         .find(&line.statement_id)
         .ok_or("Parent statement not found")?;
 
-    if statement.company_id != company_id {
+    if line.organization_id != organization_id
+        || statement.organization_id != organization_id
+        || statement.company_id != company_id
+        || line.statement_id != statement.id
+        || line.journal_id != statement.journal_id
+    {
         return Err("Record does not belong to this company".to_string());
+    }
+
+    if statement.state != BankStatementState::Open {
+        return Err("Only an Open statement can be reconciled".to_string());
     }
 
     if line.is_reconciled {
         return Err("Line is already reconciled".to_string());
     }
 
+    if params.move_ids.is_empty() {
+        return Err("At least one move line is required".to_string());
+    }
+    if !params.amount_residual.is_finite() || params.amount_residual < 0.0 {
+        return Err("Residual amount must be finite and non-negative".to_string());
+    }
+
+    let mut unique_move_ids = params.move_ids.clone();
+    unique_move_ids.sort_unstable();
+    unique_move_ids.dedup();
+    if unique_move_ids.len() != params.move_ids.len() {
+        return Err("Move line ids must be unique".to_string());
+    }
+
     for move_id in &params.move_ids {
-        ctx.db
+        let move_line = ctx
+            .db
             .account_move_line()
             .id()
             .find(move_id)
             .ok_or(format!("Move line {} not found", move_id))?;
+        if move_line.organization_id != organization_id || move_line.company_id != company_id {
+            return Err(format!("Move line {} belongs to a different company", move_id));
+        }
     }
 
     let is_reconciled = params.amount_residual.abs() < 0.01;

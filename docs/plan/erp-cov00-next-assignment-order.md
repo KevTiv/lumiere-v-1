@@ -119,9 +119,17 @@ stale replay, 403 reader denial, and unchanged-effect proof. Generated contract
 delta is expected to be empty because this slice adds no operation or resource
 shape. See [`erp-cov08a-invoice-payment-reconcile-status.md`](./erp-cov08a-invoice-payment-reconcile-status.md).
 
-Next bounded Finance work is COV-08b: one exact bank-statement reconciliation
-path. The full remaining-stack completion card and ordered COV-08..27 targets
-are recorded in [`erp-cov08-27-stacked-acceptance-plan.md`](./erp-cov08-27-stacked-acceptance-plan.md).
+COV-08b now implements one exact bank-statement-line reconciliation stacked on
+COV-08a. It validates line, parent statement, journal relation and selected
+journal items in the same organization/company, rejects invalid residual/effect
+sets before mutation, and adds exact readback plus stale/deny browser proof.
+Runtime acceptance is pending. See
+[`erp-cov08b-bank-statement-reconcile-status.md`](./erp-cov08b-bank-statement-reconcile-status.md).
+
+Next bounded Finance work is COV-08c: one exact period-close and financial
+statement path. The full remaining-stack completion card and ordered
+COV-08..27 targets are recorded in
+[`erp-cov08-27-stacked-acceptance-plan.md`](./erp-cov08-27-stacked-acceptance-plan.md).
 
 
 ## First implementation convergence
