@@ -14,8 +14,9 @@ use crate::manufacturing::bill_of_materials::{
 };
 use crate::manufacturing::manufacturing_orders::{
     confirm_manufacturing_order, consume_mo_materials, create_manufacturing_order,
-    create_workorder, mrp_production, mrp_workorder, start_manufacturing_order,
-    CreateMrpProductionParams, CreateWorkorderParams, MrpProduction, MrpWorkorder,
+    create_workorder, finish_manufacturing_order, mrp_production, mrp_workorder,
+    produce_manufacturing_order, start_manufacturing_order, CreateMrpProductionParams,
+    CreateWorkorderParams, MrpProduction, MrpWorkorder,
 };
 use crate::manufacturing::work_centers::{
     create_loss_category, create_workcenter, log_workcenter_productivity, mrp_loss_category,
@@ -23,7 +24,7 @@ use crate::manufacturing::work_centers::{
     CreateWorkcenterProductivityParams, MrpLossCategory, MrpWorkcenter,
 };
 use crate::test_harness::{ensure_test_superuser, OrgFixture};
-use crate::types::BomType;
+use crate::types::{BomType, MoState};
 
 fn create_test_workcenter(
     ctx: &ReducerContext,
@@ -810,5 +811,216 @@ pub fn test_consume_materials_exact_effect_and_replay(
     }
 
     log::info!("test_consume_materials_exact_effect_and_replay passed");
+    Ok(())
+}
+
+
+/// COV-07c: production quantity is state/remaining bounded; one finish owns one
+/// exact terminal move and one exact destination-quant increment; replay cannot
+/// duplicate either effect.
+pub fn test_production_output_and_finish_exact_effect(
+    ctx: &ReducerContext,
+) -> Result<(), String> {
+    ensure_test_superuser(ctx)?;
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let mo = create_test_production(ctx, &fixture, "COV-07C-OUTPUT-CLOSE")?;
+
+    if produce_manufacturing_order(
+        ctx,
+        fixture.organization_id,
+        fixture.company_id,
+        mo.id,
+        1.0,
+    )
+    .is_ok()
+    {
+        return Err("produce accepted a Draft manufacturing order".to_string());
+    }
+
+    confirm_manufacturing_order(ctx, fixture.organization_id, fixture.company_id, mo.id)?;
+    start_manufacturing_order(ctx, fixture.organization_id, fixture.company_id, mo.id)?;
+
+    if produce_manufacturing_order(
+        ctx,
+        fixture.organization_id,
+        fixture.company_id,
+        mo.id,
+        1.5,
+    )
+    .is_ok()
+    {
+        return Err("produce accepted quantity above the remaining MO quantity".to_string());
+    }
+
+    let after_rejected_overproduction = ctx
+        .db
+        .mrp_production()
+        .id()
+        .find(&mo.id)
+        .ok_or("MO missing after rejected overproduction")?;
+    if after_rejected_overproduction.qty_produced != 0.0
+        || after_rejected_overproduction.state != MoState::Progress
+    {
+        return Err("rejected overproduction changed MO quantity/state".to_string());
+    }
+
+    produce_manufacturing_order(
+        ctx,
+        fixture.organization_id,
+        fixture.company_id,
+        mo.id,
+        1.0,
+    )?;
+
+    let produced = ctx
+        .db
+        .mrp_production()
+        .id()
+        .find(&mo.id)
+        .ok_or("MO missing after production")?;
+    if produced.state != MoState::ToClose
+        || (produced.qty_produced - produced.product_qty).abs() > 1e-9
+    {
+        return Err(format!(
+            "MO did not converge to ToClose at planned quantity: state={:?} produced={} planned={}",
+            produced.state, produced.qty_produced, produced.product_qty
+        ));
+    }
+
+    if produce_manufacturing_order(
+        ctx,
+        fixture.organization_id,
+        fixture.company_id,
+        mo.id,
+        0.1,
+    )
+    .is_ok()
+    {
+        return Err("produce accepted a second output after ToClose".to_string());
+    }
+
+    let destination_candidates_before: Vec<_> = ctx
+        .db
+        .stock_quant()
+        .iter()
+        .filter(|quant| {
+            quant.organization_id == fixture.organization_id
+                && quant.company_id == fixture.company_id
+                && quant.product_id == fixture.product_id
+                && quant.location_id == fixture.location_id
+                && quant.lot_id.is_none()
+                && quant.package_id.is_none()
+                && quant.owner_id.is_none()
+        })
+        .collect();
+    if destination_candidates_before.len() != 1 {
+        return Err(format!(
+            "expected one destination quant before finish, got {}",
+            destination_candidates_before.len()
+        ));
+    }
+    let destination_quant_id = destination_candidates_before[0].id;
+    let destination_qty_before = destination_candidates_before[0].quantity;
+
+    finish_manufacturing_order(
+        ctx,
+        fixture.organization_id,
+        fixture.company_id,
+        mo.id,
+    )?;
+
+    let finished = ctx
+        .db
+        .mrp_production()
+        .id()
+        .find(&mo.id)
+        .ok_or("MO missing after finish")?;
+    if finished.state != MoState::Done
+        || finished.move_finished_ids.len() != 1
+        || finished.move_finished_count != 1
+    {
+        return Err(format!(
+            "finished MO relation mismatch: state={:?} ids={:?} count={}",
+            finished.state, finished.move_finished_ids, finished.move_finished_count
+        ));
+    }
+
+    let finished_move_id = finished.move_finished_ids[0];
+    let finished_move = ctx
+        .db
+        .stock_move()
+        .id()
+        .find(&finished_move_id)
+        .ok_or("finished move missing")?;
+    if finished_move.organization_id != fixture.organization_id
+        || finished_move.company_id != fixture.company_id
+        || finished_move.production_id != Some(mo.id)
+        || finished_move.product_id != fixture.product_id
+        || finished_move.location_id != fixture.location_id
+        || finished_move.location_dest_id != fixture.location_id
+        || finished_move.state != "done"
+        || !finished_move.is_done
+        || finished_move.is_assigned
+        || (finished_move.product_uom_qty - 1.0).abs() > 1e-9
+        || (finished_move.quantity_done - 1.0).abs() > 1e-9
+    {
+        return Err("finished-goods move did not converge exactly".to_string());
+    }
+
+    let destination_candidates_after: Vec<_> = ctx
+        .db
+        .stock_quant()
+        .iter()
+        .filter(|quant| {
+            quant.organization_id == fixture.organization_id
+                && quant.company_id == fixture.company_id
+                && quant.product_id == fixture.product_id
+                && quant.location_id == fixture.location_id
+                && quant.lot_id.is_none()
+                && quant.package_id.is_none()
+                && quant.owner_id.is_none()
+        })
+        .collect();
+    if destination_candidates_after.len() != 1
+        || destination_candidates_after[0].id != destination_quant_id
+        || (destination_candidates_after[0].quantity - (destination_qty_before + 1.0)).abs() > 1e-9
+    {
+        return Err("destination quant did not converge by exact finished quantity".to_string());
+    }
+
+    if finish_manufacturing_order(
+        ctx,
+        fixture.organization_id,
+        fixture.company_id,
+        mo.id,
+    )
+    .is_ok()
+    {
+        return Err("finish replay was accepted after MO reached Done".to_string());
+    }
+
+    let replayed = ctx
+        .db
+        .mrp_production()
+        .id()
+        .find(&mo.id)
+        .ok_or("MO missing after finish replay")?;
+    if replayed.move_finished_ids != finished.move_finished_ids
+        || replayed.move_finished_count != 1
+    {
+        return Err("finish replay changed the owned finished-move set".to_string());
+    }
+
+    let quant_after_replay = ctx
+        .db
+        .stock_quant()
+        .id()
+        .find(&destination_quant_id)
+        .ok_or("destination quant missing after replay")?;
+    if (quant_after_replay.quantity - destination_candidates_after[0].quantity).abs() > 1e-9 {
+        return Err("finish replay changed destination quantity".to_string());
+    }
+
+    log::info!("test_production_output_and_finish_exact_effect passed");
     Ok(())
 }
