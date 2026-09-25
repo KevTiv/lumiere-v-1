@@ -129,7 +129,6 @@ test.describe("DOC-009 document upload → attach → legal hold", { tag: "@p0" 
         partner_id: some(contactId),
         tag_ids: [],
         is_favorite: false,
-        index_content: some("DOC-009 smoke index content"),
         classification_id: none,
         retention_days: none,
         fiscal_kind: none,
