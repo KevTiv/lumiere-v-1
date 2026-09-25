@@ -159,7 +159,9 @@ pub fn run_inventory_serial_id_validate_test(ctx: &ReducerContext) -> Result<(),
 #[spacetimedb::reducer]
 pub fn run_inventory_replenishment_demand_test(ctx: &ReducerContext) -> Result<(), String> {
     gap_fixes_test::test_replenishment_creates_draft_po(ctx)
-        .map_err(|e| format!("replenishment_demand: {e}"))
+        .map_err(|e| format!("replenishment_demand: {e}"))?;
+    gap_fixes_test::test_replenishment_scheduled_run_reschedules(ctx)
+        .map_err(|e| format!("replenishment_scheduled_run: {e}"))
 }
 
 #[spacetimedb::reducer]
