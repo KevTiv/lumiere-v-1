@@ -3075,7 +3075,9 @@
     "default_restricted": [
       "bom_id",
       "product_id",
-      "company_id"
+      "company_id",
+      "product_qty",
+      "product_uom_id"
     ],
     "mandatory": [
       "id",
@@ -3091,7 +3093,9 @@
     "default_restricted": [
       "product_tmpl_id",
       "company_id",
-      "type"
+      "type",
+      "product_id",
+      "product_uom_id"
     ],
     "mandatory": [
       "id",
@@ -3107,7 +3111,20 @@
     "default_restricted": [
       "state",
       "product_id",
-      "company_id"
+      "company_id",
+      "bom_id",
+      "origin",
+      "product_qty",
+      "product_uom_id",
+      "qty_producing",
+      "qty_produced",
+      "location_src_id",
+      "location_dest_id",
+      "move_raw_ids",
+      "move_raw_count",
+      "move_finished_ids",
+      "move_finished_count",
+      "workorder_ids"
     ],
     "mandatory": [
       "id",
@@ -3139,7 +3156,12 @@
     ],
     "default_restricted": [
       "name",
-      "company_id"
+      "company_id",
+      "workorder_count",
+      "workorder_progress_count",
+      "productive_time",
+      "order_ids",
+      "productivity_ids"
     ],
     "mandatory": [
       "id",
@@ -3155,7 +3177,13 @@
     "default_restricted": [
       "state",
       "production_id",
-      "company_id"
+      "company_id",
+      "workcenter_id",
+      "duration_expected",
+      "duration",
+      "progress",
+      "is_produced",
+      "time_ids"
     ],
     "mandatory": [
       "id",
@@ -3501,7 +3529,9 @@
       "residual_before",
       "residual_after",
       "is_reversal",
+      "write_off_amount",
       "write_off_account_id",
+      "write_off_move_id",
       "metadata"
     ],
     "mandatory": [
@@ -3910,7 +3940,8 @@
       "public_price",
       "type",
       "barcode",
-      "purchase_ok"
+      "purchase_ok",
+      "tracking"
     ],
     "mandatory": [
       "id",
@@ -5377,7 +5408,14 @@
       "product_id",
       "product_uom_qty",
       "company_id",
-      "picking_id"
+      "picking_id",
+      "purchase_line_id",
+      "is_done",
+      "production_id",
+      "location_id",
+      "location_dest_id",
+      "product_uom",
+      "quantity_done"
     ],
     "mandatory": [
       "id",
@@ -5413,6 +5451,7 @@
       "state",
       "company_id",
       "sale_id",
+      "purchase_id",
       "picking_code",
       "is_return",
       "backorder_id",
@@ -5469,7 +5508,10 @@
       "product_id",
       "location_id",
       "quantity",
-      "company_id"
+      "company_id",
+      "lot_id",
+      "package_id",
+      "owner_id"
     ],
     "mandatory": [
       "id",
@@ -6004,7 +6046,8 @@
     "default_restricted": [
       "name",
       "employee_id",
-      "company_id"
+      "company_id",
+      "validation_status"
     ],
     "mandatory": [
       "id",
