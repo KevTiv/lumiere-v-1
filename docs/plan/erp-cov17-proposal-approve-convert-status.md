@@ -1,6 +1,6 @@
 # COV-17 — Versioned review → approve → convert to sale order
 
-**Status:** PARTIAL — award approval IMPLEMENTED (runtime acceptance pending); conversion to sale order still scaffolded  
+**Status:** IMPLEMENTED — runtime acceptance pending  
 **Module/surface:** Proposals  
 **Plan target:** versioned review → canonical conversion  
 **Scaffold source:** [`erp-cov08-27-scaffold.md`](./erp-cov08-27-scaffold.md)
@@ -59,11 +59,32 @@ Reviewer persona distinct from author.
 | O | Playwright drives the transition through the visible UI action (setup calls allowed only for fixtures) | DONE — Proposals → Award in `frontend/web/tests/e2e/cov17-proposal-approve-convert.spec.ts`; the admin's own proposal is refused (422) and stays Submitted |
 | E | Exact-effect resolver unit test (state/scope/identity/ambiguity) and browser snapshot preserved after stale (422) and denied (403) replay | DONE — `proposal-award.test.ts`; spec asserts the id/org/company/status/sale-order snapshot after every replay |
 
-## Slice 2 — conversion (pending)
+## Slice 2 — conversion (implemented)
 
-`convert_proposal_to_sale_order` already rejects a second conversion (`sale_order_id` set).
-Remaining: drive it from the UI and resolve the created order through `proposals.sale_order_id`
-(projected) with stale/denied replays.
+- **UI gap closed:** `useConvertProposalToSaleOrder` existed but no screen called it. Proposals
+  now has a **Convert to sale order** action (Awarded, not yet converted) that opens a
+  pricelist/warehouse form (`form-modal-convert-proposal-order`).
+- **Row click:** clicking a proposal row both toggled selection and navigated to the
+  workspace, so every selection-based toolbar action (Submit, Award, Convert…) left the page.
+  Row click now only selects; a new **Open** action navigates to the workspace.
+- **Domain:** `convert_proposal_to_sale_order` already rejects a second conversion
+  (`sale_order_id` set); the native test now proves the replay is rejected and creates no
+  second order (`test_convert_proposal_derives_product_uom`).
+- **Readback:** `useConvertProposalToSaleOrder` resolves the order only through the proposal's
+  own `sale_order_id` (`resolveProposalConversionEffect`): same Awarded proposal in scope, and
+  exactly one `sale-orders` row with that id in the same organization and company.
+- **Spec:** the same `@p0 @cov17` spec converts the awarded proposal through the UI, then
+  asserts the proposal snapshot and the single scoped order after a stale replay (422) and a
+  reader replay (403).
+
+## D/A/O/E proof checklist (conversion)
+
+| Gate | State |
+| --- | --- |
+| D | DONE — conversion replay rejected with the proposal unchanged and exactly one order |
+| A | DONE — `check_permission(proposal, write)` + scoped load; reader replay asserted 403 |
+| O | DONE — Proposals → Convert to sale order → form submit |
+| E | DONE — `proposal-award.test.ts` (relation, missing/foreign order, duplicates); spec snapshot after stale and denied replay |
 
 ## Acceptance
 

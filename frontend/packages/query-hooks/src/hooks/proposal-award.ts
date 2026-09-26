@@ -43,3 +43,37 @@ export function resolveProposalStatusEffect(
     || proposalStatusKey(row.status) !== proposalStatusKey(expectedStatus)) return null
   return { resource: "proposals", id: proposalId.toString() }
 }
+
+export type SaleOrderScopeProjection = {
+  readonly id?: unknown
+  readonly organizationId?: unknown
+  readonly organization_id?: unknown
+  readonly companyId?: unknown
+  readonly company_id?: unknown
+}
+
+/**
+ * COV-17: resolve the sale order created by `convert_proposal_to_sale_order`
+ * through the proposal's own `sale_order_id` relation — never by newest order.
+ * The proposal must be the same Awarded id in scope, and exactly one sale order
+ * with that id must exist in the same organization and company.
+ */
+export function resolveProposalConversionEffect(
+  proposalRows: readonly (ProposalStatusProjection & { readonly saleOrderId?: unknown; readonly sale_order_id?: unknown })[],
+  saleOrderRows: readonly SaleOrderScopeProjection[],
+  organizationId: bigint,
+  companyId: bigint,
+  proposalId: bigint,
+): CanonicalRecordRef | null {
+  if (!resolveProposalStatusEffect(proposalRows, organizationId, companyId, proposalId, "awarded")) return null
+  const proposal = proposalRows.find((row) => parseStrictU64(row.id) === proposalId)!
+  const saleOrderId = parseStrictU64(proposal.saleOrderId ?? proposal.sale_order_id)
+  if (saleOrderId == null) return null
+  const orders = saleOrderRows.filter((row) => parseStrictU64(row.id) === saleOrderId)
+  if (orders.length > 1) throw new AmbiguousOperationEffectError(`Expected one sale order, found ${orders.length}`)
+  const order = orders[0]
+  if (!order
+    || parseStrictU64(order.organizationId ?? order.organization_id) !== organizationId
+    || parseStrictU64(order.companyId ?? order.company_id) !== companyId) return null
+  return { resource: "sale-orders", id: saleOrderId.toString() }
+}

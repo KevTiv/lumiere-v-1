@@ -340,6 +340,33 @@ pub fn test_convert_proposal_derives_product_uom(ctx: &ReducerContext) -> Result
         return Err(format!("proposal row order/scope mismatch: {tables:?}"));
     }
 
+    // COV-17: a replayed conversion is rejected and creates no second order.
+    let orders_for_proposal = || {
+        ctx.db
+            .sale_order()
+            .iter()
+            .filter(|o| o.organization_id == org_id && o.proposal_id == Some(proposal_id))
+            .count()
+    };
+    let replay = convert_proposal_to_sale_order(
+        ctx,
+        org_id,
+        company_id,
+        proposal_id,
+        ConvertProposalToSaleOrderParams {
+            warehouse_id: fixture.warehouse_id,
+            pricelist_id,
+        },
+    );
+    match replay {
+        Err(message) if message.contains("already converted") => {}
+        Err(message) => return Err(format!("unexpected conversion replay rejection: {message}")),
+        Ok(()) => return Err("replayed conversion must be rejected".into()),
+    }
+    if orders_for_proposal() != 1 || proposal_row(ctx, proposal_id)? != proposal {
+        return Err("rejected conversion replay changed the proposal or its orders".into());
+    }
+
     Ok(())
 }
 

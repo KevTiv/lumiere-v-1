@@ -13,7 +13,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 
 import { apiFetch, fetchQueryList, rqBigIntKey } from "../http"
 import { responseErrorMessage } from "@lumiere/api-client/response-error"
-import { resolveProposalStatusEffect } from "./proposal-award"
+import { resolveProposalConversionEffect, resolveProposalStatusEffect } from "./proposal-award"
 import type {
   Proposal,
   ProposalBidDecision,
@@ -869,7 +869,20 @@ export function useConvertProposalToSaleOrder(
           "ConvertProposalToSaleOrderParams",
         ) })
       const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error("Failed to convert proposal to sale order")
+      if (!r.ok) throw new Error(await responseErrorMessage(r, "Failed to convert proposal to sale order"))
+      const [proposalRows, saleOrderRows] = await Promise.all([
+        fetchQueryList("/api/query/proposals", "Failed to read proposal"),
+        fetchQueryList("/api/query/sale-orders", "Failed to read sale orders"),
+      ])
+      const effect = resolveProposalConversionEffect(
+        proposalRows,
+        saleOrderRows,
+        organizationId,
+        company,
+        toScalarU64(params.proposalId),
+      )
+      if (!effect) throw new Error("Proposal did not read back as converted to a sale order")
+      return effect
     },
     onSuccess: () => invalidateProposalQueries(qc),
   })
