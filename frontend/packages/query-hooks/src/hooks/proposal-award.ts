@@ -15,9 +15,8 @@ export type ProposalStatusProjection = {
 export function proposalStatusKey(status: unknown): string {
   if (typeof status === "string") return status.trim().toLowerCase()
   if (status && typeof status === "object" && !Array.isArray(status)) {
-    const record = status as Record<string, unknown>
-    if (typeof record.tag === "string") return record.tag.toLowerCase()
-    const keys = Object.keys(record)
+    if ("tag" in status && typeof status.tag === "string") return status.tag.toLowerCase()
+    const keys = Object.keys(status)
     if (keys.length === 1) return keys[0]!.toLowerCase()
   }
   return ""

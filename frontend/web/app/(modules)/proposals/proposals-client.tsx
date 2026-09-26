@@ -156,7 +156,7 @@ function ProposalsClientLoaded({ initialProposals, organizationId }: ProposalsCl
   const convertFormConfig = useMemo((): FormConfig => {
     const options = (rows: unknown[]) =>
       rows.map((value) => {
-        const row = value as Record<string, unknown>
+        const row = value as { id?: unknown; name?: unknown }
         return { value: String(row.id ?? ""), label: String(row.name ?? row.id ?? "") }
       })
     const pricelistOptions = options(pricelists)
@@ -165,7 +165,7 @@ function ProposalsClientLoaded({ initialProposals, organizationId }: ProposalsCl
       { ...convertOpportunityToOrderForm(t), id: "convert-proposal-order" },
       { pricelistId: pricelistOptions, warehouseId: warehouseOptions },
     )
-    const defaults: Record<string, unknown> = {}
+    const defaults: { pricelistId?: string; warehouseId?: string } = {}
     if (pricelistOptions[0]) defaults.pricelistId = pricelistOptions[0].value
     if (warehouseOptions[0]) defaults.warehouseId = warehouseOptions[0].value
     return mergeFieldDefaultValues(base, defaults)
