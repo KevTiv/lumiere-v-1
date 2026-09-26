@@ -44,6 +44,7 @@ import {
   observeSentPurchaseOrder,
   postLandedCostAction,
   receivePurchaseLineAction,
+  resolveOpenReceiptTarget,
   rejectSupplierIntakeAction,
   releaseBlanketAction,
   reviewSupplierIntakeAction,
@@ -54,6 +55,7 @@ import {
   type AwardRfqBidInput,
   type CreateBillFromPurchaseOrderInput,
   type CreateVendorCreditInput,
+  type ReceiptTarget,
   type ReceivePurchaseLineInput,
   type ReleaseBlanketInput,
   type ReviewSupplierIntakeInput,
@@ -123,6 +125,7 @@ export interface PurchasingWorkflowLabels {
 }
 
 type BillInput = CreateBillFromPurchaseOrderInput<CreateBillFromPurchaseOrderParams>
+type ReceiveRunInput = ReceivePurchaseLineInput & { receiptTarget?: ReceiptTarget }
 type VendorCreditInput = CreateVendorCreditInput<VendorCreditFromReturnParams>
 type ReleaseInput = ReleaseBlanketInput<ReleaseBlanketToPoParams>
 
@@ -193,12 +196,21 @@ export function usePurchasingWorkflow(
         observe: async ({ orderId }) => observeCreatedBill(orderId, await orders()),
       }),
 
-      receiveLine: typed<ReceivePurchaseLineInput>({
+      receiveLine: typed<ReceiveRunInput>({
         id: "purchasing.line.receive",
-        command: receivePurchaseOrderLineCommand,
+        command: (input) =>
+          receivePurchaseOrderLineCommand({
+            lineId: input.lineId,
+            qty: input.qty,
+            lotId: input.lotId,
+          }),
         affects: RECEIVE_PO_LINE_AFFECTS,
-        observe: async ({ lineId }) =>
-          observeReceivedLine(lineId, await fresh<RowValueMap[]>(stockMovesQueryOptions(organizationId))),
+        observe: async ({ lineId, receiptTarget }) =>
+          observeReceivedLine(
+            lineId,
+            receiptTarget,
+            await fresh<RowValueMap[]>(stockMovesQueryOptions(organizationId)),
+          ),
       }),
 
       awardBid: typed<AwardRfqBidInput>({
@@ -318,10 +330,23 @@ export function usePurchasingWorkflow(
         label: labels.createBill,
         execute: bind(specs.createBill, (i) => i.orderId),
       }),
-      /** Row dispatch receives the full open quantity; the receive form dispatches its own quantity/lot. */
+      /** Row dispatch receives the full open quantity; capture exact receipt identity before dispatch. */
       receiveLine: receivePurchaseLineAction({
         label: labels.receiveLine,
-        execute: bind(specs.receiveLine, (i) => i.lineId),
+        execute: async (input, context) => {
+          const moves = (await qc.fetchQuery({
+            ...stockMovesQueryOptions(organizationId),
+            staleTime: 0,
+          })) as RowValueMap[]
+          const receiptTarget = resolveOpenReceiptTarget(input.lineId, moves)
+          const runInput: ReceiveRunInput = { ...input, receiptTarget }
+          return runner.run(
+            `${specs.receiveLine.id}:${input.lineId}`,
+            specs.receiveLine,
+            runInput,
+            { navigateToNext: context?.navigateToNext },
+          )
+        },
       }),
       awardBid: awardRfqBidAction({ label: labels.awardBid, execute: bind(specs.awardBid, (i) => i.rfqId) }),
       createVendorCredit: createVendorCreditFromReturnAction<VendorCreditFromReturnParams>({
@@ -333,7 +358,7 @@ export function usePurchasingWorkflow(
         execute: bind(specs.releaseBlanket, (i) => i.blanketOrderId),
       }),
     }
-  }, [labels, runner, specs])
+  }, [labels, runner, specs, qc, organizationId])
 
   return {
     requisitionActions: actions.requisition,

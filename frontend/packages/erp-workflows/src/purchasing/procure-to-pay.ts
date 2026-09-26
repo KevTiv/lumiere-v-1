@@ -195,22 +195,70 @@ export function observeCreatedBill(orderId: string, orders: readonly RowValueMap
   return { outcome: "applied", createdRecords: [bill], next: bill }
 }
 
+export interface ReceiptTarget {
+  moveId: string
+  pickingId: string
+}
+
 /**
- * Receiving validates a receipt picking through its move: the newest done move for the line
- * names the receipt that was just validated. Non-stock (service) lines have no move and stay put.
+ * Resolve the exact open stock move that a receive command is about to advance.
+ *
+ * Zero matches is valid for service/legacy lines and lets the reducer decide. Multiple matches
+ * are deliberately unresolved: neither the client nor the reducer may choose an arbitrary row.
  */
-export function observeReceivedLine(lineId: string, moves: readonly RowValueMap[]): ObservedTransition {
-  const picking = moves
-    .filter((move) => {
-      const line = firstNonNullKey(move, "purchaseLineId", "purchase_line_id")
-      const done = Boolean(firstNonNullKey(move, "isDone", "is_done")) || String(firstNonNullKey(move, "state") ?? "") === "done"
-      return line != null && String(line) === lineId && done && firstNonNullKey(move, "pickingId", "picking_id") != null
-    })
-    .map((move) => String(firstNonNullKey(move, "pickingId", "picking_id")))
-    .sort((a, b) => Number(a) - Number(b))
-    .at(-1)
-  if (!picking) return { outcome: "applied" }
-  const receipt = recordRef(pickingWorkflow.resource, picking, pickingWorkflow.module, purchaseOrderWorkflow.module)
+export function resolveOpenReceiptTarget(
+  lineId: string,
+  moves: readonly RowValueMap[],
+): ReceiptTarget | undefined {
+  const matches = moves.flatMap((move) => {
+    const line = firstNonNullKey(move, "purchaseLineId", "purchase_line_id")
+    const pickingId = firstNonNullKey(move, "pickingId", "picking_id")
+    const done =
+      Boolean(firstNonNullKey(move, "isDone", "is_done")) ||
+      String(firstNonNullKey(move, "state") ?? "") === "done"
+    const cancelled = String(firstNonNullKey(move, "state") ?? "") === "cancel"
+    if (line == null || String(line) !== lineId || pickingId == null || done || cancelled) return []
+    return [{ moveId: rowId(move), pickingId: String(pickingId) }]
+  })
+  return matches.length === 1 ? matches[0] : undefined
+}
+
+/**
+ * Observe only the move/picking identity captured before dispatch. A later/higher-id move can
+ * never replace it in the semantic result. Non-stock (service) lines have no target and stay put.
+ */
+export function observeReceivedLine(
+  lineId: string,
+  target: ReceiptTarget | undefined,
+  moves: readonly RowValueMap[],
+): ObservedTransition {
+  if (!target) return { outcome: "applied" }
+
+  const move = moves.find((candidate) => rowId(candidate) === target.moveId)
+  if (!move) return {}
+
+  const line = firstNonNullKey(move, "purchaseLineId", "purchase_line_id")
+  const pickingId = firstNonNullKey(move, "pickingId", "picking_id")
+  const done =
+    Boolean(firstNonNullKey(move, "isDone", "is_done")) ||
+    String(firstNonNullKey(move, "state") ?? "") === "done"
+
+  if (
+    line == null ||
+    String(line) !== lineId ||
+    pickingId == null ||
+    String(pickingId) !== target.pickingId ||
+    !done
+  ) {
+    return {}
+  }
+
+  const receipt = recordRef(
+    pickingWorkflow.resource,
+    target.pickingId,
+    pickingWorkflow.module,
+    purchaseOrderWorkflow.module,
+  )
   return { outcome: "applied", createdRecords: [receipt], next: receipt }
 }
 
