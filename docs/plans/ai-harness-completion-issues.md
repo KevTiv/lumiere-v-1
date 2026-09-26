@@ -326,6 +326,35 @@ Current wiring and remaining work:
   exposed only through AIH-16's session-owned BFF, which binds the acting user,
   organization and membership company to an exact current reviewer grant; no
   generic browser read contract was added.
+- **Update (2026-09-22): a source can now be inspected directly by id**,
+  closing the part of the gap above where a source/source_version was only
+  reachable indirectly, by already knowing a claim/decision/component/
+  knowledge_version that cited it. `InspectTarget::parse` (`ai-gateway/src/
+  orchestrator/evidence_inspector.rs`) gained a `Source(u64)` variant and a
+  new `inspect_source` assembly path, re-authorized through the exact same
+  boundary as every other kind (`source_in_scope`, never `owned_by`, so an
+  organization-scoped source stays visible outside its ingesting company).
+  It returns the `SourceView`, every `SourceVersionView`, their lifecycle
+  history (new `SourceChangeView`/`ai_evidence_source_change`, previously
+  unexposed anywhere) and every `PassageView` recorded against the source's
+  `(source_kind, source_key)` — three new `EvidenceRows` trait methods
+  (`source_versions_of`, `passages_of_source`, `source_changes_of_version`)
+  with safe no-op defaults. `api-server/src/routes/evidence_inspection.rs`'s
+  `kind` allowlist now accepts `"source"` alongside the existing five kinds;
+  the security boundary is unchanged (session-owned, exact
+  `ai.evidence.inspect` grant, org/company scope re-checked at request time).
+  `findings`/`lineage_passes` are not meaningful for a bare source (it is not
+  a publishable lineage chain), so they are always empty/true for this kind.
+  Verified: `cargo test -p ai-gateway --bin gateway evidence_inspector` (26/26,
+  including two new tests) and `cargo test -p api-server evidence_inspection
+  --lib` (5/5). Not yet wired into any frontend UI — the existing reviewer
+  panel (`frontend/web/app/(modules)/ai-harness/evidence-reviewer-panel.tsx`)
+  only offers decision/claim/workflow_step in its kind selector (it deliberately
+  omits component/knowledge_version too, since those existed before this
+  change), and adding a source browser there is a separate follow-up. Still
+  open: no way to *discover* a source id without already having one (a list/
+  browse endpoint was explicitly scoped out of this change; see the read-only
+  API surface note above).
 - Chat and generation do not call the new user-contribution endpoint, so the
   route is not yet part of a production discussion flow. `turn_ref` remains a
   bounded correlation string rather than validated message lineage.
