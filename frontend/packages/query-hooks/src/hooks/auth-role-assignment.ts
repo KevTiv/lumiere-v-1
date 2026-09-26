@@ -16,7 +16,7 @@ export type RoleAssignmentProjection = {
 
 function identityHex(value: unknown): string {
   if (value && typeof value === "object") {
-    const record = value as Record<string, unknown>
+    const record = value as { hex?: unknown; Hex?: unknown; __identity__?: unknown }
     return identityHex(record.hex ?? record.Hex ?? record.__identity__ ?? "")
   }
   return String(value ?? "").trim().replace(/^0x/i, "").toLowerCase()
