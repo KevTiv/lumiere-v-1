@@ -227,7 +227,7 @@
       "contract_release_required": "no",
       "contract_note": "none: `proposals` exposes status, sale_order_id and project_id, so approve and convert resolve through the proposal's own relations",
       "prerequisites": "Reviewer persona distinct from author.",
-      "status": "SCAFFOLDED",
+      "status": "PARTIAL — award approval implemented, conversion pending",
       "status_doc": "docs/plan/erp-cov17-proposal-approve-convert-status.md",
       "spec": "frontend/web/tests/e2e/cov17-proposal-approve-convert.spec.ts",
       "hooks": [
