@@ -58,7 +58,7 @@
     "config_sources": [
       {
         "path": ".env.docker.example",
-        "sha256": "58d62cb8c16220b57108205992e23e53b982026e353f4d42bb61a80576603e5a"
+        "sha256": "804dd2eeea31a63008c07e0f698cf572617c1fe97e5e96ca2d9cc7481c2478b5"
       },
       {
         "path": "frontend/web/.env.example",
