@@ -440,6 +440,16 @@
       "idempotency": "non_idempotent",
       "semantic_kind": "command"
     },
+    "create_company_stock_location": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/inventory/warehouse.rs:635 reducer body shows append-only insert/event or accumulated side effect; session-exposed.",
+      "idempotency": "non_idempotent",
+      "semantic_kind": "command"
+    },
     "create_cycle_count_plan": {
       "client_facing": true,
       "codec": {
