@@ -34,7 +34,10 @@ import {
 } from "@lumiere/query-hooks/hooks/accounting"
 import type { PartnerType, PaymentDirection, PaymentFeeBearer, PaymentProviderCode } from "@lumiere/stdb/types"
 import { nullableBigIntU64 as asId, unwrapSome as optionValue } from "@lumiere/erp-shared/form-coercion"
-import { stbTimestampFromDate } from "@lumiere/erp-shared/stb-timestamp"
+import {
+  statementImportIdempotencyKey,
+  statementImportRows,
+} from "@/lib/statement-import-csv"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -78,80 +81,6 @@ function statusVariant(status: string) {
   if (status === "Posted") return "default" as const
   if (status === "Reversed" || status === "Voided") return "destructive" as const
   return "secondary" as const
-}
-
-function parseCsvLine(line: string, delimiter: string): string[] {
-  const values: string[] = []
-  let value = ""
-  let quoted = false
-  for (let index = 0; index < line.length; index += 1) {
-    const character = line[index]
-    if (character === '"' && line[index + 1] === '"' && quoted) {
-      value += '"'
-      index += 1
-    } else if (character === '"') {
-      quoted = !quoted
-    } else if (character === delimiter && !quoted) {
-      values.push(value.trim())
-      value = ""
-    } else {
-      value += character
-    }
-  }
-  values.push(value.trim())
-  return values
-}
-
-function parseStatementDate(value: string): Date | undefined {
-  const iso = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value)
-  const european = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(value)
-  const date = iso
-    ? new Date(`${iso[1]}-${iso[2]}-${iso[3]}T00:00:00.000Z`)
-    : european
-      ? new Date(`${european[3]}-${european[2]}-${european[1]}T00:00:00.000Z`)
-      : new Date(value)
-  return Number.isNaN(date.getTime()) ? undefined : date
-}
-
-function parseStatementAmount(value: string): number | undefined {
-  const compact = value.replaceAll(/\s/g, "")
-  const normalized = compact.includes(",") && !compact.includes(".")
-    ? compact.replace(",", ".")
-    : compact.replaceAll(",", "")
-  const amount = Number(normalized)
-  return Number.isFinite(amount) ? amount : undefined
-}
-
-function statementImportRows(csvData: string) {
-  const lines = csvData.replace(/^\uFEFF/, "").split(/\r?\n/).filter((line) => line.trim())
-  if (lines.length < 2) throw new Error("Add a header and at least one statement row")
-  const delimiter = lines[0].includes(";") && !lines[0].includes(",") ? ";" : ","
-  const headers = parseCsvLine(lines[0], delimiter).map((header) => header.toLowerCase().replaceAll(/[^a-z0-9]/g, ""))
-  const dateIndex = headers.findIndex((header) => header === "date" || header === "transactiondate")
-  const amountIndex = headers.findIndex((header) => header === "amount" || header === "transactionamount")
-  if (dateIndex < 0 || amountIndex < 0) throw new Error("CSV needs date and amount columns")
-  const referenceIndex = headers.findIndex((header) => ["reference", "ref", "transactionid"].includes(header))
-  const descriptionIndex = headers.findIndex((header) => ["description", "memo", "narration"].includes(header))
-  return lines.slice(1).map((line, index) => {
-    const values = parseCsvLine(line, delimiter)
-    const date = parseStatementDate(values[dateIndex] ?? "")
-    return {
-      rowNumber: index + 2,
-      date: date ? stbTimestampFromDate(date) : undefined,
-      amount: parseStatementAmount(values[amountIndex] ?? ""),
-      reference: values[referenceIndex] || undefined,
-      description: values[descriptionIndex] || undefined,
-    }
-  })
-}
-
-function importIdempotencyKey(companyId: bigint, journalId: bigint, currencyId: bigint, csvData: string): string {
-  let hash = 2_166_136_261
-  const source = `${companyId}:${journalId}:${currencyId}:${csvData.replace(/\r\n/g, "\n").trim()}`
-  for (let index = 0; index < source.length; index += 1) {
-    hash = Math.imul(hash ^ source.charCodeAt(index), 16_777_619)
-  }
-  return `statement-csv-${(hash >>> 0).toString(16)}`
 }
 
 export interface PaymentOperationsPanelProps {
@@ -477,7 +406,7 @@ export function PaymentOperationsPanel({
         currencyId,
         params: {
           fileName: stringValue(data.fileName) || csvFile.name,
-          idempotencyKey: importIdempotencyKey(companyId, journalId, currencyId, csvData),
+          idempotencyKey: statementImportIdempotencyKey(companyId, journalId, currencyId, csvData),
           openingBalance: numberValue(data.openingBalance),
           rows,
         },
