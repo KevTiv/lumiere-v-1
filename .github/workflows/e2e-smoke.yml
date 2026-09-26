@@ -9,12 +9,17 @@ on:
   workflow_dispatch:
     inputs:
       suite:
-        description: "Playwright suite (p0 = critical smoke, full = all tests)"
+        description: "Playwright suite (p0 = critical smoke, full = all tests, targeted = only the specs below)"
         type: choice
         options:
           - p0
           - full
+          - targeted
         default: p0
+      specs:
+        description: "targeted only: space-separated spec paths relative to frontend/web (e.g. tests/e2e/cov05b-purchase-receipt.spec.ts)"
+        type: string
+        default: ""
       clear_db:
         description: "Wipe local module data before publish (E2E_CLEAR_DB=1)"
         type: boolean
@@ -58,7 +63,32 @@ jobs:
     outputs:
       configs: ${{ steps.plan.outputs.configs }}
     steps:
+      - uses: actions/checkout@v4
+        if: github.event_name == 'pull_request'
+        with:
+          fetch-depth: 0
+      - name: Test E2E target selector
+        if: github.event_name == 'pull_request'
+        run: python3 -m unittest discover -s scripts/tests -p 'test_ci_e2e_targets.py'
+      # Stacked PRs (base is not the default branch) run only the specs they
+      # add or edit, plus specs importing an edited e2e helper/fixture. PRs
+      # into the default branch, PRs labelled e2e:full, and PRs that select no
+      # spec keep the full P0 suite, which guards cross-module regressions
+      # before anything lands.
+      - id: targets
+        if: >-
+          github.event_name == 'pull_request' &&
+          github.event.pull_request.base.ref != github.event.repository.default_branch &&
+          !contains(github.event.pull_request.labels.*.name, 'e2e:full')
+        run: |
+          python3 scripts/ci-e2e-targets.py \
+            --base "${{ github.event.pull_request.base.sha }}" \
+            --head "${{ github.event.pull_request.head.sha }}" \
+            --github-output "$GITHUB_OUTPUT"
       - id: plan
+        env:
+          TARGET_SPECS: ${{ steps.targets.outputs.specs }}
+          DISPATCH_SPECS: ${{ github.event.inputs.specs }}
         run: |
           case "${{ github.event_name }}" in
             push)
@@ -66,7 +96,11 @@ jobs:
               configs='[{"suite":"full","clear_db":"1"}]'
               ;;
             pull_request)
-              configs='[{"suite":"p0","clear_db":"0"}]'
+              if [ -n "${TARGET_SPECS}" ]; then
+                configs="$(jq -cn --arg specs "${TARGET_SPECS}" '[{suite:"targeted",clear_db:"0",specs:$specs}]')"
+              else
+                configs='[{"suite":"p0","clear_db":"0"}]'
+              fi
               ;;
             schedule)
               configs='[{"suite":"full","clear_db":"1"}]'
@@ -78,7 +112,12 @@ jobs:
               else
                 clear_db="0"
               fi
-              configs="[{\"suite\":\"${suite}\",\"clear_db\":\"${clear_db}\"}]"
+              if [ "${suite}" = "targeted" ] && [ -z "${DISPATCH_SPECS}" ]; then
+                echo "suite=targeted requires the specs input" >&2
+                exit 1
+              fi
+              configs="$(jq -cn --arg suite "${suite}" --arg clear_db "${clear_db}" --arg specs "${DISPATCH_SPECS}" \
+                '[{suite:$suite,clear_db:$clear_db,specs:$specs}]')"
               ;;
             *)
               echo "Unsupported event: ${{ github.event_name }}" >&2
@@ -228,6 +267,7 @@ jobs:
         env:
           E2E_SUITE: ${{ matrix.config.suite }}
           E2E_CLEAR_DB: ${{ matrix.config.clear_db }}
+          E2E_SPEC_FILES: ${{ matrix.config.specs || '' }}
           NEXT_PUBLIC_STDB_MODULE: ${{ env.STDB_MODULE }}
           NEXT_PUBLIC_STDB_HOST: ${{ env.STDB_HOST }}
           PG_HOST: 127.0.0.1
@@ -239,7 +279,7 @@ jobs:
         run: |
           # Makefile defaults to a macOS dev PATH; use the runner PATH in CI.
           export E2E_PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:${HOME}/.cargo/bin:${HOME}/.local/bin:${PNPM_HOME}"
-          echo "E2E_SUITE=${E2E_SUITE} E2E_CLEAR_DB=${E2E_CLEAR_DB}"
+          echo "E2E_SUITE=${E2E_SUITE} E2E_CLEAR_DB=${E2E_CLEAR_DB} E2E_SPEC_FILES=${E2E_SPEC_FILES}"
           make e2e-smoke
 
       - name: Upload Playwright report
