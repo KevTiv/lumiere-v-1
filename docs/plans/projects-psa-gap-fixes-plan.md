@@ -25,7 +25,7 @@ Executable tracker for the full backlog (Pilot → Competitive → Differentiati
 - [x] Rate card tables (employee / task / project) + server-side rate resolution
 - [x] FX snapshot at validate/bill; company-currency amounts
 - [x] Live KPIs from real unbilled/validated hours (not config zeros)
-- [ ] Approval timeline UI
+- [x] Approval timeline UI
 - [x] Timer overlap guard (one running timer per employee)
 - [x] Expense rebill action surfaced on project UI (calls existing expenses reducer)
 - [x] Remove tracker phantoms (`delete_project`, `archive_project`, …) or implement soft-archive only (`set_project_active`)

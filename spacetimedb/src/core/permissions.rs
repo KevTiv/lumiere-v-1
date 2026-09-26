@@ -122,6 +122,7 @@ pub struct GrantFieldPermissionParams {
     public,
     index(accessor = role_by_org, btree(columns = [organization_id]))
 )]
+#[derive(Clone)]
 pub struct Role {
     #[primary_key]
     #[auto_inc]

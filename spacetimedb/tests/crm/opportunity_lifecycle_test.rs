@@ -205,6 +205,30 @@ pub fn test_convert_opportunity_to_sale_order(ctx: &ReducerContext) -> Result<()
         return Err("Expected sale order linked to opportunity after convert".to_string());
     }
 
+    // CRM-RI-005: a duplicate submit of the same conversion is a successful no-op, never a second
+    // order (the commit-count check below proves it also wrote nothing).
+    convert_opportunity_to_sale_order(
+        ctx,
+        org_id,
+        company_id,
+        opp.id,
+        ConvertOpportunityParams {
+            pricelist_id,
+            warehouse_id: fixture.warehouse_id,
+        },
+    )?;
+    let orders_for_opportunity = ctx
+        .db
+        .sale_order()
+        .iter()
+        .filter(|so| so.organization_id == org_id && so.opportunity_id == Some(opp.id))
+        .count();
+    if orders_for_opportunity != 1 {
+        return Err(format!(
+            "A duplicate conversion must not create another order, found {orders_for_opportunity}"
+        ));
+    }
+
     let order = ctx
         .db
         .sale_order()

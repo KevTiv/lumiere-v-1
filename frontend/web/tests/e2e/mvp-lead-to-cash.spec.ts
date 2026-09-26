@@ -2,6 +2,7 @@ import { expect, test } from "@playwright/test"
 import type { QueryRowFor } from "@lumiere/stdb/query-row-map"
 
 import { matchesOperationResponse } from "./operation-response"
+import { ORDER_SUMMARY, expectOrderSummary } from "./sales-order-fixtures"
 
 import {
   chooseFirstEnabledOption,
@@ -264,6 +265,14 @@ test.describe("MVP lead-to-cash workflow", { tag: "@p0" }, () => {
     await waitForSaleOrderConfirmed(page, orderId)
     await waitForSaleOrderBillableLines(page, orderId)
 
+    // INT-06/08: the order summary is derived from canonical records, and reads the same after a
+    // reload. Confirmed but not delivered: nothing invoiced or paid yet.
+    await expectOrderSummary(page, orderId, {
+      present: [ORDER_SUMMARY.delivery.pending, ORDER_SUMMARY.invoice.none],
+      absent: [ORDER_SUMMARY.invoice.draft, ORDER_SUMMARY.payment.unpaid, ORDER_SUMMARY.payment.paid],
+      reload: true,
+    })
+
     // Step 8 — confirm → assign → validate delivery (UI)
     await gotoModule(page, "/sales", "sales")
     await page.getByTestId("module-tab-sales-fulfillment").click()
@@ -311,6 +320,10 @@ test.describe("MVP lead-to-cash workflow", { tag: "@p0" }, () => {
       throw new Error(`validate_stock_picking failed (${validatePickingRes.status()}): ${body}`)
     }
     await waitForSaleOrderLineQtyDelivered(page, orderId)
+    await expectOrderSummary(page, orderId, {
+      present: [ORDER_SUMMARY.delivery.complete],
+      absent: [ORDER_SUMMARY.delivery.pending, ORDER_SUMMARY.delivery.partial],
+    })
 
     // Step 9 — create invoice from sale order (UI)
     const journalLabel = await fetchSalesInvoiceJournalLabel(page)
@@ -337,9 +350,16 @@ test.describe("MVP lead-to-cash workflow", { tag: "@p0" }, () => {
 
     const moveId = await fetchDraftInvoiceMoveIdByPartner(page, leadName)
     await assertMoveLinesBalanced(page, moveId)
+    await expectOrderSummary(page, orderId, { present: [ORDER_SUMMARY.invoice.draft] })
 
     // Step 10 — post invoice (UI — invoices tab → detail modal → Post)
     await postDraftInvoiceViaUi(page, leadName)
+
+    // Posted but unpaid: the draft is gone and the customer owes the invoice.
+    await expectOrderSummary(page, orderId, {
+      present: [ORDER_SUMMARY.payment.unpaid],
+      absent: [ORDER_SUMMARY.invoice.draft, ORDER_SUMMARY.payment.paid],
+    })
 
     await gotoModule(page, "/accounting", "accounting")
     await page.getByTestId("module-tab-accounting-invoices").click()
@@ -395,6 +415,13 @@ test.describe("MVP lead-to-cash workflow", { tag: "@p0" }, () => {
       submitForm(page, "register-payment-invoices"),
     ])
     expect(registerRes.ok()).toBe(true)
+
+    // Payment applied: the order reads paid, and still does after a reload.
+    await expectOrderSummary(page, orderId, {
+      present: [ORDER_SUMMARY.payment.paid],
+      absent: [ORDER_SUMMARY.payment.unpaid, ORDER_SUMMARY.payment.partial],
+      reload: true,
+    })
     await expectNoAppError(page)
 
     // Step 13 — dashboard / report updates (live KPI widgets)
@@ -437,12 +464,6 @@ test.describe("MVP lead-to-cash workflow", { tag: "@p0" }, () => {
     await page.getByTestId("module-tab-sales-orders").click()
     await selectEntityRowById(page, orderId)
     await waitForEntityActionEnabled(page, "entity-action-confirm-orders")
-    const alertMessages: string[] = []
-    const onDialog = async (dialog: import("@playwright/test").Dialog) => {
-      alertMessages.push(dialog.message())
-      await dialog.accept()
-    }
-    page.once("dialog", onDialog)
     const confirmResponse = page.waitForResponse(
       (res) => matchesOperationResponse(res, "confirm_sales_order"),
       { timeout: 30_000 },
@@ -450,8 +471,9 @@ test.describe("MVP lead-to-cash workflow", { tag: "@p0" }, () => {
     await page.getByTestId("entity-action-confirm-orders").click()
     const response = await confirmResponse
     expect(response.ok()).toBe(false)
-    await expect.poll(() => alertMessages.length, { timeout: 10_000 }).toBe(1)
-    expect(alertMessages[0]).toMatch(/insufficient|available quantity|stock/i)
+    await expect(
+      page.locator("[data-sonner-toast]").filter({ hasText: /insufficient|available quantity|stock/i }),
+    ).toBeVisible({ timeout: 10_000 })
 
     await page.reload({ waitUntil: "domcontentloaded" })
     await expect

@@ -1,9 +1,10 @@
 # COV-00 current module and operation census
 
-**Status:** REVIEW — evidence audit complete; acceptance blockers are explicit below  
+**Status:** ACCEPTED — coordinator-reviewed audit/classification baseline; downstream runtime blockers remain
 **Program:** [`erp-module-usability-parity-ledger.md`](./erp-module-usability-parity-ledger.md)  
 **Semantic authority:** [`../plans/erp-module-usability-parity-program.md`](../plans/erp-module-usability-parity-program.md)  
 **Audited base:** `afa23b702fc4c47623697d2fcb81733f2dd71c14` (`main`, 2026-09-17 audit)  
+**Accepted evidence revision:** `4f797db650ae82318ab0f477670d14aee9d5d0cd`
 **Contracts baseline:** `lumiere-contracts` v0.3.46  
 
 ## 1. Method and limits
@@ -28,6 +29,8 @@ Lumière's T0 gap is no longer mainly backend breadth. The repository already co
 - full-stack adversarial, responsive and accessibility certification.
 
 No audited T0 surface can be called U4 or U5 yet under the parity definition.
+
+> **COV-00D acceptance candidate (base `ed4987d3d99a89c2a3f2a7cddc8ca212548b1831`):** the per-owner lifecycle calibration is recorded in [`erp-cov00d-evidence-calibration-status.md`](./erp-cov00d-evidence-calibration-status.md) with machine-readable evidence in [`../evidence/cov-00d-lifecycle-evidence.json`](../evidence/cov-00d-lifecycle-evidence.json). All 22 COV-03..24 owners are covered; only one principal operator dimension is currently proven and no exact-effect/recovery dimension is complete, so every first-org surface remains at `review`.
 
 ## 3. Current surface census
 
@@ -85,6 +88,8 @@ Fleet is the clearest route/domain mismatch. STDB Fleet, frontend command/read/q
 
 ## 4. Operation inventory finding
 
+> **COV-00A acceptance candidate (base `b4e23eff69a5a1cba62e07ca9866bb5eb649c9d2`):** the refreshed full-contract census is recorded in [`../operation-classification-census.md`](../operation-classification-census.md) with machine-readable evidence in [`../evidence/cov-00a-operation-census.json`](../evidence/cov-00a-operation-census.json). It classifies 1,399 operations, reconciles 1,187 Rust reducer rows, and reports zero unowned client-facing or review-required rows. The historical finding below is retained to explain why the full-contract ratchet replaced the reducer-only denominator.
+
 The generated `docs/reducer-coverage-matrix.md` currently records:
 
 | Reducer coverage state | Count |
@@ -139,8 +144,8 @@ These are **source/evidence floors, not certification awards**. `U3` below means
 
 | COV | Surface | Current evidence floor | Existing evidence | Main gap to next class |
 | --- | --- | --- | --- | --- |
-| COV-03 | CRM | **U3** | concrete CRM route/forms; lead/opportunity mutations; contact identity UI; lead-to-cash and CRM isolation/stage specs | direct downstream record navigation; shared outcome semantics; stale/retry/adversarial consolidation |
-| COV-04 | Sales | **U3** | quote/order/invoice/returns domain + UI; lead-to-cash, invoice-flow, returns specs | U4 retry/lost-response/concurrency + canonical downstream links; downstream payment blocker |
+| COV-03 | CRM | **U3** | concrete CRM route/forms; sales-persona opportunity conversion; exact tenant/company/opportunity sale-order identity; replay no-redispatch; limited-reader denial | direct downstream record navigation; lost-response/stale-write recovery; broader CRM adversarial consolidation |
+| COV-04 | Sales | **U3** | quote/order/invoice/returns domain + UI; sales-persona order confirmation; canonical in-place order result and record-filter navigation with refresh/back proof; complete linked-picking set; stale replay and limited-reader denial | full lost-response/concurrency consolidation; cross-module fallback navigation; invoice/RMA producer-owned effect identity; downstream payment blocker |
 | COV-05 | Purchasing | **U3** | supplier/PO/receipt/bill surfaces; P2P + purchasing specs | stale approval/reference mutation/adversarial certification and direct result links |
 | COV-06 | Inventory / WMS | **U2** | product/location/stock command/query/UI breadth; inventory module/mutation specs; fulfillment participates in O2C | one operator-complete receiving/transfer/count/lot lifecycle + concurrency/stale-stock proof |
 | COV-07 | Manufacturing / Quality | **U2** | MRP domain, module route, mutation and manufacturing smoke coverage | seeded BOM → MO → consume → produce → quality/cost/close browser lifecycle |
@@ -167,7 +172,7 @@ These are **source/evidence floors, not certification awards**. `U3` below means
 No row is promoted to U4/U5 by this audit because the following shared gates remain open:
 
 - COV-01 common operation outcome/error/record-ref/readback seam depends on COH-02;
-- COV-02 reproducible first-test-org seed/persona fixture does not yet exist as the shared authority;
+- COV-02 now supplies the accepted reproducible first-test-org seed/persona authority; module-specific permission, SoD, lifecycle, and recovery proof remains open;
 - COV-25 cross-module relation/navigation consistency has not been audited/closed;
 - COV-26 common loading/empty/error/denied/responsive/accessibility/reconnect proof has not run;
 - COV-27 all-module integrated certification/launch manifest has not run;
@@ -230,8 +235,8 @@ The census changes the implementation order from broad greenfield module work to
    Create the first-org route/navigation denominator and explicitly classify AI/internal/showcase surfaces; settle Fleet `/map` ownership.
 3. **COV-01 — typed workflow result/readback boundary** after COH-02.  
    Migrate one representative lifecycle and reuse it everywhere.
-4. **COV-02 — shared seed/persona pack.**  
-   Include at least sales/purchasing/inventory/accounting, employee/payroll, project/timesheet, documents/messages, POS/MRP/Helpdesk/Fleet/IoT configuration and representative open/completed records.
+4. **COV-02 — shared seed/persona pack (`ACCEPTED`).**
+   Reuse the versioned seven-persona/22-owner foundation and its required IoT baseline; do not count it as module lifecycle evidence.
 
 ### First module lanes after the shared boundary
 
@@ -267,16 +272,16 @@ These are work-package weights, not elapsed-time estimates. The upper bound appl
 - T0/admin/AI/internal classification for the visible route families;
 - current evidence-floor U-level for every COV-03..24 owner;
 - exact shared blockers preventing U4/U5 claims;
-- explicit Fleet/Map ownership mismatch;
+- resolved Fleet/Map product ownership decision;
 - operation-coverage drift finding;
 - test-evidence quality distinction;
-- first-org exposure-manifest gap;
+- authoritative first-org exposure denominator;
 - revised execution ordering and evidence-based planning envelope.
 
-### Still required before `COV-00` can be marked ACCEPTED
+### Acceptance result
 
-- COV-00A regenerated current operation census with zero `needs-triage`/unowned user-facing operations;
-- COV-00B authoritative first-org exposure/navigation manifest;
-- coordinator review of those two artifacts on the integrated tree.
+- COV-00A through COV-00D were coordinator-reviewed and accepted at evidence revision `4f797db650ae82318ab0f477670d14aee9d5d0cd`;
+- the nine open/partial COV-00C runtime classes remain blockers only for their named downstream U4/U5 and COV-27 gates;
+- every COV-owned first-org surface remains `review` until its own acceptance package supplies complete applicable evidence.
 
-Until then the correct ledger state is **REVIEW**, not ACCEPTED. The findings are sufficient to begin non-conflicting preparation, but dependent broad module implementation should not invent operation classifications or exposure policy locally.
+The accepted coordinator record is [`erp-cov00-coordinator-acceptance.md`](./erp-cov00-coordinator-acceptance.md). Dependent module work must reuse the accepted operation classifications and exposure policy rather than redefining them locally.

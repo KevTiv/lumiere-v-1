@@ -137,3 +137,7 @@ export function useOverviewModuleSubscription(): void {
 export function useMapModuleSubscription(): void {
   useModuleSubscription(MAP_WORKSPACE_RESOURCE_KEYS)
 }
+
+export function useFleetModuleSubscription(): void {
+  useModuleSubscription(FLEET_WORKSPACE_RESOURCE_KEYS)
+}

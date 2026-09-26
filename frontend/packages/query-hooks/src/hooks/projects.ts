@@ -32,6 +32,7 @@ function invalidateTimesheetQueues(
   void qc.invalidateQueries({ queryKey: ['timesheets', k] })
   void qc.invalidateQueries({ queryKey: ['timesheets-to-validate', k] })
   void qc.invalidateQueries({ queryKey: ['timesheets-unbilled', k] })
+  void qc.invalidateQueries({ queryKey: ['project-timesheet-approvals', k] })
   void qc.invalidateQueries({ queryKey: ['project-margin-by-project', k] })
   void qc.invalidateQueries({ queryKey: ['resource-utilisation-by-employee', k] })
 }
@@ -99,6 +100,18 @@ export function useTimesheetsUnbilled(organizationId: bigint, initialData?: Quer
       ),
     staleTime: 30_000,
     initialData,
+  })
+}
+
+export function useTimesheetApprovals(organizationId: bigint) {
+  return useQuery<QueryRows>({
+    queryKey: ['project-timesheet-approvals', rqBigIntKey(organizationId)],
+    queryFn: () =>
+      fetchQueryList(
+        '/api/query/project-timesheet-approvals',
+        'Failed to fetch timesheet approvals',
+      ),
+    staleTime: 30_000,
   })
 }
 
@@ -536,7 +549,7 @@ export function useValidateTimesheets(organizationId: bigint) {
             wipLaborAccountId != null && wipLaborAccountId !== ""
               ? toScalarU64(wipLaborAccountId)
               : null,
-        }) })
+        }, "ValidateTimesheetsParams") })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to validate timesheets')
     },
@@ -558,7 +571,7 @@ export function useRejectTimesheets(organizationId: bigint) {
           companyId: companyId != null ? toScalarU64(companyId) : null,
           timesheetIds: timesheetIds.map((id) => toScalarU64(id)),
           reason,
-        }) })
+        }, "RejectTimesheetsParams") })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to reject timesheets')
     },
@@ -580,7 +593,7 @@ export function useReopenTimesheets(organizationId: bigint) {
           companyId: companyId != null ? toScalarU64(companyId) : null,
           timesheetIds: timesheetIds.map((id) => toScalarU64(id)),
           reason: reason ?? null,
-        }) })
+        }, "ReopenTimesheetsParams") })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to reopen timesheets')
     },
@@ -627,7 +640,7 @@ export function useBillTimesheets(organizationId: bigint) {
               fiscalPositionId != null && String(fiscalPositionId).trim() !== ""
                 ? toScalarU64(fiscalPositionId)
                 : null,
-          }) })
+          }, "BillTimesheetsParams") })
 
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to bill timesheets')

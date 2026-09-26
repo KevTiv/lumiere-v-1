@@ -336,9 +336,15 @@ async fn draft_actions_llm(
         return Ok(Vec::new());
     }
 
-    let agent = resolve_agent(&state.stdb, org_id, req.agent_id, req.team_member_id)
-        .await
-        .map_err(|e| DraftActionsError::other(e.to_string()))?;
+    let agent = resolve_agent(
+        &state.stdb,
+        org_id,
+        req.agent_id,
+        req.team_member_id,
+        state.config.ollama_supports_tool_calling,
+    )
+    .await
+    .map_err(|e| DraftActionsError::other(e.to_string()))?;
 
     ensure_allowed_action(&agent, "action_draft")
         .map_err(|e| DraftActionsError::other(e.to_string()))?;

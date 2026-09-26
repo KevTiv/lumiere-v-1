@@ -6,6 +6,7 @@
 use spacetimedb::rand::Rng;
 use spacetimedb::{ReducerContext, SpacetimeType, Table, Timestamp};
 
+use crate::ai::capability_grants::provision_owner_ai_capability_grants;
 use crate::core::country_pack::{
     country_pack_definition, country_pack_tax_rule, seed_country_pack_catalog_for_organization,
 };
@@ -375,6 +376,7 @@ pub(crate) fn insert_organization_with_owner(
         metadata: Some("{\"bootstrap\":true}".to_string()),
     });
     ensure_user_profile_for_organization(ctx, ctx.sender(), org.id);
+    provision_owner_ai_capability_grants(ctx, org.id, &owner_role)?;
 
     Ok((org, owner_role))
 }

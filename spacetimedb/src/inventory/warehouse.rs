@@ -625,7 +625,47 @@ pub fn create_stock_location(
     params: CreateStockLocationParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "stock_location", "create")?;
+    insert_stock_location(ctx, organization_id, None, params)
+}
 
+/// Create a stock location owned by one company, so company-bound users (who
+/// only see their company's rows) can see and use it. A parent location must
+/// belong to the same organization and be shared or owned by the same company.
+#[reducer]
+pub fn create_company_stock_location(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    params: CreateStockLocationParams,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "stock_location", "create")?;
+    require_company_in_organization(ctx, organization_id, company_id)?;
+    if let Some(parent_id) = params.location_id {
+        let parent = ctx
+            .db
+            .stock_location()
+            .id()
+            .find(&parent_id)
+            .ok_or("Parent location not found")?;
+        if parent.organization_id != organization_id {
+            return Err("Parent location belongs to a different organization".to_string());
+        }
+        if parent
+            .company_id
+            .is_some_and(|parent_company| parent_company != company_id)
+        {
+            return Err("Parent location belongs to a different company".to_string());
+        }
+    }
+    insert_stock_location(ctx, organization_id, Some(company_id), params)
+}
+
+fn insert_stock_location(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: Option<u64>,
+    params: CreateStockLocationParams,
+) -> Result<(), String> {
     if params.name.is_empty() {
         return Err("Location name cannot be empty".to_string());
     }
@@ -653,7 +693,7 @@ pub fn create_stock_location(
         child_left: params.child_left,
         child_right: params.child_right,
         usage: params.usage.clone(),
-        company_id: None,
+        company_id,
         scrap_location: params.scrap_location,
         return_location: params.return_location,
         valuation_in_account_id: params.valuation_in_account_id,
@@ -685,7 +725,7 @@ pub fn create_stock_location(
         ctx,
         organization_id,
         AuditLogParams {
-            company_id: None,
+            company_id,
             table_name: "stock_location",
             record_id: location.id,
             action: "CREATE",
