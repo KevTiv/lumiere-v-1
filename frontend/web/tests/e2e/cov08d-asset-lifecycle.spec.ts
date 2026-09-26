@@ -22,7 +22,12 @@ function timestamp(iso: string) {
 }
 
 function tagOf(value: unknown): string {
-  if (value && typeof value === "object" && "tag" in value) return String((value as { tag?: unknown }).tag ?? "")
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    if ("tag" in value) return String((value as { tag?: unknown }).tag ?? "")
+    // SATS sum JSON, e.g. `{ running: [] }` → "Running".
+    const keys = Object.keys(value)
+    if (keys.length === 1) return keys[0]!.charAt(0).toUpperCase() + keys[0]!.slice(1)
+  }
   return String(value ?? "")
 }
 
@@ -113,11 +118,11 @@ test.describe("COV-08d exact fixed-asset lifecycle", { tag: ["@p0", "@cov08", "@
       code,
       name: `COV-08d asset ${code}`,
       active: true,
-      asset_type: { tag: "Purchase" },
+      asset_type: { purchase: [] }, // SATS sum JSON: SpacetimeDB 2.x variant names are lower-case
       currency_id: currencyId,
       original_value: 1200,
       salvage_value: 0,
-      method: { tag: "Linear" },
+      method: { linear: [] },
       method_number: 12,
       method_period: 1,
       method_progress_factor: 0,
