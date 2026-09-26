@@ -329,8 +329,33 @@ Current wiring and remaining work:
 - Chat and generation do not call the new user-contribution endpoint, so the
   route is not yet part of a production discussion flow. `turn_ref` remains a
   bounded correlation string rather than validated message lineage.
-- Contribution replay currently scans the organization index; a narrower
-  idempotency index is deferred because it would change the generated schema.
+- **Update (2026-09-22): contribution replay now uses a narrower index.**
+  `ai_evidence_contribution` gained `ai_evidence_contribution_by_replay`
+  (btree on `organization_id, company_id, contributor_uid, session_ref`);
+  `find_contribution_replay` filters through it, then does the final
+  `event_ref` match in Rust (SpacetimeDB's `FilterableValue` trait has no
+  impl for `Option<T>`, so a nullable column can't itself be an index-filter
+  argument — confirmed by trying it first and hitting a compile error). This
+  narrows the replay lookup from "every contribution in the organization" to
+  "one caller's contributions in one session." Migration was carried out in
+  full: release WASM build, publish to a local scratch SpacetimeDB instance,
+  `spacetime call run_ai_evidence_provenance_tests` (passed; SQL query
+  confirmed exactly 6 contribution rows with the idempotent `event-1` replay
+  collapsing to one row, as expected), full Rust/TS SDK regeneration, and
+  `cargo run -p lumiere-codegen`. Every git-tracked generated artifact came
+  out byte-identical to what's already committed — a new index has no effect
+  on any of them (they encode reducers/tables/resources, not indexes).
+  **Blocked on a pre-existing, unrelated gap:** `make check-codegen`'s
+  `verify-release-manifest.py` step fails because
+  `release-compatibility-manifest.json`'s pinned `lumiere-contracts` release
+  is **188 commits behind current `main`** (`source_commit` resolves to
+  2026-09-something, long before this session) — the same class of drift as
+  the `health.rs` hardcoded `"0.3.48"` vs. the manifest's actual `"0.3.52"`
+  found earlier this session. Closing that gap means cutting a new release of
+  the separately-versioned `lumiere-contracts` repository and re-pinning —
+  well beyond this change's scope, and not something to fold into a
+  one-line-index PR. `cargo test -p lumiere_v1 evidence_source` (native,
+  10/10) and `cargo check` (spacetimedb crate) both pass.
 - Generated contracts are regenerated and the C0/C1/C2, operation-history,
   release-manifest and contract-IR gates pass (see AIH-18's verification
   note). This also surfaced and fixed stale hard-coded table counts and an
