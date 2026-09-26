@@ -312,13 +312,37 @@ Current wiring and remaining work:
   passages carry deterministic keys and character coordinates. A later DMS
   version retires its predecessor through the source-change/dependency path,
   and identical retries preserve the original supersession link.
-- DMS index content is caller supplied today, so these versions are explicitly
-  `origin=user_provided` and `verification=user_reported`, never `inspected`.
-  The path does not yet fetch and parse the server-owned blob, run external
-  PDF/OCR extraction, ingest books/network sources, or react to document
-  deletion/access revocation. A live blob-to-passage proof is still required;
-  the focused splitter tests and compile check do not establish production
-  ingestion readiness.
+- **Update (2026-09-22): blob fetch/parse and OCR extraction are implemented
+  and wired, superseding the "caller supplied" gap above.**
+  `api-server/src/evidence_ingestion.rs` resolves the document's current
+  `DocumentVersion`, reads the server-owned blob from managed object storage,
+  verifies its checksum/mimetype against the DB row, extracts text natively
+  for PDF (via `printpdf`/`lopdf`), HTML and plain text/JSON/XML, and falls
+  back to an operator-configured external OCR endpoint
+  (`LUMIERE_EVIDENCE_OCR_URL`) for everything else. The route
+  (`POST /ai/evidence/ingestion/documents`) calls the same
+  `record_ai_evidence_source[_version]`/`record_ai_evidence_passage` reducers
+  with `verification=inspected` — callers cannot inject replacement text. The
+  frontend calls it automatically after document creation and after every new
+  version upload (`useIngestDocumentEvidence` in
+  `frontend/web/app/(modules)/documents/documents-client.tsx` and
+  `frontend/web/components/record-document-attachments.tsx`). A companion
+  route (`POST /ai/evidence/ingestion/documents/lifecycle`) reacts to
+  deletion/access-revocation by walking every evidence version below the
+  target lifecycle rank and calling `record_ai_evidence_source_change`;
+  `delete_document` also retires evidence directly in-process
+  (`retire_document_evidence`). Network/book ingestion
+  (`import_network` in `api-server/src/document_blobs.rs`) exists behind a
+  mandatory HTTPS exact-host allowlist (`LUMIERE_EVIDENCE_NETWORK_HOSTS`,
+  disabled by default) but has no frontend caller yet — intentionally, since
+  Acceptance scopes book/network ingestion to a separately admitted
+  capability. Verified: `cargo check -p api-server` and
+  `cargo test -p api-server evidence_ingestion --lib` (4/4 pass); end-to-end
+  blob→passage→claim→revocation/deletion lifecycle is covered by
+  `test_document_blob_passage_claim_lifecycle` and
+  `test_deletion_and_revocation_preserve_honest_history` in
+  `spacetimedb/tests/ai/evidence_provenance_test.rs`. Not yet exercised
+  against a live published module in this session.
 - The tables are private and read only by the gateway as a trusted principal;
   there are no generic client-facing authorized-read contracts. The contribution
   reducer remains `denied` to generic dispatch and is reachable only through
@@ -326,9 +350,34 @@ Current wiring and remaining work:
   exposed only through AIH-16's session-owned BFF, which binds the acting user,
   organization and membership company to an exact current reviewer grant; no
   generic browser read contract was added.
-- Chat and generation do not call the new user-contribution endpoint, so the
-  route is not yet part of a production discussion flow. `turn_ref` remains a
-  bounded correlation string rather than validated message lineage.
+- **Update (2026-09-22): the live ERP Assistant chat now calls the
+  user-contribution endpoint, closing the "not part of a production
+  discussion flow" gap above.** `POST /ai/evidence/contributions` gained an
+  optional `passageId` alternative to `sourceVersionId`
+  (`api-server/src/routes/ai_evidence.rs`), resolved server-side to the
+  passage's bound `source_version_id` via a scoped SQL lookup — the browser
+  never learns or sends the numeric version id, only the RAG-returned passage
+  id it already has. `AIChatPanel` (`frontend/packages/ui/src/ai-chat/ai-chat-panel.tsx`)
+  renders a "Cite as evidence" action next to each `kind: "passage"` source on
+  an assistant message; clicking it calls the new `AIChatConfig.onCiteSource`
+  hook. `frontend/web/app/(modules)/modules-shell.tsx` wires that hook to
+  `useRecordEvidenceContribution` (new hook,
+  `frontend/packages/query-hooks/src/hooks/ai-evidence-contributions.ts`),
+  passing `sessionRef` = the chat session key, `turnRef` = the chat message's
+  client-side id (still an opaque correlation string, not a verified
+  `ai_chat_message` reference — unchanged from before), `eventRef` =
+  `cite:{messageId}:{passageId}` for idempotent retries, `introducedKind:
+  "source_version"`, and `inspectionState: "user_reported"` (the honest
+  default for citing a retrieved passage — not `inspected`, which the
+  reducer reserves for a hash-verified read). Verified: `cargo test -p
+  api-server routes::ai_evidence --lib` (8/8, including a new
+  `passage_id_and_source_version_id_are_mutually_exclusive_alternatives`
+  test), `pnpm typecheck` clean on `web`/`@lumiere/ui`/`@lumiere/query-hooks`
+  (no new errors beyond a pre-existing unrelated `fleet-inspections` gap in
+  `http.ts`), and the i18n duplicate-key/usage checkers pass. Not yet
+  exercised in a running browser against a live gateway. `turn_ref` remains a
+  bounded correlation string rather than validated message lineage — that
+  part of the original gap is unchanged.
 - Contribution replay currently scans the organization index; a narrower
   idempotency index is deferred because it would change the generated schema.
 - Generated contracts are regenerated and the C0/C1/C2, operation-history,
