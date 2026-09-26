@@ -16,6 +16,22 @@ import {
   finalizeCreateLeaveRequestParams,
   finalizeUpdateLeaveTypeParams,
 } from "../hr-params-merge"
+import type { CanonicalRecordRef } from "../operation-effect"
+import { resolveLeaveStateEffect, type HrLeaveStateTag } from "../hr-leave-approval"
+import { responseErrorMessage } from "@lumiere/api-client/response-error"
+
+async function readLeaveStateEffect(
+  organizationId: bigint,
+  companyId: bigint,
+  leaveId: bigint,
+  expected: readonly HrLeaveStateTag[],
+  failure: string,
+): Promise<CanonicalRecordRef> {
+  const rows = await fetchQueryList("/api/query/leave-requests", "Failed to read leave request")
+  const effect = resolveLeaveStateEffect(rows, organizationId, companyId, leaveId, expected)
+  if (!effect) throw new Error(failure)
+  return effect
+}
 
 
 export function useLeaveRequests(
@@ -104,12 +120,14 @@ export function useUpdateLeaveType(organizationId: bigint, companyId: bigint) {
 
 export function useSubmitLeave(organizationId: bigint, companyId: bigint) {
   const qc = useQueryClient()
-  return useMutation<void, Error, ScalarId>({
+  return useMutation<CanonicalRecordRef, Error, ScalarId>({
     mutationFn: async (leaveId) => {
-      const { urlPath, init } = stdbBffCommandPost("submit_leave", { companyId: companyId, leaveId: toScalarU64(leaveId) })
+      const id = toScalarU64(leaveId)
+      const { urlPath, init } = stdbBffCommandPost("submit_leave", { companyId: companyId, leaveId: id })
 
       const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error('Failed to submit leave')
+      if (!r.ok) throw new Error(await responseErrorMessage(r))
+      return readLeaveStateEffect(organizationId, companyId, id, ["Confirm"], "Leave did not read back as submitted")
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['hr-leave-requests', rqBigIntKey(organizationId)] })
@@ -119,12 +137,14 @@ export function useSubmitLeave(organizationId: bigint, companyId: bigint) {
 
 export function useApproveLeave(organizationId: bigint, companyId: bigint) {
   const qc = useQueryClient()
-  return useMutation<void, Error, ScalarId>({
+  return useMutation<CanonicalRecordRef, Error, ScalarId>({
     mutationFn: async (leaveId) => {
-      const { urlPath, init } = stdbBffCommandPost("approve_leave", { companyId: companyId, leaveId: toScalarU64(leaveId) })
+      const id = toScalarU64(leaveId)
+      const { urlPath, init } = stdbBffCommandPost("approve_leave", { companyId: companyId, leaveId: id })
 
       const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error('Failed to approve leave')
+      if (!r.ok) throw new Error(await responseErrorMessage(r))
+      return readLeaveStateEffect(organizationId, companyId, id, ["ValidatedOne", "Validated"], "Leave approval did not take effect; it may be waiting on a workflow review")
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['hr-leave-requests', rqBigIntKey(organizationId)] })
@@ -134,12 +154,14 @@ export function useApproveLeave(organizationId: bigint, companyId: bigint) {
 
 export function useRefuseLeave(organizationId: bigint, companyId: bigint) {
   const qc = useQueryClient()
-  return useMutation<void, Error, ScalarId>({
+  return useMutation<CanonicalRecordRef, Error, ScalarId>({
     mutationFn: async (leaveId) => {
-      const { urlPath, init } = stdbBffCommandPost("refuse_leave", { companyId: companyId, leaveId: toScalarU64(leaveId) })
+      const id = toScalarU64(leaveId)
+      const { urlPath, init } = stdbBffCommandPost("refuse_leave", { companyId: companyId, leaveId: id })
 
       const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error('Failed to refuse leave')
+      if (!r.ok) throw new Error(await responseErrorMessage(r))
+      return readLeaveStateEffect(organizationId, companyId, id, ["Refused"], "Leave did not read back as refused")
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['hr-leave-requests', rqBigIntKey(organizationId)] })
