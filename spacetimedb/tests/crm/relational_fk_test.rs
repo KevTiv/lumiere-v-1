@@ -1,7 +1,8 @@
 use spacetimedb::{ReducerContext, Table};
 
 use crate::crm::activities::{
-    activity, activity_type, create_activity, ActivityType, CreateActivityParams, CrmActivityTarget,
+    activity, activity_type, complete_activity, create_activity, ActivityType,
+    CreateActivityParams, CrmActivityTarget,
 };
 use crate::crm::contacts::{contact, create_contact, CreateContactParams};
 use crate::crm::leads::{
@@ -455,6 +456,109 @@ pub fn test_activity_type_and_contact_relations(ctx: &ReducerContext) -> Result<
             || activity.summary == "CRM FK Rejected Contact"
     }) {
         return Err("rejected activity create persisted a row".to_string());
+    }
+
+    Ok(())
+}
+
+/// COV-19: completing an activity is a one-way transition. A replay of the
+/// same command must be rejected and leave the completed row unchanged.
+pub fn test_complete_activity_rejects_replay(ctx: &ReducerContext) -> Result<(), String> {
+    ensure_test_superuser(ctx)?;
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let other = OrgFixture::seed_minimal(ctx)?;
+    let activity_type = ctx.db.activity_type().insert(ActivityType {
+        id: 0,
+        organization_id: fixture.organization_id,
+        name: "COV-19 Completion Type".to_string(),
+        category: "call".to_string(),
+        summary: None,
+        sequence: 10,
+        delay_count: None,
+        delay_unit: None,
+        delay_from: None,
+        icon: None,
+        chaining_type: "none".to_string(),
+        suggested_next_type_id: None,
+        triggered_next_type_id: None,
+        is_active: true,
+        metadata: Some(r#"{"test":"cov19-activity-completion"}"#.to_string()),
+    });
+    let summary = format!("COV-19 Completion {}", fixture.organization_id);
+    create_activity(
+        ctx,
+        fixture.organization_id,
+        CreateActivityParams {
+            activity_type_id: activity_type.id,
+            summary: summary.clone(),
+            priority: "normal".to_string(),
+            state: "planned".to_string(),
+            auto: false,
+            is_system: false,
+            is_done: false,
+            note: None,
+            date_deadline: Some(ctx.timestamp),
+            date_done: None,
+            assigned_to: None,
+            target: None,
+            duration: None,
+            location: None,
+            video_url: None,
+            metadata: Some(r#"{"test":"cov19-activity-completion"}"#.to_string()),
+        },
+    )?;
+    let created = ctx
+        .db
+        .activity()
+        .iter()
+        .find(|row| row.organization_id == fixture.organization_id && row.summary == summary)
+        .ok_or("COV-19 activity was not persisted".to_string())?;
+    if created.is_done || created.state == "done" {
+        return Err("new activity must start open".to_string());
+    }
+
+    if complete_activity(ctx, other.organization_id, created.id).is_ok() {
+        return Err("cross-organization completion must be rejected".to_string());
+    }
+    let untouched = ctx
+        .db
+        .activity()
+        .id()
+        .find(&created.id)
+        .ok_or("activity vanished after rejected completion".to_string())?;
+    if untouched.is_done || untouched.state != created.state || untouched.date_done.is_some() {
+        return Err("rejected cross-organization completion mutated the activity".to_string());
+    }
+
+    complete_activity(ctx, fixture.organization_id, created.id)?;
+    let completed = ctx
+        .db
+        .activity()
+        .id()
+        .find(&created.id)
+        .ok_or("activity vanished after completion".to_string())?;
+    if !completed.is_done || completed.state != "done" || completed.date_done.is_none() {
+        return Err("completion did not persist done state".to_string());
+    }
+
+    let replay = complete_activity(ctx, fixture.organization_id, created.id);
+    match replay {
+        Err(message) if message.contains("already done") => {}
+        Err(message) => return Err(format!("unexpected replay rejection: {message}")),
+        Ok(()) => return Err("replayed completion must be rejected".to_string()),
+    }
+    let after_replay = ctx
+        .db
+        .activity()
+        .id()
+        .find(&created.id)
+        .ok_or("activity vanished after replay".to_string())?;
+    if after_replay.is_done != completed.is_done
+        || after_replay.state != completed.state
+        || after_replay.date_done != completed.date_done
+        || after_replay.updated_at != completed.updated_at
+    {
+        return Err("rejected replay mutated the completed activity".to_string());
     }
 
     Ok(())
