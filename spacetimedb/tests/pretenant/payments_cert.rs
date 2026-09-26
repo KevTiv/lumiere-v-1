@@ -13,6 +13,7 @@ use crate::accounting::bank_reconciliation::{
     bank_statement_import, bank_statement_import_line, stage_bank_statement_import,
     StageBankStatementImportLineParams, StageBankStatementImportParams,
 };
+use crate::accounting::idempotency::accounting_operation_receipt;
 use crate::accounting::journal_entries::{account_move, account_move_line};
 use crate::accounting::payment_management::{
     allocate_payment_transaction, create_payment_account, create_payment_transaction,
@@ -752,17 +753,65 @@ fn pay_10_statement_staging_fixture_matrix(ctx: &ReducerContext) -> Result<(), S
     Ok(())
 }
 
-fn replay_with_different_payload(ctx: &ReducerContext) -> Result<(StatementScope, Result<(), String>), String> {
+fn replay_with_different_payload(
+    ctx: &ReducerContext,
+) -> Result<(StatementScope, Result<(), String>), String> {
     let scope = setup("statement scope", statement_scope(ctx))?;
     setup(
         "first stage",
-        stage(ctx, &scope, "pay11-replay", vec![statement_row(ctx, 2, true, Some(125.50), Some("REF-A"))]),
+        stage(
+            ctx,
+            &scope,
+            "pay11-replay",
+            vec![statement_row(ctx, 2, true, Some(125.50), Some("REF-A"))],
+        ),
     )?;
+    setup(
+        "exact replay",
+        stage(
+            ctx,
+            &scope,
+            "pay11-replay",
+            vec![statement_row(ctx, 2, true, Some(125.50), Some("REF-A"))],
+        ),
+    )?;
+
+    let imports = staged_imports(ctx, &scope, "pay11-replay");
+    let [(import_id, ..)] = imports.as_slice() else {
+        return Err(format!(
+            "exact replay produced {} statement imports",
+            imports.len()
+        ));
+    };
+    let receipts: Vec<_> = ctx
+        .db
+        .accounting_operation_receipt()
+        .iter()
+        .filter(|receipt| {
+            receipt.organization_id == scope.org
+                && receipt.company_id == scope.company
+                && receipt.action_kind == "stage_bank_statement_import"
+                && receipt.idempotency_key == "pay11-replay"
+        })
+        .collect();
+    if receipts.len() != 1
+        || receipts[0].result_table != "bank_statement_import"
+        || receipts[0].result_id != *import_id
+    {
+        return Err("exact replay did not preserve one statement-import receipt".to_string());
+    }
+
     let replay = stage(
         ctx,
         &scope,
         "pay11-replay",
-        vec![statement_row(ctx, 2, true, Some(999.99), Some("REF-TAMPERED"))],
+        vec![statement_row(
+            ctx,
+            2,
+            true,
+            Some(999.99),
+            Some("REF-TAMPERED"),
+        )],
     );
     Ok((scope, replay))
 }
@@ -781,8 +830,11 @@ fn pay_11a_conflicting_statement_replay_does_not_mutate(ctx: &ReducerContext) ->
 
 fn pay_11b_conflicting_statement_replay_fails_closed(ctx: &ReducerContext) -> Result<(), String> {
     let (_, replay) = replay_with_different_payload(ctx)?;
-    if replay.is_ok() {
-        return Err("idempotency key replay with a different payload was accepted silently".to_string());
+    match replay {
+        Err(error) if error.contains("idempotency key already used with different") => Ok(()),
+        Err(error) => Err(format!("unexpected statement replay conflict: {error}")),
+        Ok(()) => {
+            Err("idempotency key replay with a different payload was accepted silently".to_string())
+        }
     }
-    Ok(())
 }

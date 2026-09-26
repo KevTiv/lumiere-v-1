@@ -64,10 +64,6 @@ pub const KNOWN_DEFECTS: &[(&str, &str)] = &[
         "COMM-14",
         "a number change under the same phone identity id silently redirects an approved recipient",
     ),
-    (
-        "PAY-11B",
-        "stage_bank_statement_import silently accepts a replayed idempotency key with a different payload instead of failing closed",
-    ),
 ];
 
 pub fn setup<T>(what: &str, result: Result<T, String>) -> Result<T, String> {

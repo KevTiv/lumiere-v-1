@@ -4474,12 +4474,12 @@
     "stage_bank_statement_import": {
       "semantic_kind": "command",
       "client_facing": true,
-      "idempotency": "non_idempotent",
+      "idempotency": "idempotent",
       "codec": {
         "id": "spacetimedb-sats-json",
         "version": 1
       },
-      "evidence": "accounting/bank_reconciliation.rs: reducer inserts/appends or performs an unguarded domain mutation"
+      "evidence": "accounting/bank_reconciliation.rs: accounting operation receipt returns the original import for exact replay and rejects a reused key with different input"
     },
     "start_picking_batch": {
       "semantic_kind": "command",

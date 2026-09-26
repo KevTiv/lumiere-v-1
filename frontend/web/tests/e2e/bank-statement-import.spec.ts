@@ -1,6 +1,11 @@
 import { expect, test, type Page } from "@playwright/test"
 
-import { callReducerBff, fetchSessionOrganizationId, smokeName } from "./helpers"
+import {
+  callReducerBff,
+  callReducerBffResult,
+  fetchSessionOrganizationId,
+  smokeName,
+} from "./helpers"
 
 type QueryRow = Record<string, unknown>
 
@@ -80,8 +85,40 @@ test.describe("Bank statement CSV staging", { tag: ["@phase-1", "@accounting"] }
       { file_name: some(`${idempotencyKey}.csv`), idempotency_key: idempotencyKey, opening_balance: 0, rows },
     ])
 
-    await stage(invalidKey, [{ row_number: 2, date: none, amount: some(35), reference: none, description: some("Missing date") }])
-    await stage(invalidKey, [{ row_number: 2, date: none, amount: some(35), reference: none, description: some("Missing date") }])
+    const invalidRows = [
+      {
+        row_number: 2,
+        date: none,
+        amount: some(35),
+        reference: none,
+        description: some("Missing date"),
+      },
+    ]
+    await stage(invalidKey, invalidRows)
+    await stage(invalidKey, invalidRows)
+
+    const conflict = await callReducerBffResult(page, "stage_bank_statement_import", [
+      organizationId,
+      scope.companyId,
+      scope.journalId,
+      scope.currencyId,
+      {
+        file_name: some(`${invalidKey}.csv`),
+        idempotency_key: invalidKey,
+        opening_balance: 0,
+        rows: [
+          {
+            row_number: 2,
+            date: none,
+            amount: some(99),
+            reference: some("TAMPERED"),
+            description: some("Changed retry"),
+          },
+        ],
+      },
+    ])
+    expect(conflict.ok).toBe(false)
+    expect(conflict.error).toMatch(/idempotency key already used with different/i)
 
     await expect.poll(async () => {
       const workspace = await importWorkspace(page, scope.companyId)
@@ -91,6 +128,12 @@ test.describe("Bank statement CSV staging", { tag: ["@phase-1", "@accounting"] }
     const invalidImport = invalidWorkspace.imports.find((row) => String(field(row, "idempotencyKey", "idempotency_key")) === invalidKey)
     expect(field(invalidImport ?? {}, "state")).toBe("needs_review")
     expect(idOf(field(invalidImport ?? {}, "invalidRows", "invalid_rows"))).toBe(1)
+    const invalidLines = invalidWorkspace.lines.filter(
+      (line) => idOf(field(line, "importId", "import_id")) === idOf(field(invalidImport ?? {}, "id")),
+    )
+    expect(invalidLines).toHaveLength(1)
+    expect(field(invalidLines[0], "amount")).toBe(35)
+    expect(field(invalidLines[0], "reference")).toBeUndefined()
 
     await stage(validKey, [{ row_number: 2, date: some(timestamp("2026-07-01T00:00:00.000Z")), amount: some(125.5), reference: some(marker), description: some("Customer transfer") }])
     let validImport: QueryRow | undefined
