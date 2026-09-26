@@ -45,6 +45,7 @@ const SOURCE_ROUTE_MAP: Record<string, SourceRouteTarget> = {
   purchase_order: { kind: "module_tab", module: "purchasing", tab: "orders" },
   purchase_requisition: { kind: "module_tab", module: "purchasing", tab: "requisitions" },
   stock_picking: { kind: "module_tab", module: "inventory", tab: "transfers" },
+  stock_quant: { kind: "module_tab", module: "inventory", tab: "stock" },
 }
 
 function normalizeSourceKey(raw?: string): string | undefined {

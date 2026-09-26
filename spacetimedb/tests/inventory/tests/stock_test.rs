@@ -165,16 +165,6 @@ pub fn test_stock_quant_create(ctx: &ReducerContext) -> Result<(), String> {
     {
         return Err("stock move commit should contain two ordered stock_quant rows".to_string());
     }
-    let destination_quant_id = ctx
-        .db
-        .stock_quant()
-        .iter()
-        .filter(|quant| quant.organization_id == org_id && quant.location_id == destination_id)
-        .map(|quant| quant.id)
-        .max()
-        .ok_or("Destination quant missing after move")?;
-    let mut expected_ids = vec![quant.id, destination_quant_id];
-    expected_ids.sort_unstable();
     let actual_ids: Vec<u64> = changes
         .iter()
         .map(|change| {
@@ -184,10 +174,75 @@ pub fn test_stock_quant_create(ctx: &ReducerContext) -> Result<(), String> {
                 .ok_or_else(|| "stock move commit has invalid row identity".to_string())
         })
         .collect::<Result<_, _>>()?;
+    let destination_quant_id = actual_ids
+        .iter()
+        .copied()
+        .find(|id| *id != quant.id)
+        .ok_or("stock move commit did not expose destination quant id")?;
+    let destination_quant = ctx
+        .db
+        .stock_quant()
+        .id()
+        .find(&destination_quant_id)
+        .ok_or("Destination quant missing after move")?;
+    if destination_quant.location_id != destination_id
+        || (destination_quant.quantity - 2.0).abs() > 0.001
+    {
+        return Err(format!(
+            "destination quant {} did not converge to location {} / qty 2",
+            destination_quant_id, destination_id
+        ));
+    }
+
+    let mut expected_ids = vec![quant.id, destination_quant_id];
+    expected_ids.sort_unstable();
     if actual_ids != expected_ids {
         return Err(format!(
             "stock move commit row order mismatch: expected {expected_ids:?}, got {actual_ids:?}"
         ));
+    }
+
+    // Duplicate compatible destination quants must fail closed rather than being selected by
+    // iterator order.
+    ctx.db.stock_quant().insert(crate::inventory::stock::StockQuant {
+        id: 0,
+        quantity: 1.0,
+        available_quantity: 1.0,
+        value: destination_quant.cost,
+        ..destination_quant.clone()
+    });
+    let source_before_ambiguous = ctx
+        .db
+        .stock_quant()
+        .id()
+        .find(&quant.id)
+        .ok_or("Source quant missing before ambiguity test")?;
+    match move_stock_quant(
+        ctx,
+        org_id,
+        quant.id,
+        MoveStockQuantParams {
+            company_id: Some(fixture.company_id),
+            dest_location_id: destination_id,
+            quantity: 1.0,
+        },
+    ) {
+        Err(message) if message.contains("Multiple destination quants") => {}
+        Err(message) => {
+            return Err(format!(
+                "expected duplicate destination rejection, got: {message}"
+            ))
+        }
+        Ok(()) => return Err("duplicate destination quants were accepted".to_string()),
+    }
+    let source_after_ambiguous = ctx
+        .db
+        .stock_quant()
+        .id()
+        .find(&quant.id)
+        .ok_or("Source quant missing after ambiguity test")?;
+    if (source_after_ambiguous.quantity - source_before_ambiguous.quantity).abs() > 0.001 {
+        return Err("ambiguous destination move mutated the source quant".to_string());
     }
 
     Ok(())

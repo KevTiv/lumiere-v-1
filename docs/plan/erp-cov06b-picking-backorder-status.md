@@ -50,4 +50,4 @@ This certifies one outgoing partial validation with one backorder. It does not c
 
 ## Next bounded Inventory slice
 
-Certify **one internal transfer with exact source/destination quant convergence**. Keep lot/serial tracking and cycle-count/replenishment behavior separate.
+COV-06c now owns one exact internal quant transfer. After it, prefer **lot/serial tracked movement** or **cycle-count adjustment with exact quant delta**. Keep quality/replenishment separate.

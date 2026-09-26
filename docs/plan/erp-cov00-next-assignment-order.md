@@ -91,9 +91,9 @@ The original Lane-B first-adoption path (PO → receipt → vendor bill) is now 
 
 ### COV-06
 
-Current disposition: `IMPLEMENTED` for two bounded Inventory slices; runtime acceptance is pending. COV-06a drives one exact picking through Inventory confirm → assign → validate with canonical same-id state readback and stable move identity. COV-06b partially validates an assigned picking, snapshots the source-owned `backorder_ids` relation before dispatch, requires exactly one new child id, verifies the child's `backorder_id` points to the source, and preserves stale/deny effect sets. See [`erp-cov06a-picking-lifecycle-status.md`](./erp-cov06a-picking-lifecycle-status.md) and [`erp-cov06b-picking-backorder-status.md`](./erp-cov06b-picking-backorder-status.md).
+Current disposition: `IMPLEMENTED` for three bounded Inventory slices; runtime acceptance is pending. COV-06a drives one exact picking through Inventory confirm → assign → validate with canonical same-id state readback and stable move identity. COV-06b partially validates an assigned picking using the source-owned `backorder_ids` relation and exact child linkage. COV-06c moves one untracked quant between internal locations, snapshots exact source/destination identity before dispatch, verifies exact quantity convergence after dispatch, removes first/latest destination selection, and preserves stale/deny effect sets. See [`erp-cov06a-picking-lifecycle-status.md`](./erp-cov06a-picking-lifecycle-status.md), [`erp-cov06b-picking-backorder-status.md`](./erp-cov06b-picking-backorder-status.md), and [`erp-cov06c-internal-quant-transfer-status.md`](./erp-cov06c-internal-quant-transfer-status.md).
 
-Next bounded Inventory work should certify one internal-transfer path with exact source/destination quant convergence. Do not expand into cycle counts, lots/serials, quality or replenishment.
+Next bounded Inventory work should target lot/serial tracked movement or cycle-count adjustment with exact quant delta. Keep quality/replenishment as separate slices.
 
 ## First implementation convergence
 
