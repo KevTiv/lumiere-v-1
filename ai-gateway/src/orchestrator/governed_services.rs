@@ -74,6 +74,7 @@ use sha2::{Digest, Sha256};
 
 use super::agent_loop::{LoopPolicy, LoopTools};
 use super::intelligence::{CapabilityProposal, EvidenceRef, FinalDraft};
+use super::skill_loader::sats_option;
 use crate::{
     harness::audit::{DecisionOutcome, PolicyDecision},
     providers::llm::ToolCallRequest,
@@ -356,6 +357,20 @@ impl StdbExecutionRecovery<'_> {
     }
 }
 
+fn succeeded_capability_result_params(
+    recovery_key: &str,
+    output_json: String,
+    output_hash: String,
+) -> Value {
+    serde_json::json!({
+        "recovery_key": recovery_key,
+        "status": "succeeded",
+        "output_json": sats_option(Some(Value::String(output_json))),
+        "output_hash": sats_option(Some(Value::String(output_hash))),
+        "failure_reason": sats_option(None),
+    })
+}
+
 #[async_trait]
 impl ExecutionRecovery for StdbExecutionRecovery<'_> {
     fn recovery_key(&self, run_id: u64, proposal: &CapabilityProposal) -> Result<String> {
@@ -413,13 +428,7 @@ impl ExecutionRecovery for StdbExecutionRecovery<'_> {
                 "record_ai_capability_execution_result",
                 serde_json::json!([
                     self.organization_id,
-                    {
-                        "recovery_key": key,
-                        "status": "succeeded",
-                        "output_json": output_json,
-                        "output_hash": output_hash,
-                        "failure_reason": null,
-                    }
+                    succeeded_capability_result_params(key, output_json, output_hash),
                 ]),
             ))
             .await
@@ -1412,6 +1421,22 @@ mod tests {
         assert_ne!(a, capability_recovery_key(1, &proposal()).unwrap());
 
         assert!(approval_request_key(0, &proposal()).is_err());
+    }
+
+    #[test]
+    fn durable_capability_result_uses_nested_sats_options() {
+        let params = succeeded_capability_result_params(
+            "recovery-key",
+            "{\"summary\":\"ok\"}".to_string(),
+            "abc123".to_string(),
+        );
+
+        assert_eq!(
+            params["output_json"],
+            json!({"some": "{\"summary\":\"ok\"}"})
+        );
+        assert_eq!(params["output_hash"], json!({"some": "abc123"}));
+        assert_eq!(params["failure_reason"], json!({"none": []}));
     }
 
     #[test]

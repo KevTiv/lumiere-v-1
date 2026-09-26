@@ -275,38 +275,95 @@ fn channel_allowed(template: &MessageTemplate, channel: &MessageChannel) -> bool
     template.applicable_channels.contains(channel)
 }
 
-fn contact_can_receive(
+struct ResolvedMessageRecipient {
+    contact_id: u64,
+    phone_identity_id: u64,
+    display_name: String,
+}
+
+fn resolve_message_recipient(
     ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: Option<u64>,
     contact_id: u64,
     channel: &MessageChannel,
-) -> (bool, Option<u64>) {
-    let prefs: Vec<ContactCommunicationPreference> = ctx
+) -> Result<Option<ResolvedMessageRecipient>, String> {
+    let contact_row = ctx
+        .db
+        .contact()
+        .id()
+        .find(&contact_id)
+        .ok_or("Contact not found")?;
+    if contact_row.organization_id != organization_id {
+        return Err("Contact does not belong to this organization".to_string());
+    }
+    if contact_row.deleted_at.is_some() || contact_row.merge_target_id.is_some() {
+        return Ok(None);
+    }
+    if company_id.is_some() && contact_row.company_id != company_id {
+        return Err("Contact does not belong to this company".to_string());
+    }
+
+    let opted_out = ctx
         .db
         .contact_communication_preference()
         .preference_by_contact()
         .filter(&contact_id)
-        .collect();
-    let opted_out = prefs.iter().any(|p| p.channel == *channel && !p.opted_in);
+        .any(|preference| {
+            preference.organization_id == organization_id
+                && preference.company_id == contact_row.company_id
+                && preference.channel == *channel
+                && !preference.opted_in
+        });
     if opted_out {
-        return (false, None);
+        return Ok(None);
     }
 
-    let identity_id = ctx
+    let identity = ctx
         .db
         .contact_phone_identity()
-        .iter()
-        .find(|i| {
-            i.contact_id == contact_id
-                && i.kind == crate::types::ContactIdentityKind::Primary
-                && i.archived_at.is_none()
-                && i.verification_state != ContactVerificationState::OptedOut
+        .contact_phone_identity_by_contact()
+        .filter(&contact_id)
+        .filter(|identity| {
+            identity.organization_id == organization_id
+                && identity.company_id == contact_row.company_id
+                && identity.kind == crate::types::ContactIdentityKind::Primary
+                && identity.archived_at.is_none()
+                && identity.verification_state != ContactVerificationState::OptedOut
         })
-        .map(|i| i.id);
+        .min_by_key(|identity| (!identity.is_preferred, identity.id));
 
-    match identity_id {
-        Some(id) => (true, Some(id)),
-        None => (false, None),
+    Ok(identity.map(|identity| ResolvedMessageRecipient {
+        contact_id,
+        phone_identity_id: identity.id,
+        display_name: if contact_row.display_name.trim().is_empty() {
+            contact_row.name
+        } else {
+            contact_row.display_name
+        },
+    }))
+}
+
+fn contact_batch_variables(
+    template: &MessageTemplate,
+    recipient: &ResolvedMessageRecipient,
+) -> Result<Vec<MessageTemplateVariable>, String> {
+    let mut variables = Vec::with_capacity(template.allowed_variables.len());
+    for key in &template.allowed_variables {
+        let value = match key.as_str() {
+            "customer_name" | "contact_name" | "recipient_name" => recipient.display_name.clone(),
+            other => {
+                return Err(format!(
+                    "Contact batch template variable '{other}' is not supported"
+                ))
+            }
+        };
+        variables.push(MessageTemplateVariable {
+            key: key.clone(),
+            value,
+        });
     }
+    Ok(variables)
 }
 
 fn invoice_reminder_variables(
@@ -480,11 +537,18 @@ pub fn create_operational_message(
     let status = params.status.clone();
     let subject_model = params.subject_model.clone();
 
-    let (can_receive, phone_identity_id) = contact_can_receive(ctx, params.contact_id, &channel);
-    if !can_receive {
-        return Err("Contact cannot receive messages on this channel".to_string());
+    let recipient = resolve_message_recipient(
+        ctx,
+        organization_id,
+        params.company_id,
+        params.contact_id,
+        &channel,
+    )?
+    .ok_or("Contact cannot receive messages on this channel")?;
+    if params.phone_identity_id != 0 && recipient.phone_identity_id != params.phone_identity_id {
+        return Err("Selected phone identity is not the current eligible recipient identity".to_string());
     }
-    let phone_identity_id = phone_identity_id.unwrap_or(params.phone_identity_id);
+    let phone_identity_id = recipient.phone_identity_id;
 
     let rendered_body = if params.rendered_body.is_empty() {
         render_template(&template, &params.variables)?
@@ -565,6 +629,20 @@ pub fn record_message_copied(
         .ok_or("Operational message not found")?;
     if message.organization_id != organization_id {
         return Err("Message belongs to a different organization".to_string());
+    }
+    if message.message_batch_id != 0 {
+        let batch = ctx
+            .db
+            .message_batch()
+            .id()
+            .find(&message.message_batch_id)
+            .ok_or("Message batch not found for operational message")?;
+        if batch.organization_id != organization_id {
+            return Err("Message batch belongs to a different organization".to_string());
+        }
+        if batch.status != MessageBatchStatus::Approved {
+            return Err("Batch message cannot be copied before independent approval".to_string());
+        }
     }
     if message.status != OperationalMessageStatus::Draft
         && message.status != OperationalMessageStatus::Queued
@@ -662,12 +740,17 @@ pub fn create_invoice_reminder_batch(
             excluded += 1;
             continue;
         }
-        let (can_receive, phone_identity_id) =
-            contact_can_receive(ctx, contact_id, &params.channel);
-        let Some(phone_identity_id) = phone_identity_id.filter(|_| can_receive) else {
+        let Some(recipient) = resolve_message_recipient(
+            ctx,
+            organization_id,
+            params.company_id,
+            contact_id,
+            &params.channel,
+        )? else {
             excluded += 1;
             continue;
         };
+        let phone_identity_id = recipient.phone_identity_id;
         if sample.len() < 3 {
             sample.push(phone_identity_id);
         }
@@ -791,22 +874,31 @@ pub fn create_message_batch(
     let channel = params.channel.clone();
     let subject_model = params.subject_model.clone();
 
-    let mut included: Vec<u64> = vec![];
+    let mut included = Vec::new();
     let mut excluded: u64 = 0;
     let mut sample: Vec<u64> = vec![];
 
     for contact_id in &params.candidate_contact_ids {
-        let (can_receive, phone_id) = contact_can_receive(ctx, *contact_id, &channel);
-        if can_receive {
-            included.push(*contact_id);
-            if sample.len() < 3 {
-                if let Some(pid) = phone_id {
-                    sample.push(pid);
-                }
-            }
-        } else {
+        let Some(recipient) = resolve_message_recipient(
+            ctx,
+            organization_id,
+            params.company_id,
+            *contact_id,
+            &channel,
+        )? else {
             excluded += 1;
+            continue;
+        };
+        let variables = contact_batch_variables(&template, &recipient)?;
+        let rendered_subject = render_subject(&template, &variables)?;
+        let rendered_body = render_template(&template, &variables)?;
+        if rendered_body.trim().is_empty() {
+            return Err("Contact batch rendered body cannot be empty".to_string());
         }
+        if sample.len() < 3 {
+            sample.push(recipient.phone_identity_id);
+        }
+        included.push((recipient, variables, rendered_subject, rendered_body));
     }
 
     let batch = ctx.db.message_batch().insert(MessageBatch {
@@ -831,35 +923,31 @@ pub fn create_message_batch(
         metadata: params.metadata,
     });
 
-    // Create child operational messages in draft state.
-    for contact_id in included {
-        let (_, phone_identity_id) = contact_can_receive(ctx, contact_id, &batch.channel);
-        if let Some(phone_id) = phone_identity_id {
-            let _ = ctx.db.operational_message().insert(OperationalMessage {
-                id: 0,
-                organization_id,
-                company_id: batch.company_id,
-                message_batch_id: batch.id,
-                template_id: batch.template_id,
-                contact_id,
-                phone_identity_id: phone_id,
-                channel: batch.channel.clone(),
-                status: OperationalMessageStatus::Draft,
-                subject_model: batch.subject_model.clone(),
-                subject_id: 0,
-                rendered_subject: None,
-                rendered_body: String::new(),
-                variable_hash: String::new(),
-                copied_at: None,
-                queued_at: None,
-                sent_at: None,
-                failed_at: None,
-                failure_reason: None,
-                created_at: ctx.timestamp,
-                created_by: ctx.sender(),
-                metadata: None,
-            });
-        }
+    for (recipient, variables, rendered_subject, rendered_body) in included {
+        ctx.db.operational_message().insert(OperationalMessage {
+            id: 0,
+            organization_id,
+            company_id: batch.company_id,
+            message_batch_id: batch.id,
+            template_id: batch.template_id,
+            contact_id: recipient.contact_id,
+            phone_identity_id: recipient.phone_identity_id,
+            channel: batch.channel.clone(),
+            status: OperationalMessageStatus::Draft,
+            subject_model: batch.subject_model.clone(),
+            subject_id: 0,
+            rendered_subject,
+            rendered_body,
+            variable_hash: hash_variables(&variables),
+            copied_at: None,
+            queued_at: None,
+            sent_at: None,
+            failed_at: None,
+            failure_reason: None,
+            created_at: ctx.timestamp,
+            created_by: ctx.sender(),
+            metadata: None,
+        });
     }
 
     write_audit_log_v2(
@@ -876,6 +964,68 @@ pub fn create_message_batch(
             metadata: None,
         },
     );
+    Ok(())
+}
+
+fn validate_message_batch_for_approval(
+    ctx: &ReducerContext,
+    batch: &MessageBatch,
+) -> Result<(), String> {
+    let messages: Vec<_> = ctx
+        .db
+        .operational_message()
+        .operational_message_by_batch()
+        .filter(&batch.id)
+        .collect();
+    if messages.len() as u64 != batch.recipient_count {
+        return Err("Batch recipient snapshot no longer matches its message intents".to_string());
+    }
+
+    for message in messages {
+        if message.organization_id != batch.organization_id
+            || message.company_id != batch.company_id
+            || message.template_id != batch.template_id
+            || message.channel != batch.channel
+        {
+            return Err("Batch recipient message is outside the approved batch scope".to_string());
+        }
+        if message.status != OperationalMessageStatus::Draft {
+            return Err("Batch recipient message is no longer an unapproved draft".to_string());
+        }
+        if message.rendered_body.trim().is_empty() {
+            return Err("Batch recipient has no rendered content to approve".to_string());
+        }
+
+        let current = resolve_message_recipient(
+            ctx,
+            batch.organization_id,
+            batch.company_id,
+            message.contact_id,
+            &batch.channel,
+        )?
+        .ok_or(
+            "Batch recipient consent or phone identity is no longer eligible; create a new batch",
+        )?;
+        if current.phone_identity_id != message.phone_identity_id {
+            return Err(
+                "Batch recipient phone identity changed after preview; create a new batch".to_string(),
+            );
+        }
+        let identity = ctx
+            .db
+            .contact_phone_identity()
+            .id()
+            .find(&message.phone_identity_id)
+            .ok_or("Batch recipient phone identity no longer exists")?;
+        if identity.updated_at.to_micros_since_unix_epoch()
+            > message.created_at.to_micros_since_unix_epoch()
+        {
+            return Err(
+                "Batch recipient phone identity changed after preview; create a new batch".to_string(),
+            );
+        }
+    }
+
     Ok(())
 }
 
@@ -903,8 +1053,28 @@ pub fn review_message_batch(
     if batch.organization_id != organization_id {
         return Err("Batch belongs to a different organization".to_string());
     }
+
+    if params.approved
+        && batch.status == MessageBatchStatus::Approved
+        && batch.approved_by == Some(ctx.sender())
+    {
+        return Ok(());
+    }
+    if !params.approved
+        && batch.status == MessageBatchStatus::Rejected
+        && batch.rejected_by == Some(ctx.sender())
+    {
+        return Ok(());
+    }
     if batch.status != MessageBatchStatus::PendingApproval {
         return Err("Batch is not pending approval".to_string());
+    }
+
+    if params.approved {
+        validate_message_batch_for_approval(ctx, &batch)?;
+        if batch.created_by == ctx.sender() {
+            return Err("Batch creator cannot approve their own batch".to_string());
+        }
     }
 
     let (new_status, approved_by, approved_at, rejected_by, rejected_at) = if params.approved {

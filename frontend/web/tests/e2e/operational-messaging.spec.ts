@@ -7,6 +7,7 @@ import {
   fetchSessionOrganizationId,
   smokeName,
 } from "./helpers"
+import { provisionActor, withActor } from "./pretenant-support"
 
 type QueryRow = Record<string, unknown>
 
@@ -190,6 +191,40 @@ async function createApprovedReminderTemplate(
   return templateId
 }
 
+
+async function createApprovedContactTemplate(
+  page: Page,
+  organizationId: number,
+  marker: string,
+): Promise<number> {
+  const key = `${marker}-contact-message`
+  await callRawReducer(page, "create_message_template", [
+    organizationId,
+    {
+      company_id: none(),
+      key,
+      name: `${marker} contact message`,
+      locale: "en",
+      subject: some(`Hello {{customer_name}} ${marker}`),
+      body_template: "Hello {{customer_name}}, this is an operational message.",
+      allowed_variables: ["customer_name"],
+      applicable_channels: [SMS],
+      retention_classification: "operational",
+      metadata: some(marker),
+    },
+  ])
+
+  const template = await waitForRow(
+    page,
+    "message-templates",
+    (row) => String(rowValue(row, "subject") ?? "").includes(marker),
+    `contact template ${key}`,
+  )
+  const templateId = scalarId(rowValue(template, "id"))
+  if (templateId == null) throw new Error("Created contact template is missing an id")
+  return templateId
+}
+
 function auditActionExists(rows: QueryRow[], tableName: string, recordId: number, action: string): boolean {
   return rows.some(
     (row) =>
@@ -298,6 +333,7 @@ test.describe("Operational messaging", { tag: ["@phase-1", "@operational-messagi
 
   test("P1-MSG-02 previews eligible recipients only, then approves and cancels the batch with audit evidence", async ({
     page,
+    browser,
   }) => {
     test.setTimeout(120_000)
 
@@ -315,7 +351,7 @@ test.describe("Operational messaging", { tag: ["@phase-1", "@operational-messagi
       marker,
     )
     await createPrimaryPhoneIdentity(page, organizationId, optedOutContactId, "+12025550103", marker)
-    const templateId = await createApprovedReminderTemplate(page, organizationId, marker)
+    const templateId = await createApprovedContactTemplate(page, organizationId, marker)
 
     await callRawReducer(page, "set_contact_communication_preference", [
       organizationId,
@@ -360,13 +396,14 @@ test.describe("Operational messaging", { tag: ["@phase-1", "@operational-messagi
     )
     expect(enumName(rowValue(children[0] ?? {}, "status"))).toBe("draft")
 
-    // The current local fixture has one authenticated actor. This covers lifecycle transitions;
-    // independent-approver enforcement needs a second role/session fixture before it can be E2E-proven.
-    await callRawReducer(page, "review_message_batch", [
-      organizationId,
-      batchId,
-      { approved: true, reason: some("E2E batch approval") },
-    ])
+    const approver = await provisionActor(page, `${marker}-approver`, ["message_batch:approve"])
+    await withActor(browser, approver, (approverPage) =>
+      callRawReducer(approverPage, "review_message_batch", [
+        organizationId,
+        batchId,
+        { approved: true, reason: some("E2E batch approval") },
+      ]),
+    )
 
     await expect
       .poll(async () => {

@@ -1,6 +1,6 @@
 //! Dedicated harness skill routes (fenced off legacy `/v1/skills/run`).
 
-use axum::{extract::State, Json};
+use axum::{extract::State, http::HeaderMap, Json};
 use serde::Deserialize;
 use serde_json::{Map, Value};
 
@@ -225,11 +225,81 @@ pub struct GatewayGovernedLlmSkillRequest {
     pub org_privacy_policy: OrgPrivacyPolicy,
 }
 
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct TrustedGovernedLlmSkillRequest {
+    #[serde(default)]
+    pub inputs: Value,
+    pub agent_id: Option<u64>,
+    pub team_member_id: Option<u64>,
+    pub max_steps: Option<u32>,
+    pub resume_run_id: Option<u64>,
+    #[serde(default)]
+    pub org_privacy_policy: OrgPrivacyPolicy,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+struct TrustedActorContext {
+    organization_id: u64,
+    company_id: u64,
+    identity: String,
+    token: String,
+}
+
+impl TrustedActorContext {
+    fn from_headers(headers: &HeaderMap) -> AppResult<Self> {
+        let required = |name: &str| {
+            headers
+                .get(name)
+                .and_then(|value| value.to_str().ok())
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+                .ok_or_else(|| AppError::Forbidden("acting-user context is required".into()))
+        };
+        let organization_id = required("x-lumiere-organization-id")?
+            .parse::<u64>()
+            .ok()
+            .filter(|value| *value > 0)
+            .ok_or_else(|| AppError::Forbidden("acting-user context is invalid".into()))?;
+        let company_id = required("x-lumiere-company-id")?
+            .parse::<u64>()
+            .ok()
+            .filter(|value| *value > 0)
+            .ok_or_else(|| AppError::Forbidden("acting-user context is invalid".into()))?;
+        let credentials = ActorCredentials::new(
+            required("x-lumiere-actor-token")?,
+            required("x-lumiere-actor-identity")?,
+        )
+        .map_err(|error| AppError::Forbidden(error.to_string()))?;
+        Ok(Self {
+            organization_id,
+            company_id,
+            identity: credentials.identity_hex,
+            token: credentials.stdb_token,
+        })
+    }
+}
+
 pub async fn post_report_analysis(
     State(state): State<AppState>,
-    Json(req): Json<GatewayGovernedLlmSkillRequest>,
+    headers: HeaderMap,
+    Json(req): Json<TrustedGovernedLlmSkillRequest>,
 ) -> AppResult<Json<GovernedLlmSkillResult>> {
-    run_llm_route(&state, req, REPORT_ANALYSIS_SKILL_KEY).await
+    let actor = TrustedActorContext::from_headers(&headers)?;
+    run_llm_with_context(
+        &state,
+        REPORT_ANALYSIS_SKILL_KEY,
+        actor,
+        GovernedLlmSkillInput {
+            inputs: req.inputs,
+            agent_id: req.agent_id,
+            team_member_id: req.team_member_id,
+            max_steps: req.max_steps,
+            resume_run_id: req.resume_run_id,
+        },
+        req.org_privacy_policy,
+    )
+    .await
 }
 
 pub async fn post_process_research(
@@ -260,20 +330,15 @@ async fn run_llm_route(
 ) -> AppResult<Json<GovernedLlmSkillResult>> {
     validate_scope(req.org_id, req.company_id, &req.stdb_token)?;
     let identity_hex = identity_or(req.identity_hex, &skill_key.replace('_', "-"));
-    let policy = policy_for(
-        state,
-        req.org_id,
-        skill_key,
-        LLM_BUNDLED_SKILL_VERSION,
-        req.org_privacy_policy,
-    )
-    .await?;
-    let result = run_governed_llm_skill(
+    run_llm_with_context(
         state,
         skill_key,
-        req.org_id,
-        &identity_hex,
-        &req.stdb_token,
+        TrustedActorContext {
+            organization_id: req.org_id,
+            company_id: req.company_id,
+            identity: identity_hex,
+            token: req.stdb_token,
+        },
         GovernedLlmSkillInput {
             inputs: req.inputs,
             agent_id: req.agent_id,
@@ -281,7 +346,34 @@ async fn run_llm_route(
             max_steps: req.max_steps,
             resume_run_id: req.resume_run_id,
         },
-        req.company_id,
+        req.org_privacy_policy,
+    )
+    .await
+}
+
+async fn run_llm_with_context(
+    state: &AppState,
+    skill_key: &str,
+    actor: TrustedActorContext,
+    input: GovernedLlmSkillInput,
+    org_privacy_policy: OrgPrivacyPolicy,
+) -> AppResult<Json<GovernedLlmSkillResult>> {
+    let policy = policy_for(
+        state,
+        actor.organization_id,
+        skill_key,
+        LLM_BUNDLED_SKILL_VERSION,
+        org_privacy_policy,
+    )
+    .await?;
+    let result = run_governed_llm_skill(
+        state,
+        skill_key,
+        actor.organization_id,
+        &actor.identity,
+        &actor.token,
+        input,
+        actor.company_id,
         policy,
     )
     .await
@@ -320,4 +412,67 @@ fn validate_scope(org_id: u64, company_id: u64, stdb_token: &str) -> AppResult<(
         return Err(AppError::BadRequest("stdb_token is required".into()));
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn trusted_headers() -> HeaderMap {
+        let mut headers = HeaderMap::new();
+        headers.insert("x-lumiere-organization-id", "7".parse().unwrap());
+        headers.insert("x-lumiere-company-id", "9".parse().unwrap());
+        headers.insert(
+            "x-lumiere-actor-identity",
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+                .parse()
+                .unwrap(),
+        );
+        headers.insert("x-lumiere-actor-token", "session-token".parse().unwrap());
+        headers
+    }
+
+    #[test]
+    fn report_analysis_authority_is_resolved_only_from_trusted_headers() {
+        let actor = TrustedActorContext::from_headers(&trusted_headers()).unwrap();
+        assert_eq!(actor.organization_id, 7);
+        assert_eq!(actor.company_id, 9);
+        assert_eq!(actor.identity, "a".repeat(64));
+        assert_eq!(actor.token, "session-token");
+
+        let mut missing = trusted_headers();
+        missing.remove("x-lumiere-actor-token");
+        assert!(TrustedActorContext::from_headers(&missing).is_err());
+    }
+
+    #[test]
+    fn report_analysis_json_rejects_tenant_or_actor_authority() {
+        let accepted = serde_json::json!({
+            "inputs": {"query": "revenue"},
+            "agentId": 3,
+            "teamMemberId": null,
+            "maxSteps": 4,
+            "resumeRunId": null,
+            "orgPrivacyPolicy": {}
+        });
+        assert!(serde_json::from_value::<TrustedGovernedLlmSkillRequest>(accepted).is_ok());
+
+        for field in [
+            "orgId",
+            "companyId",
+            "identityHex",
+            "stdbToken",
+            "org_id",
+            "company_id",
+            "identity_hex",
+            "stdb_token",
+        ] {
+            let mut forged = serde_json::json!({"inputs": {}});
+            forged[field] = serde_json::json!(1);
+            assert!(
+                serde_json::from_value::<TrustedGovernedLlmSkillRequest>(forged).is_err(),
+                "{field} must not be accepted in the request body"
+            );
+        }
+    }
 }
