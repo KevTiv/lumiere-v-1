@@ -249,6 +249,48 @@ pub(crate) struct StdbProgramCheckpointStore<'a> {
     pub reader: &'a StdbClient,
 }
 
+fn latest_row_by_id(rows: Vec<Value>) -> Option<Value> {
+    rows.into_iter().max_by_key(|row| {
+        row.get("id")
+            .and_then(|value| value.as_u64().or_else(|| value.as_str()?.parse().ok()))
+            .unwrap_or_default()
+    })
+}
+
+fn latest_checkpoint_row(rows: Vec<Value>, program_ref: &str) -> Option<Value> {
+    latest_row_by_id(
+        rows.into_iter()
+            .filter(|row| {
+                row.get("shadowProfileRef")
+                    .or_else(|| row.get("shadow_profile_ref"))
+                    .and_then(Value::as_str)
+                    == Some(program_ref)
+            })
+            .collect(),
+    )
+}
+
+#[cfg(test)]
+mod checkpoint_row_tests {
+    use super::*;
+
+    #[test]
+    fn latest_checkpoint_is_selected_without_server_side_ordering() {
+        let latest = latest_checkpoint_row(
+            vec![
+                json!({"id": 4, "shadowProfileRef": "skill:test@1", "outputJson": "older"}),
+                json!({"id": "9", "shadowProfileRef": "skill:test@1", "outputJson": "latest"}),
+                json!({"id": 12, "shadowProfileRef": "skill:other@1", "outputJson": "other"}),
+                json!({"id": 7, "shadowProfileRef": "skill:test@1", "outputJson": "middle"}),
+            ],
+            "skill:test@1",
+        )
+        .unwrap();
+
+        assert_eq!(latest["outputJson"], "latest");
+    }
+}
+
 impl StdbProgramCheckpointStore<'_> {
     /// Verify the latest continuation against the current graph, bounded
     /// inputs and freshly authorized dependency snapshot before a waiting run
@@ -272,16 +314,15 @@ impl ProgramCheckpointStore for StdbProgramCheckpointStore<'_> {
         context: &GovernedProgramContext,
         graph_hash: &str,
     ) -> Result<Option<GovernedProgramCheckpoint>> {
-        let program_ref = context.program_ref.replace('\'', "''");
         let rows = self
             .reader
             .query_sql(&format!(
-                "SELECT * FROM ai_intelligence_event WHERE organization_id = {}                  AND run_id = {} AND event_kind = 'program_checkpoint'                  AND shadow_profile_ref = '{}' ORDER BY id DESC LIMIT 1",
-                context.organization_id, context.run_id, program_ref
+                "SELECT * FROM ai_intelligence_event WHERE organization_id = {}                  AND run_id = {} AND event_kind = 'program_checkpoint'",
+                context.organization_id, context.run_id
             ))
             .await
             .context("load governed program checkpoint")?;
-        let Some(row) = rows.first() else {
+        let Some(row) = latest_checkpoint_row(rows, &context.program_ref) else {
             return Ok(None);
         };
         let stored_graph_hash = row
@@ -677,6 +718,7 @@ impl IntelligenceEventRecorder for StdbIntelligenceEventRecorder<'_> {
         request: &DecisionRequest,
         response: &DecisionResponse,
     ) -> Result<u64> {
+        let (confidence, provider_attempt_id) = durable_decision_sats_options(response.confidence);
         self.writer
             .call_reducer(ReducerCall::from_name(
                 "record_ai_decision_event",
@@ -692,10 +734,10 @@ impl IntelligenceEventRecorder for StdbIntelligenceEventRecorder<'_> {
                         "request_json": serde_json::to_string(request)?,
                         "outcome_kind": decision_kind_label(response.kind),
                         "output_json": serde_json::to_string(response)?,
-                        "confidence": response.confidence,
+                        "confidence": confidence,
                         "provider": response.provider.clone(),
                         "model": response.model.clone(),
-                        "provider_attempt_id": null,
+                        "provider_attempt_id": provider_attempt_id,
                         "input_tokens": response.input_tokens,
                         "output_tokens": response.output_tokens,
                     }
@@ -729,7 +771,7 @@ impl IntelligenceEventRecorder for StdbIntelligenceEventRecorder<'_> {
                         "output_json": serde_json::to_string(outcome)?,
                         "provider": reasoning_outcome_provider(outcome),
                         "model": reasoning_outcome_model(outcome),
-                        "provider_attempt_id": null,
+                        "provider_attempt_id": durable_reasoning_provider_attempt_id(),
                         "input_tokens": 0,
                         "output_tokens": 0,
                     }
@@ -789,6 +831,41 @@ impl IntelligenceEventRecorder for StdbIntelligenceEventRecorder<'_> {
             reason,
         )
         .await
+    }
+}
+
+fn durable_decision_sats_options(confidence: Option<f64>) -> (Value, Value) {
+    (
+        super::skill_loader::sats_option(confidence.map(Value::from)),
+        super::skill_loader::sats_option(None),
+    )
+}
+
+fn durable_reasoning_provider_attempt_id() -> Value {
+    super::skill_loader::sats_option(None)
+}
+
+#[cfg(test)]
+mod intelligence_event_sats_option_tests {
+    use super::*;
+
+    #[test]
+    fn decision_event_composite_options_use_sats_encoding() {
+        let (confidence, provider_attempt_id) = durable_decision_sats_options(Some(0.87));
+
+        assert_eq!(confidence, json!({ "some": 0.87 }));
+        assert_eq!(provider_attempt_id, json!({ "none": [] }));
+
+        let (confidence, _) = durable_decision_sats_options(None);
+        assert_eq!(confidence, json!({ "none": [] }));
+    }
+
+    #[test]
+    fn reasoning_event_composite_provider_attempt_uses_sats_encoding() {
+        assert_eq!(
+            durable_reasoning_provider_attempt_id(),
+            json!({ "none": [] })
+        );
     }
 }
 

@@ -34,6 +34,7 @@ const REDUCER_NAMES_PATH = path.resolve(path.dirname(fileURLToPath(import.meta.u
 
 type Probe =
   | { kind: "route"; method: "GET" | "POST"; path: string }
+  | { kind: "ai-gateway" }
   | { kind: "reducer"; pattern: RegExp }
   | { kind: "source"; path: string; contains?: string }
 
@@ -57,6 +58,42 @@ export const CAPABILITIES = {
       "Requires PR #25 personal frontend module draft save/reopen (stacked on #13 and #19).",
     probes: [{ kind: "route", method: "GET", path: "/api/presentation/drafts" }],
   },
+  presentationFieldRevocation: {
+    id: "presentation-field-revocation",
+    prerequisite:
+      "Requires saved presentation drafts plus mutable role field-permission controls.",
+    probes: [
+      { kind: "route", method: "GET", path: "/api/presentation/drafts" },
+      { kind: "reducer", pattern: /^grant_field_permission$/ },
+    ],
+  },
+  presentationMembershipRevocation: {
+    id: "presentation-membership-revocation",
+    prerequisite:
+      "Requires saved presentation drafts plus organization-membership removal.",
+    probes: [
+      { kind: "route", method: "GET", path: "/api/presentation/drafts" },
+      { kind: "reducer", pattern: /^remove_user_from_organization$/ },
+    ],
+  },
+  presentationResourceToggle: {
+    id: "presentation-resource-toggle",
+    prerequisite:
+      "Requires a runtime control that can disable a presentation resource after a draft is saved.",
+    probes: [
+      { kind: "route", method: "GET", path: "/api/presentation/drafts" },
+      { kind: "reducer", pattern: /^(set|update)_presentation_resource_(active|enabled)$/ },
+    ],
+  },
+  presentationOperationToggle: {
+    id: "presentation-operation-toggle",
+    prerequisite:
+      "Requires a runtime control that can remove/disable a presentation operation or capability.",
+    probes: [
+      { kind: "route", method: "GET", path: "/api/presentation/drafts" },
+      { kind: "reducer", pattern: /^(set|update)_presentation_(operation|capability)_(active|enabled)$/ },
+    ],
+  },
   presentationCompanySwitch: {
     id: "presentation-company-switch",
     prerequisite:
@@ -78,12 +115,18 @@ export const CAPABILITIES = {
   agentLoop: {
     id: "agent-loop",
     prerequisite: "Requires H4 bounded agent loop and event persistence (PR #23).",
-    probes: [{ kind: "source", path: "ai-gateway/src/orchestrator/agent_loop.rs" }],
+    probes: [
+      { kind: "source", path: "ai-gateway/src/orchestrator/agent_loop.rs" },
+      { kind: "ai-gateway" },
+    ],
   },
   agentPolicy: {
     id: "agent-per-call-policy",
     prerequisite: "Requires H5a per-call policy enforcement and approval stops (PR #24).",
-    probes: [{ kind: "source", path: "ai-gateway/src/orchestrator/invocation_policy.rs" }],
+    probes: [
+      { kind: "source", path: "ai-gateway/src/orchestrator/invocation_policy.rs" },
+      { kind: "ai-gateway" },
+    ],
   },
   agentBudgetPersistence: {
     id: "agent-budget-persistence",
@@ -92,6 +135,7 @@ export const CAPABILITIES = {
     probes: [
       { kind: "source", path: "spacetimedb/src/ai/spend.rs" },
       { kind: "reducer", pattern: /^reserve_ai_spend$/ },
+      { kind: "ai-gateway" },
     ],
   },
   outboundProviderDispatch: {
@@ -126,6 +170,12 @@ async function probeSucceeds(page: Page, probe: Probe): Promise<boolean> {
         maxRedirects: 0,
       })
       return response.status() !== 404
+    }
+    case "ai-gateway": {
+      const response = await page.request.get("/api/ai/health", { failOnStatusCode: false })
+      if (!response.ok()) return false
+      const body = (await response.json().catch(() => ({}))) as { ok?: boolean; status?: string }
+      return body.ok === true || body.status === "ok"
     }
     case "reducer":
       return generatedReducerNames().some((name) => probe.pattern.test(name))

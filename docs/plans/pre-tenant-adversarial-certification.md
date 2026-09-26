@@ -268,11 +268,9 @@ Legend — Class: **C** covered, **P** partial, **N** not covered, **B** blocked
 
 ## Known defects (pre-tenant blockers)
 
-Registered in `KNOWN_DEFECTS` / `expectKnownDefect()`; runtime confirmation recorded in the validation log.
-
-| Case | Blocker |
-|------|---------|
-| `AG-IDEMP-01` | (Playwright-only; not yet executed against a running stack) AI draft approval retry after commit returns an error instead of idempotent success. |
+No pre-tenant defect is currently registered in `KNOWN_DEFECTS` or wrapped by
+`expectKnownDefect()`. Any newly observed invariant failure is blocking until it is classified and
+recorded explicitly.
 
 Additional documented findings (not executed as tests): `REC-01`.
 
@@ -335,19 +333,23 @@ reconstruction. REC-03 extends this to harness runs after #26.
 
 ## CI and promotion policy
 
-Initial policy:
+Current policy:
 
-- `cargo check --locked --tests` (blocking, existing) compiles all in-module certification code.
-- Native certification tests (`make pretenant-cert-native`) — blocking candidates; not added to CI in
-  this PR until runtime is measured.
-- In-module certification executes inside the existing E2E domain-reducer loop; known defects do not
-  fail it, regressions and fixed-but-registered defects do.
-- `@pretenant` Playwright suite — optional/nightly/manual via `make e2e-pretenant`; not part of `@p0`.
-- Capability-pending tests skip with their exact prerequisite.
+- `cargo check --locked --manifest-path spacetimedb/Cargo.toml --tests`,
+  `make pretenant-cert-native`, `make check-codegen-pinned`, and frontend
+  `pnpm typecheck` are blocking prerequisites in the BASE-05 pre-tenant CI lane.
+- In-module certification executes inside the existing clean-database E2E domain-reducer loop;
+  any invariant/setup failure is blocking because the native known-defect registry is empty.
+- PR #89 runs a dedicated clean-database `E2E_SUITE=pretenant` matrix entry in addition to the
+  bounded P0 smoke, so the `@pretenant` Playwright suite is executable CI evidence for BASE-05.
+- Capability-pending tests may skip only when their explicit runtime/operation prerequisite probe
+  is absent. A capability that probes available must execute a concrete certification or fail
+  loudly through `pendingContract()`.
+- The ordinary weekly/main full-browser suites remain separate from this bounded BASE-05 lane.
 
-Promotion: adversarial test proves stable over repeated nightly runs → remove dev-fixture assumptions →
-run against an isolated tenant → promote to release blocking. A known defect is removed from the
-registry in the same PR that fixes it.
+Promotion: classify every observed failure/skip, repair fixture/harness defects here, route product
+regressions to the owning BASE package, and record exact run evidence before changing BASE-05 to
+`ACCEPTED`.
 
 ## Commands
 

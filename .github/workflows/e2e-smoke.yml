@@ -9,10 +9,11 @@ on:
   workflow_dispatch:
     inputs:
       suite:
-        description: "Playwright suite (p0 = critical smoke, full = all tests)"
+        description: "Playwright suite (p0 = critical smoke, pretenant = adversarial certification, full = all tests)"
         type: choice
         options:
           - p0
+          - pretenant
           - full
         default: p0
       clear_db:
@@ -66,7 +67,11 @@ jobs:
               configs='[{"suite":"full","clear_db":"1"}]'
               ;;
             pull_request)
-              configs='[{"suite":"p0","clear_db":"0"}]'
+              if [ "${{ github.head_ref }}" = "codex/base05-pretenant-integrated-certification" ]; then
+                configs='[{"suite":"p0","clear_db":"0"},{"suite":"pretenant","clear_db":"1"}]'
+              else
+                configs='[{"suite":"p0","clear_db":"0"}]'
+              fi
               ;;
             schedule)
               configs='[{"suite":"full","clear_db":"1"}]'
@@ -223,6 +228,15 @@ jobs:
           key: next-compiler-v1-${{ runner.os }}-node22-${{ hashFiles('frontend/pnpm-lock.yaml', 'frontend/web/next.config.*', 'frontend/web/tsconfig.json') }}-${{ github.sha }}
           restore-keys: |
             next-compiler-v1-${{ runner.os }}-node22-${{ hashFiles('frontend/pnpm-lock.yaml', 'frontend/web/next.config.*', 'frontend/web/tsconfig.json') }}-
+
+      - name: Run BASE-05 pretenant static/native gates
+        if: matrix.config.suite == 'pretenant'
+        run: |
+          cargo check --locked --manifest-path spacetimedb/Cargo.toml --tests
+          make pretenant-cert-native
+          make check-codegen-pinned
+          cd frontend/web
+          pnpm typecheck
 
       - name: Run make e2e-smoke
         env:

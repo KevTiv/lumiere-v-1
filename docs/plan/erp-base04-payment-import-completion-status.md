@@ -1,8 +1,9 @@
 # BASE-04 — payment/import correctness completion
 
-Status: **IMPLEMENTATION COMPLETE — acceptance proof pending**
+Status: **ACCEPTED — integrated correctness certification closed 2026-09-24**
 
-Current tip: PR #87 (`codex/base04-money-pilot-envelope`), stacked on PR #86.
+Implementation tip: PR #87 (`codex/base04-money-pilot-envelope`), stacked on PR #86.
+Acceptance head: PR #89, revision `9d0e92c7e3edbd2555a529f44da967fd1a7d6ad8`.
 
 ## Delivered stack
 
@@ -65,8 +66,7 @@ integer-minor-unit or decimal representation migration.
 
 ## BASE-04 acceptance
 
-Do not mark BASE-04 `ACCEPTED` until all relevant proofs have passed on the
-integrated stack:
+BASE-04 acceptance requires these proofs on the integrated stack:
 
 ```bash
 cargo check --locked --manifest-path spacetimedb/Cargo.toml --tests
@@ -87,6 +87,25 @@ node --import tsx --test lib/statement-import-csv.test.ts
 pnpm typecheck
 ```
 
-No additional BASE-04 product-code slice is currently identified. Any failure
-from these commands must be classified as either a BASE-04 regression or a
-BASE-05 harness/environment issue before promotion.
+## Integrated acceptance evidence — 2026-09-24
+
+- GitHub Actions run `36054658413` certified executable revision
+  `065c45f2f7c93cb5996378a90f723cc3f9b92308`: cargo test compilation,
+  `pretenant-cert-native` (7 passed), pinned-contract checks, and frontend
+  typecheck passed before the browser run.
+- The same clean pre-tenant job executed
+  `run_accounting_payment_management_test` and the complete `@pretenant`
+  browser lane: 27 passed, 17 capability/prerequisite skips, 0 failed. This
+  includes the payment adversarial cases and M-02 lost-response case.
+- Focused acceptance-head reruns completed against isolated local databases:
+  bank-statement import 2 passed (setup plus the workflow), CSV parser 11
+  passed, and 0 failures. Revision
+  `9d0e92c7e3edbd2555a529f44da967fd1a7d6ad8` aligns the nullable `reference`
+  assertion with the canonical JSON `null` representation exposed by the API.
+- Contracts remained pinned at immutable release `v0.3.53`; no contract
+  publication was required by this closeout.
+- Reviewer: Codex coordinator evidence review on PR #89 (not human approval).
+
+The far-outside-envelope f64 characterization remains an explicit future
+decimal/minor-unit migration constraint. No additional BASE-04 product-code
+slice is identified.

@@ -262,12 +262,11 @@ impl ModelConfigurationStore for StdbModelConfigurationStore<'_> {
             .reader
             .query_sql(&format!(
                 "SELECT * FROM ai_intelligence_policy WHERE organization_id = {organization_id} \
-                 AND policy_key = '{key}' {version_clause} AND is_active = true \
-                 ORDER BY policy_version DESC LIMIT 1"
+                 AND policy_key = '{key}' {version_clause} AND is_active = true"
             ))
             .await
             .context("load intelligence policy")?;
-        rows.first().map(decode_policy).transpose()
+        decode_latest_policy(&rows)
     }
 }
 
@@ -627,6 +626,13 @@ fn decode_policy(row: &Value) -> Result<IntelligencePolicy> {
     })
 }
 
+fn decode_latest_policy(rows: &[Value]) -> Result<Option<IntelligencePolicy>> {
+    rows.iter()
+        .map(decode_policy)
+        .collect::<Result<Vec<_>>>()
+        .map(|policies| policies.into_iter().max_by_key(|policy| policy.version))
+}
+
 fn parse_role(value: &str) -> Result<IntelligenceRole> {
     match value {
         "decision" => Ok(IntelligenceRole::Decision),
@@ -864,6 +870,29 @@ mod tests {
             )]),
             fallbacks: HashMap::new(),
         }
+    }
+
+    #[test]
+    fn selects_latest_policy_version_without_server_side_ordering() {
+        let row = |version| {
+            serde_json::json!({
+                "policy_key": "default",
+                "policy_version": version,
+                "default_decision_profile": "decision@1",
+                "default_reasoning_profile": "reasoning@1",
+                "default_generation_profile": "generation@1",
+                "default_review_profile": "review@1",
+                "shadow_profiles": [],
+                "decision_type_overrides_json": "{}",
+                "fallback_profiles_json": "{}"
+            })
+        };
+
+        let latest = decode_latest_policy(&[row(2), row(7), row(4)])
+            .unwrap()
+            .unwrap();
+
+        assert_eq!(latest.version, 7);
     }
 
     #[tokio::test]
