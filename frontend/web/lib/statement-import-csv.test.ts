@@ -11,7 +11,7 @@ const CSV = [
   "2026-07-01,125.50,TX-001,Customer transfer",
 ].join("\n")
 
-test("CSV-01 strips a leading UTF-8 BOM before parsing statement headers", () => {
+test("CSV-BOM strips a leading UTF-8 BOM before parsing statement headers", () => {
   const plain = statementImportRows(CSV)
   const withBom = statementImportRows(`\uFEFF${CSV}`)
 
@@ -23,7 +23,7 @@ test("CSV-01 strips a leading UTF-8 BOM before parsing statement headers", () =>
   assert.equal(withBom[0].description, "Customer transfer")
 })
 
-test("CSV-01 BOM normalization preserves statement import idempotency identity", async () => {
+test("CSV-BOM normalization preserves statement import idempotency identity", async () => {
   const args = [1n, 2n, 3n] as const
   assert.equal(
     await statementImportIdempotencyKey(...args, `\uFEFF${CSV}`),
@@ -126,4 +126,32 @@ test("CSV-04 statement identity remains scoped by company, journal, and currency
   assert.notEqual(base, await statementImportIdempotencyKey(9n, 2n, 3n, CSV))
   assert.notEqual(base, await statementImportIdempotencyKey(1n, 9n, 3n, CSV))
   assert.notEqual(base, await statementImportIdempotencyKey(1n, 2n, 9n, CSV))
+})
+
+
+test("CSV-01 parses European grouped decimals without changing economic value", () => {
+  const rows = statementImportRows([
+    "date;amount;reference",
+    "2026-07-01;1.234,56;TX-EU-001",
+    "2026-07-02;1.234.567,89;TX-EU-002",
+    "2026-07-03;-1.234,56;TX-EU-003",
+  ].join("\n"))
+
+  assert.equal(rows[0].amount, 1_234.56)
+  assert.equal(rows[1].amount, 1_234_567.89)
+  assert.equal(rows[2].amount, -1_234.56)
+})
+
+test("CSV-01 preserves already-supported decimal comma and US mixed separators", () => {
+  const europeanDecimal = statementImportRows([
+    "date;amount;reference",
+    "2026-07-01;12,34;TX-EU-004",
+  ].join("\n"))
+  const usDecimal = statementImportRows([
+    "date,amount,reference",
+    '2026-07-01,"1,234.56",TX-US-001',
+  ].join("\n"))
+
+  assert.equal(europeanDecimal[0].amount, 12.34)
+  assert.equal(usDecimal[0].amount, 1_234.56)
 })

@@ -45,12 +45,15 @@ function parseStatementDate(value: string): Date | undefined {
 
 function parseStatementAmount(value: string): number | undefined {
   const compact = value.replaceAll(/\s/g, "")
+  const europeanGroupedDecimal = /^[+-]?\d{1,3}(?:\.\d{3})+,\d+$/.test(compact)
   const usGroupedInteger = /^[+-]?\d{1,3}(?:,\d{3})+$/.test(compact)
-  const normalized = usGroupedInteger
-    ? compact.replaceAll(",", "")
-    : compact.includes(",") && !compact.includes(".")
-      ? compact.replace(",", ".")
-      : compact.replaceAll(",", "")
+  const normalized = europeanGroupedDecimal
+    ? compact.replaceAll(".", "").replace(",", ".")
+    : usGroupedInteger
+      ? compact.replaceAll(",", "")
+      : compact.includes(",") && !compact.includes(".")
+        ? compact.replace(",", ".")
+        : compact.replaceAll(",", "")
   const amount = Number(normalized)
   return Number.isFinite(amount) ? amount : undefined
 }

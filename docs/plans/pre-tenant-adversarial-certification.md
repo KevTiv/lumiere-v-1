@@ -176,7 +176,7 @@ integer minor units/decimal.
 `frontend/web/lib/statement-import-csv.ts` for focused unit certification. Server staging cases are
 PAY-10/11. Remaining client findings are tracked explicitly below:
 
-- `CSV-01` `parseStatementAmount("1.234,56")` → `1.23456` (European thousands + decimal comma misparsed silently).
+- `CSV-01` fixed on the parser-certification stack: canonical European grouped decimals such as `1.234,56`, `1.234.567,89`, and signed variants parse to their intended numeric values without regressing plain decimal-comma or US mixed-separator inputs.
 - `CSV-02` fixed on the parser-certification stack: quoted US grouped integers such as `"1,234"` and `"1,234,567"` parse as 1234 and 1234567, while ordinary decimal-comma values such as `12,34` retain decimal semantics.
 - `CSV-03` fixed on the parser-certification stack: numeric slash dates are rejected without an explicit date-format/locale contract, so DD/MM and MM/DD are never silently reinterpreted. ISO `YYYY-MM-DD` remains accepted.
 - `CSV-04` fixed on the parser-certification stack: statement import identity now uses full SHA-256 over company/journal/currency scope plus normalized CSV content. A real pair that collides under the legacy 32-bit FNV key is certified to produce distinct SHA-256 identities.
@@ -222,7 +222,7 @@ Legend — Class: **C** covered, **P** partial, **N** not covered, **B** blocked
 | CSV US thousands grouping | `"1,234"` and multi-group integers parse as grouping; decimal-comma values remain decimals | — | web unit | yes | CSV-BOM extraction | CSV-02 | C |
 | CSV ambiguous slash dates | numeric slash dates fail closed without an explicit format/locale; ISO remains accepted | — | web unit | yes | parser extraction | CSV-03 | C |
 | CSV statement import identity | SHA-256 over scoped normalized CSV; certified against a legacy FNV-32 collision pair | — | web unit | yes | parser extraction | CSV-04 | C |
-| CSV mixed European separators | current parser behavior only | focused locale parser fixture/policy | web unit | no | parser extraction | CSV-01 | N |
+| CSV mixed European separators | canonical grouped-decimal forms parse correctly; decimal-comma and US mixed-separator regressions remain covered | — | web unit | yes | parser extraction | CSV-01 | C |
 
 ### Frontend IR (all require the IR stack)
 
@@ -280,7 +280,7 @@ Registered in `KNOWN_DEFECTS` / `expectKnownDefect()`; runtime confirmation reco
 | `COMM-15` | (Playwright-only; not yet executed against a running stack) Batch approval retry by the same approver returns an error instead of an idempotent success. |
 | `AG-IDEMP-01` | (Playwright-only; not yet executed against a running stack) AI draft approval retry after commit returns an error instead of idempotent success. |
 
-Additional documented findings (not executed as tests): `MONEY-PRECISION`, `CSV-01`, `REC-01`.
+Additional documented findings (not executed as tests): `MONEY-PRECISION`, `REC-01`.
 
 ## Phase 5 — Mobile/network resilience
 
