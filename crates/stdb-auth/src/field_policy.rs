@@ -830,6 +830,26 @@ mod tests {
     }
 
     #[test]
+    fn resolve_http_sql_columns_exposes_payment_reconciliation_outcome() {
+        let cols = resolve_http_sql_columns("payment-reconciliations", None)
+            .expect("payment-reconciliations columns");
+        for field in [
+            "allocated_move_line_id",
+            "allocated_amount",
+            "residual_before",
+            "residual_after",
+            "write_off_amount",
+            "write_off_account_id",
+            "write_off_move_id",
+        ] {
+            assert!(
+                cols.iter().any(|column| column == field),
+                "expected {field} in payment-reconciliations projection, got: {cols:?}"
+            );
+        }
+    }
+
+    #[test]
     fn resolve_http_sql_columns_includes_invoice_readback_for_sale_orders() {
         let cols = resolve_http_sql_columns("sale-orders", None).expect("sale-orders columns");
         for field in ["invoice_ids", "invoice_count", "invoice_status"] {

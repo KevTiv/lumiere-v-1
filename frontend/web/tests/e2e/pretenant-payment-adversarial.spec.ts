@@ -197,26 +197,58 @@ test.describe("Pre-tenant payment adversarial", { tag: pretenantTags("@payments"
     })
   })
 
-  test("PAY-06-E2E overpayment leaves explicit unapplied credit and no write-off", async ({ page }) => {
+  test("PAY-06-E2E overpayment stays explicit and can partially settle a second invoice", async ({ page }) => {
     test.setTimeout(120_000)
     const s = await paymentSetup(page)
-    const line = await receivableLineId(page, s, 10_000, "pt-pay06-invoice")
+    const lineA = await receivableLineId(page, s, 10_000, "pt-pay06-invoice-a")
+    const lineB = await receivableLineId(page, s, 5_000, "pt-pay06-invoice-b")
     const payment = await postedReceipt(page, s, 12_000, "pt-pay06-receipt")
 
-    const over = await callReducerBffResult(page, "allocate_payment_transaction", allocationArgs(s, payment, line, 12_000, `pt-pay06-over-${payment}`))
+    const over = await callReducerBffResult(
+      page,
+      "allocate_payment_transaction",
+      allocationArgs(s, payment, lineA, 12_000, `pt-pay06-over-${payment}`),
+    )
     expect(over.ok).toBe(false)
     expect(await allocations(page, payment)).toHaveLength(0)
 
-    await callReducerBff(page, "allocate_payment_transaction", allocationArgs(s, payment, line, 10_000, `pt-pay06-exact-${payment}`))
+    await callReducerBff(
+      page,
+      "allocate_payment_transaction",
+      allocationArgs(s, payment, lineA, 10_000, `pt-pay06-invoice-a-${payment}`),
+    )
     await expect.poll(() => netAllocatedMinor(page, payment)).toBe(10_000)
-    const [row] = await allocations(page, payment)
-    expect(toMinor(field(row, "writeOffAmount", "write_off_amount"))).toBe(0)
-    expect(field(row, "writeOffMoveId", "write_off_move_id") ?? null).toBeNull()
-    expect(toMinor(field(row, "residualAfter", "residual_after"))).toBe(0)
+
+    const [invoiceARow] = await allocations(page, payment)
+    expect(idOf(field(invoiceARow, "allocatedMoveLineId", "allocated_move_line_id"))).toBe(lineA)
+    expect(toMinor(field(invoiceARow, "writeOffAmount", "write_off_amount"))).toBe(0)
+    expect(field(invoiceARow, "writeOffMoveId", "write_off_move_id") ?? null).toBeNull()
+    expect(toMinor(field(invoiceARow, "residualAfter", "residual_after"))).toBe(0)
 
     const transaction = await waitPosted(page, payment)
-    const unapplied = toMinor(field(transaction, "settlementAmount", "settlement_amount")) - (await netAllocatedMinor(page, payment))
-    expect(unapplied).toBe(2_000)
+    const settlementMinor = toMinor(field(transaction, "settlementAmount", "settlement_amount"))
+    expect(settlementMinor - (await netAllocatedMinor(page, payment))).toBe(2_000)
+
+    await callReducerBff(
+      page,
+      "allocate_payment_transaction",
+      allocationArgs(s, payment, lineB, 2_000, `pt-pay06-invoice-b-${payment}`),
+    )
+    await expect.poll(() => netAllocatedMinor(page, payment)).toBe(12_000)
+
+    const rows = await allocations(page, payment)
+    expect(rows).toHaveLength(2)
+    const invoiceBRow = rows.find(
+      (row) => idOf(field(row, "allocatedMoveLineId", "allocated_move_line_id")) === lineB,
+    )
+    expect(invoiceBRow).toBeDefined()
+    if (!invoiceBRow) throw new Error("PAY-06 invoice B reconciliation row missing")
+    expect(toMinor(field(invoiceBRow, "residualAfter", "residual_after"))).toBe(3_000)
+    for (const row of rows) {
+      expect(toMinor(field(row, "writeOffAmount", "write_off_amount"))).toBe(0)
+      expect(field(row, "writeOffMoveId", "write_off_move_id") ?? null).toBeNull()
+    }
+    expect(settlementMinor - (await netAllocatedMinor(page, payment))).toBe(0)
   })
 
   test("PAY-PAYER-01 provider payer mismatch enters manual review", { tag: CAPABILITY_PENDING }, async ({ page }) => {
