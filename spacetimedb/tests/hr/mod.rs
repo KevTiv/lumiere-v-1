@@ -13,6 +13,8 @@ pub fn run_hr_wave_a_test(ctx: &ReducerContext) -> Result<(), String> {
         .map_err(|e| format!("leave_balance: {e}"))?;
     wave_a_test::test_leave_must_be_submitted_before_approve(ctx)
         .map_err(|e| format!("leave_submit_gate: {e}"))?;
+    wave_a_test::test_leave_approval_rejects_replay_and_self_approval(ctx)
+        .map_err(|e| format!("leave_approval_replay_sod: {e}"))?;
     wave_a_test::test_leave_rejects_foreign_leave_type(ctx)
         .map_err(|e| format!("leave_foreign_type: {e}"))?;
     wave_a_test::test_leave_rejects_cross_company_leave_type(ctx)

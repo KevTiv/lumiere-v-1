@@ -6,10 +6,14 @@ use spacetimedb::{ReducerContext, Table};
 use crate::core::organization::{company, create_company, CreateCompanyParams};
 use crate::core::persistence::{organization_commit, organization_row_change};
 use crate::hr::contracts::{create_contract, hr_contract, CreateContractParams};
-use crate::hr::employees::{archive_employee, create_employee, hr_employee, CreateEmployeeParams};
+use crate::hr::employees::{
+    archive_employee, create_employee, hr_employee, update_employee, CreateEmployeeParams,
+    UpdateEmployeeParams,
+};
 use crate::hr::leaves::{
     approve_leave, create_leave_request, create_leave_type, hr_leave, hr_leave_allocation,
-    hr_leave_type, submit_leave, CreateLeaveRequestParams, CreateLeaveTypeParams,
+    hr_leave_type, refuse_leave, submit_leave, CreateLeaveRequestParams, CreateLeaveTypeParams,
+    HrLeave,
 };
 use crate::hr::offboarding::{
     complete_offboarding_item, start_offboarding, ArchiveEmployeeParams,
@@ -864,5 +868,134 @@ pub fn test_leave_rejects_cross_company_leave_type(ctx: &ReducerContext) -> Resu
     if !err.contains("does not belong to this company") {
         return Err(format!("unexpected cross-company leave_type error: {err}"));
     }
+    Ok(())
+}
+
+fn leave_row(ctx: &ReducerContext, leave_id: u64) -> Result<HrLeave, String> {
+    ctx.db
+        .hr_leave()
+        .id()
+        .find(&leave_id)
+        .ok_or_else(|| format!("leave {leave_id} missing"))
+}
+
+/// Run `op`, require it to fail with `expected` in the message, and require
+/// the leave row to be unchanged afterwards.
+fn expect_rejected_unchanged(
+    ctx: &ReducerContext,
+    leave_id: u64,
+    label: &str,
+    expected: &str,
+    op: impl FnOnce() -> Result<(), String>,
+) -> Result<(), String> {
+    let before = leave_row(ctx, leave_id)?;
+    match op() {
+        Ok(()) => return Err(format!("{label}: must be rejected")),
+        Err(message) if message.contains(expected) => {}
+        Err(message) => return Err(format!("{label}: unexpected rejection: {message}")),
+    }
+    if leave_row(ctx, leave_id)? != before {
+        return Err(format!("{label}: rejected call mutated the leave"));
+    }
+    Ok(())
+}
+
+/// COV-09: submit → approve / refuse are exact one-way transitions. Replays,
+/// wrong-state transitions, self-approval and a same-person second approval
+/// are all rejected and leave the row unchanged.
+pub fn test_leave_approval_rejects_replay_and_self_approval(
+    ctx: &ReducerContext,
+) -> Result<(), String> {
+    ensure_test_superuser(ctx)?;
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let (org, company) = (fixture.organization_id, fixture.company_id);
+    let employee_id = seed_employee(ctx, &fixture, "Cov09 Emp")?;
+    let leave_type_id = seed_leave_type(ctx, &fixture, "Cov09 Type", 30.0)?;
+
+    // Submit → approve, with replays of both.
+    let approved = create_draft_leave(ctx, &fixture, employee_id, leave_type_id, 2.0, "cov09-a")?;
+    submit_leave(ctx, org, company, approved)?;
+    if leave_row(ctx, approved)?.state != HrLeaveState::Confirm {
+        return Err("submit did not reach Confirm".into());
+    }
+    expect_rejected_unchanged(ctx, approved, "submit replay", "from Draft state", || {
+        submit_leave(ctx, org, company, approved)
+    })?;
+    approve_leave(ctx, org, company, approved)?;
+    let row = leave_row(ctx, approved)?;
+    if row.state != HrLeaveState::Validated || row.first_approver_id != Some(ctx.sender()) {
+        return Err("approve did not reach Validated with the approver recorded".into());
+    }
+    expect_rejected_unchanged(ctx, approved, "approve replay", "already approved", || {
+        approve_leave(ctx, org, company, approved)
+    })?;
+    expect_rejected_unchanged(
+        ctx,
+        approved,
+        "refuse validated",
+        "cannot be refused",
+        || refuse_leave(ctx, org, company, approved),
+    )?;
+
+    // Submit → refuse, with a replay and a late approval.
+    let refused = create_draft_leave(ctx, &fixture, employee_id, leave_type_id, 1.0, "cov09-r")?;
+    submit_leave(ctx, org, company, refused)?;
+    refuse_leave(ctx, org, company, refused)?;
+    if leave_row(ctx, refused)?.state != HrLeaveState::Refused {
+        return Err("refuse did not reach Refused".into());
+    }
+    expect_rejected_unchanged(ctx, refused, "refuse replay", "already refused", || {
+        refuse_leave(ctx, org, company, refused)
+    })?;
+    expect_rejected_unchanged(
+        ctx,
+        refused,
+        "approve refused",
+        "cannot be approved",
+        || approve_leave(ctx, org, company, refused),
+    )?;
+
+    // Dual approval (> 5 days): the same person cannot give both approvals.
+    let dual = create_draft_leave(ctx, &fixture, employee_id, leave_type_id, 6.0, "cov09-d")?;
+    submit_leave(ctx, org, company, dual)?;
+    approve_leave(ctx, org, company, dual)?;
+    if leave_row(ctx, dual)?.state != HrLeaveState::ValidatedOne {
+        return Err("first of two approvals did not reach ValidatedOne".into());
+    }
+    expect_rejected_unchanged(
+        ctx,
+        dual,
+        "same-person second approval",
+        "different approver",
+        || approve_leave(ctx, org, company, dual),
+    )?;
+
+    // Self-approval: the requester's linked user cannot approve.
+    let self_employee = seed_employee(ctx, &fixture, "Cov09 Self Emp")?;
+    update_employee(
+        ctx,
+        org,
+        company,
+        self_employee,
+        UpdateEmployeeParams {
+            name: None,
+            job_title: None,
+            job_id: None,
+            department_id: None,
+            parent_id: None,
+            work_email: None,
+            work_phone: None,
+            mobile_phone: None,
+            work_location: None,
+            work_contact_partner_id: None,
+            employment_type: None,
+            user_id: Some(ctx.sender()),
+        },
+    )?;
+    let own = create_draft_leave(ctx, &fixture, self_employee, leave_type_id, 1.0, "cov09-s")?;
+    submit_leave(ctx, org, company, own)?;
+    expect_rejected_unchanged(ctx, own, "self approval", "your own leave", || {
+        approve_leave(ctx, org, company, own)
+    })?;
     Ok(())
 }

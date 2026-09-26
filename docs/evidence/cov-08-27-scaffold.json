@@ -57,7 +57,7 @@
       "contract_release_required": "no",
       "contract_note": "none: `leave-requests` exposes id, organization_id, company_id, employee_id, state",
       "prerequisites": "Needs an HR manager persona distinct from the employee persona in the first-org fixture.",
-      "status": "SCAFFOLDED",
+      "status": "IMPLEMENTED — runtime acceptance pending",
       "status_doc": "docs/plan/erp-cov09-hr-leave-approval-status.md",
       "spec": "frontend/web/tests/e2e/cov09-hr-leave-approval.spec.ts",
       "hooks": [
