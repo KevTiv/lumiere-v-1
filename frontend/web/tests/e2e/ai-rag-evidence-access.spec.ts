@@ -66,7 +66,7 @@ type RagBody = {
 
 test.describe.configure({ mode: "serial" })
 
-test.describe("AI RAG evidence access", { tag: "@p0" }, () => {
+test.describe("AI RAG evidence access", { tag: ["@p0", "@ai-live"] }, () => {
   test.setTimeout(420_000)
 
   // A fact no other document states, so retrieval can only find it here.

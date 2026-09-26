@@ -57,7 +57,7 @@ const REVIEWABLE_KINDS: [&str; 3] = ["sourced_fact", "quotation", "paraphrase"];
 /// STDB client; tests use an in-memory fake.
 #[async_trait]
 pub trait QueueRows: EvidenceRows {
-    /// Claims in `status`, optionally of one verification `method`.
+    /// Newest claims in `status`, optionally of one verification `method`.
     async fn claims_with_status(
         &self,
         organization_id: u64,
@@ -66,6 +66,7 @@ pub trait QueueRows: EvidenceRows {
         method: Option<&str>,
         limit: usize,
     ) -> Result<Vec<Value>>;
+    /// Newest decisions in `status`.
     async fn decisions_with_status(
         &self,
         organization_id: u64,
@@ -73,7 +74,7 @@ pub trait QueueRows: EvidenceRows {
         status: &str,
         limit: usize,
     ) -> Result<Vec<Value>>;
-    /// Current workflow-step components of the company.
+    /// Newest current workflow-step components of the company.
     async fn workflow_step_components(
         &self,
         organization_id: u64,
@@ -110,7 +111,7 @@ impl QueueRows for StdbClient {
         if let Some(method) = method {
             sql.push_str(&format!(" AND verification_method = '{}'", label(method)?));
         }
-        sql.push_str(&format!(" LIMIT {limit}"));
+        sql.push_str(&format!(" ORDER BY id DESC LIMIT {limit}"));
         self.query_sql(&sql).await.context("load claims for review")
     }
 
@@ -123,7 +124,7 @@ impl QueueRows for StdbClient {
     ) -> Result<Vec<Value>> {
         self.query_sql(&format!(
             "SELECT * FROM ai_evidence_decision WHERE organization_id = {organization_id} \
-             AND company_id = {company_id} AND status = '{}' LIMIT {limit}",
+             AND company_id = {company_id} AND status = '{}' ORDER BY id DESC LIMIT {limit}",
             label(status)?
         ))
         .await
@@ -139,7 +140,7 @@ impl QueueRows for StdbClient {
         self.query_sql(&format!(
             "SELECT * FROM ai_artifact_component WHERE organization_id = {organization_id} \
              AND company_id = {company_id} AND component_kind = 'workflow_step' \
-             AND status = 'current' LIMIT {limit}"
+             AND status = 'current' ORDER BY id DESC LIMIT {limit}"
         ))
         .await
         .context("load workflow-step components")
@@ -627,7 +628,7 @@ mod tests {
             method: Option<&str>,
             limit: usize,
         ) -> Result<Vec<Value>> {
-            Ok(self
+            let mut matches: Vec<Value> = self
                 .claims
                 .iter()
                 .filter(|row| {
@@ -637,9 +638,11 @@ mod tests {
                         && method
                             .is_none_or(|m| text(row, "verificationMethod").as_deref() == Some(m))
                 })
-                .take(limit)
                 .cloned()
-                .collect())
+                .collect();
+            matches.sort_unstable_by_key(|row| std::cmp::Reverse(number(row, "id")));
+            matches.truncate(limit);
+            Ok(matches)
         }
         async fn decisions_with_status(
             &self,
@@ -648,7 +651,7 @@ mod tests {
             status: &str,
             limit: usize,
         ) -> Result<Vec<Value>> {
-            Ok(self
+            let mut matches: Vec<Value> = self
                 .decisions
                 .iter()
                 .filter(|row| {
@@ -656,9 +659,11 @@ mod tests {
                         && number(row, "companyId") == Some(company)
                         && text(row, "status").as_deref() == Some(status)
                 })
-                .take(limit)
                 .cloned()
-                .collect())
+                .collect();
+            matches.sort_unstable_by_key(|row| std::cmp::Reverse(number(row, "id")));
+            matches.truncate(limit);
+            Ok(matches)
         }
         async fn workflow_step_components(
             &self,
@@ -666,16 +671,18 @@ mod tests {
             company: u64,
             limit: usize,
         ) -> Result<Vec<Value>> {
-            Ok(self
+            let mut matches: Vec<Value> = self
                 .components
                 .iter()
                 .filter(|row| {
                     number(row, "organizationId") == Some(org)
                         && number(row, "companyId") == Some(company)
                 })
-                .take(limit)
                 .cloned()
-                .collect())
+                .collect();
+            matches.sort_unstable_by_key(|row| std::cmp::Reverse(number(row, "id")));
+            matches.truncate(limit);
+            Ok(matches)
         }
     }
 
@@ -824,13 +831,14 @@ mod tests {
         let queue = build_queue(&rows, viewer(), 5).await.unwrap();
         assert_eq!(queue.claims.len(), 5);
         assert!(queue.claims_truncated);
-        assert!(
-            queue.claims.iter().all(|c| c.id >= 20),
-            "no other tenant's claim"
-        );
-        assert!(
-            queue.claims.windows(2).all(|pair| pair[0].id > pair[1].id),
-            "newest first within what was read"
+        assert_eq!(
+            queue
+                .claims
+                .iter()
+                .map(|claim| claim.id)
+                .collect::<Vec<_>>(),
+            vec![39, 38, 37, 36, 35],
+            "the bounded read must retain the newest tenant rows"
         );
 
         // A passage in another company's source is reduced to an id.
