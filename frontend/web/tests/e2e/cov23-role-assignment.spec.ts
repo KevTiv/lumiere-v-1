@@ -59,6 +59,12 @@ async function toggleRoleInSettings(page: Page, roleId: number, reducer: string)
   await page.getByTestId("settings-section-users").click()
   // The users list is capped (limit=100) and other specs add users; search on
   // the server for the target persona so its row is always loaded.
+  // The row must come from the server-side users search; assert the API first
+  // so a missing persona is reported with the payload rather than a timeout.
+  const listed = await page.request.get(`/api/settings/users?limit=100&search=${encodeURIComponent(TARGET_EMAIL)}`)
+  const listedBody = await listed.text()
+  expect(listed.status(), listedBody).toBe(200)
+  expect(listedBody, `settings users search for ${TARGET_EMAIL}`).toContain(TARGET_EMAIL)
   await page.getByTestId("settings-users-search").fill(TARGET_EMAIL)
   const actions = page.getByTestId(`settings-user-actions-${TARGET_EMAIL}`)
   await expect(actions).toBeVisible({ timeout: 30_000 })
