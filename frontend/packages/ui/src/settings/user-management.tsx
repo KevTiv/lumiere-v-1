@@ -129,6 +129,7 @@ export function UserManagement() {
   const filteredUsers = users.filter(user =>
     user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     user.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    user.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
     user.department?.toLowerCase().includes(searchQuery.toLowerCase())
   )
 
@@ -331,6 +332,7 @@ export function UserManagement() {
               <div 
                 key={user.id}
                 data-testid={`settings-user-row-${user.email}`}
+                data-user-id={user.id}
                 className="flex items-center justify-between p-4 hover:bg-muted/50 transition-colors"
               >
                 <div className="flex items-center gap-4">

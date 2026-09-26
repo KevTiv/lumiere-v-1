@@ -132,7 +132,7 @@ function normalizeIdentityHex(value: unknown): string {
     return trimmed.replace(/^0x/i, '').toLowerCase()
   }
   if (value && typeof value === 'object') {
-    const hex = pickField<unknown>(value as Record<string, unknown>, 'hex', 'Hex')
+    const hex = pickField<unknown>(value as Record<string, unknown>, 'hex', 'Hex', '__identity__')
     if (hex != null) return normalizeIdentityHex(hex)
   }
   return String(value ?? '').trim().replace(/^0x/i, '').toLowerCase()

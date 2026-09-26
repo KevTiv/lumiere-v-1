@@ -82,7 +82,13 @@ async fn users_get(
                 .and_then(|v| v.as_str())
                 .unwrap_or("")
                 .to_lowercase();
-            name.contains(&term) || email.contains(&term)
+            // Identity lets operators (and fixtures) find members whose
+            // organization profile has no name/email projected yet.
+            let identity = u
+                .get("identity")
+                .map(|v| v.to_string().to_lowercase())
+                .unwrap_or_default();
+            name.contains(&term) || email.contains(&term) || identity.contains(&term)
         });
     }
 
