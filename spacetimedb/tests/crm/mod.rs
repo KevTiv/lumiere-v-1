@@ -29,7 +29,9 @@ pub fn run_crm_relational_fk_test(ctx: &ReducerContext) -> Result<(), String> {
     relational_fk_test::test_lead_stage_and_team_relations(ctx)
         .map_err(|e| format!("lead_stage_and_team_relations: {e}"))?;
     relational_fk_test::test_activity_type_and_contact_relations(ctx)
-        .map_err(|e| format!("activity_type_and_contact_relations: {e}"))
+        .map_err(|e| format!("activity_type_and_contact_relations: {e}"))?;
+    relational_fk_test::test_complete_activity_rejects_replay(ctx)
+        .map_err(|e| format!("complete_activity_rejects_replay: {e}"))
 }
 
 #[spacetimedb::reducer]

@@ -12,6 +12,8 @@ import { scalarToU64 as toScalarU64 } from "@lumiere/erp-shared/u64"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 
 import { apiFetch, fetchQueryList, rqBigIntKey } from "../http"
+import { responseErrorMessage } from "@lumiere/api-client/response-error"
+import { resolveProposalConversionEffect, resolveProposalStatusEffect } from "./proposal-award"
 import type {
   Proposal,
   ProposalBidDecision,
@@ -529,9 +531,14 @@ export function useUpdateProposalStatus(organizationId: bigint, companyId?: bigi
       status: string
     }) => {
       const company = requireCompany(companyId)
-      const { urlPath, init } = stdbBffCommandPost("update_proposal_status", { companyId: company, proposalId: toScalarU64(params.proposalId), status: params.status })
+      const id = toScalarU64(params.proposalId)
+      const { urlPath, init } = stdbBffCommandPost("update_proposal_status", { companyId: company, proposalId: id, status: params.status })
       const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error("Failed to update proposal status")
+      if (!r.ok) throw new Error(await responseErrorMessage(r, "Failed to update proposal status"))
+      const rows = await fetchQueryList("/api/query/proposals", "Failed to read proposal")
+      const effect = resolveProposalStatusEffect(rows, organizationId, company, id, params.status)
+      if (!effect) throw new Error(`Proposal did not read back as ${params.status}`)
+      return effect
     },
     onSuccess: () => invalidateProposalQueries(qc),
   })
@@ -544,7 +551,7 @@ export function useApproveProposal(organizationId: bigint, companyId?: bigint) {
       const company = requireCompany(companyId)
       const { urlPath, init } = stdbBffCommandPost("approve_proposal", { companyId: company, proposalId: toScalarU64(proposalId) })
       const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error("Failed to approve proposal")
+      if (!r.ok) throw new Error(await responseErrorMessage(r, "Failed to approve proposal"))
     },
     onSuccess: () => invalidateProposalQueries(qc),
   })
@@ -862,7 +869,20 @@ export function useConvertProposalToSaleOrder(
           "ConvertProposalToSaleOrderParams",
         ) })
       const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error("Failed to convert proposal to sale order")
+      if (!r.ok) throw new Error(await responseErrorMessage(r, "Failed to convert proposal to sale order"))
+      const [proposalRows, saleOrderRows] = await Promise.all([
+        fetchQueryList("/api/query/proposals", "Failed to read proposal"),
+        fetchQueryList("/api/query/sale-orders", "Failed to read sale orders"),
+      ])
+      const effect = resolveProposalConversionEffect(
+        proposalRows,
+        saleOrderRows,
+        organizationId,
+        company,
+        toScalarU64(params.proposalId),
+      )
+      if (!effect) throw new Error("Proposal did not read back as converted to a sale order")
+      return effect
     },
     onSuccess: () => invalidateProposalQueries(qc),
   })

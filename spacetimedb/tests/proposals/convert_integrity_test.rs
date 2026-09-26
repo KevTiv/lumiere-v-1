@@ -1,15 +1,17 @@
 //! R5: proposal → SO convert derives UoM from product; missing product fail-closed.
-use spacetimedb::{ReducerContext, Table};
+use spacetimedb::{Identity, ReducerContext, Table};
 
 use crate::core::organization::company;
 use crate::core::persistence::{organization_commit, organization_row_change};
 use crate::core::reference::{create_uom, uom, CreateUomParams};
 use crate::inventory::product::{product, Product};
 use crate::proposals::proposals::{
-    add_proposal_comment, add_proposal_line_item, convert_proposal_to_sale_order, create_proposal,
-    delete_proposal_section, proposal, proposal_comment, proposal_line_item, proposal_section,
+    add_proposal_comment, add_proposal_line_item, approve_proposal, convert_proposal_to_sale_order,
+    create_proposal, delete_proposal_section, proposal, proposal_comment, proposal_line_item,
+    proposal_section, record_proposal_bid_decision, update_proposal_status,
     upsert_proposal_section, AddProposalLineItemParams, ConvertProposalToSaleOrderParams,
-    CreateProposalParams, Proposal, ProposalLineItem, ProposalStatus, UpsertProposalSectionParams,
+    CreateProposalParams, Proposal, ProposalLineItem, ProposalStatus,
+    RecordProposalBidDecisionParams, UpsertProposalSectionParams,
 };
 use crate::sales::pricelists::{create_pricelist, product_pricelist, CreatePricelistParams};
 use crate::sales::sales_core::{sale_order, sale_order_line};
@@ -338,6 +340,33 @@ pub fn test_convert_proposal_derives_product_uom(ctx: &ReducerContext) -> Result
         return Err(format!("proposal row order/scope mismatch: {tables:?}"));
     }
 
+    // COV-17: a replayed conversion is rejected and creates no second order.
+    let orders_for_proposal = || {
+        ctx.db
+            .sale_order()
+            .iter()
+            .filter(|o| o.organization_id == org_id && o.proposal_id == Some(proposal_id))
+            .count()
+    };
+    let replay = convert_proposal_to_sale_order(
+        ctx,
+        org_id,
+        company_id,
+        proposal_id,
+        ConvertProposalToSaleOrderParams {
+            warehouse_id: fixture.warehouse_id,
+            pricelist_id,
+        },
+    );
+    match replay {
+        Err(message) if message.contains("already converted") => {}
+        Err(message) => return Err(format!("unexpected conversion replay rejection: {message}")),
+        Ok(()) => return Err("replayed conversion must be rejected".into()),
+    }
+    if orders_for_proposal() != 1 || proposal_row(ctx, proposal_id)? != proposal {
+        return Err("rejected conversion replay changed the proposal or its orders".into());
+    }
+
     Ok(())
 }
 
@@ -594,5 +623,105 @@ pub fn test_add_proposal_comment_orphan_section_rejected(
         return Err("rejected orphan-section comment was persisted".into());
     }
 
+    Ok(())
+}
+
+fn proposal_row(ctx: &ReducerContext, proposal_id: u64) -> Result<Proposal, String> {
+    ctx.db
+        .proposal()
+        .id()
+        .find(&proposal_id)
+        .ok_or_else(|| format!("proposal {proposal_id} missing"))
+}
+
+/// COV-17: award approval is a one-way, second-person step. Self-approval by
+/// the author, a replayed approval and a replayed award are all rejected and
+/// leave the proposal row unchanged.
+pub fn test_award_approval_rejects_self_and_replay(ctx: &ReducerContext) -> Result<(), String> {
+    ensure_test_superuser(ctx)?;
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let (org, company) = (fixture.organization_id, fixture.company_id);
+    let title = "COV-17 Award";
+    create_proposal(
+        ctx,
+        org,
+        company,
+        CreateProposalParams {
+            title: title.to_string(),
+            client_name: "Acme COV-17".to_string(),
+            currency_id: company_currency_id(ctx, company)?,
+            value: 1_000.0,
+            deadline: None,
+            description: None,
+            template_id: None,
+            partner_id: Some(fixture.partner_id),
+            document_folder_id: None,
+            metadata: Some(r#"{"test":"cov17"}"#.to_string()),
+        },
+    )?;
+    let id = ctx
+        .db
+        .proposal()
+        .iter()
+        .find(|p| p.organization_id == org && p.company_id == company && p.title == title)
+        .map(|p| p.id)
+        .ok_or("COV-17 proposal missing")?;
+    update_proposal_status(ctx, org, company, id, "review".to_string())?;
+    record_proposal_bid_decision(
+        ctx,
+        org,
+        company,
+        id,
+        RecordProposalBidDecisionParams {
+            decision: "bid".to_string(),
+            rationale: "COV-17 bid".to_string(),
+        },
+    )?;
+    update_proposal_status(ctx, org, company, id, "submitted".to_string())?;
+
+    let expect_rejected_unchanged =
+        |label: &str, expected: &str, op: &dyn Fn() -> Result<(), String>| {
+            let before = proposal_row(ctx, id)?;
+            match op() {
+                Ok(()) => return Err(format!("{label}: must be rejected")),
+                Err(message) if message.contains(expected) => {}
+                Err(message) => return Err(format!("{label}: unexpected rejection: {message}")),
+            }
+            if proposal_row(ctx, id)? != before {
+                return Err(format!("{label}: rejected call mutated the proposal"));
+            }
+            Ok(())
+        };
+
+    // The author cannot approve their own proposal.
+    expect_rejected_unchanged("self approval", "your own proposal", &|| {
+        approve_proposal(ctx, org, company, id)
+    })?;
+
+    // Hand authorship to someone else, then approve as a second person.
+    let row = proposal_row(ctx, id)?;
+    ctx.db.proposal().id().update(Proposal {
+        create_uid: Identity::__dummy(),
+        ..row
+    });
+    approve_proposal(ctx, org, company, id)?;
+    let approved = proposal_row(ctx, id)?;
+    if approved.award_approved_at.is_none() || approved.award_approved_by != Some(ctx.sender()) {
+        return Err("approval did not record approver and time".into());
+    }
+    expect_rejected_unchanged("approval replay", "already approved", &|| {
+        approve_proposal(ctx, org, company, id)
+    })?;
+
+    update_proposal_status(ctx, org, company, id, "awarded".to_string())?;
+    if proposal_row(ctx, id)?.status != ProposalStatus::Awarded {
+        return Err("award did not reach Awarded".into());
+    }
+    expect_rejected_unchanged("award replay", "Invalid status transition", &|| {
+        update_proposal_status(ctx, org, company, id, "awarded".to_string())
+    })?;
+    expect_rejected_unchanged("approve awarded", "Only Submitted", &|| {
+        approve_proposal(ctx, org, company, id)
+    })?;
     Ok(())
 }
