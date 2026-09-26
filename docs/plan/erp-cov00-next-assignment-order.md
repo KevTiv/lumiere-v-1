@@ -131,8 +131,14 @@ same-period readback, stale/deny preservation, and persisted proof that invoice
 and payment posting are blocked inside the closed period. Runtime acceptance is
 pending. See [`erp-cov08c-period-close-status.md`](./erp-cov08c-period-close-status.md).
 
-Next bounded Finance work is the COV-08c financial-statement follow-up; COV-08d
-then owns one fixed-asset lifecycle. The full remaining-stack completion card and ordered
+COV-08d now implements one exact fixed-asset Draft → Running → Close lifecycle
+through the Fixed Assets UI, with exact same-asset readback and stale/deny
+preservation, and retires the Close action that never dispatched. Runtime
+acceptance is pending. See
+[`erp-cov08d-asset-lifecycle-status.md`](./erp-cov08d-asset-lifecycle-status.md).
+
+Next bounded Finance work is the COV-08c financial-statement follow-up, COV-08d
+depreciation/disposal exact effects, then COV-08e finance certification. The full remaining-stack completion card and ordered
 COV-08..27 targets are recorded in
 [`erp-cov08-27-stacked-acceptance-plan.md`](./erp-cov08-27-stacked-acceptance-plan.md).
 
