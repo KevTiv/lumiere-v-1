@@ -30,12 +30,16 @@ function parseCsvLine(line: string, delimiter: string): string[] {
 
 function parseStatementDate(value: string): Date | undefined {
   const iso = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value)
-  const european = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(value)
-  const date = iso
-    ? new Date(`${iso[1]}-${iso[2]}-${iso[3]}T00:00:00.000Z`)
-    : european
-      ? new Date(`${european[3]}-${european[2]}-${european[1]}T00:00:00.000Z`)
-      : new Date(value)
+  if (iso) {
+    const date = new Date(`${iso[1]}-${iso[2]}-${iso[3]}T00:00:00.000Z`)
+    return Number.isNaN(date.getTime()) ? undefined : date
+  }
+
+  if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(value)) {
+    return undefined
+  }
+
+  const date = new Date(value)
   return Number.isNaN(date.getTime()) ? undefined : date
 }
 

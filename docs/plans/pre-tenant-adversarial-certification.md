@@ -172,13 +172,13 @@ reproduced end-to-end through the ledger. Not changed in this PR. Pre-tenant pos
 envelope only if tenant limits stay below 1e9 major units per payment; otherwise a blocker requiring
 integer minor units/decimal.
 
-**Statement CSV parsing is client-side** (`payment-operations-panel.tsx`, file-private, not
-unit-testable without extraction). Server staging cases are PAY-10/11. Client findings (documented,
-not executed here):
+**Statement CSV parsing is client-side** and now extracted to
+`frontend/web/lib/statement-import-csv.ts` for focused unit certification. Server staging cases are
+PAY-10/11. Remaining client findings are tracked explicitly below:
 
 - `CSV-01` `parseStatementAmount("1.234,56")` → `1.23456` (European thousands + decimal comma misparsed silently).
 - `CSV-02` fixed on the parser-certification stack: quoted US grouped integers such as `"1,234"` and `"1,234,567"` parse as 1234 and 1234567, while ordinary decimal-comma values such as `12,34` retain decimal semantics.
-- `CSV-03` `NN/NN/YYYY` is always read as DD/MM; US exports are silently mis-dated.
+- `CSV-03` fixed on the parser-certification stack: numeric slash dates are rejected without an explicit date-format/locale contract, so DD/MM and MM/DD are never silently reinterpreted. ISO `YYYY-MM-DD` remains accepted.
 - `CSV-04` the import idempotency key is a 32-bit hash of the file; combined with PAY-11B a collision
   silently drops a different statement.
 
@@ -221,7 +221,8 @@ Legend — Class: **C** covered, **P** partial, **N** not covered, **B** blocked
 | Statement staging fixtures | invalid row + identical retry (E2E) | negative/zero/NaN/inf/missing/duplicate/out-of-order/huge; conflicting replay | STDB | yes | — | PAY-10, PAY-11A, PAY-11B | P |
 | CSV UTF-8 BOM | extracted statement parser strips BOM before header parsing and idempotency hashing | — | web unit | yes | — | CSV-BOM | C |
 | CSV US thousands grouping | `"1,234"` and multi-group integers parse as grouping; decimal-comma values remain decimals | — | web unit | yes | CSV-BOM extraction | CSV-02 | C |
-| CSV mixed European separators / ambiguous dates / hash collisions | current parser behavior only | focused parser fixtures and stronger identity | web unit | no | parser extraction | CSV-01, CSV-03, CSV-04 | N |
+| CSV ambiguous slash dates | numeric slash dates fail closed without an explicit format/locale; ISO remains accepted | — | web unit | yes | parser extraction | CSV-03 | C |
+| CSV mixed European separators / hash collisions | current parser behavior only | focused parser fixtures and stronger identity | web unit | no | parser extraction | CSV-01, CSV-04 | N |
 
 ### Frontend IR (all require the IR stack)
 
@@ -279,7 +280,7 @@ Registered in `KNOWN_DEFECTS` / `expectKnownDefect()`; runtime confirmation reco
 | `COMM-15` | (Playwright-only; not yet executed against a running stack) Batch approval retry by the same approver returns an error instead of an idempotent success. |
 | `AG-IDEMP-01` | (Playwright-only; not yet executed against a running stack) AI draft approval retry after commit returns an error instead of idempotent success. |
 
-Additional documented findings (not executed as tests): `MONEY-PRECISION`, `CSV-01`, `CSV-03`, `CSV-04`, `REC-01`.
+Additional documented findings (not executed as tests): `MONEY-PRECISION`, `CSV-01`, `CSV-04`, `REC-01`.
 
 ## Phase 5 — Mobile/network resilience
 

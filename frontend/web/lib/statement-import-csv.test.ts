@@ -51,3 +51,35 @@ test("CSV-02 keeps ordinary decimal-comma amounts as decimals", () => {
 
   assert.equal(rows[0].amount, 12.34)
 })
+
+
+test("CSV-03 fails closed on ambiguous slash dates instead of assuming DD/MM", () => {
+  const rows = statementImportRows([
+    "date,amount,reference",
+    "02/03/2026,125.50,TX-004",
+    "03/02/2026,50.00,TX-005",
+  ].join("\n"))
+
+  assert.equal(rows[0].date, undefined)
+  assert.equal(rows[1].date, undefined)
+})
+
+test("CSV-03 also requires an explicit format for otherwise inferable slash dates", () => {
+  const rows = statementImportRows([
+    "date,amount,reference",
+    "13/02/2026,125.50,TX-006",
+    "2/13/2026,50.00,TX-006B",
+  ].join("\n"))
+
+  assert.equal(rows[0].date, undefined)
+  assert.equal(rows[1].date, undefined)
+})
+
+test("CSV-03 keeps ISO statement dates accepted", () => {
+  const rows = statementImportRows([
+    "date,amount,reference",
+    "2026-02-13,125.50,TX-007",
+  ].join("\n"))
+
+  assert.notEqual(rows[0].date, undefined)
+})
