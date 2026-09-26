@@ -62,9 +62,13 @@ import {
   useTypedStdbQuery,
 } from "../stdb"
 import { stdbInvalidationFor } from "@lumiere/contracts/stdb-reducer-invalidation"
+import {
+  POST_PAYMENT_AFFECTS,
+  RECONCILE_PAYMENT_AFFECTS,
+  workflowErrorFromResponse,
+} from "@lumiere/erp-workflows"
 
 import { responseErrorMessage as parseCallError } from "@lumiere/api-client/response-error"
-import { invalidateMoveQueries } from "./moves"
 export function useAccountPaymentTerms(
   organizationId: bigint,
   options?: { staleTime?: number; enabled?: boolean },
@@ -190,15 +194,21 @@ export function useCreatePaymentFee(organizationId: bigint) {
   })
 }
 
+/** The one `reconcile_payment_with_invoice` invocation, shared by the mutation hook and the workflow. */
+export async function reconcilePaymentWithInvoiceCommand(args: {
+  paymentMoveId: bigint
+  invoiceMoveId: bigint
+}): Promise<void> {
+  const { urlPath, init } = stdbBffCommandPost("reconcile_payment_with_invoice", { paymentMoveId: args.paymentMoveId, invoiceMoveId: args.invoiceMoveId })
+  const r = await apiFetch(urlPath, init)
+  if (!r.ok) throw workflowErrorFromResponse(r.status, await r.text().catch(() => ""), "Failed to reconcile payment")
+}
+
 export function useReconcilePaymentWithInvoice(organizationId: number, companyId: bigint) {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async (args: { paymentMoveId: bigint; invoiceMoveId: bigint }) => {
-      const { urlPath, init } = stdbBffCommandPost("reconcile_payment_with_invoice", { paymentMoveId: args.paymentMoveId, invoiceMoveId: args.invoiceMoveId })
-      const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error(await parseCallError(r))
-    },
-    onSuccess: () => invalidateMoveQueries(qc, organizationId),
+    mutationFn: reconcilePaymentWithInvoiceCommand,
+    onSuccess: () => invalidateStdbQueryResources(qc, organizationId, RECONCILE_PAYMENT_AFFECTS),
   })
 }
 
@@ -214,18 +224,18 @@ export function useCreateAccountPayment(organizationId: number) {
   })
 }
 
+/** The one `post_payment` invocation, shared by the mutation hook and the workflow action. */
+export async function postAccountPaymentCommand(paymentId: bigint): Promise<void> {
+  const { urlPath, init } = stdbBffCommandPost("post_payment", { paymentId: paymentId })
+  const r = await apiFetch(urlPath, init)
+  if (!r.ok) throw workflowErrorFromResponse(r.status, await r.text().catch(() => ""), "Failed to post payment")
+}
+
 export function usePostAccountPayment(organizationId: number) {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async (paymentId: bigint) => {
-      const { urlPath, init } = stdbBffCommandPost("post_payment", { paymentId: paymentId })
-      const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error(await parseCallError(r))
-    },
-    onSuccess: () => {
-      invalidateAccountPaymentQueries(qc, organizationId)
-      invalidateStdbQueryResources(qc, organizationId, ["account-moves"])
-    },
+    mutationFn: postAccountPaymentCommand,
+    onSuccess: () => invalidateStdbQueryResources(qc, organizationId, POST_PAYMENT_AFFECTS),
   })
 }
 
@@ -244,15 +254,22 @@ export function useCancelAccountPayment(organizationId: number) {
   })
 }
 
+/** The one `register_payment_on_invoice` invocation, shared by the mutation hook and the workflow. */
+export async function registerPaymentOnInvoiceCommand(args: {
+  paymentId: bigint
+  invoiceIds: bigint[]
+  isBill: boolean
+}): Promise<void> {
+  const { urlPath, init } = stdbBffCommandPost("register_payment_on_invoice", { paymentId: args.paymentId, invoiceIds: args.invoiceIds, isBill: args.isBill })
+  const r = await apiFetch(urlPath, init)
+  if (!r.ok) throw workflowErrorFromResponse(r.status, await r.text().catch(() => ""), "Failed to register payment")
+}
+
 export function useRegisterPaymentOnInvoice(organizationId: number) {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async (args: { paymentId: bigint; invoiceIds: bigint[]; isBill: boolean }) => {
-      const { urlPath, init } = stdbBffCommandPost("register_payment_on_invoice", { paymentId: args.paymentId, invoiceIds: args.invoiceIds, isBill: args.isBill })
-      const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error(await parseCallError(r))
-    },
-    onSuccess: () => invalidateAccountPaymentQueries(qc, organizationId),
+    mutationFn: registerPaymentOnInvoiceCommand,
+    onSuccess: () => invalidateStdbQueryResources(qc, organizationId, RECONCILE_PAYMENT_AFFECTS),
   })
 }
 

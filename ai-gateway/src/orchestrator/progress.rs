@@ -11,10 +11,11 @@
 //! provider is not progress by itself, and superficial argument edits
 //! (whitespace, key order) normalize to the same call fingerprint.
 //!
-//! Deferred: a per-tool polling policy with its own attempt, time and backoff
-//! bounds. The capability contract carries no polling metadata yet, so one
-//! bounded allowance covers legitimate short polling, and it consumes the same
-//! task budget as any other call.
+//! Explicit polling is handled by the canonical reasoning/runtime recovery
+//! layer, which gives it a separate per-capability attempt/backoff budget while
+//! retaining this evidence-based non-progress tracker for ordinary capability
+//! calls. Polling still consumes the same capability/task budget and never
+//! bypasses authorization or execution recovery.
 
 use std::collections::HashSet;
 

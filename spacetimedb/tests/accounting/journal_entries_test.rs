@@ -8,7 +8,7 @@ use crate::accounting::journal_entries::{
 };
 use crate::accounting::tax_management::{account_tax, create_account_tax, CreateAccountTaxParams};
 use crate::test_harness::{chart_keys, ensure_test_superuser, OrgFixture};
-use crate::types::{AccountMoveState, TaxAmountType, TaxTypeUse};
+use crate::types::{AccountMoveState, PaymentState, TaxAmountType, TaxTypeUse};
 
 use super::helpers::create_balanced_customer_invoice;
 
@@ -30,6 +30,20 @@ pub fn test_post_customer_invoice_creates_move_lines(ctx: &ReducerContext) -> Re
         return Err(format!(
             "Expected Posted invoice state, got {:?}",
             move_record.state
+        ));
+    }
+
+    if (move_record.amount_untaxed - amount).abs() > 0.01
+        || (move_record.amount_total - amount).abs() > 0.01
+        || (move_record.amount_residual - amount).abs() > 0.01
+        || move_record.payment_state != PaymentState::NotPaid
+    {
+        return Err(format!(
+            "Expected a wholly unpaid {amount} invoice, got untaxed={} total={} residual={} payment={:?}",
+            move_record.amount_untaxed,
+            move_record.amount_total,
+            move_record.amount_residual,
+            move_record.payment_state,
         ));
     }
 

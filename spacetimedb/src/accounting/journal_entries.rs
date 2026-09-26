@@ -452,16 +452,21 @@ fn compute_invoice_totals_internal(
     let mut amount_residual = 0.0f64;
 
     for line in lines {
-        if line.tax_line_id.is_some() || line.tax_group_id.is_some() {
-            amount_tax += line.price_total.abs();
-        } else {
-            amount_untaxed += line.price_subtotal.abs();
+        let is_counterpart =
+            is_receivable_or_payable_line_type(line.account_internal_type.as_deref());
+        if is_counterpart {
+            // The AR/AP balance is the invoice face value. Summing every debit and credit would
+            // count the balanced invoice twice and make a wholly unpaid invoice look partially
+            // paid as soon as it is posted.
+            amount_total += line.balance.abs();
+            amount_residual += line.amount_residual.abs();
+            continue;
         }
 
-        amount_total += line.balance.abs();
-        // Open residual is AR/AP only — P&L lines must not inflate invoice residual (A3).
-        if is_receivable_or_payable_line_type(line.account_internal_type.as_deref()) {
-            amount_residual += line.amount_residual.abs();
+        if line.tax_line_id.is_some() || line.tax_group_id.is_some() {
+            amount_tax += line.price_total.abs();
+        } else if !line.exclude_from_invoice_tab {
+            amount_untaxed += line.price_subtotal.abs();
         }
     }
 
@@ -2026,18 +2031,35 @@ pub fn create_invoice_from_sale_order(
         ..move_record.clone()
     });
 
-    // Determine new invoice_status: all lines invoiced → Invoiced, else ToInvoice
-    let any_remaining = ctx
-        .db
-        .sale_order_line()
-        .order_line_by_order()
-        .filter(&sale_order_id)
-        .any(|l| l.qty_to_invoice > 0.0 && l.display_type.is_none());
+    // Determine new invoice_status. `Invoiced` means every product line is billed in full; it must
+    // not be inferred from "nothing billable right now", which is also true while the rest of the
+    // order is still undelivered under the delivery policy. In that case the order is `NoInvoice`
+    // (nothing to bill yet) and a later delivery moves it back to `ToInvoice`. Marking it
+    // `Invoiced` would stay sticky and block billing the remainder.
+    let (any_remaining, fully_invoiced) = {
+        let mut any_remaining = false;
+        let mut fully_invoiced = true;
+        for l in ctx
+            .db
+            .sale_order_line()
+            .order_line_by_order()
+            .filter(&sale_order_id)
+            .filter(|l| l.display_type.is_none())
+        {
+            any_remaining |= l.qty_to_invoice > 0.0;
+            if !l.is_downpayment && l.qty_invoiced + 1e-9 < l.product_uom_qty {
+                fully_invoiced = false;
+            }
+        }
+        (any_remaining, fully_invoiced)
+    };
 
     let new_invoice_status = if any_remaining {
         InvoiceStatus::ToInvoice
-    } else {
+    } else if fully_invoiced {
         InvoiceStatus::Invoiced
+    } else {
+        InvoiceStatus::NoInvoice
     };
 
     // Update SaleOrder

@@ -42,3 +42,28 @@ spacetime call lumiere-v1 seed_dev_data '{}'
 ```
 
 If you need a clean rerun, clear the local database first and then call the reducer again.
+
+### Versioned first-organization personas
+
+After `seed_dev_data`, provision the seven named COV personas and verify their
+credential, membership, role-assignment, and representative module rows:
+
+```bash
+make seed-first-org-personas
+```
+
+The manifest is
+[`frontend/web/fixtures/first-org-fixture.v1.json`](../../frontend/web/fixtures/first-org-fixture.v1.json).
+Set `E2E_FIRST_ORG_PERSONA_PASSWORD` to override the local-only fixture password.
+The provisioner requires the exact `Lumiere Demo Corp` (`DEMO`) organization and
+`Lumiere Technologies Inc.` (`LTI`) company; it does not fall back to another
+tenant.
+
+To validate the checked-in manifest without a running stack:
+
+```bash
+make check-cov02-first-org-fixture
+```
+
+These commands are trusted setup utilities. Their health report is setup
+evidence, not browser operator-path proof.

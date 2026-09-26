@@ -293,6 +293,11 @@ pub struct CapabilityProposal {
     pub capability: String,
     pub arguments: Value,
     pub rationale: Option<String>,
+    /// Runtime-owned retry semantics remain bounded even when a provider asks
+    /// to poll. This flag never grants capability authority; admission,
+    /// authorization and spend checks still run on every attempt.
+    #[serde(default)]
+    pub poll: bool,
 }
 
 impl CapabilityProposal {
@@ -794,6 +799,7 @@ mod tests {
             capability: "erp.search".to_string(),
             arguments: json!({}),
             rationale: None,
+            poll: false,
         });
         assert!(outcome.validate_against(&request).is_err());
 
@@ -871,6 +877,7 @@ mod tests {
             capability: "erp.search".to_string(),
             arguments: json!("not-an-object"),
             rationale: None,
+            poll: false,
         };
         assert!(proposal.validate().is_err());
     }

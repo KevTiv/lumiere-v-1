@@ -39,10 +39,19 @@ impl Row {
     }
 }
 RUST
-printf '%s\n' 'error: expected identifier, found keyword `type`' >&2
-printf '%s\n' 'error: expected identifier, found keyword `ref`' >&2
+if [[ "${FAKE_COLOR:-}" == "1" ]]; then
+  printf '\033[1m\033[31merror\033[0m: expected identifier, found keyword `type`\n' >&2
+  printf '\033[1m\033[31merror\033[0m: expected identifier, found keyword `ref`\n' >&2
+else
+  printf '%s\n' 'error: expected identifier, found keyword `type`' >&2
+  printf '%s\n' 'error: expected identifier, found keyword `ref`' >&2
+fi
 if [[ "${FAKE_UNEXPECTED:-}" == "1" ]]; then
-  printf '%s\n' 'error: module compilation failed' >&2
+  if [[ "${FAKE_COLOR:-}" == "1" ]]; then
+    printf '\033[1m\033[31merror\033[0m: module compilation failed\n' >&2
+  else
+    printf '%s\n' 'error: module compilation failed' >&2
+  fi
 fi
 exit "${FAKE_EXIT_STATUS:-1}"
 FAKE
@@ -68,6 +77,12 @@ FAKE_EXIT_STATUS=0 STDB_GENERATE_WASM="$FAKE_WASM" SPACETIME_BIN="$FAKE_SPACETIM
 grep -q 'pub r#type:' "$TMP_ROOT/out-zero/row.rs"
 grep -q 'pub r#ref:' "$TMP_ROOT/out-zero/row.rs"
 
+FAKE_COLOR=1 STDB_GENERATE_WASM="$FAKE_WASM" SPACETIME_BIN="$FAKE_SPACETIME" \
+  bash "$ROOT/scripts/generate-spacetimedb-rust-sdk.sh" "$TMP_ROOT/out-color" "$TMP_ROOT/module"
+
+grep -q 'pub r#type:' "$TMP_ROOT/out-color/row.rs"
+grep -q 'pub r#ref:' "$TMP_ROOT/out-color/row.rs"
+
 if FAKE_UNEXPECTED=1 FAKE_EXIT_STATUS=0 STDB_GENERATE_WASM="$FAKE_WASM" SPACETIME_BIN="$FAKE_SPACETIME" \
   bash "$ROOT/scripts/generate-spacetimedb-rust-sdk.sh" "$TMP_ROOT/rejected" "$TMP_ROOT/module" \
   >"$TMP_ROOT/unexpected.log" 2>&1; then
@@ -83,5 +98,13 @@ if FAKE_UNEXPECTED=1 FAKE_EXIT_STATUS=1 STDB_GENERATE_WASM="$FAKE_WASM" SPACETIM
   exit 1
 fi
 grep -q 'error: module compilation failed' "$TMP_ROOT/unexpected-nonzero.log"
+
+if FAKE_COLOR=1 FAKE_UNEXPECTED=1 FAKE_EXIT_STATUS=0 STDB_GENERATE_WASM="$FAKE_WASM" SPACETIME_BIN="$FAKE_SPACETIME" \
+  bash "$ROOT/scripts/generate-spacetimedb-rust-sdk.sh" "$TMP_ROOT/rejected-color" "$TMP_ROOT/module" \
+  >"$TMP_ROOT/unexpected-color.log" 2>&1; then
+  echo "generator wrapper accepted a colored unrelated error" >&2
+  exit 1
+fi
+grep -q 'error: module compilation failed' "$TMP_ROOT/unexpected-color.log"
 
 echo "SpacetimeDB Rust SDK wrapper recovery test passed"

@@ -20,6 +20,7 @@ import {
   chatActionsToMetadata,
   looksLikeActionDraftRequest,
   parseStoredChatActions,
+  parseStoredChatRunId,
   persistedDraftsToChatActions,
 } from "@lumiere/query-hooks/action-draft-intent"
 import {
@@ -165,6 +166,7 @@ function ErpAiChatPanel(props: Omit<ComponentProps<typeof AIChatPanel>, "onSendM
             : row.duration_ms != null
               ? Number(row.duration_ms)
               : undefined,
+        runId: parseStoredChatRunId(row.metadata),
       },
     }))
   }, [messagesQuery.data])
@@ -193,6 +195,7 @@ function ErpAiChatPanel(props: Omit<ComponentProps<typeof AIChatPanel>, "onSendM
       durationMs?: number
       model?: string | null
       actions?: ChatAction[]
+      runId?: number
     }) => {
       if (!sessionKey || !orgReady || operatingCompanyId == null || operatingCompanyId <= 0) return
       try {
@@ -212,12 +215,13 @@ function ErpAiChatPanel(props: Omit<ComponentProps<typeof AIChatPanel>, "onSendM
           model: args.model ?? null,
           duration_ms: args.durationMs ?? null,
           metadata:
-            args.actions?.length
+            args.actions?.length || args.runId != null
               ? chatActionsToMetadata(
-                  args.actions.filter(
+                  (args.actions ?? []).filter(
                     (action): action is Extract<ChatAction, { type: "draft" }> =>
                       action.type === "draft" && action.draft != null,
                   ),
+                  args.runId,
                 )
               : null,
         })
@@ -371,10 +375,12 @@ function ErpAiChatPanel(props: Omit<ComponentProps<typeof AIChatPanel>, "onSendM
         durationMs: Math.round(finished - started),
         model: out.model ?? null,
         actions: draftActions.length > 0 ? draftActions : undefined,
+        runId: out.run_id,
       })
 
       return {
         content: assistantText,
+        runId: out.run_id,
         sources,
         actions: draftActions.length > 0 ? draftActions : undefined,
       }
@@ -422,6 +428,7 @@ function ErpAiChatPanel(props: Omit<ComponentProps<typeof AIChatPanel>, "onSendM
       let content = ""
       let sources: ChatMessageSourceRef[] = []
       let resolvedModel: string | null = null
+      let resolvedRunId: number | undefined
 
       const processEvent = (raw: string) => {
         const lines = raw.split(/\r?\n/)
@@ -437,9 +444,11 @@ function ErpAiChatPanel(props: Omit<ComponentProps<typeof AIChatPanel>, "onSendM
           const parsed = JSON.parse(data) as {
             sources?: AiRagSource[]
             model?: string
+            run_id?: number
           }
           sources = (parsed.sources ?? []).map(mapRagSourceToChatSource)
           resolvedModel = parsed.model ?? null
+          resolvedRunId = parsed.run_id
           handlers.onSources(sources)
         }
       }
@@ -476,10 +485,12 @@ function ErpAiChatPanel(props: Omit<ComponentProps<typeof AIChatPanel>, "onSendM
         durationMs: Math.round(finished - started),
         model: resolvedModel,
         actions: draftActions.length > 0 ? draftActions : undefined,
+        runId: resolvedRunId,
       })
 
       return {
         content,
+        runId: resolvedRunId,
         sources,
         actions: draftActions.length > 0 ? draftActions : undefined,
       }
@@ -506,7 +517,13 @@ function ErpAiChatPanel(props: Omit<ComponentProps<typeof AIChatPanel>, "onSendM
   )
 }
 
-function ModulesContent({ children }: { children: ReactNode }) {
+function ModulesContent({
+  children,
+  firstOrgProfile,
+}: {
+  children: ReactNode
+  firstOrgProfile: boolean
+}) {
   const [isAIChatOpen, setIsAIChatOpen] = useState(false)
   const [isAIChatDocked, setIsAIChatDocked] = useState(false)
   const [isNotebookOpen, setIsNotebookOpen] = useState(false)
@@ -533,6 +550,7 @@ function ModulesContent({ children }: { children: ReactNode }) {
     <ErpAiChatControllerProvider open={openAiChat}>
       <div className="flex h-screen overflow-hidden bg-muted/30 text-foreground">
         <DashboardSidebar
+          firstOrgProfile={firstOrgProfile}
           forceCollapsed={isAIChatDocked || isNotebookOpen}
           navBadges={navBadges}
           onOpenJournal={() => setIsJournalOpen(true)}
@@ -569,6 +587,7 @@ function ModulesContent({ children }: { children: ReactNode }) {
         <JournalPanel open={isJournalOpen} onClose={() => setIsJournalOpen(false)} />
 
         <ErpCommandPalette
+          firstOrgProfile={firstOrgProfile}
           onOpenAIChat={openAiChat}
           onOpenNotebook={() => setIsNotebookOpen(true)}
           onOpenJournal={() => setIsJournalOpen(true)}
@@ -578,11 +597,17 @@ function ModulesContent({ children }: { children: ReactNode }) {
   )
 }
 
-export default function ModulesShell({ children }: { children: ReactNode }) {
+export default function ModulesShell({
+  children,
+  firstOrgProfile = false,
+}: {
+  children: ReactNode
+  firstOrgProfile?: boolean
+}) {
   return (
     <Suspense fallback={null}>
       <ErpAiRouteContextProvider>
-        <ModulesContent>{children}</ModulesContent>
+        <ModulesContent firstOrgProfile={firstOrgProfile}>{children}</ModulesContent>
       </ErpAiRouteContextProvider>
     </Suspense>
   )

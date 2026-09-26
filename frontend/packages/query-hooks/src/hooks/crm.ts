@@ -62,6 +62,8 @@ import type {
 import { withCompanyScope } from "@lumiere/erp-shared/org-scoped"
 import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
 import { scalarToU64 as toScalarU64, type ScalarId } from "@lumiere/erp-shared/u64"
+import type { CanonicalRecordRef } from "./operation-effect"
+import { resolveCompletedActivityEffect } from "./crm-activity-completion"
 
 import {
   finalizeCreateActivityParams,
@@ -802,11 +804,16 @@ export function useAddContactToSegment(organizationId: bigint) {
 
 export function useCompleteActivity(organizationId: bigint) {
   const qc = useQueryClient()
-  return useMutation<void, Error, ScalarId>({
+  return useMutation<CanonicalRecordRef, Error, ScalarId>({
     mutationFn: async (activityId) => {
-      const { urlPath, init } = stdbBffCommandPost("complete_activity", { activityId: toScalarU64(activityId) })
+      const id = toScalarU64(activityId)
+      const { urlPath, init } = stdbBffCommandPost("complete_activity", { activityId: id })
       const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error('Failed to complete activity')
+      if (!r.ok) throw new Error(await parseCallErrorCrm(r))
+      const rows = await fetchQueryList("/api/query/activities", "Failed to read activity")
+      const effect = resolveCompletedActivityEffect(rows, organizationId, id)
+      if (!effect) throw new Error("Activity did not read back as done")
+      return effect
     },
     onSuccess: () => invalidateResourceQueries(qc, organizationId, ['activities']),
   })

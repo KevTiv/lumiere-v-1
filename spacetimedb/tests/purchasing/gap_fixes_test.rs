@@ -4,7 +4,7 @@ use spacetimedb::{ReducerContext, Table};
 use crate::core::organization::company;
 use crate::crm::contacts::{contact, create_contact, CreateContactParams};
 use crate::inventory::product::{create_product, product, CreateProductParams};
-use crate::inventory::stock::{resolve_warehouse_stock_location, stock_picking, stock_quant};
+use crate::inventory::stock::{resolve_warehouse_stock_location, stock_move, stock_picking, stock_quant};
 use crate::inventory::tracking::{
     create_stock_production_lot, stock_production_lot, CreateStockProductionLotParams,
 };
@@ -227,6 +227,48 @@ pub fn test_confirm_creates_incoming_picking(ctx: &ReducerContext) -> Result<(),
     if (line.qty_received - 1.5).abs() > 0.001 {
         return Err(format!("expected 1.5 received, got {}", line.qty_received));
     }
+
+    // The partial receipt leaves one exact backorder move for this line. Duplicate it to prove
+    // receipt correlation fails closed rather than choosing an arbitrary open move.
+    let open_move = ctx
+        .db
+        .stock_move()
+        .iter()
+        .find(|mv| {
+            mv.organization_id == org_id
+                && mv.purchase_line_id == Some(line_id)
+                && !mv.is_done
+                && mv.state != "cancel"
+                && mv.state != "done"
+        })
+        .ok_or("expected one open backorder move after partial receipt")?;
+    ctx.db
+        .stock_move()
+        .insert(crate::inventory::stock::StockMove { id: 0, ..open_move });
+
+    match receive_po_line(ctx, org_id, line_id, 0.5, None) {
+        Err(message) if message.contains("Multiple open receipt moves") => {}
+        Err(message) => {
+            return Err(format!(
+                "expected ambiguous receipt-move rejection, got: {message}"
+            ))
+        }
+        Ok(()) => return Err("ambiguous receipt moves were accepted".to_string()),
+    }
+
+    let unchanged = ctx
+        .db
+        .purchase_order_line()
+        .id()
+        .find(&line_id)
+        .ok_or("line missing after ambiguous receive")?;
+    if (unchanged.qty_received - 1.5).abs() > 0.001 {
+        return Err(format!(
+            "ambiguous receive changed qty_received to {}",
+            unchanged.qty_received
+        ));
+    }
+
     Ok(())
 }
 

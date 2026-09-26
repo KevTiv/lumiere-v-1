@@ -1150,6 +1150,7 @@ fn create_outgoing_pickings_for_confirmed_order(
     }
 
     ctx.db.sale_order().id().update(SaleOrder {
+        delivery_count: picking_ids.len() as u32,
         picking_ids,
         write_uid: ctx.sender(),
         write_date: ctx.timestamp,
@@ -1157,6 +1158,26 @@ fn create_outgoing_pickings_for_confirmed_order(
     });
 
     Ok(())
+}
+
+/// Attach a follow-on outbound picking (e.g. a backorder) to its sale order so the
+/// order keeps one canonical list of fulfillment records.
+pub(crate) fn link_picking_to_sale_order(ctx: &ReducerContext, order_id: u64, picking_id: u64) {
+    let Some(order) = ctx.db.sale_order().id().find(&order_id) else {
+        return;
+    };
+    if order.picking_ids.contains(&picking_id) {
+        return;
+    }
+    let mut picking_ids = order.picking_ids.clone();
+    picking_ids.push(picking_id);
+    ctx.db.sale_order().id().update(SaleOrder {
+        delivery_count: picking_ids.len() as u32,
+        picking_ids,
+        write_uid: ctx.sender(),
+        write_date: ctx.timestamp,
+        ..order
+    });
 }
 
 #[reducer]
