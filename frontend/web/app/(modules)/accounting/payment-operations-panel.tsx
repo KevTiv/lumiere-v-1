@@ -406,7 +406,7 @@ export function PaymentOperationsPanel({
         currencyId,
         params: {
           fileName: stringValue(data.fileName) || csvFile.name,
-          idempotencyKey: statementImportIdempotencyKey(companyId, journalId, currencyId, csvData),
+          idempotencyKey: await statementImportIdempotencyKey(companyId, journalId, currencyId, csvData),
           openingBalance: numberValue(data.openingBalance),
           rows,
         },
