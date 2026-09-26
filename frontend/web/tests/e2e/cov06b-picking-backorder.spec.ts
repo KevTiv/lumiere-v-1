@@ -5,12 +5,13 @@ import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
 
 import { fetchDefaultCompanyId, signIn, smokeName } from "./helpers"
 import {
-  addLaptopLine,
+  addProductLine,
   confirmOrderViaUi,
   createDraftSaleOrder,
   fetchOrderDeliveredQty,
   fetchOrderPickings,
   fetchPickingMoves,
+  SEEDED_MOUSE_PRODUCT,
 } from "./sales-order-fixtures"
 import {
   expectCanonicalPickingFocus,
@@ -62,7 +63,7 @@ test.describe(
         page,
         smokeName("cov06b-backorder"),
       )
-      await addLaptopLine(page, orderId, "2")
+      await addProductLine(page, orderId, SEEDED_MOUSE_PRODUCT, "2")
       await confirmOrderViaUi(page, orderId)
 
       const initialPickings = await fetchOrderPickings(page, orderId)
