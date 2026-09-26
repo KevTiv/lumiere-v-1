@@ -105,7 +105,9 @@ pub fn run_inventory_delivery_quant_test(ctx: &ReducerContext) -> Result<(), Str
 #[spacetimedb::reducer]
 pub fn run_inventory_company_isolation_test(ctx: &ReducerContext) -> Result<(), String> {
     gap_fixes_test::test_company_isolation_on_reserve(ctx)
-        .map_err(|e| format!("company_isolation: {e}"))
+        .map_err(|e| format!("company_isolation: {e}"))?;
+    gap_fixes_test::test_company_stock_location_scope(ctx)
+        .map_err(|e| format!("company_stock_location_scope: {e}"))
 }
 
 #[spacetimedb::reducer]

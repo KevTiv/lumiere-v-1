@@ -271,6 +271,8 @@
       "frontend/web/tests/e2e/analytics-lifecycle.spec.ts",
       "frontend/web/tests/e2e/auth-permission-enforcement.spec.ts",
       "frontend/web/tests/e2e/bank-statement-import.spec.ts",
+      "frontend/web/tests/e2e/cov17-proposal-approve-convert.spec.ts",
+      "frontend/web/tests/e2e/cov19-activity-completion.spec.ts",
       "frontend/web/tests/e2e/crm-opportunity-stage.spec.ts",
       "frontend/web/tests/e2e/crm-read-isolation.spec.ts",
       "frontend/web/tests/e2e/documents-wave-a-lifecycle.spec.ts",
