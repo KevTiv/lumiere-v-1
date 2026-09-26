@@ -691,6 +691,8 @@
       "statement_id",
       "journal_id",
       "is_reconciled",
+      "move_ids",
+      "amount_residual",
       "transaction_type",
       "account_number"
     ],
