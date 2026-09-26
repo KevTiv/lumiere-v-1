@@ -1,7 +1,6 @@
 import { expect, test, type Page, type Request } from "@playwright/test"
 
 import {
-  callReducerOwner,
   fetchDefaultCompanyId,
   fetchSessionOrganizationId,
   gotoModule,
@@ -15,6 +14,27 @@ const PERSONA_PASSWORD = process.env.E2E_FIRST_ORG_PERSONA_PASSWORD ?? "Password
 
 function timestampNow() {
   return { __timestamp_micros_since_unix_epoch__: Date.now() * 1000 }
+}
+
+/**
+ * Trusted fixture call that posts already SATS-encoded args unchanged. The
+ * shared `callReducerOwner` re-encodes the params struct, and SpacetimeDB
+ * rejected that body for these statement reducers ("trailing comma"), while the
+ * hand-encoded COV-08d asset fixture (not re-encoded) is accepted.
+ */
+async function callOwnerRaw(reducer: string, args: unknown[]): Promise<void> {
+  const host = (process.env.E2E_STDB_HOST ?? process.env.STDB_HOST ?? "http://127.0.0.1:3000").replace(/\/$/, "")
+  const moduleName = process.env.STDB_MODULE?.trim()
+  const token = process.env.STDB_SERVER_TOKEN?.trim()
+  if (!moduleName || !token) throw new Error(`trusted fixture call ${reducer} requires STDB_MODULE and STDB_SERVER_TOKEN`)
+  const response = await fetch(`${host}/v1/database/${moduleName}/call/${reducer}`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify(args),
+  })
+  if (!response.ok) {
+    throw new Error(`trusted fixture reducer ${reducer} failed (${response.status}): ${await response.text()}`)
+  }
 }
 
 async function queryRows(page: Page, resource: string): Promise<Array<Record<string, unknown>>> {
@@ -74,7 +94,7 @@ test.describe("COV-08b exact bank statement reconciliation", { tag: ["@p0", "@co
     // Setup only: statement and line are fixture data, created with the
     // trusted owner call (the session compat route returns a redacted 500 for
     // these accounting fixtures). Reconciliation is driven through the UI below.
-    await callReducerOwner("create_account_bank_statement", [
+    await callOwnerRaw("create_account_bank_statement", [
       organizationId,
       companyId,
       journalId,
@@ -92,7 +112,7 @@ test.describe("COV-08b exact bank statement reconciliation", { tag: ["@p0", "@co
     const statementId = scalarQueryId(statement?.id)
     if (statementId == null) throw new Error("created bank statement not found")
 
-    await callReducerOwner("create_account_bank_statement_line", [
+    await callOwnerRaw("create_account_bank_statement_line", [
       organizationId,
       companyId,
       statementId,

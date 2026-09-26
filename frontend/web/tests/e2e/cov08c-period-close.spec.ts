@@ -62,6 +62,8 @@ test.describe("COV-08c exact period close", { tag: ["@p0", "@cov08", "@cov08c"] 
     const fiscalYear = (await rows(page, "fiscal-years")).find((row) => row.name === yearName)
     const fiscalYearId = scalarQueryId(fiscalYear?.id)
     if (fiscalYearId == null) throw new Error("created fiscal year not found")
+    // A period can only be opened inside a running (open) fiscal year.
+    await callReducerOwner("open_fiscal_year", [organizationId, companyId, fiscalYearId])
 
     const periodName = smokeName(`cov08c-period-${suffix}`)
     await callReducerOwner("create_account_period", [organizationId, companyId, {
