@@ -109,3 +109,14 @@ pnpm typecheck
 The far-outside-envelope f64 characterization remains an explicit future
 decimal/minor-unit migration constraint. No additional BASE-04 product-code
 slice is identified.
+
+
+## Maintainability follow-up: parser boundary ratchet
+
+Statement CSV parsing is an accounting admission boundary, not a convenience coercion layer. New parser work must fail closed on missing or semantically invalid values and preserve economic/calendar meaning exactly. In particular:
+
+- blank monetary cells are invalid/missing, never implicit zero;
+- ISO dates must represent a real calendar date; JavaScript date rollover is not accepted as normalization;
+- ambiguous locale formats remain rejected until an explicit format contract exists;
+- parser fixes require focused regression tests through `statementImportRows`, not only helper-level examples;
+- extend the existing parser module rather than reimplementing statement normalization in upload/UI code.
