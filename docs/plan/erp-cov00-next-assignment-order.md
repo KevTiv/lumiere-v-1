@@ -85,7 +85,9 @@ Current disposition: `ACCEPTED` for the bounded sale-order confirmation slice. T
 
 ### COV-05
 
-Next bounded assignment: converge one Purchasing order transition with the accepted `purchasing` persona. Prefer a same-record state transition or an effect with a released durable identity, prove representative allow/deny and stale/replay behavior, and do not use newest-row or ID-delta discovery for receipts or vendor bills.
+Current disposition: `IMPLEMENTED` for the bounded PO-confirmation slice; runtime acceptance is pending. The accepted `purchasing` persona drives the existing UI confirmation, the same PO id is the stable result, inbound receipts are correlated only through exact `stock_picking.purchase_id`, stale replay must preserve the exact effect set, and the limited reader remains denied. See [`erp-cov05-purchase-order-confirmation-status.md`](./erp-cov05-purchase-order-confirmation-status.md).
+
+Next bounded Purchasing assignment: certify receipt and/or vendor-bill creation from the confirmed PO using released durable relations. Do not use newest-row or ID-delta discovery.
 
 ## First implementation convergence
 

@@ -221,7 +221,14 @@ async fn run_legacy_skill(state: &AppState, req: RunSkillRequest) -> Result<RunS
     }
     reject_legacy_analytics_sql(&req.inputs)?;
 
-    let agent = resolve_agent(&stdb, req.org_id, req.agent_id, req.team_member_id).await?;
+    let agent = resolve_agent(
+        &stdb,
+        req.org_id,
+        req.agent_id,
+        req.team_member_id,
+        state.config.ollama_supports_tool_calling,
+    )
+    .await?;
     ensure_allowed_action(&agent, "skill_run")?;
     ensure_model_allowed(&agent)?;
     ensure_within_budget(&agent)?;
@@ -655,7 +662,14 @@ pub async fn run_skill_admitted(
         anyhow::bail!("skill '{skill_key}' is disabled for this company");
     }
 
-    let agent = resolve_agent(&stdb, req.org_id, req.agent_id, req.team_member_id).await?;
+    let agent = resolve_agent(
+        &stdb,
+        req.org_id,
+        req.agent_id,
+        req.team_member_id,
+        state.config.ollama_supports_tool_calling,
+    )
+    .await?;
     ensure_allowed_action(&agent, "skill_run")?;
     ensure_model_allowed(&agent)?;
     ensure_within_budget(&agent)?;
