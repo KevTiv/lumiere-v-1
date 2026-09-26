@@ -437,8 +437,25 @@ fn pay_04_reversal_retry_is_single_compensation(ctx: &ReducerContext) -> Result<
 }
 
 fn pay_05_reversal_retry_is_idempotent_success(ctx: &ReducerContext) -> Result<(), String> {
-    let (_, _, _, retry) = settle_and_reverse_twice(ctx, "pay05")?;
-    retry.map_err(|error| format!("reversal retry after committed reversal failed: {error}"))
+    let (w, payment, _, retry) = settle_and_reverse_twice(ctx, "pay05")?;
+    retry.map_err(|error| format!("reversal retry after committed reversal failed: {error}"))?;
+
+    let conflicting = reverse_payment_transaction_impl(
+        ctx,
+        w.org(),
+        payment,
+        ReversePaymentTransactionParams {
+            company_id: w.company(),
+            reason: Some("different reversal reason".to_string()),
+            metadata: Some(r#"{"test":"pretenant"}"#.to_string()),
+        },
+        true,
+    );
+    match conflicting {
+        Err(error) if error.contains("payload differs") => Ok(()),
+        Err(error) => Err(format!("unexpected conflicting reversal replay error: {error}")),
+        Ok(()) => Err("conflicting reversal retry was accepted".to_string()),
+    }
 }
 
 /// Invoice A is 100 and invoice B is 50. A 120 payment cannot be forced into A:
