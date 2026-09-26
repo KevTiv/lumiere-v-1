@@ -53,4 +53,4 @@ This certifies one full-quantity outgoing picking through confirm → assign →
 
 ## Next bounded Inventory slice
 
-Prefer **partial validation → exact backorder identity** or **internal transfer with source/destination quant convergence**. Keep cycle counts/lots/replenishment separate.
+COV-06b now owns partial validation and exact backorder identity. After it, certify **one internal transfer with exact source/destination quant convergence**. Keep cycle counts/lots/serials/quality/replenishment separate.
