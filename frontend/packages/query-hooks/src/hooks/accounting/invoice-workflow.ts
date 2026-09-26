@@ -115,7 +115,7 @@ async function readReconciliationEffect(input: ReconcilePaymentInput) {
     "/api/query/account-moves",
     "Failed to read reconciliation result",
   )
-  return resolveReconciliationEffect(rows, input)
+  return resolveReconciliationEffect(rows, input) ?? {}
 }
 
 /**
