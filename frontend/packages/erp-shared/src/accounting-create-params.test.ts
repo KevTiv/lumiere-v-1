@@ -2,6 +2,7 @@ import assert from "node:assert/strict"
 import test from "node:test"
 
 import {
+  accountPeriodStateTag,
   paymentParamsToJson,
   toCreatePaymentParamsFromManualForm,
 } from "./accounting-create-params"
@@ -44,4 +45,11 @@ test("manual payment params reject a missing business date", () => {
       ),
     /valid business date is required/i,
   )
+})
+
+test("account period state tag reads tagged, string and SATS sum JSON states", () => {
+  assert.equal(accountPeriodStateTag({ state: { tag: "Open" } }), "Open")
+  assert.equal(accountPeriodStateTag({ state: "Draft" }), "Draft")
+  assert.equal(accountPeriodStateTag({ state: { open: [] } }), "Open")
+  assert.equal(accountPeriodStateTag({ state: { closed: [] } }), "Closed")
 })

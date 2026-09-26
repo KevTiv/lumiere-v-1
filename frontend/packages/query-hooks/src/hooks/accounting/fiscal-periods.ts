@@ -80,6 +80,12 @@ function periodState(value: unknown): string {
   if (value && typeof value === "object" && !Array.isArray(value) && "tag" in value) {
     return String((value as { tag?: unknown }).tag ?? "").toLowerCase()
   }
+  // SATS sum JSON from /api/query, e.g. `{ closed: [] }`.
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    const keys = Object.keys(value)
+    const key = keys.length === 1 ? keys[0] : undefined
+    if (key) return key.toLowerCase()
+  }
   return ""
 }
 
