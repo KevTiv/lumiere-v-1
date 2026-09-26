@@ -549,7 +549,7 @@ export function useValidateTimesheets(organizationId: bigint) {
             wipLaborAccountId != null && wipLaborAccountId !== ""
               ? toScalarU64(wipLaborAccountId)
               : null,
-        }) })
+        }, "ValidateTimesheetsParams") })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to validate timesheets')
     },
@@ -571,7 +571,7 @@ export function useRejectTimesheets(organizationId: bigint) {
           companyId: companyId != null ? toScalarU64(companyId) : null,
           timesheetIds: timesheetIds.map((id) => toScalarU64(id)),
           reason,
-        }) })
+        }, "RejectTimesheetsParams") })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to reject timesheets')
     },
@@ -593,7 +593,7 @@ export function useReopenTimesheets(organizationId: bigint) {
           companyId: companyId != null ? toScalarU64(companyId) : null,
           timesheetIds: timesheetIds.map((id) => toScalarU64(id)),
           reason: reason ?? null,
-        }) })
+        }, "ReopenTimesheetsParams") })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to reopen timesheets')
     },
@@ -640,7 +640,7 @@ export function useBillTimesheets(organizationId: bigint) {
               fiscalPositionId != null && String(fiscalPositionId).trim() !== ""
                 ? toScalarU64(fiscalPositionId)
                 : null,
-          }) })
+          }, "BillTimesheetsParams") })
 
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to bill timesheets')
