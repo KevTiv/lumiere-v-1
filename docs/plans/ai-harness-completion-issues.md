@@ -496,8 +496,11 @@ Still open, so AIH-15 must not be marked complete:
   answers still stand alone and never depend on evidence access. Document
   passages carry no effective dates, so their answers release as `qualified`.
   The live browser → gateway → Qdrant → answer-gate proof
-  (`ai-rag-evidence-access.spec.ts`) needs a real LLM and embedder and must be
-  run against a stack that has them.
+  (`ai-rag-evidence-access.spec.ts`) is now strict about provider-backed execution:
+  a grounded release must report non-degraded semantic retrieval, a routed LLM
+  provider/model, actor-authorized passage sources and durable passage-backed
+  claim ids. It remains an environment certification gate and must be run against
+  a stack with a real LLM and embedder before this live proof is marked complete.
 - **Publication adapters now use the full answer admission boundary.** Reports,
   action explanations, saved artifacts and classic-run summaries construct
   explicit material claims and pass them through
@@ -528,8 +531,14 @@ Still open, so AIH-15 must not be marked complete:
   second test) and was not run here.
 - Catalog reads are scoped to organization/company, not the acting user's
   grants ("current access" is not per-actor yet).
-- No bounded further-retrieval loop on conflict/missing evidence; the gate
-  qualifies, reviews or blocks but does not re-retrieve.
+- **Bounded recovery is now wired on governed-program answer paths.** Missing
+  or conflicting evidence findings can route back through the graph's declared
+  `AcquireEvidence` node at most twice; the acquisition counter and evidence
+  overlays are checkpointed, so restart/resume cannot reset the allowance.
+  Each acquisition invalidates the declared affected/downstream values before
+  re-evaluation. If the graph has no declared evidence-acquisition path, or the
+  allowance is exhausted, the answer remains review/blocked rather than
+  inventing a retrieval path.
 - Generated contract artifacts were regenerated with the AIH-13/14/17/18
   work and the storage-policy check now passes against a fresh schema
   snapshot (492/492 tables).
@@ -570,27 +579,44 @@ content and source metadata. Unit tests cover spoofed authority, expired/inactiv
 roles, mismatched actor scope, bounded excerpts and unavailable-content
 redaction.
 
+**Delivered — answer/run navigation, transcript and export coverage.**
+
+- Passage-backed RAG responses now expose the exact durable `run_id`, so an
+  answer can navigate to its run without newest-row discovery or client
+  inference.
+- `POST /v1/evidence/run` resolves that run in the acting user's current
+  organization/company, joins answer contributions by `agent_run_id`, joins
+  their persisted claims, and runs every claim through the existing evidence
+  inspector to reconstruct exact passage/version/source/author/review lineage.
+- The same response includes a bounded observable transcript from
+  `ai_agent_run_step`. It exposes tool name, step/order, input hash, row count,
+  duration and success/failure only; raw tool arguments and persisted
+  `output_summary` never leave the gateway.
+- `POST /v1/evidence/run/export` exports the same authorized/redacted contract
+  with a versioned export envelope. The API server exposes session-owned
+  `/ai/evidence/runs/inspect` and `/ai/evidence/runs/export` routes, and the
+  browser BFF has matching proxies. Export receives `no-store` plus an
+  attachment filename and cannot bypass the exact `ai.evidence.inspect` grant.
+- The live RAG E2E now follows answer → run → contribution/claims → passage
+  inspection and verifies the export contract and transcript redaction. The
+  focused gateway unit test separately pins that raw tool output cannot appear
+  in the transcript.
+- Workflow-step inspection and the bounded reviewer queue remain available
+  through the same inspector boundary. Production tenant bootstrap now grants
+  the canonical owner role the exact bounded `ai.evidence.inspect` capability;
+  ordinary roles remain default-deny.
+
+The reviewer UI now completes the navigation surface: assistant answers carrying
+a durable run id expose an **Inspect run** link; the evidence reviewer resolves
+that run to its first persisted answer claim under the requested company scope,
+opens the existing claim lineage view, and exposes the authorized JSON run export.
+Persisted chat metadata retains the run id so the navigation survives reloads.
+
 Still open:
 
-- Answer → foundation now works for governed-run answers: the run response
-  carries `evidenceClaimIds`, and each inspects down to passage, source and
-  author. The UI does not navigate from an answer or run to those claims, and a
-  *workflow step* has no path yet (no component is bound at save time).
-- A workflow step now has a path: `workflow_step` (version + node key)
-  resolves the step's current component and reconstructs decision, claim,
-  passage and source through its revisions, with the claim's persisted reviewer.
-  A bounded, company-scoped review queue (`POST /v1/evidence/review-queue`, same
-  exact `ai.evidence.inspect` grant) lists pending and flagged claims and
-  decisions, source and passage availability, automated result, creator and
-  proposer (so separation of duties is visible), affected workflow steps and
-  steps whose links need confirming; the reviewer screen can inspect and review
-  from it. The browser supplies only company intent, target, verdict, note and,
-  for a component confirmation, the exact content hash it saw.
-- The UI still omits export and cache integration.
-- Transcript and export paths are not covered, derived caches are not
-  invalidated, and no live authenticated browser → API server → gateway →
-  SpacetimeDB E2E was run. No default `ai.evidence.inspect` grant is seeded, so
-  deployments deny inspection until an authorized role grant is configured.
+- The newly extended live RAG/browser certification still requires an
+  environment run with the real gateway/STDB/LLM/embedder stack before this
+  end-to-end proof is marked executed.
 
 ---
 
@@ -693,10 +719,21 @@ hash and reports `hash_only`, never full replay; revocation keeps content as
 watermark. Persisted fixtures cover retraction, correction with honest
 re-review, revocation, deletion and discretionary acknowledgement.
 
+**Delivered — semantic-cache invalidation.** Qdrant invalidation is wired from
+the authoritative source-change transaction: each affected passage marks its
+`search_embedding` row `deleted` and durably enqueues an
+`embedding`/`delete_embedding` job. The gateway worker re-resolves that
+tombstone in the same org/company scope before deleting the Qdrant point. A stale
+point cannot leak during propagation because passage-backed RAG always resolves
+the Qdrant identifier through current STDB passage/source state and release-time
+authorization before text or an answer is disclosed. The current RAG serving
+path has no reusable answer cache (browser calls are no-store/mutation-style;
+chat messages are durable history), so there is no second answer-cache layer to
+invalidate. The source-change id remains the watermark contract for future
+derived caches.
+
 Still open:
 
-- No derived cache actually consults the watermark: the Qdrant/semantic index
-  and any cached answers are not invalidated by a source change yet.
 - Blocking *execution* is enforced only where these reducers are the path
   (approval, binding, link confirmation); the gateway inspector reports the
   decision but publication/action-draft execution does not call it (AIH-15
@@ -780,9 +817,14 @@ and payload-bound idempotency key; replays succeed only for the identical comman
 Steering increments a durable revision and forces a fresh checked checkpoint
 before resume. The authenticated BFF/UI exposes inspect, ask, reply and steer
 without accepting browser-supplied authority, while the gateway independently
-rechecks the actor token and `ai.run.lifecycle` grant. Still open: timeout policy,
-fine-grained dependency scheduling (a required question currently blocks the run),
-live authenticated restart/reconnect E2E, and production capability provisioning.
+rechecks the actor token and `ai.run.lifecycle` grant. Production owner-role
+provisioning now happens during canonical organization bootstrap: the active
+full-access owner receives exact, bounded `ai.evidence.retrieve`,
+`ai.evidence.inspect`, `ai.knowledge.retrieve` and `ai.run.lifecycle` grants.
+The baseline is idempotent, contains no wildcard AI grant, and ordinary roles
+remain default-deny until the existing audited grant reducer explicitly provisions
+them. Still open: timeout policy, fine-grained dependency scheduling (a required
+question currently blocks the run), and live authenticated restart/reconnect E2E.
 
 ---
 
@@ -798,6 +840,23 @@ bounded repair, then revalidate the revised candidate and its evidence links.
 forbidden operation and a violated available domain invariant yield actionable
 diagnostics. Repairs create new versions; persistent errors or exhausted repair
 budgets stop/require review and never publish a failing candidate.
+
+**Status — runtime repair mechanics delivered; validator taxonomy remains partial.**
+The governed executor now feeds answer-gate failures back as bounded recovery
+diagnostics rather than blindly retrying. Generation nodes allow at most two
+repair attempts; reasoning nodes can repair only inside their declared
+`max_iterations` and are additionally capped at two repair rounds. Every revised
+candidate is sent through the normal answer admission gate again. Authorization
+and source-validity failures (`denied`, `forbidden`, `revoked`,
+`withdrawn`, `out of scope`, `unauthorized`) are explicitly non-repairable
+and fail closed. Recovery diagnostics are carried in the existing checkpointed
+evidence overlays, so resume sees the prior failure/attempt rather than starting
+a fresh budget.
+
+Still open for the full AIH-21 acceptance gate: standardizing the same typed
+diagnostic vocabulary across every generated-contract/domain/component
+validator and proving schema/reference/domain-invariant fixtures end to end.
+
 
 ---
 
@@ -833,9 +892,20 @@ evidence, stall past the allowance, different calls with identical empty
 results, fingerprint normalization, the loop-level non-progress stop with its
 recorded events, and bounded polling still reaching a candidate answer.
 
-**Still open:** a per-tool polling policy with attempt, time and backoff bounds
-(the capability contract carries no polling metadata, so one bounded allowance
-stands in), bounded replan, and routing to an admitted question handler.
+**Delivered — explicit polling and bounded replan.** A
+`CapabilityProposal` now carries an explicit `poll` intent. Polling is bounded
+per capability (not prompt, arguments, model or provider) to four attempts with
+capped 0/50/100/200 ms backoff, still consuming the ordinary capability-call
+budget and passing through fresh admission/authorization/spend checks. Identical
+calls continue to use execution recovery rather than bypassing idempotency.
+Generic unchanged-result detection does not misclassify an admitted poll; the
+poll's own independent limit terminates it. The production executor stores poll
+attempts in the checkpointed reasoning counters, while the compatibility loop
+stores them in bounded recovery state. Unable-to-progress receives at most one
+bounded replan and cannot reset retrieval/repair/poll budgets.
+
+**Still open:** routing non-progress to the admitted durable-question handler
+where policy prefers clarification over stop.
 
 ---
 
@@ -860,9 +930,15 @@ hashes and rejects stale parents; resume reauthorizes the actor, skill, inputs,
 graph, knowledge and source dependencies before changing run state. New runs also
 initialize a private lifecycle continuation, and the runtime resume bridge loads
 that continuation and calls the checked reducer rather than directly changing a
-wait state. Required durable questions and uncertain effects block resume. Full
-continuation manifests still do not include every approval, candidate, progress
-and budget component, and automatic recovery/rebuild on mismatch remains open.
+wait state. Required durable questions and uncertain effects block resume. Recovery
+state for the newly bounded paths is now restart-safe without a parallel
+manifest: evidence re-retrieval uses checkpointed `evidence_acquisitions`;
+repair/replan/poll attempts use checkpointed `reason_iterations`; and recovery
+diagnostics/acquired evidence use checkpointed `evidence_overlays`. A resumed
+run therefore cannot regain attempts by changing provider/model or reconnecting.
+Full continuation manifests still do not include every approval, candidate,
+general task-budget/progress component, and automatic rebuild for arbitrary
+manifest mismatch remains open.
 
 ---
 

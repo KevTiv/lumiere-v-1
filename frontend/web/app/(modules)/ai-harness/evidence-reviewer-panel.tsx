@@ -2,8 +2,9 @@
 
 import type { JsonObject } from "@lumiere/api-client/json-object"
 
-import { type FormEvent, useMemo, useRef, useState } from "react"
-import { AlertCircle, BookOpenCheck, Building2, CheckCircle2, MessageSquarePlus, Search, ShieldX } from "lucide-react"
+import { type FormEvent, useEffect, useMemo, useRef, useState } from "react"
+import { useSearchParams } from "next/navigation"
+import { AlertCircle, BookOpenCheck, Building2, CheckCircle2, Download, MessageSquarePlus, Search, ShieldX } from "lucide-react"
 import { Button } from "@lumiere/ui"
 import { Alert, AlertDescription, AlertTitle } from "@lumiere/ui/components/alert"
 import { Badge } from "@lumiere/ui/components/badge"
@@ -42,7 +43,9 @@ function parseIds(value: string): number[] | null {
 }
 
 export function EvidenceReviewerPanel({ companies }: EvidenceReviewerPanelProps) {
+  const searchParams = useSearchParams()
   const companyOptions = useMemo(() => companyRowsToSelectOptions(companies), [companies])
+  const linkedRunId = Number(searchParams.get("runId"))
   const [companyId, setCompanyId] = useState(() => companyOptions[0]?.value ?? "")
   const [kind, setKind] = useState<EvidenceTargetKind>("decision")
   const [targetId, setTargetId] = useState("")
@@ -63,9 +66,9 @@ export function EvidenceReviewerPanel({ companies }: EvidenceReviewerPanelProps)
   }
 
   const loadInspection = async (
-    override?: { kind: EvidenceTargetKind; id: number; nodeKey?: string },
+    override?: { kind: EvidenceTargetKind; id: number; nodeKey?: string; companyId?: number },
   ) => {
-    const parsedCompanyId = Number(companyId)
+    const parsedCompanyId = override?.companyId ?? Number(companyId)
     const inspectKind = override?.kind ?? kind
     const parsedTargetId = override?.id ?? Number(targetId)
     const inspectNodeKey = (override ? override.nodeKey : nodeKey.trim()) ?? ""
@@ -117,6 +120,88 @@ export function EvidenceReviewerPanel({ companies }: EvidenceReviewerPanelProps)
     } catch {
       setRequest({ status: "error", message: "The evidence inspection service is unavailable." })
     }
+  }
+
+  useEffect(() => {
+    const runId = Number(searchParams.get("runId"))
+    const requestedCompanyId = Number(searchParams.get("companyId"))
+    if (!Number.isSafeInteger(runId) || runId <= 0) return
+    const selectedCompanyId =
+      Number.isSafeInteger(requestedCompanyId) && requestedCompanyId > 0
+        ? requestedCompanyId
+        : Number(companyId)
+    if (!Number.isSafeInteger(selectedCompanyId) || selectedCompanyId <= 0) return
+
+    if (String(selectedCompanyId) !== companyId) {
+      setCompanyId(String(selectedCompanyId))
+    }
+    let cancelled = false
+    void (async () => {
+      setRequest({ status: "loading" })
+      try {
+        const response = await fetch("/api/ai/evidence/runs/inspect", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ companyId: selectedCompanyId, runId }),
+        })
+        const payload = await response.json().catch(() => ({})) as JsonObject
+        if (cancelled) return
+        if (!response.ok) {
+          setRequest({
+            status: response.status === 401 || response.status === 403 ? "denied" : "error",
+            message:
+              typeof payload.error === "string"
+                ? payload.error
+                : "The run evidence inspection could not be loaded.",
+          })
+          return
+        }
+        const claimIds = Array.isArray(payload.claimIds)
+          ? payload.claimIds.filter(
+              (value): value is number => Number.isSafeInteger(value) && Number(value) > 0,
+            )
+          : []
+        const claimId = claimIds[0]
+        if (!claimId) {
+          setRequest({ status: "error", message: "This run has no persisted answer claims." })
+          return
+        }
+        setKind("claim")
+        setTargetId(String(claimId))
+        await loadInspection({ kind: "claim", id: claimId, companyId: selectedCompanyId })
+      } catch {
+        if (!cancelled) {
+          setRequest({ status: "error", message: "The run evidence inspection is unavailable." })
+        }
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+    // Run deep links are intentionally resolved once per URL/company selection.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams])
+
+  const exportLinkedRun = async () => {
+    const parsedCompanyId = Number(companyId)
+    if (!Number.isSafeInteger(linkedRunId) || linkedRunId <= 0
+      || !Number.isSafeInteger(parsedCompanyId) || parsedCompanyId <= 0) return
+    const response = await fetch("/api/ai/evidence/runs/export", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ companyId: parsedCompanyId, runId: linkedRunId }),
+    })
+    if (!response.ok) {
+      setRequest({ status: "error", message: "The authorized run export could not be created." })
+      return
+    }
+    const blob = await response.blob()
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement("a")
+    link.href = url
+    link.download = `lumiere-run-${linkedRunId}-evidence.json`
+    link.click()
+    URL.revokeObjectURL(url)
   }
 
   const inspect = (event: FormEvent<HTMLFormElement>) => {
@@ -201,6 +286,11 @@ export function EvidenceReviewerPanel({ companies }: EvidenceReviewerPanelProps)
         <p className="text-sm text-muted-foreground">
           Inspect a decision or claim and trace it back to reviewed passages and attributed sources.
         </p>
+        {Number.isSafeInteger(linkedRunId) && linkedRunId > 0 ? (
+          <Button type="button" variant="outline" className="mt-2 w-fit" onClick={() => void exportLinkedRun()}>
+            <Download data-icon="inline-start" /> Export run #{linkedRunId}
+          </Button>
+        ) : null}
       </div>
 
       <Card>

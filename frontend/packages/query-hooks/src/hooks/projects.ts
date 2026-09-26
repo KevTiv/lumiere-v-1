@@ -32,6 +32,7 @@ function invalidateTimesheetQueues(
   void qc.invalidateQueries({ queryKey: ['timesheets', k] })
   void qc.invalidateQueries({ queryKey: ['timesheets-to-validate', k] })
   void qc.invalidateQueries({ queryKey: ['timesheets-unbilled', k] })
+  void qc.invalidateQueries({ queryKey: ['project-timesheet-approvals', k] })
   void qc.invalidateQueries({ queryKey: ['project-margin-by-project', k] })
   void qc.invalidateQueries({ queryKey: ['resource-utilisation-by-employee', k] })
 }
@@ -99,6 +100,18 @@ export function useTimesheetsUnbilled(organizationId: bigint, initialData?: Quer
       ),
     staleTime: 30_000,
     initialData,
+  })
+}
+
+export function useTimesheetApprovals(organizationId: bigint) {
+  return useQuery<QueryRows>({
+    queryKey: ['project-timesheet-approvals', rqBigIntKey(organizationId)],
+    queryFn: () =>
+      fetchQueryList(
+        '/api/query/project-timesheet-approvals',
+        'Failed to fetch timesheet approvals',
+      ),
+    staleTime: 30_000,
   })
 }
 

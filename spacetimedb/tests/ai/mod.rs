@@ -38,6 +38,8 @@ pub fn run_ai_capability_grants_tests(ctx: &ReducerContext) -> Result<(), String
         .map_err(|e| format!("capability_grant_input_validation: {e}"))?;
     capability_grants_test::test_capability_grant_upsert_and_delete(ctx)
         .map_err(|e| format!("capability_grant_upsert_and_delete: {e}"))?;
+    capability_grants_test::test_owner_capability_provisioning(ctx)
+        .map_err(|e| format!("owner_capability_provisioning: {e}"))?;
     Ok(())
 }
 

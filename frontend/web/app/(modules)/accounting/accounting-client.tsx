@@ -197,7 +197,6 @@ import {
   useCreateBudgetPost,
   useUpdateBudgetPost,
   usePostAccountMove,
-  usePostInvoice,
   useCreateCreditNoteFromInvoice,
   useCancelAccountMove,
   useAddAccountMoveLine,
@@ -276,7 +275,6 @@ import {
   useRetryIntercompanyTransaction,
   useUpdateAccountMoveLine,
   useComputeInvoiceTotals,
-  useReconcilePaymentWithInvoice,
   useRefreshTaxDeadlineStatuses,
   useScheduleTaxDeadlineUpdates,
   useTaxDeadlines,
@@ -285,9 +283,7 @@ import {
   useAccountPaymentTerms,
   useAccountPaymentTermLines,
   useCreateAccountPayment,
-  usePostAccountPayment,
   useCancelAccountPayment,
-  useRegisterPaymentOnInvoice,
   useCreatePaymentTerm,
   useUpdatePaymentTerm,
   useDeletePaymentTerm,
@@ -322,6 +318,10 @@ import {
 } from "@/lib/form-lookup"
 import { useCurrencies } from "@lumiere/query-hooks/hooks/settings"
 import { useToast } from "@/hooks/use-toast"
+import { useWorkflowSurface } from "@/hooks/use-workflow-surface"
+import { useInvoiceToPaymentWorkflow } from "@lumiere/query-hooks/hooks/accounting/invoice-workflow"
+import { isPaymentRegistrable } from "@lumiere/erp-workflows"
+import { workflowActionsToEntityActions } from "@lumiere/ui"
 import type {
   AccountAnalyticAccount,
   AccountFiscalYear,
@@ -1568,7 +1568,6 @@ function AccountingClientReady({
   const createBudgetPost = useCreateBudgetPost(organizationId)
   const updateBudgetPost = useUpdateBudgetPost(organizationId)
   const postMove = usePostAccountMove(organizationId)
-  const postInvoice = usePostInvoice(organizationId)
   const createCreditNote = useCreateCreditNoteFromInvoice(organizationId)
   const mailTemplatesQuery = useMailTemplates(organizationId, organizationId > 0)
   const queueMailFromTemplate = useQueueMailFromTemplate(
@@ -1635,13 +1634,40 @@ function AccountingClientReady({
   const retryIntercompanyTransaction = useRetryIntercompanyTransaction(organizationId, operatingCompanyId)
 
   const updateAccountMoveLine = useUpdateAccountMoveLine(organizationId, operatingCompanyId)
-  const reconcilePaymentWithInvoice = useReconcilePaymentWithInvoice(organizationId, operatingCompanyId)
   const csvImports = useAccountingCsvImportMutations(organizationId, operatingCompanyId)
 
   const createAccountPayment = useCreateAccountPayment(organizationId)
-  const postAccountPayment = usePostAccountPayment(organizationId)
   const cancelAccountPayment = useCancelAccountPayment(organizationId)
-  const registerPaymentOnInvoice = useRegisterPaymentOnInvoice(organizationId)
+  const workflowSurface = useWorkflowSurface({ organizationId })
+  const resolvePostingAccounts = useCallback(() => {
+    const resolved = resolveDefaultCogsInventoryAccountIds(accounts as readonly Record<string, unknown>[])
+    return resolved
+      ? {
+          cogsAccountId: BigInt(resolved.cogsAccountId),
+          inventoryAccountId: BigInt(resolved.inventoryAccountId),
+        }
+      : undefined
+  }, [accounts])
+  const invoiceToPayment = useInvoiceToPaymentWorkflow(
+    orgId,
+    {
+      labels: {
+        postInvoice: t("accounting.invoices.invoiceActions.postDraft"),
+        postPayment: t("accounting.entities.payments.actions.postSelected"),
+      },
+      resolvePostingAccounts,
+      missingAccountsMessage: t("accounting.invoices.postMissingCogsAccounts"),
+    },
+    {
+      navigate: workflowSurface.navigate,
+    record: workflowSurface.record,
+      notify: (notice) => {
+        // The register/reconcile dialogs render their own failure inline.
+        if (notice.kind === "error" && notice.transitionId.startsWith("accounting.payment.re")) return
+        workflowSurface.notify(notice)
+      },
+    },
+  )
   const createPaymentTerm = useCreatePaymentTerm(organizationId)
   const updatePaymentTerm = useUpdatePaymentTerm(organizationId)
   const deletePaymentTerm = useDeletePaymentTerm(organizationId)
@@ -2225,18 +2251,9 @@ function AccountingClientReady({
       view: {
         ...view,
         actions: [
-          {
-            id: "pay-post",
-            label: t("accounting.entities.payments.actions.postSelected"),
-            requiresSelection: true,
-            onClick: (rows) => {
-              for (const r of rows) {
-                if (paymentStateTag(r as Record<string, unknown>) === "NotPaid") {
-                  void postAccountPayment.mutateAsync(BigInt(String((r as Record<string, unknown>).id)))
-                }
-              }
-            },
-          },
+          ...workflowActionsToEntityActions(invoiceToPayment.paymentActions, {
+            ids: { "accounting.payment.post": "pay-post" },
+          }),
           {
             id: "pay-cancel",
             label: t("accounting.entities.payments.actions.cancelSelected"),
@@ -2255,11 +2272,12 @@ function AccountingClientReady({
             id: "pay-link",
             label: t("accounting.entities.payments.actions.linkInvoices"),
             requiresSelection: true,
+            isApplicable: (rows) => rows.length === 1 && isPaymentRegistrable(rows[0] as Record<string, unknown>),
             onClick: (rows) => {
               if (rows.length !== 1) return
               const r = rows[0] as Record<string, unknown>
               if (r.id == null) return
-              if (paymentStateTag(r) !== "Paid") return
+              if (!isPaymentRegistrable(r)) return
               setRegisterPaymentError(null)
               setRegisterPaymentForId(BigInt(String(r.id)))
             },
@@ -2277,7 +2295,7 @@ function AccountingClientReady({
     }
   }, [
     t,
-    postAccountPayment,
+    invoiceToPayment.paymentActions,
     cancelAccountPayment,
     openCreateAccountPayment,
     partnerLabelMap,
@@ -2610,27 +2628,13 @@ function AccountingClientReady({
       const id = row.id as string | number | bigint
       const mt = moveTypeTag(row)
       if (isInvoiceLikeMoveType(mt)) {
-        const resolved = resolveDefaultCogsInventoryAccountIds(
-          accounts as readonly Record<string, unknown>[],
-        )
-        if (resolved == null) {
-          toast({
-            variant: "destructive",
-            title: t("accounting.invoices.invoiceActions.postDraft"),
-            description: t("accounting.invoices.postMissingCogsAccounts"),
-          })
-          return
-        }
-        postInvoice.mutate({
-          moveId: id,
-          cogsAccountId: BigInt(resolved.cogsAccountId),
-          inventoryAccountId: BigInt(resolved.inventoryAccountId),
-        })
+        // The workflow surface already reports the failure.
+        void invoiceToPayment.postInvoice.execute(String(id)).catch(() => undefined)
       } else {
         postMove.mutate(id)
       }
     },
-    [postMove, postInvoice, organizationId, accounts, toast, t],
+    [postMove, invoiceToPayment.postInvoice],
   )
 
   const handleInvoiceDownloadPdf = useCallback(async () => {
@@ -3203,7 +3207,7 @@ function AccountingClientReady({
                     onComputeInvoiceTotals={(move) =>
                       void computeInvoiceTotals.mutateAsync(move.id as string | number | bigint)
                     }
-                    postMovePending={postMove.isPending || postInvoice.isPending}
+                    postMovePending={postMove.isPending || invoiceToPayment.isPending}
                     cancelMovePending={cancelMove.isPending}
                     computeInvoiceTotalsPending={computeInvoiceTotals.isPending}
                   />
@@ -3715,7 +3719,7 @@ function AccountingClientReady({
       intercompanyRulesEntityConfig,
       intercompanyTransactionsEntityConfig,
       postMove,
-      postInvoice,
+      invoiceToPayment.postInvoice,
       cancelMove,
       computeInvoiceTotals.mutateAsync,
       refreshTaxDeadlineStatuses.mutateAsync,
@@ -3960,7 +3964,7 @@ function AccountingClientReady({
               return
             }
             try {
-              await registerPaymentOnInvoice.mutateAsync({
+              await invoiceToPayment.registerPayment({
                 paymentId: registerPaymentForId,
                 invoiceIds: ids,
                 isBill: Boolean(fd.isBill),
@@ -3970,7 +3974,7 @@ function AccountingClientReady({
               setRegisterPaymentError(e instanceof Error ? e.message : String(e))
             }
           }}
-          isPending={registerPaymentOnInvoice.isPending}
+          isPending={invoiceToPayment.isPending}
         />
       ) : null}
 
@@ -3996,7 +4000,7 @@ function AccountingClientReady({
               return
             }
             try {
-              await reconcilePaymentWithInvoice.mutateAsync({
+              await invoiceToPayment.reconcilePayment({
                 paymentMoveId,
                 invoiceMoveId,
               })
@@ -4005,7 +4009,7 @@ function AccountingClientReady({
               setReconcilePaymentError(e instanceof Error ? e.message : String(e))
             }
           }}
-          isPending={reconcilePaymentWithInvoice.isPending}
+          isPending={invoiceToPayment.isPending}
         />
       ) : null}
 
@@ -4053,7 +4057,7 @@ function AccountingClientReady({
               )
             : undefined
         }
-        postDraftPending={postMove.isPending || postInvoice.isPending}
+        postDraftPending={postMove.isPending || invoiceToPayment.isPending}
         downloadPdfPending={invoiceDocBusy === "download"}
         archivePdfPending={invoiceDocBusy === "archive"}
         sendEmailPending={invoiceDocBusy === "send"}

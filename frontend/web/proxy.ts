@@ -77,7 +77,9 @@ export function proxy(request: NextRequest) {
   //   return NextResponse.redirect(new URL('/overview', request.url))
   // }
 
-  return NextResponse.next()
+  const requestHeaders = new Headers(request.headers)
+  requestHeaders.set('x-lumiere-pathname', pathname)
+  return NextResponse.next({ request: { headers: requestHeaders } })
 }
 
 export const config = {

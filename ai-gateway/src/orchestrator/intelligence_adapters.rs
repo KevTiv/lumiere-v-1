@@ -383,6 +383,7 @@ impl ReasoningProvider for AgentLoopReasoner<'_> {
                 capability: required_str(args, "capability")?,
                 arguments: args.get("arguments").cloned().unwrap_or_else(|| json!({})),
                 rationale: optional_str(args, "rationale"),
+                poll: args.get("poll").and_then(Value::as_bool).unwrap_or(false),
             }),
             TOOL_PROPOSE_PROGRAM_PATCH => {
                 ReasoningOutcome::ProgramPatchProposal(ProgramPatchProposal {
@@ -504,6 +505,10 @@ fn reasoning_tool_specs(request: &ReasoningRequest) -> Vec<ToolSpec> {
                         "capability": {"type": "string"},
                         "arguments": {"type": "object"},
                         "rationale": {"type": "string"},
+                        "poll": {
+                            "type": "boolean",
+                            "description": "Set only for an intentional status poll. Polling remains separately attempt/time/backoff bounded and consumes the normal capability budget."
+                        },
                     },
                     "required": ["capability", "arguments"],
                     "additionalProperties": false,
@@ -935,7 +940,7 @@ mod tests {
         let mut response = base_response();
         response.tool_calls = vec![tool_call(
             TOOL_PROPOSE_CAPABILITY,
-            json!({"capability": "erp.search", "arguments": {"q": "PO-42"}}),
+            json!({"capability": "erp.search", "arguments": {"q": "PO-42"}, "poll": true}),
         )];
         let transport = ScriptedLlm::new(vec![response]);
         let reasoner = AgentLoopReasoner::new(
@@ -951,6 +956,7 @@ mod tests {
         match outcome {
             ReasoningOutcome::CapabilityProposal(proposal) => {
                 assert_eq!(proposal.capability, "erp.search");
+                assert!(proposal.poll);
             }
             other => panic!("unexpected outcome {other:?}"),
         }
@@ -958,6 +964,10 @@ mod tests {
         let sent = transport.last_request.lock().unwrap().clone().unwrap();
         // capability kind + the always-on unable-to-progress escape hatch.
         assert_eq!(sent.tools.len(), 2);
+        assert_eq!(
+            sent.tools[0].parameters["properties"]["poll"]["type"],
+            "boolean"
+        );
     }
 
     #[tokio::test]

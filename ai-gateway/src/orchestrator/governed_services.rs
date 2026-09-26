@@ -1020,6 +1020,7 @@ mod tests {
             capability: "erp.search".to_string(),
             arguments: json!({"q": "PO-42"}),
             rationale: None,
+            poll: false,
         }
     }
 

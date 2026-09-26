@@ -3300,7 +3300,10 @@ fn validate_stock_picking_impl(
                 vm.lot_id,
             )?;
         }
-        if vm.residual_stock > 1e-9 && !create_backorder && !is_inbound {
+        // Reservations belong to assigned pickings. The backorder picking is created
+        // unassigned, so its residual is re-reserved (and re-checked against stock) by
+        // `assign_stock_picking`; keeping it reserved here would double-count it.
+        if vm.residual_stock > 1e-9 && !is_inbound {
             if product_requires_stock(ctx, vm.product_id) {
                 unreserve_quantity_at_location(
                     ctx,
@@ -3467,7 +3470,6 @@ fn validate_stock_picking_impl(
                     },
                 )?;
             }
-            // Residual stays reserved from original confirm.
         }
     }
 
@@ -3558,6 +3560,9 @@ fn validate_stock_picking_impl(
             }
         }
     } else if let Some(so_id) = picking.sale_id {
+        if let Some(bo_id) = backorder_picking_id {
+            crate::sales::sales_core::link_picking_to_sale_order(ctx, so_id, bo_id);
+        }
         // Collect qty_done per sale_line_id
         let mut delivered: std::collections::HashMap<u64, f64> = std::collections::HashMap::new();
         for move_record in ctx.db.stock_move().move_by_picking().filter(&picking_id) {
@@ -3725,6 +3730,26 @@ pub fn cancel_stock_picking(
 
     if picking.state == "done" {
         return Err("Cannot cancel a completed picking".to_string());
+    }
+
+    // `assign_stock_picking` reserves each outbound move's quantity and marks the move
+    // "assigned", so only those moves hold a reservation. Release it here (as
+    // `cancel_sale_order` does) or the stock stays committed to a picking that will never ship.
+    // A move that was never assigned reserved nothing and must not release another picking's.
+    if picking.picking_code.as_deref() != Some("incoming") {
+        for move_record in ctx.db.stock_move().move_by_picking().filter(&picking_id) {
+            if move_record.state == "assigned" && product_requires_stock(ctx, move_record.product_id)
+            {
+                unreserve_quantity_at_location(
+                    ctx,
+                    organization_id,
+                    company_id,
+                    move_record.product_id,
+                    move_record.location_id,
+                    move_record.product_uom_qty,
+                )?;
+            }
+        }
     }
 
     ctx.db.stock_picking().id().update(StockPicking {
