@@ -269,7 +269,7 @@
       "contract_release_required": "no",
       "contract_note": "none for activity completion (`activities` exposes state); message post readback may need a stable message key exposed (check before implementing)",
       "prerequisites": "BASE-03 (communications correctness) must be landed.",
-      "status": "SCAFFOLDED",
+      "status": "PARTIAL — activity completion implemented, message post pending",
       "status_doc": "docs/plan/erp-cov19-activity-completion-status.md",
       "spec": "frontend/web/tests/e2e/cov19-activity-completion.spec.ts",
       "hooks": [

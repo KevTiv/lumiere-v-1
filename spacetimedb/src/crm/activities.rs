@@ -196,6 +196,7 @@ pub struct UpdateCalendarEventParams {
     index(accessor = activity_by_user, btree(columns = [user_id])),
     index(accessor = activity_by_deadline, btree(columns = [date_deadline]))
 )]
+#[derive(PartialEq)]
 pub struct Activity {
     #[primary_key]
     #[auto_inc]
@@ -388,6 +389,9 @@ pub fn complete_activity(
         return Err("Activity does not belong to this organization".to_string());
     }
     check_permission(ctx, organization_id, "activity", "write")?;
+    if activity.is_done || activity.state == "done" {
+        return Err("Activity is already done".to_string());
+    }
 
     let old_is_done = activity.is_done;
     let old_state = activity.state.clone();
