@@ -44,7 +44,10 @@ pub fn run_core_sod_test(ctx: &ReducerContext) -> Result<(), String> {
     sod_test::test_sod_update_deactivates_rule(ctx).map_err(|e| format!("sod_update: {e}"))?;
     sod_test::test_revoke_delegated_admin_scope(ctx)
         .map_err(|e| format!("delegated_revoke: {e}"))?;
-    sod_test::test_opportunity_field_write_policy(ctx).map_err(|e| format!("opp_field_write: {e}"))
+    sod_test::test_opportunity_field_write_policy(ctx)
+        .map_err(|e| format!("opp_field_write: {e}"))?;
+    sod_test::test_role_assign_revoke_rejects_replay(ctx)
+        .map_err(|e| format!("role_assign_revoke_replay: {e}"))
 }
 
 #[spacetimedb::reducer]
