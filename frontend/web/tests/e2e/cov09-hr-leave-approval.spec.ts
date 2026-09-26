@@ -16,6 +16,26 @@ const PERSONA_PASSWORD = process.env.E2E_FIRST_ORG_PERSONA_PASSWORD ?? "Password
 const APPROVER_EMAIL = "fixture.hr-project@example.test"
 
 const none = { none: [] as [] }
+
+/**
+ * Trusted setup call that posts already-SATS-encoded args unchanged (no
+ * params re-encoding), for fixtures the session compat route redacts.
+ */
+async function callOwnerRaw(reducer: string, args: unknown[]): Promise<void> {
+  const host = (process.env.E2E_STDB_HOST ?? process.env.STDB_HOST ?? "http://127.0.0.1:3000").replace(/\/$/, "")
+  const moduleName = process.env.STDB_MODULE?.trim()
+  const token = process.env.STDB_SERVER_TOKEN?.trim()
+  if (!moduleName || !token) throw new Error(`trusted fixture call ${reducer} requires STDB_MODULE and STDB_SERVER_TOKEN`)
+  const response = await fetch(`${host}/v1/database/${moduleName}/call/${reducer}`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify(args),
+  })
+  if (!response.ok) {
+    throw new Error(`trusted fixture reducer ${reducer} failed (${response.status}): ${await response.text()}`)
+  }
+}
+
 const some = <T,>(value: T) => ({ some: value })
 
 type Row = Record<string, unknown>
@@ -157,7 +177,10 @@ test.describe("COV-09 exact leave submit → approve / refuse", { tag: ["@p0", "
     const employeeId = await createEmployee(`${tag} employee`)
     // The approver's own employee record: their leave must not be self-approvable.
     const approverEmployeeId = await createEmployee(`${tag} approver`)
-    await callReducerBff(page, "update_employee", [organizationId, companyId, approverEmployeeId, {
+    // Trusted setup call: the session compat route redacts this nested
+    // Option<Identity> failure as a 500, so link the approver directly with an
+    // explicit SATS identity.
+    await callOwnerRaw("update_employee", [organizationId, companyId, approverEmployeeId, {
       name: none,
       job_title: none,
       job_id: none,
@@ -169,7 +192,7 @@ test.describe("COV-09 exact leave submit → approve / refuse", { tag: ["@p0", "
       work_location: none,
       work_contact_partner_id: none,
       employment_type: none,
-      user_id: some(approverIdentity),
+      user_id: some({ __identity__: `0x${approverIdentity}` }),
     }])
 
     const nowMicros = Date.now() * 1000
