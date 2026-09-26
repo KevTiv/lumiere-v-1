@@ -17,9 +17,8 @@ export type HrLeaveEffectProjection = {
 export function hrLeaveStateTag(state: unknown): string {
   if (typeof state === "string") return state
   if (state && typeof state === "object" && !Array.isArray(state)) {
-    const record = state as Record<string, unknown>
-    if (typeof record.tag === "string") return record.tag
-    const keys = Object.keys(record)
+    if ("tag" in state && typeof state.tag === "string") return state.tag
+    const keys = Object.keys(state)
     if (keys.length === 1) return keys[0]!.charAt(0).toUpperCase() + keys[0]!.slice(1)
   }
   return ""
