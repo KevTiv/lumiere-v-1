@@ -408,9 +408,15 @@ pub async fn post_suggest(
 
     let prompt = build_suggestion_prompt(&req);
 
-    let agent = resolve_agent(&state.stdb, req.org_id, req.agent_id, req.team_member_id)
-        .await
-        .map_err(|e| AppError::BadRequest(e.to_string()))?;
+    let agent = resolve_agent(
+        &state.stdb,
+        req.org_id,
+        req.agent_id,
+        req.team_member_id,
+        state.config.ollama_supports_tool_calling,
+    )
+    .await
+    .map_err(|e| AppError::BadRequest(e.to_string()))?;
 
     ensure_allowed_action(&agent, "form_suggest")
         .map_err(|e| AppError::Forbidden(e.to_string()))?;

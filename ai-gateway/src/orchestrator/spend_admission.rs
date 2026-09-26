@@ -1063,6 +1063,7 @@ mod tests {
             monthly_spend: 0.0,
             cost_per_1k_tokens: 0.0,
             rate_limit_per_minute: 0,
+            ollama_supports_tool_calling: false,
         }
     }
 

@@ -25,6 +25,10 @@ pub struct ResolvedAgentConfig {
     pub monthly_spend: f64,
     pub cost_per_1k_tokens: f64,
     pub rate_limit_per_minute: u32,
+    /// Process-level opt-in (`OLLAMA_SUPPORTS_TOOL_CALLING`) allowing an
+    /// Ollama-provider agent to use the tool-calling roles (Decision,
+    /// Reasoning, Review) instead of the legacy single-shot-only path.
+    pub ollama_supports_tool_calling: bool,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -42,6 +46,7 @@ pub async fn resolve_agent(
     org_id: u64,
     agent_id: Option<u64>,
     team_member_id: Option<u64>,
+    ollama_supports_tool_calling: bool,
 ) -> Result<ResolvedAgentConfig> {
     let (agent_row, persona) = if let Some(member_id) = team_member_id {
         let member = fetch_team_member(stdb, org_id, member_id).await?;
@@ -53,8 +58,9 @@ pub async fn resolve_agent(
         (fetch_default_agent(stdb, org_id).await?, None)
     };
 
-    let config = row_to_agent_config(&agent_row, persona.as_ref())?;
+    let mut config = row_to_agent_config(&agent_row, persona.as_ref())?;
     validate_provider(&config.provider)?;
+    config.ollama_supports_tool_calling = ollama_supports_tool_calling;
     Ok(config)
 }
 
@@ -344,6 +350,7 @@ fn row_to_agent_config(
         monthly_spend: row.monthly_spend,
         cost_per_1k_tokens: row.cost_per_1k_tokens,
         rate_limit_per_minute: row.rate_limit_per_minute,
+        ollama_supports_tool_calling: false,
     })
 }
 
@@ -411,6 +418,7 @@ mod tests {
             monthly_spend,
             cost_per_1k_tokens: 0.01,
             rate_limit_per_minute: rate_limit,
+            ollama_supports_tool_calling: false,
         }
     }
 
