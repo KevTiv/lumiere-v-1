@@ -1,7 +1,7 @@
 import { expect, test, type Page, type Request } from "@playwright/test"
 
 import {
-  callReducerBff,
+  callReducerOwner,
   fetchDefaultCompanyId,
   fetchSessionOrganizationId,
   gotoModule,
@@ -71,7 +71,10 @@ test.describe("COV-08b exact bank statement reconciliation", { tag: ["@p0", "@co
     if (moveLineId == null) throw new Error("seeded company move line is required")
 
     const statementName = smokeName("cov08b-statement")
-    await callReducerBff(page, "create_account_bank_statement", [
+    // Setup only: statement and line are fixture data, created with the
+    // trusted owner call (the session compat route returns a redacted 500 for
+    // these accounting fixtures). Reconciliation is driven through the UI below.
+    await callReducerOwner("create_account_bank_statement", [
       organizationId,
       companyId,
       journalId,
@@ -88,7 +91,7 @@ test.describe("COV-08b exact bank statement reconciliation", { tag: ["@p0", "@co
     const statementId = scalarQueryId(statement?.id)
     if (statementId == null) throw new Error("created bank statement not found")
 
-    await callReducerBff(page, "create_account_bank_statement_line", [
+    await callReducerOwner("create_account_bank_statement_line", [
       organizationId,
       companyId,
       statementId,
