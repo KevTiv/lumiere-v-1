@@ -5588,6 +5588,80 @@
       "postgres_access_path": "organization_index"
     },
     {
+      "table": "fleet_inspection",
+      "module": "fleet",
+      "rationale": "Reviewed child history: vehicle_id references fleet_vehicle.id.",
+      "authoritative_resources": [
+        "fleet-inspections"
+      ],
+      "durability_class": "durable_history",
+      "organization_ownership": "direct",
+      "organization_column": "organization_id",
+      "company_ownership": "direct",
+      "company_column_path": [
+        "company_id"
+      ],
+      "company_column_nullable": false,
+      "aggregate": {
+        "kind": "child",
+        "parent": {
+          "table": "fleet_vehicle",
+          "child_column": "vehicle_id",
+          "parent_column": "id"
+        }
+      },
+      "primary_key": {
+        "strategy": "auto_increment",
+        "column": "id",
+        "version_strategy": "none"
+      },
+      "projection_mode": "append-history",
+      "hot_retention": "always",
+      "cooling_eligibility": "never",
+      "cooling_eligibility_source": "reviewed:fleet/lifecycle/append-only-operational-history",
+      "dependency_behavior": "follow_parent",
+      "hydration_policy": "not_applicable",
+      "delete_behavior": "append_only",
+      "postgres_access_path": "organization_partition"
+    },
+    {
+      "table": "fleet_service_record",
+      "module": "fleet",
+      "rationale": "Reviewed child history: vehicle_id references fleet_vehicle.id.",
+      "authoritative_resources": [
+        "fleet-service-records"
+      ],
+      "durability_class": "durable_history",
+      "organization_ownership": "direct",
+      "organization_column": "organization_id",
+      "company_ownership": "direct",
+      "company_column_path": [
+        "company_id"
+      ],
+      "company_column_nullable": false,
+      "aggregate": {
+        "kind": "child",
+        "parent": {
+          "table": "fleet_vehicle",
+          "child_column": "vehicle_id",
+          "parent_column": "id"
+        }
+      },
+      "primary_key": {
+        "strategy": "auto_increment",
+        "column": "id",
+        "version_strategy": "none"
+      },
+      "projection_mode": "append-history",
+      "hot_retention": "always",
+      "cooling_eligibility": "never",
+      "cooling_eligibility_source": "reviewed:fleet/lifecycle/append-only-operational-history",
+      "dependency_behavior": "follow_parent",
+      "hydration_policy": "not_applicable",
+      "delete_behavior": "append_only",
+      "postgres_access_path": "organization_partition"
+    },
+    {
       "table": "fleet_vehicle",
       "module": "fleet",
       "rationale": "Independent organization-owned aggregate root; related rows do not determine storage routing.",
@@ -5624,7 +5698,9 @@
       "table": "fleet_vehicle_service_type",
       "module": "fleet",
       "rationale": "Independent organization-owned aggregate root; related rows do not determine storage routing.",
-      "authoritative_resources": [],
+      "authoritative_resources": [
+        "fleet-service-types"
+      ],
       "durability_class": "durable_business_record",
       "organization_ownership": "direct",
       "organization_column": "organization_id",
@@ -10965,7 +11041,9 @@
       "table": "project_timesheet_approval",
       "module": "projects",
       "rationale": "Independent organization-owned aggregate root; related rows do not determine storage routing.",
-      "authoritative_resources": [],
+      "authoritative_resources": [
+        "project-timesheet-approvals"
+      ],
       "durability_class": "durable_business_record",
       "organization_ownership": "direct",
       "organization_column": "organization_id",

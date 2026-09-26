@@ -267,7 +267,104 @@ export const purchaseRequisitionsTableConfig = (t: TFunction): EntityViewConfig 
   },
 })
 
+// ── RFQs and bids ─────────────────────────────────────────────────────────────
+export const purchaseRfqsTableConfig = (t: TFunction): EntityViewConfig => ({
+  id: "purchase-rfqs-table",
+  title: t("purchasing.rfqs.title"),
+  description: t("purchasing.rfqs.description"),
+  view: {
+    mode: "table",
+    rowKey: "id",
+    searchable: true,
+    searchPlaceholder: t("purchasing.rfqs.searchPlaceholder"),
+    searchKeys: ["name", "notes"],
+    columns: [
+      { key: "name", label: t("purchasing.rfqs.columns.name"), width: "min-w-36" },
+      { key: "state", label: t("purchasing.rfqs.columns.state"), width: "min-w-24" },
+      { key: "requisitionId", label: t("purchasing.rfqs.columns.requisitionId"), width: "min-w-28" },
+      { key: "purchaseOrderId", label: t("purchasing.rfqs.columns.purchaseOrderId"), width: "min-w-28" },
+      { key: "notes", label: t("purchasing.rfqs.columns.notes"), width: "min-w-40" },
+    ],
+    emptyMessage: t("purchasing.rfqs.emptyMessage"),
+  },
+})
+
+export const purchaseRfqBidsTableConfig = (t: TFunction): EntityViewConfig => ({
+  id: "purchase-rfq-bids-table",
+  title: t("purchasing.rfqBids.title"),
+  description: t("purchasing.rfqBids.description"),
+  view: {
+    mode: "table",
+    rowKey: "id",
+    searchable: true,
+    searchPlaceholder: t("purchasing.rfqBids.searchPlaceholder"),
+    searchKeys: ["notes"],
+    columns: [
+      { key: "rfqId", label: t("purchasing.rfqBids.columns.rfqId"), width: "min-w-20" },
+      { key: "partnerId", label: t("purchasing.rfqBids.columns.partnerId"), width: "min-w-28" },
+      { key: "priceUnit", label: t("purchasing.rfqBids.columns.priceUnit"), type: "number", align: "right" },
+      { key: "amountTotal", label: t("purchasing.rfqBids.columns.amountTotal"), type: "number", align: "right" },
+      { key: "state", label: t("purchasing.rfqBids.columns.state"), width: "min-w-24" },
+    ],
+    emptyMessage: t("purchasing.rfqBids.emptyMessage"),
+  },
+})
+
 // ── Vendors ───────────────────────────────────────────────────────────────────
+// Purchase returns
+export const purchaseReturnsTableConfig = (t: TFunction): EntityViewConfig => ({
+  id: "purchase-returns-table",
+  entityType: "purchase_return",
+  title: t("purchasing.purchaseReturns.title", { defaultValue: "Purchase returns" }),
+  description: t("purchasing.purchaseReturns.description", {
+    defaultValue: "Confirm vendor returns and create the related vendor credits.",
+  }),
+  view: {
+    mode: "table",
+    rowKey: "id",
+    searchable: true,
+    searchPlaceholder: t("purchasing.purchaseReturns.searchPlaceholder", {
+      defaultValue: "Search purchase returns",
+    }),
+    searchKeys: ["name", "returnReason"],
+    filters: [
+      {
+        key: "state",
+        label: t("purchasing.purchaseReturns.filters.state.label", { defaultValue: "State" }),
+        type: "select",
+        options: [
+          { value: "draft", label: t("purchasing.purchaseReturns.states.draft", { defaultValue: "Draft" }) },
+          { value: "confirmed", label: t("purchasing.purchaseReturns.states.confirmed", { defaultValue: "Confirmed" }) },
+          { value: "refunded", label: t("purchasing.purchaseReturns.states.refunded", { defaultValue: "Refunded" }) },
+        ],
+      },
+    ],
+    columns: [
+      { key: "name", label: t("purchasing.purchaseReturns.columns.name", { defaultValue: "Return" }), width: "min-w-32", sortable: true },
+      { key: "purchaseOrderId", label: t("purchasing.purchaseReturns.columns.purchaseOrderId", { defaultValue: "Purchase order" }), width: "min-w-28" },
+      { key: "partnerId", label: t("purchasing.purchaseReturns.columns.partnerId", { defaultValue: "Vendor" }), width: "min-w-24" },
+      {
+        key: "state",
+        label: t("purchasing.purchaseReturns.columns.state", { defaultValue: "State" }),
+        type: "badge",
+        width: "min-w-24",
+        badgeVariants: { draft: "secondary", confirmed: "default", refunded: "outline" },
+        badgeLabels: {
+          draft: t("purchasing.purchaseReturns.states.draft", { defaultValue: "Draft" }),
+          confirmed: t("purchasing.purchaseReturns.states.confirmed", { defaultValue: "Confirmed" }),
+          refunded: t("purchasing.purchaseReturns.states.refunded", { defaultValue: "Refunded" }),
+        },
+      },
+      { key: "returnReason", label: t("purchasing.purchaseReturns.columns.returnReason", { defaultValue: "Reason" }), width: "min-w-40" },
+      { key: "pickingId", label: t("purchasing.purchaseReturns.columns.pickingId", { defaultValue: "Return picking" }), width: "min-w-28" },
+      { key: "creditMoveId", label: t("purchasing.purchaseReturns.columns.creditMoveId", { defaultValue: "Vendor credit" }), width: "min-w-28" },
+      { key: "createDate", label: t("purchasing.purchaseReturns.columns.createDate", { defaultValue: "Created" }), type: "relative-date", sortable: true },
+    ],
+    emptyMessage: t("purchasing.purchaseReturns.emptyMessage", { defaultValue: "No purchase returns yet." }),
+  },
+})
+
+// ── Vendors ─────────────────────────────────────────────────────────────────────────
 export const vendorsTableConfig = (t: TFunction): EntityViewConfig => ({
   id: "vendors-table",
   title: t("purchasing.vendors.title"),
@@ -321,6 +418,9 @@ export const purchasingEntityConfigs = (t: TFunction): Record<string, EntityView
   "purchase-orders-table": purchaseOrdersTableConfig(t),
   "purchase-order-lines-table": purchaseOrderLinesTableConfig(t),
   "purchase-requisitions-table": purchaseRequisitionsTableConfig(t),
+  "purchase-rfqs-table": purchaseRfqsTableConfig(t),
+  "purchase-rfq-bids-table": purchaseRfqBidsTableConfig(t),
+  "purchase-returns-table": purchaseReturnsTableConfig(t),
   "vendors-table": vendorsTableConfig(t),
   "partner-banks-table": partnerBanksTableConfig(t),
 })

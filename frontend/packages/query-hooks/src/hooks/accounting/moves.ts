@@ -62,6 +62,7 @@ import {
   useTypedStdbQuery,
 } from "../stdb"
 import { stdbInvalidationFor } from "@lumiere/contracts/stdb-reducer-invalidation"
+import { POST_INVOICE_AFFECTS, workflowErrorFromResponse } from "@lumiere/erp-workflows"
 
 import { responseErrorMessage as parseCallError } from "@lumiere/api-client/response-error"
 export function useAccountMoves(
@@ -118,23 +119,28 @@ export function usePostAccountMove(organizationId: number) {
   })
 }
 
+export interface PostInvoiceArgs {
+  moveId: bigint | number | string
+  cogsAccountId: bigint
+  inventoryAccountId: bigint
+}
+
+/** The one `post_invoice` invocation, shared by the mutation hook and the workflow action. */
+export async function postInvoiceCommand(args: PostInvoiceArgs): Promise<void> {
+  const { urlPath, init } = stdbBffCommandPost("post_invoice", {
+    moveId: toScalarU64(args.moveId),
+    cogsAccountId: args.cogsAccountId,
+    inventoryAccountId: args.inventoryAccountId,
+  })
+  const r = await apiFetch(urlPath, init)
+  if (!r.ok) throw workflowErrorFromResponse(r.status, await r.text().catch(() => ""), "Failed to post invoice")
+}
+
 export function usePostInvoice(organizationId: number) {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async (args: {
-      moveId: bigint | number | string
-      cogsAccountId: bigint
-      inventoryAccountId: bigint
-    }) => {
-      const { urlPath, init } = stdbBffCommandPost("post_invoice", {
-        moveId: toScalarU64(args.moveId),
-        cogsAccountId: args.cogsAccountId,
-        inventoryAccountId: args.inventoryAccountId,
-      })
-      const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error(await parseCallError(r))
-    },
-    onSuccess: () => invalidateStdbQueryResources(qc, organizationId, stdbInvalidationFor("post_invoice")),
+    mutationFn: postInvoiceCommand,
+    onSuccess: () => invalidateStdbQueryResources(qc, organizationId, POST_INVOICE_AFFECTS),
   })
 }
 

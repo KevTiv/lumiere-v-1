@@ -225,7 +225,7 @@ pub struct UpdateVehiclePositionParams {
 // REDUCERS
 // ============================================================================
 
-fn require_fleet_vehicle_company(
+pub(super) fn require_fleet_vehicle_company(
     vehicle: &FleetVehicle,
     organization_id: u64,
     company_id: u64,
@@ -240,7 +240,7 @@ fn require_fleet_vehicle_company(
 }
 
 /// FLT-003: driver_id must resolve to an active hr_employee in this org/company.
-fn require_fleet_driver_in_org_and_company(
+pub(super) fn require_fleet_driver_in_org_and_company(
     ctx: &ReducerContext,
     organization_id: u64,
     company_id: u64,
@@ -266,7 +266,7 @@ fn require_fleet_driver_in_org_and_company(
 
 /// FLT-004: service_type_id must resolve to an active FleetVehicleServiceType in
 /// this org; when the type carries a company_id, it must match the vehicle's.
-fn require_fleet_service_type_in_org_and_company(
+pub(super) fn require_fleet_service_type_in_org_and_company(
     ctx: &ReducerContext,
     organization_id: u64,
     company_id: u64,

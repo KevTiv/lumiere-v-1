@@ -1,0 +1,100 @@
+{
+  "version": 1,
+  "audited_base": "7b0e141831ec98d461c7fe6a6a0b774c10c5db1f",
+  "status": "accepted-runtime-foundation",
+  "scope": "Accepted shared first-organization seed and persona foundation. Runtime provisioning, login, representative authorization denial, 22-owner health, IoT baseline, and an independent clear/reseed rerun are proven; module lifecycle certification remains separate.",
+  "authorities": [
+    {
+      "id": "dev-demo-seed",
+      "classification": "dev-only-direct-insert",
+      "path": "spacetimedb/src/seed.rs",
+      "markers": ["pub fn seed_dev_data", "require_dev_reducers_enabled()?", "ctx.db.organization().insert"],
+      "reusable_for": ["synthetic baseline records", "local module rendering", "selected stable E2E prerequisites"],
+      "limits": ["direct table insertion is not product onboarding proof", "organization-name guard is not a versioned fixture identity", "one owner and one admin role do not form the required persona set"]
+    },
+    {
+      "id": "e2e-seed-wrapper",
+      "classification": "elevated-dev-reducer-call",
+      "path": "frontend/web/scripts/e2e-seed-fixture.mjs",
+      "markers": ["dev_promote_caller_superuser", "'seed_dev_data'"],
+      "reusable_for": ["repeatable local invocation of the dev seed"],
+      "limits": ["no versioned fixture manifest", "no scoped health report", "requires dev-only elevated authority"]
+    },
+    {
+      "id": "browser-admin-bootstrap",
+      "classification": "versioned-persona-provisioner",
+      "path": "frontend/web/scripts/seed-test-user.mjs",
+      "markers": ["async function resolveTargetOrg", "process.argv.includes('--all-personas')", "async function verifyFixtureHealth"],
+      "reusable_for": ["seven named browser personas", "exact-tenant membership and role bindings", "structured seed-health readback"],
+      "limits": ["domain-specific persona grants and separation-of-duties workflows remain owned by their module packages", "default command preserves the legacy administrator-only path"]
+    },
+    {
+      "id": "pretenant-actor-helper",
+      "classification": "suite-local-persona-primitive",
+      "path": "frontend/web/tests/e2e/pretenant-support.ts",
+      "markers": ["export async function provisionActor", "callReducerBff(ownerPage, \"create_role\"", "callReducerBff(ownerPage, \"assign_role\""],
+      "reusable_for": ["synthetic least-privilege actors inside pre-tenant specs"],
+      "limits": ["not a shared named COV-02 fixture", "uses compatibility reducer setup", "created actors are scenario-local rather than seed-health asserted"]
+    },
+    {
+      "id": "phase0-fixture-spec",
+      "classification": "planned-only",
+      "path": "docs/plans/phase-0-e2e-fixture-spec.md",
+      "markers": ["## Baseline Fixture", "owner_alpha", "viewer_alpha"],
+      "reusable_for": ["fixture invariants and synthetic-data constraints"],
+      "limits": ["the named baseline and personas are not implemented as a shared fixture"]
+    },
+    {
+      "id": "first-org-fixture-manifest",
+      "classification": "versioned-executable-manifest",
+      "path": "frontend/web/fixtures/first-org-fixture.v1.json",
+      "markers": ["\"fixture_key\": \"lumiere-first-org-v1\"", "\"organization-admin\"", "\"COV-24\""],
+      "reusable_for": ["explicit organization and company identity", "seven named least-privilege personas", "22-owner seed-health readback"],
+      "limits": ["fixture setup is not operator workflow proof", "module-specific lifecycle and recovery evidence remain owned by COV-03 through COV-24"]
+    }
+  ],
+  "personas": [
+    {"key": "organization-admin", "status": "login-proven", "evidence_authorities": ["browser-admin-bootstrap", "first-org-fixture-manifest"], "gap": "Module operator transitions and recovery remain module-owned proof."},
+    {"key": "finance-accounting", "status": "login-proven", "evidence_authorities": ["pretenant-actor-helper", "first-org-fixture-manifest"], "gap": "Finance grants and independent approval allow/deny cases remain COV-08/COV-11 proof."},
+    {"key": "sales-crm", "status": "login-proven", "evidence_authorities": ["pretenant-actor-helper", "first-org-fixture-manifest"], "gap": "Sales/CRM operation grants and denial controls remain COV-03/COV-04 proof."},
+    {"key": "warehouse-manufacturing", "status": "login-proven", "evidence_authorities": ["pretenant-actor-helper", "first-org-fixture-manifest"], "gap": "Warehouse/manufacturing operation grants and cross-company denial remain COV-06/COV-07 proof."},
+    {"key": "purchasing", "status": "login-proven", "evidence_authorities": ["pretenant-actor-helper", "first-org-fixture-manifest"], "gap": "Requester versus independent approver semantics remain COV-05 proof."},
+    {"key": "hr-project", "status": "login-proven", "evidence_authorities": ["pretenant-actor-helper", "first-org-fixture-manifest"], "gap": "Sensitive-data scope and self-approval denial remain COV-09/COV-10 proof."},
+    {"key": "limited-read-only", "status": "login-proven", "evidence_authorities": ["pretenant-actor-helper", "first-org-fixture-manifest"], "gap": "Masking and revoked-access behavior remain module-owned proof."}
+  ],
+  "modules": [
+    {"id": "COV-03", "surface": "CRM", "seed_status": "partial", "evidence": [{"path": "spacetimedb/src/seed.rs", "markers": ["let contact_acme = ctx.db.contact().insert", "// ── 2.3 Opportunity Stages"]}], "gaps": ["versioned open and converted lifecycle records", "canonical effect and recovery proof"], "next_package": "COV-03"},
+    {"id": "COV-04", "surface": "Sales", "seed_status": "partial", "evidence": [{"path": "spacetimedb/src/seed.rs", "markers": ["let so1 = ctx.db.sale_order().insert"]}], "gaps": ["deterministic quotation/order/fulfillment identities", "canonical effect and recovery proof"], "next_package": "COV-04"},
+    {"id": "COV-05", "surface": "Purchasing", "seed_status": "partial", "evidence": [{"path": "spacetimedb/src/seed.rs", "markers": ["let po1 = ctx.db.purchase_order().insert"]}], "gaps": ["requester and independent approver operation proof", "deterministic requisition/RFQ/receipt/bill chain"], "next_package": "COV-05"},
+    {"id": "COV-06", "surface": "Inventory / WMS", "seed_status": "partial", "evidence": [{"path": "spacetimedb/src/seed.rs", "markers": ["let wh = ctx.db.warehouse().insert", "ctx.db.stock_picking().insert"]}], "gaps": ["stable lot/serial/count/backorder scenarios", "cross-company denial fixture"], "next_package": "COV-06"},
+    {"id": "COV-07", "surface": "Manufacturing / Quality", "seed_status": "partial", "evidence": [{"path": "spacetimedb/src/seed.rs", "markers": ["let manufacturing_order = ctx.db.mrp_production().insert"]}], "gaps": ["versioned BOM-to-finished-stock scenario", "quality and cost health assertions"], "next_package": "COV-07"},
+    {"id": "COV-08", "surface": "Accounting / Finance / Assets", "seed_status": "partial", "evidence": [{"path": "spacetimedb/src/seed.rs", "markers": ["let invoice1 = ctx.db.account_move().insert", "let tax_vat_sales = ctx.db.account_tax().insert"]}], "gaps": ["independent approval operator proof", "expected minor-unit calculations and closed-period controls"], "next_package": "COV-08"},
+    {"id": "COV-09", "surface": "HR / Payroll", "seed_status": "partial", "evidence": [{"path": "spacetimedb/src/seed.rs", "markers": ["let emp_alex = ctx.db.hr_employee().insert", "let payroll_structure = ctx.db.hr_payroll_structure().insert"]}], "gaps": ["sensitive-data reader and denied actor proof", "employee-to-pay stable scenario"], "next_package": "COV-09"},
+    {"id": "COV-10", "surface": "Projects / Tasks", "seed_status": "partial", "evidence": [{"path": "spacetimedb/src/seed.rs", "markers": ["let proj_crm = ctx.db.project_project().insert", "ctx.db.project_timesheet().insert"]}], "gaps": ["approver operation proof", "stable project-to-billing references"], "next_package": "COV-10"},
+    {"id": "COV-11", "surface": "Expenses", "seed_status": "partial", "evidence": [{"path": "spacetimedb/src/seed.rs", "markers": ["let exp_sheet = ctx.db.expense_sheet().insert"]}], "gaps": ["employee submitter and independent finance approver operation proof", "receipt and duplicate-reimbursement controls"], "next_package": "COV-11"},
+    {"id": "COV-12", "surface": "Subscriptions", "seed_status": "partial", "evidence": [{"path": "spacetimedb/src/seed.rs", "markers": ["let subscription_acme = ctx.db.subscription().insert"]}], "gaps": ["versioned billing-cycle clock inputs", "idempotency keys and expected invoice links"], "next_package": "COV-12"},
+    {"id": "COV-13", "surface": "POS", "seed_status": "partial", "evidence": [{"path": "spacetimedb/src/seed.rs", "markers": ["let pos_config_frontdesk = ctx.db.pos_config().insert", "let pos_order_demo = ctx.db.pos_order().insert"]}], "gaps": ["cashier persona", "open-session, reconnect, and duplicate-payment controls"], "next_package": "COV-13"},
+    {"id": "COV-14", "surface": "Helpdesk", "seed_status": "partial", "evidence": [{"path": "spacetimedb/src/seed.rs", "markers": ["let hd_team = ctx.db.helpdesk_team().insert", "ctx.db.helpdesk_ticket().insert"]}], "gaps": ["support operator and requester visibility proof", "SLA/reopen/notification identities"], "next_package": "COV-14"},
+    {"id": "COV-15", "surface": "Fleet", "seed_status": "partial", "evidence": [{"path": "spacetimedb/src/seed.rs", "markers": ["ctx.db.fleet_vehicle().insert"]}], "gaps": ["fleet operator lifecycle proof", "driver/service/inspection/fuel links and cross-company denial"], "next_package": "COV-15"},
+    {"id": "COV-16", "surface": "IoT", "seed_status": "partial", "evidence": [{"path": "spacetimedb/src/seed.rs", "markers": ["LUMIERE-DEMO-IOT-HUB-001", "lumiere-demo-temp-001", "alert_type: \"DeviceStale\".to_string()"]}], "gaps": ["device operator lifecycle proof", "cross-company denial and degraded dependency behavior"], "next_package": "COV-16"},
+    {"id": "COV-17", "surface": "Proposals", "seed_status": "partial", "evidence": [{"path": "spacetimedb/src/seed.rs", "markers": ["let proposal = ctx.db.proposal().insert"]}], "gaps": ["author and independent reviewer operation proof", "stable conversion references and stale review"], "next_package": "COV-17"},
+    {"id": "COV-18", "surface": "Documents / Knowledge", "seed_status": "partial", "evidence": [{"path": "spacetimedb/src/seed.rs", "markers": ["ctx.db.document().insert", "ctx.db.knowledge_article().insert"]}], "gaps": ["document owner/reviewer operation proof", "version/blob/retention lifecycle"], "next_package": "COV-18"},
+    {"id": "COV-19", "surface": "Calendar + Messages / Communications", "seed_status": "partial", "evidence": [{"path": "spacetimedb/src/seed.rs", "markers": ["ctx.db.calendar_event().insert", "let message = ctx.db.mail_message().insert"]}], "gaps": ["sender/approver/recipient operation proof", "consent, provider-status, and record-link controls"], "next_package": "COV-19"},
+    {"id": "COV-20", "surface": "Reports / Analytics", "seed_status": "partial", "evidence": [{"path": "spacetimedb/src/seed.rs", "markers": ["let report_template = ctx.db.report_template().insert", "let trial_balance_report = ctx.db.financial_report().insert"]}], "gaps": ["versioned expected totals", "source-error, partial-state, and restricted-reader proof"], "next_package": "COV-20"},
+    {"id": "COV-21", "surface": "Approvals / Workflow automation", "seed_status": "partial", "evidence": [{"path": "spacetimedb/src/seed.rs", "markers": ["let sales_workflow_id = seed_published_workflow", "start_workflow("]}], "gaps": ["requester and independent approver operation proof", "stale/replay/timer scenarios"], "next_package": "COV-21"},
+    {"id": "COV-22", "surface": "Imports / Data Ops + Forms / Templates", "seed_status": "partial", "evidence": [{"path": "spacetimedb/src/seed.rs", "markers": ["let form_config = ctx.db.form_config().insert"]}], "gaps": ["versioned import files and expected hashes", "mapping/preview/error/replay operation proof"], "next_package": "COV-22"},
+    {"id": "COV-23", "surface": "Organization / Company / Settings / Auth", "seed_status": "partial", "evidence": [{"path": "spacetimedb/src/seed.rs", "markers": ["let owner_role = ctx.db.role().insert"]}, {"path": "frontend/web/scripts/seed-test-user.mjs", "markers": ["async function resolveTargetOrg", "async function verifyFixtureHealth"]}], "gaps": ["revocation/company-switch/recovery fixture", "hidden internal settings proof"], "next_package": "COV-23"},
+    {"id": "COV-24", "surface": "Distributor workspace", "seed_status": "partial", "evidence": [{"path": "spacetimedb/src/seed.rs", "markers": ["// ── Phase 5 distributor read-only controls"]}], "gaps": ["named distributor operator lifecycle proof", "stable sale/stock/collection/exception scenario"], "next_package": "COV-24"}
+  ],
+  "runtime_evidence": {
+    "stack": {"stdb_module": "lumiere-cov02c-e2e", "postgres_database": "lumiere_cov02c_e2e", "disposable": true},
+    "health": {"fixture_key": "lumiere-first-org-v1", "persona_count": 7, "module_count": 22, "required_module_count": 22, "missing_required_modules": 0, "healthy": true},
+    "browser": {"spec": "frontend/web/tests/e2e/first-org-personas.spec.ts", "tests_passed": 13, "persona_login_tests": 7, "managed_role_denial_tests": 6},
+    "independent_rerun": {"cleared_stdb": true, "recreated_postgres": true, "healthy": true, "browser_tests_passed": 13}
+  },
+  "minimum_next_slice": {
+    "id": "COV-03",
+    "objective": "Converge the CRM opportunity lifecycle through one operator-driven transition, canonical persisted readback, exact effect identity, and representative allow/deny behavior using the accepted first-org personas.",
+    "required_controls": ["operator-transition", "canonical-readback", "exact-effect-identity", "permission-allow-deny", "browser-rerun"]
+  }
+}

@@ -1268,16 +1268,6 @@ pub fn convert_opportunity_to_sale_order(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "opportunity", "write")?;
 
-    // CRM-RI-005: idempotency — a sale order already linked to this opportunity
-    // means a prior (or concurrent) conversion already succeeded. Treat a retry
-    // as a successful no-op rather than creating a second sale order.
-    let already_converted = ctx.db.sale_order().iter().any(|so| {
-        so.organization_id == organization_id && so.opportunity_id == Some(opportunity_id)
-    });
-    if already_converted {
-        return Ok(());
-    }
-
     let opp = ctx
         .db
         .opportunity()
@@ -1288,6 +1278,31 @@ pub fn convert_opportunity_to_sale_order(
     if opp.organization_id != organization_id {
         return Err("Opportunity does not belong to this organization".to_string());
     }
+    require_single_company_crm_scope(ctx, organization_id, Some(company_id))?;
+    let opp_company_id = resolve_opportunity_company_id(&opp, company_id)?;
+
+    // CRM-RI-005: idempotency is the exact 0..1 relation for this tenant,
+    // company, and opportunity. One row is an already-applied retry; multiple
+    // rows are an invariant failure and must never be hidden by picking one.
+    let existing_orders: Vec<_> = ctx
+        .db
+        .sale_order()
+        .iter()
+        .filter(|order| {
+            order.organization_id == organization_id
+                && order.company_id == opp_company_id
+                && order.opportunity_id == Some(opportunity_id)
+        })
+        .collect();
+    match existing_orders.len() {
+        0 => {}
+        1 => return Ok(()),
+        count => {
+            return Err(format!(
+                "Invariant violation: opportunity {opportunity_id} has {count} sale orders in company {opp_company_id}"
+            ))
+        }
+    }
 
     let partner_id = opp
         .partner_id
@@ -1296,8 +1311,6 @@ pub fn convert_opportunity_to_sale_order(
     let currency_id = opp
         .company_currency_id
         .ok_or("Opportunity has no company_currency_id — set currency before converting")?;
-    require_single_company_crm_scope(ctx, organization_id, Some(company_id))?;
-    let opp_company_id = resolve_opportunity_company_id(&opp, company_id)?;
 
     // Validate the partner up front (read-only) — the customer flag is only
     // flipped once every other validation below has passed.
@@ -1485,15 +1498,28 @@ pub fn convert_opportunity_to_sale_order(
         .id()
         .find(&opportunity_id)
         .ok_or("Opportunity not found after conversion")?;
-    let sale_order = ctx
+    let sale_orders: Vec<_> = ctx
         .db
         .sale_order()
         .iter()
         .filter(|order| {
-            order.organization_id == organization_id && order.opportunity_id == Some(opportunity_id)
+            order.organization_id == organization_id
+                && order.company_id == opp_company_id
+                && order.opportunity_id == Some(opportunity_id)
         })
-        .max_by_key(|order| order.id)
-        .ok_or("Sale order not found after opportunity conversion")?;
+        .collect();
+    let sale_order = match sale_orders.len() {
+        1 => sale_orders
+            .into_iter()
+            .next()
+            .expect("checked exactly one sale order"),
+        0 => return Err("Sale order not found after opportunity conversion".to_string()),
+        count => {
+            return Err(format!(
+                "Invariant violation: opportunity {opportunity_id} produced {count} sale orders in company {opp_company_id}"
+            ))
+        }
+    };
     let mut changes = Vec::new();
     if partner_needs_customer_flag {
         let contact = ctx

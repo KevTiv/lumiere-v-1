@@ -1,0 +1,324 @@
+{
+  "version": 1,
+  "audited_base": "77f94ef5ea0bd912863acb0a7d12884ad3ad8ecb",
+  "status": "acceptance-candidate",
+  "scope": "Current-tree classification and downstream ownership; runtime repair remains with the named implementation packages.",
+  "defects": [
+    {
+      "id": "COV-D01",
+      "class": "false-success",
+      "status": "resolved",
+      "severity": "P0",
+      "launch_impact": "The shared form host now refuses to close or toast when no submit owner exists; regressions block every affected T0 form.",
+      "affected_surfaces": ["shared FormModal callers", "all form-backed T0 modules"],
+      "owner": "UX-07 + COV-01",
+      "downstream_packages": ["UX-07", "COV-01"],
+      "closure_gate": "The missing-handler guard must remain before submit, close, and success feedback.",
+      "evidence": [
+        {
+          "path": "frontend/packages/ui/src/forms/form-modal.tsx",
+          "markers": ["if (!onSubmit) return", "await onSubmit(data)", "toast.success"]
+        }
+      ]
+    },
+    {
+      "id": "COV-D02",
+      "class": "heuristic-effect-correlation",
+      "status": "open",
+      "severity": "P0",
+      "launch_impact": "AI draft persistence can attach the wrong pending draft under concurrency or replay and therefore remains launch-blocking for governed draft execution.",
+      "affected_surfaces": ["AI action drafts", "governed action approval"],
+      "owner": "GOV/CAP exact-effect owner",
+      "downstream_packages": ["COH-02", "GOV/CAP", "COV-01-adoption"],
+      "closure_gate": "Persist and read back a stable request/effect identity; never select the highest pending reducer row.",
+      "evidence": [
+        {
+          "path": "frontend/packages/query-hooks/src/hooks/ai-action-drafts.ts",
+          "markers": ["resolveLatestDraftId", ".sort((a, b) => Number(b.id) - Number(a.id))[0]"]
+        }
+      ]
+    },
+    {
+      "id": "COV-D03",
+      "class": "ambiguous-empty-read-state",
+      "status": "open",
+      "severity": "P0",
+      "launch_impact": "Authentication, company scope, and admitted module SSR reads can render denied or unavailable data as a legitimate empty state.",
+      "affected_surfaces": ["application shell", "company scope", "first-org T0 module SSR", "Fleet map"],
+      "owner": "UX shared resource-state owner + COV-26",
+      "downstream_packages": ["UX-03", "COV-23", "COV-26"],
+      "closure_gate": "Every classified caller must adopt explicit ready/empty/denied/unavailable state or document a genuinely optional degraded-safe read.",
+      "evidence": [
+        {
+          "path": "frontend/packages/api-client/src/create-client.ts",
+          "markers": ["fetchQueryListAllowEmpty", "if (!r.ok) return []"]
+        },
+        {
+          "path": "frontend/web/lib/server-query.ts",
+          "markers": ["serverFetchQueryListAllowEmpty", "catch {", "return []"]
+        }
+      ]
+    },
+    {
+      "id": "COV-D04",
+      "class": "degraded-runtime-form-dependency",
+      "status": "open",
+      "severity": "P0",
+      "launch_impact": "A runtime configuration failure can silently substitute a static form and still perform a consequential mutation.",
+      "affected_surfaces": ["ModuleView forms", "CRM", "Sales", "Purchasing", "Accounting", "Messages"],
+      "owner": "UX-07 + COV-22",
+      "downstream_packages": ["UX-07", "COV-22"],
+      "closure_gate": "Critical forms must expose dependency failure and disable submission unless an explicitly classified degraded-safe mode exists.",
+      "evidence": [
+        {
+          "path": "frontend/packages/ui/src/forms/runtime-form-modal.tsx",
+          "markers": ["config={error ? staticConfig : resolvedConfig}", "onSubmit={error ? onSubmit : handleSubmit}"]
+        }
+      ]
+    },
+    {
+      "id": "COV-D05",
+      "class": "analytics-filter-truthfulness",
+      "status": "open",
+      "severity": "P0",
+      "launch_impact": "Malformed domains and unknown operators can broaden admitted report data while presenting plausible totals.",
+      "affected_surfaces": ["Reports stored dashboards", "report query builder", "dashboard exports"],
+      "owner": "UX-08 + COV-20",
+      "downstream_packages": ["UX-08", "COV-20"],
+      "closure_gate": "Malformed definitions and unsupported operators must yield an explicit invalid-definition state, never all rows or a truthy filter.",
+      "evidence": [
+        {
+          "path": "frontend/packages/ui/src/lib/stored-dashboard-resolver.ts",
+          "markers": ["return true", "catch {", "return rows"]
+        }
+      ]
+    },
+    {
+      "id": "COV-D06",
+      "class": "analytics-completeness",
+      "status": "open",
+      "severity": "P0",
+      "launch_impact": "Rows without timestamps remain in bounded periods and missing measures become zero, allowing incomplete data to appear complete.",
+      "affected_surfaces": ["Reports stored dashboards", "KPI widgets", "chart aggregations", "dashboard exports"],
+      "owner": "UX-08 + COV-20",
+      "downstream_packages": ["UX-08", "COV-20"],
+      "closure_gate": "Each admitted metric must declare timestamp and measure completeness policy and surface rejected/incomplete rows.",
+      "evidence": [
+        {
+          "path": "frontend/packages/ui/src/lib/stored-dashboard-resolver.ts",
+          "markers": ["if (ms == null) return true", "Number(rowField(row, field) ?? 0)"]
+        }
+      ]
+    },
+    {
+      "id": "COV-D07",
+      "class": "partial-source-masking",
+      "status": "open",
+      "severity": "P0",
+      "launch_impact": "A failed dashboard source is indexed as an empty row set because the shared hook returns loading but no source error or partial-state contract.",
+      "affected_surfaces": ["Reports stored dashboards", "report query builder", "dashboard exports"],
+      "owner": "UX-08 + COV-20/COV-26",
+      "downstream_packages": ["UX-08", "COV-20", "COV-26"],
+      "closure_gate": "The renderer and exporter must receive per-source ready/empty/denied/unavailable/partial state.",
+      "evidence": [
+        {
+          "path": "frontend/web/hooks/use-stored-dashboard-data-sources.ts",
+          "markers": ["queries[index]?.data ?? []", "return { dataSources, isLoading }"]
+        }
+      ]
+    },
+    {
+      "id": "COV-D08",
+      "class": "test-only-operator-bypass",
+      "status": "open",
+      "severity": "P1",
+      "launch_impact": "Browser-named evidence can overstate operator readiness when the principal transition is performed through a reducer/BFF helper.",
+      "affected_surfaces": ["CRM", "Sales", "Purchasing", "Inventory", "Manufacturing", "Accounting", "HR/Payroll", "Projects", "Expenses", "Documents", "Helpdesk", "IoT", "Proposals", "Workflows", "Distributor"],
+      "owner": "owning COV-03..24 module + COV-27",
+      "downstream_packages": ["COV-03..24", "COV-27"],
+      "closure_gate": "COV-00D must classify each principal transition; U4/U5 requires the actual operator action while setup-only helper use stays explicitly labeled.",
+      "evidence": [
+        {
+          "path": "frontend/web/tests/e2e/hr-wave-lifecycle.spec.ts",
+          "markers": ["callReducerBff", "create_payslip"]
+        },
+        {
+          "path": "frontend/web/tests/e2e/projects-wave-lifecycle.spec.ts",
+          "markers": ["callReducerBff"]
+        },
+        {
+          "path": "frontend/web/tests/e2e/iot-lifecycle.spec.ts",
+          "markers": ["callReducerBff"]
+        },
+        {
+          "path": "frontend/web/tests/e2e/proposals-lifecycle.spec.ts",
+          "markers": ["callReducerBff"]
+        }
+      ]
+    },
+    {
+      "id": "COV-D09",
+      "class": "test-heuristic-effect-identity",
+      "status": "partially-resolved",
+      "severity": "P1",
+      "launch_impact": "CRM to Sales now rejects duplicate exact effects, but HR, P2P, accounting, manufacturing, and older certification helpers can still select newest/highest IDs.",
+      "affected_surfaces": ["HR/Payroll", "Sales", "Purchasing", "Accounting", "Manufacturing"],
+      "owner": "COV-01 + owning module test owner",
+      "downstream_packages": ["COV-01", "COV-04", "COV-05", "COV-07", "COV-08", "COV-09"],
+      "closure_gate": "Every 0..1 certification effect must use a stable relation and fail on multiple matches; latest-row helpers must be retired from certification paths.",
+      "evidence": [
+        {
+          "path": "frontend/web/tests/e2e/hr-wave-lifecycle.spec.ts",
+          "markers": [".sort((a, b) => Number(b.id) - Number(a.id))[0]?.id", "scalarQueryId(b.id)"]
+        },
+        {
+          "path": "frontend/web/tests/e2e/helpers-legacy.ts",
+          "markers": ["fetchLatestPurchaseOrderIdByPartner", "fetchLatestPurchaseOrderLineIdByOrder", "fetchLatestPaymentIdByPartner"]
+        },
+        {
+          "path": "frontend/web/tests/e2e/helpers-exact-sale-order.ts",
+          "markers": ["never hidden by selecting the newest/highest id"]
+        }
+      ]
+    },
+    {
+      "id": "COV-D10",
+      "class": "transport-success-semantic-overclaim",
+      "status": "partially-resolved",
+      "severity": "P0",
+      "launch_impact": "The CRM reference path returns exact semantic outcomes, while the remaining generated-dispatch hook baseline can still resolve void/transport success without effect disposition.",
+      "affected_surfaces": ["all consequential T0 module actions not yet migrated to the COV-01 seam"],
+      "owner": "COH-02/10 + COV-01 + owning module COV owner",
+      "downstream_packages": ["COH-02", "COH-10", "COV-01", "COV-03..24"],
+      "closure_gate": "The baseline may only decrease; each promoted consequential action must return typed rejection/waiting/replay/outcome-unknown or exact convergence semantics.",
+      "evidence": [
+        {
+          "path": "frontend/packages/query-hooks/src/hooks/crm-opportunity-conversion.ts",
+          "markers": ["executeOperationWithCanonicalReadback", "requireResolvedOperationEffect"]
+        },
+        {
+          "path": "frontend/packages/query-hooks/src/hooks/crm.ts",
+          "markers": ["stdbBffCommandPost("]
+        }
+      ]
+    },
+    {
+      "id": "COV-D11",
+      "class": "observed-convergence-semantic-overclaim",
+      "status": "resolved",
+      "severity": "P0",
+      "launch_impact": "The shared reference vocabulary now distinguishes observed convergence from authoritative applied disposition.",
+      "affected_surfaces": ["COV-01 reference operation", "future semantic-outcome adopters"],
+      "owner": "COV-01 shared outcome owner",
+      "downstream_packages": ["COV-01"],
+      "closure_gate": "Exact post-read without domain disposition remains Converged; Applied is forbidden in the shared helper.",
+      "evidence": [
+        {
+          "path": "frontend/packages/query-hooks/src/hooks/operation-effect.ts",
+          "markers": ["readonly kind: \"converged\"", "Exact post-dispatch readback yields Converged, not Applied"]
+        }
+      ]
+    }
+  ],
+  "inventories": {
+    "allow_empty_files": [
+      "frontend/packages/api-client/src/create-client.ts",
+      "frontend/packages/query-hooks/src/hooks/map.ts",
+      "frontend/packages/query-hooks/src/http.ts",
+      "frontend/web/app/(modules)/accounting/page.tsx",
+      "frontend/web/app/(modules)/ai-harness/page.tsx",
+      "frontend/web/app/(modules)/calendar/page.tsx",
+      "frontend/web/app/(modules)/crm/page.tsx",
+      "frontend/web/app/(modules)/documents/page.tsx",
+      "frontend/web/app/(modules)/expenses/page.tsx",
+      "frontend/web/app/(modules)/fleet/page.tsx",
+      "frontend/web/app/(modules)/helpdesk/page.tsx",
+      "frontend/web/app/(modules)/hr/page.tsx",
+      "frontend/web/app/(modules)/inventory/page.tsx",
+      "frontend/web/app/(modules)/iot/page.tsx",
+      "frontend/web/app/(modules)/manufacturing/page.tsx",
+      "frontend/web/app/(modules)/messages/page.tsx",
+      "frontend/web/app/(modules)/overview/page.tsx",
+      "frontend/web/app/(modules)/pos/page.tsx",
+      "frontend/web/app/(modules)/projects/page.tsx",
+      "frontend/web/app/(modules)/proposals/page.tsx",
+      "frontend/web/app/(modules)/purchasing/page.tsx",
+      "frontend/web/app/(modules)/reports/page.tsx",
+      "frontend/web/app/(modules)/sales/page.tsx",
+      "frontend/web/app/(modules)/subscriptions/page.tsx",
+      "frontend/web/app/(modules)/tasks/page.tsx",
+      "frontend/web/app/(modules)/workflows/page.tsx",
+      "frontend/web/app/layout.tsx",
+      "frontend/web/lib/company-scope-server.ts",
+      "frontend/web/lib/query-fetch.ts",
+      "frontend/web/lib/server-query.ts",
+      "frontend/web/lib/stdb-org-resolve.ts"
+    ],
+    "runtime_form_modal_files": [
+      "frontend/packages/ui/src/pages/module-view.tsx",
+      "frontend/web/app/(modules)/accounting/accounting-client.tsx",
+      "frontend/web/app/(modules)/accounting/payment-operations-panel.tsx",
+      "frontend/web/app/(modules)/crm/contact-identities-panel.tsx",
+      "frontend/web/app/(modules)/crm/crm-client.tsx",
+      "frontend/web/app/(modules)/messages/message-batches-panel.tsx",
+      "frontend/web/app/(modules)/purchasing/purchasing-client.tsx",
+      "frontend/web/app/(modules)/sales/sales-client.tsx"
+    ],
+    "operator_bypass_files": [
+      "frontend/web/tests/e2e/accounting-post-reconcile.spec.ts",
+      "frontend/web/tests/e2e/ai-human-review-provenance.spec.ts",
+      "frontend/web/tests/e2e/ai-rag-evidence-access.spec.ts",
+      "frontend/web/tests/e2e/analytics-lifecycle.spec.ts",
+      "frontend/web/tests/e2e/auth-permission-enforcement.spec.ts",
+      "frontend/web/tests/e2e/bank-statement-import.spec.ts",
+      "frontend/web/tests/e2e/crm-opportunity-stage.spec.ts",
+      "frontend/web/tests/e2e/crm-read-isolation.spec.ts",
+      "frontend/web/tests/e2e/documents-wave-a-lifecycle.spec.ts",
+      "frontend/web/tests/e2e/expenses-wave-lifecycle.spec.ts",
+      "frontend/web/tests/e2e/helpdesk-mutations.spec.ts",
+      "frontend/web/tests/e2e/helpers-legacy.ts",
+      "frontend/web/tests/e2e/hr-wave-lifecycle.spec.ts",
+      "frontend/web/tests/e2e/inventory-module.spec.ts",
+      "frontend/web/tests/e2e/iot-lifecycle.spec.ts",
+      "frontend/web/tests/e2e/iot-read-isolation.spec.ts",
+      "frontend/web/tests/e2e/manufacturing-mutations.spec.ts",
+      "frontend/web/tests/e2e/mobile-money-payments.spec.ts",
+      "frontend/web/tests/e2e/mvp-ai-rag.spec.ts",
+      "frontend/web/tests/e2e/mvp-lead-to-cash.spec.ts",
+      "frontend/web/tests/e2e/mvp-procure-to-pay.spec.ts",
+      "frontend/web/tests/e2e/o2c-certification.spec.ts",
+      "frontend/web/tests/e2e/operational-messaging.spec.ts",
+      "frontend/web/tests/e2e/parity-phase3-approvals-documents-mutations.spec.ts",
+      "frontend/web/tests/e2e/payment-fixtures.ts",
+      "frontend/web/tests/e2e/phone-first-contacts.spec.ts",
+      "frontend/web/tests/e2e/pretenant-agent-adversarial.spec.ts",
+      "frontend/web/tests/e2e/pretenant-communications-adversarial.spec.ts",
+      "frontend/web/tests/e2e/pretenant-payment-adversarial.spec.ts",
+      "frontend/web/tests/e2e/pretenant-support.ts",
+      "frontend/web/tests/e2e/projects-wave-lifecycle.spec.ts",
+      "frontend/web/tests/e2e/proposals-lifecycle.spec.ts",
+      "frontend/web/tests/e2e/purchasing-module.spec.ts",
+      "frontend/web/tests/e2e/sales-invoice-flow.spec.ts",
+      "frontend/web/tests/e2e/sales-mutations.spec.ts",
+      "frontend/web/tests/e2e/vertical-distributor.spec.ts",
+      "frontend/web/tests/e2e/workflows-gate-ui.spec.ts"
+    ],
+    "latest_function_sites": [
+      "frontend/packages/query-hooks/src/hooks/ai-action-drafts.ts::resolveLatestDraftId",
+      "frontend/packages/query-hooks/src/hooks/ai-skill-registry.ts::latestCertificationFor",
+      "frontend/packages/query-hooks/src/hooks/import-jobs.ts::findLatestImportJob",
+      "frontend/web/tests/e2e/helpers-legacy.ts::fetchLatestPaymentIdByPartner",
+      "frontend/web/tests/e2e/helpers-legacy.ts::fetchLatestPurchaseOrderIdByPartner",
+      "frontend/web/tests/e2e/helpers-legacy.ts::fetchLatestPurchaseOrderLineIdByOrder",
+      "frontend/web/tests/e2e/manufacturing-mutations.spec.ts::fetchLatestMoIdByProduct",
+      "frontend/web/tests/e2e/purchasing-module.spec.ts::fetchLatestLandedCostId",
+      "frontend/web/tests/e2e/sales-invoice-flow.spec.ts::fetchLatestSaleOrderIdByPartnerId"
+    ],
+    "semantic_dispatch_baseline": {
+      "root": "frontend/packages/query-hooks/src/hooks",
+      "token": "stdbBffCommandPost(",
+      "max_occurrences": 866,
+      "classification": "Legacy dispatch baseline owned by COV-01 and module adoption packages; count may decrease but not grow without updating the owned census."
+    }
+  }
+}

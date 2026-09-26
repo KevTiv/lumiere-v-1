@@ -1760,6 +1760,26 @@
       "idempotency": "non_idempotent",
       "semantic_kind": "operator"
     },
+    "record_fleet_inspection": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/fleet/lifecycle.rs:260 reducer body uses a tenant-scoped client request id guard; session-exposed.",
+      "idempotency": "request_guarded",
+      "semantic_kind": "operator"
+    },
+    "record_fleet_service": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/fleet/lifecycle.rs:171 reducer body uses a tenant-scoped client request id guard; session-exposed.",
+      "idempotency": "request_guarded",
+      "semantic_kind": "operator"
+    },
     "record_google_drive_sync": {
       "client_facing": false,
       "codec": {
@@ -2491,14 +2511,14 @@
       "semantic_kind": "internal"
     },
     "update_fleet_vehicle": {
-      "client_facing": false,
+      "client_facing": true,
       "codec": {
         "id": "spacetimedb-sats-json",
         "version": 1
       },
-      "evidence": "spacetimedb/src/fleet/fleet.rs:442 reducer body shows current-state or membership guard; denied.",
+      "evidence": "spacetimedb/src/fleet/fleet.rs:430 reducer body shows a tenant/company-scoped current-state guard; session-exposed.",
       "idempotency": "state_guarded",
-      "semantic_kind": "internal"
+      "semantic_kind": "command"
     },
     "update_google_drive_connection": {
       "client_facing": true,

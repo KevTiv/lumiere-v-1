@@ -73,6 +73,24 @@ export function parseStoredChatActions(metadata?: string | null): ActionDraftCha
   }
 }
 
-export function chatActionsToMetadata(actions: ActionDraftChatAction[]): string {
-  return JSON.stringify({ actions })
+export function parseStoredChatRunId(metadata?: string | null): number | undefined {
+  if (!metadata?.trim()) return undefined
+  try {
+    const parsed = JSON.parse(metadata) as { runId?: unknown }
+    return typeof parsed.runId === "number" && Number.isSafeInteger(parsed.runId) && parsed.runId > 0
+      ? parsed.runId
+      : undefined
+  } catch {
+    return undefined
+  }
+}
+
+export function chatActionsToMetadata(
+  actions: ActionDraftChatAction[],
+  runId?: number,
+): string {
+  return JSON.stringify({
+    ...(actions.length > 0 ? { actions } : {}),
+    ...(runId != null && Number.isSafeInteger(runId) && runId > 0 ? { runId } : {}),
+  })
 }

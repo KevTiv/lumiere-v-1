@@ -142,6 +142,7 @@
       "invoice_date",
       "invoice_date_due",
       "invoice_partner_display_name",
+      "sale_order_id",
       "amount_untaxed",
       "amount_tax",
       "amount_total",
@@ -1979,6 +1980,65 @@
       "company_id"
     ],
     "table": "account_asset"
+  },
+  "fleet-inspections": {
+    "aliases": [
+      "fleet-inspections",
+      "fleet_inspection"
+    ],
+    "default_restricted": [
+      "company_id",
+      "vehicle_id",
+      "inspector_id",
+      "inspected_at",
+      "outcome",
+      "odometer_km",
+      "notes"
+    ],
+    "mandatory": [
+      "id",
+      "organization_id",
+      "company_id"
+    ],
+    "table": "fleet_inspection"
+  },
+  "fleet-service-records": {
+    "aliases": [
+      "fleet-service-records",
+      "fleet_service_record"
+    ],
+    "default_restricted": [
+      "company_id",
+      "vehicle_id",
+      "service_type_id",
+      "serviced_at",
+      "odometer_km",
+      "provider",
+      "notes"
+    ],
+    "mandatory": [
+      "id",
+      "organization_id",
+      "company_id"
+    ],
+    "table": "fleet_service_record"
+  },
+  "fleet-service-types": {
+    "aliases": [
+      "fleet-service-types",
+      "fleet_vehicle_service_type"
+    ],
+    "default_restricted": [
+      "company_id",
+      "name",
+      "is_active"
+    ],
+    "mandatory": [
+      "id",
+      "organization_id",
+      "company_id"
+    ],
+    "table": "fleet_vehicle_service_type"
   },
   "fleet-vehicles": {
     "aliases": [
@@ -3979,6 +4039,29 @@
     ],
     "table": "project_milestone"
   },
+  "project-timesheet-approvals": {
+    "aliases": [
+      "project-timesheet-approvals",
+      "project_timesheet_approval"
+    ],
+    "default_restricted": [
+      "company_id",
+      "timesheet_id",
+      "actor",
+      "decision",
+      "reason",
+      "hours",
+      "sell_rate",
+      "cost_rate",
+      "currency_id",
+      "decided_at"
+    ],
+    "mandatory": [
+      "id",
+      "organization_id"
+    ],
+    "table": "project_timesheet_approval"
+  },
   "project-rate-card-lines": {
     "aliases": [
       "project-rate-card-lines",
@@ -5066,7 +5149,10 @@
       "company_id",
       "date_order",
       "opportunity_id",
-      "picking_ids"
+      "picking_ids",
+      "invoice_ids",
+      "invoice_count",
+      "invoice_status"
     ],
     "mandatory": [
       "id",
@@ -5289,6 +5375,7 @@
     "default_restricted": [
       "state",
       "product_id",
+      "product_uom_qty",
       "company_id",
       "picking_id"
     ],
@@ -5328,6 +5415,7 @@
       "sale_id",
       "picking_code",
       "is_return",
+      "backorder_id",
       "picking_type_id",
       "location_id",
       "location_dest_id"
