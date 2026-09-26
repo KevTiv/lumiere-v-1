@@ -53,10 +53,11 @@ test.describe("COV-08c exact period close", { tag: ["@p0", "@cov08", "@cov08c"] 
       name: yearName,
       date_from: timestamp(`${year}-01-01T00:00:00Z`),
       date_to: timestamp(`${year}-12-31T23:59:59Z`),
-      type_: "normal",
+      // SATS field name is `type` (the Rust `type_` field is exposed as `type`).
+      type: "normal",
       is_adjustment: false,
-      notes: null,
-      metadata: null,
+      notes: { none: [] },
+      metadata: { none: [] },
     }])
     const fiscalYear = (await rows(page, "fiscal-years")).find((row) => row.name === yearName)
     const fiscalYearId = scalarQueryId(fiscalYear?.id)
@@ -70,8 +71,8 @@ test.describe("COV-08c exact period close", { tag: ["@p0", "@cov08", "@cov08c"] 
       date_to: timestamp(`${year}-01-31T23:59:59Z`),
       fiscal_year_id: fiscalYearId,
       is_adjustment: false,
-      notes: null,
-      metadata: null,
+      notes: { none: [] },
+      metadata: { none: [] },
     }])
     const period = (await rows(page, "account-periods")).find((row) => row.name === periodName)
     const periodId = scalarQueryId(period?.id)
