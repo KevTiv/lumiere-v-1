@@ -216,7 +216,7 @@
   "web/app/(modules)/projects/advanced-psa-panel.tsx": 1,
   "web/app/(modules)/projects/projects-client.tsx": 54,
   "web/app/(modules)/projects/projects-panels.tsx": 13,
-  "web/app/(modules)/proposals/proposals-client.tsx": 8,
+  "web/app/(modules)/proposals/proposals-client.tsx": 7,
   "web/app/(modules)/purchasing/purchasing-blanket-workspace.tsx": 3,
   "web/app/(modules)/purchasing/purchasing-client.tsx": 67,
   "web/app/(modules)/purchasing/purchasing-ops-sod.tsx": 4,

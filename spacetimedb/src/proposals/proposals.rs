@@ -135,7 +135,7 @@ impl BidDecisionKind {
 // TABLES
 // ============================================================================
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 #[spacetimedb::table(
     accessor = proposal,
     public,
@@ -910,6 +910,12 @@ pub fn approve_proposal(
     let proposal = load_proposal_scoped(ctx, organization_id, company_id, proposal_id)?;
     if proposal.status != ProposalStatus::Submitted {
         return Err("Only Submitted proposals can be approved for award".to_string());
+    }
+    if proposal.award_approved_at.is_some() {
+        return Err("Proposal is already approved for award".to_string());
+    }
+    if proposal.create_uid == ctx.sender() {
+        return Err("cannot approve your own proposal for award".to_string());
     }
 
     ctx.db.proposal().id().update(Proposal {

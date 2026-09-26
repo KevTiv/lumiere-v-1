@@ -1042,6 +1042,10 @@
       "name": "create_company",
       "shape_fingerprint": "sha256:a9a101463d6e7448c868a305af8b1d0a089587b56a544faab2d220b4c766af89"
     },
+    "erp.create_company_stock_location": {
+      "name": "create_company_stock_location",
+      "shape_fingerprint": "sha256:c167c6425edad0580bde2dab0b16cb0c6b771c55304d8570f1f36c8f0ab284ac"
+    },
     "erp.create_consignment_agreement": {
       "name": "create_consignment_agreement",
       "shape_fingerprint": "sha256:7a51f82740d6254a74e660394b1a7de33e1a780835fe4269b77564065100ca92"
@@ -5707,6 +5711,14 @@
       "current_operations_fingerprint": "sha256:ae7fb54898246581a44cff3fabb66a5a6076881938cdaebfeab370e2c10185b2",
       "operation_count": 1399,
       "reason": "add typed workflow provenance staging (begin_ai_workflow_generation, stage_ai_workflow_node_provenance) and its in-database test reducer on top of released v0.3.52 while preserving the Fleet lifecycle operation set"
+    },
+    {
+      "previous_release": "v0.3.54",
+      "previous_ir_sha256": "sha256:ebbbf4eee47309cb7e2a1dbdb5d7fbc50554e374d33211924d5ecb4ba3b6508a",
+      "previous_operations_fingerprint": "sha256:ae7fb54898246581a44cff3fabb66a5a6076881938cdaebfeab370e2c10185b2",
+      "current_operations_fingerprint": "sha256:595eff9c71f29eef47776c4d270d534e2ce6494b7f82f522456182ccf94216e4",
+      "operation_count": 1400,
+      "reason": "add company-scoped create_company_stock_location on top of released v0.3.54 so company-bound users can create locations they can read; every existing operation shape is unchanged"
     }
   ]
 }

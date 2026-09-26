@@ -255,6 +255,7 @@
     "create_budget_post": "erp.create_budget_post",
     "create_calendar_event": "erp.create_calendar_event",
     "create_company": "erp.create_company",
+    "create_company_stock_location": "erp.create_company_stock_location",
     "create_consignment_agreement": "erp.create_consignment_agreement",
     "create_consolidation_account": "erp.create_consolidation_account",
     "create_consolidation_journal": "erp.create_consolidation_journal",
