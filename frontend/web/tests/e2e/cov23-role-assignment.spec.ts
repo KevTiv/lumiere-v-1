@@ -54,20 +54,13 @@ async function roleAssignments(page: Page, organizationId: number, roleId: numbe
     .sort((a, b) => (a.id ?? 0) - (b.id ?? 0))
 }
 
-async function toggleRoleInSettings(
-  page: Page,
-  targetIdentity: string,
-  roleId: number,
-  reducer: string,
-): Promise<Response> {
+async function toggleRoleInSettings(page: Page, roleId: number, reducer: string): Promise<Response> {
   await gotoModule(page, "/settings")
   await page.getByTestId("settings-section-users").click()
   // The users list is capped (limit=100) and other specs add users; search on
-  // the server for the target persona so its row is always loaded. Fixture
-  // personas' organization profiles carry no email, so match on identity.
-  await page.getByTestId("settings-users-search").fill(targetIdentity)
-  const row = page.locator(`[data-user-id="${targetIdentity}"]`)
-  const actions = row.locator('[data-testid^="settings-user-actions-"]')
+  // the server for the target persona so its row is always loaded.
+  await page.getByTestId("settings-users-search").fill(TARGET_EMAIL)
+  const actions = page.getByTestId(`settings-user-actions-${TARGET_EMAIL}`)
   await expect(actions).toBeVisible({ timeout: 30_000 })
   await actions.click()
   await page.getByTestId("settings-user-edit").click()
@@ -122,7 +115,7 @@ test.describe("COV-23 exact role assignment", { tag: ["@p0", "@cov23"] }, () => 
     expect(await roleAssignments(page, organizationId, roleId)).toEqual([])
 
     // Assign through Settings → Users → Edit → role checkbox → Save.
-    const assigned = await toggleRoleInSettings(page, targetIdentity, roleId, "assign_role")
+    const assigned = await toggleRoleInSettings(page, roleId, "assign_role")
     await expect.poll(() => roleAssignments(page, organizationId, roleId), { timeout: 30_000 }).toHaveLength(1)
     const [active] = await roleAssignments(page, organizationId, roleId)
     expect(active).toMatchObject({ identity: targetIdentity, isActive: true })
@@ -133,7 +126,7 @@ test.describe("COV-23 exact role assignment", { tag: ["@p0", "@cov23"] }, () => 
     expect(await roleAssignments(page, organizationId, roleId)).toEqual([active])
 
     // Revoke through the same dialog by clearing the checkbox.
-    const revoked = await toggleRoleInSettings(page, targetIdentity, roleId, "revoke_role")
+    const revoked = await toggleRoleInSettings(page, roleId, "revoke_role")
     const effect = [{ id: assignmentId, identity: targetIdentity, isActive: false }]
     await expect.poll(() => roleAssignments(page, organizationId, roleId), { timeout: 30_000 }).toEqual(effect)
 
