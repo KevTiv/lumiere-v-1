@@ -421,6 +421,7 @@ mod generated_registry_tests {
             monthly_spend: 0.0,
             cost_per_1k_tokens: 0.0,
             rate_limit_per_minute: 1,
+            ollama_supports_tool_calling: false,
         }
     }
 
@@ -491,6 +492,7 @@ mod generated_registry_tests {
             ollama_embed_model: "test".into(),
             ollama_vision_model: "test".into(),
             ollama_llm_model: "test".into(),
+            ollama_supports_tool_calling: false,
             mistral_api_key: None,
             google_api_key: None,
             gemini_embed_model: "test".into(),

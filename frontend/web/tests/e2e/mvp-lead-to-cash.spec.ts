@@ -471,10 +471,9 @@ test.describe("MVP lead-to-cash workflow", { tag: "@p0" }, () => {
     await page.getByTestId("entity-action-confirm-orders").click()
     const response = await confirmResponse
     expect(response.ok()).toBe(false)
-    await expect(page.locator("[data-sonner-toast]")).toContainText(
-      /insufficient|available quantity|stock/i,
-      { timeout: 10_000 },
-    )
+    await expect(
+      page.locator("[data-sonner-toast]").filter({ hasText: /insufficient|available quantity|stock/i }),
+    ).toBeVisible({ timeout: 10_000 })
 
     await page.reload({ waitUntil: "domcontentloaded" })
     await expect

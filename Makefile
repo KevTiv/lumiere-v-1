@@ -31,6 +31,10 @@ E2E_SUITE          ?= full
 E2E_SPEC           ?= mvp-lead-to-cash.spec.ts
 E2E_GREP           ?=
 E2E_ONLY_SPEC      ?=
+# Space-separated spec paths relative to frontend/web; used by E2E_SUITE=targeted.
+E2E_SPEC_FILES     ?=
+# Playwright shard for e2e-smoke, e.g. 2/3 (CI splits the p0/full suites across runners).
+E2E_SHARD          ?=
 E2E_WORKERS        ?= 1
 # Some interactive shells in Cursor can inherit a literal "$$PATH"; use a known-good command path for E2E orchestration.
 E2E_PATH           ?= /Users/kevintivert/.nvm/versions/node/v21.7.0/bin:/Users/kevintivert/.cargo/bin:/Users/kevintivert/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin
@@ -544,8 +548,14 @@ e2e-smoke-test:
 		echo "[e2e] Running Playwright ($${E2E_SUITE:-full} suite, workers=$$E2E_WORKERS)..."; \
 		pnpm exec playwright install chromium; \
 		PW_ARGS=(--workers "$$E2E_WORKERS"); \
-		if [ "$${E2E_SUITE:-full}" = "p0" ]; then PW_ARGS+=(--grep @p0 --grep-invert @dev-fixture); fi; \
-		if [ "$${E2E_SUITE:-full}" = "pretenant" ]; then PW_ARGS+=(--grep @pretenant); fi; \
+		if [ "$${E2E_SUITE:-full}" = "p0" ]; then \
+			PW_ARGS+=(--grep @p0); \
+			if [ "$${E2E_REQUIRE_AI:-0}" = "1" ]; then PW_ARGS+=(--grep-invert @dev-fixture); else PW_ARGS+=(--grep-invert "@dev-fixture|@ai-live"); fi; \
+		elif [ "$${E2E_SUITE:-full}" = "pretenant" ]; then \
+			PW_ARGS+=(--grep @pretenant); \
+		elif [ "$${E2E_REQUIRE_AI:-0}" != "1" ]; then \
+			PW_ARGS+=(--grep-invert @ai-live); \
+		fi; \
 		PORT="" \
 		PLAYWRIGHT_PORT="$(E2E_WEB_PORT)" \
 		PLAYWRIGHT_BASE_URL="http://127.0.0.1:$(E2E_WEB_PORT)" \
@@ -771,7 +781,7 @@ e2e-playwright-only:
 	'
 
 e2e-smoke:
-	@env PATH="$(E2E_PATH):$$PATH" E2E_SUITE="$(E2E_SUITE)" E2E_WORKERS="$(E2E_WORKERS)" /bin/bash -c 'set -euo pipefail; \
+	@env PATH="$(E2E_PATH):$$PATH" E2E_SUITE="$(E2E_SUITE)" E2E_WORKERS="$(E2E_WORKERS)" E2E_SPEC_FILES="$(E2E_SPEC_FILES)" E2E_SHARD="$(E2E_SHARD)" /bin/bash -c 'set -euo pipefail; \
 		ROOT="$$(pwd)"; \
 		LOG_DIR="$$ROOT/.tmp/e2e"; \
 		mkdir -p "$$LOG_DIR"; \
@@ -929,8 +939,21 @@ e2e-smoke:
 		echo "[e2e] Running Playwright ($${E2E_SUITE:-full} suite, workers=$$E2E_WORKERS)..."; \
 		pnpm exec playwright install chromium; \
 		PW_ARGS=(--workers "$$E2E_WORKERS"); \
-		if [ "$${E2E_SUITE:-full}" = "p0" ]; then PW_ARGS+=(--grep @p0 --grep-invert @dev-fixture); fi; \
-		if [ "$${E2E_SUITE:-full}" = "pretenant" ]; then PW_ARGS+=(--grep @pretenant); fi; \
+		if [ "$${E2E_SUITE:-full}" = "p0" ]; then \
+			PW_ARGS+=(--grep @p0); \
+			if [ "$${E2E_REQUIRE_AI:-0}" = "1" ]; then PW_ARGS+=(--grep-invert @dev-fixture); else PW_ARGS+=(--grep-invert "@dev-fixture|@ai-live"); fi; \
+		elif [ "$${E2E_SUITE:-full}" = "pretenant" ]; then \
+			PW_ARGS+=(--grep @pretenant); \
+		elif [ "$${E2E_SUITE:-full}" = "targeted" ]; then \
+			read -r -a SPEC_FILES <<< "$${E2E_SPEC_FILES:-}"; \
+			if [ "$${#SPEC_FILES[@]}" -eq 0 ]; then echo "[e2e] E2E_SUITE=targeted requires E2E_SPEC_FILES" >&2; exit 1; fi; \
+			echo "[e2e] Targeted specs: $${SPEC_FILES[*]}"; \
+			if [ "$${E2E_REQUIRE_AI:-0}" = "1" ]; then PW_ARGS+=(--grep-invert @dev-fixture); else PW_ARGS+=(--grep-invert "@dev-fixture|@ai-live"); fi; \
+			PW_ARGS+=("$${SPEC_FILES[@]}"); \
+		elif [ "$${E2E_REQUIRE_AI:-0}" != "1" ]; then \
+			PW_ARGS+=(--grep-invert @ai-live); \
+		fi; \
+		if [ -n "$${E2E_SHARD:-}" ]; then echo "[e2e] Shard $$E2E_SHARD"; PW_ARGS+=(--shard "$$E2E_SHARD"); fi; \
 		PORT="" \
 		PLAYWRIGHT_PORT="$(E2E_WEB_PORT)" \
 		PLAYWRIGHT_BASE_URL="http://127.0.0.1:$(E2E_WEB_PORT)" \

@@ -2,7 +2,7 @@ import { expect, test, type Page } from "@playwright/test"
 
 import {
   callReducerBff,
-  callReducerOwner,
+  callReducerBffResult,
   fetchDefaultCompanyId,
   fetchSessionOrganizationId,
   scalarQueryId,
@@ -84,24 +84,35 @@ test.describe("IoT HTTP company isolation", { tag: "@p0" }, () => {
 
     const defaultSerial = `${suffix}-default-hub`
     const branchSerial = `${suffix}-branch-hub`
-    for (const [companyId, serial] of [
-      [defaultCompanyId, defaultSerial],
-      [branchCompanyId, branchSerial],
-    ] as const) {
-      const callReducer = companyId === defaultCompanyId ? callReducerBff.bind(null, page) : callReducerOwner
-      await callReducer("register_iot_hub", [
-        organizationId,
-        companyId,
-        {
-          name: serial,
-          serial,
-          ip_address: some("192.0.2.10"),
-          firmware_version: some("1.0.0"),
-          metadata: none,
-        },
-      ])
-      await callReducer("generate_hub_pairing_token", [organizationId, companyId])
-    }
+    await callReducerBff(page, "register_iot_hub", [
+      organizationId,
+      defaultCompanyId,
+      {
+        name: defaultSerial,
+        serial: defaultSerial,
+        ip_address: some("192.0.2.10"),
+        firmware_version: some("1.0.0"),
+        metadata: none,
+      },
+    ])
+    await callReducerBff(page, "generate_hub_pairing_token", [organizationId, defaultCompanyId])
+
+    // Creating a sibling company does not silently expand the signed-in
+    // principal's company scope. Exercise the trusted BFF boundary instead of
+    // using that principal to manufacture a cross-company fixture.
+    const forgedBranchWrite = await callReducerBffResult(page, "register_iot_hub", [
+      organizationId,
+      branchCompanyId,
+      {
+        name: branchSerial,
+        serial: branchSerial,
+        ip_address: some("192.0.2.11"),
+        firmware_version: some("1.0.0"),
+        metadata: none,
+      },
+    ])
+    expect(forgedBranchWrite.status).toBe(403)
+    expect(forgedBranchWrite.error ?? "").toMatch(/company scope mismatch/i)
 
     const defaultHub = await waitForRow(
       page,
@@ -113,7 +124,6 @@ test.describe("IoT HTTP company isolation", { tag: "@p0" }, () => {
     if (defaultHubId == null) throw new Error("default IoT hub has no id")
 
     const scopedHubs = await queryRows(page, "iot-hubs", defaultCompanyId)
-    expect(scopedHubs.some((row) => row.serial === branchSerial)).toBe(false)
     expect(scopedHubs.every((row) => rowCompanyId(row) === defaultCompanyId)).toBe(true)
 
     const scopedTokens = await queryRows(page, "iot-pairing-tokens", defaultCompanyId)
