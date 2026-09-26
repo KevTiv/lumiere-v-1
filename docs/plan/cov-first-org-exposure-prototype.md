@@ -1,7 +1,8 @@
 # COV first-organization exposure prototype
 
-**Status:** DESIGN PROTOTYPE for COV-00B  
-**Current canonical presentation owner:** `frontend/packages/ui/src/lib/navigation-catalog.ts`
+**Status:** IMPLEMENTED COV-00B denominator; all unaccepted surfaces remain REVIEW/hidden
+**Canonical product admission owner:** `frontend/packages/ui/src/lib/product-surface-catalog.ts`
+**Canonical presentation owner:** `frontend/packages/ui/src/lib/navigation-catalog.ts`
 
 ## 1. Current state
 
@@ -37,11 +38,11 @@ navigation presentation
 
 Hiding a route never grants or revokes backend permission.
 
-## 3. Proposed single product-surface authority
+## 3. Single product-surface authority
 
-Add one checked-in product-surface admission catalog keyed by a stable surface ID, then make navigation and route admission consume it.
+The checked-in product-surface admission catalog is keyed by stable surface ID. Navigation and configured first-org route admission consume it. Sidebar and command-palette labels/icons/grouping remain in the navigation catalog; they reference, rather than duplicate, the product-surface decision.
 
-Illustrative type:
+Implemented metadata includes:
 
 ```ts
 type ProductSurfaceClass =
@@ -65,6 +66,8 @@ interface ProductSurfaceDefinition {
   covOwner?: string
 }
 ```
+
+The first-org profile is activated only for the organization ID explicitly configured in server-side `LUMIERE_FIRST_TEST_ORGANIZATION_ID`. There is no "first row" or organization-ID heuristic. If the variable is absent, ordinary product navigation is unchanged; an invalid configured value is rejected. When it matches the current session organization, REVIEW/hidden routes and quick actions are omitted and direct module-route access redirects to the containment page.
 
 Do not create a second independent navigation hierarchy. The existing navigation catalog should reference the stable `surfaceId` and derive admission metadata from this authority.
 
@@ -110,7 +113,7 @@ no duplicate href or surface id
 
 A route may exist in source while hidden for the first organization. That is containment, not U5 completion; the COV backlog remains.
 
-## 6. Initial decisions that need coordinator/product confirmation
+## 6. Current decisions and explicit review entries
 
 The audit can classify obvious concern families without deciding every product exposure:
 
@@ -118,7 +121,10 @@ The audit can classify obvious concern families without deciding every product e
 - `forensics`: INTRO/admin concern, not ordinary T0 module;
 - `trackers`: requires explicit product ownership before first-org exposure;
 - `settings`: administrative, needs administrator certification rather than business-module U5;
-- `/map`: currently owns Fleet/field-asset operations; coordinator must decide whether this is the canonical Fleet product workspace or whether Fleet remains hidden until a dedicated workspace is admitted.
+- `/fleet` is the canonical COV-15 Fleet workspace. It now owns the broader vehicle, driver, service and inspection lifecycle.
+- `/map` is a mixed geospatial showcase (Fleet position, warehouse and POS pins), is hidden from the first-org profile, and must receive a separate product owner before admission. It is not a second Fleet workspace authority.
+
+No business/horizontal module in this catalog is relabelled U5 by COV-00B. Current COV routes remain `REVIEW` and fail closed for the configured first organization until their owning COV acceptance revision promotes them. `trackers` and `notebook` retain explicit `BLOCKED: product owner required` ownership rather than an invented policy.
 
 Do not let an implementation worker make those product decisions implicitly by adding/removing a sidebar link.
 

@@ -69,8 +69,8 @@ use crate::inventory::tracking::{
     StockProductionLot,
 };
 use crate::inventory::warehouse::{
-    create_stock_location, stock_location, update_warehouse, warehouse, CreateStockLocationParams,
-    UpdateWarehouseParams,
+    create_company_stock_location, create_stock_location, stock_location, update_warehouse,
+    warehouse, CreateStockLocationParams, UpdateWarehouseParams,
 };
 use crate::inventory::warehouse_operations::{
     cartonization_result, complete_picking_wave, create_packaging_material, create_picking_wave,
@@ -4701,6 +4701,116 @@ pub fn test_adjustment_requires_valid_reason_id(ctx: &ReducerContext) -> Result<
     );
     if result.is_ok() {
         return Err("expected Err when reason_id does not exist, got Ok".to_string());
+    }
+    Ok(())
+}
+
+fn internal_location_params(name: &str, parent: Option<u64>) -> CreateStockLocationParams {
+    CreateStockLocationParams {
+        name: name.to_string(),
+        usage: "internal".to_string(),
+        location_category: "internal".to_string(),
+        parent_path: "/".to_string(),
+        child_left: 0,
+        child_right: 0,
+        scrap_location: false,
+        return_location: false,
+        active: true,
+        posx: 0.0,
+        posy: 0.0,
+        posz: 0.0,
+        cyclic_inventory_frequency: 0,
+        location_id: parent,
+        complete_name: Some(name.to_string()),
+        valuation_in_account_id: None,
+        valuation_out_account_id: None,
+        comment: None,
+        barcode: None,
+        last_inventory_date: None,
+        next_inventory_date: None,
+        metadata: Some(r#"{"test":"company-stock-location"}"#.to_string()),
+    }
+}
+
+/// `create_company_stock_location` stores the company (so company-bound users
+/// can see the location) and rejects a foreign company or a parent location
+/// from another organization or company. `create_stock_location` still
+/// creates an organization-shared location.
+pub fn test_company_stock_location_scope(ctx: &ReducerContext) -> Result<(), String> {
+    ensure_test_superuser(ctx)?;
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let other = OrgFixture::seed_minimal(ctx)?;
+    let org_id = fixture.organization_id;
+    let find = |name: &str| {
+        ctx.db
+            .stock_location()
+            .iter()
+            .find(|l| l.organization_id == org_id && l.name == name)
+    };
+
+    create_company_stock_location(
+        ctx,
+        org_id,
+        fixture.company_id,
+        internal_location_params("Company Bin", None),
+    )?;
+    let owned = find("Company Bin").ok_or("company location missing")?;
+    if owned.company_id != Some(fixture.company_id) {
+        return Err(format!(
+            "company location stored company_id {:?}, expected {}",
+            owned.company_id, fixture.company_id
+        ));
+    }
+
+    create_company_stock_location(
+        ctx,
+        org_id,
+        fixture.company_id,
+        internal_location_params("Company Child Bin", Some(owned.id)),
+    )?;
+    let child = find("Company Child Bin").ok_or("company child location missing")?;
+    if child.company_id != Some(fixture.company_id) || child.location_id != Some(owned.id) {
+        return Err("company child location lost its company or parent".into());
+    }
+
+    if create_company_stock_location(
+        ctx,
+        org_id,
+        other.company_id,
+        internal_location_params("Foreign Company Bin", None),
+    )
+    .is_ok()
+    {
+        return Err("a company from another organization must be rejected".into());
+    }
+    let foreign_parent = ctx
+        .db
+        .stock_location()
+        .iter()
+        .find(|l| l.organization_id == other.organization_id)
+        .map(|l| l.id)
+        .ok_or("other organization has no location")?;
+    if create_company_stock_location(
+        ctx,
+        org_id,
+        fixture.company_id,
+        internal_location_params("Cross Org Child", Some(foreign_parent)),
+    )
+    .is_ok()
+    {
+        return Err("a parent location from another organization must be rejected".into());
+    }
+    if find("Foreign Company Bin").is_some() || find("Cross Org Child").is_some() {
+        return Err("a rejected company location was inserted".into());
+    }
+
+    create_stock_location(ctx, org_id, internal_location_params("Shared Bin", None))?;
+    if find("Shared Bin")
+        .ok_or("shared location missing")?
+        .company_id
+        .is_some()
+    {
+        return Err("create_stock_location must keep creating shared locations".into());
     }
     Ok(())
 }

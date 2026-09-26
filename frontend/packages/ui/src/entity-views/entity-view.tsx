@@ -32,8 +32,9 @@ interface EntityViewProps {
   boardFilterItem?: (row: Record<string, unknown>) => boolean
   /** Show skeleton rows in table view while subscription data is loading. */
   isLoading?: boolean
-  /** Applied to table view filters on mount (e.g. URL drill-down from charts). */
+  /** Current URL or parent-owned filters, applied as transient overlays. */
   initialFilters?: Record<string, string>
+  onInitialFilterClear?: (key: string) => void
 }
 
 export function useEntitySurfaceFilter<T extends EntityPermissioned>(
@@ -129,6 +130,7 @@ export function EntityView({
   boardFilterItem,
   isLoading,
   initialFilters,
+  onInitialFilterClear,
 }: EntityViewProps) {
   const hybrid =
     config.view.mode === "table-or-board" ? (config.view as EntityTableBoardViewConfig) : null
@@ -191,6 +193,7 @@ export function EntityView({
               onRowClick={onRowClick}
               isLoading={isLoading}
               initialFilters={initialFilters}
+              onInitialFilterClear={onInitialFilterClear}
             />
           ) : boardColumns.length && onBoardMove ? (
             <EntityBoardView
@@ -219,6 +222,7 @@ export function EntityView({
           onRowClick={onRowClick}
           isLoading={isLoading}
           initialFilters={initialFilters}
+          onInitialFilterClear={onInitialFilterClear}
         />
       )
     }

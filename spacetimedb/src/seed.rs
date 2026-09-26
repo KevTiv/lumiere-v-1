@@ -70,6 +70,11 @@ use crate::inventory::tracking::{
 };
 use crate::inventory::warehouse::{stock_location, warehouse, StockLocation, Warehouse};
 
+// ── IoT ──────────────────────────────────────────────────────────────────────
+use crate::iot::alerts::{iot_alert, IoTAlert};
+use crate::iot::registry::{iot_device, iot_hub, IoTDevice, IoTHub};
+use crate::iot::telemetry::{iot_telemetry, IoTTelemetry};
+
 // ── Sales ─────────────────────────────────────────────────────────────────────
 use crate::hr::country_pack_hr::seed_hr_country_pack_leave_catalog_for_organization;
 use crate::sales::pos_config::{
@@ -2333,7 +2338,77 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
         ..wh
     });
 
-    // ── 3.5 Stock Quants (on-hand) ────────────────────────────────────────────
+    // ── 3.5 IoT baseline ─────────────────────────────────────────────────────
+    // One offline warehouse gateway, temperature sensor, historical reading,
+    // and unresolved stale-device alert give the IoT workspace an owned,
+    // tenant-scoped first-organization baseline without impersonating a live
+    // physical gateway.
+    let iot_hub = ctx.db.iot_hub().insert(IoTHub {
+        id: 0,
+        organization_id: org_id,
+        company_id,
+        name: "Main Warehouse IoT Gateway".to_string(),
+        serial: "LUMIERE-DEMO-IOT-HUB-001".to_string(),
+        credential_hash: None,
+        ip_address: None,
+        firmware_version: Some("fixture-1.0.0".to_string()),
+        status: "Offline".to_string(),
+        last_heartbeat: None,
+        connectivity_quality: None,
+        create_uid: seeder,
+        create_date: ctx.timestamp,
+        write_uid: seeder,
+        write_date: ctx.timestamp,
+        metadata: Some("{\"seed\":true,\"fixture\":\"lumiere-first-org-v1\"}".to_string()),
+    });
+    let iot_device = ctx.db.iot_device().insert(IoTDevice {
+        id: 0,
+        hub_id: iot_hub.id,
+        organization_id: org_id,
+        company_id,
+        name: "Warehouse Temperature Sensor".to_string(),
+        device_type: "Sensor".to_string(),
+        identifier: "lumiere-demo-temp-001".to_string(),
+        status: "Offline".to_string(),
+        capabilities: vec!["temperature".to_string()],
+        last_seen: None,
+        workcenter_id: None,
+        stock_location_id: Some(loc_stock.id),
+        pos_config_id: None,
+        quality_check_id: None,
+        create_uid: seeder,
+        create_date: ctx.timestamp,
+        write_uid: seeder,
+        write_date: ctx.timestamp,
+        metadata: Some("{\"seed\":true,\"fixture\":\"lumiere-first-org-v1\"}".to_string()),
+    });
+    ctx.db.iot_telemetry().insert(IoTTelemetry {
+        id: 0,
+        device_id: iot_device.id,
+        organization_id: org_id,
+        company_id,
+        sensor_type: "temperature".to_string(),
+        value: 22.5,
+        raw_value: None,
+        unit: "Celsius".to_string(),
+        quality: "good".to_string(),
+        recorded_at: ctx.timestamp - std::time::Duration::from_secs(2 * 3600),
+    });
+    ctx.db.iot_alert().insert(IoTAlert {
+        id: 0,
+        device_id: iot_device.id,
+        organization_id: org_id,
+        company_id,
+        alert_type: "DeviceStale".to_string(),
+        severity: "Warning".to_string(),
+        message: "Fixture device has not reported within the expected window".to_string(),
+        triggered_at: ctx.timestamp - std::time::Duration::from_secs(3600),
+        resolved_at: None,
+        resolved_by: None,
+        metadata: Some("{\"seed\":true,\"fixture\":\"lumiere-first-org-v1\"}".to_string()),
+    });
+
+    // ── 3.6 Stock Quants (on-hand) ────────────────────────────────────────────
     ctx.db.stock_quant().insert(StockQuant {
         id: 0,
         organization_id: org_id,
@@ -9436,7 +9511,7 @@ Prioritize high-severity findings and cite related records."#,
         receipt_header: Some("Lumiere Demo POS".to_string()),
         receipt_footer: Some("Thank you for visiting.".to_string()),
         proxy_ip: None,
-        iot_device_ids: vec![],
+        iot_device_ids: vec![iot_device.id],
         pos_device_ids: vec![],
         floor_ids: vec![],
         pricelist_id: 0,

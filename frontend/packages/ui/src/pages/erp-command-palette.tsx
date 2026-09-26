@@ -10,6 +10,7 @@ import {
 import { useTranslation } from "@lumiere/i18n"
 import { useRBAC } from "@/lib/rbac-context"
 import { buildNavGroups, type NavGroup } from "../lib/navigation-catalog"
+import { isFirstOrgSurfaceAdmitted } from "../lib/product-surface-catalog"
 import {
   Command,
   CommandDialog,
@@ -25,19 +26,31 @@ export interface ErpCommandPaletteProps {
   onOpenAIChat?: () => void
   onOpenNotebook?: () => void
   onOpenJournal?: () => void
+  /** Apply the fail-closed first-test-organization product admission profile. */
+  firstOrgProfile?: boolean
 }
 
 export function ErpCommandPalette({
   onOpenAIChat,
   onOpenNotebook,
   onOpenJournal,
+  firstOrgProfile = false,
 }: ErpCommandPaletteProps) {
   const [open, setOpen] = useState(false)
   const router = useRouter()
-  const { checkPermission } = useRBAC()
+  const { checkPermission, isAdmin } = useRBAC()
   const { t } = useTranslation()
 
-  const navGroups = useMemo((): NavGroup[] => buildNavGroups(t), [t])
+  const userIsAdmin = isAdmin()
+  const navGroups = useMemo(
+    (): NavGroup[] => buildNavGroups(t, { firstOrgProfile, isAdmin: userIsAdmin }),
+    [firstOrgProfile, t, userIsAdmin],
+  )
+  const quickActionIsVisible = useCallback(
+    (surfaceId: string) =>
+      !firstOrgProfile || isFirstOrgSurfaceAdmitted(surfaceId, userIsAdmin),
+    [firstOrgProfile, userIsAdmin],
+  )
 
   const accessibleNavGroups = useMemo(
     () =>
@@ -75,7 +88,10 @@ export function ErpCommandPalette({
     return () => window.removeEventListener("keydown", handleKeyDown)
   }, [])
 
-  const hasQuickActions = onOpenAIChat || onOpenNotebook || onOpenJournal
+  const visibleAiChat = quickActionIsVisible("ai-assistant") ? onOpenAIChat : undefined
+  const visibleNotebook = quickActionIsVisible("notebook") ? onOpenNotebook : undefined
+  const visibleJournal = quickActionIsVisible("journal") ? onOpenJournal : undefined
+  const hasQuickActions = visibleAiChat || visibleNotebook || visibleJournal
 
   return (
     <CommandDialog
@@ -93,28 +109,28 @@ export function ErpCommandPalette({
           {hasQuickActions ? (
             <>
               <CommandGroup heading="Quick Actions">
-                {onOpenAIChat ? (
+                {visibleAiChat ? (
                   <CommandItem
                     value={`${t("nav.aiAssistant")} ai assistant`}
-                    onSelect={() => runAction(onOpenAIChat)}
+                    onSelect={() => runAction(visibleAiChat)}
                   >
                     <Sparkles className="h-4 w-4" />
                     {t("nav.aiAssistant")}
                   </CommandItem>
                 ) : null}
-                {onOpenNotebook ? (
+                {visibleNotebook ? (
                   <CommandItem
                     value={`${t("nav.notebook")} notebook`}
-                    onSelect={() => runAction(onOpenNotebook)}
+                    onSelect={() => runAction(visibleNotebook)}
                   >
                     <BookOpen className="h-4 w-4" />
                     {t("nav.notebook")}
                   </CommandItem>
                 ) : null}
-                {onOpenJournal ? (
+                {visibleJournal ? (
                   <CommandItem
                     value={`${t("nav.journal")} journal`}
-                    onSelect={() => runAction(onOpenJournal)}
+                    onSelect={() => runAction(visibleJournal)}
                   >
                     <BookMarked className="h-4 w-4" />
                     {t("nav.journal")}

@@ -41,15 +41,7 @@ export function moveTypeTagFromRow(row: Record<string, unknown>): string {
   return enumTag(row.moveType ?? row.move_type)
 }
 
-/** Customer/vendor invoice and refund document types (matches SpacetimeDB MoveType). */
-export function isInvoiceLikeMoveType(mt: string): boolean {
-  return (
-    mt === 'OutInvoice' ||
-    mt === 'InInvoice' ||
-    mt === 'OutRefund' ||
-    mt === 'InRefund'
-  )
-}
+export { isInvoiceLikeMoveType } from '@lumiere/erp-workflows'
 
 function accountGroupTag(a: Record<string, unknown>): string | undefined {
   const tag = enumTag(a.internalGroup ?? a.internal_group)

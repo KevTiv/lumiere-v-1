@@ -564,7 +564,8 @@
   ],
   "BillTimesheetsParams": [
     "company_id",
-    "invoice_date"
+    "invoice_date",
+    "fiscal_position_id"
   ],
   "BomExplosionResult": [
     "line_id",
@@ -3304,6 +3305,13 @@
   "RejectExpensePolicyExceptionParams": [
     "metadata"
   ],
+  "RejectTimesheetsParams": [
+    "company_id"
+  ],
+  "ReopenTimesheetsParams": [
+    "company_id",
+    "reason"
+  ],
   "ReplenishmentRule": [
     "warehouse_id",
     "route_id",
@@ -5024,7 +5032,10 @@
     "metadata"
   ],
   "ValidateTimesheetsParams": [
-    "company_id"
+    "company_id",
+    "wip_journal_id",
+    "wip_account_id",
+    "wip_labor_account_id"
   ],
   "Warehouse": [
     "partner_id",

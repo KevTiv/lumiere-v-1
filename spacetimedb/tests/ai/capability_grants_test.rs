@@ -3,7 +3,9 @@
 use spacetimedb::{ReducerContext, Table};
 
 use crate::ai::capability_grants::{
-    ai_capability_role_grant, delete_ai_capability_role_grant, set_ai_capability_role_grant,
+    ai_capability_role_grant, delete_ai_capability_role_grant,
+    provision_owner_ai_capability_grants, set_ai_capability_role_grant,
+    OWNER_AI_CAPABILITY_GRANTS,
 };
 use crate::core::permissions::{create_role, role, CreateRoleParams};
 use crate::test_harness::{ensure_test_superuser, OrgFixture};
@@ -267,6 +269,67 @@ pub fn test_capability_grant_upsert_and_delete(ctx: &ReducerContext) -> Result<(
                 "AI-CG-004 expected denial for cross-org delete, got {other:?}"
             ))
         }
+    }
+
+    Ok(())
+}
+
+
+/// AI-CG-005: the production owner baseline is exact, idempotent, and cannot
+/// be applied to an ordinary role.
+pub fn test_owner_capability_provisioning(ctx: &ReducerContext) -> Result<(), String> {
+    ensure_test_superuser(ctx)?;
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let owner_role_id = seed_role(ctx, fixture.organization_id, "AI-CG-005 Owner")?;
+    let mut owner_role = ctx.db.role().id().find(&owner_role_id).ok_or("owner role missing")?;
+    owner_role.permissions = vec!["*:*".to_string()];
+    owner_role.is_system = true;
+    ctx.db.role().id().update(owner_role.clone());
+
+    provision_owner_ai_capability_grants(ctx, fixture.organization_id, &owner_role)?;
+    provision_owner_ai_capability_grants(ctx, fixture.organization_id, &owner_role)?;
+
+    let grants: Vec<_> = ctx
+        .db
+        .ai_capability_role_grant()
+        .ai_capability_grant_by_role()
+        .filter(&owner_role_id)
+        .filter(|grant| grant.organization_id == fixture.organization_id)
+        .collect();
+
+    if grants.len() != OWNER_AI_CAPABILITY_GRANTS.len() {
+        return Err(format!(
+            "AI-CG-005 expected {} exact owner grants, got {}",
+            OWNER_AI_CAPABILITY_GRANTS.len(),
+            grants.len()
+        ));
+    }
+
+    for expected in OWNER_AI_CAPABILITY_GRANTS {
+        let grant = grants
+            .iter()
+            .find(|grant| grant.capability_key == expected.capability_key)
+            .ok_or_else(|| format!("AI-CG-005 missing {}", expected.capability_key))?;
+        if !grant.is_active
+            || grant.max_rows != expected.max_rows
+            || grant.max_bytes != expected.max_bytes
+        {
+            return Err(format!(
+                "AI-CG-005 wrong bounds for {}",
+                expected.capability_key
+            ));
+        }
+    }
+
+    let ordinary_role_id = seed_role(ctx, fixture.organization_id, "AI-CG-005 Ordinary")?;
+    let ordinary_role = ctx
+        .db
+        .role()
+        .id()
+        .find(&ordinary_role_id)
+        .ok_or("ordinary role missing")?;
+    if provision_owner_ai_capability_grants(ctx, fixture.organization_id, &ordinary_role).is_ok() {
+        return Err("AI-CG-005 ordinary role unexpectedly received owner grants".to_string());
     }
 
     Ok(())

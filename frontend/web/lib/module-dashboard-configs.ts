@@ -6,6 +6,14 @@ import {
   proposalTemplatesTableConfig,
   newProposalForm,
   posTerminalsAdminTableConfig,
+  fleetVehiclesTableConfig,
+  fleetServiceRecordsTableConfig,
+  fleetInspectionsTableConfig,
+  newFleetVehicleForm,
+  assignFleetDriverForm,
+  recordFleetServiceForm,
+  recordFleetInspectionForm,
+  type FleetFormOption,
 } from "@lumiere/ui"
 import {
   buildAccountsTableConfig,
@@ -3198,6 +3206,62 @@ export const posModuleConfig = (t: TFunction): ModuleConfig => ({
       label: t("pos.admin.tabs.admin"),
       type: "entity",
       entityConfig: posTerminalsAdminTableConfig(t),
+    },
+  ],
+})
+
+// ─── Fleet ────────────────────────────────────────────────────────────────────
+
+export interface FleetModuleOptions {
+  vehicles?: FleetFormOption[]
+  employees?: FleetFormOption[]
+  serviceTypes?: FleetFormOption[]
+}
+
+export const fleetModuleConfig = (
+  t: TFunction,
+  { vehicles = [], employees = [], serviceTypes = [] }: FleetModuleOptions = {},
+): ModuleConfig => ({
+  id: "fleet",
+  title: t("fleet.title"),
+  description: t("fleet.forms.newVehicle.description"),
+  defaultTab: "fleet-vehicles",
+  tabs: [
+    {
+      id: "fleet-vehicles",
+      label: t("fleet.subtitle"),
+      type: "entity",
+      entityConfig: fleetVehiclesTableConfig(t),
+      createForm: newFleetVehicleForm(t),
+      createLabel: t("fleet.create"),
+      createAction: "createFleetVehicle",
+    },
+    {
+      id: "fleet-driver-assignment",
+      label: t("fleet.lifecycle.assignments.title"),
+      type: "entity",
+      entityConfig: fleetVehiclesTableConfig(t),
+      createForm: assignFleetDriverForm(t, vehicles, employees),
+      createLabel: t("fleet.lifecycle.assignments.action"),
+      createAction: "assignFleetDriver",
+    },
+    {
+      id: "fleet-service-records",
+      label: t("fleet.lifecycle.service.title"),
+      type: "entity",
+      entityConfig: fleetServiceRecordsTableConfig(t),
+      createForm: recordFleetServiceForm(t, vehicles, serviceTypes),
+      createLabel: t("fleet.lifecycle.service.action"),
+      createAction: "recordFleetService",
+    },
+    {
+      id: "fleet-inspections",
+      label: t("fleet.lifecycle.inspections.title"),
+      type: "entity",
+      entityConfig: fleetInspectionsTableConfig(t),
+      createForm: recordFleetInspectionForm(t, vehicles, employees),
+      createLabel: t("fleet.lifecycle.inspections.action"),
+      createAction: "recordFleetInspection",
     },
   ],
 })

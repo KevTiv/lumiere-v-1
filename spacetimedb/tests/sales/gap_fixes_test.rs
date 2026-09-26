@@ -648,8 +648,17 @@ pub fn test_exchange_order_from_return(ctx: &ReducerContext) -> Result<(), Strin
         .sale_order()
         .iter()
         .find(|o| o.organization_id == org_id && o.origin_so_id == Some(order_id));
-    if exchange.is_none() {
-        return Err("Expected exchange SO linked via origin_so_id".to_string());
+    let exchange = exchange.ok_or("Expected exchange SO linked via origin_so_id")?;
+
+    // The frontend (`exchangeSourceReturnId` in erp-workflows) finds the exchange order for a
+    // return by these two stamps; changing either must be a deliberate, coordinated change.
+    let expected_origin = format!("exchange:RMA/{rma_id}");
+    if exchange.origin.as_deref() != Some(expected_origin.as_str()) {
+        return Err(format!("Expected exchange origin {expected_origin}, got {:?}", exchange.origin));
+    }
+    let expected_stamp = format!("\"exchange_return_id\":{rma_id}");
+    if !exchange.metadata.as_deref().is_some_and(|m| m.contains(&expected_stamp)) {
+        return Err(format!("Expected exchange metadata to contain {expected_stamp}, got {:?}", exchange.metadata));
     }
     Ok(())
 }

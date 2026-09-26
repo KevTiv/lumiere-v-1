@@ -13,13 +13,14 @@ use axum::{
     response::{IntoResponse, Response},
     Json,
 };
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
+use serde_json::{json, Value};
 
 use crate::{
     error::{AppError, AppResult},
     orchestrator::evidence_inspector::{
         inspect, inspect_workflow_step, retrieve_reusable_knowledge, ActorIdentity, InspectTarget,
-        KnowledgeRetrieval, Viewer,
+        Inspection, KnowledgeRetrieval, Viewer,
     },
     orchestrator::review_queue::{build_queue, DEFAULT_QUEUE_LIMIT},
     state::AppState,
@@ -28,11 +29,105 @@ use crate::{
 const ACTOR_GRANT_TIMEOUT: Duration = Duration::from_secs(3);
 const INSPECT_CAPABILITY: &str = "ai.evidence.inspect";
 const KNOWLEDGE_RETRIEVE_CAPABILITY: &str = "ai.knowledge.retrieve";
+const MAX_RUN_TRANSCRIPT_STEPS: usize = 200;
+const MAX_RUN_CLAIMS: usize = 100;
 /// Exact authority to have persisted evidence passages placed in a RAG answer.
 /// Deliberately distinct from `ai.knowledge.retrieve` (reviewed knowledge
 /// reuse): holding one never implies the other, and neither is seeded by
 /// default.
 pub(crate) const RAG_EVIDENCE_RETRIEVE_CAPABILITY: &str = "ai.evidence.retrieve";
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct RunInspectionRequest {
+    pub run_id: u64,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RunTranscriptStep {
+    pub id: u64,
+    pub step_no: u64,
+    pub tool_name: String,
+    /// Raw tool arguments are never exposed; only their persisted hash.
+    pub input_hash: String,
+    /// Result payloads stay private. This bounded status is enough to reconstruct
+    /// the observable run without exporting sensitive tool output.
+    pub result_summary: String,
+    pub output_row_count: Option<u64>,
+    pub duration_ms: u64,
+    pub error: bool,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RunEvidenceInspection {
+    pub run_id: u64,
+    pub status: String,
+    pub answer: Option<String>,
+    pub step_count: u64,
+    pub tokens_used: u64,
+    pub error_message: Option<String>,
+    pub transcript: Vec<RunTranscriptStep>,
+    pub contribution_ids: Vec<u64>,
+    pub claim_ids: Vec<u64>,
+    pub claims: Vec<Inspection>,
+}
+
+#[derive(Clone, Copy)]
+enum RunResponseShape {
+    Inspection,
+    Export,
+}
+
+fn serialized_run_size(
+    inspection: &RunEvidenceInspection,
+    shape: RunResponseShape,
+) -> AppResult<usize> {
+    let encoded = match shape {
+        RunResponseShape::Inspection => serde_json::to_vec(inspection),
+        RunResponseShape::Export => serde_json::to_vec(&json!({
+            "schemaVersion": 1,
+            "kind": "lumiere_run_evidence_export",
+            "run": inspection,
+        })),
+    }
+    .map_err(|error| AppError::Internal(error.to_string()))?;
+    Ok(encoded.len())
+}
+
+/// Reduce optional run detail until the exact response envelope fits the
+/// actor's byte grant. The required run identity and counters are never
+/// silently truncated; an impossibly small grant fails closed.
+fn enforce_run_byte_bound(
+    inspection: &mut RunEvidenceInspection,
+    max_bytes: u64,
+    shape: RunResponseShape,
+) -> AppResult<()> {
+    let fits = |inspection: &RunEvidenceInspection| {
+        serialized_run_size(inspection, shape).map(|size| size as u64 <= max_bytes)
+    };
+    while !inspection.claims.is_empty() && !fits(inspection)? {
+        inspection.claims.pop();
+        inspection.claim_ids.pop();
+    }
+    while !inspection.transcript.is_empty() && !fits(inspection)? {
+        inspection.transcript.pop();
+    }
+    while !inspection.contribution_ids.is_empty() && !fits(inspection)? {
+        inspection.contribution_ids.pop();
+    }
+    if !fits(inspection)? {
+        inspection.answer = None;
+        inspection.error_message = None;
+    }
+    if !fits(inspection)? {
+        return Err(AppError::Forbidden(
+            "evidence response exceeds the acting user's grant".into(),
+        ));
+    }
+    Ok(())
+}
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
@@ -292,6 +387,184 @@ pub async fn post_inspect(
     Ok(response)
 }
 
+fn row_u64(row: &Value, camel: &str, snake: &str) -> Option<u64> {
+    row.get(camel)
+        .or_else(|| row.get(snake))
+        .and_then(|value| value.as_u64().or_else(|| value.as_str()?.parse().ok()))
+}
+
+fn row_text(row: &Value, camel: &str, snake: &str) -> Option<String> {
+    row.get(camel)
+        .or_else(|| row.get(snake))
+        .and_then(Value::as_str)
+        .map(str::to_string)
+}
+
+fn redacted_step(row: &Value) -> Option<RunTranscriptStep> {
+    let row_count = row_u64(row, "outputRowCount", "output_row_count");
+    let error_message = row_text(row, "errorMessage", "error_message");
+    Some(RunTranscriptStep {
+        id: row_u64(row, "id", "id")?,
+        step_no: row_u64(row, "stepNo", "step_no")?,
+        tool_name: row_text(row, "toolName", "tool_name")?,
+        input_hash: row_text(row, "inputHash", "input_hash")?,
+        result_summary: if error_message.is_some() {
+            "tool failed".to_string()
+        } else if let Some(count) = row_count {
+            format!("{count} row(s)")
+        } else {
+            "completed".to_string()
+        },
+        output_row_count: row_count,
+        duration_ms: row_u64(row, "durationMs", "duration_ms").unwrap_or_default(),
+        error: error_message.is_some(),
+    })
+}
+
+async fn inspect_run(
+    state: &AppState,
+    actor: &ActorCredentials,
+    run_id: u64,
+    shape: RunResponseShape,
+) -> AppResult<RunEvidenceInspection> {
+    if run_id == 0 {
+        return Err(AppError::BadRequest("runId is required".into()));
+    }
+    let grant = require_actor_grant_bounds(state, actor, INSPECT_CAPABILITY).await?;
+    let runs = state
+        .stdb
+        .query_sql(&format!(
+            "SELECT * FROM ai_agent_run WHERE organization_id = {} AND company_id = {} AND id = {} LIMIT 1",
+            actor.organization_id, actor.company_id, run_id
+        ))
+        .await
+        .map_err(|error| AppError::Internal(error.to_string()))?;
+    let run = runs
+        .into_iter()
+        .next()
+        .ok_or_else(|| AppError::NotFound("run not found".into()))?;
+
+    let mut transcript = state
+        .stdb
+        .query_sql(&format!(
+            "SELECT * FROM ai_agent_run_step WHERE organization_id = {} AND run_id = {}",
+            actor.organization_id, run_id
+        ))
+        .await
+        .map_err(|error| AppError::Internal(error.to_string()))?
+        .iter()
+        .filter_map(redacted_step)
+        .collect::<Vec<_>>();
+    transcript.sort_by_key(|step| (step.step_no, step.id));
+    let mut remaining_rows =
+        usize::try_from(grant.max_rows.saturating_sub(1)).unwrap_or(usize::MAX);
+    transcript.truncate(MAX_RUN_TRANSCRIPT_STEPS.min(remaining_rows));
+    remaining_rows = remaining_rows.saturating_sub(transcript.len());
+
+    let contributions = state
+        .stdb
+        .query_sql(&format!(
+            "SELECT * FROM ai_evidence_contribution WHERE organization_id = {} AND company_id = {}",
+            actor.organization_id, actor.company_id
+        ))
+        .await
+        .map_err(|error| AppError::Internal(error.to_string()))?;
+    let mut contribution_ids = contributions
+        .iter()
+        .filter(|row| row_u64(row, "agentRunId", "agent_run_id") == Some(run_id))
+        .filter_map(|row| row_u64(row, "id", "id"))
+        .collect::<Vec<_>>();
+    contribution_ids.sort_unstable();
+    contribution_ids.dedup();
+    contribution_ids.truncate(remaining_rows);
+    remaining_rows = remaining_rows.saturating_sub(contribution_ids.len());
+
+    let viewer = Viewer {
+        organization_id: actor.organization_id,
+        company_id: actor.company_id,
+        actor_identity: ActorIdentity::parse(&actor.identity),
+    };
+    let contribution_set = contribution_ids
+        .iter()
+        .copied()
+        .collect::<std::collections::BTreeSet<_>>();
+    let claim_rows = state
+        .stdb
+        .query_sql(&format!(
+            "SELECT * FROM ai_evidence_claim WHERE organization_id = {} AND company_id = {}",
+            actor.organization_id, actor.company_id
+        ))
+        .await
+        .map_err(|error| AppError::Internal(error.to_string()))?;
+    let mut claim_ids = claim_rows
+        .iter()
+        .filter(|row| {
+            row_u64(row, "contributionId", "contribution_id")
+                .is_some_and(|id| contribution_set.contains(&id))
+        })
+        .filter_map(|row| row_u64(row, "id", "id"))
+        .collect::<Vec<_>>();
+    claim_ids.sort_unstable();
+    claim_ids.dedup();
+    claim_ids.truncate(MAX_RUN_CLAIMS.min(remaining_rows));
+
+    let mut claims = Vec::with_capacity(claim_ids.len());
+    for claim_id in &claim_ids {
+        let inspection = inspect(state.stdb.as_ref(), viewer, InspectTarget::Claim(*claim_id))
+            .await
+            .map_err(|error| AppError::Internal(error.to_string()))?;
+        claims.push(inspection);
+    }
+
+    let mut inspection = RunEvidenceInspection {
+        run_id,
+        status: row_text(&run, "status", "status").unwrap_or_else(|| "unknown".into()),
+        answer: row_text(&run, "summary", "summary"),
+        step_count: row_u64(&run, "stepCount", "step_count").unwrap_or_default(),
+        tokens_used: row_u64(&run, "tokensUsed", "tokens_used").unwrap_or_default(),
+        error_message: row_text(&run, "errorMessage", "error_message"),
+        transcript,
+        contribution_ids,
+        claim_ids,
+        claims,
+    };
+    enforce_run_byte_bound(&mut inspection, grant.max_bytes, shape)?;
+    Ok(inspection)
+}
+
+pub async fn post_run_inspect(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Json(req): Json<RunInspectionRequest>,
+) -> AppResult<Response> {
+    let actor = ActorCredentials::from_headers(&headers)?;
+    let inspection = inspect_run(&state, &actor, req.run_id, RunResponseShape::Inspection).await?;
+    let mut response = Json(inspection).into_response();
+    response
+        .headers_mut()
+        .insert(CACHE_CONTROL, HeaderValue::from_static("no-store"));
+    Ok(response)
+}
+
+pub async fn post_run_export(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Json(req): Json<RunInspectionRequest>,
+) -> AppResult<Response> {
+    let actor = ActorCredentials::from_headers(&headers)?;
+    let inspection = inspect_run(&state, &actor, req.run_id, RunResponseShape::Export).await?;
+    let mut response = Json(json!({
+        "schemaVersion": 1,
+        "kind": "lumiere_run_evidence_export",
+        "run": inspection,
+    }))
+    .into_response();
+    response
+        .headers_mut()
+        .insert(CACHE_CONTROL, HeaderValue::from_static("no-store"));
+    Ok(response)
+}
+
 /// The reviewer's queue for the acting user's company. It grants no review
 /// right: it needs the same exact `ai.evidence.inspect` grant as inspection,
 /// and the review reducers still enforce permission, membership and
@@ -361,6 +634,77 @@ mod route_tests {
         headers.insert("x-lumiere-organization-id", HeaderValue::from_static("7"));
         headers.insert("x-lumiere-company-id", HeaderValue::from_static("9"));
         headers
+    }
+
+    #[test]
+    fn run_transcript_never_exposes_raw_tool_output() {
+        let step = redacted_step(&json!({
+            "id": 1,
+            "stepNo": 2,
+            "toolName": "erp.search",
+            "inputHash": "abc123",
+            "outputSummary": "customer secret should never leave the gateway",
+            "outputRowCount": 3,
+            "durationMs": 17,
+            "errorMessage": null
+        }))
+        .expect("redacted step");
+        let encoded = serde_json::to_value(step).expect("serialize");
+        assert_eq!(encoded["resultSummary"], "3 row(s)");
+        assert_eq!(encoded["inputHash"], "abc123");
+        assert!(encoded.get("outputSummary").is_none());
+        assert!(!encoded.to_string().contains("customer secret"));
+    }
+
+    #[test]
+    fn run_export_is_trimmed_to_the_exact_byte_grant() {
+        let mut inspection = RunEvidenceInspection {
+            run_id: 11,
+            status: "completed".to_string(),
+            answer: Some("sensitive answer".repeat(50)),
+            step_count: 1,
+            tokens_used: 20,
+            error_message: None,
+            transcript: vec![RunTranscriptStep {
+                id: 1,
+                step_no: 1,
+                tool_name: "erp.search".to_string(),
+                input_hash: "abc123".to_string(),
+                result_summary: "3 row(s)".to_string(),
+                output_row_count: Some(3),
+                duration_ms: 17,
+                error: false,
+            }],
+            contribution_ids: vec![7, 8],
+            claim_ids: vec![],
+            claims: vec![],
+        };
+        let minimal = RunEvidenceInspection {
+            run_id: 11,
+            status: "completed".to_string(),
+            answer: None,
+            step_count: 1,
+            tokens_used: 20,
+            error_message: None,
+            transcript: vec![],
+            contribution_ids: vec![],
+            claim_ids: vec![],
+            claims: vec![],
+        };
+        let max_bytes = serialized_run_size(&minimal, RunResponseShape::Export)
+            .expect("serialize minimal export") as u64;
+
+        enforce_run_byte_bound(&mut inspection, max_bytes, RunResponseShape::Export)
+            .expect("trim export");
+
+        assert!(inspection.answer.is_none());
+        assert!(inspection.transcript.is_empty());
+        assert!(inspection.contribution_ids.is_empty());
+        assert!(
+            serialized_run_size(&inspection, RunResponseShape::Export)
+                .expect("serialize bounded export") as u64
+                <= max_bytes
+        );
     }
 
     #[test]

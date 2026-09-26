@@ -142,6 +142,7 @@
       "invoice_date",
       "invoice_date_due",
       "invoice_partner_display_name",
+      "sale_order_id",
       "amount_untaxed",
       "amount_tax",
       "amount_total",
@@ -1980,6 +1981,65 @@
     ],
     "table": "account_asset"
   },
+  "fleet-inspections": {
+    "aliases": [
+      "fleet-inspections",
+      "fleet_inspection"
+    ],
+    "default_restricted": [
+      "company_id",
+      "vehicle_id",
+      "inspector_id",
+      "inspected_at",
+      "outcome",
+      "odometer_km",
+      "notes"
+    ],
+    "mandatory": [
+      "id",
+      "organization_id",
+      "company_id"
+    ],
+    "table": "fleet_inspection"
+  },
+  "fleet-service-records": {
+    "aliases": [
+      "fleet-service-records",
+      "fleet_service_record"
+    ],
+    "default_restricted": [
+      "company_id",
+      "vehicle_id",
+      "service_type_id",
+      "serviced_at",
+      "odometer_km",
+      "provider",
+      "notes"
+    ],
+    "mandatory": [
+      "id",
+      "organization_id",
+      "company_id"
+    ],
+    "table": "fleet_service_record"
+  },
+  "fleet-service-types": {
+    "aliases": [
+      "fleet-service-types",
+      "fleet_vehicle_service_type"
+    ],
+    "default_restricted": [
+      "company_id",
+      "name",
+      "is_active"
+    ],
+    "mandatory": [
+      "id",
+      "organization_id",
+      "company_id"
+    ],
+    "table": "fleet_vehicle_service_type"
+  },
   "fleet-vehicles": {
     "aliases": [
       "fleet-vehicles",
@@ -3015,7 +3075,9 @@
     "default_restricted": [
       "bom_id",
       "product_id",
-      "company_id"
+      "company_id",
+      "product_qty",
+      "product_uom_id"
     ],
     "mandatory": [
       "id",
@@ -3031,7 +3093,9 @@
     "default_restricted": [
       "product_tmpl_id",
       "company_id",
-      "type"
+      "type",
+      "product_id",
+      "product_uom_id"
     ],
     "mandatory": [
       "id",
@@ -3047,7 +3111,20 @@
     "default_restricted": [
       "state",
       "product_id",
-      "company_id"
+      "company_id",
+      "bom_id",
+      "origin",
+      "product_qty",
+      "product_uom_id",
+      "qty_producing",
+      "qty_produced",
+      "location_src_id",
+      "location_dest_id",
+      "move_raw_ids",
+      "move_raw_count",
+      "move_finished_ids",
+      "move_finished_count",
+      "workorder_ids"
     ],
     "mandatory": [
       "id",
@@ -3079,7 +3156,12 @@
     ],
     "default_restricted": [
       "name",
-      "company_id"
+      "company_id",
+      "workorder_count",
+      "workorder_progress_count",
+      "productive_time",
+      "order_ids",
+      "productivity_ids"
     ],
     "mandatory": [
       "id",
@@ -3095,7 +3177,13 @@
     "default_restricted": [
       "state",
       "production_id",
-      "company_id"
+      "company_id",
+      "workcenter_id",
+      "duration_expected",
+      "duration",
+      "progress",
+      "is_produced",
+      "time_ids"
     ],
     "mandatory": [
       "id",
@@ -3441,7 +3529,9 @@
       "residual_before",
       "residual_after",
       "is_reversal",
+      "write_off_amount",
       "write_off_account_id",
+      "write_off_move_id",
       "metadata"
     ],
     "mandatory": [
@@ -3850,7 +3940,8 @@
       "public_price",
       "type",
       "barcode",
-      "purchase_ok"
+      "purchase_ok",
+      "tracking"
     ],
     "mandatory": [
       "id",
@@ -3978,6 +4069,29 @@
       "organization_id"
     ],
     "table": "project_milestone"
+  },
+  "project-timesheet-approvals": {
+    "aliases": [
+      "project-timesheet-approvals",
+      "project_timesheet_approval"
+    ],
+    "default_restricted": [
+      "company_id",
+      "timesheet_id",
+      "actor",
+      "decision",
+      "reason",
+      "hours",
+      "sell_rate",
+      "cost_rate",
+      "currency_id",
+      "decided_at"
+    ],
+    "mandatory": [
+      "id",
+      "organization_id"
+    ],
+    "table": "project_timesheet_approval"
   },
   "project-rate-card-lines": {
     "aliases": [
@@ -5066,7 +5180,10 @@
       "company_id",
       "date_order",
       "opportunity_id",
-      "picking_ids"
+      "picking_ids",
+      "invoice_ids",
+      "invoice_count",
+      "invoice_status"
     ],
     "mandatory": [
       "id",
@@ -5289,8 +5406,16 @@
     "default_restricted": [
       "state",
       "product_id",
+      "product_uom_qty",
       "company_id",
-      "picking_id"
+      "picking_id",
+      "purchase_line_id",
+      "is_done",
+      "production_id",
+      "location_id",
+      "location_dest_id",
+      "product_uom",
+      "quantity_done"
     ],
     "mandatory": [
       "id",
@@ -5326,8 +5451,11 @@
       "state",
       "company_id",
       "sale_id",
+      "purchase_id",
       "picking_code",
       "is_return",
+      "backorder_id",
+      "backorder_ids",
       "picking_type_id",
       "location_id",
       "location_dest_id"
@@ -5381,7 +5509,10 @@
       "product_id",
       "location_id",
       "quantity",
-      "company_id"
+      "company_id",
+      "lot_id",
+      "package_id",
+      "owner_id"
     ],
     "mandatory": [
       "id",
@@ -5916,7 +6047,8 @@
     "default_restricted": [
       "name",
       "employee_id",
-      "company_id"
+      "company_id",
+      "validation_status"
     ],
     "mandatory": [
       "id",

@@ -120,6 +120,8 @@ pub struct RagResponse {
     pub sources: Vec<RagSource>,
     pub retrieval_degraded: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub run_id: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub agent_id: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub provider: Option<String>,
@@ -140,6 +142,7 @@ fn no_relevant_information_response(retrieval_degraded: bool) -> RagResponse {
         answer: "No relevant information found for your query.".to_string(),
         sources: Vec::new(),
         retrieval_degraded,
+        run_id: None,
         agent_id: None,
         provider: None,
         model: None,
@@ -684,9 +687,15 @@ pub async fn post_rag(
     let company_hit_count = company_hits.len();
     let org_hit_count = org_hits.len();
 
-    let agent = resolve_agent(&state.stdb, org_id, req.agent_id, req.team_member_id)
-        .await
-        .map_err(|e| AppError::BadRequest(e.to_string()))?;
+    let agent = resolve_agent(
+        &state.stdb,
+        org_id,
+        req.agent_id,
+        req.team_member_id,
+        state.config.ollama_supports_tool_calling,
+    )
+    .await
+    .map_err(|e| AppError::BadRequest(e.to_string()))?;
 
     let allowed_types =
         (!req.allowed_entity_types.is_empty()).then_some(req.allowed_entity_types.as_slice());
@@ -1013,6 +1022,7 @@ pub async fn post_rag(
     let provenance = Some(provenance);
     let provider = program.generation_provider.clone();
     let model = program.generation_model.clone();
+    let run_id = Some(run.run_id);
     let agent_id = Some(agent.agent_id);
 
     let mut sources: Vec<RagSource> = live_snapshots_to_rag_sources(&live_snapshots);
@@ -1037,6 +1047,7 @@ pub async fn post_rag(
         answer,
         sources,
         retrieval_degraded,
+        run_id,
         agent_id,
         provider,
         model,
@@ -1077,6 +1088,7 @@ fn rag_stream_events(response: &RagResponse) -> Vec<(&'static str, String)> {
 fn rag_stream_metadata(response: &RagResponse) -> Value {
     json!({
         "sources": response.sources,
+        "run_id": response.run_id,
         "agent_id": response.agent_id,
         "provider": response.provider,
         "model": response.model,
@@ -1365,6 +1377,7 @@ mod tests {
             answer: release.answer.clone(),
             sources,
             retrieval_degraded: false,
+            run_id: None,
             agent_id: Some(1),
             provider: Some("test".into()),
             model: Some("test".into()),

@@ -24,6 +24,7 @@
     "@hookform/resolvers": "^3.10.0",
     "@lumiere/erp-session": "workspace:*",
     "@lumiere/erp-shared": "workspace:*",
+    "@lumiere/erp-workflows": "workspace:*",
     "@lumiere/i18n": "workspace:*",
     "@lumiere/presentation-core": "workspace:*",
     "@lumiere/query-hooks": "workspace:*",

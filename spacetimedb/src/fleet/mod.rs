@@ -7,5 +7,7 @@
 /// | **PosTerminal** | Point-of-sale terminal with geo location |
 /// | **WarehouseGeo** | Geo-location metadata for existing warehouses |
 pub mod fleet;
+pub mod lifecycle;
 
 pub use fleet::*;
+pub use lifecycle::*;

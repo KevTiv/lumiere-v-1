@@ -22,6 +22,13 @@ class ChangeScopeTests(unittest.TestCase):
         self.assert_domains(module.classify_paths(["frontend/packages/ui/src/button.tsx", "docs/test.md"]),
                             ("frontend", "e2e"))
 
+    def test_cov_evidence_and_validators_are_frontend(self):
+        for path in ["docs/evidence/cov-00c-correctness-defects.json",
+                     "scripts/validate-cov00c-correctness-census.py"]:
+            with self.subTest(path=path):
+                self.assert_domains(module.classify_paths([path, "frontend/web/tests/e2e/a.spec.ts"]),
+                                    ("frontend", "e2e"))
+
     def test_service_rust(self):
         for path in ["api-server/src/main.rs", "ai-gateway/src/lib.rs", "iot-gateway/src/main.rs"]:
             with self.subTest(path=path):
