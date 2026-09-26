@@ -100,6 +100,12 @@ async function runLeaveAction(page: Page, leaveId: number, actionId: string, red
   const leaveRow = page.getByTestId(`entity-row-${leaveId}`)
   await expect(leaveRow).toBeVisible({ timeout: 30_000 })
   await leaveRow.click()
+  // The row click also opens the leave record sheet over the toolbar; close it
+  // (the table selection is kept) so the action button is clickable.
+  const recordSheet = page.getByRole("dialog")
+  await expect(recordSheet).toBeVisible()
+  await page.keyboard.press("Escape")
+  await expect(recordSheet).toBeHidden()
   const action = page.getByTestId(`entity-action-${actionId}`)
   await expect(action).toBeEnabled()
   const [response] = await Promise.all([
