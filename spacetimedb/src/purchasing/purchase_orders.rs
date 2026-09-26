@@ -2336,14 +2336,23 @@ pub fn receive_po_line(
         }
     }
 
-    // Prefer open inbound move linked to this PO line.
-    let open_move = ctx.db.stock_move().iter().find(|m| {
+    // Resolve the one canonical open inbound move for this PO line. Never choose an
+    // arbitrary/latest move when the relation is ambiguous: that would make the
+    // consequential receipt effect impossible to correlate safely.
+    let mut open_moves = ctx.db.stock_move().iter().filter(|m| {
         m.organization_id == organization_id
             && m.purchase_line_id == Some(line_id)
             && !m.is_done
             && m.state != "cancel"
             && m.state != "done"
     });
+    let open_move = open_moves.next();
+    if open_moves.next().is_some() {
+        return Err(format!(
+            "Multiple open receipt moves found for purchase order line {}",
+            line_id
+        ));
+    }
 
     if let Some(mv) = open_move {
         let picking_id = mv

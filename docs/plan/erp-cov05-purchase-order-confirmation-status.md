@@ -51,4 +51,4 @@ This slice certifies PO confirmation only. It does not yet certify receiving, pa
 
 ## Next bounded Purchasing slice
 
-Use the confirmed PO's released durable identities to certify **receipt and/or vendor-bill creation** without newest-row or id-delta discovery. Prefer exact `purchase_id`, `purchase_line_id`, and released bill relation fields and include stale/duplicate behavior.
+COV-05b now owns the exact PO-line receipt slice. After it, certify **vendor-bill creation** without newest-row or id-delta discovery. Replace the current `invoice_ids.at(-1)` semantic readback with a released exact PO→bill relation and include stale/duplicate behavior.

@@ -34,7 +34,7 @@ PAY-06 write-off fields are already waiting on v0.3.55).
 | COV-08d2 | Fixed-asset depreciation board and disposal exact effects | `compute_depreciation_board`, `dispose_account_asset` | maybe | [status](./erp-cov08d2-asset-depreciation-disposal-status.md) |
 | COV-08e | Finance module certification over 08a–d | `archive_financial_report` | no | [status](./erp-cov08e-finance-certification-status.md) |
 | COV-09 | Leave request submit → approve/refuse | `submit_leave`, `approve_leave`, `refuse_leave` | no | [status](./erp-cov09-hr-leave-approval-status.md) |
-| COV-10 | Approved timesheet validation → billing handoff | `validate_timesheets`, `reject_timesheets` | no | [status](./erp-cov10-project-timesheet-validation-status.md) |
+| COV-10 | Approved timesheet validation → billing handoff | `validate_timesheets`, `reject_timesheets` | maybe | [status](./erp-cov10-project-timesheet-validation-status.md) |
 | COV-11 | Expense sheet submit → approve → post → reimburse | `submit_expense_sheet`, `approve_expense_sheet`, `post_expense_sheet`, `create_expense_reimbursement_payment` | no | [status](./erp-cov11-expense-sheet-lifecycle-status.md) |
 | COV-12 | One recurring invoice run | `generate_subscription_invoice`, `pay_subscription_invoice` | maybe | [status](./erp-cov12-subscription-invoice-run-status.md) |
 | COV-13 | Session order/payment → close | `close_pos_session` | yes | [status](./erp-cov13-pos-session-close-status.md) |
