@@ -31,6 +31,8 @@ import type {
 type ScalarId = bigint | number | string;
 
 import { responseErrorMessage as parseCallError } from '@lumiere/api-client/response-error';
+import { scalarToU64 } from '@lumiere/erp-shared/u64';
+import { resolveResolvedIotAlertEffect } from './iot-alert-resolution';
 
 // ── Reads ────────────────────────────────────────────────────────────────────
 
@@ -502,11 +504,16 @@ export function useResolveIotAlert(organizationId: bigint) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (alertId: ScalarId) => {
+      const id = scalarToU64(alertId);
       const { urlPath, init } = stdbBffCommandPost('resolve_iot_alert', {
-        alertId: alertId,
+        alertId: id,
       });
       const r = await apiFetch(urlPath, init);
       if (!r.ok) throw new Error(await parseCallError(r));
+      const rows = await fetchQueryList('/api/query/iot-alerts', 'Failed to read IoT alert');
+      const effect = resolveResolvedIotAlertEffect(rows, organizationId, id);
+      if (!effect) throw new Error('IoT alert did not read back as resolved');
+      return effect;
     },
     onSuccess: () => invalidateIotQueries(qc, organizationId),
   });

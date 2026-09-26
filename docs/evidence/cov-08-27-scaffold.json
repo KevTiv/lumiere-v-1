@@ -206,7 +206,7 @@
       "contract_release_required": "no",
       "contract_note": "none: `iot-alerts` exposes resolved_at, `iot-actions` exposes status (both organization-scoped; company scope via device)",
       "prerequisites": "Owned-device fixture; degraded telemetry must be explicit.",
-      "status": "SCAFFOLDED",
+      "status": "PARTIAL — alert resolution implemented, action acknowledge pending",
       "status_doc": "docs/plan/erp-cov16-iot-alert-resolve-status.md",
       "spec": "frontend/web/tests/e2e/cov16-iot-alert-resolve.spec.ts",
       "hooks": [
