@@ -19,7 +19,7 @@
   },
   "operation_history": {
     "path": "lumiere-codegen/contract-operation-history.json",
-    "checksum": "sha256:d7e5bb320439ff21dc7649654ecc1df88e6f69070a8a92090c3da47d64f0dda6"
+    "checksum": "sha256:176c319ae9448a3a003f2750aa44aa76c0aefb8f73585be37fc109ddd2196322"
   },
   "stdb_module": {
     "name": "lumiere_v1",
