@@ -11,14 +11,14 @@ import type {
   AccountTaxQueryRow,
 } from "@lumiere/stdb/resource-reads"
 import { createStdbSdk } from "@lumiere/stdb/sdk"
-import { apiFetch } from "../../http"
+import { apiFetch, fetchQueryList } from "../../http"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import {
   paymentParamsToJson,
   type ClearablePatch,
 } from "@lumiere/erp-shared/accounting-create-params"
 import { stdbParamsToJson, encodeOptionalU64 } from "@lumiere/erp-shared/stdb-params-json"
-import { scalarToU64 as toScalarU64 } from "@lumiere/erp-shared/u64"
+import { parseStrictU64, scalarToU64 as toScalarU64 } from "@lumiere/erp-shared/u64"
 import type {
   AccountFiscalYear,
   AccountPeriod,
@@ -64,6 +64,7 @@ import {
 import { stdbInvalidationFor } from "@lumiere/contracts/stdb-reducer-invalidation"
 
 import { responseErrorMessage as parseCallError } from "@lumiere/api-client/response-error"
+import { AmbiguousOperationEffectError, type CanonicalRecordRef } from "../operation-effect"
 export function useAccountFixedAssets(
   organizationId: bigint,
   options?: { staleTime?: number; enabled?: boolean }
@@ -148,6 +149,55 @@ export function useDeleteAccountAsset(organizationId: number, companyId: bigint)
   })
 }
 
+export type AccountAssetLifecycleState = "Running" | "Close"
+
+export interface AccountAssetStateProjection {
+  readonly id?: unknown
+  readonly companyId?: unknown
+  readonly company_id?: unknown
+  readonly state?: unknown
+}
+
+function accountAssetStateTag(value: unknown): string {
+  if (typeof value === "string") return value
+  if (value && typeof value === "object" && !Array.isArray(value) && "tag" in value) {
+    return String((value as { tag?: unknown }).tag ?? "")
+  }
+  return ""
+}
+
+/**
+ * Exact lifecycle readback for one fixed asset: the same company-scoped asset
+ * id must be in the expected state. The account-assets projection carries no
+ * organization column; the query route already scopes rows to the session's
+ * organization, so company + id + state is the stable identity here.
+ */
+export function resolveAccountAssetStateEffect(
+  rows: readonly AccountAssetStateProjection[],
+  companyId: bigint,
+  assetId: bigint,
+  expected: AccountAssetLifecycleState,
+): CanonicalRecordRef | null {
+  const matches = rows.filter((row) => parseStrictU64(row.id) === assetId)
+  if (matches.length > 1) throw new AmbiguousOperationEffectError(`Expected one fixed asset, found ${matches.length}`)
+  const row = matches[0]
+  if (!row
+    || parseStrictU64(row.companyId ?? row.company_id) !== companyId
+    || accountAssetStateTag(row.state) !== expected) return null
+  return { resource: "account-assets", id: assetId.toString() }
+}
+
+async function readAccountAssetStateEffect(
+  companyId: bigint,
+  assetId: bigint,
+  expected: AccountAssetLifecycleState,
+): Promise<CanonicalRecordRef> {
+  const rows = await fetchQueryList("/api/query/account-assets", "Failed to read fixed asset")
+  const effect = resolveAccountAssetStateEffect(rows, companyId, assetId, expected)
+  if (!effect) throw new Error(`Fixed asset did not read back as ${expected}`)
+  return effect
+}
+
 export function useConfirmAccountAsset(organizationId: number, companyId: bigint) {
   const qc = useQueryClient()
   return useMutation({
@@ -155,6 +205,7 @@ export function useConfirmAccountAsset(organizationId: number, companyId: bigint
       const { urlPath, init } = stdbBffCommandPost("confirm_account_asset", { companyId: companyId, assetId: assetId })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
+      return readAccountAssetStateEffect(companyId, assetId, "Running")
     },
     onSuccess: () => invalidateFixedAssetQueries(qc, organizationId),
   })
@@ -167,6 +218,7 @@ export function useCloseAccountAsset(organizationId: number, companyId: bigint) 
       const { urlPath, init } = stdbBffCommandPost("close_account_asset", { companyId: companyId, assetId: assetId })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
+      return readAccountAssetStateEffect(companyId, assetId, "Close")
     },
     onSuccess: () => invalidateFixedAssetQueries(qc, organizationId),
   })

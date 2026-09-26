@@ -2197,7 +2197,7 @@ function AccountingClientReady({
             requiresSelection: true,
             onClick: (rows) => {
               for (const r of rows) {
-                if (assetStateTag(r as Record<string, unknown>) === "Open") {
+                if (assetStateTag(r as Record<string, unknown>) === "Running") {
                   void closeAccountAsset.mutateAsync(BigInt(String(r.id)))
                 }
               }

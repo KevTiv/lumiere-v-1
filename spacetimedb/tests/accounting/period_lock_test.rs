@@ -95,6 +95,26 @@ fn seed_closed_period(ctx: &ReducerContext, fixture: &OrgFixture) -> Result<(), 
         .ok_or("Fixture period not found")?;
 
     close_account_period(ctx, fixture.organization_id, fixture.company_id, period_id)?;
+    let closed = ctx
+        .db
+        .account_period()
+        .id()
+        .find(&period_id)
+        .ok_or("Closed period disappeared")?;
+    match close_account_period(ctx, fixture.organization_id, fixture.company_id, period_id) {
+        Err(error) if error.contains("Only open periods") => {}
+        Err(error) => return Err(format!("unexpected period-close replay error: {error}")),
+        Ok(()) => return Err("period-close replay unexpectedly succeeded".to_string()),
+    }
+    let after_replay = ctx
+        .db
+        .account_period()
+        .id()
+        .find(&period_id)
+        .ok_or("Period disappeared after replay")?;
+    if after_replay.state != closed.state || after_replay.write_date != closed.write_date {
+        return Err("period-close replay changed the canonical period".to_string());
+    }
 
     Ok(())
 }

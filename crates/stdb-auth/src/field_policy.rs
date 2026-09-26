@@ -127,6 +127,10 @@ static HTTP_SQL_INCLUDED_COLUMNS: Lazy<HashMap<String, HashSet<String>>> = Lazy:
         ["metadata"].into_iter().map(String::from).collect(),
     );
     m.insert(
+        "bank-statement-lines".to_string(),
+        ["move_ids"].into_iter().map(String::from).collect(),
+    );
+    m.insert(
         "dashboards".to_string(),
         ["widget_ids"].into_iter().map(String::from).collect(),
     );
@@ -825,6 +829,18 @@ mod tests {
             assert!(
                 cols.iter().any(|column| column == field),
                 "expected {field} in account-moves projection, got: {cols:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn resolve_http_sql_columns_includes_bank_reconciliation_readback() {
+        let cols = resolve_http_sql_columns("bank-statement-lines", None)
+            .expect("bank-statement-lines columns");
+        for field in ["move_ids", "amount_residual"] {
+            assert!(
+                cols.iter().any(|column| column == field),
+                "expected {field} in bank-statement-lines projection, got: {cols:?}"
             );
         }
     }
