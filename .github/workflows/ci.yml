@@ -336,7 +336,11 @@ jobs:
             typecheck-v1-${{ runner.os }}-${{ hashFiles('frontend/pnpm-lock.yaml', 'frontend/turbo.json') }}-
 
       - name: Typecheck
-        run: pnpm exec turbo run typecheck --cache-dir=.turbo/cache
+        # @lumiere/ui's tsc peaks near Node's default ~4 GB heap; give each
+        # process headroom and cap parallelism so two fit in runner memory.
+        env:
+          NODE_OPTIONS: --max-old-space-size=6144
+        run: pnpm exec turbo run typecheck --cache-dir=.turbo/cache --concurrency=2
 
   owner-report-pdf:
     name: Owner-report PDF structural regression
