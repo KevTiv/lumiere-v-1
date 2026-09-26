@@ -35,7 +35,6 @@ import {
   browserPost,
   callRaw,
   callRawOk,
-  expectKnownDefect,
   loseNextResponse,
   openActorPages,
   openOwnerPages,
@@ -192,9 +191,7 @@ test.describe("Pre-tenant payment adversarial", { tag: pretenantTags("@payments"
     await page.reload()
     expect(idOf(field(await waitPosted(page, transactionId), "accountPaymentId", "account_payment_id"))).toBe(ledgerPaymentId)
 
-    await expectKnownDefect("PAY-03", "post retry after commit returns an error", () => {
-      expect(results.every((result) => result.ok), results.map((r) => r.error).join(" | ")).toBe(true)
-    })
+    expect(results.every((result) => result.ok), results.map((r) => r.error).join(" | ")).toBe(true)
   })
 
   test("PAY-06-E2E overpayment stays explicit and can partially settle a second invoice", async ({ page }) => {
