@@ -87,6 +87,41 @@ Current disposition: `ACCEPTED` for the bounded sale-order confirmation slice. T
 
 Next bounded assignment: converge one Purchasing order transition with the accepted `purchasing` persona. Prefer a same-record state transition or an effect with a released durable identity, prove representative allow/deny and stale/replay behavior, and do not use newest-row or ID-delta discovery for receipts or vendor bills.
 
+### COV-08
+
+Current disposition: `IMPLEMENTED` for COV-08a; runtime acceptance is pending.
+The existing generated reconciliation operation now has exact same-ID workflow
+readback, and the reducer rejects a fully settled invoice/payment replay before
+any move, line, sale-total, timestamp, or audit mutation. The persisted domain
+test snapshots both moves and all affected lines; the browser path adds 422
+stale replay, 403 reader denial, and unchanged-effect proof. Generated contract
+delta is expected to be empty because this slice adds no operation or resource
+shape. See [`erp-cov08a-invoice-payment-reconcile-status.md`](./erp-cov08a-invoice-payment-reconcile-status.md).
+
+COV-08b now implements one exact bank-statement-line reconciliation stacked on
+COV-08a. It validates line, parent statement, journal relation and selected
+journal items in the same organization/company, rejects invalid residual/effect
+sets before mutation, and adds exact readback plus stale/deny browser proof.
+Runtime acceptance is pending. See
+[`erp-cov08b-bank-statement-reconcile-status.md`](./erp-cov08b-bank-statement-reconcile-status.md).
+
+COV-08c now implements one exact Open → Closed period transition, exact
+same-period readback, stale/deny preservation, and persisted proof that invoice
+and payment posting are blocked inside the closed period. Runtime acceptance is
+pending. See [`erp-cov08c-period-close-status.md`](./erp-cov08c-period-close-status.md).
+
+COV-08d now implements one exact fixed-asset Draft → Running → Close lifecycle
+through the Fixed Assets UI, with exact same-asset readback and stale/deny
+preservation, and retires the Close action that never dispatched. Runtime
+acceptance is pending. See
+[`erp-cov08d-asset-lifecycle-status.md`](./erp-cov08d-asset-lifecycle-status.md).
+
+Next bounded Finance work is the COV-08c financial-statement follow-up, COV-08d
+depreciation/disposal exact effects, then COV-08e finance certification. The full remaining-stack completion card and ordered
+COV-08..27 targets are recorded in
+[`erp-cov08-27-stacked-acceptance-plan.md`](./erp-cov08-27-stacked-acceptance-plan.md).
+
+
 ## First implementation convergence
 
 Prioritize closing U4/U5 gaps on CRM/Sales/Purchasing/Accounting before adding new backend breadth, but migrate the reference cross-module action through COV-01 first so module agents inherit a proven outcome/readback pattern.

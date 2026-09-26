@@ -1,5 +1,5 @@
 import { matchesOperationResponse } from "./operation-response"
-import { expect, test, type Page } from "@playwright/test"
+import { expect, test, type Page, type Request } from "@playwright/test"
 
 import {
   callReducerBff,
@@ -8,9 +8,36 @@ import {
   fetchSessionOrganizationId,
   gotoModule,
   scalarQueryId,
+  signIn,
   smokeName,
   waitForMovePosted,
 } from "./helpers"
+
+const PERSONA_PASSWORD = process.env.E2E_FIRST_ORG_PERSONA_PASSWORD ?? "Password123$"
+
+async function replayOperationAs(page: Page, request: Request) {
+  const url = new URL(request.url())
+  return page.request.post(`${url.pathname}${url.search}`, {
+    headers: { "Content-Type": "application/json" },
+    data: request.postDataJSON(),
+  })
+}
+
+async function fetchMoveSnapshots(page: Page, ids: readonly number[]) {
+  const res = await page.request.get("/api/query/account-moves")
+  if (!res.ok()) throw new Error(`account-moves query failed: ${res.status()}`)
+  const json = (await res.json()) as { data?: Array<Record<string, unknown>> }
+  return ids.map((id) => {
+    const row = (json.data ?? []).find((candidate) => scalarQueryId(candidate.id) === id)
+    if (!row) throw new Error(`account move not found: ${id}`)
+    return {
+      id,
+      amountResidual: Number(row.amountResidual ?? row.amount_residual),
+      paymentState: row.paymentState ?? row.payment_state,
+      state: row.state,
+    }
+  })
+}
 
 /**
  * ACC-003: journal entry create -> post -> reconcile against a posted invoice.
@@ -352,6 +379,7 @@ async function createDraftJournalEntry(
 
 test.describe("Accounting journal entry post + reconcile", { tag: "@p0" }, () => {
   test("posts a draft journal entry via UI, then reconciles it against a posted invoice", async ({
+    browser,
     page,
   }) => {
     test.setTimeout(240_000)
@@ -484,5 +512,24 @@ test.describe("Accounting journal entry post + reconcile", { tag: "@p0" }, () =>
         { timeout: 30_000 },
       )
       .toEqual({ residual: 0, paymentState: "Paid" })
+
+    const acceptedEffect = await fetchMoveSnapshots(page, [entryMoveId, invoiceMoveId])
+
+    // The exact accepted request is stale once this invoice is settled. Both
+    // stale replay and a read-only persona must preserve the same two moves.
+    const replay = await replayOperationAs(page, reconcileRes.request())
+    expect(replay.status()).toBe(422)
+    expect(await fetchMoveSnapshots(page, [entryMoveId, invoiceMoveId])).toEqual(acceptedEffect)
+
+    const readerContext = await browser.newContext({ storageState: { cookies: [], origins: [] } })
+    const readerPage = await readerContext.newPage()
+    try {
+      await signIn(readerPage, "fixture.reader@example.test", PERSONA_PASSWORD)
+      const denial = await replayOperationAs(readerPage, reconcileRes.request())
+      expect(denial.status()).toBe(403)
+      expect(await fetchMoveSnapshots(page, [entryMoveId, invoiceMoveId])).toEqual(acceptedEffect)
+    } finally {
+      await readerContext.close()
+    }
   })
 })

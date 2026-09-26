@@ -417,6 +417,26 @@ pub fn test_asset_and_amortization_relation_negative_matrix(
         fixture.company_id,
         valid_asset.id,
     )?;
+    // COV-08d: confirm is a single Draft -> Running transition; a replay is
+    // rejected and leaves the exact asset unchanged.
+    let confirmed = find_asset(ctx, &valid_code)?;
+    if confirmed.state != crate::types::AssetState::Running {
+        return Err("confirmed asset is not Running".to_string());
+    }
+    match confirm_account_asset(
+        ctx,
+        fixture.organization_id,
+        fixture.company_id,
+        valid_asset.id,
+    ) {
+        Err(error) if error.contains("Draft state") => {}
+        Err(error) => return Err(format!("unexpected asset-confirm replay error: {error}")),
+        Ok(()) => return Err("asset-confirm replay unexpectedly succeeded".to_string()),
+    }
+    let after_replay = find_asset(ctx, &valid_code)?;
+    if after_replay.state != confirmed.state || after_replay.write_date != confirmed.write_date {
+        return Err("asset-confirm replay changed the canonical asset".to_string());
+    }
     if dispose_account_asset(
         ctx,
         fixture.organization_id,
