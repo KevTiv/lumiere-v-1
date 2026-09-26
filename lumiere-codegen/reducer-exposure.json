@@ -497,6 +497,11 @@
       "reason": "invoked by an enumerated frontend BFF call site"
     },
     {
+      "name": "cancel_replenishment_run",
+      "exposure": "session",
+      "reason": "removes a company-owned replenishment rule's pending scheduled runs; validates organization, company and rule scope"
+    },
+    {
       "name": "cancel_return_order",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
@@ -976,6 +981,11 @@
       "name": "create_bom",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
+    },
+    {
+      "name": "create_bom_byproduct",
+      "exposure": "session",
+      "reason": "adds a byproduct definition to an organization BOM; validates BOM scope, product, UOM compatibility and cost-share bounds"
     },
     {
       "name": "create_budget_line",
@@ -1954,6 +1964,11 @@
       "reason": "invoked by an enumerated frontend BFF call site"
     },
     {
+      "name": "create_workorder_quality_check",
+      "exposure": "session",
+      "reason": "attaches a required quality check to an executing company-owned workorder; validates organization, company, workorder and parent MO scope"
+    },
+    {
       "name": "deactivate_pos_config",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
@@ -2378,6 +2393,11 @@
       "name": "fail_warehouse_sync_intent",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
+    },
+    {
+      "name": "fail_workorder_quality_check",
+      "exposure": "session",
+      "reason": "records an in-process manufacturing quality failure; validates organization, company and workorder ownership of the check"
     },
     {
       "name": "finalize_import_assistant_job",
@@ -3523,6 +3543,11 @@
       "name": "schedule_document_retention_purge",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
+    },
+    {
+      "name": "schedule_replenishment_run",
+      "exposure": "session",
+      "reason": "opts an active, company-owned replenishment rule into recurring scheduled execution; validates organization, company and rule scope before insert"
     },
     {
       "name": "schedule_sales_sla_escalation",

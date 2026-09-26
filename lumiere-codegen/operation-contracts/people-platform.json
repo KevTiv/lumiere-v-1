@@ -4101,6 +4101,16 @@
       },
       "evidence": "run_inventory_uom_conversion_test: IR schema/exposure is locked as a denied test reducer; no client retry semantics apply"
     },
+    "run_inventory_warehouse_qc_location_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "run_inventory_warehouse_qc_location_test: IR schema/exposure is locked as a denied test reducer; no client retry semantics apply"
+    },
     "run_inventory_warehouse_sync_test": {
       "semantic_kind": "test",
       "client_facing": false,

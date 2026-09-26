@@ -3,7 +3,7 @@
 /// Tables:
 ///   - ReplenishmentRule
 ///   - StockReorderGroup
-use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
+use spacetimedb::{Identity, ReducerContext, ScheduleAt, SpacetimeType, Table, Timestamp};
 
 use crate::accounting::idempotency::{record_result, replayed_result};
 use crate::accounting::relations::require_active_currency_id;
@@ -623,6 +623,19 @@ pub fn execute_replenishment_rule(
     idempotency_key: String,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "replenishment_rule", "execute")?;
+    execute_replenishment_rule_impl(ctx, organization_id, company_id, rule_id, idempotency_key)
+}
+
+/// Shared body of `execute_replenishment_rule`, reusable by the scheduled
+/// worker below without requiring a user permission grant — the scheduler
+/// itself is the caller, not a user action.
+fn execute_replenishment_rule_impl(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    rule_id: u64,
+    idempotency_key: String,
+) -> Result<(), String> {
     require_company_in_organization(ctx, organization_id, company_id)?;
 
     let rule = ctx
@@ -779,6 +792,201 @@ pub fn execute_replenishment_rule(
             metadata: None,
         },
     );
+
+    Ok(())
+}
+
+// ── Scheduled execution ─────────────────────────────────────────────────────
+//
+// `next_run` on `ReplenishmentRule` was, until this table existed, an inert
+// timestamp: every execution stamped it but nothing ever consumed it, so a
+// rule only ran when a user clicked "execute." `ReplenishmentRunJob` gives a
+// rule an actual recurring schedule: `schedule_replenishment_run` opts a rule
+// in, `run_scheduled_replenishment` fires it and reschedules the next run
+// from the rule's freshly-updated `next_run`, and `cancel_replenishment_run`
+// opts it back out.
+
+#[derive(Clone)]
+#[spacetimedb::table(
+    accessor = replenishment_run_job,
+    index(accessor = replenishment_run_job_by_rule, btree(columns = [rule_id])),
+    scheduled(run_scheduled_replenishment)
+)]
+pub struct ReplenishmentRunJob {
+    #[primary_key]
+    #[auto_inc]
+    pub scheduled_id: u64,
+    pub scheduled_at: ScheduleAt,
+    pub organization_id: u64,
+    pub company_id: u64,
+    pub rule_id: u64,
+}
+
+fn rule_run_job_exists(ctx: &ReducerContext, rule_id: u64) -> bool {
+    ctx.db
+        .replenishment_run_job()
+        .replenishment_run_job_by_rule()
+        .filter(&rule_id)
+        .next()
+        .is_some()
+}
+
+/// Opt an active rule into automatic recurring execution. Fails closed if the
+/// rule already has a pending scheduled run — call `cancel_replenishment_run`
+/// first rather than silently scheduling a duplicate.
+#[spacetimedb::reducer]
+pub fn schedule_replenishment_run(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    rule_id: u64,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "replenishment_rule", "write")?;
+
+    let rule = ctx
+        .db
+        .replenishment_rule()
+        .id()
+        .find(&rule_id)
+        .ok_or("Rule not found")?;
+    if rule.organization_id != organization_id {
+        return Err("Rule does not belong to this organization".to_string());
+    }
+    if rule.company_id != company_id {
+        return Err("Rule does not belong to this company".to_string());
+    }
+    if !rule.active {
+        return Err("Rule is not active".to_string());
+    }
+    if rule_run_job_exists(ctx, rule_id) {
+        return Err(format!("Rule {} already has a scheduled run", rule_id));
+    }
+
+    let when = rule
+        .next_run
+        .unwrap_or(ctx.timestamp + std::time::Duration::from_secs(86400));
+    ctx.db.replenishment_run_job().insert(ReplenishmentRunJob {
+        scheduled_id: 0,
+        scheduled_at: ScheduleAt::Time(when),
+        organization_id,
+        company_id,
+        rule_id,
+    });
+
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "replenishment_rule",
+            record_id: rule_id,
+            action: "UPDATE",
+            old_values: None,
+            new_values: Some(serde_json::json!({ "scheduled": true }).to_string()),
+            changed_fields: vec!["scheduled".to_string()],
+            metadata: None,
+        },
+    );
+
+    Ok(())
+}
+
+/// Opt a rule back out of automatic execution by removing its pending job(s).
+/// A rule with no scheduled run is a no-op success, not an error.
+#[spacetimedb::reducer]
+pub fn cancel_replenishment_run(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    rule_id: u64,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "replenishment_rule", "write")?;
+
+    let rule = ctx
+        .db
+        .replenishment_rule()
+        .id()
+        .find(&rule_id)
+        .ok_or("Rule not found")?;
+    if rule.organization_id != organization_id {
+        return Err("Rule does not belong to this organization".to_string());
+    }
+    if rule.company_id != company_id {
+        return Err("Rule does not belong to this company".to_string());
+    }
+
+    let jobs: Vec<u64> = ctx
+        .db
+        .replenishment_run_job()
+        .replenishment_run_job_by_rule()
+        .filter(&rule_id)
+        .map(|job| job.scheduled_id)
+        .collect();
+    for scheduled_id in jobs {
+        ctx.db.replenishment_run_job().scheduled_id().delete(&scheduled_id);
+    }
+
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "replenishment_rule",
+            record_id: rule_id,
+            action: "UPDATE",
+            old_values: None,
+            new_values: Some(serde_json::json!({ "scheduled": false }).to_string()),
+            changed_fields: vec!["scheduled".to_string()],
+            metadata: None,
+        },
+    );
+
+    Ok(())
+}
+
+/// Scheduled worker: executes the rule's demand check using a deterministic,
+/// job-scoped idempotency key, then reschedules the next run from the rule's
+/// freshly-updated `next_run`. If the rule was deleted or deactivated since
+/// this job was scheduled, it runs once more as a no-op and does not
+/// reschedule — the job row itself is auto-deleted by SpacetimeDB after this
+/// reducer returns, regardless.
+#[spacetimedb::reducer]
+pub fn run_scheduled_replenishment(
+    ctx: &ReducerContext,
+    job: ReplenishmentRunJob,
+) -> Result<(), String> {
+    let Some(rule) = ctx.db.replenishment_rule().id().find(&job.rule_id) else {
+        return Ok(());
+    };
+    if !rule.active {
+        return Ok(());
+    }
+
+    let idempotency_key = format!("scheduled:{}:{}", job.rule_id, job.scheduled_id);
+    execute_replenishment_rule_impl(
+        ctx,
+        job.organization_id,
+        job.company_id,
+        job.rule_id,
+        idempotency_key,
+    )?;
+
+    let updated_rule = ctx
+        .db
+        .replenishment_rule()
+        .id()
+        .find(&job.rule_id)
+        .ok_or("Rule disappeared mid-execution")?;
+    let next_when = updated_rule
+        .next_run
+        .unwrap_or(ctx.timestamp + std::time::Duration::from_secs(86400));
+    ctx.db.replenishment_run_job().insert(ReplenishmentRunJob {
+        scheduled_id: 0,
+        scheduled_at: ScheduleAt::Time(next_when),
+        organization_id: job.organization_id,
+        company_id: job.company_id,
+        rule_id: job.rule_id,
+    });
 
     Ok(())
 }

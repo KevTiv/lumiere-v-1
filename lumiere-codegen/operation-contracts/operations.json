@@ -220,6 +220,16 @@
       "idempotency": "state_guarded",
       "semantic_kind": "command"
     },
+    "cancel_replenishment_run": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/inventory/replenishment.rs:897 reducer body shows keyed overwrite/delete or recomputation (deletes the rule's pending replenishment_run_job rows; no-op when none); session-exposed.",
+      "idempotency": "idempotent",
+      "semantic_kind": "command"
+    },
     "cancel_stock_move": {
       "client_facing": true,
       "codec": {
@@ -440,13 +450,23 @@
       "idempotency": "non_idempotent",
       "semantic_kind": "command"
     },
+    "create_bom_byproduct": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/manufacturing/bill_of_materials.rs:665 reducer body shows current-state or membership guard (one byproduct row per product per BOM, cost-share cap); session-exposed.",
+      "idempotency": "state_guarded",
+      "semantic_kind": "command"
+    },
     "create_company_stock_location": {
       "client_facing": true,
       "codec": {
         "id": "spacetimedb-sats-json",
         "version": 1
       },
-      "evidence": "spacetimedb/src/inventory/warehouse.rs:635 reducer body shows append-only insert/event or accumulated side effect; session-exposed.",
+      "evidence": "spacetimedb/src/inventory/warehouse.rs:642 reducer body shows append-only insert/event or accumulated side effect; session-exposed.",
       "idempotency": "non_idempotent",
       "semantic_kind": "command"
     },
@@ -1140,6 +1160,16 @@
       "idempotency": "non_idempotent",
       "semantic_kind": "command"
     },
+    "create_workorder_quality_check": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/inventory/quality.rs:406 reducer body shows current-state or membership guard (one quality check per Progress workorder); session-exposed.",
+      "idempotency": "state_guarded",
+      "semantic_kind": "command"
+    },
     "delete_barcode_nomenclature": {
       "client_facing": true,
       "codec": {
@@ -1479,6 +1509,16 @@
       "evidence": "spacetimedb/src/inventory/warehouse_sync.rs:341 reducer body shows request/idempotency key or intent guard; session-exposed.",
       "idempotency": "request_guarded",
       "semantic_kind": "operator"
+    },
+    "fail_workorder_quality_check": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/inventory/quality.rs:508 reducer body shows current-state or membership guard (completed checks are rejected); session-exposed.",
+      "idempotency": "state_guarded",
+      "semantic_kind": "command"
     },
     "finish_manufacturing_order": {
       "client_facing": true,
@@ -2180,6 +2220,16 @@
       "idempotency": "state_guarded",
       "semantic_kind": "operator"
     },
+    "run_scheduled_replenishment": {
+      "client_facing": false,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/inventory/replenishment.rs:954 scheduled reducer for replenishment_run_job: executes the rule's demand and inserts the next job; denied internal reducer.",
+      "idempotency": "non_idempotent",
+      "semantic_kind": "internal"
+    },
     "run_traceability_report": {
       "client_facing": true,
       "codec": {
@@ -2199,6 +2249,16 @@
       "evidence": "spacetimedb/src/documents/regional.rs:263 reducer body shows append-only insert/event or accumulated side effect; session-exposed.",
       "idempotency": "non_idempotent",
       "semantic_kind": "operator"
+    },
+    "schedule_replenishment_run": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/inventory/replenishment.rs:838 reducer body shows current-state or membership guard (rejects a rule that already has a pending replenishment_run_job); session-exposed.",
+      "idempotency": "state_guarded",
+      "semantic_kind": "command"
     },
     "seed_pack_holidays": {
       "client_facing": false,

@@ -1170,6 +1170,48 @@ pub fn cancel_manufacturing_order(
     }
 }
 
+fn require_workorder_parent(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    wo: &MrpWorkorder,
+) -> Result<MrpProduction, String> {
+    let mo = require_mo_in_company(ctx, organization_id, company_id, wo.production_id)?;
+    if !mo.workorder_ids.contains(&wo.id) {
+        return Err(format!(
+            "Manufacturing order {} does not own workorder {}",
+            mo.id, wo.id
+        ));
+    }
+    Ok(mo)
+}
+
+pub(crate) fn require_workorder_execution_scope(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    workorder_id: u64,
+) -> Result<(MrpWorkorder, MrpProduction), String> {
+    require_company_in_organization(ctx, organization_id, company_id)?;
+    let wo = ctx
+        .db
+        .mrp_workorder()
+        .id()
+        .find(&workorder_id)
+        .ok_or("Work order not found")?;
+    if wo.organization_id != organization_id {
+        return Err("Work order does not belong to this organization".to_string());
+    }
+    if wo.company_id != company_id {
+        return Err("Record does not belong to this company".to_string());
+    }
+    let mo = require_workorder_parent(ctx, organization_id, company_id, &wo)?;
+    if mo.state != MoState::Progress && mo.state != MoState::ToClose {
+        return Err("Parent manufacturing order must be in Progress or ToClose".to_string());
+    }
+    Ok((wo, mo))
+}
+
 // ============================================================================
 // REDUCERS: WORK ORDER
 // ============================================================================
