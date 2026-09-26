@@ -34,6 +34,7 @@ use crate::types::TimesheetInvoiceType;
     index(accessor = timesheet_by_employee, btree(columns = [employee_id])),
     index(accessor = timesheet_by_company, btree(columns = [company_id]))
 )]
+#[derive(PartialEq)]
 pub struct ProjectTimesheet {
     #[primary_key]
     #[auto_inc]
