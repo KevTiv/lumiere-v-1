@@ -4,7 +4,7 @@ use spacetimedb::{ReducerContext, Table};
 
 use crate::core::persistence::{organization_commit, organization_row_change};
 use crate::iot::actions::{create_iot_action, iot_action, CreateActionParams};
-use crate::iot::alerts::iot_alert;
+use crate::iot::alerts::{create_iot_alert, iot_alert, resolve_iot_alert};
 use crate::iot::integrations::link_device_to_location;
 use crate::iot::registry::{
     iot_device, iot_hub, register_iot_device, register_iot_hub, sync_hub_devices, DeviceSyncEntry,
@@ -317,6 +317,74 @@ pub fn test_device_sync_records_one_ordered_commit(ctx: &ReducerContext) -> Resu
             .any(|id| !synced_ids.contains(&id))
     {
         return Err("device sync commit did not preserve exact ordered org rows".to_string());
+    }
+    Ok(())
+}
+
+/// COV-16: resolving an alert is a one-way transition. Cross-organization
+/// resolution and a replay of the accepted resolution must both be rejected
+/// and leave the alert row unchanged.
+pub fn test_resolve_alert_rejects_replay(ctx: &ReducerContext) -> Result<(), String> {
+    ensure_test_superuser(ctx)?;
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let other = OrgFixture::seed_minimal(ctx)?;
+    let device_id = seed_device(ctx, &fixture, "Cov16 Resolve Sensor", "TemperatureSensor")?;
+
+    create_iot_alert(
+        ctx,
+        fixture.organization_id,
+        device_id,
+        "cov16_manual".to_string(),
+        "Warning".to_string(),
+        "COV-16 resolve proof".to_string(),
+    )?;
+    let open = ctx
+        .db
+        .iot_alert()
+        .iter()
+        .find(|a| a.device_id == device_id && a.alert_type == "cov16_manual")
+        .ok_or("COV-16 alert missing after create")?;
+    if open.resolved_at.is_some() || open.resolved_by.is_some() {
+        return Err("new alert must start unresolved".to_string());
+    }
+
+    if resolve_iot_alert(ctx, other.organization_id, open.id).is_ok() {
+        return Err("cross-organization resolution must be rejected".to_string());
+    }
+    let untouched = ctx
+        .db
+        .iot_alert()
+        .id()
+        .find(&open.id)
+        .ok_or("alert vanished after rejected resolution")?;
+    if untouched != open {
+        return Err("rejected cross-organization resolution mutated the alert".to_string());
+    }
+
+    resolve_iot_alert(ctx, fixture.organization_id, open.id)?;
+    let resolved = ctx
+        .db
+        .iot_alert()
+        .id()
+        .find(&open.id)
+        .ok_or("alert vanished after resolution")?;
+    if resolved.resolved_at.is_none() || resolved.resolved_by != Some(ctx.sender()) {
+        return Err("resolution did not persist resolved_at/resolved_by".to_string());
+    }
+
+    match resolve_iot_alert(ctx, fixture.organization_id, open.id) {
+        Err(message) if message.contains("already resolved") => {}
+        Err(message) => return Err(format!("unexpected replay rejection: {message}")),
+        Ok(()) => return Err("replayed resolution must be rejected".to_string()),
+    }
+    let after_replay = ctx
+        .db
+        .iot_alert()
+        .id()
+        .find(&open.id)
+        .ok_or("alert vanished after replay")?;
+    if after_replay != resolved {
+        return Err("rejected replay mutated the resolved alert".to_string());
     }
     Ok(())
 }
