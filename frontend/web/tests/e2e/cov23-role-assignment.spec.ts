@@ -80,10 +80,18 @@ test.describe("COV-23 exact role assignment", { tag: ["@p0", "@cov23"] }, () => 
     test.setTimeout(180_000)
     const organizationId = await fetchSessionOrganizationId(page)
 
-    const target = (await rows(page, `/api/settings/users?limit=100&search=${encodeURIComponent(TARGET_EMAIL)}`))
-      .filter((row) => row.email === TARGET_EMAIL)
-    expect(target).toHaveLength(1)
-    const targetIdentity = identityHex(target[0]?.identity)
+    // The persona's identity comes from its own sign-in session cookie
+    // (`/api/settings/*` is not proxied to the api-server in E2E).
+    const targetContext = await browser.newContext({ storageState: { cookies: [], origins: [] } })
+    let targetIdentity = ""
+    try {
+      await signIn(await targetContext.newPage(), TARGET_EMAIL, PERSONA_PASSWORD)
+      targetIdentity = identityHex(
+        (await targetContext.cookies()).find((cookie) => cookie.name === "stdb_identity")?.value,
+      )
+    } finally {
+      await targetContext.close()
+    }
     expect(targetIdentity).toMatch(/^[0-9a-f]{64}$/)
 
     // Setup only: a fresh, minimal role so the assignment is unambiguous and
