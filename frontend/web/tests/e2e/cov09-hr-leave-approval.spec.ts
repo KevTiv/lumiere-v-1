@@ -98,10 +98,14 @@ test.describe("COV-09 exact leave submit → approve / refuse", { tag: ["@p0", "
     const organizationId = await fetchSessionOrganizationId(page)
     const companyId = await fetchDefaultCompanyId(page)
 
-    const approver = (await rows(page, `/api/settings/users?limit=100&search=${encodeURIComponent(APPROVER_EMAIL)}`))
-      .filter((row) => row.email === APPROVER_EMAIL)
-    expect(approver).toHaveLength(1)
-    const approverIdentity = identityHex(approver[0]?.identity)
+    // Sign the approver persona in first: its identity comes from its own
+    // stdb_identity session cookie (`/api/settings/*` is not proxied in E2E).
+    const approverContext = await browser.newContext({ storageState: { cookies: [], origins: [] } })
+    const approverPage = await approverContext.newPage()
+    await signIn(approverPage, APPROVER_EMAIL, PERSONA_PASSWORD)
+    const approverIdentity = identityHex(
+      (await approverContext.cookies()).find((cookie) => cookie.name === "stdb_identity")?.value,
+    )
     expect(approverIdentity).toMatch(/^[0-9a-f]{64}$/)
 
     // ── Fixtures (setup calls only) ─────────────────────────────────────────
@@ -191,13 +195,9 @@ test.describe("COV-09 exact leave submit → approve / refuse", { tag: ["@p0", "
     }
 
     // ── Operator path: the HR approver persona drives every transition ─────
-    const approverContext = await browser.newContext({ storageState: { cookies: [], origins: [] } })
-    const approverPage = await approverContext.newPage()
     const readerContext = await browser.newContext({ storageState: { cookies: [], origins: [] } })
     const readerPage = await readerContext.newPage()
     try {
-      await signIn(approverPage, APPROVER_EMAIL, PERSONA_PASSWORD)
-
       for (const leaveId of [toApprove, toRefuse, ownLeave]) {
         const submitted = await runLeaveAction(approverPage, leaveId, "submit-leave", "submit_leave")
         expect(submitted.ok()).toBe(true)
