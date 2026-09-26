@@ -196,6 +196,7 @@ pub struct UpdateCalendarEventParams {
     index(accessor = activity_by_user, btree(columns = [user_id])),
     index(accessor = activity_by_deadline, btree(columns = [date_deadline]))
 )]
+#[derive(PartialEq)]
 pub struct Activity {
     #[primary_key]
     #[auto_inc]

@@ -526,7 +526,7 @@ pub fn test_complete_activity_rejects_replay(ctx: &ReducerContext) -> Result<(),
         .id()
         .find(&created.id)
         .ok_or("activity vanished after rejected completion".to_string())?;
-    if untouched.is_done || untouched.state != created.state || untouched.date_done.is_some() {
+    if untouched != created {
         return Err("rejected cross-organization completion mutated the activity".to_string());
     }
 
@@ -553,11 +553,7 @@ pub fn test_complete_activity_rejects_replay(ctx: &ReducerContext) -> Result<(),
         .id()
         .find(&created.id)
         .ok_or("activity vanished after replay".to_string())?;
-    if after_replay.is_done != completed.is_done
-        || after_replay.state != completed.state
-        || after_replay.date_done != completed.date_done
-        || after_replay.updated_at != completed.updated_at
-    {
+    if after_replay != completed {
         return Err("rejected replay mutated the completed activity".to_string());
     }
 
