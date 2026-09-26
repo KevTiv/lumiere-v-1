@@ -134,6 +134,10 @@ async function receivePoLineQty(
 }
 
 async function createBillFromPo(page: import("@playwright/test").Page, orderId: number) {
+  // Receiving a stocked line may navigate to the new receipt (navigateToNext), and that
+  // client-side push can land after the receive form closes. Reload purchasing so the bill
+  // step never races it.
+  await gotoModule(page, "/purchasing", "purchasing")
   await selectModuleTab(page, "purchasing", "orders")
   const journalLabel = await fetchVendorBillJournalLabel(page)
   const expenseLabel = await fetchAccountSelectLabelByInternalType(page, "expense")
