@@ -242,6 +242,7 @@ test.describe("Pre-tenant payment adversarial", { tag: pretenantTags("@payments"
       (row) => idOf(field(row, "allocatedMoveLineId", "allocated_move_line_id")) === lineB,
     )
     expect(invoiceBRow).toBeDefined()
+    if (!invoiceBRow) throw new Error("PAY-06 invoice B reconciliation row missing")
     expect(toMinor(field(invoiceBRow, "residualAfter", "residual_after"))).toBe(3_000)
     for (const row of rows) {
       expect(toMinor(field(row, "writeOffAmount", "write_off_amount"))).toBe(0)
