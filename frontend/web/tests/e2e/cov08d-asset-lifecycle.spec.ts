@@ -1,7 +1,7 @@
 import { expect, test, type Page, type Request } from "@playwright/test"
 
 import {
-  callReducerBff,
+  callReducerOwner,
   fetchDefaultCompanyId,
   fetchSessionOrganizationId,
   gotoModule,
@@ -103,10 +103,12 @@ test.describe("COV-08d exact fixed-asset lifecycle", { tag: ["@p0", "@cov08", "@
     const expenseAccountId = await pickAccount(page, companyId, "Expense")
     const journalId = await pickGeneralJournal(page, companyId)
 
-    // Setup only: the Draft asset is fixture data. The transitions under test
-    // are driven through the Fixed Assets UI below.
+    // Setup only: the Draft asset is fixture data, created with the trusted
+    // owner call (the session compat route returns a redacted 500 for this
+    // accounting fixture). The transitions under test are driven through the
+    // Fixed Assets UI below.
     const code = smokeName("cov08d-asset").slice(-24)
-    await callReducerBff(page, "create_account_asset", [organizationId, companyId, {
+    await callReducerOwner("create_account_asset", [organizationId, companyId, {
       idempotency_key: code,
       code,
       name: `COV-08d asset ${code}`,
