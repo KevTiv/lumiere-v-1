@@ -64,8 +64,9 @@ pub const CERT_SEEDS: &[u64] = &[1, 42, 1337, 20_260_912, 0xDEAD_BEEF];
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::accounting::money::{validate_pilot_money_amount, PILOT_MAX_MAJOR_UNITS};
 
-    /// Mirror of the private production constant; the source check below keeps it honest.
+    /// Mirror of the private production reconciliation epsilon; the source check below keeps it honest.
     const RECONCILIATION_EPSILON: f64 = 0.000_001;
     const PAYMENT_MANAGEMENT_SOURCE: &str =
         include_str!("../../src/accounting/payment_management.rs");
@@ -80,6 +81,26 @@ mod tests {
     }
 
     #[test]
+    fn production_pilot_money_guard_rejects_non_finite_and_out_of_envelope_values() {
+        for amount in [
+            f64::NAN,
+            f64::INFINITY,
+            f64::NEG_INFINITY,
+            PILOT_MAX_MAJOR_UNITS + 0.01,
+            -(PILOT_MAX_MAJOR_UNITS + 0.01),
+        ] {
+            assert!(
+                validate_pilot_money_amount("amount", amount).is_err(),
+                "production pilot guard accepted {amount}"
+            );
+        }
+        for amount in [-PILOT_MAX_MAJOR_UNITS, 0.0, PILOT_MAX_MAJOR_UNITS] {
+            validate_pilot_money_amount("amount", amount)
+                .unwrap_or_else(|error| panic!("production pilot guard rejected {amount}: {error}"));
+        }
+    }
+
+    #[test]
     fn f64_accumulation_requires_minor_unit_rounding() {
         let mut sum = 0.0_f64;
         for _ in 0..100 {
@@ -91,9 +112,9 @@ mod tests {
         assert_eq!(to_minor(0.1 + 0.2, 2), to_minor(0.3, 2));
     }
 
-    /// Characterises the pre-tenant blocker documented as MONEY-PRECISION in the plan:
-    /// from ~1e10 major units the absolute epsilon is below f64 resolution, so admission
-    /// comparisons silently become exact float comparisons.
+    /// Characterises why the pilot admission cap exists: from ~1e10 major units
+    /// the absolute epsilon is below f64 resolution, so allocation comparisons
+    /// silently become exact float comparisons.
     #[test]
     fn reconciliation_epsilon_is_below_f64_resolution_from_ten_billion() {
         assert!(ulp(1.0e9) < RECONCILIATION_EPSILON);
@@ -156,24 +177,27 @@ mod tests {
         out
     }
 
-    /// Safe envelope: zero-, two- and three-decimal currencies up to 1e8 major units.
+    /// Pilot envelope: zero-, two- and three-decimal currencies through the
+    /// production admission cap.
     #[test]
-    fn f64_admission_matches_exact_minor_units_inside_safe_envelope() {
+    fn f64_admission_matches_exact_minor_units_inside_pilot_envelope() {
+        let max_major = PILOT_MAX_MAJOR_UNITS as u64;
+        assert_eq!(max_major, 1_000_000_000);
         for decimals in [0, 2, 3] {
-            let result = run_envelope(decimals, 100_000_000, 2_000);
+            let result = run_envelope(decimals, max_major, 2_000);
             assert_eq!(
                 result.diverged,
                 0,
-                "f64 admission diverged from exact minor units inside the safe envelope: {:?} ({} trials)",
+                "f64 admission diverged from exact minor units inside the pilot envelope: {:?} ({} trials)",
                 result.first,
                 result.trials
             );
         }
     }
 
-    /// Outside the envelope the representation is not exact. This test asserts the
-    /// divergence exists so the plan's blocker cannot silently go stale; when money moves
-    /// to integer minor units / decimals, invert it into a blocking exactness test.
+    /// Far outside the enforced pilot envelope the representation is not exact.
+    /// Keep this characterization so removing/raising the cap requires an explicit
+    /// representation decision instead of silently widening f64 admission.
     #[test]
     fn f64_admission_diverges_beyond_ten_billion_major_units() {
         let result = run_envelope(2, 1_000_000_000_000, 2_000);

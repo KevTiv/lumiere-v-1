@@ -15,6 +15,7 @@ use crate::accounting::bank_reconciliation::{
 };
 use crate::accounting::idempotency::accounting_operation_receipt;
 use crate::accounting::journal_entries::{account_move, account_move_line};
+use crate::accounting::money::PILOT_MAX_MAJOR_UNITS;
 use crate::accounting::payment_management::{
     allocate_payment_transaction, create_payment_account, create_payment_transaction,
     payment_account, payment_reconciliation, payment_reversal, payment_transaction,
@@ -39,7 +40,7 @@ pub const CASES: &[CertCase] = &[
     ("PAY-06", pay_06_overpayment_and_partial_multi_invoice_are_explicit),
     ("PAY-07", pay_07_reference_duplicate_scope),
     ("PAY-08", pay_08_many_small_allocations_reconcile_exactly),
-    ("PAY-09", pay_09_large_values_settle_exactly),
+    ("PAY-09", pay_09_pilot_money_boundary_is_enforced),
     ("PAY-10", pay_10_statement_staging_fixture_matrix),
     ("PAY-11A", pay_11a_conflicting_statement_replay_does_not_mutate),
     ("PAY-11B", pay_11b_conflicting_statement_replay_fails_closed),
@@ -604,20 +605,77 @@ fn pay_08_many_small_allocations_reconcile_exactly(ctx: &ReducerContext) -> Resu
     require_minor_eq("split unapplied", unapplied(ctx, split_payment)?, 0, CENTS)
 }
 
-/// A ~1.2e10 payment settled by two invoices must reconcile to the cent. Beyond ~1e10
-/// the absolute reconciliation epsilon is below f64 resolution (MONEY-PRECISION).
-fn pay_09_large_values_settle_exactly(ctx: &ReducerContext) -> Result<(), String> {
+/// The enforced pilot money envelope is exact at the boundary and rejects
+/// values that would widen the f64 domain without a representation change.
+fn pay_09_pilot_money_boundary_is_enforced(ctx: &ReducerContext) -> Result<(), String> {
     let w = setup("wallet", wallet(ctx, "pay09"))?;
-    let (large_invoice, large_line) = setup("large invoice", invoice(ctx, &w, 12_345_678_901.22))?;
+    let cap = PILOT_MAX_MAJOR_UNITS;
+    let (large_invoice, large_line) =
+        setup("large invoice", invoice(ctx, &w, cap - 0.01))?;
     let (cent_invoice, cent_line) = setup("cent invoice", invoice(ctx, &w, 0.01))?;
-    let payment = setup("large receipt", posted_receipt(ctx, &w, "PAY09-LARGE", 12_345_678_901.23))?;
-    allocate(ctx, &w, payment, large_line, 12_345_678_901.22, "pay09-large")
-        .map_err(|error| format!("large allocation rejected: {error}"))?;
+    let payment = setup("cap receipt", posted_receipt(ctx, &w, "PAY09-CAP", cap))?;
+    allocate(ctx, &w, payment, large_line, cap - 0.01, "pay09-large")
+        .map_err(|error| format!("cap allocation rejected: {error}"))?;
     allocate(ctx, &w, payment, cent_line, 0.01, "pay09-final-cent")
-        .map_err(|error| format!("final cent of a large payment rejected: {error}"))?;
-    require_minor_eq("large invoice residual", invoice_residual(ctx, large_invoice)?, 0, CENTS)?;
+        .map_err(|error| format!("final cent at cap rejected: {error}"))?;
+    require_minor_eq("cap invoice residual", invoice_residual(ctx, large_invoice)?, 0, CENTS)?;
     require_minor_eq("cent invoice residual", invoice_residual(ctx, cent_invoice)?, 0, CENTS)?;
-    require_minor_eq("large unapplied", unapplied(ctx, payment)?, 0, CENTS)
+    require_minor_eq("cap unapplied", unapplied(ctx, payment)?, 0, CENTS)?;
+
+    for (reference, amount) in [
+        ("PAY09-OVER", cap + 0.01),
+        ("PAY09-NAN", f64::NAN),
+        ("PAY09-INF", f64::INFINITY),
+    ] {
+        if create_receipt(ctx, &w, reference, amount).is_ok() {
+            return Err(format!("out-of-envelope payment {reference} was accepted"));
+        }
+        if ctx.db.payment_transaction().iter().any(|transaction| {
+            transaction.organization_id == w.org()
+                && transaction.external_reference.as_deref() == Some(reference)
+        }) {
+            return Err(format!(
+                "rejected out-of-envelope payment {reference} still persisted"
+            ));
+        }
+    }
+
+    let (_, invalid_line) = setup("invalid allocation invoice", invoice(ctx, &w, 100.0))?;
+    let invalid_payment =
+        setup("invalid allocation receipt", posted_receipt(ctx, &w, "PAY09-ALLOC", 100.0))?;
+    for (key, allocated_amount, write_off_amount) in [
+        ("pay09-alloc-nan", f64::NAN, 0.0),
+        ("pay09-writeoff-inf", 1.0, f64::INFINITY),
+    ] {
+        let result = allocate_payment_transaction(
+            ctx,
+            w.org(),
+            AllocatePaymentParams {
+                idempotency_key: key.to_string(),
+                company_id: w.company(),
+                payment_transaction_id: invalid_payment,
+                allocated_move_line_id: invalid_line,
+                allocated_amount,
+                currency_id: w.currency_id,
+                write_off_amount,
+                write_off_account_id: None,
+                metadata: None,
+            },
+        );
+        if result.is_ok() {
+            return Err(format!("non-finite allocation input {key} was accepted"));
+        }
+    }
+    if ctx
+        .db
+        .payment_reconciliation()
+        .iter()
+        .any(|row| row.payment_transaction_id == invalid_payment)
+    {
+        return Err("rejected non-finite allocation persisted reconciliation state".to_string());
+    }
+
+    Ok(())
 }
 
 struct StatementScope {
@@ -720,23 +778,108 @@ fn pay_10_statement_staging_fixture_matrix(ctx: &ReducerContext) -> Result<(), S
         statement_row(ctx, 9, true, Some(0.0), Some("REF-ZERO")),
         statement_row(ctx, 10, true, Some(f64::NAN), Some("REF-NAN")),
         statement_row(ctx, 11, true, Some(f64::INFINITY), Some("REF-INF")),
+        statement_row(
+            ctx,
+            12,
+            true,
+            Some(PILOT_MAX_MAJOR_UNITS + 0.01),
+            Some("REF-OVER-LIMIT"),
+        ),
     ];
     stage(ctx, &scope, "pay10-matrix", rows)?;
     let imports = staged_imports(ctx, &scope, "pay10-matrix");
     let [(import_id, total, invalid, state)] = imports.as_slice() else {
         return Err(format!("expected one staged import, got {}", imports.len()));
     };
-    if (*total, *invalid, state.as_str()) != (10, 5, "needs_review") {
+    if (*total, *invalid, state.as_str()) != (11, 6, "needs_review") {
         return Err(format!("staging summary mismatch: total={total} invalid={invalid} state={state}"));
     }
     let lines = staged_lines(ctx, *import_id);
     let invalid_rows: Vec<u32> = lines.iter().filter(|l| l.2).map(|l| l.0).collect();
-    if invalid_rows != vec![6, 8, 9, 10, 11] {
+    if invalid_rows != vec![6, 8, 9, 10, 11, 12] {
         return Err(format!("unexpected invalid rows {invalid_rows:?}"));
     }
     let negative = lines.iter().find(|l| l.0 == 7).and_then(|l| l.1);
     if negative != Some(-4_510) {
         return Err(format!("negative amount not preserved exactly: {negative:?}"));
+    }
+
+    let oversized_opening_key = "pay10-opening-over-limit";
+    let oversized_opening = stage_bank_statement_import(
+        ctx,
+        scope.org,
+        scope.company,
+        scope.journal_id,
+        scope.currency_id,
+        StageBankStatementImportParams {
+            file_name: Some(format!("{oversized_opening_key}.csv")),
+            idempotency_key: oversized_opening_key.to_string(),
+            opening_balance: PILOT_MAX_MAJOR_UNITS + 0.01,
+            rows: vec![statement_row(
+                ctx,
+                2,
+                true,
+                Some(1.0),
+                Some("REF-OPENING"),
+            )],
+        },
+    );
+    if oversized_opening.is_ok() {
+        return Err("oversized statement opening balance was accepted".to_string());
+    }
+    if !staged_imports(ctx, &scope, oversized_opening_key).is_empty() {
+        return Err("rejected opening balance still persisted a statement import".to_string());
+    }
+
+    let oversized_total_key = "pay10-total-over-limit";
+    let oversized_total = stage_bank_statement_import(
+        ctx,
+        scope.org,
+        scope.company,
+        scope.journal_id,
+        scope.currency_id,
+        StageBankStatementImportParams {
+            file_name: Some(format!("{oversized_total_key}.csv")),
+            idempotency_key: oversized_total_key.to_string(),
+            opening_balance: 0.0,
+            rows: vec![
+                statement_row(ctx, 2, true, Some(600_000_000.0), Some("REF-TOTAL-A")),
+                statement_row(ctx, 3, true, Some(600_000_000.0), Some("REF-TOTAL-B")),
+            ],
+        },
+    );
+    if oversized_total.is_ok() {
+        return Err("oversized statement movement total was accepted".to_string());
+    }
+    if !staged_imports(ctx, &scope, oversized_total_key).is_empty() {
+        return Err("rejected statement movement total still persisted an import".to_string());
+    }
+
+    let oversized_closing_key = "pay10-closing-over-limit";
+    let oversized_closing = stage_bank_statement_import(
+        ctx,
+        scope.org,
+        scope.company,
+        scope.journal_id,
+        scope.currency_id,
+        StageBankStatementImportParams {
+            file_name: Some(format!("{oversized_closing_key}.csv")),
+            idempotency_key: oversized_closing_key.to_string(),
+            opening_balance: 900_000_000.0,
+            rows: vec![statement_row(
+                ctx,
+                2,
+                true,
+                Some(200_000_000.0),
+                Some("REF-CLOSING"),
+            )],
+        },
+    );
+    if oversized_closing.is_ok() {
+        return Err("oversized statement closing balance was accepted".to_string());
+    }
+    if !staged_imports(ctx, &scope, oversized_closing_key).is_empty() {
+        return Err("rejected statement closing balance still persisted an import".to_string());
     }
 
     let huge: Vec<_> = (1..=2_000)

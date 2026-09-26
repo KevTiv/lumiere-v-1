@@ -14,6 +14,7 @@ use crate::accounting::journal_entries::{
     account_move, account_move_line, insert_draft_account_move_line,
     is_receivable_or_payable_line_type, AccountMove, AccountMoveLine,
 };
+use crate::accounting::money::validate_pilot_money_amount;
 use crate::accounting::payments::{
     account_payment, insert_balanced_payment_lines_and_post, payment_line_params, AccountPayment,
 };
@@ -363,6 +364,14 @@ fn validate_payment_transaction_invariants(
     net: f64,
     fees: &[PaymentFee],
 ) -> Result<(), String> {
+    validate_pilot_money_amount("gross_external_amount", gross)?;
+    validate_pilot_money_amount("settlement_amount", settlement)?;
+    validate_pilot_money_amount("net_account_amount", net)?;
+    for fee in fees {
+        validate_pilot_money_amount("payment fee amount", fee.amount)?;
+        validate_pilot_money_amount("payment fee tax amount", fee.tax_amount)?;
+    }
+
     if gross <= 0.0 {
         return Err("gross_external_amount must be positive".to_string());
     }
@@ -871,6 +880,9 @@ pub fn create_payment_transaction(
         &params.evidence_document_ids,
     )?;
 
+    validate_pilot_money_amount("gross_external_amount", params.gross_external_amount)?;
+    validate_pilot_money_amount("settlement_amount", params.settlement_amount)?;
+    validate_pilot_money_amount("net_account_amount", params.net_account_amount)?;
     if params.gross_external_amount <= 0.0 {
         return Err("gross_external_amount must be positive".to_string());
     }
@@ -1238,6 +1250,8 @@ pub fn create_payment_fee(
     if transaction.status != PaymentTransactionStatus::Draft {
         return Err("Fees can only be added to draft transactions".to_string());
     }
+    validate_pilot_money_amount("payment fee amount", params.amount)?;
+    validate_pilot_money_amount("payment fee tax amount", params.tax_amount)?;
     if params.amount < 0.0 {
         return Err("Fee amount must be non-negative".to_string());
     }
@@ -1749,6 +1763,8 @@ pub fn allocate_payment_transaction(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "payment_reconciliation", "create")?;
     require_company_in_organization(ctx, organization_id, params.company_id)?;
+    validate_pilot_money_amount("allocated amount", params.allocated_amount)?;
+    validate_pilot_money_amount("write-off amount", params.write_off_amount)?;
     if params.allocated_amount <= 0.0 {
         return Err("allocated amount must be positive".to_string());
     }
@@ -1779,6 +1795,7 @@ pub fn allocate_payment_transaction(
     {
         return Ok(());
     }
+    validate_pilot_money_amount("payment settlement amount", transaction.settlement_amount)?;
     if transaction.status != PaymentTransactionStatus::Posted {
         return Err("only posted transactions can be allocated".to_string());
     }
@@ -1994,6 +2011,7 @@ pub fn allocate_payment_transaction(
 
     let residual_before = move_line.amount_residual.abs();
     let target_reduction = params.allocated_amount + params.write_off_amount;
+    validate_pilot_money_amount("allocation plus write-off", target_reduction)?;
     if target_reduction > residual_before + RECONCILIATION_EPSILON {
         return Err("allocation and write-off exceed the target residual".to_string());
     }

@@ -162,15 +162,16 @@ never a blind resend.
 Accounting remains the sole ledger source of truth; every case asserts ledger rows (ledger payment,
 move residuals, clearing residual) rather than operational rows alone.
 
-**Money representation.** Operational amounts are `f64`; admission uses an absolute
-`RECONCILIATION_EPSILON = 1e-6`. The native model (`money.rs`) shows exact agreement with integer
-minor units for 0-, 2- and 3-decimal currencies up to 1e8 major units, and demonstrates that from
-~1e10 major units the epsilon is below f64 resolution so admission becomes exact float comparison
-(`MONEY-PRECISION`). The in-module PAY-09 case (a 12,345,678,901.23 payment settled by two
-allocations) passes on `main`, so the divergence is proven for the admission rule in isolation, not yet
-reproduced end-to-end through the ledger. Not changed in this PR. Pre-tenant position: acceptable for the SME pilot
-envelope only if tenant limits stay below 1e9 major units per payment; otherwise a blocker requiring
-integer minor units/decimal.
+**Money representation.** Operational amounts remain `f64`, but the pilot boundary is now explicit
+and enforced: every payment/import monetary input used by BASE-04 must be finite and satisfy
+`|amount| <= 1_000_000_000` major units. Allocation admission still uses
+`RECONCILIATION_EPSILON = 1e-6`. The native model (`money.rs`) now compares that production cap
+against integer minor units for 0-, 2- and 3-decimal currencies and finds no admission divergence
+through the cap. PAY-09 settles a payment exactly at the cap to the cent and rejects over-cap/NaN/∞
+payment/allocation inputs; PAY-10 applies the same boundary to statement rows and opening balances.
+The native characterization still demonstrates divergence far beyond the cap (~1e10+), so raising or
+removing the pilot limit requires an explicit integer-minor-unit/decimal representation change rather
+than silently widening `f64` admission.
 
 **Statement CSV parsing is client-side** and now extracted to
 `frontend/web/lib/statement-import-csv.ts` for focused unit certification. Server staging cases are
@@ -209,15 +210,15 @@ Legend — Class: **C** covered, **P** partial, **N** not covered, **B** blocked
 |------|-------------------|------------------|-----------|---------------|--------------|----------------|-------|
 | Concurrent allocation 80/50 on 100 | single allocation + retry (ACC-RI-004) | interleaving + true concurrency | STDB + E2E | yes | — | PAY-01, SM-02, PAY-01-E2E | P |
 | Allocation retry after commit | ACC-RI-004 receipts/audit | — | STDB | yes | — | reused | C |
-| Post retry after lost response | — | single effect, idempotent success | STDB + E2E | yes | — | PAY-02, PAY-03, PAY-02-E2E, M-02 | N |
-| Reversal retry | — | single compensation, idempotent success | STDB | yes | — | PAY-04, PAY-05 | N |
+| Post retry after lost response | committed replay validates the original ledger effect; native + browser assertions require one effect and success | — | STDB + E2E | yes | — | PAY-02, PAY-03, PAY-02-E2E, M-02 | C |
+| Reversal retry | durable reversal receipt validates one coherent compensation; exact retry succeeds and conflicting payload fails closed | — | STDB | yes | — | PAY-04, PAY-05 | C |
 | Statement approval retry | `bank-statement-import.spec.ts` (approve twice) | — | E2E | yes | — | reused | C |
 | Duplicate refs: same account / normalized variant / distinct account / cross-company forgery | `payment_management_test`, P1-PAY-02 | cross-organization scope | STDB | yes | — | PAY-07 | P |
-| Overpayment → explicit unapplied | — | all | STDB + E2E | yes | — | PAY-06, PAY-06-E2E | N |
+| Overpayment → explicit unapplied | over-allocation rejects; unapplied credit remains explicit and can settle a second invoice without write-off | — | STDB + E2E | yes | — | PAY-06, PAY-06-E2E | C |
 | Provider payer mismatch → manual review | — | all | STDB | no | payer identity on `PaymentTransaction` | PAY-PAYER-01 (gated) | B |
 | Reversal/chargeback after settlement | supplier reversal (P1-PAY-03), partial allocation reversal (ACC-RI-004) | full customer settlement + immutability + retry | STDB | yes | — | PAY-04 | P |
-| Monetary precision (0.01, large, many small, 0/3-decimal) | — | all | native + STDB | yes | — | `money.rs`, PAY-08, PAY-09 | N |
-| Statement staging fixtures | invalid row + identical retry (E2E) | negative/zero/NaN/inf/missing/duplicate/out-of-order/huge; conflicting replay | STDB | yes | — | PAY-10, PAY-11A, PAY-11B | P |
+| Monetary precision / pilot envelope | exact minor-unit model through 1e9; many-small/split allocations; at-cap ledger settlement; non-finite/over-cap rejection | — | native + STDB | yes | — | `money.rs`, PAY-08, PAY-09, PAY-10 | C |
+| Statement staging fixtures | invalid/missing/non-finite/over-cap rows, negative amounts, huge files, exact replay and conflicting replay are certified | — | STDB + E2E | yes | — | PAY-10, PAY-11A, PAY-11B, bank-statement-import.spec.ts | C |
 | CSV UTF-8 BOM | extracted statement parser strips BOM before header parsing and idempotency hashing | — | web unit | yes | — | CSV-BOM | C |
 | CSV US thousands grouping | `"1,234"` and multi-group integers parse as grouping; decimal-comma values remain decimals | — | web unit | yes | CSV-BOM extraction | CSV-02 | C |
 | CSV ambiguous slash dates | numeric slash dates fail closed without an explicit format/locale; ISO remains accepted | — | web unit | yes | parser extraction | CSV-03 | C |
@@ -280,7 +281,11 @@ Registered in `KNOWN_DEFECTS` / `expectKnownDefect()`; runtime confirmation reco
 | `COMM-15` | (Playwright-only; not yet executed against a running stack) Batch approval retry by the same approver returns an error instead of an idempotent success. |
 | `AG-IDEMP-01` | (Playwright-only; not yet executed against a running stack) AI draft approval retry after commit returns an error instead of idempotent success. |
 
-Additional documented findings (not executed as tests): `MONEY-PRECISION`, `REC-01`.
+Additional documented findings (not executed as tests): `REC-01`.
+
+`MONEY-PRECISION` remains a characterization of values outside the enforced pilot envelope, not an
+enabled-pilot defect. Removing or raising the 1e9 boundary requires a separate money-representation
+migration.
 
 ## Phase 5 — Mobile/network resilience
 
