@@ -14,6 +14,7 @@ import {
   MissingOrganization,
   mergeFieldDefaultValues,
   mergeSelectOptionsForFields,
+  convertOpportunityToOrderForm,
 } from "@lumiere/ui"
 import type { EntityAction, FormConfig, ModuleConfig } from "@lumiere/ui"
 import { proposalsModuleConfig } from "@/lib/module-dashboard-configs"
@@ -25,7 +26,10 @@ import {
   useUpdateProposal,
   useUpdateProposalStatus,
   useApproveProposal,
+  useConvertProposalToSaleOrder,
 } from "@lumiere/query-hooks/hooks/proposals"
+import { usePricelists } from "@lumiere/query-hooks/hooks/sales"
+import { useWarehouses } from "@lumiere/query-hooks/hooks/inventory"
 import type { Proposal } from "@lumiere/query-hooks/hooks/proposals"
 import { useDefaultOperatingCompanyBigInt } from "@lumiere/query-hooks/hooks/use-operating-company"
 import { useCurrencies } from "@lumiere/query-hooks/hooks/settings"
@@ -35,7 +39,9 @@ import { currencyOptionsFromRows } from "@/lib/form-lookup"
 import {
   Archive,
   Award,
+  ExternalLink,
   Eye,
+  FileOutput,
   Pencil,
   Send,
   ThumbsDown,
@@ -127,6 +133,7 @@ function ProposalsClientLoaded({ initialProposals, organizationId }: ProposalsCl
   const operatingCompanyId = useDefaultOperatingCompanyBigInt(organizationId) ?? 0n
   const [quickActionForm, setQuickActionForm] = useState<{ form: FormConfig; action: string } | null>(null)
   const [editRow, setEditRow] = useState<Record<string, unknown> | null>(null)
+  const [convertProposalId, setConvertProposalId] = useState<string | number | null>(null)
   const [activeTab, setActiveTab] = useState<string>("dashboard")
 
   const { data: proposals = [] } = useProposals(orgId, initialProposals)
@@ -135,12 +142,34 @@ function ProposalsClientLoaded({ initialProposals, organizationId }: ProposalsCl
   const updateProposal = useUpdateProposal(orgId, operatingCompanyId)
   const updateProposalStatus = useUpdateProposalStatus(orgId, operatingCompanyId)
   const approveProposal = useApproveProposal(orgId, operatingCompanyId)
+  const convertProposal = useConvertProposalToSaleOrder(orgId, operatingCompanyId)
+  const { data: pricelists = [] } = usePricelists(orgId)
+  const { data: warehouses = [] } = useWarehouses(orgId)
 
   const isPending =
     createProposal.isPending ||
     updateProposal.isPending ||
     updateProposalStatus.isPending ||
-    approveProposal.isPending
+    approveProposal.isPending ||
+    convertProposal.isPending
+
+  const convertFormConfig = useMemo((): FormConfig => {
+    const options = (rows: unknown[]) =>
+      rows.map((value) => {
+        const row = value as { id?: unknown; name?: unknown }
+        return { value: String(row.id ?? ""), label: String(row.name ?? row.id ?? "") }
+      })
+    const pricelistOptions = options(pricelists)
+    const warehouseOptions = options(warehouses)
+    const base = mergeSelectOptionsForFields(
+      { ...convertOpportunityToOrderForm(t), id: "convert-proposal-order" },
+      { pricelistId: pricelistOptions, warehouseId: warehouseOptions },
+    )
+    const defaults: { pricelistId?: string; warehouseId?: string } = {}
+    if (pricelistOptions[0]) defaults.pricelistId = pricelistOptions[0].value
+    if (warehouseOptions[0]) defaults.warehouseId = warehouseOptions[0].value
+    return mergeFieldDefaultValues(base, defaults)
+  }, [t, pricelists, warehouses])
 
   const currencyOptions = useMemo(() => currencyOptionsFromRows(currencies), [currencies])
   const proposalCreateForm = useMemo(
@@ -172,6 +201,19 @@ function ProposalsClientLoaded({ initialProposals, organizationId }: ProposalsCl
 
   const proposalRowActions = useMemo((): EntityAction[] => {
     return [
+      {
+        id: "open-proposal",
+        label: t("proposals.actions.open"),
+        icon: ExternalLink,
+        variant: "outline",
+        requiresSelection: true,
+        onClick: (rows) => {
+          const row = rows[0]
+          if (!row?.id) return
+          const title = encodeURIComponent(String(row.title ?? ""))
+          router.push(`/proposals/${row.id}?title=${title}&orgId=${organizationId}`)
+        },
+      },
       {
         id: "edit-proposal",
         label: t("proposals.actions.edit"),
@@ -222,6 +264,19 @@ function ProposalsClientLoaded({ initialProposals, organizationId }: ProposalsCl
         },
       },
       {
+        id: "convert-proposal-order",
+        label: t("proposals.actions.convertToSaleOrder"),
+        icon: FileOutput,
+        variant: "outline",
+        requiresSelection: true,
+        onClick: (rows) => {
+          const row = rows[0]
+          if (!row?.id || normalizeProposalStatus(row.status) !== "Awarded") return
+          if (row.saleOrderId != null || row.sale_order_id != null) return
+          setConvertProposalId(row.id as string | number)
+        },
+      },
+      {
         id: "reject-proposal",
         label: t("proposals.actions.reject"),
         icon: ThumbsDown,
@@ -251,7 +306,7 @@ function ProposalsClientLoaded({ initialProposals, organizationId }: ProposalsCl
         },
       },
     ]
-  }, [t, setStatus, approveProposal])
+  }, [t, setStatus, approveProposal, router, organizationId])
 
   const editFormConfig = useMemo((): FormConfig | null => {
     if (!editRow) return null
@@ -397,11 +452,6 @@ function ProposalsClientLoaded({ initialProposals, organizationId }: ProposalsCl
     }
   }
 
-  const handleRowClick = (_tabId: string, row: Record<string, unknown>) => {
-    const title = encodeURIComponent(String(row.title ?? ""))
-    router.push(`/proposals/${row.id}?title=${title}&orgId=${organizationId}`)
-  }
-
   return (
     <>
       {currencyOptions.length > 0 ? (
@@ -416,7 +466,6 @@ function ProposalsClientLoaded({ initialProposals, organizationId }: ProposalsCl
         onActiveTabChange={setActiveTab}
         isPending={isPending}
         onFormSubmit={handleFormSubmit}
-        onRowClick={handleRowClick}
       />
       <FormModal
         open={quickActionForm !== null}
@@ -427,6 +476,22 @@ function ProposalsClientLoaded({ initialProposals, organizationId }: ProposalsCl
           if (quickActionForm) await handleFormSubmit("dashboard", quickActionForm.action, formData)
         }}
       />
+      {convertProposalId != null ? (
+        <FormModal
+          open
+          onOpenChange={(open) => !open && setConvertProposalId(null)}
+          config={convertFormConfig}
+          isPending={isPending}
+          onSubmit={async (formData) => {
+            await convertProposal.mutateAsync({
+              proposalId: convertProposalId,
+              pricelistId: String(formData.pricelistId ?? ""),
+              warehouseId: String(formData.warehouseId ?? ""),
+            })
+            setConvertProposalId(null)
+          }}
+        />
+      ) : null}
       {editFormConfig ? (
         <FormModal
           open
