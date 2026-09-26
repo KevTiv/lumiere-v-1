@@ -75,10 +75,10 @@
         "reject_timesheets"
       ],
       "resources": "timesheets-to-validate, timesheets-unbilled",
-      "contract_release_required": "no",
+      "contract_release_required": "maybe",
       "contract_note": "none: `timesheets-to-validate` exposes validation_status and timesheet_invoice_id (the plain `timesheets` resource does not)",
       "prerequisites": "Seed project + employee + timesheet fixture.",
-      "status": "SCAFFOLDED",
+      "status": "PARTIAL — validation/rejection proven; hook readback and billing handoff need a contract release",
       "status_doc": "docs/plan/erp-cov10-project-timesheet-validation-status.md",
       "spec": "frontend/web/tests/e2e/cov10-project-timesheet-validation.spec.ts",
       "hooks": [

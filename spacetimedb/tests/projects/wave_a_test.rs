@@ -12,8 +12,8 @@ use crate::hr::employees::{create_employee, hr_employee, CreateEmployeeParams};
 use crate::projects::projects::{create_project, project_project, CreateProjectParams};
 use crate::projects::tasks::{create_task, project_task, CreateTaskParams};
 use crate::projects::timesheets::{
-    log_timesheet, project_timesheet, stop_timesheet_timer, validate_timesheets,
-    LogTimesheetParams, ValidateTimesheetsParams,
+    log_timesheet, project_timesheet, reject_timesheets, stop_timesheet_timer, validate_timesheets,
+    LogTimesheetParams, ProjectTimesheet, RejectTimesheetsParams, ValidateTimesheetsParams,
 };
 use crate::test_harness::{chart_keys, ensure_test_superuser, OrgFixture};
 use crate::types::{EmploymentType, JournalType, TaskState};
@@ -613,4 +613,141 @@ pub fn test_period_lock_rejects_bill(ctx: &ReducerContext) -> Result<(), String>
         }
         Err(msg) => Err(format!("unexpected period-lock error: {msg}")),
     }
+}
+
+fn timesheet_row(ctx: &ReducerContext, timesheet_id: u64) -> Result<ProjectTimesheet, String> {
+    ctx.db
+        .project_timesheet()
+        .id()
+        .find(&timesheet_id)
+        .ok_or_else(|| format!("timesheet {timesheet_id} missing"))
+}
+
+/// Run `op`, require it to fail with `expected` in the message, and require
+/// the timesheet row to be unchanged afterwards.
+fn expect_timesheet_rejected_unchanged(
+    ctx: &ReducerContext,
+    timesheet_id: u64,
+    label: &str,
+    expected: &str,
+    op: impl FnOnce() -> Result<(), String>,
+) -> Result<(), String> {
+    let before = timesheet_row(ctx, timesheet_id)?;
+    match op() {
+        Ok(()) => return Err(format!("{label}: must be rejected")),
+        Err(message) if message.contains(expected) => {}
+        Err(message) => return Err(format!("{label}: unexpected rejection: {message}")),
+    }
+    if timesheet_row(ctx, timesheet_id)? != before {
+        return Err(format!("{label}: rejected call mutated the timesheet"));
+    }
+    Ok(())
+}
+
+/// COV-10: validate / reject are exact one-way transitions. Replays,
+/// cross-transitions, self-validation and an empty rejection reason are all
+/// rejected and leave the row unchanged.
+pub fn test_validate_reject_rejects_replay(ctx: &ReducerContext) -> Result<(), String> {
+    ensure_test_superuser(ctx)?;
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let (org, company) = (fixture.organization_id, fixture.company_id);
+    let employee_id = seed_employee(ctx, &fixture, "Cov10 Emp")?;
+    let project_id = seed_billable_project(ctx, &fixture, "Cov10 Project")?;
+    let task_id = seed_task(ctx, &fixture, project_id, "Cov10 Task")?;
+    let log = |name: &str| {
+        log_billable_hours(
+            ctx,
+            &fixture,
+            project_id,
+            task_id,
+            employee_id,
+            name,
+            1.0,
+            40.0,
+            80.0,
+        )
+    };
+    let validate = |id: u64| {
+        validate_timesheets(
+            ctx,
+            org,
+            ValidateTimesheetsParams {
+                company_id: Some(company),
+                timesheet_ids: vec![id],
+                wip_journal_id: None,
+                wip_account_id: None,
+                wip_labor_account_id: None,
+            },
+        )
+    };
+    let reject = |id: u64, reason: &str| {
+        reject_timesheets(
+            ctx,
+            org,
+            RejectTimesheetsParams {
+                company_id: Some(company),
+                timesheet_ids: vec![id],
+                reason: reason.to_string(),
+            },
+        )
+    };
+
+    // Validate, then replay and cross-transition.
+    let validated = log("Cov10 Validate")?;
+    reassign_logger_to_dummy(ctx, validated)?;
+    validate(validated)?;
+    let row = timesheet_row(ctx, validated)?;
+    if row.validation_status != "validated" || row.validated_by != Some(ctx.sender()) {
+        return Err("validate did not persist validated status and validator".into());
+    }
+    expect_timesheet_rejected_unchanged(
+        ctx,
+        validated,
+        "validate replay",
+        "must be draft",
+        || validate(validated),
+    )?;
+    expect_timesheet_rejected_unchanged(
+        ctx,
+        validated,
+        "reject validated",
+        "must be draft or submitted",
+        || reject(validated, "late rejection"),
+    )?;
+
+    // Reject, then replay and cross-transition.
+    let rejected = log("Cov10 Reject")?;
+    reassign_logger_to_dummy(ctx, rejected)?;
+    expect_timesheet_rejected_unchanged(
+        ctx,
+        rejected,
+        "empty reason",
+        "reason is required",
+        || reject(rejected, "  "),
+    )?;
+    reject(rejected, "wrong project")?;
+    if timesheet_row(ctx, rejected)?.validation_status != "rejected" {
+        return Err("reject did not persist rejected status".into());
+    }
+    expect_timesheet_rejected_unchanged(
+        ctx,
+        rejected,
+        "reject replay",
+        "must be draft or submitted",
+        || reject(rejected, "wrong project"),
+    )?;
+    expect_timesheet_rejected_unchanged(
+        ctx,
+        rejected,
+        "validate rejected",
+        "must be draft",
+        || validate(rejected),
+    )?;
+
+    // Separation of duties: the logger cannot validate their own entry.
+    let own = log("Cov10 Own")?;
+    expect_timesheet_rejected_unchanged(ctx, own, "self validation", "self-validate", || {
+        validate(own)
+    })?;
+    Ok(())
 }
