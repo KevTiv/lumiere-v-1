@@ -85,7 +85,13 @@ test.describe("COV-08c exact period close", { tag: ["@p0", "@cov08", "@cov08c"] 
     await page.getByTestId("module-tab-accounting-account-periods").click()
     const periodRow = page.getByTestId(`entity-row-${periodId}`)
     await expect(periodRow).toContainText(periodName)
+    // Clicking an open period selects it and opens its edit form; dismiss the
+    // form so the table's Close action is reachable.
     await periodRow.click()
+    const editDialog = page.getByRole("dialog")
+    await expect(editDialog).toBeVisible()
+    await page.keyboard.press("Escape")
+    await expect(editDialog).toBeHidden()
     const closeButton = page.getByTestId("entity-action-ap-close")
     await expect(closeButton).toBeEnabled()
     const [accepted] = await Promise.all([
