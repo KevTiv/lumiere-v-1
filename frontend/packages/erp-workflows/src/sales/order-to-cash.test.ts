@@ -26,19 +26,23 @@ test("only draft and sent orders offer confirm, including enum-shaped state", ()
   assert.ok(!isSaleOrderConfirmable({ state: { tag: "Cancel" } }))
 })
 
-test("a confirmed order links its delivery pickings and opens the first", () => {
+test("a confirmed order reports every linked delivery and keeps the order as the result", () => {
   const observed = observeConfirmedOrder(
     "5",
     [{ id: 5, state: { tag: "Sale" } }],
     [
       { id: 11, saleId: 5, isReturn: false },
+      { id: 14, saleId: 5, isReturn: false },
       { id: 12, saleId: 6, isReturn: false },
       { id: 13, saleId: 5, isReturn: true },
     ],
   )
   assert.equal(observed.outcome, "applied")
-  assert.deepEqual(observed.createdRecords, [{ resource: "stock_picking", id: "11", module: "inventory", context: "sales" }])
-  assert.deepEqual(observed.next, { resource: "stock_picking", id: "11", module: "inventory", context: "sales" })
+  assert.deepEqual(observed.createdRecords, [
+    { resource: "stock_picking", id: "11", module: "inventory", context: "sales" },
+    { resource: "stock_picking", id: "14", module: "inventory", context: "sales" },
+  ])
+  assert.deepEqual(observed.next, { resource: "sale_order", id: "5", module: "sales" })
 })
 
 test("an order left unconfirmed by the approval gate is approval_pending and stays the next record", () => {

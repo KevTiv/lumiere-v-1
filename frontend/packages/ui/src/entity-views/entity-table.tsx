@@ -77,8 +77,10 @@ interface EntityTableProps {
   onRowClick?: (row: EntityRow) => void
   className?: string
   isLoading?: boolean
-  /** URL or parent-provided filters applied on mount (e.g. chart drill-down). */
+  /** Current URL or parent-owned filters, applied as transient overlays. */
   initialFilters?: Record<string, string>
+  /** Clears a parent-owned filter at its source rather than persisting a local override. */
+  onInitialFilterClear?: (key: string) => void
 }
 
 function rowFilterValue(row: EntityRow, key: string): string {
@@ -121,6 +123,20 @@ function compareRowValues(a: unknown, b: unknown, direction: SortDirection): num
   return mul * String(a).localeCompare(String(b), undefined, { numeric: true })
 }
 
+function readPersistedFilters(
+  value: unknown,
+  allowedKeys: ReadonlySet<string>,
+): Record<string, string> {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) return {}
+
+  return Object.fromEntries(
+    Object.entries(value).filter(
+      (entry): entry is [string, string] =>
+        allowedKeys.has(entry[0]) && typeof entry[1] === "string",
+    ),
+  )
+}
+
 function paginationItems(currentPage: number, totalPages: number): Array<number | "ellipsis"> {
   if (totalPages <= 7) {
     return Array.from({ length: totalPages }, (_, index) => index + 1)
@@ -146,44 +162,56 @@ export function EntityTable({
   className,
   isLoading = false,
   initialFilters,
+  onInitialFilterClear,
 }: EntityTableProps) {
   const { checkPermission } = useRBAC()
   const [search, setSearch] = useState("")
-  const [filters, setFilters] = useState<Record<string, string>>({})
+  const [persistedFilters, setPersistedFilters] = useState<Record<string, string>>({})
+  const [loadedListViewKey, setLoadedListViewKey] = useState<string | null>(null)
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set())
   const [sortKey, setSortKey] = useState<string | null>(null)
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc")
   const [page, setPage] = useState(1)
+  const persistedFilterKeys = useMemo(
+    () => new Set(config.filters?.map((filter) => filter.key) ?? []),
+    [config.filters],
+  )
 
   useEffect(() => {
-    if (initialFilters && Object.keys(initialFilters).length > 0) {
-      setFilters((prev) => ({ ...prev, ...initialFilters }))
+    const key = config.listViewKey
+    if (!key || typeof window === "undefined") {
+      setPersistedFilters({})
+      setLoadedListViewKey(key ?? "")
       return
     }
 
-    const key = config.listViewKey
-    if (!key || typeof window === "undefined") return
+    let savedFilters: Record<string, string> = {}
     try {
       const raw = window.localStorage.getItem(key)
-      if (!raw) return
-      const parsed = JSON.parse(raw) as unknown
-      if (parsed !== null && typeof parsed === "object" && !Array.isArray(parsed)) {
-        setFilters(parsed as Record<string, string>)
+      if (raw) {
+        savedFilters = readPersistedFilters(JSON.parse(raw) as unknown, persistedFilterKeys)
       }
     } catch {
       // ignore corrupt saved filters
     }
-  }, [config.listViewKey, initialFilters])
+    setPersistedFilters(savedFilters)
+    setLoadedListViewKey(key)
+  }, [config.listViewKey, persistedFilterKeys])
 
   useEffect(() => {
     const key = config.listViewKey
-    if (!key || typeof window === "undefined") return
+    if (!key || loadedListViewKey !== key || typeof window === "undefined") return
     try {
-      window.localStorage.setItem(key, JSON.stringify(filters))
+      window.localStorage.setItem(key, JSON.stringify(persistedFilters))
     } catch {
       // ignore quota errors
     }
-  }, [config.listViewKey, filters])
+  }, [config.listViewKey, loadedListViewKey, persistedFilters])
+
+  const filters = useMemo(
+    () => ({ ...persistedFilters, ...initialFilters }),
+    [initialFilters, persistedFilters],
+  )
 
   useEffect(() => {
     setPage(1)
@@ -321,12 +349,17 @@ export function EntityTable({
                 size="sm"
                 aria-label={`Clear filter ${key}`}
                 data-testid={`entity-active-filter-${key}`}
-                onClick={() =>
-                  setFilters((prev) => {
+                disabled={Object.hasOwn(initialFilters ?? {}, key) && !onInitialFilterClear}
+                onClick={() => {
+                  if (Object.hasOwn(initialFilters ?? {}, key)) {
+                    onInitialFilterClear?.(key)
+                    return
+                  }
+                  setPersistedFilters((prev) => {
                     const { [key]: _removed, ...rest } = prev
                     return rest
                   })
-                }
+                }}
               >
                 {key}: {value}
                 <X className="ml-2 h-3 w-3" />
@@ -356,12 +389,16 @@ export function EntityTable({
                 <Select
                   key={f.key}
                   value={selectValue}
-                  onValueChange={(val) =>
-                    setFilters((prev) => ({
+                  disabled={Object.hasOwn(initialFilters ?? {}, f.key) && !onInitialFilterClear}
+                  onValueChange={(val) => {
+                    if (Object.hasOwn(initialFilters ?? {}, f.key)) {
+                      onInitialFilterClear?.(f.key)
+                    }
+                    setPersistedFilters((prev) => ({
                       ...prev,
                       [f.key]: val === "__all__" ? "__all__" : storedValueFromRadixSelect(val),
                     }))
-                  }
+                  }}
                 >
                   <SelectTrigger className="w-40" aria-label={f.label}>
                     <SelectValue placeholder={f.placeholder ?? f.label} />

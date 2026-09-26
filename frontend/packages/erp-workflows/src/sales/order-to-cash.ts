@@ -70,7 +70,9 @@ export function observeConfirmedOrder(
   return {
     outcome: "applied",
     createdRecords: deliveries.length > 0 ? deliveries : undefined,
-    next: deliveries[0] ?? orderRef,
+    // Confirmation is an in-place transition on the canonical sale order.
+    // Fulfillment is one-to-many, so no child picking is privileged as "the" result.
+    next: orderRef,
   }
 }
 

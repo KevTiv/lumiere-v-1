@@ -1,8 +1,10 @@
 # COV-00 correctness and evidence defect register
 
-**Status:** REQUIRED COV-00 ACCEPTANCE EVIDENCE  
-**Audited base:** `afa23b702fc4c47623697d2fcb81733f2dd71c14`  
+**Status:** COV-00C ACCEPTANCE CANDIDATE; DOWNSTREAM RUNTIME GATES REMAIN OPEN
+**Audited base:** `77f94ef5ea0bd912863acb0a7d12884ad3ad8ecb`
 **Purpose:** convert source-level correctness/evidence defects discovered during COV-00 review into explicit owners, closure gates and downstream implementation slices.
+
+Machine-readable ownership and source inventories live in [`../evidence/cov-00c-correctness-defects.json`](../evidence/cov-00c-correctness-defects.json) and are enforced by `python3 scripts/validate-cov00c-correctness-census.py`. See [`erp-cov00c-correctness-census-status.md`](./erp-cov00c-correctness-census-status.md) for the current disposition.
 
 This register is part of COV-00. It does **not** authorize COV-00 workers to repair every runtime defect inside the census PR. COV-00 owns discovery, classification, ownership and acceptance ratchets; COV-01/UX/module owners implement the repairs.
 
@@ -10,7 +12,7 @@ This register is part of COV-00. It does **not** authorize COV-00 workers to rep
 
 | ID | Class | Current source evidence | Risk | Owning implementation gate | COV-00 requirement |
 | --- | --- | --- | --- | --- | --- |
-| `COV-D01` | false success | `frontend/packages/ui/src/forms/form-modal.tsx` closes/toasts after submit even when `onSubmit` is absent | UI can claim persisted success without an admitted effect | UX-07 + COV-01 | mark affected form surfaces; require one outcome owner and no success on missing/rejected/waiting/unknown action |
+| `COV-D01` | false success — **resolved/guarded** | `frontend/packages/ui/src/forms/form-modal.tsx` now returns before submit/close/toast when `onSubmit` is absent | regression would let UI claim persisted success without an admitted effect | UX-07 + COV-01 | retain the ordered missing-handler guard; rejected/waiting/unknown adoption continues under `COV-D10` |
 | `COV-D02` | heuristic effect correlation | `frontend/packages/query-hooks/src/hooks/ai-action-drafts.ts::resolveLatestDraftId` selects highest pending id by reducer | concurrent/replayed drafts can be associated with the wrong request | COH exact-effect owner + GOV/CAP; COV-01 pattern reused | classify as prohibited latest-row correlation; require stable request/effect identity before acceptance |
 | `COV-D03` | ambiguous read state | `fetchQueryListAllowEmpty` / `serverFetchQueryListAllowEmpty` collapse non-OK/failure to `[]` | denied/unavailable/error can render as legitimate empty data | UX shared resource-state work + COV-26 | inventory every critical T0 use; classify whether empty-on-failure is intentional optional behavior or a correctness defect |
 | `COV-D04` | degraded form dependency | `RuntimeFormModal` falls back to static config on runtime-config error and can still submit | required relation/visibility/config failure can silently become a different form | UX-07 + COV-22 | classify every form using this fallback; critical forms must expose invalid/degraded state rather than silently proceed |
@@ -18,9 +20,9 @@ This register is part of COV-00. It does **not** authorize COV-00 workers to rep
 | `COV-D06` | analytics completeness | stored-dashboard time filtering retains rows with missing timestamp; missing numeric measure can coerce to zero | period totals/aggregates can silently misstate scope/data completeness | UX-08 + COV-20 | classify metric bindings by time/measure/completeness policy before U4/U5 |
 | `COV-D07` | partial-source masking | stored dashboard source hook exposes loading but not source error/partial state to renderer | failed source can appear as an empty dataset/card | UX-08 + COV-20/COV-26 | add source-state evidence requirement for every admitted dashboard/report surface |
 | `COV-D08` | test-only operator bypass | HR/Projects/IoT/Proposals and other browser specs perform principal lifecycle transitions through `callReducerBff`/owner helpers | browser test filename/tag can overstate real UI readiness | module COV owner + COV-27 | classify each primary transition as UI-driven, API-only integration, fixture setup or domain-only; U4/U5 requires actual operator transition where user reachability is claimed |
-| `COV-D09` | test heuristic identity | lead-to-cash helper and HR payslip lifecycle use newest/highest id fallback for effect discovery | duplicates/concurrency can be hidden by test helpers | COV-01 + owning module tests | no certification helper may choose latest/newest for a 0..1 business effect; exact cardinality failure is required |
-| `COV-D10` | semantic overclaim | transport 2xx / `{ok:true}` only proves dispatch acceptance; current hooks often return `void` | callers cannot distinguish applied, replay, waiting, rejected or outcome-unknown | COH-02/10 + COV-01 | classify consequential actions lacking semantic outcomes; do not award U4/U5 while effect disposition is unknown |
-| `COV-D11` | prototype semantic overclaim | an ambiguous/lost dispatch followed by exact effect readback proves convergence, but not necessarily whether this invocation applied vs replay/concurrent effect | a shared helper could encode stronger semantics than evidence supports | COV-01 prototype review | shared outcome vocabulary must distinguish authoritative disposition from merely observed/converged effect unless server/domain returns disposition |
+| `COV-D09` | test heuristic identity — **partially resolved** | CRM→Sales now uses exact 0..1 `opportunity_id`; HR/P2P/accounting/manufacturing and legacy helpers still contain latest/highest discovery | duplicates/concurrency can be hidden by test helpers | COV-01 + owning module tests | no certification helper may choose latest/newest for a 0..1 business effect; exact cardinality failure is required |
+| `COV-D10` | semantic overclaim — **partially resolved** | CRM reference conversion returns exact semantic convergence; the classified legacy dispatch baseline still commonly resolves transport success/`void` | callers cannot distinguish applied, replay, waiting, rejected or outcome-unknown | COH-02/10 + COV-01 | baseline may only decrease; do not award U4/U5 while effect disposition is unknown |
+| `COV-D11` | prototype semantic overclaim — **resolved/guarded** | shared reference helper returns `converged`, not `applied`, after exact readback without domain disposition | regression could encode stronger semantics than evidence supports | COV-01 prototype review | keep observed convergence distinct from authoritative `Applied` unless the server/domain proves disposition |
 
 ## 2. Evidence claim model
 
@@ -59,23 +61,23 @@ The lifecycle spec explicitly performs proposal setup/status/approval/award/conv
 
 ### CRM → Sales
 
-The operator action is stronger than the examples above, but current effect lookup can choose newest order or weaker fallback identity. Operator proof exists; exact effect/recovery proof remains partial until strict `opportunity_id` 0..1 correlation and replay/lost-response behavior are enforced.
+The operator action now uses strict `opportunity_id` + company 0..1 correlation, rejects duplicate effects, distinguishes `converged` from authoritative `applied`, and proves replay does not redispatch. Direct navigation plus full stale/denied/lost-response UI recovery still belong to COV-01/COV-00D evidence review.
 
 ## 4. COV-00 acceptance additions
 
 COV-00 cannot be ACCEPTED until:
 
-1. every discovered defect above has a stable owner and downstream package;
+1. every discovered defect above has a stable owner and downstream package — satisfied by the COV-00C manifest;
 2. every intended T0 module has a `D/A/O/E` evidence row for its primary lifecycle;
 3. browser specs that bypass the principal operator transition are not counted as operator proof;
-4. latest/newest/heuristic result discovery is explicitly identified and scheduled for removal on certification paths;
-5. critical `allow-empty` read paths are classified as optional/degraded-safe or correctness defects;
-6. false-success/form-config/report truthfulness defects are attached to UX/COV owners and remain launch blockers where exposed;
-7. the COV-01 outcome vocabulary is reviewed so observed convergence is not mislabeled as authoritative `Applied` without sufficient evidence.
+4. latest/newest/heuristic result discovery is explicitly identified and scheduled for removal on certification paths — satisfied for the current named-helper inventory;
+5. critical `allow-empty` read paths are classified as correctness debt pending explicit resource-state migration — satisfied for the current callsite inventory;
+6. false-success/form-config/report truthfulness defects are attached to UX/COV owners and remain launch blockers where exposed — satisfied;
+7. the COV-01 outcome vocabulary is reviewed so observed convergence is not mislabeled as authoritative `Applied` without sufficient evidence — satisfied and guarded.
 
 ## 5. Ratchets to add after census classification
 
-The follow-up implementation should add the narrowest maintainable checks possible:
+The COV-00A/B/C follow-up implementations now enforce the first-org, operation, and correctness ownership inventories. COV-00D/COV-27 must add the evidence-promotion checks that depend on the D/A/O/E matrix:
 
 - no new unclassified user-facing operation;
 - no new first-org route without product/COV classification;

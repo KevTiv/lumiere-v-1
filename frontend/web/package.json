@@ -14,11 +14,13 @@
     "test:e2e:p0": "playwright test --grep @p0 --grep-invert @dev-fixture",
     "test:e2e:full": "playwright test",
     "test:e2e:ui": "playwright test --ui",
-    "analyze:coverage": "tsx scripts/track-reducer-coverage.ts",
-    "analyze:coverage:check": "tsx scripts/track-reducer-coverage.ts --check",
+    "analyze:coverage": "tsx scripts/track-reducer-coverage.ts && python3 ../../scripts/generate-operation-census.py",
+    "analyze:coverage:check": "tsx scripts/track-reducer-coverage.ts --check && python3 ../../scripts/generate-operation-census.py --check",
     "analyze:reducers": "tsx scripts/analyze-reducer-types.ts",
     "analyze:forms": "tsx scripts/analyze-form-mutation-contracts.ts",
     "seed-test-user": "node ./scripts/seed-test-user.mjs",
+    "seed-first-org-personas": "node ./scripts/seed-test-user.mjs --all-personas",
+    "first-org-fixture:check": "node ./scripts/seed-test-user.mjs --check-manifest",
     "e2e-seed-fixture": "node ./scripts/e2e-seed-fixture.mjs"
   },
   "dependencies": {

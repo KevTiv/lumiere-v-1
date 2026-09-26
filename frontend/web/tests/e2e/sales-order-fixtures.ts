@@ -145,12 +145,12 @@ export async function confirmOrderViaUi(page: Page, orderId: number) {
 
 export async function openFulfillmentTab(page: Page) {
   await gotoModule(page, "/sales", "sales")
-  await Promise.all([
-    page.waitForResponse((res) => res.url().includes("/api/query/stock-pickings") && res.ok(), {
-      timeout: 30_000,
-    }),
-    page.getByTestId("module-tab-sales-fulfillment").click(),
-  ])
+  const tab = page.getByTestId("module-tab-sales-fulfillment")
+  await tab.click()
+  await expect(tab).toHaveAttribute("aria-selected", "true")
+  await expect(page.locator('[role="tabpanel"]:visible').getByTestId("entity-table")).toBeVisible({
+    timeout: 30_000,
+  })
 }
 
 /** Run one toolbar action on a picking in the fulfillment tab and wait for its reducer. */

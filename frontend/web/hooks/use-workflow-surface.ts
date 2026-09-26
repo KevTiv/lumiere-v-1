@@ -2,7 +2,7 @@
 
 import { useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { buildModuleTabHref, showWorkflowToast, useRBAC } from '@lumiere/ui';
+import { buildModuleTabHref, showWorkflowToast } from '@lumiere/ui';
 import { useTranslation } from '@lumiere/i18n';
 import {
   resolveRecordLocation,
@@ -11,6 +11,18 @@ import {
   type TransitionNotice,
 } from '@lumiere/erp-workflows';
 import { phCapture } from '@/lib/posthog-browser';
+
+/**
+ * Resolve a canonical workflow result to its UI-owned record URL. The destination's server query
+ * remains the authorization boundary; a presentation-only module permission must not discard a
+ * result that the operation and canonical readback already authorized.
+ */
+export function workflowRecordHref(ref: ErpRecordRef): string | undefined {
+  const location = resolveRecordLocation(ref);
+  return location
+    ? buildModuleTabHref(location.module, location.tab, location.filter)
+    : undefined;
+}
 
 /**
  * The web surface for workflow completion: typed-outcome toasts and record-ref navigation.
@@ -24,7 +36,6 @@ export function useWorkflowSurface(options: { organizationId?: number | bigint }
   const { organizationId } = options;
   const { t } = useTranslation();
   const router = useRouter();
-  const { checkPermission } = useRBAC();
 
   const notify = useCallback(
     (notice: TransitionNotice) => {
@@ -62,13 +73,10 @@ export function useWorkflowSurface(options: { organizationId?: number | bigint }
 
   const navigate = useCallback(
     (ref: ErpRecordRef) => {
-      // Same rule the navigation catalog uses: read on the module resource.
-      const location = resolveRecordLocation(ref, {
-        canAccess: (module) => checkPermission(`module:${module}`, 'read').allowed,
-      });
-      if (location) router.push(buildModuleTabHref(location.module, location.tab, location.filter));
+      const href = workflowRecordHref(ref);
+      if (href) router.push(href);
     },
-    [router, checkPermission],
+    [router],
   );
 
   const record = useCallback(
