@@ -1,7 +1,7 @@
 import { expect, test, type Page, type Request } from "@playwright/test"
 
 import {
-  callReducerBff,
+  callReducerOwner,
   fetchDefaultCompanyId,
   fetchSessionOrganizationId,
   gotoModule,
@@ -46,7 +46,10 @@ test.describe("COV-08c exact period close", { tag: ["@p0", "@cov08", "@cov08c"] 
     const suffix = Date.now() % 100000
     const year = 2200 + (suffix % 100)
     const yearName = smokeName(`cov08c-fy-${suffix}`)
-    await callReducerBff(page, "create_fiscal_year", [organizationId, companyId, {
+    // Setup only: fiscal year and open period are fixture data, created with
+    // the trusted owner call (the session compat route returns a redacted 500
+    // for these accounting fixtures). The close is driven through the UI below.
+    await callReducerOwner("create_fiscal_year", [organizationId, companyId, {
       name: yearName,
       date_from: timestamp(`${year}-01-01T00:00:00Z`),
       date_to: timestamp(`${year}-12-31T23:59:59Z`),
@@ -60,7 +63,7 @@ test.describe("COV-08c exact period close", { tag: ["@p0", "@cov08", "@cov08c"] 
     if (fiscalYearId == null) throw new Error("created fiscal year not found")
 
     const periodName = smokeName(`cov08c-period-${suffix}`)
-    await callReducerBff(page, "create_account_period", [organizationId, companyId, {
+    await callReducerOwner("create_account_period", [organizationId, companyId, {
       name: periodName,
       code: `C08C${suffix}`,
       date_from: timestamp(`${year}-01-01T00:00:00Z`),
@@ -73,7 +76,7 @@ test.describe("COV-08c exact period close", { tag: ["@p0", "@cov08", "@cov08c"] 
     const period = (await rows(page, "account-periods")).find((row) => row.name === periodName)
     const periodId = scalarQueryId(period?.id)
     if (periodId == null) throw new Error("created period not found")
-    await callReducerBff(page, "open_account_period", [organizationId, companyId, periodId])
+    await callReducerOwner("open_account_period", [organizationId, companyId, periodId])
 
     await gotoModule(page, "accounting")
     await page.getByTestId("module-tab-accounting-account-periods").click()
