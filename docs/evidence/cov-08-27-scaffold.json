@@ -1,0 +1,429 @@
+{
+  "generated_from": "docs/plan/erp-cov08-27-stacked-acceptance-plan.md",
+  "tracks": [
+    {
+      "track": "COV-08d2",
+      "slug": "asset-depreciation-disposal",
+      "module": "Accounting / Assets",
+      "title": "Fixed-asset depreciation board and disposal exact effects",
+      "route": "/accounting \u2192 Fixed assets",
+      "reducers": [
+        "compute_depreciation_board",
+        "dispose_account_asset"
+      ],
+      "resources": "account-assets, depreciation-lines",
+      "contract_release_required": "maybe",
+      "contract_note": "maybe: state-only disposal readback (`account-assets.state` = Removed) and depreciation lines (`depreciation-lines` by asset_id) need no release; proving the disposal journal move identity needs the asset\u2192move relation exposed on `account-assets`",
+      "prerequisites": "Stack on #103 (COV-08d confirm/close).",
+      "status": "SCAFFOLDED",
+      "status_doc": "docs/plan/erp-cov08d2-asset-depreciation-disposal-status.md",
+      "spec": "frontend/web/tests/e2e/cov08d2-asset-depreciation-disposal.spec.ts",
+      "hooks": [
+        "frontend/packages/query-hooks/src/hooks/accounting/assets.ts"
+      ]
+    },
+    {
+      "track": "COV-08e",
+      "slug": "finance-certification",
+      "module": "Accounting / Finance",
+      "title": "Finance module certification over 08a\u2013d",
+      "route": "/accounting, /reports",
+      "reducers": [
+        "archive_financial_report"
+      ],
+      "resources": "financial-reports, account-moves, account-periods, account-assets",
+      "contract_release_required": "no",
+      "contract_note": "none: `financial-reports` exposes id, organization_id, company_id, state",
+      "prerequisites": "08a\u2013d accepted; contracts v0.3.55 for 08b/COV-05 registry changes.",
+      "status": "SCAFFOLDED",
+      "status_doc": "docs/plan/erp-cov08e-finance-certification-status.md",
+      "spec": "frontend/web/tests/e2e/cov08e-finance-certification.spec.ts",
+      "hooks": [
+        "frontend/packages/query-hooks/src/hooks/reports.ts"
+      ]
+    },
+    {
+      "track": "COV-09",
+      "slug": "hr-leave-approval",
+      "module": "HR / Payroll",
+      "title": "Leave request submit \u2192 approve/refuse",
+      "route": "/hr \u2192 Leave",
+      "reducers": [
+        "submit_leave",
+        "approve_leave",
+        "refuse_leave"
+      ],
+      "resources": "leave-requests, leaves-to-approve",
+      "contract_release_required": "no",
+      "contract_note": "none: `leave-requests` exposes id, organization_id, company_id, employee_id, state",
+      "prerequisites": "Needs an HR manager persona distinct from the employee persona in the first-org fixture.",
+      "status": "SCAFFOLDED",
+      "status_doc": "docs/plan/erp-cov09-hr-leave-approval-status.md",
+      "spec": "frontend/web/tests/e2e/cov09-hr-leave-approval.spec.ts",
+      "hooks": [
+        "frontend/packages/query-hooks/src/hooks/hr/leave.ts"
+      ]
+    },
+    {
+      "track": "COV-10",
+      "slug": "project-timesheet-validation",
+      "module": "Projects / Tasks",
+      "title": "Approved timesheet validation \u2192 billing handoff",
+      "route": "/projects \u2192 Timesheets",
+      "reducers": [
+        "validate_timesheets",
+        "reject_timesheets"
+      ],
+      "resources": "timesheets-to-validate, timesheets-unbilled",
+      "contract_release_required": "no",
+      "contract_note": "none: `timesheets-to-validate` exposes validation_status and timesheet_invoice_id (the plain `timesheets` resource does not)",
+      "prerequisites": "Seed project + employee + timesheet fixture.",
+      "status": "SCAFFOLDED",
+      "status_doc": "docs/plan/erp-cov10-project-timesheet-validation-status.md",
+      "spec": "frontend/web/tests/e2e/cov10-project-timesheet-validation.spec.ts",
+      "hooks": [
+        "frontend/packages/query-hooks/src/hooks/projects.ts"
+      ]
+    },
+    {
+      "track": "COV-11",
+      "slug": "expense-sheet-lifecycle",
+      "module": "Expenses",
+      "title": "Expense sheet submit \u2192 approve \u2192 post \u2192 reimburse",
+      "route": "/expenses",
+      "reducers": [
+        "submit_expense_sheet",
+        "approve_expense_sheet",
+        "post_expense_sheet",
+        "create_expense_reimbursement_payment"
+      ],
+      "resources": "expense-sheets, account-moves",
+      "contract_release_required": "no",
+      "contract_note": "none: `expense-sheets` exposes state, account_move_id and reimbursement_move_id, so post and reimburse resolve through the sheet's own relations",
+      "prerequisites": "Receipt attachment path (COV-18 documents) for the receipt-backed variant.",
+      "status": "SCAFFOLDED",
+      "status_doc": "docs/plan/erp-cov11-expense-sheet-lifecycle-status.md",
+      "spec": "frontend/web/tests/e2e/cov11-expense-sheet-lifecycle.spec.ts",
+      "hooks": [
+        "frontend/packages/query-hooks/src/hooks/expenses.ts"
+      ]
+    },
+    {
+      "track": "COV-12",
+      "slug": "subscription-invoice-run",
+      "module": "Subscriptions",
+      "title": "One recurring invoice run",
+      "route": "/subscriptions",
+      "reducers": [
+        "generate_subscription_invoice",
+        "pay_subscription_invoice"
+      ],
+      "resources": "subscriptions, account-moves",
+      "contract_release_required": "maybe",
+      "contract_note": "maybe: the run itself resolves through `subscription-billing-runs.billing_run_key` (no release); proving the exact invoice move needs the run/subscription\u2192move relation (`invoice_ids` is not on the `subscriptions` projection, `invoice_origin` is not on `account-moves`)",
+      "prerequisites": "Scheduler replay proof needs the recurring job id exposed or a native test.",
+      "status": "SCAFFOLDED",
+      "status_doc": "docs/plan/erp-cov12-subscription-invoice-run-status.md",
+      "spec": "frontend/web/tests/e2e/cov12-subscription-invoice-run.spec.ts",
+      "hooks": [
+        "frontend/packages/query-hooks/src/hooks/subscriptions.ts"
+      ]
+    },
+    {
+      "track": "COV-13",
+      "slug": "pos-session-close",
+      "module": "POS",
+      "title": "Session order/payment \u2192 close",
+      "route": "/pos",
+      "reducers": [
+        "close_pos_session"
+      ],
+      "resources": "pos-sessions, pos-configs",
+      "contract_release_required": "yes",
+      "contract_note": "release (scope): `pos-sessions` has neither organization_id nor company_id in its projection (the table has no company column); exact scoped readback needs the config/company relation exposed or a join-backed resource",
+      "prerequisites": "Stock/accounting convergence proof depends on COV-06/08 acceptance.",
+      "status": "SCAFFOLDED",
+      "status_doc": "docs/plan/erp-cov13-pos-session-close-status.md",
+      "spec": "frontend/web/tests/e2e/cov13-pos-session-close.spec.ts",
+      "hooks": [
+        "frontend/packages/query-hooks/src/hooks/pos.ts"
+      ]
+    },
+    {
+      "track": "COV-14",
+      "slug": "helpdesk-ticket-lifecycle",
+      "module": "Helpdesk",
+      "title": "Ticket assign \u2192 close \u2192 reopen",
+      "route": "/helpdesk",
+      "reducers": [
+        "assign_ticket",
+        "close_ticket",
+        "reopen_ticket"
+      ],
+      "resources": "helpdesk-tickets",
+      "contract_release_required": "yes",
+      "contract_note": "release (assign only): `helpdesk-tickets` exposes state but not the assignee (user_id); close/reopen need none. Table has no company_id \u2014 scope is organization-only",
+      "prerequisites": "Role visibility fixture for agent vs reader.",
+      "status": "SCAFFOLDED",
+      "status_doc": "docs/plan/erp-cov14-helpdesk-ticket-lifecycle-status.md",
+      "spec": "frontend/web/tests/e2e/cov14-helpdesk-ticket-lifecycle.spec.ts",
+      "hooks": [
+        "frontend/packages/query-hooks/src/hooks/helpdesk.ts"
+      ]
+    },
+    {
+      "track": "COV-15",
+      "slug": "fleet-service-cost",
+      "module": "Fleet",
+      "title": "Vehicle service/inspection cost history",
+      "route": "/fleet (dedicated route now exists on main; /map stays the live-map view)",
+      "reducers": [
+        "record_fleet_service",
+        "record_fleet_inspection"
+      ],
+      "resources": "fleet-service-records, fleet-inspections, fleet-vehicles",
+      "contract_release_required": "maybe",
+      "contract_note": "maybe: projections expose vehicle_id, company_id and serviced_at/inspected_at, so a natural-key readback needs no release; the record params carry no idempotency key, so replay-safety needs a params change (contract release)",
+      "prerequisites": "Confirm the route decision: `/fleet` exists on main, so COV-15 certifies `/fleet` and treats `/map` as a view.",
+      "status": "SCAFFOLDED",
+      "status_doc": "docs/plan/erp-cov15-fleet-service-cost-status.md",
+      "spec": "frontend/web/tests/e2e/cov15-fleet-service-cost.spec.ts",
+      "hooks": [
+        "frontend/packages/query-hooks/src/hooks/fleet.ts"
+      ]
+    },
+    {
+      "track": "COV-16",
+      "slug": "iot-alert-resolve",
+      "module": "IoT",
+      "title": "Device alert \u2192 acknowledge/resolve",
+      "route": "/iot",
+      "reducers": [
+        "acknowledge_iot_action",
+        "resolve_iot_alert"
+      ],
+      "resources": "iot-alerts, iot-actions",
+      "contract_release_required": "no",
+      "contract_note": "none: `iot-alerts` exposes resolved_at, `iot-actions` exposes status (both organization-scoped; company scope via device)",
+      "prerequisites": "Owned-device fixture; degraded telemetry must be explicit.",
+      "status": "SCAFFOLDED",
+      "status_doc": "docs/plan/erp-cov16-iot-alert-resolve-status.md",
+      "spec": "frontend/web/tests/e2e/cov16-iot-alert-resolve.spec.ts",
+      "hooks": [
+        "frontend/packages/query-hooks/src/hooks/iot.ts"
+      ]
+    },
+    {
+      "track": "COV-17",
+      "slug": "proposal-approve-convert",
+      "module": "Proposals",
+      "title": "Versioned review \u2192 approve \u2192 convert to sale order",
+      "route": "/proposals",
+      "reducers": [
+        "approve_proposal",
+        "convert_proposal_to_sale_order"
+      ],
+      "resources": "proposals, sale-orders",
+      "contract_release_required": "no",
+      "contract_note": "none: `proposals` exposes status, sale_order_id and project_id, so approve and convert resolve through the proposal's own relations",
+      "prerequisites": "Reviewer persona distinct from author.",
+      "status": "SCAFFOLDED",
+      "status_doc": "docs/plan/erp-cov17-proposal-approve-convert-status.md",
+      "spec": "frontend/web/tests/e2e/cov17-proposal-approve-convert.spec.ts",
+      "hooks": [
+        "frontend/packages/query-hooks/src/hooks/proposals.ts"
+      ]
+    },
+    {
+      "track": "COV-18",
+      "slug": "document-lock-version",
+      "module": "Documents / Knowledge",
+      "title": "Upload/version \u2192 lock/unlock one document",
+      "route": "/documents",
+      "reducers": [
+        "lock_document",
+        "unlock_document"
+      ],
+      "resources": "documents",
+      "contract_release_required": "yes",
+      "contract_note": "release: `documents` projection exposes no lock columns (table has is_locked, locked_by, locked_at, locked_until)",
+      "prerequisites": "Blob/version identity fixture.",
+      "status": "SCAFFOLDED",
+      "status_doc": "docs/plan/erp-cov18-document-lock-version-status.md",
+      "spec": "frontend/web/tests/e2e/cov18-document-lock-version.spec.ts",
+      "hooks": [
+        "frontend/packages/query-hooks/src/hooks/documents.ts"
+      ]
+    },
+    {
+      "track": "COV-19",
+      "slug": "activity-completion",
+      "module": "Calendar / Comms",
+      "title": "Record-linked activity completion (then message post)",
+      "route": "/calendar, /messages",
+      "reducers": [
+        "complete_activity",
+        "post_message"
+      ],
+      "resources": "activities, mail-messages",
+      "contract_release_required": "no",
+      "contract_note": "none for activity completion (`activities` exposes state); message post readback may need a stable message key exposed (check before implementing)",
+      "prerequisites": "BASE-03 (communications correctness) must be landed.",
+      "status": "SCAFFOLDED",
+      "status_doc": "docs/plan/erp-cov19-activity-completion-status.md",
+      "spec": "frontend/web/tests/e2e/cov19-activity-completion.spec.ts",
+      "hooks": [
+        "frontend/packages/query-hooks/src/hooks/crm.ts",
+        "frontend/packages/query-hooks/src/hooks/messages.ts"
+      ]
+    },
+    {
+      "track": "COV-20",
+      "slug": "report-run",
+      "module": "Reports / Analytics",
+      "title": "Configure \u2192 execute \u2192 export one scheduled report",
+      "route": "/reports",
+      "reducers": [
+        "create_scheduled_report",
+        "record_report_run"
+      ],
+      "resources": "scheduled-reports",
+      "contract_release_required": "yes",
+      "contract_note": "release: `scheduled-reports` exposes neither last_run nor run_count and there is no report-run resource",
+      "prerequisites": "Deterministic dataset fixture.",
+      "status": "SCAFFOLDED",
+      "status_doc": "docs/plan/erp-cov20-report-run-status.md",
+      "spec": "frontend/web/tests/e2e/cov20-report-run.spec.ts",
+      "hooks": [
+        "frontend/packages/query-hooks/src/hooks/reports.ts"
+      ]
+    },
+    {
+      "track": "COV-21",
+      "slug": "approval-decision",
+      "module": "Approvals / Workflows",
+      "title": "One evidence-backed human-task decision",
+      "route": "/approvals",
+      "reducers": [
+        "claim_workflow_human_task",
+        "decide_workflow_human_task"
+      ],
+      "resources": "workflow human tasks (no resource yet)",
+      "contract_release_required": "yes",
+      "contract_note": "release: `workflow_human_task` has no query resource; a resource with id, organization_id, company_id, state/decision and decided_by is required",
+      "prerequisites": "Approver persona; SOD rule fixture.",
+      "status": "SCAFFOLDED",
+      "status_doc": "docs/plan/erp-cov21-approval-decision-status.md",
+      "spec": "frontend/web/tests/e2e/cov21-approval-decision.spec.ts",
+      "hooks": [
+        "frontend/packages/query-hooks/src/hooks/approvals.ts"
+      ]
+    },
+    {
+      "track": "COV-22",
+      "slug": "form-publish-import-commit",
+      "module": "Imports / Forms",
+      "title": "Publish one form configuration; validate\u2192commit one import",
+      "route": "embedded surfaces (no standalone route)",
+      "reducers": [
+        "publish_form_configuration",
+        "import_hr_payslip_csv"
+      ],
+      "resources": "form-configs, payslips",
+      "contract_release_required": "no",
+      "contract_note": "none for form publish (`form-configs` exposes config_version, is_active); import idempotency proof depends on BASE-04's SHA-256 import identity",
+      "prerequisites": "BASE-04 landed.",
+      "status": "SCAFFOLDED",
+      "status_doc": "docs/plan/erp-cov22-form-publish-import-commit-status.md",
+      "spec": "frontend/web/tests/e2e/cov22-form-publish-import-commit.spec.ts",
+      "hooks": [
+        "frontend/packages/query-hooks/src/hooks/hr/imports.ts"
+      ]
+    },
+    {
+      "track": "COV-23",
+      "slug": "role-assignment",
+      "module": "Org / Settings / Auth",
+      "title": "Membership role assign \u2192 revoke",
+      "route": "/settings",
+      "reducers": [
+        "assign_role",
+        "revoke_role"
+      ],
+      "resources": "user-role-assignment",
+      "contract_release_required": "no",
+      "contract_note": "none: `user-role-assignment` exposes id, user_identity, role_id, organization_id, is_active",
+      "prerequisites": "Admin + non-admin personas (first-org fixture has them).",
+      "status": "SCAFFOLDED",
+      "status_doc": "docs/plan/erp-cov23-role-assignment-status.md",
+      "spec": "frontend/web/tests/e2e/cov23-role-assignment.spec.ts",
+      "hooks": [
+        "frontend/packages/query-hooks/src/hooks/auth.ts"
+      ]
+    },
+    {
+      "track": "COV-24",
+      "slug": "distributor-workspace",
+      "module": "Distributor workspace",
+      "title": "Order \u2192 delivery \u2192 collection exception workspace",
+      "route": "/distributor",
+      "reducers": [],
+      "resources": "sale-orders, stock-pickings, account-moves (reused)",
+      "contract_release_required": "no",
+      "contract_note": "none expected (composition over existing resources)",
+      "prerequisites": "COV-04, COV-06, COV-08, COV-19 accepted.",
+      "status": "SCAFFOLDED",
+      "status_doc": "docs/plan/erp-cov24-distributor-workspace-status.md",
+      "spec": null,
+      "hooks": []
+    },
+    {
+      "track": "COV-25",
+      "slug": "cross-module-links",
+      "module": "Cross-module",
+      "title": "Close one missing downstream record link per PR",
+      "route": "all T0 modules",
+      "reducers": [],
+      "resources": "n/a",
+      "contract_release_required": "no",
+      "contract_note": "per link: none when the relation is already projected; release otherwise",
+      "prerequisites": "COV-03..24 candidates.",
+      "status": "SCAFFOLDED",
+      "status_doc": "docs/plan/erp-cov25-cross-module-links-status.md",
+      "spec": null,
+      "hooks": []
+    },
+    {
+      "track": "COV-26",
+      "slug": "ux-accessibility",
+      "module": "UX / Accessibility",
+      "title": "One module quality pass per PR",
+      "route": "all T0 modules",
+      "reducers": [],
+      "resources": "n/a",
+      "contract_release_required": "no",
+      "contract_note": "none",
+      "prerequisites": "COV-03..25 candidates.",
+      "status": "SCAFFOLDED",
+      "status_doc": "docs/plan/erp-cov26-ux-accessibility-status.md",
+      "spec": null,
+      "hooks": []
+    },
+    {
+      "track": "COV-27",
+      "slug": "full-stack-certification",
+      "module": "Certification",
+      "title": "Seeded all-module launch manifest and ratchets",
+      "route": "all T0 modules",
+      "reducers": [],
+      "resources": "n/a",
+      "contract_release_required": "no",
+      "contract_note": "none (aggregates earlier releases)",
+      "prerequisites": "COV-02..26, BASE-05.",
+      "status": "SCAFFOLDED",
+      "status_doc": "docs/plan/erp-cov27-full-stack-certification-status.md",
+      "spec": null,
+      "hooks": []
+    }
+  ]
+}
