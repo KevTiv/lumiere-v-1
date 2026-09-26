@@ -57,6 +57,9 @@ async function roleAssignments(page: Page, organizationId: number, roleId: numbe
 async function toggleRoleInSettings(page: Page, roleId: number, reducer: string): Promise<Response> {
   await gotoModule(page, "/settings")
   await page.getByTestId("settings-section-users").click()
+  // The users list is capped (limit=100) and other specs add users; search on
+  // the server for the target persona so its row is always loaded.
+  await page.getByTestId("settings-users-search").fill(TARGET_EMAIL)
   const actions = page.getByTestId(`settings-user-actions-${TARGET_EMAIL}`)
   await expect(actions).toBeVisible({ timeout: 30_000 })
   await actions.click()
