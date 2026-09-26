@@ -30,3 +30,24 @@ test("CSV-01 BOM normalization preserves statement import idempotency identity",
     statementImportIdempotencyKey(...args, CSV),
   )
 })
+
+
+test("CSV-02 parses a quoted US thousands separator as grouping, not a decimal comma", () => {
+  const rows = statementImportRows([
+    "date,amount,reference",
+    '2026-07-01,"1,234",TX-001',
+    '2026-07-02,"1,234,567",TX-002',
+  ].join("\n"))
+
+  assert.equal(rows[0].amount, 1_234)
+  assert.equal(rows[1].amount, 1_234_567)
+})
+
+test("CSV-02 keeps ordinary decimal-comma amounts as decimals", () => {
+  const rows = statementImportRows([
+    "date;amount;reference",
+    "2026-07-01;12,34;TX-003",
+  ].join("\n"))
+
+  assert.equal(rows[0].amount, 12.34)
+})

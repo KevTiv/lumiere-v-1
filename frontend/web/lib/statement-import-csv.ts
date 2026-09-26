@@ -41,9 +41,12 @@ function parseStatementDate(value: string): Date | undefined {
 
 function parseStatementAmount(value: string): number | undefined {
   const compact = value.replaceAll(/\s/g, "")
-  const normalized = compact.includes(",") && !compact.includes(".")
-    ? compact.replace(",", ".")
-    : compact.replaceAll(",", "")
+  const usGroupedInteger = /^[+-]?\d{1,3}(?:,\d{3})+$/.test(compact)
+  const normalized = usGroupedInteger
+    ? compact.replaceAll(",", "")
+    : compact.includes(",") && !compact.includes(".")
+      ? compact.replace(",", ".")
+      : compact.replaceAll(",", "")
   const amount = Number(normalized)
   return Number.isFinite(amount) ? amount : undefined
 }
