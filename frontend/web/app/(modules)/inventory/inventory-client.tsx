@@ -68,6 +68,7 @@ import type {
   ModuleConfig,
 } from '@lumiere/ui';
 import { inventoryModuleConfig } from '@/lib/module-dashboard-configs';
+import { useModuleTab } from '@/hooks/use-module-tab';
 import { useInventoryModuleSubscription } from '@/lib/module-subscription-hooks';
 import { useWorkflowSurface } from '@/hooks/use-workflow-surface';
 import { usePickingWorkflow } from '@lumiere/query-hooks/hooks/picking-workflow';
@@ -445,7 +446,20 @@ function InventoryClientLoaded({
     unknown
   > | null>(null);
   const [blockSerialId, setBlockSerialId] = useState<ScalarId | null>(null);
-  const [activeTab, setActiveTab] = useState<string | undefined>(undefined);
+  // Sync the active tab with `?tab=` so record links (e.g. a receipt's
+  // `/inventory?tab=transfers&filter=id:…`) land on the right tab.
+  const inventoryTabIds = useMemo(
+    () => [
+      ...inventoryModuleConfig(t).tabs.map((tab) => tab.id),
+      'cycle-wizard',
+      'quality-alerts',
+    ],
+    [t],
+  );
+  const { activeTab, setActiveTab } = useModuleTab(
+    'dashboard',
+    inventoryTabIds,
+  );
   const [wizardCycleCountId, setWizardCycleCountId] = useState<ScalarId | ''>(
     '',
   );
