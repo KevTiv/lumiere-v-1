@@ -24,6 +24,8 @@ import { invalidateResourceQueries } from "../subscription-query"
 import { toCreateAuditRuleParams } from "@lumiere/erp-shared/settings-create-params"
 import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
 import { scalarToU64 as toScalarU64, type ScalarId } from "@lumiere/erp-shared/u64"
+import type { CanonicalRecordRef } from "./operation-effect"
+import { resolveActiveRoleAssignmentEffect, resolveRevokedRoleAssignmentEffect } from "./auth-role-assignment"
 import type {
   AuditLog,
   AuditRule,
@@ -521,7 +523,7 @@ export type AssignRoleParamsInput = {
 export function useAssignRole(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<
-    void,
+    CanonicalRecordRef,
     Error,
     {
       userIdentity: string
@@ -530,7 +532,8 @@ export function useAssignRole(organizationId: bigint) {
     }
   >({
     mutationFn: async ({ userIdentity, roleId, params }) => {
-      const { urlPath, init } = stdbBffCommandPost("assign_role", { userIdentity: userIdentity.trim(), roleId: toScalarU64(roleId), params: stdbParamsToJson({
+      const role = toScalarU64(roleId)
+      const { urlPath, init } = stdbBffCommandPost("assign_role", { userIdentity: userIdentity.trim(), roleId: role, params: stdbParamsToJson({
           expiresAtMicros:
             params.expiresAtMicros != null && String(params.expiresAtMicros).trim() !== ''
               ? toScalarU64(params.expiresAtMicros as ScalarId)
@@ -539,6 +542,10 @@ export function useAssignRole(organizationId: bigint) {
         }) })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to assign role')
+      const rows = await fetchQueryList('/api/query/user-role-assignment', 'Failed to read role assignment')
+      const effect = resolveActiveRoleAssignmentEffect(rows, organizationId, userIdentity, role)
+      if (!effect) throw new Error('Role assignment did not read back as active')
+      return effect
     },
     onSuccess: async () => {
       await invalidateAuthModule(qc, organizationId)
@@ -548,11 +555,16 @@ export function useAssignRole(organizationId: bigint) {
 
 export function useRevokeRole(organizationId: bigint) {
   const qc = useQueryClient()
-  return useMutation<void, Error, { assignmentId: string | number | bigint }>({
+  return useMutation<CanonicalRecordRef, Error, { assignmentId: string | number | bigint }>({
     mutationFn: async ({ assignmentId }) => {
-      const { urlPath, init } = stdbBffCommandPost("revoke_role", { assignmentId: toScalarU64(assignmentId) })
+      const id = toScalarU64(assignmentId)
+      const { urlPath, init } = stdbBffCommandPost("revoke_role", { assignmentId: id })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to revoke role')
+      const rows = await fetchQueryList('/api/query/user-role-assignment', 'Failed to read role assignment')
+      const effect = resolveRevokedRoleAssignmentEffect(rows, organizationId, id)
+      if (!effect) throw new Error('Role assignment did not read back as revoked')
+      return effect
     },
     onSuccess: async () => {
       await invalidateAuthModule(qc, organizationId)

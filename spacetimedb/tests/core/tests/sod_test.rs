@@ -1,15 +1,15 @@
 //! Segregation-of-duties enforcement (A6) and delegated-admin guards.
-use spacetimedb::{Identity, ReducerContext};
+use spacetimedb::{Identity, ReducerContext, Table};
 
 use crate::core::organization::{insert_organization_with_owner, CreateOrganizationParams};
 use crate::core::permissions::{
     assign_role, create_role, create_sod_conflict_rule, delegated_admin_scope,
     ensure_resource_fields_writable, grant_delegated_admin_scope, grant_field_permission,
-    grant_permission, revoke_delegated_admin_scope, role, sod_conflict_rule,
-    update_sod_conflict_rule, AssignRoleParams, CreateRoleParams, CreateSodConflictRuleParams,
-    FieldPermissionAction, GrantDelegatedAdminScopeParams, GrantFieldPermissionParams,
-    GrantOrgPermissionParams, PermissionAction, PermissionEffect, PermissionSubject,
-    UpdateSodConflictRuleParams,
+    grant_permission, revoke_delegated_admin_scope, revoke_role, role, sod_conflict_rule,
+    update_sod_conflict_rule, user_role_assignment, AssignRoleParams, CreateRoleParams,
+    CreateSodConflictRuleParams, FieldPermissionAction, GrantDelegatedAdminScopeParams,
+    GrantFieldPermissionParams, GrantOrgPermissionParams, PermissionAction, PermissionEffect,
+    PermissionSubject, UpdateSodConflictRuleParams,
 };
 use crate::core::users::{add_user_to_organization, AddUserToOrganizationParams};
 use crate::test_harness::{ensure_test_superuser, OrgFixture};
@@ -436,4 +436,111 @@ pub fn test_opportunity_field_write_policy(ctx: &ReducerContext) -> Result<(), S
         Err(msg) if msg.contains("column-level write policy") => Ok(()),
         Err(msg) => Err(format!("Unexpected opportunity field policy error: {msg}")),
     }
+}
+
+/// COV-23: assign → revoke is exact and one-way. A duplicate assignment, a
+/// cross-organization revoke and a replayed revoke are all rejected and leave
+/// the assignment row unchanged.
+pub fn test_role_assign_revoke_rejects_replay(ctx: &ReducerContext) -> Result<(), String> {
+    let (org_id, clerk_role_id, _approver_role_id, member_role_id) = seed_sod_org(ctx)?;
+    let other = OrgFixture::seed_minimal(ctx)?;
+    let member = Identity::__dummy();
+
+    add_user_to_organization(
+        ctx,
+        member,
+        org_id,
+        AddUserToOrganizationParams {
+            role_id: member_role_id,
+            company_id: None,
+            job_title: None,
+            department_id: None,
+            employee_id: None,
+            is_active: true,
+            is_default: false,
+            metadata: None,
+        },
+    )?;
+
+    let params = || AssignRoleParams {
+        expires_at_micros: None,
+        metadata: None,
+    };
+    let clerk_assignments = || {
+        ctx.db
+            .user_role_assignment()
+            .iter()
+            .filter(|a| {
+                a.organization_id == org_id
+                    && a.role_id == clerk_role_id
+                    && a.user_identity == member
+            })
+            .collect::<Vec<_>>()
+    };
+
+    assign_role(ctx, member, clerk_role_id, org_id, params())?;
+    let assigned = match clerk_assignments().as_slice() {
+        [only] if only.is_active => only.id,
+        rows => {
+            return Err(format!(
+                "expected one active clerk assignment, found {}",
+                rows.len()
+            ))
+        }
+    };
+    let active = ctx
+        .db
+        .user_role_assignment()
+        .id()
+        .find(&assigned)
+        .ok_or("assignment vanished after assign")?;
+
+    match assign_role(ctx, member, clerk_role_id, org_id, params()) {
+        Err(message) if message.contains("already has this role") => {}
+        Err(message) => return Err(format!("unexpected duplicate-assign rejection: {message}")),
+        Ok(()) => return Err("duplicate assignment must be rejected".to_string()),
+    }
+    if clerk_assignments().len() != 1 {
+        return Err("rejected duplicate assignment inserted a row".to_string());
+    }
+
+    if revoke_role(ctx, other.organization_id, assigned).is_ok() {
+        return Err("cross-organization revoke must be rejected".to_string());
+    }
+    let untouched = ctx
+        .db
+        .user_role_assignment()
+        .id()
+        .find(&assigned)
+        .ok_or("assignment vanished after rejected revoke")?;
+    if untouched != active {
+        return Err("rejected cross-organization revoke mutated the assignment".to_string());
+    }
+
+    revoke_role(ctx, org_id, assigned)?;
+    let revoked = ctx
+        .db
+        .user_role_assignment()
+        .id()
+        .find(&assigned)
+        .ok_or("assignment vanished after revoke")?;
+    if revoked.is_active {
+        return Err("revoke did not persist is_active = false".to_string());
+    }
+
+    match revoke_role(ctx, org_id, assigned) {
+        Err(message) if message.contains("already revoked") => {}
+        Err(message) => return Err(format!("unexpected replay rejection: {message}")),
+        Ok(()) => return Err("replayed revoke must be rejected".to_string()),
+    }
+    let after_replay = ctx
+        .db
+        .user_role_assignment()
+        .id()
+        .find(&assigned)
+        .ok_or("assignment vanished after replay")?;
+    if after_replay != revoked {
+        return Err("rejected replay mutated the revoked assignment".to_string());
+    }
+    Ok(())
 }
