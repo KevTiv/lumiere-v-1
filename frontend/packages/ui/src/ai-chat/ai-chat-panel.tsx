@@ -153,6 +153,7 @@ export function AIChatPanel({
   const [showCommands, setShowCommands] = useState(false)
   const [commandFilter, setCommandFilter] = useState("")
   const [copiedId, setCopiedId] = useState<string | null>(null)
+  const [citeStatus, setCiteStatus] = useState<Record<string, "pending" | "done" | "error">>({})
   const [selectedCommandIndex, setSelectedCommandIndex] = useState(0)
 
   // Floating panel state
@@ -587,6 +588,22 @@ export function AIChatPanel({
     [config, patchDraftInMessages],
   )
 
+  const handleCiteSource = useCallback(
+    async (messageId: string, sourceKey: string, source: ChatMessageSourceRef) => {
+      if (!config?.onCiteSource || citeStatus[sourceKey] === "pending" || citeStatus[sourceKey] === "done") {
+        return
+      }
+      setCiteStatus((prev) => ({ ...prev, [sourceKey]: "pending" }))
+      try {
+        await config.onCiteSource({ messageId, source })
+        setCiteStatus((prev) => ({ ...prev, [sourceKey]: "done" }))
+      } catch {
+        setCiteStatus((prev) => ({ ...prev, [sourceKey]: "error" }))
+      }
+    },
+    [config, citeStatus],
+  )
+
   const handleClearHistory = () => {
     setMessages([])
   }
@@ -770,8 +787,11 @@ export function AIChatPanel({
                                   : src.kind === "activity"
                                     ? t("aiChat.sourceActivity")
                                     : t("aiChat.sourceMemory")
+                              const sourceKey = `${message.id}-src-${i}`
+                              const canCite = config?.onCiteSource != null && src.kind === "passage" && src.passage_id != null
+                              const status = citeStatus[sourceKey]
                               return (
-                                <li key={`${message.id}-src-${i}`} className="break-all">
+                                <li key={sourceKey} className="break-all">
                                   <span
                                     className={cn(
                                       "mr-1 inline-flex rounded px-1 py-px text-[9px] font-medium uppercase tracking-wide",
@@ -799,6 +819,34 @@ export function AIChatPanel({
                                   )}
                                   {src.score != null && src.kind !== "live" ? ` · ${src.score.toFixed(2)}` : ""}
                                   {src.excerpt ? ` — ${src.excerpt}` : ""}
+                                  {canCite && (
+                                    <button
+                                      type="button"
+                                      disabled={status === "pending" || status === "done"}
+                                      onClick={() => handleCiteSource(message.id, sourceKey, src)}
+                                      className={cn(
+                                        "ml-1.5 inline-flex items-center gap-0.5 rounded px-1 py-px text-[9px] font-medium underline-offset-2",
+                                        status === "done"
+                                          ? "text-success"
+                                          : status === "error"
+                                            ? "text-destructive hover:underline"
+                                            : "text-primary hover:underline",
+                                      )}
+                                    >
+                                      {status === "pending" ? (
+                                        <Loader2 className="h-2.5 w-2.5 animate-spin" />
+                                      ) : status === "done" ? (
+                                        <Check className="h-2.5 w-2.5" />
+                                      ) : null}
+                                      {status === "pending"
+                                        ? t("aiChat.citeSourcePending")
+                                        : status === "done"
+                                          ? t("aiChat.citeSourceDone")
+                                          : status === "error"
+                                            ? t("aiChat.citeSourceError")
+                                            : t("aiChat.citeSource")}
+                                    </button>
+                                  )}
                                 </li>
                               )
                             })}

@@ -189,6 +189,7 @@ pub struct FieldPermission {
     index(accessor = role_assign_by_user, btree(columns = [user_identity])),
     index(accessor = role_assign_by_org,  btree(columns = [organization_id]))
 )]
+#[derive(PartialEq)]
 pub struct UserRoleAssignment {
     #[primary_key]
     #[auto_inc]
@@ -1473,6 +1474,9 @@ pub fn revoke_role(
 
     if assignment.organization_id != organization_id {
         return Err("Role assignment does not belong to this organization".to_string());
+    }
+    if !assignment.is_active {
+        return Err("Role assignment is already revoked".to_string());
     }
 
     let old_values = serde_json::json!({

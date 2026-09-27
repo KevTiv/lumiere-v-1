@@ -66,7 +66,8 @@ async fn users_get(
 
     let trusted = TrustedOperationContext::for_resource_read(&state, &session)?;
     let client = trusted.client();
-    let mut users = query_org_users(&client, org_id, session.field_access.as_ref()).await?;
+    let mut users =
+        query_org_users(&client, &state.stdb, org_id, session.field_access.as_ref()).await?;
 
     if let Some(ref search) = q.search {
         let term = search.to_lowercase();
