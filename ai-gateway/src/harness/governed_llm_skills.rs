@@ -155,8 +155,26 @@ fn resource_contract(name: &str, output_type: &str) -> NamedResourceContract {
 }
 
 fn validate_llm_input(value: &Value) -> Result<(), String> {
-    let _: GovernedLlmSkillInput = serde_json::from_value(value.clone())
-        .map_err(|error| format!("invalid governed LLM skill input: {error}"))?;
+    let Some(fields) = value.as_object() else {
+        return Err("invalid governed LLM skill input: expected an object".to_string());
+    };
+    let is_route_envelope = [
+        "inputs",
+        "agentId",
+        "teamMemberId",
+        "maxSteps",
+        "resumeRunId",
+    ]
+    .iter()
+    .any(|field| fields.contains_key(*field));
+    if is_route_envelope {
+        let _: GovernedLlmSkillInput = serde_json::from_value(value.clone())
+            .map_err(|error| format!("invalid governed LLM skill input: {error}"))?;
+    }
+    // The admitted governed program evaluates the same named-resource
+    // contract again for each server-authored capability proposal. At that
+    // boundary the value is the already-unwrapped `inputs` object; authority
+    // and scope fields are independently rejected by ReviewedInvocationPolicy.
     Ok(())
 }
 
@@ -346,5 +364,23 @@ mod tests {
                 .contains(&Capability::ActionExecute),
             "first GP-17 price-search graph must remain non-executing"
         );
+    }
+
+    #[test]
+    fn named_resource_validator_accepts_route_envelope_and_unwrapped_tool_input() {
+        validate_llm_input(&json!({
+            "inputs": {"query": "summarize"},
+            "agentId": 2,
+            "maxSteps": 5,
+        }))
+        .unwrap();
+        validate_llm_input(&json!({"query": "summarize"})).unwrap();
+
+        assert!(validate_llm_input(&json!({
+            "inputs": {},
+            "organizationId": 999,
+        }))
+        .is_err());
+        assert!(validate_llm_input(&json!("summarize")).is_err());
     }
 }
