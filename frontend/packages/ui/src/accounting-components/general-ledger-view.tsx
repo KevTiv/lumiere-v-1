@@ -39,6 +39,7 @@ import { moveStateIsDraft, moveTypeIsInvoiceOrRefund } from "../lib/accounting-m
 import { getRowField } from "../lib/entity-row-utils"
 import { useClearModuleUrlFilter, useModuleUrlFilters } from "../lib/module-url-filters"
 import { useTranslation } from "@lumiere/i18n"
+import type { RowValueMap } from "@lumiere/erp-shared/row-values"
 
 function formatTimestamp(ts?: { microsSinceUnixEpoch: bigint } | null): string {
   if (!ts) return "—"
@@ -67,7 +68,7 @@ function moveStateStr(state: unknown): string {
 function routeFilterValue(value: unknown): string {
   if (value == null) return ""
   if (typeof value === "object" && !Array.isArray(value)) {
-    const record = value as Record<string, unknown>
+    const record = value as RowValueMap
     if (typeof record.tag === "string") return record.tag
     if ("some" in record) return routeFilterValue(record.some)
   }
@@ -119,7 +120,7 @@ export function GeneralLedgerView({
     const ref = String(m?.ref)?.toLowerCase() ?? ""
     const matchesSearch =
       name.includes(searchQuery.toLowerCase()) || ref.includes(searchQuery.toLowerCase())
-    const row = m as unknown as Record<string, unknown>
+    const row = m as unknown as RowValueMap
     const matchesUrlFilters = activeUrlFilters.every(
       ([key, value]) =>
         routeFilterValue(getRowField(row, key)).toLowerCase() === value.toLowerCase(),
