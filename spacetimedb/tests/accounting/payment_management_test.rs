@@ -326,10 +326,16 @@ pub fn test_payment_transaction_post_creates_ledger_payment(
     let account_payment_id = posted
         .account_payment_id
         .ok_or("Posted transaction missing ledger payment link")?;
-    match post_payment_transaction(ctx, org_id, transaction.id) {
-        Err(error) if error.contains("Only draft transactions") => {}
-        Err(error) => return Err(format!("unexpected payment post retry conflict: {error}")),
-        Ok(()) => return Err("posted payment transaction was applied twice".to_string()),
+    post_payment_transaction(ctx, org_id, transaction.id)
+        .map_err(|error| format!("committed payment post retry failed: {error}"))?;
+    let replayed = ctx
+        .db
+        .payment_transaction()
+        .id()
+        .find(&transaction.id)
+        .ok_or("Posted transaction missing after retry")?;
+    if replayed.account_payment_id != Some(account_payment_id) {
+        return Err("payment post retry changed the linked ledger payment".to_string());
     }
 
     let ledger_payment = ctx
