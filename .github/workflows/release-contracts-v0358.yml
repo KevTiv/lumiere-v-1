@@ -58,6 +58,16 @@ jobs:
             echo "skip=false" >> "$GITHUB_OUTPUT"
           fi
 
+      # Same key as the CI contracts job, so a module CI already compiled for
+      # these sources is reused instead of rebuilt.
+      - name: Restore compiled contracts module
+        id: contracts-module
+        if: steps.guard.outputs.skip != 'true'
+        uses: actions/cache@v4
+        with:
+          path: .ci/contracts-module.wasm
+          key: contracts-module-v1-${{ runner.os }}-${{ hashFiles('spacetimedb/src/**', 'spacetimedb/assets/**', 'spacetimedb/Cargo.toml', 'spacetimedb/Cargo.lock', 'crates/presentation-core/src/**', 'crates/presentation-core/Cargo.toml') }}
+
       - uses: Swatinem/rust-cache@v2
         if: steps.guard.outputs.skip != 'true'
         with:
@@ -84,12 +94,16 @@ jobs:
           cat /tmp/lumiere-release-stdb.log
           exit 1
 
-      - name: Build and publish module
-        if: steps.guard.outputs.skip != 'true'
+      - name: Build contracts module (ci-contracts profile)
+        if: steps.guard.outputs.skip != 'true' && steps.contracts-module.outputs.cache-hit != 'true'
         run: |
           cargo build --manifest-path spacetimedb/Cargo.toml --target wasm32-unknown-unknown --profile ci-contracts
           mkdir -p .ci
           cp spacetimedb/target/wasm32-unknown-unknown/ci-contracts/lumiere_v1.wasm .ci/contracts-module.wasm
+
+      - name: Publish module
+        if: steps.guard.outputs.skip != 'true'
+        run: |
           spacetime publish "$STDB_MODULE" --bin-path .ci/contracts-module.wasm --server local --delete-data=always -y --no-config
 
       - name: Regenerate contracts (pass 1)
