@@ -28,6 +28,8 @@ env:
   STDB_SCHEMA_SERVER: local
   STDB_SCHEMA_HOST: http://127.0.0.1:3000
   STDB_GENERATE_WASM: .ci/contracts-module.wasm
+  # Importing scripts must not leave bytecode for `git add -A` to commit.
+  PYTHONDONTWRITEBYTECODE: "1"
 
 jobs:
   release:
@@ -152,6 +154,9 @@ jobs:
           )
           print("added:", added)
           print("changed:", changed)
+          if not added and not changed:
+              print("operation set unchanged; history needs no revision")
+              raise SystemExit(0)
           current["retired_ids"] = previous["retired_ids"]
           current["revisions"] = list(previous.get("revisions", []))
           current["revisions"].append({
@@ -198,6 +203,16 @@ jobs:
           fi
           python3 scripts/verify-operation-history.py
           python3 scripts/verify-contract-ir.py .contracts-staging/ir/lumiere-contract-ir-v2.json --require-clean
+
+      # The presentation contract generator imports frontend dev dependencies
+      # (json-schema-to-typescript).
+      - uses: ./.github/actions/setup-frontend
+        if: steps.guard.outputs.skip != 'true'
+
+      - name: Install frontend dependencies
+        if: steps.guard.outputs.skip != 'true'
+        working-directory: frontend
+        run: pnpm install --frozen-lockfile
 
       # Build and check the full candidate first; nothing remote changes if it fails.
       - name: Prepare contracts release
