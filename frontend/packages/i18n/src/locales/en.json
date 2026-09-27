@@ -9437,6 +9437,8 @@
     "actions": {
       "edit": "Edit proposal",
       "submitForReview": "Submit for review",
+      "open": "Open",
+      "convertToSaleOrder": "Convert to sale order",
       "submit": "Submit",
       "award": "Award",
       "reject": "Reject",

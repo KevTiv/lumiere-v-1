@@ -207,6 +207,7 @@ mod readiness_tests {
             ollama_embed_model: "embed".into(),
             ollama_vision_model: "vision".into(),
             ollama_llm_model: "llm".into(),
+            ollama_supports_tool_calling: false,
             mistral_api_key: None,
             google_api_key: None,
             gemini_embed_model: "gemini".into(),
