@@ -6,7 +6,9 @@
 use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::accounting::chart_of_accounts::account_journal;
+use crate::accounting::idempotency::{record_result, replayed_result};
 use crate::accounting::journal_entries::{account_move_line, AccountMoveLine};
+use crate::accounting::money::validate_pilot_money_amount;
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 use crate::types::BankStatementState;
 
@@ -318,8 +320,8 @@ pub struct StageBankStatementImportParams {
 
 // ── Reducers ─────────────────────────────────────────────────────────────────
 
-/// Stage parsed statement rows for review. Repeating the same payload for the
-/// same company is a no-op, which makes client and network retries safe.
+/// Stage parsed statement rows for review. Repeating the exact payload for the
+/// same company/key is a no-op; reusing the key with different input fails closed.
 #[spacetimedb::reducer]
 pub fn stage_bank_statement_import(
     ctx: &ReducerContext,
@@ -345,29 +347,60 @@ pub fn stage_bank_statement_import(
     if journal.company_id != company_id {
         return Err("Journal does not belong to the specified company".to_string());
     }
+
+    let payload_fingerprint = format!(
+        "journal_id={journal_id};currency_id={currency_id};params={params:?}"
+    );
+    if replayed_result(
+        ctx,
+        organization_id,
+        company_id,
+        "stage_bank_statement_import",
+        &params.idempotency_key,
+        &payload_fingerprint,
+    )?
+    .is_some()
+    {
+        return Ok(());
+    }
     if ctx.db.bank_statement_import().iter().any(|import| {
         import.organization_id == organization_id
             && import.company_id == company_id
             && import.idempotency_key == params.idempotency_key
     }) {
-        return Ok(());
+        return Err(
+            "statement import exists without an idempotency receipt; replay cannot be verified"
+                .to_string(),
+        );
     }
 
+    validate_pilot_money_amount("opening balance", params.opening_balance)?;
+    let idempotency_key = params.idempotency_key.clone();
     let mut invalid_rows = 0_u32;
     let mut staged_lines = Vec::with_capacity(params.rows.len());
     for row in params.rows {
         let validation_error = match (row.date, row.amount) {
             (None, _) => Some("date is required".to_string()),
             (_, None) => Some("amount is required".to_string()),
-            (_, Some(amount)) if !amount.is_finite() => Some("amount must be finite".to_string()),
             (_, Some(0.0)) => Some("amount must not be zero".to_string()),
-            _ => None,
+            (_, Some(amount)) => validate_pilot_money_amount("statement amount", amount).err(),
         };
         if validation_error.is_some() {
             invalid_rows += 1;
         }
         staged_lines.push((row, validation_error));
     }
+
+    let staged_total = staged_lines
+        .iter()
+        .filter(|(_, validation_error)| validation_error.is_none())
+        .filter_map(|(row, _)| row.amount)
+        .sum::<f64>();
+    validate_pilot_money_amount("statement total amount", staged_total)?;
+    validate_pilot_money_amount(
+        "statement closing balance",
+        params.opening_balance + staged_total,
+    )?;
 
     let total_rows = staged_lines.len() as u32;
     let import = ctx.db.bank_statement_import().insert(BankStatementImport {
@@ -427,6 +460,16 @@ pub fn stage_bank_statement_import(
             metadata: None,
         },
     );
+    record_result(
+        ctx,
+        organization_id,
+        company_id,
+        "stage_bank_statement_import",
+        idempotency_key,
+        payload_fingerprint,
+        "bank_statement_import",
+        import.id,
+    );
     Ok(())
 }
 
@@ -451,6 +494,7 @@ pub fn approve_bank_statement_import(
     if import.approved_statement_id.is_some() {
         return Ok(());
     }
+    validate_pilot_money_amount("opening balance", import.opening_balance)?;
     if import.invalid_rows > 0 {
         return Err("Correct invalid rows before approving this statement import".to_string());
     }
@@ -464,6 +508,11 @@ pub fn approve_bank_statement_import(
         return Err("Statement import has no rows".to_string());
     }
     let total_amount = lines.iter().filter_map(|line| line.amount).sum::<f64>();
+    validate_pilot_money_amount("statement total amount", total_amount)?;
+    validate_pilot_money_amount(
+        "statement closing balance",
+        import.opening_balance + total_amount,
+    )?;
     let metadata = format!(r#"{{"bank_statement_import_id":{import_id}}}"#);
     create_account_bank_statement(
         ctx,
@@ -496,6 +545,7 @@ pub fn approve_bank_statement_import(
     for line in lines {
         let date = line.date.ok_or("Staged import line is missing date")?;
         let amount = line.amount.ok_or("Staged import line is missing amount")?;
+        validate_pilot_money_amount("statement amount", amount)?;
         create_account_bank_statement_line(
             ctx,
             organization_id,
