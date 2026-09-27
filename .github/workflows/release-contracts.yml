@@ -236,7 +236,9 @@ jobs:
       - name: Commit regenerated sources
         if: steps.changes.outputs.release == 'true'
         run: |
-          git add -A -- ':!.ci' ':!.contracts-staging'
+          # The compiled module in .ci/ is a build output, never source.
+          echo '/.ci/' >> .git/info/exclude
+          git add -A
           git status --short
           if ! git diff --cached --quiet; then
             git -c user.name="github-actions[bot]" -c user.email="41898+github-actions[bot]@users.noreply.github.com" \
