@@ -393,6 +393,13 @@ pub fn approve_ai_action_draft_core(
 ) -> Result<(), String> {
     let draft = load_mutable_draft(ctx, organization_id, company_id, draft_id)?;
 
+    if draft.status == "approved"
+        && draft.reviewed_by == Some(ctx.sender())
+        && draft.executed_at.is_some()
+        && draft.execution_error.is_none()
+    {
+        return Ok(());
+    }
     if draft.status != "pending" {
         return Err(format!("draft is not pending (status={})", draft.status));
     }
