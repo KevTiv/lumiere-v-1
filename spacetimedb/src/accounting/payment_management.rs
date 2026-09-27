@@ -14,6 +14,7 @@ use crate::accounting::journal_entries::{
     account_move, account_move_line, insert_draft_account_move_line,
     is_receivable_or_payable_line_type, AccountMove, AccountMoveLine,
 };
+use crate::accounting::money::validate_pilot_money_amount;
 use crate::accounting::payments::{
     account_payment, insert_balanced_payment_lines_and_post, payment_line_params, AccountPayment,
 };
@@ -363,6 +364,14 @@ fn validate_payment_transaction_invariants(
     net: f64,
     fees: &[PaymentFee],
 ) -> Result<(), String> {
+    validate_pilot_money_amount("gross_external_amount", gross)?;
+    validate_pilot_money_amount("settlement_amount", settlement)?;
+    validate_pilot_money_amount("net_account_amount", net)?;
+    for fee in fees {
+        validate_pilot_money_amount("payment fee amount", fee.amount)?;
+        validate_pilot_money_amount("payment fee tax amount", fee.tax_amount)?;
+    }
+
     if gross <= 0.0 {
         return Err("gross_external_amount must be positive".to_string());
     }
@@ -380,6 +389,51 @@ fn validate_payment_transaction_invariants(
             fee_total, expected_fee_total
         ));
     }
+    Ok(())
+}
+
+fn validate_committed_payment_ledger_effect(
+    ctx: &ReducerContext,
+    transaction: &PaymentTransaction,
+) -> Result<(), String> {
+    let account_payment_id = transaction
+        .account_payment_id
+        .ok_or("payment transaction has no linked ledger payment")?;
+    let payment = ctx
+        .db
+        .account_payment()
+        .id()
+        .find(&account_payment_id)
+        .ok_or("payment transaction ledger payment is missing")?;
+    let move_id = payment
+        .move_id
+        .ok_or("payment transaction ledger payment has no move")?;
+    let move_record = ctx
+        .db
+        .account_move()
+        .id()
+        .find(&move_id)
+        .ok_or("payment transaction ledger move is missing")?;
+    let expected_payment_type = match transaction.direction {
+        PaymentDirection::Inbound => PaymentType::InBound,
+        PaymentDirection::Outbound => PaymentType::OutBound,
+    };
+
+    if payment.organization_id != transaction.organization_id
+        || payment.company_id != transaction.company_id
+        || payment.partner_id != transaction.partner_id
+        || payment.partner_type != transaction.partner_type
+        || payment.payment_type != expected_payment_type
+        || payment.currency_id != transaction.currency_id
+        || (payment.amount - transaction.settlement_amount).abs() > RECONCILIATION_EPSILON
+        || payment.state != PaymentState::Paid
+        || move_record.organization_id != transaction.organization_id
+        || move_record.company_id != transaction.company_id
+        || move_record.state != AccountMoveState::Posted
+    {
+        return Err("payment transaction ledger effect is inconsistent".to_string());
+    }
+
     Ok(())
 }
 
@@ -826,6 +880,9 @@ pub fn create_payment_transaction(
         &params.evidence_document_ids,
     )?;
 
+    validate_pilot_money_amount("gross_external_amount", params.gross_external_amount)?;
+    validate_pilot_money_amount("settlement_amount", params.settlement_amount)?;
+    validate_pilot_money_amount("net_account_amount", params.net_account_amount)?;
     if params.gross_external_amount <= 0.0 {
         return Err("gross_external_amount must be positive".to_string());
     }
@@ -1035,6 +1092,9 @@ pub fn post_payment_transaction_impl(
     if transaction.organization_id != organization_id {
         return Err("Payment transaction belongs to a different organization".to_string());
     }
+    if transaction.status == PaymentTransactionStatus::Posted {
+        return validate_committed_payment_ledger_effect(ctx, &transaction);
+    }
     if transaction.status != PaymentTransactionStatus::Draft {
         return Err("Only draft transactions can be posted".to_string());
     }
@@ -1190,6 +1250,8 @@ pub fn create_payment_fee(
     if transaction.status != PaymentTransactionStatus::Draft {
         return Err("Fees can only be added to draft transactions".to_string());
     }
+    validate_pilot_money_amount("payment fee amount", params.amount)?;
+    validate_pilot_money_amount("payment fee tax amount", params.tax_amount)?;
     if params.amount < 0.0 {
         return Err("Fee amount must be non-negative".to_string());
     }
@@ -1701,6 +1763,8 @@ pub fn allocate_payment_transaction(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "payment_reconciliation", "create")?;
     require_company_in_organization(ctx, organization_id, params.company_id)?;
+    validate_pilot_money_amount("allocated amount", params.allocated_amount)?;
+    validate_pilot_money_amount("write-off amount", params.write_off_amount)?;
     if params.allocated_amount <= 0.0 {
         return Err("allocated amount must be positive".to_string());
     }
@@ -1731,6 +1795,7 @@ pub fn allocate_payment_transaction(
     {
         return Ok(());
     }
+    validate_pilot_money_amount("payment settlement amount", transaction.settlement_amount)?;
     if transaction.status != PaymentTransactionStatus::Posted {
         return Err("only posted transactions can be allocated".to_string());
     }
@@ -1946,6 +2011,7 @@ pub fn allocate_payment_transaction(
 
     let residual_before = move_line.amount_residual.abs();
     let target_reduction = params.allocated_amount + params.write_off_amount;
+    validate_pilot_money_amount("allocation plus write-off", target_reduction)?;
     if target_reduction > residual_before + RECONCILIATION_EPSILON {
         return Err("allocation and write-off exceed the target residual".to_string());
     }
@@ -2067,6 +2133,74 @@ pub fn allocate_payment_transaction(
 
 // ── Reversal reducers ─────────────────────────────────────────────────────────
 
+fn validate_committed_reversal_replay(
+    ctx: &ReducerContext,
+    original: &PaymentTransaction,
+    params: &ReversePaymentTransactionParams,
+) -> Result<(), String> {
+    let reversals: Vec<_> = ctx
+        .db
+        .payment_reversal()
+        .reversal_by_original()
+        .filter(&original.id)
+        .collect();
+    let [reversal] = reversals.as_slice() else {
+        return Err(format!(
+            "reversed payment transaction has {} reversal records",
+            reversals.len()
+        ));
+    };
+
+    let original_account_payment_id = original
+        .account_payment_id
+        .ok_or("reversed payment transaction has no original ledger payment")?;
+    if reversal.organization_id != original.organization_id
+        || reversal.company_id != original.company_id
+        || reversal.original_transaction_id != original.id
+        || reversal.original_account_payment_id != original_account_payment_id
+    {
+        return Err("reversal record does not match the original payment transaction".to_string());
+    }
+    if reversal.reason != params.reason || reversal.metadata != params.metadata {
+        return Err("reversal retry payload differs from the committed reversal".to_string());
+    }
+
+    validate_committed_payment_ledger_effect(ctx, original)?;
+
+    let correcting = ctx
+        .db
+        .payment_transaction()
+        .id()
+        .find(&reversal.correcting_transaction_id)
+        .ok_or("reversal correcting payment transaction is missing")?;
+    let expected_direction = match original.direction {
+        PaymentDirection::Inbound => PaymentDirection::Outbound,
+        PaymentDirection::Outbound => PaymentDirection::Inbound,
+    };
+    if correcting.organization_id != original.organization_id
+        || correcting.company_id != original.company_id
+        || correcting.payment_account_id != original.payment_account_id
+        || correcting.direction != expected_direction
+        || correcting.partner_type != original.partner_type
+        || correcting.partner_id != original.partner_id
+        || correcting.currency_id != original.currency_id
+        || (correcting.gross_external_amount - original.gross_external_amount).abs()
+            > RECONCILIATION_EPSILON
+        || (correcting.settlement_amount - original.settlement_amount).abs()
+            > RECONCILIATION_EPSILON
+        || (correcting.net_account_amount - original.net_account_amount).abs()
+            > RECONCILIATION_EPSILON
+        || correcting.status != PaymentTransactionStatus::Posted
+        || correcting.source_entity.as_deref() != Some("reversal")
+        || correcting.source_entity_id != Some(original.id)
+        || correcting.account_payment_id != Some(reversal.correcting_account_payment_id)
+    {
+        return Err("reversal correcting payment transaction is inconsistent".to_string());
+    }
+
+    validate_committed_payment_ledger_effect(ctx, &correcting)
+}
+
 /// Reverse a posted payment transaction. Creates a compensating transaction,
 /// ledger payment, and reversal record without mutating the original.
 #[reducer]
@@ -2097,6 +2231,9 @@ pub fn reverse_payment_transaction_impl(
         return Err(
             "Payment transaction belongs to a different organization or company".to_string(),
         );
+    }
+    if original.status == PaymentTransactionStatus::Reversed {
+        return validate_committed_reversal_replay(ctx, &original, &params);
     }
     if original.status != PaymentTransactionStatus::Posted {
         return Err("Only posted transactions can be reversed".to_string());

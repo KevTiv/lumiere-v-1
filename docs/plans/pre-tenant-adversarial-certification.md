@@ -114,7 +114,7 @@ with a pointer to this plan; it never silently passes. There are no unconditiona
 | Concern | Canonical owner | Other representations / gaps |
 |---------|-----------------|------------------------------|
 | Message intent | `OperationalMessage` | User-authored outbound `CrmConversationMessage` rows are intents without an `OperationalMessage` until a provider callback links them. |
-| Recipient snapshot | `OperationalMessage.contact_id` + `phone_identity_id` | Stored **by reference**: `update_contact_identity` changes `normalized_e164` under the same id (COMM-14). No value/hash snapshot. |
+| Recipient snapshot | `OperationalMessage.contact_id` + `phone_identity_id` + preview timestamp | Approval re-resolves the current org/company-scoped recipient and rejects archived/replaced/updated identities; number changes under the same id invalidate the preview. |
 | Channel | `OperationalMessage.channel` | Duplicated on `MessageBatch` and `CrmConversation`; scope checks compare them. |
 | Provider attempt | **none** | No attempt table; no outbound dispatch exists on `main` or any open PR. |
 | Provider message id | `CrmConversationMessage.provider_message_id` | Org-scoped uniqueness by scan (no unique index); relies on serialized reducers. |
@@ -122,8 +122,8 @@ with a pointer to this plan; it never silently passes. There are no unconditiona
 | Delivery status | `OperationalMessage.status` (intent) and `CrmConversationMessage.status` (timeline) | Two representations updated together; SM-01 asserts they agree. |
 | Conversation | `CrmConversation` (`external_thread_id` binding by trusted principal) | — |
 | Timeline entry | `CrmConversationMessage` | `MailMessage` chatter is separate; invoice reminders do not appear on the invoice chatter. |
-| Consent | `ContactCommunicationPreference` (contact/company/channel) | Also `ContactPhoneIdentity.verification_state = OptedOut` and `core::privacy::PrivacyConsent`; `contact_can_receive` reads only the first two and does not scope by organization (COMM-13). |
-| Approval | `MessageBatch.approved_by/at` | No independence rule (COMM-11), no content binding (COMM-09), no revalidation (COMM-06/07/14). |
+| Consent | `ContactCommunicationPreference` (contact/company/channel) | Recipient resolution is organization/company scoped and rechecked at approval; opted-out preferences or identities invalidate the preview. `core::privacy::PrivacyConsent` remains a separate privacy subsystem. |
+| Approval | `MessageBatch.approved_by/at` | Creator self-approval denies; rendered child content and recipient eligibility are revalidated before first approval; same-approver committed retry is idempotent. |
 | Audit | `audit_log` via `write_audit_log_v2` | Messaging, inbox and payment reducers do not record organization commits (see Phase 8). |
 
 ### Canonical rules decided by this suite
@@ -140,8 +140,9 @@ with a pointer to this plan; it never silently passes. There are no unconditiona
 6. **Recipient identity is an immutable snapshot.** If the snapshotted identity is archived or its
    number changes, approval/dispatch fails closed; a new batch (re-resolution) must be approved
    (COMM-07, COMM-14).
-7. **Approved content is immutable.** Approval binds rendered content; template edits never change
-   rendered messages (COMM-08 holds for invoice reminders; COMM-09 fails for contact batches).
+7. **Approved content is immutable.** Approval binds rendered content; invoice-reminder and generic
+   contact batches render before approval and later template edits never change the snapshot
+   (COMM-08, COMM-09).
 8. **Merge keeps one timeline.** After A→B merge, provider events continue on the same conversation
    under B; events still addressed to A fail closed (the webhook adapter must resolve
    `merge_target_id`) (COMM-10).
@@ -162,25 +163,25 @@ never a blind resend.
 Accounting remains the sole ledger source of truth; every case asserts ledger rows (ledger payment,
 move residuals, clearing residual) rather than operational rows alone.
 
-**Money representation.** Operational amounts are `f64`; admission uses an absolute
-`RECONCILIATION_EPSILON = 1e-6`. The native model (`money.rs`) shows exact agreement with integer
-minor units for 0-, 2- and 3-decimal currencies up to 1e8 major units, and demonstrates that from
-~1e10 major units the epsilon is below f64 resolution so admission becomes exact float comparison
-(`MONEY-PRECISION`). The in-module PAY-09 case (a 12,345,678,901.23 payment settled by two
-allocations) passes on `main`, so the divergence is proven for the admission rule in isolation, not yet
-reproduced end-to-end through the ledger. Not changed in this PR. Pre-tenant position: acceptable for the SME pilot
-envelope only if tenant limits stay below 1e9 major units per payment; otherwise a blocker requiring
-integer minor units/decimal.
+**Money representation.** Operational amounts remain `f64`, but the pilot boundary is now explicit
+and enforced: every payment/import monetary input used by BASE-04 must be finite and satisfy
+`|amount| <= 1_000_000_000` major units. Allocation admission still uses
+`RECONCILIATION_EPSILON = 1e-6`. The native model (`money.rs`) now compares that production cap
+against integer minor units for 0-, 2- and 3-decimal currencies and finds no admission divergence
+through the cap. PAY-09 settles a payment exactly at the cap to the cent and rejects over-cap/NaN/∞
+payment/allocation inputs; PAY-10 applies the same boundary to statement rows and opening balances.
+The native characterization still demonstrates divergence far beyond the cap (~1e10+), so raising or
+removing the pilot limit requires an explicit integer-minor-unit/decimal representation change rather
+than silently widening `f64` admission.
 
-**Statement CSV parsing is client-side** (`payment-operations-panel.tsx`, file-private, not
-unit-testable without extraction). Server staging cases are PAY-10/11. Client findings (documented,
-not executed here):
+**Statement CSV parsing is client-side** and now extracted to
+`frontend/web/lib/statement-import-csv.ts` for focused unit certification. Server staging cases are
+PAY-10/11. Remaining client findings are tracked explicitly below:
 
-- `CSV-01` `parseStatementAmount("1.234,56")` → `1.23456` (European thousands + decimal comma misparsed silently).
-- `CSV-02` `parseStatementAmount("1,234")` → `1.234` (US thousands separator read as decimal comma).
-- `CSV-03` `NN/NN/YYYY` is always read as DD/MM; US exports are silently mis-dated.
-- `CSV-04` the import idempotency key is a 32-bit hash of the file; combined with PAY-11B a collision
-  silently drops a different statement.
+- `CSV-01` fixed on the parser-certification stack: canonical European grouped decimals such as `1.234,56`, `1.234.567,89`, and signed variants parse to their intended numeric values without regressing plain decimal-comma or US mixed-separator inputs.
+- `CSV-02` fixed on the parser-certification stack: quoted US grouped integers such as `"1,234"` and `"1,234,567"` parse as 1234 and 1234567, while ordinary decimal-comma values such as `12,34` retain decimal semantics.
+- `CSV-03` fixed on the parser-certification stack: numeric slash dates are rejected without an explicit date-format/locale contract, so DD/MM and MM/DD are never silently reinterpreted. ISO `YYYY-MM-DD` remains accepted.
+- `CSV-04` fixed on the parser-certification stack: statement import identity now uses full SHA-256 over company/journal/currency scope plus normalized CSV content. A real pair that collides under the legacy 32-bit FNV key is certified to produce distinct SHA-256 identities.
 
 ## Coverage matrix
 
@@ -192,17 +193,17 @@ Legend — Class: **C** covered, **P** partial, **N** not covered, **B** blocked
 |------|-------------------|------------------|-----------|---------------|--------------|----------------|-------|
 | Exact inbound replay, conflicting inbound replay, cross account/org/company, inactive principal | `deferred_test::test_crm_whatsapp_inbox` | — | STDB | yes | — | reused | C |
 | Webhook signature/freshness/metadata stripping | `whatsapp_webhooks.rs` tests | — | api-server | yes | — | reused | C |
-| Event id reused across kinds; conflicting delivery replay | — | all | STDB | yes | — | COMM-01 | N |
-| Duplicate delivered callback (new event id) | exact delivery replay only | single-effect proof | STDB | yes | — | COMM-02 | P |
-| Same provider message id across two messages | — | all | STDB | yes | — | COMM-03 | N |
-| Out-of-order callbacks (delivered→sent/failed, failed→delivered, dup sent, delivered before sent) | — | all | STDB + state machine | yes | — | COMM-04, COMM-05, SM-01 | N |
+| Event id reused across kinds; conflicting delivery replay | exact/conflicting event receipt semantics are certified | — | STDB | yes | — | COMM-01 | C |
+| Duplicate delivered callback (new event id) | distinct callback ids converge to one terminal effect | — | STDB | yes | — | COMM-02 | C |
+| Same provider message id across two messages | provider message ownership collision rejects | — | STDB | yes | — | COMM-03 | C |
+| Out-of-order callbacks (delivered→sent/failed, failed→delivered, dup sent, delivered before sent) | monotonic transitions plus stale-sent absorption/receipt are certified | — | STDB + state machine | yes | — | COMM-04, COMM-05, SM-01 | C |
 | Ambiguous outbound timeout | — | all | api-server worker + E2E | no | outbound dispatch capability | COMM-OUT-01 (gated) | B |
-| Consent race (opt-out after preview) | preview exclusion (P1-MSG-02, core test) | revalidation at approval | STDB + two-session E2E | yes | — | COMM-06, COMM-06-E2E | P |
-| Phone identity changes before dispatch | — | archive and number-change paths | STDB | yes | — | COMM-07, COMM-14 | N |
-| Template change after approval | — | immutability proof | STDB | yes | — | COMM-08, COMM-09 | N |
-| Contact merge with active provider conversation | merge UI (`crm-duplicate-merge.spec.ts`) | timeline continuity | STDB | yes | — | COMM-10 | P |
-| Independent approval | single actor lifecycle (P1-MSG-02) | creator denial, approver, retry, simultaneous | STDB + two-session E2E | yes | — | COMM-11, COMM-11-E2E a–d | N |
-| Batch/consent tenancy | `crm-read-isolation.spec.ts` (reads) | mutation and recipient scoping | STDB | yes | — | COMM-12, COMM-13 | P |
+| Consent race (opt-out after preview) | preview exclusion plus approval-time revalidation | — | STDB + two-session E2E | yes | — | COMM-06, COMM-06-E2E | C |
+| Phone identity changes before dispatch | approval revalidates exact active recipient identity and preview timestamp | — | STDB | yes | — | COMM-07, COMM-14 | C |
+| Template/content immutability | invoice and contact batches snapshot rendered content before approval; later template edits do not mutate it | — | STDB | yes | — | COMM-08, COMM-09 | C |
+| Contact merge with active provider conversation | existing thread is retained under merge target and stale source events reject | — | STDB + E2E | yes | — | COMM-10, crm-duplicate-merge.spec.ts | C |
+| Independent approval | creator denial, independent approver, same-approver retry and simultaneous approval single-effect are blocking | — | STDB + two-session E2E | yes | — | COMM-11, COMM-11-E2E, COMM-15, M-03 | C |
+| Batch/consent tenancy | foreign batch/consent mutations and cross-organization/company recipient injection reject before effect | — | STDB | yes | — | COMM-12, COMM-13 | C |
 
 ### Payments
 
@@ -210,16 +211,20 @@ Legend — Class: **C** covered, **P** partial, **N** not covered, **B** blocked
 |------|-------------------|------------------|-----------|---------------|--------------|----------------|-------|
 | Concurrent allocation 80/50 on 100 | single allocation + retry (ACC-RI-004) | interleaving + true concurrency | STDB + E2E | yes | — | PAY-01, SM-02, PAY-01-E2E | P |
 | Allocation retry after commit | ACC-RI-004 receipts/audit | — | STDB | yes | — | reused | C |
-| Post retry after lost response | — | single effect, idempotent success | STDB + E2E | yes | — | PAY-02, PAY-03, PAY-02-E2E, M-02 | N |
-| Reversal retry | — | single compensation, idempotent success | STDB | yes | — | PAY-04, PAY-05 | N |
+| Post retry after lost response | committed replay validates the original ledger effect; native + browser assertions require one effect and success | — | STDB + E2E | yes | — | PAY-02, PAY-03, PAY-02-E2E, M-02 | C |
+| Reversal retry | durable reversal receipt validates one coherent compensation; exact retry succeeds and conflicting payload fails closed | — | STDB | yes | — | PAY-04, PAY-05 | C |
 | Statement approval retry | `bank-statement-import.spec.ts` (approve twice) | — | E2E | yes | — | reused | C |
 | Duplicate refs: same account / normalized variant / distinct account / cross-company forgery | `payment_management_test`, P1-PAY-02 | cross-organization scope | STDB | yes | — | PAY-07 | P |
-| Overpayment → explicit unapplied | — | all | STDB + E2E | yes | — | PAY-06, PAY-06-E2E | N |
+| Overpayment → explicit unapplied | over-allocation rejects; unapplied credit remains explicit and can settle a second invoice without write-off | — | STDB + E2E | yes | — | PAY-06, PAY-06-E2E | C |
 | Provider payer mismatch → manual review | — | all | STDB | no | payer identity on `PaymentTransaction` | PAY-PAYER-01 (gated) | B |
 | Reversal/chargeback after settlement | supplier reversal (P1-PAY-03), partial allocation reversal (ACC-RI-004) | full customer settlement + immutability + retry | STDB | yes | — | PAY-04 | P |
-| Monetary precision (0.01, large, many small, 0/3-decimal) | — | all | native + STDB | yes | — | `money.rs`, PAY-08, PAY-09 | N |
-| Statement staging fixtures | invalid row + identical retry (E2E) | negative/zero/NaN/inf/missing/duplicate/out-of-order/huge; conflicting replay | STDB | yes | — | PAY-10, PAY-11A, PAY-11B | P |
-| CSV BOM/delimiter/localized decimals | BOM stripped in parser (untested) | parser tests | web unit | no (parser file-private) | parser extraction | CSV-01..04 (documented) | N |
+| Monetary precision / pilot envelope | exact minor-unit model through 1e9; many-small/split allocations; at-cap ledger settlement; non-finite/over-cap rejection | — | native + STDB | yes | — | `money.rs`, PAY-08, PAY-09, PAY-10 | C |
+| Statement staging fixtures | invalid/missing/non-finite/over-cap rows, negative amounts, huge files, exact replay and conflicting replay are certified | — | STDB + E2E | yes | — | PAY-10, PAY-11A, PAY-11B, bank-statement-import.spec.ts | C |
+| CSV UTF-8 BOM | extracted statement parser strips BOM before header parsing and idempotency hashing | — | web unit | yes | — | CSV-BOM | C |
+| CSV US thousands grouping | `"1,234"` and multi-group integers parse as grouping; decimal-comma values remain decimals | — | web unit | yes | CSV-BOM extraction | CSV-02 | C |
+| CSV ambiguous slash dates | numeric slash dates fail closed without an explicit format/locale; ISO remains accepted | — | web unit | yes | parser extraction | CSV-03 | C |
+| CSV statement import identity | SHA-256 over scoped normalized CSV; certified against a legacy FNV-32 collision pair | — | web unit | yes | parser extraction | CSV-04 | C |
+| CSV mixed European separators | canonical grouped-decimal forms parse correctly; decimal-comma and US mixed-separator regressions remain covered | — | web unit | yes | parser extraction | CSV-01 | C |
 
 ### Frontend IR (all require the IR stack)
 
@@ -263,24 +268,15 @@ Legend — Class: **C** covered, **P** partial, **N** not covered, **B** blocked
 
 ## Known defects (pre-tenant blockers)
 
-Registered in `KNOWN_DEFECTS` / `expectKnownDefect()`; runtime confirmation recorded in the validation log.
+No pre-tenant defect is currently registered in `KNOWN_DEFECTS` or wrapped by
+`expectKnownDefect()`. Any newly observed invariant failure is blocking until it is classified and
+recorded explicitly.
 
-| Case | Blocker |
-|------|---------|
-| `COMM-05` | Stale-but-valid provider status callback is rejected with an error; the webhook returns non-2xx and the provider retries. |
-| `COMM-06` | Batch approval does not revalidate consent; a contact who opted out after preview remains an approved recipient. |
-| `COMM-07` | Batch approval does not revalidate the snapshotted identity; an archived recipient identity remains approved. |
-| `COMM-09` | Contact message batches are approved without rendered content, so approved content is not immutable. |
-| `COMM-11` | A batch creator can approve their own batch; no independent-approval rule. |
-| `COMM-13` | `create_message_batch` does not scope candidate contacts/identities to the calling organization. |
-| `COMM-14` | A number change under the same identity id silently redirects an approved recipient. |
-| `COMM-15` | (Playwright-only; not yet executed against a running stack) Batch approval retry by the same approver returns an error instead of an idempotent success. |
-| `PAY-03` | `post_payment_transaction` retry after commit returns an error instead of idempotent success. |
-| `PAY-05` | `reverse_payment_transaction` retry after commit returns an error instead of idempotent success. |
-| `PAY-11B` | `stage_bank_statement_import` silently accepts a replayed idempotency key with a different payload. |
-| `AG-IDEMP-01` | (Playwright-only; not yet executed against a running stack) AI draft approval retry after commit returns an error instead of idempotent success. |
+Additional documented findings (not executed as tests): `REC-01`.
 
-Additional documented findings (not executed as tests): `MONEY-PRECISION`, `CSV-01..04`, `REC-01`.
+`MONEY-PRECISION` remains a characterization of values outside the enforced pilot envelope, not an
+enabled-pilot defect. Removing or raising the 1e9 boundary requires a separate money-representation
+migration.
 
 ## Phase 5 — Mobile/network resilience
 
@@ -302,8 +298,8 @@ error — no screenshot assertions.
   every step (net allocated, ≤ settlement, per-invoice residual, tenant scope).
 
 Every failure message includes `seed=<n> step=<n>`. Contact/opt-out/merge/permission operations are
-certified by the deterministic COMM cases; extending SM-01 with those operations is follow-up once
-COMM-06/07/13/14 are fixed (otherwise every seed stops at the known defect).
+certified by the deterministic COMM cases. Extending SM-01 with those operations remains optional
+state-machine hardening; it is no longer blocked by a known communications defect.
 
 ## Phase 7 — Synthetic personas
 
@@ -337,19 +333,23 @@ reconstruction. REC-03 extends this to harness runs after #26.
 
 ## CI and promotion policy
 
-Initial policy:
+Current policy:
 
-- `cargo check --locked --tests` (blocking, existing) compiles all in-module certification code.
-- Native certification tests (`make pretenant-cert-native`) — blocking candidates; not added to CI in
-  this PR until runtime is measured.
-- In-module certification executes inside the existing E2E domain-reducer loop; known defects do not
-  fail it, regressions and fixed-but-registered defects do.
-- `@pretenant` Playwright suite — optional/nightly/manual via `make e2e-pretenant`; not part of `@p0`.
-- Capability-pending tests skip with their exact prerequisite.
+- `cargo check --locked --manifest-path spacetimedb/Cargo.toml --tests`,
+  `make pretenant-cert-native`, `make check-codegen-pinned`, and frontend
+  `pnpm typecheck` are blocking prerequisites in the BASE-05 pre-tenant CI lane.
+- In-module certification executes inside the existing clean-database E2E domain-reducer loop;
+  any invariant/setup failure is blocking because the native known-defect registry is empty.
+- PR #89 runs a dedicated clean-database `E2E_SUITE=pretenant` matrix entry in addition to the
+  bounded P0 smoke, so the `@pretenant` Playwright suite is executable CI evidence for BASE-05.
+- Capability-pending tests may skip only when their explicit runtime/operation prerequisite probe
+  is absent. A capability that probes available must execute a concrete certification or fail
+  loudly through `pendingContract()`.
+- The ordinary weekly/main full-browser suites remain separate from this bounded BASE-05 lane.
 
-Promotion: adversarial test proves stable over repeated nightly runs → remove dev-fixture assumptions →
-run against an isolated tenant → promote to release blocking. A known defect is removed from the
-registry in the same PR that fixes it.
+Promotion: classify every observed failure/skip, repair fixture/harness defects here, route product
+regressions to the owning BASE package, and record exact run evidence before changing BASE-05 to
+`ACCEPTED`.
 
 ## Commands
 
