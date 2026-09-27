@@ -19,6 +19,8 @@ pub fn run_projects_wave_a_test(ctx: &ReducerContext) -> Result<(), String> {
         .map_err(|e| format!("bill_uses_sell_rate_and_links_invoice: {e}"))?;
     wave_a_test::test_period_lock_rejects_bill(ctx)
         .map_err(|e| format!("period_lock_rejects_bill: {e}"))?;
+    wave_a_test::test_validate_reject_rejects_replay(ctx)
+        .map_err(|e| format!("validate_reject_replay: {e}"))?;
     Ok(())
 }
 

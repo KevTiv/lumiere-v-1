@@ -367,13 +367,16 @@ function ProjectsClientLoaded({
   const addCsvToolbar = (
     ec: EntityViewConfig,
     actions: ProjectToolbarAction[],
+    // Tabs whose row click opens an editor keep selection off the row click;
+    // tabs without one (timesheets) need it, or selection actions stay disabled.
+    options: { selectOnRowClick?: boolean } = {},
   ): EntityViewConfig => {
     if (ec.view.mode !== "table") return ec
     return {
       ...ec,
       view: {
         ...ec.view,
-        rowSelectionToggleOnClick: false,
+        rowSelectionToggleOnClick: options.selectOnRowClick ?? false,
         actions,
       },
     }
@@ -1083,7 +1086,7 @@ function ProjectsClientLoaded({
                     setLifecycleModal({ type: "billTimesheets", rows, form: billTimesheetsFormConfig })
                   },
                 },
-              ]),
+              ], { selectOnRowClick: true }),
             }
           }
           return tab
