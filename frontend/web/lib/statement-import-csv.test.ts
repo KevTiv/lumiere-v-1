@@ -155,3 +155,26 @@ test("CSV-01 preserves already-supported decimal comma and US mixed separators",
   assert.equal(europeanDecimal[0].amount, 12.34)
   assert.equal(usDecimal[0].amount, 1_234.56)
 })
+
+
+test("CSV boundary rejects blank amounts instead of coercing them to zero", () => {
+  const rows = statementImportRows([
+    "date,amount,reference",
+    "2026-07-01,   ,TX-BLANK",
+  ].join("\n"))
+
+  assert.equal(rows[0].amount, undefined)
+})
+
+test("CSV boundary rejects impossible ISO calendar dates instead of normalizing them", () => {
+  const rows = statementImportRows([
+    "date,amount,reference",
+    "2026-02-31,125.50,TX-DATE",
+    "2026-02-29,50.00,TX-NONLEAP",
+    "2028-02-29,75.00,TX-LEAP",
+  ].join("\n"))
+
+  assert.equal(rows[0].date, undefined)
+  assert.equal(rows[1].date, undefined)
+  assert.notEqual(rows[2].date, undefined)
+})

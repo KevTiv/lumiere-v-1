@@ -31,8 +31,18 @@ function parseCsvLine(line: string, delimiter: string): string[] {
 function parseStatementDate(value: string): Date | undefined {
   const iso = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value)
   if (iso) {
-    const date = new Date(`${iso[1]}-${iso[2]}-${iso[3]}T00:00:00.000Z`)
-    return Number.isNaN(date.getTime()) ? undefined : date
+    const year = Number(iso[1])
+    const month = Number(iso[2])
+    const day = Number(iso[3])
+    const date = new Date(Date.UTC(year, month - 1, day))
+    if (
+      date.getUTCFullYear() !== year ||
+      date.getUTCMonth() !== month - 1 ||
+      date.getUTCDate() !== day
+    ) {
+      return undefined
+    }
+    return date
   }
 
   if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(value)) {
@@ -45,6 +55,7 @@ function parseStatementDate(value: string): Date | undefined {
 
 function parseStatementAmount(value: string): number | undefined {
   const compact = value.replaceAll(/\s/g, "")
+  if (compact === "") return undefined
   const europeanGroupedDecimal = /^[+-]?\d{1,3}(?:\.\d{3})+,\d+$/.test(compact)
   const usGroupedInteger = /^[+-]?\d{1,3}(?:,\d{3})+$/.test(compact)
   const normalized = europeanGroupedDecimal
