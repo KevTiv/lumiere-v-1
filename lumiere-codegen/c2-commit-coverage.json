@@ -121,6 +121,20 @@
       "change_constructors": ["upsert_stdb_row"]
     },
     {
+      "source": "spacetimedb/src/inventory/cycle_count.rs",
+      "function": "post_cycle_count_adjustments",
+      "operation": "post_cycle_count_adjustments",
+      "operation_id": "erp.post_cycle_count_adjustments",
+      "change_constructors": ["upsert_stdb_row"]
+    },
+    {
+      "source": "spacetimedb/src/inventory/stock.rs",
+      "function": "quarantine_quantity",
+      "operation": "fail_quality_check",
+      "operation_id": "erp.fail_quality_check",
+      "change_constructors": ["upsert_stdb_row", "delete"]
+    },
+    {
       "source": "spacetimedb/src/manufacturing/bill_of_materials.rs",
       "function": "create_bom",
       "operation": "create_bom",
