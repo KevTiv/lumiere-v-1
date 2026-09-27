@@ -770,6 +770,28 @@ pub fn receive_crm_provider_message(
     Ok(())
 }
 
+fn record_provider_delivery_receipt(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    conversation_id: u64,
+    params: &RecordCrmProviderDeliveryParams,
+) {
+    ctx.db
+        .crm_provider_event_receipt()
+        .insert(CrmProviderEventReceipt {
+            id: 0,
+            organization_id,
+            provider_account_id: params.provider_account_id,
+            provider_event_id: params.provider_event_id.clone(),
+            event_fingerprint: params.event_fingerprint.clone(),
+            event_kind: "delivery".to_string(),
+            conversation_id,
+            conversation_message_id: params.conversation_message_id,
+            received_at: ctx.timestamp,
+            received_by: ctx.sender(),
+        });
+}
+
 #[spacetimedb::reducer]
 pub fn record_crm_provider_delivery(
     ctx: &ReducerContext,
@@ -850,6 +872,8 @@ pub fn record_crm_provider_delivery(
             "conversation message is not an outbound message for this conversation".to_string(),
         );
     }
+    let stale_sent = params.status == "sent"
+        && matches!(message.status.as_str(), "delivered" | "failed");
     let transition_allowed = match params.status.as_str() {
         "sent" => message.status == "queued" || message.status == "sent",
         "delivered" => {
@@ -860,7 +884,7 @@ pub fn record_crm_provider_delivery(
         }
         _ => false,
     };
-    if !transition_allowed {
+    if !transition_allowed && !stale_sent {
         return Err("provider delivery transition is not allowed".to_string());
     }
     ensure_provider_message_id_available(
@@ -889,6 +913,11 @@ pub fn record_crm_provider_delivery(
         .find(&params.operational_message_id)
         .ok_or("operational message not found")?;
     validate_operational_message_scope(&operational, &conversation, &contact)?;
+    let operational_stale_sent = params.status == "sent"
+        && matches!(
+            &operational.status,
+            OperationalMessageStatus::Delivered | OperationalMessageStatus::Failed
+        );
     let operational_transition_allowed = match params.status.as_str() {
         "sent" => matches!(
             &operational.status,
@@ -908,8 +937,15 @@ pub fn record_crm_provider_delivery(
         ),
         _ => false,
     };
-    if !operational_transition_allowed {
+    if !operational_transition_allowed && !operational_stale_sent {
         return Err("operational message delivery transition is not allowed".to_string());
+    }
+    if stale_sent != operational_stale_sent {
+        return Err("conversation and operational delivery states are inconsistent".to_string());
+    }
+    if stale_sent {
+        record_provider_delivery_receipt(ctx, organization_id, conversation.id, &params);
+        return Ok(());
     }
 
     let next_operational_status = match params.status.as_str() {
@@ -923,7 +959,7 @@ pub fn record_crm_provider_delivery(
         .id()
         .update(CrmConversationMessage {
             status: params.status.clone(),
-            provider_message_id: Some(params.provider_message_id),
+            provider_message_id: Some(params.provider_message_id.clone()),
             operational_message_id: Some(params.operational_message_id),
             metadata: None,
             ..message
@@ -939,23 +975,10 @@ pub fn record_crm_provider_delivery(
                 operational.sent_at
             },
             failed_at: (params.status == "failed").then_some(ctx.timestamp),
-            failure_reason: params.failure_reason,
+            failure_reason: params.failure_reason.clone(),
             ..operational
         });
-    ctx.db
-        .crm_provider_event_receipt()
-        .insert(CrmProviderEventReceipt {
-            id: 0,
-            organization_id,
-            provider_account_id: params.provider_account_id,
-            provider_event_id: params.provider_event_id,
-            event_fingerprint: params.event_fingerprint,
-            event_kind: "delivery".to_string(),
-            conversation_id: conversation.id,
-            conversation_message_id: params.conversation_message_id,
-            received_at: ctx.timestamp,
-            received_by: ctx.sender(),
-        });
+    record_provider_delivery_receipt(ctx, organization_id, conversation.id, &params);
     write_audit_log_v2(
         ctx,
         organization_id,

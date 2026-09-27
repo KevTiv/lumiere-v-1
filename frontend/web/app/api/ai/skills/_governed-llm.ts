@@ -1,4 +1,4 @@
-import { type NextRequest } from "next/server"
+import { NextResponse, type NextRequest } from "next/server"
 
 import {
   optionalPositiveInteger,
@@ -10,6 +10,7 @@ import {
   validateCompanyScope,
 } from "../_lib/route-helpers"
 import { resolveAiPrivacyPolicy } from "../_lib/ai-privacy-policy"
+import { buildTrustedGovernedLlmRequest } from "./_governed-llm-contract"
 
 const GATEWAY_PATHS = {
   "report-analysis": "/v1/skills/report-analysis",
@@ -47,17 +48,44 @@ async function postGovernedLlmSkill(
   const companyError = await validateCompanyScope(session, companyId ?? NaN)
   if (companyError) return companyError
 
+  const inputs = sanitizeRecord(body.inputs) ?? {}
+  const agentId = optionalPositiveInteger(body.agentId ?? body.agent_id) ?? null
+  const teamMemberId =
+    optionalPositiveInteger(body.teamMemberId ?? body.team_member_id) ?? null
+  const maxSteps = parseOptionalMaxSteps(body.maxSteps ?? body.max_steps)
+  const resumeRunId =
+    optionalPositiveInteger(body.resumeRunId ?? body.resume_run_id) ?? null
+  const orgPrivacyPolicy = resolveAiPrivacyPolicy(session.fieldAccess)
+
+  if (skillSlug === "report-analysis") {
+    if (!session.identityHex || session.identityHex === "unknown" || !session.stdbToken.trim()) {
+      return NextResponse.json(
+        { error: "Authenticated actor context required" },
+        { status: 403 },
+      )
+    }
+    const trusted = buildTrustedGovernedLlmRequest(
+      { inputs, agentId, teamMemberId, maxSteps, resumeRunId, orgPrivacyPolicy },
+      {
+        organizationId: orgId,
+        companyId: companyId as number,
+        actorIdentity: session.identityHex,
+        stdbToken: session.stdbToken,
+      },
+    )
+    return proxyAiGateway(GATEWAY_PATHS[skillSlug], trusted.body, trusted.headers)
+  }
+
   return proxyAiGateway(GATEWAY_PATHS[skillSlug], {
     org_id: orgId,
     company_id: companyId,
-    inputs: sanitizeRecord(body.inputs) ?? {},
-    agent_id: optionalPositiveInteger(body.agentId ?? body.agent_id) ?? null,
-    team_member_id:
-      optionalPositiveInteger(body.teamMemberId ?? body.team_member_id) ?? null,
-    max_steps: parseOptionalMaxSteps(body.maxSteps ?? body.max_steps),
+    inputs,
+    agent_id: agentId,
+    team_member_id: teamMemberId,
+    max_steps: maxSteps,
     stdb_token: session.stdbToken,
     identity_hex: session.identityHex,
-    org_privacy_policy: resolveAiPrivacyPolicy(session.fieldAccess),
+    org_privacy_policy: orgPrivacyPolicy,
   })
 }
 

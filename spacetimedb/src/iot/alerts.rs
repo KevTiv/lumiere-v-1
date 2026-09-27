@@ -17,6 +17,7 @@ use crate::iot::registry::iot_device;
     index(accessor = iot_alert_by_org, btree(columns = [organization_id])),
     index(accessor = iot_alert_unresolved, btree(columns = [organization_id, resolved_at]))
 )]
+#[derive(PartialEq)]
 pub struct IoTAlert {
     #[primary_key]
     #[auto_inc]
