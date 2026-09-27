@@ -247,7 +247,11 @@ pub struct AiEvidenceSourceVersion {
 #[derive(Clone)]
 #[spacetimedb::table(
     accessor = ai_evidence_contribution,
-    index(accessor = ai_evidence_contribution_by_org, btree(columns = [organization_id]))
+    index(accessor = ai_evidence_contribution_by_org, btree(columns = [organization_id])),
+    index(
+        accessor = ai_evidence_contribution_by_replay,
+        btree(columns = [organization_id, company_id, contributor_uid, session_ref])
+    )
 )]
 pub struct AiEvidenceContribution {
     #[primary_key]
@@ -1201,16 +1205,16 @@ fn find_contribution_replay(
     params: &RecordAiEvidenceContributionParams,
 ) -> Option<AiEvidenceContribution> {
     let event_ref = params.event_ref.as_ref()?;
+    // `event_ref` is `Option<String>`, which SpacetimeDB cannot use as an
+    // index filter argument (only integers, bool, String, Identity, Uuid,
+    // Timestamp, ConnectionId, Hash and no-payload enums are `FilterableValue`).
+    // The index instead narrows to one caller's contributions in one session
+    // — already a small set — and the exact `event_ref` match happens here.
     ctx.db
         .ai_evidence_contribution()
-        .ai_evidence_contribution_by_org()
-        .filter(&organization_id)
-        .find(|row| {
-            row.company_id == company_id
-                && row.contributor_uid == ctx.sender()
-                && row.session_ref == params.session_ref
-                && row.event_ref.as_ref() == Some(event_ref)
-        })
+        .ai_evidence_contribution_by_replay()
+        .filter((&organization_id, &company_id, &ctx.sender(), &params.session_ref))
+        .find(|row| row.event_ref.as_ref() == Some(event_ref))
 }
 
 fn contribution_matches(

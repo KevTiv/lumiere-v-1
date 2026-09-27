@@ -416,8 +416,26 @@ Current wiring and remaining work:
   exercised in a running browser against a live gateway. `turn_ref` remains a
   bounded correlation string rather than validated message lineage — that
   part of the original gap is unchanged.
-- Contribution replay currently scans the organization index; a narrower
-  idempotency index is deferred because it would change the generated schema.
+- **Update (2026-09-22): contribution replay now uses a narrower index.**
+  `ai_evidence_contribution` gained `ai_evidence_contribution_by_replay`
+  (btree on `organization_id, company_id, contributor_uid, session_ref`);
+  `find_contribution_replay` filters through it, then does the final
+  `event_ref` match in Rust (SpacetimeDB's `FilterableValue` trait has no
+  impl for `Option<T>`, so a nullable column can't itself be an index-filter
+  argument — confirmed by trying it first and hitting a compile error). This
+  narrows the replay lookup from "every contribution in the organization" to
+  "one caller's contributions in one session." Migration was carried out in
+  full: release WASM build, publish to a local scratch SpacetimeDB instance,
+  `spacetime call run_ai_evidence_provenance_tests` (passed; SQL query
+  confirmed exactly 6 contribution rows with the idempotent `event-1` replay
+  collapsing to one row, as expected), full Rust/TS SDK regeneration, and
+  `cargo run -p lumiere-codegen`. Every git-tracked generated artifact came
+  out byte-identical to what's already committed — a new index has no effect
+  on any of them (they encode reducers/tables/resources, not indexes).
+  The separately-versioned contracts drift that previously blocked this work
+  is closed by the v0.3.57 release and immutable repin on this branch.
+  `cargo test -p lumiere_v1 evidence_source` (native, 10/10) and
+  `cargo check` (spacetimedb crate) both pass.
 - Generated contracts are regenerated and the C0/C1/C2, operation-history,
   release-manifest and contract-IR gates pass (see AIH-18's verification
   note). This also surfaced and fixed stale hard-coded table counts and an

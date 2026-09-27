@@ -1,6 +1,6 @@
 # COV-23 — Membership role assign → revoke
 
-**Status:** IMPLEMENTED — runtime acceptance pending  
+**Status:** IMPLEMENTED — runtime acceptance pending
 **Module/surface:** Org / Settings / Auth  
 **Plan target:** membership/role change and session recovery  
 **Scaffold source:** [`erp-cov08-27-scaffold.md`](./erp-cov08-27-scaffold.md)
