@@ -489,7 +489,7 @@ export function UserManagement() {
             </div>
             <div className="space-y-2">
               <Label>{t("settings.users.roles")}</Label>
-              <div className="grid gap-2 sm:grid-cols-2">
+              <div className="grid max-h-64 gap-2 overflow-y-auto rounded-md border p-3 sm:grid-cols-2">
                 {roles.map((role) => (
                   <div key={role.id} className="flex items-center gap-2">
                     <Checkbox

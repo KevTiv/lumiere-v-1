@@ -22,7 +22,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { apiFetch, fetchQueryList, type QueryRows, rqBigIntKey } from "../http"
 import { invalidateResourceQueries } from "../subscription-query"
 import { toCreateAuditRuleParams } from "@lumiere/erp-shared/settings-create-params"
-import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
+import { encodeIdentity, stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
 import { scalarToU64 as toScalarU64, type ScalarId } from "@lumiere/erp-shared/u64"
 import type { CanonicalRecordRef } from "./operation-effect"
 import { resolveActiveRoleAssignmentEffect, resolveRevokedRoleAssignmentEffect } from "./auth-role-assignment"
@@ -552,7 +552,7 @@ export function useAssignRole(organizationId: bigint) {
   >({
     mutationFn: async ({ userIdentity, roleId, params }) => {
       const role = toScalarU64(roleId)
-      const { urlPath, init } = stdbBffCommandPost("assign_role", { userIdentity: userIdentity.trim(), roleId: role, params: stdbParamsToJson({
+      const { urlPath, init } = stdbBffCommandPost("assign_role", { userIdentity: encodeIdentity(userIdentity), roleId: role, params: stdbParamsToJson({
           expiresAtMicros:
             params.expiresAtMicros != null && String(params.expiresAtMicros).trim() !== ''
               ? toScalarU64(params.expiresAtMicros as ScalarId)
