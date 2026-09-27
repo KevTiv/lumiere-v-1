@@ -298,8 +298,13 @@ jobs:
             frontend/packages/presentation-core/package.json \
             frontend/packages/query-hooks/package.json \
             frontend/packages/stdb/package.json
-          sed -i "s/lumiere-contracts#v$PREVIOUS_VERSION&/lumiere-contracts#v$VERSION\&/; s/lumiere-contracts.git#$PREVIOUS_REVISION&/lumiere-contracts.git#$REVISION\&/" \
+          # The old revision appears in specifiers, package keys and the git
+          # resolution; the resolved package entry also records the version.
+          sed -i "s/lumiere-contracts#v$PREVIOUS_VERSION&/lumiere-contracts#v$VERSION\&/; s/$PREVIOUS_REVISION/$REVISION/g" \
             frontend/pnpm-lock.yaml
+          sed -i "/resolution: {commit: $REVISION, path: packages\/contracts/{n;s/^    version: $PREVIOUS_VERSION\$/    version: $VERSION/}" \
+            frontend/pnpm-lock.yaml
+          if grep -q "$PREVIOUS_REVISION" frontend/pnpm-lock.yaml; then echo "pnpm-lock.yaml still references $PREVIOUS_REVISION"; exit 1; fi
           sed -i "s/v$PREVIOUS_VERSION/v$VERSION/g" api-server/src/presentation_dictionary.rs
           cargo update -p lumiere-contracts
           grep -q "tag=v$VERSION#$REVISION" Cargo.lock
@@ -320,7 +325,10 @@ jobs:
               "artifact_sha256": pin["artifact_sha256"],
               "schema_hash": pin["schema_hash"],
               "source_commit": pin["source_commit"],
+              "source_repository": pin["source_repository"],
           })
+          durable = manifest["durable_postgres"]
+          durable["checksum"] = "sha256:" + hashlib.sha256((checkout / durable["sql_path"]).read_bytes()).hexdigest()
           manifest["lumiere_contracts"].update({"version": version, "tag": f"v{version}", "revision": revision})
           history = Path(manifest["operation_history"]["path"]).read_bytes()
           manifest["operation_history"]["checksum"] = "sha256:" + hashlib.sha256(history).hexdigest()

@@ -60,3 +60,18 @@ in `spacetimedb/tests/inventory/tests/gap_fixes_test.rs`.
 - **COV-07:** the manufacturing specs and resolvers read the fields above; re-run the stack.
 - **COV-10:** add the exact readback to `useValidateTimesheets` / `useRejectTimesheets` through
   `timesheets.validation_status`.
+
+## v0.3.58: COV-05c/06/07/08 (released and pinned)
+
+`lumiere-contracts` v0.3.58 (`e049139e`) carries COV-05c, the COV-06/07 stack and COV-08a–d
+from the `claude/remaining-implementation-tasks-9ujw4u` integration branch. It adds 15 denied
+operation IDs and the organization-owned tables `replenishment_run_job` and `mrp_bom_byproduct`
+(census 503). This branch pins it in `Cargo.toml`, `Cargo.lock`, the three frontend packages,
+`frontend/pnpm-lock.yaml`, `api-server/src/presentation_dictionary.rs` and
+`release-compatibility-manifest.json`.
+
+It was published from CI with `.github/workflows/release-contracts.yml`'s one-off twin. Later
+releases use that reusable workflow (`workflow_dispatch` on main), which needs the
+`LUMIERE_CONTRACTS_PUBLISH_KEY` write deploy key. CI checkouts record `source_repository`
+without `.git`, and the pin step copies it and the durable PG migration checksum from the
+release.
