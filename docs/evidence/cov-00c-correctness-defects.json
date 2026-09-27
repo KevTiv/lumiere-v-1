@@ -298,6 +298,7 @@
       "frontend/web/tests/e2e/phone-first-contacts.spec.ts",
       "frontend/web/tests/e2e/pretenant-agent-adversarial.spec.ts",
       "frontend/web/tests/e2e/pretenant-communications-adversarial.spec.ts",
+      "frontend/web/tests/e2e/pretenant-ir-adversarial.spec.ts",
       "frontend/web/tests/e2e/pretenant-payment-adversarial.spec.ts",
       "frontend/web/tests/e2e/pretenant-support.ts",
       "frontend/web/tests/e2e/projects-wave-lifecycle.spec.ts",
