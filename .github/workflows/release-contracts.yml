@@ -20,6 +20,17 @@ on:
         description: "Operation-history revision reason (defaults to a generated summary)"
         type: string
         default: ""
+  # Lets a branch that is not main yet trigger a release through a thin caller.
+  workflow_call:
+    inputs:
+      version:
+        description: "Explicit x.y.z version (leave empty to bump the current pin)"
+        type: string
+        default: ""
+      reason:
+        description: "Operation-history revision reason (defaults to a generated summary)"
+        type: string
+        default: ""
 
 permissions:
   contents: write
