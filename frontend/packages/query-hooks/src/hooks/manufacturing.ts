@@ -466,7 +466,7 @@ export function useManufacturingMutations(organizationId: bigint, companyId: big
     computeBomCost: useComputeBomCost(organizationId, companyId),
     explodeBom: useExplodeBom(organizationId, companyId),
     updateWorkcenter: useUpdateWorkcenter(organizationId, companyId),
-    logProductivity: useLogWorkcenterProductivity(organizationId, companyId),
+    logProductivity: useLogWorkcenterProductivity(organizationId),
     importWorkcenterCsv: useImportWorkcenterCsv(organizationId, companyId),
     importBomCsv: useImportBomCsv(organizationId, companyId),
     importBomLineCsv: useImportBomLineCsv(organizationId, companyId),

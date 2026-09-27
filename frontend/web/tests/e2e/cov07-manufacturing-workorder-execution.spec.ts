@@ -218,7 +218,7 @@ async function createProgressMo(
         (row) => String((row as { origin?: unknown }).origin ?? "") === origin,
       )
       if (matches.length > 1) throw new Error("duplicate setup MO origin")
-      moId = scalarQueryId(matches[0]?.id)
+      moId = scalarQueryId(matches[0]?.id) ?? undefined
       return moId
     })
     .toEqual(expect.any(Number))

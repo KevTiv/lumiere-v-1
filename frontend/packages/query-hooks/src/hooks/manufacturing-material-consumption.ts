@@ -11,7 +11,7 @@ import { resolveManufacturingOrderState, type ManufacturingOrderEffectRef } from
 import {
   executeOperationWithCanonicalReadback,
   requireResolvedOperationEffect,
-  resolveUniqueEffect,
+  resolveUniqueRow,
   type CanonicalRecordRef,
   type ResolvedOperationEffectOutcome,
 } from "./operation-effect"
@@ -131,12 +131,11 @@ export function resolveManufacturingMaterialEffect(
   manufacturingOrderId: bigint,
   companyId: bigint,
 ): ManufacturingMaterialEffectRef | null {
-  const order = resolveUniqueEffect(
+  const order = resolveUniqueRow(
     orders,
     (row) =>
       parseStrictU64(row.id) === manufacturingOrderId &&
       parseStrictU64(row.companyId ?? row.company_id) === companyId,
-    (row) => row,
   )
   if (!order) return null
 

@@ -9,9 +9,9 @@ import { useMutation, useQueryClient, type QueryClient } from "@tanstack/react-q
 import { apiFetch, fetchQueryList, rqBigIntKey } from "../http"
 import { invalidateResourceQueries } from "../subscription-query"
 import {
-  AmbiguousOperationEffectError,
   executeOperationWithCanonicalReadback,
   requireResolvedOperationEffect,
+  resolveUniqueRow,
   type CanonicalRecordRef,
   type ResolvedOperationEffectOutcome,
 } from "./operation-effect"
@@ -121,19 +121,6 @@ function parseIdList(value: unknown): string[] | null {
   return ids
 }
 
-function exactRow<Row>(
-  rows: readonly Row[],
-  matches: (row: Row) => boolean,
-): Row | null {
-  const matched = rows.filter(matches)
-  if (matched.length > 1) {
-    throw new AmbiguousOperationEffectError(
-      `Expected one canonical row, found ${matched.length}`,
-    )
-  }
-  return matched[0] ?? null
-}
-
 function sameNumber(left: number, right: number): boolean {
   return Math.abs(left - right) <= 1e-9
 }
@@ -161,7 +148,7 @@ function resolveExecutionContext(
   productionId: bigint
   workcenterId: bigint
 } | null {
-  const workorder = exactRow(
+  const workorder = resolveUniqueRow(
     workorders,
     (row) =>
       parseStrictU64(row.id) === workorderId &&
@@ -177,13 +164,13 @@ function resolveExecutionContext(
   )
   if (productionId == null || workcenterId == null) return null
 
-  const production = exactRow(
+  const production = resolveUniqueRow(
     productions,
     (row) =>
       parseStrictU64(row.id) === productionId &&
       parseStrictU64(row.companyId ?? row.company_id) === companyId,
   )
-  const workcenter = exactRow(
+  const workcenter = resolveUniqueRow(
     workcenters,
     (row) =>
       parseStrictU64(row.id) === workcenterId &&
@@ -454,7 +441,7 @@ export function useLogWorkcenterProductivity(
       }
 
       const beforeRows = await readExecutionRows()
-      const beforeWorkorder = exactRow(
+      const beforeWorkorder = resolveUniqueRow(
         beforeRows.workorders,
         (row) => parseStrictU64(row.id) === workorderId,
       )

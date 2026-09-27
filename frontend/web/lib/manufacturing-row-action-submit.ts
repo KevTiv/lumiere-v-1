@@ -204,7 +204,7 @@ export async function submitManufacturingRowAction(
         if (!params) throw new Error(i18n.t("common.paramsMapper.invalidProductivityLog"))
         await m.logProductivity.mutateAsync({
           workcenterId: wcId,
-          params: params as unknown as Record<string, unknown>,
+          params,
         })
         return
       }

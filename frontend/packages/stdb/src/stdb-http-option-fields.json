@@ -4920,6 +4920,7 @@
     "sequence",
     "partner_id",
     "metadata",
+    "wh_qc_stock_loc_id",
     "resupplyWhIds"
   ],
   "UpdateWhatsAppBusinessAccountParams": [
