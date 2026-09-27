@@ -7,6 +7,7 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 OUT_DIR="${1:-$ROOT/.contracts-staging/bindings}"
 MODULE_DIR="${2:-$ROOT/spacetimedb}"
 SPACETIME_BIN="${SPACETIME_BIN:-spacetime}"
+RUSTFMT_BIN="${RUSTFMT_BIN:-rustfmt}"
 GENERATE_WASM="${STDB_GENERATE_WASM:-}"
 LOG_FILE="$(mktemp "${TMPDIR:-/tmp}/lumiere-stdb-rust-generate.XXXXXX.log")"
 CLEAN_LOG_FILE="$(mktemp "${TMPDIR:-/tmp}/lumiere-stdb-rust-generate-clean.XXXXXX.log")"
@@ -70,8 +71,10 @@ fi
 bash "$ROOT/scripts/fix-spacetimedb-rust-sdk-bindings.sh" "$OUT_DIR"
 
 # The CLI's formatter ran before the keyword repair. Run it again to both
-# normalize and parse-check every repaired output file.
-find "$OUT_DIR" -name '*.rs' -print0 | xargs -0 rustfmt --edition 2021
+# normalize and parse-check every repaired output file. Keep each rustfmt
+# invocation bounded: a full module currently contains more than a thousand
+# files, which can exhaust a constrained CI runner when passed in one batch.
+find "$OUT_DIR" -name '*.rs' -print0 | xargs -0 -n 64 "$RUSTFMT_BIN" --edition 2021
 
 if [[ ! -s "$OUT_DIR/mod.rs" ]]; then
   echo "SpacetimeDB Rust generation did not produce $OUT_DIR/mod.rs" >&2

@@ -66,6 +66,30 @@ pub struct LlmRequest {
     pub temperature: Option<f64>,
     pub top_p: Option<f64>,
     pub tools: Vec<ToolSpec>,
+    /// Allow one exact schema response without native provider tool calls.
+    /// Typed intelligence adapters opt in; agent-loop requests do not.
+    pub single_shot_tool: bool,
+    /// Provider-visible thinking control. Only transports with an explicit
+    /// control apply it; other transports leave their request unchanged.
+    pub thinking: ThinkingMode,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum ThinkingMode {
+    #[default]
+    ProviderDefault,
+    Enabled,
+    Disabled,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum CompletionTermination {
+    Complete,
+    Length,
+    ToolCall,
+    Filtered,
+    #[default]
+    Unknown,
 }
 
 #[derive(Clone, Debug)]
@@ -76,6 +100,28 @@ pub struct LlmResponse {
     pub model: String,
     pub provider: String,
     pub tool_calls: Vec<ToolCallRequest>,
+    /// Provider-neutral terminal classification plus the provider's bounded
+    /// reason label. Neither field contains model-authored reasoning text.
+    pub termination: CompletionTermination,
+    pub provider_done_reason: Option<String>,
+    /// Whether the provider returned a nonempty thinking channel. The channel
+    /// contents are deliberately discarded at the transport boundary.
+    pub thinking_observed: bool,
+}
+
+impl LlmResponse {
+    pub fn exhausted_before_content(&self) -> bool {
+        self.termination == CompletionTermination::Length
+            && self.text.trim().is_empty()
+            && !self
+                .tool_calls
+                .iter()
+                .any(|call| call.arguments_error.is_none())
+    }
+
+    pub fn thinking_exhausted_before_content(&self) -> bool {
+        self.exhausted_before_content() && self.thinking_observed
+    }
 }
 
 /// Routes chat completion to Kong (when configured) or direct Mistral/Gemini/Ollama APIs.
@@ -187,7 +233,6 @@ impl LlmClient {
                 .collect::<Vec<_>>());
             payload["tool_choice"] = json!("auto");
         }
-
         payload
     }
 
@@ -217,10 +262,11 @@ impl LlmClient {
     }
 
     async fn complete_ollama(&self, req: &LlmRequest) -> Result<LlmResponse> {
-        if !req.tools.is_empty() {
-            anyhow::bail!(
-                "Ollama tool calling is not admitted; select the explicit single-shot path"
-            );
+        // Native tool calling is admitted only through the model profile's
+        // explicit OLLAMA_SUPPORTS_TOOL_CALLING opt-in; the transport itself
+        // serves both native tools and the single-shot schema path.
+        if req.single_shot_tool && req.tools.is_empty() {
+            anyhow::bail!("Ollama single-shot completion requires at least one output schema");
         }
 
         let url = format!("{}/api/chat", self.ollama_url.trim_end_matches('/'));
@@ -230,18 +276,7 @@ impl LlmClient {
             req.model.clone()
         };
 
-        let mut messages = vec![json!({"role": "system", "content": req.system})];
-        messages.extend(req.messages.iter().map(openai_message));
-
-        let body = json!({
-            "model": model,
-            "stream": false,
-            "messages": messages,
-            "options": {
-                "temperature": req.temperature.unwrap_or(0.7),
-                "num_predict": req.max_tokens,
-            }
-        });
+        let body = self.ollama_payload(req, &model);
 
         let resp = self
             .http
@@ -258,16 +293,89 @@ impl LlmClient {
         }
 
         let parsed: OllamaChatResponse = resp.json().await.context("parse Ollama response")?;
-        let text = parsed.message.and_then(|m| m.content).unwrap_or_default();
+        Ok(Self::from_ollama_response(parsed, req, model))
+    }
 
-        Ok(LlmResponse {
+    fn ollama_payload(&self, req: &LlmRequest, model: &str) -> serde_json::Value {
+        let mut messages = vec![json!({"role": "system", "content": req.system})];
+        messages.extend(req.messages.iter().map(ollama_message));
+        let mut body = json!({
+            "model": model,
+            "stream": false,
+            "messages": messages,
+            "options": {
+                "temperature": req.temperature.unwrap_or(0.7),
+                "num_predict": req.max_tokens,
+            }
+        });
+        match req.thinking {
+            ThinkingMode::ProviderDefault => {}
+            ThinkingMode::Enabled => body["think"] = json!(true),
+            ThinkingMode::Disabled => body["think"] = json!(false),
+        }
+        if req.single_shot_tool {
+            body["format"] = ollama_output_schema(&req.tools);
+        } else if !req.tools.is_empty() {
+            body["tools"] = json!(req
+                .tools
+                .iter()
+                .map(|tool| {
+                    json!({
+                        "type": "function",
+                        "function": {
+                            "name": tool.name,
+                            "description": tool.description,
+                            "parameters": tool.parameters,
+                        }
+                    })
+                })
+                .collect::<Vec<_>>());
+        }
+        body
+    }
+
+    fn from_ollama_response(
+        parsed: OllamaChatResponse,
+        req: &LlmRequest,
+        model: String,
+    ) -> LlmResponse {
+        let (text, thinking_observed, native_tool_calls) = parsed
+            .message
+            .map(|message| {
+                (
+                    message.content.unwrap_or_default(),
+                    message
+                        .thinking
+                        .is_some_and(|thinking| !thinking.trim().is_empty()),
+                    message.tool_calls.unwrap_or_default(),
+                )
+            })
+            .unwrap_or_default();
+        let tool_calls = if req.single_shot_tool {
+            ollama_tool_calls(&req.tools, &text)
+        } else {
+            native_tool_calls
+                .into_iter()
+                .map(|call| ToolCallRequest {
+                    id: call.id,
+                    name: call.function.name,
+                    arguments: call.function.arguments,
+                    arguments_error: None,
+                })
+                .collect()
+        };
+        let (termination, provider_done_reason) = completion_termination(parsed.done_reason);
+        LlmResponse {
             text,
             input_tokens: parsed.prompt_eval_count.unwrap_or(0) as u32,
             output_tokens: parsed.eval_count.unwrap_or(0) as u32,
             model,
             provider: "ollama".to_string(),
-            tool_calls: Vec::new(),
-        })
+            tool_calls,
+            termination,
+            provider_done_reason,
+            thinking_observed,
+        }
     }
 
     async fn complete_gemini(&self, req: &LlmRequest) -> Result<LlmResponse> {
@@ -357,6 +465,9 @@ impl LlmClient {
                 arguments_error: None,
             })
             .collect();
+        let (termination, provider_done_reason) = completion_termination(
+            first_candidate.and_then(|candidate| candidate.finish_reason.clone()),
+        );
 
         LlmResponse {
             text,
@@ -365,6 +476,9 @@ impl LlmClient {
             model,
             provider: "gemini".to_string(),
             tool_calls,
+            termination,
+            provider_done_reason,
+            thinking_observed: false,
         }
     }
 
@@ -411,6 +525,12 @@ impl LlmClient {
                 )
             })
             .unwrap_or((0, 0));
+        let (termination, provider_done_reason) = completion_termination(
+            body.choices
+                .as_ref()
+                .and_then(|choices| choices.first())
+                .and_then(|choice| choice.finish_reason.clone()),
+        );
 
         LlmResponse {
             text,
@@ -419,8 +539,116 @@ impl LlmClient {
             model: body.model.unwrap_or_else(|| model.to_string()),
             provider: provider.to_string(),
             tool_calls,
+            termination,
+            provider_done_reason,
+            thinking_observed: false,
         }
     }
+}
+
+fn ollama_output_schema(tools: &[ToolSpec]) -> serde_json::Value {
+    if let [tool] = tools {
+        return tool.parameters.clone();
+    }
+    json!({
+        "oneOf": tools.iter().map(|tool| json!({
+            "type": "object",
+            "properties": {
+                "name": {"const": tool.name},
+                "arguments": tool.parameters,
+            },
+            "required": ["name", "arguments"],
+            "additionalProperties": false,
+        })).collect::<Vec<_>>()
+    })
+}
+
+fn ollama_tool_calls(tools: &[ToolSpec], text: &str) -> Vec<ToolCallRequest> {
+    let parsed = serde_json::from_str::<serde_json::Value>(text);
+    if let [tool] = tools {
+        return vec![match parsed {
+            Ok(arguments) => ToolCallRequest {
+                id: None,
+                name: tool.name.clone(),
+                arguments,
+                arguments_error: None,
+            },
+            Err(error) => invalid_ollama_tool_call(
+                tool.name.clone(),
+                format!("invalid single-shot JSON: {error}"),
+            ),
+        }];
+    }
+    let envelope = parsed
+        .ok()
+        .and_then(|value| value.as_object().cloned())
+        .and_then(|object| {
+            let name = object.get("name")?.as_str()?.to_string();
+            let arguments = object.get("arguments")?.clone();
+            Some((name, arguments))
+        });
+    match envelope {
+        Some((name, arguments)) if tools.iter().any(|tool| tool.name == name) => {
+            vec![ToolCallRequest {
+                id: None,
+                name,
+                arguments,
+                arguments_error: None,
+            }]
+        }
+        Some((name, _)) => vec![invalid_ollama_tool_call(
+            name,
+            "single-shot outcome was not among the admitted schemas".to_string(),
+        )],
+        None => vec![invalid_ollama_tool_call(
+            String::new(),
+            "invalid multi-outcome single-shot JSON envelope".to_string(),
+        )],
+    }
+}
+
+fn invalid_ollama_tool_call(name: String, error: String) -> ToolCallRequest {
+    ToolCallRequest {
+        id: None,
+        name,
+        arguments: serde_json::Value::Null,
+        arguments_error: Some(error),
+    }
+}
+
+fn completion_termination(
+    provider_reason: Option<String>,
+) -> (CompletionTermination, Option<String>) {
+    let provider_reason = provider_reason
+        .map(|reason| reason.trim().chars().take(64).collect::<String>())
+        .filter(|reason| !reason.is_empty());
+    let termination = match provider_reason.as_deref().map(str::to_ascii_lowercase) {
+        Some(reason) if matches!(reason.as_str(), "stop" | "end_turn") => {
+            CompletionTermination::Complete
+        }
+        Some(reason) if matches!(reason.as_str(), "length" | "max_tokens") => {
+            CompletionTermination::Length
+        }
+        Some(reason) if matches!(reason.as_str(), "tool_call" | "tool_calls") => {
+            CompletionTermination::ToolCall
+        }
+        Some(reason)
+            if matches!(
+                reason.as_str(),
+                "content_filter"
+                    | "safety"
+                    | "recitation"
+                    | "blocked"
+                    | "blocklist"
+                    | "prohibited_content"
+                    | "spii"
+            ) =>
+        {
+            CompletionTermination::Filtered
+        }
+        _ => CompletionTermination::Unknown,
+    };
+    (termination, provider_reason)
 }
 
 fn openai_message(message: &LlmMessage) -> serde_json::Value {
@@ -450,6 +678,33 @@ fn openai_message(message: &LlmMessage) -> serde_json::Value {
             "role": "tool",
             "tool_call_id": tool_call_id,
             "name": name,
+            "content": content,
+        }),
+    }
+}
+
+/// Like `openai_message`, but Ollama's `/api/chat` takes tool-call arguments
+/// as a native JSON object (not a stringified-JSON `arguments` field) and
+/// keys tool results by `tool_name` rather than `tool_call_id`.
+fn ollama_message(message: &LlmMessage) -> serde_json::Value {
+    match message {
+        LlmMessage::Text { role, content } => json!({"role": role, "content": content}),
+        LlmMessage::AssistantToolCalls {
+            content,
+            tool_calls,
+        } => json!({
+            "role": "assistant",
+            "content": content,
+            "tool_calls": tool_calls.iter().map(|call| json!({
+                "function": {
+                    "name": call.name,
+                    "arguments": call.arguments,
+                }
+            })).collect::<Vec<_>>()
+        }),
+        LlmMessage::ToolResult { name, content, .. } => json!({
+            "role": "tool",
+            "tool_name": name,
             "content": content,
         }),
     }
@@ -514,6 +769,7 @@ struct OpenAiChatResponse {
 #[derive(Debug, Deserialize)]
 struct OpenAiChoice {
     message: Option<OpenAiMessage>,
+    finish_reason: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -545,11 +801,29 @@ struct OllamaChatResponse {
     message: Option<OllamaMessage>,
     prompt_eval_count: Option<u64>,
     eval_count: Option<u64>,
+    done_reason: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
 struct OllamaMessage {
     content: Option<String>,
+    thinking: Option<String>,
+    #[serde(default)]
+    tool_calls: Option<Vec<OllamaToolCall>>,
+}
+
+#[derive(Debug, Deserialize)]
+struct OllamaToolCall {
+    id: Option<String>,
+    function: OllamaFunctionCall,
+}
+
+#[derive(Debug, Deserialize)]
+struct OllamaFunctionCall {
+    name: String,
+    /// Ollama returns arguments as a native JSON object, unlike the
+    /// OpenAI-compatible stringified-JSON `arguments` field.
+    arguments: serde_json::Value,
 }
 
 #[derive(Debug, Deserialize)]
@@ -562,6 +836,8 @@ struct GeminiGenerateResponse {
 #[derive(Debug, Deserialize)]
 struct GeminiCandidate {
     content: Option<GeminiContent>,
+    #[serde(rename = "finishReason")]
+    finish_reason: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -618,6 +894,8 @@ mod tests {
             temperature: Some(0.2),
             top_p: Some(0.9),
             tools,
+            single_shot_tool: false,
+            thinking: ThinkingMode::ProviderDefault,
         }
     }
 
@@ -691,6 +969,7 @@ mod tests {
         let body: OpenAiChatResponse = serde_json::from_value(json!({
             "model": "mistral-large-latest",
             "choices": [{
+                "finish_reason": "tool_calls",
                 "message": {
                     "content": null,
                     "tool_calls": [{
@@ -717,6 +996,8 @@ mod tests {
         assert_eq!(response.tool_calls[0].name, "erp_snapshot");
         assert_eq!(response.tool_calls[0].arguments, json!({ "entity_id": 42 }));
         assert_eq!(response.tool_calls[0].arguments_error, None);
+        assert_eq!(response.termination, CompletionTermination::ToolCall);
+        assert_eq!(response.provider_done_reason.as_deref(), Some("tool_calls"));
     }
 
     #[test]
@@ -746,6 +1027,7 @@ mod tests {
     fn gemini_fixture_populates_function_calls() {
         let body: GeminiGenerateResponse = serde_json::from_value(json!({
             "candidates": [{
+                "finishReason": "STOP",
                 "content": {
                     "parts": [{
                         "functionCall": {
@@ -772,6 +1054,7 @@ mod tests {
         assert_eq!(response.tool_calls[0].id.as_deref(), Some("gemini-call-42"));
         assert_eq!(response.tool_calls[0].name, "erp_snapshot");
         assert_eq!(response.tool_calls[0].arguments, json!({ "entity_id": 42 }));
+        assert_eq!(response.termination, CompletionTermination::Complete);
     }
 
     #[test]
@@ -819,13 +1102,289 @@ mod tests {
         );
     }
 
-    #[tokio::test]
-    async fn ollama_rejects_tool_enabled_requests_before_network_dispatch() {
-        let error = client()
-            .complete_ollama(&request(vec![stock_tool()]))
-            .await
-            .expect_err("tool-enabled Ollama requests must fail closed");
+    #[test]
+    fn ollama_payload_omits_tools_and_applies_disabled_thinking() {
+        let mut req = request(Vec::new());
+        req.thinking = ThinkingMode::Disabled;
+        let body = client().ollama_payload(&req, "gemma4:e2b-mlx");
 
-        assert!(error.to_string().contains("single-shot"));
+        assert_eq!(body["model"], "gemma4:e2b-mlx");
+        assert_eq!(body["think"], false);
+        assert_eq!(body["stream"], false);
+        assert!(body.get("tools").is_none());
+        assert_eq!(body["messages"][0]["role"], "system");
+    }
+
+    #[test]
+    fn ollama_payload_declares_function_tools() {
+        let body = client().ollama_payload(&request(vec![stock_tool()]), "gemma4:e2b-mlx");
+
+        assert_eq!(body["tools"][0]["type"], "function");
+        assert_eq!(body["tools"][0]["function"]["name"], "erp_snapshot");
+        assert_eq!(
+            body["tools"][0]["function"]["parameters"]["required"][0],
+            "entity_id"
+        );
+        // Unlike the OpenAI/Kong path, Ollama never gets a `tool_choice` key.
+        assert!(body.get("tool_choice").is_none());
+    }
+
+    #[test]
+    fn ollama_message_sends_native_json_arguments_not_a_string() {
+        let call = ToolCallRequest {
+            id: Some("call_1".to_string()),
+            name: "erp_snapshot".to_string(),
+            arguments: json!({"entity_id": 42}),
+            arguments_error: None,
+        };
+        let assistant = LlmMessage::AssistantToolCalls {
+            content: None,
+            tool_calls: vec![call],
+        };
+
+        let body = ollama_message(&assistant);
+
+        // Ollama takes structured JSON args, not a stringified-JSON field like
+        // the OpenAI-compatible `openai_message` path.
+        assert_eq!(
+            body["tool_calls"][0]["function"]["arguments"]["entity_id"],
+            42
+        );
+        assert!(body["tool_calls"][0]["function"]["arguments"].is_object());
+    }
+
+    #[test]
+    fn ollama_message_tool_result_uses_tool_name_not_tool_call_id() {
+        let result = LlmMessage::ToolResult {
+            tool_call_id: Some("call_1".to_string()),
+            name: "erp_snapshot".to_string(),
+            content: "{\"stock\":7}".to_string(),
+        };
+
+        let body = ollama_message(&result);
+
+        assert_eq!(body["role"], "tool");
+        assert_eq!(body["tool_name"], "erp_snapshot");
+        assert_eq!(body["content"], "{\"stock\":7}");
+    }
+
+    #[test]
+    fn ollama_response_parses_native_json_tool_call_arguments() {
+        let raw = json!({
+            "message": {
+                "role": "assistant",
+                "content": "",
+                "tool_calls": [{
+                    "id": "call_nq3sckva",
+                    "function": {
+                        "name": "erp_snapshot",
+                        "arguments": {"entity_id": 42}
+                    }
+                }]
+            },
+            "prompt_eval_count": 26,
+            "eval_count": 3
+        });
+
+        let parsed: OllamaChatResponse = serde_json::from_value(raw).unwrap();
+        let message = parsed.message.expect("message present");
+        let tool_calls = message.tool_calls.expect("tool_calls present");
+
+        assert_eq!(tool_calls.len(), 1);
+        assert_eq!(tool_calls[0].function.name, "erp_snapshot");
+        assert_eq!(tool_calls[0].function.arguments["entity_id"], 42);
+        assert_eq!(tool_calls[0].id.as_deref(), Some("call_nq3sckva"));
+    }
+
+    /// Live smoke check against a real local Ollama instance running a
+    /// tool-capable model (e.g. `gemma4:e2b-mlx`). Not run in CI — requires
+    /// `spacetime`-adjacent local infra this crate's test suite doesn't
+    /// otherwise depend on. Run manually with:
+    ///   OLLAMA_SMOKE_MODEL=gemma4:e2b-mlx cargo test --bin gateway \
+    ///     live_ollama_model_returns_a_real_tool_call -- --ignored --nocapture
+    #[tokio::test]
+    #[ignore]
+    async fn live_ollama_model_returns_a_real_tool_call() {
+        let model =
+            std::env::var("OLLAMA_SMOKE_MODEL").unwrap_or_else(|_| "gemma4:e2b-mlx".to_string());
+        let mut llm_client = client();
+        llm_client.ollama_llm_model = model.clone();
+
+        let mut req = request(vec![ToolSpec {
+            name: "get_stock".to_string(),
+            description: "Get stock level for a SKU".to_string(),
+            parameters: json!({
+                "type": "object",
+                "properties": {"sku": {"type": "string"}},
+                "required": ["sku"]
+            }),
+        }]);
+        req.messages = vec![LlmMessage::text(
+            "user",
+            "What is the stock level of product SKU-42?",
+        )];
+        req.model = model;
+
+        let response = llm_client
+            .complete_ollama(&req)
+            .await
+            .expect("local Ollama must be running with the smoke model pulled");
+
+        assert_eq!(response.provider, "ollama");
+        assert_eq!(response.tool_calls.len(), 1);
+        assert_eq!(response.tool_calls[0].name, "get_stock");
+        assert_eq!(response.tool_calls[0].arguments["sku"], "SKU-42");
+    }
+
+    #[test]
+    fn ollama_response_without_tool_calls_parses_plain_text() {
+        let raw = json!({
+            "message": {"role": "assistant", "content": "Hello there."},
+            "prompt_eval_count": 10,
+            "eval_count": 3
+        });
+
+        let parsed: OllamaChatResponse = serde_json::from_value(raw).unwrap();
+        let message = parsed.message.expect("message present");
+
+        assert_eq!(message.content.as_deref(), Some("Hello there."));
+        assert!(message.tool_calls.is_none());
+    }
+
+    #[test]
+    fn ollama_payload_applies_explicit_thinking_and_multi_outcome_schema() {
+        let mut req = request(vec![
+            stock_tool(),
+            ToolSpec {
+                name: "unable_to_progress".to_string(),
+                description: "Stop safely.".to_string(),
+                parameters: json!({
+                    "type": "object",
+                    "properties": {"reason": {"type": "string"}},
+                    "required": ["reason"],
+                    "additionalProperties": false,
+                }),
+            },
+        ]);
+        req.single_shot_tool = true;
+        req.thinking = ThinkingMode::Enabled;
+
+        let payload = client().ollama_payload(&req, "gemma4:e2b-mlx");
+
+        assert_eq!(payload["think"], true);
+        assert_eq!(payload["options"]["num_predict"], 256);
+        assert_eq!(payload["format"]["oneOf"].as_array().unwrap().len(), 2);
+        assert_eq!(
+            payload["format"]["oneOf"][0]["properties"]["name"]["const"],
+            "erp_snapshot"
+        );
+    }
+
+    #[test]
+    fn ollama_thinking_trace_is_reduced_to_safe_starvation_metadata() {
+        let mut req = request(vec![stock_tool()]);
+        req.single_shot_tool = true;
+        req.thinking = ThinkingMode::Enabled;
+        let parsed: OllamaChatResponse = serde_json::from_value(json!({
+            "message": {
+                "content": "",
+                "thinking": "SECRET MODEL TRACE THAT MUST NOT SURVIVE"
+            },
+            "done_reason": "length",
+            "prompt_eval_count": 41,
+            "eval_count": 256
+        }))
+        .unwrap();
+
+        let response = LlmClient::from_ollama_response(parsed, &req, "gemma4:e2b-mlx".into());
+
+        assert_eq!(response.termination, CompletionTermination::Length);
+        assert_eq!(response.provider_done_reason.as_deref(), Some("length"));
+        assert!(response.thinking_observed);
+        assert!(response.thinking_exhausted_before_content());
+        assert!(!format!("{response:?}").contains("SECRET MODEL TRACE"));
+    }
+
+    #[test]
+    fn ollama_multi_outcome_envelope_becomes_one_admitted_tool_call() {
+        let tools = vec![
+            stock_tool(),
+            ToolSpec {
+                name: "unable_to_progress".to_string(),
+                description: "Stop safely.".to_string(),
+                parameters: json!({
+                    "type": "object",
+                    "properties": {"reason": {"type": "string"}},
+                    "required": ["reason"],
+                    "additionalProperties": false,
+                }),
+            },
+        ];
+        let calls = ollama_tool_calls(
+            &tools,
+            r#"{"name":"unable_to_progress","arguments":{"reason":"no evidence"}}"#,
+        );
+
+        assert_eq!(calls.len(), 1);
+        assert_eq!(calls[0].name, "unable_to_progress");
+        assert_eq!(calls[0].arguments, json!({"reason": "no evidence"}));
+        assert!(calls[0].arguments_error.is_none());
+
+        let rejected = ollama_tool_calls(&tools, r#"{"name":"unreviewed_action","arguments":{}}"#);
+        assert!(rejected[0].arguments_error.is_some());
+    }
+
+    #[test]
+    fn provider_done_reason_is_bounded_and_unknown_values_stay_non_authoritative() {
+        let raw = format!("vendor_reason_{}", "x".repeat(100));
+        let (termination, reason) = completion_termination(Some(raw));
+        assert_eq!(termination, CompletionTermination::Unknown);
+        assert_eq!(reason.unwrap().chars().count(), 64);
+    }
+
+    #[tokio::test]
+    #[ignore = "requires GOV00A_OLLAMA_MODEL and a local Ollama service"]
+    async fn live_ollama_reports_starvation_and_accepts_closed_union_fallback() {
+        let model = std::env::var("GOV00A_OLLAMA_MODEL")
+            .expect("set GOV00A_OLLAMA_MODEL to an installed thinking-capable model");
+        let tools = vec![
+            stock_tool(),
+            ToolSpec {
+                name: "unable_to_progress".to_string(),
+                description: "Stop safely when bounded evidence is insufficient.".to_string(),
+                parameters: json!({
+                    "type": "object",
+                    "properties": {"reason": {"type": "string"}},
+                    "required": ["reason"],
+                    "additionalProperties": false,
+                }),
+            },
+        ];
+        let mut req = request(tools);
+        req.provider = "ollama".to_string();
+        req.model = model;
+        req.system = "Return exactly one JSON object matching the supplied schema. Choose unable_to_progress because no evidence is available.".to_string();
+        req.messages = vec![LlmMessage::text("user", "Resolve the bounded task.")];
+        req.single_shot_tool = true;
+        req.thinking = ThinkingMode::Enabled;
+        req.max_tokens = 256;
+
+        let first = client().complete_ollama(&req).await.unwrap();
+        assert!(
+            first.thinking_exhausted_before_content()
+                || first
+                    .tool_calls
+                    .iter()
+                    .any(|call| call.arguments_error.is_none()),
+            "thinking request must yield a valid outcome or the exact typed exhausted state: {first:?}"
+        );
+
+        req.thinking = ThinkingMode::Disabled;
+        let fallback = client().complete_ollama(&req).await.unwrap();
+        assert_eq!(fallback.termination, CompletionTermination::Complete);
+        assert!(!fallback.thinking_observed);
+        assert_eq!(fallback.tool_calls.len(), 1);
+        assert_eq!(fallback.tool_calls[0].name, "unable_to_progress");
+        assert!(fallback.tool_calls[0].arguments_error.is_none());
     }
 }
