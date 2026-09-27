@@ -160,10 +160,15 @@ export function sanitizeRecord(raw: unknown): JsonObject | undefined {
   return safe && typeof safe === 'object' && !Array.isArray(safe) ? (safe as JsonObject) : undefined
 }
 
-export async function proxyAiGateway(path: string, payload: JsonObject) {
+export async function proxyAiGateway(
+  path: string,
+  payload: JsonObject,
+  headers?: HeadersInit,
+) {
   try {
     const gw = await fetchAiGateway(path, {
       method: 'POST',
+      headers,
       body: JSON.stringify(payload),
     })
     const responsePayload = gw.text

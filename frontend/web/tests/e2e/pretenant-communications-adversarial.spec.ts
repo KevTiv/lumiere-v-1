@@ -13,7 +13,6 @@ import {
   auditCount,
   callRaw,
   callRawOk,
-  expectKnownDefect,
   field,
   idOf,
   none,
@@ -90,9 +89,9 @@ async function template(page: Page, s: Scope, marker: string): Promise<number> {
       key: `${marker}-template`,
       name: `${marker} template`,
       locale: "en",
-      subject: some(`Reminder ${marker}`),
-      body_template: "Hello {{customer_name}}, invoice {{invoice_number}} is due.",
-      allowed_variables: ["customer_name", "invoice_number"],
+      subject: some(`Reminder ${marker} for {{customer_name}}`),
+      body_template: "Hello {{customer_name}}, this is an operational message.",
+      allowed_variables: ["customer_name"],
       applicable_channels: [SMS],
       retention_classification: "operational",
       metadata: some(marker),
@@ -191,10 +190,8 @@ test.describe("Pre-tenant communications adversarial", { tag: pretenantTags("@co
     })
     requireNotPermissionDenied(selfApproval.result, "creator")
 
-    await expectKnownDefect("COMM-11", "batch creator can approve their own batch", async () => {
-      expect(selfApproval.result.ok, "creator self-approval must be rejected").toBe(false)
-      expect(await batchStatus(page, selfApproval.batchId)).toBe("pendingapproval")
-    })
+    expect(selfApproval.result.ok, "creator self-approval must be rejected").toBe(false)
+    expect(await batchStatus(page, selfApproval.batchId)).toBe("pendingapproval")
   })
 
   test("COMM-11-E2E simultaneous independent approvals execute once", async ({ page, browser }) => {
@@ -234,9 +231,7 @@ test.describe("Pre-tenant communications adversarial", { tag: pretenantTags("@co
     await expect.poll(() => auditCount(page, "message_batch", batchId, "APPROVE")).toBe(1)
     expect(await batchStatus(page, batchId)).toBe("approved")
 
-    await expectKnownDefect("COMM-15", "approval retry by the approver returns an error", () => {
-      expect(retry.ok, `retry should be an idempotent success: ${retry.error}`).toBe(true)
-    })
+    expect(retry.ok, `retry should be an idempotent success: ${retry.error}`).toBe(true)
   })
 
   test("COMM-06-E2E opt-out between preview and approval is revalidated", async ({ page, browser }) => {
@@ -251,15 +246,13 @@ test.describe("Pre-tenant communications adversarial", { tag: pretenantTags("@co
     )
     requireNotPermissionDenied(approval, "approver")
 
-    await expectKnownDefect("COMM-06", "approval does not revalidate consent", async () => {
-      const targeted = (await children(page, batchId)).some(
-        (row) =>
-          idOf(field(row, "contactId", "contact_id")) === contactId &&
-          ["draft", "queued", "copied"].includes(tagOf(field(row, "status"))),
-      )
-      const approved = (await batchStatus(page, batchId)) === "approved"
-      expect(approved && targeted, "approved batch must not target an opted-out contact").toBe(false)
-    })
+    const targeted = (await children(page, batchId)).some(
+      (row) =>
+        idOf(field(row, "contactId", "contact_id")) === contactId &&
+        ["draft", "queued", "copied"].includes(tagOf(field(row, "status"))),
+    )
+    const approved = (await batchStatus(page, batchId)) === "approved"
+    expect(approved && targeted, "approved batch must not target an opted-out contact").toBe(false)
   })
 
   test("COMM-OUT-01 ambiguous outbound provider timeout yields one provider-visible intent", { tag: CAPABILITY_PENDING }, async ({ page }) => {
