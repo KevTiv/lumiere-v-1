@@ -272,7 +272,7 @@
     },
     "erp.approve_ai_action_draft": {
       "name": "approve_ai_action_draft",
-      "shape_fingerprint": "sha256:d201d768d5035b145b7bca558fb3f31708840bb1ca9eaebea2890efac82b665e"
+      "shape_fingerprint": "sha256:b0f2314916a39dfac65ad8abded5b766b1ac848b57e7681b727f022fea0c9ae0"
     },
     "erp.approve_bank_statement_import": {
       "name": "approve_bank_statement_import",
@@ -4668,7 +4668,7 @@
     },
     "erp.stage_bank_statement_import": {
       "name": "stage_bank_statement_import",
-      "shape_fingerprint": "sha256:b060ff97703fc668136ca9bd84582c007ee810bf12e50300b5579bb43506af27"
+      "shape_fingerprint": "sha256:6435df28987c8203a6ee3392910eb39f32fbd9fff7ed9cf53d7eb14849f49dd2"
     },
     "erp.start_cycle_count_session": {
       "name": "start_cycle_count_session",
@@ -5719,6 +5719,14 @@
       "current_operations_fingerprint": "sha256:595eff9c71f29eef47776c4d270d534e2ce6494b7f82f522456182ccf94216e4",
       "operation_count": 1400,
       "reason": "add company-scoped create_company_stock_location on top of released v0.3.54 so company-bound users can create locations they can read; every existing operation shape is unchanged"
+    },
+    {
+      "previous_release": "v0.3.55",
+      "previous_ir_sha256": "sha256:b23cb4b36503d904b91edef6756b281f2a2d665c3fee709a35785d3721cec10e",
+      "previous_operations_fingerprint": "sha256:595eff9c71f29eef47776c4d270d534e2ce6494b7f82f522456182ccf94216e4",
+      "current_operations_fingerprint": "sha256:110acf5a697c6f40ac490a23ce2f5e234ca667a8e38e61ea2c490cf45649e908",
+      "operation_count": 1400,
+      "reason": "mark approve_ai_action_draft and stage_bank_statement_import idempotent on top of released v0.3.55: exact replays return the committed outcome and a reused key with different input is rejected; the active operation ID set and every other operation shape are unchanged"
     }
   ]
 }

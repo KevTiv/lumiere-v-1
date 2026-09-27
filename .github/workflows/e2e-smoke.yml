@@ -9,10 +9,11 @@ on:
   workflow_dispatch:
     inputs:
       suite:
-        description: "Playwright suite (p0 = critical smoke, full = all tests, targeted = only the specs below)"
+        description: "Playwright suite (p0 = critical smoke, pretenant = adversarial certification, full = all tests, targeted = only the specs below)"
         type: choice
         options:
           - p0
+          - pretenant
           - full
           - targeted
         default: p0
@@ -101,7 +102,9 @@ jobs:
               configs="$(shard full 1)"
               ;;
             pull_request)
-              if [ -n "${TARGET_SPECS}" ]; then
+              if [ "${{ github.head_ref }}" = "codex/base05-pretenant-integrated-certification" ]; then
+                configs="$(jq -cn --argjson p0 "$(shard p0 0)" '$p0 + [{suite:"pretenant",clear_db:"1"}]')"
+              elif [ -n "${TARGET_SPECS}" ]; then
                 configs="$(jq -cn --arg specs "${TARGET_SPECS}" '[{suite:"targeted",clear_db:"0",specs:$specs}]')"
               else
                 configs="$(shard p0 0)"
@@ -271,6 +274,15 @@ jobs:
           key: next-compiler-v1-${{ runner.os }}-node22-${{ hashFiles('frontend/pnpm-lock.yaml', 'frontend/web/next.config.*', 'frontend/web/tsconfig.json') }}-${{ github.sha }}
           restore-keys: |
             next-compiler-v1-${{ runner.os }}-node22-${{ hashFiles('frontend/pnpm-lock.yaml', 'frontend/web/next.config.*', 'frontend/web/tsconfig.json') }}-
+
+      - name: Run BASE-05 pretenant static/native gates
+        if: matrix.config.suite == 'pretenant'
+        run: |
+          cargo check --locked --manifest-path spacetimedb/Cargo.toml --tests
+          make pretenant-cert-native
+          make check-codegen-pinned
+          cd frontend/web
+          pnpm typecheck
 
       - name: Run make e2e-smoke
         env:
