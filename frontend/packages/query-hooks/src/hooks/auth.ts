@@ -22,8 +22,10 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { apiFetch, fetchQueryList, type QueryRows, rqBigIntKey } from "../http"
 import { invalidateResourceQueries } from "../subscription-query"
 import { toCreateAuditRuleParams } from "@lumiere/erp-shared/settings-create-params"
-import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
+import { encodeIdentity, stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
 import { scalarToU64 as toScalarU64, type ScalarId } from "@lumiere/erp-shared/u64"
+import type { CanonicalRecordRef } from "./operation-effect"
+import { resolveActiveRoleAssignmentEffect, resolveRevokedRoleAssignmentEffect } from "./auth-role-assignment"
 import type {
   AuditLog,
   AuditRule,
@@ -113,6 +115,22 @@ async function fetchSettingsList(path: string, errorMessage: string): Promise<Qu
   const raw = (json as { data: unknown }).data
   if (!Array.isArray(raw)) return []
   return raw.filter((row): row is QueryRows[number] => !!row && typeof row === 'object')
+}
+
+export async function collectSettingsRows(
+  fetchPage: (offset: number, limit: number) => Promise<QueryRows>,
+  pageSize = 100,
+): Promise<QueryRows> {
+  if (!Number.isSafeInteger(pageSize) || pageSize <= 0) {
+    throw new Error('pageSize must be a positive safe integer')
+  }
+
+  const rows: QueryRows = []
+  for (let offset = 0; ; offset += pageSize) {
+    const page = await fetchPage(offset, pageSize)
+    rows.push(...page)
+    if (page.length < pageSize) return rows
+  }
 }
 
 function pickField<T>(row: Record<string, unknown>, ...keys: string[]): T | undefined {
@@ -406,9 +424,12 @@ export function useSettingsRoles(organizationId: bigint) {
   return useQuery<SettingsRoleRecord[]>({
     queryKey: ['settings-roles', rqBigIntKey(organizationId)],
     queryFn: async () => {
-      const rows = await fetchSettingsList(
-        '/api/settings/roles?limit=100',
-        'Failed to fetch settings roles',
+      const rows = await collectSettingsRows(
+        (offset, limit) =>
+          fetchSettingsList(
+            `/api/settings/roles?limit=${limit}&offset=${offset}`,
+            'Failed to fetch settings roles',
+          ),
       )
       return rows.map(mapApiRoleRow)
     },
@@ -521,7 +542,7 @@ export type AssignRoleParamsInput = {
 export function useAssignRole(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<
-    void,
+    CanonicalRecordRef,
     Error,
     {
       userIdentity: string
@@ -530,7 +551,8 @@ export function useAssignRole(organizationId: bigint) {
     }
   >({
     mutationFn: async ({ userIdentity, roleId, params }) => {
-      const { urlPath, init } = stdbBffCommandPost("assign_role", { userIdentity: userIdentity.trim(), roleId: toScalarU64(roleId), params: stdbParamsToJson({
+      const role = toScalarU64(roleId)
+      const { urlPath, init } = stdbBffCommandPost("assign_role", { userIdentity: encodeIdentity(userIdentity), roleId: role, params: stdbParamsToJson({
           expiresAtMicros:
             params.expiresAtMicros != null && String(params.expiresAtMicros).trim() !== ''
               ? toScalarU64(params.expiresAtMicros as ScalarId)
@@ -539,6 +561,10 @@ export function useAssignRole(organizationId: bigint) {
         }) })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to assign role')
+      const rows = await fetchQueryList('/api/query/user-role-assignment', 'Failed to read role assignment')
+      const effect = resolveActiveRoleAssignmentEffect(rows, organizationId, userIdentity, role)
+      if (!effect) throw new Error('Role assignment did not read back as active')
+      return effect
     },
     onSuccess: async () => {
       await invalidateAuthModule(qc, organizationId)
@@ -548,11 +574,16 @@ export function useAssignRole(organizationId: bigint) {
 
 export function useRevokeRole(organizationId: bigint) {
   const qc = useQueryClient()
-  return useMutation<void, Error, { assignmentId: string | number | bigint }>({
+  return useMutation<CanonicalRecordRef, Error, { assignmentId: string | number | bigint }>({
     mutationFn: async ({ assignmentId }) => {
-      const { urlPath, init } = stdbBffCommandPost("revoke_role", { assignmentId: toScalarU64(assignmentId) })
+      const id = toScalarU64(assignmentId)
+      const { urlPath, init } = stdbBffCommandPost("revoke_role", { assignmentId: id })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to revoke role')
+      const rows = await fetchQueryList('/api/query/user-role-assignment', 'Failed to read role assignment')
+      const effect = resolveRevokedRoleAssignmentEffect(rows, organizationId, id)
+      if (!effect) throw new Error('Role assignment did not read back as revoked')
+      return effect
     },
     onSuccess: async () => {
       await invalidateAuthModule(qc, organizationId)

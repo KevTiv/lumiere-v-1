@@ -577,6 +577,19 @@ async function main() {
       credential.platformUserId,
       identityForReducer,
     ])
+    // add_org_member creates the organization profile blank; project the
+    // persona's email and a display name so it is findable in Settings → Users.
+    await callStdbReducer(host, moduleName, adminToken, 'project_user_profile', [
+      identityForReducer,
+      orgId,
+      persona.email,
+      true,
+      `Fixture ${persona.key}`,
+      SATS_NONE,
+      SATS_NONE,
+      'UTC',
+      'en',
+    ])
     await ensureRoleAssignment(
       host,
       moduleName,

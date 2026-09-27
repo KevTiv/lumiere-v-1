@@ -35,8 +35,13 @@ pub async fn query_lead_by_id(
     Ok(rows.into_iter().next())
 }
 
+/// `client` carries the caller's session token and reads the public
+/// membership table. `user_profile` is private authority state, so profiles
+/// are read with `authority` (the server credential) and constrained to this
+/// organization and the identities of its active members.
 pub async fn query_org_users(
     client: &StdbClient,
+    authority: &StdbClient,
     org_id: u64,
     fa: Option<&FieldAccessContext>,
 ) -> Result<Vec<Value>, ApiError> {
@@ -87,6 +92,8 @@ pub async fn query_org_users(
                 .join(" OR ")
         )
     };
-    let sql = format!("SELECT {col_p} FROM user_profile WHERE {where_clause}");
-    client.query_sql(&sql).await.map_err(ApiError::internal)
+    let sql = format!(
+        "SELECT {col_p} FROM user_profile WHERE organization_id = {org_id} AND {where_clause}"
+    );
+    authority.query_sql(&sql).await.map_err(ApiError::internal)
 }
