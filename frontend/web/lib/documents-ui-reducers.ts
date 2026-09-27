@@ -29,7 +29,6 @@ export const DOCUMENTS_UI_REDUCERS = [
   "restore_document",
   "schedule_document_retention_purge",
   "set_article_published",
-  "set_document_index_content",
   "set_document_retention",
   "set_google_drive_conflict_policy",
   "sync_external_file_to_document",

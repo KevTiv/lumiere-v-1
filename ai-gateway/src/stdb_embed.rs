@@ -22,10 +22,16 @@ pub struct AuthoritativeEmbedding {
 
 #[derive(Debug, Deserialize)]
 pub struct EmbedJobPayload {
+    #[serde(default = "default_embedding_operation")]
+    pub operation: String,
     pub company_id: u64,
     pub content_type: String,
     pub content_id: u64,
     pub text: String,
+}
+
+fn default_embedding_operation() -> String {
+    "upsert".to_string()
 }
 
 #[async_trait]
@@ -209,4 +215,52 @@ pub async fn authoritative_embedding_for_resource(
             text: string_field(&row, "text", "text")?,
         })
     }))
+}
+
+pub async fn deleted_embedding_for_resource(
+    stdb: &StdbClient,
+    organization_id: u64,
+    company_id: u64,
+    resource_kind: &str,
+    resource_id: u64,
+) -> anyhow::Result<Option<u64>> {
+    if resource_kind.is_empty()
+        || !resource_kind
+            .chars()
+            .all(|ch| ch.is_ascii_alphanumeric() || ch == '_' || ch == '-')
+    {
+        anyhow::bail!("invalid semantic resource kind");
+    }
+    let sql = format!(
+        "SELECT id FROM search_embedding WHERE organization_id = {organization_id} AND company_id = {company_id} AND content_type = '{resource_kind}' AND content_id = {resource_id} AND sync_status = 'deleted' LIMIT 1"
+    );
+    let rows = stdb
+        .query_sql(&sql)
+        .await
+        .map_err(|error| anyhow::anyhow!("{error}"))?;
+    Ok(rows
+        .into_iter()
+        .next()
+        .and_then(|row| u64_field(&row, "id", "id")))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn embedding_queue_payloads_default_to_upsert_and_accept_delete() {
+        let upsert: EmbedJobPayload = serde_json::from_str(
+            r#"{"company_id":2,"content_type":"document","content_id":7,"text":"body"}"#,
+        )
+        .expect("legacy upsert payload");
+        assert_eq!(upsert.operation, "upsert");
+
+        let delete: EmbedJobPayload = serde_json::from_str(
+            r#"{"operation":"delete","company_id":2,"content_type":"ai_evidence_passage","content_id":9,"text":""}"#,
+        )
+        .expect("delete payload");
+        assert_eq!(delete.operation, "delete");
+        assert!(delete.text.is_empty());
+    }
 }

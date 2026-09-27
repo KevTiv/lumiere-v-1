@@ -20,8 +20,11 @@ use sha2::{Digest, Sha256};
 use tower_cookies::Cookies;
 
 use crate::error::ApiError;
+use crate::evidence_ingestion::{configured_network_hosts, validate_network_url};
+use crate::query_exec::resolve_membership_company_id;
 use crate::state::AppState;
-use crate::web_session::{require_org, resolve_session};
+use crate::trusted_context::TrustedOperationContext;
+use crate::web_session::{require_org, resolve_session, OrgSession};
 
 const MAX_UPLOAD_BYTES: u64 = 50 * 1024 * 1024; // 50 MiB pilot cap
 
@@ -36,6 +39,8 @@ struct BlobMeta {
     expected_size: u64,
     expected_checksum: Option<String>,
     residency: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    source_url: Option<String>,
     completed: bool,
     actual_size: Option<u64>,
     actual_checksum: Option<String>,
@@ -79,9 +84,6 @@ struct CompleteResponse {
     checksum: String,
     mimetype: String,
     file_name: String,
-    /// UTF-8 text extract for `text/*` blobs (Wave C search index seed).
-    #[serde(skip_serializing_if = "Option::is_none")]
-    extracted_text: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -99,12 +101,144 @@ pub fn blob_router() -> Router<Arc<AppState>> {
             put(upload),
         )
         .route("/documents/blobs/complete", post(complete))
+        .route("/documents/blobs/import-network", post(import_network))
         .route(
             "/documents/blobs/object/:organization_id/:residency/:object_id",
             get(download),
         )
-        // Wave D: lightweight text extract for OCR workers (PDFs need an external OCR TSP).
-        .route("/documents/ocr/extract", post(ocr_extract))
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+struct NetworkImportBody {
+    company_id: u64,
+    source_url: String,
+    file_name: Option<String>,
+}
+
+async fn import_network(
+    State(state): State<Arc<AppState>>,
+    OrgSession {
+        session,
+        organization_id,
+    }: OrgSession,
+    Json(body): Json<NetworkImportBody>,
+) -> Result<Json<CompleteResponse>, ApiError> {
+    if body.company_id == 0 {
+        return Err(ApiError::BadRequest("companyId must be positive".into()));
+    }
+    let context = TrustedOperationContext::for_resource_read(&state, &session)?;
+    let company_id = resolve_membership_company_id(
+        context.client(),
+        organization_id,
+        context.actor_identity(),
+        Some(body.company_id),
+        "network ingestion company scope mismatch",
+    )
+    .await?;
+    let hosts = configured_network_hosts()?;
+    let source_url = validate_network_url(&body.source_url, &hosts)?;
+    let client = reqwest::Client::builder()
+        .redirect(reqwest::redirect::Policy::none())
+        .timeout(std::time::Duration::from_secs(30))
+        .build()
+        .map_err(ApiError::internal)?;
+    let mut response = client
+        .get(source_url.clone())
+        .header(
+            header::ACCEPT,
+            "application/pdf,text/plain,text/html,application/json,application/xml",
+        )
+        .send()
+        .await
+        .map_err(ApiError::unavailable)?;
+    if response.status().is_redirection() || !response.status().is_success() {
+        return Err(ApiError::UnavailableSource(anyhow::anyhow!(
+            "network evidence source returned {}",
+            response.status()
+        )));
+    }
+    if response
+        .content_length()
+        .is_some_and(|length| length == 0 || length > MAX_UPLOAD_BYTES)
+    {
+        return Err(ApiError::Unprocessable(
+            "network source exceeds the blob size limit".into(),
+        ));
+    }
+    let content_type = response
+        .headers()
+        .get(header::CONTENT_TYPE)
+        .and_then(|value| value.to_str().ok())
+        .unwrap_or("application/octet-stream")
+        .split(';')
+        .next()
+        .unwrap_or("application/octet-stream")
+        .trim()
+        .to_ascii_lowercase();
+    let mut bytes = Vec::with_capacity(response.content_length().unwrap_or(0) as usize);
+    while let Some(chunk) = response.chunk().await.map_err(ApiError::unavailable)? {
+        if bytes.len().saturating_add(chunk.len()) > MAX_UPLOAD_BYTES as usize {
+            return Err(ApiError::Unprocessable(
+                "network source exceeds the blob size limit".into(),
+            ));
+        }
+        bytes.extend_from_slice(&chunk);
+    }
+    if bytes.is_empty() {
+        return Err(ApiError::Unprocessable("network source is empty".into()));
+    }
+
+    let file_name = body.file_name.unwrap_or_else(|| {
+        source_url
+            .path_segments()
+            .and_then(Iterator::last)
+            .filter(|name| !name.is_empty())
+            .unwrap_or("network-source.bin")
+            .to_owned()
+    });
+    let file_name = sanitize_file_name(&file_name);
+    let residency = "network".to_string();
+    let mut id_bytes = [0u8; 16];
+    rand::thread_rng().fill_bytes(&mut id_bytes);
+    let object_id = hex::encode(id_bytes);
+    let object_key = format!("org-{organization_id}/{residency}/{object_id}");
+    let (bin_path, meta_path) = object_paths(
+        &state.config.document_blob_dir,
+        organization_id,
+        &object_id,
+        &residency,
+    );
+    if let Some(parent) = bin_path.parent() {
+        fs::create_dir_all(parent).map_err(ApiError::internal)?;
+    }
+    fs::write(&bin_path, &bytes).map_err(ApiError::internal)?;
+    let checksum = hex::encode(Sha256::digest(&bytes));
+    write_meta(
+        &meta_path,
+        &BlobMeta {
+            organization_id,
+            company_id: Some(company_id),
+            object_key: object_key.clone(),
+            file_name: file_name.clone(),
+            content_type: content_type.clone(),
+            expected_size: bytes.len() as u64,
+            expected_checksum: Some(checksum.clone()),
+            residency: Some(residency.clone()),
+            source_url: Some(source_url.to_string()),
+            completed: true,
+            actual_size: Some(bytes.len() as u64),
+            actual_checksum: Some(checksum.clone()),
+        },
+    )?;
+    Ok(Json(CompleteResponse {
+        url: format!("/api/documents/blobs/object/{organization_id}/{residency}/{object_id}"),
+        object_key,
+        file_size: bytes.len() as u64,
+        checksum,
+        mimetype: content_type.clone(),
+        file_name,
+    }))
 }
 
 fn sanitize_file_name(name: &str) -> String {
@@ -177,10 +311,79 @@ fn parse_object_key(object_key: &str) -> Result<(u64, String, String), ApiError>
         .map_err(|_| ApiError::Unprocessable("invalid object_key org id".into()))?;
     let residency = parts[1].to_string();
     let object_id = parts[2].to_string();
+    if residency.is_empty()
+        || residency.len() > 32
+        || !residency
+            .chars()
+            .all(|character| character.is_ascii_alphanumeric() || matches!(character, '-' | '_'))
+    {
+        return Err(ApiError::Unprocessable("invalid residency segment".into()));
+    }
     if object_id.len() != 32 || !object_id.chars().all(|c| c.is_ascii_hexdigit()) {
         return Err(ApiError::Unprocessable("invalid object_id".into()));
     }
     Ok((organization_id, residency, object_id))
+}
+
+pub(crate) fn managed_blob_url(
+    expected_organization_id: u64,
+    object_key: &str,
+) -> Result<String, ApiError> {
+    let (organization_id, residency, object_id) = parse_object_key(object_key)?;
+    if organization_id != expected_organization_id {
+        return Err(ApiError::Forbidden("organization mismatch".into()));
+    }
+    Ok(format!(
+        "/api/documents/blobs/object/{organization_id}/{residency}/{object_id}"
+    ))
+}
+
+pub(crate) struct CompletedBlob {
+    pub object_key: String,
+    pub content_type: String,
+    pub checksum: String,
+    pub source_url: Option<String>,
+    pub bytes: Vec<u8>,
+}
+
+pub(crate) fn read_completed_blob(
+    root: &Path,
+    expected_organization_id: u64,
+    expected_company_id: u64,
+    object_url: &str,
+) -> Result<CompletedBlob, ApiError> {
+    const PREFIX: &str = "/api/documents/blobs/object/";
+    let key = object_url.strip_prefix(PREFIX).ok_or_else(|| {
+        ApiError::Conflict("document version does not name a managed blob".into())
+    })?;
+    let (organization_id, residency, object_id) = parse_object_key(key)?;
+    if organization_id != expected_organization_id {
+        return Err(ApiError::Forbidden("organization mismatch".into()));
+    }
+    let (bin_path, meta_path) = object_paths(root, organization_id, &object_id, &residency);
+    let meta = read_meta(&meta_path)?;
+    if !meta.completed || meta.company_id != Some(expected_company_id) {
+        return Err(ApiError::NotFound(
+            "completed company blob not found".into(),
+        ));
+    }
+    let bytes =
+        fs::read(&bin_path).map_err(|_| ApiError::NotFound("blob bytes not found".into()))?;
+    let checksum = hex::encode(Sha256::digest(&bytes));
+    if meta.actual_size != Some(bytes.len() as u64)
+        || meta.actual_checksum.as_deref() != Some(checksum.as_str())
+    {
+        return Err(ApiError::Conflict(
+            "server-owned blob integrity check failed".into(),
+        ));
+    }
+    Ok(CompletedBlob {
+        object_key: meta.object_key,
+        content_type: meta.content_type,
+        checksum,
+        source_url: meta.source_url,
+        bytes,
+    })
 }
 
 fn read_meta(path: &Path) -> Result<BlobMeta, ApiError> {
@@ -248,6 +451,7 @@ async fn presign(
         expected_size: body.content_length,
         expected_checksum,
         residency: Some(residency.clone()),
+        source_url: None,
         completed: false,
         actual_size: None,
         actual_checksum: None,
@@ -402,8 +606,6 @@ async fn complete(
 
     let url = format!("/api/documents/blobs/object/{organization_id}/{residency}/{object_id}");
 
-    let extracted_text = extract_text_for_index(&meta.content_type, &bytes);
-
     Ok(Json(CompleteResponse {
         url,
         object_key: meta.object_key,
@@ -411,80 +613,6 @@ async fn complete(
         checksum: digest,
         mimetype: meta.content_type,
         file_name: meta.file_name,
-        extracted_text,
-    }))
-}
-
-const MAX_EXTRACT_CHARS: usize = 32_768;
-
-fn extract_text_for_index(content_type: &str, bytes: &[u8]) -> Option<String> {
-    let mt = content_type.trim().to_ascii_lowercase();
-    if !mt.starts_with("text/") && mt != "application/json" && mt != "application/xml" {
-        return None;
-    }
-    let raw = std::str::from_utf8(bytes).ok()?.trim();
-    if raw.is_empty() {
-        return None;
-    }
-    if raw.chars().count() > MAX_EXTRACT_CHARS {
-        Some(raw.chars().take(MAX_EXTRACT_CHARS).collect())
-    } else {
-        Some(raw.to_string())
-    }
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct OcrExtractBody {
-    object_key: String,
-}
-
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-struct OcrExtractResponse {
-    object_key: String,
-    mimetype: String,
-    extracted_text: Option<String>,
-    /// true when binary types need an external OCR provider
-    needs_external_ocr: bool,
-}
-
-async fn ocr_extract(
-    State(state): State<Arc<AppState>>,
-    headers: HeaderMap,
-    cookies: Cookies,
-    Json(body): Json<OcrExtractBody>,
-) -> Result<Json<OcrExtractResponse>, ApiError> {
-    let session = resolve_session(&state, &headers, &cookies)
-        .await?
-        .ok_or(ApiError::Unauthorized)?;
-    let org_id = require_org(&session)?;
-    let (organization_id, residency, object_id) = parse_object_key(&body.object_key)?;
-    if organization_id != org_id {
-        return Err(ApiError::Forbidden("organization mismatch".into()));
-    }
-
-    let (bin_path, meta_path) = object_paths(
-        &state.config.document_blob_dir,
-        organization_id,
-        &object_id,
-        &residency,
-    );
-    let meta = read_meta(&meta_path)?;
-    if !meta.completed || !bin_path.exists() {
-        return Err(ApiError::Unprocessable(
-            "blob not ready for OCR extract".into(),
-        ));
-    }
-    let bytes = fs::read(&bin_path).map_err(ApiError::internal)?;
-    let extracted_text = extract_text_for_index(&meta.content_type, &bytes);
-    let needs_external_ocr = extracted_text.is_none();
-
-    Ok(Json(OcrExtractResponse {
-        object_key: body.object_key,
-        mimetype: meta.content_type,
-        extracted_text,
-        needs_external_ocr,
     }))
 }
 
@@ -534,4 +662,20 @@ async fn download(
         .unwrap_or_else(|_| header::HeaderValue::from_static("attachment")),
     );
     Ok(response)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn managed_blob_urls_reject_cross_org_and_unsafe_residency_segments() {
+        let key = "org-7/eu/0123456789abcdef0123456789abcdef";
+        assert_eq!(
+            managed_blob_url(7, key).expect("valid managed blob key"),
+            "/api/documents/blobs/object/7/eu/0123456789abcdef0123456789abcdef"
+        );
+        assert!(managed_blob_url(8, key).is_err());
+        assert!(managed_blob_url(7, "org-7/../0123456789abcdef0123456789abcdef").is_err());
+    }
 }

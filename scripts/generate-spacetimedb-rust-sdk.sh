@@ -7,9 +7,11 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 OUT_DIR="${1:-$ROOT/.contracts-staging/bindings}"
 MODULE_DIR="${2:-$ROOT/spacetimedb}"
 SPACETIME_BIN="${SPACETIME_BIN:-spacetime}"
+RUSTFMT_BIN="${RUSTFMT_BIN:-rustfmt}"
 GENERATE_WASM="${STDB_GENERATE_WASM:-}"
 LOG_FILE="$(mktemp "${TMPDIR:-/tmp}/lumiere-stdb-rust-generate.XXXXXX.log")"
-trap 'rm -f "$LOG_FILE"' EXIT
+CLEAN_LOG_FILE="$(mktemp "${TMPDIR:-/tmp}/lumiere-stdb-rust-generate-clean.XXXXXX.log")"
+trap 'rm -f "$LOG_FILE" "$CLEAN_LOG_FILE"' EXIT
 
 if [[ -z "$GENERATE_WASM" ]]; then
   "$SPACETIME_BIN" build --module-path "$MODULE_DIR"
@@ -35,12 +37,17 @@ set +e
 generate_status="${PIPESTATUS[0]}"
 set -e
 
+# GitHub's runner preserves ANSI styling from the SpacetimeDB/rustfmt diagnostics.
+# Classify a color-free copy so a known keyword parse error is recognized identically
+# in CI and non-interactive local shells. Keep the original log for user-facing output.
+perl -pe 's/\e\[[0-9;?]*[ -\/]*[@-~]//g' "$LOG_FILE" >"$CLEAN_LOG_FILE"
+
 # SpacetimeDB 2.8.2 may return either failure or success after rustfmt rejects
 # generated keyword fields. Inspect diagnostics independently of the exit code:
 # only the known keyword parse error is recoverable, and any other `error:` line
 # remains fatal even when the CLI returns zero.
-expected_keyword_errors="$({ grep -E 'error: expected identifier, found keyword `[^`]+`' "$LOG_FILE" || true; } | wc -l | tr -d ' ')"
-unexpected_errors="$({ grep 'error:' "$LOG_FILE" || true; } | \
+expected_keyword_errors="$({ grep -E 'error: expected identifier, found keyword `[^`]+`' "$CLEAN_LOG_FILE" || true; } | wc -l | tr -d ' ')"
+unexpected_errors="$({ grep 'error:' "$CLEAN_LOG_FILE" || true; } | \
   grep -Ev 'error: expected identifier, found keyword `[^`]+`' || true)"
 
 if [[ -n "$unexpected_errors" || ( "$generate_status" -ne 0 && "$expected_keyword_errors" -eq 0 ) ]]; then
@@ -64,8 +71,10 @@ fi
 bash "$ROOT/scripts/fix-spacetimedb-rust-sdk-bindings.sh" "$OUT_DIR"
 
 # The CLI's formatter ran before the keyword repair. Run it again to both
-# normalize and parse-check every repaired output file.
-find "$OUT_DIR" -name '*.rs' -print0 | xargs -0 rustfmt --edition 2021
+# normalize and parse-check every repaired output file. Keep each rustfmt
+# invocation bounded: a full module currently contains more than a thousand
+# files, which can exhaust a constrained CI runner when passed in one batch.
+find "$OUT_DIR" -name '*.rs' -print0 | xargs -0 -n 64 "$RUSTFMT_BIN" --edition 2021
 
 if [[ ! -s "$OUT_DIR/mod.rs" ]]; then
   echo "SpacetimeDB Rust generation did not produce $OUT_DIR/mod.rs" >&2

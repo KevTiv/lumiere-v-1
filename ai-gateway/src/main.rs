@@ -1,4 +1,5 @@
 mod ai_agent;
+mod ai_spend;
 mod config;
 mod context_worker;
 mod error;
@@ -132,6 +133,13 @@ async fn main() -> anyhow::Result<()> {
             token.clone(),
         ))
     });
+    let spend_read_stdb = config.ai_spend_read_stdb_token.as_ref().map(|token| {
+        Arc::new(StdbClient::new(
+            config.stdb_host.clone(),
+            config.stdb_module.clone(),
+            token.clone(),
+        ))
+    });
     let vector_store = Arc::new(vector_store);
     let stdb = Arc::new(stdb);
     let rig = Arc::new(rig);
@@ -141,6 +149,7 @@ async fn main() -> anyhow::Result<()> {
         providers: providers.clone(),
         vector_store: vector_store.clone(),
         stdb: stdb.clone(),
+        spend_read_stdb,
         rig: rig.clone(),
         http: Arc::new(http),
         download_jobs: Arc::new(DashMap::new()),
@@ -187,13 +196,26 @@ async fn main() -> anyhow::Result<()> {
         .route("/v1/skills", get(routes::skills::get_skills))
         .route("/v1/skills/run", post(routes::skills::post_run))
         .route("/v1/skills/sync", post(routes::skills::post_sync))
+        .route("/v1/evidence/inspect", post(routes::evidence::post_inspect))
+        .route("/v1/evidence/run", post(routes::evidence::post_run_inspect))
+        .route(
+            "/v1/evidence/run/export",
+            post(routes::evidence::post_run_export),
+        )
+        .route(
+            "/v1/evidence/review-queue",
+            post(routes::evidence::post_review_queue),
+        )
+        .route(
+            "/v1/knowledge/retrieve",
+            post(routes::evidence::post_knowledge_retrieve),
+        )
         .route("/v1/forms/suggest", post(routes::forms::post_suggest))
         .route("/v1/forms/validate", post(routes::forms::post_validate))
         .route("/v1/import/analyze", post(routes::import::post_analyze))
         .route("/v1/import/preview", post(routes::import::post_preview))
         .route("/v1/context/search", post(routes::context::post_search))
         .route("/v1/context/ingest", post(routes::context::post_ingest))
-        .route("/v1/context/document", post(routes::context::post_document))
         .route("/v1/kaggle/search", post(routes::kaggle::post_search))
         .route("/v1/kaggle/download", post(routes::kaggle::post_download))
         .route("/v1/kaggle/status/:job_id", get(routes::kaggle::get_status))
@@ -213,6 +235,14 @@ async fn main() -> anyhow::Result<()> {
         .route(
             "/v1/skills/distributor/delivery-run-summary",
             post(routes::distributor::post_delivery_run_summary),
+        )
+        .route(
+            "/v1/harness/governed/bootstrap",
+            post(routes::harness_skills::post_governed_bootstrap),
+        )
+        .route(
+            "/v1/internal/harness/runs/lifecycle",
+            post(routes::run_lifecycle::post_run_lifecycle),
         )
         .route(
             "/v1/skills/import-mapping",

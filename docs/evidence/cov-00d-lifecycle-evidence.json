@@ -1,0 +1,387 @@
+{
+  "version": 1,
+  "audited_base": "ed4987d3d99a89c2a3f2a7cddc8ca212548b1831",
+  "status": "acceptance-candidate",
+  "vocabulary": {
+    "D": "domain invariant",
+    "A": "authenticated API or generated-operation integration",
+    "O": "actual operator UI transition",
+    "E": "exact effect identity plus replay or lost-response recovery"
+  },
+  "rows": [
+    {
+      "id": "COV-03",
+      "surface": "CRM",
+      "surface_ids": ["crm"],
+      "primary_lifecycle": "lead to opportunity to customer and Sales handoff",
+      "current_floor": "U3",
+      "launch_admission": "review",
+      "operator_evidence_mode": "ui-primary",
+      "dimensions": {
+        "D": {"status": "proven", "reason": "Opportunity conversion and replay invariants have focused domain coverage.", "evidence": [{"path": "spacetimedb/tests/crm/opportunity_lifecycle_test.rs", "claim": "domain opportunity lifecycle and conversion invariants"}]},
+        "A": {"status": "proven", "reason": "The reference action uses the generated operation endpoint and typed receipt/readback path.", "evidence": [{"path": "frontend/packages/query-hooks/src/hooks/crm-opportunity-conversion.ts", "claim": "generated conversion dispatch and canonical readback"}]},
+        "O": {"status": "proven", "reason": "The browser creates and converts through visible CRM forms and actions.", "evidence": [{"path": "frontend/web/tests/e2e/cov01d-opportunity-order-effect.spec.ts", "role": "principal-operator-transition", "claim": "visible opportunity conversion action performs the principal transition"}]},
+        "E": {"status": "partial", "reason": "Exact 0..1 relation and replay are proven; direct navigation and lost-response UI recovery remain incomplete.", "evidence": [{"path": "frontend/web/tests/e2e/cov01d-opportunity-order-effect.spec.ts", "claim": "exact opportunity relation and no-redispatch replay proof"}]}
+      },
+      "missing_proof": ["result-link navigation", "stale and denied UI recovery", "committed-response-lost UI reconciliation"],
+      "next_packages": ["COV-01e", "COV-03", "COV-27"]
+    },
+    {
+      "id": "COV-04",
+      "surface": "Sales",
+      "surface_ids": ["sales"],
+      "primary_lifecycle": "quotation and order through fulfillment, invoice, return and credit continuation",
+      "current_floor": "U3",
+      "launch_admission": "review",
+      "operator_evidence_mode": "mixed",
+      "dimensions": {
+        "D": {"status": "proven", "reason": "O2C and backorder domain suites exercise core state and idempotency invariants.", "evidence": [{"path": "spacetimedb/tests/sales/o2c_certification_test.rs", "claim": "order-to-cash domain invariants"}]},
+        "A": {"status": "partial", "reason": "Generated UI actions exist, while several certification continuations still use compatibility helpers.", "evidence": [{"path": "frontend/web/tests/e2e/mvp-sales-returns.spec.ts", "claim": "persisted return and credit integration"}]},
+        "O": {"status": "partial", "reason": "Sales actions and forms are exercised, but the complete primary lifecycle is not uniformly operator-driven.", "evidence": [{"path": "frontend/web/tests/e2e/mvp-sales-returns.spec.ts", "role": "partial-operator-transition", "claim": "operator-visible return workflow with backend-assisted continuation"}]},
+        "E": {"status": "partial", "reason": "Some downstream relations are asserted, but retry, concurrency and lost-response proof is incomplete.", "evidence": [{"path": "frontend/web/tests/e2e/o2c-certification.spec.ts", "claim": "persisted downstream O2C relation checks"}]}
+      },
+      "missing_proof": ["all principal transitions through UI", "canonical fulfillment/invoice/return links", "lost-response and concurrency recovery"],
+      "next_packages": ["COV-04", "COV-25", "COV-27"]
+    },
+    {
+      "id": "COV-05",
+      "surface": "Purchasing",
+      "surface_ids": ["purchasing"],
+      "primary_lifecycle": "supplier and requisition through PO, receipt, bill and payment handoff",
+      "current_floor": "U3",
+      "launch_admission": "review",
+      "operator_evidence_mode": "mixed",
+      "dimensions": {
+        "D": {"status": "proven", "reason": "Purchase order, bill and containment invariants have focused domain coverage.", "evidence": [{"path": "spacetimedb/tests/purchasing/purchase_bill_test.rs", "claim": "purchase-to-bill domain invariants"}]},
+        "A": {"status": "partial", "reason": "The P2P browser evidence mixes UI operations with the fixture-only compatibility reducer route.", "evidence": [{"path": "frontend/web/tests/e2e/mvp-procure-to-pay.spec.ts", "claim": "authenticated persisted P2P integration with compatibility calls"}]},
+        "O": {"status": "partial", "reason": "PO and bill forms are user-driven in places, but not every principal transition is.", "evidence": [{"path": "frontend/web/tests/e2e/mvp-procure-to-pay.spec.ts", "role": "partial-operator-transition", "claim": "mixed UI and API-driven procure-to-pay path"}]},
+        "E": {"status": "partial", "reason": "Latest purchase-order, line and payment helpers weaken 0..1 effect proof.", "evidence": [{"path": "frontend/web/tests/e2e/helpers-legacy.ts", "claim": "classified latest-row P2P helper debt"}]}
+      },
+      "missing_proof": ["exact PO, receipt, bill and payment identities", "operator approval and stale-reference path", "retry and duplicate protection"],
+      "next_packages": ["COV-05", "COV-08", "COV-27"]
+    },
+    {
+      "id": "COV-06",
+      "surface": "Inventory / WMS",
+      "surface_ids": ["inventory"],
+      "primary_lifecycle": "receiving, transfer or picking through stock effect, count and traceability",
+      "current_floor": "U2",
+      "launch_admission": "review",
+      "operator_evidence_mode": "mixed",
+      "dimensions": {
+        "D": {"status": "proven", "reason": "Stock picking, quant and adjustment invariants have domain tests.", "evidence": [{"path": "spacetimedb/tests/inventory/tests/stock_picking_quant_test.rs", "claim": "stock picking and quant domain invariants"}]},
+        "A": {"status": "partial", "reason": "Module queries and mutations exist, but lifecycle API proof is split across fixture helpers and adjacent O2C tests.", "evidence": [{"path": "frontend/web/tests/e2e/inventory-module.spec.ts", "claim": "inventory module integration and selected mutations"}]},
+        "O": {"status": "partial", "reason": "The UI exposes products, cycle planning and quality actions without one complete receiving or transfer lifecycle.", "evidence": [{"path": "frontend/web/tests/e2e/inventory-module.spec.ts", "role": "partial-operator-transition", "claim": "visible inventory actions and partial operator mutations"}]},
+        "E": {"status": "absent", "reason": "No selected operator path proves exact stock-effect identity plus replay or lost-response recovery.", "evidence": []}
+      },
+      "missing_proof": ["operator-complete receiving or transfer lifecycle", "exact picking and stock-effect relation", "stale stock and concurrency recovery"],
+      "next_packages": ["COV-06", "COV-25", "COV-27"]
+    },
+    {
+      "id": "COV-07",
+      "surface": "Manufacturing / Quality",
+      "surface_ids": ["manufacturing"],
+      "primary_lifecycle": "BOM to manufacturing order, consume, produce, quality and close",
+      "current_floor": "U2",
+      "launch_admission": "review",
+      "operator_evidence_mode": "api-driven",
+      "dimensions": {
+        "D": {"status": "partial", "reason": "Relational and work-center tests exist, but the complete production lifecycle invariant is not represented as one domain proof.", "evidence": [{"path": "spacetimedb/tests/manufacturing/relational_integrity_test.rs", "claim": "manufacturing relationship invariants"}]},
+        "A": {"status": "partial", "reason": "The browser lifecycle invokes compatibility reducers rather than the generated operator boundary.", "evidence": [{"path": "frontend/web/tests/e2e/manufacturing-mutations.spec.ts", "claim": "API-driven manufacturing lifecycle"}]},
+        "O": {"status": "absent", "reason": "The create-confirm-produce-close certification transition is explicitly driven by BFF reducers.", "evidence": [{"path": "frontend/web/tests/e2e/manufacturing-mutations.spec.ts", "role": "api-driven-transition", "claim": "principal lifecycle bypasses operator UI"}]},
+        "E": {"status": "absent", "reason": "Manufacturing order discovery selects the latest matching row and lacks replay recovery.", "evidence": []}
+      },
+      "missing_proof": ["one domain lifecycle invariant", "operator BOM-to-close transition", "exact MO and stock/cost effect identities"],
+      "next_packages": ["COV-07", "COV-06", "COV-27"]
+    },
+    {
+      "id": "COV-08",
+      "surface": "Accounting / Finance / Assets",
+      "surface_ids": ["accounting"],
+      "primary_lifecycle": "invoice or journal through posting, payment, reconciliation and close",
+      "current_floor": "U3",
+      "launch_admission": "review",
+      "operator_evidence_mode": "mixed",
+      "dimensions": {
+        "D": {"status": "proven", "reason": "Journal, payment, period-lock and posted-immutability invariants have focused domain suites.", "evidence": [{"path": "spacetimedb/tests/accounting/journal_entries_test.rs", "claim": "journal and posting domain invariants"}]},
+        "A": {"status": "partial", "reason": "Posting and reconciliation evidence is persisted but mixes UI with compatibility reducer setup and transitions.", "evidence": [{"path": "frontend/web/tests/e2e/accounting-post-reconcile.spec.ts", "claim": "authenticated accounting integration with compatibility calls"}]},
+        "O": {"status": "partial", "reason": "Draft journal posting is operator-driven, while invoice setup and posting/reconciliation continuation are backend-assisted.", "evidence": [{"path": "frontend/web/tests/e2e/accounting-post-reconcile.spec.ts", "role": "partial-operator-transition", "claim": "mixed operator and API accounting path"}]},
+        "E": {"status": "partial", "reason": "Persisted reconciliation is checked, but payment identity, duplicate and committed-response-lost recovery remain incomplete.", "evidence": [{"path": "frontend/web/tests/e2e/pretenant-payment-adversarial.spec.ts", "claim": "adversarial payment and allocation evidence"}]}
+      },
+      "missing_proof": ["operator-complete invoice/payment/reconcile path", "exact payment and reversal refs", "closed-period and lost-response browser proof"],
+      "next_packages": ["COV-08", "BASE-04", "COV-27"]
+    },
+    {
+      "id": "COV-09",
+      "surface": "HR / Payroll",
+      "surface_ids": ["hr"],
+      "primary_lifecycle": "employee and contract through leave, payroll, approval and posting",
+      "current_floor": "U2",
+      "launch_admission": "review",
+      "operator_evidence_mode": "api-driven",
+      "dimensions": {
+        "D": {"status": "proven", "reason": "HR wave domain coverage preserves employee, leave and payroll invariants.", "evidence": [{"path": "spacetimedb/tests/hr/wave_a_test.rs", "claim": "HR and payroll domain invariants"}]},
+        "A": {"status": "partial", "reason": "Lifecycle calls are authenticated but use the explicit compatibility reducer route rather than generated operations.", "evidence": [{"path": "frontend/web/tests/e2e/hr-wave-lifecycle.spec.ts", "claim": "authenticated compatibility API lifecycle"}]},
+        "O": {"status": "partial", "reason": "The browser renders and reads HR state, while leave and payroll principal transitions are BFF-driven.", "evidence": [{"path": "frontend/web/tests/e2e/hr-wave-lifecycle.spec.ts", "role": "api-driven-transition", "claim": "principal leave and payroll transitions bypass UI"}]},
+        "E": {"status": "partial", "reason": "Payslip lookup uses highest ID after filtering and cannot prove exact 0..1 effect identity.", "evidence": [{"path": "frontend/web/tests/e2e/hr-wave-lifecycle.spec.ts", "claim": "classified highest-ID payslip discovery"}]}
+      },
+      "missing_proof": ["operator employee-to-pay lifecycle", "second-persona SoD", "exact payslip/export/post identities and recovery"],
+      "next_packages": ["COV-09", "COV-02", "COV-27"]
+    },
+    {
+      "id": "COV-10",
+      "surface": "Projects / Tasks",
+      "surface_ids": ["projects", "tasks"],
+      "primary_lifecycle": "project and task through timesheet validation, billing and accounting handoff",
+      "current_floor": "U2",
+      "launch_admission": "review",
+      "operator_evidence_mode": "api-driven",
+      "dimensions": {
+        "D": {"status": "proven", "reason": "Project and timesheet wave suites include domain and SoD coverage.", "evidence": [{"path": "spacetimedb/tests/projects/wave_a_test.rs", "claim": "project and timesheet domain invariants"}]},
+        "A": {"status": "partial", "reason": "The browser lifecycle uses authenticated compatibility calls for project, task and timesheet transitions.", "evidence": [{"path": "frontend/web/tests/e2e/projects-wave-lifecycle.spec.ts", "claim": "authenticated project lifecycle integration"}]},
+        "O": {"status": "partial", "reason": "Actions and forms are visible, but the core create/log/validate sequence is backend-driven.", "evidence": [{"path": "frontend/web/tests/e2e/projects-wave-lifecycle.spec.ts", "role": "api-driven-transition", "claim": "principal project and timesheet transitions bypass UI"}]},
+        "E": {"status": "partial", "reason": "Persisted rows are read back, but canonical billing/accounting result refs and recovery are incomplete.", "evidence": [{"path": "frontend/packages/query-hooks/src/hooks/projects-timesheet-approvals.test.ts", "claim": "focused project approval query identity and invalidation coverage"}]}
+      },
+      "missing_proof": ["operator create-to-bill lifecycle", "second-persona validation", "canonical invoice and accounting handoff ref"],
+      "next_packages": ["COV-10", "COV-02", "COV-25", "COV-27"]
+    },
+    {
+      "id": "COV-11",
+      "surface": "Expenses",
+      "surface_ids": ["expenses"],
+      "primary_lifecycle": "capture and expense through submit, approve, post and reimburse",
+      "current_floor": "U2",
+      "launch_admission": "review",
+      "operator_evidence_mode": "api-driven",
+      "dimensions": {
+        "D": {"status": "proven", "reason": "Expense wave suites cover approval, posting, reimbursement and duplicate guards.", "evidence": [{"path": "spacetimedb/tests/expenses/wave_f_test.rs", "claim": "expense posting and close integrity"}]},
+        "A": {"status": "partial", "reason": "The lifecycle is persisted but principal transitions largely use compatibility reducer calls.", "evidence": [{"path": "frontend/web/tests/e2e/expenses-wave-lifecycle.spec.ts", "claim": "authenticated expense lifecycle integration"}]},
+        "O": {"status": "partial", "reason": "Capture and forms are user-visible while submit, approve and posting proof remains API-driven.", "evidence": [{"path": "frontend/web/tests/e2e/expenses-wave-lifecycle.spec.ts", "role": "api-driven-transition", "claim": "mixed UI setup and API-driven principal lifecycle"}]},
+        "E": {"status": "partial", "reason": "State convergence is observed without one canonical reimbursement/post result contract and lost-response proof.", "evidence": [{"path": "frontend/web/tests/e2e/expenses-wave-lifecycle.spec.ts", "claim": "persisted state readback with incomplete exact result identity"}]}
+      },
+      "missing_proof": ["operator submit-to-reimburse path", "receipt/document link", "exact post and reimbursement refs with duplicate recovery"],
+      "next_packages": ["COV-11", "COV-08", "COV-02", "COV-27"]
+    },
+    {
+      "id": "COV-12",
+      "surface": "Subscriptions",
+      "surface_ids": ["subscriptions"],
+      "primary_lifecycle": "plan and subscription through recurring billing, payment, amendment and cancellation",
+      "current_floor": "U2",
+      "launch_admission": "review",
+      "operator_evidence_mode": "route-only",
+      "dimensions": {
+        "D": {"status": "proven", "reason": "Subscription wave suites cover lifecycle and billing-domain behavior.", "evidence": [{"path": "spacetimedb/tests/subscriptions/wave_a_test.rs", "claim": "subscription lifecycle domain invariants"}]},
+        "A": {"status": "partial", "reason": "Command breadth exists, but the selected browser evidence does not prove the complete generated-operation lifecycle.", "evidence": [{"path": "frontend/web/tests/e2e/subscriptions-wave-lifecycle.spec.ts", "claim": "subscription route and action integration smoke"}]},
+        "O": {"status": "partial", "reason": "The browser proves tabs and invoice affordances rather than the subscription lifecycle.", "evidence": [{"path": "frontend/web/tests/e2e/subscriptions-wave-lifecycle.spec.ts", "role": "route-or-affordance-only", "claim": "tabs and form affordances only"}]},
+        "E": {"status": "absent", "reason": "No selected evidence proves exact billing-run invoice identity or replay-safe double-bill prevention.", "evidence": []}
+      },
+      "missing_proof": ["operator activate-to-cancel lifecycle", "billing-run idempotency", "canonical invoice/payment links"],
+      "next_packages": ["COV-12", "COV-08", "COV-27"]
+    },
+    {
+      "id": "COV-13",
+      "surface": "POS",
+      "surface_ids": ["pos"],
+      "primary_lifecycle": "configuration and session through order, payment, close, stock and accounting effects",
+      "current_floor": "U2",
+      "launch_admission": "review",
+      "operator_evidence_mode": "route-only",
+      "dimensions": {
+        "D": {"status": "proven", "reason": "POS order finalization has domain coverage across sale, stock and accounting primitives.", "evidence": [{"path": "spacetimedb/tests/sales/pos_order_finalize_test.rs", "claim": "POS order finalization invariants"}]},
+        "A": {"status": "partial", "reason": "Named POS commands and queries exist without one selected persisted lifecycle integration test.", "evidence": [{"path": "frontend/packages/query-hooks/src/hooks/pos.ts", "claim": "POS command and query integration surface"}]},
+        "O": {"status": "partial", "reason": "The POS route and configuration/session surfaces exist, but no complete operator lifecycle is selected.", "evidence": [{"path": "frontend/web/app/(modules)/pos/page.tsx", "role": "route-or-affordance-only", "claim": "operator route and SSR surface"}]},
+        "E": {"status": "absent", "reason": "No browser evidence proves exact payment, stock and accounting effects under duplicate or reconnect behavior.", "evidence": []}
+      },
+      "missing_proof": ["seeded operator session-to-close lifecycle", "duplicate payment/order recovery", "exact stock and accounting refs"],
+      "next_packages": ["COV-13", "COV-06", "COV-08", "COV-27"]
+    },
+    {
+      "id": "COV-14",
+      "surface": "Helpdesk",
+      "surface_ids": ["helpdesk"],
+      "primary_lifecycle": "ticket intake through assignment, SLA, resolution, close and reopen",
+      "current_floor": "U2",
+      "launch_admission": "review",
+      "operator_evidence_mode": "mixed",
+      "dimensions": {
+        "D": {"status": "partial", "reason": "Referential and tenant integrity is covered, but the complete ticket state machine lacks one domain certification suite.", "evidence": [{"path": "spacetimedb/tests/helpdesk/relational_integrity_test.rs", "claim": "helpdesk relational and tenant invariants"}]},
+        "A": {"status": "partial", "reason": "Ticket integration is persisted but assignment still uses the compatibility reducer helper.", "evidence": [{"path": "frontend/web/tests/e2e/helpdesk-mutations.spec.ts", "claim": "persisted ticket mutation integration"}]},
+        "O": {"status": "partial", "reason": "Closing is a row action while setup and assignment are backend-assisted.", "evidence": [{"path": "frontend/web/tests/e2e/helpdesk-mutations.spec.ts", "role": "partial-operator-transition", "claim": "visible close action with API-driven assignment"}]},
+        "E": {"status": "absent", "reason": "No exact ticket outcome/ref plus stale assignment or retry recovery is proven.", "evidence": []}
+      },
+      "missing_proof": ["domain ticket lifecycle", "operator intake-to-reopen path", "stale assignment and exact notification/activity effects"],
+      "next_packages": ["COV-14", "COV-19", "COV-27"]
+    },
+    {
+      "id": "COV-15",
+      "surface": "Fleet",
+      "surface_ids": ["fleet"],
+      "primary_lifecycle": "vehicle and driver assignment through service, inspection, fuel and cost history",
+      "current_floor": "U1",
+      "launch_admission": "review",
+      "operator_evidence_mode": "route-only",
+      "dimensions": {
+        "D": {"status": "proven", "reason": "Fleet lifecycle and relational integrity have focused domain tests.", "evidence": [{"path": "spacetimedb/tests/fleet/lifecycle_test.rs", "claim": "fleet lifecycle invariants"}]},
+        "A": {"status": "partial", "reason": "Fleet named commands, hooks and focused hook tests exist without one full API lifecycle proof.", "evidence": [{"path": "frontend/packages/query-hooks/src/hooks/fleet-lifecycle.test.ts", "claim": "fleet command and invalidation integration"}]},
+        "O": {"status": "partial", "reason": "The dedicated Fleet route and lifecycle affordances exist but lack a persisted operator lifecycle spec.", "evidence": [{"path": "frontend/web/app/(modules)/fleet/fleet-client.tsx", "role": "route-or-affordance-only", "claim": "canonical Fleet workspace and lifecycle affordances"}]},
+        "E": {"status": "partial", "reason": "Hook-level result handling exists without browser refresh, replay, or cross-company effect proof.", "evidence": [{"path": "frontend/packages/query-hooks/src/hooks/fleet-lifecycle.test.ts", "claim": "focused lifecycle hook result handling"}]}
+      },
+      "missing_proof": ["operator assignment-to-cost-history lifecycle", "finance and employee record refs", "refresh and cross-company denial"],
+      "next_packages": ["COV-15", "COV-08", "COV-09", "COV-27"]
+    },
+    {
+      "id": "COV-16",
+      "surface": "IoT",
+      "surface_ids": ["iot"],
+      "primary_lifecycle": "hub and device provisioning through telemetry, alert, acknowledge and action",
+      "current_floor": "U2",
+      "launch_admission": "review",
+      "operator_evidence_mode": "api-driven",
+      "dimensions": {
+        "D": {"status": "partial", "reason": "IoT relationship and isolation invariants exist, but the full alert lifecycle lacks one domain certification suite.", "evidence": [{"path": "spacetimedb/tests/iot/relational_integrity_test.rs", "claim": "IoT ownership and relationship invariants"}]},
+        "A": {"status": "partial", "reason": "The lifecycle is authenticated but executed through compatibility reducer calls.", "evidence": [{"path": "frontend/web/tests/e2e/iot-lifecycle.spec.ts", "claim": "persisted API-driven IoT lifecycle"}]},
+        "O": {"status": "partial", "reason": "The browser verifies the module after backend provisioning and telemetry transitions.", "evidence": [{"path": "frontend/web/tests/e2e/iot-lifecycle.spec.ts", "role": "api-driven-transition", "claim": "principal IoT transitions bypass the operator UI"}]},
+        "E": {"status": "partial", "reason": "Device and alert rows are read back without stale-alert, replay, or degraded telemetry recovery.", "evidence": [{"path": "frontend/web/tests/e2e/iot-lifecycle.spec.ts", "claim": "device and alert readback after API-driven transitions"}]}
+      },
+      "missing_proof": ["operator provisioning-to-action lifecycle", "stale alert denial", "degraded telemetry and exact action effect recovery"],
+      "next_packages": ["COV-16", "COV-26", "COV-27"]
+    },
+    {
+      "id": "COV-17",
+      "surface": "Proposals",
+      "surface_ids": ["proposals"],
+      "primary_lifecycle": "proposal content and review through approval, award and canonical conversion",
+      "current_floor": "U3",
+      "launch_admission": "review",
+      "operator_evidence_mode": "api-driven",
+      "dimensions": {
+        "D": {"status": "proven", "reason": "Proposal conversion and stale/source integrity have focused domain tests.", "evidence": [{"path": "spacetimedb/tests/proposals/convert_integrity_test.rs", "claim": "proposal conversion integrity"}]},
+        "A": {"status": "partial", "reason": "The lifecycle persists through authenticated compatibility reducers rather than generated operator actions.", "evidence": [{"path": "frontend/web/tests/e2e/proposals-lifecycle.spec.ts", "claim": "API-driven proposal lifecycle integration"}]},
+        "O": {"status": "partial", "reason": "Proposal creation has UI smoke evidence, while publish, approve, award and conversion are BFF-driven.", "evidence": [{"path": "frontend/web/tests/e2e/proposals-lifecycle.spec.ts", "role": "api-driven-transition", "claim": "principal review and conversion transitions bypass UI"}]},
+        "E": {"status": "partial", "reason": "Conversion state is observed without one exact result ref and replay/lost-response proof.", "evidence": [{"path": "frontend/web/tests/e2e/proposals-lifecycle.spec.ts", "claim": "sale-order conversion readback with incomplete effect semantics"}]}
+      },
+      "missing_proof": ["operator review-to-conversion lifecycle", "stale review and authorization UI", "exact converted record ref and replay recovery"],
+      "next_packages": ["COV-17", "COV-04", "COV-27"]
+    },
+    {
+      "id": "COV-18",
+      "surface": "Documents / Knowledge",
+      "surface_ids": ["documents"],
+      "primary_lifecycle": "upload and attach through version, access, review, archive, delete and retention",
+      "current_floor": "U2",
+      "launch_admission": "review",
+      "operator_evidence_mode": "api-driven",
+      "dimensions": {
+        "D": {"status": "partial", "reason": "Legal-hold denial is exercised through the domain/API boundary, but no complete document domain suite covers blob/version/retention lifecycle.", "evidence": [{"path": "frontend/web/tests/e2e/documents-wave-a-lifecycle.spec.ts", "claim": "legal-hold invariant through persisted API path"}]},
+        "A": {"status": "partial", "reason": "Document create, hold and delete denial are authenticated but driven through compatibility calls.", "evidence": [{"path": "frontend/web/tests/e2e/documents-wave-a-lifecycle.spec.ts", "claim": "document lifecycle API integration"}]},
+        "O": {"status": "partial", "reason": "Upload and lifecycle tabs are visible while attach/hold/delete transitions remain backend-driven or route-only.", "evidence": [{"path": "frontend/web/tests/e2e/documents-wave-b-lifecycle.spec.ts", "role": "route-or-affordance-only", "claim": "document lifecycle UI surfaces without principal transition proof"}]},
+        "E": {"status": "partial", "reason": "Document rows are observed without version/blob identity, replay and linked-record navigation proof.", "evidence": [{"path": "frontend/web/tests/e2e/documents-wave-a-lifecycle.spec.ts", "claim": "persisted document and legal-hold readback"}]}
+      },
+      "missing_proof": ["domain version/blob/retention lifecycle", "operator upload-to-retention path", "exact version and linked-record refs"],
+      "next_packages": ["COV-18", "COH-09", "COV-25", "COV-27"]
+    },
+    {
+      "id": "COV-19",
+      "surface": "Calendar + Messages / Communications",
+      "surface_ids": ["calendar", "messages"],
+      "primary_lifecycle": "event or activity and consent-aware communication through dispatch, status and history",
+      "current_floor": "U2",
+      "launch_admission": "review",
+      "operator_evidence_mode": "mixed",
+      "dimensions": {
+        "D": {"status": "proven", "reason": "Calendar and operational-message domain tests cover scheduling and delivery invariants.", "evidence": [{"path": "spacetimedb/tests/core/tests/operational_messaging_test.rs", "claim": "operational messaging domain invariants"}]},
+        "A": {"status": "partial", "reason": "Persisted communication tests exist, but some paths use the compatibility route and provider simulation.", "evidence": [{"path": "frontend/web/tests/e2e/operational-messaging.spec.ts", "claim": "persisted communication integration"}]},
+        "O": {"status": "partial", "reason": "Calendar/messages routes and selected controls exist without one operator-complete consent-to-status lifecycle.", "evidence": [{"path": "frontend/web/tests/e2e/phase-11-missing-modules-smoke.spec.ts", "role": "route-or-affordance-only", "claim": "calendar and messages route visibility"}]},
+        "E": {"status": "partial", "reason": "Provider status and child message rows are asserted without complete recipient identity and replay semantics.", "evidence": [{"path": "frontend/web/tests/e2e/pretenant-communications-adversarial.spec.ts", "claim": "adversarial communication status and recipient evidence"}]}
+      },
+      "missing_proof": ["operator consent-aware dispatch lifecycle", "canonical record activity/message links", "provider callback and replay recovery"],
+      "next_packages": ["COV-19", "BASE-03", "COV-25", "COV-27"]
+    },
+    {
+      "id": "COV-20",
+      "surface": "Reports / Analytics",
+      "surface_ids": ["reports"],
+      "primary_lifecycle": "configure and run report through inspect, drill, export and schedule",
+      "current_floor": "U3",
+      "launch_admission": "review",
+      "operator_evidence_mode": "api-driven",
+      "dimensions": {
+        "D": {"status": "partial", "reason": "Analytics relationship integrity is tested, while malformed filter and completeness semantics remain open COV-D05/D06 defects.", "evidence": [{"path": "spacetimedb/tests/analytics/relational_integrity_test.rs", "claim": "analytics relation and tenant invariants"}]},
+        "A": {"status": "partial", "reason": "Dashboard and schedule integration is persisted through compatibility calls and lacks full source-state semantics.", "evidence": [{"path": "frontend/web/tests/e2e/analytics-lifecycle.spec.ts", "claim": "dashboard and scheduled-report integration"}]},
+        "O": {"status": "partial", "reason": "Report UI and creation affordances render, while principal dashboard composition is API-driven.", "evidence": [{"path": "frontend/web/tests/e2e/analytics-lifecycle.spec.ts", "role": "api-driven-transition", "claim": "dashboard lifecycle uses BFF transitions"}]},
+        "E": {"status": "absent", "reason": "Invalid definitions, partial sources, deterministic totals and export provenance are not jointly proven.", "evidence": []}
+      },
+      "missing_proof": ["fail-closed filters and completeness", "per-source error/partial state", "operator drill/export/schedule provenance"],
+      "next_packages": ["COV-20", "UX-08", "COV-26", "COV-27"]
+    },
+    {
+      "id": "COV-21",
+      "surface": "Approvals / Workflow automation",
+      "surface_ids": ["approvals", "workflows"],
+      "primary_lifecycle": "define and publish workflow through run, human approval, timer, failure and recovery",
+      "current_floor": "U2",
+      "launch_admission": "review",
+      "operator_evidence_mode": "mixed",
+      "dimensions": {
+        "D": {"status": "proven", "reason": "Workflow runtime, authorization, human-task and timer behavior have focused domain suites.", "evidence": [{"path": "spacetimedb/tests/workflow/runtime_test.rs", "claim": "workflow runtime and recovery invariants"}]},
+        "A": {"status": "partial", "reason": "UI and persisted workflow integration exists, but publish/retire certification still uses compatibility reducers.", "evidence": [{"path": "frontend/web/tests/e2e/workflows-gate-ui.spec.ts", "claim": "workflow and approval integration"}]},
+        "O": {"status": "partial", "reason": "Workflow creation and simulation are user-driven; publish/retire and full approval/failure lifecycle are not.", "evidence": [{"path": "frontend/web/tests/e2e/workflows-gate-ui.spec.ts", "role": "partial-operator-transition", "claim": "mixed operator workflow creation and API-driven lifecycle"}]},
+        "E": {"status": "partial", "reason": "Runtime domain recovery is strong, but UI effect refs, stale approval and timer replay evidence remain incomplete.", "evidence": [{"path": "spacetimedb/tests/workflow/human_tasks_test.rs", "claim": "human-task effect and authorization invariants"}]}
+      },
+      "missing_proof": ["operator publish-to-retire lifecycle", "stale and SoD approval UI", "timer replay and failure recovery in browser"],
+      "next_packages": ["COV-21", "COV-01", "COV-27"]
+    },
+    {
+      "id": "COV-22",
+      "surface": "Imports / Data Ops + Forms / Templates",
+      "surface_ids": [],
+      "primary_lifecycle": "upload, map, validate, preview, commit and rollback plus form/template definition",
+      "current_floor": "U2",
+      "launch_admission": "review",
+      "operator_evidence_mode": "mixed",
+      "dimensions": {
+        "D": {"status": "proven", "reason": "Import commit and rollback invariants have focused domain coverage.", "evidence": [{"path": "spacetimedb/tests/data_ops/commit_test.rs", "claim": "import commit and idempotency invariants"}]},
+        "A": {"status": "partial", "reason": "Import rollback has persisted browser integration while form/template exposure and malformed input coverage remain fragmented.", "evidence": [{"path": "frontend/web/tests/e2e/import-rollback.spec.ts", "claim": "persisted import and rollback integration"}]},
+        "O": {"status": "partial", "reason": "One import and rollback path is UI-driven, but the combined COV-22 surface includes uncalibrated forms/templates entry points.", "evidence": [{"path": "frontend/web/tests/e2e/import-rollback.spec.ts", "role": "partial-operator-transition", "claim": "operator import and rollback for one admitted entity"}]},
+        "E": {"status": "partial", "reason": "Rollback persistence is checked without complete hash, locale, retry and template-version result semantics.", "evidence": [{"path": "frontend/web/tests/e2e/import-rollback.spec.ts", "claim": "import job and rollback readback"}]}
+      },
+      "missing_proof": ["malformed and locale/date boundaries", "idempotent retry and exact job identity", "form/template exposure and version application"],
+      "next_packages": ["COV-22", "BASE-04", "UX-07", "COV-27"]
+    },
+    {
+      "id": "COV-23",
+      "surface": "Organization / Company / Settings / Auth",
+      "surface_ids": ["settings"],
+      "primary_lifecycle": "organization bootstrap, membership, role, company, invitation, recovery and switching",
+      "current_floor": "U3",
+      "launch_admission": "review",
+      "operator_evidence_mode": "route-only",
+      "dimensions": {
+        "D": {"status": "proven", "reason": "Organization, permission and user domain suites cover tenant and privilege invariants.", "evidence": [{"path": "spacetimedb/tests/core/tests/organization_tests.rs", "claim": "organization and membership invariants"}]},
+        "A": {"status": "proven", "reason": "Authentication and permission enforcement have persisted API/browser integration coverage.", "evidence": [{"path": "frontend/web/tests/e2e/auth-permission-enforcement.spec.ts", "claim": "authenticated permission and denial integration"}]},
+        "O": {"status": "partial", "reason": "Settings sections and invitation dialog are reachable, but bootstrap, revoke, switch and recovery are not one operator lifecycle.", "evidence": [{"path": "frontend/web/tests/e2e/phase-0-settings-smoke.spec.ts", "role": "route-or-affordance-only", "claim": "settings and invitation affordances"}]},
+        "E": {"status": "partial", "reason": "Authorization denial is proven without complete revoked-session, company-switch and recovery convergence.", "evidence": [{"path": "frontend/web/tests/e2e/auth-permission-enforcement.spec.ts", "claim": "permission denial and scoped readback"}]}
+      },
+      "missing_proof": ["shared first-org persona fixture", "operator revoke and company switch", "session recovery and hidden internal settings"],
+      "next_packages": ["COV-23", "COV-02", "COV-27"]
+    },
+    {
+      "id": "COV-24",
+      "surface": "Distributor workspace",
+      "surface_ids": ["distributor"],
+      "primary_lifecycle": "order, credit, delivery, collection and stock exception over canonical module records",
+      "current_floor": "U2",
+      "launch_admission": "review",
+      "operator_evidence_mode": "route-only",
+      "dimensions": {
+        "D": {"status": "partial", "reason": "Underlying Sales, Inventory and Accounting invariants exist without one distributor daily-loop domain proof.", "evidence": [{"path": "spacetimedb/tests/sales/o2c_certification_test.rs", "claim": "underlying canonical Sales and stock effects"}]},
+        "A": {"status": "partial", "reason": "The workspace uses canonical records, while setup and stock transitions in the selected evidence are compatibility calls.", "evidence": [{"path": "frontend/web/tests/e2e/vertical-distributor.spec.ts", "claim": "distributor workspace integration over canonical data"}]},
+        "O": {"status": "partial", "reason": "The browser proves workspace enablement and a low-stock alert, not the complete daily loop.", "evidence": [{"path": "frontend/web/tests/e2e/vertical-distributor.spec.ts", "role": "route-or-affordance-only", "claim": "workspace and alert visibility"}]},
+        "E": {"status": "absent", "reason": "No exact cross-module order, delivery, collection and stock-exception result chain is proven.", "evidence": []}
+      },
+      "missing_proof": ["operator daily loop", "direct canonical module navigation", "exact payment, delivery and stock exception refs"],
+      "next_packages": ["COV-24", "COV-04", "COV-06", "COV-08", "COV-19", "COV-27"]
+    }
+  ]
+}

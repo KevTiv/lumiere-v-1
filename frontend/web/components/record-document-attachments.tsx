@@ -4,6 +4,7 @@ import { RecordAttachmentsPanel } from "@lumiere/ui"
 import {
   useCreateDocument,
   useDocuments,
+  useIngestDocumentEvidence,
 } from "@lumiere/query-hooks/hooks/documents"
 import { useOperatingCompanyBigInt } from "@lumiere/query-hooks/hooks/use-operating-company"
 import {
@@ -30,6 +31,7 @@ export function RecordDocumentAttachments({
   const companyId = useOperatingCompanyBigInt(Number(organizationId)) ?? 0n
   const { data: documents = [] } = useDocuments(organizationId)
   const createDocument = useCreateDocument(organizationId, companyId)
+  const ingestDocumentEvidence = useIngestDocumentEvidence(organizationId)
 
   return (
     <RecordAttachmentsPanel
@@ -37,7 +39,7 @@ export function RecordDocumentAttachments({
       resModel={resModel}
       resId={resId}
       documents={documents as never[]}
-      disabled={createDocument.isPending}
+      disabled={createDocument.isPending || ingestDocumentEvidence.isPending}
       onUpload={async (file, meta) => {
         const uploaded = await uploadDocumentBlob({
           file,
@@ -57,12 +59,15 @@ export function RecordDocumentAttachments({
           partnerId: undefined,
           tagIds: [],
           isFavorite: false,
-          indexContent: undefined,
           classificationId: undefined,
           retentionDays: undefined,
           fiscalKind: undefined,
           residencyRegion: undefined,
           metadata: undefined,
+        })
+        await ingestDocumentEvidence.mutateAsync({
+          companyId,
+          objectKey: uploaded.objectKey,
         })
       }}
     />

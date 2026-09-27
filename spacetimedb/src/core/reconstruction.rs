@@ -12,10 +12,10 @@ use spacetimedb::{ReducerContext, Table, Timestamp};
 use crate::core::cold_tier_identity::{
     is_active_cold_tier_service_identity, ORGANIZATION_RECONSTRUCTOR_SERVICE,
 };
-use crate::core::persistence::organization_commit_cursor as _;
 use crate::core::permissions::{
     build_policy_snapshot_row, policy_snapshot, upsert_policy_snapshot,
 };
+use crate::core::persistence::organization_commit_cursor as _;
 use crate::core::users::user_organization;
 use crate::projects::project_accounting::{
     project_margin_snapshot, refresh_project_margin_snapshot,
@@ -378,7 +378,9 @@ pub fn complete_organization_reconstruction(
         .checked_sub(1)
         .ok_or_else(|| "reconstructed organization commit cursor is invalid".to_string())?;
     if restored_watermark != verified_watermark {
-        return Err("reconstructed organization commit cursor does not match watermark".to_string());
+        return Err(
+            "reconstructed organization commit cursor does not match watermark".to_string(),
+        );
     }
     rebuild_organization_recreated_state(ctx, organization_id)?;
     fence.state = COMPLETE.to_string();

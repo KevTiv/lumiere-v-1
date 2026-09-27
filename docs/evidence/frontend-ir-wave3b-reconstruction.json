@@ -1,0 +1,160 @@
+{
+  "proof": "frontend-ir-wave3b-reconstruction",
+  "recordedAt": "2026-09-12",
+  "applicationCommit": "632a4ea27",
+  "contracts": {
+    "tag": "v0.3.43",
+    "commit": "932a121bf3d06a42d7e6b388fd5c4a90e7817bbc"
+  },
+  "runtime": {
+    "source": "lumiere-c7-presentation-source",
+    "target": "lumiere-c7-presentation-target",
+    "host": "http://127.0.0.1:3917",
+    "postgresDatabase": "lumiere_presentation_wave3b",
+    "disposable": true
+  },
+  "fixture": {
+    "organizationId": 1,
+    "seed": "seed_dev_data plus save_presentation_module, import_account_csv and register_iot_hub",
+    "frozenDuringCaptureAndComparison": true,
+    "negativeFixture": "run_presentation_draft_tests creates foreign organization rows"
+  },
+  "failureInjection": {
+    "point": "after a committed account_account reconstruction batch",
+    "observed": "C7 injected failure after a committed reconstruction batch",
+    "resumeRunId": "c7-presentation-wave3b-c1001dd7c17b0037"
+  },
+  "coverage": {
+    "organization_id": 1,
+    "watermark": {
+      "sequence": 2,
+      "commit_checksum": "91ff5e4c11dbf0144c82a6f881efe1a7ecb8ae96230adcc9019bc25f00c3a2ff"
+    },
+    "modules": [
+      "accounting",
+      "ai",
+      "analytics",
+      "core",
+      "crm",
+      "data_ops",
+      "documents",
+      "expenses",
+      "fleet",
+      "forms",
+      "helpdesk",
+      "hr",
+      "integrations",
+      "inventory",
+      "iot",
+      "manufacturing",
+      "presentation",
+      "projects",
+      "proposals",
+      "purchasing",
+      "sales",
+      "subscriptions",
+      "workflow"
+    ],
+    "module_row_counts": {
+      "accounting": 101,
+      "ai": 42,
+      "analytics": 11,
+      "core": 724,
+      "crm": 24,
+      "data_ops": 1,
+      "documents": 6,
+      "expenses": 1,
+      "fleet": 1,
+      "forms": 3,
+      "helpdesk": 8,
+      "hr": 37,
+      "integrations": 2,
+      "inventory": 36,
+      "iot": 1,
+      "manufacturing": 15,
+      "presentation": 8,
+      "projects": 14,
+      "proposals": 6,
+      "purchasing": 5,
+      "sales": 13,
+      "subscriptions": 3,
+      "workflow": 663
+    },
+    "source_tables_with_rows": 203,
+    "source_rows": 1725,
+    "projection_commits": 2,
+    "projected_row_changes": 1728,
+    "deleted_table": "activity",
+    "deleted_identity": {
+      "id": 1
+    },
+    "relationship_values": 3562,
+    "total_values": 208,
+    "audit_rows": 672,
+    "durable_idempotency_records": 1730
+  },
+  "resume": {
+    "run_id": "c7-presentation-wave3b-c1001dd7c17b0037",
+    "organization_id": 1,
+    "placement_generation": 1,
+    "watermark": {
+      "sequence": 2,
+      "commit_checksum": "91ff5e4c11dbf0144c82a6f881efe1a7ecb8ae96230adcc9019bc25f00c3a2ff"
+    },
+    "restored_tables": 460,
+    "restored_rows": 3455,
+    "recreated_tables": 5,
+    "excluded_tables": 0,
+    "verified": true,
+    "elapsed_millis": 194356
+  },
+  "repeat": {
+    "run_id": "c7-presentation-wave3b-c1001dd7c17b0037-repeat",
+    "organization_id": 1,
+    "placement_generation": 1,
+    "watermark": {
+      "sequence": 2,
+      "commit_checksum": "91ff5e4c11dbf0144c82a6f881efe1a7ecb8ae96230adcc9019bc25f00c3a2ff"
+    },
+    "restored_tables": 460,
+    "restored_rows": 3455,
+    "recreated_tables": 5,
+    "excluded_tables": 0,
+    "verified": true,
+    "elapsed_millis": 195626
+  },
+  "presentation": {
+    "verified": true,
+    "organization_id": 1,
+    "watermark": {
+      "sequence": 2,
+      "commit_checksum": "91ff5e4c11dbf0144c82a6f881efe1a7ecb8ae96230adcc9019bc25f00c3a2ff"
+    },
+    "tables": {
+      "presentation_module": {
+        "rows": 3,
+        "complete_rows_sha256": "d872c5c05ce4a82cc643d5d55c38c862dd16ddfb4eefd3c76acd541f96a8448e"
+      },
+      "presentation_module_version": {
+        "rows": 5,
+        "complete_rows_sha256": "7db7d51231898ac96513d7c386e9d537425cf2f81e0498edfaef80e67b5c3a12"
+      }
+    },
+    "foreign_source_rows_excluded": 6
+  },
+  "checks": {
+    "allModuleDrill": "passed",
+    "deleteTombstone": "passed",
+    "batchReceipts": "passed",
+    "sourceTargetCompletePresentationRows": "passed",
+    "canonicalDefinitionHashes": "passed"
+  },
+  "reproduction": {
+    "snapshotAndReplay": "scripts/c7-all-module-reconstruction-drill.sh 1",
+    "completeRowComparison": "python3 scripts/verify-presentation-reconstruction.py",
+    "instructions": "docs/organization-reconstruction.md",
+    "bindIp": "LUMIERE_API_BIND_IP=127.0.0.1 for separate API/browser fixtures"
+  },
+  "scope": "Local PostgreSQL-to-fresh-STDB reconstruction with failure/resume/repeat; not the separate authoritative C9 eight-lane isolation matrix or production deployment",
+  "credentials": "not recorded"
+}

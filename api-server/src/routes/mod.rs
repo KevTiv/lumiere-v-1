@@ -2,19 +2,23 @@
 
 mod accounting;
 mod admin;
+mod ai_capabilities;
 mod ai_certifications;
+mod ai_evidence;
 mod auth;
 mod billing;
 mod bootstrap;
 mod country_packs;
 mod crm;
 mod documents;
+mod evidence_inspection;
 pub(crate) mod health;
 mod import;
 mod inventory;
 mod mail;
 mod messaging;
 pub(crate) mod operations;
+mod presentation;
 mod proposals;
 pub(crate) mod queries;
 pub(crate) mod reports;
@@ -34,7 +38,11 @@ use crate::state::AppState;
 
 pub fn domain_router() -> Router<Arc<AppState>> {
     Router::new()
+        .merge(ai_capabilities::router())
         .merge(ai_certifications::router())
+        .merge(ai_evidence::router())
+        .merge(crate::evidence_ingestion::router())
+        .merge(evidence_inspection::router())
         .merge(auth::router())
         .merge(session::router())
         .merge(crm::router())
@@ -51,6 +59,7 @@ pub fn domain_router() -> Router<Arc<AppState>> {
         .merge(billing::router())
         .merge(admin::router())
         .merge(proposals::router())
+        .merge(presentation::router())
         .merge(reports::router())
         .merge(country_packs::router())
         .merge(statutory_adapters::router())

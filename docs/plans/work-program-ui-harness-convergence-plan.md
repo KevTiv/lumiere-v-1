@@ -79,6 +79,10 @@ Do not inject organization-created program logic into the canonical application 
 
 Application IR remains build-time/platform truth. WorkPrograms are runtime versioned extension metadata validated against the current application-contract version.
 
+**Module composition alignment (2026-09-12):** The [frontend plan](./frontend-multisurface-workflow-presentation-plan.md#38-modulepage-composition-is-the-product-contract) makes versioned modules/pages the user-facing extension unit. WorkPrograms own executable graphs and typed outputs; module/page revisions own where those programs appear. Program placement hints are suggested compatible locations, not a second active placement store. Human editing and harness-authored module patches use one validator, preview, publication and rollback path. Runtime registry entries are resolved from the active module/page revision.
+
+After the human F0.5 module proof and minimal WorkProgram runtime/certification gates, prioritize one explicit sandbox-run-to-published-report attachment before broad Expo migration. This advances a narrow reporting proof; full workflow, import/document and cross-surface convergence retain their own acceptance gates. The [delivery ledger](./frontend-ir-luna-coordination-plan.md) records that slice as P3H.
+
 ```text
 Application IR
       ↓ exposes

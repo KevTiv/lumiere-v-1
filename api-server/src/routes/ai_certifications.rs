@@ -11,7 +11,7 @@ use axum::{
     routing::get,
     Json, Router,
 };
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 use stdb_auth::FieldAccessContext;
@@ -21,6 +21,7 @@ use tower_cookies::Cookies;
 use crate::{
     commands::dispatch_session_reducer,
     error::ApiError,
+    query_exec::authorize_membership_company_ids,
     session::parse_stdb_identity_hex,
     state::AppState,
     trusted_context::TrustedOperationContext,
@@ -29,9 +30,17 @@ use crate::{
 
 const MAX_IDEMPOTENCY_KEY_LEN: usize = 160;
 const MAX_STATUS_ROWS: usize = 500;
+const MAX_PROMOTION_TEXT_LEN: usize = 65_536;
 const STATUS_COLUMNS: &str = "id, organization_id, company_id, skill_id, skill_version_id, \
     fixture_id, status, requested_at, requester_superuser_bypass, runtime_profile_id, \
     certification_environment_id, attempt_count, claimed_at, terminal_at, error_code";
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct CertificationReadiness {
+    ready: bool,
+    code: &'static str,
+}
 
 fn ensure_ai_skill_access(
     field_access: Option<&FieldAccessContext>,
@@ -66,6 +75,26 @@ struct RequestCertificationBody {
     idempotency_key: String,
 }
 
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+struct ProposeKnowledgePromotionBody {
+    company_id: u64,
+    idempotency_key: String,
+    knowledge_version_id: u64,
+    skill_id: Option<u64>,
+    skill_key: String,
+    skill_name: String,
+    manifest_json: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+struct ReviewKnowledgePromotionBody {
+    company_id: u64,
+    outcome: String,
+    note: Option<String>,
+}
+
 fn validate_request(body: &RequestCertificationBody) -> Result<(), ApiError> {
     if body.company_id == 0 {
         return Err(ApiError::BadRequest(
@@ -90,6 +119,47 @@ fn validate_request(body: &RequestCertificationBody) -> Result<(), ApiError> {
     {
         return Err(ApiError::BadRequest(
             "idempotencyKey must be trimmed, non-empty, and at most 160 bytes".into(),
+        ));
+    }
+    Ok(())
+}
+
+fn validate_promotion(body: &ProposeKnowledgePromotionBody) -> Result<(), ApiError> {
+    if body.company_id == 0 || body.knowledge_version_id == 0 || body.skill_id == Some(0) {
+        return Err(ApiError::BadRequest(
+            "companyId, knowledgeVersionId, and optional skillId must be positive".into(),
+        ));
+    }
+    for (name, value, max) in [
+        ("idempotencyKey", body.idempotency_key.as_str(), 160),
+        ("skillKey", body.skill_key.as_str(), 160),
+        ("skillName", body.skill_name.as_str(), 256),
+        (
+            "manifestJson",
+            body.manifest_json.as_str(),
+            MAX_PROMOTION_TEXT_LEN,
+        ),
+    ] {
+        if value.trim().is_empty()
+            || value.trim() != value
+            || value.len() > max
+            || value.chars().any(char::is_control) && name != "manifestJson"
+        {
+            return Err(ApiError::BadRequest(format!("invalid {name}")));
+        }
+    }
+    Ok(())
+}
+
+fn validate_promotion_review(body: &ReviewKnowledgePromotionBody) -> Result<(), ApiError> {
+    if body.company_id == 0 || !matches!(body.outcome.as_str(), "accepted" | "rejected") {
+        return Err(ApiError::BadRequest(
+            "companyId must be positive and outcome must be accepted or rejected".into(),
+        ));
+    }
+    if body.note.as_ref().is_some_and(|note| note.len() > 2_000) {
+        return Err(ApiError::BadRequest(
+            "note must be at most 2000 bytes".into(),
         ));
     }
     Ok(())
@@ -193,9 +263,10 @@ async fn add_current_passing_evidence(
 ) -> Result<(), ApiError> {
     let queries = [
         format!(
-            "SELECT certification_request_id, skill_version_id, fixture_id, runtime_profile_id, \
+            "SELECT id, certification_request_id, skill_version_id, fixture_id, runtime_profile_id, \
              certification_environment_id, status, source_hash, manifest_hash, fixture_hash, \
-             runtime_hash, environment_hash, policy_snapshot_hash, execution_evidence_hash \
+             runtime_hash, environment_hash, policy_snapshot_hash, execution_evidence_hash, \
+             executor_run_id, failure_kind, failure_reason, executed_at \
              FROM ai_skill_certification_evidence WHERE organization_id = {organization_id} LIMIT 2000"
         ),
         format!(
@@ -260,7 +331,7 @@ async fn add_current_passing_evidence(
     let active_profile = (profiles.len() == 1).then(|| &profiles[0]);
 
     for request in requests {
-        let current = request_has_current_passing_evidence(
+        let readiness = certification_readiness(
             request,
             active_profile,
             &evidence_by_request,
@@ -268,81 +339,94 @@ async fn add_current_passing_evidence(
             &fixture_by_id,
             &environment_by_fixture,
         );
+        let evidence = value_u64(request, "id", "id")
+            .and_then(|request_id| evidence_by_request.get(&request_id).copied())
+            .cloned()
+            .unwrap_or(Value::Null);
         if let Some(object) = request.as_object_mut() {
             object.insert(
                 "hasCurrentPassingEvidence".to_string(),
-                Value::Bool(current),
+                Value::Bool(readiness.ready),
             );
+            object.insert(
+                "readiness".to_string(),
+                serde_json::to_value(&readiness).expect("readiness is serializable"),
+            );
+            object.insert("evidence".to_string(), evidence);
         }
     }
     Ok(())
 }
 
-fn request_has_current_passing_evidence(
+fn certification_readiness(
     request: &Value,
     active_profile: Option<&Value>,
     evidence_by_request: &HashMap<u64, &Value>,
     version_by_id: &HashMap<u64, &Value>,
     fixture_by_id: &HashMap<u64, &Value>,
     environment_by_fixture: &HashMap<u64, &Value>,
-) -> bool {
-    if value_string(request, "status", "status")
-        .is_none_or(|status| !status.eq_ignore_ascii_case("completed"))
-    {
-        return false;
+) -> CertificationReadiness {
+    let status = value_string(request, "status", "status")
+        .unwrap_or_default()
+        .to_ascii_lowercase();
+    if matches!(status.as_str(), "queued" | "running") {
+        return readiness(false, "certification_pending");
+    }
+    if status != "completed" {
+        return readiness(false, "certification_failed");
     }
     let Some(request_id) = value_u64(request, "id", "id") else {
-        return false;
+        return readiness(false, "invalid_request");
     };
     let Some(version_id) = value_u64(request, "skillVersionId", "skill_version_id") else {
-        return false;
+        return readiness(false, "version_unavailable");
     };
     let Some(fixture_id) = value_u64(request, "fixtureId", "fixture_id") else {
-        return false;
+        return readiness(false, "fixture_unavailable");
     };
     let Some(evidence) = evidence_by_request.get(&request_id).copied() else {
-        return false;
+        return readiness(false, "evidence_missing");
     };
     let Some(profile) = active_profile else {
-        return false;
+        return readiness(false, "runtime_unavailable");
     };
     let Some(version) = version_by_id.get(&version_id).copied() else {
-        return false;
+        return readiness(false, "version_unavailable");
     };
     let Some(fixture) = fixture_by_id.get(&fixture_id).copied() else {
-        return false;
+        return readiness(false, "fixture_unavailable");
     };
     let Some(environment) = environment_by_fixture.get(&fixture_id).copied() else {
-        return false;
+        return readiness(false, "environment_unavailable");
     };
 
     let Some(profile_id) = value_u64(profile, "id", "id") else {
-        return false;
+        return readiness(false, "runtime_unavailable");
     };
     let Some(environment_id) = value_u64(environment, "id", "id") else {
-        return false;
+        return readiness(false, "environment_unavailable");
     };
     let Some(runtime_hash) = value_string(profile, "runtimeHash", "runtime_hash") else {
-        return false;
+        return readiness(false, "runtime_unavailable");
     };
     let Some(environment_hash) = value_string(
         environment,
         "environmentFingerprint",
         "environment_fingerprint",
     ) else {
-        return false;
+        return readiness(false, "environment_unavailable");
     };
     let Some(source_hash) = value_string(version, "sourceHash", "source_hash") else {
-        return false;
+        return readiness(false, "version_unavailable");
     };
     let Some(manifest_json) = value_string(version, "manifestJson", "manifest_json") else {
-        return false;
+        return readiness(false, "version_unavailable");
     };
     let Some(fixture_hash) = fixture_fingerprint(fixture) else {
-        return false;
+        return readiness(false, "fixture_unavailable");
     };
 
-    value_string(evidence, "status", "status")
+    let current = value_string(evidence, "status", "status")
         .is_some_and(|status| status.eq_ignore_ascii_case("passed"))
         && value_u64(request, "runtimeProfileId", "runtime_profile_id") == Some(profile_id)
         && value_u64(evidence, "runtimeProfileId", "runtime_profile_id") == Some(profile_id)
@@ -377,7 +461,19 @@ fn request_has_current_passing_evidence(
                     "execution_evidence_hash"
                 };
                 value_string(evidence, camel, snake).is_some_and(|hash| valid_sha256(&hash))
-            })
+            });
+    readiness(
+        current,
+        if current {
+            "ready"
+        } else {
+            "evidence_stale_or_failed"
+        },
+    )
+}
+
+fn readiness(ready: bool, code: &'static str) -> CertificationReadiness {
+    CertificationReadiness { ready, code }
 }
 
 fn fixture_fingerprint(fixture: &Value) -> Option<String> {
@@ -420,6 +516,78 @@ fn valid_sha256(value: &str) -> bool {
                 .bytes()
                 .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
     })
+}
+
+fn value_u64_list(row: &Value, camel: &str, snake: &str) -> Option<Vec<u64>> {
+    row.get(camel)
+        .or_else(|| row.get(snake))?
+        .as_array()?
+        .iter()
+        .map(|value| value.as_u64().or_else(|| value.as_str()?.parse().ok()))
+        .collect()
+}
+
+fn knowledge_lineage_hash(version: &Value) -> Option<String> {
+    let mut hasher = Sha256::new();
+    hasher.update(b"lumiere.ai.knowledge-promotion.v1");
+    for part in [
+        value_u64(version, "organizationId", "organization_id")?.to_string(),
+        value_u64(version, "companyId", "company_id")?.to_string(),
+        value_u64(version, "entryId", "entry_id")?.to_string(),
+        value_u64(version, "id", "id")?.to_string(),
+        value_u64(version, "reviewEpoch", "review_epoch")?.to_string(),
+        value_string(version, "title", "title")?,
+        value_string(version, "body", "body")?,
+    ] {
+        hasher.update((part.len() as u64).to_be_bytes());
+        hasher.update(part.as_bytes());
+    }
+    for ids in [
+        value_u64_list(version, "sourcePassageIds", "source_passage_ids")?,
+        value_u64_list(version, "claimIds", "claim_ids")?,
+        value_u64_list(version, "decisionIds", "decision_ids")?,
+    ] {
+        hasher.update((ids.len() as u64).to_be_bytes());
+        for id in ids {
+            hasher.update(id.to_be_bytes());
+        }
+    }
+    Some(format!("{:x}", hasher.finalize()))
+}
+
+async fn bind_manifest_to_knowledge_lineage(
+    state: &AppState,
+    organization_id: u64,
+    company_id: u64,
+    knowledge_version_id: u64,
+    manifest_json: &str,
+) -> Result<String, ApiError> {
+    let mut rows = state
+        .stdb
+        .query_sql(&format!(
+            "SELECT id, organization_id, company_id, entry_id, review_epoch, title, body, \
+             source_passage_ids, claim_ids, decision_ids FROM ai_knowledge_entry_version \
+             WHERE organization_id = {organization_id} AND company_id = {company_id} \
+             AND id = {knowledge_version_id} LIMIT 1"
+        ))
+        .await
+        .map_err(|error| ApiError::Internal(format!("load knowledge lineage: {error}")))?;
+    let version = rows
+        .pop()
+        .ok_or_else(|| ApiError::NotFound("knowledge version not found".into()))?;
+    let lineage_hash = knowledge_lineage_hash(&version)
+        .ok_or_else(|| ApiError::Internal("knowledge lineage is incomplete".into()))?;
+    let mut manifest: Value = serde_json::from_str(manifest_json)
+        .map_err(|_| ApiError::BadRequest("manifestJson must be a JSON object".into()))?;
+    let object = manifest
+        .as_object_mut()
+        .ok_or_else(|| ApiError::BadRequest("manifestJson must be a JSON object".into()))?;
+    object.insert(
+        "source_hash".to_string(),
+        Value::String(format!("sha256:{lineage_hash}")),
+    );
+    serde_json::to_string(&manifest)
+        .map_err(|error| ApiError::Internal(format!("serialize promotion manifest: {error}")))
 }
 
 fn row_id(row: &Value) -> u64 {
@@ -468,6 +636,125 @@ async fn get_certification(
     Ok(Json(json!({ "data": row })))
 }
 
+const PROMOTION_COLUMNS: &str = "id, organization_id, company_id, knowledge_entry_id, \
+    knowledge_version_id, knowledge_review_epoch, source_passage_ids, claim_ids, decision_ids, \
+    requested_skill_id, skill_key, skill_name, lineage_hash, payload_hash, status, \
+    certification_state, skill_id, skill_version_id, proposed_by, proposed_at, reviewed_by, \
+    reviewed_at, review_note, invalidated_at";
+
+async fn authorize_promotion_company(
+    state: &AppState,
+    session: &crate::session::ApiSession,
+    organization_id: u64,
+    company_id: u64,
+) -> Result<(), ApiError> {
+    authorize_membership_company_ids(
+        &state.stdb,
+        organization_id,
+        &session.identity_hex,
+        &[company_id],
+        "Cannot access another company's knowledge promotions",
+    )
+    .await
+}
+
+async fn list_knowledge_promotions(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    cookies: Cookies,
+    Path(company_id): Path<u64>,
+) -> Result<Json<Value>, ApiError> {
+    if company_id == 0 {
+        return Err(ApiError::BadRequest("company id must be positive".into()));
+    }
+    let session = resolve_session(&state, &headers, &cookies)
+        .await?
+        .ok_or(ApiError::Unauthorized)?;
+    let organization_id = require_org(&session)?;
+    ensure_ai_skill_access(session.field_access.as_ref(), "read")?;
+    authorize_promotion_company(&state, &session, organization_id, company_id).await?;
+    let _context = TrustedOperationContext::for_resource_read(&state, &session)?
+        .with_company_scope(vec![company_id])?;
+    let mut rows = state
+        .stdb
+        .query_sql(&format!(
+            "SELECT {PROMOTION_COLUMNS} FROM ai_knowledge_skill_promotion \
+             WHERE organization_id = {organization_id} AND company_id = {company_id} LIMIT {MAX_STATUS_ROWS}"
+        ))
+        .await
+        .map_err(|error| ApiError::Internal(format!("load knowledge promotions: {error}")))?;
+    rows.sort_by_key(|row| std::cmp::Reverse(row_id(row)));
+    Ok(Json(json!({ "data": rows })))
+}
+
+async fn propose_knowledge_promotion(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    cookies: Cookies,
+    Json(body): Json<ProposeKnowledgePromotionBody>,
+) -> Result<Json<Value>, ApiError> {
+    validate_promotion(&body)?;
+    let session = resolve_session(&state, &headers, &cookies)
+        .await?
+        .ok_or(ApiError::Unauthorized)?;
+    let organization_id = require_org(&session)?;
+    ensure_ai_skill_access(session.field_access.as_ref(), "write")?;
+    authorize_promotion_company(&state, &session, organization_id, body.company_id).await?;
+    let manifest_json = bind_manifest_to_knowledge_lineage(
+        &state,
+        organization_id,
+        body.company_id,
+        body.knowledge_version_id,
+        &body.manifest_json,
+    )
+    .await?;
+    dispatch_session_reducer(
+        &state,
+        &session,
+        "propose_ai_knowledge_skill_promotion",
+        json!([organization_id, body.company_id, {
+            "idempotencyKey": body.idempotency_key,
+            "knowledgeVersionId": body.knowledge_version_id,
+            "skillId": body.skill_id,
+            "skillKey": body.skill_key,
+            "skillName": body.skill_name,
+            "manifestJson": manifest_json,
+        }]),
+    )
+    .await?;
+    Ok(Json(json!({ "ok": true })))
+}
+
+async fn review_knowledge_promotion(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    cookies: Cookies,
+    Path(promotion_id): Path<u64>,
+    Json(body): Json<ReviewKnowledgePromotionBody>,
+) -> Result<Json<Value>, ApiError> {
+    if promotion_id == 0 {
+        return Err(ApiError::BadRequest("promotion id must be positive".into()));
+    }
+    validate_promotion_review(&body)?;
+    let session = resolve_session(&state, &headers, &cookies)
+        .await?
+        .ok_or(ApiError::Unauthorized)?;
+    let organization_id = require_org(&session)?;
+    ensure_ai_skill_access(session.field_access.as_ref(), "write")?;
+    authorize_promotion_company(&state, &session, organization_id, body.company_id).await?;
+    dispatch_session_reducer(
+        &state,
+        &session,
+        "review_ai_knowledge_skill_promotion",
+        json!([organization_id, body.company_id, promotion_id, {
+            "outcome": body.outcome,
+            "note": body.note,
+        }]),
+    )
+    .await?;
+    Ok(Json(json!({ "ok": true })))
+}
+
 pub fn router() -> Router<Arc<AppState>> {
     Router::new()
         .route(
@@ -477,6 +764,18 @@ pub fn router() -> Router<Arc<AppState>> {
         .route(
             "/ai/skills/certifications/:request_id",
             get(get_certification),
+        )
+        .route(
+            "/ai/knowledge/skill-promotions",
+            axum::routing::post(propose_knowledge_promotion),
+        )
+        .route(
+            "/ai/knowledge/skill-promotions/company/:company_id",
+            get(list_knowledge_promotions),
+        )
+        .route(
+            "/ai/knowledge/skill-promotions/:promotion_id/review",
+            axum::routing::post(review_knowledge_promotion),
         )
 }
 
@@ -602,24 +901,75 @@ mod tests {
         let fixture_by_id = HashMap::from([(3, &fixture)]);
         let environment_by_fixture = HashMap::from([(3, &environment)]);
 
-        assert!(request_has_current_passing_evidence(
-            &request,
-            Some(&profile),
-            &evidence_by_request,
-            &version_by_id,
-            &fixture_by_id,
-            &environment_by_fixture,
-        ));
+        assert!(
+            certification_readiness(
+                &request,
+                Some(&profile),
+                &evidence_by_request,
+                &version_by_id,
+                &fixture_by_id,
+                &environment_by_fixture,
+            )
+            .ready
+        );
+        assert_eq!(
+            certification_readiness(
+                &request,
+                Some(&profile),
+                &evidence_by_request,
+                &version_by_id,
+                &fixture_by_id,
+                &environment_by_fixture,
+            )
+            .code,
+            "ready"
+        );
 
         let stale_profile = json!({"id": 6, "runtimeHash": runtime_hash});
-        assert!(!request_has_current_passing_evidence(
-            &request,
-            Some(&stale_profile),
-            &evidence_by_request,
-            &version_by_id,
-            &fixture_by_id,
-            &environment_by_fixture,
-        ));
+        assert!(
+            !certification_readiness(
+                &request,
+                Some(&stale_profile),
+                &evidence_by_request,
+                &version_by_id,
+                &fixture_by_id,
+                &environment_by_fixture,
+            )
+            .ready
+        );
+        assert_eq!(
+            certification_readiness(
+                &request,
+                Some(&stale_profile),
+                &evidence_by_request,
+                &version_by_id,
+                &fixture_by_id,
+                &environment_by_fixture,
+            )
+            .code,
+            "evidence_stale_or_failed"
+        );
+    }
+
+    #[test]
+    fn certification_readiness_explains_pending_and_missing_evidence() {
+        let empty = HashMap::new();
+        let queued = json!({"id": 7, "status": "Queued"});
+        assert_eq!(
+            certification_readiness(&queued, None, &empty, &empty, &empty, &empty).code,
+            "certification_pending"
+        );
+
+        let completed = json!({
+            "id": 7,
+            "status": "Completed",
+            "skillVersionId": 2,
+            "fixtureId": 3,
+        });
+        assert_eq!(
+            certification_readiness(&completed, None, &empty, &empty, &empty, &empty).code,
+            "evidence_missing"
+        );
     }
 
     #[test]

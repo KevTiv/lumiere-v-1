@@ -69,7 +69,6 @@ export function toCreateDocumentParams(
     partnerId: optionalBigIntU64(formData.partnerId),
     tagIds: u64IdArrayFromForm(formData.tagIds),
     isFavorite: Boolean(formData.isFavorite),
-    indexContent: optionalTrimmedString(formData.indexContent),
     classificationId: optionalBigIntU64(formData.classificationId),
     retentionDays:
       retentionDays === undefined || Number.isNaN(retentionDays)
@@ -223,17 +222,6 @@ export function toCreateDocumentFolderParams(
     storageId: optionalBigIntU64(formData.storageId),
     residencyRegion: optionalTrimmedString(formData.residencyRegion),
     metadata: optionalTrimmedString(formData.metadata),
-  }
-}
-
-export function toSetDocumentIndexContentParams(
-  formData: Record<string, unknown>,
-): { content: string; language?: string } | null {
-  const content = requiredTrimmedString(formData.content)
-  if (!content) return null
-  return {
-    content,
-    language: optionalTrimmedString(formData.language),
   }
 }
 

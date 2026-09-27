@@ -6,6 +6,14 @@ import {
   proposalTemplatesTableConfig,
   newProposalForm,
   posTerminalsAdminTableConfig,
+  fleetVehiclesTableConfig,
+  fleetServiceRecordsTableConfig,
+  fleetInspectionsTableConfig,
+  newFleetVehicleForm,
+  assignFleetDriverForm,
+  recordFleetServiceForm,
+  recordFleetInspectionForm,
+  type FleetFormOption,
 } from "@lumiere/ui"
 import {
   buildAccountsTableConfig,
@@ -1878,71 +1886,6 @@ export const manufacturingModuleConfig = (t: TFunction): ModuleConfig => ({
 
 // ─── Projects ─────────────────────────────────────────────────────────────────
 
-// ─── Executive Overview (home dashboard) ─────────────────────────────────────
-
-export const overviewDashboard = (t: TFunction): DashboardConfig => ({
-  id: "overview",
-  title: t("overview.page.title"),
-  description: t("overview.page.description"),
-  sections: [
-    {
-      id: "overview-kpis",
-      widgets: [
-        {
-          id: "overview-stat-cards",
-          type: "stat-cards",
-          title: t("overview.dashboard.keyMetrics"),
-          width: "full",
-          data: {
-            stats: [
-              { label: t("sales.dashboard.widgets.revenue"), value: "—", icon: "BarChart2" },
-              { label: t("overview.dashboard.stats.openSalesOrders"), value: "—", icon: "ShoppingCart" },
-              { label: t("overview.dashboard.stats.openTasks"), value: "—", icon: "CheckSquare" },
-              { label: t("crm.contacts.title"), value: "—", icon: "Users" },
-            ],
-          },
-        },
-      ],
-    },
-    {
-      id: "overview-revenue",
-      widgets: [
-        {
-          id: "overview-sales-trend",
-          type: "bar-chart",
-          title: t("overview.dashboard.widgets.salesTrend"),
-          width: "full",
-          data: {
-            categoryKey: "month",
-            series: [{ name: "revenue", color: "hsl(var(--chart-1))" }],
-            values: [],
-          },
-        },
-      ],
-    },
-    {
-      id: "overview-attention",
-      title: t("overview.dashboard.sections.attention"),
-      widgets: [
-        {
-          id: "overview-needs-attention",
-          type: "table",
-          title: t("overview.dashboard.sections.attention"),
-          width: "full",
-          data: {
-            columns: [
-              { key: "reference", label: t("overview.dashboard.tables.reference") },
-              { key: "amount", label: t("overview.dashboard.tables.amount"), align: "right" as const },
-              { key: "status", label: t("overview.dashboard.tables.status") },
-            ],
-            rows: [],
-          },
-        },
-      ],
-    },
-  ],
-})
-
 export const projectsDashboard: DashboardConfig = {
   id: "projects",
   title: "Projects",
@@ -3263,6 +3206,62 @@ export const posModuleConfig = (t: TFunction): ModuleConfig => ({
       label: t("pos.admin.tabs.admin"),
       type: "entity",
       entityConfig: posTerminalsAdminTableConfig(t),
+    },
+  ],
+})
+
+// ─── Fleet ────────────────────────────────────────────────────────────────────
+
+export interface FleetModuleOptions {
+  vehicles?: FleetFormOption[]
+  employees?: FleetFormOption[]
+  serviceTypes?: FleetFormOption[]
+}
+
+export const fleetModuleConfig = (
+  t: TFunction,
+  { vehicles = [], employees = [], serviceTypes = [] }: FleetModuleOptions = {},
+): ModuleConfig => ({
+  id: "fleet",
+  title: t("fleet.title"),
+  description: t("fleet.forms.newVehicle.description"),
+  defaultTab: "fleet-vehicles",
+  tabs: [
+    {
+      id: "fleet-vehicles",
+      label: t("fleet.subtitle"),
+      type: "entity",
+      entityConfig: fleetVehiclesTableConfig(t),
+      createForm: newFleetVehicleForm(t),
+      createLabel: t("fleet.create"),
+      createAction: "createFleetVehicle",
+    },
+    {
+      id: "fleet-driver-assignment",
+      label: t("fleet.lifecycle.assignments.title"),
+      type: "entity",
+      entityConfig: fleetVehiclesTableConfig(t),
+      createForm: assignFleetDriverForm(t, vehicles, employees),
+      createLabel: t("fleet.lifecycle.assignments.action"),
+      createAction: "assignFleetDriver",
+    },
+    {
+      id: "fleet-service-records",
+      label: t("fleet.lifecycle.service.title"),
+      type: "entity",
+      entityConfig: fleetServiceRecordsTableConfig(t),
+      createForm: recordFleetServiceForm(t, vehicles, serviceTypes),
+      createLabel: t("fleet.lifecycle.service.action"),
+      createAction: "recordFleetService",
+    },
+    {
+      id: "fleet-inspections",
+      label: t("fleet.lifecycle.inspections.title"),
+      type: "entity",
+      entityConfig: fleetInspectionsTableConfig(t),
+      createForm: recordFleetInspectionForm(t, vehicles, employees),
+      createLabel: t("fleet.lifecycle.inspections.action"),
+      createAction: "recordFleetInspection",
     },
   ],
 })

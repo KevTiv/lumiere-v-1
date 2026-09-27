@@ -5,6 +5,8 @@ domains; Phase 7 is next — 2026-08-31
 **Tracks:** canonical IR, contracts extraction, write-path hardening, typed reads,
 generated codecs, generated SDK, frontend type debt
 
+**Current-tree reconciliation (2026-09-12):** See the [frontend IR coordination ledger](./frontend-ir-luna-coordination-plan.md). The application now pins contracts v0.3.40. Typed-read completion remains limited to reviewed resources; the generic query path still lacks runtime row decoding. Phase 7 must use current symbol consumers: domain `*-http.ts` files now also own live command metadata, so deleting them wholesale is not an acceptance criterion. Phase 8's ratchet exists, but boundary-only migration remains pending.
+
 **Completed foundation:**
 [ir-api-sdk-operation-foundation-continuation.md](./ir-api-sdk-operation-foundation-continuation.md)
 records the first IR-to-SDK/API vertical slice and its cross-repository release
@@ -322,7 +324,9 @@ scope before joining the typed-read set.
 
 Delete only after consumer counts reach zero:
 
-- the 32 handwritten domain `*-http.ts` transport helpers;
+- obsolete handwritten transport functions, after proving zero consumers;
+  retain domain `*-http.ts` files/exports that still own reducer metadata,
+  invalidation/subscription hints, or contract-test inputs;
 - `REDUCER_PARAM_STRUCTS`, flat option-index maps, and reducer-specific logic
   from `frontend/packages/stdb/src/stdb-params-json.ts`;
 - the local generated proxy files replaced by package exports;

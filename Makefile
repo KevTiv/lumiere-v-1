@@ -25,12 +25,16 @@ E2E_STDB_MODULE    ?= lumiere-v1-local-e2e
 # Local E2E ports. e2e-smoke-test pre-builds Next.js and starts next start; Makefile starts api-server.
 E2E_WEB_PORT       ?= 3100
 E2E_API_PORT       ?= 8082
-# Playwright suite: full (default) or p0 (test:e2e:p0)
+# Playwright suite: full (default), p0, or pretenant.
 E2E_SUITE          ?= full
 # Single-spec iteration (e2e-single-test / e2e-single)
 E2E_SPEC           ?= mvp-lead-to-cash.spec.ts
 E2E_GREP           ?=
 E2E_ONLY_SPEC      ?=
+# Space-separated spec paths relative to frontend/web; used by E2E_SUITE=targeted.
+E2E_SPEC_FILES     ?=
+# Playwright shard for e2e-smoke, e.g. 2/3 (CI splits the p0/full suites across runners).
+E2E_SHARD          ?=
 E2E_WORKERS        ?= 1
 # Some interactive shells in Cursor can inherit a literal "$$PATH"; use a known-good command path for E2E orchestration.
 E2E_PATH           ?= /Users/kevintivert/.nvm/versions/node/v21.7.0/bin:/Users/kevintivert/.cargo/bin:/Users/kevintivert/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin
@@ -98,15 +102,15 @@ E2E_DOMAIN_TEST_REDUCERS := \
 .PHONY: \
 	help help-e2e \
 	setup check check-env check-env-prod build validate-subscriptions \
-	start stop publish publish-clear test call-tests logs seed-test-user \
+	start stop publish publish-clear test call-tests logs seed-test-user seed-first-org-personas \
 	generate-stdb-ts-sdk generate-stdb-rust-sdk schema-snapshot \
 	e2e-smoke e2e-smoke-setup e2e-smoke-test e2e-playwright-only \
 	e2e-wipe-local-stdb e2e-single e2e-single-test e2e-p2p e2e-mvp-golden \
 	e2e-crm-isolation e2e-dx-test e2e-web-dev e2e-single-running \
 	e2e-pretenant pretenant-cert-stdb pretenant-cert-native \
 	init-stack docker-dev docker-dev-iot \
-	codegen check-codegen check-codegen-pinned check-contract-ir check-operation-history check-release-compatibility check-tenant-ownership check-storage-policy check-c2-commit-coverage check-reducer-contracts-drift check-contracts-source-drift check-contracts-drift check-c9-isolation-matrix lint-trusted-route-boundaries \
-	clean-contracts-live-staging lint-reducer-call-literals api-server-run \
+	codegen check-codegen check-codegen-pinned check-contract-ir check-operation-history check-release-compatibility check-tenant-ownership check-storage-policy check-c2-commit-coverage check-cov00c-correctness-census check-cov00d-evidence-matrix check-cov02-seed-inventory check-cov02-first-org-fixture check-reducer-contracts-drift check-contracts-source-drift check-contracts-drift check-c9-isolation-matrix lint-trusted-route-boundaries \
+	clean-contracts-live-staging generate-presentation-schemas generate-presentation-contracts lint-reducer-call-literals api-server-run \
 	lint-no-magic-fk-zero lint-accounting-as-unknown-as lint-accounting-currency-refs \
 	publish-cloud publish-cloud-clear call-tests-cloud logs-cloud \
 	module-check module-build module-generate-ts module-generate-rust \
@@ -133,10 +137,10 @@ help-legacy:
 	@echo "  call-tests           Call run_all_core_tests on local"
 	@echo "  logs                 Tail logs from local"
 	@echo "  seed-test-user       Provision test@email.com + admin org (run e2e-seed-fixture first if DB was cleared)"
-	@echo "  e2e-smoke            Full stack: setup + Playwright (E2E_SUITE=full|p0, default full)"
+	@echo "  e2e-smoke            Full stack: setup + Playwright (E2E_SUITE=full|p0|pretenant, default full)"
 	@echo "  e2e-smoke-setup      STDB + publish + seed + api-server only (writes .tmp/e2e/env.sh; module=$(E2E_STDB_MODULE))"
 	@echo "  e2e-wipe-local-stdb  Stop local SpacetimeDB and delete ~/.local/share/spacetime/data (destructive)"
-	@echo "  e2e-smoke-test       Pre-build Next.js, start web, Playwright (requires setup; E2E_SUITE=full|p0)"
+	@echo "  e2e-smoke-test       Pre-build Next.js, start web, Playwright (requires setup; E2E_SUITE=full|p0|pretenant)"
 	@echo "  e2e-playwright-only  Playwright only when STDB, api-server, and Next.js are already running"
 	@echo "  e2e-single           setup + one Playwright spec (E2E_SPEC, E2E_GREP, E2E_WORKERS=1)"
 	@echo "  e2e-single-test      one spec; matching local Next builds are reused (--workers=1)"
@@ -153,6 +157,8 @@ help-legacy:
 	@echo "  codegen                 Extract canonical contract IR plus local runtime/audit artifacts"
 	@echo "  check-codegen           Fail if generated artifacts drift from sources (CI). Requires .contracts-staging/ (see contracts-staging-from-pinned)"
 	@echo "  check-contract-ir       Validate the versioned IR envelope and both SHA-256 hashes"
+	@echo "  check-agent-capabilities Validate the live-generated agent capability artifact and checksum"
+	@echo "  check-agent-capabilities-pinned Validate capabilities against pinned IR (CI-safe; no live schema)"
 	@echo "  check-operation-history Fail on reused operation IDs or unapproved contract-shape changes"
 	@echo "  check-release-compatibility Validate pinned IR, contracts, PG migration, services, and deployment generation"
 	@echo "  check-tenant-ownership  Validate C0 direct organization ownership (required by check-codegen)"
@@ -189,6 +195,7 @@ help:
 	$(call print-command,local-test,Clear then republish and run core reducer tests.)
 	$(call print-command,local-logs,Tail logs for the local module.)
 	$(call print-command,seed-test-user,Seed the browser test user after fixture seeding.)
+	$(call print-command,seed-first-org-personas,Seed all seven named first-org personas and verify fixture health.)
 	@printf "\nCode generation\n"
 	$(call print-command,module-generate-ts,Regenerate TypeScript client bindings from the module.)
 	$(call print-command,module-generate-rust,Regenerate Rust API-server bindings and apply keyword fixes.)
@@ -212,7 +219,7 @@ help:
 
 help-e2e:
 	@printf "E2E commands (all use local SpacetimeDB and write logs under .tmp/e2e):\n"
-	$(call print-command,e2e-smoke,Full setup and Playwright run; E2E_SUITE=full|p0.)
+	$(call print-command,e2e-smoke,Full setup and Playwright run; E2E_SUITE=full|p0|pretenant.)
 	$(call print-command,e2e-smoke-setup,Database publish plus reducer checks fixture seed and API only.)
 	$(call print-command,e2e-smoke-test,Build web and run Playwright; requires e2e-smoke-setup.)
 	$(call print-command,e2e-playwright-only,Run Playwright against already-running services.)
@@ -286,6 +293,9 @@ logs:
 
 seed-test-user:
 	cd frontend/web && pnpm run seed-test-user
+
+seed-first-org-personas:
+	cd frontend/web && pnpm run seed-first-org-personas
 
 # ── End-to-end integration workflows ─────────────────────────────────────────
 #
@@ -383,7 +393,7 @@ e2e-smoke-setup:
 		else \
 			echo "[e2e] Seeding smoke fixture (seed_dev_data)..."; \
 			cd "$$ROOT/frontend/web"; \
-			STDB_SERVER_TOKEN="$$E2E_STDB_TOKEN" STDB_MODULE="$(E2E_DB)" NEXT_PUBLIC_STDB_MODULE="$(E2E_DB)" STDB_HOST="$$E2E_STDB_HOST" NEXT_PUBLIC_STDB_HOST="$$E2E_STDB_HOST" pnpm run e2e-seed-fixture; \
+			STDB_TOKEN_PREFLIGHT_VERIFIED=1 STDB_SERVER_TOKEN="$$E2E_STDB_TOKEN" STDB_MODULE="$(E2E_DB)" NEXT_PUBLIC_STDB_MODULE="$(E2E_DB)" STDB_HOST="$$E2E_STDB_HOST" NEXT_PUBLIC_STDB_HOST="$$E2E_STDB_HOST" pnpm run e2e-seed-fixture; \
 			cd "$$ROOT"; \
 			echo "$$CUR_STDB_HASH" >"$$STDB_HASH_FILE"; \
 		fi; \
@@ -432,7 +442,7 @@ e2e-smoke-setup:
 		echo "[e2e] Seeding browser test user through the running API server..."; \
 		cd "$$ROOT/frontend/web"; \
 		set -a; [ ! -f "$$ROOT/frontend/web/.env.local" ] || . "$$ROOT/frontend/web/.env.local"; set +a; \
-		LUMIERE_API_SERVER_URL="http://127.0.0.1:$(E2E_API_PORT)" STDB_SERVER_TOKEN="$$E2E_STDB_TOKEN" STDB_MODULE="$(E2E_DB)" NEXT_PUBLIC_STDB_MODULE="$(E2E_DB)" STDB_HOST="$$E2E_STDB_HOST" NEXT_PUBLIC_STDB_HOST="$$E2E_STDB_HOST" pnpm run seed-test-user; \
+		LUMIERE_API_SERVER_URL="http://127.0.0.1:$(E2E_API_PORT)" STDB_TOKEN_PREFLIGHT_VERIFIED=1 STDB_SERVER_TOKEN="$$E2E_STDB_TOKEN" STDB_MODULE="$(E2E_DB)" NEXT_PUBLIC_STDB_MODULE="$(E2E_DB)" STDB_HOST="$$E2E_STDB_HOST" NEXT_PUBLIC_STDB_HOST="$$E2E_STDB_HOST" pnpm run seed-first-org-personas; \
 		cd "$$ROOT"; \
 		{ \
 			printf "export E2E_STDB_TOKEN=%q\n" "$$E2E_STDB_TOKEN"; \
@@ -538,7 +548,14 @@ e2e-smoke-test:
 		echo "[e2e] Running Playwright ($${E2E_SUITE:-full} suite, workers=$$E2E_WORKERS)..."; \
 		pnpm exec playwright install chromium; \
 		PW_ARGS=(--workers "$$E2E_WORKERS"); \
-		if [ "$${E2E_SUITE:-full}" = "p0" ]; then PW_ARGS+=(--grep @p0 --grep-invert @dev-fixture); fi; \
+		if [ "$${E2E_SUITE:-full}" = "p0" ]; then \
+			PW_ARGS+=(--grep @p0); \
+			if [ "$${E2E_REQUIRE_AI:-0}" = "1" ]; then PW_ARGS+=(--grep-invert @dev-fixture); else PW_ARGS+=(--grep-invert "@dev-fixture|@ai-live"); fi; \
+		elif [ "$${E2E_SUITE:-full}" = "pretenant" ]; then \
+			PW_ARGS+=(--grep @pretenant); \
+		elif [ "$${E2E_REQUIRE_AI:-0}" != "1" ]; then \
+			PW_ARGS+=(--grep-invert @ai-live); \
+		fi; \
 		PORT="" \
 		PLAYWRIGHT_PORT="$(E2E_WEB_PORT)" \
 		PLAYWRIGHT_BASE_URL="http://127.0.0.1:$(E2E_WEB_PORT)" \
@@ -743,6 +760,7 @@ e2e-playwright-only:
 		set -a; [ ! -f "$$ROOT/frontend/web/.env.local" ] || . "$$ROOT/frontend/web/.env.local"; set +a; \
 		E2E_PNPM_SCRIPT="test:e2e"; \
 		if [ "$${E2E_SUITE:-full}" = "p0" ]; then E2E_PNPM_SCRIPT="test:e2e:p0"; fi; \
+		if [ "$${E2E_SUITE:-full}" = "pretenant" ]; then E2E_PNPM_SCRIPT="test:e2e:pretenant"; fi; \
 		PW_ARGS=(--workers "$$E2E_WORKERS"); \
 		if [ -n "$$E2E_ONLY_SPEC" ]; then PW_ARGS+=("tests/e2e/$$E2E_ONLY_SPEC"); fi; \
 		if [ -n "$$E2E_GREP" ]; then PW_ARGS+=(--grep "$$E2E_GREP"); fi; \
@@ -763,7 +781,7 @@ e2e-playwright-only:
 	'
 
 e2e-smoke:
-	@env PATH="$(E2E_PATH):$$PATH" E2E_SUITE="$(E2E_SUITE)" E2E_WORKERS="$(E2E_WORKERS)" /bin/bash -c 'set -euo pipefail; \
+	@env PATH="$(E2E_PATH):$$PATH" E2E_SUITE="$(E2E_SUITE)" E2E_WORKERS="$(E2E_WORKERS)" E2E_SPEC_FILES="$(E2E_SPEC_FILES)" E2E_SHARD="$(E2E_SHARD)" /bin/bash -c 'set -euo pipefail; \
 		ROOT="$$(pwd)"; \
 		LOG_DIR="$$ROOT/.tmp/e2e"; \
 		mkdir -p "$$LOG_DIR"; \
@@ -842,7 +860,7 @@ e2e-smoke:
 		echo "[e2e] Seeding smoke fixture (seed_dev_data)..."; \
 		cd "$$ROOT/frontend/web"; \
 		E2E_STDB_TOKEN="$$STDB_SERVER_TOKEN"; \
-		STDB_SERVER_TOKEN="$$E2E_STDB_TOKEN" STDB_MODULE="$(E2E_DB)" NEXT_PUBLIC_STDB_MODULE="$(E2E_DB)" STDB_HOST="$$E2E_STDB_HOST" NEXT_PUBLIC_STDB_HOST="$$E2E_STDB_HOST" pnpm run e2e-seed-fixture; \
+		STDB_TOKEN_PREFLIGHT_VERIFIED=1 STDB_SERVER_TOKEN="$$E2E_STDB_TOKEN" STDB_MODULE="$(E2E_DB)" NEXT_PUBLIC_STDB_MODULE="$(E2E_DB)" STDB_HOST="$$E2E_STDB_HOST" NEXT_PUBLIC_STDB_HOST="$$E2E_STDB_HOST" pnpm run e2e-seed-fixture; \
 		cd "$$ROOT"; \
 		if curl -fsS "http://127.0.0.1:$(E2E_API_PORT)/health" >/dev/null 2>&1; then \
 			echo "[e2e] Stopping existing api-server on :$(E2E_API_PORT) for e2e env..."; \
@@ -877,7 +895,7 @@ e2e-smoke:
 		echo "[e2e] Seeding browser test user through the running API server..."; \
 		cd "$$ROOT/frontend/web"; \
 		set -a; [ ! -f "$$ROOT/frontend/web/.env.local" ] || . "$$ROOT/frontend/web/.env.local"; set +a; \
-		LUMIERE_API_SERVER_URL="http://127.0.0.1:$(E2E_API_PORT)" STDB_SERVER_TOKEN="$$E2E_STDB_TOKEN" STDB_MODULE="$(E2E_DB)" NEXT_PUBLIC_STDB_MODULE="$(E2E_DB)" STDB_HOST="$$E2E_STDB_HOST" NEXT_PUBLIC_STDB_HOST="$$E2E_STDB_HOST" pnpm run seed-test-user; \
+		LUMIERE_API_SERVER_URL="http://127.0.0.1:$(E2E_API_PORT)" STDB_TOKEN_PREFLIGHT_VERIFIED=1 STDB_SERVER_TOKEN="$$E2E_STDB_TOKEN" STDB_MODULE="$(E2E_DB)" NEXT_PUBLIC_STDB_MODULE="$(E2E_DB)" STDB_HOST="$$E2E_STDB_HOST" NEXT_PUBLIC_STDB_HOST="$$E2E_STDB_HOST" pnpm run seed-first-org-personas; \
 		cd "$$ROOT"; \
 		if curl -fsS "http://127.0.0.1:$(E2E_WEB_PORT)" >/dev/null 2>&1; then \
 			echo "[e2e] Stopping existing Next.js on :$(E2E_WEB_PORT)..."; \
@@ -921,7 +939,21 @@ e2e-smoke:
 		echo "[e2e] Running Playwright ($${E2E_SUITE:-full} suite, workers=$$E2E_WORKERS)..."; \
 		pnpm exec playwright install chromium; \
 		PW_ARGS=(--workers "$$E2E_WORKERS"); \
-		if [ "$${E2E_SUITE:-full}" = "p0" ]; then PW_ARGS+=(--grep @p0 --grep-invert @dev-fixture); fi; \
+		if [ "$${E2E_SUITE:-full}" = "p0" ]; then \
+			PW_ARGS+=(--grep @p0); \
+			if [ "$${E2E_REQUIRE_AI:-0}" = "1" ]; then PW_ARGS+=(--grep-invert @dev-fixture); else PW_ARGS+=(--grep-invert "@dev-fixture|@ai-live"); fi; \
+		elif [ "$${E2E_SUITE:-full}" = "pretenant" ]; then \
+			PW_ARGS+=(--grep @pretenant); \
+		elif [ "$${E2E_SUITE:-full}" = "targeted" ]; then \
+			read -r -a SPEC_FILES <<< "$${E2E_SPEC_FILES:-}"; \
+			if [ "$${#SPEC_FILES[@]}" -eq 0 ]; then echo "[e2e] E2E_SUITE=targeted requires E2E_SPEC_FILES" >&2; exit 1; fi; \
+			echo "[e2e] Targeted specs: $${SPEC_FILES[*]}"; \
+			if [ "$${E2E_REQUIRE_AI:-0}" = "1" ]; then PW_ARGS+=(--grep-invert @dev-fixture); else PW_ARGS+=(--grep-invert "@dev-fixture|@ai-live"); fi; \
+			PW_ARGS+=("$${SPEC_FILES[@]}"); \
+		elif [ "$${E2E_REQUIRE_AI:-0}" != "1" ]; then \
+			PW_ARGS+=(--grep-invert @ai-live); \
+		fi; \
+		if [ -n "$${E2E_SHARD:-}" ]; then echo "[e2e] Shard $$E2E_SHARD"; PW_ARGS+=(--shard "$$E2E_SHARD"); fi; \
 		PORT="" \
 		PLAYWRIGHT_PORT="$(E2E_WEB_PORT)" \
 		PLAYWRIGHT_BASE_URL="http://127.0.0.1:$(E2E_WEB_PORT)" \
@@ -957,7 +989,22 @@ docker-dev-iot:
 codegen: schema-snapshot
 	cargo run -p lumiere-codegen
 
-check-contract-ir: codegen
+check-agent-capabilities: codegen
+	python3 scripts/verify-agent-capability-artifact.py .contracts-staging/ir/agent-capability-registry-v1.json
+	PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts/test_verify_agent_capability_artifact.py scripts/test_compare_agent_capability_artifact.py
+
+# CI-safe capability validation for the immutable contracts release. This is
+# deliberately separate from `check-agent-capabilities`: the live source gate
+# must continue to regenerate every artifact, while this target stages one
+# coherent pinned release and emits only the capability artifact from its
+# already-pinned canonical IR. Keeping the staging prerequisite here avoids
+# mixing live schema output with pinned bindings/manifests/IR.
+check-agent-capabilities-pinned: contracts-staging-from-pinned
+	cargo run -p lumiere-codegen -- --agent-capabilities-only
+	python3 scripts/verify-agent-capability-artifact.py .contracts-staging/ir/agent-capability-registry-v1.json
+	PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts/test_verify_agent_capability_artifact.py scripts/test_compare_agent_capability_artifact.py
+
+check-contract-ir: codegen check-agent-capabilities
 	python3 scripts/verify-contract-ir.py .contracts-staging/ir/lumiere-contract-ir-v2.json
 	python3 lumiere-codegen/tests/test_contract_ir_pin.py
 	python3 scripts/verify-operation-history.py
@@ -974,6 +1021,18 @@ check-operation-history-pinned:
 check-c8-contract-ratchet:
 	@node scripts/validate-subscription-census.mjs --check
 	@node scripts/validate-c8-contract-ratchet.mjs
+
+check-cov00c-correctness-census:
+	@python3 scripts/validate-cov00c-correctness-census.py
+
+check-cov00d-evidence-matrix:
+	@python3 scripts/validate-cov00d-evidence-matrix.py
+
+check-cov02-seed-inventory:
+	@python3 scripts/validate-cov02-seed-inventory.py
+
+check-cov02-first-org-fixture:
+	@node frontend/web/scripts/seed-test-user.mjs --check-manifest
 
 check-release-compatibility:
 	python3 scripts/verify-release-manifest.py
@@ -1011,7 +1070,7 @@ check-codegen: codegen check-contract-ir check-tenant-ownership check-storage-po
 # CI-safe validation for a previously published immutable contract. Source-to-
 # contract regeneration belongs to check-contracts-source-drift; this target
 # must not couple ordinary Rust checks to whichever module is currently deployed.
-check-codegen-pinned: check-operation-history-pinned check-release-compatibility check-tenant-ownership check-c2-commit-coverage check-c8-contract-ratchet lint-reducer-call-literals lint-trusted-route-boundaries
+check-codegen-pinned: check-agent-capabilities-pinned check-operation-history-pinned check-release-compatibility check-tenant-ownership check-c2-commit-coverage check-c8-contract-ratchet lint-reducer-call-literals lint-trusted-route-boundaries
 	python3 scripts/verify-contract-ir.py .contracts-staging/ir/lumiere-contract-ir-v2.json --require-clean
 	python3 lumiere-codegen/tests/test_contract_ir_pin.py
 	node scripts/bootstrap-storage-policies.mjs --check
@@ -1057,6 +1116,14 @@ contracts-staging-from-pinned:
 	python3 scripts/verify-contract-ir.py \
 		"$$CHECKOUT/ir/lumiere-contract-ir-v2.json" \
 		--require-clean --allow-legacy-v2 --expect-pin-from "$$V2_PIN"; \
+	if [ -f "$$CHECKOUT/ir/agent-capability-registry-v1.json" ] || [ -f "$$CHECKOUT/ir/agent-capability-registry-v1.json.sha256" ]; then \
+		if [ ! -f "$$CHECKOUT/ir/agent-capability-registry-v1.json" ] || [ ! -f "$$CHECKOUT/ir/agent-capability-registry-v1.json.sha256" ]; then \
+			echo "contracts-staging-from-pinned: capability artifact and checksum sidecar must be published together" >&2; \
+			exit 1; \
+		fi; \
+		python3 scripts/verify-agent-capability-artifact.py \
+			"$$CHECKOUT/ir/agent-capability-registry-v1.json"; \
+	fi; \
 	cp -R "$$CHECKOUT/packages/contracts/src/generated/." .contracts-staging/ts/generated/; \
 	cp "$$CHECKOUT/packages/contracts/src/stdb-generated-sql-columns.json" .contracts-staging/ts/; \
 	cp "$$CHECKOUT/packages/contracts/src/stdb-reducer-invalidation.ts" .contracts-staging/ts/; \
@@ -1083,6 +1150,7 @@ check-contracts-source-drift: clean-contracts-live-staging generate-stdb-rust-sd
 	diff -rq "$$CHECKOUT/crates/lumiere-contracts/src/bindings" .contracts-staging/bindings && \
 	diff -rq \
 		-x query-registry.ts -x operation-inputs.ts -x operation-descriptors.ts \
+		-x agent-capability-registry.ts \
 		-x operations.ts -x resources.ts -x resource-codecs.ts -x wire-codecs.ts \
 		"$$CHECKOUT/packages/contracts/src/generated" .contracts-staging/ts/generated && \
 	echo "check-contracts-source-drift: source bindings match pinned lumiere-contracts release"
@@ -1098,7 +1166,7 @@ check-contracts-source-drift: clean-contracts-live-staging generate-stdb-rust-sd
 clean-contracts-live-staging:
 	rm -rf .contracts-staging
 
-check-contracts-drift: clean-contracts-live-staging schema-snapshot generate-stdb-rust-sdk generate-stdb-ts-sdk codegen check-contract-ir
+check-contracts-drift: clean-contracts-live-staging generate-presentation-schemas schema-snapshot generate-stdb-rust-sdk generate-stdb-ts-sdk codegen check-contract-ir
 	@CHECKOUT="$$(bash scripts/resolve-pinned-contracts.sh)"; \
 	if [ -z "$$CHECKOUT" ] || [ ! -d "$$CHECKOUT/crates/lumiere-contracts/src/bindings" ]; then \
 		echo "check-contracts-drift: could not resolve the pinned lumiere-contracts checkout (run cargo fetch first); skipping" >&2; \
@@ -1114,9 +1182,18 @@ check-contracts-drift: clean-contracts-live-staging schema-snapshot generate-std
 		! -name 'application-operations.json' ! -name 'resource-registry.json' | LC_ALL=C sort) && \
 	python3 scripts/verify-contract-ir.py .contracts-staging/ir/lumiere-contract-ir-v2.json --require-clean --expect-schema-hash-from "$$CHECKOUT/ir/lumiere-contract-ir-v2.json" && \
 	python3 scripts/verify-contract-ir.py "$$CHECKOUT/ir/lumiere-contract-ir-v2.json" --require-clean --expect-pin-from "$$V2_PIN" && \
+	if [ -f "$$CHECKOUT/ir/agent-capability-registry-v1.json" ] || [ -f "$$CHECKOUT/ir/agent-capability-registry-v1.json.sha256" ]; then \
+		test -f .contracts-staging/ir/agent-capability-registry-v1.json && \
+		test -f "$$CHECKOUT/ir/agent-capability-registry-v1.json.sha256" && \
+		test -f .contracts-staging/ir/agent-capability-registry-v1.json.sha256 && \
+		python3 scripts/verify-agent-capability-artifact.py .contracts-staging/ir/agent-capability-registry-v1.json && \
+		python3 scripts/verify-agent-capability-artifact.py "$$CHECKOUT/ir/agent-capability-registry-v1.json" && \
+		python3 scripts/compare-agent-capability-artifact.py .contracts-staging/ir/agent-capability-registry-v1.json "$$CHECKOUT/ir/agent-capability-registry-v1.json"; \
+	fi && \
 	python3 "$$CHECKOUT/scripts/generate-from-ir.py" --check && \
 	diff -rq \
 		-x query-registry.ts -x operation-inputs.ts -x operation-descriptors.ts \
+		-x agent-capability-registry.ts \
 		-x operations.ts -x resources.ts -x resource-codecs.ts -x wire-codecs.ts \
 		"$$CHECKOUT/packages/contracts/src/generated" .contracts-staging/ts/generated && \
 	diff "$$CHECKOUT/packages/contracts/src/stdb-generated-sql-columns.json" .contracts-staging/ts/stdb-generated-sql-columns.json && \
@@ -1125,9 +1202,19 @@ check-contracts-drift: clean-contracts-live-staging schema-snapshot generate-std
 
 # Publish freshly generated bindings + manifests to lumiere-contracts as a new
 # tagged release, then print the Cargo.toml dependency line to bump.
-publish-contracts: schema-snapshot generate-stdb-rust-sdk generate-stdb-ts-sdk codegen
+publish-contracts: generate-presentation-contracts schema-snapshot generate-stdb-rust-sdk generate-stdb-ts-sdk codegen
 	@if [ -z "$(VERSION)" ]; then echo "usage: make publish-contracts VERSION=x.y.z" >&2; exit 1; fi
 	bash scripts/publish-contracts.sh "$(VERSION)"
+
+# Presentation wire contracts are generated from crates/presentation-core Rust
+# models. Schemas are released as manifests (checked by contracts drift, which
+# needs only cargo); TypeScript types are generated from those schemas for the
+# contracts package when publishing.
+generate-presentation-schemas:
+	node frontend/packages/presentation-core/scripts/generate-module-contract.mjs --out-staging .contracts-staging --schemas-only
+
+generate-presentation-contracts:
+	node frontend/packages/presentation-core/scripts/generate-module-contract.mjs --out-staging .contracts-staging
 
 # Fail if coverage/create-params mappers use magic FK sentinels (`?? 0n` / `|| 0n`).
 lint-no-magic-fk-zero:

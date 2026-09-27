@@ -25,7 +25,7 @@ import {
   projectsCsvImportForm,
   ImportAssistantWizard,
 } from "@lumiere/ui"
-import type { EntityViewConfig, FormConfig, ModuleConfig, ProjectsCsvImportKind } from "@lumiere/ui"
+import type { EntityRow, EntityViewConfig, FormConfig, ModuleConfig, ProjectsCsvImportKind } from "@lumiere/ui"
 import {
   projectsParamsToJson,
   toCreateProjectParams,
@@ -69,7 +69,9 @@ import {
   useSetTaskParent,
   useAssignTaskUsers,
   useValidateTimesheets,
+  useRejectTimesheets,
   useBillTimesheets,
+  useTimesheetApprovals,
   useEmployees,
   useProjectsCsvImportMutations,
   useCapacityForecastByEmployee,
@@ -354,7 +356,9 @@ function ProjectsClientLoaded({
   const setTaskParent = useSetTaskParent(orgId)
   const assignTaskUsers = useAssignTaskUsers(orgId)
   const validateTimesheets = useValidateTimesheets(orgId)
+  const rejectTimesheets = useRejectTimesheets(orgId)
   const billTimesheets = useBillTimesheets(orgId)
+  const { data: timesheetApprovals = [] } = useTimesheetApprovals(orgId)
   const projectRebill = useCreateExpenseProjectRebill(orgId)
   const csvImports = useProjectsCsvImportMutations(orgId, operatingCompanyId)
 
@@ -363,13 +367,16 @@ function ProjectsClientLoaded({
   const addCsvToolbar = (
     ec: EntityViewConfig,
     actions: ProjectToolbarAction[],
+    // Tabs whose row click opens an editor keep selection off the row click;
+    // tabs without one (timesheets) need it, or selection actions stay disabled.
+    options: { selectOnRowClick?: boolean } = {},
   ): EntityViewConfig => {
     if (ec.view.mode !== "table") return ec
     return {
       ...ec,
       view: {
         ...ec.view,
-        rowSelectionToggleOnClick: false,
+        rowSelectionToggleOnClick: options.selectOnRowClick ?? false,
         actions,
       },
     }
@@ -634,6 +641,41 @@ function ProjectsClientLoaded({
       refreshEvm,
       organizationId,
     ],
+  )
+
+  const approvalTab = useMemo(
+    () => ({
+      id: "timesheet-approvals",
+      label: "Approval Timeline",
+      type: "entity" as const,
+      entityConfig: {
+        id: "timesheet-approvals-table",
+        view: {
+          mode: "table" as const,
+          rowKey: "id",
+          searchable: true,
+          searchKeys: ["decision", "reason"],
+          columns: [
+            { key: "timesheetId", label: "Timesheet ID" },
+            {
+              key: "decision",
+              label: "Decision",
+              type: "badge" as const,
+              badgeVariants: {
+                validated: "success",
+                rejected: "destructive",
+                reopened: "warning",
+              },
+            },
+            { key: "hours", label: "Hours", type: "number" as const, align: "right" as const },
+            { key: "reason", label: "Reason" },
+            { key: "decidedAt", label: "Date", type: "datetime" as const },
+          ],
+          emptyMessage: "No approval events yet.",
+        },
+      } as EntityViewConfig,
+    }),
+    [],
   )
 
   const taskStageFieldOptions = useMemo(() => {
@@ -1024,6 +1066,18 @@ function ProjectsClientLoaded({
                     }),
                 },
                 {
+                  id: "reject-timesheets",
+                  label: "Reject",
+                  requiresSelection: true,
+                  variant: "destructive" as const,
+                  onClick: (rows) =>
+                    void rejectTimesheets.mutateAsync({
+                      companyId: operatingCompanyId,
+                      timesheetIds: selectedIds(rows),
+                      reason: "Rejected by manager",
+                    }),
+                },
+                {
                   id: "bill-timesheets",
                   label: "Bill",
                   requiresSelection: true,
@@ -1032,7 +1086,7 @@ function ProjectsClientLoaded({
                     setLifecycleModal({ type: "billTimesheets", rows, form: billTimesheetsFormConfig })
                   },
                 },
-              ]),
+              ], { selectOnRowClick: true }),
             }
           }
           return tab
@@ -1041,6 +1095,7 @@ function ProjectsClientLoaded({
           resourceTab,
           utilisationTab,
           advancedTab,
+          approvalTab,
         ],
       }) as ModuleConfig,
     [
@@ -1049,6 +1104,7 @@ function ProjectsClientLoaded({
       resourceTab,
       utilisationTab,
       advancedTab,
+      approvalTab,
       liveSections,
       projectFormConfig,
       taskFormConfig,
@@ -1076,8 +1132,9 @@ function ProjectsClientLoaded({
       timesheets: timesheets as unknown as Record<string, unknown>[],
       "rate-cards": rateCards as unknown as Record<string, unknown>[],
       resources: employees as unknown as Record<string, unknown>[],
+      "timesheet-approvals": timesheetApprovals as unknown as EntityRow[],
     }),
-    [projects, tasks, timesheets, rateCards, employees],
+    [projects, tasks, timesheets, rateCards, employees, timesheetApprovals],
   )
 
   const handleFormSubmit = async (
@@ -1185,6 +1242,7 @@ function ProjectsClientLoaded({
     setTaskParent.isPending ||
     assignTaskUsers.isPending ||
     validateTimesheets.isPending ||
+    rejectTimesheets.isPending ||
     billTimesheets.isPending ||
     projectRebill.isPending ||
     csvImports.importProject.isPending ||

@@ -10,8 +10,6 @@ export type DocumentBlobUploadResult = {
   checksum: string
   mimetype: string
   fileName: string
-  /** Present for text/* / JSON / XML blobs (search index seed). */
-  extractedText?: string
 }
 
 export type DocumentBlobUploadOptions = {
@@ -107,7 +105,6 @@ export async function uploadDocumentBlob(
     checksum: string
     mimetype: string
     fileName: string
-    extractedText?: string
   }
 
   return {
@@ -117,7 +114,6 @@ export async function uploadDocumentBlob(
     checksum: completed.checksum,
     mimetype: completed.mimetype,
     fileName: completed.fileName,
-    extractedText: completed.extractedText,
   }
 }
 

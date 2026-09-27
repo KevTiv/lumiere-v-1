@@ -18,6 +18,10 @@ pub struct Config {
     /// When absent, the certification worker is disabled. This token must not
     /// be shared with the HTTP gateway or browser-facing sessions.
     pub ai_certification_stdb_token: Option<String>,
+    /// Dedicated read identity for private H5b spend and draft-request tables.
+    ///
+    /// Reads only; it must differ from `STDB_TOKEN` and the certification token.
+    pub ai_spend_read_stdb_token: Option<String>,
     /// SHA-256 fingerprint of the certification executor build/profile.
     pub ai_certification_runtime_hash: Option<String>,
     /// How often the certification worker polls for queued requests (seconds).
@@ -45,6 +49,11 @@ pub struct Config {
     pub ollama_embed_model: String,
     pub ollama_vision_model: String,
     pub ollama_llm_model: String,
+    /// Explicit opt-in for Ollama tool calling in the reasoning/review/decision
+    /// roles. Off by default: Ollama models otherwise stay on the legacy
+    /// single-shot (no tools) path documented in
+    /// `docs/plans/ai-harness-completion-issues.md`.
+    pub ollama_supports_tool_calling: bool,
     pub mistral_api_key: Option<String>,
     pub google_api_key: Option<String>,
     pub gemini_embed_model: String,
@@ -96,6 +105,14 @@ impl Config {
                 std::env::var("AI_CERTIFICATION_RUNTIME_HASH").ok(),
             )?;
         ensure_dedicated_certification_token(&stdb_token, ai_certification_stdb_token.as_deref())?;
+        let ai_spend_read_stdb_token = std::env::var("AI_SPEND_READ_STDB_TOKEN")
+            .ok()
+            .filter(|value| !value.trim().is_empty());
+        ensure_dedicated_spend_read_token(
+            &stdb_token,
+            ai_certification_stdb_token.as_deref(),
+            ai_spend_read_stdb_token.as_deref(),
+        )?;
         if runtime_is_production() && ai_certification_stdb_token.is_none() {
             anyhow::bail!(
                 "AI_CERTIFICATION_STDB_TOKEN and AI_CERTIFICATION_RUNTIME_HASH are required in production"
@@ -123,6 +140,7 @@ impl Config {
                 .context("STDB_MODULE is required (e.g. lumiere-v1)")?,
             stdb_token,
             ai_certification_stdb_token,
+            ai_spend_read_stdb_token,
             ai_certification_runtime_hash,
             ai_certification_poll_secs: std::env::var("AI_CERTIFICATION_POLL_SECS")
                 .unwrap_or_else(|_| "5".to_string())
@@ -163,7 +181,10 @@ impl Config {
             ollama_vision_model: std::env::var("OLLAMA_VISION_MODEL")
                 .unwrap_or_else(|_| "llava".to_string()),
             ollama_llm_model: std::env::var("OLLAMA_LLM_MODEL")
-                .unwrap_or_else(|_| "llama3.2".to_string()),
+                .unwrap_or_else(|_| "gemma4:e2b-mlx".to_string()),
+            ollama_supports_tool_calling: std::env::var("OLLAMA_SUPPORTS_TOOL_CALLING")
+                .map(|v| matches!(v.trim().to_ascii_lowercase().as_str(), "1" | "true" | "yes"))
+                .unwrap_or(false),
             mistral_api_key: std::env::var("MISTRAL_API_KEY").ok(),
             google_api_key,
             gemini_embed_model: std::env::var("GEMINI_EMBED_MODEL")
@@ -257,6 +278,22 @@ fn ensure_dedicated_certification_token(
     Ok(())
 }
 
+fn ensure_dedicated_spend_read_token(
+    stdb_token: &str,
+    certification_token: Option<&str>,
+    spend_read_token: Option<&str>,
+) -> Result<()> {
+    let Some(read_token) = spend_read_token else {
+        return Ok(());
+    };
+    if read_token == stdb_token || Some(read_token) == certification_token {
+        anyhow::bail!(
+            "AI_SPEND_READ_STDB_TOKEN must use a dedicated identity distinct from STDB_TOKEN and AI_CERTIFICATION_STDB_TOKEN"
+        );
+    }
+    Ok(())
+}
+
 fn parse_certification_timeout(value: Option<String>) -> Result<u64> {
     const DEFAULT_SECS: u64 = 30;
     const MIN_SECS: u64 = 1;
@@ -306,6 +343,19 @@ mod tests {
         assert!(ensure_dedicated_certification_token("gateway", Some("certifier")).is_ok());
         assert!(ensure_dedicated_certification_token("gateway", None).is_ok());
         assert!(ensure_dedicated_certification_token("gateway", Some("gateway")).is_err());
+    }
+
+    #[test]
+    fn spend_read_token_must_not_reuse_write_or_certification_identity() {
+        assert!(ensure_dedicated_spend_read_token("gateway", Some("certifier"), None).is_ok());
+        assert!(
+            ensure_dedicated_spend_read_token("gateway", Some("certifier"), Some("reader")).is_ok()
+        );
+        assert!(ensure_dedicated_spend_read_token("gateway", None, Some("gateway")).is_err());
+        assert!(
+            ensure_dedicated_spend_read_token("gateway", Some("certifier"), Some("certifier"))
+                .is_err()
+        );
     }
 
     #[test]

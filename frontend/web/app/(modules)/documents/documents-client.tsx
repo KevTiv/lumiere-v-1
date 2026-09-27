@@ -18,7 +18,6 @@ import {
   editKnowledgeArticleForm,
   editDocumentFolderForm,
   addArticleMemberForm,
-  reindexDocumentForm,
   setDocumentRetentionForm,
   MissingOrganization,
   mergeSelectOptionsForFields,
@@ -44,7 +43,7 @@ import {
   useUnlockDocument,
   useRecordDocumentView,
   useAddDocumentVersion,
-  useSetDocumentIndexContent,
+  useIngestDocumentEvidence,
   useSetDocumentRetention,
   usePurgeExpiredDocuments,
   useApplyDocumentLegalHold,
@@ -97,7 +96,6 @@ import {
   toAddDocumentVersionParams,
   toUpdateKnowledgeArticleParams,
   toUpdateDocumentFolderParams,
-  toSetDocumentIndexContentParams,
   toSetDocumentRetentionParams,
 } from "@/lib/documents-create-params"
 import { optionalBigIntU64 } from "@lumiere/erp-shared/form-coercion"
@@ -118,7 +116,6 @@ export { DOCUMENTS_UI_REDUCERS } from "@/lib/documents-ui-reducers"
 type DocumentRowAction =
   | { action: "updateDocument"; row: Record<string, unknown>; form: FormConfig }
   | { action: "uploadVersion"; row: Record<string, unknown>; form: FormConfig }
-  | { action: "reindexDocument"; row: Record<string, unknown>; form: FormConfig }
   | { action: "setRetention"; row: Record<string, unknown>; form: FormConfig }
   | { action: "updateArticle"; row: Record<string, unknown>; form: FormConfig }
   | { action: "updateFolder"; row: Record<string, unknown>; form: FormConfig }
@@ -285,7 +282,7 @@ function DocumentsClientLoaded({
   const unlockDocument = useUnlockDocument(orgId)
   const recordDocumentView = useRecordDocumentView(orgId)
   const addDocumentVersion = useAddDocumentVersion(orgId)
-  const setDocumentIndexContent = useSetDocumentIndexContent(orgId)
+  const ingestDocumentEvidence = useIngestDocumentEvidence(orgId)
   const setDocumentRetention = useSetDocumentRetention(orgId)
   const purgeExpiredDocuments = usePurgeExpiredDocuments(orgId)
   const applyDocumentLegalHold = useApplyDocumentLegalHold(orgId)
@@ -798,7 +795,7 @@ function DocumentsClientLoaded({
       lockDocument,
       recordDocumentView,
       unlockDocument,
-      setDocumentIndexContent,
+      ingestDocumentEvidence,
       setDocumentRetention,
       purgeExpiredDocuments,
       applyDocumentLegalHold,
@@ -869,13 +866,16 @@ function DocumentsClientLoaded({
         mimetype: uploaded.mimetype,
         url: uploaded.url,
         checksum: uploaded.checksum,
-        indexContent: formData.indexContent ?? uploaded.extractedText,
         residencyRegion: formData.residencyRegion ?? residency,
       })
       if (!params) {
         throw new Error("Document registration params incomplete after upload")
       }
       await createDocument.mutateAsync(params)
+      await ingestDocumentEvidence.mutateAsync({
+        companyId: operatingCompanyId,
+        objectKey: uploaded.objectKey,
+      })
     } else if (action === "createArticle") {
       const params = toCreateKnowledgeArticleParams(formData, operatingCompanyId)
       if (!params) return
@@ -913,7 +913,7 @@ function DocumentsClientLoaded({
     unlockDocument.isPending ||
     recordDocumentView.isPending ||
     addDocumentVersion.isPending ||
-    setDocumentIndexContent.isPending ||
+    ingestDocumentEvidence.isPending ||
     setDocumentRetention.isPending ||
     purgeExpiredDocuments.isPending ||
     createKnowledgeArticle.isPending ||
@@ -1032,24 +1032,17 @@ function DocumentsClientLoaded({
                   documentId: documentRowAction.row.id as string | number,
                   params,
                 })
-                if (uploaded.extractedText) {
-                  await setDocumentIndexContent.mutateAsync({
-                    documentId: documentRowAction.row.id as string | number,
-                    params: { content: uploaded.extractedText },
-                  })
-                }
+                await ingestDocumentEvidence.mutateAsync({
+                  companyId: operatingCompanyId,
+                  documentId: documentRowAction.row.id as string | number,
+                  language:
+                    typeof formData.language === "string" ? formData.language : undefined,
+                })
                 if (formData.unlockAfter !== false) {
                   await unlockDocument.mutateAsync(
                     documentRowAction.row.id as string | number,
                   )
                 }
-              } else if (documentRowAction.action === "reindexDocument") {
-                const params = toSetDocumentIndexContentParams(formData)
-                if (!params) throw new Error("Index content is required")
-                await setDocumentIndexContent.mutateAsync({
-                  documentId: documentRowAction.row.id as string | number,
-                  params,
-                })
               } else if (documentRowAction.action === "setRetention") {
                 await setDocumentRetention.mutateAsync({
                   documentId: documentRowAction.row.id as string | number,

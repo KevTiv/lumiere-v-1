@@ -39,14 +39,43 @@ impl Row {
     }
 }
 RUST
-printf '%s\n' 'error: expected identifier, found keyword `type`' >&2
-printf '%s\n' 'error: expected identifier, found keyword `ref`' >&2
+if [[ "${FAKE_MANY_FILES:-}" == "1" ]]; then
+  for index in {1..65}; do
+    printf 'pub struct Extra%s;\n' "$index" >"$out_dir/extra_$index.rs"
+  done
+fi
+if [[ "${FAKE_COLOR:-}" == "1" ]]; then
+  printf '\033[1m\033[31merror\033[0m: expected identifier, found keyword `type`\n' >&2
+  printf '\033[1m\033[31merror\033[0m: expected identifier, found keyword `ref`\n' >&2
+else
+  printf '%s\n' 'error: expected identifier, found keyword `type`' >&2
+  printf '%s\n' 'error: expected identifier, found keyword `ref`' >&2
+fi
 if [[ "${FAKE_UNEXPECTED:-}" == "1" ]]; then
-  printf '%s\n' 'error: module compilation failed' >&2
+  if [[ "${FAKE_COLOR:-}" == "1" ]]; then
+    printf '\033[1m\033[31merror\033[0m: module compilation failed\n' >&2
+  else
+    printf '%s\n' 'error: module compilation failed' >&2
+  fi
 fi
 exit "${FAKE_EXIT_STATUS:-1}"
 FAKE
 chmod +x "$FAKE_SPACETIME"
+
+FAKE_RUSTFMT="$TMP_ROOT/rustfmt"
+cat >"$FAKE_RUSTFMT" <<'FAKE'
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Two option arguments plus at most 64 generated files.
+if [[ "$#" -gt 66 ]]; then
+  echo "rustfmt received an unbounded generated-file batch" >&2
+  exit 91
+fi
+printf 'invocation\n' >>"$FAKE_RUSTFMT_LOG"
+exec rustfmt "$@"
+FAKE
+chmod +x "$FAKE_RUSTFMT"
 
 # Exercise only the generator recovery path. The wrapper builds a module when
 # no source WASM is supplied, while this fake CLI intentionally implements only
@@ -68,6 +97,20 @@ FAKE_EXIT_STATUS=0 STDB_GENERATE_WASM="$FAKE_WASM" SPACETIME_BIN="$FAKE_SPACETIM
 grep -q 'pub r#type:' "$TMP_ROOT/out-zero/row.rs"
 grep -q 'pub r#ref:' "$TMP_ROOT/out-zero/row.rs"
 
+FAKE_COLOR=1 STDB_GENERATE_WASM="$FAKE_WASM" SPACETIME_BIN="$FAKE_SPACETIME" \
+  bash "$ROOT/scripts/generate-spacetimedb-rust-sdk.sh" "$TMP_ROOT/out-color" "$TMP_ROOT/module"
+
+grep -q 'pub r#type:' "$TMP_ROOT/out-color/row.rs"
+grep -q 'pub r#ref:' "$TMP_ROOT/out-color/row.rs"
+
+FAKE_RUSTFMT_LOG="$TMP_ROOT/rustfmt.log" FAKE_MANY_FILES=1 \
+  RUSTFMT_BIN="$FAKE_RUSTFMT" STDB_GENERATE_WASM="$FAKE_WASM" \
+  SPACETIME_BIN="$FAKE_SPACETIME" \
+  bash "$ROOT/scripts/generate-spacetimedb-rust-sdk.sh" "$TMP_ROOT/out-many" "$TMP_ROOT/module"
+
+test "$(wc -l <"$TMP_ROOT/rustfmt.log" | tr -d ' ')" -ge 2
+grep -q 'pub r#type:' "$TMP_ROOT/out-many/row.rs"
+
 if FAKE_UNEXPECTED=1 FAKE_EXIT_STATUS=0 STDB_GENERATE_WASM="$FAKE_WASM" SPACETIME_BIN="$FAKE_SPACETIME" \
   bash "$ROOT/scripts/generate-spacetimedb-rust-sdk.sh" "$TMP_ROOT/rejected" "$TMP_ROOT/module" \
   >"$TMP_ROOT/unexpected.log" 2>&1; then
@@ -83,5 +126,13 @@ if FAKE_UNEXPECTED=1 FAKE_EXIT_STATUS=1 STDB_GENERATE_WASM="$FAKE_WASM" SPACETIM
   exit 1
 fi
 grep -q 'error: module compilation failed' "$TMP_ROOT/unexpected-nonzero.log"
+
+if FAKE_COLOR=1 FAKE_UNEXPECTED=1 FAKE_EXIT_STATUS=0 STDB_GENERATE_WASM="$FAKE_WASM" SPACETIME_BIN="$FAKE_SPACETIME" \
+  bash "$ROOT/scripts/generate-spacetimedb-rust-sdk.sh" "$TMP_ROOT/rejected-color" "$TMP_ROOT/module" \
+  >"$TMP_ROOT/unexpected-color.log" 2>&1; then
+  echo "generator wrapper accepted a colored unrelated error" >&2
+  exit 1
+fi
+grep -q 'error: module compilation failed' "$TMP_ROOT/unexpected-color.log"
 
 echo "SpacetimeDB Rust SDK wrapper recovery test passed"

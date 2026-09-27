@@ -4,6 +4,11 @@ use serde_json::{Map, Value};
 use sha2::{Digest, Sha256};
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
+use crate::ai::knowledge_promotion::{
+    require_skill_version_promotion_valid, set_promotion_certification_state,
+    CERTIFICATION_CERTIFIED, CERTIFICATION_EVIDENCE_RECORDED, CERTIFICATION_FAILED,
+    CERTIFICATION_QUEUED, CERTIFICATION_RUNNING,
+};
 use crate::ai::skills::{
     ai_agent_run, ai_skill, ai_skill_config, AiAgentRun, AiSkill, AiSkillConfig,
 };
@@ -49,7 +54,7 @@ impl AiSkillRisk {
         }
     }
 
-    fn as_manifest_str(&self) -> &'static str {
+    pub(crate) fn as_manifest_str(&self) -> &'static str {
         match self {
             Self::Green => "green",
             Self::Amber => "amber",
@@ -530,17 +535,17 @@ pub struct FailAiSkillCertificationParams {
 }
 
 #[derive(Debug, PartialEq, Eq)]
-struct ValidatedManifest {
-    schema_version: u32,
-    skill_key: String,
-    version: String,
-    source_hash: String,
-    risk: AiSkillRisk,
-    max_steps: u32,
-    max_tool_calls: u32,
-    permissions: Vec<String>,
-    resources: Vec<String>,
-    output_types: Vec<String>,
+pub(crate) struct ValidatedManifest {
+    pub(crate) schema_version: u32,
+    pub(crate) skill_key: String,
+    pub(crate) version: String,
+    pub(crate) source_hash: String,
+    pub(crate) risk: AiSkillRisk,
+    pub(crate) max_steps: u32,
+    pub(crate) max_tool_calls: u32,
+    pub(crate) permissions: Vec<String>,
+    pub(crate) resources: Vec<String>,
+    pub(crate) output_types: Vec<String>,
 }
 
 #[reducer]
@@ -645,7 +650,9 @@ pub fn promote_ai_skill_version(
     }
 
     require_independent_release_actor(ctx, &version)?;
+    require_skill_version_promotion_valid(ctx, version.id)?;
     ensure_fixtures_passed_for_version(ctx, organization_id, version.skill_id, version.id)?;
+    set_promotion_certification_state(ctx, version.id, CERTIFICATION_CERTIFIED);
     transition_release(ctx, organization_id, &version, "promote", None, reason)?;
     Ok(())
 }
@@ -783,7 +790,6 @@ pub fn create_ai_skill_certification_environment(
             created_at: ctx.timestamp,
             metadata: params.metadata,
         });
-
     write_audit_log_v2(
         ctx,
         organization_id,
@@ -974,6 +980,7 @@ pub fn request_ai_skill_certification(
             terminal_at: None,
             error_code: None,
         });
+    set_promotion_certification_state(ctx, version.id, CERTIFICATION_QUEUED);
 
     write_audit_log_v2(
         ctx,
@@ -1048,6 +1055,7 @@ pub fn claim_ai_skill_certification(
             certification_environment_id: Some(environment.id),
             ..request.clone()
         });
+    set_promotion_certification_state(ctx, request.skill_version_id, CERTIFICATION_RUNNING);
 
     write_audit_log_v2(
         ctx,
@@ -1158,6 +1166,15 @@ pub fn complete_ai_skill_certification(
             ..request.clone()
         });
     write_certification_terminal_audit(ctx, &request, &evidence, "COMPLETE", status.as_str());
+    set_promotion_certification_state(
+        ctx,
+        request.skill_version_id,
+        if passed {
+            CERTIFICATION_EVIDENCE_RECORDED
+        } else {
+            CERTIFICATION_FAILED
+        },
+    );
     Ok(())
 }
 
@@ -1215,6 +1232,7 @@ pub fn fail_ai_skill_certification(
             ..request.clone()
         });
     write_certification_terminal_audit(ctx, &request, &evidence, "FAIL", "failed");
+    set_promotion_certification_state(ctx, request.skill_version_id, CERTIFICATION_FAILED);
     Ok(())
 }
 
@@ -1311,6 +1329,7 @@ pub fn record_ai_agent_run_policy_snapshot(
     if version.skill_id != run.skill_id {
         return Err("active release version does not match run skill".to_string());
     }
+    require_skill_version_promotion_valid(ctx, version.id)?;
 
     let config = load_effective_config(ctx, &run)?;
     let (config_json, custom_instructions, tool_overrides) = match config {
@@ -2177,7 +2196,10 @@ fn load_effective_config(
     Ok(Some(config))
 }
 
-fn validate_manifest(raw: &str, expected_skill_key: &str) -> Result<ValidatedManifest, String> {
+pub(crate) fn validate_manifest(
+    raw: &str,
+    expected_skill_key: &str,
+) -> Result<ValidatedManifest, String> {
     if raw.is_empty() {
         return Err("manifest_json is required".to_string());
     }

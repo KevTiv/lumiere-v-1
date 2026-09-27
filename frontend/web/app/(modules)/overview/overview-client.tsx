@@ -14,8 +14,8 @@ import {
   timeRangeToMs,
 } from "@lumiere/ui"
 import { Skeleton } from "@lumiere/ui/components/skeleton"
-import type { DashboardSection } from "@lumiere/ui"
-import { overviewDashboard } from "@/lib/module-dashboard-configs"
+import { toDashboardSections, overviewDashboardWebOptions } from "@lumiere/ui/lib/presentation-dashboard"
+import { overviewDashboardDefinition, type OverviewDashboardData } from "@lumiere/presentation-core"
 import { useOverviewModuleSubscription } from "@/lib/module-subscription-hooks"
 import { enumTag, moveTypeTagFromRow } from "@/lib/accounting-post-draft"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
@@ -292,67 +292,22 @@ function OverviewClientLoaded({
       },
     ]
 
-    const baseConfig = overviewDashboard(t)
-
-    return baseConfig.sections.map((section) => ({
-      ...section,
-      widgets: section.widgets.map((w) => {
-        if (w.type === "stat-cards") {
-          return {
-            ...w,
-            data: {
-              stats: [
-                {
-                  label: t("sales.dashboard.widgets.revenue"),
-                  value: `$${Math.round(currentRevenue).toLocaleString()}`,
-                  change: revenueChange,
-                  icon: "BarChart2",
-                  testId: "overview-stat-revenue",
-                },
-                {
-                  label: t("overview.dashboard.stats.openSalesOrders"),
-                  value: String(currentOpenOrders),
-                  change: openOrdersChange,
-                  icon: "ShoppingCart",
-                  testId: "overview-stat-open-sales-orders",
-                },
-                {
-                  label: t("overview.dashboard.stats.openTasks"),
-                  value: String(openTasks),
-                  icon: "CheckSquare",
-                  testId: "overview-stat-open-tasks",
-                },
-                {
-                  label: t("crm.contacts.title"),
-                  value: String(scopedContacts.length),
-                  icon: "Users",
-                  testId: "overview-stat-contacts",
-                },
-              ],
-            },
-          }
-        }
-        if (w.id === "overview-sales-trend") {
-          return {
-            ...w,
-            data: {
-              ...(w.data as Record<string, unknown>),
-              values: salesTrendValues,
-            },
-          }
-        }
-        if (w.id === "overview-needs-attention") {
-          return {
-            ...w,
-            data: {
-              ...(w.data as Record<string, unknown>),
-              rows: needsAttentionRows,
-            },
-          }
-        }
-        return w
-      }),
-    })) as DashboardSection[]
+    const data: OverviewDashboardData = {
+      metrics: {
+        revenue: {
+          value: `$${Math.round(currentRevenue).toLocaleString()}`,
+          change: revenueChange,
+        },
+        "open-sales-orders": { value: String(currentOpenOrders), change: openOrdersChange },
+        "open-tasks": { value: String(openTasks) },
+        contacts: { value: String(scopedContacts.length) },
+      },
+      series: {
+        revenue: salesTrendValues.map(({ month, revenue }) => ({ label: month, value: revenue })),
+      },
+      tables: { "needs-attention": needsAttentionRows },
+    }
+    return toDashboardSections(overviewDashboardDefinition, data, t, overviewDashboardWebOptions)
   }, [scopedMoves, scopedTasks, scopedContacts, pendingAiDrafts, salesTrendValues, periodMetrics, t])
 
   const ownerControlLoop = useMemo(() => {
@@ -386,8 +341,8 @@ function OverviewClientLoaded({
   return (
     <div className="space-y-6">
       <DashboardHeader
-        title={t("overview.page.title")}
-        description={t("overview.page.description")}
+        title={t(overviewDashboardDefinition.titleKey)}
+        description={t(overviewDashboardDefinition.descriptionKey)}
         timeRange={timeRange}
         onTimeRangeChange={setTimeRange}
         onExport={() => void handleDashboardExport()}

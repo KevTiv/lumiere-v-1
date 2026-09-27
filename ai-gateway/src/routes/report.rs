@@ -83,6 +83,8 @@ pub async fn post_compose(
             timezone: req.timezone,
         },
         policy,
+        state.stdb.as_ref(),
+        state.spend_read_stdb.as_deref(),
     )
     .await
     .map_err(|message| AppError::Internal(message))?;

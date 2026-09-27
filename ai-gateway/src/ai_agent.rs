@@ -16,6 +16,8 @@ pub struct ResolvedAgentConfig {
     pub system_prompt: String,
     pub temperature: f64,
     pub max_tokens: u32,
+    /// Agent context window in tokens; 0 when unset, which spend admission rejects.
+    pub context_window: u32,
     pub top_p: f64,
     pub allowed_actions: Vec<String>,
     pub allowed_models: Vec<String>,
@@ -23,6 +25,10 @@ pub struct ResolvedAgentConfig {
     pub monthly_spend: f64,
     pub cost_per_1k_tokens: f64,
     pub rate_limit_per_minute: u32,
+    /// Process-level opt-in (`OLLAMA_SUPPORTS_TOOL_CALLING`) allowing an
+    /// Ollama-provider agent to use the tool-calling roles (Decision,
+    /// Reasoning, Review) instead of the legacy single-shot-only path.
+    pub ollama_supports_tool_calling: bool,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -40,6 +46,7 @@ pub async fn resolve_agent(
     org_id: u64,
     agent_id: Option<u64>,
     team_member_id: Option<u64>,
+    ollama_supports_tool_calling: bool,
 ) -> Result<ResolvedAgentConfig> {
     let (agent_row, persona) = if let Some(member_id) = team_member_id {
         let member = fetch_team_member(stdb, org_id, member_id).await?;
@@ -51,8 +58,9 @@ pub async fn resolve_agent(
         (fetch_default_agent(stdb, org_id).await?, None)
     };
 
-    let config = row_to_agent_config(&agent_row, persona.as_ref())?;
+    let mut config = row_to_agent_config(&agent_row, persona.as_ref())?;
     validate_provider(&config.provider)?;
+    config.ollama_supports_tool_calling = ollama_supports_tool_calling;
     Ok(config)
 }
 
@@ -198,6 +206,7 @@ struct AgentRow {
     system_prompt: Option<String>,
     temperature: f64,
     max_tokens: u32,
+    context_window: u32,
     top_p: f64,
     allowed_actions: Vec<String>,
     allowed_models: Vec<String>,
@@ -279,6 +288,9 @@ fn parse_agent_row(row: &Value) -> Result<AgentRow> {
         max_tokens: row_u64(row, "maxTokens", "max_tokens")
             .map(|v| v as u32)
             .unwrap_or(4096),
+        context_window: row_u64(row, "contextWindow", "context_window")
+            .and_then(|v| u32::try_from(v).ok())
+            .unwrap_or(0),
         top_p: f64_field(row, "topP", Some("top_p")).unwrap_or(1.0),
         allowed_actions: string_vec_field(row, "allowedActions", Some("allowed_actions")),
         allowed_models: string_vec_field(row, "allowedModels", Some("allowed_models")),
@@ -330,6 +342,7 @@ fn row_to_agent_config(
         system_prompt,
         temperature: row.temperature,
         max_tokens: row.max_tokens,
+        context_window: row.context_window,
         top_p: row.top_p,
         allowed_actions: row.allowed_actions.clone(),
         allowed_models: row.allowed_models.clone(),
@@ -337,6 +350,7 @@ fn row_to_agent_config(
         monthly_spend: row.monthly_spend,
         cost_per_1k_tokens: row.cost_per_1k_tokens,
         rate_limit_per_minute: row.rate_limit_per_minute,
+        ollama_supports_tool_calling: false,
     })
 }
 
@@ -396,6 +410,7 @@ mod tests {
             system_prompt: "test".to_string(),
             temperature: 0.7,
             max_tokens: 1024,
+            context_window: 32_000,
             top_p: 1.0,
             allowed_actions: vec!["chat".to_string()],
             allowed_models: vec![],
@@ -403,6 +418,7 @@ mod tests {
             monthly_spend,
             cost_per_1k_tokens: 0.01,
             rate_limit_per_minute: rate_limit,
+            ollama_supports_tool_calling: false,
         }
     }
 

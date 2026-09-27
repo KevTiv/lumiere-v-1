@@ -55,6 +55,7 @@ interface Size {
 
 interface ChatReply {
   content: string
+  runId?: number
   sources?: ChatMessageSourceRef[]
   actions?: ChatAction[]
 }
@@ -462,6 +463,8 @@ export function AIChatPanel({
                 : undefined,
           metadata: {
             duration: Math.round(t1 - t0),
+            runId: reply.runId,
+            companyId: context?.companyId,
           },
         }
         setMessages((prev) =>
@@ -480,6 +483,8 @@ export function AIChatPanel({
           actions: reply.actions && reply.actions.length > 0 ? reply.actions : undefined,
           metadata: {
             duration: Math.round(t1 - t0),
+            runId: reply.runId,
+            companyId: context?.companyId,
           },
         }
       } else {
@@ -746,12 +751,12 @@ export function AIChatPanel({
                           <div className="font-medium text-foreground/80 mb-0.5">{t("aiChat.sources")}</div>
                           <ul className="space-y-0.5 list-disc list-inside">
                             {(message.sources as ChatMessageSourceRef[]).map((src, i) => {
-                              const scope = src.entity_type ?? src.content_type ?? "ref"
+                              const scope = src.entity_type ?? src.source_kind ?? "ref"
                               const idLabel =
                                 src.entity_id != null && String(src.entity_id) !== ""
                                   ? String(src.entity_id)
-                                  : src.content_id != null
-                                    ? String(src.content_id)
+                                  : src.passage_id != null
+                                    ? String(src.passage_id)
                                     : null
                               const citationLabel =
                                 src.label ??
@@ -847,6 +852,14 @@ export function AIChatPanel({
                             Use in form
                           </button>
                         )}
+                        {message.role === "assistant" && message.metadata?.runId != null ? (
+                          <a
+                            href={`/ai-harness?runId=${message.metadata.runId}${message.metadata.companyId ? `&companyId=${message.metadata.companyId}` : ""}`}
+                            className="text-[9px] text-primary hover:underline"
+                          >
+                            Inspect run
+                          </a>
+                        ) : null}
                         {message.metadata?.tokens != null ? (
                           <span className="text-[9px] text-muted-foreground">
                             {message.metadata.tokens}t

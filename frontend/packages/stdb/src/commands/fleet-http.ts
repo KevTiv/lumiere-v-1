@@ -7,6 +7,9 @@ import type { ReducerCommandContractMeta } from "./types";
  */
 export const FLEET_BFF_REDUCERS = [
   "create_fleet_vehicle",
+  "update_fleet_vehicle",
+  "record_fleet_service",
+  "record_fleet_inspection",
   "update_vehicle_position",
 ] as const;
 
@@ -18,6 +21,9 @@ export const FLEET_COMMAND_SUBSCRIPTION_HINTS: Record<
   readonly string[]
 > = {
   create_fleet_vehicle: ["fleet-vehicles"],
+  update_fleet_vehicle: ["fleet-vehicles"],
+  record_fleet_service: ["fleet-vehicles", "fleet-service-records"],
+  record_fleet_inspection: ["fleet-vehicles", "fleet-inspections"],
   update_vehicle_position: ["fleet-vehicles"],
 };
 
@@ -30,6 +36,6 @@ export function fleetCommandContract(
     requiredSubscriptionResources: FLEET_COMMAND_SUBSCRIPTION_HINTS[reducer],
     affectedTables: [],
     expectations:
-      "Authenticated api-server session with organization + company scope; trailing args must match CreateFleetVehicleParams / UpdateVehiclePositionParams (see stringifyReducerCallBody).",
+      "Authenticated api-server session with organization + company scope; reducer arguments must match the named Fleet params contract (see stringifyReducerCallBody).",
   };
 }

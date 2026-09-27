@@ -25,6 +25,13 @@ admit bounded specialists and typed lifecycle extensions independently; disabled
 optional capabilities do not block the single-agent base. These adaptations and
 their OpenCode source references are recorded in completion-plan §8.
 
+The control-plane architecture is further bounded by
+[`ai-harness-t3-control-plane-adoption.md`](./ai-harness-t3-control-plane-adoption.md):
+record accepted intent before external effects, isolate provider instances behind
+adapters, negotiate environment capabilities explicitly, resume run streams from
+durable sequence cursors, and model complex agent output as reviewable ERP
+proposal workspaces rather than pretending committed ERP state is Git-revertible.
+
 ## Current Codebase References
 
 - `ai-gateway/src/main.rs`: current `/v1/skills/run`, `/v1/actions/draft`, RAG,
@@ -51,35 +58,61 @@ However, policy decisions are distributed, skill records are mutable/unversioned
 the run route can still be understood as a generic skill execution endpoint, and
 there is no canonical privacy/risk/scope contract that every AI path shares.
 
+The current H5 stack also establishes the beginnings of a stronger durable
+execution boundary: atomic spend reservations/settlement, exact run/request to
+draft correlation, replay-safe step append/completion, and retained reservations
+for ambiguous timeout cases. The next control-plane work must generalize those
+properties to provider/tool side effects rather than create a second competing
+execution model.
+
 ## 2. Proposed Architecture
 
 Create `packages/ai-harness/` as the portable policy/type package (or Rust
 equivalent shared only where required) and make the gateway the sole execution
-authority. The core components are:
+authority. The logical components are:
 
 ```txt
 intent-router -> policy-engine -> data-scope-resolver -> skill-registry
--> shell-generator -> sandbox-runner -> privacy-guard -> report-composer
--> action-draft-bridge -> audit-logger
+-> shell-generator -> accepted-intent/effect-boundary -> sandbox/tool runner
+-> privacy-guard -> report-composer -> action-draft/proposal bridge
+-> audit/projector
 ```
 
-Flow:
+Provider work is normalized separately:
+
+```txt
+agent loop
+  -> provider selector
+  -> authorized ProviderInstance
+  -> ProviderAdapter
+  -> external provider
+```
+
+Normal flow:
 
 ```txt
 user request
 -> classify intent
 -> resolve organization/company/user scope
 -> select existing skill or generate constrained shell
--> execute through approved SDK in sandbox
--> privacy guard
--> compose answer/report/PDF/action draft
--> audit
--> optionally save as skill draft
+-> authorize planned call
+-> persist accepted intent / idempotency receipt
+-> commit
+-> effect reactor executes approved provider/tool capability
+-> persist result | failure | outcome-unknown
+-> privacy/evidence gates
+-> compose answer/report/PDF/action draft/proposal workspace
+-> audit/project run projection
 ```
 
 The shell is declarative: allowed datasets/resources, typed inputs/outputs, max
 rows/tokens/tool calls, query AST or named data operation, risk level, masking,
 and expiry. It is not user/model-provided executable code.
+
+A provider response ending the model turn is not the same as the run being fully
+settled. Evidence validation, artifact persistence, draft creation, spend
+settlement and ambiguous effect reconciliation may continue after the agent
+portion becomes settled.
 
 ## 3. Backend Changes
 
@@ -105,6 +138,26 @@ action_draft_bridge,audit_logger}.rs`; refactor existing `orchestrator`,
    response persistence. It masks phone/payment references by default, suppresses
    fields denied by policy, limits rows/columns, removes secrets, and rejects
    cross-company source rows.
+6. Add a durable accepted-intent/effect boundary for provider calls and
+   consequential external tools. Persist stable effect IDs and command receipts
+   before external I/O; execute through a reactor/worker after commit; feed
+   success/failure/unknown outcomes back through durable commands/events. Do not
+   blindly redispatch an uncertain effect after reconnect/restart.
+7. Split provider **driver** from provider **instance**. A driver owns protocol
+   normalization; an instance owns organization/account/credential/endpoint/
+   region/capability/pricing lifecycle. Selection must bind the run to the exact
+   authorized instance and preserve it in audit/history.
+8. Add an authorized, generated/versioned harness descriptor containing contract
+   release, capability-registry hash, environment identity, admitted feature
+   flags and provider capability summaries. Descriptor state is compatibility
+   discovery only; every operation remains reauthorized.
+9. Persist monotonically ordered run events/steps suitable for resumable
+   subscriptions. The server accepts an `afterSequence` cursor and returns only
+   committed state after that cursor. Reconnect never implies mutation replay.
+10. Extend action-draft orchestration with an `AiProposalWorkspace`-equivalent
+   aggregate for coherent multi-artifact/multi-draft proposals. Workspaces may
+   checkpoint/fork/compare proposed state, but posted ERP effects remain outside
+   workspace rollback and require explicit correction/reversal reducers.
 
 ## 4. Frontend Changes
 
@@ -117,6 +170,20 @@ action_draft_bridge,audit_logger}.rs`; refactor existing `orchestrator`,
 3. Add a scope selector that only lists session-authorized companies and uses
    compact report/action forms. Do not expose tool, SQL, secret, or raw shell
    controls to normal operators.
+4. Add a shared harness client runtime that owns one connection/subscription
+   scope per environment, stores projection state with its replay cursor, resumes
+   subscriptions after reconnect, and keeps transport health distinct from data
+   freshness. Individual React views consume this runtime instead of owning
+   competing reconnect loops.
+5. Drive feature visibility from the authoritative harness descriptor. Missing
+   or removed capabilities hide/deny corresponding UI paths; client version or
+   stale cache cannot infer that an environment supports a feature.
+6. Surface run settlement phases distinctly: provider/agent work may be done
+   while evidence, artifacts, spend or effect reconciliation is still settling.
+   Never stream a candidate answer as validated final output before the answer
+   gate passes.
+7. Add proposal-workspace inspect/compare/fork UI for complex agent work. Each
+   consequential draft keeps its own approval status and correction semantics.
 
 ## 5. Skill Registry and Promotion Workflow
 
@@ -159,6 +226,10 @@ required approver role, and correction plan. Do not call generic reducers from
 the gateway. Existing red operations that do not have safe compensating behavior
 must remain unavailable to AI.
 
+A proposal workspace may group several amber/red drafts for review, but it cannot
+merge their authority: each effect still requires its own current permission,
+approval, expected watermark and correction contract.
+
 ## 7. Permissions and Audit Requirements
 
 - Every harness decision emits a correlation ID and audit sequence: requested,
@@ -173,6 +244,17 @@ must remain unavailable to AI.
   into prompts or artifacts.
 - Enforce retention and encrypted/policy-restricted access to run prompts,
   outputs, artifacts, and failure diagnostics.
+- External side effects require a durable accepted-intent/effect receipt before
+  dispatch. An acknowledgement of that receipt means intent committed, not that
+  the external effect completed.
+- `outcome_unknown` is a durable state. Reconciliation or operator review must
+  resolve it before dependent consequential work resumes.
+- Provider credentials, account state and mutable catalog/session state belong to
+  the selected server-side provider instance; they are never supplied by the
+  browser/model.
+- Harness/environment descriptors and provider capability manifests never grant
+  permission. They only describe compatible/admitted surfaces; invocation still
+  passes current policy and scope checks.
 
 ## 8. E2E Test Requirements
 
@@ -188,6 +270,19 @@ must remain unavailable to AI.
    approval or role is absent.
 5. Promote a fixture-tested tenant skill, run it, roll back its version, and
    verify older runs keep their historical version/artifact metadata.
+6. Crash after accepted intent commits but before dispatch; restart executes the
+   effect at most once and records the result against the original effect ID.
+7. Simulate timeout/disconnect after dispatch where completion is uncertain;
+   record `outcome_unknown`, reconcile, and prove restart does not blind-retry.
+8. Configure two instances of one provider driver and prove credentials,
+   mutable session/catalog state, region policy and spend selection do not leak
+   across instances.
+9. Disconnect a transcript consumer after sequence N, append later events,
+   reconnect from N and converge without duplicate/missed rows; descriptor
+   downgrade removes stale UI capability state.
+10. Fork/revert a proposal workspace and prove proposal lineage/checkpoints
+    change while already-posted ERP state remains untouched and still requires an
+    explicit correction/reversal operation.
 
 ## 9. Risks / Open Questions
 
@@ -199,16 +294,30 @@ must remain unavailable to AI.
   simplest secure launch excludes it completely.
 - Determine approval quorum/delegation and unavailable-approver handling for
   financial red actions.
+- Decide which external tools require effect receipts/reconciliation versus
+  being safe deterministic reads that can simply be repeated.
+- Define the minimal provider-instance lifecycle contract for local/offline and
+  customer-managed deployments without centralizing customer credentials.
+- Keep descriptor/version compatibility simple enough that old persisted run
+  history remains decodable after frontend/server upgrades and downgrades.
 
 ## Suggested Implementation Order
 
-1. Define manifest, scope, risk, policy, and audit schemas; inventory existing
-   skills/tools/routes.
-2. Introduce intent/policy/scope/privacy layers around green read-only skills.
-3. Build registry draft/version/fixture/promotion workflow and migrate bundled
-   skills into immutable versions.
-4. Adapt current action drafts to the risk matrix and introduce amber flows.
-5. Add only red actions with reviewed corrections, approval E2E, and segregation
+1. Define manifest, scope, risk, policy, audit and capability schemas; inventory
+   existing skills/tools/routes.
+2. Introduce intent/policy/scope/privacy layers around green read-only skills and
+   finish H5 durable budget/draft persistence release+pin work.
+3. Add H5c durable accepted-intent/effect orchestration and ambiguous-outcome
+   reconciliation before using the H6 pilot as the reference execution model.
+4. Add H5d provider driver/instance isolation, normalized adapters and capability
+   truth before provider-backed pilot admission.
+5. Build registry draft/version/fixture/promotion workflow and evidence/answer
+   gates; admit the `low_stock` pilot only against its declared matrix.
+6. Build sequence-based run streaming/shared frontend runtime and the harness
+   descriptor before claiming robust web/desktop/local reconnect compatibility.
+7. Adapt current action drafts to the risk matrix and introduce amber flows;
+   extend AIH-24 with proposal workspaces before complex multi-draft flows.
+8. Add only red actions with reviewed corrections, approval E2E, and segregation
    of duties. Keep all other red intents denied.
 
 ## Milestones and Acceptance Criteria
@@ -219,10 +328,21 @@ must remain unavailable to AI.
 - No AI path has unrestricted SQL or cross-tenant/company data access.
 - A promoted skill can be fixture-tested, disabled, rolled back, and forensically
   traced without deleting historical executions.
+- No external consequential effect occurs before its accepted intent is durable;
+  duplicate/restarted execution is idempotent and uncertain outcomes reconcile.
+- Provider-backed runs are bound to an explicit authorized provider instance and
+  preserve the effective driver/model/region/capability/pricing decision.
+- Candidate model completion is distinguishable from fully settled run state.
+- Clients can resume committed run history from a durable sequence cursor and
+  cannot infer unavailable capabilities from their own version or stale cache.
+- Complex agent proposals can checkpoint/fork/compare without inheriting action
+  approval or pretending posted ERP state can be workspace-reverted.
 
 ## Security and Privacy Considerations
 
 Policy defaults deny. Use least-privilege resource contracts, bounded outputs,
 field masking, approval for sensitive exports, and signed/correlation-linked
 audit data. Generated shells are data, not executable code; raw AI HTML and
-provider secrets are never accepted as trusted artifacts.
+provider secrets are never accepted as trusted artifacts. Provider/account state
+is instance-owned server state, environment capability discovery does not grant
+authority, and reconnect/resume cannot silently replay mutations.

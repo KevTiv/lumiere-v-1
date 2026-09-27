@@ -6,7 +6,7 @@ use crate::config::Config;
 
 use super::{
     embed::{EmbedProvider, GeminiEmbed, MistralEmbed, OllamaEmbed},
-    llm::LlmClient,
+    llm::{LlmClient, LlmCompletion},
     parser::{DocumentParser, PlainTextParser, UnstructuredParser},
     vision::{MistralVision, OllamaVision, VisionProvider},
     web_search::{build_web_search, WebSearchProvider},
@@ -18,7 +18,7 @@ pub struct Providers {
     pub embedder: Arc<dyn EmbedProvider>,
     pub vision: Arc<dyn VisionProvider>,
     pub parser: Arc<dyn DocumentParser>,
-    pub llm: Arc<LlmClient>,
+    pub llm: Arc<dyn LlmCompletion>,
     pub web_search: Arc<dyn WebSearchProvider>,
 }
 
@@ -68,7 +68,7 @@ pub fn build(config: &Config, http: reqwest::Client) -> Result<Providers> {
         _ => Arc::new(PlainTextParser),
     };
 
-    let llm = Arc::new(LlmClient::from_config(config)?);
+    let llm: Arc<dyn LlmCompletion> = Arc::new(LlmClient::from_config(config)?);
     let web_search: Arc<dyn WebSearchProvider> = Arc::from(build_web_search(
         http.clone(),
         &config.web_search_provider,

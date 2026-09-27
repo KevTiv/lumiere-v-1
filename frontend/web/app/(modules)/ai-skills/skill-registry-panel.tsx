@@ -1,19 +1,21 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useMemo, useRef, useState } from "react"
 
 import {
   certificationHasPassingEvidence,
   latestCertificationFor,
+  useAiKnowledgeSkillPromotions,
   useAiSkillCertificationRequests,
   useAiSkillFixtures,
   useAiSkillReleases,
-  useAiSkillTestRuns,
   useAiSkillVersions,
   useCreateAiSkillFixture,
   useCreateAiSkillVersion,
   usePromoteAiSkillVersion,
+  useProposeAiKnowledgeSkillPromotion,
   useRequestAiSkillCertification,
+  useReviewAiKnowledgeSkillPromotion,
   useRollbackAiSkillRelease,
   versionWorkflowStatus,
   type AiSkillFixtureRow,
@@ -68,14 +70,16 @@ export function SkillRegistryPanel({ organizationId, companyId, skills }: SkillR
   const versions = useAiSkillVersions(organizationId)
   const releases = useAiSkillReleases(organizationId)
   const fixtures = useAiSkillFixtures(organizationId)
-  const testRuns = useAiSkillTestRuns(organizationId)
   const certifications = useAiSkillCertificationRequests(organizationId)
+  const knowledgePromotions = useAiKnowledgeSkillPromotions(organizationId, companyId)
 
   const createVersion = useCreateAiSkillVersion(orgNumber)
   const createFixture = useCreateAiSkillFixture(orgNumber)
   const requestCertification = useRequestAiSkillCertification(orgNumber)
   const promoteVersion = usePromoteAiSkillVersion(orgNumber)
   const rollbackRelease = useRollbackAiSkillRelease(orgNumber)
+  const proposeKnowledge = useProposeAiKnowledgeSkillPromotion(orgNumber, companyId)
+  const reviewKnowledge = useReviewAiKnowledgeSkillPromotion(orgNumber, companyId)
 
   const [selectedSkillId, setSelectedSkillId] = useState<number>(() => skills[0]?.id ?? 0)
   const [manifestJson, setManifestJson] = useState(DEFAULT_MANIFEST)
@@ -88,36 +92,71 @@ export function SkillRegistryPanel({ organizationId, companyId, skills }: SkillR
     '{"items":[],"reportKey":"daily_business_summary_v1","title":"Daily Business Summary"}',
   )
   const [actionError, setActionError] = useState<string | null>(null)
+  const [knowledgeVersionId, setKnowledgeVersionId] = useState("")
+  const [promotionReviewNote, setPromotionReviewNote] = useState("")
+  const requestKeys = useRef(new Map<string, string>())
+
+  const effectiveSkillId = skills.some((skill) => skill.id === selectedSkillId)
+    ? selectedSkillId
+    : (skills[0]?.id ?? 0)
 
   const skillVersions = useMemo(
     () =>
       (versions.data ?? []).filter(
-        (row) => Number(row.skillId ?? row.skill_id) === selectedSkillId,
+        (row) => Number(row.skillId ?? row.skill_id) === effectiveSkillId,
       ),
-    [versions.data, selectedSkillId],
+    [versions.data, effectiveSkillId],
   )
 
   const skillReleases = useMemo(
     () =>
       (releases.data ?? []).filter(
-        (row) => Number(row.skillId ?? row.skill_id) === selectedSkillId,
+        (row) => Number(row.skillId ?? row.skill_id) === effectiveSkillId,
       ),
-    [releases.data, selectedSkillId],
+    [releases.data, effectiveSkillId],
   )
 
   const skillFixtures = useMemo(
     () =>
       (fixtures.data ?? []).filter(
-        (row) => Number(row.skillId ?? row.skill_id) === selectedSkillId,
+        (row) => Number(row.skillId ?? row.skill_id) === effectiveSkillId,
       ),
-    [fixtures.data, selectedSkillId],
+    [fixtures.data, effectiveSkillId],
   )
 
   const activeRelease = skillReleases.find(
     (release) => release.isActive === true || release.is_active === true,
   )
 
-  const selectedSkill = skills.find((skill) => skill.id === selectedSkillId)
+  const selectedSkill = skills.find((skill) => skill.id === effectiveSkillId)
+
+  const registryLoading =
+    versions.isLoading || releases.isLoading || fixtures.isLoading || certifications.isLoading
+  const registryError =
+    versions.error ?? releases.error ?? fixtures.error ?? certifications.error ?? null
+
+  async function retryRegistry() {
+    setActionError(null)
+    await Promise.all([
+      versions.refetch(),
+      releases.refetch(),
+      fixtures.refetch(),
+      certifications.refetch(),
+    ])
+  }
+
+  function certificationRequestKey(fixtureId: number, versionId: number): string {
+    const tuple = `${organizationId}:${companyId ?? 0}:${versionId}:${fixtureId}`
+    const existing = requestKeys.current.get(tuple)
+    if (existing) return existing
+    const created = globalThis.crypto.randomUUID()
+    requestKeys.current.set(tuple, created)
+    return created
+  }
+
+  function clearCertificationRequestKey(fixtureId: number, versionId: number) {
+    requestKeys.current.delete(`${organizationId}:${companyId ?? 0}:${versionId}:${fixtureId}`)
+  }
 
   async function runAction(action: () => Promise<void>) {
     setActionError(null)
@@ -126,6 +165,26 @@ export function SkillRegistryPanel({ organizationId, companyId, skills }: SkillR
     } catch (error) {
       setActionError(error instanceof Error ? error.message : String(error))
     }
+  }
+
+  async function proposeSelectedKnowledge() {
+    const versionId = Number(knowledgeVersionId)
+    if (!Number.isInteger(versionId) || versionId <= 0 || !selectedSkill) {
+      throw new Error("Enter a positive approved knowledge version id and select a skill")
+    }
+    const tuple = `promotion:${organizationId}:${companyId ?? 0}:${versionId}:${selectedSkill.id}`
+    const idempotencyKey = requestKeys.current.get(tuple) ?? globalThis.crypto.randomUUID()
+    requestKeys.current.set(tuple, idempotencyKey)
+    await proposeKnowledge.mutateAsync({
+      knowledgeVersionId: versionId,
+      skillId: selectedSkill.id,
+      skillKey: selectedSkill.skill_key,
+      skillName: selectedSkill.name,
+      manifestJson,
+      idempotencyKey,
+    })
+    requestKeys.current.delete(tuple)
+    setKnowledgeVersionId("")
   }
 
   return (
@@ -144,7 +203,7 @@ export function SkillRegistryPanel({ organizationId, companyId, skills }: SkillR
             <span className="text-muted-foreground">Skill</span>
             <select
               className="min-w-[220px] rounded-md border border-border bg-background px-3 py-2"
-              value={selectedSkillId}
+              value={effectiveSkillId}
               onChange={(event) => setSelectedSkillId(Number(event.target.value))}
             >
               {skills.map((skill) => (
@@ -170,6 +229,32 @@ export function SkillRegistryPanel({ organizationId, companyId, skills }: SkillR
           </p>
         ) : null}
 
+        {registryLoading ? (
+          <p className="text-sm text-muted-foreground" role="status">
+            Loading persisted certification state…
+          </p>
+        ) : null}
+
+        {registryError ? (
+          <div className="flex flex-wrap items-center gap-3" role="alert">
+            <p className="text-sm text-destructive">
+              {registryError instanceof Error
+                ? registryError.message
+                : "Failed to load persisted certification state"}
+            </p>
+            <Button size="sm" variant="outline" onClick={() => void retryRegistry()}>
+              Retry
+            </Button>
+          </div>
+        ) : null}
+
+        {!registryLoading && !registryError && skills.length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            No persisted skills are available for certification.
+          </p>
+        ) : null}
+
+        {!registryLoading && !registryError && skills.length > 0 ? (
         <div className="grid gap-4 lg:grid-cols-2">
           <div className="space-y-3 rounded-lg border border-border p-4">
             <h3 className="text-sm font-medium">Versions</h3>
@@ -187,7 +272,7 @@ export function SkillRegistryPanel({ organizationId, companyId, skills }: SkillR
                         fixtureRowId(fixture),
                         id,
                         certifications.data ?? [],
-                        testRuns.data ?? [],
+                        [],
                       ),
                     )
                   return (
@@ -239,7 +324,7 @@ export function SkillRegistryPanel({ organizationId, companyId, skills }: SkillR
               />
               <Button
                 size="sm"
-                disabled={!selectedSkillId || createVersion.isPending}
+                disabled={!effectiveSkillId || createVersion.isPending}
                 onClick={() =>
                   void runAction(async () => {
                     const skillKey = selectedSkill?.skill_key ?? "report_composer"
@@ -248,7 +333,7 @@ export function SkillRegistryPanel({ organizationId, companyId, skills }: SkillR
                       `"skill_key":"${skillKey}"`,
                     )
                     await createVersion.mutateAsync({
-                      skillId: BigInt(selectedSkillId),
+                      skillId: BigInt(effectiveSkillId),
                       manifestJson: normalized,
                       reviewNotes: "Created from AI Skills admin",
                       metadata: undefined,
@@ -290,7 +375,7 @@ export function SkillRegistryPanel({ organizationId, companyId, skills }: SkillR
                             fixtureId,
                             vid,
                             certifications.data ?? [],
-                            testRuns.data ?? [],
+                            [],
                           )
                           const active = requestStatus === "queued" || requestStatus === "running"
                           const label = certificationButtonLabel(passed, requestStatus)
@@ -306,14 +391,15 @@ export function SkillRegistryPanel({ organizationId, companyId, skills }: SkillR
                                 requestCertification.isPending
                               }
                               onClick={() =>
-                                void runAction(() =>
-                                  requestCertification.mutateAsync({
+                                void runAction(async () => {
+                                  await requestCertification.mutateAsync({
                                     companyId: companyId ?? 0,
                                     skillVersionId: vid,
                                     fixtureId,
-                                    idempotencyKey: globalThis.crypto.randomUUID(),
-                                  }),
-                                )
+                                    idempotencyKey: certificationRequestKey(fixtureId, vid),
+                                  })
+                                  clearCertificationRequestKey(fixtureId, vid)
+                                })
                               }
                             >
                               {label} · v{version.version}
@@ -321,6 +407,34 @@ export function SkillRegistryPanel({ organizationId, companyId, skills }: SkillR
                           )
                         })}
                       </div>
+                      {skillVersions.map((version) => {
+                        const vid = versionId(version)
+                        const request = latestCertificationFor(
+                          fixtureId,
+                          vid,
+                          certifications.data ?? [],
+                        )
+                        if (!request) return null
+                        const readinessCode = request.readiness?.code ?? "readiness_unknown"
+                        const evidence = request.evidence
+                        return (
+                          <div
+                            key={`evidence-${fixtureId}-${vid}`}
+                            className="mt-2 rounded bg-muted/40 px-2 py-1.5 text-xs text-muted-foreground"
+                          >
+                            <p>
+                              v{version.version} · request #{Number(request.id)} · {String(request.status ?? "unknown")} · {readinessCode}
+                            </p>
+                            {evidence ? (
+                              <p className="mt-1 font-mono text-[10px] break-all">
+                                evidence #{Number(evidence.id)} · {String(evidence.status ?? "unknown")} · {String(evidence.executionEvidenceHash ?? evidence.execution_evidence_hash ?? "no execution hash")}
+                              </p>
+                            ) : (
+                              <p className="mt-1">No terminal evidence has been persisted.</p>
+                            )}
+                          </div>
+                        )
+                      })}
                     </li>
                   )
                 })}
@@ -347,11 +461,11 @@ export function SkillRegistryPanel({ organizationId, companyId, skills }: SkillR
               />
               <Button
                 size="sm"
-                disabled={!selectedSkillId || createFixture.isPending}
+                disabled={!effectiveSkillId || createFixture.isPending}
                 onClick={() =>
                   void runAction(() =>
                     createFixture.mutateAsync({
-                      skillId: BigInt(selectedSkillId),
+                      skillId: BigInt(effectiveSkillId),
                       fixtureKey,
                       name: fixtureName,
                       description: "Created from AI Skills admin",
@@ -367,7 +481,9 @@ export function SkillRegistryPanel({ organizationId, companyId, skills }: SkillR
             </div>
           </div>
         </div>
+        ) : null}
 
+        {!registryLoading && !registryError && skills.length > 0 ? (
         <div className="space-y-2">
           <h3 className="text-sm font-medium">Release history</h3>
           {skillReleases.length === 0 ? (
@@ -398,7 +514,7 @@ export function SkillRegistryPanel({ organizationId, companyId, skills }: SkillR
                         onClick={() =>
                           void runAction(() =>
                             rollbackRelease.mutateAsync({
-                              skillId: selectedSkillId,
+                              skillId: effectiveSkillId,
                               targetReleaseId: id,
                               reason: "Rollback from AI Skills admin",
                             }),
@@ -407,6 +523,76 @@ export function SkillRegistryPanel({ organizationId, companyId, skills }: SkillR
                       >
                         Roll back to this
                       </Button>
+                    ) : null}
+                  </li>
+                )
+              })}
+            </ul>
+          )}
+        </div>
+        ) : null}
+
+        <div className="space-y-3 rounded-lg border border-border p-4">
+          <div>
+            <h3 className="text-sm font-medium">Knowledge promotion</h3>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Independent acceptance creates an unreleased skill version. The server binds the
+              reviewed knowledge lineage; certification and release remain gated above.
+            </p>
+          </div>
+          <div className="flex flex-wrap items-end gap-2">
+            <label className="flex min-w-[220px] flex-col gap-1 text-xs">
+              <span className="text-muted-foreground">Approved knowledge version id</span>
+              <Input
+                inputMode="numeric"
+                value={knowledgeVersionId}
+                onChange={(event) => setKnowledgeVersionId(event.target.value)}
+              />
+            </label>
+            <Button
+              size="sm"
+              disabled={!companyId || !selectedSkill || proposeKnowledge.isPending}
+              onClick={() => void runAction(proposeSelectedKnowledge)}
+            >
+              {proposeKnowledge.isPending ? "Proposing…" : "Propose for review"}
+            </Button>
+          </div>
+          {knowledgePromotions.isLoading ? (
+            <p className="text-sm text-muted-foreground" role="status">Loading persisted promotions…</p>
+          ) : knowledgePromotions.error ? (
+            <div className="flex items-center gap-2" role="alert">
+              <p className="text-sm text-destructive">Failed to load knowledge promotions.</p>
+              <Button size="sm" variant="outline" onClick={() => void knowledgePromotions.refetch()}>Retry</Button>
+            </div>
+          ) : (knowledgePromotions.data ?? []).length === 0 ? (
+            <p className="text-sm text-muted-foreground">No persisted knowledge promotions.</p>
+          ) : (
+            <ul className="divide-y divide-border rounded-lg border border-border text-sm">
+              {(knowledgePromotions.data ?? []).map((promotion) => {
+                const status = String(promotion.status ?? "unknown").toLowerCase()
+                return (
+                  <li key={Number(promotion.id)} className="space-y-2 px-3 py-3">
+                    <p className="font-medium">
+                      Knowledge version {Number(promotion.knowledgeVersionId ?? promotion.knowledge_version_id)} → {String(promotion.skillName ?? promotion.skill_name ?? promotion.skillKey ?? promotion.skill_key)}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {status} · certification {String(promotion.certificationState ?? promotion.certification_state ?? "not_requested")}
+                    </p>
+                    {status === "proposed" ? (
+                      <div className="flex flex-wrap gap-2">
+                        <Input value={promotionReviewNote} onChange={(event) => setPromotionReviewNote(event.target.value)} placeholder="Independent review note" />
+                        {(["accepted", "rejected"] as const).map((outcome) => (
+                          <Button
+                            key={outcome}
+                            size="sm"
+                            variant={outcome === "accepted" ? "default" : "outline"}
+                            disabled={reviewKnowledge.isPending}
+                            onClick={() => void runAction(() => reviewKnowledge.mutateAsync({ promotionId: Number(promotion.id), outcome, note: promotionReviewNote.trim() || undefined }))}
+                          >
+                            {outcome === "accepted" ? "Accept" : "Reject"}
+                          </Button>
+                        ))}
+                      </div>
                     ) : null}
                   </li>
                 )

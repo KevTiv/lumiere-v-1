@@ -1,0 +1,172 @@
+{
+  "schema_version": 1,
+  "suite_ref": "deterministic-graduation-reviewed@1",
+  "fixtures": [
+    {
+      "id": "choice-historical-a",
+      "category": "historical",
+      "implementation_ref": "fixture:choice-by-state@1",
+      "organization_id": 1,
+      "company_id": 1,
+      "decision_type": { "name": "FixtureChoice", "version": 1 },
+      "request": {
+        "decision_type": { "name": "FixtureChoice", "version": 1 },
+        "kind": "choice",
+        "question": "choose",
+        "bounded_state": { "deterministic_choice": "a" },
+        "candidates": ["a", "b"],
+        "precedent": [],
+        "evidence": []
+      },
+      "expected": {
+        "kind": "choice",
+        "choice": "a",
+        "score": null,
+        "probability": null,
+        "rationale": null
+      },
+      "absolute_tolerance": 0.0,
+      "relative_tolerance": 0.0,
+      "threshold_gate": null,
+      "calibration_profile": null,
+      "policy_refs": ["decision-type:FixtureChoice@1/graduation"]
+    },
+    {
+      "id": "choice-candidate-set-boundary",
+      "category": "candidate_set_change",
+      "implementation_ref": "fixture:choice-by-state@1",
+      "organization_id": 1,
+      "company_id": 1,
+      "decision_type": { "name": "FixtureChoice", "version": 1 },
+      "request": {
+        "decision_type": { "name": "FixtureChoice", "version": 1 },
+        "kind": "choice",
+        "question": "choose",
+        "bounded_state": { "deterministic_choice": "b" },
+        "candidates": ["b", "c"],
+        "precedent": [],
+        "evidence": []
+      },
+      "expected": {
+        "kind": "choice",
+        "choice": "b",
+        "score": null,
+        "probability": null,
+        "rationale": null
+      },
+      "absolute_tolerance": 0.0,
+      "relative_tolerance": 0.0,
+      "threshold_gate": null,
+      "calibration_profile": null,
+      "policy_refs": ["decision-type:FixtureChoice@1/graduation"]
+    },
+    {
+      "id": "probability-threshold-high",
+      "category": "boundary",
+      "implementation_ref": "fixture:probability-by-state@1",
+      "organization_id": 1,
+      "company_id": 1,
+      "decision_type": { "name": "FixtureProbability", "version": 1 },
+      "request": {
+        "decision_type": { "name": "FixtureProbability", "version": 1 },
+        "kind": "probability",
+        "question": "probability",
+        "bounded_state": { "deterministic_probability": 0.8 },
+        "candidates": [],
+        "precedent": [],
+        "evidence": []
+      },
+      "expected": {
+        "kind": "probability",
+        "choice": null,
+        "score": null,
+        "probability": 0.81,
+        "rationale": null
+      },
+      "absolute_tolerance": 0.02,
+      "relative_tolerance": 0.0,
+      "threshold_gate": {
+        "name": "fixture-gate",
+        "hard_stop_at_least": 0.7,
+        "continue_below": 0.4,
+        "require_calibrated": true
+      },
+      "calibration_profile": {
+        "name": "fixture-identity",
+        "version": 1,
+        "breakpoints": [[0.0, 0.0], [1.0, 1.0]]
+      },
+      "policy_refs": [
+        "decision-type:FixtureProbability@1/graduation",
+        "threshold-policy:fixture-gate@1",
+        "calibration:fixture-identity@1"
+      ]
+    },
+    {
+      "id": "probability-threshold-low",
+      "category": "policy_version_change",
+      "implementation_ref": "fixture:probability-by-state@1",
+      "organization_id": 2,
+      "company_id": 7,
+      "decision_type": { "name": "FixtureProbability", "version": 1 },
+      "request": {
+        "decision_type": { "name": "FixtureProbability", "version": 1 },
+        "kind": "probability",
+        "question": "probability",
+        "bounded_state": { "deterministic_probability": 0.2 },
+        "candidates": [],
+        "precedent": [],
+        "evidence": []
+      },
+      "expected": {
+        "kind": "probability",
+        "choice": null,
+        "score": null,
+        "probability": 0.21,
+        "rationale": null
+      },
+      "absolute_tolerance": 0.02,
+      "relative_tolerance": 0.0,
+      "threshold_gate": {
+        "name": "fixture-gate",
+        "hard_stop_at_least": 0.7,
+        "continue_below": 0.4,
+        "require_calibrated": true
+      },
+      "calibration_profile": {
+        "name": "fixture-identity",
+        "version": 1,
+        "breakpoints": [[0.0, 0.0], [1.0, 1.0]]
+      },
+      "policy_refs": [
+        "decision-type:FixtureProbability@1/graduation",
+        "threshold-policy:fixture-gate@2",
+        "calibration:fixture-identity@1"
+      ]
+    },
+    {
+      "id": "malformed-empty-choice-candidates",
+      "category": "malformed_request",
+      "implementation_ref": "fixture:choice-by-state@1",
+      "organization_id": 1,
+      "company_id": 1,
+      "decision_type": { "name": "FixtureChoice", "version": 1 },
+      "request": {
+        "decision_type": { "name": "FixtureChoice", "version": 1 },
+        "kind": "choice",
+        "question": "choose",
+        "bounded_state": { "deterministic_choice": "a" },
+        "candidates": [],
+        "precedent": [],
+        "evidence": []
+      },
+      "expected": null,
+      "expect_validation_error": true,
+      "absolute_tolerance": 0.0,
+      "relative_tolerance": 0.0,
+      "threshold_gate": null,
+      "calibration_profile": null,
+      "policy_refs": ["decision-type:FixtureChoice@1/graduation"]
+    }
+  ]
+}

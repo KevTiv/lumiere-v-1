@@ -15,7 +15,8 @@ use crate::{
     providers::EmbedProvider,
     qdrant_client::VectorStore,
     stdb_embed::{
-        authoritative_embedding_for_resource, company_belongs_to_organization, LumiereStdbExt,
+        authoritative_embedding_for_resource, company_belongs_to_organization,
+        deleted_embedding_for_resource, LumiereStdbExt,
     },
 };
 use stdb_client::StdbClient;
@@ -76,45 +77,69 @@ async fn process_batch(
         }
 
         let result = match company_belongs_to_organization(stdb, org_id, payload.company_id).await {
-            Ok(true) => match authoritative_embedding_for_resource(
-                stdb,
-                org_id,
-                payload.company_id,
-                &payload.content_type,
-                payload.content_id,
-            )
-            .await
-            {
-                Ok(Some(embedding)) => {
-                    if embedding.text != payload.text {
-                        Err(anyhow::anyhow!(
-                            "queued embedding source is stale for {} #{}",
-                            payload.content_type,
-                            payload.content_id
-                        ))
-                    } else {
-                        let fingerprint = embedding
-                            .embedding_hash
-                            .unwrap_or_else(|| job.input_hash.clone());
-                        process_job(
-                            embedder,
-                            vector_store,
-                            org_id,
-                            embedding.id,
-                            &fingerprint,
-                            &model,
-                            &payload,
-                        )
+            Ok(true) if payload.operation == "delete" => {
+                match deleted_embedding_for_resource(
+                    stdb,
+                    org_id,
+                    payload.company_id,
+                    &payload.content_type,
+                    payload.content_id,
+                )
+                .await
+                {
+                    Ok(Some(embedding_id)) => vector_store
+                        .delete(embedding_id)
                         .await
-                    }
+                        .map(|()| (embedding_id, 0)),
+                    Ok(None) => Ok((0, 0)),
+                    Err(error) => Err(error.context("failed to resolve deleted embedding")),
                 }
-                Ok(None) => Err(anyhow::anyhow!(
-                    "authoritative SearchEmbedding is missing for {} #{}",
-                    payload.content_type,
-                    payload.content_id
-                )),
-                Err(error) => Err(error.context("failed to resolve authoritative embedding")),
-            },
+            }
+            Ok(true) if payload.operation == "upsert" => {
+                match authoritative_embedding_for_resource(
+                    stdb,
+                    org_id,
+                    payload.company_id,
+                    &payload.content_type,
+                    payload.content_id,
+                )
+                .await
+                {
+                    Ok(Some(embedding)) => {
+                        if embedding.text != payload.text {
+                            Err(anyhow::anyhow!(
+                                "queued embedding source is stale for {} #{}",
+                                payload.content_type,
+                                payload.content_id
+                            ))
+                        } else {
+                            let fingerprint = embedding
+                                .embedding_hash
+                                .unwrap_or_else(|| job.input_hash.clone());
+                            process_job(
+                                embedder,
+                                vector_store,
+                                org_id,
+                                embedding.id,
+                                &fingerprint,
+                                &model,
+                                &payload,
+                            )
+                            .await
+                        }
+                    }
+                    Ok(None) => Err(anyhow::anyhow!(
+                        "authoritative SearchEmbedding is missing for {} #{}",
+                        payload.content_type,
+                        payload.content_id
+                    )),
+                    Err(error) => Err(error.context("failed to resolve authoritative embedding")),
+                }
+            }
+            Ok(true) => Err(anyhow::anyhow!(
+                "unsupported embedding queue operation '{}'",
+                payload.operation
+            )),
             Ok(false) => Err(anyhow::anyhow!(
                 "embedding job company {} does not belong to organization {}",
                 payload.company_id,
@@ -125,17 +150,19 @@ async fn process_batch(
 
         match result {
             Ok((embedding_id, dim)) => {
-                if let Err(e) = stdb
-                    .mark_embedding_synced(
-                        org_id,
-                        Some(payload.company_id),
-                        embedding_id,
-                        &model,
-                        dim,
-                    )
-                    .await
-                {
-                    tracing::warn!(job_id, "mark_embedding_synced failed: {}", e);
+                if payload.operation != "delete" {
+                    if let Err(e) = stdb
+                        .mark_embedding_synced(
+                            org_id,
+                            Some(payload.company_id),
+                            embedding_id,
+                            &model,
+                            dim,
+                        )
+                        .await
+                    {
+                        tracing::warn!(job_id, "mark_embedding_synced failed: {}", e);
+                    }
                 }
 
                 if let Err(e) = stdb.complete_queue_job(org_id, job_id, None).await {

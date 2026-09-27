@@ -83,7 +83,10 @@ import type {
   ExpenseCardStatementLine,
   FieldPermission,
   FinancialReport,
+  FleetInspection,
+  FleetServiceRecord,
   FleetVehicle,
+  FleetVehicleServiceType,
   FormConfig,
   FormConfigField,
   FormFieldLabel,
@@ -202,6 +205,7 @@ import type {
   ProjectSubcontractorCost,
   ProjectTask,
   ProjectTimesheet,
+  ProjectTimesheetApproval,
   Proposal,
   ProposalAnalysis,
   ProposalBidDecision,
@@ -420,6 +424,9 @@ export interface QueryRowMap {
   "financial-reports": FinancialReport
   "fiscal-years": AccountFiscalYear
   "fixed-assets": AccountAsset
+  "fleet-inspections": FleetInspection
+  "fleet-service-records": FleetServiceRecord
+  "fleet-service-types": FleetVehicleServiceType
   "fleet-vehicles": FleetVehicle
   "form-config-fields": FormConfigField
   "form-configs": FormConfig
@@ -528,6 +535,7 @@ export interface QueryRowMap {
   "project-revenue-lines": ProjectRevenueLine
   "project-revenue-schedules": ProjectRevenueSchedule
   "project-subcontractor-costs": ProjectSubcontractorCost
+  "project-timesheet-approvals": ProjectTimesheetApproval
   "projects": ProjectProject
   "proposal-analyses": ProposalAnalysis
   "proposal-bid-decisions": ProposalBidDecision

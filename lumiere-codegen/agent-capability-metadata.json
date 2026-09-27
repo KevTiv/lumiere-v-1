@@ -1,0 +1,41 @@
+{
+  "version": 1,
+  "entries": [
+    {
+      "resource": "products",
+      "capability_key": "inventory.products.read",
+      "risk": "read_only",
+      "requires_confirmation": false,
+      "result_policy": { "kind": "dataset", "max_rows": 100, "max_bytes": 65536 },
+      "review": {
+        "reviewed_by": "KevTiv",
+        "reviewed_at": "2026-09-13T00:00:00Z",
+        "evidence": "Read already performed by the promoted low_stock skill through raw SQL on the product table; exposing it as a reviewed capability narrows rather than widens reach. Row ceiling matches that skill's accepted 100-row limit."
+      }
+    },
+    {
+      "resource": "stock-locations",
+      "capability_key": "inventory.stock-locations.read",
+      "risk": "read_only",
+      "requires_confirmation": false,
+      "result_policy": { "kind": "dataset", "max_rows": 100, "max_bytes": 65536 },
+      "review": {
+        "reviewed_by": "KevTiv",
+        "reviewed_at": "2026-09-13T00:00:00Z",
+        "evidence": "Needed to name the location behind a stock quantity in an answer. Company-scoped read with server-enforced authorization; no pricing, cost or personal fields."
+      }
+    },
+    {
+      "resource": "stock-quants",
+      "capability_key": "inventory.stock-quants.read",
+      "risk": "read_only",
+      "requires_confirmation": false,
+      "result_policy": { "kind": "dataset", "max_rows": 100, "max_bytes": 65536 },
+      "review": {
+        "reviewed_by": "KevTiv",
+        "reviewed_at": "2026-09-13T00:00:00Z",
+        "evidence": "Read already performed by the promoted low_stock skill through raw SQL on the stock_quant table. Quantities only, company-scoped, no valuation fields."
+      }
+    }
+  ]
+}

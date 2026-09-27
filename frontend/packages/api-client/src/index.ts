@@ -10,6 +10,13 @@ export {
   type QueryRow,
   type QueryRows,
 } from "./query-list"
+export {
+  OperationRequestError,
+  decodeOperationDispatch,
+  type OperationDispatchReceipt,
+  type OperationProblemCode,
+  type OperationRetryDisposition,
+} from "./operation-outcome"
 export { resolveApiUrl, resolveRequestUrl } from "./resolve-url"
 export {
   queryStdbList,

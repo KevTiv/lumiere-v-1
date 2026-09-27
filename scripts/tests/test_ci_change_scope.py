@@ -22,10 +22,22 @@ class ChangeScopeTests(unittest.TestCase):
         self.assert_domains(module.classify_paths(["frontend/packages/ui/src/button.tsx", "docs/test.md"]),
                             ("frontend", "e2e"))
 
+    def test_cov_evidence_and_validators_are_frontend(self):
+        for path in ["docs/evidence/cov-00c-correctness-defects.json",
+                     "scripts/validate-cov00c-correctness-census.py"]:
+            with self.subTest(path=path):
+                self.assert_domains(module.classify_paths([path, "frontend/web/tests/e2e/a.spec.ts"]),
+                                    ("frontend", "e2e"))
+
     def test_service_rust(self):
         for path in ["api-server/src/main.rs", "ai-gateway/src/lib.rs", "iot-gateway/src/main.rs"]:
             with self.subTest(path=path):
                 self.assert_domains(module.classify_paths([path]), ("rust", "e2e"))
+
+    def test_frontend_generated_presentation_contract_runs_rust_drift_gate(self):
+        for path in ["frontend/packages/presentation-core/scripts/generate-module-contract.mjs"]:
+            with self.subTest(path=path):
+                self.assert_domains(module.classify_paths([path]), module.DOMAINS)
 
     def test_shared_schema_and_unknown_are_full(self):
         for path in ["spacetimedb/src/lib.rs", "lumiere-codegen/src/main.rs", "crates/stdb-auth/src/lib.rs",

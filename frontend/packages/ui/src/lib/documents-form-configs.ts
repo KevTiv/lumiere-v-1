@@ -315,38 +315,6 @@ export const newDocumentFolderForm = (t: TFunction): FormConfig => ({
   ],
 })
 
-export const reindexDocumentForm = (t: TFunction): FormConfig => ({
-  id: "reindex-document",
-  title: t("documents.forms.reindexDocument.title"),
-  description: t("documents.forms.reindexDocument.description"),
-  sections: [
-    {
-      id: "index",
-      title: t("documents.forms.reindexDocument.sections.index"),
-      fields: [
-        {
-          id: "content",
-          name: "content",
-          type: "textarea",
-          label: t("documents.forms.reindexDocument.fields.content"),
-          placeholder: t("documents.forms.reindexDocument.fields.contentPlaceholder"),
-          required: true,
-          width: "full",
-          rows: 6,
-        },
-        {
-          id: "language",
-          name: "language",
-          type: "text",
-          label: t("documents.forms.reindexDocument.fields.language"),
-          placeholder: t("documents.forms.reindexDocument.fields.languageHint"),
-          width: "1/2",
-        },
-      ],
-    },
-  ],
-})
-
 export const setDocumentRetentionForm = (t: TFunction): FormConfig => ({
   id: "set-document-retention",
   title: t("documents.forms.setRetention.title"),
@@ -824,6 +792,5 @@ export const documentsFormConfigs = (t: TFunction): Record<string, FormConfig> =
   "upload-document-version": uploadDocumentVersionForm(t),
   "new-document-template": newDocumentTemplateForm(t),
   "new-mail-template": newMailTemplateForm(t),
-  "reindex-document": reindexDocumentForm(t),
   "set-document-retention": setDocumentRetentionForm(t),
 })

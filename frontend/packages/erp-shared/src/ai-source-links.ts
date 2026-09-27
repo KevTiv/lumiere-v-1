@@ -1,10 +1,10 @@
 /** Map RAG / activity source identifiers to in-app ERP routes (metadata only). */
 
 export type AiSourceLinkInput = {
-  content_type?: string
   entity_type?: string
-  content_id?: number | string
   entity_id?: string | number
+  source_kind?: string
+  source_key?: string
 }
 
 type ModuleTabTarget = {
@@ -21,9 +21,9 @@ type PathPrefixTarget = {
 
 type SourceRouteTarget = ModuleTabTarget | PathPrefixTarget
 
-/** Known SearchEmbedding content_type and activity entity_type to module tab routes. */
+/** Known persisted source kinds and live entity types mapped to ERP routes. */
 const SOURCE_ROUTE_MAP: Record<string, SourceRouteTarget> = {
-  // Vector search (SearchEmbedding.content_type)
+  // Persisted evidence source kinds.
   product: { kind: "module_tab", module: "inventory", tab: "products" },
   contact: { kind: "module_tab", module: "crm", tab: "contacts" },
   document: { kind: "module_tab", module: "documents", tab: "documents" },
@@ -35,6 +35,7 @@ const SOURCE_ROUTE_MAP: Record<string, SourceRouteTarget> = {
 
   // Activity memory (context_worker entity_type)
   sale_order: { kind: "module_tab", module: "sales", tab: "orders" },
+  return_order: { kind: "module_tab", module: "sales", tab: "returns" },
   project_task: { kind: "module_tab", module: "projects", tab: "tasks" },
   project_project: { kind: "module_tab", module: "projects", tab: "projects" },
   hr_leave: { kind: "module_tab", module: "hr", tab: "leaves" },
@@ -42,6 +43,8 @@ const SOURCE_ROUTE_MAP: Record<string, SourceRouteTarget> = {
   account_move: { kind: "module_tab", module: "accounting", tab: "journal-entries" },
   mrp_production: { kind: "module_tab", module: "manufacturing", tab: "orders" },
   purchase_order: { kind: "module_tab", module: "purchasing", tab: "orders" },
+  purchase_requisition: { kind: "module_tab", module: "purchasing", tab: "requisitions" },
+  stock_picking: { kind: "module_tab", module: "inventory", tab: "transfers" },
 }
 
 function normalizeSourceKey(raw?: string): string | undefined {
@@ -55,8 +58,10 @@ function sourceRecordId(input: AiSourceLinkInput): string | undefined {
   if (input.entity_id != null && String(input.entity_id).trim() !== "") {
     return String(input.entity_id).trim()
   }
-  if (input.content_id != null && String(input.content_id).trim() !== "") {
-    return String(input.content_id).trim()
+  if (input.source_key != null) {
+    const separator = input.source_key.indexOf(":")
+    const sourceId = separator >= 0 ? input.source_key.slice(separator + 1).trim() : ""
+    if (sourceId) return sourceId
   }
   return undefined
 }
@@ -76,18 +81,25 @@ function resolveTarget(target: SourceRouteTarget, recordId?: string): string | u
   return buildModuleTabHref(target.module, target.tab)
 }
 
+/** Owning module tab for a canonical table name; undefined for path-prefixed or unknown resources. */
+export function resolveErpResourceTarget(resource: string): { module: string; tab: string } | undefined {
+  const key = normalizeSourceKey(resource)
+  const target = key ? SOURCE_ROUTE_MAP[key] : undefined
+  return target?.kind === "module_tab" ? { module: target.module, tab: target.tab } : undefined
+}
+
 /**
  * Resolve an in-app href for a RAG or activity citation.
- * Prefers content_type/content_id, then entity_type/entity_id.
+ * Resolves canonical source/source-key or entity identity.
  * Returns undefined when the type is unknown (caller keeps plain-text citation).
  */
 export function resolveAiSourceHref(input: AiSourceLinkInput): string | undefined {
-  const contentKey = normalizeSourceKey(input.content_type)
+  const sourceKind = normalizeSourceKey(input.source_kind)
   const entityKey = normalizeSourceKey(input.entity_type)
   const recordId = sourceRecordId(input)
 
   const target =
-    (contentKey ? SOURCE_ROUTE_MAP[contentKey] : undefined) ??
+    (sourceKind ? SOURCE_ROUTE_MAP[sourceKind] : undefined) ??
     (entityKey ? SOURCE_ROUTE_MAP[entityKey] : undefined)
 
   if (!target) return undefined

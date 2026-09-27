@@ -12,6 +12,7 @@ edition = "2021"
 crate-type = ["cdylib"]
 
 [dependencies]
+lumiere-presentation-core = { path = "../crates/presentation-core" }
 spacetimedb = { version = "=2.8.2" }
 spacetimedb-sats = { version = "=2.8.2", features = ["serde"] }
 log = "0.4"
@@ -35,3 +36,11 @@ lto = "fat"
 codegen-units = 1
 panic = "abort"
 strip = "symbols"
+
+# CI contract/schema extraction only needs the module's schema and reducer
+# behaviour, not size-optimised code: skip fat LTO and single-unit codegen.
+[profile.ci-contracts]
+inherits = "release"
+opt-level = 1
+lto = false
+codegen-units = 16

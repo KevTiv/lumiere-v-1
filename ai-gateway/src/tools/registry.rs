@@ -6,7 +6,6 @@ use serde_json::Value;
 
 use crate::{
     ai_agent::ResolvedAgentConfig,
-    providers::llm::ToolSpec,
     tools::{
         action_draft, analytics, erp_search, erp_snapshot, save_artifact,
         types::{hash_tool_input, ToolContext, ToolOutput},
@@ -18,8 +17,6 @@ use crate::{
 pub trait AgentTool: Send + Sync {
     fn name(&self) -> &'static str;
     fn required_action(&self) -> &'static str;
-    /// JSON Schema object describing the tool's input parameters.
-    fn schema(&self) -> Value;
     async fn execute(&self, ctx: &ToolContext, input: &Value) -> Result<ToolOutput>;
 }
 
@@ -41,27 +38,6 @@ impl AgentTool for ErpSnapshotTool {
         "live_read"
     }
 
-    fn schema(&self) -> Value {
-        serde_json::json!({
-            "type": "object",
-            "properties": {
-                "entity_type": {
-                    "type": "string",
-                    "description": "ERP entity type to snapshot (e.g. 'product', 'order', 'customer')"
-                },
-                "entity_id": {
-                    "type": "string",
-                    "description": "ID of the entity to snapshot"
-                },
-                "max_snapshots": {
-                    "type": "integer",
-                    "description": "Maximum number of historical snapshots to return (optional)"
-                }
-            },
-            "required": ["entity_type", "entity_id"]
-        })
-    }
-
     async fn execute(&self, ctx: &ToolContext, input: &Value) -> Result<ToolOutput> {
         erp_snapshot::execute(ctx, input).await
     }
@@ -75,27 +51,6 @@ impl AgentTool for ErpSearchTool {
 
     fn required_action(&self) -> &'static str {
         "live_read"
-    }
-
-    fn schema(&self) -> Value {
-        serde_json::json!({
-            "type": "object",
-            "properties": {
-                "query": {
-                    "type": "string",
-                    "description": "Semantic search query against the ERP knowledge base"
-                },
-                "limit": {
-                    "type": "integer",
-                    "description": "Maximum number of results to return (1–20, default 8)"
-                },
-                "score_threshold": {
-                    "type": "number",
-                    "description": "Minimum similarity score threshold (default 0.65)"
-                }
-            },
-            "required": ["query"]
-        })
     }
 
     async fn execute(&self, ctx: &ToolContext, input: &Value) -> Result<ToolOutput> {
@@ -113,26 +68,6 @@ impl AgentTool for SaveArtifactTool {
         "skill_run"
     }
 
-    fn schema(&self) -> Value {
-        serde_json::json!({
-            "type": "object",
-            "properties": {
-                "title": {
-                    "type": "string",
-                    "description": "Artifact title (default: 'Skill artifact')"
-                },
-                "kind": {
-                    "type": "string",
-                    "description": "Artifact format, e.g. 'markdown', 'json' (default: 'markdown')"
-                },
-                "content": {
-                    "description": "Artifact content (string or structured value)"
-                }
-            },
-            "required": ["content"]
-        })
-    }
-
     async fn execute(&self, ctx: &ToolContext, input: &Value) -> Result<ToolOutput> {
         save_artifact::execute(ctx, input).await
     }
@@ -146,14 +81,6 @@ impl AgentTool for AnalyticsSummaryTool {
 
     fn required_action(&self) -> &'static str {
         "analytics_read"
-    }
-
-    fn schema(&self) -> Value {
-        serde_json::json!({
-            "type": "object",
-            "properties": {},
-            "required": []
-        })
     }
 
     async fn execute(&self, ctx: &ToolContext, input: &Value) -> Result<ToolOutput> {
@@ -171,23 +98,6 @@ impl AgentTool for WebSearchTool {
         "web_search"
     }
 
-    fn schema(&self) -> Value {
-        serde_json::json!({
-            "type": "object",
-            "properties": {
-                "query": {
-                    "type": "string",
-                    "description": "Web search query"
-                },
-                "max_results": {
-                    "type": "integer",
-                    "description": "Maximum number of results (optional, default from config)"
-                }
-            },
-            "required": ["query"]
-        })
-    }
-
     async fn execute(&self, ctx: &ToolContext, input: &Value) -> Result<ToolOutput> {
         web_search::execute_search(ctx, input).await
     }
@@ -201,23 +111,6 @@ impl AgentTool for FetchUrlTool {
 
     fn required_action(&self) -> &'static str {
         "web_search"
-    }
-
-    fn schema(&self) -> Value {
-        serde_json::json!({
-            "type": "object",
-            "properties": {
-                "url": {
-                    "type": "string",
-                    "description": "URL to fetch content from"
-                },
-                "max_bytes": {
-                    "type": "integer",
-                    "description": "Maximum bytes to retrieve (optional, default from config)"
-                }
-            },
-            "required": ["url"]
-        })
     }
 
     async fn execute(&self, ctx: &ToolContext, input: &Value) -> Result<ToolOutput> {
@@ -235,40 +128,6 @@ impl AgentTool for ActionDraftTool {
         "action_draft"
     }
 
-    fn schema(&self) -> Value {
-        serde_json::json!({
-            "type": "object",
-            "properties": {
-                "reducer_name": {
-                    "type": "string",
-                    "description": "Name of the ERP reducer to call"
-                },
-                "params_json": {
-                    "type": "string",
-                    "description": "JSON-encoded parameters for the reducer"
-                },
-                "summary": {
-                    "type": "string",
-                    "description": "Human-readable description of the proposed action"
-                },
-                "confidence": {
-                    "type": "number",
-                    "description": "Confidence score 0–1 (default 0.75)"
-                },
-                "elevated": {
-                    "type": "boolean",
-                    "description": "Whether this action requires elevated approval (default false)"
-                },
-                "warnings": {
-                    "type": "array",
-                    "items": { "type": "string" },
-                    "description": "Optional list of caution messages"
-                }
-            },
-            "required": ["reducer_name", "params_json"]
-        })
-    }
-
     async fn execute(&self, ctx: &ToolContext, input: &Value) -> Result<ToolOutput> {
         action_draft::execute(ctx, input).await
     }
@@ -276,6 +135,41 @@ impl AgentTool for ActionDraftTool {
 
 pub struct ToolRegistry {
     tools: Vec<Box<dyn AgentTool>>,
+}
+
+/// The model-facing subset of a [`ToolRegistry`].
+///
+/// This view owns no tools; it only borrows entries selected by both the
+/// skill allowlist and the resolved agent action policy. Model-selected names
+/// must be resolved through this type rather than the legacy raw registry.
+pub struct AuthorizedToolView<'a> {
+    tools: Vec<&'a dyn AgentTool>,
+}
+
+impl<'a> AuthorizedToolView<'a> {
+    fn resolve(&self, name: &str) -> Result<&'a dyn AgentTool> {
+        self.tools
+            .iter()
+            .find(|tool| tool.name() == name)
+            .copied()
+            .ok_or_else(|| anyhow!("tool '{name}' is not authorized"))
+    }
+
+    /// Execute an allowlisted tool by its exact registry name.
+    pub async fn run_named(
+        &self,
+        name: &str,
+        ctx: &ToolContext,
+        input: &Value,
+    ) -> Result<ToolOutput> {
+        reject_model_scope_override(input)?;
+        let tool = self.resolve(name)?;
+        tool.execute(ctx, input).await
+    }
+
+    pub fn tool_names(&self) -> impl Iterator<Item = &'static str> + '_ {
+        self.tools.iter().map(|tool| tool.name())
+    }
 }
 
 impl Default for ToolRegistry {
@@ -303,35 +197,12 @@ impl ToolRegistry {
         self.tools.iter().map(|t| t.name()).collect()
     }
 
-    /// Iterate over all registered tools.
-    pub fn tools(&self) -> impl Iterator<Item = &dyn AgentTool> {
-        self.tools.iter().map(|t| t.as_ref())
-    }
-
-    /// Return `ToolSpec`s for all tools whose `required_action` is permitted by
-    /// `agent` and whose name is in `allowed_tool_names`.  Used by `agent_loop`
-    /// to build the `LlmRequest.tools` list.
-    pub fn specs_for(
-        &self,
-        agent: &ResolvedAgentConfig,
-        allowed_tool_names: &[String],
-    ) -> Vec<ToolSpec> {
-        self.tools
-            .iter()
-            .filter(|tool| {
-                allowed_tool_names.iter().any(|n| n == tool.name())
-                    && agent_allows_action(agent, tool.required_action())
-            })
-            .map(|tool| ToolSpec {
-                name: tool.name().to_string(),
-                description: format!(
-                    "Tool: {} (requires action: {})",
-                    tool.name(),
-                    tool.required_action()
-                ),
-                parameters: tool.schema(),
-            })
-            .collect()
+    /// Discover generated ERP tools from the verified, pinned catalog.
+    ///
+    /// This namespace never falls back to the local runtime tools. Nonempty
+    /// catalogs remain unsupported until the contract supplies provider metadata.
+    pub fn generated_specs(&self) -> Result<Vec<crate::providers::llm::ToolSpec>> {
+        Ok(super::generated::embedded_catalog()?.specs()?)
     }
 
     pub fn filter_for_agent<'a>(
@@ -349,6 +220,20 @@ impl ToolRegistry {
             .collect()
     }
 
+    /// Build the only registry surface intended for model-selected calls.
+    pub fn authorized_view<'a>(
+        &'a self,
+        agent: &ResolvedAgentConfig,
+        allowed_tool_names: &[String],
+    ) -> AuthorizedToolView<'a> {
+        AuthorizedToolView {
+            tools: self.filter_for_agent(agent, allowed_tool_names),
+        }
+    }
+
+    /// Legacy unrestricted lookup for fixed internal callers.
+    ///
+    /// Model-selected calls must use [`AuthorizedToolView::run_named`].
     pub async fn run_named(
         &self,
         name: &str,
@@ -421,6 +306,35 @@ impl ToolRegistry {
     }
 }
 
+fn reject_model_scope_override(input: &Value) -> Result<()> {
+    fn visit(value: &Value) -> Option<&str> {
+        match value {
+            Value::Object(fields) => fields.iter().find_map(|(key, value)| {
+                if matches!(
+                    key.as_str(),
+                    "org_id"
+                        | "organization_id"
+                        | "company_id"
+                        | "orgId"
+                        | "organizationId"
+                        | "companyId"
+                ) {
+                    Some(key.as_str())
+                } else {
+                    visit(value)
+                }
+            }),
+            Value::Array(values) => values.iter().find_map(visit),
+            _ => None,
+        }
+    }
+
+    if let Some(key) = visit(input) {
+        anyhow::bail!("model input cannot set scope field '{key}'")
+    }
+    Ok(())
+}
+
 pub fn agent_allows_action(agent: &ResolvedAgentConfig, action: &str) -> bool {
     if agent.allowed_actions.iter().any(|a| a == action) {
         return true;
@@ -454,7 +368,260 @@ pub fn agent_allows_action(agent: &ResolvedAgentConfig, action: &str) -> bool {
     }
 }
 
-async fn persist_step(
+#[cfg(test)]
+mod generated_registry_tests {
+    use std::sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc,
+    };
+
+    use crate::{
+        config::Config, providers, qdrant_client::VectorStore, rig_agent::RigContext,
+        state::AppState,
+    };
+    use stdb_client::StdbClient;
+
+    use super::*;
+
+    #[test]
+    fn generated_specs_come_from_the_reviewed_catalog_only() {
+        let registry = ToolRegistry::new();
+        assert_eq!(registry.tool_names().len(), 7);
+        let specs = registry
+            .generated_specs()
+            .expect("valid pinned catalog")
+            .into_iter()
+            .map(|spec| spec.name)
+            .collect::<Vec<_>>();
+        assert_eq!(
+            specs.len(),
+            3,
+            "the pinned release ships three reviewed reads"
+        );
+        // The generated namespace never falls back to, or collides with, the
+        // runtime tools.
+        for runtime in registry.tool_names() {
+            assert!(!specs.iter().any(|name| name == runtime), "{runtime}");
+        }
+    }
+
+    fn sample_agent() -> ResolvedAgentConfig {
+        ResolvedAgentConfig {
+            agent_id: 1,
+            provider: "test".into(),
+            model: "test".into(),
+            system_prompt: String::new(),
+            temperature: 0.0,
+            max_tokens: 1,
+            context_window: 32_000,
+            top_p: 1.0,
+            allowed_actions: vec!["chat".into()],
+            allowed_models: vec![],
+            monthly_budget: None,
+            monthly_spend: 0.0,
+            cost_per_1k_tokens: 0.0,
+            rate_limit_per_minute: 1,
+            ollama_supports_tool_calling: false,
+        }
+    }
+
+    #[test]
+    fn authorized_view_contains_only_allowlisted_action_permitted_tools() {
+        let registry = ToolRegistry::new();
+        let view = registry.authorized_view(
+            &sample_agent(),
+            &[
+                "erp_snapshot".into(),
+                "web_search".into(),
+                "not_registered".into(),
+            ],
+        );
+        let names: Vec<_> = view.tool_names().collect();
+        assert_eq!(names, vec!["erp_snapshot"]);
+    }
+
+    struct CounterTool {
+        calls: Arc<AtomicUsize>,
+    }
+
+    #[async_trait]
+    impl AgentTool for CounterTool {
+        fn name(&self) -> &'static str {
+            "synthetic_counter"
+        }
+
+        fn required_action(&self) -> &'static str {
+            "chat"
+        }
+
+        async fn execute(&self, ctx: &ToolContext, _input: &Value) -> Result<ToolOutput> {
+            self.calls.fetch_add(1, Ordering::SeqCst);
+            Ok(ToolOutput {
+                summary: format!("{}:{}", ctx.org_id, ctx.company_id),
+                data: Value::Null,
+                citations: vec![],
+                row_count: None,
+            })
+        }
+    }
+
+    async fn test_context() -> ToolContext {
+        let config = Config {
+            port: 8080,
+            internal_secret: None,
+            qdrant_url: "http://127.0.0.1:6334".into(),
+            qdrant_api_key: None,
+            qdrant_collection: "test".into(),
+            stdb_host: "http://127.0.0.1:3000".into(),
+            stdb_module: "test".into(),
+            stdb_token: "test-token".into(),
+            ai_certification_stdb_token: None,
+            ai_spend_read_stdb_token: None,
+            ai_certification_runtime_hash: None,
+            ai_certification_poll_secs: 60,
+            ai_certification_batch_size: 1,
+            ai_certification_timeout_secs: 1,
+            worker_poll_secs: 60,
+            worker_batch_size: 1,
+            kaggle_username: None,
+            kaggle_api_key: None,
+            dataset_cache_dir: "/tmp".into(),
+            kaggle_cache_ttl_secs: 60,
+            embedding_provider: "ollama".into(),
+            ollama_url: "http://127.0.0.1:11434".into(),
+            ollama_embed_model: "test".into(),
+            ollama_vision_model: "test".into(),
+            ollama_llm_model: "test".into(),
+            ollama_supports_tool_calling: false,
+            mistral_api_key: None,
+            google_api_key: None,
+            gemini_embed_model: "test".into(),
+            kong_llm_url: None,
+            kong_llm_service_token: None,
+            kong_llm_readiness_url: None,
+            vision_provider: "ollama".into(),
+            document_parser: "plain".into(),
+            unstructured_url: "http://127.0.0.1:8000".into(),
+            unstructured_api_key: None,
+            activity_refs_collection: "test".into(),
+            activity_ingest_interval_secs: 60,
+            max_upload_bytes: 1024,
+            web_search_provider: "disabled".into(),
+            web_search_api_key: None,
+            web_fetch_max_bytes: 1024,
+            api_server_url: None,
+        };
+        let http = reqwest::Client::new();
+        let providers = providers::build(&config, http.clone()).expect("test providers");
+        let vector_store = Arc::new(
+            VectorStore::new(
+                &config.qdrant_url,
+                config.qdrant_api_key.as_deref(),
+                config.activity_refs_collection.clone(),
+            )
+            .await
+            .expect("test vector store"),
+        );
+        let rig = Arc::new(
+            RigContext::new(&config, providers.clone())
+                .await
+                .expect("test rig context"),
+        );
+        let stdb = Arc::new(StdbClient::new(
+            config.stdb_host.clone(),
+            config.stdb_module.clone(),
+            config.stdb_token.clone(),
+        ));
+        ToolContext {
+            state: AppState {
+                config: Arc::new(config),
+                providers,
+                vector_store,
+                rig,
+                stdb: stdb.clone(),
+                spend_read_stdb: None,
+                http: Arc::new(http),
+                activity_watermarks: Arc::new(dashmap::DashMap::new()),
+                download_jobs: Arc::new(dashmap::DashMap::new()),
+                kaggle_search_cache: Arc::new(dashmap::DashMap::new()),
+                agent_rate_limiter: Arc::new(crate::rate_limit::AgentRateLimiter::new()),
+            },
+            stdb,
+            org_id: 12,
+            company_id: 34,
+            run_id: 1,
+            skill_key: "test".into(),
+            config_json: Value::Null,
+            inputs: Value::Null,
+            allowed_action_drafts: vec![],
+            actor: None,
+        }
+    }
+
+    #[tokio::test]
+    async fn authorized_view_executes_only_allowed_counter_calls() {
+        let calls = Arc::new(AtomicUsize::new(0));
+        let counter = CounterTool {
+            calls: calls.clone(),
+        };
+        let view = AuthorizedToolView {
+            tools: vec![&counter],
+        };
+        let ctx = test_context().await;
+
+        let output = view
+            .run_named("synthetic_counter", &ctx, &serde_json::json!({}))
+            .await
+            .expect("allowlisted counter executes");
+        assert_eq!(output.summary, "12:34");
+        assert_eq!(calls.load(Ordering::SeqCst), 1);
+
+        let unknown = match view
+            .run_named("not_allowlisted", &ctx, &serde_json::json!({}))
+            .await
+        {
+            Ok(_) => panic!("unknown name unexpectedly executed"),
+            Err(error) => error,
+        };
+        assert!(unknown.to_string().contains("not authorized"));
+        let scope = match view
+            .run_named(
+                "synthetic_counter",
+                &ctx,
+                &serde_json::json!({"nested": {"companyId": 99}}),
+            )
+            .await
+        {
+            Ok(_) => panic!("scope override unexpectedly executed"),
+            Err(error) => error,
+        };
+        assert!(scope.to_string().contains("cannot set scope"));
+        assert_eq!(calls.load(Ordering::SeqCst), 1);
+
+        let denied_agent = ResolvedAgentConfig {
+            allowed_actions: vec![],
+            ..sample_agent()
+        };
+        let denied_registry = ToolRegistry {
+            tools: vec![Box::new(CounterTool {
+                calls: calls.clone(),
+            })],
+        };
+        let denied_view =
+            denied_registry.authorized_view(&denied_agent, &["synthetic_counter".into()]);
+        let denied = match denied_view
+            .run_named("synthetic_counter", &ctx, &serde_json::json!({}))
+            .await
+        {
+            Ok(_) => panic!("action-filtered tool unexpectedly executed"),
+            Err(error) => error,
+        };
+        assert!(denied.to_string().contains("not authorized"));
+        assert_eq!(calls.load(Ordering::SeqCst), 1);
+    }
+}
+
+pub(crate) async fn persist_step(
     stdb: &stdb_client::StdbClient,
     org_id: u64,
     company_id: u64,
@@ -478,7 +645,7 @@ async fn persist_step(
                 "step_no": step_no,
                 "tool_name": tool_name,
                 "input_hash": input_hash,
-                "output_summary": output_summary.chars().take(8000).collect::<String>(),
+                "output_summary": bounded_step_summary(output_summary),
                 "output_row_count": output_row_count,
                 "citations_json": citations_json,
                 "duration_ms": duration_ms,
@@ -488,4 +655,29 @@ async fn persist_step(
     ))
     .await?;
     Ok(())
+}
+
+fn bounded_step_summary(summary: &str) -> String {
+    const MAX_BYTES: usize = 8_000;
+    if summary.len() <= MAX_BYTES {
+        return summary.to_string();
+    }
+    let mut end = MAX_BYTES;
+    while !summary.is_char_boundary(end) {
+        end -= 1;
+    }
+    summary[..end].to_string()
+}
+
+#[cfg(test)]
+mod step_persistence_tests {
+    use super::bounded_step_summary;
+
+    #[test]
+    fn step_summary_bound_is_utf8_safe_and_measured_in_bytes() {
+        let summary = format!("{}é", "a".repeat(7_999));
+        let bounded = bounded_step_summary(&summary);
+        assert_eq!(bounded.len(), 7_999);
+        assert!(bounded.is_char_boundary(bounded.len()));
+    }
 }
