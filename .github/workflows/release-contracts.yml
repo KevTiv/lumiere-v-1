@@ -187,7 +187,10 @@ jobs:
           previous = json.loads(path.read_text(encoding="utf-8"))
           history._validate_history(previous)
           current = history.build_history(Path(".contracts-staging/ir/lumiere-contract-ir-v2.json"))
-          previous_operations = previous["operations"]
+          # The revision chain binds the recorded operations; shape comparison
+          # uses them with approved compatibility exceptions applied.
+          recorded_operations = previous["operations"]
+          previous_operations = json.loads(json.dumps(recorded_operations))
           for exception in previous["compatibility_exceptions"]:
               if exception["operation_id"] in previous_operations:
                   previous_operations[exception["operation_id"]]["shape_fingerprint"] = exception["current_fingerprint"]
@@ -221,7 +224,7 @@ jobs:
           current["revisions"].append({
               "previous_release": "v" + os.environ["PREVIOUS_VERSION"],
               "previous_ir_sha256": os.environ["PREVIOUS_IR_SHA256"],
-              "previous_operations_fingerprint": history.operation_set_fingerprint(previous_operations),
+              "previous_operations_fingerprint": history.operation_set_fingerprint(recorded_operations),
               "current_operations_fingerprint": history.operation_set_fingerprint(current["operations"]),
               "operation_count": len(current["operations"]),
               "reason": reason,
