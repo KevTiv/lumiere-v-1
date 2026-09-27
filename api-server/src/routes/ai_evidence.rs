@@ -27,6 +27,11 @@ struct RecordUserContributionBody {
     event_ref: String,
     introduced_kind: String,
     source_version_id: Option<u64>,
+    /// Alternative to `source_version_id`: the id of an `ai_evidence_passage`
+    /// the user is citing (e.g. from a RAG answer's sources). Resolved to its
+    /// bound source version server-side — the browser never supplies the
+    /// version id itself in this path.
+    passage_id: Option<u64>,
     inspection_state: String,
     #[serde(default)]
     is_secondary_quotation: bool,
@@ -81,15 +86,31 @@ fn validate_body(body: &RecordUserContributionBody) -> Result<(), ApiError> {
             "introducedKind must be source_version or concept".into(),
         ));
     }
-    match (body.introduced_kind.as_str(), body.source_version_id) {
-        ("source_version", None | Some(0)) => {
+    if body.source_version_id.is_some_and(|id| id == 0)
+        || body.passage_id.is_some_and(|id| id == 0)
+    {
+        return Err(ApiError::BadRequest(
+            "sourceVersionId and passageId must be positive when present".into(),
+        ));
+    }
+    match (
+        body.introduced_kind.as_str(),
+        body.source_version_id,
+        body.passage_id,
+    ) {
+        ("source_version", None, None) => {
             return Err(ApiError::BadRequest(
-                "sourceVersionId is required for a source_version contribution".into(),
+                "a source_version contribution requires exactly one of sourceVersionId or passageId".into(),
             ));
         }
-        ("concept", Some(_)) => {
+        ("source_version", Some(_), Some(_)) => {
             return Err(ApiError::BadRequest(
-                "sourceVersionId is not allowed for a concept contribution".into(),
+                "provide only one of sourceVersionId or passageId".into(),
+            ));
+        }
+        ("concept", Some(_), _) | ("concept", _, Some(_)) => {
+            return Err(ApiError::BadRequest(
+                "sourceVersionId and passageId are not allowed for a concept contribution".into(),
             ));
         }
         _ => {}
@@ -186,6 +207,7 @@ fn validate_decision_body(body: &CaptureDecisionBody) -> Result<(), ApiError> {
         event_ref: body.event_ref.clone(),
         introduced_kind: "concept".into(),
         source_version_id: None,
+        passage_id: None,
         inspection_state: "user_reported".into(),
         is_secondary_quotation: false,
         note: Some(body.rationale.clone()),
@@ -226,6 +248,36 @@ fn validate_decision_body(body: &CaptureDecisionBody) -> Result<(), ApiError> {
 fn row_id(row: &Value) -> Option<u64> {
     row.get("id")
         .and_then(|value| value.as_u64().or_else(|| value.as_str()?.parse().ok()))
+}
+
+fn row_u64_field(row: &Value, camel: &str, snake: &str) -> Option<u64> {
+    row.get(camel)
+        .or_else(|| row.get(snake))
+        .and_then(|value| value.as_u64().or_else(|| value.as_str()?.parse().ok()))
+}
+
+/// Resolve a cited passage to the source version it is bound to. Scoped to
+/// the caller's own organization/company so a passage id cannot be used to
+/// probe another tenant's evidence graph.
+async fn resolve_passage_source_version_id(
+    context: &TrustedOperationContext,
+    organization_id: u64,
+    company_id: u64,
+    passage_id: u64,
+) -> Result<u64, ApiError> {
+    let rows = context
+        .client()
+        .query_sql_sats(&format!(
+            "SELECT * FROM ai_evidence_passage WHERE organization_id = {organization_id} AND company_id = {company_id} AND id = {passage_id} LIMIT 2"
+        ))
+        .await
+        .map_err(ApiError::internal)?;
+    if rows.len() != 1 {
+        return Err(ApiError::NotFound("cited passage not found".into()));
+    }
+    row_u64_field(&rows[0], "sourceVersionId", "source_version_id").ok_or_else(|| {
+        ApiError::Unprocessable("cited passage is not bound to a source version".into())
+    })
 }
 
 async fn contribution_id(
@@ -307,6 +359,21 @@ async fn record_user_contribution(
     .await
     .map_err(opaque_dispatch_error)?;
 
+    let source_version_id = match (body.source_version_id, body.passage_id) {
+        (Some(id), None) => Some(id),
+        (None, Some(passage_id)) => Some(
+            resolve_passage_source_version_id(
+                &read_context,
+                organization_id,
+                company_id,
+                passage_id,
+            )
+            .await?,
+        ),
+        (None, None) => None,
+        (Some(_), Some(_)) => unreachable!("validate_body rejects both fields set"),
+    };
+
     let event_ref = body.event_ref.trim().to_string();
     let params = json!({
         "contributor_kind": "user",
@@ -315,7 +382,7 @@ async fn record_user_contribution(
         "turn_ref": body.turn_ref.as_deref().map(str::trim),
         "event_ref": event_ref,
         "introduced_kind": body.introduced_kind,
-        "source_version_id": body.source_version_id,
+        "source_version_id": source_version_id,
         "inspection_state": body.inspection_state,
         "is_secondary_quotation": body.is_secondary_quotation,
         "note": body.note,
@@ -551,6 +618,7 @@ mod tests {
             event_ref: "x".repeat(MAX_REFERENCE_LENGTH + 1),
             introduced_kind: "concept".into(),
             source_version_id: None,
+            passage_id: None,
             inspection_state: "unverified_recollection".into(),
             is_secondary_quotation: false,
             note: None,
@@ -567,6 +635,7 @@ mod tests {
             event_ref: "event-1".into(),
             introduced_kind: "source_version".into(),
             source_version_id: None,
+            passage_id: None,
             inspection_state: "inspected".into(),
             is_secondary_quotation: false,
             note: None,
@@ -577,6 +646,38 @@ mod tests {
         assert!(matches!(validate_body(&body), Err(ApiError::BadRequest(_))));
         body.source_version_id = None;
         body.inspection_state = "trusted_by_model".into();
+        assert!(matches!(validate_body(&body), Err(ApiError::BadRequest(_))));
+    }
+
+    #[test]
+    fn passage_id_and_source_version_id_are_mutually_exclusive_alternatives() {
+        let mut body = RecordUserContributionBody {
+            company_id: 9,
+            session_ref: "session-1".into(),
+            turn_ref: None,
+            event_ref: "event-1".into(),
+            introduced_kind: "source_version".into(),
+            source_version_id: Some(11),
+            passage_id: Some(22),
+            inspection_state: "user_reported".into(),
+            is_secondary_quotation: false,
+            note: None,
+        };
+        assert!(matches!(validate_body(&body), Err(ApiError::BadRequest(_))));
+
+        body.source_version_id = None;
+        assert!(validate_body(&body).is_ok());
+
+        body.passage_id = None;
+        body.source_version_id = Some(0);
+        assert!(matches!(validate_body(&body), Err(ApiError::BadRequest(_))));
+
+        body.source_version_id = None;
+        body.passage_id = Some(0);
+        assert!(matches!(validate_body(&body), Err(ApiError::BadRequest(_))));
+
+        body.passage_id = Some(22);
+        body.introduced_kind = "concept".into();
         assert!(matches!(validate_body(&body), Err(ApiError::BadRequest(_))));
     }
 
