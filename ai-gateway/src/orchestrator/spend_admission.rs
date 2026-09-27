@@ -19,6 +19,9 @@
 //!   reservation stays reserved; neither is retried or settled here. The
 //!   transport cannot tell a lost response from a provider that never ran, so
 //!   no dispatch error is recorded as a definite `failed`;
+//! - a definite unusable completion (length exhaustion, filtering, or
+//!   malformed structured output): the attempt becomes `failed` with bounded
+//!   metadata and its known usage is settled;
 //! - usage above the reserved allowance: the module rejects the result and the
 //!   error propagates with the attempt dispatched and the reservation reserved.
 
@@ -34,7 +37,9 @@ use crate::ai_spend::{
     PriceSnapshot, ProviderAttempt, RequestKind, Reservation, ReserveRequest, SpendBudget,
     SpendReader, ATTEMPT_ACCEPTED, STATUS_RESERVED,
 };
-use crate::providers::llm::{LlmCompletion, LlmMessage, LlmRequest, LlmResponse};
+use crate::providers::llm::{
+    CompletionTermination, LlmCompletion, LlmMessage, LlmRequest, LlmResponse,
+};
 
 /// Persistence operations needed for admission; implemented over SpacetimeDB
 /// in production and in memory for tests.
@@ -463,15 +468,19 @@ impl LlmCompletion for SpendAdmittedLlm<'_> {
                 )));
             }
         };
+        let result = match definite_completion_failure(&response) {
+            Some(reason) => AttemptResult::failed(
+                attempt.id,
+                response.input_tokens,
+                response.output_tokens,
+                &reason,
+            ),
+            None => {
+                AttemptResult::succeeded(attempt.id, response.input_tokens, response.output_tokens)
+            }
+        };
         self.ledger
-            .record_attempt_result(
-                organization_id,
-                &AttemptResult::succeeded(
-                    attempt.id,
-                    response.input_tokens,
-                    response.output_tokens,
-                ),
-            )
+            .record_attempt_result(organization_id, &result)
             .await
             .with_context(|| {
                 format!("recording the result of {key} failed; attempt and reservation left for reconciliation")
@@ -488,6 +497,48 @@ impl LlmCompletion for SpendAdmittedLlm<'_> {
                 format!("settlement failed for {key}; reservation left for reconciliation")
             })?;
         Ok(response)
+    }
+}
+
+fn definite_completion_failure(response: &LlmResponse) -> Option<String> {
+    let content_present = !response.text.trim().is_empty()
+        || response
+            .tool_calls
+            .iter()
+            .any(|call| call.arguments_error.is_none());
+    match response.termination {
+        CompletionTermination::Length => Some(format!(
+            "completion_termination=length; thinking_observed={}; content_present={content_present}",
+            response.thinking_observed
+        )),
+        CompletionTermination::Filtered => Some(format!(
+            "completion_termination=filtered; provider_reason={}",
+            response.provider_done_reason.as_deref().unwrap_or("filtered")
+        )),
+        CompletionTermination::Complete
+        | CompletionTermination::ToolCall
+        | CompletionTermination::Unknown => {
+            if response
+                .tool_calls
+                .iter()
+                .any(|call| call.arguments_error.is_some())
+            {
+                Some("completion_termination=malformed_structured_output".to_string())
+            } else if !content_present {
+                Some(format!(
+                    "completion_termination={}; content_present=false",
+                    match response.termination {
+                        CompletionTermination::Complete => "complete",
+                        CompletionTermination::ToolCall => "tool_call",
+                        CompletionTermination::Unknown => "unknown",
+                        CompletionTermination::Length => "length",
+                        CompletionTermination::Filtered => "filtered",
+                    }
+                ))
+            } else {
+                None
+            }
+        }
     }
 }
 
@@ -549,11 +600,14 @@ fn prompt_bytes(req: &LlmRequest) -> usize {
 mod tests {
     use super::*;
     use crate::ai_spend::{
-        ATTEMPT_DISPATCHED, ATTEMPT_OUTCOME_UNKNOWN, ATTEMPT_SUCCEEDED, STATUS_SETTLED,
+        ATTEMPT_DISPATCHED, ATTEMPT_FAILED, ATTEMPT_OUTCOME_UNKNOWN, ATTEMPT_SUCCEEDED,
+        STATUS_SETTLED,
     };
     use anyhow::anyhow;
     use chrono::TimeZone;
     use std::sync::Mutex;
+
+    use crate::providers::llm::ThinkingMode;
 
     fn fixed_clock() -> DateTime<Utc> {
         Utc.with_ymd_and_hms(2026, 9, 13, 12, 0, 0).unwrap()
@@ -582,6 +636,8 @@ mod tests {
             temperature: None,
             top_p: None,
             tools: Vec::new(),
+            single_shot_tool: false,
+            thinking: ThinkingMode::ProviderDefault,
         }
     }
 
@@ -593,18 +649,25 @@ mod tests {
             model: "mistral-small".into(),
             provider: "mistral".into(),
             tool_calls: Vec::new(),
+            termination: CompletionTermination::Complete,
+            provider_done_reason: Some("stop".into()),
+            thinking_observed: false,
         }
     }
 
     struct Provider {
-        result: Mutex<Option<Result<LlmResponse>>>,
+        results: Mutex<Vec<Result<LlmResponse>>>,
         calls: Mutex<u32>,
     }
 
     impl Provider {
         fn new(result: Result<LlmResponse>) -> Self {
+            Self::sequence(vec![result])
+        }
+
+        fn sequence(results: Vec<Result<LlmResponse>>) -> Self {
             Self {
-                result: Mutex::new(Some(result)),
+                results: Mutex::new(results.into_iter().rev().collect()),
                 calls: Mutex::new(0),
             }
         }
@@ -617,11 +680,11 @@ mod tests {
     impl LlmCompletion for Provider {
         async fn complete(&self, _req: LlmRequest) -> Result<LlmResponse> {
             *self.calls.lock().unwrap() += 1;
-            self.result
+            self.results
                 .lock()
                 .unwrap()
-                .take()
-                .unwrap_or_else(|| Err(anyhow!("provider called twice")))
+                .pop()
+                .unwrap_or_else(|| Err(anyhow!("scripted provider exhausted")))
         }
     }
 
@@ -785,6 +848,7 @@ mod tests {
                 },
                 input_tokens: 0,
                 output_tokens: 0,
+                failure_reason: None,
             });
             Ok(())
         }
@@ -836,6 +900,7 @@ mod tests {
             row.status = result.status.into();
             row.input_tokens = result.input_tokens;
             row.output_tokens = result.output_tokens;
+            row.failure_reason = result.failure_reason.clone();
             Ok(())
         }
     }
@@ -878,6 +943,90 @@ mod tests {
                 "settle"
             ]
         );
+    }
+
+    #[tokio::test]
+    async fn bounded_fallback_calls_receive_distinct_attempts_in_one_causal_scope() {
+        let mut starved = response(40, 256);
+        starved.text.clear();
+        starved.termination = CompletionTermination::Length;
+        starved.provider_done_reason = Some("length".into());
+        starved.thinking_observed = true;
+        let provider = Provider::sequence(vec![Ok(starved), Ok(response(40, 20))]);
+        let ledger = FakeLedger::configured();
+        let admitted =
+            SpendAdmittedLlm::with_clock_and_scope(&provider, &ledger, binding(), fixed_clock, 17)
+                .unwrap();
+
+        admitted.complete(request()).await.unwrap();
+        let mut fallback = request();
+        fallback.thinking = ThinkingMode::Disabled;
+        admitted.complete(fallback).await.unwrap();
+
+        assert_eq!(provider.calls(), 2);
+        let reservations = ledger.reservations.lock().unwrap();
+        assert_eq!(reservations.len(), 2);
+        assert_eq!(
+            reservations[0].request_key,
+            "h5:spend:run:42:step:1700001:attempt:0"
+        );
+        assert_eq!(
+            reservations[1].request_key,
+            "h5:spend:run:42:step:1700002:attempt:0"
+        );
+        assert!(reservations.iter().all(|row| row.status == STATUS_SETTLED));
+        let attempts = ledger.attempts.lock().unwrap();
+        assert_eq!(attempts.len(), 2);
+        assert_eq!(attempts[0].status, ATTEMPT_FAILED);
+        assert_eq!(
+            attempts[0].failure_reason.as_deref(),
+            Some("completion_termination=length; thinking_observed=true; content_present=false")
+        );
+        assert_eq!(attempts[1].status, ATTEMPT_SUCCEEDED);
+        assert!(attempts[1].failure_reason.is_none());
+        assert_eq!(
+            ledger.writes(),
+            vec![
+                "reserve",
+                "accept",
+                "dispatch",
+                &format!("result:{ATTEMPT_FAILED}"),
+                "settle",
+                "reserve",
+                "accept",
+                "dispatch",
+                &format!("result:{ATTEMPT_SUCCEEDED}"),
+                "settle",
+            ]
+        );
+    }
+
+    #[test]
+    fn definite_completion_failures_are_safe_and_distinct() {
+        let mut empty = response(40, 0);
+        empty.text.clear();
+        empty.termination = CompletionTermination::Unknown;
+        empty.provider_done_reason = Some("vendor_empty".into());
+        assert_eq!(
+            definite_completion_failure(&empty).as_deref(),
+            Some("completion_termination=unknown; content_present=false")
+        );
+
+        let mut malformed = response(40, 20);
+        malformed.text.clear();
+        malformed.tool_calls = vec![crate::providers::llm::ToolCallRequest {
+            id: None,
+            name: "submit".into(),
+            arguments: serde_json::Value::Null,
+            arguments_error: Some("SECRET provider output".into()),
+        }];
+        assert_eq!(
+            definite_completion_failure(&malformed).as_deref(),
+            Some("completion_termination=malformed_structured_output")
+        );
+        assert!(!definite_completion_failure(&malformed)
+            .unwrap()
+            .contains("SECRET"));
     }
 
     #[tokio::test]
@@ -940,6 +1089,7 @@ mod tests {
             status: ATTEMPT_SUCCEEDED.into(),
             input_tokens: 1,
             output_tokens: 1,
+            failure_reason: None,
         });
         let err = admitted(&provider, &ledger)
             .complete(request())

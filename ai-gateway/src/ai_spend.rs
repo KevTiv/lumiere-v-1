@@ -47,7 +47,7 @@ input_token_allowance, output_token_allowance, status, settled_input_tokens, set
 const DRAFT_REQUEST_COLS: &str =
     "id, organization_id, company_id, run_id, request_key, draft_id, creation_payload_hash";
 const ATTEMPT_COLS: &str = "id, organization_id, company_id, agent_id, run_id, reservation_id, \
-request_key, provider, model, status, input_tokens, output_tokens";
+request_key, provider, model, status, input_tokens, output_tokens, failure_reason";
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum RequestKind {
@@ -204,6 +204,7 @@ pub struct ProviderAttempt {
     pub status: String,
     pub input_tokens: u32,
     pub output_tokens: u32,
+    pub failure_reason: Option<String>,
 }
 
 /// Exact binding for an accepted attempt, mirroring
@@ -252,6 +253,19 @@ impl AttemptResult {
             status: ATTEMPT_OUTCOME_UNKNOWN,
             input_tokens: 0,
             output_tokens: 0,
+            failure_reason: attempt_note(reason),
+        }
+    }
+
+    /// The provider returned a definite but unusable completion. Usage remains
+    /// known and is settled, while the bounded failure reason makes the
+    /// terminal condition inspectable without retaining provider output.
+    pub fn failed(attempt_id: u64, input_tokens: u32, output_tokens: u32, reason: &str) -> Self {
+        Self {
+            attempt_id,
+            status: ATTEMPT_FAILED,
+            input_tokens,
+            output_tokens,
             failure_reason: attempt_note(reason),
         }
     }
@@ -713,6 +727,11 @@ fn find_attempt(
             status,
             input_tokens: req_u32(row, "inputTokens", "input_tokens")?,
             output_tokens: req_u32(row, "outputTokens", "output_tokens")?,
+            failure_reason: row
+                .get("failureReason")
+                .or_else(|| row.get("failure_reason"))
+                .and_then(Value::as_str)
+                .map(str::to_string),
         });
     }
     Ok(found)
@@ -938,6 +957,15 @@ mod tests {
             .unwrap()
             .unwrap();
         assert_eq!((found.reservation_id, found.input_tokens), (100, 40));
+        assert!(found.failure_reason.is_none());
+        let mut failed_row = row(9, 42, key, ATTEMPT_FAILED, 100);
+        failed_row["failure_reason"] = json!("completion_termination=length");
+        let failed = find_attempt(&[failed_row], 9, 42, key).unwrap().unwrap();
+        assert_eq!(failed.status, ATTEMPT_FAILED);
+        assert_eq!(
+            failed.failure_reason.as_deref(),
+            Some("completion_termination=length")
+        );
         assert!(
             find_attempt(&[row(9, 42, key, ATTEMPT_ACCEPTED, 100)], 9, 43, key)
                 .unwrap()
@@ -966,6 +994,14 @@ mod tests {
         assert!(AttemptResult::outcome_unknown(5, "   ")
             .failure_reason
             .is_none());
+
+        let failed = AttemptResult::failed(5, 40, 256, " completion_termination=length ");
+        assert_eq!(failed.status, ATTEMPT_FAILED);
+        assert_eq!((failed.input_tokens, failed.output_tokens), (40, 256));
+        assert_eq!(
+            failed.failure_reason.as_deref(),
+            Some("completion_termination=length")
+        );
 
         // Truncation stays inside the module limit, is marked, and never splits
         // a multi-byte character.
