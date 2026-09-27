@@ -1,0 +1,254 @@
+name: Release contracts v0.3.58
+# One-off release of the COV-05c/06/07/08 integration branch. It regenerates
+# the contracts from a live module, records the operation-history revision,
+# publishes lumiere-contracts v0.3.58 and pins it on this branch. Remove this
+# file once the pin has landed.
+
+on:
+  push:
+    branches: [claude/remaining-implementation-tasks-9ujw4u]
+    paths:
+      - .github/workflows/release-contracts-v0358.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-contracts-v0358
+  cancel-in-progress: false
+
+env:
+  VERSION: "0.3.58"
+  PREVIOUS_VERSION: "0.3.57"
+  # sha256 of ir/lumiere-contract-ir-v2.json in v0.3.57 (release manifest artifact_sha256).
+  PREVIOUS_IR_SHA256: "sha256:fac05dd12b3f2f0d785ff95cd031875efb66f58c46c58a6baba9d43cff6ddf99"
+  SPACETIME_CLI_VERSION: "2.8.2"
+  STDB_MODULE: lumiere-release-contracts
+  STDB_SCHEMA_SERVER: local
+  STDB_SCHEMA_HOST: http://127.0.0.1:3000
+  STDB_GENERATE_WASM: .ci/contracts-module.wasm
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
+          fetch-depth: 0
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      # A dedicated write key is preferred; the shared deploy key is used when
+      # no publish key is configured.
+      - uses: ./.github/actions/setup-contracts-ssh
+        with:
+          deploy-key: ${{ secrets.LUMIERE_CONTRACTS_PUBLISH_KEY || secrets.LUMIERE_CONTRACTS_DEPLOY_KEY }}
+
+      - name: Skip when the tag already exists
+        id: guard
+        run: |
+          if git ls-remote --exit-code --tags git@github.com:KevTiv/lumiere-contracts.git "refs/tags/v$VERSION" >/dev/null; then
+            echo "lumiere-contracts v$VERSION already exists; nothing to publish"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: Swatinem/rust-cache@v2
+        if: steps.guard.outputs.skip != 'true'
+        with:
+          workspaces: |
+            spacetimedb
+            .
+          cache-on-failure: true
+
+      - uses: ./.github/actions/setup-spacetime-cli
+        if: steps.guard.outputs.skip != 'true'
+        with:
+          version: ${{ env.SPACETIME_CLI_VERSION }}
+
+      - name: Start standalone SpacetimeDB
+        if: steps.guard.outputs.skip != 'true'
+        run: |
+          nohup spacetime start --listen-addr 127.0.0.1:3000 > /tmp/lumiere-release-stdb.log 2>&1 &
+          for attempt in {1..60}; do
+            if curl -fsS -X POST http://127.0.0.1:3000/v1/identity >/dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat /tmp/lumiere-release-stdb.log
+          exit 1
+
+      - name: Build and publish module
+        if: steps.guard.outputs.skip != 'true'
+        run: |
+          cargo build --manifest-path spacetimedb/Cargo.toml --target wasm32-unknown-unknown --profile ci-contracts
+          mkdir -p .ci
+          cp spacetimedb/target/wasm32-unknown-unknown/ci-contracts/lumiere_v1.wasm .ci/contracts-module.wasm
+          spacetime publish "$STDB_MODULE" --bin-path .ci/contracts-module.wasm --server local --delete-data=always -y --no-config
+
+      - name: Regenerate contracts (pass 1)
+        if: steps.guard.outputs.skip != 'true'
+        run: |
+          make clean-contracts-live-staging
+          make generate-presentation-schemas schema-snapshot generate-stdb-rust-sdk generate-stdb-ts-sdk codegen
+
+      # New operation IDs and the update_warehouse parameter change are one
+      # release-bound revision on top of v0.3.57.
+      - name: Record operation-history revision
+        if: steps.guard.outputs.skip != 'true'
+        run: |
+          python3 - <<'PY'
+          import importlib.util
+          import json
+          import os
+          from pathlib import Path
+
+          spec = importlib.util.spec_from_file_location("history", "scripts/verify-operation-history.py")
+          history = importlib.util.module_from_spec(spec)
+          spec.loader.exec_module(history)
+
+          path = Path("lumiere-codegen/contract-operation-history.json")
+          previous = json.loads(path.read_text(encoding="utf-8"))
+          history._validate_history(previous)
+          current = history.build_history(Path(".contracts-staging/ir/lumiere-contract-ir-v2.json"))
+          previous_operations = previous["operations"]
+          for exception in previous["compatibility_exceptions"]:
+              if exception["operation_id"] in previous_operations:
+                  previous_operations[exception["operation_id"]]["shape_fingerprint"] = exception["current_fingerprint"]
+          missing = sorted(set(previous_operations) - set(current["operations"]))
+          if missing:
+              raise SystemExit(f"release must not drop operations: {missing}")
+          for operation_id, entry in previous_operations.items():
+              if entry["name"] != current["operations"][operation_id]["name"]:
+                  raise SystemExit(f"release must not rename {operation_id}")
+          added = sorted(set(current["operations"]) - set(previous_operations))
+          changed = sorted(
+              operation_id
+              for operation_id, entry in previous_operations.items()
+              if entry["shape_fingerprint"] != current["operations"][operation_id]["shape_fingerprint"]
+          )
+          print("added:", added)
+          print("changed:", changed)
+          current["retired_ids"] = previous["retired_ids"]
+          current["revisions"] = list(previous.get("revisions", []))
+          current["revisions"].append({
+              "previous_release": "v" + os.environ["PREVIOUS_VERSION"],
+              "previous_ir_sha256": os.environ["PREVIOUS_IR_SHA256"],
+              "previous_operations_fingerprint": history.operation_set_fingerprint(previous_operations),
+              "current_operations_fingerprint": history.operation_set_fingerprint(current["operations"]),
+              "operation_count": len(current["operations"]),
+              "reason": (
+                  "COV-05c/06/07/08 release on top of v" + os.environ["PREVIOUS_VERSION"] + ": add "
+                  + ", ".join(operation_id.removeprefix("erp.") for operation_id in added)
+                  + "; change the input shape of "
+                  + (", ".join(operation_id.removeprefix("erp.") for operation_id in changed) or "no existing operation")
+              ),
+          })
+          path.write_text(json.dumps(current, indent=2) + "\n", encoding="utf-8")
+          PY
+          python3 scripts/verify-operation-history.py
+
+      - name: Commit regenerated sources
+        if: steps.guard.outputs.skip != 'true'
+        run: |
+          git add -A -- ':!.ci' ':!.contracts-staging'
+          git status --short
+          if ! git diff --cached --quiet; then
+            git -c user.name="github-actions[bot]" -c user.email="41898+github-actions[bot]@users.noreply.github.com" \
+              commit -m "chore(contracts): regenerate for v$VERSION"
+            git push origin "HEAD:${GITHUB_REF_NAME}"
+          fi
+
+      - name: Regenerate from the clean commit (pass 2)
+        if: steps.guard.outputs.skip != 'true'
+        run: |
+          make clean-contracts-live-staging
+          make generate-presentation-schemas schema-snapshot generate-stdb-rust-sdk generate-stdb-ts-sdk codegen
+          dirty="$(git status --porcelain --untracked-files=normal -- spacetimedb crates/presentation-core lumiere-codegen crates/stdb-auth/assets/resource_registry.json)"
+          if [ -n "$dirty" ]; then
+            echo "Regeneration is not reproducible from the committed tree:"
+            echo "$dirty"
+            git diff --stat
+            exit 1
+          fi
+          python3 scripts/verify-operation-history.py
+          python3 scripts/verify-contract-ir.py .contracts-staging/ir/lumiere-contract-ir-v2.json --require-clean
+
+      # Build and check the full candidate first; nothing remote changes if it fails.
+      - name: Prepare contracts release
+        if: steps.guard.outputs.skip != 'true'
+        env:
+          LUMIERE_CONTRACTS_PREPARE_DIR: ${{ runner.temp }}/contracts-release
+        run: make publish-contracts VERSION="$VERSION"
+
+      - name: Publish contracts release
+        if: steps.guard.outputs.skip != 'true'
+        working-directory: ${{ runner.temp }}/contracts-release/repo
+        run: |
+          git push origin HEAD:main
+          git -c user.name="lumiere-codegen" -c user.email="codegen@lumiere.local" \
+            tag -a "v$VERSION" -m "Generated contracts release v$VERSION"
+          git push origin "v$VERSION"
+
+      - name: Pin the release
+        if: steps.guard.outputs.skip != 'true'
+        run: |
+          REVISION="$(git -C "$RUNNER_TEMP/contracts-release/repo" rev-parse HEAD)"
+          OLD_REVISION="$(python3 -c 'import json;print(json.load(open("release-compatibility-manifest.json"))["lumiere_contracts"]["revision"])')"
+          sed -i "s/tag = \"v$PREVIOUS_VERSION\"/tag = \"v$VERSION\"/" Cargo.toml
+          sed -i "s/lumiere-contracts#v$PREVIOUS_VERSION&/lumiere-contracts#v$VERSION\&/" \
+            frontend/packages/presentation-core/package.json \
+            frontend/packages/query-hooks/package.json \
+            frontend/packages/stdb/package.json
+          sed -i "s/lumiere-contracts#v$PREVIOUS_VERSION&/lumiere-contracts#v$VERSION\&/; s/lumiere-contracts.git#$OLD_REVISION&/lumiere-contracts.git#$REVISION\&/" \
+            frontend/pnpm-lock.yaml
+          sed -i "s/v$PREVIOUS_VERSION/v$VERSION/g" api-server/src/presentation_dictionary.rs
+          cargo update -p lumiere-contracts
+          grep -q "tag=v$VERSION#$REVISION" Cargo.lock
+          CHECKOUT="$(bash scripts/resolve-pinned-contracts.sh)"
+          python3 - "$CHECKOUT" "$REVISION" <<'PY'
+          import hashlib
+          import json
+          import os
+          import sys
+          from pathlib import Path
+
+          checkout, revision = Path(sys.argv[1]), sys.argv[2]
+          version = os.environ["VERSION"]
+          pin = json.loads((checkout / "ir/PIN.json").read_text(encoding="utf-8"))
+          path = Path("release-compatibility-manifest.json")
+          manifest = json.loads(path.read_text(encoding="utf-8"))
+          manifest["application_contract"].update({
+              "artifact_sha256": pin["artifact_sha256"],
+              "schema_hash": pin["schema_hash"],
+              "source_commit": pin["source_commit"],
+          })
+          manifest["lumiere_contracts"].update({"version": version, "tag": f"v{version}", "revision": revision})
+          history = Path(manifest["operation_history"]["path"]).read_bytes()
+          manifest["operation_history"]["checksum"] = "sha256:" + hashlib.sha256(history).hexdigest()
+          manifest["minimum_client_contract"]["generated_contract_release"] = version
+          path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+          PY
+          python3 scripts/verify-release-manifest.py
+          git diff --stat
+
+      - name: Verify the pin matches regeneration
+        if: steps.guard.outputs.skip != 'true'
+        run: make check-contracts-drift STDB_MODULE="$STDB_MODULE"
+
+      - name: Commit the pin
+        if: steps.guard.outputs.skip != 'true'
+        run: |
+          git add Cargo.toml Cargo.lock frontend/packages/presentation-core/package.json \
+            frontend/packages/query-hooks/package.json frontend/packages/stdb/package.json \
+            frontend/pnpm-lock.yaml api-server/src/presentation_dictionary.rs \
+            release-compatibility-manifest.json
+          git -c user.name="github-actions[bot]" -c user.email="41898+github-actions[bot]@users.noreply.github.com" \
+            commit -m "chore(contracts): publish and pin v$VERSION"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
