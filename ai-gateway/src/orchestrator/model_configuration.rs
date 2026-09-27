@@ -123,7 +123,7 @@ impl ModelProfile {
 
     pub fn legacy(agent: &ResolvedAgentConfig) -> Self {
         let provider = normalize_provider(&agent.provider);
-        let supports_tools = provider != "ollama";
+        let supports_tools = provider != "ollama" || agent.ollama_supports_tool_calling;
         Self {
             reference: ModelProfileRef {
                 key: "legacy-agent-default".to_string(),
@@ -262,12 +262,11 @@ impl ModelConfigurationStore for StdbModelConfigurationStore<'_> {
             .reader
             .query_sql(&format!(
                 "SELECT * FROM ai_intelligence_policy WHERE organization_id = {organization_id} \
-                 AND policy_key = '{key}' {version_clause} AND is_active = true \
-                 ORDER BY policy_version DESC LIMIT 1"
+                 AND policy_key = '{key}' {version_clause} AND is_active = true"
             ))
             .await
             .context("load intelligence policy")?;
-        rows.first().map(decode_policy).transpose()
+        decode_latest_policy(&rows)
     }
 }
 
@@ -627,6 +626,13 @@ fn decode_policy(row: &Value) -> Result<IntelligencePolicy> {
     })
 }
 
+fn decode_latest_policy(rows: &[Value]) -> Result<Option<IntelligencePolicy>> {
+    rows.iter()
+        .map(decode_policy)
+        .collect::<Result<Vec<_>>>()
+        .map(|policies| policies.into_iter().max_by_key(|policy| policy.version))
+}
+
 fn parse_role(value: &str) -> Result<IntelligenceRole> {
     match value {
         "decision" => Ok(IntelligenceRole::Decision),
@@ -785,6 +791,16 @@ mod tests {
             monthly_spend: 0.0,
             cost_per_1k_tokens: 0.0,
             rate_limit_per_minute: 60,
+            ollama_supports_tool_calling: false,
+        }
+    }
+
+    fn ollama_agent(supports_tool_calling: bool) -> ResolvedAgentConfig {
+        ResolvedAgentConfig {
+            provider: "ollama".to_string(),
+            model: "gemma4:e2b-mlx".to_string(),
+            ollama_supports_tool_calling: supports_tool_calling,
+            ..agent()
         }
     }
 
@@ -864,6 +880,29 @@ mod tests {
             )]),
             fallbacks: HashMap::new(),
         }
+    }
+
+    #[test]
+    fn selects_latest_policy_version_without_server_side_ordering() {
+        let row = |version| {
+            serde_json::json!({
+                "policy_key": "default",
+                "policy_version": version,
+                "default_decision_profile": "decision@1",
+                "default_reasoning_profile": "reasoning@1",
+                "default_generation_profile": "generation@1",
+                "default_review_profile": "review@1",
+                "shadow_profiles": [],
+                "decision_type_overrides_json": "{}",
+                "fallback_profiles_json": "{}"
+            })
+        };
+
+        let latest = decode_latest_policy(&[row(2), row(7), row(4)])
+            .unwrap()
+            .unwrap();
+
+        assert_eq!(latest.version, 7);
     }
 
     #[tokio::test]
@@ -1035,6 +1074,60 @@ mod tests {
             .await
             .unwrap_err();
         assert!(error.to_string().contains("governed intelligence policy"));
+    }
+
+    /// Default posture: an Ollama-provider agent without an explicit policy
+    /// (legacy fallback) stays single-shot only — Decision/Reasoning/Review
+    /// all fail closed rather than silently dropping tool calls.
+    #[tokio::test]
+    async fn legacy_ollama_agent_without_opt_in_rejects_tool_calling_roles() {
+        let store = FakeStore::new();
+        let resolver =
+            IntelligenceRouteResolver::new(&store, 9, &ollama_agent(false), None).unwrap();
+
+        for role in [
+            IntelligenceRole::Decision,
+            IntelligenceRole::Reasoning,
+            IntelligenceRole::Review,
+        ] {
+            let error = resolver.resolve(role, None).await.unwrap_err();
+            assert!(
+                error.to_string().contains("lacks tool-calling"),
+                "role {role:?}: unexpected error {error}"
+            );
+        }
+    }
+
+    /// A generation-only role never needs tool calling, so it stays available
+    /// on the legacy Ollama fallback even without the opt-in.
+    #[tokio::test]
+    async fn legacy_ollama_agent_without_opt_in_still_allows_generation() {
+        let store = FakeStore::new();
+        let resolver =
+            IntelligenceRouteResolver::new(&store, 9, &ollama_agent(false), None).unwrap();
+
+        let route = resolver
+            .resolve(IntelligenceRole::Generation, None)
+            .await
+            .unwrap();
+        assert_eq!(route.primary.provider, "ollama");
+    }
+
+    /// With the explicit `OLLAMA_SUPPORTS_TOOL_CALLING` opt-in threaded onto
+    /// the resolved agent, the legacy fallback profile admits tool-calling
+    /// roles for that Ollama model.
+    #[tokio::test]
+    async fn legacy_ollama_agent_with_opt_in_allows_tool_calling_roles() {
+        let store = FakeStore::new();
+        let resolver =
+            IntelligenceRouteResolver::new(&store, 9, &ollama_agent(true), None).unwrap();
+
+        let route = resolver
+            .resolve(IntelligenceRole::Reasoning, None)
+            .await
+            .unwrap();
+        assert_eq!(route.primary.provider, "ollama");
+        assert!(route.primary.supports_tool_calling);
     }
 
     #[tokio::test]
