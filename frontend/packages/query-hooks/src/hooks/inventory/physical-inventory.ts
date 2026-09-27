@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { stdbBffCommandPost } from "@lumiere/stdb/commands"
 import { apiFetch, fetchQueryList, coalesceQueryInitialData, type QueryRows, rqBigIntKey } from "../../http"
 import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
+import { workflowErrorFromResponse } from "@lumiere/erp-workflows"
 import { scalarToU64 as toScalarU64, type ScalarId } from "@lumiere/erp-shared/u64"
 import {
   toCreateStockInventoryParams,
@@ -328,28 +329,23 @@ export function useValidateCycleCount(
   });
 }
 
-export function usePostCycleCountAdjustments(
-  organizationId: bigint,
-  companyId?: bigint,
-) {
-  const qc = useQueryClient();
-  return useMutation<void, Error, ScalarId>({
-    mutationFn: async (cycleCountId) => {
-      if (companyId == null || companyId <= 0n)
-        throw new Error('A selected company is required');
-      const { urlPath, init } = stdbBffCommandPost(
-        'post_cycle_count_adjustments',
-        { companyId, cycleCountId: toScalarU64(cycleCountId) },
-      );
-      const r = await apiFetch(urlPath, init);
-      if (!r.ok) throw new Error('Failed to post cycle count adjustments');
-    },
-    onSuccess: () => {
-      const orgKey = rqBigIntKey(organizationId);
-      void qc.invalidateQueries({ queryKey: ['stock-cycle-counts', orgKey] });
-      void qc.invalidateQueries({ queryKey: ['stock-quants', orgKey] });
-    },
+/** Underlying command for the `inventory.cycle-count.post` workflow (`useCycleCountAdjustmentWorkflow`). */
+export async function postCycleCountAdjustmentsCommand(
+  companyId: bigint,
+  cycleCountId: ScalarId,
+): Promise<void> {
+  const { urlPath, init } = stdbBffCommandPost('post_cycle_count_adjustments', {
+    companyId,
+    cycleCountId: toScalarU64(cycleCountId),
   });
+  const r = await apiFetch(urlPath, init);
+  if (!r.ok) {
+    throw workflowErrorFromResponse(
+      r.status,
+      await r.text().catch(() => ''),
+      'Failed to post cycle count adjustments',
+    );
+  }
 }
 
 

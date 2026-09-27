@@ -15,7 +15,7 @@ use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 use crate::inventory::inventory_close::assert_inventory_writable;
 use crate::inventory::product::product;
 use crate::inventory::tracking::{
-    stock_production_lot, stock_production_serial, StockProductionSerial,
+    stock_production_lot, stock_production_serial, StockProductionLot, StockProductionSerial,
 };
 use crate::inventory::warehouse::{stock_location, warehouse};
 use crate::inventory::warehouse_operations::warehouse_task;
@@ -1310,57 +1310,119 @@ pub(crate) fn quarantine_quantity(
         });
     }
 
-    if let Some(dest) = ctx
+    // Resolve at most one existing destination quant with the same stock identity.
+    // Duplicate compatible quants are an invariant violation: never merge into
+    // whichever one the iterator visits first.
+    let mut matching_destinations = ctx
         .db
         .stock_quant()
         .quant_by_product()
         .filter(&product_id)
-        .find(|q| {
+        .filter(|q| {
             q.organization_id == organization_id
                 && q.company_id == company_id
                 && q.location_id == quarantine_location_id
                 && q.lot_id == lot_id
-        })
-    {
-        let dq = dest.quantity + qty;
-        // Quarantined stock is never ATP-available even if co-located.
-        ctx.db.stock_quant().id().update(StockQuant {
-            quantity: dq,
-            available_quantity: 0.0,
-            reserved_quantity: 0.0,
-            value: dq * dest.cost,
-            ..dest
         });
-    } else {
-        ctx.db.stock_quant().insert(StockQuant {
-            id: 0,
-            organization_id,
-            product_id,
-            product_variant_id: src.product_variant_id,
-            location_id: quarantine_location_id,
-            lot_id,
-            package_id: src.package_id,
-            owner_id: src.owner_id,
-            company_id,
-            quantity: qty,
-            reserved_quantity: 0.0,
-            available_quantity: 0.0,
-            in_date: Some(ctx.timestamp),
-            inventory_quantity: qty,
-            inventory_diff_quantity: 0.0,
-            inventory_quantity_set: true,
-            is_outdated: false,
-            user_id: Some(ctx.sender()),
-            inventory_date: Some(ctx.timestamp),
-            cost: src.cost,
-            value: qty * src.cost,
-            cost_method: src.cost_method.clone(),
-            accounting_date: None,
-            currency_id: src.currency_id,
-            accounting_entry_ids: vec![],
-            metadata: Some(r#"{"quarantine":true}"#.to_string()),
-        });
+    let dest_id = matching_destinations.next().map(|q| q.id);
+    if matching_destinations.next().is_some() {
+        return Err(format!(
+            "Multiple destination quants match product {} at quarantine location {}",
+            product_id, quarantine_location_id
+        ));
     }
+
+    let destination_quant_id = match dest_id {
+        Some(did) => {
+            let dest = ctx
+                .db
+                .stock_quant()
+                .id()
+                .find(&did)
+                .ok_or("Quarantine destination quant disappeared")?;
+            let dq = dest.quantity + qty;
+            // Quarantined stock is never ATP-available even if co-located.
+            ctx.db.stock_quant().id().update(StockQuant {
+                quantity: dq,
+                available_quantity: 0.0,
+                reserved_quantity: 0.0,
+                value: dq * dest.cost,
+                ..dest
+            });
+            did
+        }
+        None => {
+            let inserted = ctx.db.stock_quant().insert(StockQuant {
+                id: 0,
+                organization_id,
+                product_id,
+                product_variant_id: src.product_variant_id,
+                location_id: quarantine_location_id,
+                lot_id,
+                package_id: src.package_id,
+                owner_id: src.owner_id,
+                company_id,
+                quantity: qty,
+                reserved_quantity: 0.0,
+                available_quantity: 0.0,
+                in_date: Some(ctx.timestamp),
+                inventory_quantity: qty,
+                inventory_diff_quantity: 0.0,
+                inventory_quantity_set: true,
+                is_outdated: false,
+                user_id: Some(ctx.sender()),
+                inventory_date: Some(ctx.timestamp),
+                cost: src.cost,
+                value: qty * src.cost,
+                cost_method: src.cost_method.clone(),
+                accounting_date: None,
+                currency_id: src.currency_id,
+                accounting_entry_ids: vec![],
+                metadata: Some(r#"{"quarantine":true}"#.to_string()),
+            });
+            inserted.id
+        }
+    };
+
+    // Capture the exact quant outcomes: the source tombstone is retained when
+    // the quarantine empties it, mirroring move_stock_quant's commit shape.
+    let mut changed_quants: Vec<RowChange> = Vec::with_capacity(2);
+    if let Some(source_after) = ctx.db.stock_quant().id().find(&src.id) {
+        changed_quants.push(RowChange::upsert_stdb_row(
+            "stock_quant",
+            serde_json::json!({"id": source_after.id}),
+            &source_after,
+        )?);
+    } else {
+        changed_quants.push(RowChange::delete(
+            "stock_quant",
+            serde_json::json!({"id": src.id}),
+        ));
+    }
+    let destination_after = ctx
+        .db
+        .stock_quant()
+        .id()
+        .find(&destination_quant_id)
+        .ok_or("Quarantine destination quant disappeared before commit recording")?;
+    changed_quants.push(RowChange::upsert_stdb_row(
+        "stock_quant",
+        serde_json::json!({"id": destination_after.id}),
+        &destination_after,
+    )?);
+
+    record_organization_commit(
+        ctx,
+        OrganizationCommitInput {
+            organization_id,
+            operation_id: "erp.quarantine_quantity".to_string(),
+            correlation_id: format!(
+                "stock-quant:{}:quarantine-to:{}",
+                src.id, quarantine_location_id
+            ),
+            changes: changed_quants,
+        },
+    )?;
 
     Ok(())
 }
@@ -2219,40 +2281,42 @@ pub fn move_stock_quant(
         return Err("Cannot move more than available quantity (unreserve first)".to_string());
     }
 
+    // A lot-tracked quant carries its lot's org/company/product/lock/expiry
+    // integrity into every relocation, not just reservation and picking
+    // validate — otherwise a locked or expired lot could be moved freely.
+    if let Some(lot_id) = src.lot_id {
+        ensure_lot_for_product(ctx, organization_id, company_id, src.product_id, lot_id)?;
+    }
+
     let qty = params.quantity;
     let eps = 1e-9_f64;
 
-    // Find an existing quant at destination with the same product / variant / lot / package / owner.
-    let mut dest_id: Option<u64> = None;
-    for q in ctx
+    // Resolve at most one existing destination quant with the same stock identity.
+    // Duplicate compatible quants are an invariant violation: never choose by iteration order.
+    let mut matching_destinations = ctx
         .db
         .stock_quant()
         .quant_by_product()
         .filter(&src.product_id)
-    {
-        if q.organization_id != organization_id || q.company_id != company_id {
-            continue;
-        }
-        if q.location_id != params.dest_location_id {
-            continue;
-        }
-        if q.product_variant_id != src.product_variant_id {
-            continue;
-        }
-        if q.lot_id != src.lot_id {
-            continue;
-        }
-        if q.package_id != src.package_id {
-            continue;
-        }
-        if q.owner_id != src.owner_id {
-            continue;
-        }
-        dest_id = Some(q.id);
-        break;
+        .filter(|q| {
+            q.organization_id == organization_id
+                && q.company_id == company_id
+                && q.location_id == params.dest_location_id
+                && q.product_variant_id == src.product_variant_id
+                && q.lot_id == src.lot_id
+                && q.package_id == src.package_id
+                && q.owner_id == src.owner_id
+        });
+    let dest_id = matching_destinations.next().map(|q| q.id);
+    if matching_destinations.next().is_some() {
+        return Err(format!(
+            "Multiple destination quants match source quant {} at location {}",
+            quant_id, params.dest_location_id
+        ));
     }
 
     let is_emptying_src = (src.quantity - qty).abs() <= eps;
+    let mut destination_quant_id = dest_id;
 
     match dest_id {
         Some(did) => {
@@ -2309,7 +2373,7 @@ pub fn move_stock_quant(
                 ..src.clone()
             });
 
-            ctx.db.stock_quant().insert(StockQuant {
+            let inserted_destination = ctx.db.stock_quant().insert(StockQuant {
                 id: 0,
                 organization_id: src.organization_id,
                 product_id: src.product_id,
@@ -2337,6 +2401,27 @@ pub fn move_stock_quant(
                 accounting_entry_ids: src.accounting_entry_ids.clone(),
                 metadata: src.metadata.clone(),
             });
+            destination_quant_id = Some(inserted_destination.id);
+        }
+    }
+
+    if dest_id.is_none() && is_emptying_src {
+        destination_quant_id = Some(quant_id);
+    }
+
+    // The lot's own denormalized location is only unambiguous when this move
+    // empties the lot's entire presence at the source location. A partial
+    // move leaves the lot present at both locations, so the field is left
+    // untouched rather than overwritten with a guess.
+    if is_emptying_src {
+        if let Some(lot_id) = src.lot_id {
+            if let Some(lot) = ctx.db.stock_production_lot().id().find(&lot_id) {
+                ctx.db.stock_production_lot().id().update(StockProductionLot {
+                    location_id: Some(params.dest_location_id),
+                    write_date: ctx.timestamp,
+                    ..lot
+                });
+            }
         }
     }
 
@@ -2386,8 +2471,14 @@ pub fn move_stock_quant(
             RowChange::delete("stock_quant", serde_json::json!({"id": quant_id})),
         ));
     }
-    if let Some(destination_id) = dest_id {
-        if let Some(destination_after) = ctx.db.stock_quant().id().find(&destination_id) {
+    if let Some(destination_id) = destination_quant_id {
+        if destination_id != quant_id {
+            let destination_after = ctx
+                .db
+                .stock_quant()
+                .id()
+                .find(&destination_id)
+                .ok_or("Destination quant disappeared before commit recording")?;
             changed_quants.push((
                 destination_after.id,
                 RowChange::upsert_stdb_row(
@@ -2397,31 +2488,6 @@ pub fn move_stock_quant(
                 )?,
             ));
         }
-    } else if !is_emptying_src {
-        let destination_after = ctx
-            .db
-            .stock_quant()
-            .iter()
-            .filter(|quant| {
-                quant.organization_id == organization_id
-                    && quant.company_id == company_id
-                    && quant.product_id == src.product_id
-                    && quant.location_id == params.dest_location_id
-                    && quant.product_variant_id == src.product_variant_id
-                    && quant.lot_id == src.lot_id
-                    && quant.package_id == src.package_id
-                    && quant.owner_id == src.owner_id
-            })
-            .max_by_key(|quant| quant.id)
-            .ok_or("Destination quant disappeared before commit recording")?;
-        changed_quants.push((
-            destination_after.id,
-            RowChange::upsert_stdb_row(
-                "stock_quant",
-                serde_json::json!({"id": destination_after.id}),
-                &destination_after,
-            )?,
-        ));
     }
     changed_quants.sort_by_key(|(id, _)| *id);
     record_organization_commit(
@@ -2450,6 +2516,17 @@ pub fn create_stock_move(
     organization_id: u64,
     params: CreateStockMoveParams,
 ) -> Result<(), String> {
+    create_stock_move_internal(ctx, organization_id, params).map(|_| ())
+}
+
+/// Internal stock-move creation owner for reducers that need the exact inserted
+/// row identity in the same transaction. Callers must use this returned row;
+/// rediscovering a just-created move by "latest"/max id is forbidden.
+pub(crate) fn create_stock_move_internal(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    params: CreateStockMoveParams,
+) -> Result<StockMove, String> {
     check_permission(ctx, organization_id, "stock_move", "create")?;
 
     let company_id = company_id_from_scope(ctx, organization_id, params.company_id)?;
@@ -2598,7 +2675,7 @@ pub fn create_stock_move(
         },
     );
 
-    Ok(())
+    Ok(move_record)
 }
 
 #[reducer]

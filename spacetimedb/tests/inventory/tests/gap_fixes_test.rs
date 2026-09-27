@@ -52,16 +52,17 @@ use crate::inventory::quality::{
     create_quality_check, fail_quality_check, quality_check, CreateQualityCheckParams,
 };
 use crate::inventory::replenishment::{
-    create_replenishment_rule, execute_replenishment_rule, replenishment_rule,
-    CreateReplenishmentRuleParams,
+    cancel_replenishment_run, create_replenishment_rule, execute_replenishment_rule,
+    replenishment_rule, replenishment_run_job, run_scheduled_replenishment,
+    schedule_replenishment_run, CreateReplenishmentRuleParams, ReplenishmentRunJob,
 };
 use crate::inventory::stock::{
     apply_validated_move_to_quants, assign_stock_picking, confirm_stock_picking, create_stock_move,
-    create_stock_picking, create_stock_quant, increase_quant_at_location,
+    create_stock_picking, create_stock_quant, increase_quant_at_location, move_stock_quant,
     reserve_quantity_at_location, reserve_stock_quant, resolve_warehouse_stock_location,
     stock_move, stock_picking, stock_quant, to_product_stock_qty, validate_stock_picking,
     CreateStockMoveParams, CreateStockPickingParams, CreateStockQuantParams,
-    StockQuantReserveParams,
+    MoveStockQuantParams, StockQuantReserveParams,
 };
 use crate::inventory::tracking::{
     create_stock_production_lot, create_stock_production_serial, stock_production_lot,
@@ -1092,6 +1093,151 @@ pub fn test_expired_lot_blocked_on_reserve(ctx: &ReducerContext) -> Result<(), S
     }
 }
 
+/// Lot-tracked quant move: a full relocation carries the lot's own denormalized
+/// `location_id` to the destination, and a locked lot blocks the move entirely
+/// rather than silently relocating quarantined stock.
+pub fn test_lot_tracked_quant_move(ctx: &ReducerContext) -> Result<(), String> {
+    ensure_test_superuser(ctx)?;
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let org_id = fixture.organization_id;
+    let company_id = fixture.company_id;
+    let product_id = create_tracked_product(ctx, &fixture, "lot", "LOT-MOVE")?;
+
+    let destination_id = ctx
+        .db
+        .stock_location()
+        .iter()
+        .find(|location| {
+            location.organization_id == org_id
+                && location.company_id == Some(company_id)
+                && location.id != fixture.location_id
+                && location.active
+        })
+        .map(|location| location.id)
+        .ok_or("No second active fixture location for lot move test")?;
+
+    create_stock_production_lot(
+        ctx,
+        org_id,
+        CreateStockProductionLotParams {
+            company_id: Some(company_id),
+            name: "LOT-MOVE-A".to_string(),
+            product_id,
+            product_variant_id: None,
+            ref_: None,
+            note: None,
+            expiration_date: None,
+            use_date: None,
+            removal_date: None,
+            alert_date: None,
+            product_qty: 4.0,
+            location_id: Some(fixture.location_id),
+            package_id: None,
+            owner_id: None,
+            is_scrap: false,
+            is_locked: false,
+            metadata: None,
+        },
+    )?;
+    let lot = ctx
+        .db
+        .stock_production_lot()
+        .iter()
+        .find(|l| l.organization_id == org_id && l.name == "LOT-MOVE-A")
+        .ok_or("lot missing")?;
+    let lot_id = lot.id;
+
+    let quant_id = create_quant(
+        ctx,
+        org_id,
+        company_id,
+        product_id,
+        fixture.location_id,
+        4.0,
+        Some(lot_id),
+    )?;
+
+    // A locked lot blocks the move entirely: quarantined stock cannot be
+    // relocated by a raw quant move any more than it can be reserved.
+    ctx.db
+        .stock_production_lot()
+        .id()
+        .update(StockProductionLot {
+            is_locked: true,
+            ..lot.clone()
+        });
+    match move_stock_quant(
+        ctx,
+        org_id,
+        quant_id,
+        MoveStockQuantParams {
+            company_id: Some(company_id),
+            dest_location_id: destination_id,
+            quantity: 4.0,
+        },
+    ) {
+        Err(msg) if msg.to_lowercase().contains("locked") => {}
+        Err(msg) => return Err(format!("Expected locked-lot error, got: {msg}")),
+        Ok(()) => return Err("locked-lot move was accepted".into()),
+    }
+    let quant_after_locked = ctx
+        .db
+        .stock_quant()
+        .id()
+        .find(&quant_id)
+        .ok_or("quant missing after locked-move attempt")?;
+    if quant_after_locked.location_id != fixture.location_id {
+        return Err("locked-lot move relocated the quant despite failing".into());
+    }
+
+    ctx.db
+        .stock_production_lot()
+        .id()
+        .update(StockProductionLot {
+            is_locked: false,
+            ..lot
+        });
+
+    move_stock_quant(
+        ctx,
+        org_id,
+        quant_id,
+        MoveStockQuantParams {
+            company_id: Some(company_id),
+            dest_location_id: destination_id,
+            quantity: 4.0,
+        },
+    )?;
+
+    let moved_quant = ctx
+        .db
+        .stock_quant()
+        .id()
+        .find(&quant_id)
+        .ok_or("quant missing after full lot move")?;
+    if moved_quant.location_id != destination_id || moved_quant.lot_id != Some(lot_id) {
+        return Err(format!(
+            "expected quant {quant_id} at location {destination_id} with lot {lot_id}, got location {} lot {:?}",
+            moved_quant.location_id, moved_quant.lot_id
+        ));
+    }
+
+    let lot_after_move = ctx
+        .db
+        .stock_production_lot()
+        .id()
+        .find(&lot_id)
+        .ok_or("lot missing after move")?;
+    if lot_after_move.location_id != Some(destination_id) {
+        return Err(format!(
+            "expected lot {lot_id} location to follow its emptied source to {destination_id}, got {:?}",
+            lot_after_move.location_id
+        ));
+    }
+
+    Ok(())
+}
+
 /// FEFO: soft reserve prefers the lot that expires sooner.
 pub fn test_fefo_prefers_earlier_expiry(ctx: &ReducerContext) -> Result<(), String> {
     ensure_test_superuser(ctx)?;
@@ -1624,6 +1770,241 @@ pub fn test_replenishment_creates_draft_po(ctx: &ReducerContext) -> Result<(), S
     Ok(())
 }
 
+/// `next_run` was previously an inert timestamp: nothing consumed it. This
+/// proves the actual recurring schedule: scheduling a rule creates one job,
+/// firing that job (simulating the scheduler's own dispatch — delete-then-
+/// invoke, matching how SpacetimeDB actually runs a scheduled reducer) both
+/// executes the rule and reschedules exactly one new job, and cancelling
+/// removes it. Scheduling an already-scheduled rule fails closed.
+pub fn test_replenishment_scheduled_run_reschedules(ctx: &ReducerContext) -> Result<(), String> {
+    ensure_test_superuser(ctx)?;
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let org_id = fixture.organization_id;
+    let company_id = fixture.company_id;
+    let product = ctx
+        .db
+        .product()
+        .id()
+        .find(&fixture.product_id)
+        .ok_or("product")?;
+
+    create_contact(
+        ctx,
+        org_id,
+        CreateContactParams {
+            name: "Sched Replen Vendor".to_string(),
+            type_: "contact".to_string(),
+            email: None,
+            phone: None,
+            mobile: None,
+            company_id: Some(company_id),
+            is_customer: false,
+            is_vendor: true,
+            is_employee: false,
+            is_prospect: false,
+            is_partner: false,
+            customer_rank: 0,
+            supplier_rank: 1,
+            display_name: Some("Sched Replen Vendor".to_string()),
+            first_name: None,
+            last_name: None,
+            title: None,
+            email_secondary: None,
+            fax: None,
+            website: None,
+            street: None,
+            street2: None,
+            city: None,
+            state_code: None,
+            zip: None,
+            country_code: None,
+            tax_id: None,
+            company_registry: None,
+            industry: None,
+            employees_count: None,
+            annual_revenue: None,
+            description: None,
+            salesperson_id: None,
+            assigned_user_id: None,
+            parent_id: None,
+            user_id: None,
+            color: None,
+            metadata: Some(r#"{"test":"sched-replen"}"#.to_string()),
+        },
+    )?;
+    let vendor_id = ctx
+        .db
+        .contact()
+        .iter()
+        .find(|c| c.organization_id == org_id && c.display_name == "Sched Replen Vendor")
+        .map(|c| c.id)
+        .ok_or("vendor")?;
+
+    create_product_supplier_info(
+        ctx,
+        org_id,
+        CreateProductSupplierInfoParams {
+            partner_id: vendor_id,
+            product_tmpl_id: Some(fixture.product_id),
+            product_id: Some(fixture.product_id),
+            min_qty: 1.0,
+            price: 12.0,
+            currency_id: 1,
+            delay: 3,
+            sequence: 1,
+            product_name: None,
+            product_code: None,
+            date_start: None,
+            date_end: None,
+        },
+    )?;
+
+    create_stock_location(
+        ctx,
+        org_id,
+        CreateStockLocationParams {
+            name: "Sched Replen Empty Dest".to_string(),
+            usage: "internal".to_string(),
+            location_category: "internal".to_string(),
+            parent_path: "/".to_string(),
+            child_left: 0,
+            child_right: 0,
+            scrap_location: false,
+            return_location: false,
+            active: true,
+            posx: 0.0,
+            posy: 0.0,
+            posz: 0.0,
+            cyclic_inventory_frequency: 0,
+            location_id: None,
+            complete_name: Some("Sched Replen Empty Dest".to_string()),
+            valuation_in_account_id: None,
+            valuation_out_account_id: None,
+            comment: None,
+            barcode: None,
+            last_inventory_date: None,
+            next_inventory_date: None,
+            metadata: Some(r#"{"test":"sched-replen-empty-dest"}"#.to_string()),
+        },
+    )?;
+    let empty_dest_location_id = ctx
+        .db
+        .stock_location()
+        .iter()
+        .find(|l| l.organization_id == org_id && l.name == "Sched Replen Empty Dest")
+        .map(|l| l.id)
+        .ok_or("empty dest location missing")?;
+
+    create_replenishment_rule(
+        ctx,
+        org_id,
+        company_id,
+        CreateReplenishmentRuleParams {
+            product_id: fixture.product_id,
+            location_id: empty_dest_location_id,
+            warehouse_id: Some(fixture.warehouse_id),
+            uom_id: product.uom_id,
+            product_min_qty: 10.0,
+            product_max_qty: 20.0,
+            qty_multiple: 5.0,
+            lead_days: 2,
+            route_id: None,
+            trigger: "auto".to_string(),
+            group_id: None,
+            active: true,
+            last_run: None,
+            next_run: None,
+            metadata: None,
+        },
+    )?;
+    let rule_id = ctx
+        .db
+        .replenishment_rule()
+        .iter()
+        .find(|r| r.organization_id == org_id && r.product_id == fixture.product_id)
+        .map(|r| r.id)
+        .ok_or("rule missing")?;
+
+    // Scheduling an already-scheduled rule fails closed.
+    schedule_replenishment_run(ctx, org_id, company_id, rule_id)?;
+    match schedule_replenishment_run(ctx, org_id, company_id, rule_id) {
+        Err(msg) if msg.to_lowercase().contains("already") => {}
+        Err(msg) => return Err(format!("Expected duplicate-schedule rejection, got: {msg}")),
+        Ok(()) => return Err("duplicate scheduling was accepted".into()),
+    }
+
+    let jobs_before: Vec<_> = ctx
+        .db
+        .replenishment_run_job()
+        .replenishment_run_job_by_rule()
+        .filter(&rule_id)
+        .collect();
+    if jobs_before.len() != 1 {
+        return Err(format!(
+            "expected exactly one scheduled job, got {}",
+            jobs_before.len()
+        ));
+    }
+    let job = jobs_before[0].clone();
+    let job_id = job.scheduled_id;
+
+    // Simulate the scheduler's own dispatch: the job row is gone by the time
+    // the reducer body runs (SpacetimeDB deletes it after invoking the
+    // reducer for a real fire, but the row must not exist to test that this
+    // reducer's own reschedule is a fresh insert, not a mutation of the same row).
+    ctx.db.replenishment_run_job().scheduled_id().delete(&job_id);
+    run_scheduled_replenishment(ctx, job)?;
+
+    let rule_after = ctx
+        .db
+        .replenishment_rule()
+        .id()
+        .find(&rule_id)
+        .ok_or("rule after scheduled run")?;
+    if rule_after.last_run.is_none() {
+        return Err("expected last_run stamped by the scheduled run".into());
+    }
+    let meta = rule_after.metadata.unwrap_or_default();
+    if !meta.contains("buy") {
+        return Err(format!("expected demand_type buy in metadata, got {meta}"));
+    }
+
+    let jobs_after: Vec<_> = ctx
+        .db
+        .replenishment_run_job()
+        .replenishment_run_job_by_rule()
+        .filter(&rule_id)
+        .collect();
+    if jobs_after.len() != 1 {
+        return Err(format!(
+            "expected exactly one rescheduled job, got {}",
+            jobs_after.len()
+        ));
+    }
+    if jobs_after[0].scheduled_id == job_id {
+        return Err("reschedule reused the old job id instead of inserting a new one".into());
+    }
+
+    cancel_replenishment_run(ctx, org_id, company_id, rule_id)?;
+    let jobs_cancelled: Vec<_> = ctx
+        .db
+        .replenishment_run_job()
+        .replenishment_run_job_by_rule()
+        .filter(&rule_id)
+        .collect();
+    if !jobs_cancelled.is_empty() {
+        return Err(format!(
+            "expected no scheduled jobs after cancel, got {}",
+            jobs_cancelled.len()
+        ));
+    }
+
+    // Cancelling an unscheduled rule is a no-op success, not an error.
+    cancel_replenishment_run(ctx, org_id, company_id, rule_id)?;
+
+    Ok(())
+}
+
 /// fail_quality_check moves qty to QC location and removes it from ATP.
 pub fn test_quality_fail_quarantines_from_atp(ctx: &ReducerContext) -> Result<(), String> {
     ensure_test_superuser(ctx)?;
@@ -1770,6 +2151,234 @@ pub fn test_quality_fail_quarantines_from_atp(ctx: &ReducerContext) -> Result<()
         Err(msg) => Err(format!("Expected QC/ATP block, got: {msg}")),
         Ok(()) => Err("quarantine ATP block failed: reserved from QC location".into()),
     }
+}
+
+/// A quality check with no picking to disambiguate, and on-hand stock for the same
+/// product at two different locations, must fail closed rather than quarantining
+/// whichever location the iterator visits first.
+pub fn test_quality_fail_ambiguous_source_rejected(ctx: &ReducerContext) -> Result<(), String> {
+    ensure_test_superuser(ctx)?;
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let org_id = fixture.organization_id;
+    let company_id = fixture.company_id;
+    let product_id = fixture.product_id;
+
+    // Isolate the ambiguity: exactly the two quants this test creates should
+    // be on-hand candidates for this product.
+    if let Some(seed_quant) = ctx.db.stock_quant().iter().find(|q| {
+        q.organization_id == org_id
+            && q.product_id == product_id
+            && q.location_id == fixture.location_id
+            && q.metadata.as_deref() == Some(r#"{"harness":"minimal"}"#)
+    }) {
+        ctx.db.stock_quant().id().delete(&seed_quant.id);
+    }
+
+    let second_location_id = ctx
+        .db
+        .stock_location()
+        .iter()
+        .find(|location| {
+            location.organization_id == org_id
+                && location.company_id == Some(company_id)
+                && location.id != fixture.location_id
+                && location.active
+        })
+        .map(|location| location.id)
+        .ok_or("No second active fixture location for ambiguity test")?;
+
+    create_quant(ctx, org_id, company_id, product_id, fixture.location_id, 5.0, None)?;
+    create_quant(ctx, org_id, company_id, product_id, second_location_id, 5.0, None)?;
+
+    create_quality_check(
+        ctx,
+        org_id,
+        company_id,
+        CreateQualityCheckParams {
+            name: "QC-AMBIG-SRC".to_string(),
+            test_type: "passfail".to_string(),
+            product_id: Some(product_id),
+            product_variant_id: None,
+            picking_id: None,
+            move_line_id: None,
+            lot_id: None,
+            team_id: None,
+            user_id: None,
+            control_point_id: None,
+            qty_tested: 5.0,
+            tolerance_min: None,
+            tolerance_max: None,
+            norm_unit: None,
+            metadata: None,
+        },
+    )?;
+    let check_id = ctx
+        .db
+        .quality_check()
+        .iter()
+        .find(|c| c.organization_id == org_id && c.name == "QC-AMBIG-SRC")
+        .map(|c| c.id)
+        .ok_or("quality check missing")?;
+
+    let src_before: Vec<(u64, f64)> = ctx
+        .db
+        .stock_quant()
+        .iter()
+        .filter(|q| q.organization_id == org_id && q.product_id == product_id)
+        .map(|q| (q.id, q.quantity))
+        .collect();
+
+    // No explicit failure_location_id: the fallback must refuse to guess between
+    // the two on-hand locations rather than quarantining an arbitrary one.
+    match fail_quality_check(
+        ctx,
+        org_id,
+        company_id,
+        check_id,
+        2.0,
+        None,
+        None,
+        None,
+    ) {
+        Err(msg) if msg.to_lowercase().contains("locations") => {}
+        Err(msg) => return Err(format!("Expected ambiguous-location error, got: {msg}")),
+        Ok(()) => return Err("ambiguous source location was accepted".into()),
+    }
+
+    let src_after: Vec<(u64, f64)> = ctx
+        .db
+        .stock_quant()
+        .iter()
+        .filter(|q| q.organization_id == org_id && q.product_id == product_id)
+        .map(|q| (q.id, q.quantity))
+        .collect();
+    if src_before != src_after {
+        return Err("ambiguous source rejection mutated a quant".into());
+    }
+
+    Ok(())
+}
+
+/// Two compatible quants already present at the quarantine destination must fail
+/// closed rather than being merged into whichever one the iterator visits first.
+pub fn test_quality_fail_ambiguous_destination_rejected(
+    ctx: &ReducerContext,
+) -> Result<(), String> {
+    ensure_test_superuser(ctx)?;
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let org_id = fixture.organization_id;
+    let company_id = fixture.company_id;
+    let product_id = fixture.product_id;
+
+    create_stock_location(
+        ctx,
+        org_id,
+        CreateStockLocationParams {
+            name: "QC Ambiguous Destination".to_string(),
+            usage: "internal_qc".to_string(),
+            location_category: "qc".to_string(),
+            parent_path: "/".to_string(),
+            child_left: 0,
+            child_right: 0,
+            scrap_location: false,
+            return_location: false,
+            active: true,
+            posx: 0.0,
+            posy: 0.0,
+            posz: 0.0,
+            cyclic_inventory_frequency: 0,
+            location_id: None,
+            complete_name: Some("QC Ambiguous Destination".to_string()),
+            valuation_in_account_id: None,
+            valuation_out_account_id: None,
+            comment: None,
+            barcode: None,
+            last_inventory_date: None,
+            next_inventory_date: None,
+            metadata: Some(r#"{"test":"qc-ambig-dest"}"#.to_string()),
+        },
+    )?;
+    let qc_loc = ctx
+        .db
+        .stock_location()
+        .iter()
+        .find(|l| l.organization_id == org_id && l.name == "QC Ambiguous Destination")
+        .map(|l| l.id)
+        .ok_or("qc location missing")?;
+
+    let source_quant_id =
+        create_quant(ctx, org_id, company_id, product_id, fixture.location_id, 5.0, None)?;
+    // Two compatible destination quants already at the quarantine location.
+    create_quant(ctx, org_id, company_id, product_id, qc_loc, 1.0, None)?;
+    create_quant(ctx, org_id, company_id, product_id, qc_loc, 1.0, None)?;
+
+    create_quality_check(
+        ctx,
+        org_id,
+        company_id,
+        CreateQualityCheckParams {
+            name: "QC-AMBIG-DST".to_string(),
+            test_type: "passfail".to_string(),
+            product_id: Some(product_id),
+            product_variant_id: None,
+            picking_id: None,
+            move_line_id: None,
+            lot_id: None,
+            team_id: None,
+            user_id: None,
+            control_point_id: None,
+            qty_tested: 5.0,
+            tolerance_min: None,
+            tolerance_max: None,
+            norm_unit: None,
+            metadata: None,
+        },
+    )?;
+    let check_id = ctx
+        .db
+        .quality_check()
+        .iter()
+        .find(|c| c.organization_id == org_id && c.name == "QC-AMBIG-DST")
+        .map(|c| c.id)
+        .ok_or("quality check missing")?;
+
+    let source_before = ctx
+        .db
+        .stock_quant()
+        .id()
+        .find(&source_quant_id)
+        .ok_or("source quant missing before ambiguous destination test")?;
+
+    match fail_quality_check(
+        ctx,
+        org_id,
+        company_id,
+        check_id,
+        2.0,
+        None,
+        None,
+        Some(qc_loc),
+    ) {
+        Err(msg) if msg.contains("Multiple destination quants") => {}
+        Err(msg) => {
+            return Err(format!(
+                "Expected duplicate destination rejection, got: {msg}"
+            ))
+        }
+        Ok(()) => return Err("duplicate destination quants were accepted".into()),
+    }
+
+    let source_after = ctx
+        .db
+        .stock_quant()
+        .id()
+        .find(&source_quant_id)
+        .ok_or("source quant missing after ambiguous destination test")?;
+    if (source_after.quantity - source_before.quantity).abs() > 0.001 {
+        return Err("ambiguous destination rejection mutated the source quant".into());
+    }
+
+    Ok(())
 }
 
 /// Wave release creates pick tasks; validate blocked until tasks done; complete needs done pickings.
@@ -2741,6 +3350,90 @@ pub fn test_consignment_excluded_from_atp(ctx: &ReducerContext) -> Result<(), St
     }
 }
 
+/// `update_warehouse` can configure `wh_qc_stock_loc_id` after creation — the
+/// only reducer that could set it previously was `create_warehouse`, so a
+/// warehouse's QC location could never be configured retroactively, leaving
+/// `fail_quality_check`'s own warehouse-lookup fallback permanently dead for
+/// any already-created warehouse. An out-of-org location must still be
+/// rejected without mutating the warehouse.
+pub fn test_update_warehouse_qc_location(ctx: &ReducerContext) -> Result<(), String> {
+    ensure_test_superuser(ctx)?;
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let org_id = fixture.organization_id;
+    let company_id = fixture.company_id;
+
+    let other_org = OrgFixture::seed_minimal(ctx)?;
+
+    fn base_update_params() -> UpdateWarehouseParams {
+        UpdateWarehouseParams {
+            name: None,
+            code: None,
+            active: None,
+            reception_steps: None,
+            delivery_steps: None,
+            manufacture_steps: None,
+            buy_to_resupply: None,
+            manufacture_to_resupply: None,
+            crossdock: None,
+            sequence: None,
+            partner_id: None,
+            resupply_wh_ids: None,
+            wh_qc_stock_loc_id: None,
+            metadata: None,
+        }
+    }
+
+    match update_warehouse(
+        ctx,
+        org_id,
+        company_id,
+        fixture.warehouse_id,
+        UpdateWarehouseParams {
+            wh_qc_stock_loc_id: Some(other_org.location_id),
+            ..base_update_params()
+        },
+    ) {
+        Err(msg) if msg.to_lowercase().contains("organization") => {}
+        Err(msg) => return Err(format!("Expected cross-org location rejection, got: {msg}")),
+        Ok(()) => return Err("cross-org QC location was accepted".into()),
+    }
+    let warehouse_after_rejected = ctx
+        .db
+        .warehouse()
+        .id()
+        .find(&fixture.warehouse_id)
+        .ok_or("warehouse missing after rejected update")?;
+    if warehouse_after_rejected.wh_qc_stock_loc_id.is_some() {
+        return Err("rejected cross-org QC location update still set a value".into());
+    }
+
+    update_warehouse(
+        ctx,
+        org_id,
+        company_id,
+        fixture.warehouse_id,
+        UpdateWarehouseParams {
+            wh_qc_stock_loc_id: Some(fixture.location_id),
+            ..base_update_params()
+        },
+    )?;
+
+    let warehouse_after = ctx
+        .db
+        .warehouse()
+        .id()
+        .find(&fixture.warehouse_id)
+        .ok_or("warehouse missing after update")?;
+    if warehouse_after.wh_qc_stock_loc_id != Some(fixture.location_id) {
+        return Err(format!(
+            "expected wh_qc_stock_loc_id {}, got {:?}",
+            fixture.location_id, warehouse_after.wh_qc_stock_loc_id
+        ));
+    }
+
+    Ok(())
+}
+
 /// Cross-dock creates outbound picking from inbound dest when warehouse.crossdock.
 pub fn test_cross_dock_creates_outbound(ctx: &ReducerContext) -> Result<(), String> {
     ensure_test_superuser(ctx)?;
@@ -2766,6 +3459,7 @@ pub fn test_cross_dock_creates_outbound(ctx: &ReducerContext) -> Result<(), Stri
             sequence: None,
             partner_id: None,
             resupply_wh_ids: None,
+            wh_qc_stock_loc_id: None,
             metadata: None,
         },
     )?;
@@ -4109,6 +4803,7 @@ pub fn test_multi_wh_promise_atp(ctx: &ReducerContext) -> Result<(), String> {
             sequence: None,
             partner_id: None,
             resupply_wh_ids: Some(vec![wh_b.id]),
+            wh_qc_stock_loc_id: None,
             metadata: None,
         },
     )?;

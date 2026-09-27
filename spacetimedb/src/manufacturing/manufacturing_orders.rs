@@ -10,16 +10,20 @@ use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Times
 use crate::core::organization::{company_id_from_scope, require_company_in_organization};
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 use crate::inventory::product::product;
+use crate::inventory::quality::quality_check;
 use crate::inventory::stock::{
-    create_stock_move, done_stock_move, stock_move, stock_quant, CreateStockMoveParams,
-    DoneStockMoveParams, StockMove, StockQuant,
+    create_stock_move, create_stock_move_internal, done_stock_move, move_stock_quant, stock_move, stock_quant,
+    CreateStockMoveParams, DoneStockMoveParams, MoveStockQuantParams, StockMove, StockQuant,
 };
-use crate::manufacturing::bill_of_materials::mrp_bom_line;
+use crate::manufacturing::bill_of_materials::{mrp_bom, mrp_bom_byproduct, mrp_bom_line};
 use crate::manufacturing::relations::{
     require_active_workcenter_in_company, require_bom_in_company,
     require_location_for_manufacturing, require_product_for_manufacturing,
     require_routing_workcenter_in_company, require_warehouse_for_manufacturing,
     validate_positive_duration, validate_positive_qty,
+};
+use crate::manufacturing::work_centers::{
+    mrp_workcenter, mrp_workcenter_productivity, MrpWorkcenter,
 };
 use crate::types::{ConsumptionMode, MoState, WorkorderState};
 use serde_json;
@@ -235,6 +239,99 @@ fn get_stock_location(mo: &MrpProduction) -> u64 {
     mo.location_dest_id
 }
 
+fn finished_move_params(ctx: &ReducerContext, mo: &MrpProduction, qty: f64) -> CreateStockMoveParams {
+    CreateStockMoveParams {
+        company_id: Some(mo.company_id),
+        name: format!("MO {} finished product {}", mo.id, mo.product_id),
+        product_id: mo.product_id,
+        product_tmpl_id: mo.product_tmpl_id,
+        product_uom: mo.product_uom_id,
+        product_uom_qty: qty,
+        location_id: mo.location_src_id,
+        location_dest_id: get_stock_location(mo),
+        date_expected: ctx.timestamp,
+        move_type: "direct".to_string(),
+        priority: "normal".to_string(),
+        reference: Some(format!("MO/{}", mo.id)),
+        sequence: 1,
+        origin: Some(format!("MO {}", mo.id)),
+        note: None,
+        date: Some(ctx.timestamp),
+        date_deadline: None,
+        picking_id: None,
+        picking_type_id: Some(mo.picking_type_id),
+        partner_id: None,
+        product_variant_id: None,
+        group_id: None,
+        rule_id: None,
+        procure_method: "make_to_stock".to_string(),
+        price_unit: 0.0,
+        scrapped: false,
+        to_refund: false,
+        propagate_cancel: true,
+        delay_alert: false,
+        product_packaging_id: None,
+        product_packaging_qty: 0.0,
+        warehouse_id: Some(mo.warehouse_id),
+        production_id: Some(mo.id),
+        raw_material_production_id: None,
+        unbuild_id: None,
+        consume_unbuild_id: None,
+        cost_share: 0.0,
+        is_subcontract: false,
+        purchase_line_id: None,
+        need_release: false,
+        release_ready: false,
+        propagation_cancel: false,
+        has_tracking: false,
+        inventory_id: None,
+        sale_line_id: None,
+        lot_id: mo.lot_producing_id,
+        serial_id: None,
+        package_id: None,
+        result_package_id: None,
+        owner_id: None,
+        package_level_id: None,
+        product_type: None,
+        metadata: None,
+    }
+}
+
+fn complete_output_move(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    params: CreateStockMoveParams,
+    quantity: f64,
+) -> Result<u64, String> {
+    let product_id = params.product_id;
+    let destination_id = params.location_dest_id;
+    let created = create_stock_move_internal(ctx, organization_id, params)?;
+    let move_id = created.id;
+    ctx.db.stock_move().id().update(StockMove {
+        state: "assigned".to_string(),
+        is_assigned: true,
+        write_uid: ctx.sender(),
+        write_date: ctx.timestamp,
+        ..created
+    });
+    done_stock_move(ctx, organization_id, move_id, DoneStockMoveParams {
+        company_id: Some(company_id),
+        quantity_done: quantity,
+    })?;
+    let completed = ctx.db.stock_move().id().find(&move_id).ok_or("Output move disappeared")?;
+    ctx.db.stock_move().id().update(StockMove {
+        state: "done".to_string(),
+        is_done: true,
+        is_assigned: false,
+        write_uid: ctx.sender(),
+        write_date: ctx.timestamp,
+        ..completed
+    });
+    upsert_stock_quant(ctx, organization_id, company_id, product_id, destination_id, quantity)?;
+    Ok(move_id)
+}
+
 fn require_mo_in_company(
     ctx: &ReducerContext,
     organization_id: u64,
@@ -282,22 +379,38 @@ fn upsert_stock_quant(
     product_id: u64,
     location_id: u64,
     qty_delta: f64,
-) -> Result<(), String> {
-    if let Some(existing) = ctx.db.stock_quant().iter().find(|q| {
-        q.organization_id == organization_id
-            && q.company_id == company_id
-            && q.product_id == product_id
-            && q.location_id == location_id
-            && q.lot_id.is_none()
-            && q.package_id.is_none()
-            && q.owner_id.is_none()
-    }) {
+) -> Result<StockQuant, String> {
+    let matches: Vec<_> = ctx
+        .db
+        .stock_quant()
+        .iter()
+        .filter(|q| {
+            q.organization_id == organization_id
+                && q.company_id == company_id
+                && q.product_id == product_id
+                && q.location_id == location_id
+                && q.lot_id.is_none()
+                && q.package_id.is_none()
+                && q.owner_id.is_none()
+        })
+        .collect();
+
+    if matches.len() > 1 {
+        return Err(format!(
+            "Ambiguous stock quant identity for product {} at location {}: found {} rows",
+            product_id,
+            location_id,
+            matches.len()
+        ));
+    }
+
+    if let Some(existing) = matches.into_iter().next() {
         let new_quantity = existing.quantity + qty_delta;
         let new_available = new_quantity - existing.reserved_quantity;
         let new_value = new_quantity * existing.cost;
         let inventory_diff_quantity = existing.available_quantity - new_available;
 
-        ctx.db.stock_quant().id().update(StockQuant {
+        let updated = StockQuant {
             quantity: new_quantity,
             available_quantity: new_available,
             value: new_value,
@@ -306,8 +419,9 @@ fn upsert_stock_quant(
             user_id: Some(ctx.sender()),
             inventory_date: Some(ctx.timestamp),
             ..existing
-        });
-        return Ok(());
+        };
+        ctx.db.stock_quant().id().update(updated.clone());
+        return Ok(updated);
     }
 
     let product = ctx
@@ -321,7 +435,7 @@ fn upsert_stock_quant(
     let quantity = qty_delta;
     let value = quantity * cost;
 
-    ctx.db.stock_quant().insert(StockQuant {
+    Ok(ctx.db.stock_quant().insert(StockQuant {
         id: 0,
         organization_id,
         product_id,
@@ -348,9 +462,7 @@ fn upsert_stock_quant(
         currency_id: Some(product.currency_id),
         accounting_entry_ids: Vec::new(),
         metadata: None,
-    });
-
-    Ok(())
+    }))
 }
 
 // ============================================================================
@@ -656,15 +768,29 @@ pub fn produce_manufacturing_order(
 
     let mo = require_mo_in_company(ctx, organization_id, company_id, mo_id)?;
 
-    if qty_producing <= 0.0 {
-        return Err("Quantity must be greater than 0".to_string());
+    if mo.state != MoState::Progress {
+        return Err("Manufacturing order must be in Progress state to record output".to_string());
+    }
+    if !qty_producing.is_finite() || qty_producing <= 0.0 {
+        return Err("Quantity must be a finite number greater than 0".to_string());
+    }
+
+    let remaining_qty = (mo.product_qty - mo.qty_produced).max(0.0);
+    if remaining_qty <= 1e-9 {
+        return Err("Manufacturing order has no remaining quantity to produce".to_string());
+    }
+    if qty_producing > remaining_qty + 1e-9 {
+        return Err(format!(
+            "Quantity {} exceeds remaining manufacturing quantity {}",
+            qty_producing, remaining_qty
+        ));
     }
 
     let new_qty_produced = mo.qty_produced + qty_producing;
-    let new_state = if new_qty_produced >= mo.product_qty {
+    let new_state = if (new_qty_produced - mo.product_qty).abs() <= 1e-9 {
         MoState::ToClose
     } else {
-        mo.state.clone()
+        MoState::Progress
     };
 
     ctx.db.mrp_production().id().update(MrpProduction {
@@ -689,7 +815,11 @@ pub fn produce_manufacturing_order(
                 serde_json::json!({ "qty_producing": qty_producing, "qty_produced": new_qty_produced })
                     .to_string(),
             ),
-            changed_fields: vec!["qty_producing".to_string(), "qty_produced".to_string()],
+            changed_fields: vec![
+                "qty_producing".to_string(),
+                "qty_produced".to_string(),
+                "state".to_string(),
+            ],
             metadata: None,
         },
     );
@@ -757,7 +887,7 @@ pub fn consume_mo_materials(
                 &format!("MO {} consume component {}", mo.id, line.product_id),
             )?;
 
-            create_stock_move(
+            let created_move = create_stock_move_internal(
                 ctx,
                 organization_id,
                 CreateStockMoveParams {
@@ -816,22 +946,8 @@ pub fn consume_mo_materials(
                     metadata: None,
                 },
             )?;
-
-            let move_id = ctx
-                .db
-                .stock_move()
-                .iter()
-                .filter(|m| m.production_id == Some(mo.id) && m.product_id == line.product_id)
-                .max_by_key(|m| m.id)
-                .map(|m| m.id)
-                .ok_or("Failed to locate created raw material move")?;
-
-            let move_row = ctx
-                .db
-                .stock_move()
-                .id()
-                .find(&move_id)
-                .ok_or("Raw move not found")?;
+            let move_id = created_move.id;
+            let move_row = created_move;
             if move_row.state == "draft" {
                 ctx.db.stock_move().id().update(StockMove {
                     state: "assigned".to_string(),
@@ -851,6 +967,25 @@ pub fn consume_mo_materials(
                     quantity_done: required_qty,
                 },
             )?;
+
+            // Manufacturing raw moves have no picking validation step. The
+            // quantity effect is applied below in this reducer, so close the
+            // exact move here instead of leaving consumed material "assigned".
+            let consumed_move = ctx
+                .db
+                .stock_move()
+                .id()
+                .find(&move_id)
+                .ok_or("Raw move disappeared before completion")?;
+            ctx.db.stock_move().id().update(StockMove {
+                state: "done".to_string(),
+                is_done: true,
+                is_assigned: false,
+                write_uid: ctx.sender(),
+                write_date: ctx.timestamp,
+                ..consumed_move
+            });
+
             upsert_stock_quant(
                 ctx,
                 organization_id,
@@ -865,8 +1000,8 @@ pub fn consume_mo_materials(
     }
 
     ctx.db.mrp_production().id().update(MrpProduction {
+        move_raw_count: created_move_ids.len() as u32,
         move_raw_ids: created_move_ids,
-        move_raw_count: mo.move_raw_count + 1,
         write_uid: ctx.sender(),
         write_date: ctx.timestamp,
         ..mo
@@ -902,232 +1037,275 @@ pub fn finish_manufacturing_order(
 
     let mo = require_mo_in_company(ctx, organization_id, company_id, mo_id)?;
 
-    match mo.state {
-        MoState::Progress | MoState::ToClose => {
-            require_lot_when_tracked(
-                &mo.product_tracking,
-                mo.lot_producing_id,
-                &format!("MO {} finish", mo.id),
-            )?;
-            let dest_location_id = get_stock_location(&mo);
-            let finished_qty = if mo.qty_produced > 0.0 {
-                mo.qty_produced
-            } else {
-                mo.product_qty
-            };
-
-            create_stock_move(
-                ctx,
-                organization_id,
-                CreateStockMoveParams {
-                    company_id: Some(company_id),
-                    name: format!("MO {} finished product {}", mo.id, mo.product_id),
-                    product_id: mo.product_id,
-                    product_tmpl_id: mo.product_tmpl_id,
-                    product_uom: mo.product_uom_id,
-                    product_uom_qty: finished_qty,
-                    location_id: mo.location_src_id,
-                    location_dest_id: dest_location_id,
-                    date_expected: ctx.timestamp,
-                    move_type: "direct".to_string(),
-                    priority: "normal".to_string(),
-                    reference: Some(format!("MO/{}", mo.id)),
-                    sequence: (mo.move_finished_count + 1) as i32,
-                    origin: Some(format!("MO {}", mo.id)),
-                    note: None,
-                    date: Some(ctx.timestamp),
-                    date_deadline: None,
-                    picking_id: None,
-                    picking_type_id: Some(mo.picking_type_id),
-                    partner_id: None,
-                    product_variant_id: None,
-                    group_id: None,
-                    rule_id: None,
-                    procure_method: "make_to_stock".to_string(),
-                    price_unit: 0.0,
-                    scrapped: false,
-                    to_refund: false,
-                    propagate_cancel: true,
-                    delay_alert: false,
-                    product_packaging_id: None,
-                    product_packaging_qty: 0.0,
-                    warehouse_id: Some(mo.warehouse_id),
-                    production_id: Some(mo.id),
-                    raw_material_production_id: None,
-                    unbuild_id: None,
-                    consume_unbuild_id: None,
-                    cost_share: 0.0,
-                    is_subcontract: false,
-                    purchase_line_id: None,
-                    need_release: false,
-                    release_ready: false,
-                    propagation_cancel: false,
-                    has_tracking: false,
-                    inventory_id: None,
-                    sale_line_id: None,
-                    lot_id: mo.lot_producing_id,
-                    serial_id: None,
-                    package_id: None,
-                    result_package_id: None,
-                    owner_id: None,
-                    package_level_id: None,
-                    product_type: None,
-                    metadata: None,
-                },
-            )?;
-
-            let finished_move_id = ctx
-                .db
-                .stock_move()
-                .iter()
-                .filter(|m| m.production_id == Some(mo.id) && m.product_id == mo.product_id)
-                .max_by_key(|m| m.id)
-                .map(|m| m.id)
-                .ok_or("Failed to locate created finished move")?;
-
-            let finished_move = ctx
-                .db
-                .stock_move()
-                .id()
-                .find(&finished_move_id)
-                .ok_or("Finished move not found")?;
-            if finished_move.state == "draft" {
-                ctx.db.stock_move().id().update(StockMove {
-                    state: "assigned".to_string(),
-                    is_assigned: true,
-                    write_uid: ctx.sender(),
-                    write_date: ctx.timestamp,
-                    ..finished_move
-                });
-            }
-
-            done_stock_move(
-                ctx,
-                organization_id,
-                finished_move_id,
-                DoneStockMoveParams {
-                    company_id: Some(company_id),
-                    quantity_done: finished_qty,
-                },
-            )?;
-            upsert_stock_quant(
-                ctx,
-                organization_id,
-                company_id,
-                mo.product_id,
-                dest_location_id,
-                finished_qty,
-            )?;
-
-            // Auto-consume raw materials if consume_mo_materials was not called separately
-            let prod_source_location = get_production_location(&mo);
-            if mo.move_raw_ids.is_empty() {
-                // No raw moves exist yet — deduct component stock directly from BOM
-                if let Some(bom_id) = mo.bom_id {
-                    let bom_lines: Vec<_> = ctx
-                        .db
-                        .mrp_bom_line()
-                        .mrp_bom_line_by_bom()
-                        .filter(&bom_id)
-                        .collect();
-                    for line in bom_lines {
-                        let required_qty = line.product_qty * mo.product_qty.max(1.0);
-                        upsert_stock_quant(
-                            ctx,
-                            organization_id,
-                            company_id,
-                            line.product_id,
-                            prod_source_location,
-                            -required_qty,
-                        )?;
-                    }
-                }
-            } else {
-                // Raw moves exist — mark any not yet done as done and deduct stock
-                for raw_move_id in &mo.move_raw_ids {
-                    if let Some(raw_move) = ctx.db.stock_move().id().find(raw_move_id) {
-                        if raw_move.state != "done" {
-                            let qty = if raw_move.quantity_done > 0.0 {
-                                raw_move.quantity_done
-                            } else {
-                                raw_move.product_uom_qty
-                            };
-                            let component_product_id = raw_move.product_id;
-                            let component_location_id = raw_move.location_id;
-                            if raw_move.state == "draft" {
-                                ctx.db.stock_move().id().update(StockMove {
-                                    state: "assigned".to_string(),
-                                    is_assigned: true,
-                                    write_uid: ctx.sender(),
-                                    write_date: ctx.timestamp,
-                                    ..raw_move
-                                });
-                            }
-                            // done_stock_move re-fetches the move internally.
-                            // Fail closed: propagate errors rather than silently
-                            // skipping stock deductions for failed moves.
-                            done_stock_move(
-                                ctx,
-                                organization_id,
-                                *raw_move_id,
-                                DoneStockMoveParams {
-                                    company_id: Some(company_id),
-                                    quantity_done: qty,
-                                },
-                            )?;
-                            upsert_stock_quant(
-                                ctx,
-                                organization_id,
-                                company_id,
-                                component_product_id,
-                                component_location_id,
-                                -qty,
-                            )?;
-                        }
-                    }
-                }
-            }
-
-            let mut finished_ids = mo.move_finished_ids.clone();
-            finished_ids.push(finished_move_id);
-
-            ctx.db.mrp_production().id().update(MrpProduction {
-                state: MoState::Done,
-                date_finished: Some(ctx.timestamp),
-                move_finished_ids: finished_ids,
-                move_finished_count: mo.move_finished_count + 1,
-                write_uid: ctx.sender(),
-                write_date: ctx.timestamp,
-                ..mo
-            });
-
-            write_audit_log_v2(
-                ctx,
-                organization_id,
-                AuditLogParams {
-                    company_id: Some(company_id),
-                    table_name: "mrp_production",
-                    record_id: mo_id,
-                    action: "UPDATE",
-                    old_values: None,
-                    new_values: Some(serde_json::json!({ "state": "done" }).to_string()),
-                    changed_fields: vec![
-                        "state".to_string(),
-                        "date_finished".to_string(),
-                        "move_finished_ids".to_string(),
-                    ],
-                    metadata: None,
-                },
-            );
-
-            log::info!("Manufacturing order finished: id={}", mo_id);
-            Ok(())
-        }
-        _ => Err("Manufacturing order must be in Progress or ToClose state to finish".to_string()),
+    if mo.state != MoState::ToClose {
+        return Err("Manufacturing order must be in ToClose state to finish".to_string());
     }
+    if (mo.qty_produced - mo.product_qty).abs() > 1e-9 {
+        return Err(format!(
+            "Produced quantity {} must equal planned quantity {} before finish",
+            mo.qty_produced, mo.product_qty
+        ));
+    }
+    if !mo.move_finished_ids.is_empty() {
+        return Err("Manufacturing order already owns a finished-goods move".to_string());
+    }
+
+    let workorders: Vec<_> = ctx.db.mrp_workorder().mrp_workorder_by_production().filter(&mo.id).collect();
+    let mut authoritative_ids: Vec<_> = workorders.iter().map(|wo| wo.id).collect();
+    authoritative_ids.sort_unstable();
+    let mut owned_ids = mo.workorder_ids.clone();
+    owned_ids.sort_unstable();
+    if authoritative_ids != owned_ids || workorders.iter().any(|wo| {
+        wo.organization_id != organization_id || wo.company_id != company_id
+            || wo.state != WorkorderState::Done || wo.quality_check_todo || wo.quality_check_fail
+    }) {
+        return Err("Manufacturing order has unfinished or quality-blocked workorders".to_string());
+    }
+
+    if let Some(bom_id) = mo.bom_id {
+        let bom_line_count = ctx
+            .db
+            .mrp_bom_line()
+            .mrp_bom_line_by_bom()
+            .filter(&bom_id)
+            .count();
+        if bom_line_count > 0 && mo.move_raw_ids.is_empty() {
+            return Err(
+                "Manufacturing materials must be consumed before finishing this order".to_string(),
+            );
+        }
+    }
+
+    for raw_move_id in &mo.move_raw_ids {
+        let raw_move = ctx
+            .db
+            .stock_move()
+            .id()
+            .find(raw_move_id)
+            .ok_or_else(|| format!("Raw material move {} not found", raw_move_id))?;
+        if raw_move.organization_id != organization_id
+            || raw_move.company_id != company_id
+            || raw_move.production_id != Some(mo.id)
+            || raw_move.state != "done"
+            || !raw_move.is_done
+        {
+            return Err(format!(
+                "Raw material move {} is not a completed effect of this manufacturing order",
+                raw_move_id
+            ));
+        }
+    }
+
+    require_lot_when_tracked(
+        &mo.product_tracking,
+        mo.lot_producing_id,
+        &format!("MO {} finish", mo.id),
+    )?;
+
+    let finished_qty = mo.qty_produced;
+    let mut byproduct_outputs = Vec::new();
+    if let Some(bom_id) = mo.bom_id {
+        let bom = ctx.db.mrp_bom().id().find(&bom_id).ok_or("Manufacturing BOM not found")?;
+        if bom.organization_id != organization_id || bom.company_id != company_id {
+            return Err("Manufacturing BOM does not match MO scope".to_string());
+        }
+        let rows: Vec<_> = ctx.db.mrp_bom_byproduct().mrp_bom_byproduct_by_bom().filter(&bom_id).collect();
+        let mut row_ids: Vec<_> = rows.iter().map(|row| row.id).collect();
+        row_ids.sort_unstable();
+        let mut owned_ids = bom.byproduct_ids.clone();
+        owned_ids.sort_unstable();
+        if row_ids != owned_ids || rows.iter().any(|row| {
+            row.organization_id != organization_id || row.company_id != company_id
+        }) {
+            return Err("BOM byproduct relation is inconsistent".to_string());
+        }
+        for row in rows {
+            let product = require_product_for_manufacturing(ctx, organization_id, row.product_id, "BOM byproduct")?;
+            if product.tracking != "none" {
+                return Err("Tracked byproduct output requires a separate lot/serial path".to_string());
+            }
+            let quantity = row.product_qty * (mo.product_qty / bom.product_qty);
+            validate_positive_qty(quantity, "byproduct output quantity")?;
+            byproduct_outputs.push((row, product, quantity));
+        }
+    }
+
+    let finished_move_id = complete_output_move(
+        ctx,
+        organization_id,
+        company_id,
+        finished_move_params(ctx, &mo, finished_qty),
+        finished_qty,
+    )?;
+    let mut finished_ids = vec![finished_move_id];
+    for (row, product, quantity) in byproduct_outputs {
+        let move_id = complete_output_move(
+            ctx,
+            organization_id,
+            company_id,
+            CreateStockMoveParams {
+                name: format!("MO {} byproduct {}", mo.id, row.product_id),
+                product_id: row.product_id,
+                product_tmpl_id: row.product_tmpl_id,
+                product_uom: row.product_uom_id,
+                product_uom_qty: quantity,
+                reference: Some(format!("MO/{}/BYPRODUCT/{}", mo.id, row.id)),
+                sequence: row.sequence as i32,
+                cost_share: row.cost_share,
+                has_tracking: false,
+                lot_id: None,
+                product_type: Some(product.type_.clone()),
+                metadata: Some(serde_json::json!({"bom_byproduct_id": row.id}).to_string()),
+                ..finished_move_params(ctx, &mo, quantity)
+            },
+            quantity,
+        )?;
+        finished_ids.push(move_id);
+    }
+    ctx.db.mrp_production().id().update(MrpProduction {
+        state: MoState::Done,
+        date_finished: Some(ctx.timestamp),
+        move_finished_count: finished_ids.len() as u32,
+        move_finished_ids: finished_ids,
+        write_uid: ctx.sender(),
+        write_date: ctx.timestamp,
+        ..mo
+    });
+
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "mrp_production",
+            record_id: mo_id,
+            action: "UPDATE",
+            old_values: None,
+            new_values: Some(serde_json::json!({ "state": "done" }).to_string()),
+            changed_fields: vec![
+                "state".to_string(),
+                "date_finished".to_string(),
+                "move_finished_ids".to_string(),
+            ],
+            metadata: None,
+        },
+    );
+
+    log::info!("Manufacturing order finished: id={}", mo_id);
+    Ok(())
 }
 
-/// Cancel a manufacturing order
+/// Scrap a bounded quantity of finished, untracked output from a completed MO.
+/// The stock move is the durable MO-owned effect; quant relocation changes stock.
+#[reducer]
+pub fn scrap_finished_manufacturing_output(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    mo_id: u64,
+    scrap_location_id: u64,
+    quantity: f64,
+    request_id: String,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "mrp_production", "write")?;
+    let mo = require_mo_in_company(ctx, organization_id, company_id, mo_id)?;
+    if mo.state != MoState::Done {
+        return Err("Manufacturing order must be Done before scrapping finished output".to_string());
+    }
+    if mo.product_tracking != "none" {
+        return Err("Tracked finished output requires a separate lot/serial scrap path".to_string());
+    }
+    validate_positive_qty(quantity, "scrap quantity")?;
+    let request_id = request_id.trim();
+    if request_id.is_empty() {
+        return Err("Scrap request id is required".to_string());
+    }
+    let scrap_location = require_location_for_manufacturing(ctx, organization_id, scrap_location_id, "Scrap")?;
+    if !scrap_location.scrap_location || scrap_location.company_id.is_some_and(|id| id != company_id)
+        || scrap_location_id == mo.location_dest_id {
+        return Err("Destination must be a different, company-compatible scrap location".to_string());
+    }
+
+    let primary_finished_ids: Vec<_> = mo.move_finished_ids.iter().filter_map(|id| {
+        ctx.db.stock_move().id().find(id).filter(|mv| mv.product_id == mo.product_id && !mv.scrapped).map(|_| *id)
+    }).collect();
+    let finished_id = match primary_finished_ids.as_slice() {
+        [id] => *id,
+        _ => return Err("Manufacturing order must own exactly one primary finished move".to_string()),
+    };
+    let finished = ctx.db.stock_move().id().find(&finished_id).ok_or("Finished move missing")?;
+    if finished.organization_id != organization_id || finished.company_id != company_id
+        || finished.production_id != Some(mo_id) || finished.scrapped
+        || !finished.is_done || finished.state != "done"
+        || finished.product_id != mo.product_id || finished.location_dest_id != mo.location_dest_id
+        || (finished.quantity_done - mo.qty_produced).abs() > 1e-9 {
+        return Err("Finished move does not match manufacturing output".to_string());
+    }
+
+    let reference = format!("MO/{mo_id}/SCRAP/{request_id}");
+    let scrap_moves: Vec<_> = ctx.db.stock_move().iter().filter(|mv| {
+        mv.organization_id == organization_id && mv.company_id == company_id
+            && mv.production_id == Some(mo_id) && mv.scrapped
+    }).collect();
+    if scrap_moves.iter().any(|mv| mv.reference.as_deref() == Some(reference.as_str())) {
+        return Err("Scrap request has already been recorded".to_string());
+    }
+    if scrap_moves.iter().any(|mv| !mv.is_done || mv.state != "done"
+        || mv.product_id != mo.product_id || mv.location_id != mo.location_dest_id
+        || !mv.quantity_done.is_finite() || mv.quantity_done <= 0.0) {
+        return Err("Manufacturing scrap effects are inconsistent".to_string());
+    }
+    let already_scrapped: f64 = scrap_moves.iter().map(|mv| mv.quantity_done).sum();
+    if quantity > mo.qty_produced - already_scrapped + 1e-9 {
+        return Err("Scrap quantity exceeds unscrapped manufacturing output".to_string());
+    }
+
+    let mut source_quants = ctx.db.stock_quant().quant_by_product().filter(&mo.product_id).filter(|q| {
+        q.organization_id == organization_id && q.company_id == company_id
+            && q.location_id == mo.location_dest_id && q.product_variant_id.is_none()
+            && q.lot_id.is_none() && q.package_id.is_none() && q.owner_id.is_none()
+    });
+    let source = source_quants.next().ok_or("Finished output quant not found")?;
+    if source_quants.next().is_some() {
+        return Err("Finished output quant identity is ambiguous".to_string());
+    }
+    if source.available_quantity + 1e-9 < quantity {
+        return Err("Not enough available finished output to scrap".to_string());
+    }
+
+    let created = create_stock_move_internal(ctx, organization_id, CreateStockMoveParams {
+        name: format!("MO {mo_id} finished output scrap"),
+        product_uom_qty: quantity,
+        location_id: mo.location_dest_id,
+        location_dest_id: scrap_location_id,
+        reference: Some(reference),
+        scrapped: true,
+        ..finished_move_params(ctx, &mo, quantity)
+    })?;
+    ctx.db.stock_move().id().update(StockMove {
+        state: "assigned".to_string(), is_assigned: true,
+        write_uid: ctx.sender(), write_date: ctx.timestamp, ..created.clone()
+    });
+    done_stock_move(ctx, organization_id, created.id, DoneStockMoveParams {
+        company_id: Some(company_id), quantity_done: quantity,
+    })?;
+    move_stock_quant(ctx, organization_id, source.id, MoveStockQuantParams {
+        company_id: Some(company_id), dest_location_id: scrap_location_id, quantity,
+    })?;
+    let completed = ctx.db.stock_move().id().find(&created.id).ok_or("Scrap move disappeared")?;
+    ctx.db.stock_move().id().update(StockMove {
+        state: "done".to_string(), is_done: true, is_assigned: false,
+        write_uid: ctx.sender(), write_date: ctx.timestamp, ..completed
+    });
+    write_audit_log_v2(ctx, organization_id, AuditLogParams {
+        company_id: Some(company_id), table_name: "mrp_production", record_id: mo_id,
+        action: "UPDATE", old_values: None,
+        new_values: Some(serde_json::json!({"scrap_move_id": created.id, "quantity": quantity}).to_string()),
+        changed_fields: vec!["scrap_move".to_string()], metadata: None,
+    });
+    Ok(())
+}
+
 #[reducer]
 pub fn cancel_manufacturing_order(
     ctx: &ReducerContext,
@@ -1168,6 +1346,105 @@ pub fn cancel_manufacturing_order(
             Ok(())
         }
     }
+}
+
+fn require_workorder_parent(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    wo: &MrpWorkorder,
+) -> Result<MrpProduction, String> {
+    let mo = require_mo_in_company(ctx, organization_id, company_id, wo.production_id)?;
+    if !mo.workorder_ids.contains(&wo.id) {
+        return Err(format!(
+            "Manufacturing order {} does not own workorder {}",
+            mo.id, wo.id
+        ));
+    }
+    Ok(mo)
+}
+
+pub(crate) fn require_workorder_execution_scope(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    workorder_id: u64,
+) -> Result<(MrpWorkorder, MrpProduction), String> {
+    require_company_in_organization(ctx, organization_id, company_id)?;
+    let wo = ctx
+        .db
+        .mrp_workorder()
+        .id()
+        .find(&workorder_id)
+        .ok_or("Work order not found")?;
+    if wo.organization_id != organization_id {
+        return Err("Work order does not belong to this organization".to_string());
+    }
+    if wo.company_id != company_id {
+        return Err("Record does not belong to this company".to_string());
+    }
+    let mo = require_workorder_parent(ctx, organization_id, company_id, &wo)?;
+    if mo.state != MoState::Progress && mo.state != MoState::ToClose {
+        return Err("Parent manufacturing order must be in Progress or ToClose".to_string());
+    }
+    Ok((wo, mo))
+}
+
+pub(crate) fn sync_workcenter_workorder_projection(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    workcenter_id: u64,
+) -> Result<(), String> {
+    let wc = ctx
+        .db
+        .mrp_workcenter()
+        .id()
+        .find(&workcenter_id)
+        .ok_or("Work center not found")?;
+    if wc.organization_id != organization_id || wc.company_id != company_id {
+        return Err("Work center does not match workorder scope".to_string());
+    }
+
+    let rows: Vec<_> = ctx
+        .db
+        .mrp_workorder()
+        .mrp_workorder_by_workcenter()
+        .filter(&workcenter_id)
+        .collect();
+    if rows
+        .iter()
+        .any(|wo| wo.organization_id != organization_id || wo.company_id != company_id)
+    {
+        return Err("Work center has cross-scope workorder rows".to_string());
+    }
+
+    let mut order_ids: Vec<u64> = rows.iter().map(|wo| wo.id).collect();
+    order_ids.sort_unstable();
+    let ready = rows
+        .iter()
+        .filter(|wo| wo.state == WorkorderState::Ready)
+        .count() as u32;
+    let progress = rows
+        .iter()
+        .filter(|wo| wo.state == WorkorderState::Progress)
+        .count() as u32;
+    let pending = rows
+        .iter()
+        .filter(|wo| wo.state == WorkorderState::Pending)
+        .count() as u32;
+
+    ctx.db.mrp_workcenter().id().update(MrpWorkcenter {
+        order_ids,
+        workorder_count: rows.len() as u32,
+        workorder_ready_count: ready,
+        workorder_progress_count: progress,
+        workorder_pending_count: pending,
+        write_uid: ctx.sender(),
+        write_date: ctx.timestamp,
+        ..wc
+    });
+    Ok(())
 }
 
 // ============================================================================
@@ -1292,6 +1569,7 @@ pub fn create_workorder(
         write_date: ctx.timestamp,
         ..mo
     });
+    sync_workcenter_workorder_projection(ctx, organization_id, company_id, wo.workcenter_id)?;
 
     write_audit_log_v2(
         ctx,
@@ -1327,24 +1605,27 @@ pub fn start_workorder(
     workorder_id: u64,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "mrp_workorder", "write")?;
-    require_company_in_organization(ctx, organization_id, company_id)?;
-
-    let wo = ctx
-        .db
-        .mrp_workorder()
-        .id()
-        .find(&workorder_id)
-        .ok_or("Work order not found")?;
-
-    if wo.organization_id != organization_id {
-        return Err("Work order does not belong to this organization".to_string());
-    }
-    if wo.company_id != company_id {
-        return Err("Record does not belong to this company".to_string());
-    }
+    let (wo, _mo) =
+        require_workorder_execution_scope(ctx, organization_id, company_id, workorder_id)?;
 
     match wo.state {
         WorkorderState::Pending | WorkorderState::Ready => {
+            if let Some(blocker_id) = wo.blocked_by_workorder_id {
+                let blocker = ctx
+                    .db
+                    .mrp_workorder()
+                    .id()
+                    .find(&blocker_id)
+                    .ok_or("Blocker workorder not found")?;
+                if blocker.production_id != wo.production_id
+                    || blocker.company_id != company_id
+                    || blocker.state != WorkorderState::Done
+                {
+                    return Err("Blocking workorder must be Done before start".to_string());
+                }
+            }
+
+            let workcenter_id = wo.workcenter_id;
             ctx.db.mrp_workorder().id().update(MrpWorkorder {
                 state: WorkorderState::Progress,
                 date_start: Some(ctx.timestamp),
@@ -1353,6 +1634,12 @@ pub fn start_workorder(
                 write_date: ctx.timestamp,
                 ..wo
             });
+            sync_workcenter_workorder_projection(
+                ctx,
+                organization_id,
+                company_id,
+                workcenter_id,
+            )?;
 
             write_audit_log_v2(
                 ctx,
@@ -1385,61 +1672,119 @@ pub fn finish_workorder(
     workorder_id: u64,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "mrp_workorder", "write")?;
-    require_company_in_organization(ctx, organization_id, company_id)?;
+    let (wo, _mo) =
+        require_workorder_execution_scope(ctx, organization_id, company_id, workorder_id)?;
 
-    let wo = ctx
+    if wo.state != WorkorderState::Progress {
+        return Err("Work order must be in Progress state to finish".to_string());
+    }
+
+    let linked_checks: Vec<_> = ctx.db.quality_check().iter().filter(|check| {
+        check.organization_id == organization_id
+            && check.company_id == company_id
+            && check.workorder_id == Some(workorder_id)
+    }).collect();
+    let mut linked_ids: Vec<_> = linked_checks.iter().map(|check| check.id).collect();
+    linked_ids.sort_unstable();
+    let mut owned_ids = wo.check_ids.clone();
+    owned_ids.sort_unstable();
+    if linked_ids != owned_ids {
+        return Err("Work order quality relation is inconsistent".to_string());
+    }
+    if linked_checks.iter().any(|check| {
+        check.production_id != Some(wo.production_id)
+            || check.product_id != Some(wo.product_id)
+            || check.status != "completed"
+            || check.quality_state != "pass"
+            || check.is_failed
+    }) || wo.quality_check_todo || wo.quality_check_fail {
+        return Err("Work order requires passing quality checks before finish".to_string());
+    }
+
+    let productivity_rows: Vec<_> = ctx
         .db
-        .mrp_workorder()
-        .id()
-        .find(&workorder_id)
-        .ok_or("Work order not found")?;
-
-    if wo.organization_id != organization_id {
-        return Err("Work order does not belong to this organization".to_string());
+        .mrp_workcenter_productivity()
+        .mrp_productivity_by_workorder()
+        .filter(&workorder_id)
+        .collect();
+    if productivity_rows.iter().any(|row| {
+        row.organization_id != organization_id
+            || row.company_id != company_id
+            || row.workcenter_id != wo.workcenter_id
+    }) {
+        return Err("Work order has invalid productivity scope".to_string());
     }
-    if wo.company_id != company_id {
-        return Err("Record does not belong to this company".to_string());
+
+    let mut authoritative_ids: Vec<u64> = productivity_rows.iter().map(|row| row.id).collect();
+    authoritative_ids.sort_unstable();
+    let mut owned_ids = wo.time_ids.clone();
+    owned_ids.sort_unstable();
+    if authoritative_ids != owned_ids {
+        return Err("Work order productivity relation is inconsistent".to_string());
     }
 
-    match wo.state {
-        WorkorderState::Progress => {
-            let duration = wo.duration + 1.0; // Simplified
-            let progress = 100.0;
+    let duration: f64 = productivity_rows.iter().map(|row| row.duration).sum();
+    let duration_percent = if wo.duration_expected > 0.0 {
+        (duration / wo.duration_expected * 100.0).min(100.0)
+    } else {
+        100.0
+    };
 
-            ctx.db.mrp_workorder().id().update(MrpWorkorder {
-                state: WorkorderState::Done,
-                date_finished: Some(ctx.timestamp),
-                duration,
-                progress,
-                is_user_working: false,
-                is_produced: true,
-                write_uid: ctx.sender(),
-                write_date: ctx.timestamp,
-                ..wo
-            });
-
-            write_audit_log_v2(
-                ctx,
-                organization_id,
-                AuditLogParams {
-                    company_id: Some(company_id),
-                    table_name: "mrp_workorder",
-                    record_id: workorder_id,
-                    action: "UPDATE",
-                    old_values: None,
-                    new_values: Some(serde_json::json!({ "state": "done" }).to_string()),
-                    changed_fields: vec![
-                        "state".to_string(),
-                        "date_finished".to_string(),
-                        "is_produced".to_string(),
-                    ],
-                    metadata: None,
-                },
-            );
-
-            log::info!("Work order finished: id={}", workorder_id);
-            Ok(())
+    for productivity in productivity_rows {
+        if productivity.date_end.is_none() {
+            ctx.db
+                .mrp_workcenter_productivity()
+                .id()
+                .update(crate::manufacturing::work_centers::MrpWorkcenterProductivity {
+                    date_end: Some(ctx.timestamp),
+                    write_uid: ctx.sender(),
+                    write_date: ctx.timestamp,
+                    ..productivity
+                });
         }
-        _ => Err("Work order must be in Progress state to finish".to_string()),
     }
+
+    let workcenter_id = wo.workcenter_id;
+    ctx.db.mrp_workorder().id().update(MrpWorkorder {
+        state: WorkorderState::Done,
+        date_finished: Some(ctx.timestamp),
+        duration,
+        duration_percent,
+        progress: 100.0,
+        is_user_working: false,
+        is_produced: true,
+        write_uid: ctx.sender(),
+        write_date: ctx.timestamp,
+        ..wo
+    });
+    sync_workcenter_workorder_projection(
+        ctx,
+        organization_id,
+        company_id,
+        workcenter_id,
+    )?;
+
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "mrp_workorder",
+            record_id: workorder_id,
+            action: "UPDATE",
+            old_values: None,
+            new_values: Some(serde_json::json!({ "state": "done", "duration": duration }).to_string()),
+            changed_fields: vec![
+                "state".to_string(),
+                "date_finished".to_string(),
+                "duration".to_string(),
+                "progress".to_string(),
+                "is_produced".to_string(),
+            ],
+            metadata: None,
+        },
+    );
+
+    log::info!("Work order finished: id={}", workorder_id);
+    Ok(())
 }

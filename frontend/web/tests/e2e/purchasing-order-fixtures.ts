@@ -7,7 +7,9 @@ import {
   chooseFirstEnabledOption,
   chooseSelectOptionByLabel,
   clickEntityActionAndWaitForReducer,
+  fetchAccountSelectLabelByInternalType,
   fetchPurchaseOrderSelectLabel,
+  fetchVendorBillJournalLabel,
   fillField,
   gotoModule,
   scalarQueryId,
@@ -251,4 +253,109 @@ export async function receivePurchaseLineViaUi(
     "entity-action-pol-receive-qty",
     "receive_po_line",
   )
+}
+
+
+export async function fetchPurchaseOrderInvoiceIds(
+  page: Page,
+  orderId: number,
+): Promise<number[]> {
+  const response = await page.request.get("/api/query/purchase-orders")
+  if (!response.ok()) return []
+
+  const payload = (await response.json()) as {
+    data?: Array<Record<string, unknown>>
+  }
+  const order = (payload.data ?? []).find(
+    (row) => scalarQueryId(row.id) === orderId,
+  )
+  const raw = order?.invoiceIds ?? order?.invoice_ids
+  if (!Array.isArray(raw)) return []
+  return raw
+    .flatMap((value) => {
+      const id = scalarQueryId(value)
+      return id == null ? [] : [id]
+    })
+    .sort((a, b) => a - b)
+}
+
+export interface VendorBillSnapshot {
+  id: number
+  moveType: string
+  state: string
+  invoiceOrigin?: string
+  amountTotal: number
+}
+
+export async function fetchVendorBillById(
+  page: Page,
+  billId: number,
+): Promise<VendorBillSnapshot | undefined> {
+  const response = await page.request.get("/api/query/account-moves")
+  if (!response.ok()) return undefined
+
+  const payload = (await response.json()) as {
+    data?: Array<Record<string, unknown>>
+  }
+  const row = (payload.data ?? []).find(
+    (candidate) => scalarQueryId(candidate.id) === billId,
+  )
+  if (!row) return undefined
+
+  const variant = (value: unknown): string => {
+    if (value != null && typeof value === "object" && "tag" in value) {
+      return String((value as { tag: string }).tag)
+    }
+    return String(value ?? "")
+  }
+
+  return {
+    id: billId,
+    moveType: variant(row.moveType ?? row.move_type),
+    state: variant(row.state),
+    invoiceOrigin:
+      row.invoiceOrigin == null && row.invoice_origin == null
+        ? undefined
+        : String(row.invoiceOrigin ?? row.invoice_origin),
+    amountTotal: Number(row.amountTotal ?? row.amount_total ?? 0),
+  }
+}
+
+export async function createVendorBillViaUi(
+  page: Page,
+  orderId: number,
+): Promise<import("@playwright/test").Response> {
+  await gotoModule(page, "/purchasing", "purchasing")
+  await selectModuleTab(page, "purchasing", "orders")
+  await selectEntityRowById(page, orderId)
+  await page.getByTestId("entity-action-po-create-bill").click()
+  await expect(
+    page.getByTestId("form-modal-create-bill-from-purchase-order"),
+  ).toBeVisible({ timeout: 15_000 })
+
+  await chooseSelectOptionByLabel(
+    page,
+    "journalId",
+    await fetchVendorBillJournalLabel(page),
+  )
+  await chooseSelectOptionByLabel(
+    page,
+    "defaultExpenseAccountId",
+    await fetchAccountSelectLabelByInternalType(page, "expense"),
+  )
+  await chooseSelectOptionByLabel(
+    page,
+    "payableAccountId",
+    await fetchAccountSelectLabelByInternalType(page, "payable"),
+  )
+  await fillField(page, "invoiceDate", new Date().toISOString().slice(0, 10))
+
+  const responsePromise = page.waitForResponse(
+    (response) =>
+      matchesOperationResponse(response, "create_bill_from_purchase_order") &&
+      response.ok(),
+    { timeout: 30_000 },
+  )
+  await submitForm(page, "create-bill-from-purchase-order")
+  return responsePromise
 }

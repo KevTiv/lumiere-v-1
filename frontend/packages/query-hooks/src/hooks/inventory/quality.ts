@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { stdbBffCommandPost } from "@lumiere/stdb/commands"
 import { apiFetch, fetchQueryList, coalesceQueryInitialData, type QueryRows, rqBigIntKey } from "../../http"
 import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
+import { workflowErrorFromResponse } from "@lumiere/erp-workflows"
 import { scalarToU64 as toScalarU64, type ScalarId } from "@lumiere/erp-shared/u64"
 
 
@@ -202,40 +203,33 @@ export function usePassQualityCheck(organizationId: bigint, companyId: bigint) {
   });
 }
 
-export function useFailQualityCheck(organizationId: bigint, companyId: bigint) {
-  const qc = useQueryClient();
-  return useMutation<
-    void,
-    Error,
-    {
-      checkId: ScalarId;
-      qtyFailed: number;
-      note?: string | null;
-      pictureFail?: string | null;
-      failureLocationId?: ScalarId | null;
-    }
-  >({
-    mutationFn: async ({
-      checkId,
-      qtyFailed,
-      note,
-      pictureFail,
-      failureLocationId,
-    }) => {
-      const { urlPath, init } = stdbBffCommandPost('fail_quality_check', {
-        companyId: companyId,
-        checkId: toScalarU64(checkId),
-        qtyFailed: qtyFailed,
-        note: note ?? null,
-        pictureFail: pictureFail ?? null,
-        failureLocationId:
-          failureLocationId != null ? toScalarU64(failureLocationId) : null,
-      });
-      const r = await apiFetch(urlPath, init);
-      if (!r.ok) throw new Error('Failed to fail quality check');
-    },
-    onSuccess: () => invalidateInventoryQueries(qc, organizationId),
+/** Underlying command for the `inventory.quality-check.fail` workflow (`useQualityCheckFailWorkflow`). */
+export async function failQualityCheckCommand(
+  companyId: bigint,
+  input: {
+    checkId: ScalarId;
+    qtyFailed: number;
+    note?: string | null;
+    pictureFail?: string | null;
+    failureLocationId: ScalarId;
+  },
+): Promise<void> {
+  const { urlPath, init } = stdbBffCommandPost('fail_quality_check', {
+    companyId,
+    checkId: toScalarU64(input.checkId),
+    qtyFailed: input.qtyFailed,
+    note: input.note ?? null,
+    pictureFail: input.pictureFail ?? null,
+    failureLocationId: toScalarU64(input.failureLocationId),
   });
+  const r = await apiFetch(urlPath, init);
+  if (!r.ok) {
+    throw workflowErrorFromResponse(
+      r.status,
+      await r.text().catch(() => ''),
+      'Failed to fail quality check',
+    );
+  }
 }
 
 export function useCreateQualityAlert(

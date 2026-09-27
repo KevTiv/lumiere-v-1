@@ -5,6 +5,7 @@
 ///   - StockCountSheet
 use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
+use crate::core::persistence::{record_organization_commit, OrganizationCommitInput, RowChange};
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 use crate::inventory::inventory_close::assert_inventory_writable;
 use crate::inventory::product::product;
@@ -461,6 +462,7 @@ pub fn post_cycle_count_adjustments(
 
     assert_inventory_writable(ctx, organization_id, cycle.company_id)?;
 
+    let mut adjusted_quant_ids: Vec<u64> = Vec::new();
     let sheet_ids = cycle.line_ids.clone();
     for sheet_id in sheet_ids {
         let sheet = ctx
@@ -479,6 +481,7 @@ pub fn post_cycle_count_adjustments(
             let new_available = (new_qty - quant.reserved_quantity).max(0.0);
             let new_value = new_qty * quant.cost;
 
+            let quant_id = quant.id;
             ctx.db.stock_quant().id().update(StockQuant {
                 quantity: new_qty,
                 available_quantity: new_available,
@@ -490,6 +493,7 @@ pub fn post_cycle_count_adjustments(
                 user_id: Some(ctx.sender()),
                 ..quant
             });
+            adjusted_quant_ids.push(quant_id);
         } else {
             // New quant: inherit cost and currency from product rather than defaulting to zero
             let (unit_cost, quant_currency_id) = ctx
@@ -501,7 +505,7 @@ pub fn post_cycle_count_adjustments(
                 .unwrap_or((0.0, None));
 
             let qty = sheet.counted_qty;
-            ctx.db.stock_quant().insert(StockQuant {
+            let inserted = ctx.db.stock_quant().insert(StockQuant {
                 id: 0,
                 organization_id: sheet.organization_id,
                 product_id: sheet.product_id,
@@ -529,6 +533,7 @@ pub fn post_cycle_count_adjustments(
                 accounting_entry_ids: vec![],
                 metadata: Some("{\"source\":\"cycle_count_post\"}".to_string()),
             });
+            adjusted_quant_ids.push(inserted.id);
         }
 
         ctx.db.stock_count_sheet().id().update(StockCountSheet {
@@ -559,6 +564,35 @@ pub fn post_cycle_count_adjustments(
             metadata: None,
         },
     );
+
+    // Capture the exact quant outcomes this post produced. Every id here was
+    // resolved by identity match (find_quant_for_sheet) or is a fresh insert
+    // whose id we carry directly — never rediscovered by newest/highest id.
+    adjusted_quant_ids.sort_unstable();
+    adjusted_quant_ids.dedup();
+    let mut changed_quants: Vec<RowChange> = Vec::with_capacity(adjusted_quant_ids.len());
+    for quant_id in adjusted_quant_ids {
+        let quant_after = ctx
+            .db
+            .stock_quant()
+            .id()
+            .find(&quant_id)
+            .ok_or("Adjusted quant disappeared before commit recording")?;
+        changed_quants.push(RowChange::upsert_stdb_row(
+            "stock_quant",
+            serde_json::json!({"id": quant_after.id}),
+            &quant_after,
+        )?);
+    }
+    record_organization_commit(
+        ctx,
+        OrganizationCommitInput {
+            organization_id,
+            operation_id: "erp.post_cycle_count_adjustments".to_string(),
+            correlation_id: format!("cycle-count:{cycle_count_id}:post"),
+            changes: changed_quants,
+        },
+    )?;
 
     Ok(())
 }

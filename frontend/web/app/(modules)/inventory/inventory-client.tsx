@@ -20,6 +20,7 @@ import {
   editProductForm,
   newProductVariantForm,
   assignUserToPickingForm,
+  buildPartialDeliveryForm,
   pickingRowActions,
   newQualityCheckForm,
   newQualityPointForm,
@@ -72,6 +73,13 @@ import { useModuleTab } from '@/hooks/use-module-tab';
 import { useInventoryModuleSubscription } from '@/lib/module-subscription-hooks';
 import { useWorkflowSurface } from '@/hooks/use-workflow-surface';
 import { usePickingWorkflow } from '@lumiere/query-hooks/hooks/picking-workflow';
+import { useStockQuantWorkflow } from '@lumiere/query-hooks/hooks/stock-quant-workflow';
+import { useQualityCheckFailWorkflow } from '@lumiere/query-hooks/hooks/quality-check-fail-workflow';
+import { useReplenishmentExecutionWorkflow } from '@lumiere/query-hooks/hooks/replenishment-execution-workflow';
+import { useSerialReserveWorkflow } from '@lumiere/query-hooks/hooks/serial-reserve-workflow';
+import { useSerialUseWorkflow } from '@lumiere/query-hooks/hooks/serial-use-workflow';
+import { useSerialBlockWorkflow } from '@lumiere/query-hooks/hooks/serial-block-workflow';
+import { planPartialDelivery } from '@lumiere/erp-workflows';
 import { groupBy } from '@/lib/utils';
 import { InventoryOpsPanel } from './inventory-ops-panel';
 import {
@@ -128,12 +136,10 @@ import {
   useReserveStockQuant,
   useUnreserveStockQuant,
   useWarehouse3D,
-  useMoveStockItem3D,
   useOrgUsers,
   // Quality management
   useCreateQualityCheck,
   usePassQualityCheck,
-  useFailQualityCheck,
   useCreateQualityAlert,
   useAssignQualityAlert,
   useCancelQualityAlert,
@@ -154,8 +160,6 @@ import {
   useAddRuleToNomenclature,
   useRemoveRuleFromNomenclature,
   useCreateAdjustmentReason,
-  useUseSerial,
-  useBlockSerial,
   useCreateStockProductionLot,
   useCreateStockProductionSerial,
   useCreateTraceabilityRecord,
@@ -191,7 +195,6 @@ import {
   useDeleteQualityAlertReason,
   useAddMemberToQualityTeam,
   useRemoveMemberFromQualityTeam,
-  useExecuteReplenishmentRule,
   useCreateStockQuant,
   useUpdateStockQuantQuantity,
   useUpdateStockProductionLot,
@@ -393,6 +396,24 @@ export function InventoryClient(props: InventoryClientProps) {
   );
 }
 
+function runPickingWorkflowActionForRows(
+  action: {
+    execute(
+      recordId: string,
+      context?: { navigateToNext?: boolean },
+    ): Promise<unknown>;
+  },
+  rows: ReadonlyArray<{ id?: unknown }>,
+): void {
+  const navigateToNext = rows.length === 1;
+  for (const row of rows) {
+    if (row.id == null) continue;
+    action
+      .execute(String(row.id), { navigateToNext })
+      .catch(() => undefined);
+  }
+}
+
 function InventoryClientLoaded({
   initialProducts,
   initialStockQuants,
@@ -433,6 +454,11 @@ function InventoryClientLoaded({
     unknown
   > | null>(null);
   const [assignPickingId, setAssignPickingId] = useState<ScalarId | null>(null);
+  const [moveQuantRow, setMoveQuantRow] = useState<Record<string, unknown> | null>(null);
+  const [moveQuantError, setMoveQuantError] = useState<string | null>(null);
+  const [partialTransferPicking, setPartialTransferPicking] =
+    useState<Record<string, unknown> | null>(null);
+  const [partialTransferError, setPartialTransferError] = useState<string | null>(null);
   const [assignQualityAlertId, setAssignQualityAlertId] =
     useState<ScalarId | null>(null);
   const [solveQualityAlertId, setSolveQualityAlertId] =
@@ -789,6 +815,15 @@ function InventoryClientLoaded({
   const cancelStockMove = useCancelStockMove(orgId, operatingCompanyId);
   const assignUserToPicking = useAssignUserToPicking(orgId, operatingCompanyId);
   const workflowSurface = useWorkflowSurface({ organizationId });
+  const stockQuantWorkflow = useStockQuantWorkflow(
+    orgId,
+    operatingCompanyId,
+    {
+      navigate: workflowSurface.navigate,
+      notify: workflowSurface.notify,
+      record: workflowSurface.record,
+    },
+  );
   const pickingWorkflow = usePickingWorkflow(
     orgId,
     operatingCompanyId,
@@ -958,10 +993,24 @@ function InventoryClientLoaded({
     return withDefaultsFromRow(editProductForm(t), editProductRow);
   }, [t, editProductRow]);
 
+  const qcLocationOptions = useMemo(() => {
+    const opts = locations.map((loc) => ({
+      value: String(loc.id),
+      label: String(loc.completeName ?? loc.name ?? loc.id),
+    }));
+    return [
+      { value: '', label: t('inventory.forms.editWarehouse.fields.qcStockLocNone') },
+      ...opts,
+    ];
+  }, [locations, t]);
+
   const editWarehouseModalConfig = useMemo(() => {
-    if (!editWarehouseRow) return editWarehouseForm(t);
-    return withDefaultsFromRow(editWarehouseForm(t), editWarehouseRow);
-  }, [t, editWarehouseRow]);
+    const base = mergeSelectOptionsForFields(editWarehouseForm(t), {
+      whQcStockLocId: qcLocationOptions,
+    });
+    if (!editWarehouseRow) return base;
+    return withDefaultsFromRow(base, editWarehouseRow);
+  }, [t, editWarehouseRow, qcLocationOptions]);
 
   // 3D viewer — use first warehouse found (or 0n as a no-op before warehouses load)
   const firstWarehouseId = warehouses[0]?.id
@@ -972,12 +1021,15 @@ function InventoryClientLoaded({
     slots,
     items: warehouseItems,
   } = useWarehouse3D(orgId, operatingCompanyId, firstWarehouseId);
-  const moveStockItem = useMoveStockItem3D(orgId, operatingCompanyId);
 
   // Quality management hooks
   const createQualityCheck = useCreateQualityCheck(orgId, operatingCompanyId);
   const passQualityCheck = usePassQualityCheck(orgId, operatingCompanyId);
-  const failQualityCheck = useFailQualityCheck(orgId, operatingCompanyId);
+  const failQualityCheck = useQualityCheckFailWorkflow(
+    orgId,
+    operatingCompanyId ?? 0n,
+    workflowSurface,
+  );
   const createQualityAlert = useCreateQualityAlert(orgId, operatingCompanyId);
   const assignQualityAlert = useAssignQualityAlert(orgId, operatingCompanyId);
   const cancelQualityAlert = useCancelQualityAlert(orgId, operatingCompanyId);
@@ -1017,8 +1069,9 @@ function InventoryClientLoaded({
     orgId,
     operatingCompanyId,
   );
-  const useSerial = useUseSerial(orgId, operatingCompanyId);
-  const blockSerial = useBlockSerial(orgId, operatingCompanyId);
+  const useSerial = useSerialUseWorkflow(orgId, workflowSurface);
+  const blockSerial = useSerialBlockWorkflow(orgId, workflowSurface);
+  const reserveSerial = useSerialReserveWorkflow(orgId, workflowSurface);
   const createStockProductionLot = useCreateStockProductionLot(
     orgId,
     operatingCompanyId,
@@ -1105,9 +1158,10 @@ function InventoryClientLoaded({
   const deleteQualityAlertReason = useDeleteQualityAlertReason(orgId);
   const addMemberToQualityTeam = useAddMemberToQualityTeam(orgId);
   const removeMemberFromQualityTeam = useRemoveMemberFromQualityTeam(orgId);
-  const executeReplenishmentRule = useExecuteReplenishmentRule(
+  const executeReplenishmentRule = useReplenishmentExecutionWorkflow(
     orgId,
-    selectedOperatingCompanyId,
+    operatingCompanyId,
+    workflowSurface,
   );
   const createStockQuant = useCreateStockQuant(orgId, {
     companyId: operatingCompanyId ?? undefined,
@@ -1232,6 +1286,51 @@ function InventoryClientLoaded({
     return map;
   }, [products]);
 
+  const assignedMovesForPartialTransfer = useMemo(() => {
+    if (!partialTransferPicking) return [];
+    const pickingId = String(partialTransferPicking.id ?? '');
+    return (stockMoves as Record<string, unknown>[]).filter((move) => {
+      const movePickingId = String(move.pickingId ?? move.picking_id ?? '');
+      const rawState = move.state;
+      const state =
+        rawState != null && typeof rawState === 'object' && 'tag' in rawState
+          ? String((rawState as { tag: string }).tag).toLowerCase()
+          : String(rawState ?? '').toLowerCase();
+      return movePickingId === pickingId && state === 'assigned';
+    });
+  }, [partialTransferPicking, stockMoves]);
+
+  const partialTransferFormConfig = useMemo(() => {
+    if (!partialTransferPicking) return null;
+    const pickingName = String(
+      partialTransferPicking.name ??
+        partialTransferPicking.origin ??
+        partialTransferPicking.id ??
+        '',
+    );
+    return buildPartialDeliveryForm(
+      t,
+      pickingName,
+      assignedMovesForPartialTransfer.map((move) => {
+        const moveId = String(move.id ?? '');
+        const productId = String(move.productId ?? move.product_id ?? '');
+        return {
+          moveId,
+          productLabel:
+            productLabelById.get(productId) ?? `Product ${productId}`,
+          orderedQty: Number(
+            move.productUomQty ?? move.product_uom_qty ?? 0,
+          ),
+        };
+      }),
+    );
+  }, [
+    partialTransferPicking,
+    assignedMovesForPartialTransfer,
+    productLabelById,
+    t,
+  ]);
+
   const locationLabelById = useMemo(() => {
     const map = new Map<string, string>();
     for (const location of locations) {
@@ -1242,6 +1341,70 @@ function InventoryClientLoaded({
     }
     return map;
   }, [locations]);
+
+  const moveQuantFormConfig = useMemo((): FormConfig | null => {
+    if (!moveQuantRow) return null;
+    const sourceLocationId = String(
+      moveQuantRow.locationId ?? moveQuantRow.location_id ?? '',
+    );
+    const targetOptions = locations
+      .filter((location) => {
+        const row = location as Record<string, unknown>;
+        const active = row.active !== false;
+        return active && String(row.id ?? '') !== sourceLocationId;
+      })
+      .map((location) => ({
+        value: String(location.id),
+        label: String(location.completeName ?? location.name ?? location.id),
+      }));
+    const available = Number(
+      moveQuantRow.availableQuantity ??
+        moveQuantRow.available_quantity ??
+        moveQuantRow.quantity ??
+        0,
+    );
+    return {
+      id: 'move-stock-quant',
+      title: t('inventory.forms.newTransfer.title'),
+      description: t('inventory.forms.newTransfer.description'),
+      submitLabel: t('common.save'),
+      cancelLabel: t('common.cancel'),
+      sections: [
+        {
+          id: 'move-stock-quant',
+          fields: [
+            {
+              id: 'targetLocationId',
+              name: 'targetLocationId',
+              type: 'select',
+              label: t('inventory.forms.newTransfer.fields.locationDestId'),
+              required: true,
+              width: 'full',
+              options:
+                targetOptions.length > 0
+                  ? targetOptions
+                  : [
+                      {
+                        value: '',
+                        label: t('common.lookup.noStockMoves'),
+                        disabled: true,
+                      },
+                    ],
+            },
+            {
+              id: 'quantity',
+              name: 'quantity',
+              type: 'number',
+              label: t('inventory.stockOnHand.columns.availableQuantity'),
+              required: true,
+              width: '1/2',
+              defaultValue: Math.min(1, Math.max(available, 0)),
+            },
+          ],
+        },
+      ],
+    };
+  }, [moveQuantRow, locations, t]);
 
   const productsEntityConfig = useMemo((): EntityViewConfig => {
     const base = productsTableConfig(t, {
@@ -1274,6 +1437,29 @@ function InventoryClientLoaded({
           ...view.emptyState,
           onAction: openCreateStockQuant,
         },
+        actions: [
+          ...(view.actions ?? []),
+          {
+            id: 'move-stock-quant',
+            label: t('inventory.forms.newTransfer.title'),
+            icon: Route,
+            requiresSelection: true,
+            isApplicable: (rows) =>
+              rows.length === 1 &&
+              Number(
+                rows[0]?.availableQuantity ??
+                  rows[0]?.available_quantity ??
+                  rows[0]?.quantity ??
+                  0,
+              ) > 0,
+            onClick: (rows) => {
+              const first = rows[0] as Record<string, unknown> | undefined;
+              if (!first) return;
+              setMoveQuantError(null);
+              setMoveQuantRow(first);
+            },
+          },
+        ],
       },
     };
   }, [t, openCreateStockQuant]);
@@ -1841,11 +2027,13 @@ function InventoryClientLoaded({
                 warehouses[0]?.name ? String(warehouses[0].name) : undefined
               }
               onMoveItem={(itemId, targetSlotId) => {
-                moveStockItem.mutate({
-                  quantId: BigInt(itemId),
-                  targetLocationId: BigInt(targetSlotId),
-                  quantity: 1,
-                });
+                void stockQuantWorkflow
+                  .move({
+                    quantId: String(itemId),
+                    targetLocationId: String(targetSlotId),
+                    quantity: 1,
+                  })
+                  .catch(() => undefined);
               }}
             />
           </div>
@@ -1857,7 +2045,7 @@ function InventoryClientLoaded({
       slots,
       warehouseItems,
       warehouses,
-      moveStockItem,
+      stockQuantWorkflow,
       t,
       isMounted,
       warehouse3dZoneFormConfig,
@@ -1956,14 +2144,23 @@ function InventoryClientLoaded({
                 t,
                 {
                   // Every selected transfer qualifies (the toolbar requires it), so each one is run.
-                  confirm: (rows) => runRecordActionForRows(pickingWorkflow.confirm, rows),
-                  assign: (rows) => runRecordActionForRows(pickingWorkflow.assign, rows),
+                  confirm: (rows) =>
+                    runPickingWorkflowActionForRows(pickingWorkflow.confirm, rows),
+                  assign: (rows) =>
+                    runPickingWorkflowActionForRows(pickingWorkflow.assign, rows),
+                  'partial-validate': (rows) => {
+                    const first = rows[0] as Record<string, unknown> | undefined;
+                    if (!first) return;
+                    setPartialTransferError(null);
+                    setPartialTransferPicking(first);
+                  },
                   'assign-user': (rows) => {
                     const id = rows[0]?.id as ScalarId | undefined;
                     if (id != null) setAssignPickingId(id);
                   },
                   pack: (rows) => runRecordActionForRows(pickingWorkflow.pack, rows),
-                  validate: (rows) => runRecordActionForRows(pickingWorkflow.validate, rows),
+                  validate: (rows) =>
+                    runPickingWorkflowActionForRows(pickingWorkflow.validate, rows),
                   cancel: (rows) => runRecordActionForRows(pickingWorkflow.cancel, rows),
                 },
                 {
@@ -2907,7 +3104,11 @@ function InventoryClientLoaded({
                       locationId: undefined,
                       packageId: undefined,
                       ownerId: undefined,
-                      state: 'available',
+                      // The serial lifecycle only recognizes "free" as the
+                      // initial state (reserve_serial/use_serial/etc. all
+                      // check for it verbatim) — "available" left every
+                      // UI-created serial permanently unreservable.
+                      state: 'free',
                       isScrap: false,
                       isLocked: false,
                       warrantyExpiration: undefined,
@@ -2920,13 +3121,31 @@ function InventoryClientLoaded({
                   },
                 },
                 {
+                  id: 'reserve-serial',
+                  label: t('inventory.productionSerials.actions.reserve'),
+                  icon: ListChecks,
+                  requiresSelection: true,
+                  onClick: (rows) => {
+                    const id = rows[0]?.id as ScalarId | undefined;
+                    if (id != null)
+                      void reserveSerial.reserve(
+                        { serialId: String(id) },
+                        { navigateToNext: true },
+                      );
+                  },
+                },
+                {
                   id: 'use-serial',
                   label: t('inventory.productionSerials.actions.markInUse'),
                   icon: CheckCircle,
                   requiresSelection: true,
                   onClick: (rows) => {
                     const id = rows[0]?.id as ScalarId | undefined;
-                    if (id != null) void useSerial.mutateAsync(id);
+                    if (id != null)
+                      void useSerial.markInUse(
+                        { serialId: String(id) },
+                        { navigateToNext: true },
+                      );
                   },
                 },
                 {
@@ -3043,22 +3262,56 @@ function InventoryClientLoaded({
                   variant: 'destructive',
                   requiresSelection: true,
                   onClick: (rows) => {
-                    const id = rows[0]?.id as ScalarId | undefined;
+                    const row = rows[0] as Record<string, unknown> | undefined;
+                    const id = row?.id as ScalarId | undefined;
+                    const productId = row?.productId ?? row?.product_id;
+                    const companyId = row?.companyId ?? row?.company_id;
+                    const lotId = row?.lotId ?? row?.lot_id;
+                    const quarantineWarehouse = (
+                      warehouses as Record<string, unknown>[]
+                    ).find(
+                      (w) =>
+                        (w.whQcStockLocId ?? w.wh_qc_stock_loc_id) != null,
+                    );
+                    const configuredQuarantineLocationId =
+                      quarantineWarehouse?.whQcStockLocId ??
+                      quarantineWarehouse?.wh_qc_stock_loc_id;
+                    // No warehouse in this org has a configured QC location yet
+                    // (wh_qc_stock_loc_id is create-only, never set by seed data
+                    // or update_warehouse) — ask the operator which location the
+                    // failed stock quarantines to.
+                    const quarantineLocationId =
+                      configuredQuarantineLocationId ??
+                      promptScalarId(
+                        t('inventory.qualityActions.quarantineLocationPrompt'),
+                      );
                     const reason =
                       typeof window !== 'undefined'
                         ? window.prompt(
                             t('inventory.qualityActions.failReason'),
                           )
                         : null;
-                    if (id != null) {
-                      void failQualityCheck.mutateAsync({
-                        checkId: id,
-                        qtyFailed: 1,
-                        note:
-                          reason && reason.trim() !== '' ? reason.trim() : null,
-                        pictureFail: null,
-                        failureLocationId: null,
-                      });
+                    if (
+                      id != null &&
+                      productId != null &&
+                      companyId != null &&
+                      quarantineLocationId != null
+                    ) {
+                      void failQualityCheck.fail(
+                        {
+                          checkId: String(id),
+                          productId: String(productId),
+                          lotId: lotId != null ? String(lotId) : undefined,
+                          companyId: String(companyId),
+                          quarantineLocationId: String(quarantineLocationId),
+                          qtyFailed: 1,
+                          note:
+                            reason && reason.trim() !== ''
+                              ? reason.trim()
+                              : undefined,
+                        },
+                        { navigateToNext: true },
+                      );
                     }
                   },
                 },
@@ -3297,10 +3550,13 @@ function InventoryClientLoaded({
                       ) {
                         return;
                       }
-                      void executeReplenishmentRule.mutateAsync({
-                        ruleId: id,
-                        idempotencyKey: globalThis.crypto.randomUUID(),
-                      });
+                      void executeReplenishmentRule.execute(
+                        {
+                          ruleId: String(id),
+                          idempotencyKey: globalThis.crypto.randomUUID(),
+                        },
+                        { navigateToNext: true },
+                      );
                     }
                   },
                 },
@@ -4251,7 +4507,7 @@ function InventoryClientLoaded({
       processAdjustment,
       reserveQuant,
       unreserveQuant,
-      moveStockItem,
+      stockQuantWorkflow,
       createQualityCheck,
       passQualityCheck,
       failQualityCheck,
@@ -4392,6 +4648,7 @@ function InventoryClientLoaded({
               type="button"
               variant="destructive"
               size="sm"
+              data-testid="serial-detail-block-button"
               onClick={() => {
                 const id = selectedSerialRow.id as ScalarId;
                 setBlockSerialId(id);
@@ -4421,12 +4678,12 @@ function InventoryClientLoaded({
         isPending={isFormMutationPending}
         onSubmit={async (fd) => {
           if (blockSerialId == null) return;
-          await blockSerial.mutateAsync({
-            serialId: blockSerialId,
+          await blockSerial.block({
+            serialId: String(blockSerialId),
             reason:
               fd.reason != null && String(fd.reason).trim() !== ''
                 ? String(fd.reason).trim()
-                : null,
+                : undefined,
           });
           setBlockSerialId(null);
           setSelectedSerialRow(null);
@@ -4585,9 +4842,24 @@ function InventoryClientLoaded({
         onSubmit={async (fd) => {
           if (!editWarehouseRow) return;
           const id = editWarehouseRow.id as ScalarId;
+          // whQcStockLocId is not yet part of the generated UpdateWarehouseParams
+          // TS shape (pending an @lumiere/contracts release); pre-encode its SATS
+          // option wrapper by hand so stdbParamsToJson passes it through as-is
+          // regardless of whether the generated option-fields list knows about it.
+          const qcStockLocRaw = fd.whQcStockLocId;
+          const whQcStockLocId =
+            qcStockLocRaw == null || String(qcStockLocRaw).trim() === ''
+              ? { none: [] }
+              : { some: Number(qcStockLocRaw) };
           await updateWarehouse.mutateAsync({
             warehouseId: id,
             params: {
+              // Cast: whQcStockLocId is not yet part of the generated
+              // UpdateWarehouseParams TS shape (pending an @lumiere/contracts
+              // release); the pre-encoded SATS option wrapper above still
+              // reaches the server correctly since stdbParamsToJson passes an
+              // already-wrapped { some }/{ none } value through unchanged.
+              ...({ whQcStockLocId } as Record<string, unknown>),
               name:
                 fd.name != null && String(fd.name).trim() !== ''
                   ? String(fd.name)
@@ -4634,6 +4906,109 @@ function InventoryClientLoaded({
           });
         }}
       />
+      {moveQuantRow != null && moveQuantFormConfig ? (
+        <FormModal
+          key={`move-quant-${String(moveQuantRow.id ?? '')}`}
+          open
+          onOpenChange={(open) => {
+            if (!open) {
+              setMoveQuantRow(null);
+              setMoveQuantError(null);
+            }
+          }}
+          config={moveQuantFormConfig}
+          closeOnSubmit={false}
+          submitError={moveQuantError}
+          isPending={stockQuantWorkflow.isPending}
+          onSubmit={async (formData) => {
+            setMoveQuantError(null);
+            const quantId = moveQuantRow.id;
+            const targetLocationId = formData.targetLocationId;
+            const quantity = Number(formData.quantity);
+            if (
+              quantId == null ||
+              targetLocationId == null ||
+              targetLocationId === '' ||
+              !Number.isFinite(quantity)
+            ) {
+              setMoveQuantError(t('common.validation.required'));
+              return;
+            }
+            try {
+              await stockQuantWorkflow.move(
+                {
+                  quantId: String(quantId),
+                  targetLocationId: String(targetLocationId),
+                  quantity,
+                },
+                { navigateToNext: true },
+              );
+              setMoveQuantRow(null);
+            } catch (error) {
+              setMoveQuantError(
+                error instanceof Error ? error.message : String(error),
+              );
+            }
+          }}
+        />
+      ) : null}
+      {partialTransferPicking != null && partialTransferFormConfig ? (
+        <FormModal
+          key={`partial-transfer-${String(partialTransferPicking.id ?? '')}`}
+          open
+          onOpenChange={(open) => {
+            if (!open) {
+              setPartialTransferPicking(null);
+              setPartialTransferError(null);
+            }
+          }}
+          config={partialTransferFormConfig}
+          closeOnSubmit={false}
+          submitError={partialTransferError}
+          isPending={pickingWorkflow.isPending}
+          onSubmit={async (formData) => {
+            setPartialTransferError(null);
+            if (assignedMovesForPartialTransfer.length === 0) {
+              setPartialTransferError(
+                t('sales.forms.partialDelivery.errors.noAssignedMoves'),
+              );
+              return;
+            }
+            const pickingId = partialTransferPicking.id;
+            if (pickingId == null) return;
+            const plan = planPartialDelivery(
+              assignedMovesForPartialTransfer.map((move) => ({
+                moveId: String(move.id),
+                orderedQty: Number(
+                  move.productUomQty ?? move.product_uom_qty ?? 0,
+                ),
+              })),
+              formData,
+            );
+            if (!plan.ok) {
+              setPartialTransferError(
+                t(`sales.forms.partialDelivery.errors.${plan.error}`),
+              );
+              return;
+            }
+            try {
+              await pickingWorkflow.partialValidate.execute(
+                {
+                  pickingId: String(pickingId),
+                  shortMoves: plan.shortMoves,
+                  createBackorder: formData.createBackorder === true,
+                },
+                { navigateToNext: true },
+              );
+              setPartialTransferPicking(null);
+            } catch (error) {
+              setPartialTransferError(
+                error instanceof Error ? error.message : String(error),
+              );
+            }
+          }}
+        />
+      ) : null}
       <FormModal
         key={
           assignPickingId != null

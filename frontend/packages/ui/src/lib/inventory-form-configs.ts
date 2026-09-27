@@ -479,6 +479,15 @@ export const editWarehouseForm = (t: TFunction): FormConfig => ({
           width: "1/2",
         },
         {
+          id: "whQcStockLocId",
+          name: "whQcStockLocId",
+          type: "select",
+          label: t("inventory.forms.editWarehouse.fields.qcStockLocId"),
+          placeholder: t("inventory.forms.editWarehouse.fields.qcStockLocPlaceholder"),
+          width: "1/2",
+          options: emptySelect,
+        },
+        {
           id: "metadata",
           name: "metadata",
           type: "textarea",

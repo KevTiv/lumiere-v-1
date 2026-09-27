@@ -20,6 +20,7 @@ import {
   observeSentPurchaseOrder,
   poSourceRfqId,
   purchaseLineOpenQty,
+  purchaseOrderInvoiceIds,
   receivePurchaseLineAction,
   resolveOpenReceiptTarget,
 } from "./procure-to-pay"
@@ -100,12 +101,29 @@ test("the PO an RFQ award created is found by its rfq_id stamp, newest first", (
   assert.deepEqual(observeAwardedRfq("99", []), {})
 })
 
-test("the vendor bill is the last entry of the order's invoice ids and opens in accounting", () => {
-  const observed = observeCreatedBill("5", [{ id: 5, invoiceIds: [20, 21] }])
-  const bill = { resource: "account_move", id: "21", module: "accounting", context: "purchasing" }
+test("vendor bill identity is the one exact new id in the PO relation", () => {
+  const before = purchaseOrderInvoiceIds("5", [{ id: 5, invoiceIds: [20] }])
+  assert.deepEqual(before, ["20"])
+
+  const observed = observeCreatedBill("5", before ?? [], [
+    { id: 5, invoiceIds: [20, 21] },
+  ])
+  const bill = {
+    resource: "account_move",
+    id: "21",
+    module: "accounting",
+    context: "purchasing",
+  }
   assert.deepEqual(observed.createdRecords, [bill])
   assert.deepEqual(observed.next, bill)
-  assert.deepEqual(observeCreatedBill("5", [{ id: 5, invoiceIds: [] }]), {})
+
+  // No new effect, multiple concurrent effects, or relation regression is unresolved.
+  assert.deepEqual(observeCreatedBill("5", ["20"], [{ id: 5, invoiceIds: [20] }]), {})
+  assert.deepEqual(
+    observeCreatedBill("5", ["20"], [{ id: 5, invoiceIds: [20, 21, 22] }]),
+    {},
+  )
+  assert.deepEqual(observeCreatedBill("5", ["20"], [{ id: 5, invoiceIds: [21] }]), {})
 })
 
 test("receiving needs open quantity and defaults the row dispatch to all of it", () => {
