@@ -132,7 +132,10 @@ static HTTP_SQL_INCLUDED_COLUMNS: Lazy<HashMap<String, HashSet<String>>> = Lazy:
     );
     m.insert(
         "purchase-orders".to_string(),
-        ["picking_ids"].into_iter().map(String::from).collect(),
+        ["picking_ids", "invoice_ids"]
+            .into_iter()
+            .map(String::from)
+            .collect(),
     );
     m.insert(
         "sale-orders".to_string(),
@@ -856,6 +859,18 @@ mod tests {
             assert!(
                 cols.iter().any(|column| column == field),
                 "expected {field} in sale-orders projection, got: {cols:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn resolve_http_sql_columns_includes_invoice_readback_for_purchase_orders() {
+        let cols =
+            resolve_http_sql_columns("purchase-orders", None).expect("purchase-orders columns");
+        for field in ["invoice_ids", "invoice_count", "invoice_status"] {
+            assert!(
+                cols.iter().any(|column| column == field),
+                "expected {field} in purchase-orders projection, got: {cols:?}"
             );
         }
     }
