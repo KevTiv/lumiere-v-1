@@ -290,7 +290,8 @@ test.describe("SAL-004: Full SO → Invoice creation flow", { tag: "@p0" }, () =
             },
           ],
           origin: none,
-          client_order_ref: none,
+          // Lets Step 7 filter the orders table to this order; later pages are not rendered.
+          client_order_ref: some(customerName),
           payment_term_id: none,
           fiscal_position_id: none,
           team_id: none,
@@ -347,6 +348,10 @@ test.describe("SAL-004: Full SO → Invoice creation flow", { tag: "@p0" }, () =
       // ── Step 7: Navigate to Sales → Orders and select the SO ─────────────────
       await gotoModule(page, "/sales", "sales")
       await page.getByTestId("module-tab-sales-orders").click()
+      await page
+        .locator('[role="tabpanel"]:visible')
+        .getByRole("textbox", { name: "Search records" })
+        .fill(customerName)
 
       await selectEntityRowById(page, orderId)
 
