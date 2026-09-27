@@ -141,6 +141,7 @@
       "currency_id",
       "invoice_date",
       "invoice_date_due",
+      "invoice_origin",
       "invoice_partner_display_name",
       "sale_order_id",
       "amount_untaxed",

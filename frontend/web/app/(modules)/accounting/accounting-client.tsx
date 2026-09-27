@@ -1,5 +1,6 @@
 "use client"
 import { mapDashboardWidgets, withDashboardSections } from "@lumiere/ui/lib/dashboard-sections"
+import { useModuleTab } from "@/hooks/use-module-tab"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { useTranslation } from "@lumiere/i18n"
@@ -646,6 +647,14 @@ function AccountingClientReady({
   const { currentUser } = useRBAC()
   const runtimeRoleId = currentUser?.roles[0]
   const moduleConfigBase = useMemo(() => accountingModuleConfig(t), [t])
+  const accountingTabIds = useMemo(
+    () => moduleConfigBase.tabs.map((tab) => tab.id),
+    [moduleConfigBase],
+  )
+  const { activeTab: accountingActiveTab, setActiveTab: setAccountingActiveTab } = useModuleTab(
+    moduleConfigBase.defaultTab ?? "dashboard",
+    accountingTabIds,
+  )
   /** BigInt organization id for `useStdbQuery` cache keys (not SpacetimeDB `company_id` reducers). */
   const { orgId } = orgBigInts(organizationId)
   async function persistAccountMoveCustomFieldsAfterCreate(metadata: unknown, displayName: string) {
@@ -721,8 +730,6 @@ function AccountingClientReady({
   const [moveLineEdit, setMoveLineEdit] = useState<Record<string, unknown> | null>(null)
   const [chatterTarget, setChatterTarget] = useState<ChatterTarget | null>(null)
   const [glDrilldownAccount, setGlDrilldownAccount] = useState<AccountAccount | null>(null)
-  const [accountingActiveTab, setAccountingActiveTab] = useState<string>("dashboard")
-
   // ── Data hooks ──────────────────────────────────────────────────────────────
   const { data: accounts = [] } = useAccountAccounts(orgId, {
     enabled: organizationId > 0,

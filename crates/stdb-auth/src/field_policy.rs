@@ -824,7 +824,7 @@ mod tests {
     #[test]
     fn resolve_http_sql_columns_includes_workflow_links_for_account_moves() {
         let cols = resolve_http_sql_columns("account-moves", None).expect("account-moves columns");
-        for field in ["metadata", "sale_order_id"] {
+        for field in ["metadata", "sale_order_id", "invoice_origin"] {
             assert!(
                 cols.iter().any(|column| column == field),
                 "expected {field} in account-moves projection, got: {cols:?}"
