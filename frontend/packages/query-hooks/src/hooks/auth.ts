@@ -117,6 +117,22 @@ async function fetchSettingsList(path: string, errorMessage: string): Promise<Qu
   return raw.filter((row): row is QueryRows[number] => !!row && typeof row === 'object')
 }
 
+export async function collectSettingsRows(
+  fetchPage: (offset: number, limit: number) => Promise<QueryRows>,
+  pageSize = 100,
+): Promise<QueryRows> {
+  if (!Number.isSafeInteger(pageSize) || pageSize <= 0) {
+    throw new Error('pageSize must be a positive safe integer')
+  }
+
+  const rows: QueryRows = []
+  for (let offset = 0; ; offset += pageSize) {
+    const page = await fetchPage(offset, pageSize)
+    rows.push(...page)
+    if (page.length < pageSize) return rows
+  }
+}
+
 function pickField<T>(row: Record<string, unknown>, ...keys: string[]): T | undefined {
   for (const key of keys) {
     const value = row[key]
@@ -408,9 +424,12 @@ export function useSettingsRoles(organizationId: bigint) {
   return useQuery<SettingsRoleRecord[]>({
     queryKey: ['settings-roles', rqBigIntKey(organizationId)],
     queryFn: async () => {
-      const rows = await fetchSettingsList(
-        '/api/settings/roles?limit=100',
-        'Failed to fetch settings roles',
+      const rows = await collectSettingsRows(
+        (offset, limit) =>
+          fetchSettingsList(
+            `/api/settings/roles?limit=${limit}&offset=${offset}`,
+            'Failed to fetch settings roles',
+          ),
       )
       return rows.map(mapApiRoleRow)
     },
