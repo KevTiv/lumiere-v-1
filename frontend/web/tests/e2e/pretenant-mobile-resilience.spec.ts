@@ -12,6 +12,13 @@ import {
 } from "./helpers"
 import { matchesOperationResponse } from "./operation-response"
 import {
+  presentationDefinition,
+  presentationDraft,
+  presentationModuleKey,
+  presentationOptions,
+  savePresentationDraft,
+} from "./presentation-fixtures"
+import {
   createTransaction,
   enumTag,
   fetchPartnerId,
@@ -22,17 +29,14 @@ import {
 } from "./payment-fixtures"
 import {
   CAPABILITIES,
-  CAPABILITY_PENDING,
   auditCount,
   browserPost,
   callRaw,
   callRawOk,
-  expectKnownDefect,
   loseNextResponse,
   none,
   openActorPages,
   openOwnerPages,
-  pendingContract,
   pollRow,
   pretenantTags,
   provisionActor,
@@ -159,9 +163,7 @@ test.describe("Pre-tenant mobile and network resilience", { tag: pretenantTags("
     expect(await ledgerPaymentId(page, transactionId)).toBeGreaterThan(0)
     await expect.poll(() => auditCount(page, "payment_transaction", transactionId, "POST")).toBe(1)
 
-    await expectKnownDefect("PAY-03", "post retry after a lost committed response returns an error", () => {
-      expect(retry.status).toBe(200)
-    })
+    expect(retry.status).toBe(200)
   })
 
   test("M-03 approval with lost response then retry approves once", async ({ page, browser }) => {
@@ -183,18 +185,36 @@ test.describe("Pre-tenant mobile and network resilience", { tag: pretenantTags("
       await session.close()
     }
     await expect.poll(() => auditCount(page, "message_batch", batchId, "APPROVE")).toBe(1)
-    await expectKnownDefect("COMM-15", "approval retry after a lost committed response returns an error", () => {
-      expect(retry.status).toBe(200)
-    })
+    expect(retry.status).toBe(200)
   })
 
-  test("M-04 IR draft save with lost response creates one revision", { tag: CAPABILITY_PENDING }, async ({ page }) => {
+  test("M-04 IR draft save with lost response creates one revision", async ({ page }) => {
     await requireCapability(page, CAPABILITIES.presentationSavedDrafts)
-    pendingContract(
-      CAPABILITIES.presentationSavedDrafts,
-      "M-04",
-      "save N→N+1 commits but the response is lost; retry with expectedRevision=N receives an explicit stale-revision conflict, the head stays N+1 (no N+2), and local edits remain available",
+    const options = await presentationOptions(page)
+    const moduleKey = presentationModuleKey("pt-m04")
+    const first = await savePresentationDraft(
+      page,
+      presentationDefinition(moduleKey, "M04 revision one", options),
+      null,
     )
+    expect(first.status(), await first.text()).toBe(200)
+
+    await page.goto("/presentation-preview")
+    const url = "/api/presentation/drafts"
+    const definition = presentationDefinition(moduleKey, "M04 committed update", options, "1")
+    const payload = { expectedRevision: "1", definition }
+    const loss = await loseNextResponse(page, url)
+    expect((await browserPost(page, url, payload)).status).toBe("network-error")
+    expect(loss.lost()).toBe(true)
+
+    const retry = await browserPost(page, url, payload)
+    expect(retry.status).toBe(409)
+
+    const final = await presentationDraft(page, moduleKey)
+    expect(final.status(), await final.text()).toBe(200)
+    const body = (await final.json()) as { revision: string; definition: { title: string } }
+    expect(body.revision).toBe("2")
+    expect(body.definition.title).toBe("M04 committed update")
   })
 
   test("M-05 AI draft approval with lost response then retry executes once", async ({ page }) => {
@@ -210,9 +230,7 @@ test.describe("Pre-tenant mobile and network resilience", { tag: pretenantTags("
     expect(loss.lost()).toBe(true)
     const retry = await browserPost(page, url, [organizationId, companyId, draftId])
     await expect.poll(() => auditCount(page, "ai_action_draft", draftId, "EXECUTE")).toBe(1)
-    await expectKnownDefect("AG-IDEMP-01", "AI draft approval retry after a lost committed response returns an error", () => {
-      expect(retry.status).toBe(200)
-    })
+    expect(retry.status).toBe(200)
   })
 
   test("M-06 resumed stale client cannot re-approve or allocate against changed state", async ({ page, browser }) => {

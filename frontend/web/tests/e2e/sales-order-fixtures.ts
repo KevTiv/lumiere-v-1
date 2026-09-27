@@ -66,10 +66,26 @@ export async function createDraftSaleOrder(page: Page, clientRef: string): Promi
 
 /** Add a line of the seeded laptop to an order through the Order Lines tab. */
 export async function addLaptopLine(page: Page, orderId: number, quantity: string): Promise<void> {
+  await addProductLine(page, orderId, "Lumiere Dev Laptop", quantity)
+}
+
+/**
+ * Seeded mouse stock (50 units). Specs that only need some storable product use it so they
+ * leave the 10 seeded laptops to the specs that assert against them.
+ */
+export const SEEDED_MOUSE_PRODUCT = "Wireless Ergonomic Mouse"
+
+/** Add a line of a seeded storable product to an order through the Order Lines tab. */
+export async function addProductLine(
+  page: Page,
+  orderId: number,
+  productName: string,
+  quantity: string,
+): Promise<void> {
   await openEntityCreate(page, "/sales", "sales", "order-lines", "add-sale-order-line")
   await chooseSelectOptionByLabel(page, "orderId", await fetchSaleOrderSelectLabel(page, orderId))
   await page.getByTestId("form-field-productId").click()
-  await page.getByRole("option", { name: "Lumiere Dev Laptop" }).click()
+  await page.getByRole("option", { name: productName }).click()
   await chooseFirstEnabledOption(page, "uomId")
   await fillField(page, "quantity", quantity)
   await fillField(page, "priceUnit", "1200")
