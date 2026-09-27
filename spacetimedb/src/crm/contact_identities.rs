@@ -6,12 +6,15 @@
 use sha2::{Digest, Sha256};
 use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
+use crate::core::operational_messaging::operational_message;
 use crate::core::organization::require_company_in_organization;
 use crate::core::users::find_user_profile_for_organization;
 use crate::crm::contacts::{contact, Contact};
 use crate::crm::require_single_company_crm_scope;
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
-use crate::types::{ContactIdentityKind, ContactVerificationState};
+use crate::types::{
+    ContactIdentityKind, ContactVerificationState, OperationalMessageStatus,
+};
 
 // ── Tables ────────────────────────────────────────────────────────────────────
 
@@ -526,6 +529,23 @@ pub fn update_contact_identity(
     validate_requested_company_scope(&contact, params.company_id)?;
 
     let raw_value_provided = params.raw_value.is_some();
+    if raw_value_provided
+        && ctx.db.operational_message().iter().any(|message| {
+            message.organization_id == organization_id
+                && message.phone_identity_id == identity_id
+                && matches!(
+                    message.status,
+                    OperationalMessageStatus::Draft
+                        | OperationalMessageStatus::Queued
+                        | OperationalMessageStatus::Copied
+                )
+        })
+    {
+        return Err(
+            "cannot change a phone number while an active message intent references this identity; create a new identity and re-preview the message"
+                .to_string(),
+        );
+    }
     let (normalized, display_masked) = match params.raw_value.as_ref() {
         Some(raw) => {
             if identity.verification_state == ContactVerificationState::OptedOut {

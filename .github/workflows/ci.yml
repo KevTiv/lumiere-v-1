@@ -183,6 +183,15 @@ jobs:
         with:
           deploy-key: ${{ secrets.LUMIERE_CONTRACTS_DEPLOY_KEY }}
 
+      # The published schema depends only on module sources, so reuse the
+      # compiled module whenever they are unchanged.
+      - name: Restore compiled contracts module
+        id: contracts-module
+        uses: actions/cache@v4
+        with:
+          path: .ci/contracts-module.wasm
+          key: contracts-module-v1-${{ runner.os }}-${{ hashFiles('spacetimedb/src/**', 'spacetimedb/assets/**', 'spacetimedb/Cargo.toml', 'spacetimedb/Cargo.lock', 'crates/presentation-core/src/**', 'crates/presentation-core/Cargo.toml') }}
+
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: |
@@ -206,8 +215,17 @@ jobs:
           cat /tmp/lumiere-ci-stdb.log
           exit 1
 
+      # Schema extraction is optimisation-independent: build with the fast
+      # ci-contracts profile (the size-optimised release build is ~4x slower).
+      - name: Build contracts module (ci-contracts profile)
+        if: steps.contracts-module.outputs.cache-hit != 'true'
+        run: |
+          cargo build --manifest-path spacetimedb/Cargo.toml --target wasm32-unknown-unknown --profile ci-contracts
+          mkdir -p .ci
+          cp spacetimedb/target/wasm32-unknown-unknown/ci-contracts/lumiere_v1.wasm .ci/contracts-module.wasm
+
       - name: Publish production module to standalone SpacetimeDB
-        run: spacetime publish lumiere-ci-contracts --module-path spacetimedb --server local --delete-data=always -y --no-config
+        run: spacetime publish lumiere-ci-contracts --bin-path .ci/contracts-module.wasm --server local --delete-data=always -y --no-config
 
       - name: Persisted presentation draft revision and isolation proof
         run: spacetime call lumiere-ci-contracts run_presentation_draft_tests --server local -y --no-config
@@ -218,6 +236,9 @@ jobs:
         env:
           STDB_SCHEMA_SERVER: local
           STDB_SCHEMA_HOST: http://127.0.0.1:3000
+          # Reuse the exact module published above. The generator otherwise
+          # rebuilds an equivalent release WASM and needlessly adds ~10 min.
+          STDB_GENERATE_WASM: .ci/contracts-module.wasm
         run: make check-contracts-drift STDB_MODULE=lumiere-ci-contracts
 
   frontend:
@@ -261,9 +282,6 @@ jobs:
       - name: Enforce COV seed and persona inventory
         run: pnpm cov-seed-inventory:check
 
-      - name: Typecheck
-        run: pnpm typecheck
-
       - name: Validate Playwright tests load
         working-directory: frontend/web
         run: pnpm exec playwright test --list
@@ -285,6 +303,47 @@ jobs:
 
       - name: Unit tests (web BFF helpers)
         run: pnpm --dir web test:unit
+
+  # Typecheck runs beside the frontend checks rather than after them, and keeps
+  # turbo's task cache plus tsc incremental state between runs so packages a
+  # change does not touch replay from cache.
+  frontend-typecheck:
+    name: Frontend typecheck
+    needs: scope
+    if: needs.scope.outputs.run_frontend == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ./.github/actions/setup-contracts-ssh
+        with:
+          deploy-key: ${{ secrets.LUMIERE_CONTRACTS_DEPLOY_KEY }}
+
+      - uses: ./.github/actions/setup-frontend
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Restore typecheck cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            frontend/.turbo/cache
+            frontend/web/*.tsbuildinfo
+            frontend/packages/*/*.tsbuildinfo
+          key: typecheck-v1-${{ runner.os }}-${{ hashFiles('frontend/pnpm-lock.yaml', 'frontend/turbo.json') }}-${{ github.sha }}
+          restore-keys: |
+            typecheck-v1-${{ runner.os }}-${{ hashFiles('frontend/pnpm-lock.yaml', 'frontend/turbo.json') }}-
+
+      - name: Typecheck
+        # @lumiere/ui's tsc peaks near Node's default ~4 GB heap; give each
+        # process headroom and cap parallelism so two fit in runner memory.
+        env:
+          NODE_OPTIONS: --max-old-space-size=6144
+        run: pnpm exec turbo run typecheck --cache-dir=.turbo/cache --concurrency=2
 
   owner-report-pdf:
     name: Owner-report PDF structural regression
@@ -329,22 +388,24 @@ jobs:
   playwright-compile:
     name: Playwright (compile smoke)
     if: always()
-    needs: [scope, frontend]
+    needs: [scope, frontend, frontend-typecheck]
     runs-on: ubuntu-latest
     steps:
       - name: Compatibility check
         run: |
           test "${{ needs.scope.result }}" = success
           test "${{ needs.scope.outputs.valid }}" = true
-          case "${{ needs.scope.outputs.run_frontend }}:${{ needs.frontend.result }}" in
-            true:success|false:skipped) ;;
-            *) exit 1 ;;
-          esac
+          for result in "${{ needs.frontend.result }}" "${{ needs.frontend-typecheck.result }}"; do
+            case "${{ needs.scope.outputs.run_frontend }}:${result}" in
+              true:success|false:skipped) ;;
+              *) exit 1 ;;
+            esac
+          done
 
   gate:
     name: CI gate
     if: always()
-    needs: [scope, stdb-check, rust, contracts-drift, frontend, owner-report-pdf, playwright-compile]
+    needs: [scope, stdb-check, rust, contracts-drift, frontend, frontend-typecheck, owner-report-pdf, playwright-compile]
     runs-on: ubuntu-latest
     steps:
       - name: Require scope and scheduled validations to pass
@@ -356,6 +417,7 @@ jobs:
             "run_rust:${{ needs.scope.outputs.run_rust }}:${{ needs.rust.result }}" \
             "run_contracts:${{ needs.scope.outputs.run_contracts }}:${{ needs.contracts-drift.result }}" \
             "run_frontend:${{ needs.scope.outputs.run_frontend }}:${{ needs.frontend.result }}" \
+            "run_frontend:${{ needs.scope.outputs.run_frontend }}:${{ needs.frontend-typecheck.result }}" \
             "run_pdf:${{ needs.scope.outputs.run_pdf }}:${{ needs.owner-report-pdf.result }}"; do
             IFS=: read -r name expected actual <<< "$pair"
             case "$expected:$actual" in

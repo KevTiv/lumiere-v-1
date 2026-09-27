@@ -132,7 +132,7 @@ fn enforce_run_byte_bound(
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct InspectRequest {
-    /// component | decision | claim | knowledge_version | workflow_step
+    /// component | decision | claim | knowledge_version | workflow_step | source
     pub kind: String,
     /// For `workflow_step`, the workflow version id.
     pub id: u64,
