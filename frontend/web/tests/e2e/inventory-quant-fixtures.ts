@@ -8,6 +8,7 @@ import {
   activeTabEntityTable,
   chooseFirstEnabledOption,
   chooseSelectOptionByLabel,
+  fetchDefaultCompanyId,
   fetchFirstUomId,
   fillField,
   gotoModule,
@@ -27,11 +28,17 @@ export interface QuantSnapshot {
   reservedQuantity: number
 }
 
+// Company-owned so company-bound personas (who only read their company's rows)
+// can see the location; organization-shared `create_stock_location` rows are
+// invisible to them.
 export async function createInternalLocation(
   page: Page,
   name: string,
+  companyId?: number,
 ): Promise<number> {
-  const { urlPath, init } = stdbBffCommandPost("create_stock_location", {
+  const ownerCompanyId = companyId ?? (await fetchDefaultCompanyId(page))
+  const { urlPath, init } = stdbBffCommandPost("create_company_stock_location", {
+    companyId: ownerCompanyId,
     params: stdbParamsToJson(
       {
         name,

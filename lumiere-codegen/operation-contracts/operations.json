@@ -220,6 +220,16 @@
       "idempotency": "state_guarded",
       "semantic_kind": "command"
     },
+    "cancel_replenishment_run": {
+      "client_facing": false,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/inventory/replenishment.rs:912 reducer deletes the rule's pending runs and succeeds as a no-op when none exist; denied until a session call site exists.",
+      "idempotency": "idempotent",
+      "semantic_kind": "command"
+    },
     "cancel_stock_move": {
       "client_facing": true,
       "codec": {
@@ -438,6 +448,16 @@
       },
       "evidence": "spacetimedb/src/manufacturing/bill_of_materials.rs:443 reducer body shows append-only insert/event or accumulated side effect; session-exposed.",
       "idempotency": "non_idempotent",
+      "semantic_kind": "command"
+    },
+    "create_bom_byproduct": {
+      "client_facing": false,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/manufacturing/bill_of_materials.rs:664 reducer rejects a duplicate byproduct for the same BOM and cost shares above 100; denied until a session call site exists.",
+      "idempotency": "state_guarded",
       "semantic_kind": "command"
     },
     "create_company_stock_location": {
@@ -1140,6 +1160,16 @@
       "idempotency": "non_idempotent",
       "semantic_kind": "command"
     },
+    "create_workorder_quality_check": {
+      "client_facing": false,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/inventory/quality.rs:405 reducer requires an in-progress work order without an existing quality check; denied until a session call site exists.",
+      "idempotency": "state_guarded",
+      "semantic_kind": "command"
+    },
     "delete_barcode_nomenclature": {
       "client_facing": true,
       "codec": {
@@ -1479,6 +1509,16 @@
       "evidence": "spacetimedb/src/inventory/warehouse_sync.rs:341 reducer body shows request/idempotency key or intent guard; session-exposed.",
       "idempotency": "request_guarded",
       "semantic_kind": "operator"
+    },
+    "fail_workorder_quality_check": {
+      "client_facing": false,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/inventory/quality.rs:507 reducer rejects an already completed check; denied until a session call site exists.",
+      "idempotency": "state_guarded",
+      "semantic_kind": "command"
     },
     "finish_manufacturing_order": {
       "client_facing": true,
@@ -2170,6 +2210,16 @@
       "idempotency": "state_guarded",
       "semantic_kind": "operator"
     },
+    "run_inventory_lot_move_test": {
+      "client_facing": false,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "run_inventory_lot_move_test: in-database test reducer executes assertions; denied and not client facing",
+      "idempotency": "not_applicable",
+      "semantic_kind": "test"
+    },
     "run_inventory_preflight_audit": {
       "client_facing": false,
       "codec": {
@@ -2179,6 +2229,86 @@
       "evidence": "spacetimedb/src/inventory/audit.rs:136 reducer body shows current-state or membership guard; denied.",
       "idempotency": "state_guarded",
       "semantic_kind": "operator"
+    },
+    "run_inventory_warehouse_qc_location_test": {
+      "client_facing": false,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "run_inventory_warehouse_qc_location_test: in-database test reducer executes assertions; denied and not client facing",
+      "idempotency": "not_applicable",
+      "semantic_kind": "test"
+    },
+    "run_manufacturing_bom_byproduct_output_exact_effect_test": {
+      "client_facing": false,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "run_manufacturing_bom_byproduct_output_exact_effect_test: in-database test reducer executes assertions; denied and not client facing",
+      "idempotency": "not_applicable",
+      "semantic_kind": "test"
+    },
+    "run_manufacturing_consume_materials_exact_effect_test": {
+      "client_facing": false,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "run_manufacturing_consume_materials_exact_effect_test: in-database test reducer executes assertions; denied and not client facing",
+      "idempotency": "not_applicable",
+      "semantic_kind": "test"
+    },
+    "run_manufacturing_finished_output_scrap_exact_effect_test": {
+      "client_facing": false,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "run_manufacturing_finished_output_scrap_exact_effect_test: in-database test reducer executes assertions; denied and not client facing",
+      "idempotency": "not_applicable",
+      "semantic_kind": "test"
+    },
+    "run_manufacturing_production_close_exact_effect_test": {
+      "client_facing": false,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "run_manufacturing_production_close_exact_effect_test: in-database test reducer executes assertions; denied and not client facing",
+      "idempotency": "not_applicable",
+      "semantic_kind": "test"
+    },
+    "run_manufacturing_workorder_execution_exact_effect_test": {
+      "client_facing": false,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "run_manufacturing_workorder_execution_exact_effect_test: in-database test reducer executes assertions; denied and not client facing",
+      "idempotency": "not_applicable",
+      "semantic_kind": "test"
+    },
+    "run_manufacturing_workorder_quality_gate_test": {
+      "client_facing": false,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "run_manufacturing_workorder_quality_gate_test: in-database test reducer executes assertions; denied and not client facing",
+      "idempotency": "not_applicable",
+      "semantic_kind": "test"
+    },
+    "run_scheduled_replenishment": {
+      "client_facing": false,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/inventory/replenishment.rs:969 scheduled reducer derives a per-job idempotency key (rule, scheduled_id) before executing the rule; invoked only by the scheduler.",
+      "idempotency": "request_guarded",
+      "semantic_kind": "internal"
     },
     "run_traceability_report": {
       "client_facing": true,
@@ -2199,6 +2329,26 @@
       "evidence": "spacetimedb/src/documents/regional.rs:263 reducer body shows append-only insert/event or accumulated side effect; session-exposed.",
       "idempotency": "non_idempotent",
       "semantic_kind": "operator"
+    },
+    "schedule_replenishment_run": {
+      "client_facing": false,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/inventory/replenishment.rs:853 reducer rejects a rule that already has a pending scheduled run; denied until a session call site exists.",
+      "idempotency": "state_guarded",
+      "semantic_kind": "command"
+    },
+    "scrap_finished_manufacturing_output": {
+      "client_facing": false,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/manufacturing/manufacturing_orders.rs:1200 reducer takes a caller idempotency key and rejects a reused key; denied until a session call site exists.",
+      "idempotency": "request_guarded",
+      "semantic_kind": "command"
     },
     "seed_pack_holidays": {
       "client_facing": false,
