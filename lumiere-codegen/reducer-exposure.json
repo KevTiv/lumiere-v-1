@@ -998,6 +998,11 @@
       "reason": "invoked by an enumerated frontend BFF call site"
     },
     {
+      "name": "create_company_stock_location",
+      "exposure": "session",
+      "reason": "company-scoped stock location creation; validates organization, company and parent-location scope before insert"
+    },
+    {
       "name": "create_consignment_agreement",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
