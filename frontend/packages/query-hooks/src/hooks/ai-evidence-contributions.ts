@@ -29,7 +29,7 @@ export type RecordEvidenceContributionParams = {
  * what was introduced (a cited passage/source version, or a concept) and how
  * they know it.
  */
-export function useRecordEvidenceContribution(organizationId: bigint) {
+export function useRecordEvidenceContribution(organizationId: ScalarId) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (params: RecordEvidenceContributionParams) => {
