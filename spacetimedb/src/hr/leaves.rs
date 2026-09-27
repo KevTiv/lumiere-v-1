@@ -69,6 +69,7 @@ pub struct HrLeaveAllocation {
     index(accessor = leave_by_state, btree(columns = [state])),
     index(accessor = leave_by_org, btree(columns = [organization_id]))
 )]
+#[derive(PartialEq)]
 pub struct HrLeave {
     #[primary_key]
     #[auto_inc]
@@ -536,6 +537,9 @@ pub fn approve_leave_impl(
     }
 
     assert_not_self_approve(ctx, &leave)?;
+    if leave.state == HrLeaveState::ValidatedOne && leave.first_approver_id == Some(ctx.sender()) {
+        return Err("second approval must come from a different approver".to_string());
+    }
 
     if !skip_approval_check {
         if matches!(

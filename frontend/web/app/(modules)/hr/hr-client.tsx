@@ -466,11 +466,12 @@ function HrClientLoaded({
     }>,
   ): EntityViewConfig => {
     if (ec.view.mode !== "table") return ec
+    // No HR tab opens an editor on row click, so let the table's default apply:
+    // clicking a row selects it whenever an action needs a selection.
     return {
       ...ec,
       view: {
         ...ec.view,
-        rowSelectionToggleOnClick: false,
         actions,
       },
     }
