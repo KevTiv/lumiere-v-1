@@ -47,6 +47,8 @@ pub fn run_proposals_convert_integrity_test(ctx: &ReducerContext) -> Result<(), 
         .map_err(|e| format!("pro_005_archived_product: {e}"))?;
     convert_integrity_test::test_add_proposal_comment_orphan_section_rejected(ctx)
         .map_err(|e| format!("pro_006_orphan_section_comment: {e}"))?;
+    convert_integrity_test::test_award_approval_rejects_self_and_replay(ctx)
+        .map_err(|e| format!("cov17_award_approval: {e}"))?;
     Ok(())
 }
 
