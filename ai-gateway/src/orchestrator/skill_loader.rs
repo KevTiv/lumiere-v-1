@@ -72,6 +72,13 @@ fn row_string_list(row: &Value, key: &str) -> Vec<String> {
         .unwrap_or_default()
 }
 
+pub(super) fn sats_option(value: Option<Value>) -> Value {
+    match value {
+        Some(value) => serde_json::json!({ "some": value }),
+        None => serde_json::json!({ "none": [] }),
+    }
+}
+
 pub fn intelligence_policy_ref(config: &Value) -> Result<Option<String>> {
     let Some(value) = config
         .get("intelligencePolicyRef")
@@ -111,13 +118,22 @@ pub async fn load_skill(
     skill_key: &str,
 ) -> Result<LoadedSkill> {
     let escaped = skill_key.replace('\'', "''");
-    let sql = format!(
-        "SELECT * FROM ai_skill \
-         WHERE skill_key = '{escaped}' AND is_active = true \
-         AND (organization_id = 0 OR organization_id = {org_id}) \
-         ORDER BY organization_id DESC LIMIT 1"
-    );
-    let rows = stdb.query_sql(&sql).await.context("load ai_skill")?;
+    let mut rows = stdb
+        .query_sql(&format!(
+            "SELECT * FROM ai_skill WHERE skill_key = '{escaped}' \
+             AND organization_id = {org_id} AND is_active = true LIMIT 1"
+        ))
+        .await
+        .context("load organization ai_skill")?;
+    if rows.is_empty() {
+        rows = stdb
+            .query_sql(&format!(
+                "SELECT * FROM ai_skill WHERE skill_key = '{escaped}' \
+                 AND organization_id = 0 AND is_active = true LIMIT 1"
+            ))
+            .await
+            .context("load system ai_skill")?;
+    }
 
     if let Some(skill_row) = rows.first() {
         let skill_id = row_u64(skill_row, "id");
@@ -236,14 +252,25 @@ async fn load_skill_config(
     company_id: u64,
     skill_id: u64,
 ) -> Result<Option<Value>> {
-    let sql = format!(
-        "SELECT * FROM ai_skill_config \
-         WHERE organization_id = {org_id} AND skill_id = {skill_id} \
-         AND (company_id = {company_id} OR company_id IS NULL) \
-         ORDER BY company_id DESC LIMIT 1"
-    );
-    let rows = stdb.query_sql(&sql).await.context("load ai_skill_config")?;
-    Ok(rows.into_iter().next())
+    let rows = stdb
+        .query_sql(&format!(
+            "SELECT * FROM ai_skill_config WHERE organization_id = {org_id} \
+             AND skill_id = {skill_id}"
+        ))
+        .await
+        .context("load ai_skill_config")?;
+    Ok(select_skill_config(rows, company_id))
+}
+
+fn select_skill_config(rows: Vec<Value>, company_id: u64) -> Option<Value> {
+    let exact = rows
+        .iter()
+        .find(|row| row_u64(row, "companyId") == company_id)
+        .cloned();
+    exact.or_else(|| {
+        rows.into_iter()
+            .find(|row| row.get("companyId").is_none_or(Value::is_null))
+    })
 }
 
 pub async fn lookup_run_id(stdb: &StdbClient, run_key: &str) -> Result<u64> {
@@ -296,6 +323,13 @@ async fn create_run_with_program_ref(
     program_ref: Option<&str>,
 ) -> Result<GovernedRunRef> {
     let policy_ref = intelligence_policy_ref(&skill.config_json)?;
+    let metadata = serde_json::json!({
+        "intelligence_policy_ref": policy_ref.clone(),
+        "skill_id": skill.id,
+        "skill_config_id": skill.skill_config_id,
+        "program_ref": program_ref,
+    })
+    .to_string();
     stdb.call_reducer(stdb_client::reducer_call!(
         "create_ai_agent_run",
         serde_json::json!([
@@ -303,18 +337,13 @@ async fn create_run_with_program_ref(
             {
                 "company_id": company_id,
                 "skill_id": skill.id,
-                "skill_config_id": skill.skill_config_id,
+                "skill_config_id": sats_option(skill.skill_config_id.map(Value::from)),
                 "agent_id": agent_id,
-                "team_member_id": team_member_id,
+                "team_member_id": sats_option(team_member_id.map(Value::from)),
                 "run_key": run_key,
                 "inputs_json": inputs_json,
                 "triggered_by_hex": triggered_by_hex,
-                "metadata": serde_json::json!({
-                    "intelligence_policy_ref": policy_ref.clone(),
-                    "skill_id": skill.id,
-                    "skill_config_id": skill.skill_config_id,
-                    "program_ref": program_ref,
-                }).to_string(),
+                "metadata": sats_option(Some(Value::String(metadata))),
             }
         ]),
     ))
@@ -425,13 +454,13 @@ pub async fn complete_run(
             run_id,
             {
                 "status": status,
-                "summary": summary,
-                "artifacts_json": artifacts_json,
-                "citations_json": citations_json,
+                "summary": sats_option(summary.map(Value::String)),
+                "artifacts_json": sats_option(artifacts_json.map(Value::String)),
+                "citations_json": sats_option(citations_json.map(Value::String)),
                 "action_draft_ids": [],
                 "step_count": step_count,
                 "tokens_used": tokens_used,
-                "error_message": error_message,
+                "error_message": sats_option(error_message.map(Value::String)),
             }
         ]),
     ))
@@ -676,6 +705,33 @@ mod tests {
             "intelligencePolicyRef": 7
         }))
         .is_err());
+    }
+
+    #[test]
+    fn company_skill_config_takes_precedence_without_optional_sql_predicates() {
+        let selected = select_skill_config(
+            vec![
+                serde_json::json!({"id": 1, "companyId": null}),
+                serde_json::json!({"id": 2, "companyId": 267}),
+            ],
+            267,
+        )
+        .unwrap();
+        assert_eq!(row_u64(&selected, "id"), 2);
+
+        let fallback =
+            select_skill_config(vec![serde_json::json!({"id": 1, "companyId": null})], 999)
+                .unwrap();
+        assert_eq!(row_u64(&fallback, "id"), 1);
+    }
+
+    #[test]
+    fn nested_reducer_options_use_sats_sum_encoding() {
+        assert_eq!(
+            sats_option(Some(Value::from(9))),
+            serde_json::json!({"some": 9})
+        );
+        assert_eq!(sats_option(None), serde_json::json!({"none": []}));
     }
 
     #[test]

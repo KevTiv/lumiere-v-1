@@ -13,7 +13,9 @@ use crate::accounting::bank_reconciliation::{
     bank_statement_import, bank_statement_import_line, stage_bank_statement_import,
     StageBankStatementImportLineParams, StageBankStatementImportParams,
 };
+use crate::accounting::idempotency::accounting_operation_receipt;
 use crate::accounting::journal_entries::{account_move, account_move_line};
+use crate::accounting::money::PILOT_MAX_MAJOR_UNITS;
 use crate::accounting::payment_management::{
     allocate_payment_transaction, create_payment_account, create_payment_transaction,
     payment_account, payment_reconciliation, payment_reversal, payment_transaction,
@@ -35,10 +37,10 @@ pub const CASES: &[CertCase] = &[
     ("PAY-03", pay_03_post_retry_is_idempotent_success),
     ("PAY-04", pay_04_reversal_retry_is_single_compensation),
     ("PAY-05", pay_05_reversal_retry_is_idempotent_success),
-    ("PAY-06", pay_06_overpayment_stays_explicit_unapplied),
+    ("PAY-06", pay_06_overpayment_and_partial_multi_invoice_are_explicit),
     ("PAY-07", pay_07_reference_duplicate_scope),
     ("PAY-08", pay_08_many_small_allocations_reconcile_exactly),
-    ("PAY-09", pay_09_large_values_settle_exactly),
+    ("PAY-09", pay_09_pilot_money_boundary_is_enforced),
     ("PAY-10", pay_10_statement_staging_fixture_matrix),
     ("PAY-11A", pay_11a_conflicting_statement_replay_does_not_mutate),
     ("PAY-11B", pay_11b_conflicting_statement_replay_fails_closed),
@@ -437,36 +439,112 @@ fn pay_04_reversal_retry_is_single_compensation(ctx: &ReducerContext) -> Result<
 }
 
 fn pay_05_reversal_retry_is_idempotent_success(ctx: &ReducerContext) -> Result<(), String> {
-    let (_, _, _, retry) = settle_and_reverse_twice(ctx, "pay05")?;
-    retry.map_err(|error| format!("reversal retry after committed reversal failed: {error}"))
+    let (w, payment, _, retry) = settle_and_reverse_twice(ctx, "pay05")?;
+    retry.map_err(|error| format!("reversal retry after committed reversal failed: {error}"))?;
+
+    let conflicting = reverse_payment_transaction_impl(
+        ctx,
+        w.org(),
+        payment,
+        ReversePaymentTransactionParams {
+            company_id: w.company(),
+            reason: Some("different reversal reason".to_string()),
+            metadata: Some(r#"{"test":"pretenant"}"#.to_string()),
+        },
+        true,
+    );
+    match conflicting {
+        Err(error) if error.contains("payload differs") => Ok(()),
+        Err(error) => Err(format!("unexpected conflicting reversal replay error: {error}")),
+        Ok(()) => Err("conflicting reversal retry was accepted".to_string()),
+    }
 }
 
-/// Invoice 100, payment 120: 100 allocated, 20 stays explicit unapplied, no write-off.
-fn pay_06_overpayment_stays_explicit_unapplied(ctx: &ReducerContext) -> Result<(), String> {
+/// Invoice A is 100 and invoice B is 50. A 120 payment cannot be forced into A:
+/// 100 settles A, the 20 overage remains explicit unapplied credit, and that credit can
+/// then be intentionally allocated as a partial payment to B without any write-off.
+fn pay_06_overpayment_and_partial_multi_invoice_are_explicit(
+    ctx: &ReducerContext,
+) -> Result<(), String> {
     let w = setup("wallet", wallet(ctx, "pay06"))?;
-    let (invoice_id, line_id) = setup("invoice", invoice(ctx, &w, 100.0))?;
+    let (invoice_a, line_a) = setup("invoice A", invoice(ctx, &w, 100.0))?;
+    let (invoice_b, line_b) = setup("invoice B", invoice(ctx, &w, 50.0))?;
     let payment = setup("receipt", posted_receipt(ctx, &w, "PAY06-REF", 120.0))?;
-    if allocate(ctx, &w, payment, line_id, 120.0, "pay06-over").is_ok() {
-        return Err("allocation beyond the invoice residual was accepted".to_string());
+
+    if allocate(ctx, &w, payment, line_a, 120.0, "pay06-over").is_ok() {
+        return Err("allocation beyond invoice A residual was accepted".to_string());
     }
-    allocate(ctx, &w, payment, line_id, 100.0, "pay06-exact")?;
+    if ctx
+        .db
+        .payment_reconciliation()
+        .iter()
+        .any(|row| row.payment_transaction_id == payment)
+    {
+        return Err("rejected over-allocation persisted a reconciliation".to_string());
+    }
+
+    allocate(ctx, &w, payment, line_a, 100.0, "pay06-invoice-a")?;
+    require_minor_eq("invoice A residual", invoice_residual(ctx, invoice_a)?, 0, CENTS)?;
+    require_minor_eq(
+        "unapplied customer credit after invoice A",
+        unapplied(ctx, payment)?,
+        2_000,
+        CENTS,
+    )?;
+
+    let after_invoice_a: Vec<_> = ctx
+        .db
+        .payment_reconciliation()
+        .iter()
+        .filter(|row| row.payment_transaction_id == payment)
+        .collect();
+    if after_invoice_a.len() != 1
+        || after_invoice_a
+            .iter()
+            .any(|row| to_minor(row.write_off_amount, CENTS) != 0 || row.write_off_move_id.is_some())
+    {
+        return Err("invoice A allocation produced an implicit write-off".to_string());
+    }
+
+    allocate(ctx, &w, payment, line_b, 20.0, "pay06-invoice-b-partial")?;
     let rows: Vec<_> = ctx
         .db
         .payment_reconciliation()
         .iter()
-        .filter(|r| r.payment_transaction_id == payment)
+        .filter(|row| row.payment_transaction_id == payment)
         .collect();
-    if rows.len() != 1 || rows.iter().any(|r| to_minor(r.write_off_amount, CENTS) != 0 || r.write_off_move_id.is_some()) {
-        return Err("overpayment produced an implicit write-off or extra allocation".to_string());
+    if rows.len() != 2
+        || rows
+            .iter()
+            .any(|row| to_minor(row.write_off_amount, CENTS) != 0 || row.write_off_move_id.is_some())
+    {
+        return Err(
+            "multi-invoice allocation produced an implicit write-off or wrong row count".to_string(),
+        );
     }
-    require_minor_eq("invoice residual", invoice_residual(ctx, invoice_id)?, 0, CENTS)?;
-    require_minor_eq("unapplied customer credit", unapplied(ctx, payment)?, 2_000, CENTS)?;
+    if net_allocated_minor(ctx, payment) != 12_000 {
+        return Err("multi-invoice allocations did not consume the exact payment amount".to_string());
+    }
+
+    require_minor_eq(
+        "invoice B residual",
+        invoice_residual(ctx, invoice_b)?,
+        3_000,
+        CENTS,
+    )?;
+    require_minor_eq(
+        "unapplied after invoice B partial",
+        unapplied(ctx, payment)?,
+        0,
+        CENTS,
+    )?;
+
     let settlement = ctx
         .db
         .payment_transaction()
         .id()
         .find(&payment)
-        .map(|t| t.settlement_amount)
+        .map(|transaction| transaction.settlement_amount)
         .ok_or("transaction missing")?;
     require_minor_eq("settlement unchanged", settlement, 12_000, CENTS)
 }
@@ -527,20 +605,77 @@ fn pay_08_many_small_allocations_reconcile_exactly(ctx: &ReducerContext) -> Resu
     require_minor_eq("split unapplied", unapplied(ctx, split_payment)?, 0, CENTS)
 }
 
-/// A ~1.2e10 payment settled by two invoices must reconcile to the cent. Beyond ~1e10
-/// the absolute reconciliation epsilon is below f64 resolution (MONEY-PRECISION).
-fn pay_09_large_values_settle_exactly(ctx: &ReducerContext) -> Result<(), String> {
+/// The enforced pilot money envelope is exact at the boundary and rejects
+/// values that would widen the f64 domain without a representation change.
+fn pay_09_pilot_money_boundary_is_enforced(ctx: &ReducerContext) -> Result<(), String> {
     let w = setup("wallet", wallet(ctx, "pay09"))?;
-    let (large_invoice, large_line) = setup("large invoice", invoice(ctx, &w, 12_345_678_901.22))?;
+    let cap = PILOT_MAX_MAJOR_UNITS;
+    let (large_invoice, large_line) =
+        setup("large invoice", invoice(ctx, &w, cap - 0.01))?;
     let (cent_invoice, cent_line) = setup("cent invoice", invoice(ctx, &w, 0.01))?;
-    let payment = setup("large receipt", posted_receipt(ctx, &w, "PAY09-LARGE", 12_345_678_901.23))?;
-    allocate(ctx, &w, payment, large_line, 12_345_678_901.22, "pay09-large")
-        .map_err(|error| format!("large allocation rejected: {error}"))?;
+    let payment = setup("cap receipt", posted_receipt(ctx, &w, "PAY09-CAP", cap))?;
+    allocate(ctx, &w, payment, large_line, cap - 0.01, "pay09-large")
+        .map_err(|error| format!("cap allocation rejected: {error}"))?;
     allocate(ctx, &w, payment, cent_line, 0.01, "pay09-final-cent")
-        .map_err(|error| format!("final cent of a large payment rejected: {error}"))?;
-    require_minor_eq("large invoice residual", invoice_residual(ctx, large_invoice)?, 0, CENTS)?;
+        .map_err(|error| format!("final cent at cap rejected: {error}"))?;
+    require_minor_eq("cap invoice residual", invoice_residual(ctx, large_invoice)?, 0, CENTS)?;
     require_minor_eq("cent invoice residual", invoice_residual(ctx, cent_invoice)?, 0, CENTS)?;
-    require_minor_eq("large unapplied", unapplied(ctx, payment)?, 0, CENTS)
+    require_minor_eq("cap unapplied", unapplied(ctx, payment)?, 0, CENTS)?;
+
+    for (reference, amount) in [
+        ("PAY09-OVER", cap + 0.01),
+        ("PAY09-NAN", f64::NAN),
+        ("PAY09-INF", f64::INFINITY),
+    ] {
+        if create_receipt(ctx, &w, reference, amount).is_ok() {
+            return Err(format!("out-of-envelope payment {reference} was accepted"));
+        }
+        if ctx.db.payment_transaction().iter().any(|transaction| {
+            transaction.organization_id == w.org()
+                && transaction.external_reference.as_deref() == Some(reference)
+        }) {
+            return Err(format!(
+                "rejected out-of-envelope payment {reference} still persisted"
+            ));
+        }
+    }
+
+    let (_, invalid_line) = setup("invalid allocation invoice", invoice(ctx, &w, 100.0))?;
+    let invalid_payment =
+        setup("invalid allocation receipt", posted_receipt(ctx, &w, "PAY09-ALLOC", 100.0))?;
+    for (key, allocated_amount, write_off_amount) in [
+        ("pay09-alloc-nan", f64::NAN, 0.0),
+        ("pay09-writeoff-inf", 1.0, f64::INFINITY),
+    ] {
+        let result = allocate_payment_transaction(
+            ctx,
+            w.org(),
+            AllocatePaymentParams {
+                idempotency_key: key.to_string(),
+                company_id: w.company(),
+                payment_transaction_id: invalid_payment,
+                allocated_move_line_id: invalid_line,
+                allocated_amount,
+                currency_id: w.currency_id,
+                write_off_amount,
+                write_off_account_id: None,
+                metadata: None,
+            },
+        );
+        if result.is_ok() {
+            return Err(format!("non-finite allocation input {key} was accepted"));
+        }
+    }
+    if ctx
+        .db
+        .payment_reconciliation()
+        .iter()
+        .any(|row| row.payment_transaction_id == invalid_payment)
+    {
+        return Err("rejected non-finite allocation persisted reconciliation state".to_string());
+    }
+
+    Ok(())
 }
 
 struct StatementScope {
@@ -643,23 +778,108 @@ fn pay_10_statement_staging_fixture_matrix(ctx: &ReducerContext) -> Result<(), S
         statement_row(ctx, 9, true, Some(0.0), Some("REF-ZERO")),
         statement_row(ctx, 10, true, Some(f64::NAN), Some("REF-NAN")),
         statement_row(ctx, 11, true, Some(f64::INFINITY), Some("REF-INF")),
+        statement_row(
+            ctx,
+            12,
+            true,
+            Some(PILOT_MAX_MAJOR_UNITS + 0.01),
+            Some("REF-OVER-LIMIT"),
+        ),
     ];
     stage(ctx, &scope, "pay10-matrix", rows)?;
     let imports = staged_imports(ctx, &scope, "pay10-matrix");
     let [(import_id, total, invalid, state)] = imports.as_slice() else {
         return Err(format!("expected one staged import, got {}", imports.len()));
     };
-    if (*total, *invalid, state.as_str()) != (10, 5, "needs_review") {
+    if (*total, *invalid, state.as_str()) != (11, 6, "needs_review") {
         return Err(format!("staging summary mismatch: total={total} invalid={invalid} state={state}"));
     }
     let lines = staged_lines(ctx, *import_id);
     let invalid_rows: Vec<u32> = lines.iter().filter(|l| l.2).map(|l| l.0).collect();
-    if invalid_rows != vec![6, 8, 9, 10, 11] {
+    if invalid_rows != vec![6, 8, 9, 10, 11, 12] {
         return Err(format!("unexpected invalid rows {invalid_rows:?}"));
     }
     let negative = lines.iter().find(|l| l.0 == 7).and_then(|l| l.1);
     if negative != Some(-4_510) {
         return Err(format!("negative amount not preserved exactly: {negative:?}"));
+    }
+
+    let oversized_opening_key = "pay10-opening-over-limit";
+    let oversized_opening = stage_bank_statement_import(
+        ctx,
+        scope.org,
+        scope.company,
+        scope.journal_id,
+        scope.currency_id,
+        StageBankStatementImportParams {
+            file_name: Some(format!("{oversized_opening_key}.csv")),
+            idempotency_key: oversized_opening_key.to_string(),
+            opening_balance: PILOT_MAX_MAJOR_UNITS + 0.01,
+            rows: vec![statement_row(
+                ctx,
+                2,
+                true,
+                Some(1.0),
+                Some("REF-OPENING"),
+            )],
+        },
+    );
+    if oversized_opening.is_ok() {
+        return Err("oversized statement opening balance was accepted".to_string());
+    }
+    if !staged_imports(ctx, &scope, oversized_opening_key).is_empty() {
+        return Err("rejected opening balance still persisted a statement import".to_string());
+    }
+
+    let oversized_total_key = "pay10-total-over-limit";
+    let oversized_total = stage_bank_statement_import(
+        ctx,
+        scope.org,
+        scope.company,
+        scope.journal_id,
+        scope.currency_id,
+        StageBankStatementImportParams {
+            file_name: Some(format!("{oversized_total_key}.csv")),
+            idempotency_key: oversized_total_key.to_string(),
+            opening_balance: 0.0,
+            rows: vec![
+                statement_row(ctx, 2, true, Some(600_000_000.0), Some("REF-TOTAL-A")),
+                statement_row(ctx, 3, true, Some(600_000_000.0), Some("REF-TOTAL-B")),
+            ],
+        },
+    );
+    if oversized_total.is_ok() {
+        return Err("oversized statement movement total was accepted".to_string());
+    }
+    if !staged_imports(ctx, &scope, oversized_total_key).is_empty() {
+        return Err("rejected statement movement total still persisted an import".to_string());
+    }
+
+    let oversized_closing_key = "pay10-closing-over-limit";
+    let oversized_closing = stage_bank_statement_import(
+        ctx,
+        scope.org,
+        scope.company,
+        scope.journal_id,
+        scope.currency_id,
+        StageBankStatementImportParams {
+            file_name: Some(format!("{oversized_closing_key}.csv")),
+            idempotency_key: oversized_closing_key.to_string(),
+            opening_balance: 900_000_000.0,
+            rows: vec![statement_row(
+                ctx,
+                2,
+                true,
+                Some(200_000_000.0),
+                Some("REF-CLOSING"),
+            )],
+        },
+    );
+    if oversized_closing.is_ok() {
+        return Err("oversized statement closing balance was accepted".to_string());
+    }
+    if !staged_imports(ctx, &scope, oversized_closing_key).is_empty() {
+        return Err("rejected statement closing balance still persisted an import".to_string());
     }
 
     let huge: Vec<_> = (1..=2_000)
@@ -676,17 +896,65 @@ fn pay_10_statement_staging_fixture_matrix(ctx: &ReducerContext) -> Result<(), S
     Ok(())
 }
 
-fn replay_with_different_payload(ctx: &ReducerContext) -> Result<(StatementScope, Result<(), String>), String> {
+fn replay_with_different_payload(
+    ctx: &ReducerContext,
+) -> Result<(StatementScope, Result<(), String>), String> {
     let scope = setup("statement scope", statement_scope(ctx))?;
     setup(
         "first stage",
-        stage(ctx, &scope, "pay11-replay", vec![statement_row(ctx, 2, true, Some(125.50), Some("REF-A"))]),
+        stage(
+            ctx,
+            &scope,
+            "pay11-replay",
+            vec![statement_row(ctx, 2, true, Some(125.50), Some("REF-A"))],
+        ),
     )?;
+    setup(
+        "exact replay",
+        stage(
+            ctx,
+            &scope,
+            "pay11-replay",
+            vec![statement_row(ctx, 2, true, Some(125.50), Some("REF-A"))],
+        ),
+    )?;
+
+    let imports = staged_imports(ctx, &scope, "pay11-replay");
+    let [(import_id, ..)] = imports.as_slice() else {
+        return Err(format!(
+            "exact replay produced {} statement imports",
+            imports.len()
+        ));
+    };
+    let receipts: Vec<_> = ctx
+        .db
+        .accounting_operation_receipt()
+        .iter()
+        .filter(|receipt| {
+            receipt.organization_id == scope.org
+                && receipt.company_id == scope.company
+                && receipt.action_kind == "stage_bank_statement_import"
+                && receipt.idempotency_key == "pay11-replay"
+        })
+        .collect();
+    if receipts.len() != 1
+        || receipts[0].result_table != "bank_statement_import"
+        || receipts[0].result_id != *import_id
+    {
+        return Err("exact replay did not preserve one statement-import receipt".to_string());
+    }
+
     let replay = stage(
         ctx,
         &scope,
         "pay11-replay",
-        vec![statement_row(ctx, 2, true, Some(999.99), Some("REF-TAMPERED"))],
+        vec![statement_row(
+            ctx,
+            2,
+            true,
+            Some(999.99),
+            Some("REF-TAMPERED"),
+        )],
     );
     Ok((scope, replay))
 }
@@ -705,8 +973,11 @@ fn pay_11a_conflicting_statement_replay_does_not_mutate(ctx: &ReducerContext) ->
 
 fn pay_11b_conflicting_statement_replay_fails_closed(ctx: &ReducerContext) -> Result<(), String> {
     let (_, replay) = replay_with_different_payload(ctx)?;
-    if replay.is_ok() {
-        return Err("idempotency key replay with a different payload was accepted silently".to_string());
+    match replay {
+        Err(error) if error.contains("idempotency key already used with different") => Ok(()),
+        Err(error) => Err(format!("unexpected statement replay conflict: {error}")),
+        Ok(()) => {
+            Err("idempotency key replay with a different payload was accepted silently".to_string())
+        }
     }
-    Ok(())
 }

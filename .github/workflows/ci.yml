@@ -236,6 +236,9 @@ jobs:
         env:
           STDB_SCHEMA_SERVER: local
           STDB_SCHEMA_HOST: http://127.0.0.1:3000
+          # Reuse the exact module published above. The generator otherwise
+          # rebuilds an equivalent release WASM and needlessly adds ~10 min.
+          STDB_GENERATE_WASM: .ci/contracts-module.wasm
         run: make check-contracts-drift STDB_MODULE=lumiere-ci-contracts
 
   frontend:
