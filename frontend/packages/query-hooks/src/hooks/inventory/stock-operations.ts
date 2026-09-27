@@ -371,7 +371,7 @@ export async function moveStockQuantCommand(
       company_id: companyId,
       dest_location_id: toScalarU64(params.targetLocationId),
       quantity: params.quantity,
-    } as object),
+    }, 'MoveStockQuantParams'),
   });
   const r = await apiFetch(urlPath, init);
   if (!r.ok) {
@@ -467,7 +467,7 @@ export function useCreateStockLocation(organizationId: bigint) {
     mutationFn: async (params) => {
       const merged = mergeReducerParams(CREATE_STOCK_LOCATION_DEFAULTS, params);
       const { urlPath, init } = stdbBffCommandPost('create_stock_location', {
-        params: stdbParamsToJson(merged as object),
+        params: stdbParamsToJson(merged as object, 'CreateStockLocationParams'),
       });
       const r = await apiFetch(urlPath, init);
       if (!r.ok) throw new Error('Failed to create stock location');
@@ -637,7 +637,7 @@ export function useCreatePickingWave(
     mutationFn: async (params) => {
       const { urlPath, init } = stdbBffCommandPost('create_picking_wave', {
         companyId: companyId,
-        params: stdbParamsToJson(params as object),
+        params: stdbParamsToJson(params as object, 'CreatePickingWaveParams'),
       });
       const r = await apiFetch(urlPath, init);
       if (!r.ok) throw new Error('Failed to create picking wave');
@@ -898,7 +898,7 @@ export function useCreateStockRoute(
   return useMutation<void, Error, CreateStockRouteParams>({
     mutationFn: async (params) => {
       const { urlPath, init } = stdbBffCommandPost('create_stock_route', {
-        params: stdbParamsToJson(params as object),
+        params: stdbParamsToJson(params as object, 'CreateStockRouteParams'),
       });
       const r = await apiFetch(urlPath, init);
       if (!r.ok) throw new Error('Failed to create stock route');
@@ -963,7 +963,7 @@ export function useCreateStockRule(
   return useMutation<void, Error, CreateStockRuleParams>({
     mutationFn: async (params) => {
       const { urlPath, init } = stdbBffCommandPost('create_stock_rule', {
-        params: stdbParamsToJson(params as object),
+        params: stdbParamsToJson(params as object, 'CreateStockRuleParams'),
       });
       const r = await apiFetch(urlPath, init);
       if (!r.ok) throw new Error('Failed to create stock rule');
@@ -1032,7 +1032,7 @@ export function useCreateWarehouseTask(
     mutationFn: async (params) => {
       const { urlPath, init } = stdbBffCommandPost('create_warehouse_task', {
         companyId: companyId,
-        params: stdbParamsToJson(params as object),
+        params: stdbParamsToJson(params as object, 'CreateWarehouseTaskParams'),
       });
       const r = await apiFetch(urlPath, init);
       if (!r.ok) throw new Error('Failed to create warehouse task');
@@ -1168,7 +1168,7 @@ export function useCreateStockQuant(
       );
       const merged = mergeReducerParams(base, params);
       const { urlPath, init } = stdbBffCommandPost('create_stock_quant', {
-        params: stdbParamsToJson(merged as object),
+        params: stdbParamsToJson(merged as object, 'CreateStockQuantParams'),
       });
       const r = await apiFetch(urlPath, init);
       if (!r.ok) throw new Error('Failed to create stock quant');

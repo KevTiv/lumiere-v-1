@@ -423,7 +423,7 @@ export function useCreateAdjustmentReason(
   return useMutation<void, Error, CreateAdjustmentReasonParams>({
     mutationFn: async (params) => {
       const { urlPath, init } = stdbBffCommandPost('create_adjustment_reason', {
-        params: stdbParamsToJson(params as object),
+        params: stdbParamsToJson(params as object, 'CreateAdjustmentReasonParams'),
       });
       const r = await apiFetch(urlPath, init);
       if (!r.ok) throw new Error('Failed to create adjustment reason');

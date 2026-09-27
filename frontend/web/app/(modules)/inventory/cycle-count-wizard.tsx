@@ -81,6 +81,8 @@ export function CycleCountWizard({
   const [recQty, setRecQty] = useState('');
   const [recUom, setRecUom] = useState('');
   const [planCreatedAt, setPlanCreatedAt] = useState(0);
+  // Highest plan id at the chosen location before this wizard created one.
+  const [planBaselineId, setPlanBaselineId] = useState(0);
 
   useEffect(() => {
     if (initialCycleCountId != null && initialCycleCountId !== '') {
@@ -96,11 +98,13 @@ export function CycleCountWizard({
       : cycleCounts;
     const sorted = [...forLoc].sort((a, b) => num(b.id) - num(a.id));
     const newest = sorted[0];
-    if (newest?.id != null) {
+    if (newest?.id != null && num(newest.id) > planBaselineId) {
       setCycleCountId(newest.id as ScalarId);
       setStep(2);
+      // Select the new plan once; later refetches must not rewind the wizard.
+      setPlanCreatedAt(0);
     }
-  }, [cycleCounts, locationId, planCreatedAt]);
+  }, [cycleCounts, locationId, planCreatedAt, planBaselineId]);
 
   const selectedCount = useMemo(
     () => cycleCounts.find((c) => strId(c.id) === strId(cycleCountId)),
@@ -285,6 +289,14 @@ export function CycleCountWizard({
             disabled={createPlan.isPending || !locationId}
             onClick={() => {
               const lid = Number(locationId);
+              setPlanBaselineId(
+                Math.max(
+                  0,
+                  ...cycleCounts
+                    .filter((c) => strId(c.locationId) === locationId)
+                    .map((c) => num(c.id)),
+                ),
+              );
               void createPlan
                 .mutateAsync({
                   locationId: lid,

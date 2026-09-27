@@ -30,7 +30,7 @@ async function moveQuantRequest(
       company_id: BigInt(companyId),
       dest_location_id: BigInt(targetLocationId),
       quantity,
-    } as object),
+    }, "MoveStockQuantParams"),
   })
   return page.request.post(urlPath, {
     headers: { "Content-Type": "application/json" },

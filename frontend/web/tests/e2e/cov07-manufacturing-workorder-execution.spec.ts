@@ -302,14 +302,13 @@ async function executionRows(page: Page) {
 async function runWorkorderAction(
   page: Page,
   workorderId: number,
-  name: string,
   action: "start" | "log_productivity" | "finish",
   duration?: number,
 ) {
   await gotoModule(page, "/manufacturing", "manufacturing")
   await page.getByTestId("module-tab-manufacturing-workorders").click()
+  // Workorders persist no name, so select the exact row by id.
   const panel = page.locator('[role="tabpanel"]:visible')
-  await panel.getByLabel("Search records").fill(name)
   const row = panel.getByTestId(`entity-row-${workorderId}`)
   await expect(row).toBeVisible({ timeout: 30_000 })
   await row.click()
@@ -414,7 +413,6 @@ test.describe(
         await runWorkorderAction(
           warehousePage,
           workorderId,
-          workorderName,
           "start",
         )
 
@@ -464,7 +462,6 @@ test.describe(
         await runWorkorderAction(
           warehousePage,
           workorderId,
-          workorderName,
           "log_productivity",
           2.5,
         )
@@ -504,7 +501,7 @@ test.describe(
           readerPage,
           stdbBffCommandPost("log_workcenter_productivity", {
             workcenterId: BigInt(workcenterId),
-            params,
+            params: stdbParamsToJson(params, "CreateWorkcenterProductivityParams"),
           }),
         )
         expect(deniedLog.status()).toBe(403)
@@ -537,7 +534,6 @@ test.describe(
         await runWorkorderAction(
           warehousePage,
           workorderId,
-          workorderName,
           "finish",
         )
 

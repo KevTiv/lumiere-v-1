@@ -1454,7 +1454,7 @@ function InventoryClientLoaded({
         ],
       },
     };
-  }, [t, openCreateStockQuant]);
+  }, [t, openCreateStockQuant, stockQuants]);
 
   const transfersEntityConfig = useMemo((): EntityViewConfig => {
     const base = transfersTableConfig(t, { onEmptyAction: openCreateTransfer });
@@ -2713,6 +2713,8 @@ function InventoryClientLoaded({
             view: {
               ...v,
               actions: [
+                // Keep the stock tab's own actions (move-stock-quant).
+                ...(v.actions ?? []),
                 {
                   id: 'csv-stock-quant',
                   label: t('inventory.csvImport.toolbarQuants'),
@@ -4147,6 +4149,7 @@ function InventoryClientLoaded({
     uomFieldOptions,
     locationParentOptions,
     setCsvKind,
+    transfers,
   ]);
 
   const filteredStockQuants = useMemo(() => {
@@ -4833,16 +4836,21 @@ function InventoryClientLoaded({
         onSubmit={async (fd) => {
           if (!editWarehouseRow) return;
           const id = editWarehouseRow.id as ScalarId;
-          // An empty QC location leaves the warehouse's current one unchanged.
+          // "Not configured" clears the QC location only when one is set.
           const qcStockLocRaw = fd.whQcStockLocId;
           const whQcStockLocId =
             qcStockLocRaw == null || String(qcStockLocRaw).trim() === ''
               ? undefined
               : scalarToU64(String(qcStockLocRaw));
+          const clearWhQcStockLocId =
+            whQcStockLocId === undefined && editWarehouseRow.whQcStockLocId != null
+              ? true
+              : undefined;
           await updateWarehouse.mutateAsync({
             warehouseId: id,
             params: {
               whQcStockLocId,
+              clearWhQcStockLocId,
               name:
                 fd.name != null && String(fd.name).trim() !== ''
                   ? String(fd.name)

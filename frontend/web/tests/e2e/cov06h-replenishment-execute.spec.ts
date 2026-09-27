@@ -21,9 +21,9 @@ const PERSONA_PASSWORD =
   process.env.E2E_FIRST_ORG_PERSONA_PASSWORD ?? "Password123$"
 const SEEDED_VENDOR_NAME = "Globex Corp"
 
-async function fetchPurchaseOrderIdByPartnerRef(
+async function fetchPurchaseOrderIdByOrigin(
   page: Page,
-  partnerRef: string,
+  origin: string,
 ): Promise<number | undefined> {
   const response = await page.request.get("/api/query/purchase-orders")
   if (!response.ok()) return undefined
@@ -31,7 +31,7 @@ async function fetchPurchaseOrderIdByPartnerRef(
     data?: Array<Record<string, unknown>>
   }
   const matches = (payload.data ?? []).filter(
-    (row) => String(row.partnerRef ?? row.partner_ref ?? "") === partnerRef,
+    (row) => String(row.origin ?? "") === origin,
   )
   if (matches.length !== 1) return undefined
   return scalarQueryId(matches[0]?.id) ?? undefined
@@ -119,9 +119,10 @@ test.describe(
         productId,
         locationId,
       )
-      const partnerRef = `RPL-${ruleId}`
+      // The rule's draft PO carries origin REPLENISH-<rule id> (partner_ref is not projected).
+      const poOrigin = `REPLENISH-${ruleId}`
 
-      expect(await fetchPurchaseOrderIdByPartnerRef(page, partnerRef)).toBeUndefined()
+      expect(await fetchPurchaseOrderIdByOrigin(page, poOrigin)).toBeUndefined()
 
       const warehouseContext = await browser.newContext({
         storageState: { cookies: [], origins: [] },
@@ -145,7 +146,7 @@ test.describe(
         await expect
           .poll(
             async () => {
-              poId = await fetchPurchaseOrderIdByPartnerRef(page, partnerRef)
+              poId = await fetchPurchaseOrderIdByOrigin(page, poOrigin)
               return poId
             },
             { timeout: 30_000 },
@@ -169,7 +170,7 @@ test.describe(
           idempotentKey,
         )
         expect(replay.ok()).toBe(true)
-        expect(await fetchPurchaseOrderIdByPartnerRef(page, partnerRef)).toBe(poId)
+        expect(await fetchPurchaseOrderIdByOrigin(page, poOrigin)).toBe(poId)
 
         // The limited reader is denied without creating or changing any PO.
         await signIn(
@@ -184,7 +185,7 @@ test.describe(
           `cov06h-deny-${ruleId}`,
         )
         expect(denial.status()).toBe(403)
-        expect(await fetchPurchaseOrderIdByPartnerRef(page, partnerRef)).toBe(poId)
+        expect(await fetchPurchaseOrderIdByOrigin(page, poOrigin)).toBe(poId)
       } finally {
         await readerContext.close()
         await warehouseContext.close()

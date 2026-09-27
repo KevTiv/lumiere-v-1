@@ -167,7 +167,7 @@ export function useCreateQualityCheck(
     mutationFn: async (params) => {
       const { urlPath, init } = stdbBffCommandPost('create_quality_check', {
         companyId: companyId,
-        params: stdbParamsToJson(params as object),
+        params: stdbParamsToJson(params as object, 'CreateQualityCheckParams'),
       });
       const r = await apiFetch(urlPath, init);
       if (!r.ok) throw new Error('Failed to create quality check');
@@ -308,7 +308,7 @@ export function useCreateQualityPoint(
     mutationFn: async (params) => {
       const { urlPath, init } = stdbBffCommandPost('create_quality_point', {
         companyId: companyId,
-        params: stdbParamsToJson(params as object),
+        params: stdbParamsToJson(params as object, 'CreateQualityPointParams'),
       });
       const r = await apiFetch(urlPath, init);
       if (!r.ok) throw new Error('Failed to create quality point');
@@ -366,7 +366,7 @@ export function useCreateQualityTeam(
   return useMutation<void, Error, CreateQualityTeamParams>({
     mutationFn: async (params) => {
       const { urlPath, init } = stdbBffCommandPost('create_quality_team', {
-        params: stdbParamsToJson(params as object),
+        params: stdbParamsToJson(params as object, 'CreateQualityTeamParams'),
       });
       const r = await apiFetch(urlPath, init);
       if (!r.ok) throw new Error('Failed to create quality team');

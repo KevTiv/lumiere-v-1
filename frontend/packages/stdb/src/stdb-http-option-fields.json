@@ -2195,6 +2195,7 @@
     "metadata"
   ],
   "CreateWorkcenterProductivityParams": [
+    "loss_id",
     "description",
     "metadata"
   ],
@@ -4919,6 +4920,7 @@
     "partner_id",
     "metadata",
     "wh_qc_stock_loc_id",
+    "clear_wh_qc_stock_loc_id",
     "resupply_wh_ids"
   ],
   "UpdateWhatsAppBusinessAccountParams": [

@@ -1,6 +1,7 @@
 "use client"
 
 import { decodeOperationDispatch } from "@lumiere/api-client"
+import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
 import { parseStrictU64, scalarToU64, type ScalarId } from "@lumiere/erp-shared/u64"
 import { stdbBffCommandPost } from "@lumiere/stdb/commands"
 import type { CreateWorkcenterProductivityParams } from "@lumiere/stdb/types"
@@ -508,7 +509,7 @@ export function useLogWorkcenterProductivity(
             "log_workcenter_productivity",
             {
               workcenterId,
-              params,
+              params: stdbParamsToJson(params, "CreateWorkcenterProductivityParams"),
             },
           )
           return decodeOperationDispatch(

@@ -5481,7 +5481,9 @@
       "name",
       "product_id",
       "company_id",
-      "ref"
+      "ref",
+      "location_id",
+      "is_locked"
     ],
     "mandatory": [
       "id",
@@ -5498,7 +5500,8 @@
       "name",
       "product_id",
       "company_id",
-      "lot_id"
+      "lot_id",
+      "state"
     ],
     "mandatory": [
       "id",
@@ -5515,6 +5518,8 @@
       "product_id",
       "location_id",
       "quantity",
+      "reserved_quantity",
+      "available_quantity",
       "company_id",
       "lot_id",
       "package_id",
@@ -6385,7 +6390,8 @@
       "name",
       "code",
       "company_id",
-      "active"
+      "active",
+      "wh_qc_stock_loc_id"
     ],
     "mandatory": [
       "id",
