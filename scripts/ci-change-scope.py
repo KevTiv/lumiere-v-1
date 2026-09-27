@@ -35,6 +35,11 @@ def classify_paths(paths: list[str]) -> dict[str, str]:
             return scope(DOMAINS, "shared presentation contract; full validation")
         if path.startswith("frontend/"):
             categories.add("frontend")
+        elif path.startswith("docs/evidence/") or (
+                path.startswith("scripts/validate-cov") and pure.suffix == ".py"):
+            # COV evidence/census data and their validators are enforced by the
+            # frontend job; they cannot change contracts or service code.
+            categories.add("frontend")
         elif path.startswith(("api-server/src/", "ai-gateway/src/", "iot-gateway/src/")) and pure.suffix == ".rs":
             categories.add("rust")
         else:
