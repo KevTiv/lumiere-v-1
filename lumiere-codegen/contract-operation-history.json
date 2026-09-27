@@ -526,6 +526,10 @@
       "name": "cancel_queue_job",
       "shape_fingerprint": "sha256:b9fca786e0aab7d6c92ad74d5ca56836b04fb7030057a6ab123c8b9f1a5f12a4"
     },
+    "erp.cancel_replenishment_run": {
+      "name": "cancel_replenishment_run",
+      "shape_fingerprint": "sha256:60997cd64eed0875af26234110a4f55c15f5f2f39b9aa226dfa19aa3e4945e3c"
+    },
     "erp.cancel_return_order": {
       "name": "cancel_return_order",
       "shape_fingerprint": "sha256:faef57af3a8a8dbfa78d9f55854122449ba55a9c10bc68cc13c047931b8840dd"
@@ -1025,6 +1029,10 @@
     "erp.create_bom": {
       "name": "create_bom",
       "shape_fingerprint": "sha256:bcd0b3b77354a502d37d8c342de8f02266d2d5707af1d8e4a6e485f5310b9ddc"
+    },
+    "erp.create_bom_byproduct": {
+      "name": "create_bom_byproduct",
+      "shape_fingerprint": "sha256:7d8ba11964987d5a1c1d7d4e120e2c40b5d40bb91bb7aa720525c544bdf63349"
     },
     "erp.create_budget_line": {
       "name": "create_budget_line",
@@ -1902,6 +1910,10 @@
       "name": "create_workorder",
       "shape_fingerprint": "sha256:e55a3f30a31a959f5afa19663bc0ab91047c996ee68ef890994d52213c107e42"
     },
+    "erp.create_workorder_quality_check": {
+      "name": "create_workorder_quality_check",
+      "shape_fingerprint": "sha256:115f81bb4710929770c07044cb36a1161a1fa9033150f5066fb44edea8cd3c41"
+    },
     "erp.crm_integrity_inventory": {
       "name": "crm_integrity_inventory",
       "shape_fingerprint": "sha256:d39e180dad29f9ff9076a40cb53fee62f86b9517d257199c72a27639b4495816"
@@ -2321,6 +2333,10 @@
     "erp.fail_warehouse_sync_intent": {
       "name": "fail_warehouse_sync_intent",
       "shape_fingerprint": "sha256:1a845b71cc2aa4976ac5453c1aa79697021d74db26178e9f4193233f686a77c6"
+    },
+    "erp.fail_workorder_quality_check": {
+      "name": "fail_workorder_quality_check",
+      "shape_fingerprint": "sha256:13ce138cdbbe5894aaceab380b0a4411726dabc6382e851d4996b46398ad6622"
     },
     "erp.finalize_import_assistant_job": {
       "name": "finalize_import_assistant_job",
@@ -4002,6 +4018,10 @@
       "name": "run_inventory_integration_result_fk_relations_test",
       "shape_fingerprint": "sha256:d10ac304a62e08240d97a4c7d0907c58037d29a2c3478a171475142b14ee2f1f"
     },
+    "erp.run_inventory_lot_move_test": {
+      "name": "run_inventory_lot_move_test",
+      "shape_fingerprint": "sha256:4c1408846b2bd6a71a5b16a5283fabebcdbd012685c3d6f83b039ee434f3b698"
+    },
     "erp.run_inventory_lot_reserve_test": {
       "name": "run_inventory_lot_reserve_test",
       "shape_fingerprint": "sha256:52a57d2741c79665b9b6c94dacb7740ee1bb36b7912fbf65086aa539b3750a3b"
@@ -4082,6 +4102,10 @@
       "name": "run_inventory_uom_conversion_test",
       "shape_fingerprint": "sha256:0ab7557453d37970abf978a11351267af7fd78faa3550d92c0c6ab38d0d5ef81"
     },
+    "erp.run_inventory_warehouse_qc_location_test": {
+      "name": "run_inventory_warehouse_qc_location_test",
+      "shape_fingerprint": "sha256:2f404638612ab5cf2d0467993c29bc7085fed016cededeb78f7591fdee7ec47a"
+    },
     "erp.run_inventory_warehouse_sync_test": {
       "name": "run_inventory_warehouse_sync_test",
       "shape_fingerprint": "sha256:27553cbcbaccd8f1841f92f733dd6f797a7deefb0f1300fc1c0c3ebb19b4ecde"
@@ -4094,9 +4118,21 @@
       "name": "run_iot_relational_integrity_test",
       "shape_fingerprint": "sha256:4ef9a5a48db9b95950427acc942baf11415ccdd31255900b0c6774f07338366a"
     },
+    "erp.run_manufacturing_bom_byproduct_output_exact_effect_test": {
+      "name": "run_manufacturing_bom_byproduct_output_exact_effect_test",
+      "shape_fingerprint": "sha256:5d3faa87116ffa6a665fd805a44ec3aa3af606fa813e39a71fc5fee57ed10cb8"
+    },
     "erp.run_manufacturing_consume_materials_cross_org_component_test": {
       "name": "run_manufacturing_consume_materials_cross_org_component_test",
       "shape_fingerprint": "sha256:4ce3cc5565591c1eaa7d6da2fac0f4cc4d36fa9a768654b3b14a1bfe0f07c55d"
+    },
+    "erp.run_manufacturing_consume_materials_exact_effect_test": {
+      "name": "run_manufacturing_consume_materials_exact_effect_test",
+      "shape_fingerprint": "sha256:d3499a6a879919795940b8593e2936aa63714f86341d3909a9de4d365d81c08d"
+    },
+    "erp.run_manufacturing_finished_output_scrap_exact_effect_test": {
+      "name": "run_manufacturing_finished_output_scrap_exact_effect_test",
+      "shape_fingerprint": "sha256:c6aa8f7f73e69c828114e8fc57b327d5366a702cc0d032086d8cbc6f37caaab5"
     },
     "erp.run_manufacturing_loss_category_create_test": {
       "name": "run_manufacturing_loss_category_create_test",
@@ -4105,6 +4141,10 @@
     "erp.run_manufacturing_loss_category_invalid_category_test": {
       "name": "run_manufacturing_loss_category_invalid_category_test",
       "shape_fingerprint": "sha256:b7391648a14114c3de98c85f7bd0661770b0c714f5f7ab9ce6836449326aeda9"
+    },
+    "erp.run_manufacturing_production_close_exact_effect_test": {
+      "name": "run_manufacturing_production_close_exact_effect_test",
+      "shape_fingerprint": "sha256:6578b1f5dfb94a5daa2777f51f83cf312d517c98eadb32ec0fff85261c752208"
     },
     "erp.run_manufacturing_productivity_relational_integrity_test": {
       "name": "run_manufacturing_productivity_relational_integrity_test",
@@ -4121,6 +4161,14 @@
     "erp.run_manufacturing_workcenter_test": {
       "name": "run_manufacturing_workcenter_test",
       "shape_fingerprint": "sha256:1caf344f22f58c1317e3ef9aa12f9d0c332159c605cbf5c32da1596836804b96"
+    },
+    "erp.run_manufacturing_workorder_execution_exact_effect_test": {
+      "name": "run_manufacturing_workorder_execution_exact_effect_test",
+      "shape_fingerprint": "sha256:c5541ecfd53bdff380b81b54f4e09ef942c8b196810210cc68c2fbadb6f30ff6"
+    },
+    "erp.run_manufacturing_workorder_quality_gate_test": {
+      "name": "run_manufacturing_workorder_quality_gate_test",
+      "shape_fingerprint": "sha256:93c2aa0a0fcf29e101baa765c64d60d1e8f664a0832f00ffc7ba9df27076cfed"
     },
     "erp.run_manufacturing_workorder_workcenter_integrity_test": {
       "name": "run_manufacturing_workorder_workcenter_integrity_test",
@@ -4334,6 +4382,10 @@
       "name": "run_sales_sla_escalation",
       "shape_fingerprint": "sha256:8db4ca8750c3d4c91b78ec5093c430f6e47041f72a1769af4d7807d94069bc17"
     },
+    "erp.run_scheduled_replenishment": {
+      "name": "run_scheduled_replenishment",
+      "shape_fingerprint": "sha256:e0b29b5e11a9a7d3ac3b4d985c6b0f7623616c5f7e3f48acf8593aa4b366de28"
+    },
     "erp.run_subscription_plan_test": {
       "name": "run_subscription_plan_test",
       "shape_fingerprint": "sha256:ba7ebc8b2515e25a1f0f6f9629147f6427d983b6cfc7656564d6c93634929f95"
@@ -4418,6 +4470,10 @@
       "name": "schedule_document_retention_purge",
       "shape_fingerprint": "sha256:3bd288a0e0dde38c23cee9fe1eb35c290641e61fb3e4ec3e7ea3b2dba42fc0ad"
     },
+    "erp.schedule_replenishment_run": {
+      "name": "schedule_replenishment_run",
+      "shape_fingerprint": "sha256:4a8fa304d91568f684b9aa42c5060e265321d329339d980f3e2803c6b4606c1b"
+    },
     "erp.schedule_sales_sla_escalation": {
       "name": "schedule_sales_sla_escalation",
       "shape_fingerprint": "sha256:b41d0316ace7f72fa6a64a74172d9aa046fe7bc25f0fc9dbc7e272acf03c0a8d"
@@ -4425,6 +4481,10 @@
     "erp.schedule_tax_deadline_updates": {
       "name": "schedule_tax_deadline_updates",
       "shape_fingerprint": "sha256:24e75b5abf45d5f6eb35aac9eb2f85482cc0f2c2ec75aece380acff728e4764e"
+    },
+    "erp.scrap_finished_manufacturing_output": {
+      "name": "scrap_finished_manufacturing_output",
+      "shape_fingerprint": "sha256:1695011c5f01641298e43f7a12126a101045a38eb7cbb7ccf3cf2153e94cba96"
     },
     "erp.seed_dev_data": {
       "name": "seed_dev_data",
@@ -5064,7 +5124,7 @@
     },
     "erp.update_fleet_vehicle": {
       "name": "update_fleet_vehicle",
-      "shape_fingerprint": "sha256:6285f3495bfce3aef330dc203d283dc730ca99a52e15f4602b7bf7f4700e3944"
+      "shape_fingerprint": "sha256:26f673a2902b82e76e72bb96bf91bd1e72071727fd7f03213e46b0833e58dc6a"
     },
     "erp.update_form_field": {
       "name": "update_form_field",
@@ -5623,14 +5683,7 @@
     "erp.test_finalize_rejects_unregistered_caller",
     "erp.update_user_password"
   ],
-  "compatibility_exceptions": [
-    {
-      "operation_id": "erp.update_fleet_vehicle",
-      "previous_fingerprint": "sha256:6285f3495bfce3aef330dc203d283dc730ca99a52e15f4602b7bf7f4700e3944",
-      "current_fingerprint": "sha256:26f673a2902b82e76e72bb96bf91bd1e72071727fd7f03213e46b0833e58dc6a",
-      "reason": "Expose the existing tenant and company guarded Fleet assignment update through the authenticated session operation surface"
-    }
-  ],
+  "compatibility_exceptions": [],
   "revisions": [
     {
       "previous_release": "v0.3.33",
@@ -5727,6 +5780,14 @@
       "current_operations_fingerprint": "sha256:110acf5a697c6f40ac490a23ce2f5e234ca667a8e38e61ea2c490cf45649e908",
       "operation_count": 1400,
       "reason": "mark approve_ai_action_draft and stage_bank_statement_import idempotent on top of released v0.3.55: exact replays return the committed outcome and a reused key with different input is rejected; the active operation ID set and every other operation shape are unchanged"
+    },
+    {
+      "previous_release": "v0.3.57",
+      "previous_ir_sha256": "sha256:fac05dd12b3f2f0d785ff95cd031875efb66f58c46c58a6baba9d43cff6ddf99",
+      "previous_operations_fingerprint": "sha256:110acf5a697c6f40ac490a23ce2f5e234ca667a8e38e61ea2c490cf45649e908",
+      "current_operations_fingerprint": "sha256:a8e89515b61b951db4ec206c3002945cb78d8a9f65560524182f3963ec649cf2",
+      "operation_count": 1415,
+      "reason": "COV-05c/06/07/08 release on top of v0.3.57: add cancel_replenishment_run, create_bom_byproduct, create_workorder_quality_check, fail_workorder_quality_check, run_inventory_lot_move_test, run_inventory_warehouse_qc_location_test, run_manufacturing_bom_byproduct_output_exact_effect_test, run_manufacturing_consume_materials_exact_effect_test, run_manufacturing_finished_output_scrap_exact_effect_test, run_manufacturing_production_close_exact_effect_test, run_manufacturing_workorder_execution_exact_effect_test, run_manufacturing_workorder_quality_gate_test, run_scheduled_replenishment, schedule_replenishment_run, scrap_finished_manufacturing_output; change the input shape of no existing operation"
     }
   ]
 }
