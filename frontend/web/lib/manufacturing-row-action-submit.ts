@@ -106,7 +106,7 @@ export async function submitManufacturingRowAction(
           workcenterId: wcRaw,
         })
         if (!params) throw new Error("Work order name is required")
-        await m.createWorkorder.mutateAsync(params as unknown as Record<string, unknown>)
+        await m.createWorkorder.mutateAsync(params)
         return
       }
       default:

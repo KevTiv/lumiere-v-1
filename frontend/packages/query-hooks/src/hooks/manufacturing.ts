@@ -15,6 +15,7 @@ import type {
   CreateBomParams,
   CreateMrpProductionParams,
   CreateWorkcenterParams,
+  CreateWorkorderParams,
   MrpBom,
   MrpBomLine,
   MrpProduction,
@@ -250,12 +251,13 @@ export function useCheckMoAvailability(organizationId: bigint, companyId: bigint
   })
 }
 
-/** Params match generated `CreateWorkorderParams` (camelCase JSON). */
 export function useCreateWorkorder(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async (params: Record<string, unknown>) => {
-      const { urlPath, init } = stdbBffCommandPost("create_workorder", { params: params })
+    mutationFn: async (params: CreateWorkorderParams) => {
+      const { urlPath, init } = stdbBffCommandPost("create_workorder", {
+        params: stdbParamsToJson(params, "CreateWorkorderParams"),
+      })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },

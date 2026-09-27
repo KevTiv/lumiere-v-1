@@ -268,7 +268,9 @@ async function createExactWorkorder(
 
   const response = await postPreparedCommand(
     page,
-    stdbBffCommandPost("create_workorder", { params }),
+    stdbBffCommandPost("create_workorder", {
+      params: stdbParamsToJson(params, "CreateWorkorderParams"),
+    }),
   )
   expect(response.ok()).toBe(true)
 

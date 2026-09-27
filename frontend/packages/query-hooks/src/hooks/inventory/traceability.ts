@@ -209,7 +209,7 @@ export function useCreateStockProductionSerial(
     mutationFn: async (params) => {
       const { urlPath, init } = stdbBffCommandPost(
         'create_stock_production_serial',
-        { params: stdbParamsToJson(params as object) },
+        { params: stdbParamsToJson(params, 'CreateStockProductionSerialParams') },
       );
       const r = await apiFetch(urlPath, init);
       if (!r.ok) throw new Error('Failed to create stock production serial');
