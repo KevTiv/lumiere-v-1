@@ -10,8 +10,9 @@ use crate::accounting::analytic_accounting::{
 use crate::accounting::bank_reconciliation::{
     account_bank_statement, account_bank_statement_line, create_account_bank_statement,
     create_account_bank_statement_line, delete_account_bank_statement, match_bank_line,
-    post_account_bank_statement, update_account_bank_statement,
-    CreateAccountBankStatementLineParams, CreateAccountBankStatementParams,
+    post_account_bank_statement, reconcile_account_bank_statement_line,
+    update_account_bank_statement, CreateAccountBankStatementLineParams,
+    CreateAccountBankStatementParams, ReconcileAccountBankStatementLineParams,
     UpdateAccountBankStatementParams,
 };
 use crate::accounting::chart_of_accounts::{
@@ -496,6 +497,29 @@ pub fn test_bank_statement_reducers_reject_cross_tenant(
         .iter()
         .find(|l| l.statement_id == statement_a.id)
         .ok_or("line A not found after create")?;
+
+    let cross_reconcile = reconcile_account_bank_statement_line(
+        ctx,
+        fixture_b.organization_id,
+        fixture_a.company_id,
+        line_a.id,
+        ReconcileAccountBankStatementLineParams {
+            move_ids: vec![u64::MAX],
+            amount_residual: 0.0,
+        },
+    );
+    if cross_reconcile.is_ok() {
+        return Err("bank reconcile accepted a cross-organization caller".to_string());
+    }
+    let line_after_denial = ctx
+        .db
+        .account_bank_statement_line()
+        .id()
+        .find(&line_a.id)
+        .ok_or("line A disappeared after denied reconciliation")?;
+    if line_after_denial.is_reconciled || !line_after_denial.move_ids.is_empty() {
+        return Err("denied bank reconciliation changed the statement line".to_string());
+    }
 
     let cross_match = match_bank_line(ctx, fixture_b.organization_id, line_a.id, None);
     if cross_match.is_ok() {
