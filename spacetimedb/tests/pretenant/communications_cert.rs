@@ -15,8 +15,9 @@ use crate::accounting_tests::helpers::create_balanced_customer_invoice;
 use crate::core::operational_messaging::{
     cancel_message_batch, contact_communication_preference, create_invoice_reminder_batch,
     create_message_batch, create_message_template, message_batch, message_template,
-    operational_message, review_message_batch, set_contact_communication_preference,
-    update_message_template, CreateInvoiceReminderBatchParams, CreateMessageBatchParams,
+    operational_message, record_message_copied, review_message_batch,
+    set_contact_communication_preference, update_message_template,
+    CreateInvoiceReminderBatchParams, CreateMessageBatchParams,
     CreateMessageTemplateParams, MessageBatch, OperationalMessage, ReviewMessageBatchParams,
     UpdateMessageTemplateParams,
 };
@@ -190,6 +191,32 @@ fn seed_template(ctx: &ReducerContext, org: u64, key: &str) -> Result<u64, Strin
         .map(|t| t.id)
         .max()
         .ok_or_else(|| format!("template {key} missing"))
+}
+
+fn seed_contact_template(ctx: &ReducerContext, org: u64, key: &str) -> Result<u64, String> {
+    create_message_template(
+        ctx,
+        org,
+        CreateMessageTemplateParams {
+            company_id: None,
+            key: key.to_string(),
+            name: format!("{key} contact"),
+            locale: "en".to_string(),
+            subject: Some("Hello {{customer_name}}".to_string()),
+            body_template: "Hello {{customer_name}}, this is an operational message.".to_string(),
+            allowed_variables: vec!["customer_name".to_string()],
+            applicable_channels: vec![MessageChannel::Sms, MessageChannel::WhatsApp],
+            retention_classification: "operational".to_string(),
+            metadata: None,
+        },
+    )?;
+    ctx.db
+        .message_template()
+        .message_template_by_key()
+        .filter((&org, &key.to_string()))
+        .map(|t| t.id)
+        .max()
+        .ok_or_else(|| format!("contact template {key} missing"))
 }
 
 fn seed_contact_batch(
@@ -691,7 +718,7 @@ fn batch_scenario(ctx: &ReducerContext, tag: &str, phone: &str) -> Result<BatchS
     let company = fixture.company_id;
     let contact_id = seed_contact(ctx, org, company, &format!("{tag} recipient"))?;
     let identity_id = add_primary_phone(ctx, org, contact_id, phone)?;
-    let template_id = seed_template(ctx, org, &format!("{tag}-template"))?;
+    let template_id = seed_contact_template(ctx, org, &format!("{tag}-template"))?;
     let created = seed_contact_batch(ctx, org, company, template_id, vec![contact_id], tag)?;
     if created.recipient_count != 1 || children(ctx, created.id).len() != 1 {
         return Err("expected one previewed recipient".to_string());
@@ -834,14 +861,65 @@ fn comm_08_rendered_content_immutable_after_template_edit(ctx: &ReducerContext) 
 /// Approval must bind to concrete rendered content, not to a mutable template reference.
 fn comm_09_contact_batch_approves_rendered_content(ctx: &ReducerContext) -> Result<(), String> {
     let s = setup("batch scenario", batch_scenario(ctx, "comm09", "+12025550191"))?;
-    let unrendered = children(ctx, s.batch_id)
+    let before = children(ctx, s.batch_id);
+    if before.iter().any(|m| m.rendered_body.trim().is_empty()) {
+        return Err("contact batch has no rendered content to approve".to_string());
+    }
+    let template_id = before
+        .first()
+        .map(|message| message.template_id)
+        .ok_or("contact batch has no rendered message")?;
+    let snapshot = before
         .iter()
-        .filter(|m| m.rendered_body.trim().is_empty())
-        .count();
-    if unrendered > 0 {
-        return Err(format!(
-            "{unrendered} batch recipient(s) have no rendered content to approve"
-        ));
+        .map(|m| {
+            (
+                m.id,
+                m.rendered_subject.clone(),
+                m.rendered_body.clone(),
+                m.variable_hash.clone(),
+            )
+        })
+        .collect::<Vec<_>>();
+    let message_id = before
+        .first()
+        .map(|message| message.id)
+        .ok_or("contact batch has no child message")?;
+    if record_message_copied(ctx, s.org, message_id).is_ok() {
+        return Err("batch child was copied before independent approval".to_string());
+    }
+
+    setup(
+        "template edit",
+        update_message_template(
+            ctx,
+            s.org,
+            template_id,
+            UpdateMessageTemplateParams {
+                name: None,
+                subject: Some("CHANGED {{customer_name}}".to_string()),
+                body_template: Some("CHANGED {{customer_name}}".to_string()),
+                allowed_variables: None,
+                applicable_channels: None,
+                active: None,
+                review_state: None,
+                metadata: None,
+            },
+        ),
+    )?;
+
+    let after = children(ctx, s.batch_id)
+        .iter()
+        .map(|m| {
+            (
+                m.id,
+                m.rendered_subject.clone(),
+                m.rendered_body.clone(),
+                m.variable_hash.clone(),
+            )
+        })
+        .collect::<Vec<_>>();
+    if snapshot != after {
+        return Err("template edit changed previewed contact-batch content".to_string());
     }
     Ok(())
 }
@@ -991,6 +1069,9 @@ fn comm_13_batch_recipients_are_org_scoped(ctx: &ReducerContext) -> Result<(), S
             metadata: None,
         },
     );
+    if result.is_ok() {
+        return Err("foreign recipient injection was silently accepted".to_string());
+    }
     let leaked = ctx
         .db
         .operational_message()
@@ -1000,8 +1081,17 @@ fn comm_13_batch_recipients_are_org_scoped(ctx: &ReducerContext) -> Result<(), S
         .count();
     if leaked > 0 {
         return Err(format!(
-            "organization B created {leaked} message intent(s) for organization A's contact (batch result: {result:?})"
+            "organization B created {leaked} message intent(s) for organization A's contact"
         ));
+    }
+    let foreign_batch = ctx
+        .db
+        .message_batch()
+        .message_batch_by_org()
+        .filter(&foreign_org)
+        .any(|batch| batch.template_id == template_id);
+    if foreign_batch {
+        return Err("rejected foreign recipient injection still persisted a batch".to_string());
     }
     Ok(())
 }
@@ -1011,37 +1101,49 @@ fn comm_13_batch_recipients_are_org_scoped(ctx: &ReducerContext) -> Result<(), S
 fn comm_14_recipient_number_change_invalidates_approval(ctx: &ReducerContext) -> Result<(), String> {
     let previewed = "+12025550141";
     let s = setup("batch scenario", batch_scenario(ctx, "comm14", previewed))?;
-    setup(
-        "change number",
-        update_contact_identity(
-            ctx,
-            s.org,
-            s.identity_id,
-            UpdateContactIdentityParams {
-                company_id: None,
-                raw_value: Some("+12025550142".to_string()),
-                is_preferred: None,
-                verification_state: None,
-                metadata: None,
-            },
-        ),
-    )?;
-    let approval = approve(ctx, s.org, s.batch_id);
-    approval_rejection_must_mention(&approval, &["identity", "recipient", "phone", "number", "changed"])?;
-    let approved = batch(ctx, s.batch_id)?.status == MessageBatchStatus::Approved;
+    let change = update_contact_identity(
+        ctx,
+        s.org,
+        s.identity_id,
+        UpdateContactIdentityParams {
+            company_id: None,
+            raw_value: Some("+12025550142".to_string()),
+            is_preferred: None,
+            verification_state: None,
+            metadata: None,
+        },
+    );
+    match change {
+        Err(error)
+            if error.contains("active message intent")
+                || error.contains("re-preview")
+                || error.contains("phone number") => {}
+        Err(error) => {
+            return Err(format!(
+                "number change was rejected for an unrelated reason: {error}"
+            ))
+        }
+        Ok(()) => {
+            return Err(
+                "phone number changed in place while an active batch still referenced the identity"
+                    .to_string(),
+            )
+        }
+    }
+
     let current = ctx
         .db
         .contact_phone_identity()
         .id()
         .find(&s.identity_id)
         .map(|identity| identity.normalized_e164);
-    let targeted = children(ctx, s.batch_id)
-        .iter()
-        .any(|m| m.phone_identity_id == s.identity_id && is_active_intent(&m.status));
-    if approved && targeted && current.as_deref() != Some(previewed) {
+    if current.as_deref() != Some(previewed) {
         return Err(format!(
-            "approved batch now resolves to {current:?} instead of the previewed {previewed}"
+            "rejected number change still mutated identity to {current:?}"
         ));
+    }
+    if batch(ctx, s.batch_id)?.status != MessageBatchStatus::PendingApproval {
+        return Err("rejected number change mutated batch approval state".to_string());
     }
     Ok(())
 }

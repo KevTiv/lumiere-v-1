@@ -10,6 +10,7 @@ import { expect, test, type Page } from "@playwright/test"
 
 import {
   callReducerBff,
+  callReducerOwner,
   expectNoAppError,
   fetchContactIdByName,
   fetchCurrencyIdByCode,
@@ -107,7 +108,10 @@ test.describe("PRO-007 proposal → publish → convert lifecycle @proposals @p0
 
     const proposalTitle = smokeName("pro007-proposal")
     const nowMicros = Date.now() * 1000
-    await callReducerBff(page, "create_proposal", [
+    // COV-17: the award approver must not be the proposal's author, so the
+    // fixture proposal is authored by the owner identity and approved below by
+    // the signed-in admin.
+    await callReducerOwner("create_proposal", [
       organizationId,
       companyId,
       {
