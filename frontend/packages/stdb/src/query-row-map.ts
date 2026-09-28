@@ -248,6 +248,7 @@ import type {
   ResourceCapacitySnapshot,
   ResourceUtilisationSnapshot,
   ReturnOrder,
+  ReturnOrderCreation,
   ReturnOrderLine,
   RevenueRecognitionRule,
   Role,
@@ -263,6 +264,7 @@ import type {
   StockCycleCount,
   StockInventory,
   StockLandedCost,
+  StockLandedCostApplication,
   StockLandedCostLines,
   StockLocation,
   StockMove,
@@ -464,6 +466,7 @@ export interface QueryRowMap {
   "knowledge-articles": KnowledgeArticle
   "knowledge-categories": KnowledgeArticleCategory
   "labor-cost-snapshots": HrLaborCostSnapshot
+  "landed-cost-applications": StockLandedCostApplication
   "landed-cost-lines": StockLandedCostLines
   "landed-costs": StockLandedCost
   "lead-lost-reasons": LeadLostReason
@@ -580,6 +583,7 @@ export interface QueryRowMap {
   "resource-allocations": ResourceAllocation
   "resource-capacity-by-employee": ResourceCapacitySnapshot
   "resource-utilisation-by-employee": ResourceUtilisationSnapshot
+  "return-order-creations": ReturnOrderCreation
   "return-order-lines": ReturnOrderLine
   "return-orders": ReturnOrder
   "revenue-recognition-rules": RevenueRecognitionRule
