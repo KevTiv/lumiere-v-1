@@ -3379,6 +3379,7 @@ pub fn test_update_warehouse_qc_location(ctx: &ReducerContext) -> Result<(), Str
             partner_id: None,
             resupply_wh_ids: None,
             wh_qc_stock_loc_id: None,
+            clear_wh_qc_stock_loc_id: None,
             metadata: None,
         }
     }
@@ -3431,6 +3432,70 @@ pub fn test_update_warehouse_qc_location(ctx: &ReducerContext) -> Result<(), Str
         ));
     }
 
+    // Setting and clearing in one update is contradictory and changes nothing.
+    match update_warehouse(
+        ctx,
+        org_id,
+        company_id,
+        fixture.warehouse_id,
+        UpdateWarehouseParams {
+            wh_qc_stock_loc_id: Some(fixture.location_id),
+            clear_wh_qc_stock_loc_id: Some(true),
+            ..base_update_params()
+        },
+    ) {
+        Err(msg) if msg.contains("both set and clear") => {}
+        Err(msg) => return Err(format!("Expected set+clear rejection, got: {msg}")),
+        Ok(()) => return Err("set+clear QC location update was accepted".into()),
+    }
+
+    // An update that names neither field leaves the QC location unchanged.
+    update_warehouse(
+        ctx,
+        org_id,
+        company_id,
+        fixture.warehouse_id,
+        UpdateWarehouseParams {
+            name: Some("QC unchanged".to_string()),
+            ..base_update_params()
+        },
+    )?;
+    let warehouse_unchanged = ctx
+        .db
+        .warehouse()
+        .id()
+        .find(&fixture.warehouse_id)
+        .ok_or("warehouse missing after unrelated update")?;
+    if warehouse_unchanged.wh_qc_stock_loc_id != Some(fixture.location_id) {
+        return Err(format!(
+            "unrelated update changed wh_qc_stock_loc_id to {:?}",
+            warehouse_unchanged.wh_qc_stock_loc_id
+        ));
+    }
+
+    update_warehouse(
+        ctx,
+        org_id,
+        company_id,
+        fixture.warehouse_id,
+        UpdateWarehouseParams {
+            clear_wh_qc_stock_loc_id: Some(true),
+            ..base_update_params()
+        },
+    )?;
+    let warehouse_cleared = ctx
+        .db
+        .warehouse()
+        .id()
+        .find(&fixture.warehouse_id)
+        .ok_or("warehouse missing after clearing QC location")?;
+    if warehouse_cleared.wh_qc_stock_loc_id.is_some() {
+        return Err(format!(
+            "expected cleared wh_qc_stock_loc_id, got {:?}",
+            warehouse_cleared.wh_qc_stock_loc_id
+        ));
+    }
+
     Ok(())
 }
 
@@ -3460,6 +3525,7 @@ pub fn test_cross_dock_creates_outbound(ctx: &ReducerContext) -> Result<(), Stri
             partner_id: None,
             resupply_wh_ids: None,
             wh_qc_stock_loc_id: None,
+            clear_wh_qc_stock_loc_id: None,
             metadata: None,
         },
     )?;
@@ -4804,6 +4870,7 @@ pub fn test_multi_wh_promise_atp(ctx: &ReducerContext) -> Result<(), String> {
             partner_id: None,
             resupply_wh_ids: Some(vec![wh_b.id]),
             wh_qc_stock_loc_id: None,
+            clear_wh_qc_stock_loc_id: None,
             metadata: None,
         },
     )?;

@@ -354,7 +354,7 @@
       "contract_release_required": "no",
       "contract_note": "none: `user-role-assignment` exposes id, user_identity, role_id, organization_id, is_active",
       "prerequisites": "Admin + non-admin personas (first-org fixture has them).",
-      "status": "SCAFFOLDED",
+      "status": "IMPLEMENTED — runtime acceptance pending",
       "status_doc": "docs/plan/erp-cov23-role-assignment-status.md",
       "spec": "frontend/web/tests/e2e/cov23-role-assignment.spec.ts",
       "hooks": [

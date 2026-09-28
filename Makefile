@@ -1198,7 +1198,7 @@ check-contracts-drift: clean-contracts-live-staging generate-presentation-schema
 		"$$CHECKOUT/packages/contracts/src/generated" .contracts-staging/ts/generated && \
 	diff "$$CHECKOUT/packages/contracts/src/stdb-generated-sql-columns.json" .contracts-staging/ts/stdb-generated-sql-columns.json && \
 	echo "check-contracts-drift: staging matches pinned lumiere-contracts release" || \
-	(echo "Local generation drifted from the pinned lumiere-contracts tag. Run: make publish-contracts VERSION=x.y.z" && exit 1)
+	(echo "Local generation drifted from the pinned lumiere-contracts tag. Push the branch: the Release contracts workflow publishes and pins the next version." && exit 1)
 
 # Publish freshly generated bindings + manifests to lumiere-contracts as a new
 # tagged release, then print the Cargo.toml dependency line to bump.

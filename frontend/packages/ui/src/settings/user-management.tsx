@@ -246,6 +246,7 @@ export function UserManagement() {
         <div className="relative flex-1 max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
+            data-testid="settings-users-search"
             placeholder={t("settings.users.searchPlaceholder")}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
@@ -329,6 +330,7 @@ export function UserManagement() {
             {filteredUsers.map((user) => (
               <div 
                 key={user.id}
+                data-testid={`settings-user-row-${user.email}`}
                 className="flex items-center justify-between p-4 hover:bg-muted/50 transition-colors"
               >
                 <div className="flex items-center gap-4">
@@ -370,13 +372,13 @@ export function UserManagement() {
 
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon">
+                      <Button variant="ghost" size="icon" data-testid={`settings-user-actions-${user.email}`}>
                         <MoreHorizontal className="h-4 w-4" />
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
                       {canEdit && (
-                        <DropdownMenuItem onClick={() => handleEditUser(user)}>
+                        <DropdownMenuItem data-testid="settings-user-edit" onClick={() => handleEditUser(user)}>
                           <Pencil className="h-4 w-4 mr-2" />
                           {t("settings.users.actions.edit")}
                         </DropdownMenuItem>
@@ -487,11 +489,12 @@ export function UserManagement() {
             </div>
             <div className="space-y-2">
               <Label>{t("settings.users.roles")}</Label>
-              <div className="grid gap-2 sm:grid-cols-2">
+              <div className="grid max-h-64 gap-2 overflow-y-auto rounded-md border p-3 sm:grid-cols-2">
                 {roles.map((role) => (
                   <div key={role.id} className="flex items-center gap-2">
                     <Checkbox
                       id={role.id}
+                      data-testid={`settings-user-role-${role.id}`}
                       checked={selectedRoles.includes(role.id)}
                       onCheckedChange={(checked) => {
                         if (checked) {
@@ -512,7 +515,7 @@ export function UserManagement() {
               <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
                 {t("common.cancel")}
               </Button>
-              <Button type="submit" disabled={isSaving || !orgReady}>
+              <Button type="submit" data-testid="settings-user-save" disabled={isSaving || !orgReady}>
                 {editingUser ? t("settings.users.saveChanges") : t("settings.users.createUser")}
               </Button>
             </DialogFooter>

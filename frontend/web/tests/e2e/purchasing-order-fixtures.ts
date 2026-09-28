@@ -261,7 +261,11 @@ export async function fetchPurchaseOrderInvoiceIds(
   orderId: number,
 ): Promise<number[]> {
   const response = await page.request.get("/api/query/purchase-orders")
-  if (!response.ok()) return []
+  if (!response.ok()) {
+    throw new Error(
+      `Failed to query purchase orders (${response.status()}): ${await response.text()}`,
+    )
+  }
 
   const payload = (await response.json()) as {
     data?: Array<Record<string, unknown>>
@@ -269,8 +273,15 @@ export async function fetchPurchaseOrderInvoiceIds(
   const order = (payload.data ?? []).find(
     (row) => scalarQueryId(row.id) === orderId,
   )
+  if (order == null) {
+    throw new Error(`Purchase order ${orderId} is missing from the canonical query`)
+  }
   const raw = order?.invoiceIds ?? order?.invoice_ids
-  if (!Array.isArray(raw)) return []
+  if (!Array.isArray(raw)) {
+    throw new Error(
+      `Purchase order ${orderId} is missing the canonical invoice_ids relation`,
+    )
+  }
   return raw
     .flatMap((value) => {
       const id = scalarQueryId(value)

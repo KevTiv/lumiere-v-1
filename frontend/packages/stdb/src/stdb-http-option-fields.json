@@ -573,7 +573,6 @@
   ],
   "BomLineInput": [
     "operation_id",
-    "parent_product_tmpl_id",
     "child_bom_id",
     "metadata"
   ],
@@ -2196,6 +2195,7 @@
     "metadata"
   ],
   "CreateWorkcenterProductivityParams": [
+    "loss_id",
     "description",
     "metadata"
   ],
@@ -2214,7 +2214,6 @@
     "operation_note",
     "operation_id",
     "blocked_by_workorder_id",
-    "quality_state",
     "metadata"
   ],
   "CrossoveredBudget": [
@@ -4920,7 +4919,9 @@
     "sequence",
     "partner_id",
     "metadata",
-    "resupplyWhIds"
+    "wh_qc_stock_loc_id",
+    "clear_wh_qc_stock_loc_id",
+    "resupply_wh_ids"
   ],
   "UpdateWhatsAppBusinessAccountParams": [
     "name",

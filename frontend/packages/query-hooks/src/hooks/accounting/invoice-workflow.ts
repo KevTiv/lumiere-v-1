@@ -4,6 +4,7 @@ import {
   POST_PAYMENT_AFFECTS,
   RECONCILE_PAYMENT_AFFECTS,
   WorkflowError,
+  invoiceWorkflow,
   isPaymentReconciledWith,
   observePostedInvoice,
   observeSameRecord,
@@ -17,8 +18,10 @@ import {
   type RowValueMap,
   type TransitionSpec,
 } from "@lumiere/erp-workflows"
+import { parseStrictU64 } from "@lumiere/erp-shared/u64"
 
 import { fetchQueryList } from "../../http"
+import { AmbiguousOperationEffectError } from "../operation-effect"
 import { useWorkflowRunner, type WorkflowSurfaceCallbacks } from "../workflow"
 import { postInvoiceCommand } from "./moves"
 import {
@@ -58,6 +61,79 @@ async function observePayment(
 export interface ReconcilePaymentInput {
   paymentMoveId: bigint
   invoiceMoveId: bigint
+}
+
+export interface ReconciliationMoveProjection {
+  readonly id?: unknown
+  readonly companyId?: unknown
+  readonly company_id?: unknown
+  readonly state?: unknown
+  readonly paymentState?: unknown
+  readonly payment_state?: unknown
+  readonly amountResidual?: unknown
+  readonly amount_residual?: unknown
+}
+
+function stateTag(value: unknown): string {
+  if (value == null) return ""
+  if (typeof value === "string") return value.toLowerCase()
+  if (typeof value === "object" && !Array.isArray(value) && "tag" in value) {
+    return String((value as { tag?: unknown }).tag ?? "").toLowerCase()
+  }
+  return String(value).toLowerCase()
+}
+
+function finiteNonnegative(value: unknown): boolean {
+  if (value == null || value === "") return false
+  const number = Number(value)
+  return Number.isFinite(number) && number >= 0
+}
+
+/** Resolve only the exact posted payment/invoice pair in one company. */
+export function resolveReconciliationEffect(
+  rows: readonly ReconciliationMoveProjection[],
+  input: ReconcilePaymentInput,
+) {
+  const exactMove = (moveId: bigint) => {
+    const matches = rows.filter((row) => parseStrictU64(row.id) === moveId)
+    if (matches.length > 1) {
+      throw new AmbiguousOperationEffectError(
+        `Expected one account move ${moveId}, found ${matches.length}`,
+      )
+    }
+    return matches[0] ?? null
+  }
+  const payment = exactMove(input.paymentMoveId)
+  const invoice = exactMove(input.invoiceMoveId)
+  if (!payment || !invoice) return null
+
+  const paymentCompany = parseStrictU64(payment.companyId ?? payment.company_id)
+  const invoiceCompany = parseStrictU64(invoice.companyId ?? invoice.company_id)
+  const invoicePaymentState = stateTag(invoice.paymentState ?? invoice.payment_state)
+  if (
+    paymentCompany == null ||
+    paymentCompany !== invoiceCompany ||
+    stateTag(payment.state) !== "posted" ||
+    stateTag(invoice.state) !== "posted" ||
+    !["paid", "partial"].includes(invoicePaymentState) ||
+    !finiteNonnegative(payment.amountResidual ?? payment.amount_residual) ||
+    !finiteNonnegative(invoice.amountResidual ?? invoice.amount_residual)
+  ) {
+    return null
+  }
+
+  return {
+    outcome: "applied" as const,
+    next: recordRef(invoiceWorkflow.resource, input.invoiceMoveId, invoiceWorkflow.module),
+  }
+}
+
+async function readReconciliationEffect(input: ReconcilePaymentInput) {
+  const rows = await fetchQueryList(
+    "/api/query/account-moves",
+    "Failed to read reconciliation result",
+  )
+  return resolveReconciliationEffect(rows, input) ?? {}
 }
 
 /**
@@ -123,7 +199,7 @@ export function useInvoiceToPaymentWorkflow(
       id: "accounting.payment.reconcile",
       command: reconcilePaymentWithInvoiceCommand,
       affects: RECONCILE_PAYMENT_AFFECTS,
-      noReadback: "Pending COV-08's exact posted payment/invoice pair readback (resolveReconciliationEffect) on main.",
+      observe: readReconciliationEffect,
     }),
     [],
   )

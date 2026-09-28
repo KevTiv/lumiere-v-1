@@ -29,7 +29,7 @@ COV-08d for the minimal form). Never correlate by newest row, name or timestamp.
 
 **Contract release required.** `documents` projection exposes no lock columns (table has is_locked, locked_by, locked_at, locked_until)
 
-Contract releases cannot be cut from CI or from the authoring session; stop at IMPLEMENTED with the registry diff prepared and hand off `make publish-contracts VERSION=x.y.z` to a maintainer with `lumiere-contracts` access.
+Contract releases are automatic: pushing the registry or reducer change runs `.github/workflows/release-contracts.yml`, which publishes the next lumiere-contracts version and pins it on the branch. Pull its pin commit before continuing.
 
 ## Prerequisites / decisions
 

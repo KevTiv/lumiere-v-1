@@ -100,9 +100,48 @@ COV-06's stock-movement lineage (picking lifecycle, backorder, quant transfer, c
 
 ### COV-07
 
-Current disposition: `IMPLEMENTED` for COV-07a through COV-07c; runtime acceptance is pending. COV-07a moves Draft → Confirmed onto exact same-MO readback. COV-07b extends through Progress → BOM material consumption, replacing raw-move newest-id rediscovery with returned identity, closing raw moves as Done, and certifying the exact `move_raw_ids`/BOM effect set. COV-07c closes the principal production spine: output is now Progress-only and bounded by remaining planned quantity; Finish is ToClose-only at exact planned output; BOM-backed Finish requires the COV-07b material effect; finished move creation uses the exact returned identity; the finished move closes as Done; `move_finished_ids` owns exactly one finished effect; and the Manufacturing-local quant upsert fails closed on ambiguous product/location identity. Operator readback proves the exact owned finished move plus exact destination-quant increment and preserves both across replay/denial. See [`erp-cov07a-mo-confirmation-status.md`](./erp-cov07a-mo-confirmation-status.md), [`erp-cov07b-material-consumption-status.md`](./erp-cov07b-material-consumption-status.md), and [`erp-cov07c-production-close-status.md`](./erp-cov07c-production-close-status.md).
+Current disposition: `IMPLEMENTED` for COV-07a through COV-07d; runtime acceptance is pending. COV-07a proves exact same-MO Draft → Confirmed readback. COV-07b closes exact BOM material consumption and the `move_raw_ids` effect set. COV-07c closes exact production quantity → finished move → destination quant → Done. COV-07d adds one exact workorder execution path and closes the previously disconnected workorder/productivity projections: workcenter `order_ids` and state counts are derived from authoritative workorders; Start requires an MO-owned workorder under an executing parent and a completed blocker when present; productivity is Progress-only and writes the exact inserted productivity ID into both `workorder.time_ids` and `workcenter.productivity_ids`; workorder duration/workcenter productive time advance by the submitted duration; Finish requires the productivity reverse relation to match authoritative rows, derives duration rather than adding a placeholder, closes open productivity logs, and refreshes workcenter state counters. The certified UI path logs productivity from the selected workorder row using its exact workcenter, rather than asking the operator to type a workorder ID. See [`erp-cov07a-mo-confirmation-status.md`](./erp-cov07a-mo-confirmation-status.md), [`erp-cov07b-material-consumption-status.md`](./erp-cov07b-material-consumption-status.md), [`erp-cov07c-production-close-status.md`](./erp-cov07c-production-close-status.md), and [`erp-cov07d-workorder-execution-status.md`](./erp-cov07d-workorder-execution-status.md).
 
-Next bounded Manufacturing work is COV-07d: one exact work-order execution path (parent relation → Start → productivity/workcenter effect → Finish → same workorder Done), with stale/replay/deny preservation. Keep quality, scrap/byproducts, and full costing separate.
+Next bounded Manufacturing work is COV-07e: one production/workorder-linked quality gate with exact pass/fail effect, completion gating, and stale/replay/deny preservation. The backend gate and persisted test are implemented on `codex/cov07e-manufacturing-quality-gate`; contract release, UI readback, browser denial/replay, and runtime acceptance remain pending. See [`erp-cov07e-manufacturing-quality-gate-status.md`](./erp-cov07e-manufacturing-quality-gate-status.md). Keep scrap/byproducts and full costing separate.
+
+COV-07f now implements one bounded post-production scrap backend path, stacked on COV-07e. It records exact MO-owned scrap move identity and moves an untracked finished quantity to a designated scrap location; contract/UI and runtime certification remain pending. See [`erp-cov07f-finished-output-scrap-status.md`](./erp-cov07f-finished-output-scrap-status.md). Byproducts, tracked scrap, and full costing remain separate.
+
+COV-07g now implements authoritative BOM byproducts and exact untracked byproduct output at MO completion, stacked on COV-07f. Contract/UI and runtime certification remain pending. See [`erp-cov07g-bom-byproduct-output-status.md`](./erp-cov07g-bom-byproduct-output-status.md). Tracked byproducts and full accounting valuation remain separate.
+
+
+### COV-08
+
+Current disposition: `IMPLEMENTED` for COV-08a; runtime acceptance is pending.
+The existing generated reconciliation operation now has exact same-ID workflow
+readback, and the reducer rejects a fully settled invoice/payment replay before
+any move, line, sale-total, timestamp, or audit mutation. The persisted domain
+test snapshots both moves and all affected lines; the browser path adds 422
+stale replay, 403 reader denial, and unchanged-effect proof. Generated contract
+delta is expected to be empty because this slice adds no operation or resource
+shape. See [`erp-cov08a-invoice-payment-reconcile-status.md`](./erp-cov08a-invoice-payment-reconcile-status.md).
+
+COV-08b now implements one exact bank-statement-line reconciliation stacked on
+COV-08a. It validates line, parent statement, journal relation and selected
+journal items in the same organization/company, rejects invalid residual/effect
+sets before mutation, and adds exact readback plus stale/deny browser proof.
+Runtime acceptance is pending. See
+[`erp-cov08b-bank-statement-reconcile-status.md`](./erp-cov08b-bank-statement-reconcile-status.md).
+
+COV-08c now implements one exact Open → Closed period transition, exact
+same-period readback, stale/deny preservation, and persisted proof that invoice
+and payment posting are blocked inside the closed period. Runtime acceptance is
+pending. See [`erp-cov08c-period-close-status.md`](./erp-cov08c-period-close-status.md).
+
+COV-08d now implements one exact fixed-asset Draft → Running → Close lifecycle
+through the Fixed Assets UI, with exact same-asset readback and stale/deny
+preservation, and retires the Close action that never dispatched. Runtime
+acceptance is pending. See
+[`erp-cov08d-asset-lifecycle-status.md`](./erp-cov08d-asset-lifecycle-status.md).
+
+Next bounded Finance work is the COV-08c financial-statement follow-up, COV-08d
+depreciation/disposal exact effects, then COV-08e finance certification. The full remaining-stack completion card and ordered
+COV-08..27 targets are recorded in
+[`erp-cov08-27-stacked-acceptance-plan.md`](./erp-cov08-27-stacked-acceptance-plan.md).
 
 
 ## Maintainability convergence rule
@@ -130,7 +169,7 @@ For the remaining ERP sequence, assign work in this order:
 3. **Feature breadth third** — only then add the next operator-visible lifecycle step.
 4. **Ratchet** — add focused native/unit/browser evidence so later slices cannot reintroduce the older convention.
 
-COV-07d and later Manufacturing slices must therefore build on COV-07a–c's exact-readback protocol rather than the older raw `apiFetch + response.ok + invalidate` mutation style. Work-order execution should be the next migration point: exact workorder id, parent-MO relation, canonical state/effect observation, stale/replay/deny preservation, and no duplicated stock/workcenter bookkeeping.
+COV-07e and later Manufacturing slices must therefore build on the COV-07a–d exact-readback protocol rather than the older raw `apiFetch + response.ok + invalidate` mutation style. COV-07d already moved work-order execution onto it (exact workorder id, parent-MO relation, canonical state/effect observation, stale/replay/deny preservation, no duplicated stock/workcenter bookkeeping); the quality gate should follow the same shape.
 
 ## First implementation convergence
 

@@ -221,6 +221,7 @@ export function manufacturingBomRowActionForm(
 export interface ManufacturingWorkorderRowFormParams {
   recordId: string
   state: string
+  workcenterId: string
 }
 
 export function manufacturingWorkorderRowActionForm(
@@ -232,6 +233,10 @@ export function manufacturingWorkorderRowActionForm(
     options.push({ value: "start", label: t("manufacturing.rowActions.start") })
   }
   if (p.state === "Progress") {
+    options.push({
+      value: "log_productivity",
+      label: t("manufacturing.rowActions.logProductivity"),
+    })
     options.push({ value: "finish", label: t("manufacturing.rowActions.finish") })
   }
   const defaultWo = options[0]?.value ?? "start"
@@ -259,6 +264,12 @@ export function manufacturingWorkorderRowActionForm(
             defaultValue: p.recordId,
           },
           {
+            type: "hidden",
+            id: "woWorkcenterId",
+            name: "woWorkcenterId",
+            defaultValue: p.workcenterId,
+          },
+          {
             type: "radio",
             id: "woAction",
             name: "woAction",
@@ -275,6 +286,30 @@ export function manufacturingWorkorderRowActionForm(
                       label: t("manufacturing.rowActions.form.noActionsAvailable"),
                     },
                   ],
+            width: "full",
+          },
+        ],
+      },
+      {
+        id: "wo-productivity",
+        title: t("manufacturing.rowActions.form.parameters"),
+        columns: 2,
+        fields: [
+          {
+            type: "number",
+            id: "woLogDuration",
+            name: "woLogDuration",
+            label: t("manufacturing.rowActions.duration"),
+            defaultValue: 1,
+            step: 0.0001,
+            width: "1/2",
+          },
+          {
+            type: "text",
+            id: "woLogDescription",
+            name: "woLogDescription",
+            label: t("manufacturing.rowActions.form.logDescription"),
+            placeholder: t("manufacturing.rowActions.form.logDescriptionPlaceholder"),
             width: "full",
           },
         ],

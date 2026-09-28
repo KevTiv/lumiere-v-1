@@ -825,6 +825,7 @@ fn execute_replenishment_rule_impl(
 #[derive(Clone)]
 #[spacetimedb::table(
     accessor = replenishment_run_job,
+    index(accessor = replenishment_run_job_by_organization, btree(columns = [organization_id])),
     index(accessor = replenishment_run_job_by_rule, btree(columns = [rule_id])),
     scheduled(run_scheduled_replenishment)
 )]

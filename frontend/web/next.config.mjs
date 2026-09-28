@@ -52,6 +52,12 @@ function rustApiRewrites() {
       source: '/api/operations/:path*',
       destination: `${base}/v1/operations/:path*`,
     },
+    // Settings → Users / Roles read these api-server routes; without a
+    // gateway (local, E2E) they were otherwise unreachable and 404ed in Next.
+    {
+      source: '/api/settings/:path*',
+      destination: `${base}/v1/settings/:path*`,
+    },
   ]
 }
 

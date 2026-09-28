@@ -17,12 +17,12 @@ import {
   runPickingActionViaInventoryUi,
 } from "./inventory-picking-fixtures"
 import {
-  createInternalLocation,
   createSerialTrackedProductFixture,
   createStockProductionSerialFixture,
   createStockQuantFixture,
   fetchQuantsAtProductLocation,
   fetchSerialById,
+  fetchWarehouseStockLocationId,
 } from "./inventory-quant-fixtures"
 
 const PERSONA_PASSWORD =
@@ -61,8 +61,8 @@ test.describe(
       const companyId = await fetchDefaultCompanyId(page)
       const productName = smokeName("cov06f-serial-product")
       const productId = await createSerialTrackedProductFixture(page, productName)
-      const sourceName = smokeName("cov06f-src")
-      const sourceLocationId = await createInternalLocation(page, sourceName)
+      // Sales ATP and the delivery draw from the warehouse stock location.
+      const sourceLocationId = await fetchWarehouseStockLocationId(page, companyId)
 
       // On-hand quant for ATP plus exactly one free serial — the bounded case.
       await createStockQuantFixture(

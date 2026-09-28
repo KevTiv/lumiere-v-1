@@ -347,6 +347,7 @@ import type {
   CreateStockQuantParams,
   CreateWarehouse3DZoneParams,
 } from '@lumiere/stdb/types';
+import { scalarToU64 } from '@lumiere/erp-shared/u64';
 
 // WarehouseViewer uses Three.js — must be loaded client-side only, imported directly to avoid SSR barrel evaluation
 const WarehouseViewer = dynamic(
@@ -454,10 +455,10 @@ function InventoryClientLoaded({
     unknown
   > | null>(null);
   const [assignPickingId, setAssignPickingId] = useState<ScalarId | null>(null);
-  const [moveQuantRow, setMoveQuantRow] = useState<Record<string, unknown> | null>(null);
+  const [moveQuantRow, setMoveQuantRow] = useState<StockQuant | null>(null);
   const [moveQuantError, setMoveQuantError] = useState<string | null>(null);
   const [partialTransferPicking, setPartialTransferPicking] =
-    useState<Record<string, unknown> | null>(null);
+    useState<StockPicking | null>(null);
   const [partialTransferError, setPartialTransferError] = useState<string | null>(null);
   const [assignQualityAlertId, setAssignQualityAlertId] =
     useState<ScalarId | null>(null);
@@ -1289,15 +1290,11 @@ function InventoryClientLoaded({
   const assignedMovesForPartialTransfer = useMemo(() => {
     if (!partialTransferPicking) return [];
     const pickingId = String(partialTransferPicking.id ?? '');
-    return (stockMoves as Record<string, unknown>[]).filter((move) => {
-      const movePickingId = String(move.pickingId ?? move.picking_id ?? '');
-      const rawState = move.state;
-      const state =
-        rawState != null && typeof rawState === 'object' && 'tag' in rawState
-          ? String((rawState as { tag: string }).tag).toLowerCase()
-          : String(rawState ?? '').toLowerCase();
-      return movePickingId === pickingId && state === 'assigned';
-    });
+    return stockMoves.filter(
+      (move) =>
+        String(move.pickingId ?? '') === pickingId &&
+        move.state.toLowerCase() === 'assigned',
+    );
   }, [partialTransferPicking, stockMoves]);
 
   const partialTransferFormConfig = useMemo(() => {
@@ -1313,14 +1310,12 @@ function InventoryClientLoaded({
       pickingName,
       assignedMovesForPartialTransfer.map((move) => {
         const moveId = String(move.id ?? '');
-        const productId = String(move.productId ?? move.product_id ?? '');
+        const productId = String(move.productId);
         return {
           moveId,
           productLabel:
             productLabelById.get(productId) ?? `Product ${productId}`,
-          orderedQty: Number(
-            move.productUomQty ?? move.product_uom_qty ?? 0,
-          ),
+          orderedQty: move.productUomQty,
         };
       }),
     );
@@ -1344,24 +1339,18 @@ function InventoryClientLoaded({
 
   const moveQuantFormConfig = useMemo((): FormConfig | null => {
     if (!moveQuantRow) return null;
-    const sourceLocationId = String(
-      moveQuantRow.locationId ?? moveQuantRow.location_id ?? '',
-    );
+    const sourceLocationId = String(moveQuantRow.locationId);
     const targetOptions = locations
-      .filter((location) => {
-        const row = location as Record<string, unknown>;
-        const active = row.active !== false;
-        return active && String(row.id ?? '') !== sourceLocationId;
-      })
+      .filter(
+        (location) =>
+          location.active !== false && String(location.id) !== sourceLocationId,
+      )
       .map((location) => ({
         value: String(location.id),
         label: String(location.completeName ?? location.name ?? location.id),
       }));
     const available = Number(
-      moveQuantRow.availableQuantity ??
-        moveQuantRow.available_quantity ??
-        moveQuantRow.quantity ??
-        0,
+      moveQuantRow.availableQuantity ?? moveQuantRow.quantity ?? 0,
     );
     return {
       id: 'move-stock-quant',
@@ -1453,16 +1442,19 @@ function InventoryClientLoaded({
                   0,
               ) > 0,
             onClick: (rows) => {
-              const first = rows[0] as Record<string, unknown> | undefined;
-              if (!first) return;
+              const selectedId = rows[0]?.id;
+              const quant = stockQuants.find(
+                (row) => String(row.id) === String(selectedId),
+              );
+              if (!quant) return;
               setMoveQuantError(null);
-              setMoveQuantRow(first);
+              setMoveQuantRow(quant);
             },
           },
         ],
       },
     };
-  }, [t, openCreateStockQuant]);
+  }, [t, openCreateStockQuant, stockQuants]);
 
   const transfersEntityConfig = useMemo((): EntityViewConfig => {
     const base = transfersTableConfig(t, { onEmptyAction: openCreateTransfer });
@@ -2149,10 +2141,13 @@ function InventoryClientLoaded({
                   assign: (rows) =>
                     runPickingWorkflowActionForRows(pickingWorkflow.assign, rows),
                   'partial-validate': (rows) => {
-                    const first = rows[0] as Record<string, unknown> | undefined;
-                    if (!first) return;
+                    const selectedId = rows[0]?.id;
+                    const picking = transfers.find(
+                      (row) => String(row.id) === String(selectedId),
+                    );
+                    if (!picking) return;
                     setPartialTransferError(null);
-                    setPartialTransferPicking(first);
+                    setPartialTransferPicking(picking);
                   },
                   'assign-user': (rows) => {
                     const id = rows[0]?.id as ScalarId | undefined;
@@ -2718,6 +2713,8 @@ function InventoryClientLoaded({
             view: {
               ...v,
               actions: [
+                // Keep the stock tab's own actions (move-stock-quant).
+                ...(v.actions ?? []),
                 {
                   id: 'csv-stock-quant',
                   label: t('inventory.csvImport.toolbarQuants'),
@@ -3262,20 +3259,16 @@ function InventoryClientLoaded({
                   variant: 'destructive',
                   requiresSelection: true,
                   onClick: (rows) => {
-                    const row = rows[0] as Record<string, unknown> | undefined;
-                    const id = row?.id as ScalarId | undefined;
-                    const productId = row?.productId ?? row?.product_id;
-                    const companyId = row?.companyId ?? row?.company_id;
-                    const lotId = row?.lotId ?? row?.lot_id;
-                    const quarantineWarehouse = (
-                      warehouses as Record<string, unknown>[]
-                    ).find(
-                      (w) =>
-                        (w.whQcStockLocId ?? w.wh_qc_stock_loc_id) != null,
+                    const row = rows[0];
+                    const id = row?.id;
+                    const productId = row?.productId;
+                    const companyId = row?.companyId;
+                    const lotId = row?.lotId;
+                    const quarantineWarehouse = warehouses.find(
+                      (w) => w.whQcStockLocId != null,
                     );
                     const configuredQuarantineLocationId =
-                      quarantineWarehouse?.whQcStockLocId ??
-                      quarantineWarehouse?.wh_qc_stock_loc_id;
+                      quarantineWarehouse?.whQcStockLocId;
                     // No warehouse in this org has a configured QC location yet
                     // (wh_qc_stock_loc_id is create-only, never set by seed data
                     // or update_warehouse) — ask the operator which location the
@@ -4156,6 +4149,7 @@ function InventoryClientLoaded({
     uomFieldOptions,
     locationParentOptions,
     setCsvKind,
+    transfers,
   ]);
 
   const filteredStockQuants = useMemo(() => {
@@ -4842,24 +4836,21 @@ function InventoryClientLoaded({
         onSubmit={async (fd) => {
           if (!editWarehouseRow) return;
           const id = editWarehouseRow.id as ScalarId;
-          // whQcStockLocId is not yet part of the generated UpdateWarehouseParams
-          // TS shape (pending an @lumiere/contracts release); pre-encode its SATS
-          // option wrapper by hand so stdbParamsToJson passes it through as-is
-          // regardless of whether the generated option-fields list knows about it.
+          // "Not configured" clears the QC location only when one is set.
           const qcStockLocRaw = fd.whQcStockLocId;
           const whQcStockLocId =
             qcStockLocRaw == null || String(qcStockLocRaw).trim() === ''
-              ? { none: [] }
-              : { some: Number(qcStockLocRaw) };
+              ? undefined
+              : scalarToU64(String(qcStockLocRaw));
+          const clearWhQcStockLocId =
+            whQcStockLocId === undefined && editWarehouseRow.whQcStockLocId != null
+              ? true
+              : undefined;
           await updateWarehouse.mutateAsync({
             warehouseId: id,
             params: {
-              // Cast: whQcStockLocId is not yet part of the generated
-              // UpdateWarehouseParams TS shape (pending an @lumiere/contracts
-              // release); the pre-encoded SATS option wrapper above still
-              // reaches the server correctly since stdbParamsToJson passes an
-              // already-wrapped { some }/{ none } value through unchanged.
-              ...({ whQcStockLocId } as Record<string, unknown>),
+              whQcStockLocId,
+              clearWhQcStockLocId,
               name:
                 fd.name != null && String(fd.name).trim() !== ''
                   ? String(fd.name)
@@ -4979,9 +4970,7 @@ function InventoryClientLoaded({
             const plan = planPartialDelivery(
               assignedMovesForPartialTransfer.map((move) => ({
                 moveId: String(move.id),
-                orderedQty: Number(
-                  move.productUomQty ?? move.product_uom_qty ?? 0,
-                ),
+                orderedQty: move.productUomQty,
               })),
               formData,
             );

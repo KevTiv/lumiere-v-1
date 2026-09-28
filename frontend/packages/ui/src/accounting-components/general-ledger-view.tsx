@@ -32,10 +32,14 @@ import {
   Trash2,
   Upload,
   Calculator,
+  X,
 } from "lucide-react"
 import type { AccountMove } from "../lib/accounting-types"
 import { moveStateIsDraft, moveTypeIsInvoiceOrRefund } from "../lib/accounting-move-utils"
+import { getRowField } from "../lib/entity-row-utils"
+import { useClearModuleUrlFilter, useModuleUrlFilters } from "../lib/module-url-filters"
 import { useTranslation } from "@lumiere/i18n"
+import type { RowValueMap } from "@lumiere/erp-shared/row-values"
 
 function formatTimestamp(ts?: { microsSinceUnixEpoch: bigint } | null): string {
   if (!ts) return "—"
@@ -59,6 +63,16 @@ function moveStateStr(state: unknown): string {
     return String((state as { tag: string }).tag)
   }
   return String(state ?? '')
+}
+
+function routeFilterValue(value: unknown): string {
+  if (value == null) return ""
+  if (typeof value === "object" && !Array.isArray(value)) {
+    const record = value as RowValueMap
+    if (typeof record.tag === "string") return record.tag
+    if ("some" in record) return routeFilterValue(record.some)
+  }
+  return String(value)
 }
 
 interface GeneralLedgerViewProps {
@@ -88,6 +102,8 @@ export function GeneralLedgerView({
   computeInvoiceTotalsPending,
 }: GeneralLedgerViewProps) {
   const { t } = useTranslation()
+  const urlFilters = useModuleUrlFilters()
+  const clearUrlFilter = useClearModuleUrlFilter()
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedMove, setSelectedMove] = useState<AccountMove | null>(null)
   const [showCreateModal, setShowCreateModal] = useState(false)
@@ -96,10 +112,20 @@ export function GeneralLedgerView({
     { id: "2", accountId: "", description: "", debit: 0, credit: 0 },
   ])
 
+  const activeUrlFilters = Object.entries(urlFilters).filter(
+    ([, value]) => value && value !== "__all__",
+  )
   const filtered = moves.filter((m) => {
     const name = m?.name?.toLowerCase() ?? ""
     const ref = String(m?.ref)?.toLowerCase() ?? ""
-    return name.includes(searchQuery.toLowerCase()) || ref.includes(searchQuery.toLowerCase())
+    const matchesSearch =
+      name.includes(searchQuery.toLowerCase()) || ref.includes(searchQuery.toLowerCase())
+    const row = m as unknown as RowValueMap
+    const matchesUrlFilters = activeUrlFilters.every(
+      ([key, value]) =>
+        routeFilterValue(getRowField(row, key)).toLowerCase() === value.toLowerCase(),
+    )
+    return matchesSearch && matchesUrlFilters
   })
 
   const stats = {
@@ -124,7 +150,7 @@ export function GeneralLedgerView({
   const isBalanced = totalDebits === totalCredits && totalDebits > 0
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" data-testid="entity-table">
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Card><CardContent className="p-4">
@@ -177,6 +203,27 @@ export function GeneralLedgerView({
               </Button>
             </div>
           </div>
+          {activeUrlFilters.length > 0 ? (
+            <div
+              className="mt-4 flex flex-wrap items-center gap-2"
+              data-testid="entity-active-filters"
+            >
+              {activeUrlFilters.map(([key, value]) => (
+                <Button
+                  key={key}
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  aria-label={`Clear filter ${key}`}
+                  data-testid={`entity-active-filter-${key}`}
+                  onClick={() => clearUrlFilter(key)}
+                >
+                  {key}: {value}
+                  <X className="ml-2 h-3 w-3" />
+                </Button>
+              ))}
+            </div>
+          ) : null}
           <div className="relative mt-4 max-w-sm">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input placeholder={t("accounting.journalEntries.searchPlaceholder")} value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-10" />

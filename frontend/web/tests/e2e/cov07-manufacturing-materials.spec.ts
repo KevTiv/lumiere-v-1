@@ -287,7 +287,7 @@ async function createSetupMo(
         if (matches.length > 1) {
           throw new Error(`duplicate MO origin ${origin}`)
         }
-        moId = scalarQueryId(matches[0]?.id)
+        moId = scalarQueryId(matches[0]?.id) ?? undefined
         return {
           id: moId,
           state: stateTag(matches[0]?.state),
@@ -465,7 +465,7 @@ test.describe(
 
         await runMoActionViaUi(warehousePage, moId, origin, "consume")
 
-        let firstEffect: Awaited<ReturnType<typeof fetchMaterialEffect>> = null
+        let firstEffect = null as Awaited<ReturnType<typeof fetchMaterialEffect>>
         await expect
           .poll(
             async () => {

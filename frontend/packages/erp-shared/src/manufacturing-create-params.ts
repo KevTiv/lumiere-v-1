@@ -14,6 +14,7 @@
 import type {
   BomLineInput,
   BomType,
+  CreateBomByproductParams,
   CreateBomParams,
   CreateMrpProductionParams,
   CreateRoutingWorkcenterParams,
@@ -24,6 +25,7 @@ import type {
 
 import { formValue as field, optionalBigIntU64, u64IdArrayFromForm } from "./form-coercion"
 import { stbTimestampFromDate } from "./stb-timestamp"
+import type { ScalarId } from "./u64"
 
 function optionalTrimmedString(v: unknown): string | undefined {
   if (v == null) return undefined
@@ -215,6 +217,36 @@ export function toCreateBomParams(
     warehouseId: optionalBigIntU64(field(formData, "warehouseId", "warehouse_id")),
     routingId: optionalBigIntU64(field(formData, "routingId", "routing_id")),
     metadata: optionalTrimmedString(field(formData, "metadata", "metadata")),
+  }
+}
+
+export type BomByproductFormValues = {
+  productId: ScalarId | null | undefined
+  productUomId: ScalarId | null | undefined
+  productQty: number | string | null | undefined
+  costShare?: number | string | null
+  sequence?: number | string | null
+  metadata?: string | null
+}
+
+/**
+ * Byproduct line for `create_bom_byproduct`. The BOM and company come from the
+ * reducer's target BOM, so only the byproduct's own intent is mapped here.
+ */
+export function toCreateBomByproductParams(
+  values: BomByproductFormValues,
+): CreateBomByproductParams | null {
+  const productId = requiredBigIntU64(values.productId)
+  const productUomId = requiredBigIntU64(values.productUomId)
+  const productQty = num(values.productQty, 0)
+  if (productId === null || productUomId === null || productQty <= 0) return null
+  return {
+    productId,
+    productQty,
+    productUomId,
+    costShare: num(values.costShare, 0),
+    sequence: Math.trunc(num(values.sequence, 1)),
+    metadata: optionalTrimmedString(values.metadata),
   }
 }
 

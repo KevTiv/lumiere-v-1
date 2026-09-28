@@ -1415,7 +1415,7 @@ pub(crate) fn quarantine_quantity(
         ctx,
         OrganizationCommitInput {
             organization_id,
-            operation_id: "erp.quarantine_quantity".to_string(),
+            operation_id: "erp.fail_quality_check".to_string(),
             correlation_id: format!(
                 "stock-quant:{}:quarantine-to:{}",
                 src.id, quarantine_location_id

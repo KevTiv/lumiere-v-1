@@ -191,7 +191,7 @@ export function useCreateStockProductionLot(
     mutationFn: async (params) => {
       const { urlPath, init } = stdbBffCommandPost(
         'create_stock_production_lot',
-        { params: stdbParamsToJson(params as object) },
+        { params: stdbParamsToJson(params as object, 'CreateStockProductionLotParams') },
       );
       const r = await apiFetch(urlPath, init);
       if (!r.ok) throw new Error('Failed to create stock production lot');
@@ -209,7 +209,7 @@ export function useCreateStockProductionSerial(
     mutationFn: async (params) => {
       const { urlPath, init } = stdbBffCommandPost(
         'create_stock_production_serial',
-        { params: stdbParamsToJson(params as object) },
+        { params: stdbParamsToJson(params, 'CreateStockProductionSerialParams') },
       );
       const r = await apiFetch(urlPath, init);
       if (!r.ok) throw new Error('Failed to create stock production serial');
@@ -279,7 +279,7 @@ export function useCreateTraceabilityRecord(
     mutationFn: async (params) => {
       const { urlPath, init } = stdbBffCommandPost(
         'create_traceability_record',
-        { params: stdbParamsToJson(params as object) },
+        { params: stdbParamsToJson(params as object, 'CreateTraceabilityRecordParams') },
       );
       const r = await apiFetch(urlPath, init);
       if (!r.ok) throw new Error('Failed to create traceability record');
@@ -301,7 +301,7 @@ export function useCreateTraceabilityReport(
     mutationFn: async (params) => {
       const { urlPath, init } = stdbBffCommandPost(
         'create_traceability_report',
-        { params: stdbParamsToJson(params as object) },
+        { params: stdbParamsToJson(params as object, 'CreateStockTraceabilityReportParams') },
       );
       const r = await apiFetch(urlPath, init);
       if (!r.ok) throw new Error('Failed to create traceability report');

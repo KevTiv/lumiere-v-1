@@ -1,13 +1,15 @@
 import { expect } from "@playwright/test"
-import type { Page } from "@playwright/test"
+import type { Dialog, Page } from "@playwright/test"
 import { stdbBffCommandPost } from "@lumiere/stdb/commands"
 import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
 
 import { matchesOperationResponse } from "./operation-response"
+import { SEEDED_MOUSE_PRODUCT } from "./sales-order-fixtures"
 import {
   activeTabEntityTable,
   chooseFirstEnabledOption,
   chooseSelectOptionByLabel,
+  fetchDefaultCompanyId,
   fetchFirstUomId,
   fillField,
   gotoModule,
@@ -27,11 +29,17 @@ export interface QuantSnapshot {
   reservedQuantity: number
 }
 
+// Company-owned so company-bound personas (who only read their company's rows)
+// can see the location; organization-shared `create_stock_location` rows are
+// invisible to them.
 export async function createInternalLocation(
   page: Page,
   name: string,
+  companyId?: number,
 ): Promise<number> {
-  const { urlPath, init } = stdbBffCommandPost("create_stock_location", {
+  const ownerCompanyId = companyId ?? (await fetchDefaultCompanyId(page))
+  const { urlPath, init } = stdbBffCommandPost("create_company_stock_location", {
+    companyId: ownerCompanyId,
     params: stdbParamsToJson(
       {
         name,
@@ -385,6 +393,62 @@ export async function fetchSerialById(
   return { id: serialId, state: variantTagValue(row.state).toLowerCase() }
 }
 
+/**
+ * The company warehouse's stock location, where sales ATP and deliveries look
+ * for stock. The seeded mouse is stocked there, so its quant identifies it.
+ */
+export async function fetchWarehouseStockLocationId(
+  page: Page,
+  companyId: number,
+): Promise<number> {
+  const products = await page.request.get("/api/query/products")
+  expect(products.ok()).toBe(true)
+  const productRows = ((await products.json()) as {
+    data?: Array<{ id?: unknown; name?: unknown }>
+  }).data ?? []
+  const mouse = productRows.filter((row) => row.name === SEEDED_MOUSE_PRODUCT)
+  expect(mouse).toHaveLength(1)
+  const mouseId = scalarQueryId(mouse[0]?.id)
+
+  const quants = await page.request.get("/api/query/stock-quants")
+  expect(quants.ok()).toBe(true)
+  const quantRows = ((await quants.json()) as {
+    data?: Array<{
+      id?: unknown
+      productId?: unknown
+      companyId?: unknown
+      locationId?: unknown
+    }>
+  }).data ?? []
+  // Other specs add mouse stock elsewhere; the seeded quant is the oldest.
+  const seeded = quantRows
+    .filter(
+      (row) =>
+        scalarQueryId(row.productId) === mouseId &&
+        scalarQueryId(row.companyId) === companyId,
+    )
+    .sort((a, b) => (scalarQueryId(a.id) ?? 0) - (scalarQueryId(b.id) ?? 0))[0]
+  const locationId = scalarQueryId(seeded?.locationId)
+  if (locationId == null) throw new Error("seeded warehouse stock location missing")
+  return locationId
+}
+
+/**
+ * Answer the next `answers.length` browser prompts in order. One listener is
+ * registered up front: a UI that opens prompts back to back would otherwise
+ * race a handler registered from inside the previous one (an unhandled
+ * dialog is dismissed and the action silently aborts).
+ */
+function answerPromptsInOrder(page: Page, answers: string[]): void {
+  const queue = [...answers]
+  const onDialog = (dialog: Dialog) => {
+    const answer = queue.shift() ?? ""
+    if (queue.length === 0) page.off("dialog", onDialog)
+    void dialog.accept(answer)
+  }
+  page.on("dialog", onDialog)
+}
+
 export async function createStockQuantFixture(
   page: Page,
   companyId: number,
@@ -438,8 +502,13 @@ export async function createStockQuantFixture(
         const payload = (await query.json()) as {
           data?: Array<Record<string, unknown>>
         }
+        // The quant's exact business key; metadata is not in the read projection.
         const matches = (payload.data ?? []).filter(
-          (row) => String(row.metadata ?? "") === marker,
+          (row) =>
+            scalarQueryId(row.companyId ?? row.company_id) === companyId &&
+            scalarQueryId(row.productId ?? row.product_id) === productId &&
+            scalarQueryId(row.locationId ?? row.location_id) === locationId &&
+            scalarQueryId(row.lotId ?? row.lot_id) === lotId,
         )
         if (matches.length !== 1) return 0
         quantId = scalarQueryId(matches[0]?.id) ?? 0
@@ -626,12 +695,7 @@ export async function failQualityCheckViaUi(
   await selectEntityRowById(page, checkId)
 
   const prompts = [String(quarantineLocationId), reason]
-  page.once("dialog", async (dialog) => {
-    await dialog.accept(prompts.shift() ?? "")
-    page.once("dialog", async (nextDialog) => {
-      await nextDialog.accept(prompts.shift() ?? "")
-    })
-  })
+  answerPromptsInOrder(page, prompts)
 
   await Promise.all([
     page.waitForResponse(
@@ -767,12 +831,7 @@ export async function createSerialViaUi(
   await selectModuleTab(page, "inventory", "serials")
 
   const prompts = [name, String(productId)]
-  page.once("dialog", async (dialog) => {
-    await dialog.accept(prompts.shift() ?? "")
-    page.once("dialog", async (nextDialog) => {
-      await nextDialog.accept(prompts.shift() ?? "")
-    })
-  })
+  answerPromptsInOrder(page, prompts)
 
   await Promise.all([
     page.waitForResponse(
@@ -919,7 +978,12 @@ export async function blockSerialViaUi(
 ): Promise<void> {
   await gotoModule(page, "/inventory", "inventory")
   await selectModuleTab(page, "inventory", "serials")
-  await selectEntityRowById(page, serialId)
+  // A row click opens the serial detail; selectEntityRowById would dismiss it.
+  const row = page
+    .locator('[role="tabpanel"]:visible')
+    .getByTestId(`entity-row-${serialId}`)
+  await expect(row).toBeVisible({ timeout: 30_000 })
+  await row.click()
   await page.getByTestId("serial-detail-block-button").click()
   await expect(page.getByTestId("form-modal-block-serial")).toBeVisible({
     timeout: 15_000,

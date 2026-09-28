@@ -243,7 +243,11 @@ pub struct UpdateWarehouseParams {
     pub sequence: Option<i32>,
     pub partner_id: Option<u64>,
     pub resupply_wh_ids: Option<Vec<u64>>,
+    /// Sets the QC/quarantine location; `None` leaves it unchanged.
     pub wh_qc_stock_loc_id: Option<u64>,
+    /// `Some(true)` removes the QC/quarantine location. Cannot be combined
+    /// with `wh_qc_stock_loc_id`.
+    pub clear_wh_qc_stock_loc_id: Option<bool>,
     pub metadata: Option<String>,
 }
 
@@ -525,9 +529,18 @@ pub fn update_warehouse(
         return Err("Warehouse does not belong to this company".to_string());
     }
 
+    let clear_qc_loc = params.clear_wh_qc_stock_loc_id == Some(true);
+    if clear_qc_loc && params.wh_qc_stock_loc_id.is_some() {
+        return Err("Cannot both set and clear the warehouse QC location".to_string());
+    }
     if let Some(qc_loc) = params.wh_qc_stock_loc_id {
         require_location_in_org(ctx, organization_id, qc_loc)?;
     }
+    let wh_qc_stock_loc_id = if clear_qc_loc {
+        None
+    } else {
+        params.wh_qc_stock_loc_id.or(warehouse.wh_qc_stock_loc_id)
+    };
 
     ctx.db.warehouse().id().update(Warehouse {
         name: params.name.unwrap_or_else(|| warehouse.name.clone()),
@@ -552,7 +565,7 @@ pub fn update_warehouse(
         resupply_wh_ids: params
             .resupply_wh_ids
             .unwrap_or_else(|| warehouse.resupply_wh_ids.clone()),
-        wh_qc_stock_loc_id: params.wh_qc_stock_loc_id.or(warehouse.wh_qc_stock_loc_id),
+        wh_qc_stock_loc_id,
         metadata: params.metadata.or(warehouse.metadata),
         updated_at: ctx.timestamp,
         ..warehouse

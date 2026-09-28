@@ -127,16 +127,46 @@ static HTTP_SQL_INCLUDED_COLUMNS: Lazy<HashMap<String, HashSet<String>>> = Lazy:
         ["metadata"].into_iter().map(String::from).collect(),
     );
     m.insert(
+        "bank-statement-lines".to_string(),
+        ["move_ids"].into_iter().map(String::from).collect(),
+    );
+    m.insert(
         "dashboards".to_string(),
         ["widget_ids"].into_iter().map(String::from).collect(),
     );
     m.insert(
         "purchase-orders".to_string(),
-        ["picking_ids"].into_iter().map(String::from).collect(),
+        ["picking_ids", "invoice_ids"]
+            .into_iter()
+            .map(String::from)
+            .collect(),
     );
     m.insert(
         "sale-orders".to_string(),
         ["picking_ids", "invoice_ids"]
+            .into_iter()
+            .map(String::from)
+            .collect(),
+    );
+    // Exact COV-06/07 readbacks resolve effects through these owned relations.
+    m.insert(
+        "stock-pickings".to_string(),
+        ["backorder_ids"].into_iter().map(String::from).collect(),
+    );
+    m.insert(
+        "mrp-productions".to_string(),
+        ["move_raw_ids", "move_finished_ids", "workorder_ids"]
+            .into_iter()
+            .map(String::from)
+            .collect(),
+    );
+    m.insert(
+        "mrp-workorders".to_string(),
+        ["time_ids"].into_iter().map(String::from).collect(),
+    );
+    m.insert(
+        "mrp-workcenters".to_string(),
+        ["order_ids", "productivity_ids"]
             .into_iter()
             .map(String::from)
             .collect(),
@@ -821,10 +851,22 @@ mod tests {
     #[test]
     fn resolve_http_sql_columns_includes_workflow_links_for_account_moves() {
         let cols = resolve_http_sql_columns("account-moves", None).expect("account-moves columns");
-        for field in ["metadata", "sale_order_id"] {
+        for field in ["metadata", "sale_order_id", "invoice_origin"] {
             assert!(
                 cols.iter().any(|column| column == field),
                 "expected {field} in account-moves projection, got: {cols:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn resolve_http_sql_columns_includes_bank_reconciliation_readback() {
+        let cols = resolve_http_sql_columns("bank-statement-lines", None)
+            .expect("bank-statement-lines columns");
+        for field in ["move_ids", "amount_residual"] {
+            assert!(
+                cols.iter().any(|column| column == field),
+                "expected {field} in bank-statement-lines projection, got: {cols:?}"
             );
         }
     }
@@ -856,6 +898,81 @@ mod tests {
             assert!(
                 cols.iter().any(|column| column == field),
                 "expected {field} in sale-orders projection, got: {cols:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn resolve_http_sql_columns_includes_invoice_readback_for_purchase_orders() {
+        let cols =
+            resolve_http_sql_columns("purchase-orders", None).expect("purchase-orders columns");
+        for field in ["invoice_ids", "invoice_count", "invoice_status"] {
+            assert!(
+                cols.iter().any(|column| column == field),
+                "expected {field} in purchase-orders projection, got: {cols:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn resolve_http_sql_columns_includes_cov06_cov07_relation_ids() {
+        for (resource, fields) in [
+            ("stock-pickings", &["backorder_ids"][..]),
+            (
+                "mrp-productions",
+                &["move_raw_ids", "move_finished_ids", "workorder_ids"][..],
+            ),
+            ("mrp-workorders", &["time_ids"][..]),
+            ("mrp-workcenters", &["order_ids", "productivity_ids"][..]),
+        ] {
+            let cols = resolve_http_sql_columns(resource, None).expect("columns");
+            for field in fields {
+                assert!(
+                    cols.iter().any(|column| column == field),
+                    "expected {field} in {resource} projection, got: {cols:?}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn resolve_http_sql_columns_includes_location_and_lock_for_lots() {
+        let cols = resolve_http_sql_columns("stock-production-lots", None)
+            .expect("stock-production-lots columns");
+        for field in ["location_id", "is_locked"] {
+            assert!(
+                cols.iter().any(|column| column == field),
+                "expected {field} in stock-production-lots projection, got: {cols:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn resolve_http_sql_columns_includes_state_for_serials() {
+        let cols = resolve_http_sql_columns("stock-production-serials", None)
+            .expect("stock-production-serials columns");
+        assert!(
+            cols.iter().any(|column| column == "state"),
+            "expected state in stock-production-serials projection, got: {cols:?}"
+        );
+    }
+
+    #[test]
+    fn resolve_http_sql_columns_includes_qc_location_for_warehouses() {
+        let cols = resolve_http_sql_columns("warehouses", None).expect("warehouses columns");
+        assert!(
+            cols.iter().any(|column| column == "wh_qc_stock_loc_id"),
+            "expected wh_qc_stock_loc_id in warehouses projection, got: {cols:?}"
+        );
+    }
+
+    #[test]
+    fn resolve_http_sql_columns_includes_availability_for_stock_quants() {
+        let cols = resolve_http_sql_columns("stock-quants", None).expect("stock-quants columns");
+        for field in ["quantity", "reserved_quantity", "available_quantity"] {
+            assert!(
+                cols.iter().any(|column| column == field),
+                "expected {field} in stock-quants projection, got: {cols:?}"
             );
         }
     }

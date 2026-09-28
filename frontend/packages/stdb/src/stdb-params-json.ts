@@ -33,6 +33,9 @@ const NESTED_ARRAY_STRUCTS: Partial<
   CreateSaleOrderParams: {
     order_lines: "CreateSaleOrderLineParams",
   },
+  CreateBomParams: {
+    lines: "BomLineInput",
+  },
 }
 
 /** Nested object fields that need struct-scoped Option encoding via `stdbParamsToJson`. */

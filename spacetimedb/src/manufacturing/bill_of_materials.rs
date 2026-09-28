@@ -105,6 +105,34 @@ pub struct MrpBomLine {
     pub metadata: Option<String>,
 }
 
+/// A secondary product yielded whenever the parent BOM is completed.
+#[derive(Clone)]
+#[spacetimedb::table(
+    accessor = mrp_bom_byproduct,
+    public,
+    index(accessor = mrp_bom_byproduct_by_org, btree(columns = [organization_id])),
+    index(accessor = mrp_bom_byproduct_by_bom, btree(columns = [bom_id]))
+)]
+pub struct MrpBomByproduct {
+    #[primary_key]
+    #[auto_inc]
+    pub id: u64,
+    pub organization_id: u64,
+    pub company_id: u64,
+    pub bom_id: u64,
+    pub product_id: u64,
+    pub product_tmpl_id: u64,
+    pub product_qty: f64,
+    pub product_uom_id: u64,
+    pub cost_share: f64,
+    pub sequence: u32,
+    pub create_uid: Identity,
+    pub create_date: Timestamp,
+    pub write_uid: Identity,
+    pub write_date: Timestamp,
+    pub metadata: Option<String>,
+}
+
 /// Routing Workcenter — Defines operations and work centers for manufacturing
 #[derive(Clone)]
 #[spacetimedb::table(
@@ -195,6 +223,16 @@ pub struct BomLineInput {
     pub child_bom_id: Option<u64>,
     pub bom_product_template_attribute_value_ids: Vec<u64>,
     pub possible_bom_product_template_attribute_value_ids: Vec<u64>,
+    pub metadata: Option<String>,
+}
+
+#[derive(SpacetimeType, Debug, Clone)]
+pub struct CreateBomByproductParams {
+    pub product_id: u64,
+    pub product_qty: f64,
+    pub product_uom_id: u64,
+    pub cost_share: f64,
+    pub sequence: u32,
     pub metadata: Option<String>,
 }
 
@@ -622,6 +660,99 @@ pub fn create_bom(
     Ok(())
 }
 
+/// Add one authoritative byproduct definition to a BOM.
+#[reducer]
+pub fn create_bom_byproduct(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    bom_id: u64,
+    params: CreateBomByproductParams,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "mrp_bom", "write")?;
+    let bom = ctx.db.mrp_bom().id().find(&bom_id).ok_or("BOM not found")?;
+    if bom.organization_id != organization_id {
+        return Err("BOM does not belong to this organization".to_string());
+    }
+    validate_positive_qty(params.product_qty, "byproduct product_qty")?;
+    if !params.cost_share.is_finite() || params.cost_share < 0.0 || params.cost_share > 100.0 {
+        return Err("Byproduct cost share must be between 0 and 100".to_string());
+    }
+    let product = require_product_for_manufacturing(
+        ctx,
+        organization_id,
+        params.product_id,
+        "BOM byproduct",
+    )?;
+    if product.id == bom.product_id {
+        return Err("Byproduct must differ from the BOM primary product".to_string());
+    }
+    let product_uom = require_uom_in_org(ctx, organization_id, product.uom_id, "Byproduct product UOM")?;
+    let requested_uom = require_uom_in_org(ctx, organization_id, params.product_uom_id, "Byproduct quantity UOM")?;
+    require_uom_compatible(&product_uom, &requested_uom, "BOM byproduct")?;
+
+    let rows: Vec<_> = ctx.db.mrp_bom_byproduct().mrp_bom_byproduct_by_bom().filter(&bom_id).collect();
+    if rows.iter().any(|row| row.organization_id != organization_id || row.company_id != bom.company_id) {
+        return Err("BOM byproduct relation crosses organization or company".to_string());
+    }
+    let mut authoritative_ids: Vec<_> = rows.iter().map(|row| row.id).collect();
+    authoritative_ids.sort_unstable();
+    let mut owned_ids = bom.byproduct_ids.clone();
+    owned_ids.sort_unstable();
+    if authoritative_ids != owned_ids {
+        return Err("BOM byproduct relation is inconsistent".to_string());
+    }
+    if rows.iter().any(|row| row.product_id == product.id) {
+        return Err("BOM already has this byproduct".to_string());
+    }
+    let total_cost_share: f64 = rows.iter().map(|row| row.cost_share).sum::<f64>() + params.cost_share;
+    if total_cost_share > 100.0 + 1e-9 {
+        return Err("BOM byproduct cost shares cannot exceed 100".to_string());
+    }
+
+    let row = ctx.db.mrp_bom_byproduct().insert(MrpBomByproduct {
+        id: 0,
+        organization_id,
+        company_id: bom.company_id,
+        bom_id,
+        product_id: product.id,
+        product_tmpl_id: product.id,
+        product_qty: params.product_qty,
+        product_uom_id: params.product_uom_id,
+        cost_share: params.cost_share,
+        sequence: params.sequence,
+        create_uid: ctx.sender(),
+        create_date: ctx.timestamp,
+        write_uid: ctx.sender(),
+        write_date: ctx.timestamp,
+        metadata: params.metadata,
+    });
+    let mut ids = bom.byproduct_ids.clone();
+    ids.push(row.id);
+    ids.sort_unstable();
+    ctx.db.mrp_bom().id().update(MrpBom {
+        byproduct_ids: ids,
+        write_uid: ctx.sender(),
+        write_date: ctx.timestamp,
+        ..bom
+    });
+    write_audit_log_v2(ctx, organization_id, AuditLogParams {
+        company_id: Some(row.company_id),
+        table_name: "mrp_bom_byproduct",
+        record_id: row.id,
+        action: "CREATE",
+        old_values: None,
+        new_values: Some(serde_json::json!({
+            "bom_id": bom_id,
+            "product_id": row.product_id,
+            "product_qty": row.product_qty,
+            "cost_share": row.cost_share,
+        }).to_string()),
+        changed_fields: vec!["bom_id".to_string(), "product_id".to_string()],
+        metadata: None,
+    });
+    Ok(())
+}
+
 /// Update an existing Bill of Materials.
 ///
 /// Company is derived from the stored BOM — callers do not supply it.
@@ -740,6 +871,9 @@ pub fn delete_bom(ctx: &ReducerContext, organization_id: u64, bom_id: u64) -> Re
     // Delete associated BOM lines
     for line_id in &bom.bom_line_ids {
         ctx.db.mrp_bom_line().id().delete(line_id);
+    }
+    for byproduct_id in &bom.byproduct_ids {
+        ctx.db.mrp_bom_byproduct().id().delete(byproduct_id);
     }
 
     // Delete cached explosion rows for this root BOM
