@@ -453,6 +453,8 @@ export function toCreateReturnOrderParams(
     saleOrderId,
     returnReason: optionalTrimmedString(formData.returnReason),
     lines: [line],
+    // The return workflow assigns one key per submission; a form never supplies it.
+    idempotencyKey: undefined,
   }
 }
 

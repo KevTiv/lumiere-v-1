@@ -1788,7 +1788,8 @@
   ],
   "CreateReturnOrderParams": [
     "sale_order_id",
-    "return_reason"
+    "return_reason",
+    "idempotency_key"
   ],
   "CreateRevenueRecognitionRuleParams": [
     "expense_account_id",

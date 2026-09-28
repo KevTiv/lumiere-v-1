@@ -14,7 +14,6 @@ import {
   createReturnOrderAction,
   observeCreatedReturnOrder,
   returnExchangeOrderIds,
-  saleOrderReturnIds,
   observeConfirmedReturn,
   observeExchangeOrder,
   observeReturnCreditNote,
@@ -81,26 +80,30 @@ test("a picking is taken to done only through the steps it has not passed", () =
   assert.equal(pickingStepsToDone({ state: "cancel" }), undefined)
 })
 
-test("the one return added to the sale order since the snapshot is created, and it can be opened", () => {
-  const returns = [
-    { id: 11, saleOrderId: 5 },
-    { id: 14, saleOrderId: 5 },
-    { id: 15, saleOrderId: 6 },
+test("the return a keyed create produced is the one its creation row names, and it can be opened", () => {
+  const returns = [{ id: 11 }, { id: 14 }]
+  const creations = [
+    { id: 1, idempotencyKey: "k-1", returnOrderId: 11 },
+    { id: 2, idempotency_key: "k-2", return_order_id: 14 },
   ]
-  assert.deepEqual(saleOrderReturnIds("5", returns), ["11", "14"])
-  const observed = observeCreatedReturnOrder("5", ["14"], returns)
+  const observed = observeCreatedReturnOrder(" k-1 ", creations, returns)
   const ref = { resource: "return_order", id: "11", module: "sales" }
   assert.equal(observed.outcome, "applied")
   assert.deepEqual(observed.createdRecords, [ref])
   assert.deepEqual(observed.next, ref)
   assert.deepEqual(resolveRecordLocation(ref), { module: "sales", tab: "returns", filter: { id: "11" } })
+  assert.equal(observeCreatedReturnOrder("k-2", creations, returns).next?.id, "14")
 })
 
-test("no new return, several new returns, or a lost prior return claims nothing", () => {
-  assert.deepEqual(observeCreatedReturnOrder("5", ["1"], [{ id: 1, saleOrderId: 5 }]), {})
-  assert.deepEqual(observeCreatedReturnOrder("5", [], [{ id: 1, saleOrderId: 5 }, { id: 2, sale_order_id: 5 }]), {})
-  assert.deepEqual(observeCreatedReturnOrder("5", ["1"], [{ id: 2, saleOrderId: 5 }]), {})
-  assert.deepEqual(observeCreatedReturnOrder("5", [], []), {})
+test("an unknown, blank, duplicated or dangling key claims nothing", () => {
+  const returns = [{ id: 11 }]
+  assert.deepEqual(observeCreatedReturnOrder("k-9", [{ idempotencyKey: "k-1", returnOrderId: 11 }], returns), {})
+  assert.deepEqual(observeCreatedReturnOrder(" ", [{ idempotencyKey: "", returnOrderId: 11 }], returns), {})
+  assert.deepEqual(
+    observeCreatedReturnOrder("k-1", [{ idempotencyKey: "k-1", returnOrderId: 11 }, { idempotencyKey: "k-1", returnOrderId: 11 }], returns),
+    {},
+  )
+  assert.deepEqual(observeCreatedReturnOrder("k-1", [{ idempotencyKey: "k-1", returnOrderId: 99 }], returns), {})
 })
 
 test("creating a return is form-backed, offered against a confirmed order, and refreshes returns only", async () => {

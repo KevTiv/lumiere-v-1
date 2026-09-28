@@ -18,6 +18,7 @@ import {
   observeExchangeOrder,
   observePickingState,
   observeReturnCreditNote,
+  newCorrelationId,
   observeSameRecord,
   pickingStepsToDone,
   receiveReturnAction,
@@ -25,7 +26,6 @@ import {
   returnOrderWorkflow,
   returnExchangeOrderIds,
   rowId,
-  saleOrderReturnIds,
   stateIs,
   type AnyWorkflowAction,
   type CreateReturnCreditNoteInput,
@@ -51,6 +51,7 @@ import {
   returnOrdersQueryOptions,
   saleOrdersQueryOptions,
 } from "./sales"
+import { fetchQueryList } from "../http"
 import { useWorkflowRunner, type WorkflowSurfaceCallbacks } from "./workflow"
 
 export interface ReturnOrderWorkflowLabels {
@@ -66,7 +67,7 @@ export interface ReturnOrderWorkflowLabels {
 
 type CreditNoteInput = CreateReturnCreditNoteInput<CreateCreditNoteFromReturnOrderParams>
 type CreateInput = CreateReturnOrderInput<CreateReturnOrderParams>
-type CreateFromSaleOrderRunInput = CreateInput & { saleOrderId: string; returnIdsBefore: string[] }
+type CreateRunInput = CreateInput & { idempotencyKey: string }
 type ExchangeRunInput = { returnOrderId: string; exchangeOrderIdsBefore: string[] }
 
 /**
@@ -92,24 +93,20 @@ export function useReturnOrderWorkflow(
       validate: (id) => validateStockPickingCommand(companyId, id),
     }
 
-    const create: TransitionSpec<CreateFromSaleOrderRunInput> = {
+    // One key per submission, kept in the run input: a retry re-sends the same key and the server
+    // converges on the return it already created, which the creation row names exactly.
+    const create: TransitionSpec<CreateRunInput> = {
       id: "sales.return.create",
-      command: ({ params }) => createReturnOrderCommand(companyId, params),
+      idempotent: true,
+      command: ({ params, idempotencyKey }) => createReturnOrderCommand(companyId, { ...params, idempotencyKey }),
       affects: CREATE_RETURN_ORDER_AFFECTS,
-      observe: async ({ saleOrderId, returnIdsBefore }) =>
-        observeCreatedReturnOrder(
-          saleOrderId,
-          returnIdsBefore,
-          await fresh<RowValueMap[]>(returnOrdersQueryOptions(organizationId)),
-        ),
-    }
-
-    const createStandalone: TransitionSpec<CreateInput> = {
-      id: "sales.return.create",
-      command: ({ params }) => createReturnOrderCommand(companyId, params),
-      affects: CREATE_RETURN_ORDER_AFFECTS,
-      noReadback:
-        "A return without a sale order has no owning relation or client key to identify it; needs a create_return_order idempotency key.",
+      observe: async ({ idempotencyKey }) => {
+        const [creations, returns] = await Promise.all([
+          fetchQueryList("/api/query/return-order-creations", "Failed to read return order creations"),
+          fresh<RowValueMap[]>(returnOrdersQueryOptions(organizationId)),
+        ])
+        return observeCreatedReturnOrder(idempotencyKey, creations, returns)
+      },
     }
 
     const confirm: TransitionSpec<string> = {
@@ -169,31 +166,22 @@ export function useReturnOrderWorkflow(
         observeReturnCreditNote(returnOrderId, await fresh<RowValueMap[]>(returnOrdersQueryOptions(organizationId))),
     }
 
-    return { create, createStandalone, confirm, receive, cancel, exchange, creditNote }
+    return { create, confirm, receive, cancel, exchange, creditNote }
   }, [qc, organizationId, companyId, labels.notReceivable])
 
   const create = useMemo(
     () =>
       createReturnOrderAction<CreateReturnOrderParams>({
         label: labels.create,
-        execute: async (input, context) => {
-          const { saleOrderId } = input
-          if (saleOrderId == null) {
-            return runner.run("sales.return.create:none", specs.createStandalone, input)
-          }
-          const returnIdsBefore = saleOrderReturnIds(
-            saleOrderId,
-            (await qc.fetchQuery({ ...returnOrdersQueryOptions(organizationId), staleTime: 0 })) as RowValueMap[],
-          )
-          return runner.run(
-            `sales.return.create:${saleOrderId}`,
+        execute: (input, context) =>
+          runner.run(
+            `sales.return.create:${input.saleOrderId ?? "none"}`,
             specs.create,
-            { ...input, saleOrderId, returnIdsBefore },
+            { ...input, idempotencyKey: newCorrelationId() },
             { navigateToNext: context?.navigateToNext },
-          )
-        },
+          ),
       }),
-    [labels.create, runner, specs, qc, organizationId],
+    [labels.create, runner, specs],
   )
 
   const createCreditNote = useMemo(

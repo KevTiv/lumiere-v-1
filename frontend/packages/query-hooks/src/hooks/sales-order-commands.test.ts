@@ -128,7 +128,13 @@ describe("sale order lifecycle commands", () => {
   it("types a rejected return order instead of a generic failure", async () => {
     respondWith(422, JSON.stringify({ error: "Return quantity exceeds the delivered quantity" }))
     await assert.rejects(
-      createReturnOrderCommand(3n, { saleOrderId: 5n, partnerId: 1n, returnReason: undefined, lines: [] }),
+      createReturnOrderCommand(3n, {
+        saleOrderId: 5n,
+        partnerId: 1n,
+        returnReason: undefined,
+        lines: [],
+        idempotencyKey: undefined,
+      }),
       (error: unknown) => {
         assert.ok(error instanceof WorkflowError)
         assert.equal(error.kind, "validation")
@@ -138,9 +144,18 @@ describe("sale order lifecycle commands", () => {
     )
   })
 
-  it("creates a return through create_return_order", async () => {
+  it("creates a return through create_return_order, sending its key as an Option", async () => {
     const requests = respondWith(200, "{}")
-    await createReturnOrderCommand(3n, { saleOrderId: 5n, partnerId: 1n, returnReason: undefined, lines: [] })
+    await createReturnOrderCommand(3n, {
+      saleOrderId: 5n,
+      partnerId: 1n,
+      returnReason: undefined,
+      lines: [],
+      idempotencyKey: "rma-key-1",
+    })
     assert.match(requests[0].url, /create_return_order/)
+    const params = (JSON.parse(requests[0].body) as { params: Record<string, unknown> }).params
+    assert.deepEqual(params.idempotency_key, { some: "rma-key-1" })
+    assert.equal("idempotencyKey" in params, false)
   })
 })

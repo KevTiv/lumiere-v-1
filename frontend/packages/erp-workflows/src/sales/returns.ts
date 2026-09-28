@@ -67,26 +67,25 @@ export function returnPickingId(row: RowValueMap): string | undefined {
   return id == null ? undefined : String(id)
 }
 
-/** Returns raised against this sale order (the child-owned `sale_order_id` relation). */
-export function saleOrderReturnIds(saleOrderId: string, returns: readonly RowValueMap[]): string[] {
-  return returns
-    .filter((row) => String(firstNonNullKey(row, "saleOrderId", "sale_order_id") ?? "") === saleOrderId)
-    .map(rowId)
-}
-
 /**
- * The caller snapshots the sale order's returns before dispatch; the created return is the one
- * new id after readback, never the newest. A return raised without a sale order has no owning
- * relation to read back, so the surface does not declare an observation for it.
+ * `create_return_order` records one `return_order_creation` row per idempotency key, naming the
+ * exact return it produced (a replay converges on the same row). The created return is that row's
+ * return, and it must exist; zero or several rows for the key are unresolved. This holds with or
+ * without a source sale order, so no snapshot or newest-row scan is needed.
  */
 export function observeCreatedReturnOrder(
-  saleOrderId: string,
-  returnIdsBefore: readonly string[],
+  idempotencyKey: string,
+  creations: readonly RowValueMap[],
   returns: readonly RowValueMap[],
 ): ObservedTransition {
-  const created = singleAddedId(returnIdsBefore, saleOrderReturnIds(saleOrderId, returns))
-  if (!created) return {}
-  const ref = recordRef(returnOrderWorkflow.resource, created, returnOrderWorkflow.module)
+  const key = idempotencyKey.trim()
+  const matches = creations.filter(
+    (row) => String(firstNonNullKey(row, "idempotencyKey", "idempotency_key") ?? "") === key,
+  )
+  if (!key || matches.length !== 1) return {}
+  const returnId = firstNonNullKey(matches[0], "returnOrderId", "return_order_id")
+  if (returnId == null || !returns.some((row) => rowId(row) === String(returnId))) return {}
+  const ref = recordRef(returnOrderWorkflow.resource, String(returnId), returnOrderWorkflow.module)
   return { outcome: "applied", createdRecords: [ref], next: ref }
 }
 
