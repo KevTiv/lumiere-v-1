@@ -152,6 +152,7 @@ test("partial validation resolves exactly one new backorder from the parent rela
 test("validating in full requires done state and returns the same picking", () => {
   assert.deepEqual(observeValidatedPicking("5", [{ id: 5, state: "done" }]), {
     outcome: "applied",
+    createdRecords: undefined,
     next: { resource: "stock_picking", id: "5", module: "inventory" },
   })
   assert.deepEqual(observeValidatedPicking("5", [{ id: 5, state: "assigned" }]), {})

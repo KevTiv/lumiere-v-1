@@ -17,7 +17,7 @@ test("success invalidates declared resources, observes state and navigates to ne
   const fake = createFakeCompletionPorts()
   const picking = recordRef("stock_picking", 7)
   const result = await completeTransition(
-    spec({ observe: async () => ({ createdRecords: [picking], next: picking }) }),
+    spec({ observe: async () => ({ outcome: "applied", createdRecords: [picking], next: picking }) }),
     "1",
     fake.ports,
     { navigateToNext: true },
@@ -31,7 +31,7 @@ test("success invalidates declared resources, observes state and navigates to ne
 test("navigation is opt-in", async () => {
   const fake = createFakeCompletionPorts()
   const picking = recordRef("stock_picking", 7)
-  await completeTransition(spec({ observe: async () => ({ next: picking }) }), "1", fake.ports)
+  await completeTransition(spec({ observe: async () => ({ outcome: "applied", next: picking }) }), "1", fake.ports)
   assert.deepEqual(fake.navigated, [])
 })
 
@@ -86,6 +86,29 @@ test("a failing canonical readback cannot be reported as applied", async () => {
   )
   assert.equal(fake.notices[0]?.kind, "error")
   assert.equal(fake.notices[0]?.error?.kind, "outcome_unknown")
+})
+
+test("a readback that cannot confirm the effect is outcome_unknown, never applied", async () => {
+  const fake = createFakeCompletionPorts()
+  const picking = recordRef("stock_picking", 7)
+  await assert.rejects(
+    completeTransition(spec({ observe: async () => ({ next: picking }) }), "1", fake.ports, {
+      navigateToNext: true,
+    }),
+    (error: unknown) => error instanceof WorkflowError && error.kind === "outcome_unknown",
+  )
+  assert.deepEqual(fake.invalidated, [["sale-orders", "stock-pickings"]])
+  assert.deepEqual(fake.navigated, [])
+  assert.equal(fake.notices[0]?.kind, "error")
+  assert.equal(fake.notices[0]?.refreshed, true)
+  assert.equal(fake.notices[0]?.retry, undefined)
+})
+
+test("a transition without a declared readback reports transport acceptance as applied", async () => {
+  const fake = createFakeCompletionPorts()
+  const result = await completeTransition(spec(), "1", fake.ports)
+  assert.equal(result.outcome, "applied")
+  assert.equal(fake.notices[0]?.kind, "success")
 })
 
 test("single-flight collapses concurrent runs and releases afterwards", async () => {

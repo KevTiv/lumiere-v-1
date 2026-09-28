@@ -60,7 +60,7 @@ test("a failed refresh is reported as not refreshed, and the original error stil
 test("a successful run logs the outcome, duration, affected resources and created record ids", async () => {
   const fake = createFakeCompletionPorts()
   const invoice = recordRef("account_move", 41, "accounting", "sales")
-  await completeTransition(succeeding({ observe: async () => ({ createdRecords: [invoice] }) }), "5", fake.ports)
+  await completeTransition(succeeding({ observe: async () => ({ outcome: "applied", createdRecords: [invoice] }) }), "5", fake.ports)
   const [event] = fake.events
   assert.equal(event?.status, "applied")
   assert.equal(event?.transitionId, "test.ok")
@@ -75,6 +75,18 @@ test("an approval hand-off is logged as approval_pending, not applied", async ()
   const fake = createFakeCompletionPorts()
   await completeTransition(succeeding({ observe: async () => ({ outcome: "approval_pending" }) }), "5", fake.ports)
   assert.equal(fake.events[0]?.status, "approval_pending")
+})
+
+test("an unconfirmed readback is logged as a failed outcome_unknown run, not applied", async () => {
+  for (const observe of [async () => ({}), async () => { throw new Error("readback failed") }]) {
+    const fake = createFakeCompletionPorts()
+    await assert.rejects(completeTransition(succeeding({ observe }), "5", fake.ports))
+    assert.equal(fake.events.length, 1)
+    assert.equal(fake.events[0]?.status, "failed")
+    assert.equal(fake.events[0]?.errorKind, "outcome_unknown")
+    assert.equal(fake.events[0]?.refreshed, true)
+    assert.deepEqual(fake.events[0]?.affectedResources, ["sale-orders", "stock-pickings"])
+  }
 })
 
 test("a failed run logs the failure kind and HTTP status", async () => {

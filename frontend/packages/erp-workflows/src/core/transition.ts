@@ -2,7 +2,10 @@ import { WorkflowError, toWorkflowError, type WorkflowErrorKind } from "./errors
 import type { ErpRecordRef } from "./record-ref"
 import type { WorkflowOutcome, WorkflowResult } from "./result"
 
-/** What the canonical readback found after a command was accepted. */
+/**
+ * What the canonical readback found after a command was accepted. An observation without an
+ * `outcome` means the effect could not be confirmed, and the run fails as `outcome_unknown`.
+ */
 export interface ObservedTransition {
   outcome?: WorkflowOutcome
   createdRecords?: ErpRecordRef[]
@@ -21,7 +24,11 @@ export interface TransitionSpec<TInput> {
   affects: readonly string[]
   /** True when re-issuing the command cannot duplicate its effect. */
   idempotent?: boolean
-  /** Read canonical state after invalidation to resolve outcome and created/next records. */
+  /**
+   * Read canonical state after invalidation to resolve outcome and created/next records. Once
+   * declared, it must confirm the effect: a throw or a missing `outcome` is `outcome_unknown`.
+   * Omit it only when transport acceptance is the whole contract.
+   */
   observe?(input: TInput): Promise<ObservedTransition>
 }
 
@@ -141,31 +148,23 @@ export async function completeTransition<TInput>(
   const affectedResources = [...spec.affects]
   await ports.invalidate(affectedResources)
 
+  // The command was accepted, but its effect could not be confirmed: never report it as applied.
+  const unresolved = (message: string, cause?: unknown): WorkflowError => {
+    const error = new WorkflowError("outcome_unknown", message, cause === undefined ? undefined : { cause })
+    record({ status: "failed", errorKind: error.kind, refreshed: true, affectedResources })
+    ports.notify?.({ kind: "error", transitionId: spec.id, correlationId, attempt, error, refreshed: true })
+    return error
+  }
+
   let observed: ObservedTransition = {}
   if (spec.observe) {
     try {
       observed = (await spec.observe(input)) ?? {}
     } catch (cause) {
-      const error = new WorkflowError(
-        "outcome_unknown",
-        "Command was accepted but canonical readback failed",
-        { cause },
-      )
-      record({
-        status: "failed",
-        errorKind: error.kind,
-        refreshed: true,
-        affectedResources,
-      })
-      ports.notify?.({
-        kind: "error",
-        transitionId: spec.id,
-        correlationId,
-        attempt,
-        error,
-        refreshed: true,
-      })
-      throw error
+      throw unresolved("Command was accepted but canonical readback failed", cause)
+    }
+    if (observed.outcome === undefined) {
+      throw unresolved("Command was accepted but canonical readback did not confirm its effect")
     }
   }
 
