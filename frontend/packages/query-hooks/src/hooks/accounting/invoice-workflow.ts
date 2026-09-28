@@ -4,15 +4,15 @@ import {
   POST_PAYMENT_AFFECTS,
   RECONCILE_PAYMENT_AFFECTS,
   WorkflowError,
+  observePostedInvoice,
   postInvoiceAction,
   postPaymentAction,
-  invoiceWorkflow,
-  recordRef,
   type AnyWorkflowAction,
   type RowValueMap,
   type TransitionSpec,
 } from "@lumiere/erp-workflows"
 
+import { fetchQueryList } from "../../http"
 import { useWorkflowRunner, type WorkflowSurfaceCallbacks } from "../workflow"
 import { postInvoiceCommand } from "./moves"
 import {
@@ -70,10 +70,11 @@ export function useInvoiceToPaymentWorkflow(
         return postInvoiceCommand({ moveId, ...accounts })
       },
       affects: POST_INVOICE_AFFECTS,
-      // Posting is where the customer is asked to pay: stay on the invoice.
-      observe: async (moveId) => ({
-        next: recordRef(invoiceWorkflow.resource, moveId, invoiceWorkflow.module),
-      }),
+      observe: async (moveId) =>
+        observePostedInvoice(
+          moveId,
+          await fetchQueryList("/api/query/account-moves", "Failed to read posted invoice"),
+        ),
     }),
     [resolvePostingAccounts, missingAccountsMessage],
   )

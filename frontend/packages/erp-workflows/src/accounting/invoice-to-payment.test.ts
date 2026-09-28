@@ -6,6 +6,7 @@ import {
   isInvoicePostable,
   isPaymentPostable,
   isPaymentRegistrable,
+  observePostedInvoice,
 } from "./invoice-to-payment"
 
 test("only draft invoices and refunds post through post_invoice", () => {
@@ -31,4 +32,14 @@ test("a payment posts from NotPaid and is applied to invoices only once posted",
   assert.ok(!isPaymentPostable({ state: "Paid" }))
   assert.ok(isPaymentRegistrable({ state: { tag: "Paid" } }))
   assert.ok(!isPaymentRegistrable({ state: "NotPaid" }))
+})
+
+test("a post is confirmed only by the same move reading back as Posted", () => {
+  assert.deepEqual(observePostedInvoice("9", [{ id: 9, state: { tag: "Posted" } }]), {
+    outcome: "applied",
+    next: { resource: "account_move", id: "9", module: "accounting" },
+  })
+  assert.deepEqual(observePostedInvoice("9", [{ id: 9, state: { tag: "Draft" } }]), {})
+  assert.deepEqual(observePostedInvoice("9", [{ id: 10, state: { tag: "Posted" } }]), {})
+  assert.deepEqual(observePostedInvoice("9", []), {})
 })
