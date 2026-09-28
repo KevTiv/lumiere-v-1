@@ -11,12 +11,13 @@ import {
   useStartCycleCountSession,
   useRecordCycleCountLine,
   useValidateCycleCount,
-  usePostCycleCountAdjustments,
   useOpenQualityAlert,
   useQualityAlerts,
   useSolveQualityAlert,
   useCancelQualityAlert,
 } from '@lumiere/query-hooks/hooks/inventory';
+import { useCycleCountAdjustmentWorkflow } from '@lumiere/query-hooks/hooks/cycle-count-adjustment-workflow';
+import { useWorkflowSurface } from '@/hooks/use-workflow-surface';
 import type { QueryRows } from '@/lib/query-fetch';
 import { ChevronRight, MapPin, Package } from 'lucide-react';
 
@@ -58,7 +59,12 @@ export function CycleCountWizard({
   const startSession = useStartCycleCountSession(orgId, operatingCompanyId);
   const recordLine = useRecordCycleCountLine(orgId, operatingCompanyId);
   const validate = useValidateCycleCount(orgId, operatingCompanyId);
-  const postAdj = usePostCycleCountAdjustments(orgId, operatingCompanyId);
+  const workflowSurface = useWorkflowSurface({ organizationId });
+  const postAdj = useCycleCountAdjustmentWorkflow(
+    orgId,
+    operatingCompanyId ?? 0n,
+    workflowSurface,
+  );
 
   const [step, setStep] = useState<WizardStep>(1);
   const [cycleCountId, setCycleCountId] = useState<ScalarId | ''>(
@@ -75,6 +81,8 @@ export function CycleCountWizard({
   const [recQty, setRecQty] = useState('');
   const [recUom, setRecUom] = useState('');
   const [planCreatedAt, setPlanCreatedAt] = useState(0);
+  // Highest plan id at the chosen location before this wizard created one.
+  const [planBaselineId, setPlanBaselineId] = useState(0);
 
   useEffect(() => {
     if (initialCycleCountId != null && initialCycleCountId !== '') {
@@ -90,11 +98,13 @@ export function CycleCountWizard({
       : cycleCounts;
     const sorted = [...forLoc].sort((a, b) => num(b.id) - num(a.id));
     const newest = sorted[0];
-    if (newest?.id != null) {
+    if (newest?.id != null && num(newest.id) > planBaselineId) {
       setCycleCountId(newest.id as ScalarId);
       setStep(2);
+      // Select the new plan once; later refetches must not rewind the wizard.
+      setPlanCreatedAt(0);
     }
-  }, [cycleCounts, locationId, planCreatedAt]);
+  }, [cycleCounts, locationId, planCreatedAt, planBaselineId]);
 
   const selectedCount = useMemo(
     () => cycleCounts.find((c) => strId(c.id) === strId(cycleCountId)),
@@ -275,9 +285,18 @@ export function CycleCountWizard({
           </div>
           <Button
             type="button"
+            data-testid="cycle-wizard-create-plan"
             disabled={createPlan.isPending || !locationId}
             onClick={() => {
               const lid = Number(locationId);
+              setPlanBaselineId(
+                Math.max(
+                  0,
+                  ...cycleCounts
+                    .filter((c) => strId(c.locationId) === locationId)
+                    .map((c) => num(c.id)),
+                ),
+              );
               void createPlan
                 .mutateAsync({
                   locationId: lid,
@@ -326,6 +345,7 @@ export function CycleCountWizard({
           </div>
           <Button
             type="button"
+            data-testid="cycle-wizard-start-session"
             disabled={startSession.isPending || cycleCountId === ''}
             onClick={() =>
               void startSession.mutateAsync(cycleCountId).then(goNext)
@@ -395,6 +415,7 @@ export function CycleCountWizard({
           </div>
           <Button
             type="button"
+            data-testid="cycle-wizard-record-line"
             disabled={recordLine.isPending || cycleCountId === ''}
             onClick={() =>
               void recordLine
@@ -427,6 +448,7 @@ export function CycleCountWizard({
           <Button
             type="button"
             variant="secondary"
+            data-testid="cycle-wizard-validate"
             disabled={validate.isPending || cycleCountId === ''}
             onClick={() => void validate.mutateAsync(cycleCountId).then(goNext)}
           >
@@ -443,8 +465,26 @@ export function CycleCountWizard({
           </p>
           <Button
             type="button"
-            disabled={postAdj.isPending || cycleCountId === ''}
-            onClick={() => void postAdj.mutateAsync(cycleCountId)}
+            data-testid="cycle-wizard-post"
+            disabled={
+              postAdj.isPending ||
+              cycleCountId === '' ||
+              !recProductId ||
+              !recLocId ||
+              operatingCompanyId == null
+            }
+            onClick={() =>
+              void postAdj.post(
+                {
+                  cycleCountId: strId(cycleCountId),
+                  productId: recProductId,
+                  locationId: recLocId,
+                  companyId: strId(operatingCompanyId),
+                  countedQty: num(recQty),
+                },
+                { navigateToNext: true },
+              )
+            }
           >
             {t('inventory.cycleCountWizard.post')}
           </Button>

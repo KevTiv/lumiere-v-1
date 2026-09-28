@@ -57,7 +57,7 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "test": "node --import tsx --test src/form-coercion.test.ts src/u64.test.ts src/accounting-create-params.test.ts src/csv-import-transform.test.ts src/csv-import-safety.test.ts src/csv-import-bundles.test.ts src/csv-import-retry.test.ts src/contact-matching.test.ts src/timestamp-values.test.ts src/row-values.test.ts"
+    "test": "node --import tsx --test src/form-coercion.test.ts src/u64.test.ts src/accounting-create-params.test.ts src/manufacturing-create-params.test.ts src/csv-import-transform.test.ts src/csv-import-safety.test.ts src/csv-import-bundles.test.ts src/csv-import-retry.test.ts src/contact-matching.test.ts src/timestamp-values.test.ts src/row-values.test.ts"
   },
   "dependencies": {
     "@lumiere/api-client": "workspace:*",

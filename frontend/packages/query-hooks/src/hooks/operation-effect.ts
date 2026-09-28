@@ -25,14 +25,22 @@ export function resolveUniqueEffect<Row, Ref extends CanonicalRecordRef>(
   matches: (row: Row) => boolean,
   toRef: (row: Row) => Ref,
 ): Ref | null {
+  const row = resolveUniqueRow(rows, matches)
+  return row == null ? null : toRef(row)
+}
+
+/** Zero-or-one projection row by exact business key; more than one match throws. */
+export function resolveUniqueRow<Row>(
+  rows: readonly Row[],
+  matches: (row: Row) => boolean,
+): Row | null {
   const matched = rows.filter(matches)
-  if (matched.length === 0) return null
   if (matched.length > 1) {
     throw new AmbiguousOperationEffectError(
-      `Expected one canonical effect, found ${matched.length}`,
+      `Expected one canonical row, found ${matched.length}`,
     )
   }
-  return toRef(matched[0]!)
+  return matched[0] ?? null
 }
 
 export type OperationEffectWarning = "refresh-failed"

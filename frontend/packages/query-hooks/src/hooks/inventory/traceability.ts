@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { stdbBffCommandPost } from "@lumiere/stdb/commands"
 import { apiFetch, fetchQueryList, coalesceQueryInitialData, type QueryRows, rqBigIntKey } from "../../http"
 import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
+import { workflowErrorFromResponse } from "@lumiere/erp-workflows"
 import { scalarToU64 as toScalarU64, type ScalarId } from "@lumiere/erp-shared/u64"
 
 
@@ -158,18 +159,22 @@ export function useStockTraceabilityReports(
 }
 
 
+export const stockProductionSerialsQueryOptions = (organizationId: bigint) => ({
+  queryKey: ['stock-production-serials', rqBigIntKey(organizationId)] as const,
+  queryFn: () =>
+    fetchQueryList(
+      '/api/query/stock-production-serials',
+      'Failed to fetch serial numbers',
+    ),
+  staleTime: 30_000,
+});
+
 export function useStockProductionSerials(
   organizationId: bigint,
   initialData?: StockProductionSerial[],
 ) {
   return useQuery<StockProductionSerial[]>({
-    queryKey: ['stock-production-serials', rqBigIntKey(organizationId)],
-    queryFn: () =>
-      fetchQueryList(
-        '/api/query/stock-production-serials',
-        'Failed to fetch serial numbers',
-      ),
-    staleTime: 30_000,
+    ...stockProductionSerialsQueryOptions(organizationId),
     initialData: coalesceQueryInitialData(initialData),
   });
 }
@@ -186,7 +191,7 @@ export function useCreateStockProductionLot(
     mutationFn: async (params) => {
       const { urlPath, init } = stdbBffCommandPost(
         'create_stock_production_lot',
-        { params: stdbParamsToJson(params as object) },
+        { params: stdbParamsToJson(params as object, 'CreateStockProductionLotParams') },
       );
       const r = await apiFetch(urlPath, init);
       if (!r.ok) throw new Error('Failed to create stock production lot');
@@ -204,7 +209,7 @@ export function useCreateStockProductionSerial(
     mutationFn: async (params) => {
       const { urlPath, init } = stdbBffCommandPost(
         'create_stock_production_serial',
-        { params: stdbParamsToJson(params as object) },
+        { params: stdbParamsToJson(params, 'CreateStockProductionSerialParams') },
       );
       const r = await apiFetch(urlPath, init);
       if (!r.ok) throw new Error('Failed to create stock production serial');
@@ -213,54 +218,55 @@ export function useCreateStockProductionSerial(
   });
 }
 
-export function useReserveSerial(organizationId: bigint, _companyId?: bigint) {
-  const qc = useQueryClient();
-  return useMutation<void, Error, ScalarId>({
-    mutationFn: async (serialId) => {
-      const { urlPath, init } = stdbBffCommandPost('reserve_serial', {
-        serialId: toScalarU64(serialId),
-      });
-      const r = await apiFetch(urlPath, init);
-      if (!r.ok) throw new Error('Failed to reserve serial');
-    },
-    onSuccess: () => invalidateInventoryQueries(qc, organizationId),
+/** Underlying command for the `inventory.serial.reserve` workflow (`useSerialReserveWorkflow`). */
+export async function reserveSerialCommand(serialId: ScalarId): Promise<void> {
+  const { urlPath, init } = stdbBffCommandPost('reserve_serial', {
+    serialId: toScalarU64(serialId),
   });
+  const r = await apiFetch(urlPath, init);
+  if (!r.ok) {
+    throw workflowErrorFromResponse(
+      r.status,
+      await r.text().catch(() => ''),
+      'Failed to reserve serial',
+    );
+  }
 }
 
-export function useBlockSerial(organizationId: bigint, _companyId?: bigint) {
-  const qc = useQueryClient();
-  return useMutation<
-    void,
-    Error,
-    { serialId: ScalarId; reason?: string | null }
-  >({
-    mutationFn: async ({ serialId, reason }) => {
-      const { urlPath, init } = stdbBffCommandPost('block_serial', {
-        serialId: toScalarU64(serialId),
-        reason: reason ?? null,
-      });
-      const r = await apiFetch(urlPath, init);
-      if (!r.ok) throw new Error('Failed to block serial');
-    },
-    onSuccess: () => invalidateInventoryQueries(qc, organizationId),
+/** Underlying command for the `inventory.serial.block` workflow (`useSerialBlockWorkflow`). */
+export async function blockSerialCommand(
+  serialId: ScalarId,
+  reason?: string | null,
+): Promise<void> {
+  const { urlPath, init } = stdbBffCommandPost('block_serial', {
+    serialId: toScalarU64(serialId),
+    reason: reason ?? null,
   });
+  const r = await apiFetch(urlPath, init);
+  if (!r.ok) {
+    throw workflowErrorFromResponse(
+      r.status,
+      await r.text().catch(() => ''),
+      'Failed to block serial',
+    );
+  }
 }
 
 // ── Quality Management ───────────────────────────────────────────────────────
 
-
-export function useUseSerial(organizationId: bigint, _companyId?: bigint) {
-  const qc = useQueryClient();
-  return useMutation<void, Error, ScalarId>({
-    mutationFn: async (serialId) => {
-      const { urlPath, init } = stdbBffCommandPost('use_serial', {
-        serialId: toScalarU64(serialId),
-      });
-      const r = await apiFetch(urlPath, init);
-      if (!r.ok) throw new Error('Failed to mark serial in use');
-    },
-    onSuccess: () => invalidateInventoryQueries(qc, organizationId),
+/** Underlying command for the `inventory.serial.use` workflow (`useSerialUseWorkflow`). */
+export async function useSerialCommand(serialId: ScalarId): Promise<void> {
+  const { urlPath, init } = stdbBffCommandPost('use_serial', {
+    serialId: toScalarU64(serialId),
   });
+  const r = await apiFetch(urlPath, init);
+  if (!r.ok) {
+    throw workflowErrorFromResponse(
+      r.status,
+      await r.text().catch(() => ''),
+      'Failed to mark serial in use',
+    );
+  }
 }
 
 export function useCreateTraceabilityRecord(
@@ -273,7 +279,7 @@ export function useCreateTraceabilityRecord(
     mutationFn: async (params) => {
       const { urlPath, init } = stdbBffCommandPost(
         'create_traceability_record',
-        { params: stdbParamsToJson(params as object) },
+        { params: stdbParamsToJson(params as object, 'CreateTraceabilityRecordParams') },
       );
       const r = await apiFetch(urlPath, init);
       if (!r.ok) throw new Error('Failed to create traceability record');
@@ -295,7 +301,7 @@ export function useCreateTraceabilityReport(
     mutationFn: async (params) => {
       const { urlPath, init } = stdbBffCommandPost(
         'create_traceability_report',
-        { params: stdbParamsToJson(params as object) },
+        { params: stdbParamsToJson(params as object, 'CreateStockTraceabilityReportParams') },
       );
       const r = await apiFetch(urlPath, init);
       if (!r.ok) throw new Error('Failed to create traceability report');

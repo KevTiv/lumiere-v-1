@@ -141,6 +141,7 @@
       "currency_id",
       "invoice_date",
       "invoice_date_due",
+      "invoice_origin",
       "invoice_partner_display_name",
       "sale_order_id",
       "amount_untaxed",
@@ -691,6 +692,8 @@
       "statement_id",
       "journal_id",
       "is_reconciled",
+      "move_ids",
+      "amount_residual",
       "transaction_type",
       "account_number"
     ],
@@ -4659,7 +4662,10 @@
       "partner_id",
       "company_id",
       "origin",
-      "picking_ids"
+      "picking_ids",
+      "invoice_ids",
+      "invoice_count",
+      "invoice_status"
     ],
     "mandatory": [
       "id",
@@ -5475,7 +5481,9 @@
       "name",
       "product_id",
       "company_id",
-      "ref"
+      "ref",
+      "location_id",
+      "is_locked"
     ],
     "mandatory": [
       "id",
@@ -5492,7 +5500,8 @@
       "name",
       "product_id",
       "company_id",
-      "lot_id"
+      "lot_id",
+      "state"
     ],
     "mandatory": [
       "id",
@@ -5509,6 +5518,8 @@
       "product_id",
       "location_id",
       "quantity",
+      "reserved_quantity",
+      "available_quantity",
       "company_id",
       "lot_id",
       "package_id",
@@ -6379,7 +6390,8 @@
       "name",
       "code",
       "company_id",
-      "active"
+      "active",
+      "wh_qc_stock_loc_id"
     ],
     "mandatory": [
       "id",

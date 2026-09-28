@@ -113,15 +113,19 @@ import type {
   CreateStockQuantParams,
 } from '@lumiere/stdb/types';
 
+export const stockQuantsQueryOptions = (organizationId: bigint) => ({
+  queryKey: ['stock-quants', rqBigIntKey(organizationId)] as const,
+  queryFn: () =>
+    fetchQueryList('/api/query/stock-quants', 'Failed to fetch stock quants'),
+  staleTime: 30_000,
+});
+
 export function useStockQuants(
   organizationId: bigint,
   initialData?: StockQuant[],
 ) {
   return useQuery<StockQuant[]>({
-    queryKey: ['stock-quants', rqBigIntKey(organizationId)],
-    queryFn: () =>
-      fetchQueryList('/api/query/stock-quants', 'Failed to fetch stock quants'),
-    staleTime: 30_000,
+    ...stockQuantsQueryOptions(organizationId),
     initialData: coalesceQueryInitialData(initialData),
   });
 }
@@ -353,6 +357,32 @@ export function useCreateStockPicking(
 
 
 
+export async function moveStockQuantCommand(
+  companyId: bigint,
+  params: {
+    quantId: bigint | number | string;
+    targetLocationId: bigint | number | string;
+    quantity: number;
+  },
+): Promise<void> {
+  const { urlPath, init } = stdbBffCommandPost('move_stock_quant', {
+    quantId: toScalarU64(params.quantId),
+    params: stdbParamsToJson({
+      company_id: companyId,
+      dest_location_id: toScalarU64(params.targetLocationId),
+      quantity: params.quantity,
+    }, 'MoveStockQuantParams'),
+  });
+  const r = await apiFetch(urlPath, init);
+  if (!r.ok) {
+    throw workflowErrorFromResponse(
+      r.status,
+      await r.text().catch(() => ''),
+      'Failed to move stock item',
+    );
+  }
+}
+
 export function useMoveStockItem3D(organizationId: bigint, companyId: bigint) {
   const qc = useQueryClient();
   return useMutation<
@@ -360,18 +390,7 @@ export function useMoveStockItem3D(organizationId: bigint, companyId: bigint) {
     Error,
     { quantId: bigint; targetLocationId: bigint; quantity: number }
   >({
-    mutationFn: async (params) => {
-      const { urlPath, init } = stdbBffCommandPost('move_stock_quant', {
-        quantId: toScalarU64(params.quantId),
-        params: stdbParamsToJson({
-          company_id: companyId,
-          dest_location_id: toScalarU64(params.targetLocationId),
-          quantity: params.quantity,
-        } as object),
-      });
-      const r = await apiFetch(urlPath, init);
-      if (!r.ok) throw new Error('Failed to move stock item');
-    },
+    mutationFn: (params) => moveStockQuantCommand(companyId, params),
     onSuccess: () => {
       const orgKey = rqBigIntKey(organizationId);
       void qc.invalidateQueries({ queryKey: ['stock-quants', orgKey] });
@@ -448,7 +467,7 @@ export function useCreateStockLocation(organizationId: bigint) {
     mutationFn: async (params) => {
       const merged = mergeReducerParams(CREATE_STOCK_LOCATION_DEFAULTS, params);
       const { urlPath, init } = stdbBffCommandPost('create_stock_location', {
-        params: stdbParamsToJson(merged as object),
+        params: stdbParamsToJson(merged as object, 'CreateStockLocationParams'),
       });
       const r = await apiFetch(urlPath, init);
       if (!r.ok) throw new Error('Failed to create stock location');
@@ -618,7 +637,7 @@ export function useCreatePickingWave(
     mutationFn: async (params) => {
       const { urlPath, init } = stdbBffCommandPost('create_picking_wave', {
         companyId: companyId,
-        params: stdbParamsToJson(params as object),
+        params: stdbParamsToJson(params as object, 'CreatePickingWaveParams'),
       });
       const r = await apiFetch(urlPath, init);
       if (!r.ok) throw new Error('Failed to create picking wave');
@@ -879,7 +898,7 @@ export function useCreateStockRoute(
   return useMutation<void, Error, CreateStockRouteParams>({
     mutationFn: async (params) => {
       const { urlPath, init } = stdbBffCommandPost('create_stock_route', {
-        params: stdbParamsToJson(params as object),
+        params: stdbParamsToJson(params as object, 'CreateStockRouteParams'),
       });
       const r = await apiFetch(urlPath, init);
       if (!r.ok) throw new Error('Failed to create stock route');
@@ -944,7 +963,7 @@ export function useCreateStockRule(
   return useMutation<void, Error, CreateStockRuleParams>({
     mutationFn: async (params) => {
       const { urlPath, init } = stdbBffCommandPost('create_stock_rule', {
-        params: stdbParamsToJson(params as object),
+        params: stdbParamsToJson(params as object, 'CreateStockRuleParams'),
       });
       const r = await apiFetch(urlPath, init);
       if (!r.ok) throw new Error('Failed to create stock rule');
@@ -1013,7 +1032,7 @@ export function useCreateWarehouseTask(
     mutationFn: async (params) => {
       const { urlPath, init } = stdbBffCommandPost('create_warehouse_task', {
         companyId: companyId,
-        params: stdbParamsToJson(params as object),
+        params: stdbParamsToJson(params as object, 'CreateWarehouseTaskParams'),
       });
       const r = await apiFetch(urlPath, init);
       if (!r.ok) throw new Error('Failed to create warehouse task');
@@ -1113,33 +1132,25 @@ export function useCancelWarehouseTask(
 // ── Product Operations ───────────────────────────────────────────────────────
 
 
-export function useExecuteReplenishmentRule(
-  organizationId: bigint,
-  companyId?: bigint | null,
-) {
-  const qc = useQueryClient();
-  return useMutation<void, Error, { ruleId: ScalarId; idempotencyKey: string }>({
-    mutationFn: async ({ ruleId, idempotencyKey }) => {
-      if (companyId == null || companyId <= 0n) {
-        throw new Error('A selected company is required');
-      }
-      const { urlPath, init } = stdbBffCommandPost(
-        'execute_replenishment_rule',
-        {
-          companyId,
-          ruleId: toScalarU64(ruleId),
-          idempotencyKey,
-        },
-      );
-      const r = await apiFetch(urlPath, init);
-      if (!r.ok) throw new Error('Failed to execute replenishment rule');
-    },
-    onSuccess: () => {
-      const orgKey = rqBigIntKey(organizationId);
-      void qc.invalidateQueries({ queryKey: ['replenishment-rules', orgKey] });
-      void qc.invalidateQueries({ queryKey: ['stock-quants', orgKey] });
-    },
+/** Underlying command for the `inventory.replenishment.execute` workflow (`useReplenishmentExecutionWorkflow`). */
+export async function executeReplenishmentRuleCommand(
+  companyId: bigint,
+  ruleId: ScalarId,
+  idempotencyKey: string,
+): Promise<void> {
+  const { urlPath, init } = stdbBffCommandPost('execute_replenishment_rule', {
+    companyId,
+    ruleId: toScalarU64(ruleId),
+    idempotencyKey,
   });
+  const r = await apiFetch(urlPath, init);
+  if (!r.ok) {
+    throw workflowErrorFromResponse(
+      r.status,
+      await r.text().catch(() => ''),
+      'Failed to execute replenishment rule',
+    );
+  }
 }
 
 
@@ -1157,7 +1168,7 @@ export function useCreateStockQuant(
       );
       const merged = mergeReducerParams(base, params);
       const { urlPath, init } = stdbBffCommandPost('create_stock_quant', {
-        params: stdbParamsToJson(merged as object),
+        params: stdbParamsToJson(merged as object, 'CreateStockQuantParams'),
       });
       const r = await apiFetch(urlPath, init);
       if (!r.ok) throw new Error('Failed to create stock quant');

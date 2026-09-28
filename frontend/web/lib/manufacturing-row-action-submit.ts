@@ -106,7 +106,7 @@ export async function submitManufacturingRowAction(
           workcenterId: wcRaw,
         })
         if (!params) throw new Error("Work order name is required")
-        await m.createWorkorder.mutateAsync(params as unknown as Record<string, unknown>)
+        await m.createWorkorder.mutateAsync(params)
         return
       }
       default:
@@ -151,6 +151,21 @@ export async function submitManufacturingRowAction(
       await m.startWo.mutateAsync(woId)
       return
     }
+    if (action === "log_productivity") {
+      const workcenterId = idFrom(values, ["woWorkcenterId"])
+      if (!workcenterId) throw new Error("Work center ID is required")
+      const params = toCreateWorkcenterProductivityParams({
+        logWorkorderId: woId,
+        logDuration: values.woLogDuration,
+        logDescription: values.woLogDescription,
+      })
+      if (!params) throw new Error("Productivity duration is required")
+      await m.logProductivity.mutateAsync({
+        workcenterId,
+        params,
+      })
+      return
+    }
     if (action === "finish") {
       await m.finishWo.mutateAsync(woId)
       return
@@ -189,7 +204,7 @@ export async function submitManufacturingRowAction(
         if (!params) throw new Error(i18n.t("common.paramsMapper.invalidProductivityLog"))
         await m.logProductivity.mutateAsync({
           workcenterId: wcId,
-          params: params as unknown as Record<string, unknown>,
+          params,
         })
         return
       }

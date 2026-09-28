@@ -168,20 +168,98 @@ export function pickingStepsToDone(row: RowValueMap): readonly PickingStep[] | u
   return STEPS_FROM_STATE[pickingStateTag(row)]
 }
 
-/**
- * Where a validated picking's short-shipped remainder went: the backorder picking the reducer
- * created (linked by `backorder_id`), newest first. A validation without a backorder claims nothing.
- */
-export function observeValidatedPicking(pickingId: string, pickings: readonly RowValueMap[]): ObservedTransition {
-  const source = pickings.find((row) => rowId(row) === pickingId)
-  const backorders = pickings
-    .filter((row) => String(firstNonNullKey(row, "backorderId", "backorder_id") ?? "") === pickingId)
-    .sort((a, b) => Number(rowId(b)) - Number(rowId(a)))
-  if (backorders.length === 0) return source ? { outcome: "applied" } : {}
-  const context = firstNonNullKey(source ?? {}, "saleId", "sale_id") != null ? "sales" : undefined
+/** Exact same-record readback for confirm/assign/validate transitions. */
+export function observePickingState(
+  pickingId: string,
+  expectedState: "confirmed" | "assigned" | "done",
+  pickings: readonly RowValueMap[],
+): ObservedTransition {
+  const picking = pickings.find((row) => rowId(row) === pickingId)
+  if (!picking || pickingStateTag(picking) !== expectedState) return {}
   return {
     outcome: "applied",
-    createdRecords: backorders.map((row) => recordRef(pickingWorkflow.resource, rowId(row), pickingWorkflow.module, context)),
+    next: recordRef(pickingWorkflow.resource, pickingId, pickingWorkflow.module),
+  }
+}
+
+/** Parent-owned durable relation to every backorder picking created from this source. */
+export function pickingBackorderIds(
+  pickingId: string,
+  pickings: readonly RowValueMap[],
+): string[] | undefined {
+  const source = pickings.find((row) => rowId(row) === pickingId)
+  if (!source) return undefined
+  const value = firstNonNullKey(source, "backorderIds", "backorder_ids")
+  return Array.isArray(value) ? value.map(String) : []
+}
+
+/**
+ * Full validation readback: the source itself must be done. Existing backorders are surfaced from
+ * the source picking's durable `backorder_ids` relation rather than by scanning for newest rows.
+ */
+export function observeValidatedPicking(
+  pickingId: string,
+  pickings: readonly RowValueMap[],
+): ObservedTransition {
+  const source = pickings.find((row) => rowId(row) === pickingId)
+  if (!source || pickingStateTag(source) !== "done") return {}
+
+  const context = firstNonNullKey(source, "saleId", "sale_id") != null ? "sales" : undefined
+  const backorderIds = pickingBackorderIds(pickingId, pickings) ?? []
+  return {
+    outcome: "applied",
+    createdRecords:
+      backorderIds.length > 0
+        ? backorderIds.map((id) =>
+            recordRef(pickingWorkflow.resource, id, pickingWorkflow.module, context),
+          )
+        : undefined,
+    next: recordRef(pickingWorkflow.resource, pickingId, pickingWorkflow.module, context),
+  }
+}
+
+/**
+ * Partial validation must create exactly one new backorder on the source's durable relation.
+ * Zero/multiple deltas or a child that does not point back to the source are unresolved.
+ */
+export function observePartialValidatedPicking(
+  pickingId: string,
+  backorderIdsBefore: readonly string[],
+  pickings: readonly RowValueMap[],
+): ObservedTransition {
+  const source = pickings.find((row) => rowId(row) === pickingId)
+  if (!source || pickingStateTag(source) !== "done") return {}
+
+  const backorderIdsAfter = pickingBackorderIds(pickingId, pickings)
+  if (!backorderIdsAfter) return {}
+
+  const after = new Set(backorderIdsAfter)
+  if (backorderIdsBefore.some((id) => !after.has(id))) return {}
+
+  const before = new Set(backorderIdsBefore)
+  const created = backorderIdsAfter.filter((id) => !before.has(id))
+  if (created.length !== 1) return {}
+
+  const backorderId = created[0]
+  const backorder = pickings.find((row) => rowId(row) === backorderId)
+  if (
+    !backorder ||
+    String(firstNonNullKey(backorder, "backorderId", "backorder_id") ?? "") !== pickingId
+  ) {
+    return {}
+  }
+
+  const context = firstNonNullKey(source, "saleId", "sale_id") != null ? "sales" : undefined
+  const backorderRef = recordRef(
+    pickingWorkflow.resource,
+    backorderId,
+    pickingWorkflow.module,
+    context,
+  )
+  return {
+    outcome: "applied",
+    createdRecords: [backorderRef],
+    next: backorderRef,
   }
 }
 

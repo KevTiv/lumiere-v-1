@@ -1016,6 +1016,12 @@ export function toUpdateFiscalYearParams(formData: Record<string, unknown>): Rec
 export function accountPeriodStateTag(row: Record<string, unknown>): string {
   const v = row.state
   if (v != null && typeof v === 'object' && 'tag' in v) return String((v as { tag: string }).tag)
+  // SATS sum JSON from /api/query, e.g. `{ open: [] }` → "Open".
+  if (v != null && typeof v === 'object' && !Array.isArray(v)) {
+    const keys = Object.keys(v)
+    const key = keys.length === 1 ? keys[0] : undefined
+    if (key) return key.charAt(0).toUpperCase() + key.slice(1)
+  }
   return String(v ?? '')
 }
 

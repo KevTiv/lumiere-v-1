@@ -11,14 +11,14 @@ import type {
   AccountTaxQueryRow,
 } from "@lumiere/stdb/resource-reads"
 import { createStdbSdk } from "@lumiere/stdb/sdk"
-import { apiFetch } from "../../http"
+import { apiFetch, fetchQueryList } from "../../http"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import {
   paymentParamsToJson,
   type ClearablePatch,
 } from "@lumiere/erp-shared/accounting-create-params"
 import { stdbParamsToJson, encodeOptionalU64 } from "@lumiere/erp-shared/stdb-params-json"
-import { scalarToU64 as toScalarU64 } from "@lumiere/erp-shared/u64"
+import { parseStrictU64, scalarToU64 as toScalarU64 } from "@lumiere/erp-shared/u64"
 import type {
   AccountFiscalYear,
   AccountPeriod,
@@ -64,10 +64,103 @@ import {
 import { stdbInvalidationFor } from "@lumiere/contracts/stdb-reducer-invalidation"
 
 import { responseErrorMessage as parseCallError } from "@lumiere/api-client/response-error"
+import { AmbiguousOperationEffectError, type CanonicalRecordRef } from "../operation-effect"
 
 export type BankStatementImportWorkspace = {
   imports: Record<string, unknown>[]
   lines: Record<string, unknown>[]
+}
+
+export interface BankReconciliationLineProjection {
+  readonly id?: unknown
+  readonly organizationId?: unknown
+  readonly organization_id?: unknown
+  readonly statementId?: unknown
+  readonly statement_id?: unknown
+  readonly isReconciled?: unknown
+  readonly is_reconciled?: unknown
+  readonly moveIds?: unknown
+  readonly move_ids?: unknown
+  readonly amountResidual?: unknown
+  readonly amount_residual?: unknown
+}
+
+export interface BankReconciliationStatementProjection {
+  readonly id?: unknown
+  readonly organizationId?: unknown
+  readonly organization_id?: unknown
+  readonly companyId?: unknown
+  readonly company_id?: unknown
+  readonly state?: unknown
+}
+
+export interface BankReconciliationEffectRef extends CanonicalRecordRef {
+  readonly resource: "bank-statement-lines"
+  readonly statementId: string
+  readonly companyId: string
+  readonly moveLineIds: readonly string[]
+  readonly isReconciled: boolean
+}
+
+function enumTag(value: unknown): string {
+  if (typeof value === "string") return value.toLowerCase()
+  if (value && typeof value === "object" && !Array.isArray(value) && "tag" in value) {
+    return String((value as { tag?: unknown }).tag ?? "").toLowerCase()
+  }
+  return ""
+}
+
+function boolValue(value: unknown): boolean {
+  return value === true || String(value).toLowerCase() === "true"
+}
+
+function exactIdList(value: unknown): bigint[] | null {
+  if (!Array.isArray(value)) return null
+  const ids = value.map(parseStrictU64)
+  return ids.every((id): id is bigint => id != null) ? ids : null
+}
+
+export function resolveBankStatementReconciliationEffect(
+  lines: readonly BankReconciliationLineProjection[],
+  statements: readonly BankReconciliationStatementProjection[],
+  args: { organizationId: bigint; companyId: bigint; lineId: bigint; moveIds: readonly bigint[]; amountResidual: number },
+): BankReconciliationEffectRef | null {
+  const exact = <T extends { readonly id?: unknown }>(rows: readonly T[], id: bigint, name: string) => {
+    const matches = rows.filter((row) => parseStrictU64(row.id) === id)
+    if (matches.length > 1) throw new AmbiguousOperationEffectError(`Expected one ${name}, found ${matches.length}`)
+    return matches[0] ?? null
+  }
+  const line = exact(lines, args.lineId, "bank statement line")
+  if (!line) return null
+  const statementId = parseStrictU64(line.statementId ?? line.statement_id)
+  if (statementId == null) return null
+  const statement = exact(statements, statementId, "bank statement")
+  if (!statement) return null
+  const actualIds = exactIdList(line.moveIds ?? line.move_ids)
+  const expectedIds = [...args.moveIds].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0))
+  const sortedActual = actualIds?.slice().sort((a, b) => (a < b ? -1 : a > b ? 1 : 0))
+  const residual = Number(line.amountResidual ?? line.amount_residual)
+  const expectedReconciled = Math.abs(args.amountResidual) < 0.01
+  if (
+    parseStrictU64(line.organizationId ?? line.organization_id) !== args.organizationId ||
+    parseStrictU64(statement.organizationId ?? statement.organization_id) !== args.organizationId ||
+    parseStrictU64(statement.companyId ?? statement.company_id) !== args.companyId ||
+    enumTag(statement.state) !== "open" ||
+    boolValue(line.isReconciled ?? line.is_reconciled) !== expectedReconciled ||
+    !sortedActual ||
+    sortedActual.length !== expectedIds.length ||
+    sortedActual.some((id, index) => id !== expectedIds[index]) ||
+    !Number.isFinite(residual) ||
+    Math.abs(residual - args.amountResidual) > 0.000001
+  ) return null
+  return {
+    resource: "bank-statement-lines",
+    id: args.lineId.toString(),
+    statementId: statementId.toString(),
+    companyId: args.companyId.toString(),
+    moveLineIds: expectedIds.map(String),
+    isReconciled: expectedReconciled,
+  }
 }
 
 export function useAccountBankStatements(
@@ -288,6 +381,12 @@ export function useReconcileAccountBankStatementLine(organizationId: number, com
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (args: { lineId: bigint; params: Record<string, unknown> }) => {
+      const rawMoveIds = args.params.move_ids ?? args.params.moveIds
+      const moveIds = exactIdList(rawMoveIds)
+      const amountResidual = Number(args.params.amount_residual ?? args.params.amountResidual)
+      if (!moveIds || moveIds.length === 0 || !Number.isFinite(amountResidual)) {
+        throw new Error("Valid move line ids and residual are required")
+      }
       const { urlPath, init } = stdbBffCommandPost("reconcile_account_bank_statement_line", {
         companyId,
         lineId: args.lineId,
@@ -295,6 +394,19 @@ export function useReconcileAccountBankStatementLine(organizationId: number, com
       })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
+      const [lines, statements] = await Promise.all([
+        fetchQueryList("/api/query/bank-statement-lines", "Failed to read reconciled bank line"),
+        fetchQueryList("/api/query/bank-statements", "Failed to read parent bank statement"),
+      ])
+      const effect = resolveBankStatementReconciliationEffect(lines, statements, {
+        organizationId: BigInt(organizationId),
+        companyId,
+        lineId: args.lineId,
+        moveIds,
+        amountResidual,
+      })
+      if (!effect) throw new Error("Bank reconciliation result did not read back exactly")
+      return effect
     },
     onSuccess: () => invalidateBankStatementQueries(qc, organizationId),
   })

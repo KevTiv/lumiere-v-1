@@ -27,6 +27,7 @@ pub fn run_all_inventory_tests(ctx: &ReducerContext) -> Result<(), String> {
     run_inventory_lot_validate_test(ctx)?;
     run_inventory_expired_lot_test(ctx)?;
     run_inventory_fefo_test(ctx)?;
+    run_inventory_lot_move_test(ctx)?;
     run_inventory_serial_id_validate_test(ctx)?;
     run_inventory_replenishment_demand_test(ctx)?;
     run_inventory_qc_quarantine_test(ctx)?;
@@ -37,6 +38,7 @@ pub fn run_all_inventory_tests(ctx: &ReducerContext) -> Result<(), String> {
     run_inventory_cartonization_test(ctx)?;
     run_inventory_consignment_atp_test(ctx)?;
     run_inventory_cross_dock_test(ctx)?;
+    run_inventory_warehouse_qc_location_test(ctx)?;
     run_inventory_directed_putaway_test(ctx)?;
     run_inventory_close_valuation_test(ctx)?;
     run_inventory_packing_workflow_test(ctx)?;
@@ -147,6 +149,11 @@ pub fn run_inventory_fefo_test(ctx: &ReducerContext) -> Result<(), String> {
 }
 
 #[spacetimedb::reducer]
+pub fn run_inventory_lot_move_test(ctx: &ReducerContext) -> Result<(), String> {
+    gap_fixes_test::test_lot_tracked_quant_move(ctx).map_err(|e| format!("lot_move: {e}"))
+}
+
+#[spacetimedb::reducer]
 pub fn run_inventory_serial_id_validate_test(ctx: &ReducerContext) -> Result<(), String> {
     gap_fixes_test::test_serial_id_on_validate(ctx).map_err(|e| format!("serial_id_validate: {e}"))
 }
@@ -154,13 +161,19 @@ pub fn run_inventory_serial_id_validate_test(ctx: &ReducerContext) -> Result<(),
 #[spacetimedb::reducer]
 pub fn run_inventory_replenishment_demand_test(ctx: &ReducerContext) -> Result<(), String> {
     gap_fixes_test::test_replenishment_creates_draft_po(ctx)
-        .map_err(|e| format!("replenishment_demand: {e}"))
+        .map_err(|e| format!("replenishment_demand: {e}"))?;
+    gap_fixes_test::test_replenishment_scheduled_run_reschedules(ctx)
+        .map_err(|e| format!("replenishment_scheduled_run: {e}"))
 }
 
 #[spacetimedb::reducer]
 pub fn run_inventory_qc_quarantine_test(ctx: &ReducerContext) -> Result<(), String> {
     gap_fixes_test::test_quality_fail_quarantines_from_atp(ctx)
-        .map_err(|e| format!("qc_quarantine: {e}"))
+        .map_err(|e| format!("qc_quarantine: {e}"))?;
+    gap_fixes_test::test_quality_fail_ambiguous_source_rejected(ctx)
+        .map_err(|e| format!("qc_ambiguous_source: {e}"))?;
+    gap_fixes_test::test_quality_fail_ambiguous_destination_rejected(ctx)
+        .map_err(|e| format!("qc_ambiguous_destination: {e}"))
 }
 
 #[spacetimedb::reducer]
@@ -200,6 +213,12 @@ pub fn run_inventory_consignment_atp_test(ctx: &ReducerContext) -> Result<(), St
 #[spacetimedb::reducer]
 pub fn run_inventory_cross_dock_test(ctx: &ReducerContext) -> Result<(), String> {
     gap_fixes_test::test_cross_dock_creates_outbound(ctx).map_err(|e| format!("cross_dock: {e}"))
+}
+
+#[spacetimedb::reducer]
+pub fn run_inventory_warehouse_qc_location_test(ctx: &ReducerContext) -> Result<(), String> {
+    gap_fixes_test::test_update_warehouse_qc_location(ctx)
+        .map_err(|e| format!("warehouse_qc_location: {e}"))
 }
 
 #[spacetimedb::reducer]

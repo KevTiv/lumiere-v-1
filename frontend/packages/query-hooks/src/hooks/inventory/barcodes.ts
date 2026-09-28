@@ -150,7 +150,7 @@ export function useCreateBarcodeRule(
   return useMutation<void, Error, CreateBarcodeRuleParams>({
     mutationFn: async (params) => {
       const { urlPath, init } = stdbBffCommandPost('create_barcode_rule', {
-        params: stdbParamsToJson(params as object),
+        params: stdbParamsToJson(params as object, 'CreateBarcodeRuleParams'),
       });
       const r = await apiFetch(urlPath, init);
       if (!r.ok) throw new Error('Failed to create barcode rule');
@@ -215,7 +215,7 @@ export function useRecordBarcodeScan(
   return useMutation<void, Error, RecordBarcodeScanParams>({
     mutationFn: async (params) => {
       const { urlPath, init } = stdbBffCommandPost('record_barcode_scan', {
-        params: stdbParamsToJson(params as object),
+        params: stdbParamsToJson(params as object, 'RecordBarcodeScanParams'),
       });
       const r = await apiFetch(urlPath, init);
       if (!r.ok) throw new Error('Failed to record barcode scan');

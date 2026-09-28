@@ -45,4 +45,4 @@ This certifies one full-quantity stock receipt. It does not certify partial rece
 
 ## Next bounded Purchasing slice
 
-Certify **vendor-bill creation from the received PO**. Replace the current `invoice_ids.at(-1)` semantic readback with an exact released PO→bill relation before claiming the bill result.
+COV-05c now owns vendor-bill creation and replaces `invoice_ids.at(-1)` with an exact pre/post PO relation delta. After COV-05c, prefer three-way-match rejection/recovery or partial receipt/backorder billing; bill posting/payment converges with COV-08 Accounting.

@@ -11,6 +11,26 @@ import {
 } from "./stdb-params-json"
 
 describe("stdbParamsToJson", () => {
+  it("fills every Option field of nested BOM lines", () => {
+    const params = stdbParamsToJson(
+      {
+        productId: 5n,
+        lines: [{ productId: 7n, productQty: 2, productUomId: 1n, operationId: 9n }],
+      },
+      "CreateBomParams",
+    )
+    assert.deepEqual(params.lines, [
+      {
+        product_id: 7,
+        product_qty: 2,
+        product_uom_id: 1,
+        operation_id: { some: 9 },
+        child_bom_id: { none: [] },
+        metadata: { none: [] },
+      },
+    ])
+  })
+
   it("converts top-level camelCase keys to snake_case", () => {
     assert.deepEqual(
       stdbParamsToJson({ contactName: "Ada", partnerId: 1n }),

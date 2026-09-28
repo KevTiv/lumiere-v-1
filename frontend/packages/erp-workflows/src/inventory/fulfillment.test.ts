@@ -5,7 +5,10 @@ import {
   INVENTORY_QUERY_RESOURCES,
   PICKING_ORDER_RESOURCES,
   PICKING_TRANSITION_AFFECTS,
+  observePartialValidatedPicking,
+  observePickingState,
   observeValidatedPicking,
+  pickingBackorderIds,
   packPickingAction,
   partialValidatePickingAction,
   isPickingActionApplicable,
@@ -77,21 +80,81 @@ test("a picking transition refreshes stock and the orders that originated it", (
   assert.equal(new Set(INVENTORY_QUERY_RESOURCES).size, INVENTORY_QUERY_RESOURCES.length, "no duplicates")
 })
 
-test("validating with a backorder links the newest backorder picking, keeping the sales context", () => {
-  const observed = observeValidatedPicking("5", [
-    { id: 5, saleId: 2, state: "done" },
+test("confirm and assign require the same picking id at the expected state", () => {
+  assert.deepEqual(
+    observePickingState("5", "confirmed", [{ id: 5, state: "confirmed" }]),
+    {
+      outcome: "applied",
+      next: { resource: "stock_picking", id: "5", module: "inventory" },
+    },
+  )
+  assert.deepEqual(
+    observePickingState("5", "assigned", [{ id: 5, state: "confirmed" }]),
+    {},
+  )
+  assert.deepEqual(observePickingState("5", "done", [{ id: 6, state: "done" }]), {})
+})
+
+test("full validation reports backorders from the source-owned relation", () => {
+  const rows = [
+    { id: 5, saleId: 2, state: "done", backorderIds: [8, 9] },
     { id: 8, backorderId: 5, saleId: 2 },
     { id: 9, backorderId: 5, saleId: 2 },
     { id: 10, backorderId: 6 },
-  ])
+  ]
+  assert.deepEqual(pickingBackorderIds("5", rows), ["8", "9"])
+
+  const observed = observeValidatedPicking("5", rows)
   assert.equal(observed.outcome, "applied")
-  assert.deepEqual(observed.createdRecords?.map((r) => r.id), ["9", "8"])
-  assert.deepEqual(observed.createdRecords?.[0], { resource: "stock_picking", id: "9", module: "inventory", context: "sales" })
-  assert.equal(observed.next, undefined)
+  assert.deepEqual(observed.createdRecords?.map((r) => r.id), ["8", "9"])
+  assert.deepEqual(observed.createdRecords?.[0], {
+    resource: "stock_picking",
+    id: "8",
+    module: "inventory",
+    context: "sales",
+  })
+  assert.deepEqual(observed.next, {
+    resource: "stock_picking",
+    id: "5",
+    module: "inventory",
+    context: "sales",
+  })
 })
 
-test("validating in full claims no created record, and an unknown picking claims nothing", () => {
-  assert.deepEqual(observeValidatedPicking("5", [{ id: 5, state: "done" }]), { outcome: "applied" })
+test("partial validation resolves exactly one new backorder from the parent relation", () => {
+  const observed = observePartialValidatedPicking("5", ["7"], [
+    { id: 5, saleId: 2, state: "done", backorderIds: [7, 11] },
+    { id: 7, backorderId: 5 },
+    { id: 11, backorderId: 5, state: "draft" },
+  ])
+  assert.deepEqual(observed.createdRecords, [
+    { resource: "stock_picking", id: "11", module: "inventory", context: "sales" },
+  ])
+  assert.deepEqual(observed.next, observed.createdRecords?.[0])
+
+  assert.deepEqual(
+    observePartialValidatedPicking("5", ["7"], [
+      { id: 5, state: "done", backorderIds: [7, 11, 12] },
+      { id: 11, backorderId: 5 },
+      { id: 12, backorderId: 5 },
+    ]),
+    {},
+  )
+  assert.deepEqual(
+    observePartialValidatedPicking("5", [], [
+      { id: 5, state: "done", backorderIds: [11] },
+      { id: 11, backorderId: 99 },
+    ]),
+    {},
+  )
+})
+
+test("validating in full requires done state and returns the same picking", () => {
+  assert.deepEqual(observeValidatedPicking("5", [{ id: 5, state: "done" }]), {
+    outcome: "applied",
+    next: { resource: "stock_picking", id: "5", module: "inventory" },
+  })
+  assert.deepEqual(observeValidatedPicking("5", [{ id: 5, state: "assigned" }]), {})
   assert.deepEqual(observeValidatedPicking("5", []), {})
 })
 

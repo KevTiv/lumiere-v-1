@@ -187,11 +187,44 @@ export function observeAwardedRfq(rfqId: string, orders: readonly RowValueMap[])
   return { outcome: "applied", createdRecords: [order], next: order }
 }
 
-/** The reducer appends the new bill to the PO's `invoice_ids`: the last entry is the bill this command produced. */
-export function observeCreatedBill(orderId: string, orders: readonly RowValueMap[]): ObservedTransition {
-  const last = idList(findRow(orders, orderId) ?? {}, "invoiceIds", "invoice_ids").at(-1)
-  if (!last) return {}
-  const bill = recordRef(invoiceWorkflow.resource, last, invoiceWorkflow.module, purchaseOrderWorkflow.module)
+/** Canonical PO-owned bill relation, normalized for pre/post effect comparison. */
+export function purchaseOrderInvoiceIds(
+  orderId: string,
+  orders: readonly RowValueMap[],
+): string[] | undefined {
+  const order = findRow(orders, orderId)
+  if (!order) return undefined
+  return idList(order, "invoiceIds", "invoice_ids")
+}
+
+/**
+ * Resolve the bill created by one invocation from the durable PO→bill relation.
+ *
+ * The caller snapshots `invoice_ids` immediately before dispatch. Post-read succeeds only when
+ * every prior id is still present and exactly one new id appeared. Zero or multiple new ids are
+ * intentionally unresolved; we never choose the last/highest bill.
+ */
+export function observeCreatedBill(
+  orderId: string,
+  invoiceIdsBefore: readonly string[],
+  orders: readonly RowValueMap[],
+): ObservedTransition {
+  const invoiceIdsAfter = purchaseOrderInvoiceIds(orderId, orders)
+  if (!invoiceIdsAfter) return {}
+
+  const after = new Set(invoiceIdsAfter)
+  if (invoiceIdsBefore.some((id) => !after.has(id))) return {}
+
+  const before = new Set(invoiceIdsBefore)
+  const created = invoiceIdsAfter.filter((id) => !before.has(id))
+  if (created.length !== 1) return {}
+
+  const bill = recordRef(
+    invoiceWorkflow.resource,
+    created[0],
+    invoiceWorkflow.module,
+    purchaseOrderWorkflow.module,
+  )
   return { outcome: "applied", createdRecords: [bill], next: bill }
 }
 

@@ -7,10 +7,15 @@ import { useQuery, useMutation, useQueryClient, type QueryClient } from '@tansta
 import { apiFetch, fetchQueryList, rqBigIntKey } from "../http"
 import { withCompanyScope } from "@lumiere/erp-shared/org-scoped"
 import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
+import { useConfirmManufacturingOrder } from "./manufacturing-order-confirmation"
+import { useConsumeMoMaterials, useStartManufacturingOrder } from "./manufacturing-material-consumption"
+import { useFinishManufacturingOrder, useProduceManufacturingOrder } from "./manufacturing-production-close"
+import { useFinishWorkorder, useLogWorkcenterProductivity, useStartWorkorder } from "./manufacturing-workorder-execution"
 import type {
   CreateBomParams,
   CreateMrpProductionParams,
   CreateWorkcenterParams,
+  CreateWorkorderParams,
   MrpBom,
   MrpBomLine,
   MrpProduction,
@@ -177,56 +182,6 @@ export function useCreateWorkcenter(organizationId: bigint, companyId?: bigint) 
   })
 }
 
-export function useConfirmManufacturingOrder(organizationId: bigint, companyId: bigint) {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: async (productionId: string | number | bigint) => {
-      if (!companyId) throw new Error("Active company required")
-      const { urlPath, init } = stdbBffCommandPost("confirm_manufacturing_order", { companyId: companyId, moId: productionId })
-      const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error('Failed to confirm manufacturing order')
-    },
-    onSuccess: () => {
-      invalidateMrpProductions(qc, organizationId)
-      invalidateMrpWorkorders(qc, organizationId)
-    },
-  })
-}
-
-export function useStartManufacturingOrder(organizationId: bigint, companyId: bigint) {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: async (productionId: string | number | bigint) => {
-      if (!companyId) throw new Error("Active company required")
-      const { urlPath, init } = stdbBffCommandPost("start_manufacturing_order", { companyId: companyId, moId: productionId })
-      const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error('Failed to start manufacturing order')
-    },
-    onSuccess: () => {
-      invalidateMrpProductions(qc, organizationId)
-      invalidateMrpWorkorders(qc, organizationId)
-    },
-  })
-}
-
-export function useFinishManufacturingOrder(organizationId: bigint, companyId: bigint) {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: async (productionId: string | number | bigint) => {
-      if (!companyId) throw new Error("Active company required")
-      const { urlPath, init } = stdbBffCommandPost("finish_manufacturing_order", { companyId: companyId, moId: productionId })
-      const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error('Failed to finish manufacturing order')
-    },
-    onSuccess: () => {
-      invalidateMrpProductions(qc, organizationId)
-      invalidateMrpWorkorders(qc, organizationId)
-      // Finishing an MO posts finished-goods stock moves — refresh inventory quants.
-      void qc.invalidateQueries({ queryKey: ['stock-quants', rqBigIntKey(organizationId)] })
-    },
-  })
-}
-
 export function useCancelManufacturingOrder(organizationId: bigint, companyId: bigint) {
   const qc = useQueryClient()
   return useMutation({
@@ -239,39 +194,6 @@ export function useCancelManufacturingOrder(organizationId: bigint, companyId: b
     onSuccess: () => {
       invalidateMrpProductions(qc, organizationId)
       invalidateMrpWorkorders(qc, organizationId)
-    },
-  })
-}
-
-export function useStartWorkorder(organizationId: bigint, companyId: bigint) {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: async (workorderId: string | number | bigint) => {
-      if (!companyId) throw new Error("Active company required")
-      const { urlPath, init } = stdbBffCommandPost("start_workorder", { companyId: companyId, workorderId: workorderId })
-      const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error('Failed to start workorder')
-    },
-    onSuccess: () => {
-      invalidateMrpWorkorders(qc, organizationId)
-      invalidateMrpProductions(qc, organizationId)
-    },
-  })
-}
-
-export function useFinishWorkorder(organizationId: bigint, companyId: bigint) {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: async (workorderId: string | number | bigint) => {
-      if (!companyId) throw new Error("Active company required")
-      const { urlPath, init } = stdbBffCommandPost("finish_workorder", { companyId: companyId, workorderId: workorderId })
-      const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error('Failed to finish workorder')
-    },
-    onSuccess: () => {
-      invalidateMrpWorkorders(qc, organizationId)
-      invalidateMrpProductions(qc, organizationId)
-      invalidateMrpWorkcenters(qc, organizationId)
     },
   })
 }
@@ -329,46 +251,13 @@ export function useCheckMoAvailability(organizationId: bigint, companyId: bigint
   })
 }
 
-export function useProduceManufacturingOrder(organizationId: bigint, companyId: bigint) {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: async ({ moId, qty }: { moId: string | number | bigint; qty: number }) => {
-      if (!companyId) throw new Error("Active company required")
-      const { urlPath, init } = stdbBffCommandPost("produce_manufacturing_order", { companyId: companyId, moId: moId, qtyProducing: qty })
-      const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error(await parseCallError(r))
-    },
-    onSuccess: () => {
-      invalidateMrpProductions(qc, organizationId)
-      // Producing posts stock moves — refresh quants.
-      void qc.invalidateQueries({ queryKey: ['stock-quants', rqBigIntKey(organizationId)] })
-    },
-  })
-}
-
-export function useConsumeMoMaterials(organizationId: bigint, companyId: bigint) {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: async (moId: string | number | bigint) => {
-      if (!companyId) throw new Error("Active company required")
-      const { urlPath, init } = stdbBffCommandPost("consume_mo_materials", { companyId: companyId, moId: moId })
-      const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error(await parseCallError(r))
-    },
-    onSuccess: () => {
-      invalidateMrpProductions(qc, organizationId)
-      // Consumption moves material stock — refresh quants.
-      void qc.invalidateQueries({ queryKey: ['stock-quants', rqBigIntKey(organizationId)] })
-    },
-  })
-}
-
-/** Params match generated `CreateWorkorderParams` (camelCase JSON). */
 export function useCreateWorkorder(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async (params: Record<string, unknown>) => {
-      const { urlPath, init } = stdbBffCommandPost("create_workorder", { params: params })
+    mutationFn: async (params: CreateWorkorderParams) => {
+      const { urlPath, init } = stdbBffCommandPost("create_workorder", {
+        params: stdbParamsToJson(params, "CreateWorkorderParams"),
+      })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -466,29 +355,6 @@ export function useUpdateWorkcenter(organizationId: bigint, companyId: bigint) {
     },
     onSuccess: () =>
       qc.invalidateQueries({ queryKey: ['mrp-workcenters', rqBigIntKey(organizationId)] }),
-  })
-}
-
-export function useLogWorkcenterProductivity(organizationId: bigint, companyId: bigint) {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: async ({
-      workcenterId,
-      params,
-    }: {
-      workcenterId: string | number | bigint
-      params: Record<string, unknown>
-    }) => {
-      if (!companyId) throw new Error("Active company required")
-      const { urlPath, init } = stdbBffCommandPost("log_workcenter_productivity", { workcenterId: workcenterId, params: params })
-      const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error(await parseCallError(r))
-    },
-    onSuccess: () => {
-      invalidateMrpWorkcenters(qc, organizationId)
-      // Productivity log targets a workorder — workorder totals may update.
-      invalidateMrpWorkorders(qc, organizationId)
-    },
   })
 }
 
@@ -602,7 +468,7 @@ export function useManufacturingMutations(organizationId: bigint, companyId: big
     computeBomCost: useComputeBomCost(organizationId, companyId),
     explodeBom: useExplodeBom(organizationId, companyId),
     updateWorkcenter: useUpdateWorkcenter(organizationId, companyId),
-    logProductivity: useLogWorkcenterProductivity(organizationId, companyId),
+    logProductivity: useLogWorkcenterProductivity(organizationId),
     importWorkcenterCsv: useImportWorkcenterCsv(organizationId, companyId),
     importBomCsv: useImportBomCsv(organizationId, companyId),
     importBomLineCsv: useImportBomLineCsv(organizationId, companyId),
@@ -614,6 +480,11 @@ export function useManufacturingMutations(organizationId: bigint, companyId: big
 }
 
 export type ManufacturingMutations = ReturnType<typeof useManufacturingMutations>
+
+export { useConfirmManufacturingOrder }
+export { useConsumeMoMaterials, useStartManufacturingOrder }
+export { useFinishManufacturingOrder, useProduceManufacturingOrder }
+export { useFinishWorkorder, useLogWorkcenterProductivity, useStartWorkorder }
 
 // ── Types (re-exported so client components import from one place) ────────────
 export type {
