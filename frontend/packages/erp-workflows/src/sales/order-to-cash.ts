@@ -168,6 +168,13 @@ export const SALE_ORDER_LOCK_AFFECTS = ["sale-orders"] as const
 /** `update_sale_order` edits header fields and can re-price lines (pricelist, warehouse). */
 export const UPDATE_SALE_ORDER_AFFECTS = ["sale-orders", "sale-order-lines"] as const
 
+/** `accept_sale_order_quotation` records the signer and signing time on the order itself. */
+export const isQuotationSignedBy =
+  (signedBy: string) =>
+  (row: RowValueMap): boolean =>
+    String(firstNonNullKey(row, "signedBy", "signed_by") ?? "") === signedBy.trim() &&
+    firstNonNullKey(row, "signedOn", "signed_on") != null
+
 export const isSaleOrderLocked = (row: RowValueMap): boolean =>
   Boolean(firstNonNullKey(row, "isLocked", "is_locked"))
 

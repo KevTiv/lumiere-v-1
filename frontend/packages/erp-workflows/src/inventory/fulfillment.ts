@@ -172,13 +172,35 @@ export function pickingStepsToDone(row: RowValueMap): readonly PickingStep[] | u
 /** Exact same-record readback for confirm/assign/validate transitions. */
 export function observePickingState(
   pickingId: string,
-  expectedState: "confirmed" | "assigned" | "done",
+  expectedState: "confirmed" | "assigned" | "done" | "cancel",
   pickings: readonly RowValueMap[],
 ): ObservedTransition {
   const picking = pickings.find((row) => rowId(row) === pickingId)
   if (!picking || pickingStateTag(picking) !== expectedState) return {}
   return {
     outcome: "applied",
+    next: recordRef(pickingWorkflow.resource, pickingId, pickingWorkflow.module),
+  }
+}
+
+/** Packages created for this picking (the child-owned `stock_package.picking_id` relation). */
+export function pickingPackageIds(pickingId: string, packages: readonly RowValueMap[]): string[] {
+  return packages
+    .filter((row) => String(firstNonNullKey(row, "pickingId", "picking_id") ?? "") === pickingId)
+    .map(rowId)
+}
+
+/** `pack_stock_picking` creates one package on the picking: exactly one new package id is the effect. */
+export function observePackedPicking(
+  pickingId: string,
+  packageIdsBefore: readonly string[],
+  packages: readonly RowValueMap[],
+): ObservedTransition {
+  const created = singleAddedId(packageIdsBefore, pickingPackageIds(pickingId, packages))
+  if (!created) return {}
+  return {
+    outcome: "applied",
+    createdRecords: [recordRef("stock_package", created, pickingWorkflow.module)],
     next: recordRef(pickingWorkflow.resource, pickingId, pickingWorkflow.module),
   }
 }

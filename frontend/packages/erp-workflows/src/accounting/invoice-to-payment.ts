@@ -75,6 +75,18 @@ export function isPaymentRegistrable(row: RowValueMap): boolean {
   return normalizedTag(firstNonNullKey(row, "state")) === "paid"
 }
 
+/** `register_payment_on_invoice` records every applied invoice (or bill) on the payment. */
+export const isPaymentReconciledWith =
+  (invoiceIds: readonly (string | number | bigint)[], isBill: boolean) =>
+  (row: RowValueMap): boolean => {
+    const value = isBill
+      ? firstNonNullKey(row, "reconciledBillIds", "reconciled_bill_ids")
+      : firstNonNullKey(row, "reconciledInvoiceIds", "reconciled_invoice_ids")
+    if (invoiceIds.length === 0 || !Array.isArray(value)) return false
+    const reconciled = new Set(value.map(String))
+    return invoiceIds.every((id) => reconciled.has(String(id)))
+  }
+
 export function postInvoiceAction(options: {
   label: string
   execute(moveId: string, context?: WorkflowExecuteContext): Promise<WorkflowResult>

@@ -18,6 +18,7 @@ import {
   observeConfirmedOrder,
   observeCreatedInvoice,
   saleOrderInvoiceIds,
+  isQuotationSignedBy,
 } from "./order-to-cash"
 
 test("only draft and sent orders offer confirm, including enum-shaped state", () => {
@@ -146,4 +147,10 @@ test("only an unlocked draft or sent order can have its header edited", () => {
   assert.ok(isSaleOrderEditable({ state: { tag: "Sent" } }))
   assert.ok(!isSaleOrderEditable({ state: "Draft", isLocked: true }))
   assert.ok(!isSaleOrderEditable({ state: "Sale" }))
+})
+
+test("an accepted quotation is confirmed by its recorded signer and signing time", () => {
+  assert.ok(isQuotationSignedBy(" Ada ")({ id: 5, signedBy: "Ada", signedOn: 1 }))
+  assert.ok(!isQuotationSignedBy("Ada")({ id: 5, signedBy: "Ada", signedOn: null }))
+  assert.ok(!isQuotationSignedBy("Ada")({ id: 5, signed_by: "Bob", signed_on: 1 }))
 })

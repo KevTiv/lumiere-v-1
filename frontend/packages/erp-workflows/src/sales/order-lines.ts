@@ -7,9 +7,13 @@
  */
 
 import { recordAction, type WorkflowAction, type WorkflowExecuteContext } from "../core/action"
+import { singleAddedId } from "../core/effect-delta"
+import { recordRef } from "../core/record-ref"
 import type { WorkflowResult } from "../core/result"
+import { rowId } from "../core/row"
+import type { ObservedTransition } from "../core/transition"
 import { defineWorkflow } from "../core/workflow"
-import type { RowValueMap } from "@lumiere/erp-shared/row-values"
+import { firstNonNullKey, type RowValueMap } from "@lumiere/erp-shared/row-values"
 
 export const saleOrderLineWorkflow = defineWorkflow({
   id: "sales.order-line",
@@ -18,6 +22,33 @@ export const saleOrderLineWorkflow = defineWorkflow({
 })
 
 export const SALE_ORDER_LINE_AFFECTS = ["sale-order-lines", "sale-orders"] as const
+
+/** The order-owned `order_line` relation, normalized for pre/post effect comparison. */
+export function saleOrderLineIds(orderId: string, orders: readonly RowValueMap[]): string[] | undefined {
+  const order = orders.find((row) => rowId(row) === orderId)
+  if (!order) return undefined
+  const ids = firstNonNullKey(order, "orderLine", "order_line")
+  return Array.isArray(ids) ? ids.map(String) : []
+}
+
+/** `create_sale_order_line` appends the new line to the order: exactly one new id is the line. */
+export function observeCreatedSaleOrderLine(
+  orderId: string,
+  lineIdsBefore: readonly string[],
+  orders: readonly RowValueMap[],
+): ObservedTransition {
+  const created = singleAddedId(lineIdsBefore, saleOrderLineIds(orderId, orders))
+  if (!created) return {}
+  return {
+    outcome: "applied",
+    createdRecords: [recordRef(saleOrderLineWorkflow.resource, created, saleOrderLineWorkflow.module)],
+  }
+}
+
+/** `delete_sale_order_line` removes the line row itself; its absence is the effect. */
+export function observeDeletedSaleOrderLine(lineId: string, lines: readonly RowValueMap[]): ObservedTransition {
+  return lines.some((row) => rowId(row) === lineId) ? {} : { outcome: "applied" }
+}
 
 export interface CreateSaleOrderLineInput<TParams> {
   orderId: string
