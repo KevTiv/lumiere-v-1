@@ -110,7 +110,8 @@ Next bounded Manufacturing work is COV-07d: one exact work-order execution path 
 The remaining COV implementation must converge on the codebase's strongest existing patterns rather than add parallel conventions. Treat this as an implementation constraint for every new bounded slice:
 
 - consequential mutations use one canonical operation path: generated command dispatch, exact cache-independent readback, explicit affected resources, and typed unresolved/rejected outcomes; transport acceptance alone is never business success;
-- a workflow that declares canonical observation must fail closed as `outcome_unknown` when that observation itself fails; never silently downgrade failed readback to `applied`;
+- a workflow that declares canonical observation must fail closed as `outcome_unknown` when that observation itself fails, or when it completes without confirming the effect; never silently downgrade failed or empty readback to `applied`;
+- every `TransitionSpec` declares either `observe` or a reviewed `noReadback` reason (enforced by the type). An exemption names why no exact effect is readable yet, so removing it is a tracked follow-up rather than a silent default;
 - effect identity comes from stable primary keys or owned relations. Do not add newest/highest-row, first-match, global child-scan, or id-delta discovery;
 - decode/normalize transport/query shapes at a shared boundary where practical. New feature code should not introduce fresh `Record<string, unknown>` casts or duplicate camelCase/snake_case projection adapters unless the boundary genuinely cannot express the type yet;
 - domain invariants have one owner. Cross-domain workflows call that owner's operation/helper rather than reproducing its bookkeeping locally;

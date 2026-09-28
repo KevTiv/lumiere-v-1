@@ -12,11 +12,7 @@ export interface ObservedTransition {
   next?: ErpRecordRef
 }
 
-/**
- * One command's contract with the rest of the app. The command is a generated operation; this
- * only declares what it touches and how to find what it produced.
- */
-export interface TransitionSpec<TInput> {
+interface TransitionSpecBase<TInput> {
   id: string
   /** Executes the generated command. Throw a `WorkflowError`, or anything `toWorkflowError` accepts. */
   command(input: TInput): Promise<void>
@@ -24,13 +20,32 @@ export interface TransitionSpec<TInput> {
   affects: readonly string[]
   /** True when re-issuing the command cannot duplicate its effect. */
   idempotent?: boolean
-  /**
-   * Read canonical state after invalidation to resolve outcome and created/next records. Once
-   * declared, it must confirm the effect: a throw or a missing `outcome` is `outcome_unknown`.
-   * Omit it only when transport acceptance is the whole contract.
-   */
-  observe?(input: TInput): Promise<ObservedTransition>
 }
+
+interface ObservedTransitionSpec<TInput> extends TransitionSpecBase<TInput> {
+  /**
+   * Read canonical state after invalidation to resolve outcome and created/next records. It must
+   * confirm the effect: a throw or a missing `outcome` is `outcome_unknown`.
+   */
+  observe(input: TInput): Promise<ObservedTransition>
+  noReadback?: never
+}
+
+interface UnobservedTransitionSpec<TInput> extends TransitionSpecBase<TInput> {
+  observe?: never
+  /**
+   * Why transport acceptance is the whole contract for this command (no exact canonical effect to
+   * read back yet). Required so skipping readback is a reviewed decision, never a default.
+   */
+  noReadback: string
+}
+
+/**
+ * One command's contract with the rest of the app. The command is a generated operation; this
+ * declares what it touches and either how to confirm its effect (`observe`) or why it cannot yet
+ * (`noReadback`).
+ */
+export type TransitionSpec<TInput> = ObservedTransitionSpec<TInput> | UnobservedTransitionSpec<TInput>
 
 export interface TransitionNotice {
   kind: "success" | "info" | "error"

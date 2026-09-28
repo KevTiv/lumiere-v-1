@@ -4,7 +4,7 @@ import test from "node:test"
 import { createFakeCompletionPorts } from "../testing"
 import { WorkflowError, workflowErrorFromResponse, type WorkflowErrorKind } from "./errors"
 import { recordRef } from "./record-ref"
-import { completeTransition, newCorrelationId, type TransitionSpec } from "./transition"
+import { completeTransition, newCorrelationId, type ObservedTransition, type TransitionSpec } from "./transition"
 
 const failing = (kind: WorkflowErrorKind, status?: number): TransitionSpec<string> => ({
   id: "test.fail",
@@ -12,13 +12,18 @@ const failing = (kind: WorkflowErrorKind, status?: number): TransitionSpec<strin
     throw new WorkflowError(kind, `${kind} happened`, { status })
   },
   affects: ["sale-orders"],
+  noReadback: "test fixture",
 })
-const succeeding = (overrides: Partial<TransitionSpec<string>> = {}): TransitionSpec<string> => ({
-  id: "test.ok",
-  command: async () => undefined,
-  affects: ["sale-orders", "stock-pickings"],
-  ...overrides,
-})
+const succeeding = ({
+  command = async () => undefined,
+  observe,
+}: {
+  command?: (input: string) => Promise<void>
+  observe?: (input: string) => Promise<ObservedTransition>
+} = {}): TransitionSpec<string> => {
+  const base = { id: "test.ok", command, affects: ["sale-orders", "stock-pickings"] }
+  return observe ? { ...base, observe } : { ...base, noReadback: "test fixture" }
+}
 
 test("a stale or conflicting write did not commit but still refreshes what the user was looking at", async () => {
   for (const kind of ["stale_revision", "conflict", "not_found"] as const) {
@@ -132,6 +137,7 @@ test("a stale session's rejected command refreshes the view it was working from"
   const fake = createFakeCompletionPorts()
   const spec: TransitionSpec<string> = {
     id: "sales.order.confirm",
+    noReadback: "test fixture",
     affects: ["sale-orders", "stock-pickings"],
     command: async () => {
       throw workflowErrorFromResponse(422, '{"error":"Sale order must be in Draft, Sent, or ToApprove"}', "x")

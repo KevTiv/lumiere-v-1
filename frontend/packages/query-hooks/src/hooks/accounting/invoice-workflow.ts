@@ -4,10 +4,16 @@ import {
   POST_PAYMENT_AFFECTS,
   RECONCILE_PAYMENT_AFFECTS,
   WorkflowError,
+  isPaymentReconciledWith,
   observePostedInvoice,
+  observeSameRecord,
+  paymentWorkflow,
   postInvoiceAction,
   postPaymentAction,
+  recordRef,
+  stateIs,
   type AnyWorkflowAction,
+  type ObservedTransition,
   type RowValueMap,
   type TransitionSpec,
 } from "@lumiere/erp-workflows"
@@ -35,6 +41,18 @@ export interface RegisterPaymentInput {
   paymentId: bigint
   invoiceIds: bigint[]
   isBill: boolean
+}
+
+/** Payments read back from the canonical list, bypassing any cached view. */
+async function observePayment(
+  paymentId: bigint | string,
+  confirmed: (row: RowValueMap) => boolean,
+): Promise<ObservedTransition> {
+  return observeSameRecord(
+    recordRef(paymentWorkflow.resource, paymentId, paymentWorkflow.module),
+    await fetchQueryList("/api/query/account-payments", "Failed to read payment"),
+    confirmed,
+  )
 }
 
 export interface ReconcilePaymentInput {
@@ -84,6 +102,7 @@ export function useInvoiceToPaymentWorkflow(
       id: "accounting.payment.post",
       command: (paymentId) => postAccountPaymentCommand(BigInt(paymentId)),
       affects: POST_PAYMENT_AFFECTS,
+      observe: (paymentId) => observePayment(paymentId, stateIs("Paid")),
     }),
     [],
   )
@@ -93,6 +112,8 @@ export function useInvoiceToPaymentWorkflow(
       id: "accounting.payment.register",
       command: registerPaymentOnInvoiceCommand,
       affects: RECONCILE_PAYMENT_AFFECTS,
+      observe: ({ paymentId, invoiceIds, isBill }) =>
+        observePayment(paymentId, isPaymentReconciledWith(invoiceIds, isBill)),
     }),
     [],
   )
@@ -102,6 +123,7 @@ export function useInvoiceToPaymentWorkflow(
       id: "accounting.payment.reconcile",
       command: reconcilePaymentWithInvoiceCommand,
       affects: RECONCILE_PAYMENT_AFFECTS,
+      noReadback: "Pending COV-08's exact posted payment/invoice pair readback (resolveReconciliationEffect) on main.",
     }),
     [],
   )

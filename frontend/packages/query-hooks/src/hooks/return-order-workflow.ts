@@ -16,12 +16,17 @@ import {
   observeConfirmedReturn,
   observeCreatedReturnOrder,
   observeExchangeOrder,
+  observePickingState,
   observeReturnCreditNote,
+  observeSameRecord,
   pickingStepsToDone,
   receiveReturnAction,
+  recordRef,
+  returnOrderWorkflow,
   returnExchangeOrderIds,
   rowId,
   saleOrderReturnIds,
+  stateIs,
   type AnyWorkflowAction,
   type CreateReturnCreditNoteInput,
   type CreateReturnOrderInput,
@@ -99,12 +104,12 @@ export function useReturnOrderWorkflow(
         ),
     }
 
-    // A return raised without a sale order has no owning relation (and no client key) to read
-    // back, so it claims transport acceptance only and opens nothing.
     const createStandalone: TransitionSpec<CreateInput> = {
       id: "sales.return.create",
       command: ({ params }) => createReturnOrderCommand(companyId, params),
       affects: CREATE_RETURN_ORDER_AFFECTS,
+      noReadback:
+        "A return without a sale order has no owning relation or client key to identify it; needs a create_return_order idempotency key.",
     }
 
     const confirm: TransitionSpec<string> = {
@@ -128,12 +133,20 @@ export function useReturnOrderWorkflow(
         for (const step of steps) await stepCommands[step](pickingId)
       },
       affects: RECEIVE_RETURN_AFFECTS,
+      observe: async (pickingId) =>
+        observePickingState(pickingId, "done", await fresh<RowValueMap[]>(stockPickingsQueryOptions(organizationId))),
     }
 
     const cancel: TransitionSpec<string> = {
       id: "sales.return.cancel",
       command: (id) => cancelReturnOrderCommand(companyId, id),
       affects: CANCEL_RETURN_AFFECTS,
+      observe: async (id) =>
+        observeSameRecord(
+          recordRef(returnOrderWorkflow.resource, id, returnOrderWorkflow.module),
+          await fresh<RowValueMap[]>(returnOrdersQueryOptions(organizationId)),
+          stateIs("cancelled"),
+        ),
     }
 
     const exchange: TransitionSpec<ExchangeRunInput> = {

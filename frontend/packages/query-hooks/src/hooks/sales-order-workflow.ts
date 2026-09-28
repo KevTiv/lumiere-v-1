@@ -19,15 +19,22 @@ import {
   unlockSaleOrderAction,
   updateSaleOrderAction,
   createInvoiceFromSaleOrderAction,
+  isQuotationSignedBy,
+  isSaleOrderLocked,
   observeConfirmedOrder,
   observeCreatedInvoice,
+  observeSameRecord,
+  recordRef,
   saleOrderInvoiceIds,
+  saleOrderWorkflow,
   sendSaleOrderQuotationAction,
+  stateIs,
   type AcceptSaleOrderQuotationInput,
   type AnyWorkflowAction,
   type CreateInvoiceFromSaleOrderInput,
   type RowValueMap,
   type TransitionSpec,
+  type ObservedTransition,
   type UpdateSaleOrderInput,
 } from "@lumiere/erp-workflows"
 
@@ -75,6 +82,18 @@ export function useSaleOrderWorkflow(
   const qc = useQueryClient()
   const runner = useWorkflowRunner(organizationId, callbacks)
 
+  /** In-place transitions read the same order back and require the effect on it. */
+  const observeOrder = useMemo(
+    () =>
+      async (orderId: string, confirmed: (row: RowValueMap) => boolean): Promise<ObservedTransition> =>
+        observeSameRecord(
+          recordRef(saleOrderWorkflow.resource, orderId, saleOrderWorkflow.module),
+          (await qc.fetchQuery({ ...saleOrdersQueryOptions(organizationId), staleTime: 0 })) as unknown as RowValueMap[],
+          confirmed,
+        ),
+    [qc, organizationId],
+  )
+
   const confirmSpec = useMemo<TransitionSpec<string>>(
     () => ({
       id: "sales.order.confirm",
@@ -108,24 +127,25 @@ export function useSaleOrderWorkflow(
     [qc, organizationId],
   )
 
-  // Send, accept and cancel leave the order where it is (or end it), so there is no record to
-  // open next; the invalidation alone converges the order list.
   const sendQuotationSpec = useMemo<TransitionSpec<string>>(
     () => ({
       id: "sales.order.send-quotation",
       command: sendSaleOrderQuotationCommand,
       affects: SEND_SALE_ORDER_QUOTATION_AFFECTS,
+      observe: (orderId) => observeOrder(orderId, stateIs("Sent")),
     }),
-    [],
+    [observeOrder],
   )
 
+  // Acceptance keeps the order Sent; the signer recorded on it is the effect.
   const acceptQuotationSpec = useMemo<TransitionSpec<AcceptSaleOrderQuotationInput>>(
     () => ({
       id: "sales.order.accept-quotation",
       command: acceptSaleOrderQuotationCommand,
       affects: ACCEPT_SALE_ORDER_QUOTATION_AFFECTS,
+      observe: ({ orderId, signedBy }) => observeOrder(orderId, isQuotationSignedBy(signedBy)),
     }),
-    [],
+    [observeOrder],
   )
 
   const cancelSpec = useMemo<TransitionSpec<string>>(
@@ -133,8 +153,9 @@ export function useSaleOrderWorkflow(
       id: "sales.order.cancel",
       command: (orderId) => cancelSaleOrderCommand({ orderId }),
       affects: CANCEL_SALE_ORDER_AFFECTS,
+      observe: (orderId) => observeOrder(orderId, stateIs("Cancelled")),
     }),
-    [],
+    [observeOrder],
   )
 
   const totalsSpec = useMemo<TransitionSpec<string>>(
@@ -142,18 +163,29 @@ export function useSaleOrderWorkflow(
       id: "sales.order.compute-totals",
       command: computeSaleOrderTotalsCommand,
       affects: COMPUTE_SALE_ORDER_TOTALS_AFFECTS,
+      noReadback: "Idempotent recompute from lines: an unchanged total is a valid result, so no effect is distinguishable.",
     }),
     [],
   )
 
   const lockSpec = useMemo<TransitionSpec<string>>(
-    () => ({ id: "sales.order.lock", command: lockSaleOrderCommand, affects: SALE_ORDER_LOCK_AFFECTS }),
-    [],
+    () => ({
+      id: "sales.order.lock",
+      command: lockSaleOrderCommand,
+      affects: SALE_ORDER_LOCK_AFFECTS,
+      observe: (orderId) => observeOrder(orderId, isSaleOrderLocked),
+    }),
+    [observeOrder],
   )
 
   const unlockSpec = useMemo<TransitionSpec<string>>(
-    () => ({ id: "sales.order.unlock", command: unlockSaleOrderCommand, affects: SALE_ORDER_LOCK_AFFECTS }),
-    [],
+    () => ({
+      id: "sales.order.unlock",
+      command: unlockSaleOrderCommand,
+      affects: SALE_ORDER_LOCK_AFFECTS,
+      observe: (orderId) => observeOrder(orderId, (row) => !isSaleOrderLocked(row)),
+    }),
+    [observeOrder],
   )
 
   const updateSpec = useMemo<TransitionSpec<UpdateInput>>(
@@ -166,6 +198,8 @@ export function useSaleOrderWorkflow(
         return updateSaleOrderCommand(companyId, input)
       },
       affects: UPDATE_SALE_ORDER_AFFECTS,
+      noReadback:
+        "Partial header edit that can re-price lines: no single state or relation effect; the reducer rejects invalid input.",
     }),
     [companyId],
   )

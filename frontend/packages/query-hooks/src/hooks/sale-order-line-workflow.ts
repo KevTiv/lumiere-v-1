@@ -1,13 +1,18 @@
 import { useMemo } from "react"
-import type { QueryRow } from "../http"
+import { useQueryClient } from "@tanstack/react-query"
+import { fetchQueryList, type QueryRow } from "../http"
 import type { CreateSaleOrderLineParams } from "@lumiere/stdb/types"
 import {
   SALE_ORDER_LINE_AFFECTS,
   WorkflowError,
   createSaleOrderLineAction,
   deleteSaleOrderLineAction,
+  observeCreatedSaleOrderLine,
+  observeDeletedSaleOrderLine,
+  saleOrderLineIds,
   updateSaleOrderLineAction,
   type CreateSaleOrderLineInput,
+  type RowValueMap,
   type TransitionSpec,
   type UpdateSaleOrderLineInput,
 } from "@lumiere/erp-workflows"
@@ -15,6 +20,7 @@ import {
 import {
   createSaleOrderLineCommand,
   deleteSaleOrderLineCommand,
+  saleOrdersQueryOptions,
   updateSaleOrderLineCommand,
 } from "./sales"
 import { useWorkflowRunner, type WorkflowSurfaceCallbacks } from "./workflow"
@@ -27,6 +33,7 @@ export interface SaleOrderLineWorkflowLabels {
 
 type CreateInput = CreateSaleOrderLineInput<CreateSaleOrderLineParams>
 type UpdateInput = UpdateSaleOrderLineInput<QueryRow>
+type CreateRunInput = CreateInput & { lineIdsBefore: string[] }
 
 /**
  * `sales.order-line` record workflow. Each transition also invalidates `sale-orders`: the
@@ -38,11 +45,23 @@ export function useSaleOrderLineWorkflow(
   labels: SaleOrderLineWorkflowLabels,
   callbacks?: WorkflowSurfaceCallbacks,
 ) {
+  const qc = useQueryClient()
   const runner = useWorkflowRunner(organizationId, callbacks)
+  const freshOrders = useMemo(
+    () => async () =>
+      (await qc.fetchQuery({ ...saleOrdersQueryOptions(organizationId), staleTime: 0 })) as unknown as RowValueMap[],
+    [qc, organizationId],
+  )
 
-  const createSpec = useMemo<TransitionSpec<CreateInput>>(
-    () => ({ id: "sales.order-line.create", command: createSaleOrderLineCommand, affects: SALE_ORDER_LINE_AFFECTS }),
-    [],
+  const createSpec = useMemo<TransitionSpec<CreateRunInput>>(
+    () => ({
+      id: "sales.order-line.create",
+      command: ({ orderId, params }) => createSaleOrderLineCommand({ orderId, params }),
+      affects: SALE_ORDER_LINE_AFFECTS,
+      observe: async ({ orderId, lineIdsBefore }) =>
+        observeCreatedSaleOrderLine(orderId, lineIdsBefore, await freshOrders()),
+    }),
+    [freshOrders],
   )
 
   const updateSpec = useMemo<TransitionSpec<UpdateInput>>(
@@ -55,12 +74,22 @@ export function useSaleOrderLineWorkflow(
         return updateSaleOrderLineCommand(companyId, input)
       },
       affects: SALE_ORDER_LINE_AFFECTS,
+      noReadback: "Partial line edit re-priced by the reducer: no single state or relation effect to confirm.",
     }),
     [companyId],
   )
 
   const deleteSpec = useMemo<TransitionSpec<string>>(
-    () => ({ id: "sales.order-line.delete", command: deleteSaleOrderLineCommand, affects: SALE_ORDER_LINE_AFFECTS }),
+    () => ({
+      id: "sales.order-line.delete",
+      command: deleteSaleOrderLineCommand,
+      affects: SALE_ORDER_LINE_AFFECTS,
+      observe: async (lineId) =>
+        observeDeletedSaleOrderLine(
+          lineId,
+          await fetchQueryList("/api/query/sale-order-lines", "Failed to read sale order lines"),
+        ),
+    }),
     [],
   )
 
@@ -68,9 +97,15 @@ export function useSaleOrderLineWorkflow(
     () =>
       createSaleOrderLineAction<CreateSaleOrderLineParams>({
         label: labels.create,
-        execute: (input) => runner.run(`sales.order-line.create:${input.orderId}`, createSpec, input),
+        execute: async (input) => {
+          const lineIdsBefore = saleOrderLineIds(input.orderId, await freshOrders())
+          if (!lineIdsBefore) {
+            throw new WorkflowError("validation", "Sale order is unavailable for line readback")
+          }
+          return runner.run(`sales.order-line.create:${input.orderId}`, createSpec, { ...input, lineIdsBefore })
+        },
       }),
-    [labels.create, runner, createSpec],
+    [labels.create, runner, createSpec, freshOrders],
   )
 
   const update = useMemo(

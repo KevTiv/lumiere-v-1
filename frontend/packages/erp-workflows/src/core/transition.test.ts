@@ -4,14 +4,16 @@ import test from "node:test"
 import { createFakeCompletionPorts } from "../testing"
 import { WorkflowError } from "./errors"
 import { recordRef, resolveRecordLocation } from "./record-ref"
-import { completeTransition, createSingleFlight, type TransitionSpec } from "./transition"
+import { completeTransition, createSingleFlight, type ObservedTransition, type TransitionSpec } from "./transition"
 
-const spec = (overrides: Partial<TransitionSpec<string>> = {}): TransitionSpec<string> => ({
-  id: "test.transition",
-  command: async () => undefined,
-  affects: ["sale-orders", "stock-pickings"],
-  ...overrides,
-})
+type SpecOverrides = {
+  command?: (input: string) => Promise<void>
+  observe?: (input: string) => Promise<ObservedTransition>
+}
+const spec = ({ command = async () => undefined, observe }: SpecOverrides = {}): TransitionSpec<string> => {
+  const base = { id: "test.transition", command, affects: ["sale-orders", "stock-pickings"] }
+  return observe ? { ...base, observe } : { ...base, noReadback: "test fixture" }
+}
 
 test("success invalidates declared resources, observes state and navigates to next", async () => {
   const fake = createFakeCompletionPorts()
