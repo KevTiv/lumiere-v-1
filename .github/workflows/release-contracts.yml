@@ -1,30 +1,34 @@
 name: Release contracts
-# Publishes the next lumiere-contracts release from the selected branch and
-# pins it there. The version is the current pin bumped by one patch step;
-# each component rolls over after 999 (0.0.999 -> 0.1.0, 0.999.999 -> 1.0.0).
+# Keeps every branch pinned to a lumiere-contracts release that matches its
+# sources. It runs on each push that changes a contract source, and does
+# nothing when the generated contracts still match the pin. Otherwise it
+# publishes the next free version and pins it on the branch.
+#
+# Version: one patch step above the highest of the branch pin and every
+# published tag, so concurrent branches never reuse a number. Each component
+# rolls over after 999 (0.0.999 -> 0.1.0, 0.999.999 -> 1.0.0). A manual run
+# may request an explicit higher version.
 #
 # Steps: regenerate from a live module, record the operation-history revision
 # on top of the pinned release, commit, regenerate from that clean commit,
 # build the full candidate without pushing, publish the tag, pin it, and
-# verify the pin against a fresh regeneration. Nothing is published when the
-# generated contracts already match the pinned release.
+# verify the pin against a fresh regeneration.
 
 on:
+  push:
+    # main only receives pins through merged branches.
+    branches-ignore: [main]
+    # Everything codegen reads to produce the contract IR.
+    paths:
+      - spacetimedb/**
+      - crates/presentation-core/**
+      - lumiere-codegen/**
+      - crates/stdb-auth/assets/resource_registry.json
+      - .github/workflows/release-contracts.yml
   workflow_dispatch:
     inputs:
       version:
-        description: "Explicit x.y.z version (leave empty to bump the current pin)"
-        type: string
-        default: ""
-      reason:
-        description: "Operation-history revision reason (defaults to a generated summary)"
-        type: string
-        default: ""
-  # Lets a branch that is not main yet trigger a release through a thin caller.
-  workflow_call:
-    inputs:
-      version:
-        description: "Explicit x.y.z version (leave empty to bump the current pin)"
+        description: "Explicit x.y.z version (leave empty for the next free version)"
         type: string
         default: ""
       reason:
@@ -35,8 +39,10 @@ on:
 permissions:
   contents: write
 
+# One release at a time per branch; a newer push waits and then releases
+# whatever the branch holds by then.
 concurrency:
-  group: release-contracts
+  group: release-contracts-${{ github.ref }}
   cancel-in-progress: false
 
 env:
@@ -47,45 +53,75 @@ env:
   STDB_GENERATE_WASM: .ci/contracts-module.wasm
   # Importing scripts must not leave bytecode for `git add -A` to commit.
   PYTHONDONTWRITEBYTECODE: "1"
+  CONTRACTS_REMOTE: git@github.com:KevTiv/lumiere-contracts.git
 
 jobs:
   release:
     runs-on: ubuntu-latest
     steps:
+      # The branch head, not the triggering commit: a queued run releases the
+      # latest sources.
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.ref_name }}
           fetch-depth: 0
 
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      # A dedicated write key is preferred; the shared deploy key is used when
+      # no publish key is configured.
+      - uses: ./.github/actions/setup-contracts-ssh
+        with:
+          deploy-key: ${{ secrets.LUMIERE_CONTRACTS_PUBLISH_KEY || secrets.LUMIERE_CONTRACTS_DEPLOY_KEY }}
+
       - name: Resolve versions
         env:
           REQUESTED_VERSION: ${{ inputs.version }}
         run: |
-          python3 - <<'PY'
+          git ls-remote --tags --refs "$CONTRACTS_REMOTE" > "$RUNNER_TEMP/contract-tags"
+          python3 - "$RUNNER_TEMP/contract-tags" <<'PY'
           import json
           import os
           import re
+          import sys
           from pathlib import Path
+
+          semver = re.compile(r"^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$")
+
+          def parse(version):
+              match = semver.fullmatch(version)
+              return tuple(int(part) for part in match.groups()) if match else None
 
           manifest = json.loads(Path("release-compatibility-manifest.json").read_text(encoding="utf-8"))
           previous = manifest["lumiere_contracts"]["version"]
           cargo = Path("Cargo.toml").read_text(encoding="utf-8")
           if f'tag = "v{previous}"' not in cargo:
               raise SystemExit(f"Cargo.toml does not pin v{previous}, the release manifest version")
-          semver = re.compile(r"^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$")
-          parts = semver.fullmatch(previous)
-          if not parts:
+          pinned = parse(previous)
+          if pinned is None:
               raise SystemExit(f"current pin {previous!r} is not x.y.z")
-          major, minor, patch = (int(part) for part in parts.groups())
 
-          requested = os.environ["REQUESTED_VERSION"].strip()
+          published = {
+              parsed
+              for line in Path(sys.argv[1]).read_text(encoding="utf-8").splitlines()
+              if (parsed := parse(line.rsplit("refs/tags/v", 1)[-1].strip())) is not None
+          }
+          floor = max(published | {pinned})
+
+          requested = os.environ.get("REQUESTED_VERSION", "").strip()
           if requested:
-              if not semver.fullmatch(requested):
+              wanted = parse(requested)
+              if wanted is None:
                   raise SystemExit(f"requested version {requested!r} is not x.y.z")
-              if tuple(int(part) for part in requested.split(".")) <= (major, minor, patch):
+              if wanted in published:
+                  raise SystemExit(f"lumiere-contracts v{requested} already exists")
+              if wanted <= pinned:
                   raise SystemExit(f"requested version {requested} must be above the current pin {previous}")
               version = requested
           else:
+              major, minor, patch = floor
               patch += 1
               if patch > 999:
                   patch, minor = 0, minor + 1
@@ -98,26 +134,9 @@ jobs:
               env.write(f"PREVIOUS_REVISION={manifest['lumiere_contracts']['revision']}\n")
               env.write(f"PREVIOUS_IR_SHA256=sha256:{manifest['application_contract']['artifact_sha256']}\n")
               env.write(f"VERSION={version}\n")
-          print(f"v{previous} -> v{version}")
+          highest = ".".join(map(str, floor))
+          print(f"pinned v{previous}, highest published v{highest}; next v{version}")
           PY
-
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: wasm32-unknown-unknown
-
-      # A dedicated write key is preferred; the shared deploy key is used when
-      # no publish key is configured.
-      - uses: ./.github/actions/setup-contracts-ssh
-        with:
-          deploy-key: ${{ secrets.LUMIERE_CONTRACTS_PUBLISH_KEY || secrets.LUMIERE_CONTRACTS_DEPLOY_KEY }}
-
-      - name: Refuse an existing tag
-        run: |
-          if git ls-remote --exit-code --tags git@github.com:KevTiv/lumiere-contracts.git "refs/tags/v$VERSION" >/dev/null; then
-            echo "lumiere-contracts v$VERSION already exists but this branch pins v$PREVIOUS_VERSION."
-            echo "Pin the existing release, or dispatch with an explicit higher version."
-            exit 1
-          fi
 
       # Same key as the CI contracts job, so a module CI already compiled for
       # these sources is reused instead of rebuilt.
@@ -256,7 +275,12 @@ jobs:
           if ! git diff --cached --quiet; then
             git -c user.name="github-actions[bot]" -c user.email="41898+github-actions[bot]@users.noreply.github.com" \
               commit -m "chore(contracts): regenerate for v$VERSION"
-            git push origin "HEAD:${GITHUB_REF_NAME}"
+            # Nothing is published yet, so a branch that moved meanwhile only
+            # needs the queued run for its newer push.
+            if ! git push origin "HEAD:${GITHUB_REF_NAME}"; then
+              echo "::error::${GITHUB_REF_NAME} moved during the release; the run for the newer push releases it."
+              exit 1
+            fi
           fi
 
       - name: Regenerate from the clean commit (pass 2)
@@ -362,4 +386,14 @@ jobs:
             release-compatibility-manifest.json
           git -c user.name="github-actions[bot]" -c user.email="41898+github-actions[bot]@users.noreply.github.com" \
             commit -m "chore(contracts): publish and pin v$VERSION"
-          git push origin "HEAD:${GITHUB_REF_NAME}"
+          # The tag is already published, so land the pin even if the branch
+          # moved: replay it on top. A newer contract change there triggers
+          # its own release.
+          for attempt in 1 2 3; do
+            if git push origin "HEAD:${GITHUB_REF_NAME}"; then
+              exit 0
+            fi
+            git pull --rebase origin "${GITHUB_REF_NAME}"
+          done
+          echo "::error::could not push the v$VERSION pin to ${GITHUB_REF_NAME}; pin it by hand."
+          exit 1

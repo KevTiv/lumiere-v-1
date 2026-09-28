@@ -20,12 +20,12 @@ the current projection does not expose.
 
 ## Contract releases
 
-Releases cannot be cut from CI or from the authoring session. Slices marked
-`yes` stop at IMPLEMENTED with the registry diff prepared; a maintainer with
-`lumiere-contracts` access runs `make publish-contracts VERSION=x.y.z` and pins
-the release (see `dec51e09` for the v0.3.54 pin). Batch these into one release
-where possible (COV-05 `purchase_id`, COV-05b `purchase_line_id`/`is_done`,
-PAY-06 write-off fields are already waiting on v0.3.55).
+Releases are automatic. A push that changes a contract source (`spacetimedb/`,
+`crates/presentation-core/`, `lumiere-codegen/` or the resource registry) runs
+`.github/workflows/release-contracts.yml` on that branch. When the generated
+contracts differ from the pin, it publishes the next free lumiere-contracts
+version and pushes the pin commit to the branch; otherwise it does nothing.
+Slices marked `yes` pull that pin commit before continuing.
 
 ## Tracks
 

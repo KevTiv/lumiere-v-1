@@ -29,7 +29,7 @@ COV-08d for the minimal form). Never correlate by newest row, name or timestamp.
 
 **Contract release possibly required.** projections expose vehicle_id, company_id and serviced_at/inspected_at, so a natural-key readback needs no release; the record params carry no idempotency key, so replay-safety needs a params change (contract release)
 
-Contract releases cannot be cut from CI or from the authoring session; stop at IMPLEMENTED with the registry diff prepared and hand off `make publish-contracts VERSION=x.y.z` to a maintainer with `lumiere-contracts` access.
+Contract releases are automatic: pushing the registry or reducer change runs `.github/workflows/release-contracts.yml`, which publishes the next lumiere-contracts version and pins it on the branch. Pull its pin commit before continuing.
 
 ## Prerequisites / decisions
 
