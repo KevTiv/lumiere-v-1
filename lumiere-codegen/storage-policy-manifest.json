@@ -8779,7 +8779,9 @@
       "table": "mrp_bom_byproduct",
       "module": "manufacturing",
       "rationale": "Reviewed child aggregate: bom_id references mrp_bom.id.",
-      "authoritative_resources": [],
+      "authoritative_resources": [
+        "mrp-bom-byproducts"
+      ],
       "durability_class": "durable_business_record",
       "organization_ownership": "direct",
       "organization_column": "organization_id",
@@ -12519,7 +12521,9 @@
       "table": "replenishment_run_job",
       "module": "inventory",
       "rationale": "Scheduled replenishment job owned by the rule's organization and company; independent aggregate root.",
-      "authoritative_resources": [],
+      "authoritative_resources": [
+        "replenishment-run-jobs"
+      ],
       "durability_class": "durable_operational_state",
       "organization_ownership": "direct",
       "organization_column": "organization_id",
