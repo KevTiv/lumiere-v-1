@@ -1,7 +1,7 @@
 # COV-06n Replenishment scheduler
 
 **Package:** `COV-06n`
-**Disposition:** `IMPLEMENTED` (backend only) — frontend wiring not started, runtime acceptance pending
+**Disposition:** `IMPLEMENTED` — frontend/readback wired, runtime acceptance pending
 **Stacked base:** PR #76 / `codex/cov06m-replenishment-transfer-demand`
 **Operator proof:** native domain test only — no browser proof in this slice (see blocker below)
 
@@ -29,9 +29,12 @@ one active replenishment rule
 - Added a native domain test (`test_replenishment_scheduled_run_reschedules`, wired into `run_inventory_replenishment_demand_test`) proving: scheduling an already-scheduled rule fails closed; firing a job (simulated as the real scheduler would — delete-then-invoke) both executes the rule and inserts exactly one new job with a different id (not a mutation of the fired one); cancelling removes it; cancelling an unscheduled rule is a no-op success.
 - **Found while writing the test**: the warehouse persona fixture had no `replenishment_rule` permission at all. `execute_replenishment_rule`, `schedule_replenishment_run`, and `cancel_replenishment_run` all check for it — meaning COV-06h's and COV-06m's own browser proofs (`executeReplenishmentRuleViaUi`, driven by the warehouse persona) would have failed with 403 had they actually been run. Neither has been executed against a live stack yet (both are still `IMPLEMENTED`, pending the same runtime proof this slice is also pending), so this was caught before it could surface as a real failure. Fixed by adding `replenishment_rule:*` to the warehouse persona fixture.
 
-## Blocker: no frontend wiring in this slice
+## Frontend/readback
 
-`ReplenishmentRunJob` is a brand new table with no entry in `crates/stdb-auth/assets/resource_registry.json` and no `/api/query/replenishment-run-jobs` route. Unlike COV-06k's warehouse QC location (an existing, queryable resource that just needed a new field hand-encoded past a stale generated type), there is nothing for the frontend to query here at all yet — a UI action to schedule/cancel a rule's auto-run, and any exact-readback verification of it, needs that resource registered first. This is a genuine blocker, not a repeat of COV-06j's mistaken one.
+`replenishment_run_job` is registered as `replenishment-run-jobs`. Inventory now
+offers schedule and cancel actions for a selected rule. Schedule resolves the
+unique scoped job by `rule_id`; cancel polls for canonical absence and fails if
+the row does not disappear within the bounded readback window.
 
 ## Runtime validation required
 
@@ -44,4 +47,4 @@ Do not mark this slice `ACCEPTED` until that runtime proof passes — this is al
 
 ## Next bounded work
 
-Register `replenishment_run_job` as a query resource (`resource_registry.json` + whatever else `select_org_scoped_sql` needs), then add a UI action to schedule/cancel a rule's auto-run with a typed workflow verifying the exact job row converges, following the same shape as every other COV-06 slice. That would be COV-06o.
+Run the persisted scheduler and browser proof on the released contract head.

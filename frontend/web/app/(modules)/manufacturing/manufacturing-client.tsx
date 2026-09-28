@@ -51,6 +51,7 @@ import {
   useProducts,
   useStockQuants,
   useStockPickings,
+  useStockLocations,
   useWarehouses,
 } from "@lumiere/query-hooks/hooks/inventory"
 import { useIotDevices } from "@lumiere/query-hooks/hooks/iot"
@@ -113,18 +114,31 @@ function ManufacturingClientLoaded({
   const [csvKind, setCsvKind] = useState<ManufacturingCsvImportKind | null>(null)
   // activeTab is now URL-synced via useModuleTab below (after moduleConfig is defined)
 
-  const { data: productions = [] } = useMrpProductions(orgId, initialProductions)
-  const { data: boms = [] } = useMrpBoms(orgId, initialBoms)
-  const { data: bomLines = [] } = useMrpBomLines(orgId, initialBomLines)
-  const { data: workorders = [] } = useMrpWorkorders(orgId, initialWorkorders)
-  const { data: workcenters = [] } = useMrpWorkcenters(orgId, initialWorkcenters)
-  const { data: routingOperations = [] } = useMrpRoutingWorkcenters(orgId, initialRoutingOperations)
-  const { data: iotDevices = [] } = useIotDevices(orgId, initialIotDevices)
-  const { data: qualityChecks = [] } = useQualityChecks(orgId)
-  const { data: products = [] } = useProducts(orgId, initialProducts)
-  const { data: warehouses = [] } = useWarehouses(orgId, initialWarehouses)
-  const { data: transfers = [] } = useStockPickings(orgId, initialStockPickings)
-  const { data: stockQuants = [] } = useStockQuants(orgId, initialStockQuants)
+  const { data: productions = [] } = useMrpProductions(
+    orgId,
+    initialProductions,
+  );
+  const { data: boms = [] } = useMrpBoms(orgId, initialBoms);
+  const { data: bomLines = [] } = useMrpBomLines(orgId, initialBomLines);
+  const { data: workorders = [] } = useMrpWorkorders(orgId, initialWorkorders);
+  const { data: workcenters = [] } = useMrpWorkcenters(
+    orgId,
+    initialWorkcenters,
+  );
+  const { data: routingOperations = [] } = useMrpRoutingWorkcenters(
+    orgId,
+    initialRoutingOperations,
+  );
+  const { data: iotDevices = [] } = useIotDevices(orgId, initialIotDevices);
+  const { data: qualityChecks = [] } = useQualityChecks(orgId);
+  const { data: products = [] } = useProducts(orgId, initialProducts);
+  const { data: warehouses = [] } = useWarehouses(orgId, initialWarehouses);
+  const { data: transfers = [] } = useStockPickings(
+    orgId,
+    initialStockPickings,
+  );
+  const { data: stockQuants = [] } = useStockQuants(orgId, initialStockQuants);
+  const { data: stockLocations = [] } = useStockLocations(orgId);
 
   const m = useManufacturingMutations(orgId, operatingCompanyId)
 
@@ -183,6 +197,22 @@ function ManufacturingClientLoaded({
       locs.length > 0 ? locs : [{ value: "", label: t("common.lookup.noStockMoves"), disabled: true }]
     return { picking: emptyPicking, locs: emptyLocs }
   }, [transfers, stockQuants, t])
+
+  const scrapLocationOptions = useMemo(
+    () =>
+      stockLocations
+        .filter((location) =>
+          Boolean(
+            (location as unknown as Record<string, unknown>).scrapLocation ??
+            (location as unknown as Record<string, unknown>).scrap_location,
+          ),
+        )
+        .map((location) => ({
+          value: String(location.id),
+          label: String(location.completeName ?? location.name ?? location.id),
+        })),
+    [stockLocations],
+  );
 
   const moFormConfig = useMemo(
     () =>
@@ -509,6 +539,9 @@ function ManufacturingClientLoaded({
         row={rowPick?.row ?? null}
         workcenters={workcenters}
         iotDevices={iotDevices}
+        qualityChecks={qualityChecks as unknown as Record<string, unknown>[]}
+        productOptions={productFieldOptions}
+        scrapLocationOptions={scrapLocationOptions}
         mutations={m}
         t={t}
       />

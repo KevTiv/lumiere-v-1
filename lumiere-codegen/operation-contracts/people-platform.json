@@ -14,7 +14,7 @@
     "acknowledge_insight": {
       "semantic_kind": "command",
       "client_facing": true,
-      "idempotency": "non_idempotent",
+      "idempotency": "request_guarded",
       "codec": {
         "id": "spacetimedb-sats-json",
         "version": 1
@@ -2379,7 +2379,7 @@
         "id": "spacetimedb-sats-json",
         "version": 1
       },
-      "evidence": "spacetimedb/src/core/messaging.rs: body inserts or appends a new effect without a replay guard"
+      "evidence": "spacetimedb/src/core/messaging.rs: reducer persists a stable payload key and rejects a duplicate before message or follower-notification insertion"
     },
     "mark_onboarding_done": {
       "semantic_kind": "command",

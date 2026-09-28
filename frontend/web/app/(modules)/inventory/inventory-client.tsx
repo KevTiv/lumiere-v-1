@@ -167,6 +167,8 @@ import {
   useRunTraceabilityReport,
   // Replenishment
   useCreateReplenishmentRule,
+  useScheduleReplenishmentRun,
+  useCancelReplenishmentRun,
   // Picking waves
   useCreatePickingWave,
   useConfirmPickingWave,
@@ -1163,6 +1165,14 @@ function InventoryClientLoaded({
     orgId,
     operatingCompanyId,
     workflowSurface,
+  );
+  const scheduleReplenishmentRun = useScheduleReplenishmentRun(
+    orgId,
+    operatingCompanyId,
+  );
+  const cancelReplenishmentRun = useCancelReplenishmentRun(
+    orgId,
+    operatingCompanyId,
   );
   const createStockQuant = useCreateStockQuant(orgId, {
     companyId: operatingCompanyId ?? undefined,
@@ -2492,6 +2502,27 @@ function InventoryClientLoaded({
                             : undefined,
                       },
                     });
+                  },
+                },
+                {
+                  id: 'schedule-replenishment-run',
+                  label: t('inventory.replenishmentActions.scheduleRun'),
+                  icon: ListChecks,
+                  requiresSelection: true,
+                  onClick: (rows) => {
+                    const id = rows[0]?.id as ScalarId | undefined;
+                    if (id != null)
+                      void scheduleReplenishmentRun.mutateAsync(id);
+                  },
+                },
+                {
+                  id: 'cancel-replenishment-run',
+                  label: t('inventory.replenishmentActions.cancelSchedule'),
+                  icon: ListChecks,
+                  requiresSelection: true,
+                  onClick: (rows) => {
+                    const id = rows[0]?.id as ScalarId | undefined;
+                    if (id != null) void cancelReplenishmentRun.mutateAsync(id);
                   },
                 },
               ],

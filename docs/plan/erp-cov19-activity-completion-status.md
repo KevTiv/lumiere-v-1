@@ -1,6 +1,6 @@
 # COV-19 — Record-linked activity completion (then message post)
 
-**Status:** PARTIAL — activity completion IMPLEMENTED (runtime acceptance pending); message post still scaffolded  
+**Status:** IMPLEMENTED — activity completion and message post wired; runtime acceptance pending
 **Module/surface:** Calendar / Comms  
 **Plan target:** record-linked activity or message lifecycle  
 **Scaffold source:** [`erp-cov08-27-scaffold.md`](./erp-cov08-27-scaffold.md)
@@ -27,7 +27,10 @@ COV-08d for the minimal form). Never correlate by newest row, name or timestamp.
 
 ## Contract disposition
 
-**No generated contract delta expected.** none for activity completion (`activities` exposes state); message post readback may need a stable message key exposed (check before implementing)
+Activity completion needs no generated contract delta (`activities` exposes state).
+Message posting now projects `metadata`, `parent_id`, and `attachment_ids`; the
+stable message key is carried in metadata, so this slice does require a contract
+release.
 
 
 
@@ -56,10 +59,12 @@ BASE-03 (communications correctness) must be landed.
 | O | Playwright drives the transition through the visible UI action (setup calls allowed only for fixtures) | DONE — CRM → Activities → `entity-action-complete-activity` in `frontend/web/tests/e2e/cov19-activity-completion.spec.ts` |
 | E | Exact-effect resolver unit test (state/scope/identity/ambiguity) and browser snapshot preserved after stale (422) and denied (403) replay | DONE — `crm-activity-completion.test.ts`; spec asserts the snapshot after both replays |
 
-## Slice 2 — message post (still scaffolded)
+## Slice 2 — message post (implemented)
 
-`post_message` still needs a stable message key in the `mail-messages` projection before an
-exact readback is possible (check whether this is a contract delta before starting).
+`post_message` derives a stable SHA-256 key from framed model, record, parent,
+attachments and body bytes. It persists the key in projected metadata and
+rejects a duplicate before inserting the message or follower notifications.
+The hook derives the same key and resolves exactly one canonical message row.
 
 ## Acceptance
 

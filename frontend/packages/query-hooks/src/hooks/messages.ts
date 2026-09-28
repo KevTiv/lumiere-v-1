@@ -9,6 +9,9 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 
 import { apiFetch, fetchQueryList, rqBigIntKey } from "../http"
 import { useStdbQuery } from "./stdb"
+import { decodeOperationDispatch } from '@lumiere/api-client'
+import { executeOperationWithCanonicalReadback, requireResolvedOperationEffect, type ResolvedOperationEffectOutcome } from './operation-effect'
+import { computePostMessageKey, resolvePostedMessageEffect } from './partial-slice-effects'
 
 export type PostMessageInput = {
   model: string
@@ -104,14 +107,45 @@ export function useReviewMessageBatch(organizationId: bigint) {
 
 export function usePostMessage(organizationId: bigint) {
   const qc = useQueryClient()
-  return useMutation<void, Error, PostMessageInput>({
+  return useMutation<ResolvedOperationEffectOutcome, Error, PostMessageInput>({
     mutationFn: async ({ model, resId, body, parentId, attachmentIds }) => {
-      const { urlPath, init } = stdbBffCommandPost("post_message", { model: model, resId: toScalarU64(resId), body: body, parentId: parentId != null ? toScalarU64(parentId) : null, attachmentIds: attachmentIds.map((id) => toScalarU64(id)) })
-      const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error('Failed to post message')
+      const canonical = {
+        model: model.trim(),
+        resId: toScalarU64(resId),
+        body,
+        parentId: parentId != null ? toScalarU64(parentId) : null,
+        attachmentIds: attachmentIds.map((id) => toScalarU64(id)),
+      }
+      const messageKey = await computePostMessageKey(canonical)
+      const outcome = await executeOperationWithCanonicalReadback({
+        resolveEffect: async () =>
+          resolvePostedMessageEffect(
+            await fetchQueryList(
+              '/api/query/mail-messages',
+              'Failed to read posted messages',
+            ),
+            organizationId,
+            messageKey,
+          ),
+        dispatch: async () => {
+          const { urlPath, init } = stdbBffCommandPost(
+            'post_message',
+            canonical,
+          );
+          return decodeOperationDispatch(
+            await apiFetch(urlPath, init),
+            'Failed to post message',
+          );
+        },
+        afterDispatch: () =>
+          qc.invalidateQueries({
+            queryKey: ['mail-messages', rqBigIntKey(organizationId)],
+          }),
+        readbackAttempts: 6,
+        readbackDelayMs: 150,
+      })
+      return requireResolvedOperationEffect(outcome)
     },
-    onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['mail-messages', rqBigIntKey(organizationId)] }),
   })
 }
 

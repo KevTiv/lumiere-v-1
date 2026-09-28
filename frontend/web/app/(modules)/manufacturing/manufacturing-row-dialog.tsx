@@ -16,14 +16,21 @@ import { submitManufacturingRowAction } from "@/lib/manufacturing-row-action-sub
 type TabEntity = "orders" | "boms" | "workorders" | "workcenters"
 
 export interface ManufacturingRowDialogProps {
-  open: boolean
-  onOpenChange: (open: boolean) => void
-  tabId: string | null
-  row: Record<string, unknown> | null
-  workcenters: QueryRows
-  iotDevices: QueryRows
-  mutations: ManufacturingMutations
-  t: TFunction
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  tabId: string | null;
+  row: Record<string, unknown> | null;
+  workcenters: QueryRows;
+  iotDevices: QueryRows;
+  qualityChecks: QueryRows;
+  productOptions: Array<{ value: string; label: string; disabled?: boolean }>;
+  scrapLocationOptions: Array<{
+    value: string;
+    label: string;
+    disabled?: boolean;
+  }>;
+  mutations: ManufacturingMutations;
+  t: TFunction;
 }
 
 function rowId(row: Record<string, unknown>): string {
@@ -52,6 +59,9 @@ export function ManufacturingRowDialog({
   row,
   workcenters,
   iotDevices,
+  qualityChecks,
+  productOptions,
+  scrapLocationOptions,
   mutations,
   t,
 }: ManufacturingRowDialogProps) {
@@ -113,21 +123,31 @@ export function ManufacturingRowDialog({
         state,
         defaultProduceQty,
         workcenterOptions,
-      })
+        scrapLocationOptions,
+      });
     }
     if (entity === "boms") {
       return manufacturingBomRowActionForm(t, {
         recordId: id,
         defaultProductQty: Number(row.productQty ?? 1) || 1,
-      })
+        productOptions,
+      });
     }
-    if (entity === "workorders") {
-      const workcenterId = String(row.workcenterId ?? row.workcenter_id ?? "")
+    if (entity === 'workorders') {
+      const workcenterId = String(row.workcenterId ?? row.workcenter_id ?? '');
+      const qualityCheck = qualityChecks.find(
+        (check) => String(check.workorderId ?? check.workorder_id ?? '') === id,
+      );
       return manufacturingWorkorderRowActionForm(t, {
         recordId: id,
         state,
         workcenterId,
-      })
+        qualityCheckId:
+          qualityCheck?.id != null ? String(qualityCheck.id) : undefined,
+        qualityState: String(
+          qualityCheck?.qualityState ?? qualityCheck?.quality_state ?? 'none',
+        ),
+      });
     }
     if (entity === "workcenters") {
       return manufacturingWorkcenterRowActionForm(t, {
@@ -137,8 +157,20 @@ export function ManufacturingRowDialog({
         linkedDeviceId: linkedDeviceIdForWc || undefined,
       })
     }
-    return null
-  }, [row, entity, id, state, t, workcenterOptions, iotDeviceOptions, linkedDeviceIdForWc])
+    return null;
+  }, [
+    row,
+    entity,
+    id,
+    state,
+    t,
+    workcenterOptions,
+    iotDeviceOptions,
+    linkedDeviceIdForWc,
+    qualityChecks,
+    productOptions,
+    scrapLocationOptions,
+  ]);
 
   if (!formConfig || !tabId) return null
 
