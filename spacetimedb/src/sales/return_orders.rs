@@ -47,6 +47,27 @@ pub struct ReturnOrder {
     pub write_date: Timestamp,
 }
 
+/// One committed `create_return_order` per idempotency key: the durable identity of the return a
+/// keyed create produced, so a replay converges on it and the caller can read it back exactly.
+#[spacetimedb::table(
+    accessor = return_order_creation,
+    public,
+    index(accessor = return_order_creation_by_organization, btree(columns = [organization_id])),
+    index(accessor = return_order_creation_by_key, btree(columns = [idempotency_key]))
+)]
+pub struct ReturnOrderCreation {
+    #[primary_key]
+    #[auto_inc]
+    pub id: u64,
+    pub organization_id: u64,
+    pub company_id: u64,
+    pub return_order_id: u64,
+    pub idempotency_key: String,
+    pub request_fingerprint: String,
+    pub create_uid: Identity,
+    pub create_date: Timestamp,
+}
+
 #[spacetimedb::table(
     accessor = return_order_line,
     public,
@@ -89,6 +110,9 @@ pub struct CreateReturnOrderParams {
     pub partner_id: u64,
     pub return_reason: Option<String>,
     pub lines: Vec<CreateReturnOrderLineParams>,
+    /// Client-chosen key that makes the create replay-safe and lets the caller read back the
+    /// exact return it produced (`return_order_creation`). Optional for import/legacy callers.
+    pub idempotency_key: Option<String>,
 }
 
 #[derive(SpacetimeType, Clone, Debug)]
@@ -107,6 +131,34 @@ pub struct CreateCreditNoteFromReturnOrderParams {
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
+
+/// Deterministic request identity for a keyed create: a replay may reorder lines, but any change
+/// to a return-affecting field under the same key is rejected.
+fn return_order_request_fingerprint(params: &CreateReturnOrderParams) -> String {
+    let mut lines: Vec<serde_json::Value> = params
+        .lines
+        .iter()
+        .map(|line| {
+            serde_json::json!({
+                "sale_order_line_id": line.sale_order_line_id,
+                "product_id": line.product_id,
+                "product_uom": line.product_uom,
+                "product_uom_qty_bits": line.product_uom_qty.to_bits(),
+                "price_unit_bits": line.price_unit.to_bits(),
+                "to_refund": line.to_refund,
+                "lot_id": line.lot_id,
+            })
+        })
+        .collect();
+    lines.sort_by_key(|line| line.to_string());
+    serde_json::json!({
+        "sale_order_id": params.sale_order_id,
+        "partner_id": params.partner_id,
+        "return_reason": params.return_reason.as_deref(),
+        "lines": lines,
+    })
+    .to_string()
+}
 
 fn load_return_order(
     ctx: &ReducerContext,
@@ -376,6 +428,28 @@ pub fn create_return_order(
         return Err("Return order must have at least one line".to_string());
     }
 
+    let idempotency_key = match params.idempotency_key.as_deref().map(str::trim) {
+        Some("") => return Err("Return order idempotency_key must not be blank".to_string()),
+        other => other.map(str::to_string),
+    };
+    let fingerprint = return_order_request_fingerprint(&params);
+    if let Some(key) = idempotency_key.as_deref() {
+        if let Some(existing) = ctx
+            .db
+            .return_order_creation()
+            .return_order_creation_by_key()
+            .filter(key)
+            .find(|creation| {
+                creation.organization_id == organization_id && creation.company_id == company_id
+            })
+        {
+            if existing.request_fingerprint != fingerprint {
+                return Err("Return order key was already used with a different request".to_string());
+            }
+            return Ok(());
+        }
+    }
+
     ctx.db
         .contact()
         .id()
@@ -447,6 +521,19 @@ pub fn create_return_order(
 
     let return_order_id = return_order.id;
     let return_order_name = return_order.name.clone();
+
+    if let Some(key) = idempotency_key {
+        ctx.db.return_order_creation().insert(ReturnOrderCreation {
+            id: 0,
+            organization_id,
+            company_id,
+            return_order_id,
+            idempotency_key: key,
+            request_fingerprint: fingerprint,
+            create_uid: ctx.sender(),
+            create_date: ctx.timestamp,
+        });
+    }
 
     ctx.db.return_order().id().update(ReturnOrder {
         line_ids,
