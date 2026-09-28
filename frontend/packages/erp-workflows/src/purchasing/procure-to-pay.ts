@@ -8,6 +8,7 @@
 
 import { firstNonNullKey, type RowValueMap } from "@lumiere/erp-shared/row-values"
 import { recordAction, type ExecuteAction, type WorkflowAction } from "../core/action"
+import { singleAddedId } from "../core/effect-delta"
 import { recordRef } from "../core/record-ref"
 import { rowId, variantTag } from "../core/row"
 import type { ObservedTransition } from "../core/transition"
@@ -209,19 +210,12 @@ export function observeCreatedBill(
   invoiceIdsBefore: readonly string[],
   orders: readonly RowValueMap[],
 ): ObservedTransition {
-  const invoiceIdsAfter = purchaseOrderInvoiceIds(orderId, orders)
-  if (!invoiceIdsAfter) return {}
-
-  const after = new Set(invoiceIdsAfter)
-  if (invoiceIdsBefore.some((id) => !after.has(id))) return {}
-
-  const before = new Set(invoiceIdsBefore)
-  const created = invoiceIdsAfter.filter((id) => !before.has(id))
-  if (created.length !== 1) return {}
+  const created = singleAddedId(invoiceIdsBefore, purchaseOrderInvoiceIds(orderId, orders))
+  if (!created) return {}
 
   const bill = recordRef(
     invoiceWorkflow.resource,
-    created[0],
+    created,
     invoiceWorkflow.module,
     purchaseOrderWorkflow.module,
   )

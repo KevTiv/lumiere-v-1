@@ -1,5 +1,6 @@
 export * from "./accounting/invoice-to-payment"
 export * from "./core/action"
+export * from "./core/effect-delta"
 export * from "./core/errors"
 export * from "./core/record-ref"
 export * from "./core/result"

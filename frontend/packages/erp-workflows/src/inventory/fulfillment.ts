@@ -11,6 +11,7 @@
 
 import { firstNonNullKey, type RowValueMap } from "@lumiere/erp-shared/row-values"
 import { recordAction, type WorkflowAction, type WorkflowExecuteContext } from "../core/action"
+import { singleAddedId } from "../core/effect-delta"
 import { recordRef } from "../core/record-ref"
 import type { WorkflowResult } from "../core/result"
 import { rowId } from "../core/row"
@@ -230,17 +231,9 @@ export function observePartialValidatedPicking(
   const source = pickings.find((row) => rowId(row) === pickingId)
   if (!source || pickingStateTag(source) !== "done") return {}
 
-  const backorderIdsAfter = pickingBackorderIds(pickingId, pickings)
-  if (!backorderIdsAfter) return {}
+  const backorderId = singleAddedId(backorderIdsBefore, pickingBackorderIds(pickingId, pickings))
+  if (!backorderId) return {}
 
-  const after = new Set(backorderIdsAfter)
-  if (backorderIdsBefore.some((id) => !after.has(id))) return {}
-
-  const before = new Set(backorderIdsBefore)
-  const created = backorderIdsAfter.filter((id) => !before.has(id))
-  if (created.length !== 1) return {}
-
-  const backorderId = created[0]
   const backorder = pickings.find((row) => rowId(row) === backorderId)
   if (
     !backorder ||
