@@ -38,6 +38,7 @@ import {
   observeConfirmedPurchaseOrder,
   observeConfirmedPurchaseReturn,
   observeConvertedRequisition,
+  observeLandedCostApplied,
   observeCreatedBill,
   purchaseOrderInvoiceIds,
   landedCostWorkflow,
@@ -308,8 +309,11 @@ export function usePurchasingWorkflow(
         (id) => applyLandedCostsCommand(companyId, id),
         APPLY_LANDED_COST_AFFECTS,
         {
-          noReadback:
-            "The committed stock_landed_cost_application row is the exact effect but is not exposed through /api/query yet.",
+          observe: async (id) =>
+            observeLandedCostApplied(
+              id,
+              await fetchQueryList("/api/query/landed-cost-applications", "Failed to read landed cost applications"),
+            ),
         },
       ),
       cancelLandedCost: idSpec("purchasing.landed-cost.cancel", cancelLandedCostCommand, LANDED_COST_DRAFT_AFFECTS, {

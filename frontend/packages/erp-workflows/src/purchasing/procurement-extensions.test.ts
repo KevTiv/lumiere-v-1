@@ -13,6 +13,7 @@ import {
   isPurchaseReturnConfirmable,
   isPurchaseReturnCreditable,
   observeBlanketRelease,
+  observeLandedCostApplied,
   observeConfirmedPurchaseReturn,
   observeReturnVendorCredit,
   reviewSupplierIntakeAction,
@@ -98,4 +99,13 @@ test("only draft blankets release, and the release is the exact (blanket, idempo
     {},
   )
   assert.deepEqual(observeBlanketRelease("7", "rel-a", releases, []), {})
+})
+
+test("a landed cost apply is confirmed by its one committed application row", () => {
+  assert.deepEqual(observeLandedCostApplied("4", [{ id: 1, landedCostId: 4 }, { id: 2, landed_cost_id: 5 }]), {
+    outcome: "applied",
+    next: { resource: "stock_landed_cost", id: "4", module: "purchasing" },
+  })
+  assert.deepEqual(observeLandedCostApplied("4", [{ id: 2, landedCostId: 5 }]), {})
+  assert.deepEqual(observeLandedCostApplied("4", [{ id: 1, landedCostId: 4 }, { id: 3, landedCostId: 4 }]), {})
 })

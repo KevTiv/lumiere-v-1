@@ -39,7 +39,7 @@ export const LANDED_COST_DRAFT_AFFECTS = ["landed-costs", "landed-cost-lines", "
 /** Posting books the landed-cost journal entry. */
 export const POST_LANDED_COST_AFFECTS = [...LANDED_COST_DRAFT_AFFECTS, "account-moves", "account-move-lines"] as const
 /** Applying revalues the received stock. */
-export const APPLY_LANDED_COST_AFFECTS = [...LANDED_COST_DRAFT_AFFECTS, "stock-quants"] as const
+export const APPLY_LANDED_COST_AFFECTS = [...LANDED_COST_DRAFT_AFFECTS, "stock-quants", "landed-cost-applications"] as const
 /** Confirming a return creates the outgoing return picking. */
 export const CONFIRM_PURCHASE_RETURN_AFFECTS = [
   "purchase-returns",
@@ -144,6 +144,18 @@ export const rejectSupplierIntakeAction = (o: ReasonOptions) =>
 
 export const isLandedCostDraft = (row: RowValueMap) => isOneOf(row, "Draft")
 export const isLandedCostApplicable = (row: RowValueMap) => isOneOf(row, "Posted")
+
+/**
+ * `apply_landed_costs` commits one `stock_landed_cost_application` row per landed cost (unique by
+ * `landed_cost_id`); a retry converges on the same row. Exactly that one row is the effect.
+ */
+export function observeLandedCostApplied(landedCostId: string, applications: readonly RowValueMap[]): ObservedTransition {
+  const matches = applications.filter(
+    (row) => String(firstNonNullKey(row, "landedCostId", "landed_cost_id") ?? "") === landedCostId,
+  )
+  if (matches.length !== 1) return {}
+  return { outcome: "applied", next: recordRef(landedCostWorkflow.resource, landedCostId, landedCostWorkflow.module) }
+}
 
 type RecordActionOptions = { label: string; execute: ExecuteAction<string> }
 
