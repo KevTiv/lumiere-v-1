@@ -17,6 +17,7 @@ import {
   isSaleOrderInvoiceable,
   observeConfirmedOrder,
   observeCreatedInvoice,
+  saleOrderInvoiceIds,
 } from "./order-to-cash"
 
 test("only draft and sent orders offer confirm, including enum-shaped state", () => {
@@ -69,17 +70,21 @@ test("a confirmed order offers invoicing until it is fully invoiced", () => {
   assert.ok(!isSaleOrderInvoiceable({ state: "Draft", invoiceStatus: "ToInvoice" }))
 })
 
-test("the newest invoice on the order is created and opened in Accounting", () => {
-  const observed = observeCreatedInvoice("5", [{ id: 5, invoiceIds: [40n, 41n] }, { id: 6, invoiceIds: [99n] }])
+test("the one invoice added since the snapshot is created and opened in Accounting", () => {
+  const before = saleOrderInvoiceIds("5", [{ id: 5, invoiceIds: [40n] }])
+  assert.deepEqual(before, ["40"])
+  const observed = observeCreatedInvoice("5", before!, [{ id: 5, invoiceIds: [41n, 40n] }, { id: 6, invoiceIds: [99n] }])
   const ref = { resource: "account_move", id: "41", module: "accounting", context: "sales" }
   assert.equal(observed.outcome, "applied")
   assert.deepEqual(observed.createdRecords, [ref])
   assert.deepEqual(observed.next, ref)
 })
 
-test("an order without a readback invoice yields no claims", () => {
-  assert.deepEqual(observeCreatedInvoice("5", [{ id: 5, invoiceIds: [] }]), {})
-  assert.deepEqual(observeCreatedInvoice("5", []), {})
+test("no new invoice, several new invoices, or a missing order yields no claims", () => {
+  assert.deepEqual(observeCreatedInvoice("5", ["40"], [{ id: 5, invoiceIds: [40] }]), {})
+  assert.deepEqual(observeCreatedInvoice("5", ["40"], [{ id: 5, invoiceIds: [40, 41, 42] }]), {})
+  assert.deepEqual(observeCreatedInvoice("5", [], []), {})
+  assert.equal(saleOrderInvoiceIds("5", []), undefined)
 })
 
 test("only a draft quotation can be sent and only a sent one accepted", () => {

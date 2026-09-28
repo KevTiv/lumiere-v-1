@@ -19,7 +19,9 @@ import {
   observeReturnCreditNote,
   pickingStepsToDone,
   receiveReturnAction,
+  returnExchangeOrderIds,
   rowId,
+  saleOrderReturnIds,
   type AnyWorkflowAction,
   type CreateReturnCreditNoteInput,
   type CreateReturnOrderInput,
@@ -59,6 +61,8 @@ export interface ReturnOrderWorkflowLabels {
 
 type CreditNoteInput = CreateReturnCreditNoteInput<CreateCreditNoteFromReturnOrderParams>
 type CreateInput = CreateReturnOrderInput<CreateReturnOrderParams>
+type CreateFromSaleOrderRunInput = CreateInput & { saleOrderId: string; returnIdsBefore: string[] }
+type ExchangeRunInput = { returnOrderId: string; exchangeOrderIdsBefore: string[] }
 
 /**
  * `sales.return` record workflow: RMA confirm → receive (return picking to done) → credit note,
@@ -83,12 +87,24 @@ export function useReturnOrderWorkflow(
       validate: (id) => validateStockPickingCommand(companyId, id),
     }
 
-    const create: TransitionSpec<CreateInput> = {
+    const create: TransitionSpec<CreateFromSaleOrderRunInput> = {
       id: "sales.return.create",
       command: ({ params }) => createReturnOrderCommand(companyId, params),
       affects: CREATE_RETURN_ORDER_AFFECTS,
-      observe: async ({ saleOrderId }) =>
-        observeCreatedReturnOrder(saleOrderId, await fresh<RowValueMap[]>(returnOrdersQueryOptions(organizationId))),
+      observe: async ({ saleOrderId, returnIdsBefore }) =>
+        observeCreatedReturnOrder(
+          saleOrderId,
+          returnIdsBefore,
+          await fresh<RowValueMap[]>(returnOrdersQueryOptions(organizationId)),
+        ),
+    }
+
+    // A return raised without a sale order has no owning relation (and no client key) to read
+    // back, so it claims transport acceptance only and opens nothing.
+    const createStandalone: TransitionSpec<CreateInput> = {
+      id: "sales.return.create",
+      command: ({ params }) => createReturnOrderCommand(companyId, params),
+      affects: CREATE_RETURN_ORDER_AFFECTS,
     }
 
     const confirm: TransitionSpec<string> = {
@@ -120,12 +136,16 @@ export function useReturnOrderWorkflow(
       affects: CANCEL_RETURN_AFFECTS,
     }
 
-    const exchange: TransitionSpec<string> = {
+    const exchange: TransitionSpec<ExchangeRunInput> = {
       id: "sales.return.exchange",
-      command: (id) => createExchangeOrderFromReturnCommand(companyId, id),
+      command: ({ returnOrderId }) => createExchangeOrderFromReturnCommand(companyId, returnOrderId),
       affects: EXCHANGE_FROM_RETURN_AFFECTS,
-      observe: async (id) =>
-        observeExchangeOrder(id, await fresh<RowValueMap[]>(saleOrdersQueryOptions(organizationId))),
+      observe: async ({ returnOrderId, exchangeOrderIdsBefore }) =>
+        observeExchangeOrder(
+          returnOrderId,
+          exchangeOrderIdsBefore,
+          await fresh<RowValueMap[]>(saleOrdersQueryOptions(organizationId)),
+        ),
     }
 
     const creditNote: TransitionSpec<CreditNoteInput> = {
@@ -136,19 +156,31 @@ export function useReturnOrderWorkflow(
         observeReturnCreditNote(returnOrderId, await fresh<RowValueMap[]>(returnOrdersQueryOptions(organizationId))),
     }
 
-    return { create, confirm, receive, cancel, exchange, creditNote }
+    return { create, createStandalone, confirm, receive, cancel, exchange, creditNote }
   }, [qc, organizationId, companyId, labels.notReceivable])
 
   const create = useMemo(
     () =>
       createReturnOrderAction<CreateReturnOrderParams>({
         label: labels.create,
-        execute: (input, context) =>
-          runner.run(`sales.return.create:${input.saleOrderId ?? "none"}`, specs.create, input, {
-            navigateToNext: context?.navigateToNext,
-          }),
+        execute: async (input, context) => {
+          const { saleOrderId } = input
+          if (saleOrderId == null) {
+            return runner.run("sales.return.create:none", specs.createStandalone, input)
+          }
+          const returnIdsBefore = saleOrderReturnIds(
+            saleOrderId,
+            (await qc.fetchQuery({ ...returnOrdersQueryOptions(organizationId), staleTime: 0 })) as RowValueMap[],
+          )
+          return runner.run(
+            `sales.return.create:${saleOrderId}`,
+            specs.create,
+            { ...input, saleOrderId, returnIdsBefore },
+            { navigateToNext: context?.navigateToNext },
+          )
+        },
       }),
-    [labels.create, runner, specs],
+    [labels.create, runner, specs, qc, organizationId],
   )
 
   const createCreditNote = useMemo(
@@ -169,11 +201,25 @@ export function useReturnOrderWorkflow(
     return [
       confirmReturnAction({ label: labels.confirm, execute: run("sales.return.confirm", specs.confirm) }),
       receiveReturnAction({ label: labels.receive, execute: run("sales.return.receive", specs.receive) }),
-      exchangeReturnAction({ label: labels.exchange, execute: run("sales.return.exchange", specs.exchange) }),
+      exchangeReturnAction({
+        label: labels.exchange,
+        execute: async (returnOrderId, context) => {
+          const exchangeOrderIdsBefore = returnExchangeOrderIds(
+            returnOrderId,
+            (await qc.fetchQuery({ ...saleOrdersQueryOptions(organizationId), staleTime: 0 })) as RowValueMap[],
+          )
+          return runner.run(
+            `sales.return.exchange:${returnOrderId}`,
+            specs.exchange,
+            { returnOrderId, exchangeOrderIdsBefore },
+            { navigateToNext: context?.navigateToNext },
+          )
+        },
+      }),
       cancelReturnAction({ label: labels.cancel, execute: run("sales.return.cancel", specs.cancel) }),
       createCreditNote,
     ]
-  }, [labels.confirm, labels.receive, labels.exchange, labels.cancel, runner, specs, createCreditNote])
+  }, [labels.confirm, labels.receive, labels.exchange, labels.cancel, runner, specs, createCreditNote, qc, organizationId])
 
   return { actions, create, createCreditNote, isRunning: runner.isRunning, isPending: runner.isPending }
 }

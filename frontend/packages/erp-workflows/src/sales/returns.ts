@@ -7,6 +7,7 @@
 
 import { firstNonNullKey, type RowValueMap } from "@lumiere/erp-shared/row-values"
 import type { WorkflowAction, WorkflowExecuteContext } from "../core/action"
+import { singleAddedId } from "../core/effect-delta"
 import { recordRef } from "../core/record-ref"
 import type { WorkflowResult } from "../core/result"
 import { rowId } from "../core/row"
@@ -66,21 +67,24 @@ export function returnPickingId(row: RowValueMap): string | undefined {
   return id == null ? undefined : String(id)
 }
 
-/**
- * The newest return created for the sale order is the one just produced (the same convention as
- * the exchange order). A return without a sale order cannot be told apart from others, so it
- * claims nothing and the surface stays where it is.
- */
-export function observeCreatedReturnOrder(
-  saleOrderId: string | undefined,
-  returns: readonly RowValueMap[],
-): ObservedTransition {
-  if (saleOrderId == null) return {}
-  const created = returns
+/** Returns raised against this sale order (the child-owned `sale_order_id` relation). */
+export function saleOrderReturnIds(saleOrderId: string, returns: readonly RowValueMap[]): string[] {
+  return returns
     .filter((row) => String(firstNonNullKey(row, "saleOrderId", "sale_order_id") ?? "") === saleOrderId)
     .map(rowId)
-    .sort((a, b) => Number(a) - Number(b))
-    .at(-1)
+}
+
+/**
+ * The caller snapshots the sale order's returns before dispatch; the created return is the one
+ * new id after readback, never the newest. A return raised without a sale order has no owning
+ * relation to read back, so the surface does not declare an observation for it.
+ */
+export function observeCreatedReturnOrder(
+  saleOrderId: string,
+  returnIdsBefore: readonly string[],
+  returns: readonly RowValueMap[],
+): ObservedTransition {
+  const created = singleAddedId(returnIdsBefore, saleOrderReturnIds(saleOrderId, returns))
   if (!created) return {}
   const ref = recordRef(returnOrderWorkflow.resource, created, returnOrderWorkflow.module)
   return { outcome: "applied", createdRecords: [ref], next: ref }
@@ -126,13 +130,21 @@ export function exchangeSourceReturnId(order: RowValueMap): string | undefined {
   return typeof origin === "string" ? EXCHANGE_ORIGIN.exec(origin)?.[1] : undefined
 }
 
-/** The newest exchange order created from this return is the one just produced. */
-export function observeExchangeOrder(returnId: string, orders: readonly RowValueMap[]): ObservedTransition {
-  const created = orders
-    .filter((row) => exchangeSourceReturnId(row) === returnId)
-    .map(rowId)
-    .sort((a, b) => Number(a) - Number(b))
-    .at(-1)
+/** Sale orders stamped as exchanges of this return. */
+export function returnExchangeOrderIds(returnId: string, orders: readonly RowValueMap[]): string[] {
+  return orders.filter((row) => exchangeSourceReturnId(row) === returnId).map(rowId)
+}
+
+/**
+ * A return can be exchanged more than once, so the caller snapshots its exchange orders before
+ * dispatch; the created order is the one new id after readback, never the newest.
+ */
+export function observeExchangeOrder(
+  returnId: string,
+  exchangeOrderIdsBefore: readonly string[],
+  orders: readonly RowValueMap[],
+): ObservedTransition {
+  const created = singleAddedId(exchangeOrderIdsBefore, returnExchangeOrderIds(returnId, orders))
   if (!created) return {}
   const ref = recordRef(saleOrderWorkflow.resource, created, saleOrderWorkflow.module)
   return { outcome: "applied", createdRecords: [ref], next: ref }

@@ -1,5 +1,6 @@
 import { firstNonNullKey, type RowValueMap } from "@lumiere/erp-shared/row-values"
 import { recordAction, type WorkflowAction, type WorkflowExecuteContext } from "../core/action"
+import { singleAddedId } from "../core/effect-delta"
 import { recordRef } from "../core/record-ref"
 import type { WorkflowResult } from "../core/result"
 import { rowId, variantTag } from "../core/row"
@@ -236,16 +237,26 @@ export function isSaleOrderInvoiceable(row: RowValueMap): boolean {
   return variantTag(firstNonNullKey(row, "invoiceStatus", "invoice_status")) !== "Invoiced"
 }
 
-/**
- * The reducer appends the new move to the order's `invoice_ids`, so the last entry of the
- * canonical readback is the invoice this command produced.
- */
-export function observeCreatedInvoice(orderId: string, orders: readonly RowValueMap[]): ObservedTransition {
+/** Canonical order-owned invoice relation, normalized for pre/post effect comparison. */
+export function saleOrderInvoiceIds(orderId: string, orders: readonly RowValueMap[]): string[] | undefined {
   const order = orders.find((row) => rowId(row) === orderId)
-  const ids = firstNonNullKey(order ?? {}, "invoiceIds", "invoice_ids")
-  const last = Array.isArray(ids) ? ids.at(-1) : undefined
-  if (last == null) return {}
-  const invoice = recordRef(invoiceWorkflow.resource, last as string | number | bigint, invoiceWorkflow.module, saleOrderWorkflow.module)
+  if (!order) return undefined
+  const ids = firstNonNullKey(order, "invoiceIds", "invoice_ids")
+  return Array.isArray(ids) ? ids.map(String) : []
+}
+
+/**
+ * The reducer appends the new move to the order's `invoice_ids`. The caller snapshots that
+ * relation before dispatch; the invoice is the one new id after readback, never the last entry.
+ */
+export function observeCreatedInvoice(
+  orderId: string,
+  invoiceIdsBefore: readonly string[],
+  orders: readonly RowValueMap[],
+): ObservedTransition {
+  const created = singleAddedId(invoiceIdsBefore, saleOrderInvoiceIds(orderId, orders))
+  if (!created) return {}
+  const invoice = recordRef(invoiceWorkflow.resource, created, invoiceWorkflow.module, saleOrderWorkflow.module)
   return { outcome: "applied", createdRecords: [invoice], next: invoice }
 }
 

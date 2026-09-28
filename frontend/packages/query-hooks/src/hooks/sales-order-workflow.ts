@@ -21,6 +21,7 @@ import {
   createInvoiceFromSaleOrderAction,
   observeConfirmedOrder,
   observeCreatedInvoice,
+  saleOrderInvoiceIds,
   sendSaleOrderQuotationAction,
   type AcceptSaleOrderQuotationInput,
   type AnyWorkflowAction,
@@ -59,6 +60,7 @@ export interface SaleOrderWorkflowLabels {
 
 type UpdateInput = UpdateSaleOrderInput<Partial<UpdateSaleOrderParams>>
 type InvoiceInput = CreateInvoiceFromSaleOrderInput<CreateInvoiceFromSaleOrderParams>
+type InvoiceRunInput = InvoiceInput & { invoiceIdsBefore: string[] }
 
 /**
  * `sales.order` record workflow: actions bound to generated commands and run through the shared
@@ -93,14 +95,14 @@ export function useSaleOrderWorkflow(
     [qc, organizationId, companyId],
   )
 
-  const createInvoiceSpec = useMemo<TransitionSpec<InvoiceInput>>(
+  const createInvoiceSpec = useMemo<TransitionSpec<InvoiceRunInput>>(
     () => ({
       id: "sales.order.create-invoice",
-      command: createInvoiceFromSaleOrderCommand,
+      command: ({ orderId, params }) => createInvoiceFromSaleOrderCommand({ orderId, params }),
       affects: CREATE_INVOICE_FROM_SALE_ORDER_AFFECTS,
-      observe: async ({ orderId }) => {
+      observe: async ({ orderId, invoiceIdsBefore }) => {
         const orders = await qc.fetchQuery({ ...saleOrdersQueryOptions(organizationId), staleTime: 0 })
-        return observeCreatedInvoice(orderId, orders as unknown as RowValueMap[])
+        return observeCreatedInvoice(orderId, invoiceIdsBefore, orders as unknown as RowValueMap[])
       },
     }),
     [qc, organizationId],
@@ -226,12 +228,21 @@ export function useSaleOrderWorkflow(
     () =>
       createInvoiceFromSaleOrderAction<CreateInvoiceFromSaleOrderParams>({
         label: labels.createInvoice,
-        execute: (input, context) =>
-          runner.run(`sales.order.create-invoice:${input.orderId}`, createInvoiceSpec, input, {
-            navigateToNext: context?.navigateToNext,
-          }),
+        execute: async (input, context) => {
+          const orders = await qc.fetchQuery({ ...saleOrdersQueryOptions(organizationId), staleTime: 0 })
+          const invoiceIdsBefore = saleOrderInvoiceIds(input.orderId, orders as unknown as RowValueMap[])
+          if (!invoiceIdsBefore) {
+            throw new WorkflowError("validation", "Sale order is unavailable for invoice readback")
+          }
+          return runner.run(
+            `sales.order.create-invoice:${input.orderId}`,
+            createInvoiceSpec,
+            { ...input, invoiceIdsBefore },
+            { navigateToNext: context?.navigateToNext },
+          )
+        },
       }),
-    [labels.createInvoice, runner, createInvoiceSpec],
+    [labels.createInvoice, runner, createInvoiceSpec, qc, organizationId],
   )
 
   const actions = useMemo<Array<AnyWorkflowAction<RowValueMap>>>(

@@ -213,15 +213,32 @@ export const isBlanketReleasable = (row: RowValueMap) => String(firstNonNullKey(
 
 const BLANKET_ORIGIN = /^blanket:(\d+)$/
 
-/** `release_blanket_to_po` stamps the PO `origin` with `blanket:<id>`; the newest such PO is the release just made. */
-export function observeBlanketRelease(blanketOrderId: string, orders: readonly RowValueMap[]): ObservedTransition {
-  const created = orders
-    .filter((row) => BLANKET_ORIGIN.exec(String(firstNonNullKey(row, "origin") ?? ""))?.[1] === blanketOrderId)
-    .map(rowId)
-    .sort((a, b) => Number(a) - Number(b))
-    .at(-1)
-  if (!created) return {}
-  const ref = recordRef(purchaseOrderWorkflow.resource, created, purchaseOrderWorkflow.module)
+/**
+ * `release_blanket_to_po` commits one `purchase_blanket_release` row per idempotency key, naming
+ * the PO it created. The release is confirmed only by that exact (blanket, key) row, and the PO it
+ * names must exist with the `blanket:<id>` origin stamp. A replay of the same key converges on
+ * the same row; zero or several rows are unresolved.
+ */
+export function observeBlanketRelease(
+  blanketOrderId: string,
+  idempotencyKey: string,
+  releases: readonly RowValueMap[],
+  orders: readonly RowValueMap[],
+): ObservedTransition {
+  const key = idempotencyKey.trim()
+  const matches = releases.filter(
+    (row) =>
+      String(firstNonNullKey(row, "blanketOrderId", "blanket_order_id") ?? "") === blanketOrderId &&
+      String(firstNonNullKey(row, "idempotencyKey", "idempotency_key") ?? "") === key,
+  )
+  if (matches.length !== 1) return {}
+  const poId = firstNonNullKey(matches[0], "purchaseOrderId", "purchase_order_id")
+  if (poId == null) return {}
+  const order = orders.find((row) => rowId(row) === String(poId))
+  if (!order || BLANKET_ORIGIN.exec(String(firstNonNullKey(order, "origin") ?? ""))?.[1] !== blanketOrderId) {
+    return {}
+  }
+  const ref = recordRef(purchaseOrderWorkflow.resource, String(poId), purchaseOrderWorkflow.module)
   return { outcome: "applied", createdRecords: [ref], next: ref }
 }
 
