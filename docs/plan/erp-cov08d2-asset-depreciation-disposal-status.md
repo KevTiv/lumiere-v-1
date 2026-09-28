@@ -29,7 +29,7 @@ COV-08d for the minimal form). Never correlate by newest row, name or timestamp.
 
 **Contract release possibly required.** state-only disposal readback (`account-assets.state` = Removed) and depreciation lines (`depreciation-lines` by asset_id) need no release; proving the disposal journal move identity needs the asset→move relation exposed on `account-assets`
 
-Contract releases cannot be cut from CI or from the authoring session; stop at IMPLEMENTED with the registry diff prepared and hand off `make publish-contracts VERSION=x.y.z` to a maintainer with `lumiere-contracts` access.
+Contract releases are automatic: pushing the registry or reducer change runs `.github/workflows/release-contracts.yml`, which publishes the next lumiere-contracts version and pins it on the branch. Pull its pin commit before continuing.
 
 ## Prerequisites / decisions
 

@@ -29,7 +29,7 @@ COV-08d for the minimal form). Never correlate by newest row, name or timestamp.
 
 **Contract release required.** `scheduled-reports` exposes neither last_run nor run_count and there is no report-run resource
 
-Contract releases cannot be cut from CI or from the authoring session; stop at IMPLEMENTED with the registry diff prepared and hand off `make publish-contracts VERSION=x.y.z` to a maintainer with `lumiere-contracts` access.
+Contract releases are automatic: pushing the registry or reducer change runs `.github/workflows/release-contracts.yml`, which publishes the next lumiere-contracts version and pins it on the branch. Pull its pin commit before continuing.
 
 ## Prerequisites / decisions
 

@@ -28,7 +28,7 @@ COV-08d for the minimal form). Never correlate by newest row, name or timestamp.
 
 **Contract release required.** `pos-sessions` has neither organization_id nor company_id in its projection (the table has no company column); exact scoped readback needs the config/company relation exposed or a join-backed resource
 
-Contract releases cannot be cut from CI or from the authoring session; stop at IMPLEMENTED with the registry diff prepared and hand off `make publish-contracts VERSION=x.y.z` to a maintainer with `lumiere-contracts` access.
+Contract releases are automatic: pushing the registry or reducer change runs `.github/workflows/release-contracts.yml`, which publishes the next lumiere-contracts version and pins it on the branch. Pull its pin commit before continuing.
 
 ## Prerequisites / decisions
 
