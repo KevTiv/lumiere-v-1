@@ -1,6 +1,7 @@
 "use client"
 
 
+import { decodeOperationDispatch } from "@lumiere/api-client"
 import { stdbBffCommandPost } from "@lumiere/stdb/commands"
 /**
  * Helpdesk — React Query over `/api/query/*` and `/api/operations/*`.
@@ -22,7 +23,15 @@ import type {
   UpdateTicketParams,
 } from "@lumiere/stdb/types"
 import { encodeIdentity, stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
-import { scalarToU64 as toScalarU64 } from "@lumiere/erp-shared/u64"
+import { parseStrictU64, scalarToU64 as toScalarU64 } from "@lumiere/erp-shared/u64"
+
+import {
+  AmbiguousOperationEffectError,
+  executeOperationWithCanonicalReadback,
+  requireResolvedOperationEffect,
+  type CanonicalRecordRef,
+  type ResolvedOperationEffectOutcome,
+} from "./operation-effect"
 
 import {
   finalizeCreateHelpdeskSlaParams,
@@ -120,43 +129,223 @@ export function useUpdateTicket(organizationId: bigint) {
   })
 }
 
+export type HelpdeskLifecycleState = "InProgress" | "Closed"
+
+export interface HelpdeskTicketLifecycleProjection {
+  readonly id?: unknown
+  readonly organizationId?: unknown
+  readonly organization_id?: unknown
+  readonly userId?: unknown
+  readonly user_id?: unknown
+  readonly state?: unknown
+  readonly closedAt?: unknown
+  readonly closed_at?: unknown
+}
+
+export interface HelpdeskTicketEffectRef extends CanonicalRecordRef {
+  readonly resource: "helpdesk-tickets"
+  readonly state: HelpdeskLifecycleState
+  readonly assigneeIdentityHex?: string
+}
+
+function helpdeskStateTag(value: unknown): string {
+  if (typeof value === "string") return value
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    if ("tag" in value) return String((value as { tag?: unknown }).tag ?? "")
+    const keys = Object.keys(value)
+    if (keys.length === 1) {
+      const key = keys[0]!
+      return key.charAt(0).toUpperCase() + key.slice(1)
+    }
+  }
+  return ""
+}
+
+function helpdeskIdentityHex(value: unknown): string {
+  if (value == null || value === "") return ""
+  if (typeof value === "string") {
+    return value.trim().replace(/^0x/i, "").toLowerCase()
+  }
+  if (
+    typeof value === "object" &&
+    value !== null &&
+    "__identity__" in value
+  ) {
+    return String((value as { __identity__?: unknown }).__identity__ ?? "")
+      .trim()
+      .replace(/^0x/i, "")
+      .toLowerCase()
+  }
+  return String(value).trim().replace(/^0x/i, "").toLowerCase()
+}
+
+function hasClosedAt(value: unknown): boolean {
+  if (value == null) return false
+  if (typeof value === "object" && !Array.isArray(value)) {
+    if ("none" in value) return false
+    if ("some" in value) return true
+  }
+  return true
+}
+
+export function resolveHelpdeskTicketLifecycleEffect(
+  rows: readonly HelpdeskTicketLifecycleProjection[],
+  organizationId: bigint,
+  ticketId: bigint,
+  expectedState: HelpdeskLifecycleState,
+  expectedAssigneeIdentityHex?: string,
+): HelpdeskTicketEffectRef | null {
+  const matches = rows.filter((row) => parseStrictU64(row.id) === ticketId)
+  if (matches.length > 1) {
+    throw new AmbiguousOperationEffectError(
+      `Expected one helpdesk ticket, found ${matches.length}`,
+    )
+  }
+  const row = matches[0]
+  if (
+    !row ||
+    parseStrictU64(row.organizationId ?? row.organization_id) !== organizationId ||
+    helpdeskStateTag(row.state) !== expectedState
+  ) {
+    return null
+  }
+
+  const closedAt = row.closedAt ?? row.closed_at
+  if (expectedState === "Closed" ? !hasClosedAt(closedAt) : hasClosedAt(closedAt)) {
+    return null
+  }
+
+  const expectedAssignee = expectedAssigneeIdentityHex
+    ?.trim()
+    .replace(/^0x/i, "")
+    .toLowerCase()
+  const actualAssignee = helpdeskIdentityHex(row.userId ?? row.user_id)
+  if (expectedAssignee && actualAssignee !== expectedAssignee) return null
+
+  return {
+    resource: "helpdesk-tickets",
+    id: ticketId.toString(),
+    state: expectedState,
+    ...(actualAssignee ? { assigneeIdentityHex: actualAssignee } : {}),
+  }
+}
+
+async function readHelpdeskTickets(): Promise<HelpdeskTicketLifecycleProjection[]> {
+  return fetchQueryList(
+    "/api/query/helpdesk-tickets",
+    "Failed to read helpdesk tickets",
+  )
+}
+
 /** `agentIdentityHex` — SpacetimeDB identity hex (same format as user_profile.identity). */
 export function useAssignTicket(organizationId: bigint) {
   const qc = useQueryClient()
-  return useMutation<void, Error, { ticketId: bigint | number | string; agentIdentityHex: string }>({
-    mutationFn: async ({ ticketId, agentIdentityHex }) => {
-      const { urlPath, init } = stdbBffCommandPost("assign_ticket", {
-        ticketId: toScalarU64(ticketId),
-        agentId: encodeIdentity(agentIdentityHex),
+  return useMutation<
+    ResolvedOperationEffectOutcome<HelpdeskTicketEffectRef>,
+    Error,
+    { ticketId: bigint | number | string; agentIdentityHex: string }
+  >({
+    mutationFn: async ({ ticketId: ticketIdInput, agentIdentityHex }) => {
+      const ticketId = parseStrictU64(ticketIdInput)
+      if (ticketId == null) throw new Error("Invalid helpdesk ticket id")
+      const outcome = await executeOperationWithCanonicalReadback({
+        resolveEffect: async () =>
+          resolveHelpdeskTicketLifecycleEffect(
+            await readHelpdeskTickets(),
+            organizationId,
+            ticketId,
+            "InProgress",
+            agentIdentityHex,
+          ),
+        dispatch: async () => {
+          const { urlPath, init } = stdbBffCommandPost("assign_ticket", {
+            ticketId,
+            agentId: encodeIdentity(agentIdentityHex),
+          })
+          return decodeOperationDispatch(
+            await apiFetch(urlPath, init),
+            "Failed to assign helpdesk ticket",
+          )
+        },
+        afterDispatch: () => invalidateAll(qc, organizationId),
+        readbackAttempts: 6,
+        readbackDelayMs: 150,
       })
-      const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error('Failed to assign helpdesk ticket')
+      return requireResolvedOperationEffect(outcome)
     },
-    onSuccess: () => invalidateAll(qc, organizationId),
   })
 }
 
 export function useCloseTicket(organizationId: bigint) {
   const qc = useQueryClient()
-  return useMutation<void, Error, { ticketId: bigint | number | string }>({
-    mutationFn: async ({ ticketId }) => {
-      const { urlPath, init } = stdbBffCommandPost("close_ticket", { ticketId: toScalarU64(ticketId) })
-      const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error('Failed to close helpdesk ticket')
+  return useMutation<
+    ResolvedOperationEffectOutcome<HelpdeskTicketEffectRef>,
+    Error,
+    { ticketId: bigint | number | string }
+  >({
+    mutationFn: async ({ ticketId: ticketIdInput }) => {
+      const ticketId = parseStrictU64(ticketIdInput)
+      if (ticketId == null) throw new Error("Invalid helpdesk ticket id")
+      const outcome = await executeOperationWithCanonicalReadback({
+        resolveEffect: async () =>
+          resolveHelpdeskTicketLifecycleEffect(
+            await readHelpdeskTickets(),
+            organizationId,
+            ticketId,
+            "Closed",
+          ),
+        dispatch: async () => {
+          const { urlPath, init } = stdbBffCommandPost("close_ticket", {
+            ticketId,
+          })
+          return decodeOperationDispatch(
+            await apiFetch(urlPath, init),
+            "Failed to close helpdesk ticket",
+          )
+        },
+        afterDispatch: () => invalidateAll(qc, organizationId),
+        readbackAttempts: 6,
+        readbackDelayMs: 150,
+      })
+      return requireResolvedOperationEffect(outcome)
     },
-    onSuccess: () => invalidateAll(qc, organizationId),
   })
 }
 
 export function useReopenTicket(organizationId: bigint) {
   const qc = useQueryClient()
-  return useMutation<void, Error, { ticketId: bigint | number | string }>({
-    mutationFn: async ({ ticketId }) => {
-      const { urlPath, init } = stdbBffCommandPost("reopen_ticket", { ticketId: toScalarU64(ticketId) })
-      const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error('Failed to reopen helpdesk ticket')
+  return useMutation<
+    ResolvedOperationEffectOutcome<HelpdeskTicketEffectRef>,
+    Error,
+    { ticketId: bigint | number | string }
+  >({
+    mutationFn: async ({ ticketId: ticketIdInput }) => {
+      const ticketId = parseStrictU64(ticketIdInput)
+      if (ticketId == null) throw new Error("Invalid helpdesk ticket id")
+      const outcome = await executeOperationWithCanonicalReadback({
+        resolveBeforeDispatch: false,
+        resolveEffect: async () =>
+          resolveHelpdeskTicketLifecycleEffect(
+            await readHelpdeskTickets(),
+            organizationId,
+            ticketId,
+            "InProgress",
+          ),
+        dispatch: async () => {
+          const { urlPath, init } = stdbBffCommandPost("reopen_ticket", {
+            ticketId,
+          })
+          return decodeOperationDispatch(
+            await apiFetch(urlPath, init),
+            "Failed to reopen helpdesk ticket",
+          )
+        },
+        afterDispatch: () => invalidateAll(qc, organizationId),
+        readbackAttempts: 6,
+        readbackDelayMs: 150,
+      })
+      return requireResolvedOperationEffect(outcome)
     },
-    onSuccess: () => invalidateAll(qc, organizationId),
   })
 }
 

@@ -157,7 +157,7 @@ export function usePOS(
   const activatePosConfig = useActivatePosConfig(organizationId);
   const deactivatePosConfig = useDeactivatePosConfig(organizationId);
   const openPosSession = useOpenPosSession(organizationId);
-  const closePosSession = useClosePosSession(organizationId);
+  const closePosSession = useClosePosSession(organizationId, companyId);
   const computePosSessionTotals = useComputePosSessionTotals(organizationId);
 
   const isPosLifecyclePending =

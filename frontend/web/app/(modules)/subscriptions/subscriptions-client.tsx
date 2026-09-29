@@ -58,6 +58,7 @@ import { subscriptionsModuleConfig } from "@/lib/module-dashboard-configs"
 import { useSubscriptionsModuleSubscription } from "@/lib/module-subscription-hooks"
 import {
   useSubscriptions,
+  useSubscriptionBillingRuns,
   useSubscriptionPlans,
   useSubscriptionLines,
   useSubscriptionAmendments,
@@ -204,6 +205,7 @@ function SubscriptionsClientLoaded({
   const [recognizeMoveId, setRecognizeMoveId] = useState("")
 
   const { data: subscriptions = [] } = useSubscriptions(orgId, initialSubscriptions)
+  const { data: billingRuns = [] } = useSubscriptionBillingRuns(orgId)
   const { data: plans = [] } = useSubscriptionPlans(orgId, initialPlans)
   const { data: subscriptionLines = [] } = useSubscriptionLines(orgId)
   const { data: subscriptionAmendments = [] } = useSubscriptionAmendments(orgId)
@@ -883,18 +885,23 @@ function SubscriptionsClientLoaded({
   )
   const payInvoiceMoveOptions = useMemo(() => {
     if (payTargetId == null) return [{ value: "", label: "—", disabled: true }]
-    const sub = (subscriptions as Record<string, unknown>[]).find(
-      (s) => Number(s.id) === payTargetId,
+    const ids = new Set(
+      (billingRuns as Record<string, unknown>[])
+        .filter(
+          (run) =>
+            Number(run.subscriptionId ?? run.subscription_id) === payTargetId,
+        )
+        .map((run) => run.invoiceMoveId ?? run.invoice_move_id)
+        .filter((id) => id != null)
+        .map(String),
     )
-    const ids = (sub?.invoiceIds ?? sub?.invoice_ids ?? []) as unknown[]
-    const idSet = new Set(ids.map((id) => String(id)))
-    const moves = (accountMoves as Record<string, unknown>[]).filter((m) =>
-      idSet.has(String(m.id)),
+    const moves = (accountMoves as Record<string, unknown>[]).filter((move) =>
+      ids.has(String(move.id)),
     )
     const fromApi = accountMoveRowsToSelectOptions(moves)
     if (fromApi.length > 0) return fromApi
     return [{ value: "", label: t("common.lookup.noAccounts"), disabled: true }]
-  }, [payTargetId, subscriptions, accountMoves, t])
+  }, [payTargetId, billingRuns, accountMoves, t])
   const payForm = useMemo(
     () =>
       mergeSelectOptionsForFields(paySubscriptionInvoiceForm(t), {
