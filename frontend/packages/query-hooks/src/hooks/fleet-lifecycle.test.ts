@@ -78,6 +78,18 @@ describe("Fleet lifecycle query and command contracts", () => {
     }
   })
 
+  it("projects monetary service cost and canonical accounting linkage", () => {
+    const fields = RESOURCE_REGISTRY["fleet-service-records"]?.default_restricted ?? []
+    for (const field of [
+      "cost_amount",
+      "currency_id",
+      "account_move_id",
+      "client_request_id",
+    ]) {
+      assert.ok(fields.includes(field), `fleet-service-records must expose ${field}`)
+    }
+  })
+
   it("reads every lifecycle history through its matching organization-scoped resource", () => {
     const sharedReader = localFunction("useFleetHistory")
     assert.match(
