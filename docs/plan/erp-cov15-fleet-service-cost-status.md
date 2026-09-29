@@ -1,50 +1,120 @@
-# COV-15 — Vehicle service/inspection cost history
+# COV-15 — Vehicle service / inspection history
 
-**Status:** SCAFFOLDED — implementation pending  
+**Status:** IMPLEMENTED — bounded history slice; runtime acceptance pending  
+**Branch:** `codex/cov15-fleet-service-cost`  
+**Stack base:** `codex/cov14-helpdesk-ticket-lifecycle`  
 **Module/surface:** Fleet  
-**Plan target:** vehicle/driver service-cost lifecycle  
-**Scaffold source:** [`erp-cov08-27-scaffold.md`](./erp-cov08-27-scaffold.md)
+**Operator surface:** `/fleet`
 
-## Bounded path (to implement)
+## Bounded path
 
-Operator surface: /fleet (dedicated route now exists on main; /map stays the live-map view)
+This COV-15 slice certifies the existing service and inspection history path:
 
-Existing operations (already reachable from the frontend command layer):
+1. record one service through the visible **Service history** form;
+2. resolve it through the exact stable `client_request_id`;
+3. replay the same request and prove idempotent success with no duplicate row;
+4. record one inspection through the visible **Inspection history** form;
+5. resolve it through the exact stable `client_request_id`;
+6. replay the same request and prove idempotent success with no duplicate row;
+7. replay both accepted writes as `fixture.reader@example.test` and require
+   HTTP 403 with both canonical rows unchanged.
 
-- `record_fleet_service` — hook: `frontend/packages/query-hooks/src/hooks/fleet.ts`
-- `record_fleet_inspection` — hook: `frontend/packages/query-hooks/src/hooks/fleet.ts`
+The browser proof uses seeded `Truck #101`. The only trusted setup is creating
+one company-scoped Fleet service type because the normal Fleet UI does not
+currently expose service-type administration.
 
-Canonical resources: fleet-service-records, fleet-inspections, fleet-vehicles
+## Exact effect contract
 
-## Effect contract
+The backend already had proper idempotency support before this slice:
 
-Recorded service/inspection resolves by a stable key (vehicle_id + serviced_at/inspected_at or an idempotency key), never newest row.
+- `RecordFleetServiceParams.client_request_id`;
+- `RecordFleetInspectionParams.client_request_id`;
+- both reducers normalize the key and return successfully without inserting a
+  second history row when the same key already exists in the same org/company.
 
-Implementation pattern: wrap the mutation's readback with `resolveUniqueEffect` /
-`executeOperationWithCanonicalReadback` from
-`frontend/packages/query-hooks/src/hooks/operation-effect.ts` (see COV-08c and
-COV-08d for the minimal form). Never correlate by newest row, name or timestamp.
+The missing piece was read visibility. COV-15 exposes the existing
+`client_request_id` field on:
+
+- `fleet-service-records`;
+- `fleet-inspections`.
+
+`resolveFleetHistoryEffect` then requires:
+
+- exact organization;
+- exact company;
+- exact vehicle;
+- exact `client_request_id`;
+- exact service type for service records;
+- exact typed outcome for inspections;
+- one and only one matching persisted row.
+
+Duplicate exact effects fail closed. No newest-row or timestamp correlation is
+used.
+
+If a hook caller omits `clientRequestId`, the client generates one before
+dispatch so every UI write still has a stable readback identity.
+
+## Replay semantics
+
+Service and inspection writes are intentionally **idempotent-success**, not
+stale-422 transitions.
+
+A same-request replay:
+
+- passes authorization first;
+- finds the existing same-scope request key;
+- returns success without inserting another row;
+- leaves the same row ID and history contents unchanged.
+
+A read-only actor is denied before that idempotency short-circuit.
+
+The existing native lifecycle suite already covered duplicate suppression and
+invalid org/company/value cases. This slice strengthens it to assert the exact
+request key, organization, company, vehicle, service type / inspector and typed
+outcome persisted on the single canonical row.
 
 ## Contract disposition
 
-**Contract release possibly required.** projections expose vehicle_id, company_id and serviced_at/inspected_at, so a natural-key readback needs no release; the record params carry no idempotency key, so replay-safety needs a params change (contract release)
+**Contract release required and triggered.**
 
-Contract releases are automatic: pushing the registry or reducer change runs `.github/workflows/release-contracts.yml`, which publishes the next lumiere-contracts version and pins it on the branch. Pull its pin commit before continuing.
+Projection-only change:
 
-## Prerequisites / decisions
+- expose existing `fleet_service_record.client_request_id`;
+- expose existing `fleet_inspection.client_request_id`.
 
-Confirm the route decision: `/fleet` exists on main, so COV-15 certifies `/fleet` and treats `/map` as a view.
+No reducer signature, table column or business field was added.
 
-## D/A/O/E proof checklist
+## Monetary cost note
 
-| Gate | Required proof | State |
+The milestone label historically says “service/inspection cost history,” but
+the current Fleet domain has **no monetary service-cost field** in
+`FleetServiceRecord`, no currency/accounting relation for that record, and no
+cost input in the Fleet forms.
+
+This bounded slice does **not** invent a finance model and does not claim
+monetary-cost certification. A future Fleet/Finance slice must define the
+canonical amount/currency/accounting relation before that title-level capability
+can be considered complete.
+
+## D/A/O/E proof
+
+| Gate | Proof in this branch | Acceptance condition |
 | --- | --- | --- |
-| D | Native domain test: transition, replay rejection leaving the row unchanged, invariant/denial cases | TODO |
-| A | Generated operation keeps permission + organization/company scope; reader persona denied (403) | TODO |
-| O | Playwright drives the transition through the visible UI action (setup calls allowed only for fixtures) | TODO — `frontend/web/tests/e2e/cov15-fleet-service-cost.spec.ts` |
-| E | Exact-effect resolver unit test (state/scope/identity/ambiguity) and browser snapshot preserved after stale (422) and denied (403) replay | TODO |
+| D | Existing `test_history_is_immutable_and_idempotent` now asserts exact request IDs and tenant/vehicle/service/inspection relations; `test_history_rejects_invalid_scope_and_values` retains cross-company/org and invalid-value denial. | `run_all_fleet_tests` passes. |
+| A | Existing reducers check `fleet_vehicle:write` first and validate organization/company/vehicle/service-type/inspector scope. Browser reader replay requires 403 before the idempotency shortcut. | Authorized actor succeeds; reader and invalid scope do not mutate history. |
+| O | `cov15-fleet-service-cost.spec.ts` drives Service and Inspection creation through the visible `/fleet` forms. | Focused Playwright proof passes. |
+| E | `fleet-history-effect.test.ts` covers exact request identity, scope, vehicle, service type/outcome and ambiguity. Same-key browser retries must return success while preserving the exact snapshot. | Query-hook unit/native/browser evidence green on one head. |
 
 ## Acceptance
 
-Becomes IMPLEMENTED when the bounded path and proofs above exist, and ACCEPTED only
-with same-head green CI (plus the contract release, when required).
+This bounded COV-15 history slice becomes **ACCEPTED** only when the same branch
+head records:
+
+1. automatic contracts release/pin exposing `client_request_id`;
+2. query-hooks typecheck + unit tests;
+3. `run_all_fleet_tests` on a live stack;
+4. focused COV-15 Playwright proof;
+5. branch CI green.
+
+Until then the truthful disposition is **IMPLEMENTED — bounded history slice;
+runtime acceptance pending**.
