@@ -348,7 +348,16 @@ function taggedValue(value: unknown): string {
 }
 
 function numericValue(value: unknown): number | null {
-  const parsed = Number(value);
+  let raw = value;
+  if (
+    raw &&
+    typeof raw === 'object' &&
+    !Array.isArray(raw) &&
+    'some' in raw
+  ) {
+    raw = (raw as { some?: unknown }).some;
+  }
+  const parsed = Number(raw);
   return Number.isFinite(parsed) ? parsed : null;
 }
 
