@@ -3,11 +3,9 @@ import test from 'node:test';
 
 import { AmbiguousOperationEffectError } from './operation-effect';
 import {
-  computePostMessageKey,
   resolveAcknowledgedIotActionEffect,
   resolveBomByproductEffect,
   resolveManufacturingScrapEffect,
-  resolvePostedMessageEffect,
   resolveReplenishmentScheduleEffect,
   resolveTimesheetBillingEffect,
   resolveTimesheetStatusEffect,
@@ -127,33 +125,5 @@ test('COV-16 requires both acknowledged state and timestamp', () => {
       3n,
     ),
     { resource: 'iot-actions', id: '3' },
-  );
-});
-
-test('COV-19 derives and resolves a stable message key', async () => {
-  const key = await computePostMessageKey({
-    model: 'crm_lead',
-    resId: 42n,
-    body: 'Follow up',
-    parentId: null,
-    attachmentIds: [8n],
-  });
-  assert.equal(
-    key,
-    'sha256:7012fca419bf4a53e03937e9fa2f6bd46bb359f67487f3b1d1b8e4c1a17d932a',
-  );
-  assert.deepEqual(
-    resolvePostedMessageEffect(
-      [
-        {
-          organization_id: 7,
-          id: 55,
-          metadata: JSON.stringify({ message_key: key }),
-        },
-      ],
-      7n,
-      key,
-    ),
-    { resource: 'mail-messages', id: '55' },
   );
 });

@@ -31,9 +31,7 @@ pub fn run_crm_relational_fk_test(ctx: &ReducerContext) -> Result<(), String> {
     relational_fk_test::test_activity_type_and_contact_relations(ctx)
         .map_err(|e| format!("activity_type_and_contact_relations: {e}"))?;
     relational_fk_test::test_complete_activity_rejects_replay(ctx)
-        .map_err(|e| format!("complete_activity_rejects_replay: {e}"))?;
-    relational_fk_test::test_post_message_rejects_duplicate_key(ctx)
-        .map_err(|e| format!("post_message_rejects_duplicate_key: {e}"))
+        .map_err(|e| format!("complete_activity_rejects_replay: {e}"))
 }
 
 #[spacetimedb::reducer]

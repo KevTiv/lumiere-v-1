@@ -132,12 +132,12 @@ export function useIotThresholds(
 
 // ── Query invalidation helper ───────────────────────────────────────────────
 
-function invalidateIotQueries(
+async function invalidateIotQueries(
   qc: ReturnType<typeof useQueryClient>,
   organizationId: bigint,
-) {
+): Promise<void> {
   const k = rqBigIntKey(organizationId);
-  return Promise.all([
+  await Promise.all([
     qc.invalidateQueries({ queryKey: ['iot-devices', k] }),
     qc.invalidateQueries({ queryKey: ['iot-hubs', k] }),
     qc.invalidateQueries({ queryKey: ['iot-pairing-tokens', k] }),

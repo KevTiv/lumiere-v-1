@@ -722,10 +722,8 @@ export function useBillTimesheets(organizationId: bigint) {
           const matchingInvoices = invoices.filter(
             (invoice) =>
               parseStrictU64(invoice.id) === invoiceId &&
-              parseStrictU64(
-                invoice.organizationId ?? invoice.organization_id,
-              ) === organizationId &&
-              parseStrictU64(invoice.companyId ?? invoice.company_id) === scope,
+              parseStrictU64(invoice.organizationId) === organizationId &&
+              parseStrictU64(invoice.companyId) === scope,
           );
           if (matchingInvoices.length !== 1) return null;
           return { resource: 'account-moves', id: invoiceId.toString() };

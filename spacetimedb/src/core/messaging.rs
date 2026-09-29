@@ -6,7 +6,6 @@
 /// Clients query messages by model+res_id rather than through the Vec<u64> fields.
 /// The Vec<u64> fields on parent tables remain for backwards-compat but are not maintained.
 use spacetimedb::{reducer, Identity, ReducerContext, Table, Timestamp};
-use sha2::{Digest, Sha256};
 
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 use crate::types::MailMessageType;
@@ -23,6 +22,7 @@ use crate::types::MailMessageType;
     index(accessor = mail_message_by_model, btree(columns = [model])),
     index(accessor = mail_message_by_author, btree(columns = [author_id]))
 )]
+#[derive(PartialEq)]
 pub struct MailMessage {
     #[primary_key]
     #[auto_inc]
@@ -80,43 +80,6 @@ fn truncate_for_notification(body: &str, max_chars: usize) -> String {
     format!("{truncated}…")
 }
 
-fn frame_message_part(hasher: &mut Sha256, value: &[u8]) {
-    hasher.update((value.len() as u64).to_be_bytes());
-    hasher.update(value);
-}
-
-fn post_message_key(
-    model: &str,
-    res_id: u64,
-    body: &str,
-    parent_id: Option<u64>,
-    attachment_ids: &[u64],
-) -> String {
-    let mut hasher = Sha256::new();
-    frame_message_part(&mut hasher, model.as_bytes());
-    hasher.update(res_id.to_be_bytes());
-    match parent_id {
-        Some(id) => {
-            hasher.update([1]);
-            hasher.update(id.to_be_bytes());
-        }
-        None => hasher.update([0]),
-    }
-    hasher.update((attachment_ids.len() as u64).to_be_bytes());
-    for id in attachment_ids {
-        hasher.update(id.to_be_bytes());
-    }
-    frame_message_part(&mut hasher, body.as_bytes());
-    format!("sha256:{:x}", hasher.finalize())
-}
-
-fn metadata_message_key(metadata: Option<&str>) -> Option<&str> {
-    let metadata = metadata?;
-    let start = metadata.find("\"message_key\":\"")? + "\"message_key\":\"".len();
-    let rest = &metadata[start..];
-    Some(&rest[..rest.find('"')?])
-}
-
 /// Insert `MailMessageType::Notification` rows for followers subscribed to the event subtype.
 fn notify_record_followers(
     ctx: &ReducerContext,
@@ -170,7 +133,22 @@ fn notify_record_followers(
 
 // ── Reducers ──────────────────────────────────────────────────────────────────
 
+const MAX_MESSAGE_IDEMPOTENCY_KEY_LEN: usize = 128;
+
+/// The client-supplied idempotency key a `post_message` row was created with.
+fn message_idempotency_key(metadata: Option<&str>) -> Option<String> {
+    let value: serde_json::Value = serde_json::from_str(metadata?).ok()?;
+    value.get("idempotency_key")?.as_str().map(str::to_owned)
+}
+
 /// Post a message (comment visible to all followers) on any record.
+///
+/// `idempotency_key` names this submission. A key is scoped to the caller within
+/// the organization: re-sending the same key with the same message converges on the
+/// existing row (no duplicate, no repeat notification), and re-using it for a
+/// different message is rejected. The key is stored in `metadata` so the exact
+/// created row can be read back from `mail-messages`. Without a key the call
+/// always creates a new message.
 #[reducer]
 pub fn post_message(
     ctx: &ReducerContext,
@@ -180,6 +158,7 @@ pub fn post_message(
     body: String,
     parent_id: Option<u64>,
     attachment_ids: Vec<u64>,
+    idempotency_key: Option<String>,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "mail_message", "create")?;
     if model.is_empty() {
@@ -188,13 +167,39 @@ pub fn post_message(
     if body.is_empty() {
         return Err("Message body cannot be empty".to_string());
     }
-    let message_key = post_message_key(&model, res_id, &body, parent_id, &attachment_ids);
-    if ctx.db.mail_message().iter().any(|message| {
-        message.organization_id == organization_id
-            && metadata_message_key(message.metadata.as_deref()) == Some(message_key.as_str())
-    }) {
-        return Err("Message has already been posted".to_string());
+    let idempotency_key = idempotency_key.map(|key| key.trim().to_string());
+    if let Some(key) = &idempotency_key {
+        if key.is_empty() || key.len() > MAX_MESSAGE_IDEMPOTENCY_KEY_LEN {
+            return Err(format!(
+                "idempotency_key must be 1-{MAX_MESSAGE_IDEMPOTENCY_KEY_LEN} characters"
+            ));
+        }
+        let sender = ctx.sender();
+        let existing = ctx
+            .db
+            .mail_message()
+            .mail_message_by_author()
+            .filter(&sender)
+            .find(|message| {
+                message.organization_id == organization_id
+                    && message_idempotency_key(message.metadata.as_deref()).as_deref()
+                        == Some(key.as_str())
+            });
+        if let Some(existing) = existing {
+            if existing.model == model
+                && existing.res_id == res_id
+                && existing.body == body
+                && existing.parent_id == parent_id
+                && existing.attachment_ids == attachment_ids
+            {
+                return Ok(());
+            }
+            return Err("idempotency_key was already used for a different message".to_string());
+        }
     }
+    let metadata = idempotency_key
+        .as_ref()
+        .map(|key| serde_json::json!({ "idempotency_key": key }).to_string());
     let msg = ctx.db.mail_message().insert(MailMessage {
         id: 0,
         organization_id,
@@ -207,7 +212,7 @@ pub fn post_message(
         date: ctx.timestamp,
         parent_id,
         attachment_ids,
-        metadata: Some(serde_json::json!({ "message_key": message_key }).to_string()),
+        metadata,
     });
     notify_record_followers(
         ctx,
@@ -348,19 +353,6 @@ pub fn unsubscribe_from_record(
     Ok(())
 }
 
-#[cfg(test)]
-mod tests {
-    use super::post_message_key;
-
-    #[test]
-    fn post_message_key_has_a_stable_cross_client_fixture() {
-        assert_eq!(
-            post_message_key("crm_lead", 42, "Follow up", None, &[8]),
-            "sha256:7012fca419bf4a53e03937e9fa2f6bd46bb359f67487f3b1d1b8e4c1a17d932a"
-        );
-    }
-}
-
 /// Mark a queued outbound email as delivered (called by api-server after Resend send).
 #[reducer]
 pub fn mark_mail_message_delivered(
@@ -382,7 +374,7 @@ pub fn mark_mail_message_delivered(
         return Err("mail message does not belong to this organization".to_string());
     }
 
-    let message_key = metadata_message_key(message.metadata.as_deref()).map(str::to_owned);
+    let idempotency_key = message_idempotency_key(message.metadata.as_deref());
     let metadata = delivery_metadata.or_else(|| {
         Some(
             serde_json::json!({
@@ -392,17 +384,20 @@ pub fn mark_mail_message_delivered(
             .to_string(),
         )
     });
-    let metadata = match (metadata, message_key) {
+    let metadata = match (metadata, idempotency_key) {
         (Some(raw), Some(key)) => {
             let mut value = serde_json::from_str::<serde_json::Value>(&raw)
                 .unwrap_or_else(|_| serde_json::json!({ "delivery_metadata": raw }));
             if let Some(object) = value.as_object_mut() {
-                object.insert("message_key".to_string(), serde_json::Value::String(key));
+                object.insert(
+                    "idempotency_key".to_string(),
+                    serde_json::Value::String(key),
+                );
             }
             Some(value.to_string())
         }
         (metadata, None) => metadata,
-        (None, Some(key)) => Some(serde_json::json!({ "message_key": key }).to_string()),
+        (None, Some(key)) => Some(serde_json::json!({ "idempotency_key": key }).to_string()),
     };
 
     ctx.db.mail_message().id().update(MailMessage {

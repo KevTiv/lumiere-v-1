@@ -9,7 +9,6 @@ use crate::crm::leads::{
     create_lead, crm_team, lead, update_lead, CreateLeadParams, CrmTeam, UpdateLeadParams,
 };
 use crate::crm::opportunities::{opp_stage, OpportunityStage};
-use crate::core::messaging::{mail_message, post_message};
 use crate::test_harness::{ensure_test_superuser, OrgFixture};
 
 fn insert_stage(
@@ -558,58 +557,5 @@ pub fn test_complete_activity_rejects_replay(ctx: &ReducerContext) -> Result<(),
         return Err("rejected replay mutated the completed activity".to_string());
     }
 
-    Ok(())
-}
-
-/// COV-19: an exact message intent owns one stable message key. Replaying it
-/// must not insert a second message or duplicate follower notifications.
-pub fn test_post_message_rejects_duplicate_key(ctx: &ReducerContext) -> Result<(), String> {
-    ensure_test_superuser(ctx)?;
-    let fixture = OrgFixture::seed_minimal(ctx)?;
-    let model = "crm_lead".to_string();
-    let body = "COV-19 stable message".to_string();
-    post_message(
-        ctx,
-        fixture.organization_id,
-        model.clone(),
-        42,
-        body.clone(),
-        None,
-        vec![],
-    )?;
-    let messages_before = ctx
-        .db
-        .mail_message()
-        .iter()
-        .filter(|message| message.organization_id == fixture.organization_id)
-        .count();
-    if messages_before != 1 {
-        return Err(format!(
-            "expected one canonical message, found {messages_before}"
-        ));
-    }
-
-    match post_message(
-        ctx,
-        fixture.organization_id,
-        model,
-        42,
-        body,
-        None,
-        vec![],
-    ) {
-        Err(message) if message.contains("already been posted") => {}
-        Err(message) => return Err(format!("unexpected message replay error: {message}")),
-        Ok(()) => return Err("duplicate message post must be rejected".to_string()),
-    }
-    let messages_after = ctx
-        .db
-        .mail_message()
-        .iter()
-        .filter(|message| message.organization_id == fixture.organization_id)
-        .count();
-    if messages_after != messages_before {
-        return Err("rejected message replay inserted another message".to_string());
-    }
     Ok(())
 }
