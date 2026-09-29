@@ -1,6 +1,6 @@
-# COV-15 — Vehicle service / inspection history
+# COV-15 — Vehicle service / inspection cost history
 
-**Status:** IMPLEMENTED — bounded history slice; runtime acceptance pending  
+**Status:** IMPLEMENTED — runtime acceptance pending  
 **Branch:** `codex/cov15-fleet-service-cost`  
 **Stack base:** `codex/cov14-helpdesk-ticket-lifecycle`  
 **Module/surface:** Fleet  
@@ -8,113 +8,144 @@
 
 ## Bounded path
 
-This COV-15 slice certifies the existing service and inspection history path:
+COV-15 now certifies a real service-cost and inspection-history path:
 
-1. record one service through the visible **Service history** form;
-2. resolve it through the exact stable `client_request_id`;
-3. replay the same request and prove idempotent success with no duplicate row;
-4. record one inspection through the visible **Inspection history** form;
-5. resolve it through the exact stable `client_request_id`;
-6. replay the same request and prove idempotent success with no duplicate row;
-7. replay both accepted writes as `fixture.reader@example.test` and require
-   HTTP 403 with both canonical rows unchanged.
+1. record one vehicle service through the visible **Service history** form;
+2. enter the service amount and select the canonical journal, expense account and
+   offset account;
+3. post a balanced accounting Entry at the service date in the same reducer
+   transaction;
+4. persist `cost_amount`, the Entry's `currency_id`, and the canonical
+   `account_move_id` on the service row;
+5. resolve the exact service through `client_request_id` and that Posted move;
+6. replay the same service request and prove idempotent success with no duplicate
+   service row or journal entry;
+7. record and reconcile one inspection through its stable request key;
+8. replay both writes as `fixture.reader@example.test` and require HTTP 403
+   with the exact effects unchanged.
 
-The browser proof uses seeded `Truck #101`. The only trusted setup is creating
-one company-scoped Fleet service type because the normal Fleet UI does not
-currently expose service-type administration.
+The browser proof uses seeded `Truck #101`. The only trusted setup is one
+company-scoped Fleet service type because service-type administration is not a
+current Fleet UI surface.
+
+## Service-cost accounting model
+
+`FleetServiceRecord` now owns the canonical service-cost relation:
+
+- `cost_amount: Option<f64>`;
+- `currency_id: Option<u64>`;
+- `account_move_id: Option<u64>`.
+
+A cost-bearing `RecordFleetServiceParams` requires:
+
+- positive finite `cost_amount`;
+- stable `client_request_id`;
+- `journal_id`;
+- `expense_account_id`;
+- `offset_account_id`.
+
+The Fleet reducer delegates accounting correctness to the existing Accounting
+domain:
+
+1. `create_account_move` creates an idempotent `MoveType::Entry` with ref
+   `FLEET-SERVICE:{client_request_id}`;
+2. one debit line posts the service amount to the selected expense account;
+3. one credit line posts the same amount to the selected offset account;
+4. `post_account_move` enforces balance, account/company scope and the normal
+   accounting-period lock;
+5. only after successful posting is the Fleet row inserted with the move ID and
+   its actual currency.
+
+Because all calls run inside the same SpacetimeDB reducer transaction, a failed
+accounting post rolls back the move, lines, vehicle update and Fleet service row
+together.
+
+A non-cost backend service record remains supported for compatibility. The
+visible COV-15 Service form is cost-bearing and requires the accounting inputs.
 
 ## Exact effect contract
 
-The backend already had proper idempotency support before this slice:
+Both service and inspection writes use a normalized `client_request_id`.
 
-- `RecordFleetServiceParams.client_request_id`;
-- `RecordFleetInspectionParams.client_request_id`;
-- both reducers normalize the key and return successfully without inserting a
-  second history row when the same key already exists in the same org/company.
+For a service, `resolveFleetHistoryEffect` requires:
 
-The missing piece was read visibility. COV-15 exposes the existing
-`client_request_id` field on:
+- exact organization, company and vehicle;
+- exact request key;
+- exact service type;
+- exact monetary amount when cost-bearing;
+- non-null `currency_id` and `account_move_id`;
+- exactly one linked account move with the same organization/company/currency;
+- linked move state = `Posted`.
 
-- `fleet-service-records`;
-- `fleet-inspections`.
+For an inspection it requires exact organization/company/vehicle/request key and
+typed outcome.
 
-`resolveFleetHistoryEffect` then requires:
+Duplicate exact rows or duplicate exact accounting moves fail closed. No
+newest-row, timestamp or display-name correlation is used.
 
-- exact organization;
-- exact company;
-- exact vehicle;
-- exact `client_request_id`;
-- exact service type for service records;
-- exact typed outcome for inspections;
-- one and only one matching persisted row.
-
-Duplicate exact effects fail closed. No newest-row or timestamp correlation is
-used.
-
-If a hook caller omits `clientRequestId`, the client generates one before
-dispatch so every UI write still has a stable readback identity.
+If a UI caller omits the request key, the client generates it before dispatch.
 
 ## Replay semantics
 
-Service and inspection writes are intentionally **idempotent-success**, not
-stale-422 transitions.
+A same-key retry with the same semantic payload is intentionally
+**idempotent-success**:
 
-A same-request replay:
+- service row count remains one;
+- accounting move count remains one;
+- inspection row count remains one;
+- exact IDs and values remain unchanged.
 
-- passes authorization first;
-- finds the existing same-scope request key;
-- returns success without inserting another row;
-- leaves the same row ID and history contents unchanged.
+A same request key reused for a different service vehicle/type/cost or a
+different inspection vehicle/inspector/outcome is rejected instead of silently
+aliasing two business events.
 
-A read-only actor is denied before that idempotency short-circuit.
+A read-only actor is denied before the idempotency shortcut.
 
-The existing native lifecycle suite already covered duplicate suppression and
-invalid org/company/value cases. This slice strengthens it to assert the exact
-request key, organization, company, vehicle, service type / inspector and typed
-outcome persisted on the single canonical row.
+## Accounting and period-lock proof
+
+The Fleet native lifecycle suite now proves:
+
+- a cost-bearing service creates exactly one service row;
+- its linked move is same-scope, same-currency and Posted;
+- exactly two move lines exist;
+- debit to the Fleet expense account equals the service amount;
+- credit to the offset account equals the service amount;
+- total debit equals total credit;
+- same-key retry does not create a second move;
+- same-key changed-cost retry is rejected;
+- closing the accounting period before the service causes the service write to
+  fail and leaves neither a Fleet service row nor an accounting move behind.
 
 ## Contract disposition
 
 **Contract release required and triggered.**
 
-Projection-only change:
+COV-15 now changes both the reducer/table contract and the read projection:
 
-- expose existing `fleet_service_record.client_request_id`;
-- expose existing `fleet_inspection.client_request_id`.
-
-No reducer signature, table column or business field was added.
-
-## Monetary cost note
-
-The milestone label historically says “service/inspection cost history,” but
-the current Fleet domain has **no monetary service-cost field** in
-`FleetServiceRecord`, no currency/accounting relation for that record, and no
-cost input in the Fleet forms.
-
-This bounded slice does **not** invent a finance model and does not claim
-monetary-cost certification. A future Fleet/Finance slice must define the
-canonical amount/currency/accounting relation before that title-level capability
-can be considered complete.
+- `RecordFleetServiceParams` gains cost/journal/account fields;
+- `FleetServiceRecord` gains `cost_amount`, `currency_id`,
+  `account_move_id`;
+- `fleet-service-records` exposes those fields plus `client_request_id`;
+- `fleet-inspections` exposes `client_request_id`.
 
 ## D/A/O/E proof
 
 | Gate | Proof in this branch | Acceptance condition |
 | --- | --- | --- |
-| D | Existing `test_history_is_immutable_and_idempotent` now asserts exact request IDs and tenant/vehicle/service/inspection relations; `test_history_rejects_invalid_scope_and_values` retains cross-company/org and invalid-value denial. | `run_all_fleet_tests` passes. |
-| A | Existing reducers check `fleet_vehicle:write` first and validate organization/company/vehicle/service-type/inspector scope. Browser reader replay requires 403 before the idempotency shortcut. | Authorized actor succeeds; reader and invalid scope do not mutate history. |
-| O | `cov15-fleet-service-cost.spec.ts` drives Service and Inspection creation through the visible `/fleet` forms. | Focused Playwright proof passes. |
-| E | `fleet-history-effect.test.ts` covers exact request identity, scope, vehicle, service type/outcome and ambiguity. Same-key browser retries must return success while preserving the exact snapshot. | Query-hook unit/native/browser evidence green on one head. |
+| D | `test_history_is_immutable_and_idempotent` proves exact service cost → Posted balanced Entry linkage and retry uniqueness; `test_service_cost_respects_period_lock` proves closed-period atomic rollback; invalid scope/value coverage remains. | `run_all_fleet_tests` passes. |
+| A | Fleet permission and company/vehicle/service-type checks run first. A cost-bearing write additionally passes through Accounting's move/line create + post authorization and account/company checks. Reader browser replays require 403. | Authorized actor can post the cost; reader/cross-company invalid relations cannot. |
+| O | `cov15-fleet-service-cost.spec.ts` drives the visible Service form with amount + journal + expense/offset accounts, verifies the Posted Entry and balanced lines, then drives the Inspection form. | Focused Playwright proof passes. |
+| E | `fleet-history-effect.test.ts` requires exact request identity and, for cost-bearing service, exact amount plus one same-scope/same-currency Posted move. Projection tests lock all effect fields. | Unit/native/browser evidence green on one head. |
 
 ## Acceptance
 
-This bounded COV-15 history slice becomes **ACCEPTED** only when the same branch
-head records:
+COV-15 becomes **ACCEPTED** only when the same branch head records:
 
-1. automatic contracts release/pin exposing `client_request_id`;
-2. query-hooks typecheck + unit tests;
+1. automatic contracts release/pin for the new Fleet service-cost contract;
+2. query-hooks/UI typecheck + unit tests + i18n check;
 3. `run_all_fleet_tests` on a live stack;
 4. focused COV-15 Playwright proof;
 5. branch CI green.
 
-Until then the truthful disposition is **IMPLEMENTED — bounded history slice;
-runtime acceptance pending**.
+Until then the truthful disposition is **IMPLEMENTED — runtime acceptance
+pending**.
