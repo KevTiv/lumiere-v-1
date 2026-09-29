@@ -2,7 +2,12 @@ import { expect, test } from "@playwright/test"
 import type { Page } from "@playwright/test"
 import { stdbBffCommandPost } from "@lumiere/stdb/commands"
 
-import { fetchDefaultCompanyId, signIn, smokeName } from "./helpers"
+import {
+  TEST_PASSWORD,
+  fetchDefaultCompanyId,
+  signIn,
+  smokeName,
+} from "./helpers"
 import {
   cancelReplenishmentRunViaUi,
   createInternalLocation,
@@ -13,13 +18,8 @@ import {
   scheduleReplenishmentRunViaUi,
 } from "./inventory-quant-fixtures"
 
-function personaPassword(): string {
-  const password = process.env.E2E_FIRST_ORG_PERSONA_PASSWORD
-  if (!password) {
-    throw new Error("E2E_FIRST_ORG_PERSONA_PASSWORD is required")
-  }
-  return password
-}
+const PERSONA_PASSWORD =
+  process.env.E2E_FIRST_ORG_PERSONA_PASSWORD ?? TEST_PASSWORD
 
 async function scheduleRequest(
   page: Page,
@@ -60,9 +60,7 @@ test.describe(
       page,
     }) => {
       test.setTimeout(180_000)
-      const password = personaPassword()
-
-      await signIn(page, "test@email.com", password)
+      await signIn(page, "test@email.com", PERSONA_PASSWORD)
       const companyId = await fetchDefaultCompanyId(page)
       const productName = smokeName("cov06o-product")
       const productId = await createProductFixture(page, productName)
@@ -96,7 +94,7 @@ test.describe(
         await signIn(
           warehousePage,
           "fixture.warehouse@example.test",
-          password,
+          PERSONA_PASSWORD,
         )
 
         await scheduleReplenishmentRunViaUi(warehousePage, ruleId)
@@ -131,7 +129,7 @@ test.describe(
         await signIn(
           readerPage,
           "fixture.reader@example.test",
-          password,
+          PERSONA_PASSWORD,
         )
 
         const deniedCancel = await cancelRequest(readerPage, companyId, ruleId)
