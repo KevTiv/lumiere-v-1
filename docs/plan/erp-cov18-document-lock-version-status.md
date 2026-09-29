@@ -77,10 +77,10 @@ Contract release pin for the new `documents` projection columns (automatic on pu
 
 | Gate | Required proof | State |
 | --- | --- | --- |
-| D | Native domain test: transition, replay rejection leaving the row unchanged, invariant/denial cases | WRITTEN — `test_documents_create_and_lock` in `spacetimedb/tests/platform/platform_smoke.rs` (lock holder/time, replayed lock rejected, unlock clears holder, replayed unlock rejected, rows unchanged; identical version replay rejected in the Wave D document test); module compiles, in-module run pending |
+| D | Native domain test: transition, replay rejection leaving the row unchanged, invariant/denial cases | WRITTEN — `test_documents_create_and_lock` in `spacetimedb/tests/platform/platform_smoke.rs` (lock holder/time, replayed lock rejected, unlock clears holder, replayed unlock rejected, rows unchanged; identical version replay rejected in the Wave D document test); also version chain + deleted-document guards; RAN — release wasm published to a scratch local DB, `run_documents_wave_{a,b,c,d,e}_tests` all passed |
 | A | Generated operation keeps permission + organization/company scope; reader persona denied (403) | WRITTEN — `check_permission(document, write)` + org match; reader replays asserted 403 in the spec; not yet run |
 | O | Playwright drives the transition through the visible UI action (setup calls allowed only for fixtures) | WRITTEN — Documents tab `entity-action-lock-document` / `entity-action-unlock-document` in `frontend/web/tests/e2e/cov18-document-lock-version.spec.ts`; not yet run against a stack |
-| E | Exact-effect resolver unit test (state/scope/identity/ambiguity) and browser snapshot preserved after stale (422) and denied (403) replay | DONE (resolver) — `document-lock-effect.test.ts` and `document-version-effect.test.ts`; browser snapshot assertions written in the spec, not yet run |
+| E | Exact-effect resolver unit test (state/scope/identity/ambiguity) and browser snapshot preserved after stale (422) and denied (403) replay | DONE (resolver) — `document-lock-effect.test.ts`, `document-version-effect.test.ts` and `lib/documents-create-params.test.ts`; browser snapshot assertions written in the spec, not yet run |
 
 ## Acceptance
 

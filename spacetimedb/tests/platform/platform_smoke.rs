@@ -565,6 +565,78 @@ pub fn test_documents_create_and_lock(ctx: &ReducerContext) -> Result<(), String
         return Err("replayed unlock changed the row".to_string());
     }
 
+    // COV-18: a new version becomes the single current version and bumps the count.
+    let v2_url = "/api/documents/blobs/object/1/default/wave-a-v2".to_string();
+    add_document_version(
+        ctx,
+        org_id,
+        doc.id,
+        AddDocumentVersionParams {
+            file_name: "wave-a-v2.pdf".to_string(),
+            file_size: 256,
+            mimetype: "application/pdf".to_string(),
+            url: v2_url.clone(),
+            checksum: "C".repeat(64),
+            changes_description: Some("COV-18 v2".to_string()),
+        },
+    )?;
+    let versioned = ctx
+        .db
+        .document()
+        .id()
+        .find(&doc.id)
+        .ok_or("doc gone after version")?;
+    if versioned.version_count != doc.version_count + 1 {
+        return Err("version_count not incremented".to_string());
+    }
+    let versions: Vec<_> = ctx
+        .db
+        .document_version()
+        .iter()
+        .filter(|v| v.document_id == doc.id)
+        .collect();
+    let current: Vec<_> = versions.iter().filter(|v| v.is_current).collect();
+    if current.len() != 1 || Some(current[0].id) != versioned.current_version_id {
+        return Err("expected exactly one current version matching the document".to_string());
+    }
+    if current[0].url != v2_url || current[0].checksum.as_deref() != Some("c".repeat(64).as_str()) {
+        return Err(
+            "current version must carry the uploaded blob (checksum lowercased)".to_string(),
+        );
+    }
+    if versioned.url.as_deref() != Some(v2_url.as_str()) {
+        return Err("document must mirror the current version blob".to_string());
+    }
+
+    // COV-18: a deleted document can be neither locked nor versioned.
+    delete_document(ctx, org_id, doc.id)?;
+    let lock_deleted = lock_document(ctx, org_id, doc.id, None)
+        .err()
+        .ok_or("expected lock on a deleted document to be rejected")?;
+    if !lock_deleted.contains("deleted") {
+        return Err(format!("unexpected lock-on-deleted error: {lock_deleted}"));
+    }
+    let version_deleted = add_document_version(
+        ctx,
+        org_id,
+        doc.id,
+        AddDocumentVersionParams {
+            file_name: "wave-a-v3.pdf".to_string(),
+            file_size: 300,
+            mimetype: "application/pdf".to_string(),
+            url: "/api/documents/blobs/object/1/default/wave-a-v3".to_string(),
+            checksum: "d".repeat(64),
+            changes_description: None,
+        },
+    )
+    .err()
+    .ok_or("expected version on a deleted document to be rejected")?;
+    if !version_deleted.contains("deleted") {
+        return Err(format!(
+            "unexpected version-on-deleted error: {version_deleted}"
+        ));
+    }
+
     Ok(())
 }
 
