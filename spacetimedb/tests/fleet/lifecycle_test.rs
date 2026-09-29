@@ -154,8 +154,15 @@ pub fn test_history_is_immutable_and_idempotent(ctx: &ReducerContext) -> Result<
         .iter()
         .filter(|row| row.vehicle_id == vehicle_id)
         .collect::<Vec<_>>();
-    if services.len() != 1 || services[0].provider.as_deref() != Some("Local Garage") {
-        return Err("service history was not normalized and idempotent".into());
+    if services.len() != 1
+        || services[0].organization_id != fixture.organization_id
+        || services[0].company_id != fixture.company_id
+        || services[0].vehicle_id != vehicle_id
+        || services[0].service_type_id != service_type_id
+        || services[0].client_request_id.as_deref() != Some("fleet-service-idempotency")
+        || services[0].provider.as_deref() != Some("Local Garage")
+    {
+        return Err("service history did not preserve the exact idempotent effect".into());
     }
 
     let inspection = RecordFleetInspectionParams {
@@ -180,9 +187,16 @@ pub fn test_history_is_immutable_and_idempotent(ctx: &ReducerContext) -> Result<
         .iter()
         .filter(|row| row.vehicle_id == vehicle_id)
         .collect::<Vec<_>>();
-    if inspections.len() != 1 || inspections[0].outcome != FleetInspectionOutcome::AttentionRequired
+    if inspections.len() != 1
+        || inspections[0].organization_id != fixture.organization_id
+        || inspections[0].company_id != fixture.company_id
+        || inspections[0].vehicle_id != vehicle_id
+        || inspections[0].inspector_id != Some(inspector_id)
+        || inspections[0].client_request_id.as_deref()
+            != Some("fleet-inspection-idempotency")
+        || inspections[0].outcome != FleetInspectionOutcome::AttentionRequired
     {
-        return Err("inspection history was not typed and idempotent".into());
+        return Err("inspection history did not preserve the exact idempotent effect".into());
     }
 
     let updated = ctx
