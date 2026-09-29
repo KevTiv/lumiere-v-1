@@ -2884,7 +2884,7 @@
     },
     "erp.post_message": {
       "name": "post_message",
-      "shape_fingerprint": "sha256:bcc83e761a3415b115c537a78eff4f505b4953380d9355b74a240af67c2e4e64"
+      "shape_fingerprint": "sha256:14743d433cfda09f0c73758572a69d4e57b2e161a0209c2e28c75e46a17d983f"
     },
     "erp.post_payment": {
       "name": "post_payment",
@@ -5796,6 +5796,14 @@
       "current_operations_fingerprint": "sha256:9bd08ee708b056f13384295f642ffeda21373f494e905085f55da3f3d9b3fbfc",
       "operation_count": 1415,
       "reason": "release on top of v0.3.61: add none; change the shape of acknowledge_insight, acknowledge_iot_action, cancel_replenishment_run, create_bom_byproduct, create_workorder_quality_check, fail_workorder_quality_check, mark_mail_message_delivered, schedule_replenishment_run, scrap_finished_manufacturing_output"
+    },
+    {
+      "previous_release": "v0.3.65",
+      "previous_ir_sha256": "sha256:7f2e4d72536b5087ce3af1b0db0066994e30c02696c3edf6d306acd9a30e9ad0",
+      "previous_operations_fingerprint": "sha256:9bd08ee708b056f13384295f642ffeda21373f494e905085f55da3f3d9b3fbfc",
+      "current_operations_fingerprint": "sha256:78a0c9bbb46b904ae870ef4ea2b350489d956b53105c40a9f51972f3dfcb3878",
+      "operation_count": 1415,
+      "reason": "release on top of v0.3.65: add none; change the shape of post_message"
     }
   ]
 }
