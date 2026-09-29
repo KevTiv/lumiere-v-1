@@ -2255,8 +2255,10 @@
       "name",
       "partner_id",
       "stage_id",
+      "user_id",
       "priority",
-      "state"
+      "state",
+      "closed_at"
     ],
     "mandatory": [
       "id",
