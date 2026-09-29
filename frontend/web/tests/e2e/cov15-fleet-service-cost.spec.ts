@@ -3,6 +3,7 @@ import { expect, test, type Page, type Request } from "@playwright/test"
 import {
   callReducerOwner,
   chooseSelectOptionByValue,
+  fetchAccountIdByCode,
   fetchDefaultCompanyId,
   fetchSessionOrganizationId,
   fillField,
@@ -71,6 +72,18 @@ function findClientRequestId(value: unknown): string | null {
   return null
 }
 
+function enumTag(value: unknown): string {
+  if (typeof value === "string") return value
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    if ("tag" in value) return String((value as { tag?: unknown }).tag ?? "")
+    const keys = Object.keys(value)
+    if (keys.length === 1) {
+      return keys[0]!.charAt(0).toUpperCase() + keys[0]!.slice(1)
+    }
+  }
+  return ""
+}
+
 function outcomeTag(value: unknown): string {
   if (typeof value === "string") return value.toLowerCase()
   if (value && typeof value === "object" && !Array.isArray(value)) {
@@ -112,6 +125,10 @@ async function historySnapshot(
     odometerKm: Number(row.odometerKm ?? row.odometer_km ?? 0),
     provider: String(row.provider ?? ""),
     notes: String(row.notes ?? ""),
+    costAmount: Number(row.costAmount ?? row.cost_amount ?? 0),
+    currencyId: scalarQueryId(row.currencyId ?? row.currency_id) ?? null,
+    accountMoveId:
+      scalarQueryId(row.accountMoveId ?? row.account_move_id) ?? null,
     clientRequestId,
   }
 }
@@ -181,8 +198,34 @@ test.describe(
         "service_type_id",
         serviceTypeId,
       )
+      const journal = (await rows(page, "account-journals")).find(
+        (row) =>
+          scalarQueryId(row.companyId ?? row.company_id) === companyId &&
+          String(row.code ?? "").toUpperCase() === "MISC",
+      ) ?? (await rows(page, "account-journals")).find(
+        (row) =>
+          scalarQueryId(row.companyId ?? row.company_id) === companyId &&
+          enumTag(row.type ?? row.type_) === "General",
+      )
+      const journalId = scalarQueryId(journal?.id)
+      if (journalId == null) throw new Error("general fleet cost journal unavailable")
+      const expenseAccountId = await fetchAccountIdByCode(page, "5000")
+      const offsetAccountId = await fetchAccountIdByCode(page, "2000")
+
       await fillField(page, "odometer_km", "13000")
       await fillField(page, "provider", "COV-15 Garage")
+      await fillField(page, "cost_amount", "275.50")
+      await chooseSelectOptionByValue(page, "journal_id", journalId)
+      await chooseSelectOptionByValue(
+        page,
+        "expense_account_id",
+        expenseAccountId,
+      )
+      await chooseSelectOptionByValue(
+        page,
+        "offset_account_id",
+        offsetAccountId,
+      )
       await fillField(page, "notes", "COV-15 service proof")
 
       const [serviceAccepted] = await Promise.all([
@@ -217,6 +260,7 @@ test.describe(
           serviceTypeId,
           odometerKm: 13000,
           provider: "COV-15 Garage",
+          costAmount: 275.5,
           clientRequestId: serviceRequestId,
         })
       const serviceEffect = await historySnapshot(
@@ -224,6 +268,39 @@ test.describe(
         "fleet-service-records",
         serviceRequestId,
       )
+      if (serviceEffect.accountMoveId == null || serviceEffect.currencyId == null) {
+        throw new Error("fleet service cost is missing accounting linkage")
+      }
+      const move = (await rows(page, "account-moves")).find(
+        (row) => scalarQueryId(row.id) === serviceEffect.accountMoveId,
+      )
+      expect(move).toBeDefined()
+      expect(scalarQueryId(move?.companyId ?? move?.company_id)).toBe(companyId)
+      expect(scalarQueryId(move?.currencyId ?? move?.currency_id)).toBe(
+        serviceEffect.currencyId,
+      )
+      expect(enumTag(move?.state)).toBe("Posted")
+
+      const moveLines = (await rows(page, "account-move-lines")).filter(
+        (row) =>
+          scalarQueryId(row.moveId ?? row.move_id) === serviceEffect.accountMoveId,
+      )
+      expect(moveLines).toHaveLength(2)
+      expect(
+        moveLines.some(
+          (line) =>
+            scalarQueryId(line.accountId ?? line.account_id) === expenseAccountId &&
+            Math.abs(Number(line.debit ?? 0) - 275.5) < 0.001,
+        ),
+      ).toBe(true)
+      expect(
+        moveLines.some(
+          (line) =>
+            scalarQueryId(line.accountId ?? line.account_id) === offsetAccountId &&
+            Math.abs(Number(line.credit ?? 0) - 275.5) < 0.001,
+        ),
+      ).toBe(true)
+
 
       const serviceRetry = await replay(page, serviceAccepted.request())
       expect(serviceRetry.ok()).toBe(true)
