@@ -278,6 +278,8 @@ jobs:
             # Frontend/docs commits can advance the branch while regeneration
             # runs without changing the contract candidate. Replay the
             # generated-source commit on top instead of deadlocking the release.
+            git config user.name "github-actions[bot]"
+            git config user.email "41898+github-actions[bot]@users.noreply.github.com"
             for attempt in 1 2 3; do
               if git push origin "HEAD:${GITHUB_REF_NAME}"; then
                 break
