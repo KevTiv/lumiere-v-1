@@ -148,7 +148,7 @@ test.describe(
             receiptKey,
         )?.id,
       )
-      expect(receiptId).not.toBeNull()
+      if (receiptId == null) throw new Error("created expense receipt not found")
 
       await callReducerBff(page, "create_expense_sheet", [
         organizationId,
@@ -237,7 +237,7 @@ test.describe(
         storageState: { cookies: [], origins: [] },
       })
       const financePage = await financeContext.newPage()
-      let approvedRequest: Request
+      let approvedRequest: Request | null = null
       try {
         await signIn(
           financePage,
@@ -270,6 +270,8 @@ test.describe(
       } finally {
         await financeContext.close()
       }
+
+      if (approvedRequest == null) throw new Error("approve request was not captured")
 
       const journals = await rows(page, "account-journals")
       const journalRow =
@@ -434,7 +436,7 @@ test.describe(
         )
         for (const request of [
           submitted.request(),
-          approvedRequest!,
+          approvedRequest,
           posted.request(),
           reimbursed.request(),
         ]) {
