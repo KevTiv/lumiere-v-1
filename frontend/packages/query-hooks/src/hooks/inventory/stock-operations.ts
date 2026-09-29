@@ -286,18 +286,22 @@ export function useWarehouseTasks(
   });
 }
 
+export const replenishmentRulesQueryOptions = (organizationId: bigint) => ({
+  queryKey: ['replenishment-rules', rqBigIntKey(organizationId)] as const,
+  queryFn: () =>
+    fetchQueryList<ReplenishmentRule>(
+      '/api/query/replenishment-rules',
+      'Failed to fetch replenishment rules',
+    ),
+  staleTime: 30_000,
+});
+
 export function useReplenishmentRules(
   organizationId: bigint,
   initialData?: ReplenishmentRule[],
 ) {
   return useQuery<ReplenishmentRule[]>({
-    queryKey: ['replenishment-rules', rqBigIntKey(organizationId)],
-    queryFn: () =>
-      fetchQueryList(
-        '/api/query/replenishment-rules',
-        'Failed to fetch replenishment rules',
-      ),
-    staleTime: 30_000,
+    ...replenishmentRulesQueryOptions(organizationId),
     initialData: coalesceQueryInitialData(initialData),
   });
 }
@@ -1149,6 +1153,44 @@ export async function executeReplenishmentRuleCommand(
       r.status,
       await r.text().catch(() => ''),
       'Failed to execute replenishment rule',
+    );
+  }
+}
+
+/** Schedule the exact replenishment rule through the generated session operation. */
+export async function scheduleReplenishmentRunCommand(
+  companyId: bigint,
+  ruleId: ScalarId,
+): Promise<void> {
+  const { urlPath, init } = stdbBffCommandPost('schedule_replenishment_run', {
+    companyId,
+    ruleId: toScalarU64(ruleId),
+  });
+  const r = await apiFetch(urlPath, init);
+  if (!r.ok) {
+    throw workflowErrorFromResponse(
+      r.status,
+      await r.text().catch(() => ''),
+      'Failed to schedule replenishment run',
+    );
+  }
+}
+
+/** Cancel the exact replenishment rule's pending scheduled run. */
+export async function cancelReplenishmentRunCommand(
+  companyId: bigint,
+  ruleId: ScalarId,
+): Promise<void> {
+  const { urlPath, init } = stdbBffCommandPost('cancel_replenishment_run', {
+    companyId,
+    ruleId: toScalarU64(ruleId),
+  });
+  const r = await apiFetch(urlPath, init);
+  if (!r.ok) {
+    throw workflowErrorFromResponse(
+      r.status,
+      await r.text().catch(() => ''),
+      'Failed to cancel replenishment run',
     );
   }
 }
