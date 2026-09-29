@@ -376,6 +376,9 @@ export function useComputeDepreciationBoard(
         )
 
       const outcome = await executeOperationWithCanonicalReadback({
+        // Board computation is intentionally non-replayable: arbitrary manual
+        // depreciation rows are not proof that this command already ran.
+        resolveBeforeDispatch: false,
         resolveEffect,
         dispatch: async () => {
           const { urlPath, init } = stdbBffCommandPost(
