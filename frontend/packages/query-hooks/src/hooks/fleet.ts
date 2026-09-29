@@ -281,15 +281,31 @@ export interface FleetAccountMoveProjection {
   readonly company_id?: unknown
   readonly currencyId?: unknown
   readonly currency_id?: unknown
+  readonly journalId?: unknown
+  readonly journal_id?: unknown
   readonly state?: unknown
+}
+
+export interface FleetAccountMoveLineProjection {
+  readonly moveId?: unknown
+  readonly move_id?: unknown
+  readonly accountId?: unknown
+  readonly account_id?: unknown
+  readonly debit?: unknown
+  readonly credit?: unknown
 }
 
 function resolveFleetServiceAccountingMove(
   moves: readonly FleetAccountMoveProjection[],
+  lines: readonly FleetAccountMoveLineProjection[],
   organizationId: bigint,
   companyId: bigint,
   moveId: bigint,
   currencyId: bigint,
+  journalId: bigint,
+  expenseAccountId: bigint,
+  offsetAccountId: bigint,
+  costAmount: number,
 ): boolean {
   const matches = moves.filter((row) => parseStrictU64(row.id) === moveId)
   if (matches.length > 1) {
@@ -298,13 +314,39 @@ function resolveFleetServiceAccountingMove(
     )
   }
   const row = matches[0]
-  return Boolean(
-    row &&
-      parseStrictU64(row.organizationId ?? row.organization_id) === organizationId &&
-      parseStrictU64(row.companyId ?? row.company_id) === companyId &&
-      parseStrictU64(row.currencyId ?? row.currency_id) === currencyId &&
-      fleetOutcomeTag(row.state) === "posted",
+  if (
+    !row ||
+    parseStrictU64(row.organizationId ?? row.organization_id) !== organizationId ||
+    parseStrictU64(row.companyId ?? row.company_id) !== companyId ||
+    parseStrictU64(row.currencyId ?? row.currency_id) !== currencyId ||
+    parseStrictU64(row.journalId ?? row.journal_id) !== journalId ||
+    fleetOutcomeTag(row.state) !== "posted"
+  ) {
+    return false
+  }
+
+  const moveLines = lines.filter(
+    (line) => parseStrictU64(line.moveId ?? line.move_id) === moveId,
   )
+  if (moveLines.length !== 2) return false
+
+  const amount = (value: unknown) => {
+    const parsed = Number(value)
+    return Number.isFinite(parsed) ? parsed : Number.NaN
+  }
+  const expenseLine = moveLines.find(
+    (line) =>
+      parseStrictU64(line.accountId ?? line.account_id) === expenseAccountId &&
+      Math.abs(amount(line.debit) - costAmount) <= 0.0001 &&
+      Math.abs(amount(line.credit)) <= 0.0001,
+  )
+  const offsetLine = moveLines.find(
+    (line) =>
+      parseStrictU64(line.accountId ?? line.account_id) === offsetAccountId &&
+      Math.abs(amount(line.credit) - costAmount) <= 0.0001 &&
+      Math.abs(amount(line.debit)) <= 0.0001,
+  )
+  return Boolean(expenseLine && offsetLine)
 }
 
 
@@ -319,7 +361,11 @@ export function resolveFleetHistoryEffect(
     readonly serviceTypeId?: bigint
     readonly outcome?: FleetInspectionOutcome
     readonly costAmount?: number
+    readonly journalId?: bigint
+    readonly expenseAccountId?: bigint
+    readonly offsetAccountId?: bigint
     readonly accountMoves?: readonly FleetAccountMoveProjection[]
+    readonly accountMoveLines?: readonly FleetAccountMoveLineProjection[]
   },
 ): FleetHistoryEffectRef | null {
   const matches = rows.filter(
@@ -364,13 +410,22 @@ export function resolveFleetHistoryEffect(
       Math.abs(costAmount - expected.costAmount) > 0.0001 ||
       currencyId == null ||
       accountMoveId == null ||
+      expected.journalId == null ||
+      expected.expenseAccountId == null ||
+      expected.offsetAccountId == null ||
       expected.accountMoves == null ||
+      expected.accountMoveLines == null ||
       !resolveFleetServiceAccountingMove(
         expected.accountMoves,
+        expected.accountMoveLines,
         organizationId,
         companyId,
         accountMoveId,
         currencyId,
+        expected.journalId,
+        expected.expenseAccountId,
+        expected.offsetAccountId,
+        costAmount,
       )
     ) {
       return null
@@ -423,9 +478,16 @@ export function useRecordFleetService(organizationId: bigint, companyId?: bigint
               ...(input.costAmount != null
                 ? {
                     costAmount: input.costAmount,
+                    journalId: input.journalId,
+                    expenseAccountId: input.expenseAccountId,
+                    offsetAccountId: input.offsetAccountId,
                     accountMoves: await fetchQueryList(
                       "/api/query/account-moves",
                       "Failed to read fleet service accounting move",
+                    ),
+                    accountMoveLines: await fetchQueryList(
+                      "/api/query/account-move-lines",
+                      "Failed to read fleet service accounting lines",
                     ),
                   }
                 : {}),
