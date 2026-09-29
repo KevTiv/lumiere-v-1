@@ -164,8 +164,9 @@ async function attachRefreshWarning<Ref extends CanonicalRecordRef>(
 /**
  * Reference COV-01 mutation protocol.
  *
- * 1. Resolve the exact effect before dispatch: an idempotent replay returns
- *    AlreadyApplied without creating another effect.
+ * 1. Resolve the exact effect before dispatch when the operation supports
+ *    idempotent replay: an existing effect returns AlreadyApplied. Explicitly
+ *    non-replayable operations may skip this pre-read.
  * 2. Dispatch through the generated operation boundary exactly once.
  * 3. Whether dispatch is acknowledged or ambiguous, reconcile through the same
  *    cache-independent exact readback. Never redispatch to discover the answer.
