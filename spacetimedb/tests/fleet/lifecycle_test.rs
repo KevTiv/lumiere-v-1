@@ -363,6 +363,42 @@ pub fn test_history_is_immutable_and_idempotent(ctx: &ReducerContext) -> Result<
         return Err(format!("fleet service retry created {move_count} accounting moves"));
     }
 
+    let mismatched = record_fleet_service(
+        ctx,
+        fixture.organization_id,
+        fixture.company_id,
+        RecordFleetServiceParams {
+            vehicle_id,
+            service_type_id,
+            serviced_at: None,
+            odometer_km: Some(1250.5),
+            provider: Some("Local Garage".into()),
+            notes: Some("changed cost".into()),
+            cost_amount: Some(300.0),
+            journal_id: Some(cost_accounts.journal_id),
+            expense_account_id: Some(cost_accounts.expense_account_id),
+            offset_account_id: Some(cost_accounts.offset_account_id),
+            client_request_id: Some("fleet-service-idempotency".into()),
+        },
+    )
+    .expect_err("mismatched service retry must be rejected");
+    if !mismatched.contains("different fleet service payload") {
+        return Err(format!("unexpected mismatched service retry error: {mismatched}"));
+    }
+    let move_count_after_mismatch = ctx
+        .db
+        .account_move()
+        .iter()
+        .filter(|row| {
+            row.organization_id == fixture.organization_id
+                && row.company_id == fixture.company_id
+                && row.ref_.as_deref() == Some("FLEET-SERVICE:fleet-service-idempotency")
+        })
+        .count();
+    if move_count_after_mismatch != 1 {
+        return Err("mismatched retry changed fleet accounting move count".into());
+    }
+
     let inspection = RecordFleetInspectionParams {
         vehicle_id,
         inspector_id: Some(inspector_id),
