@@ -290,6 +290,9 @@ jobs:
           E2E_CLEAR_DB: ${{ matrix.config.clear_db }}
           E2E_SPEC_FILES: ${{ matrix.config.specs || '' }}
           E2E_SHARD: ${{ matrix.config.shard || '' }}
+          # One bounded certification run for the COV-06 scheduler stack; only
+          # shard 1 pays for the heavyweight aggregate reducer.
+          E2E_RUN_INVENTORY_AGGREGATE: ${{ github.event_name == 'pull_request' && github.head_ref == 'claude/cov06n-scheduler-readback' && matrix.config.slot == '1' && '1' || '0' }}
           NEXT_PUBLIC_STDB_MODULE: ${{ env.STDB_MODULE }}
           NEXT_PUBLIC_STDB_HOST: ${{ env.STDB_HOST }}
           PG_HOST: 127.0.0.1
