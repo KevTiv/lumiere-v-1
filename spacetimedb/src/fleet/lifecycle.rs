@@ -177,14 +177,28 @@ pub fn record_fleet_service(
         params.service_type_id,
     )?;
     let request_id = request_id(params.client_request_id)?;
-    if request_id.as_deref().is_some_and(|key| {
-        ctx.db.fleet_service_record().iter().any(|row| {
+    if let Some(key) = request_id.as_deref() {
+        if let Some(existing) = ctx.db.fleet_service_record().iter().find(|row| {
             row.organization_id == organization_id
                 && row.company_id == company_id
                 && row.client_request_id.as_deref() == Some(key)
-        })
-    }) {
-        return Ok(());
+        }) {
+            let same_cost = match (existing.cost_amount, params.cost_amount) {
+                (Some(left), Some(right)) => (left - right).abs() <= 0.0001,
+                (None, None) => true,
+                _ => false,
+            };
+            if existing.vehicle_id != params.vehicle_id
+                || existing.service_type_id != params.service_type_id
+                || !same_cost
+            {
+                return Err(
+                    "client_request_id is already used by a different fleet service payload"
+                        .to_string(),
+                );
+            }
+            return Ok(());
+        }
     }
     let odometer_km = odometer(params.odometer_km)?;
     let serviced_at = params.serviced_at.unwrap_or(ctx.timestamp);
@@ -406,14 +420,24 @@ pub fn record_fleet_inspection(
     }
     let outcome = FleetInspectionOutcome::parse(&params.outcome)?;
     let request_id = request_id(params.client_request_id)?;
-    if request_id.as_deref().is_some_and(|key| {
-        ctx.db.fleet_inspection().iter().any(|row| {
+    if let Some(key) = request_id.as_deref() {
+        if let Some(existing) = ctx.db.fleet_inspection().iter().find(|row| {
             row.organization_id == organization_id
                 && row.company_id == company_id
                 && row.client_request_id.as_deref() == Some(key)
-        })
-    }) {
-        return Ok(());
+        }) {
+            let requested_outcome = FleetInspectionOutcome::parse(&params.outcome)?;
+            if existing.vehicle_id != params.vehicle_id
+                || existing.inspector_id != params.inspector_id
+                || existing.outcome != requested_outcome
+            {
+                return Err(
+                    "client_request_id is already used by a different fleet inspection payload"
+                        .to_string(),
+                );
+            }
+            return Ok(());
+        }
     }
     let odometer_km = odometer(params.odometer_km)?;
     let row = ctx.db.fleet_inspection().insert(FleetInspection {
