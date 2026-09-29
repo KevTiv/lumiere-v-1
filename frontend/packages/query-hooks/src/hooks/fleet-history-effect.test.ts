@@ -33,8 +33,24 @@ const postedMove = {
   organizationId: "7",
   companyId: "8",
   currencyId: "3",
+  journalId: "44",
   state: { tag: "Posted" },
 }
+
+const postedLines = [
+  {
+    moveId: "900",
+    accountId: "55",
+    debit: 275.5,
+    credit: 0,
+  },
+  {
+    moveId: "900",
+    accountId: "66",
+    debit: 0,
+    credit: 275.5,
+  },
+]
 
 describe("COV-15 fleet history exact effects", () => {
   it("resolves a service by stable request identity and service type", () => {
@@ -49,7 +65,11 @@ describe("COV-15 fleet history exact effects", () => {
         {
           serviceTypeId: 12n,
           costAmount: 275.5,
+          journalId: 44n,
+          expenseAccountId: 55n,
+          offsetAccountId: 66n,
           accountMoves: [postedMove],
+          accountMoveLines: postedLines,
         },
       ),
       {
@@ -77,7 +97,11 @@ describe("COV-15 fleet history exact effects", () => {
         {
           serviceTypeId: 12n,
           costAmount: 275.5,
+          journalId: 44n,
+          expenseAccountId: 55n,
+          offsetAccountId: 66n,
           accountMoves: [{ ...postedMove, state: { tag: "Draft" } }],
+          accountMoveLines: postedLines,
         },
       ),
       null,
@@ -93,7 +117,54 @@ describe("COV-15 fleet history exact effects", () => {
         {
           serviceTypeId: 12n,
           costAmount: 275.5,
+          journalId: 44n,
+          expenseAccountId: 55n,
+          offsetAccountId: 66n,
           accountMoves: [{ ...postedMove, currencyId: "99" }],
+          accountMoveLines: postedLines,
+        },
+      ),
+      null,
+    )
+  })
+
+  it("fails closed when journal or GL account semantics differ", () => {
+    assert.equal(
+      resolveFleetHistoryEffect(
+        [service],
+        "fleet-service-records",
+        7n,
+        8n,
+        41n,
+        "fleet-service-req",
+        {
+          serviceTypeId: 12n,
+          costAmount: 275.5,
+          journalId: 99n,
+          expenseAccountId: 55n,
+          offsetAccountId: 66n,
+          accountMoves: [postedMove],
+          accountMoveLines: postedLines,
+        },
+      ),
+      null,
+    )
+    assert.equal(
+      resolveFleetHistoryEffect(
+        [service],
+        "fleet-service-records",
+        7n,
+        8n,
+        41n,
+        "fleet-service-req",
+        {
+          serviceTypeId: 12n,
+          costAmount: 275.5,
+          journalId: 44n,
+          expenseAccountId: 999n,
+          offsetAccountId: 66n,
+          accountMoves: [postedMove],
+          accountMoveLines: postedLines,
         },
       ),
       null,
