@@ -205,7 +205,9 @@
       "ref",
       "journal_id",
       "currency_id",
-      "partner_id"
+      "partner_id",
+      "reconciled_invoice_ids",
+      "reconciled_bill_ids"
     ],
     "mandatory": [
       "id",
@@ -5245,6 +5247,7 @@
       "company_id",
       "date_order",
       "opportunity_id",
+      "order_line",
       "picking_ids",
       "invoice_ids",
       "invoice_count",
@@ -5562,7 +5565,8 @@
       "product_id",
       "company_id",
       "lot_id",
-      "state"
+      "state",
+      "is_locked"
     ],
     "mandatory": [
       "id",
