@@ -443,13 +443,47 @@ function DocumentsClientLoaded({
       ...moduleConfig,
       tabs: withDashboardSections(moduleConfig, liveSections).tabs.map((tab) => {
         if (tab.id === "documents" && tab.entityConfig) {
-          // No toolbar actions are wired for this tab, so `selectionToggleOnRowClick`
-          // (EntityTable) would otherwise default to false and a row click would
-          // never set `data-state="selected"` even though ModuleView always makes
-          // the row interactive. Force selection-on-click explicitly.
+          // Selection-on-click is forced explicitly: `selectionToggleOnRowClick`
+          // (EntityTable) defaults to false, so a row click would otherwise
+          // never set `data-state="selected"` for the lock actions below.
           return {
             ...tab,
-            entityConfig: withTableActions(tab.entityConfig, [], true),
+            entityConfig: withTableActions(
+              tab.entityConfig,
+              [
+                {
+                  id: "lock-document",
+                  label: "Lock",
+                  requiresSelection: true,
+                  onClick: async (rows) => {
+                    setDocumentToolbarError(null)
+                    try {
+                      for (const row of rows) {
+                        await lockDocument.mutateAsync(row.id as string | number)
+                      }
+                    } catch (e) {
+                      setDocumentToolbarError(e instanceof Error ? e.message : String(e))
+                    }
+                  },
+                },
+                {
+                  id: "unlock-document",
+                  label: "Unlock",
+                  requiresSelection: true,
+                  onClick: async (rows) => {
+                    setDocumentToolbarError(null)
+                    try {
+                      for (const row of rows) {
+                        await unlockDocument.mutateAsync(row.id as string | number)
+                      }
+                    } catch (e) {
+                      setDocumentToolbarError(e instanceof Error ? e.message : String(e))
+                    }
+                  },
+                },
+              ],
+              true,
+            ),
           }
         }
         if (tab.id === "knowledge-base" && tab.entityConfig) {
@@ -1038,7 +1072,9 @@ function DocumentsClientLoaded({
                   language:
                     typeof formData.language === "string" ? formData.language : undefined,
                 })
-                if (formData.unlockAfter !== false) {
+                // unlock_document rejects an already-unlocked document, so only
+                // release a lock that this check-in row actually holds.
+                if (formData.unlockAfter !== false && documentRowAction.row.isLocked === true) {
                   await unlockDocument.mutateAsync(
                     documentRowAction.row.id as string | number,
                   )

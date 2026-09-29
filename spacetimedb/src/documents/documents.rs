@@ -1042,8 +1042,10 @@ pub fn unlock_document(
 
     let doc = refresh_expired_lock(ctx, doc);
 
+    // COV-18: unlocking an unlocked (or lease-expired) document is a stale
+    // replay, not a no-op success — it must not look like a second transition.
     if !doc.is_locked {
-        return Ok(());
+        return Err("Document is not locked".to_string());
     }
 
     if doc.locked_by != Some(ctx.sender()) {

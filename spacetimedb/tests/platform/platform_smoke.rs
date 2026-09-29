@@ -14,9 +14,9 @@ use crate::core::country_pack::{
 use crate::documents::documents::{
     add_document_version, create_document, create_document_folder, delete_document,
     delete_document_folder, doc_folder, document, document_version, lock_document,
-    restore_document, update_document, update_document_folder, AddDocumentVersionParams,
-    CreateDocumentFolderParams, CreateDocumentParams, Document, DocumentFolder,
-    UpdateDocumentFolderParams, UpdateDocumentParams,
+    restore_document, unlock_document, update_document, update_document_folder,
+    AddDocumentVersionParams, CreateDocumentFolderParams, CreateDocumentParams, Document,
+    DocumentFolder, UpdateDocumentFolderParams, UpdateDocumentParams,
 };
 use crate::documents::drive_sync::{
     document_external_ref, set_google_drive_conflict_policy, sync_external_file_to_document,
@@ -515,6 +515,54 @@ pub fn test_documents_create_and_lock(ctx: &ReducerContext) -> Result<(), String
         .ok_or("doc gone after lock")?;
     if !locked.is_locked {
         return Err("expected locked".to_string());
+    }
+    if locked.locked_by != Some(ctx.sender()) || locked.locked_at.is_none() {
+        return Err("lock holder/time not recorded".to_string());
+    }
+
+    // COV-18: a replayed lock is rejected and leaves the lock row untouched.
+    let replay_lock = lock_document(ctx, org_id, doc.id, None)
+        .err()
+        .ok_or("expected replayed lock to be rejected")?;
+    if !replay_lock.contains("already locked") {
+        return Err(format!("unexpected replay lock error: {replay_lock}"));
+    }
+    let after_replay = ctx
+        .db
+        .document()
+        .id()
+        .find(&doc.id)
+        .ok_or("doc gone after replayed lock")?;
+    if after_replay.locked_at != locked.locked_at || after_replay.write_date != locked.write_date {
+        return Err("replayed lock changed the lock row".to_string());
+    }
+
+    unlock_document(ctx, org_id, doc.id)?;
+    let unlocked = ctx
+        .db
+        .document()
+        .id()
+        .find(&doc.id)
+        .ok_or("doc gone after unlock")?;
+    if unlocked.is_locked || unlocked.locked_by.is_some() || unlocked.locked_at.is_some() {
+        return Err("expected unlocked with holder cleared".to_string());
+    }
+
+    // COV-18: a replayed unlock is rejected and leaves the row untouched.
+    let replay_unlock = unlock_document(ctx, org_id, doc.id)
+        .err()
+        .ok_or("expected replayed unlock to be rejected")?;
+    if !replay_unlock.contains("not locked") {
+        return Err(format!("unexpected replay unlock error: {replay_unlock}"));
+    }
+    let after_unlock_replay = ctx
+        .db
+        .document()
+        .id()
+        .find(&doc.id)
+        .ok_or("doc gone after replayed unlock")?;
+    if after_unlock_replay.write_date != unlocked.write_date {
+        return Err("replayed unlock changed the row".to_string());
     }
 
     Ok(())
