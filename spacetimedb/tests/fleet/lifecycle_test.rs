@@ -6,6 +6,9 @@ use crate::accounting::chart_of_accounts::{
     create_account_account_type, create_account_journal, CreateAccountAccountParams,
     CreateAccountAccountTypeParams, CreateAccountJournalParams,
 };
+use crate::accounting::fiscal_periods::{
+    account_period, close_account_period,
+};
 use crate::accounting::journal_entries::{account_move, account_move_line};
 use crate::core::organization::{company, create_company, CreateCompanyParams};
 use crate::fleet::fleet::{
@@ -20,6 +23,7 @@ use crate::hr::employees::{create_employee, hr_employee, CreateEmployeeParams};
 use crate::test_harness::OrgFixture;
 use crate::types::{
     AccountInternalGroup, AccountMoveState, AccountTypeInternal, EmploymentType, JournalType,
+    PeriodState,
 };
 
 fn vehicle(ctx: &ReducerContext, fixture: &OrgFixture, name: &str) -> Result<u64, String> {
@@ -401,6 +405,72 @@ pub fn test_history_is_immutable_and_idempotent(ctx: &ReducerContext) -> Result<
         .ok_or("vehicle missing after history writes")?;
     if updated.odometer_km != Some(1250.5) {
         return Err("older inspection odometer regressed the vehicle projection".into());
+    }
+    Ok(())
+}
+
+pub fn test_service_cost_respects_period_lock(ctx: &ReducerContext) -> Result<(), String> {
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let vehicle_id = vehicle(ctx, &fixture, "Fleet Locked Cost Van")?;
+    let service_type_id = service_type(ctx, &fixture, "Fleet Locked Cost Service")?;
+    let accounts = fleet_cost_accounts(ctx, &fixture)?;
+
+    let period_id = ctx
+        .db
+        .account_period()
+        .period_by_company()
+        .filter(&fixture.company_id)
+        .find(|period| period.state == PeriodState::Open)
+        .map(|period| period.id)
+        .ok_or("open fleet accounting period missing")?;
+    close_account_period(
+        ctx,
+        fixture.organization_id,
+        fixture.company_id,
+        period_id,
+    )?;
+
+    let result = record_fleet_service(
+        ctx,
+        fixture.organization_id,
+        fixture.company_id,
+        RecordFleetServiceParams {
+            vehicle_id,
+            service_type_id,
+            serviced_at: Some(ctx.timestamp),
+            odometer_km: Some(2000.0),
+            provider: Some("Locked Garage".into()),
+            notes: None,
+            cost_amount: Some(99.50),
+            journal_id: Some(accounts.journal_id),
+            expense_account_id: Some(accounts.expense_account_id),
+            offset_account_id: Some(accounts.offset_account_id),
+            client_request_id: Some("fleet-locked-cost".into()),
+        },
+    );
+    match result {
+        Ok(()) => return Err("fleet service cost posted into a closed period".into()),
+        Err(error)
+            if error.to_ascii_lowercase().contains("closed")
+                || error.to_ascii_lowercase().contains("period") => {}
+        Err(error) => {
+            return Err(format!(
+                "unexpected fleet service cost period-lock error: {error}"
+            ))
+        }
+    }
+
+    if ctx.db.fleet_service_record().iter().any(|row| {
+        row.organization_id == fixture.organization_id
+            && row.client_request_id.as_deref() == Some("fleet-locked-cost")
+    }) {
+        return Err("closed-period fleet service row survived transaction rollback".into());
+    }
+    if ctx.db.account_move().iter().any(|row| {
+        row.organization_id == fixture.organization_id
+            && row.ref_.as_deref() == Some("FLEET-SERVICE:fleet-locked-cost")
+    }) {
+        return Err("closed-period fleet accounting move survived transaction rollback".into());
     }
     Ok(())
 }
