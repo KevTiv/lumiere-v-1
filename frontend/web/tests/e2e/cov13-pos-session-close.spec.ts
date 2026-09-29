@@ -53,7 +53,7 @@ async function closedSessionSnapshot(
   companyId: number,
 ) {
   const session = (await rows(page, "pos-sessions")).find(
-    (row) => scalarQueryId(row.id) === openedSessionId,
+    (row) => scalarQueryId(row.id) === sessionId,
   )
   if (!session) throw new Error(`POS session not found: ${sessionId}`)
   const configId = scalarQueryId(session.configId ?? session.config_id)
@@ -65,7 +65,7 @@ async function closedSessionSnapshot(
   if (!config) throw new Error(`POS config not found: ${configId}`)
 
   return {
-    id: openedSessionId,
+    id: sessionId,
     organizationId: scalarQueryId(
       session.organizationId ?? session.organization_id,
     ),
