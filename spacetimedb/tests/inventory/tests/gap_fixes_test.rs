@@ -1947,6 +1947,19 @@ pub fn test_replenishment_scheduled_run_reschedules(ctx: &ReducerContext) -> Res
     }
     let job = jobs_before[0].clone();
     let job_id = job.scheduled_id;
+    let rule_scheduled = ctx
+        .db
+        .replenishment_rule()
+        .id()
+        .find(&rule_id)
+        .ok_or("rule after schedule")?;
+    if rule_scheduled.scheduled_run_job_id != Some(job_id) {
+        return Err(format!(
+            "expected rule.scheduled_run_job_id {:?} after schedule, got {:?}",
+            Some(job_id),
+            rule_scheduled.scheduled_run_job_id
+        ));
+    }
 
     // Simulate the scheduler's own dispatch: the job row is gone by the time
     // the reducer body runs (SpacetimeDB deletes it after invoking the
@@ -1984,6 +1997,12 @@ pub fn test_replenishment_scheduled_run_reschedules(ctx: &ReducerContext) -> Res
     if jobs_after[0].scheduled_id == job_id {
         return Err("reschedule reused the old job id instead of inserting a new one".into());
     }
+    if rule_after.scheduled_run_job_id != Some(jobs_after[0].scheduled_id) {
+        return Err(format!(
+            "expected rule.scheduled_run_job_id to follow the rescheduled job {}, got {:?}",
+            jobs_after[0].scheduled_id, rule_after.scheduled_run_job_id
+        ));
+    }
 
     cancel_replenishment_run(ctx, org_id, company_id, rule_id)?;
     let jobs_cancelled: Vec<_> = ctx
@@ -1997,6 +2016,15 @@ pub fn test_replenishment_scheduled_run_reschedules(ctx: &ReducerContext) -> Res
             "expected no scheduled jobs after cancel, got {}",
             jobs_cancelled.len()
         ));
+    }
+    let rule_cancelled = ctx
+        .db
+        .replenishment_rule()
+        .id()
+        .find(&rule_id)
+        .ok_or("rule after cancel")?;
+    if rule_cancelled.scheduled_run_job_id.is_some() {
+        return Err("expected scheduled_run_job_id cleared by cancel".into());
     }
 
     // Cancelling an unscheduled rule is a no-op success, not an error.
