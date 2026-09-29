@@ -1,6 +1,7 @@
 "use client"
 
 
+import { decodeOperationDispatch } from "@lumiere/api-client"
 import { stdbBffCommandPost } from "@lumiere/stdb/commands"
 import type {
   CreateExpenseAdvanceParams,
@@ -23,6 +24,7 @@ import type {
   UpsertExpensePerDiemRateParams,
 } from "@lumiere/stdb/types"
 import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
+import { parseStrictU64 } from "@lumiere/erp-shared/u64"
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 
 import { apiFetch, fetchQueryList, type QueryRows, rqBigIntKey } from "../http"
@@ -30,6 +32,13 @@ import {
   finalizeCreateExpenseParams,
   finalizeCreateExpenseSheetParams,
 } from "./expenses-params-merge"
+import {
+  AmbiguousOperationEffectError,
+  executeOperationWithCanonicalReadback,
+  requireResolvedOperationEffect,
+  type CanonicalRecordRef,
+  type ResolvedOperationEffectOutcome,
+} from "./operation-effect"
 
 // ── Reads ─────────────────────────────────────────────────────────────────────
 
@@ -303,41 +312,280 @@ export function useSubmitExpense(organizationId: bigint) {
   })
 }
 
-export function useSubmitExpenseSheet(organizationId: bigint) {
+export type ExpenseSheetLifecycleState =
+  | "Submitted"
+  | "Approved"
+  | "Posted"
+  | "Done"
+
+export interface ExpenseSheetLifecycleProjection {
+  readonly id?: unknown
+  readonly organizationId?: unknown
+  readonly organization_id?: unknown
+  readonly companyId?: unknown
+  readonly company_id?: unknown
+  readonly state?: unknown
+  readonly accountMoveId?: unknown
+  readonly account_move_id?: unknown
+  readonly reimbursementMoveId?: unknown
+  readonly reimbursement_move_id?: unknown
+}
+
+export interface ExpenseMoveProjection {
+  readonly id?: unknown
+  readonly organizationId?: unknown
+  readonly organization_id?: unknown
+  readonly companyId?: unknown
+  readonly company_id?: unknown
+  readonly state?: unknown
+}
+
+export interface ExpenseSheetLifecycleRef extends CanonicalRecordRef {
+  readonly resource: "expense-sheets"
+  readonly state: ExpenseSheetLifecycleState
+  readonly companyId: string
+  readonly accountMoveId?: string
+  readonly reimbursementMoveId?: string
+}
+
+function expenseStateTag(value: unknown): string {
+  if (typeof value === "string") return value.toLowerCase()
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    if ("tag" in value) {
+      return String((value as { tag?: unknown }).tag ?? "").toLowerCase()
+    }
+    const keys = Object.keys(value)
+    if (keys.length === 1) return keys[0]!.toLowerCase()
+  }
+  return ""
+}
+
+function exactExpenseSheet(
+  rows: readonly ExpenseSheetLifecycleProjection[],
+  organizationId: bigint,
+  companyId: bigint,
+  sheetId: bigint,
+): ExpenseSheetLifecycleProjection | null {
+  const matches = rows.filter((row) => parseStrictU64(row.id) === sheetId)
+  if (matches.length > 1) {
+    throw new AmbiguousOperationEffectError(
+      `Expected one expense sheet, found ${matches.length}`,
+    )
+  }
+  const row = matches[0]
+  if (
+    !row ||
+    parseStrictU64(row.organizationId ?? row.organization_id) !== organizationId ||
+    parseStrictU64(row.companyId ?? row.company_id) !== companyId
+  ) {
+    return null
+  }
+  return row
+}
+
+function exactPostedMove(
+  rows: readonly ExpenseMoveProjection[],
+  organizationId: bigint,
+  companyId: bigint,
+  moveId: bigint,
+): boolean {
+  const matches = rows.filter((row) => parseStrictU64(row.id) === moveId)
+  if (matches.length > 1) {
+    throw new AmbiguousOperationEffectError(
+      `Expected one expense accounting move, found ${matches.length}`,
+    )
+  }
+  const row = matches[0]
+  return Boolean(
+    row &&
+      parseStrictU64(row.organizationId ?? row.organization_id) === organizationId &&
+      parseStrictU64(row.companyId ?? row.company_id) === companyId &&
+      expenseStateTag(row.state) === "posted",
+  )
+}
+
+export function resolveExpenseSheetStateEffect(
+  rows: readonly ExpenseSheetLifecycleProjection[],
+  organizationId: bigint,
+  companyId: bigint,
+  sheetId: bigint,
+  expectedState: "Submitted" | "Approved",
+): ExpenseSheetLifecycleRef | null {
+  const row = exactExpenseSheet(rows, organizationId, companyId, sheetId)
+  if (!row || expenseStateTag(row.state) !== expectedState.toLowerCase()) return null
+  return {
+    resource: "expense-sheets",
+    id: sheetId.toString(),
+    state: expectedState,
+    companyId: companyId.toString(),
+  }
+}
+
+export function resolvePostedExpenseSheetEffect(
+  sheets: readonly ExpenseSheetLifecycleProjection[],
+  moves: readonly ExpenseMoveProjection[],
+  organizationId: bigint,
+  companyId: bigint,
+  sheetId: bigint,
+): ExpenseSheetLifecycleRef | null {
+  const row = exactExpenseSheet(sheets, organizationId, companyId, sheetId)
+  if (!row || expenseStateTag(row.state) !== "posted") return null
+  const moveId = parseStrictU64(row.accountMoveId ?? row.account_move_id)
+  if (
+    moveId == null ||
+    !exactPostedMove(moves, organizationId, companyId, moveId)
+  ) {
+    return null
+  }
+  return {
+    resource: "expense-sheets",
+    id: sheetId.toString(),
+    state: "Posted",
+    companyId: companyId.toString(),
+    accountMoveId: moveId.toString(),
+  }
+}
+
+export function resolveReimbursedExpenseSheetEffect(
+  sheets: readonly ExpenseSheetLifecycleProjection[],
+  moves: readonly ExpenseMoveProjection[],
+  organizationId: bigint,
+  companyId: bigint,
+  sheetId: bigint,
+): ExpenseSheetLifecycleRef | null {
+  const row = exactExpenseSheet(sheets, organizationId, companyId, sheetId)
+  if (!row || expenseStateTag(row.state) !== "done") return null
+  const accountMoveId = parseStrictU64(row.accountMoveId ?? row.account_move_id)
+  const reimbursementMoveId = parseStrictU64(
+    row.reimbursementMoveId ?? row.reimbursement_move_id,
+  )
+  if (
+    accountMoveId == null ||
+    reimbursementMoveId == null ||
+    !exactPostedMove(moves, organizationId, companyId, accountMoveId) ||
+    !exactPostedMove(moves, organizationId, companyId, reimbursementMoveId)
+  ) {
+    return null
+  }
+  return {
+    resource: "expense-sheets",
+    id: sheetId.toString(),
+    state: "Done",
+    companyId: companyId.toString(),
+    accountMoveId: accountMoveId.toString(),
+    reimbursementMoveId: reimbursementMoveId.toString(),
+  }
+}
+
+function requireExpenseCompany(companyId: bigint | undefined): bigint {
+  if (companyId == null || companyId <= 0n) {
+    throw new Error("Operating company is required for expense sheet workflow")
+  }
+  return companyId
+}
+
+async function readExpenseSheets(): Promise<ExpenseSheetLifecycleProjection[]> {
+  return fetchQueryList(
+    "/api/query/expense-sheets",
+    "Failed to read expense sheets",
+  )
+}
+
+async function readExpenseMoves(): Promise<ExpenseMoveProjection[]> {
+  return fetchQueryList("/api/query/account-moves", "Failed to read expense accounting moves")
+}
+
+function invalidateExpenseLifecycle(
+  qc: ReturnType<typeof useQueryClient>,
+  organizationId: bigint,
+) {
+  const k = rqBigIntKey(organizationId)
+  return Promise.all([
+    qc.invalidateQueries({ queryKey: ["expense-sheets", k] }),
+    qc.invalidateQueries({ queryKey: ["expenses", k] }),
+    qc.invalidateQueries({ queryKey: ["expense-sheets-to-approve", k] }),
+    qc.invalidateQueries({ queryKey: ["expenses-missing-receipt", k] }),
+  ])
+}
+
+export function useSubmitExpenseSheet(
+  organizationId: bigint,
+  companyId?: bigint,
+) {
   const qc = useQueryClient()
-  return useMutation({
-    mutationFn: async (sheetId: string | number | bigint) => {
-      const { urlPath, init } = stdbBffCommandPost("submit_expense_sheet", { sheetId: sheetId })
-      const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error(await parseCallErrorExpenses(r, 'Failed to submit expense sheet'))
-    },
-    onSuccess: async () => {
-      const k = rqBigIntKey(organizationId)
-      await Promise.all([
-        qc.invalidateQueries({ queryKey: ['expense-sheets', k] }),
-        qc.invalidateQueries({ queryKey: ['expenses', k] }),
-        qc.invalidateQueries({ queryKey: ['expense-sheets-to-approve', k] }),
-        qc.invalidateQueries({ queryKey: ['expenses-missing-receipt', k] }),
-      ])
+  return useMutation<
+    ResolvedOperationEffectOutcome<ExpenseSheetLifecycleRef>,
+    Error,
+    string | number | bigint
+  >({
+    mutationFn: async (sheetIdInput) => {
+      const activeCompanyId = requireExpenseCompany(companyId)
+      const sheetId = parseStrictU64(sheetIdInput)
+      if (sheetId == null) throw new Error("Invalid expense sheet id")
+      const outcome = await executeOperationWithCanonicalReadback({
+        resolveEffect: async () =>
+          resolveExpenseSheetStateEffect(
+            await readExpenseSheets(),
+            organizationId,
+            activeCompanyId,
+            sheetId,
+            "Submitted",
+          ),
+        dispatch: async () => {
+          const { urlPath, init } = stdbBffCommandPost("submit_expense_sheet", {
+            sheetId,
+          })
+          return decodeOperationDispatch(
+            await apiFetch(urlPath, init),
+            "Failed to submit expense sheet",
+          )
+        },
+        afterDispatch: () => invalidateExpenseLifecycle(qc, organizationId),
+        readbackAttempts: 6,
+        readbackDelayMs: 150,
+      })
+      return requireResolvedOperationEffect(outcome)
     },
   })
 }
 
-export function useApproveExpenseSheet(organizationId: bigint) {
+export function useApproveExpenseSheet(
+  organizationId: bigint,
+  companyId?: bigint,
+) {
   const qc = useQueryClient()
-  return useMutation({
-    mutationFn: async (sheetId: string | number | bigint) => {
-      const { urlPath, init } = stdbBffCommandPost("approve_expense_sheet", { sheetId: sheetId })
-      const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error(await parseCallErrorExpenses(r, 'Failed to approve expense sheet'))
-    },
-    onSuccess: async () => {
-      const k = rqBigIntKey(organizationId)
-      await Promise.all([
-        qc.invalidateQueries({ queryKey: ['expense-sheets', k] }),
-        qc.invalidateQueries({ queryKey: ['expenses', k] }),
-        qc.invalidateQueries({ queryKey: ['expense-sheets-to-approve', k] }),
-      ])
+  return useMutation<
+    ResolvedOperationEffectOutcome<ExpenseSheetLifecycleRef>,
+    Error,
+    string | number | bigint
+  >({
+    mutationFn: async (sheetIdInput) => {
+      const activeCompanyId = requireExpenseCompany(companyId)
+      const sheetId = parseStrictU64(sheetIdInput)
+      if (sheetId == null) throw new Error("Invalid expense sheet id")
+      const outcome = await executeOperationWithCanonicalReadback({
+        resolveEffect: async () =>
+          resolveExpenseSheetStateEffect(
+            await readExpenseSheets(),
+            organizationId,
+            activeCompanyId,
+            sheetId,
+            "Approved",
+          ),
+        dispatch: async () => {
+          const { urlPath, init } = stdbBffCommandPost("approve_expense_sheet", {
+            sheetId,
+          })
+          return decodeOperationDispatch(
+            await apiFetch(urlPath, init),
+            "Failed to approve expense sheet",
+          )
+        },
+        afterDispatch: () => invalidateExpenseLifecycle(qc, organizationId),
+        readbackAttempts: 6,
+        readbackDelayMs: 150,
+      })
+      return requireResolvedOperationEffect(outcome)
     },
   })
 }
@@ -367,50 +615,100 @@ export function useRefuseExpenseSheet(organizationId: bigint) {
   })
 }
 
-export function usePostExpenseSheet(organizationId: bigint) {
+export function usePostExpenseSheet(
+  organizationId: bigint,
+  companyId?: bigint,
+) {
   const qc = useQueryClient()
-  return useMutation({
-    mutationFn: async ({
-      sheetId,
-      params,
-    }: {
+  return useMutation<
+    ResolvedOperationEffectOutcome<ExpenseSheetLifecycleRef>,
+    Error,
+    {
       sheetId: string | number | bigint
       params: Partial<PostExpenseSheetParams>
-    }) => {
-      const { urlPath, init } = stdbBffCommandPost("post_expense_sheet", { sheetId: sheetId, params: stdbParamsToJson(params, "PostExpenseSheetParams") })
-      const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error(await parseCallErrorExpenses(r, 'Failed to post expense sheet'))
-    },
-    onSuccess: async () => {
-      await Promise.all([
-        qc.invalidateQueries({ queryKey: ['expenses', rqBigIntKey(organizationId)] }),
-        qc.invalidateQueries({ queryKey: ['expense-sheets', rqBigIntKey(organizationId)] }),
-      ])
+    }
+  >({
+    mutationFn: async ({ sheetId: sheetIdInput, params }) => {
+      const activeCompanyId = requireExpenseCompany(companyId)
+      const sheetId = parseStrictU64(sheetIdInput)
+      if (sheetId == null) throw new Error("Invalid expense sheet id")
+      const resolveEffect = async () =>
+        resolvePostedExpenseSheetEffect(
+          await readExpenseSheets(),
+          await readExpenseMoves(),
+          organizationId,
+          activeCompanyId,
+          sheetId,
+        )
+      const outcome = await executeOperationWithCanonicalReadback({
+        resolveEffect,
+        dispatch: async () => {
+          const { urlPath, init } = stdbBffCommandPost("post_expense_sheet", {
+            sheetId,
+            params: stdbParamsToJson(params, "PostExpenseSheetParams"),
+          })
+          return decodeOperationDispatch(
+            await apiFetch(urlPath, init),
+            "Failed to post expense sheet",
+          )
+        },
+        afterDispatch: () => invalidateExpenseLifecycle(qc, organizationId),
+        readbackAttempts: 6,
+        readbackDelayMs: 150,
+      })
+      return requireResolvedOperationEffect(outcome)
     },
   })
 }
 
-export function useCreateExpenseReimbursementPayment(organizationId: bigint) {
+export function useCreateExpenseReimbursementPayment(
+  organizationId: bigint,
+  companyId?: bigint,
+) {
   const qc = useQueryClient()
-  return useMutation({
-    mutationFn: async ({
-      sheetId,
-      params,
-    }: {
+  return useMutation<
+    ResolvedOperationEffectOutcome<ExpenseSheetLifecycleRef>,
+    Error,
+    {
       sheetId: string | number | bigint
       params: Partial<CreateExpenseReimbursementParams>
-    }) => {
-      const { urlPath, init } = stdbBffCommandPost("create_expense_reimbursement_payment", { sheetId: sheetId, params: stdbParamsToJson(params, "CreateExpenseReimbursementParams") })
-      const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error(await parseCallErrorExpenses(r, 'Failed to reimburse expense sheet'))
-    },
-    onSuccess: async () => {
-      const k = rqBigIntKey(organizationId)
-      await Promise.all([
-        qc.invalidateQueries({ queryKey: ['expenses', k] }),
-        qc.invalidateQueries({ queryKey: ['expense-sheets', k] }),
-        qc.invalidateQueries({ queryKey: ['expense-sheets-to-approve', k] }),
-      ])
+    }
+  >({
+    mutationFn: async ({ sheetId: sheetIdInput, params }) => {
+      const activeCompanyId = requireExpenseCompany(companyId)
+      const sheetId = parseStrictU64(sheetIdInput)
+      if (sheetId == null) throw new Error("Invalid expense sheet id")
+      const resolveEffect = async () =>
+        resolveReimbursedExpenseSheetEffect(
+          await readExpenseSheets(),
+          await readExpenseMoves(),
+          organizationId,
+          activeCompanyId,
+          sheetId,
+        )
+      const outcome = await executeOperationWithCanonicalReadback({
+        resolveEffect,
+        dispatch: async () => {
+          const { urlPath, init } = stdbBffCommandPost(
+            "create_expense_reimbursement_payment",
+            {
+              sheetId,
+              params: stdbParamsToJson(
+                params,
+                "CreateExpenseReimbursementParams",
+              ),
+            },
+          )
+          return decodeOperationDispatch(
+            await apiFetch(urlPath, init),
+            "Failed to reimburse expense sheet",
+          )
+        },
+        afterDispatch: () => invalidateExpenseLifecycle(qc, organizationId),
+        readbackAttempts: 6,
+        readbackDelayMs: 150,
+      })
+      return requireResolvedOperationEffect(outcome)
     },
   })
 }
