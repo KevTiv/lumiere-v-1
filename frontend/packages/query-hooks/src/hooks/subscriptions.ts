@@ -1,5 +1,6 @@
 'use client';
 
+import { decodeOperationDispatch } from '@lumiere/api-client';
 import { stdbBffCommandPost } from '@lumiere/stdb/commands';
 /**
  * Subscriptions hooks — Phase 4 of API Gateway Refactor
@@ -14,6 +15,7 @@ import { invalidateStdbQueryResources } from './stdb';
 import { apiFetch, fetchQueryList, type QueryRows, rqBigIntKey } from '../http';
 import { withCompanyScope } from '@lumiere/erp-shared/org-scoped';
 import { stdbParamsToJson } from '@lumiere/erp-shared/stdb-params-json';
+import { parseStrictU64 } from '@lumiere/erp-shared/u64';
 import { type ClearablePatch } from '@lumiere/erp-shared/accounting-create-params';
 import type {
   AmendSubscriptionParams,
@@ -42,6 +44,13 @@ import type {
   SubscriptionPlan,
   UpdateSubscriptionPlanParams,
 } from '@lumiere/stdb/types';
+import {
+  AmbiguousOperationEffectError,
+  executeOperationWithCanonicalReadback,
+  requireResolvedOperationEffect,
+  type CanonicalRecordRef,
+  type ResolvedOperationEffectOutcome,
+} from './operation-effect';
 
 function requireSelectedCompany(companyId: bigint | undefined): bigint {
   if (companyId == null || companyId <= 0n) {
@@ -281,50 +290,312 @@ export function useCloseSubscription(
   });
 }
 
+export interface SubscriptionBillingRunProjection {
+  readonly id?: unknown;
+  readonly organizationId?: unknown;
+  readonly organization_id?: unknown;
+  readonly companyId?: unknown;
+  readonly company_id?: unknown;
+  readonly subscriptionId?: unknown;
+  readonly subscription_id?: unknown;
+  readonly billingRunKey?: unknown;
+  readonly billing_run_key?: unknown;
+  readonly invoiceMoveId?: unknown;
+  readonly invoice_move_id?: unknown;
+}
+
+export interface SubscriptionInvoiceMoveProjection {
+  readonly id?: unknown;
+  readonly organizationId?: unknown;
+  readonly organization_id?: unknown;
+  readonly companyId?: unknown;
+  readonly company_id?: unknown;
+  readonly moveType?: unknown;
+  readonly move_type?: unknown;
+  readonly state?: unknown;
+  readonly paymentState?: unknown;
+  readonly payment_state?: unknown;
+  readonly amountTotal?: unknown;
+  readonly amount_total?: unknown;
+  readonly amountResidual?: unknown;
+  readonly amount_residual?: unknown;
+}
+
+export interface SubscriptionInvoiceEffectRef extends CanonicalRecordRef {
+  readonly resource: 'account-moves';
+  readonly subscriptionId: string;
+  readonly billingRunId?: string;
+  readonly billingRunKey?: string;
+  readonly residual?: number;
+}
+
+function taggedValue(value: unknown): string {
+  if (typeof value === 'string') {
+    return value.replace(/[_-]/g, '').toLowerCase();
+  }
+  if (value && typeof value === 'object' && !Array.isArray(value)) {
+    if ('tag' in value) {
+      return String((value as { tag?: unknown }).tag ?? '')
+        .replace(/[_-]/g, '')
+        .toLowerCase();
+    }
+    const keys = Object.keys(value);
+    if (keys.length === 1) {
+      return keys[0]!.replace(/[_-]/g, '').toLowerCase();
+    }
+  }
+  return '';
+}
+
+function numericValue(value: unknown): number | null {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function field(
+  record: Record<string, unknown>,
+  camel: string,
+  snake: string,
+): unknown {
+  return record[camel] ?? record[snake];
+}
+
+function timestampMicros(value: unknown): bigint | null {
+  if (value && typeof value === 'object' && !Array.isArray(value)) {
+    const object = value as Record<string, unknown>;
+    const raw =
+      object.microsSinceUnixEpoch ??
+      object.__timestamp_micros_since_unix_epoch__;
+    try {
+      return raw == null ? null : BigInt(String(raw));
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
+export function subscriptionBillingRunKey(
+  subscriptionId: bigint,
+  params: GenerateSubscriptionInvoiceParams,
+): string {
+  const record = params as unknown as Record<string, unknown>;
+  const explicit = field(record, 'billingRunKey', 'billing_run_key');
+  if (typeof explicit === 'string' && explicit.trim() !== '') {
+    return explicit.trim();
+  }
+  if (
+    explicit &&
+    typeof explicit === 'object' &&
+    !Array.isArray(explicit) &&
+    'some' in explicit
+  ) {
+    const some = (explicit as { some?: unknown }).some;
+    if (typeof some === 'string' && some.trim() !== '') return some.trim();
+  }
+
+  const micros = timestampMicros(field(record, 'invoiceDate', 'invoice_date'));
+  if (micros == null) {
+    throw new Error('Subscription invoice date is required for exact readback');
+  }
+  return `sub:${subscriptionId}:period:${micros / 1_000_000n}`;
+}
+
+function exactSubscriptionInvoiceMove(
+  rows: readonly SubscriptionInvoiceMoveProjection[],
+  organizationId: bigint,
+  companyId: bigint,
+  moveId: bigint,
+): SubscriptionInvoiceMoveProjection | null {
+  const matches = rows.filter((row) => parseStrictU64(row.id) === moveId);
+  if (matches.length > 1) {
+    throw new AmbiguousOperationEffectError(
+      `Expected one subscription invoice move, found ${matches.length}`,
+    );
+  }
+  const row = matches[0];
+  if (
+    !row ||
+    parseStrictU64(row.organizationId ?? row.organization_id) !== organizationId ||
+    parseStrictU64(row.companyId ?? row.company_id) !== companyId ||
+    taggedValue(row.moveType ?? row.move_type) !== 'outinvoice'
+  ) {
+    return null;
+  }
+  return row;
+}
+
+export function resolveSubscriptionBillingRunEffect(
+  runs: readonly SubscriptionBillingRunProjection[],
+  moves: readonly SubscriptionInvoiceMoveProjection[],
+  organizationId: bigint,
+  companyId: bigint,
+  subscriptionId: bigint,
+  billingRunKey: string,
+): SubscriptionInvoiceEffectRef | null {
+  const matches = runs.filter(
+    (run) =>
+      parseStrictU64(run.subscriptionId ?? run.subscription_id) ===
+        subscriptionId &&
+      String(run.billingRunKey ?? run.billing_run_key ?? '') === billingRunKey,
+  );
+  if (matches.length > 1) {
+    throw new AmbiguousOperationEffectError(
+      `Expected one subscription billing run, found ${matches.length}`,
+    );
+  }
+  const run = matches[0];
+  if (
+    !run ||
+    parseStrictU64(run.organizationId ?? run.organization_id) !== organizationId ||
+    parseStrictU64(run.companyId ?? run.company_id) !== companyId
+  ) {
+    return null;
+  }
+  const moveId = parseStrictU64(run.invoiceMoveId ?? run.invoice_move_id);
+  if (
+    moveId == null ||
+    exactSubscriptionInvoiceMove(moves, organizationId, companyId, moveId) == null
+  ) {
+    return null;
+  }
+  const runId = parseStrictU64(run.id);
+  return {
+    resource: 'account-moves',
+    id: moveId.toString(),
+    subscriptionId: subscriptionId.toString(),
+    billingRunId: runId?.toString(),
+    billingRunKey,
+  };
+}
+
+export function resolvePaidSubscriptionInvoiceEffect(
+  moves: readonly SubscriptionInvoiceMoveProjection[],
+  organizationId: bigint,
+  companyId: bigint,
+  subscriptionId: bigint,
+  invoiceMoveId: bigint,
+  expectedResidual: number,
+): SubscriptionInvoiceEffectRef | null {
+  const move = exactSubscriptionInvoiceMove(
+    moves,
+    organizationId,
+    companyId,
+    invoiceMoveId,
+  );
+  if (!move || taggedValue(move.state) !== 'posted') return null;
+
+  const residual = numericValue(move.amountResidual ?? move.amount_residual);
+  if (residual == null || Math.abs(residual - expectedResidual) > 0.0001) {
+    return null;
+  }
+  const expectedPaymentState = expectedResidual <= 0.0001 ? 'paid' : 'partial';
+  if (taggedValue(move.paymentState ?? move.payment_state) !== expectedPaymentState) {
+    return null;
+  }
+
+  return {
+    resource: 'account-moves',
+    id: invoiceMoveId.toString(),
+    subscriptionId: subscriptionId.toString(),
+    residual,
+  };
+}
+
+async function readSubscriptionBillingRuns(): Promise<
+  SubscriptionBillingRunProjection[]
+> {
+  return fetchQueryList(
+    '/api/query/subscription-billing-runs',
+    'Failed to read subscription billing runs',
+  );
+}
+
+async function readSubscriptionInvoiceMoves(): Promise<
+  SubscriptionInvoiceMoveProjection[]
+> {
+  return fetchQueryList(
+    '/api/query/account-moves',
+    'Failed to read subscription invoices',
+  );
+}
+
+async function invalidateSubscriptionInvoiceLifecycle(
+  qc: ReturnType<typeof useQueryClient>,
+  organizationId: bigint,
+) {
+  invalidateStdbQueryResources(qc, organizationId, [
+    'account-moves',
+    'account-move-lines',
+  ]);
+  await Promise.all([
+    qc.invalidateQueries({
+      queryKey: ['subscriptions', rqBigIntKey(organizationId)],
+    }),
+    qc.invalidateQueries({
+      queryKey: ['subscription-billing-runs', rqBigIntKey(organizationId)],
+    }),
+    qc.invalidateQueries({
+      queryKey: ['deferred-revenue-schedules', rqBigIntKey(organizationId)],
+    }),
+    qc.invalidateQueries({
+      queryKey: ['deferred-revenue-lines', rqBigIntKey(organizationId)],
+    }),
+    qc.invalidateQueries({
+      queryKey: ['stdb', 'account-payments', rqBigIntKey(organizationId)],
+    }),
+  ]);
+}
+
 export function useGenerateSubscriptionInvoice(
   organizationId: bigint,
   companyId?: bigint,
 ) {
   const qc = useQueryClient();
   return useMutation<
-    void,
+    ResolvedOperationEffectOutcome<SubscriptionInvoiceEffectRef>,
     Error,
     { subscriptionId: bigint; params: GenerateSubscriptionInvoiceParams }
   >({
     mutationFn: async ({ subscriptionId, params }) => {
-      const { urlPath, init } = stdbBffCommandPost(
-        'generate_subscription_invoice',
-        {
-          companyId: requireSelectedCompany(companyId),
-          subscriptionId: subscriptionId,
-          params: stdbParamsToJson(
-            params as object,
-            'GenerateSubscriptionInvoiceParams',
-          ),
+      const activeCompanyId = requireSelectedCompany(companyId);
+      const billingRunKey = subscriptionBillingRunKey(subscriptionId, params);
+      const resolveEffect = async () =>
+        resolveSubscriptionBillingRunEffect(
+          await readSubscriptionBillingRuns(),
+          await readSubscriptionInvoiceMoves(),
+          organizationId,
+          activeCompanyId,
+          subscriptionId,
+          billingRunKey,
+        );
+
+      const outcome = await executeOperationWithCanonicalReadback({
+        resolveEffect,
+        dispatch: async () => {
+          const { urlPath, init } = stdbBffCommandPost(
+            'generate_subscription_invoice',
+            {
+              companyId: activeCompanyId,
+              subscriptionId,
+              params: stdbParamsToJson(
+                params as object,
+                'GenerateSubscriptionInvoiceParams',
+              ),
+            },
+          );
+          return decodeOperationDispatch(
+            await apiFetch(urlPath, init),
+            'Failed to generate subscription invoice',
+          );
         },
-      );
-      const r = await apiFetch(urlPath, init);
-      if (!r.ok) throw new Error('Failed to generate subscription invoice');
-    },
-    onSuccess: async () => {
-      invalidateStdbQueryResources(qc, organizationId, [
-        'account-moves',
-        'account-move-lines',
-      ]);
-      await Promise.all([
-        qc.invalidateQueries({
-          queryKey: ['subscriptions', rqBigIntKey(organizationId)],
-        }),
-        qc.invalidateQueries({
-          queryKey: ['subscription-billing-runs', rqBigIntKey(organizationId)],
-        }),
-        qc.invalidateQueries({
-          queryKey: ['deferred-revenue-schedules', rqBigIntKey(organizationId)],
-        }),
-        qc.invalidateQueries({
-          queryKey: ['deferred-revenue-lines', rqBigIntKey(organizationId)],
-        }),
-      ]);
+        afterDispatch: () =>
+          invalidateSubscriptionInvoiceLifecycle(qc, organizationId),
+        readbackAttempts: 6,
+        readbackDelayMs: 150,
+      });
+
+      return requireResolvedOperationEffect(outcome);
     },
   });
 }
@@ -335,36 +606,74 @@ export function usePaySubscriptionInvoice(
 ) {
   const qc = useQueryClient();
   return useMutation<
-    void,
+    ResolvedOperationEffectOutcome<SubscriptionInvoiceEffectRef>,
     Error,
     { subscriptionId: bigint; params: ApplySubscriptionInvoicePaymentParams }
   >({
     mutationFn: async ({ subscriptionId, params }) => {
-      const { urlPath, init } = stdbBffCommandPost('pay_subscription_invoice', {
-        companyId: requireSelectedCompany(companyId),
-        subscriptionId: subscriptionId,
-        params: stdbParamsToJson(
-          params as object,
-          'ApplySubscriptionInvoicePaymentParams',
-        ),
+      const activeCompanyId = requireSelectedCompany(companyId);
+      const record = params as unknown as Record<string, unknown>;
+      const invoiceMoveId = parseStrictU64(
+        field(record, 'invoiceMoveId', 'invoice_move_id'),
+      );
+      if (invoiceMoveId == null) {
+        throw new Error('Subscription invoice move is required');
+      }
+
+      const before = exactSubscriptionInvoiceMove(
+        await readSubscriptionInvoiceMoves(),
+        organizationId,
+        activeCompanyId,
+        invoiceMoveId,
+      );
+      if (!before) throw new Error('Subscription invoice move was not found');
+      const residualBefore = numericValue(
+        before.amountResidual ?? before.amount_residual,
+      );
+      if (residualBefore == null || residualBefore <= 0.0001) {
+        throw new Error('Subscription invoice has no residual to pay');
+      }
+      const requestedAmount = numericValue(field(record, 'amount', 'amount'));
+      const appliedAmount =
+        requestedAmount == null ? residualBefore : requestedAmount;
+      const expectedResidual = Math.max(0, residualBefore - appliedAmount);
+
+      const outcome = await executeOperationWithCanonicalReadback({
+        // A prior Partial state is not proof that this payment invocation ran.
+        resolveBeforeDispatch: false,
+        resolveEffect: async () =>
+          resolvePaidSubscriptionInvoiceEffect(
+            await readSubscriptionInvoiceMoves(),
+            organizationId,
+            activeCompanyId,
+            subscriptionId,
+            invoiceMoveId,
+            expectedResidual,
+          ),
+        dispatch: async () => {
+          const { urlPath, init } = stdbBffCommandPost(
+            'pay_subscription_invoice',
+            {
+              companyId: activeCompanyId,
+              subscriptionId,
+              params: stdbParamsToJson(
+                params as object,
+                'ApplySubscriptionInvoicePaymentParams',
+              ),
+            },
+          );
+          return decodeOperationDispatch(
+            await apiFetch(urlPath, init),
+            'Failed to apply subscription invoice payment',
+          );
+        },
+        afterDispatch: () =>
+          invalidateSubscriptionInvoiceLifecycle(qc, organizationId),
+        readbackAttempts: 6,
+        readbackDelayMs: 150,
       });
-      const r = await apiFetch(urlPath, init);
-      if (!r.ok)
-        throw new Error('Failed to apply subscription invoice payment');
-    },
-    onSuccess: async () => {
-      invalidateStdbQueryResources(qc, organizationId, [
-        'account-moves',
-        'account-move-lines',
-      ]);
-      await Promise.all([
-        qc.invalidateQueries({
-          queryKey: ['subscriptions', rqBigIntKey(organizationId)],
-        }),
-        qc.invalidateQueries({
-          queryKey: ['stdb', 'account-payments', rqBigIntKey(organizationId)],
-        }),
-      ]);
+
+      return requireResolvedOperationEffect(outcome);
     },
   });
 }
