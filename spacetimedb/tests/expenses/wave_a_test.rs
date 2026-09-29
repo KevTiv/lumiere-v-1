@@ -392,6 +392,28 @@ pub fn test_expense_lifecycle_posts_move(ctx: &ReducerContext) -> Result<(), Str
     if (sheet.total_amount - 120.0).abs() > 0.001 {
         return Err(format!("expected total 120, got {}", sheet.total_amount));
     }
+    let submitted_by = sheet.submitted_by;
+    let submitted_metadata = sheet.metadata.clone();
+    match submit_expense_sheet(ctx, fixture.organization_id, sheet_id) {
+        Err(error) if error.contains("draft sheets") => {}
+        Err(error) => return Err(format!("unexpected expense-submit replay error: {error}")),
+        Ok(()) => return Err("expense-submit replay unexpectedly succeeded".to_string()),
+    }
+    let after_submit_replay = ctx
+        .db
+        .expense_sheet()
+        .id()
+        .find(&sheet_id)
+        .ok_or("sheet after submit replay")?;
+    if after_submit_replay.state != ExpenseSheetState::Submitted
+        || (after_submit_replay.total_amount - sheet.total_amount).abs() > 0.001
+        || after_submit_replay.submitted_by != submitted_by
+        || after_submit_replay.metadata != submitted_metadata
+        || after_submit_replay.account_move_id.is_some()
+        || after_submit_replay.reimbursement_move_id.is_some()
+    {
+        return Err("expense-submit replay changed the canonical sheet".to_string());
+    }
 
     // Same identity as submitter — public approve must SoD-fail.
     let sod = approve_expense_sheet(ctx, fixture.organization_id, sheet_id);
@@ -400,22 +422,48 @@ pub fn test_expense_lifecycle_posts_move(ctx: &ReducerContext) -> Result<(), Str
     }
 
     approve_expense_sheet_impl(ctx, fixture.organization_id, sheet_id, true)?;
+    let approved = ctx
+        .db
+        .expense_sheet()
+        .id()
+        .find(&sheet_id)
+        .ok_or("sheet after approve")?;
+    match approve_expense_sheet_impl(ctx, fixture.organization_id, sheet_id, true) {
+        Err(error) if error.contains("submitted sheets") => {}
+        Err(error) => return Err(format!("unexpected expense-approve replay error: {error}")),
+        Ok(()) => return Err("expense-approve replay unexpectedly succeeded".to_string()),
+    }
+    let after_approve_replay = ctx
+        .db
+        .expense_sheet()
+        .id()
+        .find(&sheet_id)
+        .ok_or("sheet after approve replay")?;
+    if after_approve_replay.state != ExpenseSheetState::Approved
+        || after_approve_replay.approver_id != approved.approver_id
+        || after_approve_replay.account_move_id.is_some()
+        || after_approve_replay.reimbursement_move_id.is_some()
+    {
+        return Err("expense-approve replay changed the canonical sheet".to_string());
+    }
+
+    let post_params = PostExpenseSheetParams {
+        journal_id: accounts.journal_id,
+        payable_account_id: accounts.payable_id,
+        default_expense_account_id: accounts.expense_id,
+        default_tax_account_id: None,
+        card_liability_account_id: None,
+        advance_account_id: None,
+        fx_fee_account_id: None,
+        fx_fee_amount: None,
+        accounting_date: ctx.timestamp,
+        client_request_id: Some("post-1".into()),
+    };
     post_expense_sheet(
         ctx,
         fixture.organization_id,
         sheet_id,
-        PostExpenseSheetParams {
-            journal_id: accounts.journal_id,
-            payable_account_id: accounts.payable_id,
-            default_expense_account_id: accounts.expense_id,
-            default_tax_account_id: None,
-            card_liability_account_id: None,
-            advance_account_id: None,
-            fx_fee_account_id: None,
-            fx_fee_amount: None,
-            accounting_date: ctx.timestamp,
-            client_request_id: Some("post-1".into()),
-        },
+        post_params.clone(),
     )?;
 
     let posted = ctx
@@ -440,24 +488,67 @@ pub fn test_expense_lifecycle_posts_move(ctx: &ReducerContext) -> Result<(), Str
     if (mv.amount_total - 120.0).abs() > 0.001 {
         return Err(format!("move total {}, expected 120", mv.amount_total));
     }
+    let move_count_after_post = ctx
+        .db
+        .account_move()
+        .iter()
+        .filter(|row| row.organization_id == fixture.organization_id)
+        .count();
+    post_expense_sheet(
+        ctx,
+        fixture.organization_id,
+        sheet_id,
+        post_params.clone(),
+    )?;
+    let after_post_retry = ctx
+        .db
+        .expense_sheet()
+        .id()
+        .find(&sheet_id)
+        .ok_or("sheet after idempotent post retry")?;
+    let move_count_after_post_retry = ctx
+        .db
+        .account_move()
+        .iter()
+        .filter(|row| row.organization_id == fixture.organization_id)
+        .count();
+    if after_post_retry.state != ExpenseSheetState::Posted
+        || after_post_retry.account_move_id != Some(move_id)
+        || move_count_after_post_retry != move_count_after_post
+    {
+        return Err("idempotent expense-post retry changed the canonical effect".to_string());
+    }
+    let mut changed_post_params = post_params;
+    changed_post_params.client_request_id = Some("post-1-stale".into());
+    if post_expense_sheet(
+        ctx,
+        fixture.organization_id,
+        sheet_id,
+        changed_post_params,
+    )
+    .is_ok()
+    {
+        return Err("changed expense-post replay unexpectedly succeeded".to_string());
+    }
 
     let line = ctx.db.hr_expense().id().find(&line_id).ok_or("line")?;
     if line.state != ExpenseState::Posted {
         return Err(format!("line state {:?}, expected Posted", line.state));
     }
 
+    let reimbursement_params = CreateExpenseReimbursementParams {
+        journal_id: accounts.journal_id,
+        liquidity_account_id: accounts.liquidity_id,
+        payable_account_id: accounts.payable_id,
+        payment_date: ctx.timestamp,
+        amount: None,
+        client_request_id: Some("reim-1".into()),
+    };
     create_expense_reimbursement_payment(
         ctx,
         fixture.organization_id,
         sheet_id,
-        CreateExpenseReimbursementParams {
-            journal_id: accounts.journal_id,
-            liquidity_account_id: accounts.liquidity_id,
-            payable_account_id: accounts.payable_id,
-            payment_date: ctx.timestamp,
-            amount: None,
-            client_request_id: Some("reim-1".into()),
-        },
+        reimbursement_params.clone(),
     )?;
     let done = ctx
         .db
@@ -468,8 +559,49 @@ pub fn test_expense_lifecycle_posts_move(ctx: &ReducerContext) -> Result<(), Str
     if done.state != ExpenseSheetState::Done {
         return Err(format!("expected Done, got {:?}", done.state));
     }
-    if done.reimbursement_move_id.is_none() {
-        return Err("reimbursement_move_id unset".into());
+    let reimbursement_move_id = done
+        .reimbursement_move_id
+        .ok_or("reimbursement_move_id unset")?;
+    let move_count_after_reimburse = ctx
+        .db
+        .account_move()
+        .iter()
+        .filter(|row| row.organization_id == fixture.organization_id)
+        .count();
+    match create_expense_reimbursement_payment(
+        ctx,
+        fixture.organization_id,
+        sheet_id,
+        reimbursement_params,
+    ) {
+        Err(error) if error.contains("posted sheets") => {}
+        Err(error) => {
+            return Err(format!(
+                "unexpected expense-reimbursement replay error: {error}"
+            ))
+        }
+        Ok(()) => {
+            return Err("expense-reimbursement replay unexpectedly succeeded".to_string())
+        }
+    }
+    let after_reimbursement_replay = ctx
+        .db
+        .expense_sheet()
+        .id()
+        .find(&sheet_id)
+        .ok_or("sheet after reimbursement replay")?;
+    let move_count_after_reimbursement_replay = ctx
+        .db
+        .account_move()
+        .iter()
+        .filter(|row| row.organization_id == fixture.organization_id)
+        .count();
+    if after_reimbursement_replay.state != ExpenseSheetState::Done
+        || after_reimbursement_replay.account_move_id != Some(move_id)
+        || after_reimbursement_replay.reimbursement_move_id != Some(reimbursement_move_id)
+        || move_count_after_reimbursement_replay != move_count_after_reimburse
+    {
+        return Err("expense-reimbursement replay changed the canonical effect".to_string());
     }
     Ok(())
 }
