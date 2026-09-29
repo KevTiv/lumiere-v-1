@@ -275,12 +275,19 @@ jobs:
           if ! git diff --cached --quiet; then
             git -c user.name="github-actions[bot]" -c user.email="41898+github-actions[bot]@users.noreply.github.com" \
               commit -m "chore(contracts): regenerate for v$VERSION"
-            # Nothing is published yet, so a branch that moved meanwhile only
-            # needs the queued run for its newer push.
-            if ! git push origin "HEAD:${GITHUB_REF_NAME}"; then
-              echo "::error::${GITHUB_REF_NAME} moved during the release; the run for the newer push releases it."
-              exit 1
-            fi
+            # Frontend/docs commits can advance the branch while regeneration
+            # runs without changing the contract candidate. Replay the
+            # generated-source commit on top instead of deadlocking the release.
+            for attempt in 1 2 3; do
+              if git push origin "HEAD:${GITHUB_REF_NAME}"; then
+                break
+              fi
+              git pull --rebase origin "${GITHUB_REF_NAME}"
+              if [ "$attempt" = "3" ]; then
+                echo "::error::could not push regenerated contract sources to ${GITHUB_REF_NAME}."
+                exit 1
+              fi
+            done
           fi
 
       - name: Regenerate from the clean commit (pass 2)
