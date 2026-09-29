@@ -91,7 +91,7 @@ test.describe(
         companyId,
         {
           name,
-          report_type: { trial_balance: [] },
+          report_type: { trialBalance: [] },
           date_from: timestamp("2026-01-01T00:00:00Z"),
           date_to: timestamp("2026-01-31T00:00:00Z"),
           currency_id: currencyId,
