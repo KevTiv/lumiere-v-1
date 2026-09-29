@@ -198,6 +198,10 @@ export interface RecordFleetServiceInput {
   odometerKm?: number
   provider?: string
   notes?: string
+  costAmount?: number
+  journalId?: bigint
+  expenseAccountId?: bigint
+  offsetAccountId?: bigint
   clientRequestId?: string
 }
 
