@@ -216,6 +216,12 @@ export interface FleetHistoryEffectProjection {
   readonly serviceTypeId?: unknown
   readonly service_type_id?: unknown
   readonly outcome?: unknown
+  readonly costAmount?: unknown
+  readonly cost_amount?: unknown
+  readonly currencyId?: unknown
+  readonly currency_id?: unknown
+  readonly accountMoveId?: unknown
+  readonly account_move_id?: unknown
   readonly clientRequestId?: unknown
   readonly client_request_id?: unknown
 }
@@ -225,6 +231,9 @@ export interface FleetHistoryEffectRef extends CanonicalRecordRef {
   readonly vehicleId: string
   readonly companyId: string
   readonly clientRequestId: string
+  readonly costAmount?: number
+  readonly currencyId?: string
+  readonly accountMoveId?: string
 }
 
 function normalizedOptionalString(value: unknown): string {
@@ -255,6 +264,49 @@ function requireFleetRequestId(value?: string): string {
   if (normalized) return normalized
   return crypto.randomUUID()
 }
+function numericField(value: unknown): number | null {
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    if ("some" in value) value = (value as { some?: unknown }).some
+    else if ("none" in value) return null
+  }
+  const parsed = Number(value)
+  return Number.isFinite(parsed) ? parsed : null
+}
+
+export interface FleetAccountMoveProjection {
+  readonly id?: unknown
+  readonly organizationId?: unknown
+  readonly organization_id?: unknown
+  readonly companyId?: unknown
+  readonly company_id?: unknown
+  readonly currencyId?: unknown
+  readonly currency_id?: unknown
+  readonly state?: unknown
+}
+
+function resolveFleetServiceAccountingMove(
+  moves: readonly FleetAccountMoveProjection[],
+  organizationId: bigint,
+  companyId: bigint,
+  moveId: bigint,
+  currencyId: bigint,
+): boolean {
+  const matches = moves.filter((row) => parseStrictU64(row.id) === moveId)
+  if (matches.length > 1) {
+    throw new AmbiguousOperationEffectError(
+      `Expected one fleet service account move, found ${matches.length}`,
+    )
+  }
+  const row = matches[0]
+  return Boolean(
+    row &&
+      parseStrictU64(row.organizationId ?? row.organization_id) === organizationId &&
+      parseStrictU64(row.companyId ?? row.company_id) === companyId &&
+      parseStrictU64(row.currencyId ?? row.currency_id) === currencyId &&
+      fleetOutcomeTag(row.state) === "posted",
+  )
+}
+
 
 export function resolveFleetHistoryEffect(
   rows: readonly FleetHistoryEffectProjection[],
@@ -266,6 +318,8 @@ export function resolveFleetHistoryEffect(
   expected?: {
     readonly serviceTypeId?: bigint
     readonly outcome?: FleetInspectionOutcome
+    readonly costAmount?: number
+    readonly accountMoves?: readonly FleetAccountMoveProjection[]
   },
 ): FleetHistoryEffectRef | null {
   const matches = rows.filter(
@@ -301,6 +355,38 @@ export function resolveFleetHistoryEffect(
   const id = parseStrictU64(row.id)
   if (id == null) return null
 
+  if (expected?.costAmount != null) {
+    const costAmount = numericField(row.costAmount ?? row.cost_amount)
+    const currencyId = parseStrictU64(row.currencyId ?? row.currency_id)
+    const accountMoveId = parseStrictU64(row.accountMoveId ?? row.account_move_id)
+    if (
+      costAmount == null ||
+      Math.abs(costAmount - expected.costAmount) > 0.0001 ||
+      currencyId == null ||
+      accountMoveId == null ||
+      expected.accountMoves == null ||
+      !resolveFleetServiceAccountingMove(
+        expected.accountMoves,
+        organizationId,
+        companyId,
+        accountMoveId,
+        currencyId,
+      )
+    ) {
+      return null
+    }
+    return {
+      resource,
+      id: id.toString(),
+      vehicleId: vehicleId.toString(),
+      companyId: companyId.toString(),
+      clientRequestId,
+      costAmount,
+      currencyId: currencyId.toString(),
+      accountMoveId: accountMoveId.toString(),
+    }
+  }
+
   return {
     resource,
     id: id.toString(),
@@ -332,7 +418,18 @@ export function useRecordFleetService(organizationId: bigint, companyId?: bigint
             scopedCompanyId,
             input.vehicleId,
             clientRequestId,
-            { serviceTypeId: input.serviceTypeId },
+            {
+              serviceTypeId: input.serviceTypeId,
+              ...(input.costAmount != null
+                ? {
+                    costAmount: input.costAmount,
+                    accountMoves: await fetchQueryList(
+                      "/api/query/account-moves",
+                      "Failed to read fleet service accounting move",
+                    ),
+                  }
+                : {}),
+            },
           ),
         dispatch: async () => {
           const { urlPath, init } = stdbBffCommandPost("record_fleet_service", {
@@ -344,6 +441,10 @@ export function useRecordFleetService(organizationId: bigint, companyId?: bigint
               odometerKm: optionalNumber(input.odometerKm),
               provider: optionalText(input.provider),
               notes: optionalText(input.notes),
+              costAmount: optionalNumber(input.costAmount),
+              journalId: encodeOptionalU64(input.journalId),
+              expenseAccountId: encodeOptionalU64(input.expenseAccountId),
+              offsetAccountId: encodeOptionalU64(input.offsetAccountId),
               clientRequestId: optionalText(clientRequestId),
             }),
           })
