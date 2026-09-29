@@ -1,6 +1,7 @@
 "use client"
 
 
+import { decodeOperationDispatch } from "@lumiere/api-client"
 import { stdbBffCommandPost } from "@lumiere/stdb/commands"
 /**
  * Reports hooks — Phase 4 of API Gateway Refactor
@@ -23,6 +24,7 @@ import type {
   TrialBalance,
 } from "@lumiere/stdb/types"
 import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
+import { parseStrictU64 } from "@lumiere/erp-shared/u64"
 import { i18n } from "@lumiere/i18n"
 import { stbTimestampFromDate } from "@lumiere/erp-shared/stb-timestamp"
 import { downloadDocumentExport } from "./templates"
@@ -38,6 +40,13 @@ import {
   toCreateDashboardParams,
   toCreateDashboardWidgetParams,
 } from "@lumiere/erp-shared/reports-dashboard-params"
+import {
+  AmbiguousOperationEffectError,
+  executeOperationWithCanonicalReadback,
+  requireResolvedOperationEffect,
+  type CanonicalRecordRef,
+  type ResolvedOperationEffectOutcome,
+} from "./operation-effect"
 
 // ── Reads ────────────────────────────────────────────────────────────────────
 
@@ -259,20 +268,99 @@ export function useExportFinancialReport(organizationId: bigint, companyId?: big
   })
 }
 
-export function useArchiveFinancialReport(organizationId: bigint, companyId?: bigint) {
+export interface FinancialReportArchiveProjection {
+  readonly id?: unknown
+  readonly organizationId?: unknown
+  readonly organization_id?: unknown
+  readonly companyId?: unknown
+  readonly company_id?: unknown
+  readonly state?: unknown
+}
+
+function financialReportState(value: unknown): string {
+  if (typeof value === "string") return value.toLowerCase()
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    if ("tag" in value) {
+      return String((value as { tag?: unknown }).tag ?? "").toLowerCase()
+    }
+    const keys = Object.keys(value)
+    if (keys.length === 1) return keys[0]!.toLowerCase()
+  }
+  return ""
+}
+
+/** COV-08e: resolve only the same scoped report after Exported → Archived. */
+export function resolveArchivedFinancialReportEffect(
+  rows: readonly FinancialReportArchiveProjection[],
+  organizationId: bigint,
+  companyId: bigint,
+  reportId: bigint,
+): CanonicalRecordRef | null {
+  const matches = rows.filter((row) => parseStrictU64(row.id) === reportId)
+  if (matches.length > 1) {
+    throw new AmbiguousOperationEffectError(
+      `Expected one financial report, found ${matches.length}`,
+    )
+  }
+
+  const row = matches[0]
+  if (
+    !row ||
+    parseStrictU64(row.organizationId ?? row.organization_id) !== organizationId ||
+    parseStrictU64(row.companyId ?? row.company_id) !== companyId ||
+    financialReportState(row.state) !== "archived"
+  ) {
+    return null
+  }
+
+  return { resource: "financial-reports", id: reportId.toString() }
+}
+
+export function useArchiveFinancialReport(
+  organizationId: bigint,
+  companyId?: bigint,
+) {
   const qc = useQueryClient()
-  return useMutation<void, Error, string | number | bigint>({
-    mutationFn: async (reportId) => {
-      const { urlPath, init } = stdbBffCommandPost("archive_financial_report", {
-        companyId: requireOperatingCompany(companyId),
-        reportId,
+  return useMutation<
+    ResolvedOperationEffectOutcome<CanonicalRecordRef>,
+    Error,
+    string | number | bigint
+  >({
+    mutationFn: async (reportIdInput) => {
+      const activeCompanyId = requireOperatingCompany(companyId)
+      const reportId = parseStrictU64(reportIdInput)
+      if (reportId == null) throw new Error("Invalid financial report id")
+
+      const outcome = await executeOperationWithCanonicalReadback({
+        resolveEffect: async () =>
+          resolveArchivedFinancialReportEffect(
+            await fetchQueryList(
+              "/api/query/financial-reports",
+              "Failed to read financial report",
+            ),
+            organizationId,
+            activeCompanyId,
+            reportId,
+          ),
+        dispatch: async () => {
+          const { urlPath, init } = stdbBffCommandPost(
+            "archive_financial_report",
+            {
+              companyId: activeCompanyId,
+              reportId,
+            },
+          )
+          return decodeOperationDispatch(
+            await apiFetch(urlPath, init),
+            "Failed to archive financial report",
+          )
+        },
+        afterDispatch: () => invalidateReportsModule(qc, organizationId),
+        readbackAttempts: 6,
+        readbackDelayMs: 150,
       })
 
-      const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error('Failed to archive report')
-    },
-    onSuccess: async () => {
-      await invalidateReportsModule(qc, organizationId)
+      return requireResolvedOperationEffect(outcome)
     },
   })
 }
