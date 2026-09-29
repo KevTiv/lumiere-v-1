@@ -79,6 +79,22 @@ export function useSubscriptions(
   });
 }
 
+export function useSubscriptionBillingRuns(
+  organizationId: bigint,
+  initialData?: SubscriptionBillingRunProjection[],
+) {
+  return useQuery<SubscriptionBillingRunProjection[]>({
+    queryKey: ['subscription-billing-runs', rqBigIntKey(organizationId)],
+    queryFn: () =>
+      fetchQueryList(
+        '/api/query/subscription-billing-runs',
+        'Failed to fetch subscription billing runs',
+      ),
+    staleTime: 30_000,
+    initialData,
+  });
+}
+
 export function useSubscriptionPlans(
   organizationId: bigint,
   initialData?: SubscriptionPlan[],
