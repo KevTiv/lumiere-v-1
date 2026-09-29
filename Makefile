@@ -380,7 +380,7 @@ e2e-smoke-setup:
 				fi; \
 			done; \
 			echo "[e2e] Domain reducer tests passed."; \
-		if [ "${E2E_RUN_INVENTORY_AGGREGATE:-0}" = "1" ]; then \
+		if [ "$${E2E_RUN_INVENTORY_AGGREGATE:-0}" = "1" ]; then \
 			echo "[e2e] Calling run_all_inventory_tests aggregate..."; \
 			if ! spacetime call "$(E2E_DB)" run_all_inventory_tests --server local --no-config; then \
 				echo "[e2e] run_all_inventory_tests failed — tail of SpacetimeDB logs:"; \
@@ -860,7 +860,7 @@ e2e-smoke:
 			fi; \
 		done; \
 		echo "[e2e] Domain reducer tests passed."; \
-		if [ "${E2E_RUN_INVENTORY_AGGREGATE:-0}" = "1" ]; then \
+		if [ "$${E2E_RUN_INVENTORY_AGGREGATE:-0}" = "1" ]; then \
 			echo "[e2e] Calling run_all_inventory_tests aggregate..."; \
 			if ! spacetime call "$(E2E_DB)" run_all_inventory_tests --server local --no-config; then \
 				echo "[e2e] run_all_inventory_tests failed — tail of SpacetimeDB logs:"; \
