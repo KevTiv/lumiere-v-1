@@ -261,6 +261,7 @@ import {
   useCloseAccountAsset,
   useCreateDepreciationLine,
   useComputeDepreciationBoard,
+  useDisposeAccountAsset,
   useIntercompanyRules,
   useIntercompanyTransactions,
   useCreateIntercompanyRule,
@@ -1627,6 +1628,7 @@ function AccountingClientReady({
   const closeAccountAsset = useCloseAccountAsset(organizationId, operatingCompanyId)
   const createDepreciationLine = useCreateDepreciationLine(organizationId, operatingCompanyId)
   const computeDepreciationBoard = useComputeDepreciationBoard(organizationId, operatingCompanyId)
+  const disposeAccountAsset = useDisposeAccountAsset(organizationId, operatingCompanyId)
 
   const createIntercompanyRule = useCreateIntercompanyRule(organizationId)
   const updateIntercompanyRule = useUpdateIntercompanyRule(organizationId, operatingCompanyId)
@@ -2214,9 +2216,40 @@ function AccountingClientReady({
             id: "asset-compute-depreciation",
             label: t("accounting.entities.fixedAssets.actions.computeDepreciation"),
             requiresSelection: true,
+            isApplicable: (rows) =>
+              rows.length > 0 &&
+              rows.every(
+                (row) =>
+                  assetStateTag(row as Record<string, unknown>) === "Running",
+              ),
             onClick: (rows) => {
               for (const r of rows) {
-                void computeDepreciationBoard.mutateAsync(BigInt(String(r.id)))
+                if (assetStateTag(r as Record<string, unknown>) === "Running") {
+                  void computeDepreciationBoard.mutateAsync(BigInt(String(r.id)))
+                }
+              }
+            },
+          },
+          {
+            id: "asset-dispose",
+            label: t("accounting.entities.fixedAssets.actions.disposeSelected"),
+            requiresSelection: true,
+            variant: "destructive",
+            isApplicable: (rows) =>
+              rows.length > 0 &&
+              rows.every((row) => {
+                const state = assetStateTag(row as Record<string, unknown>)
+                return state === "Running" || state === "Close"
+              }),
+            onClick: (rows) => {
+              for (const r of rows) {
+                const state = assetStateTag(r as Record<string, unknown>)
+                if (state === "Running" || state === "Close") {
+                  void disposeAccountAsset.mutateAsync({
+                    assetId: BigInt(String(r.id)),
+                    disposalDate: new Date(),
+                  })
+                }
               }
             },
           },
@@ -2243,6 +2276,7 @@ function AccountingClientReady({
     closeAccountAsset,
     deleteAccountAsset,
     computeDepreciationBoard,
+    disposeAccountAsset,
   ])
 
   const accountPaymentsEntityConfig = useMemo((): EntityViewConfig => {
