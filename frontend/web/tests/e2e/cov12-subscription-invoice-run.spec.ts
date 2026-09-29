@@ -101,6 +101,17 @@ async function invoiceSnapshot(page: Page, moveId: number) {
     (candidate) => scalarQueryId(candidate.id) === moveId,
   )
   if (!row) throw new Error(`invoice move not found: ${moveId}`)
+  const ref = String(row.ref ?? row.name ?? "").trim()
+  const rawMoveType = row.moveType
+  const typeTag =
+    rawMoveType != null &&
+    typeof rawMoveType === "object" &&
+    "tag" in rawMoveType
+      ? String((rawMoveType as { tag?: unknown }).tag ?? "")
+      : ""
+  const suffix = typeTag ? ` (${typeTag})` : ""
+  const optionLabel = ref ? `${ref}${suffix}` : `Move #${moveId}${suffix}`
+
   return {
     id: moveId,
     organizationId: scalarQueryId(
@@ -112,14 +123,9 @@ async function invoiceSnapshot(page: Page, moveId: number) {
     paymentState: tagged(row.paymentState ?? row.payment_state),
     amountTotal: Number(row.amountTotal ?? row.amount_total ?? 0),
     amountResidual: Number(row.amountResidual ?? row.amount_residual ?? 0),
-    ref: String(row.ref ?? row.name ?? ""),
+    ref,
+    optionLabel,
   }
-}
-
-function moveOptionLabel(snapshot: Awaited<ReturnType<typeof invoiceSnapshot>>) {
-  return snapshot.ref
-    ? `${snapshot.ref} (${snapshot.moveType})`
-    : `Move #${snapshot.id} (${snapshot.moveType})`
 }
 
 test.describe(
@@ -239,7 +245,7 @@ test.describe(
       await chooseSelectOptionByLabel(
         page,
         "invoiceMoveId",
-        moveOptionLabel(generatedInvoice),
+        generatedInvoice.optionLabel,
       )
       await chooseSelectOptionByLabel(
         page,
