@@ -289,7 +289,7 @@ export function useWarehouseTasks(
 export const replenishmentRulesQueryOptions = (organizationId: bigint) => ({
   queryKey: ['replenishment-rules', rqBigIntKey(organizationId)] as const,
   queryFn: () =>
-    fetchQueryList<ReplenishmentRule>(
+    fetchQueryList(
       '/api/query/replenishment-rules',
       'Failed to fetch replenishment rules',
     ),
