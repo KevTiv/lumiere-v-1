@@ -19,6 +19,14 @@ import {
   type FleetInspectionOutcome,
 } from "@lumiere/query-hooks/hooks/fleet"
 import { useEmployees } from "@lumiere/query-hooks/hooks/hr/employees"
+import {
+  useAccountAccounts,
+  useAccountJournals,
+} from "@lumiere/query-hooks/hooks/accounting"
+import {
+  accountAccountRowsToSelectOptions,
+  accountJournalRowsToSelectOptions,
+} from "@/lib/form-lookup"
 import type { FleetVehicle } from "@lumiere/stdb/types"
 
 interface FleetClientProps {
@@ -42,6 +50,8 @@ function FleetClientLoaded({ initialVehicles, organizationId }: FleetClientLoade
   const { data: serviceTypes = [] } = useFleetServiceTypes(orgId)
   const { data: serviceRecords = [] } = useFleetServiceRecords(orgId)
   const { data: inspections = [] } = useFleetInspections(orgId)
+  const { data: accountJournals = [] } = useAccountJournals(orgId)
+  const { data: accountAccounts = [] } = useAccountAccounts(orgId)
   const createVehicle = useCreateFleetVehicle(orgId, company ?? undefined)
   const updateDriver = useUpdateFleetVehicleDriver(orgId, company ?? undefined)
   const recordService = useRecordFleetService(orgId, company ?? undefined)
@@ -62,6 +72,12 @@ function FleetClientLoaded({ initialVehicles, organizationId }: FleetClientLoade
   const serviceTypeRows = serviceTypes.filter((row) => belongsToCompany(row, true))
   const serviceRecordRows = serviceRecords.filter((row) => belongsToCompany(row))
   const inspectionRows = inspections.filter((row) => belongsToCompany(row))
+  const journalRows = (accountJournals as unknown as EntityRow[]).filter((row) =>
+    belongsToCompany(row),
+  )
+  const accountRows = (accountAccounts as unknown as EntityRow[]).filter((row) =>
+    belongsToCompany(row),
+  )
 
   const moduleConfig = useMemo(() => {
     const rowId = (row: EntityRow) => String(row.id ?? "")
@@ -71,8 +87,10 @@ function FleetClientLoaded({ initialVehicles, organizationId }: FleetClientLoade
       vehicles: vehicleRows.map((row) => ({ value: rowId(row), label: rowLabel(row, `Vehicle ${rowId(row)}`) })),
       employees: employeeRows.map((row) => ({ value: rowId(row), label: rowLabel(row, `Employee ${rowId(row)}`) })),
       serviceTypes: serviceTypeRows.map((row) => ({ value: rowId(row), label: rowLabel(row, `Service type ${rowId(row)}`) })),
+      journals: accountJournalRowsToSelectOptions(journalRows),
+      accounts: accountAccountRowsToSelectOptions(accountRows),
     })
-  }, [employeeRows, serviceTypeRows, t, vehicleRows])
+  }, [accountRows, employeeRows, journalRows, serviceTypeRows, t, vehicleRows])
 
   const optionalDate = (value: unknown) => {
     if (value == null || String(value).trim() === "") return undefined
@@ -137,6 +155,10 @@ function FleetClientLoaded({ initialVehicles, organizationId }: FleetClientLoade
             odometerKm: optionalNumber(formData.odometer_km),
             provider: String(formData.provider ?? ""),
             notes: String(formData.notes ?? ""),
+            costAmount: Number(formData.cost_amount),
+            journalId: BigInt(String(formData.journal_id)),
+            expenseAccountId: BigInt(String(formData.expense_account_id)),
+            offsetAccountId: BigInt(String(formData.offset_account_id)),
             clientRequestId: requestId(),
           })
           return
