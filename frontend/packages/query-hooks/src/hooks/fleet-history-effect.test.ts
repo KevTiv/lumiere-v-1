@@ -13,6 +13,9 @@ const service: FleetHistoryEffectProjection = {
   companyId: "8",
   vehicleId: "41",
   serviceTypeId: "12",
+  costAmount: 275.5,
+  currencyId: "3",
+  accountMoveId: "900",
   clientRequestId: "fleet-service-req",
 }
 
@@ -25,6 +28,14 @@ const inspection: FleetHistoryEffectProjection = {
   client_request_id: { some: "fleet-inspection-req" },
 }
 
+const postedMove = {
+  id: "900",
+  organizationId: "7",
+  companyId: "8",
+  currencyId: "3",
+  state: { tag: "Posted" },
+}
+
 describe("COV-15 fleet history exact effects", () => {
   it("resolves a service by stable request identity and service type", () => {
     assert.deepEqual(
@@ -35,7 +46,11 @@ describe("COV-15 fleet history exact effects", () => {
         8n,
         41n,
         "fleet-service-req",
-        { serviceTypeId: 12n },
+        {
+          serviceTypeId: 12n,
+          costAmount: 275.5,
+          accountMoves: [postedMove],
+        },
       ),
       {
         resource: "fleet-service-records",
@@ -43,7 +58,45 @@ describe("COV-15 fleet history exact effects", () => {
         vehicleId: "41",
         companyId: "8",
         clientRequestId: "fleet-service-req",
+        costAmount: 275.5,
+        currencyId: "3",
+        accountMoveId: "900",
       },
+    )
+  })
+
+  it("requires the linked accounting move to be posted in the same scope and currency", () => {
+    assert.equal(
+      resolveFleetHistoryEffect(
+        [service],
+        "fleet-service-records",
+        7n,
+        8n,
+        41n,
+        "fleet-service-req",
+        {
+          serviceTypeId: 12n,
+          costAmount: 275.5,
+          accountMoves: [{ ...postedMove, state: { tag: "Draft" } }],
+        },
+      ),
+      null,
+    )
+    assert.equal(
+      resolveFleetHistoryEffect(
+        [service],
+        "fleet-service-records",
+        7n,
+        8n,
+        41n,
+        "fleet-service-req",
+        {
+          serviceTypeId: 12n,
+          costAmount: 275.5,
+          accountMoves: [{ ...postedMove, currencyId: "99" }],
+        },
+      ),
+      null,
     )
   })
 
