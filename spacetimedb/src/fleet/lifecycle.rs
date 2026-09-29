@@ -3,8 +3,8 @@
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::accounting::journal_entries::{
-    account_move, add_account_move_line, create_account_move, post_account_move,
-    CreateAccountMoveParams,
+    account_move, account_move_line, add_account_move_line, create_account_move,
+    post_account_move, CreateAccountMoveParams,
 };
 use crate::accounting::line_params::journal_line_params;
 use crate::core::organization::require_company_in_organization;
@@ -161,6 +161,66 @@ fn latest_odometer(vehicle: &FleetVehicle, value: Option<f64>) -> Option<f64> {
     }
 }
 
+fn service_payload_matches_existing(
+    ctx: &ReducerContext,
+    existing: &FleetServiceRecord,
+    params: &RecordFleetServiceParams,
+) -> bool {
+    let same_cost = match (existing.cost_amount, params.cost_amount) {
+        (Some(left), Some(right)) => (left - right).abs() <= 0.0001,
+        (None, None) => true,
+        _ => false,
+    };
+    if !same_cost {
+        return false;
+    }
+
+    match existing.cost_amount {
+        None => {
+            params.journal_id.is_none()
+                && params.expense_account_id.is_none()
+                && params.offset_account_id.is_none()
+        }
+        Some(amount) => {
+            let (Some(move_id), Some(journal_id), Some(expense_account_id), Some(offset_account_id)) = (
+                existing.account_move_id,
+                params.journal_id,
+                params.expense_account_id,
+                params.offset_account_id,
+            ) else {
+                return false;
+            };
+            let Some(move_record) = ctx.db.account_move().id().find(&move_id) else {
+                return false;
+            };
+            if move_record.organization_id != existing.organization_id
+                || move_record.company_id != existing.company_id
+                || move_record.journal_id != journal_id
+                || move_record.state != AccountMoveState::Posted
+            {
+                return false;
+            }
+            let lines: Vec<_> = ctx
+                .db
+                .account_move_line()
+                .move_line_by_move()
+                .filter(&move_id)
+                .collect();
+            lines.len() == 2
+                && lines.iter().any(|line| {
+                    line.account_id == expense_account_id
+                        && (line.debit - amount).abs() <= 0.0001
+                        && line.credit.abs() <= 0.0001
+                })
+                && lines.iter().any(|line| {
+                    line.account_id == offset_account_id
+                        && (line.credit - amount).abs() <= 0.0001
+                        && line.debit.abs() <= 0.0001
+                })
+        }
+    }
+}
+
 #[reducer]
 pub fn record_fleet_service(
     ctx: &ReducerContext,
@@ -183,14 +243,9 @@ pub fn record_fleet_service(
                 && row.company_id == company_id
                 && row.client_request_id.as_deref() == Some(key)
         }) {
-            let same_cost = match (existing.cost_amount, params.cost_amount) {
-                (Some(left), Some(right)) => (left - right).abs() <= 0.0001,
-                (None, None) => true,
-                _ => false,
-            };
             if existing.vehicle_id != params.vehicle_id
                 || existing.service_type_id != params.service_type_id
-                || !same_cost
+                || !service_payload_matches_existing(ctx, &existing, &params)
             {
                 return Err(
                     "client_request_id is already used by a different fleet service payload"
