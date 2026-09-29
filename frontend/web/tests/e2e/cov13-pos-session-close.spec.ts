@@ -53,7 +53,7 @@ async function closedSessionSnapshot(
   companyId: number,
 ) {
   const session = (await rows(page, "pos-sessions")).find(
-    (row) => scalarQueryId(row.id) === sessionId,
+    (row) => scalarQueryId(row.id) === openedSessionId,
   )
   if (!session) throw new Error(`POS session not found: ${sessionId}`)
   const configId = scalarQueryId(session.configId ?? session.config_id)
@@ -65,7 +65,7 @@ async function closedSessionSnapshot(
   if (!config) throw new Error(`POS config not found: ${configId}`)
 
   return {
-    id: sessionId,
+    id: openedSessionId,
     organizationId: scalarQueryId(
       session.organizationId ?? session.organization_id,
     ),
@@ -139,6 +139,7 @@ test.describe(
         })
         .not.toBeNull()
       if (sessionId == null) throw new Error("opened POS session not found")
+      const openedSessionId = sessionId
 
       const product = (await rows(page, "products")).find(
         (row) =>
@@ -164,7 +165,7 @@ test.describe(
       await callReducerBff(page, "create_pos_order", [
         organizationId,
         {
-          session_id: sessionId,
+          session_id: openedSessionId,
           partner_id: none,
           lines: [
             {
@@ -206,7 +207,7 @@ test.describe(
       await expect
         .poll(async () => {
           const session = (await rows(page, "pos-sessions")).find(
-            (row) => scalarQueryId(row.id) === sessionId,
+            (row) => scalarQueryId(row.id) === openedSessionId,
           )
           return Number(session?.orderCount ?? session?.order_count ?? 0)
         })
@@ -234,7 +235,7 @@ test.describe(
         .poll(async () => {
           const snapshot = await closedSessionSnapshot(
             page,
-            sessionId!,
+            openedSessionId,
             companyId,
           )
           return {
@@ -251,7 +252,7 @@ test.describe(
           companyId,
         })
 
-      const effect = await closedSessionSnapshot(page, sessionId, companyId)
+      const effect = await closedSessionSnapshot(page, openedSessionId, companyId)
       expect(effect.organizationId).toBe(organizationId)
       expect(effect.configOrganizationId).toBe(organizationId)
       expect(effect.configId).toBe(configId)
@@ -259,7 +260,7 @@ test.describe(
 
       const stale = await replay(page, closed.request())
       expect(stale.status()).toBe(422)
-      expect(await closedSessionSnapshot(page, sessionId, companyId)).toEqual(
+      expect(await closedSessionSnapshot(page, openedSessionId, companyId)).toEqual(
         effect,
       )
 
@@ -276,7 +277,7 @@ test.describe(
         const denied = await replay(readerPage, closed.request())
         expect(denied.status()).toBe(403)
         expect(
-          await closedSessionSnapshot(page, sessionId, companyId),
+          await closedSessionSnapshot(page, openedSessionId, companyId),
         ).toEqual(effect)
       } finally {
         await readerContext.close()
