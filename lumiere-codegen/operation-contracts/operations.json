@@ -221,12 +221,12 @@
       "semantic_kind": "command"
     },
     "cancel_replenishment_run": {
-      "client_facing": false,
+      "client_facing": true,
       "codec": {
         "id": "spacetimedb-sats-json",
         "version": 1
       },
-      "evidence": "spacetimedb/src/inventory/replenishment.rs:912 reducer deletes the rule's pending runs and succeeds as a no-op when none exist; denied until a session call site exists.",
+      "evidence": "spacetimedb/src/inventory/replenishment.rs:912 is permission-checked and COV-06o exposes it through the Inventory replenishment schedule/cancel workflow; deleting an absent run remains a backend no-op.",
       "idempotency": "idempotent",
       "semantic_kind": "command"
     },
@@ -2331,12 +2331,12 @@
       "semantic_kind": "operator"
     },
     "schedule_replenishment_run": {
-      "client_facing": false,
+      "client_facing": true,
       "codec": {
         "id": "spacetimedb-sats-json",
         "version": 1
       },
-      "evidence": "spacetimedb/src/inventory/replenishment.rs:853 reducer rejects a rule that already has a pending scheduled run; denied until a session call site exists.",
+      "evidence": "spacetimedb/src/inventory/replenishment.rs:853 is permission-checked and COV-06o exposes it through the Inventory replenishment schedule workflow; duplicate scheduling fails closed.",
       "idempotency": "state_guarded",
       "semantic_kind": "command"
     },
