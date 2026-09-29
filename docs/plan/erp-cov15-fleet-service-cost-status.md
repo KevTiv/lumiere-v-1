@@ -75,6 +75,9 @@ For a service, `resolveFleetHistoryEffect` requires:
 - exact monetary amount when cost-bearing;
 - non-null `currency_id` and `account_move_id`;
 - exactly one linked account move with the same organization/company/currency;
+- the exact submitted journal;
+- exactly two linked move lines using the submitted expense and offset accounts,
+  with equal debit/credit equal to the service amount;
 - linked move state = `Posted`.
 
 For an inspection it requires exact organization/company/vehicle/request key and
@@ -95,9 +98,9 @@ A same-key retry with the same semantic payload is intentionally
 - inspection row count remains one;
 - exact IDs and values remain unchanged.
 
-A same request key reused for a different service vehicle/type/cost or a
-different inspection vehicle/inspector/outcome is rejected instead of silently
-aliasing two business events.
+A same request key reused for a different service vehicle/type/cost/journal/GL
+account mapping or a different inspection vehicle/inspector/outcome is rejected
+instead of silently aliasing two business events.
 
 A read-only actor is denied before the idempotency shortcut.
 
