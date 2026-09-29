@@ -5313,7 +5313,9 @@
       "name",
       "frequency",
       "next_run",
-      "is_active"
+      "is_active",
+      "last_run",
+      "run_count"
     ],
     "mandatory": [
       "id",

@@ -1,12 +1,16 @@
 //! ANL-004/ANL-005: dashboard company-scope validation on create, and
 //! cross-company widget-add rejection.
-use spacetimedb::{ReducerContext, Table};
+use spacetimedb::{ReducerContext, Table, Timestamp};
 
 use crate::analytics::dashboards::{
     add_widget_to_dashboard, create_dashboard, create_dashboard_widget, dashboard,
     dashboard_widget, CreateDashboardParams, CreateDashboardWidgetParams,
 };
-use crate::analytics::reports::{record_generated_owner_report, RecordGeneratedOwnerReportParams};
+use crate::analytics::reports::{
+    create_report_template, create_scheduled_report, record_generated_owner_report,
+    record_report_run, report_template, scheduled_report, CreateReportTemplateParams,
+    CreateScheduledReportParams, RecordGeneratedOwnerReportParams,
+};
 use crate::core::organization::{company, create_company, CreateCompanyParams};
 use crate::core::persistence::{organization_commit, organization_row_change};
 use crate::test_harness::{ensure_test_superuser, OrgFixture};
@@ -270,6 +274,125 @@ pub fn test_generated_owner_report_records_ordered_commit(
         return Err(format!(
             "owner report commit row order mismatch: {tables:?}"
         ));
+    }
+    Ok(())
+}
+
+/// COV-20: recording a run advances the schedule exactly once; a replay, an
+/// inactive schedule and an owner-report schedule are rejected unchanged.
+pub fn test_record_report_run_is_exact_and_replay_safe(ctx: &ReducerContext) -> Result<(), String> {
+    ensure_test_superuser(ctx)?;
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let org_id = fixture.organization_id;
+
+    create_report_template(
+        ctx,
+        org_id,
+        Some(fixture.company_id),
+        CreateReportTemplateParams {
+            name: "COV-20 template".to_string(),
+            model: "sale_order".to_string(),
+            report_type: "qweb-pdf".to_string(),
+            orientation: "portrait".to_string(),
+            margin_top: 10.0,
+            margin_bottom: 10.0,
+            margin_left: 10.0,
+            margin_right: 10.0,
+            header_line: false,
+            footer_line: false,
+            attachment_use: false,
+            multi_company: false,
+            is_active: true,
+            description: None,
+            template_content: None,
+            paper_format: None,
+            print_report_name: None,
+            attachment: None,
+            metadata: None,
+        },
+    )?;
+    let template = ctx
+        .db
+        .report_template()
+        .iter()
+        .find(|t| t.organization_id == org_id && t.name == "COV-20 template")
+        .ok_or("template missing")?;
+
+    let first_next = Timestamp::from_micros_since_unix_epoch(1_800_000_000_000_000);
+    let params = |name: &str, is_active: bool| CreateScheduledReportParams {
+        name: name.to_string(),
+        report_template_id: Some(template.id),
+        owner_report_key: None,
+        timezone: None,
+        model: "sale_order".to_string(),
+        frequency: "daily".to_string(),
+        hour: 6,
+        minute: 0,
+        attachment_format: "pdf".to_string(),
+        next_run: first_next,
+        is_active,
+        recipients: vec!["ops@example.test".to_string()],
+        recipient_identities: vec![],
+        description: None,
+        domain: None,
+        day_of_week: None,
+        day_of_month: None,
+        subject: None,
+        body: None,
+        metadata: None,
+    };
+    create_scheduled_report(
+        ctx,
+        org_id,
+        Some(fixture.company_id),
+        params("COV-20 daily", true),
+    )?;
+    create_scheduled_report(
+        ctx,
+        org_id,
+        Some(fixture.company_id),
+        params("COV-20 paused", false),
+    )?;
+    let find = |name: &str| {
+        ctx.db
+            .scheduled_report()
+            .iter()
+            .find(|r| r.organization_id == org_id && r.name == name)
+            .ok_or_else(|| format!("{name} missing"))
+    };
+    let daily = find("COV-20 daily")?;
+    if daily.run_count != 0 || daily.last_run.is_some() {
+        return Err("new schedule must start with no runs".to_string());
+    }
+
+    let second_next = Timestamp::from_micros_since_unix_epoch(1_800_086_400_000_000);
+    record_report_run(ctx, org_id, daily.id, second_next)?;
+    let ran = find("COV-20 daily")?;
+    if ran.run_count != 1 || ran.last_run.is_none() || ran.next_run != second_next {
+        return Err(
+            "run must bump run_count once, stamp last_run and advance next_run".to_string(),
+        );
+    }
+
+    for stale in [second_next, first_next] {
+        let err = record_report_run(ctx, org_id, daily.id, stale)
+            .err()
+            .ok_or("expected stale/replayed next_run to be rejected")?;
+        if !err.contains("later than the current next_run") {
+            return Err(format!("unexpected stale-run error: {err}"));
+        }
+    }
+    let after_replay = find("COV-20 daily")?;
+    if after_replay.run_count != 1 || after_replay.write_date != ran.write_date {
+        return Err("rejected replay changed the schedule".to_string());
+    }
+
+    let paused = find("COV-20 paused")?;
+    let err = record_report_run(ctx, org_id, paused.id, second_next)
+        .err()
+        .ok_or("expected inactive schedule run to be rejected")?;
+    if !err.contains("inactive") || find("COV-20 paused")?.run_count != 0 {
+        return Err(format!("inactive schedule must reject unchanged: {err}"));
     }
     Ok(())
 }

@@ -13,6 +13,7 @@ import { stdbBffCommandPost } from "@lumiere/stdb/commands"
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { apiFetch, fetchQueryList, type QueryRows, rqBigIntKey } from "../http"
+import { responseErrorMessage } from "@lumiere/api-client/response-error"
 import type {
   AnalyticsMetric,
   Dashboard,
@@ -26,6 +27,8 @@ import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
 import { i18n } from "@lumiere/i18n"
 import { stbTimestampFromDate } from "@lumiere/erp-shared/stb-timestamp"
 import { downloadDocumentExport } from "./templates"
+import type { CanonicalRecordRef } from "./operation-effect"
+import { resolveReportRunEffect, scheduledReportRunCount } from "./report-run-effect"
 import { toCreateFinancialReportParams, toCreateTrialBalanceEntryParams } from "@lumiere/erp-shared/reports-create-params"
 import { toCreateReportTemplateParams } from "@lumiere/erp-shared/reports-template-params"
 import { toCreateScheduledReportParams } from "@lumiere/erp-shared/reports-scheduled-params"
@@ -525,21 +528,30 @@ export function useUpdateMetricValues(
 
 export function useRecordReportRun(organizationId: bigint) {
   const qc = useQueryClient()
-  return useMutation({
-    mutationFn: async (params: {
-      reportId: string | number | bigint
-      nextRun: string | number | Date
-    }) => {
+  return useMutation<
+    CanonicalRecordRef,
+    Error,
+    { reportId: string | number | bigint; nextRun: string | number | Date }
+  >({
+    mutationFn: async (params) => {
       const nextRun =
         params.nextRun instanceof Date
           ? params.nextRun.toISOString()
           : String(params.nextRun)
+      const reportId = BigInt(params.reportId)
+
+      const before = await fetchQueryList("/api/query/scheduled-reports", "Failed to read scheduled reports")
+      const runCountBefore = scheduledReportRunCount(before, organizationId, reportId)
+      if (runCountBefore == null) throw new Error("Scheduled report not found")
 
       const { urlPath, init } = stdbBffCommandPost("record_report_run", { reportId: params.reportId, nextRun: nextRun })
-
-
       const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error('Failed to record report run')
+      if (!r.ok) throw new Error(await responseErrorMessage(r))
+
+      const after = await fetchQueryList("/api/query/scheduled-reports", "Failed to read scheduled reports")
+      const effect = resolveReportRunEffect(after, organizationId, reportId, runCountBefore)
+      if (!effect) throw new Error("Report run did not read back")
+      return effect
     },
     onSuccess: async () => {
       await invalidateReportsModule(qc, organizationId)
