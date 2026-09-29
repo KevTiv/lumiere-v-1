@@ -124,6 +124,12 @@ export interface ExecuteOperationWithReadbackArgs<Ref extends CanonicalRecordRef
    * This must bypass stale UI cache when used for correctness.
    */
   readonly resolveEffect: () => Promise<Ref | null>
+  /**
+   * Resolve before dispatch when an existing exact effect is sufficient to
+   * prove an idempotent replay. Disable this for intentionally non-replayable
+   * operations whose pre-existing rows are not proof that this command ran.
+   */
+  readonly resolveBeforeDispatch?: boolean
   /** Dispatch the generated typed operation once. */
   readonly dispatch: () => Promise<OperationDispatchReceipt>
   /** Refresh/invalidate affected UI read surfaces after effect resolution. */
@@ -175,8 +181,10 @@ export async function executeOperationWithCanonicalReadback<
 >(
   args: ExecuteOperationWithReadbackArgs<Ref>,
 ): Promise<OperationEffectOutcome<Ref>> {
-  const existing = await args.resolveEffect()
-  if (existing) return { kind: "already-applied", ref: existing }
+  if (args.resolveBeforeDispatch !== false) {
+    const existing = await args.resolveEffect()
+    if (existing) return { kind: "already-applied", ref: existing }
+  }
 
   let receipt: OperationDispatchReceipt | undefined
   let dispatchCorrelationId: string | undefined
