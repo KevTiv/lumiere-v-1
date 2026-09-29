@@ -1996,7 +1996,8 @@
       "inspected_at",
       "outcome",
       "odometer_km",
-      "notes"
+      "notes",
+      "client_request_id"
     ],
     "mandatory": [
       "id",
@@ -2017,7 +2018,8 @@
       "serviced_at",
       "odometer_km",
       "provider",
-      "notes"
+      "notes",
+      "client_request_id"
     ],
     "mandatory": [
       "id",
