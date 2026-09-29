@@ -207,13 +207,11 @@ test.describe(
         subscriptionId,
         billingRunKey,
       })
-      if (runEffect.invoiceMoveId == null) {
+      const invoiceMoveId = runEffect.invoiceMoveId
+      if (invoiceMoveId == null) {
         throw new Error("billing run has no invoice_move_id")
       }
-      const generatedInvoice = await invoiceSnapshot(
-        page,
-        runEffect.invoiceMoveId,
-      )
+      const generatedInvoice = await invoiceSnapshot(page, invoiceMoveId)
       expect(generatedInvoice).toMatchObject({
         organizationId,
         companyId,
@@ -225,7 +223,7 @@ test.describe(
       expect(generateRetry.ok()).toBe(true)
       expect(await billingRunSnapshot(page, billingRunKey)).toEqual(runEffect)
       expect(
-        await invoiceSnapshot(page, runEffect.invoiceMoveId),
+        await invoiceSnapshot(page, invoiceMoveId),
       ).toEqual(generatedInvoice)
 
       await gotoModule(page, "/subscriptions", "subscriptions")
@@ -281,7 +279,7 @@ test.describe(
 
       await expect
         .poll(async () => {
-          const invoice = await invoiceSnapshot(page, runEffect.invoiceMoveId!)
+          const invoice = await invoiceSnapshot(page, invoiceMoveId)
           return {
             state: invoice.state,
             paymentState: invoice.paymentState,
@@ -294,10 +292,10 @@ test.describe(
           residual: 0,
         })
 
-      const paidEffect = await invoiceSnapshot(page, runEffect.invoiceMoveId)
+      const paidEffect = await invoiceSnapshot(page, invoiceMoveId)
       const stalePayment = await replay(page, paid.request())
       expect(stalePayment.status()).toBe(422)
-      expect(await invoiceSnapshot(page, runEffect.invoiceMoveId)).toEqual(
+      expect(await invoiceSnapshot(page, invoiceMoveId)).toEqual(
         paidEffect,
       )
       expect(await billingRunSnapshot(page, billingRunKey)).toEqual(runEffect)
@@ -317,7 +315,7 @@ test.describe(
           expect(denied.status()).toBe(403)
         }
         expect(await billingRunSnapshot(page, billingRunKey)).toEqual(runEffect)
-        expect(await invoiceSnapshot(page, runEffect.invoiceMoveId)).toEqual(
+        expect(await invoiceSnapshot(page, invoiceMoveId)).toEqual(
           paidEffect,
         )
       } finally {
