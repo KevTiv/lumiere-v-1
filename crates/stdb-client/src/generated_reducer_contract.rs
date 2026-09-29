@@ -3408,6 +3408,7 @@ const PARAMS_719: &[ReducerParam] = &[
     ReducerParam { name: "body", kind: ScalarKind::String, ref_target: None },
     ReducerParam { name: "parent_id", kind: ScalarKind::OptionalUnsignedInteger, ref_target: None },
     ReducerParam { name: "attachment_ids", kind: ScalarKind::Composite, ref_target: None },
+    ReducerParam { name: "idempotency_key", kind: ScalarKind::OptionalString, ref_target: None },
 ];
 const PARAMS_720: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
