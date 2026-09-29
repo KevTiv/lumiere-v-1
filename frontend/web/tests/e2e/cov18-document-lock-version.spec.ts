@@ -47,6 +47,49 @@ async function documentSnapshot(page: Page, documentId: number) {
   }
 }
 
+async function createFixtureDocument(page: Page, organizationId: number, companyId: number, name: string) {
+  // Setup only: the document is fixture data; the transitions under test are
+  // driven through the /documents UI.
+  await callReducerBff(page, "create_document", [
+    organizationId,
+    some(companyId),
+    {
+      name,
+      description: some("COV-18 fixture"),
+      file_name: `${name}.txt`,
+      file_size: 42,
+      mimetype: "text/plain",
+      url: "s3://lumiere-docs-test/cov18-fixture.txt",
+      checksum: "b".repeat(64),
+      folder_id: none,
+      res_model: none,
+      res_id: none,
+      partner_id: none,
+      tag_ids: [],
+      is_favorite: false,
+      classification_id: none,
+      retention_days: none,
+      fiscal_kind: none,
+      residency_region: none,
+      metadata: none,
+    },
+  ])
+}
+
+async function versionSnapshot(page: Page, documentId: number) {
+  const response = await page.request.get("/api/query/document-versions")
+  if (!response.ok()) throw new Error(`document-versions query failed: ${response.status()}`)
+  const rows = ((await response.json()) as { data?: Row[] }).data ?? []
+  return rows
+    .filter((row) => scalarQueryId(row.documentId ?? row.document_id) === documentId)
+    .map((row) => ({
+      versionNumber: Number(row.versionNumber ?? row.version_number),
+      checksum: String(row.checksum ?? ""),
+      isCurrent: (row.isCurrent ?? row.is_current) === true,
+    }))
+    .sort((a, b) => a.versionNumber - b.versionNumber)
+}
+
 test.describe("COV-18 exact document lock/unlock", { tag: ["@p0", "@cov18"] }, () => {
   test("locks and unlocks the selected document and preserves it on stale and denied replay", async ({
     browser,
@@ -56,33 +99,8 @@ test.describe("COV-18 exact document lock/unlock", { tag: ["@p0", "@cov18"] }, (
     const organizationId = await fetchSessionOrganizationId(page)
     const companyId = await fetchDefaultCompanyId(page)
 
-    // Setup only: the document is fixture data. Lock/unlock under test are
-    // driven through the /documents UI below.
     const name = smokeName("cov18-document")
-    await callReducerBff(page, "create_document", [
-      organizationId,
-      some(companyId),
-      {
-        name,
-        description: some("COV-18 fixture"),
-        file_name: `${name}.txt`,
-        file_size: 42,
-        mimetype: "text/plain",
-        url: "s3://lumiere-docs-test/cov18-fixture.txt",
-        checksum: "b".repeat(64),
-        folder_id: none,
-        res_model: none,
-        res_id: none,
-        partner_id: none,
-        tag_ids: [],
-        is_favorite: false,
-        classification_id: none,
-        retention_days: none,
-        fiscal_kind: none,
-        residency_region: none,
-        metadata: none,
-      },
-    ])
+    await createFixtureDocument(page, organizationId, companyId, name)
     const created = (await documentRows(page)).filter((row) => row.name === name)
     expect(created).toHaveLength(1)
     const documentId = scalarQueryId(created[0]?.id)
@@ -143,6 +161,62 @@ test.describe("COV-18 exact document lock/unlock", { tag: ["@p0", "@cov18"] }, (
       const deniedUnlock = await replay(readerPage, unlocked.request())
       expect(deniedUnlock.status()).toBe(403)
       expect(await documentSnapshot(page, documentId)).toEqual(open)
+    } finally {
+      await readerContext.close()
+    }
+  })
+
+  test("uploads a new version through the UI and rejects an identical replay", async ({ browser, page }) => {
+    test.setTimeout(240_000)
+    const organizationId = await fetchSessionOrganizationId(page)
+    const companyId = await fetchDefaultCompanyId(page)
+    const name = smokeName("cov18-version")
+    await createFixtureDocument(page, organizationId, companyId, name)
+    const created = (await documentRows(page)).filter((row) => row.name === name)
+    expect(created).toHaveLength(1)
+    const documentId = scalarQueryId(created[0]?.id)
+    if (documentId == null) throw new Error("created document not found")
+    const initial = await versionSnapshot(page, documentId)
+    expect(initial).toEqual([{ versionNumber: 1, checksum: "b".repeat(64), isCurrent: true }])
+
+    await gotoModule(page, "/documents", "documents")
+    await selectEntityRowById(page, documentId)
+    await page.getByTestId("entity-action-upload-document-version").click()
+    await page.locator('input[type="file"]').first().setInputFiles({
+      name: "cov18-v2.txt",
+      mimeType: "text/plain",
+      buffer: Buffer.from(`COV-18 version 2 ${name}`),
+    })
+    const [accepted] = await Promise.all([
+      page.waitForResponse((response) => matchesOperationResponse(response, "add_document_version"), {
+        timeout: 60_000,
+      }),
+      page.getByRole("button", { name: /^upload version$/i }).click(),
+    ])
+    expect(accepted.ok()).toBe(true)
+
+    await expect
+      .poll(async () => (await versionSnapshot(page, documentId)).map((v) => [v.versionNumber, v.isCurrent]))
+      .toEqual([
+        [1, false],
+        [2, true],
+      ])
+    const after = await versionSnapshot(page, documentId)
+    expect(after[0]).toEqual({ versionNumber: 1, checksum: "b".repeat(64), isCurrent: false })
+    expect(after[1]!.checksum).not.toBe("b".repeat(64))
+
+    // Re-registering the current blob is a stale replay: rejected, no new row.
+    const stale = await replay(page, accepted.request())
+    expect(stale.status()).toBe(422)
+    expect(await versionSnapshot(page, documentId)).toEqual(after)
+
+    const readerContext = await browser.newContext({ storageState: { cookies: [], origins: [] } })
+    const readerPage = await readerContext.newPage()
+    try {
+      await signIn(readerPage, "fixture.reader@example.test", PERSONA_PASSWORD)
+      const denied = await replay(readerPage, accepted.request())
+      expect(denied.status()).toBe(403)
+      expect(await versionSnapshot(page, documentId)).toEqual(after)
     } finally {
       await readerContext.close()
     }

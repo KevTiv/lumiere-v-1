@@ -1402,6 +1402,40 @@ pub fn test_documents_wave_d_hold_ocr_drive_esign_presence(
             changes_description: Some("C2 version".to_string()),
         },
     )?;
+    // COV-18: re-registering the current blob is rejected and adds no version.
+    let versions_before = ctx
+        .db
+        .document_version()
+        .iter()
+        .filter(|v| v.document_id == doc.id)
+        .count();
+    let replay_version = add_document_version(
+        ctx,
+        org_id,
+        doc.id,
+        AddDocumentVersionParams {
+            file_name: "hold-v2.pdf".to_string(),
+            file_size: 96,
+            mimetype: "application/pdf".to_string(),
+            url: "/api/documents/blobs/object/1/default/hold-v2".to_string(),
+            checksum: "e".repeat(64),
+            changes_description: Some("C2 replay".to_string()),
+        },
+    )
+    .err()
+    .ok_or("expected identical version replay to be rejected")?;
+    if !replay_version.contains("identical to the current version") {
+        return Err(format!("unexpected replay version error: {replay_version}"));
+    }
+    let versions_after = ctx
+        .db
+        .document_version()
+        .iter()
+        .filter(|v| v.document_id == doc.id)
+        .count();
+    if versions_after != versions_before {
+        return Err("replayed version registration added a version row".to_string());
+    }
     let commits: Vec<_> = ctx
         .db
         .organization_commit()

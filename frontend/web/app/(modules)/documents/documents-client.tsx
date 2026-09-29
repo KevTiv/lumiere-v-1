@@ -481,6 +481,32 @@ function DocumentsClientLoaded({
                     }
                   },
                 },
+                {
+                  id: "upload-document-version",
+                  label: "Upload version",
+                  requiresSelection: true,
+                  onClick: (rows) => {
+                    if (rows.length !== 1) return
+                    setDocumentRowAction({
+                      action: "uploadVersion",
+                      row: rows[0],
+                      form: uploadDocumentVersionForm(t),
+                    })
+                  },
+                },
+                {
+                  id: "set-document-retention",
+                  label: "Set retention",
+                  requiresSelection: true,
+                  onClick: (rows) => {
+                    if (rows.length !== 1) return
+                    setDocumentRowAction({
+                      action: "setRetention",
+                      row: rows[0],
+                      form: setDocumentRetentionForm(t),
+                    })
+                  },
+                },
               ],
               true,
             ),

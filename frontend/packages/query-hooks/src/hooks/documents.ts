@@ -28,6 +28,7 @@ import type {
 
 import { responseErrorMessage as parseCallErrorDocuments } from "@lumiere/api-client/response-error"
 
+import { resolveDocumentVersionEffect } from "./document-version-effect"
 import { resolveDocumentLockEffect, type DocumentLockProjection } from "./document-lock-effect"
 import type { CanonicalRecordRef } from "./operation-effect"
 
@@ -242,17 +243,23 @@ export function useUnlockDocument(organizationId: bigint) {
 
 export function useAddDocumentVersion(organizationId: bigint) {
   const qc = useQueryClient()
-  return useMutation({
-    mutationFn: async ({
-      documentId,
-      params,
-    }: {
-      documentId: bigint | number | string
-      params: Record<string, unknown>
-    }) => {
-      const { urlPath, init } = stdbBffCommandPost("add_document_version", { documentId: toScalarU64(documentId), params: stdbParamsToJson(params as object, "AddDocumentVersionParams") })
+  return useMutation<
+    CanonicalRecordRef,
+    Error,
+    { documentId: bigint | number | string; params: Record<string, unknown> }
+  >({
+    mutationFn: async ({ documentId: rawId, params }) => {
+      const documentId = toScalarU64(rawId)
+      const url = typeof params.url === "string" ? params.url : ""
+      const checksum = typeof params.checksum === "string" ? params.checksum : ""
+      const before = await fetchQueryList("/api/query/document-versions", "Failed to read document versions")
+      const { urlPath, init } = stdbBffCommandPost("add_document_version", { documentId, params: stdbParamsToJson(params as object, "AddDocumentVersionParams") })
       const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error('Failed to add document version')
+      if (!r.ok) throw new Error(await parseCallErrorDocuments(r))
+      const after = await fetchQueryList("/api/query/document-versions", "Failed to read document versions")
+      const effect = resolveDocumentVersionEffect(before, after, organizationId, documentId, { url, checksum })
+      if (!effect) throw new Error("Document version did not read back")
+      return effect
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['documents', rqBigIntKey(organizationId)] })
