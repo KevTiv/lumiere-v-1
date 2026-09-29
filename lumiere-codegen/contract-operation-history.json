@@ -528,7 +528,7 @@
     },
     "erp.cancel_replenishment_run": {
       "name": "cancel_replenishment_run",
-      "shape_fingerprint": "sha256:60997cd64eed0875af26234110a4f55c15f5f2f39b9aa226dfa19aa3e4945e3c"
+      "shape_fingerprint": "sha256:1b85f82d0cc369103fe7d541cea855bfbacb68b77717b1fd84cf79debcac479e"
     },
     "erp.cancel_return_order": {
       "name": "cancel_return_order",
@@ -4472,7 +4472,7 @@
     },
     "erp.schedule_replenishment_run": {
       "name": "schedule_replenishment_run",
-      "shape_fingerprint": "sha256:4a8fa304d91568f684b9aa42c5060e265321d329339d980f3e2803c6b4606c1b"
+      "shape_fingerprint": "sha256:5a82e8c600c26f89365cd8877cce5bcbd89ed7c434c2a5314290bbc35e81d366"
     },
     "erp.schedule_sales_sla_escalation": {
       "name": "schedule_sales_sla_escalation",
@@ -5788,6 +5788,14 @@
       "current_operations_fingerprint": "sha256:a8e89515b61b951db4ec206c3002945cb78d8a9f65560524182f3963ec649cf2",
       "operation_count": 1415,
       "reason": "COV-05c/06/07/08 release on top of v0.3.57: add cancel_replenishment_run, create_bom_byproduct, create_workorder_quality_check, fail_workorder_quality_check, run_inventory_lot_move_test, run_inventory_warehouse_qc_location_test, run_manufacturing_bom_byproduct_output_exact_effect_test, run_manufacturing_consume_materials_exact_effect_test, run_manufacturing_finished_output_scrap_exact_effect_test, run_manufacturing_production_close_exact_effect_test, run_manufacturing_workorder_execution_exact_effect_test, run_manufacturing_workorder_quality_gate_test, run_scheduled_replenishment, schedule_replenishment_run, scrap_finished_manufacturing_output; change the input shape of no existing operation"
+    },
+    {
+      "previous_release": "v0.3.63",
+      "previous_ir_sha256": "sha256:6b37e135605d541d35a50f89d65863256e41fef32e4935fd7440912992b65251",
+      "previous_operations_fingerprint": "sha256:a8e89515b61b951db4ec206c3002945cb78d8a9f65560524182f3963ec649cf2",
+      "current_operations_fingerprint": "sha256:4b97e2986f096884d11a27fbb66faa602c12d09ea1803e6a9a6afddf3eff2ea4",
+      "operation_count": 1415,
+      "reason": "release on top of v0.3.63: add none; change the shape of cancel_replenishment_run, schedule_replenishment_run"
     }
   ]
 }
