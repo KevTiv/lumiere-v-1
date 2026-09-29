@@ -215,11 +215,14 @@ function ExpensesClientLoaded({
     [createExpenseReceipt],
   )
   const submitExpense = useSubmitExpense(orgId)
-  const submitExpenseSheet = useSubmitExpenseSheet(orgId)
-  const approveExpenseSheet = useApproveExpenseSheet(orgId)
+  const submitExpenseSheet = useSubmitExpenseSheet(orgId, operatingCompanyId)
+  const approveExpenseSheet = useApproveExpenseSheet(orgId, operatingCompanyId)
   const refuseExpenseSheet = useRefuseExpenseSheet(orgId)
-  const postExpenseSheet = usePostExpenseSheet(orgId)
-  const reimburseExpenseSheet = useCreateExpenseReimbursementPayment(orgId)
+  const postExpenseSheet = usePostExpenseSheet(orgId, operatingCompanyId)
+  const reimburseExpenseSheet = useCreateExpenseReimbursementPayment(
+    orgId,
+    operatingCompanyId,
+  )
   const setExpenseAllocations = useSetExpenseAllocations(orgId)
   const projectRebill = useCreateExpenseProjectRebill(orgId)
   const csvImports = useExpensesCsvImportMutations(orgId)
@@ -832,6 +835,7 @@ function ExpensesClientLoaded({
           payableAccountId: BigInt(String(payableAccountId)),
           liquidityAccountId: BigInt(String(liquidityAccountId)),
           ...(amount != null && Number.isFinite(amount) ? { amount } : {}),
+          clientRequestId: `exp-reimburse-${rowId(workflowForm.row)}`,
         },
       })
     } else if (workflowForm.kind === "setAllocations") {
