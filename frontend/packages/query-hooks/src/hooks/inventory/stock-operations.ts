@@ -5,6 +5,7 @@ import { stdbBffCommandPost } from "@lumiere/stdb/commands"
 import { apiFetch, fetchQueryList, coalesceQueryInitialData, type QueryRows, rqBigIntKey } from "../../http"
 import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
 import { workflowErrorFromResponse } from "@lumiere/erp-workflows"
+import { callStdbOperation } from "../stdb"
 import { scalarToU64 as toScalarU64, type ScalarId } from "@lumiere/erp-shared/u64"
 
 
@@ -1162,11 +1163,10 @@ export async function scheduleReplenishmentRunCommand(
   companyId: bigint,
   ruleId: ScalarId,
 ): Promise<void> {
-  const { urlPath, init } = stdbBffCommandPost('schedule_replenishment_run', {
+  const r = await callStdbOperation('schedule_replenishment_run', {
     companyId,
     ruleId: toScalarU64(ruleId),
   });
-  const r = await apiFetch(urlPath, init);
   if (!r.ok) {
     throw workflowErrorFromResponse(
       r.status,
@@ -1181,11 +1181,10 @@ export async function cancelReplenishmentRunCommand(
   companyId: bigint,
   ruleId: ScalarId,
 ): Promise<void> {
-  const { urlPath, init } = stdbBffCommandPost('cancel_replenishment_run', {
+  const r = await callStdbOperation('cancel_replenishment_run', {
     companyId,
     ruleId: toScalarU64(ruleId),
   });
-  const r = await apiFetch(urlPath, init);
   if (!r.ok) {
     throw workflowErrorFromResponse(
       r.status,
