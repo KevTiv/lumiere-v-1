@@ -3753,6 +3753,7 @@
     "default_restricted": [
       "name",
       "is_active",
+      "organization_id",
       "company_id",
       "warehouse_id",
       "journal_id",
@@ -3760,7 +3761,8 @@
       "module_pos_loyalty"
     ],
     "mandatory": [
-      "id"
+      "id",
+      "organization_id"
     ],
     "table": "pos_config"
   },
@@ -3822,6 +3824,7 @@
     ],
     "default_restricted": [
       "name",
+      "organization_id",
       "config_id",
       "state",
       "start_at",
@@ -3831,7 +3834,8 @@
       "cash_register_balance_end_real"
     ],
     "mandatory": [
-      "id"
+      "id",
+      "organization_id"
     ],
     "table": "pos_session"
   },
