@@ -2019,6 +2019,9 @@
       "odometer_km",
       "provider",
       "notes",
+      "cost_amount",
+      "currency_id",
+      "account_move_id",
       "client_request_id"
     ],
     "mandatory": [
