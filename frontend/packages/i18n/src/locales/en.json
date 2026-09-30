@@ -1475,6 +1475,7 @@
           "confirmSelected": "Confirm Selected",
           "closeSelected": "Close Selected",
           "computeDepreciation": "Compute Depreciation",
+          "disposeSelected": "Dispose Selected",
           "addDepreciationLine": "Add depreciation line",
           "deleteSelected": "Delete Selected",
           "activateSelected": "Set active",
