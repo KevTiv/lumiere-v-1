@@ -2217,14 +2217,10 @@ function AccountingClientReady({
             label: t("accounting.entities.fixedAssets.actions.computeDepreciation"),
             requiresSelection: true,
             isApplicable: (rows) =>
-              rows.length > 0 &&
-              rows.every(
-                (row) =>
-                  assetStateTag(row as Record<string, unknown>) === "Running",
-              ),
+              rows.length > 0 && rows.every((row) => assetStateTag(row) === "Running"),
             onClick: (rows) => {
               for (const r of rows) {
-                if (assetStateTag(r as Record<string, unknown>) === "Running") {
+                if (assetStateTag(r) === "Running") {
                   void computeDepreciationBoard.mutateAsync(BigInt(String(r.id)))
                 }
               }
@@ -2238,12 +2234,12 @@ function AccountingClientReady({
             isApplicable: (rows) =>
               rows.length > 0 &&
               rows.every((row) => {
-                const state = assetStateTag(row as Record<string, unknown>)
+                const state = assetStateTag(row)
                 return state === "Running" || state === "Close"
               }),
             onClick: (rows) => {
               for (const r of rows) {
-                const state = assetStateTag(r as Record<string, unknown>)
+                const state = assetStateTag(r)
                 if (state === "Running" || state === "Close") {
                   void disposeAccountAsset.mutateAsync({
                     assetId: BigInt(String(r.id)),
