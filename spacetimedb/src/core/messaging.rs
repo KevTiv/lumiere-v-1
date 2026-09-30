@@ -22,6 +22,7 @@ use crate::types::MailMessageType;
     index(accessor = mail_message_by_model, btree(columns = [model])),
     index(accessor = mail_message_by_author, btree(columns = [author_id]))
 )]
+#[derive(PartialEq)]
 pub struct MailMessage {
     #[primary_key]
     #[auto_inc]
@@ -132,7 +133,22 @@ fn notify_record_followers(
 
 // ── Reducers ──────────────────────────────────────────────────────────────────
 
+const MAX_MESSAGE_IDEMPOTENCY_KEY_LEN: usize = 128;
+
+/// The client-supplied idempotency key a `post_message` row was created with.
+fn message_idempotency_key(metadata: Option<&str>) -> Option<String> {
+    let value: serde_json::Value = serde_json::from_str(metadata?).ok()?;
+    value.get("idempotency_key")?.as_str().map(str::to_owned)
+}
+
 /// Post a message (comment visible to all followers) on any record.
+///
+/// `idempotency_key` names this submission. A key is scoped to the caller within
+/// the organization: re-sending the same key with the same message converges on the
+/// existing row (no duplicate, no repeat notification), and re-using it for a
+/// different message is rejected. The key is stored in `metadata` so the exact
+/// created row can be read back from `mail-messages`. Without a key the call
+/// always creates a new message.
 #[reducer]
 pub fn post_message(
     ctx: &ReducerContext,
@@ -142,6 +158,7 @@ pub fn post_message(
     body: String,
     parent_id: Option<u64>,
     attachment_ids: Vec<u64>,
+    idempotency_key: Option<String>,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "mail_message", "create")?;
     if model.is_empty() {
@@ -150,6 +167,39 @@ pub fn post_message(
     if body.is_empty() {
         return Err("Message body cannot be empty".to_string());
     }
+    let idempotency_key = idempotency_key.map(|key| key.trim().to_string());
+    if let Some(key) = &idempotency_key {
+        if key.is_empty() || key.len() > MAX_MESSAGE_IDEMPOTENCY_KEY_LEN {
+            return Err(format!(
+                "idempotency_key must be 1-{MAX_MESSAGE_IDEMPOTENCY_KEY_LEN} characters"
+            ));
+        }
+        let sender = ctx.sender();
+        let existing = ctx
+            .db
+            .mail_message()
+            .mail_message_by_author()
+            .filter(&sender)
+            .find(|message| {
+                message.organization_id == organization_id
+                    && message_idempotency_key(message.metadata.as_deref()).as_deref()
+                        == Some(key.as_str())
+            });
+        if let Some(existing) = existing {
+            if existing.model == model
+                && existing.res_id == res_id
+                && existing.body == body
+                && existing.parent_id == parent_id
+                && existing.attachment_ids == attachment_ids
+            {
+                return Ok(());
+            }
+            return Err("idempotency_key was already used for a different message".to_string());
+        }
+    }
+    let metadata = idempotency_key
+        .as_ref()
+        .map(|key| serde_json::json!({ "idempotency_key": key }).to_string());
     let msg = ctx.db.mail_message().insert(MailMessage {
         id: 0,
         organization_id,
@@ -162,7 +212,7 @@ pub fn post_message(
         date: ctx.timestamp,
         parent_id,
         attachment_ids,
-        metadata: None,
+        metadata,
     });
     notify_record_followers(
         ctx,
@@ -324,6 +374,7 @@ pub fn mark_mail_message_delivered(
         return Err("mail message does not belong to this organization".to_string());
     }
 
+    let idempotency_key = message_idempotency_key(message.metadata.as_deref());
     let metadata = delivery_metadata.or_else(|| {
         Some(
             serde_json::json!({
@@ -333,6 +384,21 @@ pub fn mark_mail_message_delivered(
             .to_string(),
         )
     });
+    let metadata = match (metadata, idempotency_key) {
+        (Some(raw), Some(key)) => {
+            let mut value = serde_json::from_str::<serde_json::Value>(&raw)
+                .unwrap_or_else(|_| serde_json::json!({ "delivery_metadata": raw }));
+            if let Some(object) = value.as_object_mut() {
+                object.insert(
+                    "idempotency_key".to_string(),
+                    serde_json::Value::String(key),
+                );
+            }
+            Some(value.to_string())
+        }
+        (metadata, None) => metadata,
+        (None, Some(key)) => Some(serde_json::json!({ "idempotency_key": key }).to_string()),
+    };
 
     ctx.db.mail_message().id().update(MailMessage {
         metadata,

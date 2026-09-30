@@ -1,6 +1,6 @@
 # COV-07e — manufacturing quality gate
 
-**Status:** BACKEND IMPLEMENTED — contract/UI certification and runtime acceptance pending  
+**Status:** IMPLEMENTED — runtime acceptance pending
 **Branch:** `codex/cov07e-manufacturing-quality-gate`  
 **Stack base:** COV-07d / `codex/cov07d-workorder-execution`
 
@@ -26,14 +26,15 @@ path. This gate is explicitly opted into by requiring a check.
 The persisted domain test exercises pending rejection, exact linkage, pass,
 failure exception, blocked completion, and creation/disposition replay.
 
-## Remaining before claiming COV-07e certification
+## Frontend/readback
 
-- Regenerate and publish the versioned IR/contract descriptors for the two new
-  reducers, then wire their BFF commands and the selected workorder's actions.
-- Add canonical exact-check readback with stale and read-only denial browser
-  assertions, following COV-07d's workflow pattern.
-- Run native persisted tests and browser acceptance in an environment with
-  Rust/SpacetimeDB and the pinned contracts. This workspace has no `cargo`.
+The workorder row action now creates, passes, or fails its one owned quality
+check. Each command resolves the exact `(organization, company, workorder)`
+check from `quality-checks`; duplicate matches fail closed and completion is
+only reported after the canonical disposition is visible.
+
+Runtime browser acceptance and the contract-release pin remain required before
+marking the slice ACCEPTED.
 
 Scrap, byproducts, routing depth, and full manufacturing costing remain later
 bounded slices.

@@ -623,11 +623,13 @@ function IotClientLoaded({
                   requiresSelection: true,
                   onClick: (rows) => {
                     setToolbarError(null);
-                    void Promise.all(
-                      selectedIds(rows).map((actionId) =>
-                        acknowledgeAction.mutateAsync(actionId),
-                      ),
-                    ).then(
+                    if (rows.length !== 1 || str(rows[0]?.status) !== 'Sent') {
+                      setToolbarError(t('iot.toolbar.actionNotSent'));
+                      return;
+                    }
+                    const actionId = selectedIds(rows)[0];
+                    if (actionId == null) return;
+                    void acknowledgeAction.mutateAsync(actionId).then(
                       () =>
                         setBanner({
                           kind: 'ok',

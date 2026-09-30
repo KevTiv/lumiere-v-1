@@ -160,6 +160,7 @@ import type {
   MessageBatch,
   MessageTemplate,
   MrpBom,
+  MrpBomByproduct,
   MrpBomLine,
   MrpProduction,
   MrpRoutingWorkcenter,
@@ -242,6 +243,7 @@ import type {
   QualityTeam,
   RecordCustomFieldValue,
   ReplenishmentRule,
+  ReplenishmentRunJob,
   ReportTemplate,
   ResPartnerBank,
   ResourceAllocation,
@@ -482,6 +484,7 @@ export interface QueryRowMap {
   "mail-templates": MailTemplate
   "message-batches": MessageBatch
   "message-templates": MessageTemplate
+  "mrp-bom-byproducts": MrpBomByproduct
   "mrp-bom-lines": MrpBomLine
   "mrp-boms": MrpBom
   "mrp-productions": MrpProduction
@@ -579,6 +582,7 @@ export interface QueryRowMap {
   "quality-teams": QualityTeam
   "record-custom-field-values": RecordCustomFieldValue
   "replenishment-rules": ReplenishmentRule
+  "replenishment-run-jobs": ReplenishmentRunJob
   "report-templates": ReportTemplate
   "resource-allocations": ResourceAllocation
   "resource-capacity-by-employee": ResourceCapacitySnapshot

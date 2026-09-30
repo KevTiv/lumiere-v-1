@@ -2585,7 +2585,8 @@
       "triggered_by",
       "created_at",
       "sent_at",
-      "acknowledged_at"
+      "acknowledged_at",
+      "result_payload"
     ],
     "mandatory": [
       "id",
@@ -2991,7 +2992,10 @@
       "model",
       "body",
       "date",
-      "res_id"
+      "res_id",
+      "parent_id",
+      "attachment_ids",
+      "metadata"
     ],
     "mandatory": [
       "id",
@@ -3078,6 +3082,27 @@
     ],
     "table": "message_template"
   },
+  "mrp-bom-byproducts": {
+    "aliases": [
+      "mrp-bom-byproducts",
+      "mrp_bom_byproduct"
+    ],
+    "default_restricted": [
+      "bom_id",
+      "product_id",
+      "product_tmpl_id",
+      "product_qty",
+      "product_uom_id",
+      "cost_share",
+      "sequence",
+      "company_id"
+    ],
+    "mandatory": [
+      "id",
+      "organization_id"
+    ],
+    "table": "mrp_bom_byproduct"
+  },
   "mrp-bom-lines": {
     "aliases": [
       "mrp-bom-lines",
@@ -3106,7 +3131,8 @@
       "company_id",
       "type",
       "product_id",
-      "product_uom_id"
+      "product_uom_id",
+      "byproduct_ids"
     ],
     "mandatory": [
       "id",
@@ -4880,8 +4906,13 @@
     "default_restricted": [
       "name",
       "quality_state",
+      "status",
       "company_id",
-      "product_id"
+      "product_id",
+      "workorder_id",
+      "production_id",
+      "is_failed",
+      "check_date"
     ],
     "mandatory": [
       "id",
@@ -4941,6 +4972,22 @@
       "organization_id"
     ],
     "table": "replenishment_rule"
+  },
+  "replenishment-run-jobs": {
+    "aliases": [
+      "replenishment-run-jobs",
+      "replenishment_run_job"
+    ],
+    "default_restricted": [
+      "scheduled_at",
+      "company_id",
+      "rule_id"
+    ],
+    "mandatory": [
+      "scheduled_id",
+      "organization_id"
+    ],
+    "table": "replenishment_run_job"
   },
   "report-templates": {
     "aliases": [
@@ -5433,6 +5480,8 @@
       "purchase_line_id",
       "is_done",
       "production_id",
+      "reference",
+      "scrapped",
       "location_id",
       "location_dest_id",
       "product_uom",
@@ -6075,7 +6124,8 @@
       "name",
       "employee_id",
       "company_id",
-      "validation_status"
+      "validation_status",
+      "timesheet_invoice_id"
     ],
     "mandatory": [
       "id",

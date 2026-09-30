@@ -274,6 +274,12 @@ pub fn acknowledge_iot_action(
     if action.organization_id != organization_id {
         return Err("Action does not belong to this organization".to_string());
     }
+    if action.status != "Sent" {
+        return Err(format!(
+            "Cannot acknowledge action — current status is {}",
+            action.status
+        ));
+    }
 
     ctx.db.iot_action().id().update(IoTAction {
         status: "Acknowledged".to_string(),
