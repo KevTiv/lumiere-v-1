@@ -7,8 +7,9 @@ use crate::accounting::analytic_accounting::{
     CreateAnalyticAccountParams, UpdateAnalyticAccountParams,
 };
 use crate::accounting::financial_statements::{
-    create_financial_report, export_financial_report, financial_report, generate_financial_report,
-    trial_balance, CreateFinancialReportParams, ExportFinancialReportParams,
+    archive_financial_report, create_financial_report, export_financial_report, financial_report,
+    generate_financial_report, trial_balance, CreateFinancialReportParams,
+    ExportFinancialReportParams,
 };
 use crate::accounting::journal_entries::{account_move_line, AccountMoveLine};
 use crate::core::audit::audit_log;
@@ -295,6 +296,105 @@ pub fn test_trial_balance_summary_balances(ctx: &ReducerContext) -> Result<(), S
     if export_audits != 1 {
         return Err(format!(
             "financial report retry persisted {export_audits} export audits"
+        ));
+    }
+
+    // COV-08e: archive is the final Finance certification transition. Wrong
+    // company scope and stale replay must leave the exact exported/archived row
+    // unchanged rather than selecting or mutating another report.
+    let wrong_company_id = fixture
+        .company_id
+        .checked_add(1)
+        .ok_or("company id overflow in financial-report archive test")?;
+    match archive_financial_report(
+        ctx,
+        fixture.organization_id,
+        wrong_company_id,
+        report_id,
+    ) {
+        Err(error) if error.contains("company") => {}
+        Err(error) => {
+            return Err(format!(
+                "unexpected cross-company financial-report archive error: {error}"
+            ))
+        }
+        Ok(()) => return Err("cross-company financial-report archive succeeded".to_string()),
+    }
+    let after_scope_denial = ctx
+        .db
+        .financial_report()
+        .id()
+        .find(&report_id)
+        .ok_or("financial report missing after scope denial")?;
+    if after_scope_denial.state != ReportState::Exported
+        || after_scope_denial.write_date != exported.write_date
+    {
+        return Err("scope-denied archive changed the financial report".to_string());
+    }
+
+    archive_financial_report(
+        ctx,
+        fixture.organization_id,
+        fixture.company_id,
+        report_id,
+    )?;
+    let archived = ctx
+        .db
+        .financial_report()
+        .id()
+        .find(&report_id)
+        .ok_or("archived report not found")?;
+    if archived.state != ReportState::Archived {
+        return Err("financial report did not transition to Archived".to_string());
+    }
+
+    match archive_financial_report(
+        ctx,
+        fixture.organization_id,
+        fixture.company_id,
+        report_id,
+    ) {
+        Err(error) if error.contains("exported before archiving") => {}
+        Err(error) => {
+            return Err(format!(
+                "unexpected financial-report archive replay error: {error}"
+            ))
+        }
+        Ok(()) => return Err("financial-report archive replay unexpectedly succeeded".to_string()),
+    }
+    let replayed_archive = ctx
+        .db
+        .financial_report()
+        .id()
+        .find(&report_id)
+        .ok_or("archived report missing after replay")?;
+    if replayed_archive.state != archived.state
+        || replayed_archive.write_date != archived.write_date
+        || replayed_archive.export_format != archived.export_format
+        || replayed_archive.exported_file_url != archived.exported_file_url
+    {
+        return Err("financial-report archive replay changed the canonical row".to_string());
+    }
+
+    let archive_audits = ctx
+        .db
+        .audit_log()
+        .iter()
+        .filter(|audit| {
+            audit.organization_id == fixture.organization_id
+                && audit.company_id == Some(fixture.company_id)
+                && audit.table_name == "financial_report"
+                && audit.record_id == report_id
+                && audit.action == "UPDATE"
+                && audit
+                    .new_values
+                    .as_deref()
+                    .is_some_and(|values| values.contains("\"Archived\""))
+        })
+        .count();
+    if archive_audits != 1 {
+        return Err(format!(
+            "financial report archive persisted {archive_audits} archive audits"
         ));
     }
 
