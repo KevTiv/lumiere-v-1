@@ -40,12 +40,8 @@ function invalidateTimesheetQueues(
   void qc.invalidateQueries({ queryKey: ['resource-utilisation-by-employee', k] })
 }
 
-async function readTimesheets(): Promise<Record<string, unknown>[]> {
-  return fetchQueryList('/api/query/timesheets', 'Failed to read timesheets');
-}
-
 function resolveTimesheetBatchStatus(
-  rows: readonly Record<string, unknown>[],
+  rows: readonly ProjectTimesheet[],
   organizationId: bigint,
   companyId: bigint | null,
   timesheetIds: readonly bigint[],
@@ -568,7 +564,10 @@ export function useValidateTimesheets(organizationId: bigint) {
       const outcome = await executeOperationWithCanonicalReadback({
         resolveEffect: async () =>
           resolveTimesheetBatchStatus(
-            await readTimesheets(),
+            await fetchQueryList(
+            '/api/query/timesheets',
+            'Failed to read timesheets',
+          ),
             organizationId,
             scope,
             ids,
@@ -626,7 +625,10 @@ export function useRejectTimesheets(organizationId: bigint) {
       const outcome = await executeOperationWithCanonicalReadback({
         resolveEffect: async () =>
           resolveTimesheetBatchStatus(
-            await readTimesheets(),
+            await fetchQueryList(
+            '/api/query/timesheets',
+            'Failed to read timesheets',
+          ),
             organizationId,
             scope,
             ids,
@@ -705,7 +707,10 @@ export function useBillTimesheets(organizationId: bigint) {
       requireUniqueTimesheetIds(ids);
       const outcome = await executeOperationWithCanonicalReadback({
         resolveEffect: async () => {
-          const rows = await readTimesheets();
+          const rows = await fetchQueryList(
+            '/api/query/timesheets',
+            'Failed to read timesheets',
+          );
           const effects = ids.map((id) =>
             resolveTimesheetBillingEffect(rows, organizationId, scope, id),
           );
