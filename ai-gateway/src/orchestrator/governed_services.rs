@@ -1280,10 +1280,7 @@ mod tests {
         *policy.allowed.lock().unwrap() = false;
         let after_revocation = service.run(7, &proposal(), 1).await.unwrap();
 
-        assert!(matches!(
-            after_revocation,
-            CapabilityStepOutcome::Denied(_)
-        ));
+        assert!(matches!(after_revocation, CapabilityStepOutcome::Denied(_)));
         assert_eq!(*policy.evaluate_calls.lock().unwrap(), 2);
         assert_eq!(*tools.execute_calls.lock().unwrap(), 1);
     }
@@ -1612,17 +1609,28 @@ mod tests {
 
     #[tokio::test]
     async fn oversized_or_malformed_proposals_never_reach_admission_or_execution() {
-        let policy = FakePolicy { outcome: DecisionOutcome::Allow, evaluate_calls: StdMutex::new(0) };
-        let tools = FakeTools { execute_calls: StdMutex::new(0) };
+        let policy = FakePolicy {
+            outcome: DecisionOutcome::Allow,
+            evaluate_calls: StdMutex::new(0),
+        };
+        let tools = FakeTools {
+            execute_calls: StdMutex::new(0),
+        };
         let admission = PolicyBackedCapabilityAdmission::new(&policy);
         let executor = ToolsBackedCapabilityExecutor::new(&tools);
         let recovery = InMemoryExecutionRecovery::new();
         let approvals = RecordingApprovalCoordinator;
         let service = GovernedCapabilityService::new(&admission, &executor, &recovery, &approvals);
         for arguments in [Value::Null, json!([]), json!({"q": "x".repeat(16_384)})] {
-            let invalid = CapabilityProposal { arguments, ..proposal() };
+            let invalid = CapabilityProposal {
+                arguments,
+                ..proposal()
+            };
             assert!(service.run(7, &invalid, 0).await.is_err());
-            assert!(service.request_explicit_approval(7, &invalid, 0).await.is_err());
+            assert!(service
+                .request_explicit_approval(7, &invalid, 0)
+                .await
+                .is_err());
         }
         assert_eq!(*policy.evaluate_calls.lock().unwrap(), 0);
         assert_eq!(*tools.execute_calls.lock().unwrap(), 0);
@@ -1632,7 +1640,10 @@ mod tests {
     fn capability_argument_bound_counts_serialized_utf8_bytes() {
         let mut bounded = proposal();
         bounded.arguments = json!({"q": "x".repeat(16_384 - 8)});
-        assert_eq!(serde_json::to_vec(&bounded.arguments).unwrap().len(), 16_384);
+        assert_eq!(
+            serde_json::to_vec(&bounded.arguments).unwrap().len(),
+            16_384
+        );
         assert!(bounded.validate().is_ok());
         bounded.arguments = json!({"q": "x".repeat(16_384 - 7)});
         assert!(bounded.validate().is_err());
@@ -1663,27 +1674,54 @@ mod tests {
         fn recovery_key(&self, run_id: u64, proposal: &CapabilityProposal) -> Result<String> {
             capability_recovery_key(run_id, proposal)
         }
-        async fn already_executed(&self, run_id: u64, proposal: &CapabilityProposal, key: &str) -> Result<Option<ToolOutput>> {
-            replay_capability_output(&decode_capability_execution_row(&self.0)?, 1, 1, run_id, proposal, key).map(Some)
+        async fn already_executed(
+            &self,
+            run_id: u64,
+            proposal: &CapabilityProposal,
+            key: &str,
+        ) -> Result<Option<ToolOutput>> {
+            replay_capability_output(
+                &decode_capability_execution_row(&self.0)?,
+                1,
+                1,
+                run_id,
+                proposal,
+                key,
+            )
+            .map(Some)
         }
-        async fn record_outcome(&self, _run_id: u64, _proposal: &CapabilityProposal, _key: &str, _output: &ToolOutput) -> Result<()> {
+        async fn record_outcome(
+            &self,
+            _run_id: u64,
+            _proposal: &CapabilityProposal,
+            _key: &str,
+            _output: &ToolOutput,
+        ) -> Result<()> {
             panic!("restored executions must not be dispatched or recorded again")
         }
     }
 
     #[tokio::test]
     async fn fresh_recovery_instances_replay_restored_rows_without_dispatch() {
-        let policy = FakePolicy { outcome: DecisionOutcome::Allow, evaluate_calls: StdMutex::new(0) };
-        let tools = FakeTools { execute_calls: StdMutex::new(0) };
+        let policy = FakePolicy {
+            outcome: DecisionOutcome::Allow,
+            evaluate_calls: StdMutex::new(0),
+        };
+        let tools = FakeTools {
+            execute_calls: StdMutex::new(0),
+        };
         let admission = PolicyBackedCapabilityAdmission::new(&policy);
         let executor = ToolsBackedCapabilityExecutor::new(&tools);
         let approvals = RecordingApprovalCoordinator;
         let serialized = serde_json::to_string(&restored_row()).unwrap();
         for _ in 0..2 {
             let recovery = RestoredRecovery(serde_json::from_str(&serialized).unwrap());
-            let service = GovernedCapabilityService::new(&admission, &executor, &recovery, &approvals);
+            let service =
+                GovernedCapabilityService::new(&admission, &executor, &recovery, &approvals);
             match service.run(7, &proposal(), 0).await.unwrap() {
-                CapabilityStepOutcome::Replayed(result) => assert_eq!(result.summary, "persisted result"),
+                CapabilityStepOutcome::Replayed(result) => {
+                    assert_eq!(result.summary, "persisted result")
+                }
                 other => panic!("unexpected restored outcome {other:?}"),
             }
         }
@@ -1693,22 +1731,34 @@ mod tests {
 
     #[tokio::test]
     async fn corrupt_foreign_or_unresolved_recovery_never_dispatches() {
-        let policy = FakePolicy { outcome: DecisionOutcome::Allow, evaluate_calls: StdMutex::new(0) };
-        let tools = FakeTools { execute_calls: StdMutex::new(0) };
+        let policy = FakePolicy {
+            outcome: DecisionOutcome::Allow,
+            evaluate_calls: StdMutex::new(0),
+        };
+        let tools = FakeTools {
+            execute_calls: StdMutex::new(0),
+        };
         let admission = PolicyBackedCapabilityAdmission::new(&policy);
         let executor = ToolsBackedCapabilityExecutor::new(&tools);
         let approvals = RecordingApprovalCoordinator;
         for (field, value) in [
-            ("organization_id", json!(99)), ("company_id", json!(99)), ("run_id", json!(8)),
-            ("capability", json!("erp.other")), ("recovery_key", json!("forged")),
-            ("output_json", json!("{}")), ("output_hash", json!(null)),
-            ("status", json!("claimed")), ("status", json!("failed")), ("status", json!("unknown")),
+            ("organization_id", json!(99)),
+            ("company_id", json!(99)),
+            ("run_id", json!(8)),
+            ("capability", json!("erp.other")),
+            ("recovery_key", json!("forged")),
+            ("output_json", json!("{}")),
+            ("output_hash", json!(null)),
+            ("status", json!("claimed")),
+            ("status", json!("failed")),
+            ("status", json!("unknown")),
             ("failure_reason", json!("contradictory failure")),
         ] {
             let mut row = restored_row();
             row[field] = value;
             let recovery = RestoredRecovery(row);
-            let service = GovernedCapabilityService::new(&admission, &executor, &recovery, &approvals);
+            let service =
+                GovernedCapabilityService::new(&admission, &executor, &recovery, &approvals);
             assert!(service.run(7, &proposal(), 0).await.is_err(), "{field}");
         }
         assert_eq!(*tools.execute_calls.lock().unwrap(), 0);

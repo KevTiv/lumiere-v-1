@@ -406,10 +406,22 @@ mod tests {
         };
         assert!(validate_outcome(EXECUTION_SUCCEEDED, &ok).is_ok());
         for invalid in [
-            RecordAiCapabilityExecutionResultParams { output_json: None, ..ok.clone() },
-            RecordAiCapabilityExecutionResultParams { output_hash: None, ..ok.clone() },
-            RecordAiCapabilityExecutionResultParams { output_hash: Some("a".repeat(64)), ..ok.clone() },
-            RecordAiCapabilityExecutionResultParams { output_json: Some("not-json".into()), ..ok.clone() },
+            RecordAiCapabilityExecutionResultParams {
+                output_json: None,
+                ..ok.clone()
+            },
+            RecordAiCapabilityExecutionResultParams {
+                output_hash: None,
+                ..ok.clone()
+            },
+            RecordAiCapabilityExecutionResultParams {
+                output_hash: Some("a".repeat(64)),
+                ..ok.clone()
+            },
+            RecordAiCapabilityExecutionResultParams {
+                output_json: Some("not-json".into()),
+                ..ok.clone()
+            },
         ] {
             assert!(validate_outcome(EXECUTION_SUCCEEDED, &invalid).is_err());
         }

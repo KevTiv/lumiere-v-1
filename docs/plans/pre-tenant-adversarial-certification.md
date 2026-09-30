@@ -243,7 +243,7 @@ Legend — Class: **C** covered, **P** partial, **N** not covered, **B** blocked
 | Policy denial executes no tool / draft-only creates pending draft | P4-AI-01/02; `test_correlated_draft_replay`: repeated, conflicting and terminal-run replay, exact run/link/draft/audit counts, zero task effects | live red-action/reconnect acceptance | STDB + ai-gateway + E2E | candidate additions | local runtime | AG-04 | P |
 | Elevated separation of duties (requester, simultaneous approvers) | AG-02 two-session browser proof | fresh-runtime acceptance evidence | E2E | yes | — | AG-02 | P |
 | Malicious ERP text stays data | AG-01 governed action-draft bridge proof | live gateway-backed acceptance evidence | E2E (gateway required) | yes | — | AG-01 | P |
-| Stale action draft (payment changed before approval) | typed opt-in payment-row hash precondition; `test_payment_bound_draft_rejects_stale_source` covers foreign source, same-timestamp payment edit, zero stale effects and fresh approval | supported reverse-payment executor, related fee/reconciliation source binding, compiler-produced preconditions and ordinary-approver acceptance | STDB + E2E | candidate subset only | reverse-payment action remains unsupported | AG-03 subset; original case gated | P / B for original reversal |
+| Stale action draft (payment changed before approval) | strict reverse-payment payload and allowlist; current reverse permission; exact org/company/transaction binding; versioned payment/account/allocation/fee/reconciliation/ledger snapshot; `test_payment_reversal_draft_is_bound_and_idempotent` covers retarget, cross-scope, stale allocation, independent approval, exact reversal effects and retry; `test_payment_reversal_draft_preserves_finance_workflow` proves a configured finance approval route stops execution without workflow mutation | ordinary-user two-session approval, compiler-produced preconditions, live gateway/browser acceptance | STDB + E2E | candidate additions | local runtime | AG-03; browser certification gated | P |
 | Ambiguous provider timeout / no blind redispatch | `restart_after_ambiguous_timeout_never_redispatches` plus unknown-outcome persistence coverage | fresh durable-runtime restart acceptance | ai-gateway | yes | — | AG-05 | P |
 | Concurrent budget reservations | `competing_budget_reservations_never_overspend_in_any_serialization_order` plus settlement-replay coverage | live two-client reducer acceptance | STDB (`spend.rs`) | yes | — | AG-06 | P |
 | Permission / capability changes mid-run | `governed_services::tests::revocation_is_rechecked_before_replaying_recovered_output` | broader live admin-revocation E2E | ai-gateway | yes | — | AG-07 | C |
@@ -257,14 +257,19 @@ fresh durable-runtime restart and two-client reducer gates are run on the local 
 Remaining-case implementation (2026-09-30), branch
 `codex/aih-phase4-draft-protocol-recovery`, stacked on the spend-safety candidate:
 
-- AG-03 uses optional immutable draft metadata
-  `{"payment_source":{"id":123,"snapshot_hash":"<64 lowercase SHA-256 hex>"}}`.
-  `payment_source_snapshot_hash` v1 hashes every field of the transaction row, including exact
-  amount bits. Creation and approval resolve its current org/company-owned row in the reducer
-  transaction. The informational `source_snapshot_hash` alone is **not** a checked precondition.
-  Legacy unbound drafts are unchanged; this is not a universal stale-state fix or authorization.
-  The in-module fixture uses a supported `create_task` follow-up. Payment reversal is deliberately
-  not added to the executor. Its original browser placeholder remains a real outstanding case.
+- AG-03 adds the allowlisted `reverse_payment_transaction` executor with a strict
+  `{"company_id":...,"transaction_id":...,"reason":"..."}` payload and an elevated
+  `payment_reversal_source` binding. Creation and approval require exact organization/company/
+  transaction scope, an independent approver, current `payment_transaction:reverse` permission,
+  and a versioned snapshot over the transaction, operational and linked payment accounts, fees,
+  allocations, and relevant ledger moves/lines. Unknown payload or governance fields, retargeting,
+  cross-scope sources and stale related state fail closed. Execution preserves the ordinary finance
+  workflow gate: a configured approval route stops the draft before starting or completing a task,
+  and the payment reducer remains the mutation authority. Success is returned only after the
+  original is `Reversed` and exactly one matching `payment_reversal` effect exists. The two plain
+  reducer scenarios are invoked by existing `run_all_ai_tests` and prove deterministic effects and
+  committed retry idempotency. They simulate distinct identities in one harness transaction; they
+  are not ordinary-user, two-session or browser certification.
 - AG-04 is invoked from existing `run_all_ai_tests` (no new reducers). Missing/zero correlation
   read-back now fails closed in the production approval coordinator. The immutable creation hash
   still rejects a changed rationale/summary/metadata under an already-bound request key.
@@ -280,7 +285,7 @@ Remaining-case implementation (2026-09-30), branch
   duplicate, corrupt and foreign rows fail closed. Successful result recording also checks its
   JSON/hash. Tests use fresh reconstructed reader fixtures, not a live PostgreSQL reconstruction.
 
-Local next-pass gate (not executed in this code-only pass):
+Local candidate validation (executed 2026-09-30):
 
 ```sh
 cargo fmt --all -- --check
@@ -291,11 +296,20 @@ cargo test --manifest-path ai-gateway/Cargo.toml --locked orchestrator::intellig
 cargo test --manifest-path ai-gateway/Cargo.toml --locked orchestrator::invocation_policy::tests
 cargo test --manifest-path ai-gateway/Cargo.toml --locked orchestrator::proposal_loop::tests
 python3 -m unittest discover -s scripts/tests -p test_ai_harness_reconstruction.py -v
+spacetime build --module-path spacetimedb
+spacetime call --server http://127.0.0.1:3999 --no-config \
+  lumiere-aih-ag03-20260930 run_all_ai_tests
 ```
 
-Publish only to a disposable local module and invoke existing `run_all_ai_tests` with the configured
-test principal. Also run two real clients through exclusive capability claim acquisition and
-verify one consequential dispatch, including the read-miss / claim-after-winner-finished ordering.
+The locked SpacetimeDB test compilation and gateway orchestrator suite passed (372 passed, 5 ignored), the
+reconstruction verifier passed all eight tests, and the complete `run_all_ai_tests` reducer exited
+successfully against a rebuilt disposable loopback module. The workspace-wide formatting commands
+still expose unrelated baseline drift; modified candidate files pass direct `rustfmt --check` and
+`git diff --check`. This is implementation/runtime coverage, not Phase 4 certification.
+
+Still run two real clients through exclusive capability claim acquisition and verify one
+consequential dispatch, including the read-miss / claim-after-winner-finished ordering. AG-03 also
+still needs ordinary-user two-session approval and live gateway/browser evidence.
 
 For AG-09, prepare frozen `lumiere-c7-ai-source` / fresh `lumiere-c7-ai-target` loopback fixtures
 with an active run, steps, a reserved budget and `outcome_unknown` provider attempt, correlated

@@ -469,7 +469,12 @@ mod tests {
     #[tokio::test]
     async fn forged_nested_scope_variants_fail_closed() {
         let base = base();
-        let policy = ReviewedInvocationPolicy::new(PolicyEngine::default(), base.clone(), base.plan.tool_calls.clone()).unwrap();
+        let policy = ReviewedInvocationPolicy::new(
+            PolicyEngine::default(),
+            base.clone(),
+            base.plan.tool_calls.clone(),
+        )
+        .unwrap();
         for arguments in [
             serde_json::json!({"organization_id": 99}),
             serde_json::json!({"nested": [{"Company-ID": "99"}]}),
@@ -477,9 +482,15 @@ mod tests {
             serde_json::json!({"company_id": true}),
             serde_json::json!({"companyId": {"id": 7}}),
         ] {
-            let decision = policy.evaluate(&call(NAMED_READ_TOOL, arguments), 0).await.unwrap();
+            let decision = policy
+                .evaluate(&call(NAMED_READ_TOOL, arguments), 0)
+                .await
+                .unwrap();
             assert_eq!(decision.outcome, DecisionOutcome::Deny);
-            assert!(decision.reasons.iter().any(|reason| reason.code == PolicyReasonCode::InvalidInput));
+            assert!(decision
+                .reasons
+                .iter()
+                .any(|reason| reason.code == PolicyReasonCode::InvalidInput));
         }
     }
 

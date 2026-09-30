@@ -294,7 +294,7 @@ pub struct AllocatePaymentParams {
     pub metadata: Option<String>,
 }
 
-#[derive(SpacetimeType)]
+#[derive(SpacetimeType, Clone, Debug)]
 pub struct ReversePaymentTransactionParams {
     pub company_id: u64,
     pub reason: Option<String>,

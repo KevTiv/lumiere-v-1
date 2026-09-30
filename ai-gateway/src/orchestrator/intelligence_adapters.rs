@@ -396,19 +396,32 @@ impl ReasoningProvider for AgentLoopReasoner<'_> {
                 ReasoningOutcome::DecisionProposal(parse_decision_proposal(args)?)
             }
             TOOL_PROPOSE_CAPABILITY => {
-                if args.keys().any(|key| !matches!(key.as_str(), "capability" | "arguments" | "rationale" | "poll")) {
+                if args.keys().any(|key| {
+                    !matches!(
+                        key.as_str(),
+                        "capability" | "arguments" | "rationale" | "poll"
+                    )
+                }) {
                     bail!("capability proposal contains an unknown envelope field");
                 }
-                if args.get("rationale").is_some_and(|value| !value.is_null() && !value.is_string()) {
+                if args
+                    .get("rationale")
+                    .is_some_and(|value| !value.is_null() && !value.is_string())
+                {
                     bail!("capability rationale must be a string or null");
                 }
                 let poll = match args.get("poll") {
                     None => false,
-                    Some(value) => value.as_bool().context("capability poll must be a boolean")?,
+                    Some(value) => value
+                        .as_bool()
+                        .context("capability poll must be a boolean")?,
                 };
                 ReasoningOutcome::CapabilityProposal(CapabilityProposal {
                     capability: required_str(args, "capability")?,
-                    arguments: args.get("arguments").context("capability arguments are required")?.clone(),
+                    arguments: args
+                        .get("arguments")
+                        .context("capability arguments are required")?
+                        .clone(),
                     rationale: optional_str(args, "rationale"),
                     poll,
                 })
@@ -1053,14 +1066,38 @@ mod tests {
         let mut calls = vec![
             vec![tool_call("unoffered", valid.clone())],
             vec![tool_call(TOOL_PROPOSE_CAPABILITY, Value::Null)],
-            vec![tool_call(TOOL_PROPOSE_CAPABILITY, json!({"capability": "erp.search"}))],
-            vec![tool_call(TOOL_PROPOSE_CAPABILITY, json!({"capability": "erp.search", "arguments": []}))],
-            vec![tool_call(TOOL_PROPOSE_CAPABILITY, json!({"capability": "erp.search", "arguments": {}, "poll": "true"}))],
-            vec![tool_call(TOOL_PROPOSE_CAPABILITY, json!({"capability": "erp.search", "arguments": {}, "rationale": 1}))],
-            vec![tool_call(TOOL_PROPOSE_CAPABILITY, json!({"capability": "erp.search", "arguments": {}, "organization_id": 99}))],
-            vec![tool_call(TOOL_PROPOSE_CAPABILITY, json!({"capability": "erp.search", "arguments": {"q": "x".repeat(16_384)}}))],
-            vec![tool_call(TOOL_PROPOSE_CAPABILITY, json!({"capability": "x".repeat(257), "arguments": {}}))],
-            vec![tool_call(TOOL_PROPOSE_CAPABILITY, valid.clone()), tool_call(TOOL_PROPOSE_CAPABILITY, valid.clone())],
+            vec![tool_call(
+                TOOL_PROPOSE_CAPABILITY,
+                json!({"capability": "erp.search"}),
+            )],
+            vec![tool_call(
+                TOOL_PROPOSE_CAPABILITY,
+                json!({"capability": "erp.search", "arguments": []}),
+            )],
+            vec![tool_call(
+                TOOL_PROPOSE_CAPABILITY,
+                json!({"capability": "erp.search", "arguments": {}, "poll": "true"}),
+            )],
+            vec![tool_call(
+                TOOL_PROPOSE_CAPABILITY,
+                json!({"capability": "erp.search", "arguments": {}, "rationale": 1}),
+            )],
+            vec![tool_call(
+                TOOL_PROPOSE_CAPABILITY,
+                json!({"capability": "erp.search", "arguments": {}, "organization_id": 99}),
+            )],
+            vec![tool_call(
+                TOOL_PROPOSE_CAPABILITY,
+                json!({"capability": "erp.search", "arguments": {"q": "x".repeat(16_384)}}),
+            )],
+            vec![tool_call(
+                TOOL_PROPOSE_CAPABILITY,
+                json!({"capability": "x".repeat(257), "arguments": {}}),
+            )],
+            vec![
+                tool_call(TOOL_PROPOSE_CAPABILITY, valid.clone()),
+                tool_call(TOOL_PROPOSE_CAPABILITY, valid.clone()),
+            ],
             vec![],
         ];
         let mut malformed = tool_call(TOOL_PROPOSE_CAPABILITY, valid);
@@ -1070,9 +1107,17 @@ mod tests {
             let mut response = base_response();
             response.tool_calls = tool_calls;
             let transport = ScriptedLlm::new(vec![response]);
-            let reasoner = AgentLoopReasoner::new(&transport, "mistral".into(), "mistral-large-latest".into());
-            assert!(reasoner.reason(reasoning_request(vec![PROPOSAL_KIND_CAPABILITY])).await.is_err());
-            assert_eq!(transport.requests().len(), 1, "protocol errors must not consume a fallback call");
+            let reasoner =
+                AgentLoopReasoner::new(&transport, "mistral".into(), "mistral-large-latest".into());
+            assert!(reasoner
+                .reason(reasoning_request(vec![PROPOSAL_KIND_CAPABILITY]))
+                .await
+                .is_err());
+            assert_eq!(
+                transport.requests().len(),
+                1,
+                "protocol errors must not consume a fallback call"
+            );
         }
     }
 
