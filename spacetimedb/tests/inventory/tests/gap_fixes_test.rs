@@ -116,6 +116,14 @@ fn create_quant(
     quantity: f64,
     lot_id: Option<u64>,
 ) -> Result<u64, String> {
+    let currency_id = ctx
+        .db
+        .company()
+        .id()
+        .find(&company_id)
+        .ok_or_else(|| format!("company {company_id} missing for stock quant"))?
+        .currency_id;
+
     create_stock_quant(
         ctx,
         organization_id,
@@ -139,7 +147,7 @@ fn create_quant(
             cost: 10.0,
             cost_method: Some("standard".to_string()),
             accounting_date: None,
-            currency_id: Some(1),
+            currency_id: Some(currency_id),
             accounting_entry_ids: vec![],
             metadata: Some(r#"{"test":"gap_fixes"}"#.to_string()),
         },
@@ -184,7 +192,7 @@ fn create_tracked_product(
             uom_po_id: base.uom_po_id,
             standard_price: 10.0,
             list_price: 20.0,
-            currency_id: 1,
+            currency_id: fixture.currency_id,
             default_code: Some(code.to_string()),
             barcode: None,
             description: None,
@@ -250,7 +258,7 @@ pub fn test_company_isolation_on_reserve(ctx: &ReducerContext) -> Result<(), Str
         CreateCompanyParams {
             name: "Iso Company B".to_string(),
             code: format!("CB-{}", fixture.company_id),
-            currency_id: 1,
+            currency_id: fixture.currency_id,
             fiscal_year_end_month: 12,
             fiscal_year_end_day: 31,
             is_parent: false,
@@ -1656,7 +1664,7 @@ pub fn test_replenishment_creates_draft_po(ctx: &ReducerContext) -> Result<(), S
             product_id: Some(fixture.product_id),
             min_qty: 1.0,
             price: 12.0,
-            currency_id: 1,
+            currency_id: fixture.currency_id,
             delay: 3,
             sequence: 1,
             product_name: None,
@@ -1849,7 +1857,7 @@ pub fn test_replenishment_scheduled_run_reschedules(ctx: &ReducerContext) -> Res
             product_id: Some(fixture.product_id),
             min_qty: 1.0,
             price: 12.0,
-            currency_id: 1,
+            currency_id: fixture.currency_id,
             delay: 3,
             sequence: 1,
             product_name: None,
@@ -3086,7 +3094,7 @@ pub fn test_cartonization_packs_moves(ctx: &ReducerContext) -> Result<(), String
             height: 20.0,
             volume: 100.0,
             cost: 1.0,
-            currency_id: 1,
+            currency_id: fixture.currency_id,
             barcode: None,
             is_active: true,
             metadata: None,
@@ -4071,7 +4079,7 @@ pub fn test_packing_workflow(ctx: &ReducerContext) -> Result<(), String> {
             height: 20.0,
             volume: 100.0,
             cost: 1.0,
-            currency_id: 1,
+            currency_id: fixture.currency_id,
             barcode: None,
             is_active: true,
             metadata: None,
@@ -4916,7 +4924,7 @@ pub fn test_multi_wh_promise_atp(ctx: &ReducerContext) -> Result<(), String> {
         CreatePricelistParams {
             company_id: None,
             name: "MultiWH PL".to_string(),
-            currency_id: 1,
+            currency_id: fixture.currency_id,
             discount_policy: DiscountPolicy::WithDiscount,
         },
     )?;
@@ -4937,7 +4945,7 @@ pub fn test_multi_wh_promise_atp(ctx: &ReducerContext) -> Result<(), String> {
             partner_invoice_id: fixture.partner_id,
             partner_shipping_id: fixture.partner_id,
             pricelist_id,
-            currency_id: 1,
+            currency_id: fixture.currency_id,
             warehouse_id: fixture.warehouse_id,
             order_lines: vec![CreateSaleOrderLineParams {
                 product_id: fixture.product_id,
