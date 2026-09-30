@@ -5,7 +5,36 @@ import {
   type CanonicalRecordRef,
 } from './operation-effect';
 
-type Projection = Readonly<Record<string, unknown>>;
+interface Projection {
+  readonly id?: unknown;
+  readonly organizationId?: unknown;
+  readonly organization_id?: unknown;
+  readonly companyId?: unknown;
+  readonly company_id?: unknown;
+  readonly workorderId?: unknown;
+  readonly workorder_id?: unknown;
+  readonly qualityState?: unknown;
+  readonly quality_state?: unknown;
+  readonly status?: unknown;
+  readonly bomId?: unknown;
+  readonly bom_id?: unknown;
+  readonly productId?: unknown;
+  readonly product_id?: unknown;
+  readonly productionId?: unknown;
+  readonly production_id?: unknown;
+  readonly scrapped?: unknown;
+  readonly reference?: unknown;
+  readonly ruleId?: unknown;
+  readonly rule_id?: unknown;
+  readonly scheduledId?: unknown;
+  readonly scheduled_id?: unknown;
+  readonly validationStatus?: unknown;
+  readonly validation_status?: unknown;
+  readonly timesheetInvoiceId?: unknown;
+  readonly timesheet_invoice_id?: unknown;
+  readonly acknowledgedAt?: unknown;
+  readonly acknowledged_at?: unknown;
+}
 
 function field(row: Projection, camel: string, snake: string): unknown {
   return row[camel] ?? row[snake];
