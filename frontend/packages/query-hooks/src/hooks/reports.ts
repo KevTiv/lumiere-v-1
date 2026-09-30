@@ -23,7 +23,7 @@ import type {
   ScheduledReport,
   TrialBalance,
 } from "@lumiere/stdb/types"
-import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
+import { encodeTimestampMicros, stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
 import { i18n } from "@lumiere/i18n"
 import { stbTimestampFromDate } from "@lumiere/erp-shared/stb-timestamp"
 import { downloadDocumentExport } from "./templates"
@@ -534,10 +534,12 @@ export function useRecordReportRun(organizationId: bigint) {
     { reportId: string | number | bigint; nextRun: string | number | Date }
   >({
     mutationFn: async (params) => {
-      const nextRun =
+      const nextRunDate =
         params.nextRun instanceof Date
-          ? params.nextRun.toISOString()
-          : String(params.nextRun)
+          ? params.nextRun
+          : new Date(String(params.nextRun))
+      if (Number.isNaN(nextRunDate.getTime())) throw new Error("Invalid next run timestamp")
+      const nextRun = encodeTimestampMicros(stbTimestampFromDate(nextRunDate))
       const reportId = BigInt(params.reportId)
 
       const before = await fetchQueryList("/api/query/scheduled-reports", "Failed to read scheduled reports")
