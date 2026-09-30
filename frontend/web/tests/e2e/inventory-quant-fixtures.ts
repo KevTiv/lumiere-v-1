@@ -797,6 +797,89 @@ export async function createReplenishmentRuleViaUi(
   ])
 }
 
+export async function fetchReplenishmentRuleIdByLocation(
+  page: Page,
+  productId: number,
+  locationId: number,
+): Promise<number> {
+  const response = await page.request.get("/api/query/replenishment-rules")
+  if (!response.ok()) throw new Error("Failed to query replenishment rules")
+  const payload = (await response.json()) as {
+    data?: Array<Record<string, unknown>>
+  }
+  const matches = (payload.data ?? []).filter(
+    (row) =>
+      scalarQueryId(row.productId ?? row.product_id) === productId &&
+      scalarQueryId(row.locationId ?? row.location_id) === locationId,
+  )
+  if (matches.length !== 1) {
+    throw new Error(`Expected exactly one replenishment rule, got ${matches.length}`)
+  }
+  const id = scalarQueryId(matches[0]?.id)
+  if (id == null) throw new Error("Replenishment rule has no id")
+  return id
+}
+
+export async function fetchReplenishmentScheduledRunJobId(
+  page: Page,
+  ruleId: number,
+): Promise<number | null> {
+  const response = await page.request.get("/api/query/replenishment-rules")
+  if (!response.ok()) throw new Error("Failed to query replenishment rules")
+  const payload = (await response.json()) as {
+    data?: Array<Record<string, unknown>>
+  }
+  const row = (payload.data ?? []).find(
+    (candidate) => scalarQueryId(candidate.id) === ruleId,
+  )
+  if (!row) throw new Error(`Replenishment rule ${ruleId} was not found`)
+  const hasPointer =
+    Object.prototype.hasOwnProperty.call(row, "scheduledRunJobId") ||
+    Object.prototype.hasOwnProperty.call(row, "scheduled_run_job_id")
+  if (!hasPointer) {
+    throw new Error("Replenishment scheduler pointer is not projected")
+  }
+  return (
+    scalarQueryId(row.scheduledRunJobId ?? row.scheduled_run_job_id) ?? null
+  )
+}
+
+export async function scheduleReplenishmentRunViaUi(
+  page: Page,
+  ruleId: number,
+): Promise<void> {
+  await gotoModule(page, "/inventory", "inventory")
+  await selectModuleTab(page, "inventory", "replenishment")
+  await selectEntityRowById(page, ruleId)
+  await Promise.all([
+    page.waitForResponse(
+      (response) =>
+        matchesOperationResponse(response, "schedule_replenishment_run") &&
+        response.ok(),
+      { timeout: 30_000 },
+    ),
+    page.getByTestId("entity-action-schedule-replenishment-run").click(),
+  ])
+}
+
+export async function cancelReplenishmentRunViaUi(
+  page: Page,
+  ruleId: number,
+): Promise<void> {
+  await gotoModule(page, "/inventory", "inventory")
+  await selectModuleTab(page, "inventory", "replenishment")
+  await selectEntityRowById(page, ruleId)
+  await Promise.all([
+    page.waitForResponse(
+      (response) =>
+        matchesOperationResponse(response, "cancel_replenishment_run") &&
+        response.ok(),
+      { timeout: 30_000 },
+    ),
+    page.getByTestId("entity-action-cancel-replenishment-run").click(),
+  ])
+}
+
 /** Execute a replenishment rule through its row action, accepting the confirm dialog. */
 export async function executeReplenishmentRuleViaUi(
   page: Page,

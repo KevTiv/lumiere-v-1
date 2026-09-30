@@ -4879,6 +4879,8 @@
       "trigger": "Trigger now",
       "executeRule": "Stamp rule run",
       "executeRuleHint": "Updates last_run / next_run for this rule (not the same as “Trigger now”, which evaluates stock).",
+      "scheduleRun": "Schedule automatic run",
+      "cancelRun": "Cancel automatic run",
       "confirmDelete": "Delete this replenishment rule?"
     },
     "pickingWaveActions": {

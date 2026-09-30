@@ -76,10 +76,14 @@ import { usePickingWorkflow } from '@lumiere/query-hooks/hooks/picking-workflow'
 import { useStockQuantWorkflow } from '@lumiere/query-hooks/hooks/stock-quant-workflow';
 import { useQualityCheckFailWorkflow } from '@lumiere/query-hooks/hooks/quality-check-fail-workflow';
 import { useReplenishmentExecutionWorkflow } from '@lumiere/query-hooks/hooks/replenishment-execution-workflow';
+import { useReplenishmentScheduleWorkflow } from '@lumiere/query-hooks/hooks/replenishment-schedule-workflow';
 import { useSerialReserveWorkflow } from '@lumiere/query-hooks/hooks/serial-reserve-workflow';
 import { useSerialUseWorkflow } from '@lumiere/query-hooks/hooks/serial-use-workflow';
 import { useSerialBlockWorkflow } from '@lumiere/query-hooks/hooks/serial-block-workflow';
-import { planPartialDelivery } from '@lumiere/erp-workflows';
+import {
+  planPartialDelivery,
+  replenishmentScheduleState,
+} from '@lumiere/erp-workflows';
 import { groupBy } from '@/lib/utils';
 import { InventoryOpsPanel } from './inventory-ops-panel';
 import {
@@ -1160,6 +1164,11 @@ function InventoryClientLoaded({
   const addMemberToQualityTeam = useAddMemberToQualityTeam(orgId);
   const removeMemberFromQualityTeam = useRemoveMemberFromQualityTeam(orgId);
   const executeReplenishmentRule = useReplenishmentExecutionWorkflow(
+    orgId,
+    operatingCompanyId,
+    workflowSurface,
+  );
+  const replenishmentSchedule = useReplenishmentScheduleWorkflow(
     orgId,
     operatingCompanyId,
     workflowSurface,
@@ -3553,6 +3562,45 @@ function InventoryClientLoaded({
                     }
                   },
                 },
+                {
+                  id: 'schedule-replenishment-run',
+                  label: t('inventory.replenishmentActions.scheduleRun'),
+                  icon: Play,
+                  requiresSelection: true,
+                  isApplicable: (rows) => {
+                    if (rows.length !== 1) return false;
+                    const state = replenishmentScheduleState(rows[0] ?? {});
+                    return state.readable && state.jobId === null;
+                  },
+                  onClick: (rows) => {
+                    const id = rows[0]?.id as ScalarId | undefined;
+                    if (id != null) {
+                      void replenishmentSchedule.schedule(String(id), {
+                        navigateToNext: true,
+                      });
+                    }
+                  },
+                },
+                {
+                  id: 'cancel-replenishment-run',
+                  label: t('inventory.replenishmentActions.cancelRun'),
+                  icon: XCircle,
+                  variant: 'destructive',
+                  requiresSelection: true,
+                  isApplicable: (rows) => {
+                    if (rows.length !== 1) return false;
+                    const state = replenishmentScheduleState(rows[0] ?? {});
+                    return state.readable && state.jobId !== null;
+                  },
+                  onClick: (rows) => {
+                    const id = rows[0]?.id as ScalarId | undefined;
+                    if (id != null) {
+                      void replenishmentSchedule.cancel(String(id), {
+                        navigateToNext: true,
+                      });
+                    }
+                  },
+                },
               ],
             },
           },
@@ -4110,6 +4158,7 @@ function InventoryClientLoaded({
     cancelWarehouseTask,
     updateWarehouseTaskStatus,
     executeReplenishmentRule,
+    replenishmentSchedule,
     startQualityCheck,
     openQualityAlert,
     solveQualityAlert,
@@ -4557,6 +4606,7 @@ function InventoryClientLoaded({
       addMemberToQualityTeam,
       removeMemberFromQualityTeam,
       executeReplenishmentRule,
+      replenishmentSchedule,
       createStockQuant,
       updateStockQuantQuantity,
       updateStockProductionLot,

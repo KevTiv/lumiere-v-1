@@ -497,6 +497,11 @@
       "reason": "invoked by an enumerated frontend BFF call site"
     },
     {
+      "name": "cancel_replenishment_run",
+      "exposure": "session",
+      "reason": "COV-06o exposes the permission-checked replenishment scheduler cancel action through the Inventory UI"
+    },
+    {
       "name": "cancel_return_order",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
@@ -3523,6 +3528,11 @@
       "name": "schedule_document_retention_purge",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
+    },
+    {
+      "name": "schedule_replenishment_run",
+      "exposure": "session",
+      "reason": "COV-06o exposes the permission-checked replenishment scheduler action through the Inventory UI"
     },
     {
       "name": "schedule_sales_sla_escalation",
