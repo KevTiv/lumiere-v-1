@@ -14,9 +14,8 @@ use crate::accounting::payments::account_payment;
 use crate::accounting_tests::helpers::{create_balanced_customer_invoice, seed_bank_journal};
 use crate::ai::action_drafts::{
     ai_action_draft, ai_action_draft_request, approve_ai_action_draft, create_ai_action_draft,
-    create_ai_run_action_draft, payment_reversal_source_snapshot_hash,
-    payment_source_snapshot_hash, update_ai_action_draft_params, CreateAiActionDraftParams,
-    UpdateAiActionDraftParamsParams,
+    create_ai_run_action_draft, payment_source_snapshot_hash, update_ai_action_draft_params,
+    CreateAiActionDraftParams, UpdateAiActionDraftParamsParams,
 };
 use crate::ai::capability_execution::{
     ai_capability_execution, claim_ai_capability_execution, record_ai_capability_execution_result,
@@ -527,17 +526,10 @@ fn seed_reversal_case(ctx: &ReducerContext, marker: &str) -> Result<ReversalCase
 }
 
 fn reversal_draft_params(
-    ctx: &ReducerContext,
+    _ctx: &ReducerContext,
     case: &ReversalCase,
     reason: &str,
 ) -> Result<CreateAiActionDraftParams, String> {
-    let payment = ctx
-        .db
-        .payment_transaction()
-        .id()
-        .find(&case.payment_id)
-        .ok_or("AG-03 reversal source disappeared")?;
-    let snapshot_hash = payment_reversal_source_snapshot_hash(ctx, &payment)?;
     Ok(CreateAiActionDraftParams {
         reducer_name: "reverse_payment_transaction".into(),
         params_json: serde_json::json!({
@@ -559,15 +551,8 @@ fn reversal_draft_params(
                 "skill_key": "ag03-payment-reversal",
                 "skill_version": "1",
                 "policy_decision_hash": "ag03-policy",
-                "source_snapshot_hash": snapshot_hash,
                 "diff_hash": "ag03-reversal-diff",
-                "required_approver_permission": "payment_transaction:reverse",
                 "correction_plan": "reverse the compensating entry through the ordinary accounting route",
-                "payment_reversal_source": {
-                    "company_id": case.fixture.company_id,
-                    "transaction_id": case.payment_id,
-                    "snapshot_hash": snapshot_hash,
-                },
             })
             .to_string(),
         ),
@@ -665,6 +650,51 @@ pub fn test_payment_reversal_draft_is_bound_and_idempotent(
     .is_ok()
     {
         return Err("AG-03 reversal draft accepted an approval-bypass field".into());
+    }
+    let mut forged_binding = base.clone();
+    let mut forged_metadata: serde_json::Value = serde_json::from_str(
+        forged_binding
+            .metadata
+            .as_deref()
+            .ok_or("AG-03 governance metadata missing")?,
+    )
+    .map_err(|error| format!("AG-03 invalid governance fixture: {error}"))?;
+    forged_metadata["payment_reversal_source"] = serde_json::json!({
+        "company_id": case.fixture.company_id,
+        "transaction_id": case.payment_id,
+        "snapshot_hash": "0".repeat(64),
+    });
+    forged_binding.metadata = Some(forged_metadata.to_string());
+    if create_ai_action_draft(
+        ctx,
+        case.fixture.organization_id,
+        case.fixture.company_id,
+        forged_binding,
+    )
+    .is_ok()
+    {
+        return Err("AG-03 reversal draft accepted a caller-supplied source binding".into());
+    }
+    let mut forged_lifecycle = base.clone();
+    let mut forged_metadata: serde_json::Value = serde_json::from_str(
+        forged_lifecycle
+            .metadata
+            .as_deref()
+            .ok_or("AG-03 governance metadata missing")?,
+    )
+    .map_err(|error| format!("AG-03 invalid governance fixture: {error}"))?;
+    forged_metadata["approval_channel"] = serde_json::json!("ai_action_draft");
+    forged_metadata["workflow_instance_id"] = serde_json::json!(1);
+    forged_lifecycle.metadata = Some(forged_metadata.to_string());
+    if create_ai_action_draft(
+        ctx,
+        case.fixture.organization_id,
+        case.fixture.company_id,
+        forged_lifecycle,
+    )
+    .is_ok()
+    {
+        return Err("AG-03 reversal draft accepted caller-supplied lifecycle authority".into());
     }
     let mut retargeted = base.clone();
     retargeted.params_json = serde_json::json!({

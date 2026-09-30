@@ -37,6 +37,11 @@ const DRAFT_TTL_SECS: u64 = 86_400;
 const REQUEST_KEY_MAX_LEN: usize = 160;
 const REVERSAL_REASON_MAX_LEN: usize = 500;
 const REVERSE_PAYMENT_TRANSACTION: &str = "reverse_payment_transaction";
+const SERVER_OWNED_REVERSAL_METADATA_FIELDS: [&str; 3] = [
+    "approval_channel",
+    "payment_reversal_source",
+    "workflow_instance_id",
+];
 const ELEVATED_GOVERNANCE_FIELDS: [&str; 8] = [
     "risk",
     "skill_key",
@@ -147,7 +152,7 @@ fn create_ai_action_draft_inner(
     ctx: &ReducerContext,
     organization_id: u64,
     company_id: u64,
-    params: CreateAiActionDraftParams,
+    mut params: CreateAiActionDraftParams,
 ) -> Result<AiActionDraft, String> {
     check_permission(ctx, organization_id, "ai_action_draft", "create")?;
     require_company_in_organization(ctx, organization_id, company_id)?;
@@ -166,6 +171,14 @@ fn create_ai_action_draft_inner(
     if !params.confidence.is_finite() || !(0.0..=1.0).contains(&params.confidence) {
         return Err("confidence must be finite and between 0 and 1".to_string());
     }
+    bind_authoritative_reversal_source(
+        ctx,
+        organization_id,
+        company_id,
+        &reducer_name,
+        &params.params_json,
+        &mut params.metadata,
+    )?;
     if params.elevated {
         validate_elevated_governance_metadata(params.metadata.as_deref())?;
     }
@@ -745,6 +758,75 @@ struct PaymentReversalSourceBinding {
     snapshot_hash: String,
 }
 
+/// Bind reversal drafts to server-read source state at creation time. Callers
+/// describe the intended target and governance decision, but cannot supply or
+/// override the state fingerprint that later authorizes approval.
+fn bind_authoritative_reversal_source(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    reducer_name: &str,
+    params_json: &str,
+    raw_metadata: &mut Option<String>,
+) -> Result<(), String> {
+    if reducer_name != REVERSE_PAYMENT_TRANSACTION {
+        return Ok(());
+    }
+    let payload = parse_reverse_payment_draft_payload(params_json)?;
+    if payload.company_id != company_id {
+        return Err("reversal payload company_id does not match draft company scope".to_string());
+    }
+    let raw = raw_metadata
+        .as_deref()
+        .ok_or("payment reversal draft requires governance metadata")?;
+    let mut metadata: Value = serde_json::from_str(raw)
+        .map_err(|error| format!("invalid payment reversal governance metadata: {error}"))?;
+    let object = metadata
+        .as_object_mut()
+        .ok_or("payment reversal governance metadata must be a JSON object")?;
+    if let Some(field) = SERVER_OWNED_REVERSAL_METADATA_FIELDS
+        .into_iter()
+        .find(|field| object.contains_key(*field))
+    {
+        return Err(format!(
+            "{field} is server-derived and must not be supplied by callers"
+        ));
+    }
+    let payment = ctx
+        .db
+        .payment_transaction()
+        .id()
+        .find(&payload.transaction_id)
+        .ok_or("payment reversal source transaction not found")?;
+    if payment.organization_id != organization_id || payment.company_id != company_id {
+        return Err(
+            "payment reversal source is outside the requested organization/company".to_string(),
+        );
+    }
+    if payment.status != PaymentTransactionStatus::Posted {
+        return Err("payment reversal source must be a posted transaction".to_string());
+    }
+    let snapshot_hash = payment_reversal_source_snapshot_hash(ctx, &payment)?;
+    object.insert(
+        "source_snapshot_hash".to_string(),
+        Value::String(snapshot_hash.clone()),
+    );
+    object.insert(
+        "required_approver_permission".to_string(),
+        Value::String("payment_transaction:reverse".to_string()),
+    );
+    object.insert(
+        "payment_reversal_source".to_string(),
+        serde_json::json!({
+            "company_id": company_id,
+            "transaction_id": payload.transaction_id,
+            "snapshot_hash": snapshot_hash,
+        }),
+    );
+    *raw_metadata = Some(metadata.to_string());
+    Ok(())
+}
+
 fn validate_draft_payload_and_sources(
     ctx: &ReducerContext,
     organization_id: u64,
@@ -805,7 +887,7 @@ fn validate_reverse_payment_source(
         .ok_or("payment reversal governance metadata must be a JSON object")?;
     let allowed_fields: BTreeSet<&str> = ELEVATED_GOVERNANCE_FIELDS
         .into_iter()
-        .chain(["payment_reversal_source"])
+        .chain(SERVER_OWNED_REVERSAL_METADATA_FIELDS)
         .collect();
     if let Some(field) = object
         .keys()
@@ -823,6 +905,23 @@ fn validate_reverse_payment_source(
         return Err(
             "payment reversal draft requires approver permission payment_transaction:reverse"
                 .to_string(),
+        );
+    }
+    if object
+        .get("approval_channel")
+        .is_some_and(|value| value.as_str() != Some("ai_action_draft"))
+    {
+        return Err(
+            "payment reversal draft has an invalid server-owned approval channel".to_string(),
+        );
+    }
+    if object.get("workflow_instance_id").is_some_and(|value| {
+        value
+            .as_u64()
+            .is_none_or(|workflow_instance_id| workflow_instance_id == 0)
+    }) {
+        return Err(
+            "payment reversal draft has an invalid server-owned workflow instance".to_string(),
         );
     }
     let source: PaymentReversalSourceBinding = serde_json::from_value(

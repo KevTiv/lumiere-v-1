@@ -320,6 +320,7 @@ pub fn default_reducer_permission(reducer_name: &str) -> Option<(&'static str, &
         "create_task" => Some(("project_task", "create")),
         "create_sale_order" => Some(("sale_order", "create")),
         "create_purchase_order" => Some(("purchase_order", "create")),
+        "reverse_payment_transaction" => Some(("payment_transaction", "reverse")),
         _ => None,
     }
 }
