@@ -46,7 +46,7 @@ function field(
 
 function exactRow(
   rows: readonly Projection[],
-  idField: [string, string],
+  idField: [keyof Projection, keyof Projection],
   id: bigint,
   label: string,
 ): Projection | null {
