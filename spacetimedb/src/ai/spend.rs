@@ -1132,6 +1132,40 @@ mod tests {
     }
 
     #[test]
+    fn competing_budget_reservations_never_overspend_in_any_serialization_order() {
+        // Reducers are transactionally serialized by SpacetimeDB. Exercise
+        // both possible commit orders for two contenders whose combined
+        // allowance exceeds the shared budget.
+        for costs in [[60, 50], [50, 60]] {
+            let mut outstanding = 0;
+            let mut admitted = Vec::new();
+            for cost in costs {
+                match reserve_units(100, 0, outstanding, cost) {
+                    Ok(next) => {
+                        outstanding = next;
+                        admitted.push(cost);
+                    }
+                    Err(_) => {}
+                }
+                assert!(outstanding <= 100);
+            }
+            assert_eq!(admitted, vec![costs[0]]);
+            assert_eq!(outstanding, costs[0]);
+        }
+
+        // When the contenders exactly fit, both commit in either order and
+        // the shared outstanding balance reaches, but never exceeds, the cap.
+        for costs in [[60, 40], [40, 60]] {
+            let mut outstanding = 0;
+            for cost in costs {
+                outstanding = reserve_units(100, 0, outstanding, cost).unwrap();
+                assert!(outstanding <= 100);
+            }
+            assert_eq!(outstanding, 100);
+        }
+    }
+
+    #[test]
     fn settlement_and_admission_reject_overflow_underflow_and_overcharge() {
         assert!(reserve_units(u64::MAX, 1, u64::MAX, 0).is_err());
         assert!(reserve_units(u64::MAX, 0, u64::MAX, 1).is_err());

@@ -241,14 +241,18 @@ Legend — Class: **C** covered, **P** partial, **N** not covered, **B** blocked
 | Case | Existing coverage | Missing coverage | Best layer | Runs on main? | Prerequisite | Implementation | Class |
 |------|-------------------|------------------|-----------|---------------|--------------|----------------|-------|
 | Policy denial executes no tool / draft-only creates pending draft | P4-AI-01, P4-AI-02 | exactly-one draft on replay | E2E | yes (gateway required) | #26 for correlation replay | reused; AG-04 (gated) | P |
-| Elevated separation of duties (requester, simultaneous approvers) | code check only | two-session proof | E2E | yes | — | AG-02 | N |
-| Malicious ERP text stays data | — | all | E2E (gateway required) | yes | — | AG-01 | N |
+| Elevated separation of duties (requester, simultaneous approvers) | AG-02 two-session browser proof | fresh-runtime acceptance evidence | E2E | yes | — | AG-02 | P |
+| Malicious ERP text stays data | AG-01 governed action-draft bridge proof | live gateway-backed acceptance evidence | E2E (gateway required) | yes | — | AG-01 | P |
 | Stale action draft (payment changed before approval) | — | source-version binding | STDB + E2E | no | #26 exact draft correlation | AG-03 (gated) | B |
-| Ambiguous provider timeout / no blind redispatch | — | all | ai-gateway | no | #23, #26 | AG-05 (gated) | B |
-| Concurrent budget reservations | — | all | STDB (spend.rs) | no | #26 | AG-06 (gated) | B |
+| Ambiguous provider timeout / no blind redispatch | `restart_after_ambiguous_timeout_never_redispatches` plus unknown-outcome persistence coverage | fresh durable-runtime restart acceptance | ai-gateway | yes | — | AG-05 | P |
+| Concurrent budget reservations | `competing_budget_reservations_never_overspend_in_any_serialization_order` plus settlement-replay coverage | live two-client reducer acceptance | STDB (`spend.rs`) | yes | — | AG-06 | P |
 | Permission / capability changes mid-run | `governed_services::tests::revocation_is_rechecked_before_replaying_recovered_output` | broader live admin-revocation E2E | ai-gateway | yes | — | AG-07 | C |
 | Tool protocol fuzzing | #23 `agent_loop_tests.rs` (loop bounds) | duplicate ids, unknown tool, malformed/oversized args, forged org/company, post-terminal calls, duplicate red action, reconnect replay | ai-gateway | no | #23, #24 | AG-08 (gated) | B |
 | Recovery of run/budget/tool steps/pending drafts | — | all | reconstruction drill | no | #26 + reconstruction coverage | AG-09 (gated) | B |
+
+Implementation note (2026-09-30): AG-05 and AG-06 now have blocking owner-layer tests on
+`codex/aih-phase4-spend-safety`. Promotion from **P** to **C** is intentionally deferred until the
+fresh durable-runtime restart and two-client reducer gates are run on the local machine.
 
 ### Mobile / network, personas, recovery
 

@@ -113,25 +113,36 @@ export const CAPABILITIES = {
     ],
   },
   agentLoop: {
-    id: "agent-loop",
-    prerequisite: "Requires H4 bounded agent loop and event persistence (PR #23).",
+    id: "governed-capability-loop",
+    prerequisite:
+      "Requires AG-08 tool-protocol certification against the landed governed proposal/program runtime.",
     probes: [
-      { kind: "source", path: "ai-gateway/src/orchestrator/agent_loop.rs" },
+      {
+        kind: "source",
+        path: "ai-gateway/src/orchestrator/governed_services.rs",
+        contains: "GovernedCapabilityService",
+      },
+      { kind: "source", path: "ai-gateway/src/orchestrator/proposal_loop.rs" },
       { kind: "ai-gateway" },
     ],
   },
   agentPolicy: {
     id: "agent-per-call-policy",
-    prerequisite: "Requires H5a per-call policy enforcement and approval stops (PR #24).",
+    prerequisite:
+      "Requires the landed governed capability service with per-call admission; AG-07 is certified by a blocking unit test.",
     probes: [
-      { kind: "source", path: "ai-gateway/src/orchestrator/invocation_policy.rs" },
+      {
+        kind: "source",
+        path: "ai-gateway/src/orchestrator/governed_services.rs",
+        contains: "self.admission.admit(proposal, completed_calls)",
+      },
       { kind: "ai-gateway" },
     ],
   },
   agentBudgetPersistence: {
     id: "agent-budget-persistence",
     prerequisite:
-      "Requires H5 durable agent budget/run-draft persistence after AI harness stack merges (PR #26).",
+      "Landed durable spend/run-draft storage is present; AG-03, AG-04, and AG-09 still need certification against it.",
     probes: [
       { kind: "source", path: "spacetimedb/src/ai/spend.rs" },
       { kind: "reducer", pattern: /^reserve_ai_spend$/ },
