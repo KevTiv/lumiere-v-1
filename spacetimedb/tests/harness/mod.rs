@@ -755,11 +755,15 @@ impl PurchasingIntegrityFixture {
             &format!("XCO-{suffix}"),
         )?;
 
+        // Currencies are organization-owned, so the foreign scope needs its own
+        // currency; reusing the primary one is rejected at company creation.
         let foreign_base = OrgFixture::seed_minimal(ctx)?;
+        let foreign_currency_id =
+            seed_distinctive_currency(ctx, foreign_base.organization_id, suffix)?;
         let foreign = seed_purchasing_integrity_scope(
             ctx,
             foreign_base.organization_id,
-            currency_id,
+            foreign_currency_id,
             &format!("FOR-{suffix}"),
         )?;
 

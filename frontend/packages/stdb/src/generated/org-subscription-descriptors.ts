@@ -864,6 +864,11 @@ export const ORG_SUBSCRIPTION_QUERY_DESCRIPTORS = {
       }
     ]
   },
+  "landed-cost-applications": {
+    "table": "stock_landed_cost_application",
+    "predicates": [],
+    "order_by": []
+  },
   "landed-cost-lines": {
     "table": "stock_landed_cost_lines",
     "predicates": [],
@@ -1546,6 +1551,11 @@ export const ORG_SUBSCRIPTION_QUERY_DESCRIPTORS = {
   },
   "resource-utilisation-by-employee": {
     "table": "resource_utilisation_snapshot",
+    "predicates": [],
+    "order_by": []
+  },
+  "return-order-creations": {
+    "table": "return_order_creation",
     "predicates": [],
     "order_by": []
   },

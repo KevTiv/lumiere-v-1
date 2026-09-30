@@ -193,7 +193,15 @@ fn rejects_non_projected_codec_modes() {
 fn pinned_projection_codecs_are_parsed_once_and_reused() {
     let manifest = projection_worker::PROJECTION_CODEC_MANIFEST_JSON;
     let parsed = projection_codecs(manifest).expect("pinned projection codecs");
-    assert_eq!(parsed.len(), 452);
+    // Every projected (non-snapshot) table in the pinned manifest gets exactly one codec.
+    let projected = serde_json::from_str::<Value>(manifest).expect("pinned codec manifest JSON")["tables"]
+        .as_object()
+        .expect("codec manifest tables")
+        .values()
+        .filter(|entry| entry.get("projection_mode").and_then(Value::as_str) != Some("snapshot"))
+        .count();
+    assert!(projected > 0, "pinned codec manifest projects no tables");
+    assert_eq!(parsed.len(), projected);
     let table = parsed.keys().next().expect("at least one codec");
     let cached = cached_projection_codec(table).expect("cached projection codec");
     assert_eq!(cached.table_name, *table);
