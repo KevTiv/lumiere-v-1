@@ -1,17 +1,16 @@
 "use client"
 
 
-import { decodeOperationDispatch } from '@lumiere/api-client'
-import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
-import { scalarToU64 as toScalarU64 } from "@lumiere/erp-shared/u64"
 import { newCorrelationId } from "@lumiere/erp-workflows"
 import { stdbBffCommandPost } from "@lumiere/stdb/commands"
+import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
+import { scalarToU64 as toScalarU64 } from "@lumiere/erp-shared/u64"
 import type { CreateInvoiceReminderBatchParams, CreateMessageBatchParams, CreateMessageTemplateParams, MailFollower, MailMessage, ReviewMessageBatchParams } from "@lumiere/stdb/types"
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 
 import { apiFetch, fetchQueryList, rqBigIntKey } from "../http"
 import { resolvePostedMessageEffect } from "./mail-message-post"
-import { executeOperationWithCanonicalReadback, requireResolvedOperationEffect, type ResolvedOperationEffectOutcome } from './operation-effect'
+import type { CanonicalRecordRef } from "./operation-effect"
 import { useStdbQuery } from "./stdb"
 
 export type PostMessageInput = {
@@ -110,47 +109,19 @@ export function useReviewMessageBatch(organizationId: bigint) {
 
 export function usePostMessage(organizationId: bigint) {
   const qc = useQueryClient()
-  return useMutation<ResolvedOperationEffectOutcome, Error, PostMessageInput>({
+  return useMutation<CanonicalRecordRef, Error, PostMessageInput>({
     mutationFn: async ({ model, resId, body, parentId, attachmentIds, idempotencyKey }) => {
-      const canonical = {
-        model: model.trim(),
-        resId: toScalarU64(resId),
-        body,
-        parentId: parentId != null ? toScalarU64(parentId) : null,
-        attachmentIds: attachmentIds.map((id) => toScalarU64(id)),
-        idempotencyKey: idempotencyKey ?? newCorrelationId(),
-      }
-      const expected = {
-        idempotencyKey: canonical.idempotencyKey,
-        model: canonical.model,
-        resId: canonical.resId,
-      }
-      const outcome = await executeOperationWithCanonicalReadback({
-        resolveEffect: async () =>
-          resolvePostedMessageEffect(
-            await fetchQueryList(
-              '/api/query/mail-messages',
-              'Failed to read posted messages',
-            ),
-            organizationId,
-            expected,
-          ),
-        dispatch: async () => {
-          const { urlPath, init } = stdbBffCommandPost('post_message', canonical)
-          return decodeOperationDispatch(
-            await apiFetch(urlPath, init),
-            'Failed to post message',
-          )
-        },
-        afterDispatch: () =>
-          qc.invalidateQueries({
-            queryKey: ['mail-messages', rqBigIntKey(organizationId)],
-          }),
-        readbackAttempts: 6,
-        readbackDelayMs: 150,
-      })
-      return requireResolvedOperationEffect(outcome)
+      const key = idempotencyKey ?? newCorrelationId()
+      const { urlPath, init } = stdbBffCommandPost("post_message", { model: model, resId: toScalarU64(resId), body: body, parentId: parentId != null ? toScalarU64(parentId) : null, attachmentIds: attachmentIds.map((id) => toScalarU64(id)), idempotencyKey: key })
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error('Failed to post message')
+      const rows = await fetchQueryList('/api/query/mail-messages', 'Failed to read posted message')
+      const effect = resolvePostedMessageEffect(rows, organizationId, { idempotencyKey: key, model, resId: toScalarU64(resId) })
+      if (!effect) throw new Error('Message did not read back after posting')
+      return effect
     },
+    onSuccess: () =>
+      qc.invalidateQueries({ queryKey: ['mail-messages', rqBigIntKey(organizationId)] }),
   })
 }
 

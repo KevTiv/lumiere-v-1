@@ -374,7 +374,6 @@ pub fn mark_mail_message_delivered(
         return Err("mail message does not belong to this organization".to_string());
     }
 
-    let idempotency_key = message_idempotency_key(message.metadata.as_deref());
     let metadata = delivery_metadata.or_else(|| {
         Some(
             serde_json::json!({
@@ -384,21 +383,6 @@ pub fn mark_mail_message_delivered(
             .to_string(),
         )
     });
-    let metadata = match (metadata, idempotency_key) {
-        (Some(raw), Some(key)) => {
-            let mut value = serde_json::from_str::<serde_json::Value>(&raw)
-                .unwrap_or_else(|_| serde_json::json!({ "delivery_metadata": raw }));
-            if let Some(object) = value.as_object_mut() {
-                object.insert(
-                    "idempotency_key".to_string(),
-                    serde_json::Value::String(key),
-                );
-            }
-            Some(value.to_string())
-        }
-        (metadata, None) => metadata,
-        (None, Some(key)) => Some(serde_json::json!({ "idempotency_key": key }).to_string()),
-    };
 
     ctx.db.mail_message().id().update(MailMessage {
         metadata,

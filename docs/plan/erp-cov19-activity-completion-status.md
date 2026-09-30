@@ -1,8 +1,8 @@
 # COV-19 — Record-linked activity completion (then message post)
 
-**Status:** IMPLEMENTED — activity completion and message post; runtime acceptance pending
-**Module/surface:** Calendar / Comms
-**Plan target:** record-linked activity or message lifecycle
+**Status:** IMPLEMENTED — activity completion and message post; runtime acceptance pending  
+**Module/surface:** Calendar / Comms  
+**Plan target:** record-linked activity or message lifecycle  
 **Scaffold source:** [`erp-cov08-27-scaffold.md`](./erp-cov08-27-scaffold.md)
 
 ## Bounded path (to implement)
@@ -29,7 +29,7 @@ COV-08d for the minimal form). Never correlate by newest row, name or timestamp.
 
 **Activity completion:** no generated contract delta (`activities` exposes state).
 
-**Message post:** `post_message` takes an optional trailing `idempotency_key`, so the operation signature and immutable contracts package must be regenerated. The key is stored in the existing `mail_message.metadata` JSON and read back from the projected `mail-messages` resource.
+**Message post:** one contract delta — `post_message` takes an optional trailing `idempotency_key`. No table, column or projection change: the key is stored in the existing `mail_message.metadata` JSON and read back from the existing `mail-messages` projection.
 
 
 
@@ -60,22 +60,23 @@ BASE-03 (communications correctness) must be landed.
 
 ## Slice 2 — message post (implemented)
 
-`post_message` returns nothing and the row it creates previously carried no caller-owned identity, so the only possible readback was "newest row with this body", the heuristic COV-00C bans.
+`post_message` returns nothing and the row it creates carried no caller-owned identity, so the
+only exact readback was "newest row with this body", the heuristic COV-00C bans.
 
 - **Reducer:** `post_message` (`spacetimedb/src/core/messaging.rs`) takes an optional
-  `idempotency_key` (1-128 characters after trim) and stores it as `{"idempotency_key": …}` in
-  `metadata`. The key is scoped to the authenticated caller within the organization. Re-sending
-  the same key with the same message converges without a second row, follower notification or
-  audit entry; re-using it for a different message is rejected. Unkeyed callers retain the
-  previous append behavior.
-- **Hook:** `usePostMessage` (`frontend/packages/query-hooks/src/hooks/messages.ts`) supplies a
-  fresh key per call (or the caller's `idempotencyKey`) and uses
-  `executeOperationWithCanonicalReadback` for exact pre-read, one dispatch and exact post-read.
-  `resolvePostedMessageEffect` (`mail-message-post.ts`) requires the same metadata key,
-  organization, model and record and returns the canonical message ref. Duplicate matches raise
-  `AmbiguousOperationEffectError`; missing readback becomes `OutcomeUnknown` rather than success.
-- **Not covered:** a new UI submission creates a new key. Preserving one key for the lifetime of
-  an unsaved draft remains a UX follow-up for manual resubmission after page-level recovery.
+  `idempotency_key` (1-128 chars after trim) and stores it as `{"idempotency_key": …}` in
+  `metadata`. The key is scoped to the caller within the organization. Re-sending it with the
+  same message returns success without a second row, a second follower notification or a second
+  audit entry; re-using it for a different message (model, record, body, parent or attachments)
+  is rejected. Without a key the call always creates a message, as before. `MailMessage` derives
+  `PartialEq` (Rust trait only; no schema change).
+- **Hook:** `usePostMessage` (`frontend/packages/query-hooks/src/hooks/messages.ts`) sends a fresh
+  key per call (or the caller's `idempotencyKey`), reads `/api/query/mail-messages` back and
+  resolves the exact row through `resolvePostedMessageEffect` (`mail-message-post.ts`): the row
+  carrying that key, in the same organization, model and record. Duplicates raise
+  `AmbiguousOperationEffectError`; a missing row fails the mutation instead of reporting success.
+- **Not covered:** the key is generated per call, so a user who re-submits after a lost response
+  still posts a second message. Holding one key per draft is a UX follow-up.
 
 ## D/A/O/E proof checklist (message post)
 

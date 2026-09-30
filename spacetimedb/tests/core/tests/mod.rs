@@ -34,7 +34,8 @@ pub fn run_core_operational_messaging_test(ctx: &ReducerContext) -> Result<(), S
     crate::pretenant_cert::state_machine_cert::run_communications_state_machine(ctx)
 }
 
-fn run_core_chatter_post_message_test(ctx: &ReducerContext) -> Result<(), String> {
+#[spacetimedb::reducer]
+pub fn run_core_chatter_post_message_test(ctx: &ReducerContext) -> Result<(), String> {
     chatter_post_message_test::test_post_message_idempotency(ctx)
         .map_err(|e| format!("post_message_idempotency: {e}"))
 }
