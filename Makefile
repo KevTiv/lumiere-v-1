@@ -380,6 +380,17 @@ e2e-smoke-setup:
 				fi; \
 			done; \
 			echo "[e2e] Domain reducer tests passed."; \
+			if [ "${E2E_RUN_DOMAIN_AGGREGATES:-0}" = "1" ]; then \
+				for _aggregate_reducer in run_all_inventory_tests run_all_analytics_tests; do \
+					echo "[e2e] Calling $_aggregate_reducer aggregate..."; \
+					if ! spacetime call "$(E2E_DB)" "$_aggregate_reducer" --server local --no-config; then \
+						echo "[e2e] $_aggregate_reducer failed — tail of SpacetimeDB logs:"; \
+						spacetime logs "$(E2E_DB)" --server local --no-config 2>/dev/null | tail -80 || true; \
+						exit 1; \
+					fi; \
+				done; \
+				echo "[e2e] Inventory and Analytics aggregate tests passed."; \
+			fi; \
 		fi; \
 		echo "[e2e] Obtaining local SpacetimeDB owner token (with private-table SQL preflight)..."; \
 		STDB_SERVER_TOKEN="$$(E2E_STDB_HOST="$$E2E_STDB_HOST" STDB_MODULE="$(E2E_DB)" node "$$ROOT/scripts/e2e-local-stdb-token.mjs")"; \
@@ -851,6 +862,17 @@ e2e-smoke:
 			fi; \
 		done; \
 		echo "[e2e] Domain reducer tests passed."; \
+		if [ "${E2E_RUN_DOMAIN_AGGREGATES:-0}" = "1" ]; then \
+			for _aggregate_reducer in run_all_inventory_tests run_all_analytics_tests; do \
+				echo "[e2e] Calling $_aggregate_reducer aggregate..."; \
+				if ! spacetime call "$(E2E_DB)" "$_aggregate_reducer" --server local --no-config; then \
+					echo "[e2e] $_aggregate_reducer failed — tail of SpacetimeDB logs:"; \
+					spacetime logs "$(E2E_DB)" --server local --no-config 2>/dev/null | tail -80 || true; \
+					exit 1; \
+				fi; \
+			done; \
+			echo "[e2e] Inventory and Analytics aggregate tests passed."; \
+		fi; \
 		echo "[e2e] Obtaining local SpacetimeDB owner token (with private-table SQL preflight)..."; \
 		STDB_SERVER_TOKEN="$$(E2E_STDB_HOST="$$E2E_STDB_HOST" STDB_MODULE="$(E2E_DB)" node "$$ROOT/scripts/e2e-local-stdb-token.mjs")"; \
 		if [ -z "$$STDB_SERVER_TOKEN" ]; then \

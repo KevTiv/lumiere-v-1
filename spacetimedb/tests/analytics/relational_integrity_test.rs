@@ -19,7 +19,7 @@ fn seed_sibling_company(ctx: &ReducerContext, fixture: &OrgFixture) -> Result<u6
         CreateCompanyParams {
             name: "Analytics Iso Company B".to_string(),
             code: format!("ANL-CB-{}", fixture.company_id),
-            currency_id: 1,
+            currency_id: fixture.currency_id,
             fiscal_year_end_month: 12,
             fiscal_year_end_day: 31,
             is_parent: false,
