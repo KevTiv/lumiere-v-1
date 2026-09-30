@@ -1,9 +1,17 @@
 //! AI action drafts — human-approved ERP mutations proposed by the harness.
 
+use std::collections::BTreeSet;
+
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
+use crate::accounting::journal_entries::{account_move, account_move_line, AccountMoveLine};
+use crate::accounting::payment_management::{
+    payment_account, payment_fee, payment_reconciliation, payment_reversal, payment_transaction,
+    reverse_payment_transaction_impl, PaymentTransaction, ReversePaymentTransactionParams,
+};
+use crate::accounting::payments::{account_payment, AccountPayment};
 use crate::ai::action_draft_lifecycle::{
     on_draft_approved, on_draft_created, on_draft_expired, on_draft_rejected,
 };
@@ -19,10 +27,21 @@ use crate::purchasing::purchase_orders::{
 use crate::sales::sales_core::{
     create_sale_order, sale_order, CreateSaleOrderLineParams, CreateSaleOrderParams,
 };
-use crate::types::TaskState;
+use crate::types::{PaymentTransactionStatus, TaskState};
+use crate::workflow::action_registry::{
+    GuardedActionInput, GuardedActionKey, GUARDED_ACTION_SCHEMA_VERSION,
+};
+use crate::workflow::approval_gate::guarded_action_requires_human_approval;
 
 const DRAFT_TTL_SECS: u64 = 86_400;
 const REQUEST_KEY_MAX_LEN: usize = 160;
+const REVERSAL_REASON_MAX_LEN: usize = 500;
+const REVERSE_PAYMENT_TRANSACTION: &str = "reverse_payment_transaction";
+const SERVER_OWNED_REVERSAL_METADATA_FIELDS: [&str; 3] = [
+    "approval_channel",
+    "payment_reversal_source",
+    "workflow_instance_id",
+];
 const ELEVATED_GOVERNANCE_FIELDS: [&str; 8] = [
     "risk",
     "skill_key",
@@ -133,7 +152,7 @@ fn create_ai_action_draft_inner(
     ctx: &ReducerContext,
     organization_id: u64,
     company_id: u64,
-    params: CreateAiActionDraftParams,
+    mut params: CreateAiActionDraftParams,
 ) -> Result<AiActionDraft, String> {
     check_permission(ctx, organization_id, "ai_action_draft", "create")?;
     require_company_in_organization(ctx, organization_id, company_id)?;
@@ -152,9 +171,26 @@ fn create_ai_action_draft_inner(
     if !params.confidence.is_finite() || !(0.0..=1.0).contains(&params.confidence) {
         return Err("confidence must be finite and between 0 and 1".to_string());
     }
+    bind_authoritative_reversal_source(
+        ctx,
+        organization_id,
+        company_id,
+        &reducer_name,
+        &params.params_json,
+        &mut params.metadata,
+    )?;
     if params.elevated {
         validate_elevated_governance_metadata(params.metadata.as_deref())?;
     }
+    validate_draft_payload_and_sources(
+        ctx,
+        organization_id,
+        company_id,
+        &reducer_name,
+        &params.params_json,
+        params.elevated,
+        params.metadata.as_deref(),
+    )?;
 
     let expires_at = params
         .expires_at
@@ -412,6 +448,17 @@ pub fn approve_ai_action_draft_core(
     }
     // Re-check allowlist on approve so emptying/disabling blocks pending drafts.
     is_allowed_ai_reducer(ctx, organization_id, &draft.reducer_name)?;
+    // Compare the authoritative source in this reducer transaction, before
+    // executing any business effect. A supplied hash never grants authority.
+    validate_draft_payload_and_sources(
+        ctx,
+        organization_id,
+        company_id,
+        &draft.reducer_name,
+        &draft.params_json,
+        draft.elevated,
+        draft.metadata.as_deref(),
+    )?;
 
     let execution_result = execute_whitelisted_draft(ctx, organization_id, company_id, &draft);
 
@@ -688,6 +735,575 @@ fn mark_expired(ctx: &ReducerContext, draft: &AiActionDraft) {
 /// Elevated drafts are the persisted boundary for red AI actions. Require the
 /// policy decision, source/diff fingerprints, approver authorization, and a
 /// correction plan before a draft can enter the human approval queue.
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct PaymentSourceBinding {
+    id: u64,
+    snapshot_hash: String,
+}
+
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ReversePaymentDraftPayload {
+    company_id: u64,
+    transaction_id: u64,
+    reason: String,
+}
+
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct PaymentReversalSourceBinding {
+    company_id: u64,
+    transaction_id: u64,
+    snapshot_hash: String,
+}
+
+/// Bind reversal drafts to server-read source state at creation time. Callers
+/// describe the intended target and governance decision, but cannot supply or
+/// override the state fingerprint that later authorizes approval.
+fn bind_authoritative_reversal_source(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    reducer_name: &str,
+    params_json: &str,
+    raw_metadata: &mut Option<String>,
+) -> Result<(), String> {
+    if reducer_name != REVERSE_PAYMENT_TRANSACTION {
+        return Ok(());
+    }
+    let payload = parse_reverse_payment_draft_payload(params_json)?;
+    if payload.company_id != company_id {
+        return Err("reversal payload company_id does not match draft company scope".to_string());
+    }
+    let raw = raw_metadata
+        .as_deref()
+        .ok_or("payment reversal draft requires governance metadata")?;
+    let mut metadata: Value = serde_json::from_str(raw)
+        .map_err(|error| format!("invalid payment reversal governance metadata: {error}"))?;
+    let object = metadata
+        .as_object_mut()
+        .ok_or("payment reversal governance metadata must be a JSON object")?;
+    if let Some(field) = SERVER_OWNED_REVERSAL_METADATA_FIELDS
+        .into_iter()
+        .find(|field| object.contains_key(*field))
+    {
+        return Err(format!(
+            "{field} is server-derived and must not be supplied by callers"
+        ));
+    }
+    let payment = ctx
+        .db
+        .payment_transaction()
+        .id()
+        .find(&payload.transaction_id)
+        .ok_or("payment reversal source transaction not found")?;
+    if payment.organization_id != organization_id || payment.company_id != company_id {
+        return Err(
+            "payment reversal source is outside the requested organization/company".to_string(),
+        );
+    }
+    if payment.status != PaymentTransactionStatus::Posted {
+        return Err("payment reversal source must be a posted transaction".to_string());
+    }
+    let snapshot_hash = payment_reversal_source_snapshot_hash(ctx, &payment)?;
+    object.insert(
+        "source_snapshot_hash".to_string(),
+        Value::String(snapshot_hash.clone()),
+    );
+    object.insert(
+        "required_approver_permission".to_string(),
+        Value::String("payment_transaction:reverse".to_string()),
+    );
+    object.insert(
+        "payment_reversal_source".to_string(),
+        serde_json::json!({
+            "company_id": company_id,
+            "transaction_id": payload.transaction_id,
+            "snapshot_hash": snapshot_hash,
+        }),
+    );
+    *raw_metadata = Some(metadata.to_string());
+    Ok(())
+}
+
+fn validate_draft_payload_and_sources(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    reducer_name: &str,
+    params_json: &str,
+    elevated: bool,
+    metadata: Option<&str>,
+) -> Result<(), String> {
+    if reducer_name == REVERSE_PAYMENT_TRANSACTION {
+        if !elevated {
+            return Err("payment reversal drafts must be elevated".to_string());
+        }
+        let payload = parse_reverse_payment_draft_payload(params_json)?;
+        validate_reverse_payment_source(ctx, organization_id, company_id, &payload, metadata)
+    } else {
+        validate_payment_source(ctx, organization_id, company_id, metadata)
+    }
+}
+
+fn parse_reverse_payment_draft_payload(raw: &str) -> Result<ReversePaymentDraftPayload, String> {
+    let payload: ReversePaymentDraftPayload = serde_json::from_str(raw)
+        .map_err(|error| format!("invalid reverse_payment_transaction params: {error}"))?;
+    if payload.company_id == 0 || payload.transaction_id == 0 {
+        return Err(
+            "reverse_payment_transaction requires positive company_id and transaction_id"
+                .to_string(),
+        );
+    }
+    let reason = payload.reason.trim();
+    if reason.is_empty()
+        || reason != payload.reason
+        || reason.len() > REVERSAL_REASON_MAX_LEN
+        || reason.chars().any(char::is_control)
+    {
+        return Err(format!(
+            "reversal reason must be trimmed, printable, and 1..={REVERSAL_REASON_MAX_LEN} bytes"
+        ));
+    }
+    Ok(payload)
+}
+
+fn validate_reverse_payment_source(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    payload: &ReversePaymentDraftPayload,
+    raw_metadata: Option<&str>,
+) -> Result<(), String> {
+    if payload.company_id != company_id {
+        return Err("reversal payload company_id does not match draft company scope".to_string());
+    }
+    let raw_metadata = raw_metadata.ok_or("payment reversal draft requires governance metadata")?;
+    let metadata: Value = serde_json::from_str(raw_metadata)
+        .map_err(|error| format!("invalid payment reversal governance metadata: {error}"))?;
+    let object = metadata
+        .as_object()
+        .ok_or("payment reversal governance metadata must be a JSON object")?;
+    let allowed_fields: BTreeSet<&str> = ELEVATED_GOVERNANCE_FIELDS
+        .into_iter()
+        .chain(SERVER_OWNED_REVERSAL_METADATA_FIELDS)
+        .collect();
+    if let Some(field) = object
+        .keys()
+        .find(|field| !allowed_fields.contains(field.as_str()))
+    {
+        return Err(format!(
+            "payment reversal governance metadata contains unknown field '{field}'"
+        ));
+    }
+    if object
+        .get("required_approver_permission")
+        .and_then(Value::as_str)
+        != Some("payment_transaction:reverse")
+    {
+        return Err(
+            "payment reversal draft requires approver permission payment_transaction:reverse"
+                .to_string(),
+        );
+    }
+    if object
+        .get("approval_channel")
+        .is_some_and(|value| value.as_str() != Some("ai_action_draft"))
+    {
+        return Err(
+            "payment reversal draft has an invalid server-owned approval channel".to_string(),
+        );
+    }
+    if object.get("workflow_instance_id").is_some_and(|value| {
+        value
+            .as_u64()
+            .is_none_or(|workflow_instance_id| workflow_instance_id == 0)
+    }) {
+        return Err(
+            "payment reversal draft has an invalid server-owned workflow instance".to_string(),
+        );
+    }
+    let source: PaymentReversalSourceBinding = serde_json::from_value(
+        object
+            .get("payment_reversal_source")
+            .cloned()
+            .ok_or("payment reversal draft requires payment_reversal_source")?,
+    )
+    .map_err(|error| format!("invalid payment_reversal_source precondition: {error}"))?;
+    validate_lowercase_sha256(&source.snapshot_hash, "payment_reversal_source")?;
+    if source.company_id != company_id
+        || source.company_id != payload.company_id
+        || source.transaction_id != payload.transaction_id
+    {
+        return Err(
+            "payment_reversal_source does not match the draft company and transaction target"
+                .to_string(),
+        );
+    }
+    if object.get("source_snapshot_hash").and_then(Value::as_str)
+        != Some(source.snapshot_hash.as_str())
+    {
+        return Err(
+            "source_snapshot_hash must match payment_reversal_source snapshot_hash".to_string(),
+        );
+    }
+    let payment = ctx
+        .db
+        .payment_transaction()
+        .id()
+        .find(&source.transaction_id)
+        .ok_or("payment_reversal_source transaction not found")?;
+    if payment.organization_id != organization_id || payment.company_id != company_id {
+        return Err(
+            "payment_reversal_source is outside the requested organization/company".to_string(),
+        );
+    }
+    if payment.status != PaymentTransactionStatus::Posted {
+        return Err("payment reversal source must be a posted transaction".to_string());
+    }
+    if payment_reversal_source_snapshot_hash(ctx, &payment)? != source.snapshot_hash {
+        return Err("payment reversal source is stale; refresh and review a new draft".to_string());
+    }
+    Ok(())
+}
+
+fn validate_lowercase_sha256(hash: &str, label: &str) -> Result<(), String> {
+    if hash.len() != 64
+        || !hash
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+    {
+        return Err(format!(
+            "{label} requires a lowercase SHA-256 snapshot_hash"
+        ));
+    }
+    Ok(())
+}
+
+/// Optional typed precondition, separate from the historical informational
+/// `source_snapshot_hash`. Legacy unbound drafts keep their existing behavior.
+fn payment_source_binding(raw: Option<&str>) -> Result<Option<PaymentSourceBinding>, String> {
+    let Some(raw) = raw else { return Ok(None) };
+    let Ok(metadata) = serde_json::from_str::<Value>(raw) else {
+        return Ok(None);
+    };
+    let Some(source) = metadata.get("payment_source") else {
+        return Ok(None);
+    };
+    let binding: PaymentSourceBinding = serde_json::from_value(source.clone())
+        .map_err(|error| format!("invalid payment_source precondition: {error}"))?;
+    if binding.id == 0
+        || binding.snapshot_hash.len() != 64
+        || !binding
+            .snapshot_hash
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+    {
+        return Err(
+            "payment_source requires a positive id and lowercase SHA-256 snapshot_hash".into(),
+        );
+    }
+    Ok(Some(binding))
+}
+
+fn validate_payment_source(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    metadata: Option<&str>,
+) -> Result<(), String> {
+    let Some(binding) = payment_source_binding(metadata)? else {
+        return Ok(());
+    };
+    let payment = ctx
+        .db
+        .payment_transaction()
+        .id()
+        .find(&binding.id)
+        .ok_or("payment_source not found")?;
+    if payment.organization_id != organization_id || payment.company_id != company_id {
+        return Err("payment_source is outside the requested organization/company".into());
+    }
+    if payment_source_snapshot_hash(&payment) != binding.snapshot_hash {
+        return Err("draft payment_source is stale; refresh and review a new draft".into());
+    }
+    Ok(())
+}
+
+/// Versioned, exact hash of the payment transaction row (not its related fee
+/// or reconciliation rows). Float bits avoid rounding away a source change.
+pub(crate) fn payment_source_snapshot_hash(payment: &PaymentTransaction) -> String {
+    let snapshot = serde_json::json!({
+        "version": 1, "id": payment.id,
+        "organization_id": payment.organization_id, "company_id": payment.company_id,
+        "payment_account_id": payment.payment_account_id,
+        "direction": format!("{:?}", payment.direction),
+        "partner_type": format!("{:?}", payment.partner_type), "partner_id": payment.partner_id,
+        "external_reference": payment.external_reference, "reference_fingerprint": payment.reference_fingerprint,
+        "gross_external_amount_bits": payment.gross_external_amount.to_bits(),
+        "settlement_amount_bits": payment.settlement_amount.to_bits(),
+        "net_account_amount_bits": payment.net_account_amount.to_bits(), "currency_id": payment.currency_id,
+        "occurred_at": payment.occurred_at.to_micros_since_unix_epoch(), "status": format!("{:?}", payment.status),
+        "account_payment_id": payment.account_payment_id, "source_entity": payment.source_entity,
+        "source_entity_id": payment.source_entity_id, "evidence_document_ids": payment.evidence_document_ids,
+        "created_at": payment.created_at.to_micros_since_unix_epoch(), "updated_at": payment.updated_at.to_micros_since_unix_epoch(),
+        "created_by": payment.created_by.to_hex().to_string(), "updated_by": payment.updated_by.to_hex().to_string(),
+        "voided_at": payment.voided_at.map(|at| at.to_micros_since_unix_epoch()), "metadata": payment.metadata,
+    });
+    format!("{:x}", Sha256::digest(snapshot.to_string().as_bytes()))
+}
+
+/// Exact source fingerprint for a payment reversal draft. It covers the
+/// operational transaction and account, fees, allocation/reconciliation rows,
+/// the linked ledger payment, and every ledger move/line that reversal reads or
+/// restores. Any consequential allocation or residual change therefore makes
+/// the pending draft stale before business execution.
+pub(crate) fn payment_reversal_source_snapshot_hash(
+    ctx: &ReducerContext,
+    payment: &PaymentTransaction,
+) -> Result<String, String> {
+    let account = ctx
+        .db
+        .payment_account()
+        .id()
+        .find(&payment.payment_account_id)
+        .ok_or("payment reversal source account not found")?;
+    if account.organization_id != payment.organization_id
+        || account.company_id != payment.company_id
+    {
+        return Err("payment reversal source account is outside transaction scope".to_string());
+    }
+
+    let ledger_payment_id = payment
+        .account_payment_id
+        .ok_or("payment reversal source has no linked ledger payment")?;
+    let ledger_payment = ctx
+        .db
+        .account_payment()
+        .id()
+        .find(&ledger_payment_id)
+        .ok_or("payment reversal source ledger payment not found")?;
+    validate_ledger_payment_scope(payment, &ledger_payment)?;
+
+    let mut reconciliations: Vec<_> = ctx
+        .db
+        .payment_reconciliation()
+        .reconciliation_by_transaction()
+        .filter(&payment.id)
+        .collect();
+    reconciliations.sort_by_key(|row| row.id);
+    if reconciliations.iter().any(|row| {
+        row.organization_id != payment.organization_id
+            || row.company_id != payment.company_id
+            || row.account_payment_id != ledger_payment_id
+    }) {
+        return Err("payment reversal reconciliation is outside transaction scope".to_string());
+    }
+
+    let mut fees: Vec<_> = ctx
+        .db
+        .payment_fee()
+        .payment_fee_by_transaction()
+        .filter(&payment.id)
+        .collect();
+    fees.sort_by_key(|row| row.id);
+    if fees.iter().any(|row| {
+        row.organization_id != payment.organization_id || row.company_id != payment.company_id
+    }) {
+        return Err("payment reversal fee is outside transaction scope".to_string());
+    }
+
+    let mut move_ids = BTreeSet::new();
+    if let Some(move_id) = ledger_payment.move_id {
+        move_ids.insert(move_id);
+    }
+    for row in &reconciliations {
+        let line = ctx
+            .db
+            .account_move_line()
+            .id()
+            .find(&row.allocated_move_line_id)
+            .ok_or("payment reversal allocated ledger line not found")?;
+        validate_ledger_line_scope(payment, &line)?;
+        move_ids.insert(line.move_id);
+        if let Some(move_id) = row.write_off_move_id {
+            move_ids.insert(move_id);
+        }
+    }
+
+    let mut ledger_moves = Vec::with_capacity(move_ids.len());
+    for move_id in move_ids {
+        let move_record = ctx
+            .db
+            .account_move()
+            .id()
+            .find(&move_id)
+            .ok_or("payment reversal ledger move not found")?;
+        if move_record.organization_id != payment.organization_id
+            || move_record.company_id != payment.company_id
+        {
+            return Err("payment reversal ledger move is outside transaction scope".to_string());
+        }
+        let mut lines: Vec<_> = ctx
+            .db
+            .account_move_line()
+            .move_line_by_move()
+            .filter(&move_id)
+            .collect();
+        lines.sort_by_key(|line| line.id);
+        for line in &lines {
+            validate_ledger_line_scope(payment, line)?;
+        }
+        ledger_moves.push(serde_json::json!({
+            "id": move_record.id,
+            "organization_id": move_record.organization_id,
+            "company_id": move_record.company_id,
+            "journal_id": move_record.journal_id,
+            "currency_id": move_record.currency_id,
+            "state": format!("{:?}", move_record.state),
+            "move_type": format!("{:?}", move_record.move_type),
+            "partner_id": move_record.partner_id,
+            "amount_total_bits": move_record.amount_total.to_bits(),
+            "amount_residual_bits": move_record.amount_residual.to_bits(),
+            "amount_residual_signed_bits": move_record.amount_residual_signed.to_bits(),
+            "payment_state": format!("{:?}", move_record.payment_state),
+            "invoice_has_outstanding": move_record.invoice_has_outstanding,
+            "posted_before": move_record.posted_before,
+            "write_date": move_record.write_date.map(|value| value.to_micros_since_unix_epoch()),
+            "metadata": move_record.metadata,
+            "lines": lines.iter().map(ledger_line_snapshot).collect::<Vec<_>>(),
+        }));
+    }
+
+    let mut reconciled_invoice_ids = ledger_payment.reconciled_invoice_ids.clone();
+    reconciled_invoice_ids.sort_unstable();
+    let mut reconciled_bill_ids = ledger_payment.reconciled_bill_ids.clone();
+    reconciled_bill_ids.sort_unstable();
+    let snapshot = serde_json::json!({
+        "version": 1,
+        "payment_transaction_hash": payment_source_snapshot_hash(payment),
+        "payment_account": {
+            "id": account.id,
+            "organization_id": account.organization_id,
+            "company_id": account.company_id,
+            "currency_id": account.currency_id,
+            "account_journal_id": account.account_journal_id,
+            "fee_account_id": account.fee_account_id,
+            "clearing_account_id": account.clearing_account_id,
+            "active": account.active,
+            "archived_at": account.archived_at.map(|value| value.to_micros_since_unix_epoch()),
+            "updated_at": account.updated_at.to_micros_since_unix_epoch(),
+        },
+        "ledger_payment": {
+            "id": ledger_payment.id,
+            "organization_id": ledger_payment.organization_id,
+            "company_id": ledger_payment.company_id,
+            "move_id": ledger_payment.move_id,
+            "payment_type": format!("{:?}", ledger_payment.payment_type),
+            "partner_type": format!("{:?}", ledger_payment.partner_type),
+            "partner_id": ledger_payment.partner_id,
+            "amount_bits": ledger_payment.amount.to_bits(),
+            "currency_id": ledger_payment.currency_id,
+            "journal_id": ledger_payment.journal_id,
+            "reconciled_invoice_ids": reconciled_invoice_ids,
+            "reconciled_bill_ids": reconciled_bill_ids,
+            "state": format!("{:?}", ledger_payment.state),
+        },
+        "fees": fees.iter().map(|row| serde_json::json!({
+            "id": row.id,
+            "organization_id": row.organization_id,
+            "company_id": row.company_id,
+            "payment_transaction_id": row.payment_transaction_id,
+            "bearer": format!("{:?}", row.bearer),
+            "amount_bits": row.amount.to_bits(),
+            "currency_id": row.currency_id,
+            "fee_account_id": row.fee_account_id,
+            "tax_account_id": row.tax_account_id,
+            "tax_amount_bits": row.tax_amount.to_bits(),
+            "provider_reference": row.provider_reference,
+            "metadata": row.metadata,
+        })).collect::<Vec<_>>(),
+        "reconciliations": reconciliations.iter().map(|row| serde_json::json!({
+            "id": row.id,
+            "organization_id": row.organization_id,
+            "company_id": row.company_id,
+            "payment_transaction_id": row.payment_transaction_id,
+            "account_payment_id": row.account_payment_id,
+            "allocated_move_line_id": row.allocated_move_line_id,
+            "allocated_amount_bits": row.allocated_amount.to_bits(),
+            "currency_id": row.currency_id,
+            "residual_before_bits": row.residual_before.to_bits(),
+            "residual_after_bits": row.residual_after.to_bits(),
+            "write_off_amount_bits": row.write_off_amount.to_bits(),
+            "write_off_account_id": row.write_off_account_id,
+            "write_off_move_id": row.write_off_move_id,
+            "is_reversal": row.is_reversal,
+            "reversed_reconciliation_id": row.reversed_reconciliation_id,
+            "created_at": row.created_at.to_micros_since_unix_epoch(),
+            "created_by": row.created_by.to_hex().to_string(),
+            "metadata": row.metadata,
+        })).collect::<Vec<_>>(),
+        "ledger_moves": ledger_moves,
+    });
+    Ok(format!(
+        "{:x}",
+        Sha256::digest(snapshot.to_string().as_bytes())
+    ))
+}
+
+fn validate_ledger_payment_scope(
+    payment: &PaymentTransaction,
+    ledger_payment: &AccountPayment,
+) -> Result<(), String> {
+    if ledger_payment.organization_id != payment.organization_id
+        || ledger_payment.company_id != payment.company_id
+        || ledger_payment.partner_id != payment.partner_id
+        || ledger_payment.currency_id != payment.currency_id
+    {
+        return Err("payment reversal ledger payment is outside transaction scope".to_string());
+    }
+    Ok(())
+}
+
+fn validate_ledger_line_scope(
+    payment: &PaymentTransaction,
+    line: &AccountMoveLine,
+) -> Result<(), String> {
+    if line.organization_id != payment.organization_id || line.company_id != payment.company_id {
+        return Err("payment reversal ledger line is outside transaction scope".to_string());
+    }
+    Ok(())
+}
+
+fn ledger_line_snapshot(line: &AccountMoveLine) -> Value {
+    serde_json::json!({
+        "id": line.id,
+        "organization_id": line.organization_id,
+        "company_id": line.company_id,
+        "move_id": line.move_id,
+        "parent_state": format!("{:?}", line.parent_state),
+        "journal_id": line.journal_id,
+        "currency_id": line.currency_id,
+        "sequence": line.sequence,
+        "account_id": line.account_id,
+        "account_internal_type": line.account_internal_type,
+        "partner_id": line.partner_id,
+        "payment_id": line.payment_id,
+        "balance_bits": line.balance.to_bits(),
+        "amount_currency_bits": line.amount_currency.to_bits(),
+        "amount_residual_bits": line.amount_residual.to_bits(),
+        "amount_residual_currency_bits": line.amount_residual_currency.to_bits(),
+        "debit_bits": line.debit.to_bits(),
+        "credit_bits": line.credit.to_bits(),
+        "blocked": line.blocked,
+        "matching_number": line.matching_number,
+        "is_matching": line.is_matching,
+        "write_date": line.write_date.map(|value| value.to_micros_since_unix_epoch()),
+        "metadata": line.metadata,
+    })
+}
+
 fn validate_elevated_governance_metadata(raw: Option<&str>) -> Result<(), String> {
     let raw = raw.ok_or("elevated drafts require governance metadata")?;
     let metadata: Value = serde_json::from_str(raw)
@@ -780,6 +1396,87 @@ fn execute_whitelisted_draft(
             }
 
             Ok(Some(order_id))
+        }
+        REVERSE_PAYMENT_TRANSACTION => {
+            if !draft.elevated {
+                return Err("payment reversal drafts must be elevated".to_string());
+            }
+            check_permission(ctx, organization_id, "payment_transaction", "reverse")?;
+            let reversal = parse_reverse_payment_draft_payload(&draft.params_json)?;
+            if reversal.company_id != company_id {
+                return Err(
+                    "reversal payload company_id does not match draft company scope".to_string(),
+                );
+            }
+            let action_input = GuardedActionInput::ReversePaymentTransaction {
+                transaction_id: reversal.transaction_id,
+            };
+            if guarded_action_requires_human_approval(
+                ctx,
+                organization_id,
+                company_id,
+                GuardedActionKey::ReversePaymentTransaction,
+                GUARDED_ACTION_SCHEMA_VERSION,
+                action_input,
+            )? {
+                return Err(
+                    "payment reversal requires an additional finance workflow approval; use the finance workflow route"
+                        .to_string(),
+                );
+            }
+
+            let execution_metadata = Some(
+                serde_json::json!({
+                    "source": "ai_action_draft",
+                    "draft_id": draft.id,
+                })
+                .to_string(),
+            );
+            let reversal_params = ReversePaymentTransactionParams {
+                company_id,
+                reason: Some(reversal.reason),
+                metadata: execution_metadata,
+            };
+            reverse_payment_transaction_impl(
+                ctx,
+                organization_id,
+                reversal.transaction_id,
+                reversal_params.clone(),
+                false,
+            )?;
+
+            let original = ctx
+                .db
+                .payment_transaction()
+                .id()
+                .find(&reversal.transaction_id)
+                .ok_or("reversed payment transaction disappeared")?;
+            if original.organization_id != organization_id
+                || original.company_id != company_id
+                || original.status != PaymentTransactionStatus::Reversed
+            {
+                return Err("payment reversal did not commit its target effect".to_string());
+            }
+            let reversals: Vec<_> = ctx
+                .db
+                .payment_reversal()
+                .reversal_by_original()
+                .filter(&reversal.transaction_id)
+                .collect();
+            let [effect] = reversals.as_slice() else {
+                return Err(format!(
+                    "payment reversal produced {} reversal records instead of one",
+                    reversals.len()
+                ));
+            };
+            if effect.organization_id != organization_id
+                || effect.company_id != company_id
+                || effect.reason != reversal_params.reason
+                || effect.metadata != reversal_params.metadata
+            {
+                return Err("payment reversal effect does not match the approved draft".to_string());
+            }
+            Ok(Some(effect.id))
         }
         other => Err(format!("reducer '{other}' is not executable from drafts")),
     }
@@ -1145,6 +1842,30 @@ fn json_bool(map: &serde_json::Map<String, Value>, key: &str) -> Option<bool> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn payment_source_preconditions_are_strict_and_legacy_metadata_is_unbound() {
+        assert!(payment_source_binding(None).unwrap().is_none());
+        assert!(payment_source_binding(Some("legacy annotation"))
+            .unwrap()
+            .is_none());
+        assert!(payment_source_binding(Some("{} ")).unwrap().is_none());
+        let valid =
+            serde_json::json!({"payment_source": {"id": 1, "snapshot_hash": "a".repeat(64)}})
+                .to_string();
+        assert_eq!(payment_source_binding(Some(&valid)).unwrap().unwrap().id, 1);
+        for source in [
+            serde_json::json!(null),
+            serde_json::json!({"id": 0, "snapshot_hash": "a".repeat(64)}),
+            serde_json::json!({"id": "1", "snapshot_hash": "a".repeat(64)}),
+            serde_json::json!({"id": 1, "snapshot_hash": "A".repeat(64)}),
+            serde_json::json!({"id": 1, "snapshot_hash": "a".repeat(63)}),
+            serde_json::json!({"id": 1, "snapshot_hash": "a".repeat(64), "company_id": 99}),
+        ] {
+            let raw = serde_json::json!({"payment_source": source}).to_string();
+            assert!(payment_source_binding(Some(&raw)).is_err(), "{raw}");
+        }
+    }
 
     #[test]
     fn parse_task_state_defaults_to_in_progress() {

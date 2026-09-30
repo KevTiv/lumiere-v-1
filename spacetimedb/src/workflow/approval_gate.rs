@@ -198,6 +198,35 @@ pub fn request_guarded_action(
     })
 }
 
+/// Resolve the currently published guarded-action route without starting a
+/// workflow instance or creating a human task.
+///
+/// Draft executors use this to stop when the domain action has an additional
+/// approval requirement. The domain reducer still performs its ordinary gate
+/// check immediately before execution, so this is a side-effect-free preflight
+/// rather than an approval bypass.
+pub(crate) fn guarded_action_requires_human_approval(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    action: GuardedActionKey,
+    action_version: u32,
+    input: GuardedActionInput,
+) -> Result<bool, String> {
+    let snapshot = snapshot_guarded_action(
+        ctx,
+        organization_id,
+        company_id,
+        action,
+        action_version,
+        input,
+    )?;
+    Ok(
+        discover_gate_plan(ctx, organization_id, company_id, &snapshot)?
+            .is_some_and(|plan| plan.task_node.is_some()),
+    )
+}
+
 struct GatePlan {
     version: WorkflowVersion,
     task_node: Option<WorkflowNode>,

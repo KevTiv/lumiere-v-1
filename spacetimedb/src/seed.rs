@@ -1302,6 +1302,21 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
         metadata: Some(r#"{"seed":true,"risk":"low"}"#.to_string()),
     });
 
+    // The dev fixture also opts into the elevated payment-reversal draft path
+    // so the ordinary-user, two-session certification can exercise it. The
+    // production default remains fail-closed for every organization.
+    ctx.db.ai_reducer_allowlist().insert(AiReducerAllowlist {
+        id: 0,
+        organization_id: org_id,
+        reducer_name: "reverse_payment_transaction".to_string(),
+        permission_resource: "payment_transaction".to_string(),
+        permission_action: "reverse".to_string(),
+        enabled: true,
+        create_date: ctx.timestamp,
+        write_date: ctx.timestamp,
+        metadata: Some(r#"{"seed":true,"risk":"elevated"}"#.to_string()),
+    });
+
     // ── 1.8 UOM Categories & Units ────────────────────────────────────────────
     let uom_cat_unit = ctx.db.uom_cat().insert(UOMCategory {
         id: 0,

@@ -1,4 +1,5 @@
 //! AI domain test suite — invoke via `run_all_ai_tests` reducer.
+pub mod adversarial_drafts_test;
 pub mod capability_grants_test;
 pub mod decision_events_test;
 pub mod embedding_isolation_test;
@@ -104,8 +105,14 @@ pub fn run_ai_evidence_provenance_tests(ctx: &ReducerContext) -> Result<(), Stri
                 "sources_round_trip_and_unknowns_stay_unknown",
                 t::test_sources_round_trip_and_unknowns_stay_unknown,
             ),
-            ("recollected_source_stays_unverified", t::test_recollected_source_stays_unverified),
-            ("cross_scope_references_are_denied", t::test_cross_scope_references_are_denied),
+            (
+                "recollected_source_stays_unverified",
+                t::test_recollected_source_stays_unverified,
+            ),
+            (
+                "cross_scope_references_are_denied",
+                t::test_cross_scope_references_are_denied,
+            ),
             (
                 "lineage_reconstructs_after_edit_and_fork",
                 t::test_lineage_reconstructs_after_edit_and_fork,
@@ -151,8 +158,14 @@ pub fn run_workflow_provenance_tests(ctx: &ReducerContext) -> Result<(), String>
     use workflow_provenance_test as t;
     run_scenarios(
         &[
-            ("authority_is_server_resolved", t::test_authority_is_server_resolved),
-            ("generated_workflow_binds_every_step", t::test_generated_workflow_binds_every_step),
+            (
+                "authority_is_server_resolved",
+                t::test_authority_is_server_resolved,
+            ),
+            (
+                "generated_workflow_binds_every_step",
+                t::test_generated_workflow_binds_every_step,
+            ),
             (
                 "invalid_provenance_blocks_and_leaves_no_bindings",
                 t::test_invalid_provenance_blocks_and_leaves_no_bindings,
@@ -179,6 +192,11 @@ pub fn run_all_ai_tests(ctx: &ReducerContext) -> Result<(), String> {
     run_ai_intelligence_events_tests(ctx)?;
     run_ai_evidence_provenance_tests(ctx)?;
     run_workflow_provenance_tests(ctx)?;
+    adversarial_drafts_test::test_correlated_draft_replay(ctx)?;
+    adversarial_drafts_test::test_payment_bound_draft_rejects_stale_source(ctx)?;
+    adversarial_drafts_test::test_payment_reversal_draft_is_bound_and_idempotent(ctx)?;
+    adversarial_drafts_test::test_payment_reversal_draft_preserves_finance_workflow(ctx)?;
+    adversarial_drafts_test::test_execution_claim_is_exclusive(ctx)?;
     log::info!("✅ run_all_ai_tests complete");
     Ok(())
 }

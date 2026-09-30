@@ -516,12 +516,19 @@ pub async fn record_provider_attempt_result(
                 "status": result.status,
                 "input_tokens": result.input_tokens,
                 "output_tokens": result.output_tokens,
-                "failure_reason": result.failure_reason,
+                "failure_reason": sats_option(result.failure_reason.clone().map(Value::String)),
             }
         ]),
     ))
     .await
     .context("record_ai_provider_attempt_result reducer failed")
+}
+
+fn sats_option(value: Option<Value>) -> Value {
+    match value {
+        Some(value) => json!({ "some": value }),
+        None => json!({ "none": [] }),
+    }
 }
 
 /// Create a run-correlated draft. `params` is the `CreateAiActionDraftParams`
@@ -1011,6 +1018,15 @@ mod tests {
             .unwrap();
         assert!(note.len() <= ATTEMPT_NOTE_MAX_LEN);
         assert!(note.ends_with(" […]"));
+    }
+
+    #[test]
+    fn provider_attempt_failure_reason_uses_sats_option_encoding() {
+        assert_eq!(
+            sats_option(Some(Value::String("provider timeout".to_string()))),
+            json!({"some": "provider timeout"})
+        );
+        assert_eq!(sats_option(None), json!({"none": []}));
     }
 
     #[test]

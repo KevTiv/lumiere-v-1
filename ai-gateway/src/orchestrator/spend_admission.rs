@@ -1069,7 +1069,10 @@ mod tests {
         assert!(first.to_string().contains("left for reconciliation"));
         assert_eq!(timed_out_provider.calls(), 1);
         assert_eq!(ledger.attempt(KEY).status, ATTEMPT_OUTCOME_UNKNOWN);
-        assert_eq!(ledger.reservations.lock().unwrap()[0].status, STATUS_RESERVED);
+        assert_eq!(
+            ledger.reservations.lock().unwrap()[0].status,
+            STATUS_RESERVED
+        );
         assert!(ledger.settled.lock().unwrap().is_empty());
 
         // A restarted gateway reconstructs the same run-scoped first-call key.
@@ -1084,7 +1087,10 @@ mod tests {
         assert!(restarted.to_string().contains("not redispatching"));
         assert_eq!(restarted_provider.calls(), 0);
         assert_eq!(ledger.attempt(KEY).status, ATTEMPT_OUTCOME_UNKNOWN);
-        assert_eq!(ledger.reservations.lock().unwrap()[0].status, STATUS_RESERVED);
+        assert_eq!(
+            ledger.reservations.lock().unwrap()[0].status,
+            STATUS_RESERVED
+        );
         assert!(ledger.settled.lock().unwrap().is_empty());
     }
 
