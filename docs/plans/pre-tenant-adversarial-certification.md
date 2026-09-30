@@ -1,6 +1,6 @@
 # Pre-Tenant Adversarial Certification
 
-Status: draft (branch `test/pre-tenant-adversarial-certification`, cut from `main` @ `06c9c82a0`).
+Status: active certification plan (AI harness state re-inspected on `main` @ `f6a3e91fb`, 2026-09-30).
 
 ## Purpose
 
@@ -35,7 +35,7 @@ money models, no changes to the open stacked PRs.
 | STDB in-module certification | Reducer-level IDEMPOTENCY, MONEY, COMMUNICATION, STALE STATE, TENANCY; seeded state machines | `spacetimedb/tests/pretenant/*` run from existing domain reducers | Compiles in blocking `cargo check --tests`; executes in the E2E domain-reducer loop |
 | Native Rust unit/property | Money representation envelope; defect-registry ↔ plan consistency | `spacetimedb/tests/pretenant/{money,mod}.rs` `#[cfg(test)]` | Blocking candidates (`make pretenant-cert-native`) |
 | api-server | Webhook authenticity/freshness, BFF operation boundary, draft HTTP revision conflicts | `api-server/src/routes/*` unit tests (existing) | Existing CI |
-| ai-gateway | Tool protocol fuzzing, per-call reauthorization, ambiguous provider timeout, budget reservation | `ai-gateway/src/orchestrator/agent_loop_tests.rs` on the AI stack | Pending PR #23/#24/#26 |
+| ai-gateway | Tool protocol fuzzing, per-call reauthorization, ambiguous provider timeout, budget reservation | `ai-gateway/src/orchestrator/governed_services.rs` and proposal/program runtime tests | Blocking `ai-gateway` unit tests for landed capabilities; remaining cases capability-gated |
 | presentation-core | IR definition corruption, versioning, pins | `crates/presentation-core` on the IR stack | Pending PR #13/#19/#25 |
 | Playwright (production Next.js) | Operator-level separation of duties (two sessions), true request concurrency, lost responses, latency/offline, responsive reachability, capability-gated IR/agent acceptance | `frontend/web/tests/e2e/pretenant-*.spec.ts` | Optional/nightly/manual (`make e2e-pretenant`) |
 
@@ -46,13 +46,13 @@ therefore certifies reducer invariants, not RBAC).
 
 ## Repository state inspected
 
-Open stacks (all draft, none assumed merged):
+Phase 4 repository state was re-inspected before adding coverage:
 
-- Frontend/presentation IR: #13 `codex/frontend-ir-foundation` (base `main`) → #19 saved-draft
-  snapshots → #25 save/reopen.
-- AI harness: #14 (base #13) → #15 typed tool transport → #16 → #17 governed capability codegen →
-  #18 → #20 capability pin → #21 → #22 verified catalog/authorized tool view → #23 bounded agent loop
-  → #24 H5a per-call policy/approval stops → #26 H5 budget and draft persistence.
+- The historical AI harness stack ended at #23 bounded agent loop → #24 per-call policy → #26
+  budget/draft persistence. Those PRs are closed and unmerged; they are not a valid test target.
+- Current `main` instead routes capability proposals through `GovernedCapabilityService`, shared by
+  the proposal loop and governed-program runtime. AG-07 therefore targets this landed boundary.
+- Frontend/presentation IR prerequisites remain capability-gated and are outside this AI-only slice.
 
 Existing coverage reused (not duplicated): `crm::deferred_test::test_crm_whatsapp_inbox`,
 `accounting::payment_management_test` (ACC-RI-004 allocation retry/reversal),
@@ -246,7 +246,7 @@ Legend — Class: **C** covered, **P** partial, **N** not covered, **B** blocked
 | Stale action draft (payment changed before approval) | — | source-version binding | STDB + E2E | no | #26 exact draft correlation | AG-03 (gated) | B |
 | Ambiguous provider timeout / no blind redispatch | — | all | ai-gateway | no | #23, #26 | AG-05 (gated) | B |
 | Concurrent budget reservations | — | all | STDB (spend.rs) | no | #26 | AG-06 (gated) | B |
-| Permission / capability changes mid-run | — | per-call reauthorization | ai-gateway | no | #24 | AG-07 (gated) | B |
+| Permission / capability changes mid-run | `governed_services::tests::revocation_is_rechecked_before_replaying_recovered_output` | broader live admin-revocation E2E | ai-gateway | yes | — | AG-07 | C |
 | Tool protocol fuzzing | #23 `agent_loop_tests.rs` (loop bounds) | duplicate ids, unknown tool, malformed/oversized args, forged org/company, post-terminal calls, duplicate red action, reconnect replay | ai-gateway | no | #23, #24 | AG-08 (gated) | B |
 | Recovery of run/budget/tool steps/pending drafts | — | all | reconstruction drill | no | #26 + reconstruction coverage | AG-09 (gated) | B |
 

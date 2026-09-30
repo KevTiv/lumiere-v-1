@@ -1093,6 +1093,37 @@ mod tests {
         }
     }
 
+    struct SwitchablePolicy {
+        allowed: StdMutex<bool>,
+        evaluate_calls: StdMutex<u32>,
+    }
+
+    #[async_trait]
+    impl LoopPolicy for SwitchablePolicy {
+        async fn evaluate(
+            &self,
+            _call: &ToolCallRequest,
+            _completed_calls: u32,
+        ) -> Result<PolicyDecision> {
+            *self.evaluate_calls.lock().unwrap() += 1;
+            let outcome = if *self.allowed.lock().unwrap() {
+                DecisionOutcome::Allow
+            } else {
+                DecisionOutcome::Deny
+            };
+            Ok(decision(outcome))
+        }
+
+        async fn protect_output(
+            &self,
+            _call: &ToolCallRequest,
+            _completed_calls: u32,
+            output: ToolOutput,
+        ) -> Result<ToolOutput> {
+            Ok(output)
+        }
+    }
+
     struct FakeTools {
         execute_calls: StdMutex<u32>,
     }
@@ -1150,6 +1181,38 @@ mod tests {
         let second = service.run(7, &proposal(), 1).await.unwrap();
         assert!(matches!(second, CapabilityStepOutcome::Replayed(_)));
         // Only the first call actually executed the underlying tool.
+        assert_eq!(*tools.execute_calls.lock().unwrap(), 1);
+    }
+
+    #[tokio::test]
+    async fn revocation_is_rechecked_before_replaying_recovered_output() {
+        let policy = SwitchablePolicy {
+            allowed: StdMutex::new(true),
+            evaluate_calls: StdMutex::new(0),
+        };
+        let tools = FakeTools {
+            execute_calls: StdMutex::new(0),
+        };
+        let admission = PolicyBackedCapabilityAdmission::new(&policy);
+        let executor = ToolsBackedCapabilityExecutor::new(&tools);
+        let recovery = InMemoryExecutionRecovery::new();
+        let approvals = RecordingApprovalCoordinator;
+        let service = GovernedCapabilityService::new(&admission, &executor, &recovery, &approvals);
+
+        let first = service.run(7, &proposal(), 0).await.unwrap();
+        assert!(matches!(first, CapabilityStepOutcome::Executed(_)));
+
+        // Simulate permission, skill, tool, policy, or model removal while the
+        // run is active. Admission must execute before recovery lookup, so the
+        // cached result cannot bypass the current decision.
+        *policy.allowed.lock().unwrap() = false;
+        let after_revocation = service.run(7, &proposal(), 1).await.unwrap();
+
+        assert!(matches!(
+            after_revocation,
+            CapabilityStepOutcome::Denied(_)
+        ));
+        assert_eq!(*policy.evaluate_calls.lock().unwrap(), 2);
         assert_eq!(*tools.execute_calls.lock().unwrap(), 1);
     }
 
