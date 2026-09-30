@@ -2182,6 +2182,45 @@ pub fn test_quality_fail_ambiguous_source_rejected(ctx: &ReducerContext) -> Resu
         ctx.db.stock_quant().id().delete(&seed_quant.id);
     }
 
+    // Source ambiguity is independent from destination selection. Provide an
+    // explicit quarantine location so fail_quality_check reaches the source
+    // resolver instead of failing early on a missing warehouse QC location.
+    create_stock_location(
+        ctx,
+        org_id,
+        CreateStockLocationParams {
+            name: "QC Ambiguous Source Destination".to_string(),
+            usage: "internal_qc".to_string(),
+            location_category: "qc".to_string(),
+            parent_path: "/".to_string(),
+            child_left: 0,
+            child_right: 0,
+            scrap_location: false,
+            return_location: false,
+            active: true,
+            posx: 0.0,
+            posy: 0.0,
+            posz: 0.0,
+            cyclic_inventory_frequency: 0,
+            location_id: None,
+            complete_name: Some("QC Ambiguous Source Destination".to_string()),
+            valuation_in_account_id: None,
+            valuation_out_account_id: None,
+            comment: None,
+            barcode: None,
+            last_inventory_date: None,
+            next_inventory_date: None,
+            metadata: Some(r#"{"test":"qc-ambig-source-dest"}"#.to_string()),
+        },
+    )?;
+    let qc_location_id = ctx
+        .db
+        .stock_location()
+        .iter()
+        .find(|l| l.organization_id == org_id && l.name == "QC Ambiguous Source Destination")
+        .map(|l| l.id)
+        .ok_or("source ambiguity quarantine location missing")?;
+
     let second_location_id = ctx
         .db
         .stock_location()
@@ -2236,8 +2275,8 @@ pub fn test_quality_fail_ambiguous_source_rejected(ctx: &ReducerContext) -> Resu
         .map(|q| (q.id, q.quantity))
         .collect();
 
-    // No explicit failure_location_id: the fallback must refuse to guess between
-    // the two on-hand locations rather than quarantining an arbitrary one.
+    // The explicit destination removes the unrelated warehouse-QC precondition;
+    // the source resolver must still refuse to guess between two on-hand locations.
     match fail_quality_check(
         ctx,
         org_id,
@@ -2246,7 +2285,7 @@ pub fn test_quality_fail_ambiguous_source_rejected(ctx: &ReducerContext) -> Resu
         2.0,
         None,
         None,
-        None,
+        Some(qc_location_id),
     ) {
         Err(msg) if msg.to_lowercase().contains("locations") => {}
         Err(msg) => return Err(format!("Expected ambiguous-location error, got: {msg}")),
