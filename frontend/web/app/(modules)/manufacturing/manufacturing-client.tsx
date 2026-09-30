@@ -201,12 +201,7 @@ function ManufacturingClientLoaded({
   const scrapLocationOptions = useMemo(
     () =>
       stockLocations
-        .filter((location) =>
-          Boolean(
-            (location as unknown as Record<string, unknown>).scrapLocation ??
-            (location as unknown as Record<string, unknown>).scrap_location,
-          ),
-        )
+        .filter((location) => location.scrapLocation)
         .map((location) => ({
           value: String(location.id),
           label: String(location.completeName ?? location.name ?? location.id),
@@ -539,7 +534,7 @@ function ManufacturingClientLoaded({
         row={rowPick?.row ?? null}
         workcenters={workcenters}
         iotDevices={iotDevices}
-        qualityChecks={qualityChecks as unknown as Record<string, unknown>[]}
+        qualityChecks={qualityChecks}
         productOptions={productFieldOptions}
         scrapLocationOptions={scrapLocationOptions}
         mutations={m}

@@ -10,6 +10,7 @@ import {
   manufacturingWorkcenterRowActionForm,
 } from "@lumiere/ui"
 import type { ManufacturingMutations } from "@lumiere/query-hooks/hooks/manufacturing"
+import type { QualityCheck } from "@lumiere/stdb/types"
 import type { QueryRows } from "@/lib/query-fetch"
 import { submitManufacturingRowAction } from "@/lib/manufacturing-row-action-submit"
 
@@ -22,7 +23,7 @@ export interface ManufacturingRowDialogProps {
   row: Record<string, unknown> | null;
   workcenters: QueryRows;
   iotDevices: QueryRows;
-  qualityChecks: QueryRows;
+  qualityChecks: QualityCheck[];
   productOptions: Array<{ value: string; label: string; disabled?: boolean }>;
   scrapLocationOptions: Array<{
     value: string;
@@ -136,7 +137,7 @@ export function ManufacturingRowDialog({
     if (entity === 'workorders') {
       const workcenterId = String(row.workcenterId ?? row.workcenter_id ?? '');
       const qualityCheck = qualityChecks.find(
-        (check) => String(check.workorderId ?? check.workorder_id ?? '') === id,
+        (check) => String(check.workorderId ?? '') === id,
       );
       return manufacturingWorkorderRowActionForm(t, {
         recordId: id,
@@ -145,7 +146,7 @@ export function ManufacturingRowDialog({
         qualityCheckId:
           qualityCheck?.id != null ? String(qualityCheck.id) : undefined,
         qualityState: String(
-          qualityCheck?.qualityState ?? qualityCheck?.quality_state ?? 'none',
+          qualityCheck?.qualityState ?? 'none',
         ),
       });
     }

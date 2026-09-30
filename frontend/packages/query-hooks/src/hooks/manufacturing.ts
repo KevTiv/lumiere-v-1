@@ -49,10 +49,6 @@ function invalidateMrpWorkcenters(qc: QueryClient, organizationId: bigint) {
   void qc.invalidateQueries({ queryKey: ['mrp-workcenters', rqBigIntKey(organizationId)] })
 }
 
-async function readRows(resource: string): Promise<Record<string, unknown>[]> {
-  return fetchQueryList(`/api/query/${resource}`, `Failed to read ${resource}`);
-}
-
 async function refreshManufacturingEffects(
   qc: QueryClient,
   organizationId: bigint,
@@ -159,9 +155,13 @@ export function useQualityChecks(
 }
 
 export function useMrpBomByproducts(organizationId: bigint) {
-  return useQuery<Record<string, unknown>[]>({
+  return useQuery({
     queryKey: ['mrp-bom-byproducts', rqBigIntKey(organizationId)],
-    queryFn: () => readRows('mrp-bom-byproducts'),
+    queryFn: () =>
+      fetchQueryList(
+        '/api/query/mrp-bom-byproducts',
+        'Failed to read BOM byproducts',
+      ),
     staleTime: 30_000,
   });
 }
@@ -324,7 +324,10 @@ export function useCreateWorkorderQualityCheck(
       const outcome = await executeOperationWithCanonicalReadback({
         resolveEffect: async () =>
           resolveWorkorderQualityEffect(
-            await readRows('quality-checks'),
+            await fetchQueryList(
+              '/api/query/quality-checks',
+              'Failed to read quality checks',
+            ),
             organizationId,
             companyId,
             workorderId,
@@ -371,7 +374,10 @@ export function usePassWorkorderQualityCheck(
       const outcome = await executeOperationWithCanonicalReadback({
         resolveEffect: async () =>
           resolveWorkorderQualityEffect(
-            await readRows('quality-checks'),
+            await fetchQueryList(
+              '/api/query/quality-checks',
+              'Failed to read quality checks',
+            ),
             organizationId,
             companyId,
             workorderId,
@@ -420,7 +426,10 @@ export function useFailWorkorderQualityCheck(
       const outcome = await executeOperationWithCanonicalReadback({
         resolveEffect: async () =>
           resolveWorkorderQualityEffect(
-            await readRows('quality-checks'),
+            await fetchQueryList(
+              '/api/query/quality-checks',
+              'Failed to read quality checks',
+            ),
             organizationId,
             companyId,
             workorderId,
@@ -474,7 +483,10 @@ export function useScrapFinishedManufacturingOutput(
       const outcome = await executeOperationWithCanonicalReadback({
         resolveEffect: async () =>
           resolveManufacturingScrapEffect(
-            await readRows('stock-moves'),
+            await fetchQueryList(
+              '/api/query/stock-moves',
+              'Failed to read stock moves',
+            ),
             organizationId,
             companyId,
             moId,
@@ -519,7 +531,10 @@ export function useCreateBomByproduct(
       const outcome = await executeOperationWithCanonicalReadback({
         resolveEffect: async () =>
           resolveBomByproductEffect(
-            await readRows('mrp-bom-byproducts'),
+            await fetchQueryList(
+              '/api/query/mrp-bom-byproducts',
+              'Failed to read BOM byproducts',
+            ),
             organizationId,
             companyId,
             bomId,
