@@ -2,7 +2,13 @@
 
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { stdbBffCommandPost } from "@lumiere/stdb/commands"
-import { apiFetch, rqBigIntKey } from "../../http"
+import { apiFetch, fetchQueryList, rqBigIntKey } from "../../http"
+import type { CanonicalRecordRef } from "../operation-effect"
+import {
+  resolveImportCommitEffect,
+  sha256Hex,
+  type ImportJobEffectProjection,
+} from "../form-import-effect"
 import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
 import { responseErrorMessage as parseCallError } from "@lumiere/api-client/response-error"
 
@@ -135,12 +141,20 @@ function useImportHrSalaryRuleCsv(organizationId: bigint) {
 
 function useImportHrPayslipCsv(organizationId: bigint) {
   const qc = useQueryClient()
-  return useMutation({
-    mutationFn: async (csvData: string) => {
+  return useMutation<CanonicalRecordRef, Error, string>({
+    mutationFn: async (csvData) => {
+      const sha256 = await sha256Hex(csvData)
       const { urlPath, init } = stdbBffCommandPost("import_hr_payslip_csv", { csvData: csvData })
 
       const res = await apiFetch(urlPath, init)
       if (!res.ok) throw new Error(await parseCallError(res))
+      const jobs = (await fetchQueryList(
+        "/api/query/import-jobs",
+        "Failed to read back import job",
+      )) as unknown as ImportJobEffectProjection[]
+      const effect = resolveImportCommitEffect(jobs, organizationId, "hr_payslip", sha256)
+      if (!effect) throw new Error("Payslip import did not read back")
+      return effect
     },
     onSuccess: () =>
       void qc.invalidateQueries({ queryKey: ['hr-payslips', rqBigIntKey(organizationId)] }),

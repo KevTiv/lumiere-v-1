@@ -3,6 +3,7 @@
 /// Every import reducer creates an ImportJob at the start, logs row-level
 /// errors into ImportJobError, records created row IDs into ImportJobRecord,
 /// and calls finish_import_job at the end.
+use sha2::{Digest, Sha256};
 use spacetimedb::{reducer, Identity, ReducerContext, Table, Timestamp};
 
 use crate::crm::contacts::{contact, Contact};
@@ -96,6 +97,51 @@ pub fn begin_import_job(
         create_uid: ctx.sender(),
         create_date: ctx.timestamp,
         metadata: None,
+    })
+}
+
+/// SHA-256 identity of an import file (lowercase hex of the exact bytes received).
+pub fn import_content_sha256(csv_data: &str) -> String {
+    hex::encode(Sha256::digest(csv_data.as_bytes()))
+}
+
+fn import_hash_metadata(sha256: &str) -> String {
+    serde_json::json!({ "sha256": sha256 }).to_string()
+}
+
+/// Reject a replay of a file already committed for this organization and entity.
+/// Jobs that imported nothing (status `failed`) do not block a corrected retry.
+pub fn reject_committed_import_replay(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    table_name: &str,
+    sha256: &str,
+) -> Result<(), String> {
+    let metadata = import_hash_metadata(sha256);
+    let replayed = ctx
+        .db
+        .import_job()
+        .import_job_by_org()
+        .filter(&organization_id)
+        .find(|job| {
+            job.table_name == table_name
+                && matches!(job.status.as_str(), "success" | "partial")
+                && job.metadata.as_deref() == Some(metadata.as_str())
+        });
+    match replayed {
+        Some(job) => Err(format!(
+            "this {table_name} file was already imported (import job {}, sha256 {sha256})",
+            job.id
+        )),
+        None => Ok(()),
+    }
+}
+
+/// Stamp a freshly begun job with its file identity so later replays are detected.
+pub fn stamp_import_sha256(ctx: &ReducerContext, job: ImportJob, sha256: &str) -> ImportJob {
+    ctx.db.import_job().id().update(ImportJob {
+        metadata: Some(import_hash_metadata(sha256)),
+        ..job
     })
 }
 
