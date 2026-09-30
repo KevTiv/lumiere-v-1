@@ -1058,6 +1058,37 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn restart_after_ambiguous_timeout_never_redispatches() {
+        let timed_out_provider = Provider::new(Err(anyhow!("provider timeout")));
+        let ledger = FakeLedger::configured();
+
+        let first = admitted(&timed_out_provider, &ledger)
+            .complete(request())
+            .await
+            .unwrap_err();
+        assert!(first.to_string().contains("left for reconciliation"));
+        assert_eq!(timed_out_provider.calls(), 1);
+        assert_eq!(ledger.attempt(KEY).status, ATTEMPT_OUTCOME_UNKNOWN);
+        assert_eq!(ledger.reservations.lock().unwrap()[0].status, STATUS_RESERVED);
+        assert!(ledger.settled.lock().unwrap().is_empty());
+
+        // A restarted gateway reconstructs the same run-scoped first-call key.
+        // The retained reservation is reconciliation state, never authority to
+        // issue the provider request again.
+        let restarted_provider = Provider::new(Ok(response(1, 1)));
+        let restarted = admitted(&restarted_provider, &ledger)
+            .complete(request())
+            .await
+            .unwrap_err();
+
+        assert!(restarted.to_string().contains("not redispatching"));
+        assert_eq!(restarted_provider.calls(), 0);
+        assert_eq!(ledger.attempt(KEY).status, ATTEMPT_OUTCOME_UNKNOWN);
+        assert_eq!(ledger.reservations.lock().unwrap()[0].status, STATUS_RESERVED);
+        assert!(ledger.settled.lock().unwrap().is_empty());
+    }
+
+    #[tokio::test]
     async fn an_attempt_recovered_as_dispatched_is_not_redispatched() {
         let provider = Provider::new(Ok(response(1, 1)));
         let ledger = FakeLedger {
