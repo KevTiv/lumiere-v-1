@@ -316,8 +316,14 @@ pub(super) struct StdbExecutionRecovery<'a> {
 
 #[derive(Debug)]
 struct CapabilityExecutionRow {
+    organization_id: u64,
+    company_id: u64,
+    run_id: u64,
+    recovery_key: String,
+    capability: String,
     status: String,
     output_json: Option<String>,
+    output_hash: Option<String>,
     failure_reason: Option<String>,
 }
 
@@ -328,11 +334,14 @@ impl StdbExecutionRecovery<'_> {
             .reader
             .query_sql(&format!(
                 "SELECT * FROM ai_capability_execution WHERE organization_id = {} \
-                 AND recovery_key = '{key}' LIMIT 1",
+                 AND recovery_key = '{key}' LIMIT 2",
                 self.organization_id
             ))
             .await
             .context("load durable capability execution recovery row")?;
+        if rows.len() > 1 {
+            bail!("duplicate durable capability recovery rows require reconciliation");
+        }
         rows.first()
             .map(decode_capability_execution_row)
             .transpose()
@@ -387,28 +396,15 @@ impl ExecutionRecovery for StdbExecutionRecovery<'_> {
             bail!("durable execution recovery requires organization and company context");
         }
         if let Some(row) = self.load(key).await? {
-            return match row.status.as_str() {
-                "succeeded" => {
-                    let output_json = row
-                        .output_json
-                        .context("succeeded capability execution row is missing output_json")?;
-                    let output: ToolOutput = serde_json::from_str(&output_json)
-                        .context("decode replayed capability execution output")?;
-                    Ok(Some(output))
-                }
-                "failed" => bail!(
-                    "capability execution for recovery key '{key}' previously failed ({}); \
-                     requires reconciliation before retry",
-                    row.failure_reason
-                        .as_deref()
-                        .unwrap_or("no reason recorded")
-                ),
-                "claimed" => bail!(
-                    "capability execution for recovery key '{key}' is claimed but unresolved; \
-                     requires reconciliation before retry, not automatic re-execution"
-                ),
-                other => bail!("unexpected capability execution status '{other}'"),
-            };
+            return replay_capability_output(
+                &row,
+                self.organization_id,
+                self.company_id,
+                run_id,
+                proposal,
+                key,
+            )
+            .map(Some);
         }
         self.claim(run_id, proposal, key).await?;
         Ok(None)
@@ -437,6 +433,12 @@ impl ExecutionRecovery for StdbExecutionRecovery<'_> {
 }
 
 fn decode_capability_execution_row(row: &Value) -> Result<CapabilityExecutionRow> {
+    let id = |camel: &str, snake: &str| {
+        row.get(camel)
+            .or_else(|| row.get(snake))
+            .and_then(Value::as_u64)
+            .context("capability execution row missing scope binding")
+    };
     let status = row
         .get("status")
         .and_then(Value::as_str)
@@ -453,10 +455,76 @@ fn decode_capability_execution_row(row: &Value) -> Result<CapabilityExecutionRow
         .and_then(Value::as_str)
         .map(str::to_string);
     Ok(CapabilityExecutionRow {
+        organization_id: id("organizationId", "organization_id")?,
+        company_id: id("companyId", "company_id")?,
+        run_id: id("runId", "run_id")?,
+        recovery_key: row
+            .get("recoveryKey")
+            .or_else(|| row.get("recovery_key"))
+            .and_then(Value::as_str)
+            .context("capability execution row missing recovery key")?
+            .to_string(),
+        capability: row
+            .get("capability")
+            .and_then(Value::as_str)
+            .context("capability execution row missing capability")?
+            .to_string(),
         status,
         output_json,
+        output_hash: row
+            .get("outputHash")
+            .or_else(|| row.get("output_hash"))
+            .and_then(Value::as_str)
+            .map(str::to_string),
         failure_reason,
     })
+}
+
+/// A restored row is evidence only for its exact server-derived binding.
+fn replay_capability_output(
+    row: &CapabilityExecutionRow,
+    organization_id: u64,
+    company_id: u64,
+    run_id: u64,
+    proposal: &CapabilityProposal,
+    key: &str,
+) -> Result<ToolOutput> {
+    if row.organization_id != organization_id
+        || row.company_id != company_id
+        || row.run_id != run_id
+        || row.capability != proposal.capability
+        || row.recovery_key != key
+        || capability_recovery_key(run_id, proposal)? != key
+    {
+        bail!("capability recovery row has a conflicting scope or request binding");
+    }
+    match row.status.as_str() {
+        "succeeded" => {
+            if row.failure_reason.is_some() {
+                bail!("succeeded capability recovery row carries a failure reason");
+            }
+            let output_json = row
+                .output_json
+                .as_deref()
+                .context("succeeded capability execution row is missing output_json")?;
+            let output_hash = row
+                .output_hash
+                .as_deref()
+                .context("succeeded capability execution row is missing output_hash")?;
+            if output_json.len() > 16_384
+                || format!("{:x}", Sha256::digest(output_json.as_bytes())) != output_hash
+            {
+                bail!("capability recovery output failed integrity validation");
+            }
+            serde_json::from_str(output_json).context("decode replayed capability execution output")
+        }
+        "failed" => bail!(
+            "capability execution previously failed ({}); requires reconciliation before retry",
+            row.failure_reason.as_deref().unwrap_or("no reason recorded")
+        ),
+        "claimed" => bail!("capability execution is claimed but unresolved; requires reconciliation before retry, not automatic re-execution"),
+        other => bail!("unexpected capability execution status '{other}'"),
+    }
 }
 
 /// Names the seam a `DraftOnly` admission decision routes through.
@@ -596,11 +664,15 @@ impl ApprovalCoordinator for StdbApprovalCoordinator<'_> {
             .draft_request(self.organization_id, self.company_id, run_id, &request_key)
             .await
             .context("resolve durable approval draft id")?
-            .map(|request| request.draft_id);
+            .context("durable approval draft correlation was not persisted")?
+            .draft_id;
+        if draft_id == 0 {
+            bail!("durable approval draft correlation has an invalid draft id");
+        }
         Ok(ApprovalRequest {
             capability: proposal.capability.clone(),
             reason,
-            draft_id,
+            draft_id: Some(draft_id),
         })
     }
 
@@ -1505,6 +1577,8 @@ mod tests {
     #[test]
     fn decode_capability_execution_row_reads_camel_case_fields() {
         let row = json!({
+            "organizationId": 1, "companyId": 1, "runId": 7,
+            "recoveryKey": "key", "capability": "erp.search",
             "status": "succeeded",
             "outputJson": "{\"summary\":\"ok\"}",
             "failureReason": null,
@@ -1518,6 +1592,8 @@ mod tests {
     #[test]
     fn decode_capability_execution_row_falls_back_to_snake_case_fields() {
         let row = json!({
+            "organization_id": 1, "company_id": 1, "run_id": 7,
+            "recovery_key": "key", "capability": "erp.search",
             "status": "failed",
             "output_json": null,
             "failure_reason": "provider timeout",
@@ -1532,5 +1608,109 @@ mod tests {
     fn decode_capability_execution_row_requires_status() {
         let row = json!({"outputJson": null, "failureReason": null});
         assert!(decode_capability_execution_row(&row).is_err());
+    }
+
+    #[tokio::test]
+    async fn oversized_or_malformed_proposals_never_reach_admission_or_execution() {
+        let policy = FakePolicy { outcome: DecisionOutcome::Allow, evaluate_calls: StdMutex::new(0) };
+        let tools = FakeTools { execute_calls: StdMutex::new(0) };
+        let admission = PolicyBackedCapabilityAdmission::new(&policy);
+        let executor = ToolsBackedCapabilityExecutor::new(&tools);
+        let recovery = InMemoryExecutionRecovery::new();
+        let approvals = RecordingApprovalCoordinator;
+        let service = GovernedCapabilityService::new(&admission, &executor, &recovery, &approvals);
+        for arguments in [Value::Null, json!([]), json!({"q": "x".repeat(16_384)})] {
+            let invalid = CapabilityProposal { arguments, ..proposal() };
+            assert!(service.run(7, &invalid, 0).await.is_err());
+            assert!(service.request_explicit_approval(7, &invalid, 0).await.is_err());
+        }
+        assert_eq!(*policy.evaluate_calls.lock().unwrap(), 0);
+        assert_eq!(*tools.execute_calls.lock().unwrap(), 0);
+    }
+
+    #[test]
+    fn capability_argument_bound_counts_serialized_utf8_bytes() {
+        let mut bounded = proposal();
+        bounded.arguments = json!({"q": "x".repeat(16_384 - 8)});
+        assert_eq!(serde_json::to_vec(&bounded.arguments).unwrap().len(), 16_384);
+        assert!(bounded.validate().is_ok());
+        bounded.arguments = json!({"q": "x".repeat(16_384 - 7)});
+        assert!(bounded.validate().is_err());
+        bounded.arguments = json!({"q": "é".repeat(8_192)});
+        assert!(bounded.validate().is_err());
+        bounded.arguments = json!({});
+        bounded.capability = "x".repeat(256);
+        assert!(bounded.validate().is_ok());
+        bounded.capability.push('x');
+        assert!(bounded.validate().is_err());
+    }
+
+    fn restored_row() -> Value {
+        let output_json = serde_json::to_string(&output("persisted result")).unwrap();
+        json!({
+            "organization_id": 1, "company_id": 1, "run_id": 7,
+            "recovery_key": capability_recovery_key(7, &proposal()).unwrap(),
+            "capability": "erp.search", "status": "succeeded",
+            "output_hash": format!("{:x}", Sha256::digest(output_json.as_bytes())),
+            "output_json": output_json, "failure_reason": null,
+        })
+    }
+
+    struct RestoredRecovery(Value);
+
+    #[async_trait]
+    impl ExecutionRecovery for RestoredRecovery {
+        fn recovery_key(&self, run_id: u64, proposal: &CapabilityProposal) -> Result<String> {
+            capability_recovery_key(run_id, proposal)
+        }
+        async fn already_executed(&self, run_id: u64, proposal: &CapabilityProposal, key: &str) -> Result<Option<ToolOutput>> {
+            replay_capability_output(&decode_capability_execution_row(&self.0)?, 1, 1, run_id, proposal, key).map(Some)
+        }
+        async fn record_outcome(&self, _run_id: u64, _proposal: &CapabilityProposal, _key: &str, _output: &ToolOutput) -> Result<()> {
+            panic!("restored executions must not be dispatched or recorded again")
+        }
+    }
+
+    #[tokio::test]
+    async fn fresh_recovery_instances_replay_restored_rows_without_dispatch() {
+        let policy = FakePolicy { outcome: DecisionOutcome::Allow, evaluate_calls: StdMutex::new(0) };
+        let tools = FakeTools { execute_calls: StdMutex::new(0) };
+        let admission = PolicyBackedCapabilityAdmission::new(&policy);
+        let executor = ToolsBackedCapabilityExecutor::new(&tools);
+        let approvals = RecordingApprovalCoordinator;
+        let serialized = serde_json::to_string(&restored_row()).unwrap();
+        for _ in 0..2 {
+            let recovery = RestoredRecovery(serde_json::from_str(&serialized).unwrap());
+            let service = GovernedCapabilityService::new(&admission, &executor, &recovery, &approvals);
+            match service.run(7, &proposal(), 0).await.unwrap() {
+                CapabilityStepOutcome::Replayed(result) => assert_eq!(result.summary, "persisted result"),
+                other => panic!("unexpected restored outcome {other:?}"),
+            }
+        }
+        assert_eq!(*policy.evaluate_calls.lock().unwrap(), 2);
+        assert_eq!(*tools.execute_calls.lock().unwrap(), 0);
+    }
+
+    #[tokio::test]
+    async fn corrupt_foreign_or_unresolved_recovery_never_dispatches() {
+        let policy = FakePolicy { outcome: DecisionOutcome::Allow, evaluate_calls: StdMutex::new(0) };
+        let tools = FakeTools { execute_calls: StdMutex::new(0) };
+        let admission = PolicyBackedCapabilityAdmission::new(&policy);
+        let executor = ToolsBackedCapabilityExecutor::new(&tools);
+        let approvals = RecordingApprovalCoordinator;
+        for (field, value) in [
+            ("organization_id", json!(99)), ("company_id", json!(99)), ("run_id", json!(8)),
+            ("capability", json!("erp.other")), ("recovery_key", json!("forged")),
+            ("output_json", json!("{}")), ("output_hash", json!(null)),
+            ("status", json!("claimed")), ("status", json!("failed")), ("status", json!("unknown")),
+            ("failure_reason", json!("contradictory failure")),
+        ] {
+            let mut row = restored_row();
+            row[field] = value;
+            let recovery = RestoredRecovery(row);
+            let service = GovernedCapabilityService::new(&admission, &executor, &recovery, &approvals);
+            assert!(service.run(7, &proposal(), 0).await.is_err(), "{field}");
+        }
+        assert_eq!(*tools.execute_calls.lock().unwrap(), 0);
     }
 }

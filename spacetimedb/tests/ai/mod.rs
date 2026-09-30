@@ -1,4 +1,5 @@
 //! AI domain test suite — invoke via `run_all_ai_tests` reducer.
+pub mod adversarial_drafts_test;
 pub mod capability_grants_test;
 pub mod decision_events_test;
 pub mod embedding_isolation_test;
@@ -179,6 +180,9 @@ pub fn run_all_ai_tests(ctx: &ReducerContext) -> Result<(), String> {
     run_ai_intelligence_events_tests(ctx)?;
     run_ai_evidence_provenance_tests(ctx)?;
     run_workflow_provenance_tests(ctx)?;
+    adversarial_drafts_test::test_correlated_draft_replay(ctx)?;
+    adversarial_drafts_test::test_payment_bound_draft_rejects_stale_source(ctx)?;
+    adversarial_drafts_test::test_execution_claim_is_exclusive(ctx)?;
     log::info!("✅ run_all_ai_tests complete");
     Ok(())
 }

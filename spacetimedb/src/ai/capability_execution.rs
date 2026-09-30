@@ -8,8 +8,8 @@
 //! arguments)` before either reducer here is called.
 //!
 //! Mirrors `ai::spend`'s reservation/attempt split — `claim_ai_capability_execution`
-//! commits intent before execution runs (idempotent replay on an identical
-//! binding, denied on a conflicting one); `record_ai_capability_execution_result`
+//! commits exclusive intent before execution runs (duplicate claims fail closed);
+//! `record_ai_capability_execution_result`
 //! stores the outcome exactly once. Unlike price/spend rows, the row is looked
 //! up by its caller-computed `recovery_key` directly, so no id read-back is
 //! needed after the claim.
@@ -20,6 +20,7 @@
 //! to these reducers, and a trusted principal explicitly granted
 //! `ai_capability_execution/write` — none of that is added in this slice.
 
+use sha2::{Digest, Sha256};
 use spacetimedb::{reducer, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::ai::skills::{ai_agent_run, AiAgentRun};
@@ -86,9 +87,9 @@ pub struct RecordAiCapabilityExecutionResultParams {
 }
 
 /// Commit execution intent before the capability actually runs. Replaying an
-/// identical binding (same run/company/capability under the same key) is a
-/// no-op so a resumed run can call this unconditionally; reusing the key with
-/// a different binding is denied rather than silently accepted.
+/// identical binding is denied too: success must mean this invocation acquired
+/// the claim, not that a concurrent worker already owns it. Resumed runs read
+/// and replay terminal results; unresolved claims require reconciliation.
 #[reducer]
 pub fn claim_ai_capability_execution(
     ctx: &ReducerContext,
@@ -108,7 +109,7 @@ pub fn claim_ai_capability_execution(
         .next()
     {
         if claim_matches(&existing, &params) {
-            return Ok(());
+            return Err("capability execution already claimed; reload recorded outcome or reconcile before retry".into());
         }
         return Err("recovery key was already used with a different binding".into());
     }
@@ -242,6 +243,21 @@ fn validate_outcome(
     }
     if status == EXECUTION_SUCCEEDED && params.failure_reason.is_some() {
         return Err("a succeeded execution cannot carry a failure reason".into());
+    }
+    if status == EXECUTION_SUCCEEDED {
+        let output = params
+            .output_json
+            .as_deref()
+            .ok_or("a succeeded execution requires output_json")?;
+        let hash = params
+            .output_hash
+            .as_deref()
+            .ok_or("a succeeded execution requires output_hash")?;
+        serde_json::from_str::<serde_json::Value>(output)
+            .map_err(|_| "capability execution output must be valid JSON".to_string())?;
+        if format!("{:x}", Sha256::digest(output.as_bytes())) != hash {
+            return Err("capability execution output hash mismatch".into());
+        }
     }
     Ok(())
 }
@@ -385,10 +401,18 @@ mod tests {
             recovery_key: "gp03:capability:deadbeef".into(),
             status: EXECUTION_SUCCEEDED.into(),
             output_json: Some("{}".into()),
-            output_hash: Some("abc123".into()),
+            output_hash: Some(format!("{:x}", Sha256::digest(b"{}"))),
             failure_reason: None,
         };
         assert!(validate_outcome(EXECUTION_SUCCEEDED, &ok).is_ok());
+        for invalid in [
+            RecordAiCapabilityExecutionResultParams { output_json: None, ..ok.clone() },
+            RecordAiCapabilityExecutionResultParams { output_hash: None, ..ok.clone() },
+            RecordAiCapabilityExecutionResultParams { output_hash: Some("a".repeat(64)), ..ok.clone() },
+            RecordAiCapabilityExecutionResultParams { output_json: Some("not-json".into()), ..ok.clone() },
+        ] {
+            assert!(validate_outcome(EXECUTION_SUCCEEDED, &invalid).is_err());
+        }
 
         let too_large = RecordAiCapabilityExecutionResultParams {
             output_json: Some("x".repeat(MAX_OUTPUT_JSON_LEN + 1)),

@@ -305,8 +305,14 @@ impl CapabilityProposal {
         if self.capability.trim().is_empty() {
             bail!("capability proposal must name a capability");
         }
+        if self.capability.len() > 256 || self.capability.trim() != self.capability.as_str() {
+            bail!("capability proposal name is oversized or has surrounding whitespace");
+        }
         if !self.arguments.is_object() {
             bail!("capability proposal arguments must be a JSON object");
+        }
+        if serde_json::to_vec(&self.arguments)?.len() > 16_384 {
+            bail!("capability proposal arguments exceed 16384 bytes");
         }
         Ok(())
     }

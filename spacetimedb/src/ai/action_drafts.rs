@@ -4,6 +4,7 @@ use serde_json::Value;
 use sha2::{Digest, Sha256};
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
+use crate::accounting::payment_management::{payment_transaction, PaymentTransaction};
 use crate::ai::action_draft_lifecycle::{
     on_draft_approved, on_draft_created, on_draft_expired, on_draft_rejected,
 };
@@ -155,6 +156,7 @@ fn create_ai_action_draft_inner(
     if params.elevated {
         validate_elevated_governance_metadata(params.metadata.as_deref())?;
     }
+    validate_payment_source(ctx, organization_id, company_id, params.metadata.as_deref())?;
 
     let expires_at = params
         .expires_at
@@ -412,6 +414,9 @@ pub fn approve_ai_action_draft_core(
     }
     // Re-check allowlist on approve so emptying/disabling blocks pending drafts.
     is_allowed_ai_reducer(ctx, organization_id, &draft.reducer_name)?;
+    // Compare the authoritative source in this reducer transaction, before
+    // executing any business effect. A supplied hash never grants authority.
+    validate_payment_source(ctx, organization_id, company_id, draft.metadata.as_deref())?;
 
     let execution_result = execute_whitelisted_draft(ctx, organization_id, company_id, &draft);
 
@@ -688,6 +693,69 @@ fn mark_expired(ctx: &ReducerContext, draft: &AiActionDraft) {
 /// Elevated drafts are the persisted boundary for red AI actions. Require the
 /// policy decision, source/diff fingerprints, approver authorization, and a
 /// correction plan before a draft can enter the human approval queue.
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct PaymentSourceBinding {
+    id: u64,
+    snapshot_hash: String,
+}
+
+/// Optional typed precondition, separate from the historical informational
+/// `source_snapshot_hash`. Legacy unbound drafts keep their existing behavior.
+fn payment_source_binding(raw: Option<&str>) -> Result<Option<PaymentSourceBinding>, String> {
+    let Some(raw) = raw else { return Ok(None) };
+    let Ok(metadata) = serde_json::from_str::<Value>(raw) else { return Ok(None) };
+    let Some(source) = metadata.get("payment_source") else { return Ok(None) };
+    let binding: PaymentSourceBinding = serde_json::from_value(source.clone())
+        .map_err(|error| format!("invalid payment_source precondition: {error}"))?;
+    if binding.id == 0 || binding.snapshot_hash.len() != 64
+        || !binding.snapshot_hash.bytes().all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte)) {
+        return Err("payment_source requires a positive id and lowercase SHA-256 snapshot_hash".into());
+    }
+    Ok(Some(binding))
+}
+
+fn validate_payment_source(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    metadata: Option<&str>,
+) -> Result<(), String> {
+    let Some(binding) = payment_source_binding(metadata)? else { return Ok(()) };
+    let payment = ctx.db.payment_transaction().id().find(&binding.id)
+        .ok_or("payment_source not found")?;
+    if payment.organization_id != organization_id || payment.company_id != company_id {
+        return Err("payment_source is outside the requested organization/company".into());
+    }
+    if payment_source_snapshot_hash(&payment) != binding.snapshot_hash {
+        return Err("draft payment_source is stale; refresh and review a new draft".into());
+    }
+    Ok(())
+}
+
+/// Versioned, exact hash of the payment transaction row (not its related fee
+/// or reconciliation rows). Float bits avoid rounding away a source change.
+pub(crate) fn payment_source_snapshot_hash(payment: &PaymentTransaction) -> String {
+    let snapshot = serde_json::json!({
+        "version": 1, "id": payment.id,
+        "organization_id": payment.organization_id, "company_id": payment.company_id,
+        "payment_account_id": payment.payment_account_id,
+        "direction": format!("{:?}", payment.direction),
+        "partner_type": format!("{:?}", payment.partner_type), "partner_id": payment.partner_id,
+        "external_reference": payment.external_reference, "reference_fingerprint": payment.reference_fingerprint,
+        "gross_external_amount_bits": payment.gross_external_amount.to_bits(),
+        "settlement_amount_bits": payment.settlement_amount.to_bits(),
+        "net_account_amount_bits": payment.net_account_amount.to_bits(), "currency_id": payment.currency_id,
+        "occurred_at": payment.occurred_at.to_micros_since_unix_epoch(), "status": format!("{:?}", payment.status),
+        "account_payment_id": payment.account_payment_id, "source_entity": payment.source_entity,
+        "source_entity_id": payment.source_entity_id, "evidence_document_ids": payment.evidence_document_ids,
+        "created_at": payment.created_at.to_micros_since_unix_epoch(), "updated_at": payment.updated_at.to_micros_since_unix_epoch(),
+        "created_by": payment.created_by.to_hex().to_string(), "updated_by": payment.updated_by.to_hex().to_string(),
+        "voided_at": payment.voided_at.map(|at| at.to_micros_since_unix_epoch()), "metadata": payment.metadata,
+    });
+    format!("{:x}", Sha256::digest(snapshot.to_string().as_bytes()))
+}
+
 fn validate_elevated_governance_metadata(raw: Option<&str>) -> Result<(), String> {
     let raw = raw.ok_or("elevated drafts require governance metadata")?;
     let metadata: Value = serde_json::from_str(raw)
@@ -1145,6 +1213,26 @@ fn json_bool(map: &serde_json::Map<String, Value>, key: &str) -> Option<bool> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn payment_source_preconditions_are_strict_and_legacy_metadata_is_unbound() {
+        assert!(payment_source_binding(None).unwrap().is_none());
+        assert!(payment_source_binding(Some("legacy annotation")).unwrap().is_none());
+        assert!(payment_source_binding(Some("{} ")).unwrap().is_none());
+        let valid = serde_json::json!({"payment_source": {"id": 1, "snapshot_hash": "a".repeat(64)}}).to_string();
+        assert_eq!(payment_source_binding(Some(&valid)).unwrap().unwrap().id, 1);
+        for source in [
+            serde_json::json!(null),
+            serde_json::json!({"id": 0, "snapshot_hash": "a".repeat(64)}),
+            serde_json::json!({"id": "1", "snapshot_hash": "a".repeat(64)}),
+            serde_json::json!({"id": 1, "snapshot_hash": "A".repeat(64)}),
+            serde_json::json!({"id": 1, "snapshot_hash": "a".repeat(63)}),
+            serde_json::json!({"id": 1, "snapshot_hash": "a".repeat(64), "company_id": 99}),
+        ] {
+            let raw = serde_json::json!({"payment_source": source}).to_string();
+            assert!(payment_source_binding(Some(&raw)).is_err(), "{raw}");
+        }
+    }
 
     #[test]
     fn parse_task_state_defaults_to_in_progress() {
