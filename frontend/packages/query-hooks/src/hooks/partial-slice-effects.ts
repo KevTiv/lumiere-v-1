@@ -36,7 +36,11 @@ interface Projection {
   readonly acknowledged_at?: unknown;
 }
 
-function field(row: Projection, camel: string, snake: string): unknown {
+function field(
+  row: Projection,
+  camel: keyof Projection,
+  snake: keyof Projection,
+): unknown {
   return row[camel] ?? row[snake];
 }
 
