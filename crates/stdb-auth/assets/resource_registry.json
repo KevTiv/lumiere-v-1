@@ -1640,7 +1640,11 @@
       "name",
       "company_id",
       "res_model",
-      "res_id"
+      "res_id",
+      "is_locked",
+      "locked_by",
+      "locked_at",
+      "locked_until"
     ],
     "mandatory": [
       "id",

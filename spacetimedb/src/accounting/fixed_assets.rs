@@ -1098,17 +1098,14 @@ pub fn compute_depreciation_board(
 
     let asset = load_asset_in_scope(ctx, organization_id, company_id, asset_id)?;
 
-    let existing_lines: Vec<_> =
-        load_depreciation_lines_in_scope(ctx, organization_id, company_id, asset_id)?
-            .into_iter()
-            .filter(|line| !line.move_posted_check)
-            .collect();
+    if asset.state != AssetState::Running {
+        return Err("Can only compute depreciation for assets in Running state".to_string());
+    }
 
-    for line in existing_lines {
-        ctx.db
-            .account_asset_depreciation_line()
-            .id()
-            .delete(&line.id);
+    let existing_lines =
+        load_depreciation_lines_in_scope(ctx, organization_id, company_id, asset_id)?;
+    if !existing_lines.is_empty() {
+        return Err("Depreciation board already computed for asset".to_string());
     }
 
     let depreciable_amount = asset.total_depreciable_amount;
@@ -1153,6 +1150,7 @@ pub fn compute_depreciation_board(
     };
 
     let mut sequence = 0;
+    let mut board_ids = Vec::new();
     for amount in depreciation_amounts {
         if amount <= 0.0 {
             continue;
@@ -1160,7 +1158,8 @@ pub fn compute_depreciation_board(
 
         sequence += 1;
 
-        ctx.db
+        let line = ctx
+            .db
             .account_asset_depreciation_line()
             .insert(AccountAssetDepreciationLine {
                 id: 0,
@@ -1184,7 +1183,16 @@ pub fn compute_depreciation_board(
                 write_date: Some(ctx.timestamp),
                 metadata: None,
             });
+        board_ids.push(line.id);
     }
+
+    ctx.db.account_asset().id().update(AccountAsset {
+        depreciation_board_ids: board_ids,
+        depreciation_sequence: sequence,
+        write_uid: Some(ctx.sender()),
+        write_date: Some(ctx.timestamp),
+        ..asset
+    });
 
     write_audit_log_v2(
         ctx,
