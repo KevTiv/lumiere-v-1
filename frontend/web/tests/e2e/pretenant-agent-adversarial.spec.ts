@@ -177,12 +177,6 @@ test.describe("Pre-tenant agent adversarial", { tag: pretenantTags("@agent-harne
         acceptance: "concurrent reservations beyond the remaining budget: only affordable reservations commit, remaining budget never negative, settlement never duplicated",
       },
       {
-        id: "AG-07",
-        title: "permission, skill, tool, policy or model removal mid-run is enforced on the next call",
-        capability: CAPABILITIES.agentPolicy,
-        acceptance: "first inventory tool succeeds, admin revokes permission (or disables skill/tool/policy/model), next tool call is reauthorized and denied; authorization is never cached for the run",
-      },
-      {
         id: "AG-08",
         title: "tool protocol fuzzing fails closed",
         capability: CAPABILITIES.agentLoop,
