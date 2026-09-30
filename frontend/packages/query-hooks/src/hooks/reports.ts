@@ -355,7 +355,9 @@ export function useArchiveFinancialReport(
             "Failed to archive financial report",
           )
         },
-        afterDispatch: () => invalidateReportsModule(qc, organizationId),
+        afterDispatch: async () => {
+          await invalidateReportsModule(qc, organizationId)
+        },
         readbackAttempts: 6,
         readbackDelayMs: 150,
       })
