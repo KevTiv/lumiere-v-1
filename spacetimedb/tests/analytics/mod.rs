@@ -15,7 +15,6 @@ pub fn run_analytics_cross_company_widget_add_test(ctx: &ReducerContext) -> Resu
         .map_err(|e| format!("cross_company_widget_add: {e}"))
 }
 
-#[spacetimedb::reducer]
 pub fn run_analytics_record_report_run_test(ctx: &ReducerContext) -> Result<(), String> {
     relational_integrity_test::test_record_report_run_is_exact_and_replay_safe(ctx)
         .map_err(|e| format!("record_report_run: {e}"))

@@ -68,6 +68,8 @@ pub fn run_accounting_budgeting_test(ctx: &ReducerContext) -> Result<(), String>
 pub fn run_accounting_fixed_asset_ownership_test(ctx: &ReducerContext) -> Result<(), String> {
     fixed_assets_test::test_fixed_asset_ownership_is_derived_and_tenant_scoped(ctx)
         .map_err(|e| format!("fixed asset ownership: {e}"))?;
+    fixed_assets_test::test_depreciation_board_and_disposal_are_single_exact_effect(ctx)
+        .map_err(|e| format!("fixed asset depreciation/disposal exact effect: {e}"))?;
     fixed_assets_test::test_amortization_recognition_is_idempotent_and_tenant_scoped(ctx)
         .map_err(|e| format!("amortization recognition: {e}"))?;
     fixed_assets_test::test_asset_and_amortization_relation_negative_matrix(ctx)
