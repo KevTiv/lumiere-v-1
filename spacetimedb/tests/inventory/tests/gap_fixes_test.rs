@@ -2383,9 +2383,11 @@ pub fn test_quality_fail_ambiguous_destination_rejected(
 
     let source_quant_id =
         create_quant(ctx, org_id, company_id, product_id, fixture.location_id, 5.0, None)?;
-    // Two compatible destination quants already at the quarantine location.
-    create_quant(ctx, org_id, company_id, product_id, qc_loc, 1.0, None)?;
-    create_quant(ctx, org_id, company_id, product_id, qc_loc, 1.0, None)?;
+    // Two compatible destination identities already exist at the quarantine
+    // location. Keep their quantity at zero so they cannot also become source
+    // candidates before quarantine_quantity checks the duplicate destination.
+    create_quant(ctx, org_id, company_id, product_id, qc_loc, 0.0, None)?;
+    create_quant(ctx, org_id, company_id, product_id, qc_loc, 0.0, None)?;
 
     create_quality_check(
         ctx,
