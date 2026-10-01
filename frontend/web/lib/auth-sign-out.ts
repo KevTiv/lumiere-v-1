@@ -4,6 +4,7 @@
  */
 
 import { phReset } from "@/lib/posthog-browser"
+import { revokeOfflineReaders } from "./offline-lifecycle"
 
 function assignLocation(pathOrUrl: string) {
   if (pathOrUrl.startsWith("http://") || pathOrUrl.startsWith("https://")) {
@@ -15,6 +16,7 @@ function assignLocation(pathOrUrl: string) {
 
 /** Clears analytics identity, clears server/session cookies, then leaves the SPA. */
 export async function performSignOut(): Promise<void> {
+  revokeOfflineReaders()
   phReset()
 
   try {

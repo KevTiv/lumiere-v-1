@@ -10,5 +10,12 @@
     "noEmit": true,
     "isolatedModules": true
   },
-  "include": ["src/**/*.ts", "tests/**/*.ts", "playwright.config.ts"]
+  "include": [
+    "src/**/*.ts",
+    "tests/**/*.ts",
+    "playwright.config.ts",
+    "scripts/**/*.ts",
+    "../../web/offline-categories/**/*.ts",
+    "../../web/lib/offline-lifecycle.ts"
+  ]
 }

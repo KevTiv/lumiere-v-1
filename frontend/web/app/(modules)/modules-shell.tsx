@@ -1,6 +1,6 @@
 "use client"
 
-import { Suspense, useCallback, useEffect, useMemo, useState, type ComponentProps, type ReactNode } from "react"
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type ComponentProps, type ReactNode } from "react"
 import {
   DashboardSidebar,
   ErpCommandPalette,
@@ -45,6 +45,7 @@ import { useCompanies } from "@lumiere/query-hooks/hooks/organization-company"
 import { useOperatingCompanyId } from "@lumiere/query-hooks/hooks/use-operating-company"
 import { ErpAiRouteContextProvider, ErpAiChatControllerProvider, useErpAiRouteContext } from "@/lib/erp-ai-context"
 import { performSignOut } from "@/lib/auth-sign-out"
+import { revokeOfflineReaders } from "@/lib/offline-lifecycle"
 
 const AI_CHAT_SESSION_KEY_STORAGE = "lumiere:erp-ai-chat-session-key"
 
@@ -528,7 +529,13 @@ function ModulesContent({
   const [isAIChatDocked, setIsAIChatDocked] = useState(false)
   const [isNotebookOpen, setIsNotebookOpen] = useState(false)
   const [isJournalOpen, setIsJournalOpen] = useState(false)
-  const { organizationId } = useErpSession()
+  const { identity, organizationId } = useErpSession()
+  const priorSession = useRef({ identity, organizationId })
+  useEffect(() => {
+    const previous = priorSession.current
+    if (previous.identity !== identity || previous.organizationId !== organizationId) revokeOfflineReaders()
+    priorSession.current = { identity, organizationId }
+  }, [identity, organizationId])
   const orgId = organizationId ?? 0
   const orgReady = organizationId != null && organizationId > 0
   const operatingCompanyId = useOperatingCompanyId(organizationId)

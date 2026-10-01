@@ -4889,6 +4889,7 @@
       "confirmDelete": "Delete this picking wave?"
     },
     "categoryActions": {
+      "openSavedReader": "Open saved category reader",
       "confirmDelete": "Delete this product category?",
       "restoreById": "Restore category (by ID)…",
       "categoryIdPrompt": "Category ID"
