@@ -38,10 +38,11 @@ assert.ok(web.resolvedTaskDefinition.inputs.includes('.env*'), 'dotenv files mus
 for (const overrides of [
   { LUMIERE_API_SERVER_URL: 'http://127.0.0.1:8083' },
   { NEXT_PUBLIC_STDB_MODULE: 'cache-test-b' },
+  { LUMIERE_OFFLINE_GRANT_TRUST: '{"deploymentId":"cache-test-b"}' },
 ]) {
   const changed = graph(overrides)
   assert.notEqual(changed.find(task => task.taskId === web.taskId).hash, web.hash,
-    'rewrite/public build environment must invalidate web output')
+    'rewrite/public/offline trust build environment must invalidate web output')
   // Shared UI packages can legitimately infer NEXT_PUBLIC_* through their
   // framework dependencies. The API client has no web build-time environment.
   for (const task of baseline.filter(task => task.taskId === '@lumiere/api-client#build')) {

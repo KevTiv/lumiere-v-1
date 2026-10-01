@@ -3,13 +3,23 @@ import { createHash } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
+import {
+  checkedGrantTrust,
+  type OfflineGrantTrust,
+} from "../src/offline-grant.ts";
 
 /** Builds public, scope-free assets; the real session is resolved at runtime through /api. */
 export async function buildCategoryApp(
   output = fileURLToPath(
     new URL("../../../web/public/offline/categories/", import.meta.url),
   ),
+  configuredTrust: OfflineGrantTrust | null = process.env
+    .LUMIERE_OFFLINE_GRANT_TRUST
+    ? checkedGrantTrust(JSON.parse(process.env.LUMIERE_OFFLINE_GRANT_TRUST))
+    : null,
 ) {
+  const trust =
+    configuredTrust === null ? null : checkedGrantTrust(configuredTrust);
   const source = fileURLToPath(
     new URL("../../../web/offline-categories/", import.meta.url),
   );
@@ -55,6 +65,7 @@ export async function buildCategoryApp(
     await bundle(path.join(source, "client.ts"), {
       __WORKER_URL__: JSON.stringify(worker),
       __WASM_URL__: JSON.stringify(wasm),
+      __OFFLINE_GRANT_TRUST__: JSON.stringify(trust),
     }),
   );
   const style = emit(

@@ -4,6 +4,7 @@ import { test, type TestContext } from "node:test";
 import {
   connectCategoryTransport,
   ProjectionResetError,
+  ProjectionUnavailableError,
 } from "./http-transport.ts";
 import { openNodeSqlite } from "./node-sqlite.ts";
 import { ProjectionStore } from "./projection-store.ts";
@@ -18,6 +19,79 @@ test("transport bounds UTF-8 response bytes before decoding envelopes", async ()
     }),
     /byte limit/,
   );
+});
+
+test("only actual network/server outage is eligible for signed offline fallback", async () => {
+  const connect = (fetch: typeof globalThis.fetch, signal?: AbortSignal) =>
+    connectCategoryTransport(
+      { apiUrl: "https://fixture.local/v1", fetch },
+      signal,
+    );
+  await assert.rejects(
+    connect(async () => {
+      throw new TypeError("network failed");
+    }),
+    ProjectionUnavailableError,
+  );
+  await assert.rejects(
+    connect(async () => new Response("{}", { status: 503 })),
+    ProjectionUnavailableError,
+  );
+  await assert.rejects(
+    connect(
+      async () =>
+        new Response(null, { status: 302, headers: { Location: "/sign-in" } }),
+    ),
+    ProjectionResetError,
+  );
+  await assert.rejects(
+    connect(async () => new Response("{}", { status: 400 })),
+    (error) => !(error instanceof ProjectionUnavailableError),
+  );
+  await assert.rejects(
+    connect(async () => new Response("malformed")),
+    (error) => !(error instanceof ProjectionUnavailableError),
+  );
+  const controller = new AbortController();
+  controller.abort();
+  await assert.rejects(
+    connect(async () => {
+      throw new TypeError("cancelled request");
+    }, controller.signal),
+    (error) => !(error instanceof ProjectionUnavailableError),
+  );
+});
+
+test("grant request keeps authorization version/company on the existing cookie-aware transport", async () => {
+  const calls: { url: URL; init: RequestInit | undefined }[] = [];
+  const connected = await connectCategoryTransport({
+    apiUrl: "https://fixture.local/v1",
+    headers: () => ({ Authorization: "Bearer online-session" }),
+    fetch: async (input, init) => {
+      const url = new URL(String(input));
+      calls.push({ url, init });
+      return new Response(
+        JSON.stringify(
+          url.pathname.endsWith("/scope")
+            ? { scope, schemaHash: projectionSchemaHash }
+            : { signed: "fixture" },
+        ),
+      );
+    },
+  });
+  await connected.grant();
+  assert.equal(calls[1].url.pathname, "/v1/offline/product-categories/grant");
+  assert.equal(
+    calls[1].url.searchParams.get("authorizationVersion"),
+    scope.authorizationVersion,
+  );
+  assert.equal(calls[1].url.searchParams.get("companyId"), scope.companyId);
+  assert.equal(calls[1].init?.credentials, "include");
+  assert.equal(calls[1].init?.cache, "no-store");
+  assert.equal(calls[1].init?.redirect, "manual");
+  assert.deepEqual(calls[1].init?.headers, {
+    Authorization: "Bearer online-session",
+  });
 });
 
 const scope = {
