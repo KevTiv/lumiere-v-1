@@ -109,6 +109,8 @@ delete/restore and CSV replay through file-backed client restart; retained gaps;
 and active/completed reconstruction epochs. Verify response fields and checksum
 failure handling before claiming live feed acceptance.
 
-No percent-complete claim is justified by this bounded evidence. Browser/Tauri
-storage, read-only app adoption, snapshots beyond 1,000 rows, offline grant
+No percent-complete claim is justified by this bounded evidence. Browser storage
+is implemented in the next stacked slice; see
+[`offline-browser-storage-status.md`](offline-browser-storage-status.md).
+Tauri storage, read-only app adoption, snapshots beyond 1,000 rows, offline grant
 expiry/encryption, ChangeSets and admin review remain later slices.
