@@ -1901,6 +1901,12 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
         metadata: None,
     });
 
+    crate::inventory::product_category::record_seed_categories(
+        ctx,
+        org_id,
+        &[&cat_electronics, &cat_services],
+    )?;
+
     // ── 3.2 Products ──────────────────────────────────────────────────────────
     let product_laptop = ctx.db.product().insert(Product {
         id: 0,

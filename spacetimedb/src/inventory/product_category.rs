@@ -7,6 +7,7 @@
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::core::organization::require_company_in_organization;
+use crate::core::persistence::{record_organization_commit, OrganizationCommitInput, RowChange};
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 use crate::inventory::product::product;
 
@@ -132,6 +133,24 @@ pub fn create_product_category(
         },
     );
 
+    record_organization_commit(
+        ctx,
+        OrganizationCommitInput {
+            organization_id,
+            operation_id: "erp.create_product_category".into(),
+            correlation_id: format!(
+                "product-category:{}:{}",
+                category.id,
+                ctx.timestamp.to_micros_since_unix_epoch()
+            ),
+            changes: vec![RowChange::upsert_stdb_row(
+                "product_category",
+                serde_json::json!({"id": category.id}),
+                &category_effect(ctx, organization_id, category.id)?,
+            )?],
+        },
+    )?;
+
     log::info!(
         "Product category created: id={}, name='{}', parent_id={:?}",
         category.id,
@@ -214,6 +233,24 @@ pub fn update_product_category(
         },
     );
 
+    record_organization_commit(
+        ctx,
+        OrganizationCommitInput {
+            organization_id,
+            operation_id: "erp.update_product_category".into(),
+            correlation_id: format!(
+                "product-category:{}:{}",
+                category_id,
+                ctx.timestamp.to_micros_since_unix_epoch()
+            ),
+            changes: vec![RowChange::upsert_stdb_row(
+                "product_category",
+                serde_json::json!({"id": category_id}),
+                &category_effect(ctx, organization_id, category_id)?,
+            )?],
+        },
+    )?;
+
     log::info!("Product category updated: id={}", category_id);
     Ok(())
 }
@@ -279,6 +316,24 @@ pub fn delete_product_category(
         },
     );
 
+    record_organization_commit(
+        ctx,
+        OrganizationCommitInput {
+            organization_id,
+            operation_id: "erp.delete_product_category".into(),
+            correlation_id: format!(
+                "product-category:{}:{}",
+                category_id,
+                ctx.timestamp.to_micros_since_unix_epoch()
+            ),
+            changes: vec![RowChange::upsert_stdb_row(
+                "product_category",
+                serde_json::json!({"id": category_id}),
+                &category_effect(ctx, organization_id, category_id)?,
+            )?],
+        },
+    )?;
+
     log::info!("Product category deleted: id={}", category_id);
     Ok(())
 }
@@ -329,6 +384,24 @@ pub fn restore_product_category(
         },
     );
 
+    record_organization_commit(
+        ctx,
+        OrganizationCommitInput {
+            organization_id,
+            operation_id: "erp.restore_product_category".into(),
+            correlation_id: format!(
+                "product-category:{}:{}",
+                category_id,
+                ctx.timestamp.to_micros_since_unix_epoch()
+            ),
+            changes: vec![RowChange::upsert_stdb_row(
+                "product_category",
+                serde_json::json!({"id": category_id}),
+                &category_effect(ctx, organization_id, category_id)?,
+            )?],
+        },
+    )?;
+
     log::info!("Product category restored: id={}", category_id);
     Ok(())
 }
@@ -361,4 +434,46 @@ fn has_circular_reference(
     }
 
     Ok(false)
+}
+
+/// Capture the exact current row after the reducer's writes, inside its transaction.
+fn category_effect(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    category_id: u64,
+) -> Result<ProductCategory, String> {
+    let row = ctx
+        .db
+        .product_category()
+        .id()
+        .find(&category_id)
+        .ok_or("Category effect missing")?;
+    if row.organization_id != organization_id {
+        return Err("Category effect outside organization".into());
+    }
+    Ok(row)
+}
+
+/// Dev seed categories share the same canonical replay boundary as ordinary writes.
+pub(crate) fn record_seed_categories(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    categories: &[&ProductCategory],
+) -> Result<(), String> {
+    let changes = categories
+        .iter()
+        .map(|row| {
+            RowChange::upsert_stdb_row("product_category", serde_json::json!({"id": row.id}), *row)
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    record_organization_commit(
+        ctx,
+        OrganizationCommitInput {
+            organization_id,
+            operation_id: "erp.seed_dev_data".into(),
+            correlation_id: format!("seed-category:{}", organization_id),
+            changes,
+        },
+    )?;
+    Ok(())
 }

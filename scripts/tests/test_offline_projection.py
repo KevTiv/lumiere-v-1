@@ -86,6 +86,22 @@ class OfflineProjectionTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "read-only"):
             EMITTER.render(self.manifest, self.policy)
 
+    def test_server_and_client_share_fingerprint_and_selected_fields(self):
+        self.table["columns"].append({"name": "deleted_at", "sql_name": "deleted_at", "ty": "Timestamp", "nullable": True})
+        outputs = dict(EMITTER.render_outputs(self.manifest, self.policy))
+        client = outputs[EMITTER.OUTPUT]
+        server = outputs[EMITTER.RUST_OUTPUT]
+        self.assertEqual(re.search(r"sha256:[a-f0-9]+", client)[0], re.search(r"sha256:[a-f0-9]+", server)[0])
+        self.assertIn(", ".join([*self.policy["fields"], "deleted_at"]), server)
+        self.assertNotIn('"metadata"', server)
+
+    def test_server_requires_canonical_soft_delete_metadata(self):
+        with self.assertRaisesRegex(ValueError, "canonical soft-delete"):
+            EMITTER.render_outputs(self.manifest, self.policy)
+        self.table["columns"].append({"name": "deleted_at", "sql_name": "deleted_at", "ty": "String", "nullable": True})
+        with self.assertRaisesRegex(ValueError, "canonical soft-delete"):
+            EMITTER.render_outputs(self.manifest, self.policy)
+
 
 if __name__ == "__main__":
     unittest.main()

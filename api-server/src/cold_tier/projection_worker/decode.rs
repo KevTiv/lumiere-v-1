@@ -35,7 +35,7 @@ fn parse_identity(value: &Value) -> Result<String> {
     Ok(raw.to_ascii_lowercase())
 }
 
-pub(super) fn parse_commit(row: &Value) -> Result<commit_projection::OrganizationCommitEnvelope> {
+pub(crate) fn parse_commit(row: &Value) -> Result<commit_projection::OrganizationCommitEnvelope> {
     let row_change_count = u32::try_from(require_u64(row, "rowChangeCount")?)
         .context("decode projection rowChangeCount")?;
     Ok(commit_projection::OrganizationCommitEnvelope {
@@ -60,7 +60,7 @@ pub(super) fn parse_commit(row: &Value) -> Result<commit_projection::Organizatio
     })
 }
 
-pub(super) fn parse_change(row: &Value) -> Result<commit_projection::OrganizationRowChangeInput> {
+pub(crate) fn parse_change(row: &Value) -> Result<commit_projection::OrganizationRowChangeInput> {
     Ok(commit_projection::OrganizationRowChangeInput {
         id: require_string(row, "id")?,
         organization_id: require_u64(row, "organizationId")?,
