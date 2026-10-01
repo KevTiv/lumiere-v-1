@@ -16,6 +16,18 @@ export class ProjectionResetError extends Error {
   }
 }
 
+/** Only a network failure or server outage can admit a previously signed offline lease. */
+export class ProjectionUnavailableError extends Error {
+  constructor(readonly status?: number) {
+    super(
+      status
+        ? `Projection connection is unavailable (${status})`
+        : "Projection connection is unavailable",
+    );
+    this.name = "ProjectionUnavailableError";
+  }
+}
+
 export interface HttpProjectionOptions {
   /** Trusted API base, including /v1. Browser builds may use a configured BFF base. */
   apiUrl: string;
@@ -31,6 +43,7 @@ export async function connectCategoryTransport(
 ): Promise<{
   scope: Readonly<ProjectionScope>;
   transport: ProjectionTransport;
+  grant(signal?: AbortSignal): Promise<unknown>;
 }> {
   const fetcher = options.fetch ?? globalThis.fetch;
   const base = new URL(options.apiUrl);
@@ -50,16 +63,35 @@ export async function connectCategoryTransport(
   ): Promise<unknown> {
     const url = new URL(`${root}/offline/product-categories/${endpoint}`);
     url.search = new URLSearchParams(parameters).toString();
-    const response = await fetcher(url, {
-      method: "GET",
-      credentials: "include",
-      cache: "no-store",
-      redirect: "error",
-      headers: options.headers?.(),
-      signal,
-    });
+    let response: Response;
+    try {
+      response = await fetcher(url, {
+        method: "GET",
+        credentials: "include",
+        cache: "no-store",
+        redirect: "manual",
+        headers: options.headers?.(),
+        signal,
+      });
+    } catch (error) {
+      if (
+        !signal?.aborted &&
+        (error instanceof TypeError ||
+          (error instanceof DOMException && error.name === "NetworkError"))
+      )
+        throw new ProjectionUnavailableError();
+      throw error;
+    }
+    if (
+      response.type === "opaqueredirect" ||
+      (response.status >= 300 && response.status < 400)
+    )
+      throw new ProjectionResetError(401);
     if ([401, 403, 409, 410].includes(response.status))
       throw new ProjectionResetError(response.status);
+    if (!response.ok)
+      if (response.status >= 500)
+        throw new ProjectionUnavailableError(response.status);
     if (!response.ok)
       throw new Error(`Projection request failed (${response.status})`);
     const reader = response.body?.getReader();
@@ -115,5 +147,9 @@ export async function connectCategoryTransport(
     if (JSON.stringify(checkedScope(requestedScope)) !== JSON.stringify(scope))
       throw new ProjectionResetError(409);
   }
-  return { scope, transport };
+  return {
+    scope,
+    transport,
+    grant: (signal) => request("grant", parameters, signal),
+  };
 }

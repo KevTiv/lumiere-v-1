@@ -1,0 +1,10 @@
+{
+  "grant": {
+    "algorithm": "ES256",
+    "keyId": "k1",
+    "payload": "eyJ2ZXJzaW9uIjoxLCJyZXNvdXJjZSI6InByb2R1Y3QtY2F0ZWdvcmllcyIsImRlcGxveW1lbnRJZCI6InRlc3QtZGVwbG95bWVudCIsImF1ZGllbmNlIjoiaHR0cHM6Ly9lcnAuZXhhbXBsZSIsInNjaGVtYUhhc2giOiJzaGEyNTY6YjdlYjliNjg2MTFlNThkYjdlYWIzMTAwN2E3YjFhZDhlOTAwZGIzOWM1MTI1ZTVmZDFlMzZkZDA4NGQwZDE2MSIsInNjb3BlIjp7ImVudmlyb25tZW50SWQiOiJlbnYiLCJhY3RvcklkIjoiYWN0b3ItYSIsIm9yZ2FuaXphdGlvbklkIjoiNyIsImNvbXBhbnlJZCI6IjkiLCJhdXRob3JpemF0aW9uVmVyc2lvbiI6ImF1dGgtMSJ9LCJpc3N1ZWRBdCI6MTcwMDAwMDAwMCwiZXhwaXJlc0F0IjoxNzAwMDAzNjAwfQ",
+    "signature": "H-mFBrEiIlhzPqQwWYSfTjJAzjjrwXPm96ri2yKDTTIrai2YeTy9XSYu6xc3crvvUwz3mI_aQjQ13cjrb0D_KA",
+    "version": 1
+  },
+  "publicKey": "BL_m42p8x8cbcobpLphifgHhLHuXc9i6mpyN8Y65SMnxCXIntuhC8aoYZg_r32ScF8rpkY3MiFr8dooFgOh3KdM"
+}
