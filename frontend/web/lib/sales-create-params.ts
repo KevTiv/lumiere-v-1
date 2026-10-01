@@ -452,6 +452,7 @@ export function toCreateReturnOrderParams(
     partnerId,
     saleOrderId,
     returnReason: optionalTrimmedString(formData.returnReason),
+    idempotencyKey: undefined,
     lines: [line],
   }
 }

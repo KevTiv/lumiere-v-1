@@ -2776,6 +2776,12 @@
     ],
     "table": "hr_labor_cost_snapshot"
   },
+  "landed-cost-applications": {
+    "aliases": ["landed-cost-applications", "stock_landed_cost_application"],
+    "default_restricted": ["company_id", "landed_cost_id", "allocation_count", "applied_at"],
+    "mandatory": ["id", "organization_id", "company_id"],
+    "table": "stock_landed_cost_application"
+  },
   "landed-cost-lines": {
     "aliases": [
       "landed-cost-lines",
@@ -5012,6 +5018,12 @@
       "organization_id"
     ],
     "table": "resource_utilisation_snapshot"
+  },
+  "return-order-creations": {
+    "aliases": ["return-order-creations", "return_order_creation"],
+    "default_restricted": ["company_id", "return_order_id", "idempotency_key", "request_fingerprint"],
+    "mandatory": ["id", "organization_id", "company_id"],
+    "table": "return_order_creation"
   },
   "return-order-lines": {
     "aliases": [
