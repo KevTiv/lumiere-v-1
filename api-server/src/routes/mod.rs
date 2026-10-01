@@ -17,6 +17,7 @@ mod import;
 mod inventory;
 mod mail;
 mod messaging;
+mod offline;
 pub(crate) mod operations;
 mod presentation;
 mod proposals;
@@ -52,6 +53,7 @@ pub fn domain_router() -> Router<Arc<AppState>> {
         .merge(mail::router())
         .merge(messaging::router())
         .merge(inventory::router())
+        .merge(offline::router())
         .merge(settings::router())
         .merge(statement_imports::router())
         .merge(bootstrap::router())
