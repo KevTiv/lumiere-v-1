@@ -69,3 +69,22 @@ The browser suite bundles the actual adapter, worker and client bridge with
 esbuild, serves the pinned WASM locally and runs against real OPFS. The network
 server is a deterministic authenticated fixture, not the Rust API/STDB runtime.
 An installed Chromium can be selected with `LUMIERE_CHROMIUM_PATH`.
+
+## Read-only app integration
+
+Inventory's category toolbar opens `/offline/categories/index.html?companyId=...`.
+Run `pnpm --dir frontend/web build:offline` to emit the static client, module
+worker, pinned WASM and scoped service worker. Web dev/build runs this first;
+generated `public/offline/categories/` assets are ignored by git and are
+included in app build-cache outputs. Deploy immutable hashed assets together and
+retain old generations while their clients can still be open.
+
+The reader uses `/api/offline/product-categories/*` through Next's configured
+Rust rewrite or production Kong ingress. Every new reader must discover a live
+server scope before opening private saved rows. A cold offline launch boots its
+public shell and asks for reconnection. Open verified sessions can continue
+reading disconnected. Sign-out/company transitions revoke active readers;
+actor/policy changes are checked on refresh, focus and reconnect. This does not
+define signed offline grants, encryption policy or an all-actor storage wipe.
+
+See [app status and local gates](../../../docs/plan/offline-category-app-status.md).

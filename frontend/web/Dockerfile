@@ -10,6 +10,8 @@ COPY web/package.json ./web/
 COPY packages/api-client/package.json ./packages/api-client/
 COPY packages/erp-session/package.json ./packages/erp-session/
 COPY packages/erp-shared/package.json ./packages/erp-shared/
+COPY packages/erp-workflows/package.json ./packages/erp-workflows/
+COPY packages/offline/package.json ./packages/offline/
 COPY packages/presentation-core/package.json ./packages/presentation-core/
 COPY packages/query-hooks/package.json ./packages/query-hooks/
 COPY packages/stdb/package.json ./packages/stdb/
@@ -20,7 +22,8 @@ RUN pnpm install --frozen-lockfile
 # --- builder ---
 FROM base AS builder
 WORKDIR /app
-COPY --from=deps /app/node_modules ./node_modules
+# Preserve workspace package links as well as the pnpm store for the static bundler.
+COPY --from=deps /app/ ./
 COPY . .
 RUN pnpm --filter ./web build
 

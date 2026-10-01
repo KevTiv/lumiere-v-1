@@ -678,6 +678,9 @@ importers:
       '@lumiere/i18n':
         specifier: workspace:*
         version: link:../packages/i18n
+      '@lumiere/offline':
+        specifier: workspace:*
+        version: link:../packages/offline
       '@lumiere/presentation-core':
         specifier: workspace:*
         version: link:../packages/presentation-core
