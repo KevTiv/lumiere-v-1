@@ -11,6 +11,16 @@ import {
 } from "./stdb-params-json"
 
 describe("stdbParamsToJson", () => {
+  it("encodes keyed and legacy return creation with an explicit Option", () => {
+    const legacy = stdbParamsToJson({ partnerId: 1n, lines: [] }, "CreateReturnOrderParams")
+    assert.deepEqual(legacy.idempotency_key, { none: [] })
+    const keyed = stdbParamsToJson(
+      { partnerId: 1n, lines: [], idempotencyKey: "return-1" },
+      "CreateReturnOrderParams",
+    )
+    assert.deepEqual(keyed.idempotency_key, { some: "return-1" })
+  })
+
   it("fills every Option field of nested BOM lines", () => {
     const params = stdbParamsToJson(
       {

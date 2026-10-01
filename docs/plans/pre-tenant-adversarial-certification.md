@@ -304,7 +304,7 @@ Fresh runtime acceptance (executed 2026-09-30):
   and the real coverage snapshot certified 23 modules, 215 populated restore tables, 1,744 rows and
   watermark `2/9d39a32cb4d2bcd5bffa264b9a05473d65654601557e6112491d8480af7e192e`.
   Reconstruction then stopped before target mutation because `.contracts-staging` declares 504
-  restore tables while pinned contracts declare 503; the missing pinned table is
+  schema tables (499 restored) while pinned contracts declare 503 (498 restored); the missing pinned table is
   `return_order_creation`. Publishing/repinning that unrelated contract change is outside this
   Phase 4 stack, and bypassing the immutable manifest gate would invalidate the evidence.
 
@@ -489,3 +489,9 @@ Run on 2026-09-12 against `main` @ `06c9c82a0` plus this branch.
 
 Not executed: the `@pretenant` Playwright suite (needs a running seeded stack, `make e2e-pretenant`). Its
 browser-only defects (`COMM-15`, `AG-IDEMP-01`) and behavioural assertions are unverified at runtime.
+
+Contract alignment follow-up (2026-10-01): see
+`docs/plan/aih-phase4-reconstruction-contracts-status.md`. The missing table belongs to the
+ERP workflow stack and is already released there; the isolated AI follow-up imports that
+source prerequisite and uses the normal publisher to produce a matching immutable pin.
+AG-09 remains partial until the live disposable reconstruction and provider-observation gate passes.
