@@ -321,7 +321,11 @@ function optionalTextMatches(actual: unknown, expected: unknown): boolean {
 function timestampMicros(value: unknown): bigint | null {
   value = optionalValue(value)
   if (value && typeof value === "object") {
-    const timestamp = value as Record<string, unknown>
+    const timestamp = value as {
+      readonly __timestamp_micros_since_unix_epoch__?: unknown
+      readonly microsSinceUnixEpoch?: unknown
+      readonly micros_since_unix_epoch?: unknown
+    }
     value = timestamp.__timestamp_micros_since_unix_epoch__ ?? timestamp.microsSinceUnixEpoch ?? timestamp.micros_since_unix_epoch
   } else if (typeof value === "string" && !/^-?\d+$/.test(value)) {
     const milliseconds = Date.parse(value)
@@ -474,7 +478,8 @@ export function resolveFleetHistoryEffect(
     if (expected.serviceTypeId == null || provider === undefined || expected.provider === undefined ||
       !optionalTextMatches(provider, expected.provider)) return null
     if (expected.costAmount == null &&
-      (historyField(row, "costAmount", "cost_amount") === undefined ||
+      (expected.journalId != null || expected.expenseAccountId != null || expected.offsetAccountId != null ||
+       historyField(row, "costAmount", "cost_amount") === undefined ||
        optionalValue(historyField(row, "costAmount", "cost_amount")) != null ||
        historyField(row, "accountMoveId", "account_move_id") === undefined ||
        optionalValue(historyField(row, "accountMoveId", "account_move_id")) != null ||
@@ -596,12 +601,12 @@ export function useRecordFleetService(organizationId: bigint, companyId?: bigint
               provider: params.provider,
               notes: params.notes,
               serviceTypeId: input.serviceTypeId,
+              journalId: input.journalId,
+              expenseAccountId: input.expenseAccountId,
+              offsetAccountId: input.offsetAccountId,
               ...(input.costAmount != null
                 ? {
                     costAmount: input.costAmount,
-                    journalId: input.journalId,
-                    expenseAccountId: input.expenseAccountId,
-                    offsetAccountId: input.offsetAccountId,
                     accountMoves: await fetchQueryList(
                       "/api/query/account-moves",
                       "Failed to read fleet service accounting move",

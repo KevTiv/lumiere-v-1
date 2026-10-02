@@ -10,7 +10,43 @@ import { parseStrictU64 } from "@lumiere/erp-shared/u64"
  */
 export type OrderToCashScope = { readonly organizationId: bigint; readonly companyId: bigint }
 
-type Row = Readonly<Record<string, unknown>>
+export interface OrderToCashProjection {
+  readonly id?: unknown
+  readonly organizationId?: unknown
+  readonly organization_id?: unknown
+  readonly companyId?: unknown
+  readonly company_id?: unknown
+  readonly saleId?: unknown
+  readonly sale_id?: unknown
+  readonly isReturn?: unknown
+  readonly is_return?: unknown
+  readonly state?: unknown
+  readonly name?: unknown
+  readonly saleOrderId?: unknown
+  readonly sale_order_id?: unknown
+  readonly moveType?: unknown
+  readonly move_type?: unknown
+  readonly amountResidual?: unknown
+  readonly amount_residual?: unknown
+  readonly paymentState?: unknown
+  readonly payment_state?: unknown
+  readonly invoiceDateDue?: unknown
+  readonly invoice_date_due?: unknown
+  readonly partnerId?: unknown
+  readonly partner_id?: unknown
+  readonly paymentHold?: unknown
+  readonly payment_hold?: unknown
+  readonly reference?: unknown
+  readonly clientOrderRef?: unknown
+  readonly client_order_ref?: unknown
+}
+
+interface TimestampProjection {
+  readonly some?: unknown
+  readonly none?: unknown
+  readonly __timestamp_micros_since_unix_epoch__?: unknown
+  readonly microsSinceUnixEpoch?: unknown
+}
 
 export type PickingHandoff = { readonly id: bigint; readonly state: string; readonly name: string }
 export type InvoiceHandoff = {
@@ -59,7 +95,7 @@ export function stateName(value: unknown): string {
   return ""
 }
 
-function inScope(row: Row, scope: OrderToCashScope): boolean {
+function inScope(row: OrderToCashProjection, scope: OrderToCashScope): boolean {
   return (
     parseStrictU64(row.organizationId ?? row.organization_id) === scope.organizationId
     && parseStrictU64(row.companyId ?? row.company_id) === scope.companyId
@@ -70,7 +106,7 @@ function inScope(row: Row, scope: OrderToCashScope): boolean {
 export function timestampMicros(value: unknown): bigint | null {
   if (value == null) return null
   if (typeof value === "object" && !Array.isArray(value)) {
-    const record = value as Record<string, unknown>
+    const record = value as TimestampProjection
     if ("some" in record) return timestampMicros(record.some)
     if ("none" in record) return null
     const inner = record.__timestamp_micros_since_unix_epoch__ ?? record.microsSinceUnixEpoch
@@ -96,8 +132,8 @@ function byId<T extends { readonly id: bigint }>(items: T[]): T[] {
 export function orderHandoffs(
   orderId: bigint,
   scope: OrderToCashScope,
-  pickings: readonly Row[],
-  moves: readonly Row[],
+  pickings: readonly OrderToCashProjection[],
+  moves: readonly OrderToCashProjection[],
 ): OrderHandoffs {
   const deliveries: PickingHandoff[] = []
   for (const picking of pickings) {
@@ -130,7 +166,11 @@ export function orderHandoffs(
   return { pickings: byId(deliveries), invoices: byId(invoices) }
 }
 
-function partnerOnHold(holds: readonly Row[], scope: OrderToCashScope, partnerId: bigint | null): boolean {
+function partnerOnHold(
+  holds: readonly OrderToCashProjection[],
+  scope: OrderToCashScope,
+  partnerId: bigint | null,
+): boolean {
   if (partnerId == null) return false
   return holds.some(
     (hold) =>
@@ -147,10 +187,10 @@ function partnerOnHold(holds: readonly Row[], scope: OrderToCashScope, partnerId
  * approval and cancelled orders are not part of order-to-cash. Ordered by order id.
  */
 export function orderToCashRows(
-  orders: readonly Row[],
-  pickings: readonly Row[],
-  moves: readonly Row[],
-  holds: readonly Row[],
+  orders: readonly OrderToCashProjection[],
+  pickings: readonly OrderToCashProjection[],
+  moves: readonly OrderToCashProjection[],
+  holds: readonly OrderToCashProjection[],
   scope: OrderToCashScope,
   nowMicros: bigint,
 ): OrderToCashRow[] {

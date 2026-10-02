@@ -2,7 +2,23 @@ import { parseStrictU64 } from "@lumiere/erp-shared/u64"
 
 import { AmbiguousOperationEffectError, type CanonicalRecordRef } from "./operation-effect"
 
-type Tagged = string | { readonly tag?: string } | Readonly<Record<string, unknown>> | null | undefined
+type HumanTaskTag =
+  | "AllCandidates"
+  | "AnyCandidate"
+  | "Approve"
+  | "Approved"
+  | "Claimed"
+  | "Complete"
+  | "Completed"
+  | "Open"
+  | "Reject"
+  | "Rejected"
+
+type Tagged =
+  | string
+  | Readonly<{ tag?: string } & Partial<Record<HumanTaskTag, readonly unknown[]>>>
+  | null
+  | undefined
 
 export type HumanTaskEffectProjection = {
   readonly id?: unknown

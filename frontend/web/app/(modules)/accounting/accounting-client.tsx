@@ -82,7 +82,7 @@ import {
 } from "@lumiere/ui"
 import { Input } from "@lumiere/ui/components/input"
 import { Label } from "@lumiere/ui/components/label"
-import type { BadgeVariant, EntityRecordSheetConfig, EntityTableConfig, EntityViewConfig, FormConfig, ModuleConfig } from "@lumiere/ui"
+import type { BadgeVariant, EntityRecordSheetConfig, EntityRow, EntityTableConfig, EntityViewConfig, FormConfig, ModuleConfig } from "@lumiere/ui"
 import {
   accountingParamsToJson,
   analyticParamsToJson,
@@ -2220,11 +2220,11 @@ function AccountingClientReady({
               rows.length > 0 &&
               rows.every(
                 (row) =>
-                  assetStateTag(row as Record<string, unknown>) === "Running",
+                  assetStateTag(row as EntityRow) === "Running",
               ),
             onClick: (rows) => {
               for (const r of rows) {
-                if (assetStateTag(r as Record<string, unknown>) === "Running") {
+                if (assetStateTag(r as EntityRow) === "Running") {
                   void computeDepreciationBoard.mutateAsync(BigInt(String(r.id)))
                 }
               }
@@ -2238,12 +2238,12 @@ function AccountingClientReady({
             isApplicable: (rows) =>
               rows.length > 0 &&
               rows.every((row) => {
-                const state = assetStateTag(row as Record<string, unknown>)
+                const state = assetStateTag(row as EntityRow)
                 return state === "Running" || state === "Close"
               }),
             onClick: (rows) => {
               for (const r of rows) {
-                const state = assetStateTag(r as Record<string, unknown>)
+                const state = assetStateTag(r as EntityRow)
                 if (state === "Running" || state === "Close") {
                   void disposeAccountAsset.mutateAsync({
                     assetId: BigInt(String(r.id)),

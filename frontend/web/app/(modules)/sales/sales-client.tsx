@@ -1157,8 +1157,8 @@ function SalesClientLoaded({
                   handoffs={orderHandoffs(
                     orderId,
                     { organizationId: orgId, companyId: operatingCompanyId },
-                    stockPickings as Record<string, unknown>[],
-                    accountMoves as unknown as Record<string, unknown>[],
+                    stockPickings as EntityRow[],
+                    accountMoves as unknown as EntityRow[],
                   )}
                 />
               </div>

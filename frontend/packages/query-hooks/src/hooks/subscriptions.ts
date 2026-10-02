@@ -377,17 +377,30 @@ function numericValue(value: unknown): number | null {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
+interface SubscriptionCommandProjection {
+  readonly billingRunKey?: unknown;
+  readonly billing_run_key?: unknown;
+  readonly invoiceDate?: unknown;
+  readonly invoice_date?: unknown;
+  readonly invoiceMoveId?: unknown;
+  readonly invoice_move_id?: unknown;
+  readonly amount?: unknown;
+}
+
 function field(
-  record: Record<string, unknown>,
+  record: SubscriptionCommandProjection,
   camel: string,
   snake: string,
 ): unknown {
-  return record[camel] ?? record[snake];
+  return Reflect.get(record, camel) ?? Reflect.get(record, snake);
 }
 
 function timestampMicros(value: unknown): bigint | null {
   if (value && typeof value === 'object' && !Array.isArray(value)) {
-    const object = value as Record<string, unknown>;
+    const object = value as {
+      readonly microsSinceUnixEpoch?: unknown;
+      readonly __timestamp_micros_since_unix_epoch__?: unknown;
+    };
     const raw =
       object.microsSinceUnixEpoch ??
       object.__timestamp_micros_since_unix_epoch__;
@@ -404,7 +417,7 @@ export function subscriptionBillingRunKey(
   subscriptionId: bigint,
   params: GenerateSubscriptionInvoiceParams,
 ): string {
-  const record = params as unknown as Record<string, unknown>;
+  const record = params as unknown as SubscriptionCommandProjection;
   const explicit = field(record, 'billingRunKey', 'billing_run_key');
   if (typeof explicit === 'string' && explicit.trim() !== '') {
     return explicit.trim();
@@ -637,7 +650,7 @@ export function usePaySubscriptionInvoice(
   >({
     mutationFn: async ({ subscriptionId, params }) => {
       const activeCompanyId = requireSelectedCompany(companyId);
-      const record = params as unknown as Record<string, unknown>;
+      const record = params as unknown as SubscriptionCommandProjection;
       const invoiceMoveId = parseStrictU64(
         field(record, 'invoiceMoveId', 'invoice_move_id'),
       );

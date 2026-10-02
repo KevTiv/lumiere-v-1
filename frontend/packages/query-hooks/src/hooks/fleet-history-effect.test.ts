@@ -114,9 +114,16 @@ describe("COV-15 fleet history exact effects", () => {
   })
 
   it("requires explicit absence of both cost and accounting linkage for a non-cost request", () => {
-    const expected = { ...expectedService, costAmount: undefined }
+    const expected = {
+      ...expectedService, costAmount: undefined, journalId: undefined,
+      expenseAccountId: undefined, offsetAccountId: undefined,
+    }
     assert.equal(readService(service, expected), null)
-    assert.ok(readService({ ...service, costAmount: null, accountMoveId: null, currencyId: null }, expected))
+    const costless = { ...service, costAmount: null, accountMoveId: null, currencyId: null }
+    assert.ok(readService(costless, expected))
+    for (const field of ["journalId", "expenseAccountId", "offsetAccountId"] as const) {
+      assert.equal(readService(costless, { ...expected, [field]: 44n }), null)
+    }
     assert.equal(readService({ ...service, costAmount: null, accountMoveId: null, currencyId: undefined }, expected), null)
     assert.equal(readService({ ...service, costAmount: null, accountMoveId: null, currencyId: "3" }, expected), null)
     assert.equal(readService({ ...service, costAmount: 0, accountMoveId: null }, expected), null)
