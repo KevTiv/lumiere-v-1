@@ -2383,3 +2383,71 @@ pub fn test_documents_upload_rejects_oversized_and_disallowed_mimetype(
     }
     Ok(())
 }
+
+/// COV-22: publishing over an existing form configuration is a compare-and-set on
+/// `updated_at`. A publish without it (a replay of the first publish) or with an outdated
+/// value is rejected and leaves the version unchanged; the current value updates it once.
+pub fn test_publish_form_configuration_requires_expected_version(
+    ctx: &ReducerContext,
+) -> Result<(), String> {
+    use crate::forms::{form_config, publish_form_configuration, PublishFormConfigurationParams};
+
+    ensure_test_superuser(ctx)?;
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let org_id = fixture.organization_id;
+    let params = |expected_updated_at_micros: Option<i64>| PublishFormConfigurationParams {
+        module_id: "crm".to_string(),
+        form_id: "new-contact".to_string(),
+        name: "New Contact".to_string(),
+        description: None,
+        is_system_default: false,
+        fields: vec![],
+        role_configs: vec![],
+        expected_updated_at_micros,
+        replace_missing_fields: false,
+    };
+    let current = |ctx: &ReducerContext| {
+        ctx.db
+            .form_config()
+            .iter()
+            .find(|c| c.organization_id == org_id && c.module_id == "crm" && c.form_id == "new-contact")
+            .ok_or_else(|| "form configuration missing".to_string())
+    };
+
+    publish_form_configuration(ctx, org_id, params(None))?;
+    let first = current(ctx)?;
+    if first.config_version != 1 {
+        return Err(format!("first publish must be version 1, got {}", first.config_version));
+    }
+
+    // Replay of the first publish (no expected value): rejected, version unchanged.
+    match publish_form_configuration(ctx, org_id, params(None)) {
+        Err(message) if message.contains("already exists") => {}
+        Err(message) => return Err(format!("unexpected replay rejection: {message}")),
+        Ok(()) => return Err("a publish over an existing configuration needs expected_updated_at_micros".into()),
+    }
+    let after_replay = current(ctx)?;
+    if after_replay.config_version != 1 || after_replay.updated_at != first.updated_at {
+        return Err("rejected replay changed the form configuration".into());
+    }
+
+    // A stale value is rejected as a concurrent modification.
+    let stale = first.updated_at.to_micros_since_unix_epoch() - 1;
+    if publish_form_configuration(ctx, org_id, params(Some(stale))).is_ok() {
+        return Err("a stale expected_updated_at_micros must be rejected".into());
+    }
+    if current(ctx)?.config_version != 1 {
+        return Err("rejected stale publish changed the version".into());
+    }
+
+    // The current value updates it exactly once.
+    publish_form_configuration(
+        ctx,
+        org_id,
+        params(Some(first.updated_at.to_micros_since_unix_epoch())),
+    )?;
+    if current(ctx)?.config_version != 2 {
+        return Err("a publish with the current updated_at must produce version 2".into());
+    }
+    Ok(())
+}

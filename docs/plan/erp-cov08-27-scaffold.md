@@ -46,7 +46,7 @@ Slices marked `yes` pull that pin commit before continuing.
 | COV-19 | Record-linked activity completion (then message post) | `complete_activity`, `post_message` | no | [status](./erp-cov19-activity-completion-status.md) |
 | COV-20 | Configure → execute → export one scheduled report | `create_scheduled_report`, `record_report_run` | yes | [status](./erp-cov20-report-run-status.md) |
 | COV-21 | One evidence-backed human-task decision | `claim_workflow_human_task`, `decide_workflow_human_task` | yes | [status](./erp-cov21-approval-decision-status.md) |
-| COV-22 | Publish one form configuration; validate→commit one import | `publish_form_configuration`, `import_hr_payslip_csv` | no | [status](./erp-cov22-form-publish-import-commit-status.md) |
+| COV-22 | Publish one form configuration; validate→commit one import | `publish_form_configuration`, `import_hr_payslip_csv` | yes | [status](./erp-cov22-form-publish-import-commit-status.md) |
 | COV-23 | Membership role assign → revoke | `assign_role`, `revoke_role` | no | [status](./erp-cov23-role-assignment-status.md) |
 | COV-24 | Order → delivery → collection exception workspace | — | no | [status](./erp-cov24-distributor-workspace-status.md) |
 | COV-25 | Close one missing downstream record link per PR | — | no | [status](./erp-cov25-cross-module-links-status.md) |

@@ -330,10 +330,10 @@
         "import_hr_payslip_csv"
       ],
       "resources": "form-configs, payslips",
-      "contract_release_required": "no",
-      "contract_note": "none for form publish (`form-configs` exposes config_version, is_active); import idempotency proof depends on BASE-04's SHA-256 import identity",
+      "contract_release_required": "yes",
+      "contract_note": "release (registry projection): `form-configs` now also projects `updated_at`, the compare-and-set token for publishing over an existing configuration; import identity is added in `import_hr_payslip_csv`",
       "prerequisites": "BASE-04 landed.",
-      "status": "PARTIAL — payslip import commit idempotent and form publish read back; form-publish stale replay not rejected",
+      "status": "IMPLEMENTED — payslip import idempotent and form publish version-checked (contract release and runtime acceptance pending)",
       "status_doc": "docs/plan/erp-cov22-form-publish-import-commit-status.md",
       "spec": "frontend/web/tests/e2e/cov22-form-publish-import-commit.spec.ts",
       "hooks": [

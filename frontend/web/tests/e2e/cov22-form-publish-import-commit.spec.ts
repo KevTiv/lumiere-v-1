@@ -92,7 +92,7 @@ async function openPayslipImport(page: Page, csvPath: string) {
 }
 
 test.describe("COV-22 form publish and idempotent import commit", { tag: ["@p0", "@cov22"] }, () => {
-  test("publishing an unpublished form reads back version 1; the reader is denied", async ({ browser, page }) => {
+  test("publishing an unpublished form reads back version 1; a replay and the reader are rejected", async ({ browser, page }) => {
     test.setTimeout(180_000)
     const organizationId = await fetchSessionOrganizationId(page)
     let formId: (typeof CANDIDATE_FORMS)[number] | null = null
@@ -118,6 +118,11 @@ test.describe("COV-22 form publish and idempotent import commit", { tag: ["@p0",
     await expect.poll(async () => (await formConfigSnapshots(page, organizationId, "crm", formId!)).length).toBe(1)
     const [snapshot] = await formConfigSnapshots(page, organizationId, "crm", formId!)
     expect(snapshot).toMatchObject({ organizationId, moduleId: "crm", formId, version: 1, active: true })
+
+    // The configuration now exists, and a publish over it needs the current `updated_at`:
+    // a replay of the accepted request carries none, is rejected and leaves version 1.
+    expect((await replay(page, published.request())).status()).toBe(422)
+    expect(await formConfigSnapshots(page, organizationId, "crm", formId!)).toEqual([snapshot])
 
     const readerContext = await browser.newContext({ storageState: { cookies: [], origins: [] } })
     try {

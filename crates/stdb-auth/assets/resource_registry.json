@@ -2111,7 +2111,8 @@
       "description",
       "is_active",
       "is_system_default",
-      "config_version"
+      "config_version",
+      "updated_at"
     ],
     "mandatory": [
       "id",

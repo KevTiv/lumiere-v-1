@@ -3,6 +3,7 @@ import test from "node:test"
 
 import { AmbiguousOperationEffectError } from "./operation-effect"
 import {
+  formConfigUpdatedAtMicros,
   formConfigVersion,
   nextFormConfigVersion,
   resolvePublishedFormConfig,
@@ -53,4 +54,18 @@ test("returns null for another version, an inactive or missing configuration, or
 test("throws on duplicate configurations for one form", () => {
   assert.throws(() => resolvePublishedFormConfig([config(), config({ id: 6n })], key, 1n), AmbiguousOperationEffectError)
   assert.throws(() => formConfigVersion([config(), config({ id: 6n })], key), AmbiguousOperationEffectError)
+})
+
+test("reads the compare-and-set token in its Timestamp shapes", () => {
+  const at = (updatedAt: unknown) => formConfigUpdatedAtMicros([config({ updatedAt })], key)
+  assert.equal(at({ __timestamp_micros_since_unix_epoch__: 1_700_000_000_123_456 }), 1_700_000_000_123_456)
+  assert.equal(at({ microsSinceUnixEpoch: 1_700_000_000_123_456n }), 1_700_000_000_123_456)
+  assert.equal(at("1700000000123456"), 1_700_000_000_123_456)
+  assert.equal(
+    formConfigUpdatedAtMicros([{ id: "5", organization_id: "1", module_id: "crm", form_id: "new-lead", updated_at: 42 }], key),
+    42,
+  )
+  assert.equal(at(undefined), null)
+  assert.equal(at("soon"), null)
+  assert.equal(formConfigUpdatedAtMicros([], key), null)
 })

@@ -1,5 +1,6 @@
 import { toCreateRoleConfigParams } from "@lumiere/erp-shared/forms-create-params"
 import {
+  formConfigUpdatedAtMicros,
   formConfigVersion,
   nextFormConfigVersion,
   resolvePublishedFormConfig,
@@ -55,10 +56,12 @@ export function registryFieldToStdbParams(field: RegistryFieldParams): StdbCreat
  * Publishes the in-app registry default as form_config + fields + roles in one
  * SpacetimeDB transaction (avoids partial client-side create/field loops).
  *
- * COV-22: the publish is read back from `form-configs` for the exact
- * (organization, module, form): the version must be the one read before plus one
- * (1 for a first publish). Any other version means the publish did not apply once
- * or raced another publish, and is reported instead of assumed.
+ * COV-22: a publish over an existing configuration sends the `updated_at` it read as
+ * `expectedUpdatedAtMicros`, so a stale or replayed publish is rejected by the server.
+ * The publish is read back from `form-configs` for the exact (organization, module,
+ * form): the version must be the one read before plus one (1 for a first publish).
+ * Any other version means the publish did not apply once or raced another publish,
+ * and is reported instead of assumed.
  */
 export async function pushRegistryFormToDatabase(
   organizationId: number,
@@ -70,7 +73,13 @@ export async function pushRegistryFormToDatabase(
     moduleId: def.moduleId,
     formId: def.formId,
   }
-  const expectedVersion = nextFormConfigVersion(formConfigVersion(await stdbBrowserQuery("form-configs"), key))
+  const existingRows = await stdbBrowserQuery("form-configs")
+  const previousVersion = formConfigVersion(existingRows, key)
+  const expectedVersion = nextFormConfigVersion(previousVersion)
+  const expectedUpdatedAtMicros = previousVersion == null ? undefined : formConfigUpdatedAtMicros(existingRows, key)
+  if (previousVersion != null && expectedUpdatedAtMicros == null) {
+    throw new Error(`Form ${def.moduleId}:${def.formId} is published but its updated_at could not be read`)
+  }
 
   const roleConfigs = Object.values(def.roleConfigs ?? {})
     .map((rc) =>
@@ -91,7 +100,7 @@ export async function pushRegistryFormToDatabase(
     isSystemDefault: def.isSystemDefault,
     fields: def.fields.map(registryFieldToStdbParams),
     roleConfigs,
-    expectedUpdatedAtMicros: undefined,
+    expectedUpdatedAtMicros,
     replaceMissingFields: false,
   }
 

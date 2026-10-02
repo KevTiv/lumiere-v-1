@@ -14,6 +14,8 @@ export type FormConfigProjection = {
   readonly is_active?: unknown
   readonly configVersion?: unknown
   readonly config_version?: unknown
+  readonly updatedAt?: unknown
+  readonly updated_at?: unknown
 }
 
 export type FormConfigKey = {
@@ -39,6 +41,24 @@ function exactConfig(rows: readonly FormConfigProjection[], key: FormConfigKey):
 export function formConfigVersion(rows: readonly FormConfigProjection[], key: FormConfigKey): bigint | null {
   const row = exactConfig(rows, key)
   return row ? (parseStrictU64(row.configVersion ?? row.config_version) ?? null) : null
+}
+
+/**
+ * `updated_at` of the exact configuration in micros, the compare-and-set token a publish over
+ * an existing configuration must send as `expected_updated_at_micros`; `null` when unpublished
+ * or unreadable (a Timestamp object, number, bigint or numeric string).
+ */
+export function formConfigUpdatedAtMicros(rows: readonly FormConfigProjection[], key: FormConfigKey): number | null {
+  const row = exactConfig(rows, key)
+  if (!row) return null
+  const raw = row.updatedAt ?? row.updated_at
+  const inner =
+    raw && typeof raw === "object"
+      ? ((raw as Record<string, unknown>).__timestamp_micros_since_unix_epoch__
+        ?? (raw as Record<string, unknown>).microsSinceUnixEpoch)
+      : raw
+  const micros = parseStrictU64(inner)
+  return micros == null ? null : Number(micros)
 }
 
 /** The version a publish must produce from `previous` (`null` = first publish). */

@@ -81,6 +81,18 @@ mod tests {
     }
 
     #[test]
+    fn form_config_projection_exposes_the_publish_version_and_cas_token() {
+        let entry = registry_get("form-configs").expect("form configs must be registered");
+
+        for field in ["config_version", "is_active", "updated_at"] {
+            assert!(
+                entry.default_restricted.iter().any(|f| f == field),
+                "form-configs projection must expose {field}"
+            );
+        }
+    }
+
+    #[test]
     fn fleet_history_projections_expose_the_client_request_id() {
         for resource in ["fleet-service-records", "fleet-inspections"] {
             let entry = registry_get(resource).expect("fleet history must be registered");

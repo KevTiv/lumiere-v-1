@@ -1672,11 +1672,16 @@ pub fn publish_form_configuration(
 
     let configuration_id = match existing {
         Some(config) => {
-            ensure_expected_updated_at(
-                config.updated_at,
-                params.expected_updated_at_micros,
-                "form configuration",
-            )?;
+            // Publishing over an existing configuration is a compare-and-set on its
+            // `updated_at`: a replayed or stale publish carries an outdated value and
+            // is rejected instead of silently re-publishing and bumping the version.
+            let Some(expected) = params.expected_updated_at_micros else {
+                return Err(format!(
+                    "form configuration already exists (version {}); pass expected_updated_at_micros to update it",
+                    config.config_version
+                ));
+            };
+            ensure_expected_updated_at(config.updated_at, Some(expected), "form configuration")?;
             let id = config.id;
             ctx.db.form_config().id().update(FormConfig {
                 name: params.name.clone(),
