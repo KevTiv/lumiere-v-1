@@ -3,6 +3,13 @@
 
 import { stdbBffCommandPost } from "@lumiere/stdb/commands"
 import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
+import {
+  accountMoveHref,
+  accountPaymentHref,
+  expenseSheetHref,
+  purchaseOrderHref,
+  saleOrderHref,
+} from "@lumiere/erp-shared/record-links"
 import type { WorkflowHumanTaskDecision } from "@lumiere/stdb/types"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
@@ -380,17 +387,17 @@ export function approvalRecordHref(model?: string, resId?: number): string | und
   if (!model || resId == null || resId <= 0) return undefined
   switch (model) {
     case "purchase_order":
-      return `/purchasing?po=${resId}`
+      return purchaseOrderHref(resId)
     case "sale_order":
-      return `/sales?so=${resId}`
+      return saleOrderHref(resId)
     case "account_move":
-      return `/accounting?invoice=${resId}`
+      return accountMoveHref(resId)
     case "account_payment":
-      return `/accounting?payment=${resId}`
+      return accountPaymentHref(resId)
     case "ai_action_draft":
       return `/ai-action-drafts?draft=${resId}`
     case "hr_expense_sheet":
-      return `/expenses?sheet=${resId}`
+      return expenseSheetHref(resId)
     default:
       return undefined
   }
