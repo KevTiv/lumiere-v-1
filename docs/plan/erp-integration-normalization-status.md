@@ -30,8 +30,13 @@ merge the whole ERP stack.
 ## Integrated source repairs
 
 - Fleet clones only the optional request key before its existing consuming
-  validator, preserving the full submitted payload for exact replay comparison.
-  Request-key validation, journal/GL matching, and accounting invariants are unchanged.
+  validator, preserving the full submitted payload for the existing replay
+  comparison. Request-key validation, journal/GL matching, and accounting
+  invariants are unchanged. That comparison is not yet payload-exact; see the
+  blocking review finding below.
+- The dormant Expenses inbox now requires an operating-company prop and passes
+  it to approval, rather than constructing a mutation that necessarily rejects
+  its missing company. No render site or new operator surface is introduced.
 - Reports retains one `CanonicalRecordRef` import.
 - Sales and Distributor import the existing application-owned
   `frontend/web/components/order-handoff-links.tsx` by relative path, as other
@@ -62,6 +67,21 @@ All results below are local source/build evidence, not live operator acceptance.
 | `cargo check --manifest-path spacetimedb/Cargo.toml --locked --offline --target wasm32-unknown-unknown` | PASS on rerun after the initial cold compile timed out; 13 pre-existing warnings remain. |
 | `git diff --check` | PASS. |
 
+## Review finding — Fleet replay acceptance is blocked
+
+The compile fix does not repair an inherited domain gap:
+`service_payload_matches_existing` checks the cost/accounting payload, with
+vehicle and service type checked by its caller, but omits `serviced_at`,
+`odometer_km`, `provider`, and `notes`. Reusing a request key with changed values
+for these fields acknowledges the existing record instead of rejecting the
+different request.
+
+Before COV-15 exact-replay acceptance, a bounded domain repair must compare all
+canonicalized submitted fields (or a persisted canonical request fingerprint)
+and prove each mismatched replay is rejected with service/accounting effects
+unchanged. This is a business-invariant repair, not a contract-pin or compiler
+fix, and has deliberately not been folded into normalization.
+
 ## Remaining gates
 
 1. Generate and release contracts from this combined tree, then resolve and
@@ -69,8 +89,9 @@ All results below are local source/build evidence, not live operator acceptance.
    `v0.3.73` pin is retained, not certified as matching the combined sources.
 2. Run the real Inventory/Analytics certification on the repaired PR #143 head.
    Gate regression tests use stubs; earlier green CI did not execute aggregates.
-3. Run the bounded domain and actual operator proofs on the final pinned head,
-   followed by integrated P0/full/pretenant regression.
+3. Repair and prove the Fleet replay gap above, then run the bounded domain and
+   actual operator proofs on the final pinned head, followed by integrated
+   P0/full/pretenant regression.
 4. Refresh affected upstream branches and rerun their own evidence before
    landing bottom-up. A downstream green result is not upstream acceptance.
 5. Keep module follow-ups and COV-26/27 separate. This normalization does not
