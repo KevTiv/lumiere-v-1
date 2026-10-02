@@ -236,7 +236,7 @@ pub fn record_fleet_service(
         company_id,
         params.service_type_id,
     )?;
-    let request_id = request_id(params.client_request_id)?;
+    let request_id = request_id(params.client_request_id.clone())?;
     if let Some(key) = request_id.as_deref() {
         if let Some(existing) = ctx.db.fleet_service_record().iter().find(|row| {
             row.organization_id == organization_id

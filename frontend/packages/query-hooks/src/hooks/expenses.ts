@@ -540,7 +540,9 @@ export function useSubmitExpenseSheet(
             "Failed to submit expense sheet",
           )
         },
-        afterDispatch: () => invalidateExpenseLifecycle(qc, organizationId),
+        afterDispatch: async () => {
+          await invalidateExpenseLifecycle(qc, organizationId)
+        },
         readbackAttempts: 6,
         readbackDelayMs: 150,
       })
@@ -581,7 +583,9 @@ export function useApproveExpenseSheet(
             "Failed to approve expense sheet",
           )
         },
-        afterDispatch: () => invalidateExpenseLifecycle(qc, organizationId),
+        afterDispatch: async () => {
+          await invalidateExpenseLifecycle(qc, organizationId)
+        },
         readbackAttempts: 6,
         readbackDelayMs: 150,
       })
@@ -652,7 +656,9 @@ export function usePostExpenseSheet(
             "Failed to post expense sheet",
           )
         },
-        afterDispatch: () => invalidateExpenseLifecycle(qc, organizationId),
+        afterDispatch: async () => {
+          await invalidateExpenseLifecycle(qc, organizationId)
+        },
         readbackAttempts: 6,
         readbackDelayMs: 150,
       })
@@ -704,7 +710,9 @@ export function useCreateExpenseReimbursementPayment(
             "Failed to reimburse expense sheet",
           )
         },
-        afterDispatch: () => invalidateExpenseLifecycle(qc, organizationId),
+        afterDispatch: async () => {
+          await invalidateExpenseLifecycle(qc, organizationId)
+        },
         readbackAttempts: 6,
         readbackDelayMs: 150,
       })

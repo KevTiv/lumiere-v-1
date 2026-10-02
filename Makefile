@@ -970,7 +970,7 @@ e2e-smoke:
 			read -r -a SPEC_FILES <<< "$${E2E_SPEC_FILES:-}"; \
 			if [ "$${#SPEC_FILES[@]}" -eq 0 ]; then echo "[e2e] E2E_SUITE=targeted requires E2E_SPEC_FILES" >&2; exit 1; fi; \
 			echo "[e2e] Targeted specs: $${SPEC_FILES[*]}"; \
-			if [ "$${E2E_REQUIRE_AI:-0}" = "1" ]; then PW_ARGS+=(--grep-invert @dev-fixture); else PW_ARGS+=(--grep-invert "@dev-fixture|@ai-live"); fi; \
+			if [ "$${E2E_REQUIRE_AI:-0}" != "1" ]; then PW_ARGS+=(--grep-invert @ai-live); fi; \
 			PW_ARGS+=("$${SPEC_FILES[@]}"); \
 		elif [ "$${E2E_REQUIRE_AI:-0}" != "1" ]; then \
 			PW_ARGS+=(--grep-invert @ai-live); \

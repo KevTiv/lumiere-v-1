@@ -198,7 +198,7 @@ import { useReturnOrderWorkflow } from '@lumiere/query-hooks/hooks/return-order-
 import { useSaleOrderLineWorkflow } from '@lumiere/query-hooks/hooks/sale-order-line-workflow';
 import { usePickingWorkflow } from '@lumiere/query-hooks/hooks/picking-workflow';
 import { useModuleFilters } from '@/hooks/use-module-filters';
-import { OrderHandoffLinks } from '@/components/order-handoff-links';
+import { OrderHandoffLinks } from '../../../components/order-handoff-links';
 import { orderHandoffs } from '@lumiere/query-hooks/hooks/order-to-cash';
 import { downloadDocumentPdf } from '@lumiere/query-hooks/hooks/templates';
 import { useCreateDocument } from '@lumiere/query-hooks/hooks/documents';

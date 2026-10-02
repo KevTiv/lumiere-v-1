@@ -152,7 +152,9 @@ export function ExpensesInboxPanel({ organizationId }: { organizationId: number 
                     onClick={() =>
                       void run(
                         id,
-                        () => approveSheet.mutateAsync(id),
+                        async () => {
+                          await approveSheet.mutateAsync(id)
+                        },
                         t("expenses.inbox.approved", { defaultValue: "Report approved." }),
                       )
                     }

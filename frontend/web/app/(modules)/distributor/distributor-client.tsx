@@ -16,7 +16,7 @@ import { MissingOrganization } from "@lumiere/ui"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { OrderHandoffLinks, orderHref } from "@/components/order-handoff-links"
+import { OrderHandoffLinks, orderHref } from "../../../components/order-handoff-links"
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
 
 type Row = Record<string, unknown>
