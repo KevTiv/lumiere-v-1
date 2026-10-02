@@ -21,7 +21,6 @@ pub fn run_all_platform_tests(ctx: &ReducerContext) -> Result<(), String> {
     run_forms_custom_field_test(ctx)?;
     run_forms_custom_field_record_existence_test(ctx)?;
     run_forms_custom_field_invalid_model_test(ctx)?;
-    run_forms_publish_version_test(ctx)?;
     run_tenant_isolation_tests(ctx)?;
     run_country_pack_test(ctx)?;
     log::info!("✅ run_all_platform_tests complete");
@@ -104,7 +103,11 @@ pub fn run_subscription_plan_test(ctx: &ReducerContext) -> Result<(), String> {
 
 #[spacetimedb::reducer]
 pub fn run_forms_custom_field_test(ctx: &ReducerContext) -> Result<(), String> {
-    platform_smoke::test_forms_custom_field_eav(ctx).map_err(|e| format!("forms: {e}"))
+    platform_smoke::test_forms_custom_field_eav(ctx).map_err(|e| format!("forms: {e}"))?;
+    // COV-22: runs inside this existing test reducer; a new reducer would need a contract
+    // operation identity, history fingerprint and exposure entry.
+    platform_smoke::test_publish_form_configuration_requires_expected_version(ctx)
+        .map_err(|e| format!("forms_publish_version: {e}"))
 }
 
 #[spacetimedb::reducer]
@@ -117,12 +120,6 @@ pub fn run_forms_custom_field_record_existence_test(ctx: &ReducerContext) -> Res
 pub fn run_forms_custom_field_invalid_model_test(ctx: &ReducerContext) -> Result<(), String> {
     platform_smoke::test_forms_custom_field_rejects_invalid_model(ctx)
         .map_err(|e| format!("forms_invalid_model: {e}"))
-}
-
-#[spacetimedb::reducer]
-pub fn run_forms_publish_version_test(ctx: &ReducerContext) -> Result<(), String> {
-    platform_smoke::test_publish_form_configuration_requires_expected_version(ctx)
-        .map_err(|e| format!("forms_publish_version: {e}"))
 }
 
 #[spacetimedb::reducer]

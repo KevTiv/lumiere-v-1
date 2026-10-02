@@ -393,7 +393,9 @@ jobs:
             if git push origin "HEAD:${GITHUB_REF_NAME}"; then
               exit 0
             fi
-            git pull --rebase origin "${GITHUB_REF_NAME}"
+            # A rebase recommits the pin, so it needs the same identity as the commit.
+            git -c user.name="github-actions[bot]" -c user.email="41898+github-actions[bot]@users.noreply.github.com" \
+              pull --rebase origin "${GITHUB_REF_NAME}"
           done
           echo "::error::could not push the v$VERSION pin to ${GITHUB_REF_NAME}; pin it by hand."
           exit 1
