@@ -41,8 +41,7 @@ delivery and customer invoice with its state and open balance, linking to the ca
 `orderHandoffs` builder and `OrderHandoffLinks` component as the COV-24 workspace, so there is one definition of
 "this order's downstream records". No contract delta (the relation fields are already projected).
 
-**Next links (one per PR, not done):** purchase order → receipt and vendor bill, expense sheet → journal entry
-(currently `highlight=` rather than the canonical `filter=id:`), subscription → invoice and payment, proposal →
+**Next links (one per PR, not done):** purchase order → receipt and vendor bill, subscription → invoice and payment, proposal →
 sale order, ticket → record.
 
 ## Prerequisites / decisions
@@ -62,3 +61,22 @@ COV-03..24 candidates.
 
 Becomes IMPLEMENTED when the bounded path and proofs above exist, and ACCEPTED only
 with same-head green CI (plus the contract release, when required).
+
+## Canonical record links (cross-cutting)
+
+A record link is `/{module}?tab={tab}&filter=id:{id}`; `tab` and `filter` are the only parameters any module
+reads. `@lumiere/erp-shared/record-links` now owns the builder (`buildModuleTabHref` in `@lumiere/ui` delegates
+to it) and one helper per record type. Links that used parameters no module reads — and so only landed on the
+default tab — were replaced:
+
+| Link | Was | Now |
+| --- | --- | --- |
+| Approval inbox → purchase order, sale order, account move, payment, expense sheet | `?po=`, `?so=`, `?invoice=`, `?payment=`, `?sheet=` | `purchaseOrderHref`, `saleOrderHref`, `accountMoveHref`, `accountPaymentHref`, `expenseSheetHref` |
+| Opportunity conversion → sale order | `/sales?orderId=` | `saleOrderHref` |
+| Expense sheet → posting / reimbursement / rebill entry | `/accounting?tab=journal-entries&highlight=` | `accountMoveHref` |
+| Project margin widget → timesheets | `/projects?tab=timesheets&projectId=` | `projectTimesheetsHref` (`filter=projectId:`) |
+| Order deliveries and invoices (COV-24/25) | — | `stockPickingHref`, `accountMoveHref` |
+
+Unit test: `record-links.test.ts` (3 tests, passing). Not verified in a browser: that each target tab applies the
+filter. Entity tabs do (`EntityTable.initialFilters`); the Accounting "invoices" and "bills" tabs are custom lists
+that ignore it, which is why account moves link to "journal-entries".

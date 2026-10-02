@@ -1,6 +1,7 @@
 "use client"
 
 import { decodeOperationDispatch } from "@lumiere/api-client"
+import { saleOrderHref } from "@lumiere/erp-shared/record-links"
 import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
 import { parseStrictU64, scalarToU64, type ScalarId } from "@lumiere/erp-shared/u64"
 import { stdbBffCommandPost } from "@lumiere/stdb/commands"
@@ -66,7 +67,7 @@ export function resolveSaleOrderForOpportunity(
       return {
         resource: "sale-orders",
         id: id.toString(),
-        href: `/sales?orderId=${encodeURIComponent(id.toString())}`,
+        href: saleOrderHref(id),
         opportunityId: opportunityId.toString(),
         companyId: companyId.toString(),
       }
