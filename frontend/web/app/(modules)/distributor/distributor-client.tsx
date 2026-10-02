@@ -12,7 +12,7 @@ import { orderToCashRows, type OrderToCashException, type OrderToCashStage } fro
 import { useCompanyVerticalPacks, useSetCompanyVerticalPack } from "@lumiere/query-hooks/hooks/organization-company"
 import { useSaleOrders } from "@lumiere/query-hooks/hooks/sales"
 import { useDefaultOperatingCompanyBigInt } from "@lumiere/query-hooks/hooks/use-operating-company"
-import { MissingOrganization } from "@lumiere/ui"
+import { MissingOrganization, usePermission } from "@lumiere/ui"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -60,6 +60,7 @@ export function DistributorClient() {
   const { data: pickings = [] } = useStockPickings(organization)
   const { data: holds = [] } = usePartnerCreditHolds(organization)
   const { data: contacts = [] } = useContacts(organization)
+  const canReadOrders = usePermission("sale_order", "read").allowed
 
   const enabled = useMemo(
     () => packs.data?.some((pack) => pack.packKey === "distributor_wholesaler" && pack.enabled) ?? false,
@@ -79,14 +80,14 @@ export function DistributorClient() {
   const exceptionRows = useMemo(
     () =>
       orderToCashRows(
-        orders as Row[],
+        canReadOrders ? orders as Row[] : [],
         pickings as unknown as Row[],
         moves as Row[],
         holds as unknown as Row[],
         { organizationId: organization, companyId },
         BigInt(Date.now()) * 1000n,
       ).filter((row) => row.exceptions.length > 0),
-    [companyId, holds, moves, orders, organization, pickings],
+    [canReadOrders, companyId, holds, moves, orders, organization, pickings],
   )
   const partnerNames = useMemo(
     () => new Map((contacts as Row[]).map((contact) => [String(contact.id), String(contact.name ?? contact.displayName ?? contact.display_name ?? "")])),
@@ -97,7 +98,11 @@ export function DistributorClient() {
   const toggle = () => void setPack.mutate({ companyId, organizationId, packKey: "distributor_wholesaler", enabled: !enabled })
 
   return (
-    <main className="mx-auto flex w-full max-w-7xl flex-col gap-6 p-6">
+    <main
+      className="mx-auto flex w-full max-w-7xl flex-col gap-6 p-6"
+      data-testid="module-view-distributor"
+      data-hydrated={packs.isSuccess ? "true" : "false"}
+    >
       <Card>
         <CardHeader>
           <div>

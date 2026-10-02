@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test"
 
-import { gotoModule, selectEntityRowById, signIn, smokeName } from "./helpers"
+import { activeTabEntityTable, gotoModule, signIn, smokeName } from "./helpers"
 import { expectCanonicalPickingFocus } from "./inventory-picking-fixtures"
 import {
   addLaptopLine,
@@ -29,10 +29,12 @@ test.describe("COV-25 sale order → delivery link", { tag: ["@p0", "@cov25", "@
     const openHandoffs = async (id: number) => {
       await gotoModule(page, "/sales", "sales")
       await page.getByTestId("module-tab-sales-orders").click()
-      await selectEntityRowById(page, id)
-      const sheet = page.getByRole("dialog")
+      const row = activeTabEntityTable(page).getByTestId(`entity-row-${id}`)
+      await expect(row).toBeVisible({ timeout: 30_000 })
+      await row.click()
+      const sheet = page.locator('[data-slot="sheet-content"]:visible')
       await expect(sheet).toBeVisible({ timeout: 15_000 })
-      await sheet.getByRole("tab", { name: /Deliveries & invoices/i }).click()
+      await page.getByTestId("entity-record-sheet-tab-handoffs").click()
       await expect(sheet.getByTestId("sale-order-handoffs")).toBeVisible()
       return sheet
     }

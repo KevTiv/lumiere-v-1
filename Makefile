@@ -533,6 +533,7 @@ e2e-smoke-test:
 		NEXT_PUBLIC_STDB_MODULE="$(E2E_DB)" \
 		STDB_HOST="$$E2E_STDB_HOST" \
 		NEXT_PUBLIC_STDB_HOST="$$E2E_STDB_HOST" \
+		NEXT_PUBLIC_DEV_ADMIN="false" \
 		NEXT_PUBLIC_API_GATEWAY_URL="" \
 		"$$ROOT/scripts/e2e-dx.sh" frontend-build; \
 		echo "[e2e] Starting Next.js on :$(E2E_WEB_PORT)..."; \
@@ -545,6 +546,7 @@ e2e-smoke-test:
 		NEXT_PUBLIC_STDB_MODULE="$(E2E_DB)" \
 		STDB_HOST="$$E2E_STDB_HOST" \
 		NEXT_PUBLIC_STDB_HOST="$$E2E_STDB_HOST" \
+		NEXT_PUBLIC_DEV_ADMIN="false" \
 		NEXT_PUBLIC_API_GATEWAY_URL="" \
 		pnpm exec next start --hostname 127.0.0.1 --port $(E2E_WEB_PORT) >"$$LOG_DIR/next.log" 2>&1 & \
 		WEB_PID="$$!"; \
@@ -577,6 +579,7 @@ e2e-smoke-test:
 		NEXT_PUBLIC_STDB_MODULE="$(E2E_DB)" \
 		STDB_HOST="$$E2E_STDB_HOST" \
 		NEXT_PUBLIC_STDB_HOST="$$E2E_STDB_HOST" \
+		NEXT_PUBLIC_DEV_ADMIN="false" \
 		NEXT_PUBLIC_API_GATEWAY_URL="" \
 		E2E_WORKERS="$$E2E_WORKERS" \
 		pnpm exec playwright test "$${PW_ARGS[@]}"; \
@@ -673,6 +676,7 @@ e2e-single-test:
 		echo "[e2e] Building Next.js for single-spec run..."; \
 		PORT="" \
 		PLAYWRIGHT_PORT="$(E2E_WEB_PORT)" \
+		NEXT_PUBLIC_DEV_ADMIN="false" \
 		LUMIERE_API_SERVER_URL="http://127.0.0.1:$(E2E_API_PORT)" \
 		STDB_SERVER_TOKEN="$$E2E_STDB_TOKEN" \
 		STDB_CREDENTIAL_ENCRYPTION_KEY="$$STDB_CREDENTIAL_ENCRYPTION_KEY" \
@@ -736,7 +740,7 @@ e2e-web-dev: e2e-smoke-setup
 		LUMIERE_API_SERVER_URL="http://127.0.0.1:$(E2E_API_PORT)" \
 		STDB_SERVER_TOKEN="$$E2E_STDB_TOKEN" STDB_MODULE="$(E2E_DB)" \
 		NEXT_PUBLIC_STDB_MODULE="$(E2E_DB)" STDB_HOST="$$E2E_STDB_HOST" \
-		NEXT_PUBLIC_STDB_HOST="$$E2E_STDB_HOST" NEXT_PUBLIC_API_GATEWAY_URL="" \
+		NEXT_PUBLIC_STDB_HOST="$$E2E_STDB_HOST" NEXT_PUBLIC_DEV_ADMIN="false" NEXT_PUBLIC_API_GATEWAY_URL="" \
 		pnpm exec next dev --hostname 127.0.0.1 --port $(E2E_WEB_PORT); \
 	'
 
@@ -928,6 +932,7 @@ e2e-smoke:
 		echo "[e2e] Building Next.js (once, before Playwright)..."; \
 		PORT="" \
 		PLAYWRIGHT_PORT="$(E2E_WEB_PORT)" \
+		NEXT_PUBLIC_DEV_ADMIN="false" \
 		LUMIERE_API_SERVER_URL="http://127.0.0.1:$(E2E_API_PORT)" \
 		STDB_SERVER_TOKEN="$$E2E_STDB_TOKEN" \
 		STDB_CREDENTIAL_ENCRYPTION_KEY="$$STDB_CREDENTIAL_ENCRYPTION_KEY" \
