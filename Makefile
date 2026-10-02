@@ -348,7 +348,7 @@ e2e-smoke-setup:
 		STDB_HASH_FILE="$$LOG_DIR/stdb.hash"; \
 		CUR_STDB_HASH="$$(E2E_BUILD_MODULE="$(E2E_DB)" E2E_BUILD_HOST="$$E2E_STDB_HOST" "$$ROOT/scripts/e2e-dx.sh" stdb-fingerprint)"; \
 		STDB_FAST_PATH=0; \
-		if [ "$${E2E_CLEAR_DB:-0}" != "1" ] && [ "$${E2E_FORCE_REBUILD:-0}" != "1" ] && [ -f "$$STDB_HASH_FILE" ] && [ "$$(cat "$$STDB_HASH_FILE")" = "$$CUR_STDB_HASH" ] && spacetime describe "$(E2E_DB)" --json --server local --no-config >/dev/null 2>&1; then \
+		if [ "$${E2E_CLEAR_DB:-0}" != "1" ] && [ "$${E2E_FORCE_REBUILD:-0}" != "1" ] && [ "$${E2E_RUN_DOMAIN_AGGREGATES:-0}" != "1" ] && [ -f "$$STDB_HASH_FILE" ] && [ "$$(cat "$$STDB_HASH_FILE")" = "$$CUR_STDB_HASH" ] && spacetime describe "$(E2E_DB)" --json --server local --no-config >/dev/null 2>&1; then \
 			STDB_FAST_PATH=1; \
 		fi; \
 		if [ "$$STDB_FAST_PATH" = "1" ]; then \
@@ -380,11 +380,11 @@ e2e-smoke-setup:
 				fi; \
 			done; \
 			echo "[e2e] Domain reducer tests passed."; \
-			if [ "${E2E_RUN_DOMAIN_AGGREGATES:-0}" = "1" ]; then \
+			if [ "$${E2E_RUN_DOMAIN_AGGREGATES:-0}" = "1" ]; then \
 				for _aggregate_reducer in run_all_inventory_tests run_all_analytics_tests; do \
-					echo "[e2e] Calling $_aggregate_reducer aggregate..."; \
-					if ! spacetime call "$(E2E_DB)" "$_aggregate_reducer" --server local --no-config; then \
-						echo "[e2e] $_aggregate_reducer failed — tail of SpacetimeDB logs:"; \
+					echo "[e2e] Calling $$_aggregate_reducer aggregate..."; \
+					if ! spacetime call "$(E2E_DB)" "$$_aggregate_reducer" --server local --no-config; then \
+						echo "[e2e] $$_aggregate_reducer failed — tail of SpacetimeDB logs:"; \
 						spacetime logs "$(E2E_DB)" --server local --no-config 2>/dev/null | tail -80 || true; \
 						exit 1; \
 					fi; \
@@ -862,11 +862,11 @@ e2e-smoke:
 			fi; \
 		done; \
 		echo "[e2e] Domain reducer tests passed."; \
-		if [ "${E2E_RUN_DOMAIN_AGGREGATES:-0}" = "1" ]; then \
+		if [ "$${E2E_RUN_DOMAIN_AGGREGATES:-0}" = "1" ]; then \
 			for _aggregate_reducer in run_all_inventory_tests run_all_analytics_tests; do \
-				echo "[e2e] Calling $_aggregate_reducer aggregate..."; \
-				if ! spacetime call "$(E2E_DB)" "$_aggregate_reducer" --server local --no-config; then \
-					echo "[e2e] $_aggregate_reducer failed — tail of SpacetimeDB logs:"; \
+				echo "[e2e] Calling $$_aggregate_reducer aggregate..."; \
+				if ! spacetime call "$(E2E_DB)" "$$_aggregate_reducer" --server local --no-config; then \
+					echo "[e2e] $$_aggregate_reducer failed — tail of SpacetimeDB logs:"; \
 					spacetime logs "$(E2E_DB)" --server local --no-config 2>/dev/null | tail -80 || true; \
 					exit 1; \
 				fi; \
