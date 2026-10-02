@@ -17,6 +17,8 @@ pub fn run_iot_relational_integrity_test(ctx: &ReducerContext) -> Result<(), Str
         .map_err(|e| format!("device_sync_records_one_ordered_commit: {e}"))?;
     relational_integrity_test::test_resolve_alert_rejects_replay(ctx)
         .map_err(|e| format!("resolve_alert_rejects_replay: {e}"))?;
+    relational_integrity_test::test_acknowledge_action_rejects_replay(ctx)
+        .map_err(|e| format!("acknowledge_action_rejects_replay: {e}"))?;
     Ok(())
 }
 

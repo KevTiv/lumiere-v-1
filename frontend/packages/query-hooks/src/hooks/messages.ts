@@ -7,7 +7,11 @@ import { scalarToU64 as toScalarU64 } from "@lumiere/erp-shared/u64"
 import type { CreateInvoiceReminderBatchParams, CreateMessageBatchParams, CreateMessageTemplateParams, MailFollower, MailMessage, ReviewMessageBatchParams } from "@lumiere/stdb/types"
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 
+import { responseErrorMessage } from "@lumiere/api-client/response-error"
+
 import { apiFetch, fetchQueryList, rqBigIntKey } from "../http"
+import { resolvePostedMessageEffect } from "./mail-message-post"
+import type { CanonicalRecordRef } from "./operation-effect"
 import { useStdbQuery } from "./stdb"
 
 export type PostMessageInput = {
@@ -102,13 +106,25 @@ export function useReviewMessageBatch(organizationId: bigint) {
 
 // ── Mutations ─────────────────────────────────────────────────────────────────
 
+/**
+ * COV-19: `post_message` has no client request id and `mail-messages` has no author, so
+ * the post is read back as the one new message for the exact organization, model,
+ * record and body between a read before and a read after dispatch. A post is not
+ * deduplicated: posting the same body twice is two messages.
+ */
 export function usePostMessage(organizationId: bigint) {
   const qc = useQueryClient()
-  return useMutation<void, Error, PostMessageInput>({
+  return useMutation<CanonicalRecordRef, Error, PostMessageInput>({
     mutationFn: async ({ model, resId, body, parentId, attachmentIds }) => {
-      const { urlPath, init } = stdbBffCommandPost("post_message", { model: model, resId: toScalarU64(resId), body: body, parentId: parentId != null ? toScalarU64(parentId) : null, attachmentIds: attachmentIds.map((id) => toScalarU64(id)) })
+      const recordId = toScalarU64(resId)
+      const before = await fetchQueryList("/api/query/mail-messages", "Failed to read messages")
+      const { urlPath, init } = stdbBffCommandPost("post_message", { model: model, resId: recordId, body: body, parentId: parentId != null ? toScalarU64(parentId) : null, attachmentIds: attachmentIds.map((id) => toScalarU64(id)) })
       const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error('Failed to post message')
+      if (!r.ok) throw new Error(await responseErrorMessage(r))
+      const after = await fetchQueryList("/api/query/mail-messages", "Failed to read messages")
+      const effect = resolvePostedMessageEffect(before, after, { organizationId, model, resId: recordId, body })
+      if (!effect) throw new Error("Message did not read back after posting")
+      return effect
     },
     onSuccess: () =>
       qc.invalidateQueries({ queryKey: ['mail-messages', rqBigIntKey(organizationId)] }),

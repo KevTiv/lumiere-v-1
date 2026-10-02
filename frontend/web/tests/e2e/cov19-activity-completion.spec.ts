@@ -4,6 +4,7 @@ import {
   callReducerBff,
   fetchSessionOrganizationId,
   gotoModule,
+  openRecordChatterByRowText,
   scalarQueryId,
   signIn,
   smokeName,
@@ -141,6 +142,111 @@ test.describe("COV-19 exact activity completion", { tag: ["@p0", "@cov19"] }, ()
       const denied = await replay(readerPage, accepted.request())
       expect(denied.status()).toBe(403)
       expect(await activitySnapshot(page, activityId)).toEqual(effect)
+    } finally {
+      await readerContext.close()
+    }
+  })
+})
+
+async function messageSnapshots(page: Page, resId: number, body: string) {
+  return (await rows(page, "mail-messages"))
+    .filter((row) => scalarQueryId(row.resId ?? row.res_id) === resId && row.body === body)
+    .map((row) => ({
+      id: scalarQueryId(row.id),
+      organizationId: scalarQueryId(row.organizationId ?? row.organization_id),
+      model: String(row.model),
+      resId,
+      body: String(row.body),
+    }))
+}
+
+test.describe("COV-19 exact message post", { tag: ["@p0", "@cov19"] }, () => {
+  test("posts one message from the record chatter; the reader is denied", async ({ browser, page }) => {
+    test.setTimeout(180_000)
+    const organizationId = await fetchSessionOrganizationId(page)
+
+    // Setup only: the record the message is attached to. The post under test is
+    // driven through the visible chatter dialog below.
+    const tag = smokeName("cov19-msg")
+    const contactName = `${tag} contact`
+    await callReducerBff(page, "create_contact", [organizationId, {
+      name: contactName,
+      type: "contact",
+      email: some(`${tag}@example.test`),
+      phone: none,
+      mobile: none,
+      company_id: none,
+      is_customer: true,
+      is_vendor: false,
+      is_employee: false,
+      is_prospect: false,
+      is_partner: false,
+      customer_rank: 1,
+      supplier_rank: 0,
+      display_name: none,
+      first_name: none,
+      last_name: none,
+      title: none,
+      email_secondary: none,
+      fax: none,
+      website: none,
+      street: none,
+      street2: none,
+      city: none,
+      state_code: none,
+      zip: none,
+      country_code: some("US"),
+      tax_id: none,
+      company_registry: none,
+      industry: none,
+      employees_count: none,
+      annual_revenue: none,
+      description: none,
+      salesperson_id: none,
+      assigned_user_id: none,
+      parent_id: none,
+      user_id: none,
+      color: none,
+      metadata: some(JSON.stringify({ fixture: "COV-19" })),
+    }])
+    let contactId: number | null = null
+    await expect
+      .poll(async () => {
+        const matches = (await rows(page, "contacts")).filter((row) => row.name === contactName)
+        contactId = matches.length === 1 ? scalarQueryId(matches[0]?.id) : null
+        return matches.length
+      }, { timeout: 30_000 })
+      .toBe(1)
+    if (contactId == null) throw new Error("COV-19 contact has no id")
+
+    const body = `${tag} note`
+    expect(await messageSnapshots(page, contactId, body)).toEqual([])
+
+    await gotoModule(page, "/crm", "crm")
+    await page.getByTestId("module-tab-crm-contacts").click()
+    await openRecordChatterByRowText(page, contactName)
+    await page.getByTestId("record-chatter-note").fill(body)
+    const [posted] = await Promise.all([
+      page.waitForResponse((response) => matchesOperationResponse(response, "post_message"), { timeout: 30_000 }),
+      page.getByTestId("record-chatter-post").click(),
+    ])
+    expect(posted.ok()).toBe(true)
+
+    // Exact effect: one message for this record and body in this organization.
+    await expect.poll(async () => (await messageSnapshots(page, contactId!, body)).length, { timeout: 30_000 }).toBe(1)
+    const [effect] = await messageSnapshots(page, contactId, body)
+    expect(effect).toMatchObject({ organizationId, resId: contactId, body })
+    await expect(page.getByTestId("record-chatter-dialog").getByText(body, { exact: true })).toBeVisible({
+      timeout: 15_000,
+    })
+
+    // The reader may not post; the snapshot stays the single message.
+    const readerContext = await browser.newContext({ storageState: { cookies: [], origins: [] } })
+    try {
+      const readerPage = await readerContext.newPage()
+      await signIn(readerPage, "fixture.reader@example.test", PERSONA_PASSWORD)
+      expect((await replay(readerPage, posted.request())).status()).toBe(403)
+      expect(await messageSnapshots(page, contactId, body)).toEqual([effect])
     } finally {
       await readerContext.close()
     }

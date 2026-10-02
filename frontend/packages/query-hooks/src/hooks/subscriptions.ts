@@ -15,6 +15,11 @@ import { apiFetch, fetchQueryList, type QueryRows, rqBigIntKey } from '../http';
 import { responseErrorMessage } from '@lumiere/api-client/response-error';
 import type { CanonicalRecordRef } from './operation-effect';
 import {
+  invoiceResidualBefore,
+  resolveInvoicePaymentEffect,
+} from './subscription-invoice-payment';
+import { parseStrictU64 } from '@lumiere/erp-shared/u64';
+import {
   resolveSubscriptionInvoiceMove,
   resolveSubscriptionInvoiceRunEffect,
   subscriptionBillingRunKey,
@@ -60,6 +65,19 @@ function requireSelectedCompany(companyId: bigint | undefined): bigint {
 }
 
 // ── Reads ────────────────────────────────────────────────────────────────────
+
+/** Billing runs (one per subscription period); `invoice_move_id` names each run's invoice. */
+export function useSubscriptionBillingRuns(organizationId: bigint) {
+  return useQuery<QueryRows>({
+    queryKey: ['subscription-billing-runs', rqBigIntKey(organizationId)],
+    queryFn: () =>
+      fetchQueryList(
+        '/api/query/subscription-billing-runs',
+        'Failed to fetch subscription billing runs',
+      ),
+    staleTime: 30_000,
+  });
+}
 
 export function useSubscriptions(
   organizationId: bigint,
@@ -374,13 +392,26 @@ export function usePaySubscriptionInvoice(
 ) {
   const qc = useQueryClient();
   return useMutation<
-    void,
+    CanonicalRecordRef,
     Error,
     { subscriptionId: bigint; params: ApplySubscriptionInvoicePaymentParams }
   >({
     mutationFn: async ({ subscriptionId, params }) => {
+      const scopedCompanyId = requireSelectedCompany(companyId);
+      const wireParams = params as { invoiceMoveId?: unknown; invoice_move_id?: unknown };
+      const invoiceMoveId = parseStrictU64(wireParams.invoiceMoveId ?? wireParams.invoice_move_id);
+      if (invoiceMoveId == null) throw new Error('An invoice is required to apply a payment');
+      // The payment is read back as the same invoice whose open residual dropped,
+      // so remember the residual before dispatch.
+      const residualBefore = invoiceResidualBefore(
+        await fetchQueryList('/api/query/account-moves', 'Failed to read subscription invoice'),
+        organizationId,
+        scopedCompanyId,
+        invoiceMoveId,
+      );
+      if (residualBefore == null) throw new Error('Subscription invoice could not be read before payment');
       const { urlPath, init } = stdbBffCommandPost('pay_subscription_invoice', {
-        companyId: requireSelectedCompany(companyId),
+        companyId: scopedCompanyId,
         subscriptionId: subscriptionId,
         params: stdbParamsToJson(
           params as object,
@@ -388,8 +419,18 @@ export function usePaySubscriptionInvoice(
         ),
       });
       const r = await apiFetch(urlPath, init);
-      if (!r.ok)
-        throw new Error('Failed to apply subscription invoice payment');
+      if (!r.ok) throw new Error(await responseErrorMessage(r));
+      const effect = resolveInvoicePaymentEffect(
+        await fetchQueryList('/api/query/account-moves', 'Failed to read subscription invoice'),
+        organizationId,
+        scopedCompanyId,
+        invoiceMoveId,
+        residualBefore,
+      );
+      if (!effect) {
+        throw new Error('Payment did not reduce the invoice; it may be waiting for approval');
+      }
+      return effect;
     },
     onSuccess: async () => {
       invalidateStdbQueryResources(qc, organizationId, [

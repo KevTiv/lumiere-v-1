@@ -1,6 +1,6 @@
 # COV-19 — Record-linked activity completion (then message post)
 
-**Status:** PARTIAL — activity completion IMPLEMENTED (runtime acceptance pending); message post still scaffolded  
+**Status:** IMPLEMENTED — activity completion and message post (runtime acceptance pending); message post has no idempotency key  
 **Module/surface:** Calendar / Comms  
 **Plan target:** record-linked activity or message lifecycle  
 **Scaffold source:** [`erp-cov08-27-scaffold.md`](./erp-cov08-27-scaffold.md)
@@ -56,10 +56,29 @@ BASE-03 (communications correctness) must be landed.
 | O | Playwright drives the transition through the visible UI action (setup calls allowed only for fixtures) | DONE — CRM → Activities → `entity-action-complete-activity` in `frontend/web/tests/e2e/cov19-activity-completion.spec.ts` |
 | E | Exact-effect resolver unit test (state/scope/identity/ambiguity) and browser snapshot preserved after stale (422) and denied (403) replay | DONE — `crm-activity-completion.test.ts`; spec asserts the snapshot after both replays |
 
-## Slice 2 — message post (still scaffolded)
+## Slice 2 — message post (implemented, without an idempotency key)
 
-`post_message` still needs a stable message key in the `mail-messages` projection before an
-exact readback is possible (check whether this is a contract delta before starting).
+- **Finding:** `post_message` (`spacetimedb/src/core/messaging.rs`) takes no client request id, the
+  `mail-messages` projection exposes no author or key (`model`, `body`, `date`, `res_id`), and a post is
+  deliberately not deduplicated — posting the same body twice is two messages. Adding a request id would
+  change a public reducer's signature and every generated contract artifact, so it is not done here.
+- **Hook:** `usePostMessage` (`frontend/packages/query-hooks/src/hooks/messages.ts`) reads
+  `/api/query/mail-messages` before and after dispatch and resolves the one new row for the exact
+  organization, model, record and body (`resolvePostedMessageEffect`, `mail-message-post.ts`). No new row
+  means the post did not land; two identical new rows (a concurrent identical post) raise
+  `AmbiguousOperationEffectError`. It never takes "the newest message". Reducer errors now carry their
+  message.
+- **No contract delta.**
+- **Known gap:** without a key, a replay of an accepted post is a second message, and a retry after an
+  ambiguous failure can duplicate. Closing it needs a `client_request_id` on `post_message` and the
+  projection (a contract change), so it is left for a decision.
+
+| Gate | Required proof | State |
+| --- | --- | --- |
+| D | Native domain test | WRITTEN — `test_post_message_persists_one_scoped_row` in `spacetimedb/tests/core/tests/chatter_post_test.rs` (`run_all_core_tests`): one scoped Comment row authored by the caller, empty model/body persist nothing, an identical body is a second distinct message, nothing appears under another organization. **Not run in this environment (no Rust build); runs in CI.** |
+| A | Permission and scope; reader denied | WRITTEN — `check_permission(mail_message, create)`; reader replay asserted 403 in the spec |
+| O | Playwright through the UI | WRITTEN — post from the CRM contact chatter dialog in `cov19-activity-completion.spec.ts`. **Not run in this environment.** |
+| E | Resolver unit test and snapshots | Resolver unit test DONE (`mail-message-post.test.ts`, 5 tests, passing); browser assertion that exactly one message exists for the record and body WRITTEN. Stale-replay rejection is NOT asserted (see the known gap). |
 
 ## Acceptance
 

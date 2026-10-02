@@ -15,6 +15,7 @@ import { stdbBffCommandPost } from '@lumiere/stdb/commands';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
 import { apiFetch, fetchQueryList, rqBigIntKey } from '../http';
+import { resolveAcknowledgedIotActionEffect } from './iot-action-acknowledgement';
 import { toCreateActionParams } from '@lumiere/erp-shared/iot-create-params';
 import { stdbParamsToJson } from '@lumiere/erp-shared/stdb-params-json';
 import { i18n } from '@lumiere/i18n';
@@ -435,12 +436,17 @@ export function useAcknowledgeIotAction(organizationId: bigint) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (actionId: ScalarId) => {
+      const id = scalarToU64(actionId);
       const { urlPath, init } = stdbBffCommandPost('acknowledge_iot_action', {
-        actionId,
+        actionId: id,
         resultPayload: null,
       });
       const r = await apiFetch(urlPath, init);
       if (!r.ok) throw new Error(await parseCallError(r));
+      const rows = await fetchQueryList('/api/query/iot-actions', 'Failed to read IoT action');
+      const effect = resolveAcknowledgedIotActionEffect(rows, organizationId, id);
+      if (!effect) throw new Error('IoT action did not read back as acknowledged');
+      return effect;
     },
     onSuccess: () => invalidateIotQueries(qc, organizationId),
   });

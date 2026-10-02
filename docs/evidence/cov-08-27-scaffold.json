@@ -122,7 +122,7 @@
       "contract_release_required": "yes",
       "contract_note": "release (registry projection): `subscription-billing-runs` now projects invoice_move_id, invoice_date, period_start and period_end, so the run (unique billing_run_key) resolves its own invoice move; `release-contracts.yml` publishes it on push",
       "prerequisites": "Scheduler replay proof needs the recurring job id exposed or a native test.",
-      "status": "PARTIAL — invoice run implemented (contract release and runtime acceptance pending); invoice payment pending",
+      "status": "IMPLEMENTED — invoice run and payment (contract release and runtime acceptance pending)",
       "status_doc": "docs/plan/erp-cov12-subscription-invoice-run-status.md",
       "spec": "frontend/web/tests/e2e/cov12-subscription-invoice-run.spec.ts",
       "hooks": [
@@ -206,7 +206,7 @@
       "contract_release_required": "no",
       "contract_note": "none: `iot-alerts` exposes resolved_at, `iot-actions` exposes status (both organization-scoped; company scope via device)",
       "prerequisites": "Owned-device fixture; degraded telemetry must be explicit.",
-      "status": "PARTIAL — alert resolution implemented, action acknowledge pending",
+      "status": "IMPLEMENTED — runtime acceptance pending",
       "status_doc": "docs/plan/erp-cov16-iot-alert-resolve-status.md",
       "spec": "frontend/web/tests/e2e/cov16-iot-alert-resolve.spec.ts",
       "hooks": [
@@ -269,7 +269,7 @@
       "contract_release_required": "no",
       "contract_note": "none for activity completion (`activities` exposes state); message post readback may need a stable message key exposed (check before implementing)",
       "prerequisites": "BASE-03 (communications correctness) must be landed.",
-      "status": "PARTIAL — activity completion implemented, message post pending",
+      "status": "IMPLEMENTED — runtime acceptance pending; message post has no idempotency key",
       "status_doc": "docs/plan/erp-cov19-activity-completion-status.md",
       "spec": "frontend/web/tests/e2e/cov19-activity-completion.spec.ts",
       "hooks": [

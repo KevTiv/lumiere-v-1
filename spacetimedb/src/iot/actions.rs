@@ -23,6 +23,7 @@ use crate::iot::registry::iot_device;
     index(accessor = iot_action_by_org, btree(columns = [organization_id])),
     index(accessor = iot_action_by_status, btree(columns = [status]))
 )]
+#[derive(PartialEq)]
 pub struct IoTAction {
     #[primary_key]
     #[auto_inc]
@@ -273,6 +274,16 @@ pub fn acknowledge_iot_action(
 
     if action.organization_id != organization_id {
         return Err("Action does not belong to this organization".to_string());
+    }
+
+    // A device acknowledges an action it was asked to run: Pending (not yet marked
+    // sent) or Sent. A replay must not re-stamp `acknowledged_at` or overwrite the
+    // result, and a Failed action must be retried, not acknowledged.
+    if action.status != "Pending" && action.status != "Sent" {
+        return Err(format!(
+            "Cannot acknowledge — current status is {}",
+            action.status
+        ));
     }
 
     ctx.db.iot_action().id().update(IoTAction {

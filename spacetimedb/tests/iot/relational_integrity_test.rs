@@ -3,7 +3,10 @@
 use spacetimedb::{ReducerContext, Table};
 
 use crate::core::persistence::{organization_commit, organization_row_change};
-use crate::iot::actions::{create_iot_action, iot_action, CreateActionParams};
+use crate::iot::actions::{
+    acknowledge_iot_action, create_iot_action, fail_iot_action, iot_action, mark_action_sent,
+    CreateActionParams,
+};
 use crate::iot::alerts::{create_iot_alert, iot_alert, resolve_iot_alert};
 use crate::iot::integrations::link_device_to_location;
 use crate::iot::registry::{
@@ -385,6 +388,103 @@ pub fn test_resolve_alert_rejects_replay(ctx: &ReducerContext) -> Result<(), Str
         .ok_or("alert vanished after replay")?;
     if after_replay != resolved {
         return Err("rejected replay mutated the resolved alert".to_string());
+    }
+    Ok(())
+}
+
+/// COV-16: an action is acknowledged once, from Pending or Sent; a replay does not
+/// re-stamp `acknowledged_at` or overwrite the result, and a Failed action can not
+/// be acknowledged. Every rejection leaves the row unchanged.
+pub fn test_acknowledge_action_rejects_replay(ctx: &ReducerContext) -> Result<(), String> {
+    ensure_test_superuser(ctx)?;
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let other = OrgFixture::seed_minimal(ctx)?;
+    let device_id = seed_device(ctx, &fixture, "Cov16 Ack Printer", "Printer")?;
+    let queue = |ctx: &ReducerContext, tag: &str| -> Result<u64, String> {
+        create_iot_action(
+            ctx,
+            fixture.organization_id,
+            device_id,
+            CreateActionParams {
+                action_type: "Custom".to_string(),
+                payload: format!("{{\"tag\":\"{tag}\"}}"),
+                triggered_by: "cov16".to_string(),
+            },
+        )?;
+        ctx.db
+            .iot_action()
+            .iter()
+            .find(|a| a.device_id == device_id && a.payload.contains(tag))
+            .map(|a| a.id)
+            .ok_or_else(|| format!("action {tag} missing after create"))
+    };
+    let find = |ctx: &ReducerContext, id: u64| {
+        ctx.db
+            .iot_action()
+            .id()
+            .find(&id)
+            .ok_or_else(|| "action vanished".to_string())
+    };
+
+    // Pending → Acknowledged, once.
+    let pending_id = queue(ctx, "pending")?;
+    let pending = find(ctx, pending_id)?;
+    if pending.status != "Pending" || pending.acknowledged_at.is_some() {
+        return Err("new action must start Pending and unacknowledged".into());
+    }
+    if acknowledge_iot_action(ctx, other.organization_id, pending_id, None).is_ok() {
+        return Err("cross-organization acknowledgement must be rejected".into());
+    }
+    if find(ctx, pending_id)? != pending {
+        return Err("rejected cross-organization acknowledgement mutated the action".into());
+    }
+    acknowledge_iot_action(
+        ctx,
+        fixture.organization_id,
+        pending_id,
+        Some("{\"value\":12.5}".to_string()),
+    )?;
+    let acknowledged = find(ctx, pending_id)?;
+    if acknowledged.status != "Acknowledged"
+        || acknowledged.acknowledged_at.is_none()
+        || acknowledged.result_payload.as_deref() != Some("{\"value\":12.5}")
+    {
+        return Err("acknowledgement did not persist status, time and result".into());
+    }
+    match acknowledge_iot_action(
+        ctx,
+        fixture.organization_id,
+        pending_id,
+        Some("{\"value\":99}".to_string()),
+    ) {
+        Err(message) if message.contains("Cannot acknowledge") => {}
+        Err(message) => return Err(format!("unexpected replay rejection: {message}")),
+        Ok(()) => return Err("replayed acknowledgement must be rejected".into()),
+    }
+    if find(ctx, pending_id)? != acknowledged {
+        return Err("rejected replay re-stamped or overwrote the acknowledged action".into());
+    }
+
+    // Sent → Acknowledged is allowed.
+    let sent_id = queue(ctx, "sent")?;
+    mark_action_sent(ctx, fixture.organization_id, sent_id)?;
+    acknowledge_iot_action(ctx, fixture.organization_id, sent_id, None)?;
+    if find(ctx, sent_id)?.status != "Acknowledged" {
+        return Err("a Sent action must be acknowledgeable".into());
+    }
+
+    // A Failed action must be retried, not acknowledged.
+    let failed_id = queue(ctx, "failed")?;
+    fail_iot_action(ctx, fixture.organization_id, failed_id, "paper jam".to_string())?;
+    let failed = find(ctx, failed_id)?;
+    if failed.status != "Failed" {
+        return Err("fail_iot_action must mark the action Failed".into());
+    }
+    if acknowledge_iot_action(ctx, fixture.organization_id, failed_id, None).is_ok() {
+        return Err("a Failed action must not be acknowledgeable".into());
+    }
+    if find(ctx, failed_id)? != failed {
+        return Err("rejected acknowledgement mutated the failed action".into());
     }
     Ok(())
 }

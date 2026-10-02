@@ -85,6 +85,7 @@ import {
   useCloseSubscription,
   useGenerateSubscriptionInvoice,
   usePaySubscriptionInvoice,
+  useSubscriptionBillingRuns,
   useAmendSubscription,
   usePauseSubscription,
   useResumeSubscription,
@@ -224,6 +225,7 @@ function SubscriptionsClientLoaded({
   const { data: journals = [] } = useAccountJournals(orgId)
   const { data: accounts = [] } = useAccountAccounts(orgId)
   const { data: accountMoves = [] } = useAccountMoves(orgId)
+  const { data: billingRuns = [] } = useSubscriptionBillingRuns(orgId)
   const { data: accountMoveLines = [] } = useAccountMoveLines(orgId)
   const { data: currencies = [] } = useCurrencies()
 
@@ -886,7 +888,13 @@ function SubscriptionsClientLoaded({
     const sub = (subscriptions as Record<string, unknown>[]).find(
       (s) => Number(s.id) === payTargetId,
     )
-    const ids = (sub?.invoiceIds ?? sub?.invoice_ids ?? []) as unknown[]
+    // `subscriptions` does not project `invoice_ids`; each billing run names its invoice.
+    const ids = [
+      ...((sub?.invoiceIds ?? sub?.invoice_ids ?? []) as unknown[]),
+      ...(billingRuns as Record<string, unknown>[])
+        .filter((run) => Number(run.subscriptionId ?? run.subscription_id) === payTargetId)
+        .map((run) => run.invoiceMoveId ?? run.invoice_move_id),
+    ].filter((id) => id != null)
     const idSet = new Set(ids.map((id) => String(id)))
     const moves = (accountMoves as Record<string, unknown>[]).filter((m) =>
       idSet.has(String(m.id)),
@@ -894,7 +902,7 @@ function SubscriptionsClientLoaded({
     const fromApi = accountMoveRowsToSelectOptions(moves)
     if (fromApi.length > 0) return fromApi
     return [{ value: "", label: t("common.lookup.noAccounts"), disabled: true }]
-  }, [payTargetId, subscriptions, accountMoves, t])
+  }, [payTargetId, subscriptions, accountMoves, billingRuns, t])
   const payForm = useMemo(
     () =>
       mergeSelectOptionsForFields(paySubscriptionInvoiceForm(t), {

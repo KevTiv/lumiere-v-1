@@ -1,5 +1,6 @@
 //! Core domain test suite — invoke via `run_all_core_tests` reducer.
 pub mod bootstrap_commit_test;
+pub mod chatter_post_test;
 pub mod operational_messaging_test;
 pub mod permissions_tests;
 pub mod queue_tests;
@@ -10,6 +11,8 @@ use spacetimedb::ReducerContext;
 #[spacetimedb::reducer]
 pub fn run_all_core_tests(ctx: &ReducerContext) -> Result<(), String> {
     run_core_operational_messaging_test(ctx)?;
+    chatter_post_test::test_post_message_persists_one_scoped_row(ctx)
+        .map_err(|e| format!("chatter_post_scoped_row: {e}"))?;
     run_core_sod_test(ctx)?;
     run_core_permissions_test(ctx)?;
     run_queue_foundation_tests(ctx)?;

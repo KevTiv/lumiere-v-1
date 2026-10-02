@@ -144,3 +144,120 @@ test.describe("COV-16 exact IoT alert resolution", { tag: ["@p0", "@cov16"] }, (
     }
   })
 })
+
+async function actionSnapshot(page: Page, actionId: number) {
+  const matches = (await rows(page, "iot-actions")).filter((row) => scalarQueryId(row.id) === actionId)
+  if (matches.length !== 1) throw new Error(`expected one IoT action ${actionId}, found ${matches.length}`)
+  const row = matches[0]!
+  const acknowledgedAt = row.acknowledgedAt ?? row.acknowledged_at ?? null
+  return {
+    id: actionId,
+    organizationId: scalarQueryId(row.organizationId ?? row.organization_id),
+    deviceId: scalarQueryId(row.deviceId ?? row.device_id),
+    status: String(row.status),
+    acknowledgedAt: JSON.stringify(acknowledgedAt),
+  }
+}
+
+test.describe("COV-16 exact IoT action acknowledgement", { tag: ["@p0", "@cov16"] }, () => {
+  test("acknowledges once; replay, a failed action and the reader are rejected", async ({ browser, page }) => {
+    test.setTimeout(180_000)
+    const organizationId = await fetchSessionOrganizationId(page)
+    const companyId = await fetchDefaultCompanyId(page)
+
+    // Setup only: hub, device and queued actions are fixture data. The
+    // acknowledgement under test is driven through the IoT Actions UI below.
+    const hubSerial = smokeName("cov16-ack-hub")
+    await callReducerBff(page, "register_iot_hub", [organizationId, companyId, {
+      name: hubSerial,
+      serial: hubSerial,
+      ip_address: none,
+      firmware_version: none,
+      metadata: none,
+    }])
+    const hubId = await exactId(page, "iot-hubs", (row) => row.serial === hubSerial, "COV-16 ack hub")
+    const deviceName = smokeName("cov16-ack-printer")
+    await callReducerBff(page, "register_iot_device", [organizationId, companyId, hubId, {
+      name: deviceName,
+      device_type: "Printer",
+      identifier: deviceName,
+      capabilities: [],
+      metadata: none,
+    }])
+    const deviceId = await exactId(page, "iot-devices", (row) => row.name === deviceName, "COV-16 ack device")
+
+    const queueAction = async (tag: string) => {
+      const before = (await rows(page, "iot-actions")).filter((row) => scalarQueryId(row.deviceId ?? row.device_id) === deviceId)
+      await callReducerBff(page, "create_iot_action", [organizationId, deviceId, {
+        action_type: "Custom",
+        payload: JSON.stringify({ tag }),
+        triggered_by: "cov16",
+      }])
+      const known = new Set(before.map((row) => scalarQueryId(row.id)))
+      let id: number | null = null
+      await expect
+        .poll(async () => {
+          const created = (await rows(page, "iot-actions")).filter(
+            (row) => scalarQueryId(row.deviceId ?? row.device_id) === deviceId && !known.has(scalarQueryId(row.id)),
+          )
+          id = created.length === 1 ? scalarQueryId(created[0]?.id) : null
+          return created.length
+        }, { timeout: 30_000, message: `${tag} action must resolve to exactly one new row` })
+        .toBe(1)
+      if (id == null) throw new Error(`${tag} action has no id`)
+      return id
+    }
+    const pendingId = await queueAction("pending")
+    const failedId = await queueAction("failed")
+    expect(await actionSnapshot(page, pendingId)).toMatchObject({ organizationId, deviceId, status: "Pending" })
+
+    const clickAcknowledge = async (actionId: number) => {
+      await gotoModule(page, "/iot", "iot")
+      await page.getByTestId("module-tab-iot-iot-actions").click()
+      const actionRow = page.getByTestId(`entity-row-${actionId}`)
+      await expect(actionRow).toBeVisible({ timeout: 30_000 })
+      await actionRow.click()
+      const action = page.getByTestId("entity-action-ack-action")
+      await expect(action).toBeEnabled()
+      const [response] = await Promise.all([
+        page.waitForResponse((candidate) => matchesOperationResponse(candidate, "acknowledge_iot_action"), {
+          timeout: 30_000,
+        }),
+        action.click(),
+      ])
+      return response
+    }
+
+    const accepted = await clickAcknowledge(pendingId)
+    expect(accepted.ok()).toBe(true)
+    await expect
+      .poll(async () => (await actionSnapshot(page, pendingId)).status, { timeout: 30_000 })
+      .toBe("Acknowledged")
+    const effect = await actionSnapshot(page, pendingId)
+    expect(effect).toMatchObject({ id: pendingId, organizationId, deviceId, status: "Acknowledged" })
+    expect(effect.acknowledgedAt).not.toBe("null")
+
+    // The reducer rejects an acknowledged action; the timestamp must not be re-stamped.
+    expect((await replay(page, accepted.request())).status()).toBe(422)
+    expect(await actionSnapshot(page, pendingId)).toEqual(effect)
+
+    // A failed action must be retried, not acknowledged.
+    await callReducerBff(page, "fail_iot_action", [organizationId, failedId, "paper jam"])
+    await expect.poll(async () => (await actionSnapshot(page, failedId)).status, { timeout: 30_000 }).toBe("Failed")
+    const failedSnapshot = await actionSnapshot(page, failedId)
+    const refused = await clickAcknowledge(failedId)
+    expect(refused.status()).toBe(422)
+    expect(await actionSnapshot(page, failedId)).toEqual(failedSnapshot)
+
+    const readerContext = await browser.newContext({ storageState: { cookies: [], origins: [] } })
+    try {
+      const readerPage = await readerContext.newPage()
+      await signIn(readerPage, "fixture.reader@example.test", PERSONA_PASSWORD)
+      expect((await replay(readerPage, accepted.request())).status()).toBe(403)
+      expect(await actionSnapshot(page, pendingId)).toEqual(effect)
+      expect(await actionSnapshot(page, failedId)).toEqual(failedSnapshot)
+    } finally {
+      await readerContext.close()
+    }
+  })
+})

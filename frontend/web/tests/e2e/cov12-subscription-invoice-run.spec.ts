@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test"
+import { expect, test, type Page, type Request } from "@playwright/test"
 
 import {
   chooseSelectOptionByLabel,
@@ -54,6 +54,28 @@ async function runSnapshots(page: Page, subscriptionId: number) {
       invoiceMoveId: scalarQueryId(row.invoiceMoveId ?? row.invoice_move_id),
     }))
     .sort((a, b) => String(a.key).localeCompare(String(b.key)))
+}
+
+async function invoiceSnapshot(page: Page, invoiceMoveId: number) {
+  const matches = (await rows(page, "/api/query/account-moves")).filter((row) => scalarQueryId(row.id) === invoiceMoveId)
+  if (matches.length !== 1) throw new Error(`expected one invoice ${invoiceMoveId}, found ${matches.length}`)
+  const row = matches[0]!
+  return {
+    id: invoiceMoveId,
+    organizationId: scalarQueryId(row.organizationId ?? row.organization_id),
+    companyId: scalarQueryId(row.companyId ?? row.company_id),
+    paymentState: tag(row.paymentState ?? row.payment_state),
+    residual: Number(row.amountResidual ?? row.amount_residual),
+    total: Number(row.amountTotal ?? row.amount_total),
+  }
+}
+
+async function replay(page: Page, request: Request) {
+  const url = new URL(request.url())
+  return page.request.post(`${url.pathname}${url.search}`, {
+    headers: { "Content-Type": "application/json" },
+    data: request.postDataJSON(),
+  })
 }
 
 async function moveCount(page: Page): Promise<number> {
@@ -129,6 +151,47 @@ test.describe("COV-12 exact subscription invoice run", { tag: ["@p0", "@cov12"] 
     expect(await runSnapshots(page, subscriptionId)).toEqual(runsAfter)
     expect(await moveCount(page)).toBe(movesAfterRun)
 
+    // ── Payment: Apply payment from the toolbar clears the run's invoice ───
+    const bankJournal = journals.find((row) => tag(row.type ?? row.type_ ?? row.journalType) === "Bank")
+    expect(bankJournal, "a bank journal is required to apply a payment").toBeTruthy()
+    const bankJournalLabel =
+      bankJournal!.code && bankJournal!.name ? `${bankJournal!.code} — ${bankJournal!.name}` : String(bankJournal!.name ?? bankJournal!.code)
+    const bankAccountLabel = await fetchAccountSelectLabelByInternalType(page, "liquidity")
+    const invoiceRef = String(invoices[0]!.ref ?? invoices[0]!.name ?? "").trim() || `Move #${run.invoiceMoveId}`
+    const invoiceBefore = await invoiceSnapshot(page, run.invoiceMoveId!)
+    expect(invoiceBefore).toMatchObject({ organizationId, companyId })
+    expect(invoiceBefore.residual).toBeGreaterThan(0)
+
+    await gotoModule(page, "/subscriptions", "subscriptions")
+    await selectModuleTab(page, "subscriptions", "subscriptions")
+    await selectEntityRowById(page, subscriptionId)
+    await page.getByTestId("entity-action-pay-inv").click()
+    await expect(page.getByTestId("form-modal-pay-subscription-invoice")).toBeVisible({ timeout: 15_000 })
+    await chooseSelectOptionByLabel(page, "invoiceMoveId", invoiceRef)
+    await chooseSelectOptionByLabel(page, "paymentJournalId", bankJournalLabel)
+    await chooseSelectOptionByLabel(page, "bankAccountId", bankAccountLabel)
+    await chooseSelectOptionByLabel(page, "receivableAccountId", receivableLabel)
+    await chooseSelectOptionByLabel(page, "cogsAccountId", incomeLabel)
+    await chooseSelectOptionByLabel(page, "inventoryAccountId", incomeLabel)
+    const [paid] = await Promise.all([
+      page.waitForResponse((candidate) => matchesOperationResponse(candidate, "pay_subscription_invoice"), {
+        timeout: 45_000,
+      }),
+      submitForm(page, "pay-subscription-invoice"),
+    ])
+    expect(paid.ok()).toBe(true)
+    await expect
+      .poll(async () => (await invoiceSnapshot(page, run.invoiceMoveId!)).paymentState, { timeout: 60_000 })
+      .toBe("Paid")
+    const invoicePaid = await invoiceSnapshot(page, run.invoiceMoveId!)
+    expect(invoicePaid.residual).toBeLessThan(invoiceBefore.residual)
+    expect(invoicePaid.total).toBe(invoiceBefore.total)
+
+    // The amount defaults to the now-zero residual, so a replay is rejected.
+    expect((await replay(page, paid.request())).status()).toBe(422)
+    expect(await invoiceSnapshot(page, run.invoiceMoveId!)).toEqual(invoicePaid)
+    expect(await runSnapshots(page, subscriptionId)).toEqual(runsAfter)
+
     // ── Denied reader: 403 and an unchanged snapshot ───────────────────────
     const readerContext = await browser.newContext({ storageState: { cookies: [], origins: [] } })
     try {
@@ -140,7 +203,8 @@ test.describe("COV-12 exact subscription invoice run", { tag: ["@p0", "@cov12"] 
       })
       expect(denied.status()).toBe(403)
       expect(await runSnapshots(page, subscriptionId)).toEqual(runsAfter)
-      expect(await moveCount(page)).toBe(movesAfterRun)
+      expect((await replay(readerPage, paid.request())).status()).toBe(403)
+      expect(await invoiceSnapshot(page, run.invoiceMoveId!)).toEqual(invoicePaid)
     } finally {
       await readerContext.close()
     }

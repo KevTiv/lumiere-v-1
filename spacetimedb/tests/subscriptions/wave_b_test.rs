@@ -739,6 +739,46 @@ pub fn test_pay_subscription_invoice_clears_residual(ctx: &ReducerContext) -> Re
         ));
     }
 
+    // COV-12: a replayed payment (amount defaults to the now-zero residual) is rejected
+    // and leaves the invoice's payment state, residual and total unchanged.
+    let moves_after_pay = ctx.db.account_move().iter().count();
+    if pay_subscription_invoice(
+        ctx,
+        org_id,
+        company_id,
+        sub_id,
+        ApplySubscriptionInvoicePaymentParams {
+            invoice_move_id,
+            payment_journal_id: bank_journal_id,
+            bank_account_id,
+            receivable_account_id: ar_id,
+            amount: None,
+            payment_date: None,
+            cogs_account_id: income_id,
+            inventory_account_id: income_id,
+            ref_: Some(format!("SUB-PAY-REF-{sub_id}")),
+            memo: Some("Wave B pay replay".into()),
+        },
+    )
+    .is_ok()
+    {
+        return Err("a replayed subscription payment must be rejected".into());
+    }
+    let replayed = ctx
+        .db
+        .account_move()
+        .id()
+        .find(&invoice_move_id)
+        .ok_or("invoice after replay")?;
+    if replayed.payment_state != inv.payment_state
+        || replayed.amount_residual != inv.amount_residual
+        || replayed.amount_total != inv.amount_total
+        || replayed.state != inv.state
+        || ctx.db.account_move().iter().count() != moves_after_pay
+    {
+        return Err("a rejected payment replay changed the invoice or created a move".into());
+    }
+
     Ok(())
 }
 
