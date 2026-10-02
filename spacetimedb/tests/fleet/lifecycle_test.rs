@@ -265,6 +265,48 @@ fn sibling_company(ctx: &ReducerContext, fixture: &OrgFixture) -> Result<u64, St
         .ok_or("sibling company missing".into())
 }
 
+fn history_effect_snapshot(ctx: &ReducerContext, fixture: &OrgFixture) -> Result<String, String> {
+    let mut services: Vec<_> = ctx
+        .db
+        .fleet_service_record()
+        .iter()
+        .filter(|row| row.organization_id == fixture.organization_id)
+        .collect();
+    let mut inspections: Vec<_> = ctx
+        .db
+        .fleet_inspection()
+        .iter()
+        .filter(|row| row.organization_id == fixture.organization_id)
+        .collect();
+    let mut vehicles: Vec<_> = ctx
+        .db
+        .fleet_vehicle()
+        .iter()
+        .filter(|row| row.organization_id == fixture.organization_id)
+        .collect();
+    let mut moves: Vec<_> = ctx
+        .db
+        .account_move()
+        .iter()
+        .filter(|row| row.organization_id == fixture.organization_id)
+        .collect();
+    let mut lines: Vec<_> = ctx
+        .db
+        .account_move_line()
+        .iter()
+        .filter(|row| moves.iter().any(|entry| entry.id == row.move_id))
+        .collect();
+    services.sort_by_key(|row| row.id);
+    inspections.sort_by_key(|row| row.id);
+    vehicles.sort_by_key(|row| row.id);
+    moves.sort_by_key(|row| row.id);
+    lines.sort_by_key(|row| row.id);
+    serde_json::to_string(spacetimedb_sats::serde::SerdeWrapper::from_ref(
+        &(services, inspections, vehicles, moves, lines),
+    ))
+    .map_err(|error| format!("fleet effect snapshot: {error}"))
+}
+
 pub fn test_history_is_immutable_and_idempotent(ctx: &ReducerContext) -> Result<(), String> {
     let fixture = OrgFixture::seed_minimal(ctx)?;
     let vehicle_id = vehicle(ctx, &fixture, "Fleet Lifecycle Van")?;
@@ -291,7 +333,7 @@ pub fn test_history_is_immutable_and_idempotent(ctx: &ReducerContext) -> Result<
         fixture.company_id,
         service.clone(),
     )?;
-    record_fleet_service(ctx, fixture.organization_id, fixture.company_id, service)?;
+    record_fleet_service(ctx, fixture.organization_id, fixture.company_id, service.clone())?;
     let services = ctx
         .db
         .fleet_service_record()
@@ -399,6 +441,118 @@ pub fn test_history_is_immutable_and_idempotent(ctx: &ReducerContext) -> Result<
         return Err("mismatched retry changed fleet accounting move count".into());
     }
 
+    let before = history_effect_snapshot(ctx, &fixture)?;
+    let mut canonical_retry = service.clone();
+    canonical_retry.serviced_at = Some(services[0].create_date);
+    canonical_retry.provider = Some("Local Garage".into());
+    canonical_retry.notes = Some("oil and filter".into());
+    record_fleet_service(ctx, fixture.organization_id, fixture.company_id, canonical_retry)?;
+    if history_effect_snapshot(ctx, &fixture)? != before {
+        return Err("canonical service replay changed an effect".into());
+    }
+    for field in [
+        "serviced_at", "odometer_km", "odometer_none", "provider", "provider_none",
+        "notes", "notes_none", "cost_amount", "cost_none", "journal_id",
+        "expense_account_id", "offset_account_id",
+    ] {
+        let mut changed = service.clone();
+        match field {
+            "serviced_at" => changed.serviced_at = Some(ctx.timestamp + std::time::Duration::from_secs(1)),
+            "odometer_km" => changed.odometer_km = Some(1251.5),
+            "odometer_none" => changed.odometer_km = None,
+            "provider" => changed.provider = Some("Other Garage".into()),
+            "provider_none" => changed.provider = None,
+            "notes" => changed.notes = Some("different work".into()),
+            "notes_none" => changed.notes = None,
+            // This difference used to fall inside the replay tolerance.
+            "cost_amount" => changed.cost_amount = Some(275.50001),
+            "cost_none" => changed.cost_amount = None,
+            "journal_id" => changed.journal_id = None,
+            "expense_account_id" => changed.expense_account_id = Some(cost_accounts.offset_account_id),
+            "offset_account_id" => changed.offset_account_id = Some(cost_accounts.expense_account_id),
+            _ => unreachable!(),
+        }
+        let error = record_fleet_service(ctx, fixture.organization_id, fixture.company_id, changed)
+            .expect_err("changed service payload must not replay");
+        if !error.contains("different fleet service payload") {
+            return Err(format!("{field}: unexpected service replay error: {error}"));
+        }
+        if history_effect_snapshot(ctx, &fixture)? != before {
+            return Err(format!("{field}: rejected replay changed fleet/accounting effects"));
+        }
+    }
+    let mut duplicate = services[0].clone();
+    duplicate.id = 0;
+    let duplicate = ctx.db.fleet_service_record().insert(duplicate);
+    let ambiguous_before = history_effect_snapshot(ctx, &fixture)?;
+    let error = record_fleet_service(ctx, fixture.organization_id, fixture.company_id, service.clone())
+        .expect_err("ambiguous service identity must not replay");
+    if !error.contains("Multiple fleet service records")
+        || history_effect_snapshot(ctx, &fixture)? != ambiguous_before
+    {
+        return Err("ambiguous service replay did not fail closed".into());
+    }
+    let error = record_fleet_service(
+        ctx,
+        fixture.organization_id,
+        fixture.company_id,
+        RecordFleetServiceParams { vehicle_id: 0, ..service.clone() },
+    ).expect_err("ambiguous service key must not be masked by invalid vehicle");
+    if !error.contains("Multiple fleet service records")
+        || history_effect_snapshot(ctx, &fixture)? != ambiguous_before
+    {
+        return Err("service ambiguity was masked by reference validation".into());
+    }
+    ctx.db.fleet_service_record().id().delete(&duplicate.id);
+
+    // An explicitly future-dated service must not match an omitted/default date.
+    let free_service = RecordFleetServiceParams {
+        serviced_at: Some(ctx.timestamp + std::time::Duration::from_secs(60)),
+        provider: Some("  ".into()),
+        notes: None,
+        cost_amount: None,
+        journal_id: None,
+        expense_account_id: None,
+        offset_account_id: None,
+        client_request_id: Some("fleet-free-service".into()),
+        ..service.clone()
+    };
+    record_fleet_service(ctx, fixture.organization_id, fixture.company_id, free_service.clone())?;
+    let before = history_effect_snapshot(ctx, &fixture)?;
+    record_fleet_service(ctx, fixture.organization_id, fixture.company_id,
+        RecordFleetServiceParams { provider: None, notes: Some(" ".into()), ..free_service.clone() })?;
+    let error = record_fleet_service(ctx, fixture.organization_id, fixture.company_id,
+        RecordFleetServiceParams { serviced_at: None, ..free_service.clone() })
+        .expect_err("omitted date must not replay an explicit non-default date");
+    if !error.contains("different fleet service payload")
+        || history_effect_snapshot(ctx, &fixture)? != before
+    {
+        return Err("default date/empty-text replay semantics are incorrect".into());
+    }
+    let original_free = ctx.db.fleet_service_record().iter()
+        .find(|row| row.organization_id == fixture.organization_id
+            && row.client_request_id.as_deref() == Some("fleet-free-service"))
+        .ok_or("free fleet service missing")?;
+    for currency_only in [true, false] {
+        let mut inconsistent = original_free.clone();
+        if currency_only {
+            inconsistent.currency_id = Some(fixture.currency_id);
+        } else {
+            inconsistent.account_move_id = Some(move_id);
+        }
+        ctx.db.fleet_service_record().id().update(inconsistent);
+        let inconsistent_before = history_effect_snapshot(ctx, &fixture)?;
+        let error = record_fleet_service(
+            ctx, fixture.organization_id, fixture.company_id, free_service.clone(),
+        ).expect_err("costless replay must reject persisted accounting linkage");
+        if !error.contains("different fleet service payload")
+            || history_effect_snapshot(ctx, &fixture)? != inconsistent_before
+        {
+            return Err("inconsistent costless service was acknowledged or mutated".into());
+        }
+        ctx.db.fleet_service_record().id().update(original_free.clone());
+    }
+
     let inspection = RecordFleetInspectionParams {
         vehicle_id,
         inspector_id: Some(inspector_id),
@@ -414,7 +568,7 @@ pub fn test_history_is_immutable_and_idempotent(ctx: &ReducerContext) -> Result<
         fixture.company_id,
         inspection.clone(),
     )?;
-    record_fleet_inspection(ctx, fixture.organization_id, fixture.company_id, inspection)?;
+    record_fleet_inspection(ctx, fixture.organization_id, fixture.company_id, inspection.clone())?;
     let inspections = ctx
         .db
         .fleet_inspection()
@@ -432,6 +586,78 @@ pub fn test_history_is_immutable_and_idempotent(ctx: &ReducerContext) -> Result<
     {
         return Err("inspection history did not preserve the exact idempotent effect".into());
     }
+
+    let before = history_effect_snapshot(ctx, &fixture)?;
+    let canonical_retry = RecordFleetInspectionParams {
+        inspected_at: Some(inspections[0].create_date),
+        outcome: " ATTENTION_REQUIRED ".into(),
+        notes: Some("tyre pressure".into()),
+        ..inspection.clone()
+    };
+    record_fleet_inspection(ctx, fixture.organization_id, fixture.company_id, canonical_retry)?;
+    if history_effect_snapshot(ctx, &fixture)? != before {
+        return Err("canonical inspection replay changed an effect".into());
+    }
+    let mut archived_inspector = ctx.db.hr_employee().id().find(&inspector_id)
+        .ok_or("fleet inspector missing")?;
+    let original_active = archived_inspector.is_active;
+    archived_inspector.is_active = false;
+    ctx.db.hr_employee().id().update(archived_inspector);
+    record_fleet_inspection(ctx, fixture.organization_id, fixture.company_id, inspection.clone())?;
+    if history_effect_snapshot(ctx, &fixture)? != before {
+        return Err("inspection replay after inspector archival changed effects".into());
+    }
+    let mut restored_inspector = ctx.db.hr_employee().id().find(&inspector_id)
+        .ok_or("archived fleet inspector missing")?;
+    restored_inspector.is_active = original_active;
+    ctx.db.hr_employee().id().update(restored_inspector);
+    for field in ["inspected_at", "odometer_km", "odometer_none", "notes", "notes_none", "inspector_id", "outcome"] {
+        let mut changed = inspection.clone();
+        match field {
+            "inspected_at" => changed.inspected_at = Some(ctx.timestamp + std::time::Duration::from_secs(1)),
+            "odometer_km" => changed.odometer_km = Some(1241.0),
+            "odometer_none" => changed.odometer_km = None,
+            "notes" => changed.notes = Some("different inspection".into()),
+            "notes_none" => changed.notes = None,
+            "inspector_id" => changed.inspector_id = None,
+            "outcome" => changed.outcome = "passed".into(),
+            _ => unreachable!(),
+        }
+        let error = record_fleet_inspection(ctx, fixture.organization_id, fixture.company_id, changed)
+            .expect_err("changed inspection payload must not replay");
+        if !error.contains("different fleet inspection payload")
+            || history_effect_snapshot(ctx, &fixture)? != before
+        {
+            return Err(format!("{field}: rejected inspection replay changed effects: {error}"));
+        }
+    }
+    let mut duplicate = inspections[0].clone();
+    duplicate.id = 0;
+    let duplicate = ctx.db.fleet_inspection().insert(duplicate);
+    let ambiguous_before = history_effect_snapshot(ctx, &fixture)?;
+    let error = record_fleet_inspection(ctx, fixture.organization_id, fixture.company_id, inspection.clone())
+        .expect_err("ambiguous inspection identity must not replay");
+    if !error.contains("Multiple fleet inspections")
+        || history_effect_snapshot(ctx, &fixture)? != ambiguous_before
+    {
+        return Err("ambiguous inspection replay did not fail closed".into());
+    }
+    let error = record_fleet_inspection(
+        ctx,
+        fixture.organization_id,
+        fixture.company_id,
+        RecordFleetInspectionParams {
+            vehicle_id: 0,
+            inspector_id: Some(0),
+            ..inspection
+        },
+    ).expect_err("ambiguous inspection key must not be masked by invalid references");
+    if !error.contains("Multiple fleet inspections")
+        || history_effect_snapshot(ctx, &fixture)? != ambiguous_before
+    {
+        return Err("inspection ambiguity was masked by reference validation".into());
+    }
+    ctx.db.fleet_inspection().id().delete(&duplicate.id);
 
     let updated = ctx
         .db

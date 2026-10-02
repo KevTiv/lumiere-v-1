@@ -1,0 +1,56 @@
+{
+  "scope": "Fleet canonical replay invariant repair; not full operator acceptance",
+  "source_parent_sha": "be8433acdba691c05a985532609e0ddfabdf5288",
+  "runtime": {
+    "cli_and_server_version": "2.8.2",
+    "server": "disposable loopback SpacetimeDB, in memory",
+    "database": "lumiere-fleet-replay-certification",
+    "database_identity": "c200edfce570c1a33189a49dfbaef4fdae5427f05f070c3acd9318360eba3cc6",
+    "wasm_profile": "ci-contracts",
+    "wasm_sha256": "bf8b4888e45e2c2acccbceb2445cb86135fc67ec7a6185838a7d25bdce657a0b",
+    "dev_reducers_enabled": true,
+    "server_stopped_after_proof": true
+  },
+  "verification": [
+    {
+      "command": "LUMIERE_ENABLE_DEV_REDUCERS=1 cargo build --manifest-path spacetimedb/Cargo.toml --profile ci-contracts --locked --offline --target wasm32-unknown-unknown",
+      "result": "passed; 13 existing warnings"
+    },
+    {
+      "command": "spacetime call lumiere-fleet-replay-certification run_fleet_lifecycle_test --server <disposable-loopback-url> --no-config --anonymous -y",
+      "result": "passed"
+    },
+    {
+      "command": "spacetime call lumiere-fleet-replay-certification run_all_fleet_tests --server <disposable-loopback-url> --no-config --anonymous -y",
+      "result": "passed"
+    },
+    {
+      "command": "SELECT COUNT(*) AS service_records FROM fleet_service_record",
+      "result": 4
+    },
+    {
+      "command": "node --import tsx --test src/hooks/fleet-history-effect.test.ts src/hooks/fleet-lifecycle.test.ts",
+      "result": "passed; 21 tests, zero failures or skips"
+    },
+    {
+      "command": "pnpm --dir frontend --filter @lumiere/query-hooks typecheck",
+      "result": "passed"
+    }
+  ],
+  "native_cases": [
+    "canonical trim/empty text equivalence and original-default timestamp replay",
+    "changed service timestamp, odometer, provider, notes, cost, journal and GL mapping rejected",
+    "changed inspection timestamp, odometer, notes, inspector and outcome rejected",
+    "complete history, vehicle, account-move and move-line snapshots unchanged after rejected replay",
+    "scoped-key ambiguity rejected, including with invalid submitted references",
+    "no-cost currency/move inconsistency rejected without mutation",
+    "exact inspection replay preserved after inspector archival",
+    "closed accounting period rejected before cost-effect writes",
+    "full Fleet scope, relationship and company-isolation suite"
+  ],
+  "remaining_acceptance": [
+    "matching combined-tree contracts release and verified consumer pins",
+    "generated BFF permission and actual browser operator proofs",
+    "same-head integrated CI, P0/full/pretenant and module certification"
+  ]
+}

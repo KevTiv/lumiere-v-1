@@ -2,6 +2,7 @@
 
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
+use crate::accounting::fiscal_periods::ensure_accounting_period_open_for_date;
 use crate::accounting::journal_entries::{
     account_move, account_move_line, add_account_move_line, create_account_move,
     post_account_move, CreateAccountMoveParams,
@@ -166,18 +167,21 @@ fn service_payload_matches_existing(
     existing: &FleetServiceRecord,
     params: &RecordFleetServiceParams,
 ) -> bool {
-    let same_cost = match (existing.cost_amount, params.cost_amount) {
-        (Some(left), Some(right)) => (left - right).abs() <= 0.0001,
-        (None, None) => true,
-        _ => false,
-    };
-    if !same_cost {
+    // An omitted timestamp originally defaulted to create_date, not retry time.
+    if existing.serviced_at != params.serviced_at.unwrap_or(existing.create_date)
+        || existing.odometer_km != params.odometer_km
+        || existing.provider != normalized(params.provider.clone())
+        || existing.notes != normalized(params.notes.clone())
+        || existing.cost_amount != params.cost_amount
+    {
         return false;
     }
 
     match existing.cost_amount {
         None => {
-            params.journal_id.is_none()
+            existing.currency_id.is_none()
+                && existing.account_move_id.is_none()
+                && params.journal_id.is_none()
                 && params.expense_account_id.is_none()
                 && params.offset_account_id.is_none()
         }
@@ -195,6 +199,7 @@ fn service_payload_matches_existing(
             };
             if move_record.organization_id != existing.organization_id
                 || move_record.company_id != existing.company_id
+                || existing.currency_id != Some(move_record.currency_id)
                 || move_record.journal_id != journal_id
                 || move_record.state != AccountMoveState::Posted
             {
@@ -229,20 +234,26 @@ pub fn record_fleet_service(
     params: RecordFleetServiceParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "fleet_vehicle", "write")?;
-    let vehicle = require_vehicle(ctx, organization_id, company_id, params.vehicle_id)?;
-    require_fleet_service_type_in_org_and_company(
-        ctx,
-        organization_id,
-        company_id,
-        params.service_type_id,
-    )?;
+    require_company_in_organization(ctx, organization_id, company_id)?;
     let request_id = request_id(params.client_request_id.clone())?;
+    let odometer_km = odometer(params.odometer_km)?;
+    let cost_amount = match params.cost_amount {
+        Some(value) if !value.is_finite() || value <= 0.0 => {
+            return Err("cost_amount must be a finite positive value".to_string());
+        }
+        other => other,
+    };
     if let Some(key) = request_id.as_deref() {
-        if let Some(existing) = ctx.db.fleet_service_record().iter().find(|row| {
+        let mut matches = ctx.db.fleet_service_record().iter().filter(|row| {
             row.organization_id == organization_id
                 && row.company_id == company_id
                 && row.client_request_id.as_deref() == Some(key)
-        }) {
+        });
+        let existing = matches.next();
+        if matches.next().is_some() {
+            return Err("Multiple fleet service records share client_request_id".into());
+        }
+        if let Some(existing) = existing {
             if existing.vehicle_id != params.vehicle_id
                 || existing.service_type_id != params.service_type_id
                 || !service_payload_matches_existing(ctx, &existing, &params)
@@ -255,15 +266,14 @@ pub fn record_fleet_service(
             return Ok(());
         }
     }
-    let odometer_km = odometer(params.odometer_km)?;
+    let vehicle = require_vehicle(ctx, organization_id, company_id, params.vehicle_id)?;
+    require_fleet_service_type_in_org_and_company(
+        ctx,
+        organization_id,
+        company_id,
+        params.service_type_id,
+    )?;
     let serviced_at = params.serviced_at.unwrap_or(ctx.timestamp);
-
-    let cost_amount = match params.cost_amount {
-        Some(value) if !value.is_finite() || value <= 0.0 => {
-            return Err("cost_amount must be a finite positive value".to_string());
-        }
-        other => other,
-    };
 
     let (currency_id, account_move_id) = if let Some(cost_amount) = cost_amount {
         let request_id = request_id
@@ -279,6 +289,8 @@ pub fn record_fleet_service(
             .offset_account_id
             .ok_or("offset_account_id is required when posting a fleet service cost")?;
 
+        // Reuse Accounting's posting guard before any cost-effect writes.
+        ensure_accounting_period_open_for_date(ctx, company_id, serviced_at)?;
         let move_ref = format!("FLEET-SERVICE:{request_id}");
         create_account_move(
             ctx,
@@ -469,22 +481,27 @@ pub fn record_fleet_inspection(
     params: RecordFleetInspectionParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "fleet_vehicle", "write")?;
-    let vehicle = require_vehicle(ctx, organization_id, company_id, params.vehicle_id)?;
-    if let Some(inspector_id) = params.inspector_id {
-        require_fleet_driver_in_org_and_company(ctx, organization_id, company_id, inspector_id)?;
-    }
+    require_company_in_organization(ctx, organization_id, company_id)?;
     let outcome = FleetInspectionOutcome::parse(&params.outcome)?;
     let request_id = request_id(params.client_request_id)?;
+    let odometer_km = odometer(params.odometer_km)?;
     if let Some(key) = request_id.as_deref() {
-        if let Some(existing) = ctx.db.fleet_inspection().iter().find(|row| {
+        let mut matches = ctx.db.fleet_inspection().iter().filter(|row| {
             row.organization_id == organization_id
                 && row.company_id == company_id
                 && row.client_request_id.as_deref() == Some(key)
-        }) {
-            let requested_outcome = FleetInspectionOutcome::parse(&params.outcome)?;
+        });
+        let existing = matches.next();
+        if matches.next().is_some() {
+            return Err("Multiple fleet inspections share client_request_id".into());
+        }
+        if let Some(existing) = existing {
             if existing.vehicle_id != params.vehicle_id
                 || existing.inspector_id != params.inspector_id
-                || existing.outcome != requested_outcome
+                || existing.outcome != outcome
+                || existing.inspected_at != params.inspected_at.unwrap_or(existing.create_date)
+                || existing.odometer_km != odometer_km
+                || existing.notes != normalized(params.notes.clone())
             {
                 return Err(
                     "client_request_id is already used by a different fleet inspection payload"
@@ -494,7 +511,10 @@ pub fn record_fleet_inspection(
             return Ok(());
         }
     }
-    let odometer_km = odometer(params.odometer_km)?;
+    let vehicle = require_vehicle(ctx, organization_id, company_id, params.vehicle_id)?;
+    if let Some(inspector_id) = params.inspector_id {
+        require_fleet_driver_in_org_and_company(ctx, organization_id, company_id, inspector_id)?;
+    }
     let row = ctx.db.fleet_inspection().insert(FleetInspection {
         id: 0,
         organization_id,

@@ -64,7 +64,7 @@ describe("Fleet lifecycle query and command contracts", () => {
     }
   })
 
-  it("projects stable client_request_id for exact service and inspection readback", () => {
+  it("projects stable request identity and original timestamp for exact readback", () => {
     for (const resource of [
       "fleet-service-records",
       "fleet-inspections",
@@ -74,6 +74,10 @@ describe("Fleet lifecycle query and command contracts", () => {
           "client_request_id",
         ),
         `${resource} must expose client_request_id for exact idempotent readback`,
+      )
+      assert.ok(
+        RESOURCE_REGISTRY[resource]?.default_restricted?.includes("create_date"),
+        `${resource} must expose create_date for omitted-timestamp replay`,
       )
     }
   })

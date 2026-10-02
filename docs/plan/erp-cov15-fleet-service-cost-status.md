@@ -131,12 +131,16 @@ COV-15 now changes both the reducer/table contract and the read projection:
 - `fleet-service-records` exposes those fields plus `client_request_id`;
 - `fleet-inspections` exposes `client_request_id`.
 
+The integration follow-up additionally exposes existing `create_date` on both
+history projections. No table or reducer signature change is required for this
+delta. Omitted-timestamp readback fails closed until that projection is released.
+
 ## D/A/O/E proof
 
 | Gate | Proof in this branch | Acceptance condition |
 | --- | --- | --- |
 | D | `test_history_is_immutable_and_idempotent` proves exact service cost → Posted balanced Entry linkage and retry uniqueness; `test_service_cost_respects_period_lock` proves closed-period atomic rollback; invalid scope/value coverage remains. | `run_all_fleet_tests` passes. |
-| A | Fleet permission and company/vehicle/service-type checks run first. A cost-bearing write additionally passes through Accounting's move/line create + post authorization and account/company checks. Reader browser replays require 403. | Authorized actor can post the cost; reader/cross-company invalid relations cannot. |
+| A | Fleet permission and company organization scope run first, followed by pure request validation and exact replay reconciliation. New effects then validate mutable vehicle/service-type/inspector relations. Cost-bearing writes retain Accounting's move/line create + post authorization and account/company checks. Reader browser replays require 403. | Authorized actor can post the cost; reader/cross-company invalid relations cannot. |
 | O | `cov15-fleet-service-cost.spec.ts` drives the visible Service form with amount + journal + expense/offset accounts, verifies the Posted Entry and balanced lines, then drives the Inspection form. | Focused Playwright proof passes. |
 | E | `fleet-history-effect.test.ts` requires exact request identity and, for cost-bearing service, exact amount plus one same-scope/same-currency Posted move. Projection tests lock all effect fields. | Unit/native/browser evidence green on one head. |
 
@@ -152,3 +156,22 @@ COV-15 becomes **ACCEPTED** only when the same branch head records:
 
 Until then the truthful disposition is **IMPLEMENTED — runtime acceptance
 pending**.
+
+## Exact replay integration follow-up
+
+Service and inspection readback now compare every canonical request field,
+including default/explicit timestamps, optional odometer values, normalized
+provider/notes, inspector/outcome, and exact stored cost with canonical accounting
+linkage. A scoped request key with multiple effects fails closed before payload
+or mutable-reference matching. Historical replay does not depend on an inspector
+remaining active. Missing read columns, including no-cost monetary absence, are
+not evidence.
+
+The native mismatched-replay cases preserve complete service/inspection, vehicle,
+account-move and line snapshots. Both Fleet lifecycle and full Fleet reducer
+suites passed on disposable SpacetimeDB 2.8.2; the query-hook suite passed 21
+tests. Evidence:
+[`cov15-fleet-replay-proof.json`](../evidence/cov15-fleet-replay-proof.json).
+
+This is D/exact-readback evidence only. The release/pin, generated BFF denial,
+actual browser proof and same-head CI conditions above still apply.

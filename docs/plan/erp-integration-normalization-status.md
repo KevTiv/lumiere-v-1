@@ -67,20 +67,30 @@ All results below are local source/build evidence, not live operator acceptance.
 | `cargo check --manifest-path spacetimedb/Cargo.toml --locked --offline --target wasm32-unknown-unknown` | PASS on rerun after the initial cold compile timed out; 13 pre-existing warnings remain. |
 | `git diff --check` | PASS. |
 
-## Review finding — Fleet replay acceptance is blocked
+## Review finding — Fleet replay repaired in the follow-up
 
-The compile fix does not repair an inherited domain gap:
+The original compile fix did not repair an inherited domain gap:
 `service_payload_matches_existing` checks the cost/accounting payload, with
 vehicle and service type checked by its caller, but omits `serviced_at`,
 `odometer_km`, `provider`, and `notes`. Reusing a request key with changed values
 for these fields acknowledges the existing record instead of rejecting the
 different request.
 
-Before COV-15 exact-replay acceptance, a bounded domain repair must compare all
-canonicalized submitted fields (or a persisted canonical request fingerprint)
-and prove each mismatched replay is rejected with service/accounting effects
-unchanged. This is a business-invariant repair, not a contract-pin or compiler
-fix, and has deliberately not been folded into normalization.
+The follow-up compares all canonical submitted fields on service and inspection
+replay, checks scoped-key cardinality before mutable references, and makes the
+client's pre/post-readback payload-exact. Omitted timestamps reconcile against
+the original `create_date`, now exposed by both read projections. Costless
+effects require explicit absence of all monetary linkage.
+
+The real `run_fleet_lifecycle_test` and `run_all_fleet_tests` passed on a
+disposable SpacetimeDB 2.8.2. The run also required reusing Accounting's period
+guard before cost writes and repairing a hard-coded currency in the Fleet
+company-isolation fixture. Complete persisted snapshots remain unchanged after
+rejected replays. See
+[`cov15-fleet-replay-proof.json`](../evidence/cov15-fleet-replay-proof.json).
+
+This closes the scoped domain/readback defect, not full COV-15 acceptance.
+Matching contracts, generated BFF/browser evidence and integrated CI remain.
 
 ## Remaining gates
 
@@ -89,12 +99,13 @@ fix, and has deliberately not been folded into normalization.
    `v0.3.73` pin is retained, not certified as matching the combined sources.
 2. Run the real Inventory/Analytics certification on the repaired PR #143 head.
    Gate regression tests use stubs; earlier green CI did not execute aggregates.
-3. Repair and prove the Fleet replay gap above, then run the bounded domain and
-   actual operator proofs on the final pinned head, followed by integrated
-   P0/full/pretenant regression.
+3. Run the remaining bounded domain and actual operator proofs on the final
+   pinned head, followed by integrated P0/full/pretenant regression. The scoped
+   Fleet replay gap above is repaired and has live native evidence.
 4. Refresh affected upstream branches and rerun their own evidence before
    landing bottom-up. A downstream green result is not upstream acceptance.
 5. Keep module follow-ups and COV-26/27 separate. This normalization does not
    change `IMPLEMENTED — runtime acceptance pending` into `ACCEPTED` or U5.
 
-Nothing has been published or merged from this normalization branch.
+Publication/contract-release disposition is recorded with the follow-up release
+result; no merge into `main` is implied.

@@ -2003,7 +2003,8 @@
       "outcome",
       "odometer_km",
       "notes",
-      "client_request_id"
+      "client_request_id",
+      "create_date"
     ],
     "mandatory": [
       "id",
@@ -2028,7 +2029,8 @@
       "cost_amount",
       "currency_id",
       "account_move_id",
-      "client_request_id"
+      "client_request_id",
+      "create_date"
     ],
     "mandatory": [
       "id",
