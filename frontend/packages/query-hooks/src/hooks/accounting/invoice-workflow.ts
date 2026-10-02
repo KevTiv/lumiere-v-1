@@ -4,11 +4,17 @@ import {
   POST_PAYMENT_AFFECTS,
   RECONCILE_PAYMENT_AFFECTS,
   WorkflowError,
+  invoiceWorkflow,
+  isPaymentReconciledWith,
+  observePostedInvoice,
+  observeSameRecord,
+  paymentWorkflow,
   postInvoiceAction,
   postPaymentAction,
-  invoiceWorkflow,
   recordRef,
+  stateIs,
   type AnyWorkflowAction,
+  type ObservedTransition,
   type RowValueMap,
   type TransitionSpec,
 } from "@lumiere/erp-workflows"
@@ -38,6 +44,18 @@ export interface RegisterPaymentInput {
   paymentId: bigint
   invoiceIds: bigint[]
   isBill: boolean
+}
+
+/** Payments read back from the canonical list, bypassing any cached view. */
+async function observePayment(
+  paymentId: bigint | string,
+  confirmed: (row: RowValueMap) => boolean,
+): Promise<ObservedTransition> {
+  return observeSameRecord(
+    recordRef(paymentWorkflow.resource, paymentId, paymentWorkflow.module),
+    await fetchQueryList("/api/query/account-payments", "Failed to read payment"),
+    confirmed,
+  )
 }
 
 export interface ReconcilePaymentInput {
@@ -146,10 +164,11 @@ export function useInvoiceToPaymentWorkflow(
         return postInvoiceCommand({ moveId, ...accounts })
       },
       affects: POST_INVOICE_AFFECTS,
-      // Posting is where the customer is asked to pay: stay on the invoice.
-      observe: async (moveId) => ({
-        next: recordRef(invoiceWorkflow.resource, moveId, invoiceWorkflow.module),
-      }),
+      observe: async (moveId) =>
+        observePostedInvoice(
+          moveId,
+          await fetchQueryList("/api/query/account-moves", "Failed to read posted invoice"),
+        ),
     }),
     [resolvePostingAccounts, missingAccountsMessage],
   )
@@ -159,6 +178,7 @@ export function useInvoiceToPaymentWorkflow(
       id: "accounting.payment.post",
       command: (paymentId) => postAccountPaymentCommand(BigInt(paymentId)),
       affects: POST_PAYMENT_AFFECTS,
+      observe: (paymentId) => observePayment(paymentId, stateIs("Paid")),
     }),
     [],
   )
@@ -168,6 +188,8 @@ export function useInvoiceToPaymentWorkflow(
       id: "accounting.payment.register",
       command: registerPaymentOnInvoiceCommand,
       affects: RECONCILE_PAYMENT_AFFECTS,
+      observe: ({ paymentId, invoiceIds, isBill }) =>
+        observePayment(paymentId, isPaymentReconciledWith(invoiceIds, isBill)),
     }),
     [],
   )

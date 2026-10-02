@@ -5,6 +5,9 @@ import {
   SALE_ORDER_LINE_AFFECTS,
   createSaleOrderLineAction,
   deleteSaleOrderLineAction,
+  observeCreatedSaleOrderLine,
+  observeDeletedSaleOrderLine,
+  saleOrderLineIds,
   updateSaleOrderLineAction,
 } from "./order-lines"
 
@@ -43,4 +46,21 @@ test("delete is a destructive record action dispatched with the line id", async 
   assert.ok(action.canPresent({ id: 9 }))
   await action.execute(action.prepare!({ id: 9 }))
   assert.equal(deleted, "9")
+})
+
+test("a created line is the one id added to the order's order_line since the snapshot", () => {
+  const before = saleOrderLineIds("5", [{ id: 5, orderLine: [1, 2] }])
+  assert.deepEqual(before, ["1", "2"])
+  assert.deepEqual(observeCreatedSaleOrderLine("5", before!, [{ id: 5, order_line: [1, 2, 7] }]), {
+    outcome: "applied",
+    createdRecords: [{ resource: "sale_order_line", id: "7", module: "sales" }],
+  })
+  assert.deepEqual(observeCreatedSaleOrderLine("5", ["1", "2"], [{ id: 5, orderLine: [1, 2] }]), {})
+  assert.deepEqual(observeCreatedSaleOrderLine("5", ["1"], [{ id: 5, orderLine: [1, 7, 8] }]), {})
+  assert.equal(saleOrderLineIds("5", []), undefined)
+})
+
+test("a deleted line is confirmed by its absence, never by a missing order", () => {
+  assert.deepEqual(observeDeletedSaleOrderLine("7", [{ id: 6 }]), { outcome: "applied" })
+  assert.deepEqual(observeDeletedSaleOrderLine("7", [{ id: 7 }]), {})
 })

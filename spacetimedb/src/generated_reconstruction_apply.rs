@@ -485,35 +485,36 @@ pub(crate) fn generated_restore_order(table: &str) -> Option<u32> {
         "purchase_return_line" => Some(472),
         "purchase_rfq_bid" => Some(473),
         "purchase_rfq_line" => Some(474),
-        "return_order_line" => Some(475),
-        "sale_commission_plan_split" => Some(476),
-        "sale_order_line" => Some(477),
-        "sale_order_option" => Some(478),
-        "segment_member" => Some(479),
-        "stock_inventory_line" => Some(480),
-        "stock_landed_cost_allocation" => Some(481),
-        "stock_landed_cost_application" => Some(482),
-        "stock_move_line" => Some(483),
-        "stock_picking" => Some(484),
-        "subscription_bundle_item" => Some(485),
-        "subscription_line" => Some(486),
-        "subscription_usage_event" => Some(487),
-        "tax_deadline_reminder" => Some(488),
-        "workflow_calendar_version" => Some(489),
-        "workflow_decision_event" => Some(490),
-        "workflow_human_task_candidate" => Some(491),
-        "workflow_human_task_event" => Some(492),
-        "workflow_simulation_step" => Some(493),
-        "workflow_version" => Some(494),
-        "ai_knowledge_review" => Some(495),
-        "ai_knowledge_skill_promotion" => Some(496),
-        "form_field_label" => Some(497),
-        "workflow_calendar_exception" => Some(498),
+        "return_order_creation" => Some(475),
+        "return_order_line" => Some(476),
+        "sale_commission_plan_split" => Some(477),
+        "sale_order_line" => Some(478),
+        "sale_order_option" => Some(479),
+        "segment_member" => Some(480),
+        "stock_inventory_line" => Some(481),
+        "stock_landed_cost_allocation" => Some(482),
+        "stock_landed_cost_application" => Some(483),
+        "stock_move_line" => Some(484),
+        "stock_picking" => Some(485),
+        "subscription_bundle_item" => Some(486),
+        "subscription_line" => Some(487),
+        "subscription_usage_event" => Some(488),
+        "tax_deadline_reminder" => Some(489),
+        "workflow_calendar_version" => Some(490),
+        "workflow_decision_event" => Some(491),
+        "workflow_human_task_candidate" => Some(492),
+        "workflow_human_task_event" => Some(493),
+        "workflow_simulation_step" => Some(494),
+        "workflow_version" => Some(495),
+        "ai_knowledge_review" => Some(496),
+        "ai_knowledge_skill_promotion" => Some(497),
+        "form_field_label" => Some(498),
+        "workflow_calendar_exception" => Some(499),
         _ => None,
     }
 }
 
-pub(crate) const GENERATED_FINAL_RESTORE_ORDER: u32 = 498;
+pub(crate) const GENERATED_FINAL_RESTORE_ORDER: u32 = 499;
 
 pub(crate) fn apply_generated_reconstruction_row(
     ctx: &ReducerContext,
@@ -22069,6 +22070,52 @@ pub(crate) fn apply_generated_reconstruction_row(
                     if generated_id > desired_id {
                         break Err(format!(
                             "reconstruction sequence for purchase_rfq_line advanced past restored primary key {desired_id}"
+                        ));
+                    }
+                }
+            }
+        },
+        "return_order_creation" => {
+            use crate::sales::return_orders::{return_order_creation as _, ReturnOrderCreation};
+            let spacetimedb_sats::serde::SerdeWrapper(row) =
+                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<ReturnOrderCreation>>(row_json)
+                    .map_err(|error| format!("invalid canonical row JSON for return_order_creation: {error}"))?;
+            if row.organization_id != organization_id {
+                return Err("reconstruction row belongs to a different organization".to_string());
+            }
+            let rows = ctx.db.return_order_creation();
+            if let Some(existing) = rows.id().find(&row.id) {
+                let existing_json = serde_json::to_value(
+                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
+                )
+                .map_err(|error| format!("serialize existing return_order_creation row: {error}"))?;
+                let incoming_json = serde_json::to_value(
+                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
+                )
+                .map_err(|error| format!("serialize incoming return_order_creation row: {error}"))?;
+                if existing_json == incoming_json {
+                    Ok(GeneratedApplyOutcome::AlreadyPresent)
+                } else {
+                    Err("reconstruction primary-key conflict with different row data".to_string())
+                }
+            } else {
+                let desired_id = row.id;
+                loop {
+                    let spacetimedb_sats::serde::SerdeWrapper(candidate) =
+                        serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<ReturnOrderCreation>>(row_json)
+                            .map_err(|error| format!("invalid canonical row JSON for return_order_creation: {error}"))?;
+                    let inserted = rows.insert(ReturnOrderCreation {
+                        id: 0,
+                        ..candidate
+                    });
+                    if inserted.id == desired_id {
+                        break Ok(GeneratedApplyOutcome::Inserted);
+                    }
+                    let generated_id = inserted.id;
+                    rows.id().delete(&generated_id);
+                    if generated_id > desired_id {
+                        break Err(format!(
+                            "reconstruction sequence for return_order_creation advanced past restored primary key {desired_id}"
                         ));
                     }
                 }

@@ -772,6 +772,16 @@ pub fn create_purchase_order(
     organization_id: u64,
     params: CreatePurchaseOrderParams,
 ) -> Result<(), String> {
+    create_purchase_order_record(ctx, organization_id, params).map(|_| ())
+}
+
+/// Creates a purchase order and returns its id, so callers that build on the new order own its
+/// identity instead of rediscovering it by scanning for the newest matching row.
+pub(crate) fn create_purchase_order_record(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    params: CreatePurchaseOrderParams,
+) -> Result<u64, String> {
     check_permission(ctx, organization_id, "purchase_order", "create")?;
 
     if let Some(ref iqc) = params.is_quantity_copy {
@@ -875,7 +885,7 @@ pub fn create_purchase_order(
     );
 
     log::info!("Purchase order {} created", order.id);
-    Ok(())
+    Ok(order.id)
 }
 
 /// Send purchase order to vendor (change state from Draft to Sent)

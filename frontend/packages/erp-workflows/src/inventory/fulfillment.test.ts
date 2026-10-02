@@ -7,7 +7,9 @@ import {
   PICKING_TRANSITION_AFFECTS,
   observePartialValidatedPicking,
   observePickingState,
+  observePackedPicking,
   observeValidatedPicking,
+  pickingPackageIds,
   pickingBackorderIds,
   packPickingAction,
   partialValidatePickingAction,
@@ -152,6 +154,7 @@ test("partial validation resolves exactly one new backorder from the parent rela
 test("validating in full requires done state and returns the same picking", () => {
   assert.deepEqual(observeValidatedPicking("5", [{ id: 5, state: "done" }]), {
     outcome: "applied",
+    createdRecords: undefined,
     next: { resource: "stock_picking", id: "5", module: "inventory" },
   })
   assert.deepEqual(observeValidatedPicking("5", [{ id: 5, state: "assigned" }]), {})
@@ -176,4 +179,25 @@ test("pack is an immediate record action; partial validation is form-backed and 
   assert.equal(partial.kind, "form")
   assert.ok(partial.canPresent({ state: "assigned" }))
   assert.ok(!partial.canPresent({ state: "confirmed" }))
+})
+
+test("a pack is the one package added to the picking since the snapshot", () => {
+  const packages = [
+    { id: 1, pickingId: 5 },
+    { id: 2, picking_id: 5 },
+    { id: 3, pickingId: 6 },
+  ]
+  assert.deepEqual(pickingPackageIds("5", packages), ["1", "2"])
+  assert.deepEqual(observePackedPicking("5", ["1"], packages), {
+    outcome: "applied",
+    createdRecords: [{ resource: "stock_package", id: "2", module: "inventory" }],
+    next: { resource: "stock_picking", id: "5", module: "inventory" },
+  })
+  assert.deepEqual(observePackedPicking("5", ["1", "2"], packages), {})
+  assert.deepEqual(observePackedPicking("5", [], packages), {})
+})
+
+test("a cancelled picking reads back in the cancel state", () => {
+  assert.equal(observePickingState("5", "cancel", [{ id: 5, state: "cancel" }]).outcome, "applied")
+  assert.deepEqual(observePickingState("5", "cancel", [{ id: 5, state: "assigned" }]), {})
 })

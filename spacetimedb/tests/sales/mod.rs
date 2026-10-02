@@ -191,7 +191,9 @@ pub fn run_sales_pricelist_company_scope_test(ctx: &ReducerContext) -> Result<()
 #[spacetimedb::reducer]
 pub fn run_sales_exchange_from_return_test(ctx: &ReducerContext) -> Result<(), String> {
     gap_fixes_test::test_exchange_order_from_return(ctx)
-        .map_err(|e| format!("exchange_from_return: {e}"))
+        .map_err(|e| format!("exchange_from_return: {e}"))?;
+    gap_fixes_test::test_keyed_return_order_replay(ctx)
+        .map_err(|e| format!("keyed_return_order_replay: {e}"))
 }
 
 #[spacetimedb::reducer]

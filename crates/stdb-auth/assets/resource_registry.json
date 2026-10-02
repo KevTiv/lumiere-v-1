@@ -205,7 +205,9 @@
       "ref",
       "journal_id",
       "currency_id",
-      "partner_id"
+      "partner_id",
+      "reconciled_invoice_ids",
+      "reconciled_bill_ids"
     ],
     "mandatory": [
       "id",
@@ -1638,7 +1640,11 @@
       "name",
       "company_id",
       "res_model",
-      "res_id"
+      "res_id",
+      "is_locked",
+      "locked_by",
+      "locked_at",
+      "locked_until"
     ],
     "mandatory": [
       "id",
@@ -2590,7 +2596,8 @@
       "triggered_by",
       "created_at",
       "sent_at",
-      "acknowledged_at"
+      "acknowledged_at",
+      "result_payload"
     ],
     "mandatory": [
       "id",
@@ -2782,6 +2789,12 @@
       "organization_id"
     ],
     "table": "hr_labor_cost_snapshot"
+  },
+  "landed-cost-applications": {
+    "aliases": ["landed-cost-applications", "stock_landed_cost_application"],
+    "default_restricted": ["company_id", "landed_cost_id", "allocation_count", "applied_at"],
+    "mandatory": ["id", "organization_id", "company_id"],
+    "table": "stock_landed_cost_application"
   },
   "landed-cost-lines": {
     "aliases": [
@@ -2990,7 +3003,10 @@
       "model",
       "body",
       "date",
-      "res_id"
+      "res_id",
+      "parent_id",
+      "attachment_ids",
+      "metadata"
     ],
     "mandatory": [
       "id",
@@ -3077,6 +3093,27 @@
     ],
     "table": "message_template"
   },
+  "mrp-bom-byproducts": {
+    "aliases": [
+      "mrp-bom-byproducts",
+      "mrp_bom_byproduct"
+    ],
+    "default_restricted": [
+      "bom_id",
+      "product_id",
+      "product_tmpl_id",
+      "product_qty",
+      "product_uom_id",
+      "cost_share",
+      "sequence",
+      "company_id"
+    ],
+    "mandatory": [
+      "id",
+      "organization_id"
+    ],
+    "table": "mrp_bom_byproduct"
+  },
   "mrp-bom-lines": {
     "aliases": [
       "mrp-bom-lines",
@@ -3105,7 +3142,8 @@
       "company_id",
       "type",
       "product_id",
-      "product_uom_id"
+      "product_uom_id",
+      "byproduct_ids"
     ],
     "mandatory": [
       "id",
@@ -4883,8 +4921,13 @@
     "default_restricted": [
       "name",
       "quality_state",
+      "status",
       "company_id",
-      "product_id"
+      "product_id",
+      "workorder_id",
+      "production_id",
+      "is_failed",
+      "check_date"
     ],
     "mandatory": [
       "id",
@@ -4944,6 +4987,22 @@
       "organization_id"
     ],
     "table": "replenishment_rule"
+  },
+  "replenishment-run-jobs": {
+    "aliases": [
+      "replenishment-run-jobs",
+      "replenishment_run_job"
+    ],
+    "default_restricted": [
+      "scheduled_at",
+      "company_id",
+      "rule_id"
+    ],
+    "mandatory": [
+      "scheduled_id",
+      "organization_id"
+    ],
+    "table": "replenishment_run_job"
   },
   "report-templates": {
     "aliases": [
@@ -5023,6 +5082,12 @@
       "organization_id"
     ],
     "table": "resource_utilisation_snapshot"
+  },
+  "return-order-creations": {
+    "aliases": ["return-order-creations", "return_order_creation"],
+    "default_restricted": ["company_id", "return_order_id", "idempotency_key", "request_fingerprint"],
+    "mandatory": ["id", "organization_id", "company_id"],
+    "table": "return_order_creation"
   },
   "return-order-lines": {
     "aliases": [
@@ -5197,6 +5262,7 @@
       "company_id",
       "date_order",
       "opportunity_id",
+      "order_line",
       "picking_ids",
       "invoice_ids",
       "invoice_count",
@@ -5258,7 +5324,9 @@
       "name",
       "frequency",
       "next_run",
-      "is_active"
+      "is_active",
+      "last_run",
+      "run_count"
     ],
     "mandatory": [
       "id",
@@ -5429,6 +5497,8 @@
       "purchase_line_id",
       "is_done",
       "production_id",
+      "reference",
+      "scrapped",
       "location_id",
       "location_dest_id",
       "product_uom",
@@ -5512,7 +5582,8 @@
       "product_id",
       "company_id",
       "lot_id",
-      "state"
+      "state",
+      "is_locked"
     ],
     "mandatory": [
       "id",
@@ -6071,7 +6142,8 @@
       "name",
       "employee_id",
       "company_id",
-      "validation_status"
+      "validation_status",
+      "timesheet_invoice_id"
     ],
     "mandatory": [
       "id",

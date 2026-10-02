@@ -1,6 +1,7 @@
 "use client"
 
 
+import { newCorrelationId } from "@lumiere/erp-workflows"
 import { stdbBffCommandPost } from "@lumiere/stdb/commands"
 import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
 import { scalarToU64 as toScalarU64 } from "@lumiere/erp-shared/u64"
@@ -8,6 +9,8 @@ import type { CreateInvoiceReminderBatchParams, CreateMessageBatchParams, Create
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 
 import { apiFetch, fetchQueryList, rqBigIntKey } from "../http"
+import { resolvePostedMessageEffect } from "./mail-message-post"
+import type { CanonicalRecordRef } from "./operation-effect"
 import { useStdbQuery } from "./stdb"
 
 export type PostMessageInput = {
@@ -18,6 +21,8 @@ export type PostMessageInput = {
   subtype?: string | null
   parentId: bigint | number | string | null
   attachmentIds: (bigint | number | string)[]
+  /** Names this submission; defaults to a fresh key per call. */
+  idempotencyKey?: string
 }
 
 // ── Reads ─────────────────────────────────────────────────────────────────────
@@ -104,11 +109,16 @@ export function useReviewMessageBatch(organizationId: bigint) {
 
 export function usePostMessage(organizationId: bigint) {
   const qc = useQueryClient()
-  return useMutation<void, Error, PostMessageInput>({
-    mutationFn: async ({ model, resId, body, parentId, attachmentIds }) => {
-      const { urlPath, init } = stdbBffCommandPost("post_message", { model: model, resId: toScalarU64(resId), body: body, parentId: parentId != null ? toScalarU64(parentId) : null, attachmentIds: attachmentIds.map((id) => toScalarU64(id)) })
+  return useMutation<CanonicalRecordRef, Error, PostMessageInput>({
+    mutationFn: async ({ model, resId, body, parentId, attachmentIds, idempotencyKey }) => {
+      const key = idempotencyKey ?? newCorrelationId()
+      const { urlPath, init } = stdbBffCommandPost("post_message", { model: model, resId: toScalarU64(resId), body: body, parentId: parentId != null ? toScalarU64(parentId) : null, attachmentIds: attachmentIds.map((id) => toScalarU64(id)), idempotencyKey: key })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to post message')
+      const rows = await fetchQueryList('/api/query/mail-messages', 'Failed to read posted message')
+      const effect = resolvePostedMessageEffect(rows, organizationId, { idempotencyKey: key, model, resId: toScalarU64(resId) })
+      if (!effect) throw new Error('Message did not read back after posting')
+      return effect
     },
     onSuccess: () =>
       qc.invalidateQueries({ queryKey: ['mail-messages', rqBigIntKey(organizationId)] }),

@@ -8,6 +8,7 @@
 
 import { firstNonNullKey, type RowValueMap } from "@lumiere/erp-shared/row-values"
 import { recordAction, type ExecuteAction, type WorkflowAction } from "../core/action"
+import { singleAddedId } from "../core/effect-delta"
 import { recordRef } from "../core/record-ref"
 import { rowId, variantTag } from "../core/row"
 import type { ObservedTransition } from "../core/transition"
@@ -152,14 +153,27 @@ export function observeConfirmedPurchaseOrder(orderId: string, orders: readonly 
   }
 }
 
-/** The reducer appends each new PO to the requisition's `purchase_ids`, so the last is the one just created. */
-export function observeConvertedRequisition(
+/** Canonical requisition-owned PO relation, normalized for pre/post effect comparison. */
+export function requisitionPurchaseIds(
   requisitionId: string,
   requisitions: readonly RowValueMap[],
+): string[] | undefined {
+  const requisition = findRow(requisitions, requisitionId)
+  return requisition ? idList(requisition, "purchaseIds", "purchase_ids") : undefined
+}
+
+/**
+ * The reducer appends each new PO to the requisition's `purchase_ids`. The caller snapshots that
+ * relation before dispatch; the PO is the one new id after readback, never the last entry.
+ */
+export function observeConvertedRequisition(
+  requisitionId: string,
+  purchaseIdsBefore: readonly string[],
+  requisitions: readonly RowValueMap[],
 ): ObservedTransition {
-  const last = idList(findRow(requisitions, requisitionId) ?? {}, "purchaseIds", "purchase_ids").at(-1)
-  if (!last) return {}
-  const order = orderRef(last)
+  const created = singleAddedId(purchaseIdsBefore, requisitionPurchaseIds(requisitionId, requisitions))
+  if (!created) return {}
+  const order = orderRef(created)
   return { outcome: "applied", createdRecords: [order], next: order }
 }
 
@@ -175,16 +189,24 @@ export function poSourceRfqId(order: RowValueMap): string | undefined {
   }
 }
 
-/** The newest PO stamped with this RFQ is the one the award just created. */
-export function observeAwardedRfq(rfqId: string, orders: readonly RowValueMap[]): ObservedTransition {
-  const created = orders
-    .filter((row) => poSourceRfqId(row) === rfqId)
-    .map(rowId)
-    .sort((a, b) => Number(a) - Number(b))
-    .at(-1)
-  if (!created) return {}
-  const order = orderRef(created)
-  return { outcome: "applied", createdRecords: [order], next: order }
+/**
+ * An RFQ is awarded once: `award_purchase_rfq_bid` records the PO it created on the RFQ's own
+ * `purchase_order_id`. The award is confirmed only when that exact RFQ reads back awarded and the
+ * PO it names exists and carries the same `rfq_id` stamp.
+ */
+export function observeAwardedRfq(
+  rfqId: string,
+  rfqs: readonly RowValueMap[],
+  orders: readonly RowValueMap[],
+): ObservedTransition {
+  const rfq = findRow(rfqs, rfqId)
+  if (!rfq || String(firstNonNullKey(rfq, "state") ?? "") !== "awarded") return {}
+  const poId = firstNonNullKey(rfq, "purchaseOrderId", "purchase_order_id")
+  if (poId == null) return {}
+  const order = findRow(orders, String(poId))
+  if (!order || poSourceRfqId(order) !== rfqId) return {}
+  const ref = orderRef(String(poId))
+  return { outcome: "applied", createdRecords: [ref], next: ref }
 }
 
 /** Canonical PO-owned bill relation, normalized for pre/post effect comparison. */
@@ -209,19 +231,12 @@ export function observeCreatedBill(
   invoiceIdsBefore: readonly string[],
   orders: readonly RowValueMap[],
 ): ObservedTransition {
-  const invoiceIdsAfter = purchaseOrderInvoiceIds(orderId, orders)
-  if (!invoiceIdsAfter) return {}
-
-  const after = new Set(invoiceIdsAfter)
-  if (invoiceIdsBefore.some((id) => !after.has(id))) return {}
-
-  const before = new Set(invoiceIdsBefore)
-  const created = invoiceIdsAfter.filter((id) => !before.has(id))
-  if (created.length !== 1) return {}
+  const created = singleAddedId(invoiceIdsBefore, purchaseOrderInvoiceIds(orderId, orders))
+  if (!created) return {}
 
   const bill = recordRef(
     invoiceWorkflow.resource,
-    created[0],
+    created,
     invoiceWorkflow.module,
     purchaseOrderWorkflow.module,
   )

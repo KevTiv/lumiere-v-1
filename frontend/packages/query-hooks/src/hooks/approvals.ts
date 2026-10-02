@@ -3,10 +3,23 @@
 
 import { stdbBffCommandPost } from "@lumiere/stdb/commands"
 import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
+import {
+  accountMoveHref,
+  accountPaymentHref,
+  expenseSheetHref,
+  purchaseOrderHref,
+  saleOrderHref,
+} from "@lumiere/erp-shared/record-links"
 import type { WorkflowHumanTaskDecision } from "@lumiere/stdb/types"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
 import { apiFetch } from "../http"
+import type { CanonicalRecordRef } from "./operation-effect"
+import {
+  resolveHumanTaskClaimEffect,
+  resolveHumanTaskDecisionEffect,
+  type HumanTaskEffectProjection,
+} from "./human-task-effect"
 
 import { responseErrorMessage as parseCallError } from "@lumiere/api-client/response-error"
 
@@ -153,6 +166,14 @@ export function approvalInboxQueryKey(organizationId: number) {
   return humanTaskInboxQueryKey(organizationId, null)
 }
 
+/** Every-status task read (the inbox omits decided tasks) for exact effect readback. */
+async function fetchHumanTaskRows(): Promise<HumanTaskEffectProjection[]> {
+  const r = await apiFetch("/api/query/workflow-human-tasks")
+  if (!r.ok) throw new Error(await parseCallError(r))
+  const j = (await r.json()) as { data?: HumanTaskEffectProjection[] }
+  return j.data ?? []
+}
+
 export type ClaimHumanTaskInput = {
   companyId: number
   taskId: number
@@ -163,8 +184,8 @@ export type ClaimHumanTaskInput = {
 
 export function useClaimHumanTask(organizationId: number) {
   const qc = useQueryClient()
-  return useMutation({
-    mutationFn: async (input: ClaimHumanTaskInput) => {
+  return useMutation<CanonicalRecordRef, Error, ClaimHumanTaskInput>({
+    mutationFn: async (input) => {
       const params = {
         companyId: input.companyId,
         taskId: input.taskId,
@@ -176,6 +197,14 @@ export function useClaimHumanTask(organizationId: number) {
       const { urlPath, init } = stdbBffCommandPost("claim_workflow_human_task", { params: stdbParamsToJson(params, "ClaimWorkflowHumanTaskParams") })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
+      const effect = resolveHumanTaskClaimEffect(
+        await fetchHumanTaskRows(),
+        BigInt(organizationId),
+        BigInt(input.taskId),
+        input.expectedRevision,
+      )
+      if (!effect) throw new Error("Human task claim did not read back")
+      return effect
     },
     onSuccess: () => invalidateHumanTaskQueries(qc, organizationId),
   })
@@ -194,8 +223,8 @@ export type DecideHumanTaskInput = {
 
 export function useDecideHumanTask(organizationId: number) {
   const qc = useQueryClient()
-  return useMutation({
-    mutationFn: async (input: DecideHumanTaskInput) => {
+  return useMutation<CanonicalRecordRef, Error, DecideHumanTaskInput>({
+    mutationFn: async (input) => {
       const decision =
         typeof input.decision === "object" && input.decision && "tag" in input.decision
           ? input.decision
@@ -215,6 +244,15 @@ export function useDecideHumanTask(organizationId: number) {
       const { urlPath, init } = stdbBffCommandPost("decide_workflow_human_task", { params: stdbParamsToJson(params, "DecideWorkflowHumanTaskParams") })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
+      const effect = resolveHumanTaskDecisionEffect(
+        await fetchHumanTaskRows(),
+        BigInt(organizationId),
+        BigInt(input.taskId),
+        decision.tag as "Approve" | "Reject" | "Complete",
+        input.expectedTaskRevision,
+      )
+      if (!effect) throw new Error("Human task decision did not read back")
+      return effect
     },
     onSuccess: () => invalidateHumanTaskQueries(qc, organizationId),
   })
@@ -349,17 +387,17 @@ export function approvalRecordHref(model?: string, resId?: number): string | und
   if (!model || resId == null || resId <= 0) return undefined
   switch (model) {
     case "purchase_order":
-      return `/purchasing?po=${resId}`
+      return purchaseOrderHref(resId)
     case "sale_order":
-      return `/sales?so=${resId}`
+      return saleOrderHref(resId)
     case "account_move":
-      return `/accounting?invoice=${resId}`
+      return accountMoveHref(resId)
     case "account_payment":
-      return `/accounting?payment=${resId}`
+      return accountPaymentHref(resId)
     case "ai_action_draft":
       return `/ai-action-drafts?draft=${resId}`
     case "hr_expense_sheet":
-      return `/expenses?sheet=${resId}`
+      return expenseSheetHref(resId)
     default:
       return undefined
   }

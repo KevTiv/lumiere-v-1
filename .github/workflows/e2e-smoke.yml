@@ -290,6 +290,9 @@ jobs:
           E2E_CLEAR_DB: ${{ matrix.config.clear_db }}
           E2E_SPEC_FILES: ${{ matrix.config.specs || '' }}
           E2E_SHARD: ${{ matrix.config.shard || '' }}
+          # Run the heavyweight Inventory + Analytics reducers once on the
+          # fixture-repair PR; shard 1 owns the bounded certification cost.
+          E2E_RUN_DOMAIN_AGGREGATES: ${{ github.event_name == 'pull_request' && github.head_ref == 'codex/fix-org-scoped-currency-fixtures' && (matrix.config.suite == 'targeted' || matrix.config.slot == '1') && '1' || '0' }}
           NEXT_PUBLIC_STDB_MODULE: ${{ env.STDB_MODULE }}
           NEXT_PUBLIC_STDB_HOST: ${{ env.STDB_HOST }}
           PG_HOST: 127.0.0.1

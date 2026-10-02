@@ -1,4 +1,5 @@
 "use client"
+import { accountMoveHref } from "@lumiere/erp-shared/record-links"
 import { mapDashboardWidgets, withDashboardSections } from "@lumiere/ui/lib/dashboard-sections"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
@@ -1059,7 +1060,7 @@ function ExpensesClientLoaded({
                       {idStr ? (
                         <a
                           className="font-mono text-xs underline underline-offset-2"
-                          href={`/accounting?tab=journal-entries&highlight=${encodeURIComponent(idStr)}`}
+                          href={accountMoveHref(idStr)}
                           data-testid={`expenses-move-link-${camel}`}
                         >
                           #{idStr}

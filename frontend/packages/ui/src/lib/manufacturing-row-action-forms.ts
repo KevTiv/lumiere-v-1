@@ -26,17 +26,32 @@ function moActionRadioOptions(t: TFunction, state: string): RadioField["options"
     o.push({ value: "consume", label: t("manufacturing.rowActions.consumeMaterials") })
     o.push({ value: "finish", label: t("manufacturing.rowActions.finish") })
   }
-  if (state !== "Done" && state !== "Cancelled") {
-    o.push({ value: "cancel", label: t("manufacturing.rowActions.cancel") })
+  if (state === 'Done') {
+    o.push({
+      value: 'scrap_output',
+      label: t('manufacturing.rowActions.scrapOutput'),
+    });
+  }
+  if (state !== 'Done' && state !== 'Cancelled') {
+    o.push({ value: 'cancel', label: t('manufacturing.rowActions.cancel') });
   }
   return o
 }
 
 export interface ManufacturingOrderRowFormParams {
-  recordId: string
-  state: string
-  defaultProduceQty: number
-  workcenterOptions: Array<{ value: string; label: string; disabled?: boolean }>
+  recordId: string;
+  state: string;
+  defaultProduceQty: number;
+  workcenterOptions: Array<{
+    value: string;
+    label: string;
+    disabled?: boolean;
+  }>;
+  scrapLocationOptions: Array<{
+    value: string;
+    label: string;
+    disabled?: boolean;
+  }>;
 }
 
 export function manufacturingOrderRowActionForm(
@@ -104,7 +119,27 @@ export function manufacturingOrderRowActionForm(
             label: t("manufacturing.rowActions.form.produceQty"),
             defaultValue: p.defaultProduceQty,
             step: 0.0001,
-            width: "1/2",
+            width: '1/2',
+            visibleWhen: { field: 'moAction', equals: 'produce' },
+          },
+          {
+            type: 'select',
+            id: 'scrapLocationId',
+            name: 'scrapLocationId',
+            label: t('manufacturing.rowActions.form.scrapLocation'),
+            options: p.scrapLocationOptions,
+            width: '1/2',
+            visibleWhen: { field: 'moAction', equals: 'scrap_output' },
+          },
+          {
+            type: 'number',
+            id: 'scrapQuantity',
+            name: 'scrapQuantity',
+            label: t('manufacturing.rowActions.form.scrapQuantity'),
+            defaultValue: 1,
+            step: 0.0001,
+            width: '1/2',
+            visibleWhen: { field: 'moAction', equals: 'scrap_output' },
           },
           {
             type: "select",
@@ -112,15 +147,17 @@ export function manufacturingOrderRowActionForm(
             name: "woWorkcenterId",
             label: t("manufacturing.workOrders.columns.workcenterId"),
             options: wcOpts,
-            width: "1/2",
+            width: '1/2',
+            visibleWhen: { field: 'moAction', equals: 'create_workorder' },
           },
           {
-            type: "text",
-            id: "woName",
-            name: "woName",
-            label: t("manufacturing.workOrders.columns.name"),
-            defaultValue: "Operation",
-            width: "1/2",
+            type: 'text',
+            id: 'woName',
+            name: 'woName',
+            label: t('manufacturing.workOrders.columns.name'),
+            defaultValue: 'Operation',
+            width: '1/2',
+            visibleWhen: { field: 'moAction', equals: 'create_workorder' },
           },
           {
             type: "number",
@@ -128,7 +165,8 @@ export function manufacturingOrderRowActionForm(
             name: "woDuration",
             label: t("manufacturing.rowActions.durationExpected"),
             defaultValue: 60,
-            width: "1/2",
+            width: '1/2',
+            visibleWhen: { field: 'moAction', equals: 'create_workorder' },
           },
           {
             type: "number",
@@ -136,7 +174,8 @@ export function manufacturingOrderRowActionForm(
             name: "woSequence",
             label: t("manufacturing.rowActions.sequence"),
             defaultValue: 1,
-            width: "1/2",
+            width: '1/2',
+            visibleWhen: { field: 'moAction', equals: 'create_workorder' },
           },
         ],
       },
@@ -145,8 +184,9 @@ export function manufacturingOrderRowActionForm(
 }
 
 export interface ManufacturingBomRowFormParams {
-  recordId: string
-  defaultProductQty: number
+  recordId: string;
+  defaultProductQty: number;
+  productOptions: Array<{ value: string; label: string; disabled?: boolean }>;
 }
 
 export function manufacturingBomRowActionForm(
@@ -181,10 +221,26 @@ export function manufacturingBomRowActionForm(
             required: true,
             defaultValue: "update_qty",
             options: [
-              { value: "update_qty", label: t("manufacturing.rowActions.saveBomQty") },
-              { value: "compute_cost", label: t("manufacturing.rowActions.computeCost") },
-              { value: "explode", label: t("manufacturing.rowActions.explodeBom") },
-              { value: "delete", label: t("manufacturing.rowActions.deleteBom") },
+              {
+                value: 'update_qty',
+                label: t('manufacturing.rowActions.saveBomQty'),
+              },
+              {
+                value: 'compute_cost',
+                label: t('manufacturing.rowActions.computeCost'),
+              },
+              {
+                value: 'explode',
+                label: t('manufacturing.rowActions.explodeBom'),
+              },
+              {
+                value: 'add_byproduct',
+                label: t('manufacturing.rowActions.addByproduct'),
+              },
+              {
+                value: 'delete',
+                label: t('manufacturing.rowActions.deleteBom'),
+              },
             ],
             width: "full",
           },
@@ -202,7 +258,46 @@ export function manufacturingBomRowActionForm(
             label: t("manufacturing.billsOfMaterials.columns.productQty"),
             defaultValue: p.defaultProductQty,
             step: 0.0001,
-            width: "1/2",
+            width: '1/2',
+            visibleWhen: { field: 'bomAction', equals: 'update_qty' },
+          },
+          {
+            type: 'select',
+            id: 'byproductProductId',
+            name: 'byproductProductId',
+            label: t('manufacturing.rowActions.form.byproductProduct'),
+            options: p.productOptions,
+            width: '1/2',
+            visibleWhen: { field: 'bomAction', equals: 'add_byproduct' },
+          },
+          {
+            type: 'number',
+            id: 'byproductUomId',
+            name: 'byproductUomId',
+            label: t('manufacturing.rowActions.form.byproductUom'),
+            width: '1/2',
+            visibleWhen: { field: 'bomAction', equals: 'add_byproduct' },
+          },
+          {
+            type: 'number',
+            id: 'byproductQuantity',
+            name: 'byproductQuantity',
+            label: t('manufacturing.rowActions.form.byproductQuantity'),
+            defaultValue: 1,
+            step: 0.0001,
+            width: '1/2',
+            visibleWhen: { field: 'bomAction', equals: 'add_byproduct' },
+          },
+          {
+            type: 'number',
+            id: 'byproductCostShare',
+            name: 'byproductCostShare',
+            label: t('manufacturing.rowActions.form.byproductCostShare'),
+            defaultValue: 0,
+            min: 0,
+            max: 100,
+            width: '1/2',
+            visibleWhen: { field: 'bomAction', equals: 'add_byproduct' },
           },
           {
             type: "checkbox",
@@ -210,7 +305,8 @@ export function manufacturingBomRowActionForm(
             name: "bomDeleteConfirmed",
             label: t("manufacturing.rowActions.form.confirmDeleteBom"),
             defaultValue: false,
-            width: "full",
+            width: 'full',
+            visibleWhen: { field: 'bomAction', equals: 'delete' },
           },
         ],
       },
@@ -219,9 +315,11 @@ export function manufacturingBomRowActionForm(
 }
 
 export interface ManufacturingWorkorderRowFormParams {
-  recordId: string
-  state: string
-  workcenterId: string
+  recordId: string;
+  state: string;
+  workcenterId: string;
+  qualityCheckId?: string;
+  qualityState?: string;
 }
 
 export function manufacturingWorkorderRowActionForm(
@@ -237,7 +335,25 @@ export function manufacturingWorkorderRowActionForm(
       value: "log_productivity",
       label: t("manufacturing.rowActions.logProductivity"),
     })
-    options.push({ value: "finish", label: t("manufacturing.rowActions.finish") })
+    options.push({
+      value: 'finish',
+      label: t('manufacturing.rowActions.finish'),
+    });
+    if (!p.qualityCheckId) {
+      options.push({
+        value: 'require_quality',
+        label: t('manufacturing.rowActions.requireQuality'),
+      });
+    } else if ((p.qualityState ?? 'none').toLowerCase() === 'none') {
+      options.push({
+        value: 'pass_quality',
+        label: t('manufacturing.rowActions.passQuality'),
+      });
+      options.push({
+        value: 'fail_quality',
+        label: t('manufacturing.rowActions.failQuality'),
+      });
+    }
   }
   const defaultWo = options[0]?.value ?? "start"
 
@@ -270,11 +386,17 @@ export function manufacturingWorkorderRowActionForm(
             defaultValue: p.workcenterId,
           },
           {
-            type: "radio",
-            id: "woAction",
-            name: "woAction",
-            label: t("manufacturing.rowActions.form.action"),
-            layout: "vertical",
+            type: 'hidden',
+            id: 'woQualityCheckId',
+            name: 'woQualityCheckId',
+            defaultValue: p.qualityCheckId ?? '',
+          },
+          {
+            type: 'radio',
+            id: 'woAction',
+            name: 'woAction',
+            label: t('manufacturing.rowActions.form.action'),
+            layout: 'vertical',
             required: true,
             defaultValue: defaultWo,
             options:
@@ -287,6 +409,23 @@ export function manufacturingWorkorderRowActionForm(
                     },
                   ],
             width: "full",
+          },
+          {
+            type: 'text',
+            id: 'woQualityName',
+            name: 'woQualityName',
+            label: t('manufacturing.rowActions.form.qualityCheckName'),
+            defaultValue: 'In-process quality check',
+            width: 'full',
+            visibleWhen: { field: 'woAction', equals: 'require_quality' },
+          },
+          {
+            type: 'text',
+            id: 'woQualityNote',
+            name: 'woQualityNote',
+            label: t('manufacturing.rowActions.form.qualityNote'),
+            width: 'full',
+            visibleWhen: { field: 'woAction', equals: 'fail_quality' },
           },
         ],
       },
@@ -302,15 +441,19 @@ export function manufacturingWorkorderRowActionForm(
             label: t("manufacturing.rowActions.duration"),
             defaultValue: 1,
             step: 0.0001,
-            width: "1/2",
+            width: '1/2',
+            visibleWhen: { field: 'woAction', equals: 'log_productivity' },
           },
           {
-            type: "text",
-            id: "woLogDescription",
-            name: "woLogDescription",
-            label: t("manufacturing.rowActions.form.logDescription"),
-            placeholder: t("manufacturing.rowActions.form.logDescriptionPlaceholder"),
-            width: "full",
+            type: 'text',
+            id: 'woLogDescription',
+            name: 'woLogDescription',
+            label: t('manufacturing.rowActions.form.logDescription'),
+            placeholder: t(
+              'manufacturing.rowActions.form.logDescriptionPlaceholder',
+            ),
+            width: 'full',
+            visibleWhen: { field: 'woAction', equals: 'log_productivity' },
           },
         ],
       },

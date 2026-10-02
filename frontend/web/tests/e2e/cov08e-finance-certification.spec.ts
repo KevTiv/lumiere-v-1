@@ -141,7 +141,7 @@ test.describe(
         })
 
       await gotoModule(page, "/reports", "reports")
-      await page.getByTestId("module-tab-reports-financial-reports").click()
+      await page.getByTestId("module-tab-reports-reports").click()
       const reportRow = page.getByTestId(`entity-row-${reportId}`)
       await expect(reportRow).toBeVisible({ timeout: 30_000 })
       await reportRow.click()

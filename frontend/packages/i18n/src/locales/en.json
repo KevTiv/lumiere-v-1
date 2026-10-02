@@ -3597,7 +3597,8 @@
     "toolbar": {
       "selectOneHub": "Select exactly one hub.",
       "selectOneAction": "Select exactly one action.",
-      "actionNotPending": "Only Pending actions can be marked sent."
+      "actionNotPending": "Only Pending actions can be marked sent.",
+      "actionNotSent": "Select exactly one Sent action to acknowledge."
     },
     "table": {
       "token": "Token",
@@ -4880,6 +4881,8 @@
       "trigger": "Trigger now",
       "executeRule": "Stamp rule run",
       "executeRuleHint": "Updates last_run / next_run for this rule (not the same as “Trigger now”, which evaluates stock).",
+      "scheduleRun": "Schedule automatic runs",
+      "cancelSchedule": "Cancel automatic runs",
       "confirmDelete": "Delete this replenishment rule?"
     },
     "pickingWaveActions": {
@@ -7112,9 +7115,15 @@
         "moDescription": "Order #{{id}} — status: {{state}}",
         "moParamsHint": "Production quantity applies to “Record output”. Work center fields apply to “Create work order”.",
         "produceQty": "Quantity (record output)",
+        "scrapLocation": "Scrap location",
+        "scrapQuantity": "Scrap quantity",
         "bomDescription": "BOM #{{id}}",
         "bomParamsHint": "Quantity applies to “Update quantity”. Check the box before deleting a BOM.",
         "confirmDeleteBom": "I understand this BOM and its lines will be deleted",
+        "byproductProduct": "Byproduct",
+        "byproductUom": "Byproduct UOM ID",
+        "byproductQuantity": "Byproduct quantity",
+        "byproductCostShare": "Cost share (%)",
         "woDescription": "Work order #{{id}} — status: {{state}}",
         "noActionsAvailable": "No actions available for this status",
         "wcDescription": "Work center #{{id}}",
@@ -7133,6 +7142,8 @@
         "completeLogId": "Open productivity log ID",
         "logDescription": "Description",
         "logDescriptionPlaceholder": "What happened during this time entry?",
+        "qualityCheckName": "Quality check name",
+        "qualityNote": "Quality note",
         "csvFile": "CSV file"
       },
       "titleOrder": "Manufacturing order",
@@ -7147,6 +7158,7 @@
       "cancel": "Cancel",
       "recordOutput": "Record output",
       "consumeMaterials": "Consume materials",
+      "scrapOutput": "Scrap finished output",
       "createWorkorderSection": "Add work order",
       "selectWorkcenter": "Work center",
       "durationExpected": "Expected duration (min)",
@@ -7155,6 +7167,7 @@
       "saveBomQty": "Update quantity",
       "computeCost": "Compute cost",
       "explodeBom": "Explode BOM",
+      "addByproduct": "Add byproduct",
       "deleteBom": "Delete BOM",
       "deleteBomConfirm": "Delete this BOM and its lines? This cannot be undone.",
       "saveName": "Save name",
@@ -7162,6 +7175,9 @@
       "block": "Block",
       "unblock": "Unblock",
       "logProductivity": "Log productivity",
+      "requireQuality": "Require quality check",
+      "passQuality": "Pass quality check",
+      "failQuality": "Fail quality check",
       "createRoutingOperation": "Add routing operation",
       "completeProductivityLog": "Complete productivity log",
       "linkIotDevice": "Link IoT device",
