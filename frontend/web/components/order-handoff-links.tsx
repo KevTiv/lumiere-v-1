@@ -8,7 +8,9 @@ import type { OrderHandoffs } from "@lumiere/query-hooks/hooks/order-to-cash"
 /** Canonical deep links: the owning module's tab focused on exactly one record by id. */
 export const orderHref = (orderId: bigint) => buildModuleTabHref("sales", "orders", { id: orderId.toString() })
 export const pickingHref = (pickingId: bigint) => buildModuleTabHref("inventory", "transfers", { id: pickingId.toString() })
-export const invoiceHref = (invoiceId: bigint) => buildModuleTabHref("accounting", "invoices", { id: invoiceId.toString() })
+// The Accounting "invoices" tab is a custom list that ignores `filter=`; "journal-entries" applies the
+// `id` filter (GeneralLedgerView) over every move, invoices included.
+export const invoiceHref = (invoiceId: bigint) => buildModuleTabHref("accounting", "journal-entries", { id: invoiceId.toString() })
 
 /**
  * COV-25: the deliveries and customer invoices an order generated, each linking straight to

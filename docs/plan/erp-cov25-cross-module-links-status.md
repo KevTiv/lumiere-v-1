@@ -37,7 +37,7 @@ generated; an operator searched Inventory or Accounting for them. The sheet now 
 invoices** tab (`sales-client.tsx`) listing, by exact foreign key (`stock_picking.sale_id`,
 `account_move.sale_order_id`, same organization and company; returns and cancelled documents excluded), each
 delivery and customer invoice with its state and open balance, linking to the canonical record:
-`/inventory?tab=transfers&filter=id:N` and `/accounting?tab=invoices&filter=id:N`. It reuses the same
+`/inventory?tab=transfers&filter=id:N` and `/accounting?tab=journal-entries&filter=id:N` (the invoices tab is a custom list that ignores `filter=`). It reuses the same
 `orderHandoffs` builder and `OrderHandoffLinks` component as the COV-24 workspace, so there is one definition of
 "this order's downstream records". No contract delta (the relation fields are already projected).
 
