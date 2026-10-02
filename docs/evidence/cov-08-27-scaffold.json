@@ -75,10 +75,10 @@
         "reject_timesheets"
       ],
       "resources": "timesheets-to-validate, timesheets-unbilled",
-      "contract_release_required": "maybe",
-      "contract_note": "none: `timesheets-to-validate` exposes validation_status and timesheet_invoice_id (the plain `timesheets` resource does not)",
+      "contract_release_required": "yes",
+      "contract_note": "release (registry projection): `timesheets` already projects validation_status; it now also projects timesheet_invoice_id and timesheet_invoice_type so a billed entry names its invoice",
       "prerequisites": "Seed project + employee + timesheet fixture.",
-      "status": "PARTIAL — validation/rejection proven; hook readback and billing handoff need a contract release",
+      "status": "IMPLEMENTED — validate, reject and billing handoff (contract release and runtime acceptance pending)",
       "status_doc": "docs/plan/erp-cov10-project-timesheet-validation-status.md",
       "spec": "frontend/web/tests/e2e/cov10-project-timesheet-validation.spec.ts",
       "hooks": [

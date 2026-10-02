@@ -6066,7 +6066,9 @@
       "name",
       "employee_id",
       "company_id",
-      "validation_status"
+      "validation_status",
+      "timesheet_invoice_type",
+      "timesheet_invoice_id"
     ],
     "mandatory": [
       "id",

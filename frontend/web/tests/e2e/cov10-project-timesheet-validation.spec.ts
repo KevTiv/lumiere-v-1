@@ -2,13 +2,19 @@ import { expect, test, type Page, type Request, type Response } from "@playwrigh
 
 import {
   callReducerBff,
+  chooseSelectOptionByLabel,
+  fetchAccountSelectLabelByInternalType,
   fetchCurrencyIdByCode,
   fetchDefaultCompanyId,
   fetchSessionOrganizationId,
+  fillField,
   gotoModule,
+  isoDate,
   scalarQueryId,
+  selectEntityRowById,
   signIn,
   smokeName,
+  submitForm,
 } from "./helpers"
 import { matchesOperationResponse } from "./operation-response"
 
@@ -72,6 +78,19 @@ async function worklistSnapshot(page: Page, timesheetId: number) {
   }
 }
 
+/** Exact status and billing link of one timesheet from the plain `timesheets` projection. */
+async function statusSnapshot(page: Page, timesheetId: number) {
+  const matches = (await rows(page, "timesheets")).filter((row) => scalarQueryId(row.id) === timesheetId)
+  if (matches.length !== 1) throw new Error(`expected one timesheet ${timesheetId}, found ${matches.length}`)
+  const row = matches[0]!
+  return {
+    organizationId: scalarQueryId(row.organizationId ?? row.organization_id),
+    companyId: scalarQueryId(row.companyId ?? row.company_id),
+    validationStatus: String(row.validationStatus ?? row.validation_status ?? ""),
+    invoiceId: scalarQueryId(row.timesheetInvoiceId ?? row.timesheet_invoice_id),
+  }
+}
+
 async function runTimesheetAction(page: Page, timesheetId: number, actionId: string, reducer: string): Promise<Response> {
   await gotoModule(page, "/projects", "projects")
   await page.getByTestId("module-tab-projects-timesheets").click()
@@ -87,7 +106,7 @@ async function runTimesheetAction(page: Page, timesheetId: number, actionId: str
   return response
 }
 
-test.describe("COV-10 exact timesheet validation / rejection", { tag: ["@p0", "@cov10"] }, () => {
+test.describe("COV-10 exact timesheet validation / rejection / billing handoff", { tag: ["@p0", "@cov10"] }, () => {
   test("a second person validates and rejects; self-validation, replays and reader are rejected", async ({
     browser,
     page,
@@ -261,12 +280,15 @@ test.describe("COV-10 exact timesheet validation / rejection", { tag: ["@p0", "@
         unbilled: { organizationId, companyId, validationStatus: "validated", invoiceId: null },
       }
       await expect.poll(() => worklistSnapshot(page, toValidate), { timeout: 30_000 }).toEqual(validatedEffect)
+      const validatedStatus = { organizationId, companyId, validationStatus: "validated", invoiceId: null }
+      expect(await statusSnapshot(page, toValidate)).toEqual(validatedStatus)
       const staleValidate = await replay(validatorPage, validated.request())
       expect(staleValidate.status()).toBe(422)
       expect(await worklistSnapshot(page, toValidate)).toEqual(validatedEffect)
+      expect(await statusSnapshot(page, toValidate)).toEqual(validatedStatus)
 
-      // A rejected entry leaves the draft worklist and never reaches billing.
-      // Its `rejected` state is not projected yet (see the status card).
+      // A rejected entry leaves the draft worklist and never reaches billing; the plain
+      // `timesheets` projection reads its `rejected` status exactly.
       const rejected = await runTimesheetAction(validatorPage, toReject, "reject-timesheets", "reject_timesheets")
       expect(rejected.ok()).toBe(true)
       const rejectedEffect = { toValidate: null, unbilled: null }
@@ -274,6 +296,43 @@ test.describe("COV-10 exact timesheet validation / rejection", { tag: ["@p0", "@
       const staleReject = await replay(validatorPage, rejected.request())
       expect(staleReject.status()).toBe(422)
       expect(await worklistSnapshot(page, toReject)).toEqual(rejectedEffect)
+      const rejectedStatus = { organizationId, companyId, validationStatus: "rejected", invoiceId: null }
+      expect(await statusSnapshot(page, toReject)).toEqual(rejectedStatus)
+
+      // ── Billing handoff: the admin bills the validated entry from the toolbar ──
+      const journals = await rows(page, "account-journals")
+      const journalTag = (row: Row) => {
+        const type = row.type ?? row.type_ ?? row.journalType
+        return type && typeof type === "object" ? String((type as { tag?: unknown }).tag ?? "") : String(type ?? "")
+      }
+      const journal = journals.find((row) => journalTag(row) === "Sale") ?? journals[0]
+      expect(journal).toBeTruthy()
+      const journalLabel = journal!.code && journal!.name ? `${journal!.code} — ${journal!.name}` : String(journal!.name ?? journal!.code)
+      const incomeLabel = await fetchAccountSelectLabelByInternalType(page, "income")
+      await gotoModule(page, "/projects", "projects")
+      await page.getByTestId("module-tab-projects-timesheets").click()
+      await selectEntityRowById(page, toValidate)
+      await page.getByTestId("entity-action-bill-timesheets").click()
+      await expect(page.getByTestId("form-modal-projects-bill-timesheets")).toBeVisible({ timeout: 15_000 })
+      await chooseSelectOptionByLabel(page, "journalId", journalLabel)
+      await chooseSelectOptionByLabel(page, "incomeAccountId", incomeLabel)
+      await chooseSelectOptionByLabel(page, "partnerId", "Acme Corporation")
+      await fillField(page, "invoiceDate", isoDate(0))
+      const [billed] = await Promise.all([
+        page.waitForResponse((candidate) => matchesOperationResponse(candidate, "bill_timesheets"), { timeout: 45_000 }),
+        submitForm(page, "projects-bill-timesheets"),
+      ])
+      expect(billed.ok()).toBe(true)
+      await expect.poll(async () => (await statusSnapshot(page, toValidate)).invoiceId, { timeout: 30_000 }).not.toBeNull()
+      const billedStatus = await statusSnapshot(page, toValidate)
+      expect(billedStatus).toMatchObject({ organizationId, companyId, validationStatus: "validated" })
+      const invoices = (await rows(page, "account-moves")).filter((row) => scalarQueryId(row.id) === billedStatus.invoiceId)
+      expect(invoices).toHaveLength(1)
+      expect(scalarQueryId(invoices[0]!.companyId ?? invoices[0]!.company_id)).toBe(companyId)
+      // Billed entries leave the unbilled worklist, and a replay is rejected as already invoiced.
+      expect((await worklistSnapshot(page, toValidate)).unbilled).toBeNull()
+      expect((await replay(page, billed.request())).status()).toBe(422)
+      expect(await statusSnapshot(page, toValidate)).toEqual(billedStatus)
 
       await signIn(readerPage, "fixture.reader@example.test", PERSONA_PASSWORD)
       for (const [request, id, effect] of [
@@ -282,8 +341,10 @@ test.describe("COV-10 exact timesheet validation / rejection", { tag: ["@p0", "@
       ] as const) {
         const denied = await replay(readerPage, request)
         expect(denied.status()).toBe(403)
-        expect(await worklistSnapshot(page, id)).toEqual(effect)
+        expect(await worklistSnapshot(page, id)).toEqual(id === toValidate ? { toValidate: null, unbilled: null } : effect)
       }
+      expect((await replay(readerPage, billed.request())).status()).toBe(403)
+      expect(await statusSnapshot(page, toValidate)).toEqual(billedStatus)
     } finally {
       await readerContext.close()
       await validatorContext.close()

@@ -93,6 +93,18 @@ mod tests {
     }
 
     #[test]
+    fn timesheet_projection_exposes_status_and_billing_link() {
+        let entry = registry_get("timesheets").expect("timesheets must be registered");
+
+        for field in ["validation_status", "timesheet_invoice_id", "company_id"] {
+            assert!(
+                entry.default_restricted.iter().any(|f| f == field),
+                "timesheets projection must expose {field}"
+            );
+        }
+    }
+
+    #[test]
     fn fleet_history_projections_expose_the_client_request_id() {
         for resource in ["fleet-service-records", "fleet-inspections"] {
             let entry = registry_get(resource).expect("fleet history must be registered");

@@ -16,6 +16,13 @@ import { apiFetch, fetchQueryList, type QueryRows, rqBigIntKey } from "../http"
 import { withCompanyScope } from "@lumiere/erp-shared/org-scoped"
 import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
 import { scalarToU64 as toScalarU64 } from "@lumiere/erp-shared/u64"
+import type { CanonicalRecordRef } from "./operation-effect"
+import {
+  resolveTimesheetBillingEffect,
+  resolveTimesheetStatusEffects,
+  type TimesheetValidationStatus,
+} from "./project-timesheet-effects"
+import { resolveSubscriptionInvoiceMove } from "./subscription-invoice-run"
 import { stbTimestampFromDate } from "@lumiere/erp-shared/stb-timestamp"
 import type {
   HrResource,
@@ -515,6 +522,29 @@ export function useAssignTaskUsers(organizationId: bigint) {
   })
 }
 
+/**
+ * COV-10: read the batch back from `timesheets` (projects `validation_status` and the
+ * billing link) and require every id to be in the expected status — all-or-nothing.
+ */
+async function readTimesheetStatusEffects(
+  organizationId: bigint,
+  companyId: bigint | number | string | null,
+  timesheetIds: readonly (string | number | bigint)[],
+  expected: TimesheetValidationStatus,
+  failure: string,
+): Promise<CanonicalRecordRef[]> {
+  const rows = await fetchQueryList("/api/query/timesheets", "Failed to read timesheets")
+  const effects = resolveTimesheetStatusEffects(
+    rows,
+    organizationId,
+    companyId != null ? toScalarU64(companyId) : null,
+    timesheetIds.map((id) => toScalarU64(id)),
+    expected,
+  )
+  if (!effects) throw new Error(failure)
+  return effects
+}
+
 export type ValidateTimesheetsInput = {
   companyId: bigint | number | string | null
   timesheetIds: (string | number | bigint)[]
@@ -526,7 +556,7 @@ export type ValidateTimesheetsInput = {
 
 export function useValidateTimesheets(organizationId: bigint) {
   const qc = useQueryClient()
-  return useMutation<void, Error, ValidateTimesheetsInput>({
+  return useMutation<CanonicalRecordRef[], Error, ValidateTimesheetsInput>({
     mutationFn: async ({
       timesheetIds,
       companyId,
@@ -551,7 +581,14 @@ export function useValidateTimesheets(organizationId: bigint) {
               : null,
         }, "ValidateTimesheetsParams") })
       const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error('Failed to validate timesheets')
+      if (!r.ok) throw new Error(await parseCallErrorProjects(r))
+      return readTimesheetStatusEffects(
+        organizationId,
+        companyId,
+        timesheetIds,
+        "validated",
+        "Timesheets did not read back as validated",
+      )
     },
     onSuccess: () => invalidateTimesheetQueues(qc, organizationId),
   })
@@ -565,7 +602,7 @@ export type RejectTimesheetsInput = {
 
 export function useRejectTimesheets(organizationId: bigint) {
   const qc = useQueryClient()
-  return useMutation<void, Error, RejectTimesheetsInput>({
+  return useMutation<CanonicalRecordRef[], Error, RejectTimesheetsInput>({
     mutationFn: async ({ timesheetIds, companyId, reason }) => {
       const { urlPath, init } = stdbBffCommandPost("reject_timesheets", { params: stdbParamsToJson({
           companyId: companyId != null ? toScalarU64(companyId) : null,
@@ -573,7 +610,14 @@ export function useRejectTimesheets(organizationId: bigint) {
           reason,
         }, "RejectTimesheetsParams") })
       const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error('Failed to reject timesheets')
+      if (!r.ok) throw new Error(await parseCallErrorProjects(r))
+      return readTimesheetStatusEffects(
+        organizationId,
+        companyId,
+        timesheetIds,
+        "rejected",
+        "Timesheets did not read back as rejected",
+      )
     },
     onSuccess: () => invalidateTimesheetQueues(qc, organizationId),
   })
@@ -615,7 +659,7 @@ export type BillTimesheetsInput = {
 
 export function useBillTimesheets(organizationId: bigint) {
   const qc = useQueryClient()
-  return useMutation<void, Error, BillTimesheetsInput>({
+  return useMutation<CanonicalRecordRef, Error, BillTimesheetsInput>({
     mutationFn: async ({
       timesheetIds,
       companyId,
@@ -643,7 +687,25 @@ export function useBillTimesheets(organizationId: bigint) {
           }, "BillTimesheetsParams") })
 
       const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error('Failed to bill timesheets')
+      if (!r.ok) throw new Error(await parseCallErrorProjects(r))
+      // The handoff: every billed timesheet's own `timesheet_invoice_id` names the one
+      // invoice, which must read back as a move in the same organization and company.
+      const scopedCompanyId = toScalarU64(companyId)
+      const invoiceId = resolveTimesheetBillingEffect(
+        await fetchQueryList("/api/query/timesheets", "Failed to read timesheets"),
+        organizationId,
+        scopedCompanyId,
+        timesheetIds.map((id) => toScalarU64(id)),
+      )
+      if (invoiceId == null) throw new Error("Timesheets did not read back as billed to one invoice")
+      const invoice = resolveSubscriptionInvoiceMove(
+        await fetchQueryList("/api/query/account-moves", "Failed to read the timesheet invoice"),
+        organizationId,
+        scopedCompanyId,
+        invoiceId,
+      )
+      if (!invoice) throw new Error("The timesheet invoice did not read back")
+      return invoice
     },
     onSuccess: () => {
       invalidateTimesheetQueues(qc, organizationId)
