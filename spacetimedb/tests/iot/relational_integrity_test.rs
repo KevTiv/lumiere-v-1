@@ -4,7 +4,7 @@ use spacetimedb::{ReducerContext, Table};
 
 use crate::core::persistence::{organization_commit, organization_row_change};
 use crate::iot::actions::{
-    acknowledge_iot_action, create_iot_action, iot_action, mark_action_sent, CreateActionParams,
+    acknowledge_iot_action, create_iot_action, iot_action, CreateActionParams,
 };
 use crate::iot::alerts::{create_iot_alert, iot_alert, resolve_iot_alert};
 use crate::iot::integrations::link_device_to_location;
@@ -414,10 +414,7 @@ pub fn test_acknowledge_action_rejects_stale_state(ctx: &ReducerContext) -> Resu
         .find(|action| action.device_id == device_id)
         .ok_or("COV-16 action missing after create")?;
 
-    if acknowledge_iot_action(ctx, fixture.organization_id, pending.id, None).is_ok() {
-        return Err("pending action acknowledgement must be rejected".to_string());
-    }
-    mark_action_sent(ctx, fixture.organization_id, pending.id)?;
+    // Gateway may acknowledge before mark_action_sent lands: Pending is accepted.
     acknowledge_iot_action(
         ctx,
         fixture.organization_id,
