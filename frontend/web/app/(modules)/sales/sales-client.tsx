@@ -198,6 +198,8 @@ import { useReturnOrderWorkflow } from '@lumiere/query-hooks/hooks/return-order-
 import { useSaleOrderLineWorkflow } from '@lumiere/query-hooks/hooks/sale-order-line-workflow';
 import { usePickingWorkflow } from '@lumiere/query-hooks/hooks/picking-workflow';
 import { useModuleFilters } from '@/hooks/use-module-filters';
+import { OrderHandoffLinks } from '@/components/order-handoff-links';
+import { orderHandoffs } from '@lumiere/query-hooks/hooks/order-to-cash';
 import { downloadDocumentPdf } from '@lumiere/query-hooks/hooks/templates';
 import { useCreateDocument } from '@lumiere/query-hooks/hooks/documents';
 import { archiveRenderedPdfAsDocument } from '@/lib/archive-document-pdf';
@@ -1142,9 +1144,30 @@ function SalesClientLoaded({
             );
           },
         },
+        {
+          // COV-25: link the order straight to the deliveries and invoices it generated.
+          id: 'handoffs',
+          label: t('sales.order.handoffs', { defaultValue: 'Deliveries & invoices' }),
+          content: (record) => {
+            const orderId = BigInt(String(record.id ?? 0));
+            return (
+              <div className="p-4" data-testid="sale-order-handoffs">
+                <OrderHandoffLinks
+                  testIdPrefix="sale-order-handoff"
+                  handoffs={orderHandoffs(
+                    orderId,
+                    { organizationId: orgId, companyId: operatingCompanyId },
+                    stockPickings as Record<string, unknown>[],
+                    accountMoves as unknown as Record<string, unknown>[],
+                  )}
+                />
+              </div>
+            );
+          },
+        },
       ],
     };
-  }, [t, orderLines, partnerLabelById]);
+  }, [t, orderLines, partnerLabelById, orgId, operatingCompanyId, stockPickings, accountMoves]);
 
   const pickingBatchFormConfig = useMemo(() => newPickingBatchForm(t), [t]);
 
