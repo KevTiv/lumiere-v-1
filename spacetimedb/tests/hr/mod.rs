@@ -27,6 +27,8 @@ pub fn run_hr_wave_a_test(ctx: &ReducerContext) -> Result<(), String> {
         .map_err(|e| format!("offboarding_gate: {e}"))?;
     wave_a_test::test_offboarding_override_audit(ctx)
         .map_err(|e| format!("offboarding_override: {e}"))?;
+    wave_a_test::test_payslip_csv_import_is_idempotent_by_content(ctx)
+        .map_err(|e| format!("payslip_csv_idempotent: {e}"))?;
     Ok(())
 }
 

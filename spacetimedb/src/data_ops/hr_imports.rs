@@ -4,7 +4,10 @@
 use spacetimedb::{ReducerContext, Table};
 
 use crate::data_ops::helpers::*;
-use crate::data_ops::import_tracker::{begin_import_job, finish_import_job, record_import_error};
+use crate::data_ops::import_tracker::{
+    begin_identified_import_job, begin_import_job, find_committed_import, finish_import_job,
+    import_content_sha256, record_import_error,
+};
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 use crate::hr::contracts::{hr_contract, HrContract};
 use crate::hr::employees::{
@@ -698,8 +701,27 @@ pub fn import_hr_payslip_csv(
     csv_data: String,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "hr_payroll", "create")?;
+    // Idempotent by content: re-committing a file that already imported rows is a
+    // no-op, so a retried or replayed request never duplicates payslips.
+    let content_sha256 = import_content_sha256("hr_payslip", &csv_data);
+    if let Some(committed) =
+        find_committed_import(ctx, organization_id, "hr_payslip", &content_sha256)
+    {
+        log::info!(
+            "Import hr_payslip: content already committed by job_id={}, skipping",
+            committed.id
+        );
+        return Ok(());
+    }
     let (headers, rows) = parse_csv(&csv_data)?;
-    let job = begin_import_job(ctx, organization_id, "hr_payslip", None, rows.len() as u32);
+    let job = begin_identified_import_job(
+        ctx,
+        organization_id,
+        "hr_payslip",
+        None,
+        rows.len() as u32,
+        &content_sha256,
+    );
     let mut imported = 0u32;
     let mut errors = 0u32;
 

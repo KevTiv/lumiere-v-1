@@ -2,7 +2,8 @@
 
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { stdbBffCommandPost } from "@lumiere/stdb/commands"
-import { apiFetch, rqBigIntKey } from "../../http"
+import { apiFetch, fetchQueryList, rqBigIntKey } from "../../http"
+import { importContentSha256, resolveCommittedImportJob, type ImportJobEffect } from "../import-job-effect"
 import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
 import { responseErrorMessage as parseCallError } from "@lumiere/api-client/response-error"
 
@@ -133,17 +134,30 @@ function useImportHrSalaryRuleCsv(organizationId: bigint) {
   })
 }
 
+/**
+ * COV-22: committing a payslip CSV is idempotent by content (the server records the
+ * file's SHA-256 on its import job), so the effect is read back by that identity: the
+ * one import job that committed this content, never the newest job.
+ */
 function useImportHrPayslipCsv(organizationId: bigint) {
   const qc = useQueryClient()
-  return useMutation({
-    mutationFn: async (csvData: string) => {
+  return useMutation<ImportJobEffect, Error, string>({
+    mutationFn: async (csvData) => {
+      const contentSha256 = await importContentSha256("hr_payslip", csvData)
       const { urlPath, init } = stdbBffCommandPost("import_hr_payslip_csv", { csvData: csvData })
 
       const res = await apiFetch(urlPath, init)
       if (!res.ok) throw new Error(await parseCallError(res))
+      const jobs = await fetchQueryList("/api/query/import-jobs", "Failed to read import job")
+      const effect = resolveCommittedImportJob(jobs, organizationId, "hr_payslip", contentSha256)
+      if (!effect) throw new Error("Payslip import committed no rows; check the import errors")
+      return effect
     },
     onSuccess: () =>
-      void qc.invalidateQueries({ queryKey: ['hr-payslips', rqBigIntKey(organizationId)] }),
+      void Promise.all([
+        qc.invalidateQueries({ queryKey: ['hr-payslips', rqBigIntKey(organizationId)] }),
+        qc.invalidateQueries({ queryKey: ['import-jobs', rqBigIntKey(organizationId)] }),
+      ]),
   })
 }
 

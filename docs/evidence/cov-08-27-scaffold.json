@@ -182,10 +182,10 @@
         "record_fleet_inspection"
       ],
       "resources": "fleet-service-records, fleet-inspections, fleet-vehicles",
-      "contract_release_required": "maybe",
-      "contract_note": "maybe: projections expose vehicle_id, company_id and serviced_at/inspected_at, so a natural-key readback needs no release; the record params carry no idempotency key, so replay-safety needs a params change (contract release)",
+      "contract_release_required": "yes",
+      "contract_note": "release (registry projection): both record reducers already take `client_request_id`; `fleet-service-records` and `fleet-inspections` now project it so a recorded row is read back exactly",
       "prerequisites": "Confirm the route decision: `/fleet` exists on main, so COV-15 certifies `/fleet` and treats `/map` as a view.",
-      "status": "SCAFFOLDED",
+      "status": "IMPLEMENTED — contract release and runtime acceptance pending",
       "status_doc": "docs/plan/erp-cov15-fleet-service-cost-status.md",
       "spec": "frontend/web/tests/e2e/cov15-fleet-service-cost.spec.ts",
       "hooks": [
@@ -333,7 +333,7 @@
       "contract_release_required": "no",
       "contract_note": "none for form publish (`form-configs` exposes config_version, is_active); import idempotency proof depends on BASE-04's SHA-256 import identity",
       "prerequisites": "BASE-04 landed.",
-      "status": "SCAFFOLDED",
+      "status": "PARTIAL — payslip import commit idempotent and form publish read back; form-publish stale replay not rejected",
       "status_doc": "docs/plan/erp-cov22-form-publish-import-commit-status.md",
       "spec": "frontend/web/tests/e2e/cov22-form-publish-import-commit.spec.ts",
       "hooks": [

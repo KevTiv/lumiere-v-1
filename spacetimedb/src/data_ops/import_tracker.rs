@@ -3,6 +3,7 @@
 /// Every import reducer creates an ImportJob at the start, logs row-level
 /// errors into ImportJobError, records created row IDs into ImportJobRecord,
 /// and calls finish_import_job at the end.
+use sha2::{Digest, Sha256};
 use spacetimedb::{reducer, Identity, ReducerContext, Table, Timestamp};
 
 use crate::crm::contacts::{contact, Contact};
@@ -82,6 +83,17 @@ pub fn begin_import_job(
     file_name: Option<String>,
     total_rows: u32,
 ) -> ImportJob {
+    insert_import_job(ctx, organization_id, table_name, file_name, total_rows, None)
+}
+
+fn insert_import_job(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    table_name: &str,
+    file_name: Option<String>,
+    total_rows: u32,
+    metadata: Option<String>,
+) -> ImportJob {
     ctx.db.import_job().insert(ImportJob {
         id: 0,
         organization_id,
@@ -95,8 +107,76 @@ pub fn begin_import_job(
         completed_at: None,
         create_uid: ctx.sender(),
         create_date: ctx.timestamp,
-        metadata: None,
+        metadata,
     })
+}
+
+/// Content identity of one import: SHA-256 over the table name and the CSV with a
+/// leading BOM removed, CRLF normalized to LF and surrounding ASCII whitespace
+/// trimmed (the same normalization the browser applies before reading it back).
+pub fn import_content_sha256(table_name: &str, csv_data: &str) -> String {
+    let normalized = csv_data.trim_start_matches('\u{feff}').replace("\r\n", "\n");
+    let mut hasher = Sha256::new();
+    hasher.update(table_name.as_bytes());
+    hasher.update(b"\n");
+    hasher.update(
+        normalized
+            .trim_matches(|c: char| matches!(c, ' ' | '\t' | '\r' | '\n'))
+            .as_bytes(),
+    );
+    hex::encode(hasher.finalize())
+}
+
+fn import_metadata(content_sha256: &str) -> String {
+    serde_json::json!({ "content_sha256": content_sha256 }).to_string()
+}
+
+/// The job that already committed rows for this content, if any. A job that
+/// imported nothing (all rows rejected) or was rolled back does not block a retry.
+pub fn find_committed_import(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    table_name: &str,
+    content_sha256: &str,
+) -> Option<ImportJob> {
+    ctx.db
+        .import_job()
+        .import_job_by_org()
+        .filter(&organization_id)
+        .find(|job| {
+            job.table_name == table_name
+                && job.imported_rows > 0
+                && job.status != "rolled_back"
+                && job
+                    .metadata
+                    .as_deref()
+                    .and_then(|raw| serde_json::from_str::<serde_json::Value>(raw).ok())
+                    .and_then(|value| {
+                        value
+                            .get("content_sha256")
+                            .and_then(|hash| hash.as_str().map(|hash| hash == content_sha256))
+                    })
+                    .unwrap_or(false)
+        })
+}
+
+/// Like [`begin_import_job`], recording the content identity for replay detection.
+pub fn begin_identified_import_job(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    table_name: &str,
+    file_name: Option<String>,
+    total_rows: u32,
+    content_sha256: &str,
+) -> ImportJob {
+    insert_import_job(
+        ctx,
+        organization_id,
+        table_name,
+        file_name,
+        total_rows,
+        Some(import_metadata(content_sha256)),
+    )
 }
 
 /// Record a single row-level error into ImportJobError.

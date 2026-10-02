@@ -4,6 +4,8 @@ use std::time::Duration;
 use spacetimedb::{ReducerContext, Table};
 
 use crate::core::organization::{company, create_company, CreateCompanyParams};
+use crate::data_ops::hr_imports::import_hr_payslip_csv;
+use crate::data_ops::import_tracker::{import_content_sha256, import_job};
 use crate::core::persistence::{organization_commit, organization_row_change};
 use crate::hr::contracts::{create_contract, hr_contract, CreateContractParams};
 use crate::hr::employees::{
@@ -724,6 +726,89 @@ pub fn test_offboarding_override_audit(ctx: &ReducerContext) -> Result<(), Strin
             override_reason: Some("HR director waiver".to_string()),
         },
     )?;
+    Ok(())
+}
+
+/// COV-22: committing the same payslip CSV again (replay, CRLF or trailing-whitespace
+/// variant) is a no-op; changed content imports; an import that committed nothing
+/// does not block its retry.
+pub fn test_payslip_csv_import_is_idempotent_by_content(
+    ctx: &ReducerContext,
+) -> Result<(), String> {
+    ensure_test_superuser(ctx)?;
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let org = fixture.organization_id;
+    let employee_id = seed_employee(ctx, &fixture, "CSV Slip Employee")?;
+    let struct_id = seed_payroll_structure(ctx, &fixture)?;
+    let csv = format!(
+        "employee_id,struct_id,company_id,name,basic_wage\n{employee_id},{struct_id},{},CSV Idem Slip,1000\n",
+        fixture.company_id
+    );
+    let slips = |ctx: &ReducerContext| {
+        ctx.db
+            .hr_payslip()
+            .iter()
+            .filter(|row| row.organization_id == org && row.name.starts_with("CSV Idem Slip"))
+            .count()
+    };
+    let jobs = |ctx: &ReducerContext| {
+        ctx.db
+            .import_job()
+            .iter()
+            .filter(|job| job.organization_id == org && job.table_name == "hr_payslip")
+            .collect::<Vec<_>>()
+    };
+
+    import_hr_payslip_csv(ctx, org, csv.clone())?;
+    if slips(ctx) != 1 {
+        return Err(format!("expected 1 payslip, got {}", slips(ctx)));
+    }
+    let first = jobs(ctx);
+    if first.len() != 1 || first[0].status != "success" || first[0].imported_rows != 1 {
+        return Err("first import must record one successful job".into());
+    }
+    // Shared test vector: the browser derives the same identity to read the job back
+    // (`import-job-effect.test.ts`).
+    if import_content_sha256("hr_payslip", "\u{feff}  a,b\r\n1,2\r\n\n")
+        != "8c47e084bb26445ec05f1b7fc32f63590ac6c43a920e07e8965e9f4315a3a2c3"
+    {
+        return Err("import content identity drifted from the shared test vector".into());
+    }
+    let identity = import_content_sha256("hr_payslip", &csv);
+    if !first[0]
+        .metadata
+        .as_deref()
+        .is_some_and(|metadata| metadata.contains(&identity))
+    {
+        return Err("import job must record the content SHA-256".into());
+    }
+
+    for replay in [
+        csv.clone(),
+        csv.replace('\n', "\r\n"),
+        format!("{csv}\n\n"),
+    ] {
+        import_hr_payslip_csv(ctx, org, replay)?;
+    }
+    if slips(ctx) != 1 || jobs(ctx).len() != 1 {
+        return Err("replayed content must not import again or add a job".into());
+    }
+
+    import_hr_payslip_csv(ctx, org, csv.replace("CSV Idem Slip", "CSV Idem Slip 2"))?;
+    if slips(ctx) != 2 || jobs(ctx).len() != 2 {
+        return Err("changed content must import as its own job".into());
+    }
+
+    let rejected = format!(
+        "employee_id,struct_id,company_id,name\n0,0,{},CSV Idem Rejected\n",
+        fixture.company_id
+    );
+    import_hr_payslip_csv(ctx, org, rejected.clone())?;
+    import_hr_payslip_csv(ctx, org, rejected)?;
+    let all = jobs(ctx);
+    if all.len() != 4 || all.iter().filter(|job| job.status == "failed").count() != 2 {
+        return Err("an import that committed nothing must not block its retry".into());
+    }
     Ok(())
 }
 

@@ -39,7 +39,7 @@ Slices marked `yes` pull that pin commit before continuing.
 | COV-12 | One recurring invoice run | `generate_subscription_invoice`, `pay_subscription_invoice` | yes | [status](./erp-cov12-subscription-invoice-run-status.md) |
 | COV-13 | Session order/payment → close | `close_pos_session` | yes | [status](./erp-cov13-pos-session-close-status.md) |
 | COV-14 | Ticket assign → close → reopen | `assign_ticket`, `close_ticket`, `reopen_ticket` | yes | [status](./erp-cov14-helpdesk-ticket-lifecycle-status.md) |
-| COV-15 | Vehicle service/inspection cost history | `record_fleet_service`, `record_fleet_inspection` | maybe | [status](./erp-cov15-fleet-service-cost-status.md) |
+| COV-15 | Vehicle service/inspection cost history | `record_fleet_service`, `record_fleet_inspection` | yes | [status](./erp-cov15-fleet-service-cost-status.md) |
 | COV-16 | Device alert → acknowledge/resolve | `acknowledge_iot_action`, `resolve_iot_alert` | no | [status](./erp-cov16-iot-alert-resolve-status.md) |
 | COV-17 | Versioned review → approve → convert to sale order | `approve_proposal`, `convert_proposal_to_sale_order` | no | [status](./erp-cov17-proposal-approve-convert-status.md) |
 | COV-18 | Upload/version → lock/unlock one document | `lock_document`, `unlock_document` | yes | [status](./erp-cov18-document-lock-version-status.md) |

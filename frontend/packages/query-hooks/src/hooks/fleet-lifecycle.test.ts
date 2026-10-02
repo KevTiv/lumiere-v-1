@@ -23,7 +23,7 @@ const RESOURCE_REGISTRY = JSON.parse(
     ),
     "utf8",
   ),
-) as Record<string, { table?: string; mandatory?: string[] }>
+) as Record<string, { table?: string; mandatory?: string[]; default_restricted?: string[] }>
 
 function exportedFunction(name: string): string {
   const start = HOOK_SOURCE.indexOf(`export function ${name}(`)
@@ -58,6 +58,20 @@ describe("Fleet lifecycle query and command contracts", () => {
         entry.mandatory?.includes("company_id"),
         `${resource} must retain company_id for company isolation`,
       )
+    }
+  })
+
+  it("projects the request id and keys the exact-effect readback of both history writes", () => {
+    for (const resource of ["fleet-service-records", "fleet-inspections"]) {
+      assert.ok(
+        RESOURCE_REGISTRY[resource]?.default_restricted?.includes("client_request_id"),
+        `${resource} must project client_request_id for exact readback`,
+      )
+    }
+    for (const hook of ["useRecordFleetService", "useRecordFleetInspection"]) {
+      const source = exportedFunction(hook)
+      assert.match(source, /requestIdOrNew\(input\.clientRequestId\)/, `${hook} must key its readback`)
+      assert.match(source, /readFleetHistoryEffect\(/, `${hook} must read its effect back`)
     }
   })
 

@@ -1,5 +1,13 @@
 import { toCreateRoleConfigParams } from "@lumiere/erp-shared/forms-create-params"
 import {
+  formConfigVersion,
+  nextFormConfigVersion,
+  resolvePublishedFormConfig,
+  type FormConfigKey,
+} from "@lumiere/query-hooks/hooks/form-config-publish"
+import type { CanonicalRecordRef } from "@lumiere/query-hooks/hooks/operation-effect"
+import { stdbBrowserQuery } from "@lumiere/stdb/browser-http"
+import {
   publishFormConfiguration,
   type CreateFormFieldParams as StdbCreateFormFieldParams,
   type PublishFormConfigurationParams,
@@ -46,12 +54,23 @@ export function registryFieldToStdbParams(field: RegistryFieldParams): StdbCreat
 /**
  * Publishes the in-app registry default as form_config + fields + roles in one
  * SpacetimeDB transaction (avoids partial client-side create/field loops).
+ *
+ * COV-22: the publish is read back from `form-configs` for the exact
+ * (organization, module, form): the version must be the one read before plus one
+ * (1 for a first publish). Any other version means the publish did not apply once
+ * or raced another publish, and is reported instead of assumed.
  */
 export async function pushRegistryFormToDatabase(
   organizationId: number,
   formEntry: FormRegistryEntry,
-): Promise<void> {
+): Promise<CanonicalRecordRef> {
   const def = formEntry.defaultConfig()
+  const key: FormConfigKey = {
+    organizationId: BigInt(organizationId),
+    moduleId: def.moduleId,
+    formId: def.formId,
+  }
+  const expectedVersion = nextFormConfigVersion(formConfigVersion(await stdbBrowserQuery("form-configs"), key))
 
   const roleConfigs = Object.values(def.roleConfigs ?? {})
     .map((rc) =>
@@ -77,4 +96,12 @@ export async function pushRegistryFormToDatabase(
   }
 
   await publishFormConfiguration(BigInt(organizationId), params)
+
+  const published = resolvePublishedFormConfig(await stdbBrowserQuery("form-configs"), key, expectedVersion)
+  if (!published) {
+    throw new Error(
+      `Form ${def.moduleId}:${def.formId} did not read back at version ${expectedVersion}; it may have been published concurrently`,
+    )
+  }
+  return published
 }

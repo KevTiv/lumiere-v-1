@@ -10,7 +10,15 @@ import {
 } from "@lumiere/stdb/stdb-params-json"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 
+import { responseErrorMessage } from "@lumiere/api-client/response-error"
+
 import { apiFetch, fetchQueryList, rqBigIntKey, type QueryRows } from "../http"
+import {
+  fleetInspectionOutcomeFromInput,
+  resolveFleetHistoryEffect,
+  type FleetHistoryExpectation,
+} from "./fleet-history"
+import type { CanonicalRecordRef } from "./operation-effect"
 import type { FleetVehicle } from "@lumiere/stdb/types"
 
 // ── Reads ────────────────────────────────────────────────────────────────────
@@ -182,6 +190,27 @@ export function useUpdateFleetVehicleDriver(organizationId: bigint, companyId?: 
   })
 }
 
+/**
+ * COV-15: a history write is read back by its client request id (unique per
+ * organization and company), never as the vehicle's newest row. Callers that
+ * send no id get one here, because a keyless write can not be read back exactly
+ * and is not replay-safe.
+ */
+async function readFleetHistoryEffect(
+  expected: FleetHistoryExpectation,
+  failure: string,
+): Promise<CanonicalRecordRef> {
+  const rows = await fetchQueryList(fleetHistoryPath(expected.resource), `Failed to read ${expected.resource}`)
+  const effect = resolveFleetHistoryEffect(rows, expected)
+  if (!effect) throw new Error(failure)
+  return effect
+}
+
+function requestIdOrNew(value?: string): string {
+  const trimmed = value?.trim()
+  return trimmed ? trimmed : crypto.randomUUID()
+}
+
 export interface RecordFleetServiceInput {
   vehicleId: bigint
   serviceTypeId: bigint
@@ -194,9 +223,10 @@ export interface RecordFleetServiceInput {
 
 export function useRecordFleetService(organizationId: bigint, companyId?: bigint) {
   const qc = useQueryClient()
-  return useMutation<void, Error, RecordFleetServiceInput>({
+  return useMutation<CanonicalRecordRef, Error, RecordFleetServiceInput>({
     mutationFn: async (input) => {
       const scopedCompanyId = requireCompany(companyId, "record fleet service")
+      const clientRequestId = requestIdOrNew(input.clientRequestId)
       const { urlPath, init } = stdbBffCommandPost("record_fleet_service", {
         companyId: scopedCompanyId,
         params: stdbParamsToJson({
@@ -206,11 +236,22 @@ export function useRecordFleetService(organizationId: bigint, companyId?: bigint
           odometerKm: optionalNumber(input.odometerKm),
           provider: optionalText(input.provider),
           notes: optionalText(input.notes),
-          clientRequestId: optionalText(input.clientRequestId),
+          clientRequestId: optionalText(clientRequestId),
         }),
       })
       const response = await apiFetch(urlPath, init)
-      if (!response.ok) throw new Error("Failed to record fleet service")
+      if (!response.ok) throw new Error(await responseErrorMessage(response))
+      return readFleetHistoryEffect(
+        {
+          resource: "fleet-service-records",
+          organizationId,
+          companyId: scopedCompanyId,
+          vehicleId: input.vehicleId,
+          serviceTypeId: input.serviceTypeId,
+          clientRequestId,
+        },
+        "Fleet service did not read back",
+      )
     },
     onSuccess: () => invalidateFleetLifecycleQueries(qc, organizationId),
   })
@@ -230,9 +271,10 @@ export interface RecordFleetInspectionInput {
 
 export function useRecordFleetInspection(organizationId: bigint, companyId?: bigint) {
   const qc = useQueryClient()
-  return useMutation<void, Error, RecordFleetInspectionInput>({
+  return useMutation<CanonicalRecordRef, Error, RecordFleetInspectionInput>({
     mutationFn: async (input) => {
       const scopedCompanyId = requireCompany(companyId, "record a fleet inspection")
+      const clientRequestId = requestIdOrNew(input.clientRequestId)
       const { urlPath, init } = stdbBffCommandPost("record_fleet_inspection", {
         companyId: scopedCompanyId,
         params: stdbParamsToJson({
@@ -242,11 +284,22 @@ export function useRecordFleetInspection(organizationId: bigint, companyId?: big
           outcome: input.outcome,
           odometerKm: optionalNumber(input.odometerKm),
           notes: optionalText(input.notes),
-          clientRequestId: optionalText(input.clientRequestId),
+          clientRequestId: optionalText(clientRequestId),
         }),
       })
       const response = await apiFetch(urlPath, init)
-      if (!response.ok) throw new Error("Failed to record fleet inspection")
+      if (!response.ok) throw new Error(await responseErrorMessage(response))
+      return readFleetHistoryEffect(
+        {
+          resource: "fleet-inspections",
+          organizationId,
+          companyId: scopedCompanyId,
+          vehicleId: input.vehicleId,
+          outcome: fleetInspectionOutcomeFromInput(input.outcome),
+          clientRequestId,
+        },
+        "Fleet inspection did not read back",
+      )
     },
     onSuccess: () => invalidateFleetLifecycleQueries(qc, organizationId),
   })

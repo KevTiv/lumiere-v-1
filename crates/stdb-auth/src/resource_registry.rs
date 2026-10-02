@@ -81,6 +81,20 @@ mod tests {
     }
 
     #[test]
+    fn fleet_history_projections_expose_the_client_request_id() {
+        for resource in ["fleet-service-records", "fleet-inspections"] {
+            let entry = registry_get(resource).expect("fleet history must be registered");
+            assert!(
+                entry
+                    .default_restricted
+                    .iter()
+                    .any(|field| field == "client_request_id"),
+                "{resource} projection must expose client_request_id"
+            );
+        }
+    }
+
+    #[test]
     fn subscription_billing_run_projection_exposes_invoice_move_identity() {
         let entry = registry_get("subscription-billing-runs")
             .expect("subscription billing runs must be registered");
