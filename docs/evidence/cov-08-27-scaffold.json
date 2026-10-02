@@ -372,9 +372,9 @@
       "contract_release_required": "no",
       "contract_note": "none expected (composition over existing resources)",
       "prerequisites": "COV-04, COV-06, COV-08, COV-19 accepted.",
-      "status": "SCAFFOLDED",
+      "status": "IMPLEMENTED — read-only order-to-cash exceptions (runtime acceptance pending)",
       "status_doc": "docs/plan/erp-cov24-distributor-workspace-status.md",
-      "spec": null,
+      "spec": "frontend/web/tests/e2e/cov24-distributor-workspace.spec.ts",
       "hooks": []
     },
     {
@@ -388,9 +388,9 @@
       "contract_release_required": "no",
       "contract_note": "per link: none when the relation is already projected; release otherwise",
       "prerequisites": "COV-03..24 candidates.",
-      "status": "SCAFFOLDED",
+      "status": "IMPLEMENTED for link 1 (sale order → delivery and invoice); further links one per PR",
       "status_doc": "docs/plan/erp-cov25-cross-module-links-status.md",
-      "spec": null,
+      "spec": "frontend/web/tests/e2e/cov25-order-handoff-links.spec.ts",
       "hooks": []
     },
     {

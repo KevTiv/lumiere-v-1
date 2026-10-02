@@ -5,8 +5,10 @@ import Link from "next/link"
 import { BoxesIcon, CircleDollarSignIcon, PackageIcon, ReceiptTextIcon, StoreIcon } from "lucide-react"
 
 import { useErpSession } from "@lumiere/erp-session"
-import { useAccountMoves, usePaymentTransactions } from "@lumiere/query-hooks/hooks/accounting"
-import { useStockQuants } from "@lumiere/query-hooks/hooks/inventory"
+import { useAccountMoves, usePartnerCreditHolds, usePaymentTransactions } from "@lumiere/query-hooks/hooks/accounting"
+import { useContacts } from "@lumiere/query-hooks/hooks/crm"
+import { useStockPickings, useStockQuants } from "@lumiere/query-hooks/hooks/inventory"
+import { orderToCashRows, type OrderToCashException, type OrderToCashStage } from "@lumiere/query-hooks/hooks/order-to-cash"
 import { useCompanyVerticalPacks, useSetCompanyVerticalPack } from "@lumiere/query-hooks/hooks/organization-company"
 import { useSaleOrders } from "@lumiere/query-hooks/hooks/sales"
 import { useDefaultOperatingCompanyBigInt } from "@lumiere/query-hooks/hooks/use-operating-company"
@@ -14,6 +16,7 @@ import { MissingOrganization } from "@lumiere/ui"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { OrderHandoffLinks, orderHref } from "@/components/order-handoff-links"
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
 
 type Row = Record<string, unknown>
@@ -29,6 +32,21 @@ function sameCompany(row: Row, companyId: bigint): boolean {
   return value != null && String(value) === String(companyId)
 }
 
+const STAGE_LABELS: Record<OrderToCashStage, string> = {
+  to_deliver: "To deliver",
+  to_invoice: "To invoice",
+  to_collect: "To collect",
+  settled: "Settled",
+}
+
+const EXCEPTION_LABELS: Record<OrderToCashException, string> = {
+  no_delivery: "No delivery",
+  delivery_incomplete: "Delivery incomplete",
+  not_invoiced: "Not invoiced",
+  collection_overdue: "Overdue",
+  credit_hold: "Credit hold",
+}
+
 export function DistributorClient() {
   const { organizationId } = useErpSession()
   const companyId = useDefaultOperatingCompanyBigInt(organizationId ?? 0) ?? 0n
@@ -39,6 +57,9 @@ export function DistributorClient() {
   const { data: orders = [] } = useSaleOrders(organization)
   const { data: transactions = [] } = usePaymentTransactions(organization)
   const { data: moves = [] } = useAccountMoves(organization)
+  const { data: pickings = [] } = useStockPickings(organization)
+  const { data: holds = [] } = usePartnerCreditHolds(organization)
+  const { data: contacts = [] } = useContacts(organization)
 
   const enabled = useMemo(
     () => packs.data?.some((pack) => pack.packKey === "distributor_wholesaler" && pack.enabled) ?? false,
@@ -52,6 +73,25 @@ export function DistributorClient() {
     const openInvoices = (moves as Row[]).filter((row) => sameCompany(row, companyId) && enumName(row.state) === "Posted" && Number(row.amountResidual ?? row.amount_residual ?? 0) > 0).length
     return { lowStock, openOrders, postedPayments, openInvoices }
   }, [companyId, moves, orders, quants, transactions])
+
+  // COV-24: order → delivery → invoice → collection exceptions, composed from the canonical
+  // order, picking, invoice and credit-hold records by exact relation (no workspace-local state).
+  const exceptionRows = useMemo(
+    () =>
+      orderToCashRows(
+        orders as Row[],
+        pickings as unknown as Row[],
+        moves as Row[],
+        holds as unknown as Row[],
+        { organizationId: organization, companyId },
+        BigInt(Date.now()) * 1000n,
+      ).filter((row) => row.exceptions.length > 0),
+    [companyId, holds, moves, orders, organization, pickings],
+  )
+  const partnerNames = useMemo(
+    () => new Map((contacts as Row[]).map((contact) => [String(contact.id), String(contact.name ?? contact.displayName ?? contact.display_name ?? "")])),
+    [contacts],
+  )
 
   if (!organizationId) return <MissingOrganization />
   const toggle = () => void setPack.mutate({ companyId, organizationId, packKey: "distributor_wholesaler", enabled: !enabled })
@@ -74,6 +114,29 @@ export function DistributorClient() {
         <MetricCard title="Posted payments" value={metrics.postedPayments} description="Operational payments available for reconciliation." icon={<BoxesIcon />} href="/accounting" />
         <MetricCard title="Low-stock alerts" value={metrics.lowStock} description="Current quants at or below zero, or marked outdated." icon={<PackageIcon />} href="/reports" destructive={metrics.lowStock > 0} />
       </div> : null}
+      {enabled ? <Card data-testid="distributor-o2c">
+        <CardHeader>
+          <CardTitle>Order-to-cash exceptions</CardTitle>
+          <CardDescription>Confirmed orders with a missing or unfinished delivery, no invoice, an overdue balance, or a customer on credit hold. Each links to the record that owns it.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {exceptionRows.length === 0
+            ? <p className="text-sm text-muted-foreground" data-testid="distributor-o2c-empty">No order-to-cash exceptions.</p>
+            : <table className="w-full text-sm" data-testid="distributor-o2c-table">
+              <thead><tr className="text-left text-muted-foreground"><th className="pb-2">Order</th><th className="pb-2">Customer</th><th className="pb-2">Stage</th><th className="pb-2">Exceptions</th><th className="pb-2">Deliveries &amp; invoices</th><th className="pb-2 text-right">Open balance</th></tr></thead>
+              <tbody>
+                {exceptionRows.map((row) => <tr key={String(row.orderId)} className="border-t align-top" data-testid={`distributor-o2c-row-${row.orderId}`}>
+                  <td className="py-2"><Link className="underline underline-offset-2" href={orderHref(row.orderId)} data-testid={`distributor-o2c-order-${row.orderId}`}>{row.reference || `Order #${row.orderId}`}</Link></td>
+                  <td className="py-2">{row.partnerId == null ? "—" : partnerNames.get(String(row.partnerId)) || `Partner ${row.partnerId}`}</td>
+                  <td className="py-2" data-testid={`distributor-o2c-stage-${row.orderId}`}>{STAGE_LABELS[row.stage]}</td>
+                  <td className="py-2"><div className="flex flex-wrap gap-1">{row.exceptions.map((exception) => <Badge key={exception} variant="destructive" data-testid={`distributor-o2c-exception-${row.orderId}-${exception}`}>{EXCEPTION_LABELS[exception]}</Badge>)}</div></td>
+                  <td className="py-2"><OrderHandoffLinks handoffs={row.handoffs} testIdPrefix={`distributor-o2c-${row.orderId}`} /></td>
+                  <td className="py-2 text-right">{row.openBalance > 0 ? row.openBalance.toFixed(2) : "—"}</td>
+                </tr>)}
+              </tbody>
+            </table>}
+        </CardContent>
+      </Card> : null}
     </main>
   )
 }
