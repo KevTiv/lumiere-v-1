@@ -12,6 +12,13 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { invalidateStdbQueryResources } from './stdb';
 
 import { apiFetch, fetchQueryList, type QueryRows, rqBigIntKey } from '../http';
+import { responseErrorMessage } from '@lumiere/api-client/response-error';
+import type { CanonicalRecordRef } from './operation-effect';
+import {
+  resolveSubscriptionInvoiceMove,
+  resolveSubscriptionInvoiceRunEffect,
+  subscriptionBillingRunKey,
+} from './subscription-invoice-run';
 import { withCompanyScope } from '@lumiere/erp-shared/org-scoped';
 import { stdbParamsToJson } from '@lumiere/erp-shared/stdb-params-json';
 import { type ClearablePatch } from '@lumiere/erp-shared/accounting-create-params';
@@ -287,15 +294,23 @@ export function useGenerateSubscriptionInvoice(
 ) {
   const qc = useQueryClient();
   return useMutation<
-    void,
+    CanonicalRecordRef,
     Error,
     { subscriptionId: bigint; params: GenerateSubscriptionInvoiceParams }
   >({
     mutationFn: async ({ subscriptionId, params }) => {
+      const scopedCompanyId = requireSelectedCompany(companyId);
+      // The run key is unique per (subscription, period); resolve the effect by
+      // it, never by the newest invoice. The reducer is idempotent on it, so a
+      // retry reads back the same run instead of billing twice.
+      const billingRunKey = subscriptionBillingRunKey(subscriptionId, params);
+      if (billingRunKey == null) {
+        throw new Error('Billing run key or invoice date is required to generate an invoice');
+      }
       const { urlPath, init } = stdbBffCommandPost(
         'generate_subscription_invoice',
         {
-          companyId: requireSelectedCompany(companyId),
+          companyId: scopedCompanyId,
           subscriptionId: subscriptionId,
           params: stdbParamsToJson(
             params as object,
@@ -304,7 +319,31 @@ export function useGenerateSubscriptionInvoice(
         },
       );
       const r = await apiFetch(urlPath, init);
-      if (!r.ok) throw new Error('Failed to generate subscription invoice');
+      if (!r.ok) throw new Error(await responseErrorMessage(r));
+      const runs = await fetchQueryList(
+        '/api/query/subscription-billing-runs',
+        'Failed to read subscription billing run',
+      );
+      const run = resolveSubscriptionInvoiceRunEffect(
+        runs,
+        organizationId,
+        scopedCompanyId,
+        subscriptionId,
+        billingRunKey,
+      );
+      if (!run) throw new Error('Subscription invoice run did not read back');
+      const moves = await fetchQueryList(
+        '/api/query/account-moves',
+        'Failed to read subscription invoice',
+      );
+      const invoice = resolveSubscriptionInvoiceMove(
+        moves,
+        organizationId,
+        scopedCompanyId,
+        run.invoiceMoveId,
+      );
+      if (!invoice) throw new Error('Subscription invoice did not read back');
+      return invoice;
     },
     onSuccess: async () => {
       invalidateStdbQueryResources(qc, organizationId, [

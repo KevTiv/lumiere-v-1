@@ -56,6 +56,8 @@ pub fn run_expenses_wave_a_test(ctx: &ReducerContext) -> Result<(), String> {
         .map_err(|e| format!("company_isolation_on_post: {e}"))?;
     wave_a_test::test_submit_rejects_missing_receipt(ctx)
         .map_err(|e| format!("submit_rejects_missing_receipt: {e}"))?;
+    wave_a_test::test_expense_sheet_replays_leave_row_unchanged(ctx)
+        .map_err(|e| format!("expense_sheet_replays_leave_row_unchanged: {e}"))?;
     Ok(())
 }
 

@@ -36,7 +36,7 @@ Slices marked `yes` pull that pin commit before continuing.
 | COV-09 | Leave request submit → approve/refuse | `submit_leave`, `approve_leave`, `refuse_leave` | no | [status](./erp-cov09-hr-leave-approval-status.md) |
 | COV-10 | Approved timesheet validation → billing handoff | `validate_timesheets`, `reject_timesheets` | maybe | [status](./erp-cov10-project-timesheet-validation-status.md) |
 | COV-11 | Expense sheet submit → approve → post → reimburse | `submit_expense_sheet`, `approve_expense_sheet`, `post_expense_sheet`, `create_expense_reimbursement_payment` | no | [status](./erp-cov11-expense-sheet-lifecycle-status.md) |
-| COV-12 | One recurring invoice run | `generate_subscription_invoice`, `pay_subscription_invoice` | maybe | [status](./erp-cov12-subscription-invoice-run-status.md) |
+| COV-12 | One recurring invoice run | `generate_subscription_invoice`, `pay_subscription_invoice` | yes | [status](./erp-cov12-subscription-invoice-run-status.md) |
 | COV-13 | Session order/payment → close | `close_pos_session` | yes | [status](./erp-cov13-pos-session-close-status.md) |
 | COV-14 | Ticket assign → close → reopen | `assign_ticket`, `close_ticket`, `reopen_ticket` | yes | [status](./erp-cov14-helpdesk-ticket-lifecycle-status.md) |
 | COV-15 | Vehicle service/inspection cost history | `record_fleet_service`, `record_fleet_inspection` | maybe | [status](./erp-cov15-fleet-service-cost-status.md) |

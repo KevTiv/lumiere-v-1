@@ -5633,7 +5633,11 @@
     "default_restricted": [
       "billing_run_key",
       "company_id",
-      "subscription_id"
+      "subscription_id",
+      "invoice_move_id",
+      "invoice_date",
+      "period_start",
+      "period_end"
     ],
     "mandatory": [
       "id",

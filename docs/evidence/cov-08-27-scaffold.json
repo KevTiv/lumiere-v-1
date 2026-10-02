@@ -101,7 +101,7 @@
       "contract_release_required": "no",
       "contract_note": "none: `expense-sheets` exposes state, account_move_id and reimbursement_move_id, so post and reimburse resolve through the sheet's own relations",
       "prerequisites": "Receipt attachment path (COV-18 documents) for the receipt-backed variant.",
-      "status": "SCAFFOLDED",
+      "status": "IMPLEMENTED — runtime acceptance pending",
       "status_doc": "docs/plan/erp-cov11-expense-sheet-lifecycle-status.md",
       "spec": "frontend/web/tests/e2e/cov11-expense-sheet-lifecycle.spec.ts",
       "hooks": [
@@ -119,10 +119,10 @@
         "pay_subscription_invoice"
       ],
       "resources": "subscriptions, account-moves",
-      "contract_release_required": "maybe",
-      "contract_note": "maybe: the run itself resolves through `subscription-billing-runs.billing_run_key` (no release); proving the exact invoice move needs the run/subscription\u2192move relation (`invoice_ids` is not on the `subscriptions` projection, `invoice_origin` is not on `account-moves`)",
+      "contract_release_required": "yes",
+      "contract_note": "release (registry projection): `subscription-billing-runs` now projects invoice_move_id, invoice_date, period_start and period_end, so the run (unique billing_run_key) resolves its own invoice move; `release-contracts.yml` publishes it on push",
       "prerequisites": "Scheduler replay proof needs the recurring job id exposed or a native test.",
-      "status": "SCAFFOLDED",
+      "status": "PARTIAL — invoice run implemented (contract release and runtime acceptance pending); invoice payment pending",
       "status_doc": "docs/plan/erp-cov12-subscription-invoice-run-status.md",
       "spec": "frontend/web/tests/e2e/cov12-subscription-invoice-run.spec.ts",
       "hooks": [

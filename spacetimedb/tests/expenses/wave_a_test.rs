@@ -474,6 +474,157 @@ pub fn test_expense_lifecycle_posts_move(ctx: &ReducerContext) -> Result<(), Str
     Ok(())
 }
 
+/// COV-11: every lifecycle replay is rejected (or is an idempotent no-op for the
+/// same client request id) and leaves the sheet row and posted moves unchanged;
+/// a partial reimbursement attaches a move without finishing the sheet.
+pub fn test_expense_sheet_replays_leave_row_unchanged(ctx: &ReducerContext) -> Result<(), String> {
+    ensure_test_superuser(ctx)?;
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    seed_caller_manager(ctx, &fixture)?;
+    let accounts = seed_accounts(ctx, &fixture)?;
+    let employee_id = seed_employee(ctx, &fixture, "Traveler Replay")?;
+    let sheet_id = create_draft_sheet(ctx, &fixture, employee_id, "Trip Replay")?;
+    let line_id = create_line_with_receipt(ctx, &fixture, employee_id, "Flight Replay", 120.0)?;
+    submit_expense(ctx, fixture.organization_id, line_id, sheet_id)?;
+    let org = fixture.organization_id;
+    let sheet = |ctx: &ReducerContext| {
+        ctx.db
+            .expense_sheet()
+            .id()
+            .find(&sheet_id)
+            .ok_or_else(|| "sheet missing".to_string())
+    };
+    let move_count = |ctx: &ReducerContext| ctx.db.account_move().iter().count();
+    let post_params = |request: &str| PostExpenseSheetParams {
+        journal_id: accounts.journal_id,
+        payable_account_id: accounts.payable_id,
+        default_expense_account_id: accounts.expense_id,
+        default_tax_account_id: None,
+        card_liability_account_id: None,
+        advance_account_id: None,
+        fx_fee_account_id: None,
+        fx_fee_amount: None,
+        accounting_date: ctx.timestamp,
+        client_request_id: Some(request.into()),
+    };
+    let reimburse_params = |request: &str, amount: Option<f64>| CreateExpenseReimbursementParams {
+        journal_id: accounts.journal_id,
+        liquidity_account_id: accounts.liquidity_id,
+        payable_account_id: accounts.payable_id,
+        payment_date: ctx.timestamp,
+        amount,
+        client_request_id: Some(request.into()),
+    };
+
+    // Submit, then replay.
+    submit_expense_sheet(ctx, org, sheet_id)?;
+    let submitted = sheet(ctx)?;
+    if submitted.state != ExpenseSheetState::Submitted {
+        return Err(format!("expected Submitted, got {:?}", submitted.state));
+    }
+    if submit_expense_sheet(ctx, org, sheet_id).is_ok() {
+        return Err("replayed submit must be rejected".into());
+    }
+    if sheet(ctx)? != submitted {
+        return Err("rejected submit replay changed the sheet".into());
+    }
+
+    // Posting and reimbursing a Submitted sheet is rejected.
+    if post_expense_sheet(ctx, org, sheet_id, post_params("early-post")).is_ok() {
+        return Err("post before approval must be rejected".into());
+    }
+    if create_expense_reimbursement_payment(ctx, org, sheet_id, reimburse_params("early-reim", None))
+        .is_ok()
+    {
+        return Err("reimbursement before posting must be rejected".into());
+    }
+    if sheet(ctx)? != submitted {
+        return Err("rejected early post/reimburse changed the sheet".into());
+    }
+
+    // Approve, then replay.
+    approve_expense_sheet_impl(ctx, org, sheet_id, true)?;
+    let approved = sheet(ctx)?;
+    if approved.state != ExpenseSheetState::Approved {
+        return Err(format!("expected Approved, got {:?}", approved.state));
+    }
+    if approve_expense_sheet_impl(ctx, org, sheet_id, true).is_ok() {
+        return Err("replayed approve must be rejected".into());
+    }
+    if submit_expense_sheet(ctx, org, sheet_id).is_ok() {
+        return Err("submit of an approved sheet must be rejected".into());
+    }
+    if sheet(ctx)? != approved {
+        return Err("rejected approve/submit replay changed the sheet".into());
+    }
+
+    // Post, then replay with the same and with a different client request id.
+    post_expense_sheet(ctx, org, sheet_id, post_params("post-r1"))?;
+    let posted = sheet(ctx)?;
+    if posted.state != ExpenseSheetState::Posted {
+        return Err(format!("expected Posted, got {:?}", posted.state));
+    }
+    let posting_move = posted.account_move_id.ok_or("posting move unset")?;
+    let moves_after_post = move_count(ctx);
+    post_expense_sheet(ctx, org, sheet_id, post_params("post-r1"))?;
+    if sheet(ctx)? != posted || move_count(ctx) != moves_after_post {
+        return Err("idempotent post replay changed the sheet or created a move".into());
+    }
+    if post_expense_sheet(ctx, org, sheet_id, post_params("post-r2")).is_ok() {
+        return Err("post replay with a new request id must be rejected".into());
+    }
+    if approve_expense_sheet_impl(ctx, org, sheet_id, true).is_ok() {
+        return Err("approve of a posted sheet must be rejected".into());
+    }
+    if sheet(ctx)? != posted || move_count(ctx) != moves_after_post {
+        return Err("rejected post replay changed the sheet or created a move".into());
+    }
+
+    // Partial reimbursement: the sheet stays Posted and gains its own move.
+    create_expense_reimbursement_payment(ctx, org, sheet_id, reimburse_params("reim-r1", Some(50.0)))?;
+    let partial = sheet(ctx)?;
+    if partial.state != ExpenseSheetState::Posted {
+        return Err(format!("expected Posted after partial, got {:?}", partial.state));
+    }
+    let first_reimbursement = partial
+        .reimbursement_move_id
+        .ok_or("partial reimbursement move unset")?;
+    if first_reimbursement == posting_move || partial.account_move_id != Some(posting_move) {
+        return Err("reimbursement must be a distinct move from the posting move".into());
+    }
+    let moves_after_partial = move_count(ctx);
+    create_expense_reimbursement_payment(ctx, org, sheet_id, reimburse_params("reim-r1", Some(50.0)))?;
+    if sheet(ctx)? != partial || move_count(ctx) != moves_after_partial {
+        return Err("idempotent reimbursement replay changed the sheet or created a move".into());
+    }
+
+    // Final reimbursement clears the residual with a new, different move.
+    create_expense_reimbursement_payment(ctx, org, sheet_id, reimburse_params("reim-r2", None))?;
+    let done = sheet(ctx)?;
+    if done.state != ExpenseSheetState::Done {
+        return Err(format!("expected Done, got {:?}", done.state));
+    }
+    let final_reimbursement = done
+        .reimbursement_move_id
+        .ok_or("final reimbursement move unset")?;
+    if final_reimbursement == first_reimbursement || final_reimbursement == posting_move {
+        return Err("final reimbursement must be a new move".into());
+    }
+    let moves_after_done = move_count(ctx);
+    if create_expense_reimbursement_payment(ctx, org, sheet_id, reimburse_params("reim-r3", None))
+        .is_ok()
+    {
+        return Err("reimbursement of a Done sheet must be rejected".into());
+    }
+    if post_expense_sheet(ctx, org, sheet_id, post_params("post-r3")).is_ok() {
+        return Err("post of a Done sheet must be rejected".into());
+    }
+    if sheet(ctx)? != done || move_count(ctx) != moves_after_done {
+        return Err("rejected replays on a Done sheet changed it or created a move".into());
+    }
+    Ok(())
+}
+
 pub fn test_refuse_only_from_submitted(ctx: &ReducerContext) -> Result<(), String> {
     ensure_test_superuser(ctx)?;
     let fixture = OrgFixture::seed_minimal(ctx)?;

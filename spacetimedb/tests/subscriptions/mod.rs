@@ -19,6 +19,8 @@ pub fn run_subscriptions_wave_a_test(ctx: &ReducerContext) -> Result<(), String>
         .map_err(|e| format!("subscription_rejects_deleted_contact: {e}"))?;
     wave_a_test::test_subscription_rejects_cross_org_partner(ctx)
         .map_err(|e| format!("subscription_rejects_cross_org_partner: {e}"))?;
+    wave_a_test::test_subscription_invoice_run_replay_is_exact(ctx)
+        .map_err(|e| format!("subscription_invoice_run_replay_is_exact: {e}"))?;
     Ok(())
 }
 

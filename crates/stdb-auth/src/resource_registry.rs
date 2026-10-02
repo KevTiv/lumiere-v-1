@@ -81,6 +81,25 @@ mod tests {
     }
 
     #[test]
+    fn subscription_billing_run_projection_exposes_invoice_move_identity() {
+        let entry = registry_get("subscription-billing-runs")
+            .expect("subscription billing runs must be registered");
+
+        for field in [
+            "billing_run_key",
+            "company_id",
+            "subscription_id",
+            "invoice_move_id",
+            "invoice_date",
+        ] {
+            assert!(
+                entry.default_restricted.iter().any(|f| f == field),
+                "subscription-billing-runs projection must expose {field}"
+            );
+        }
+    }
+
+    #[test]
     fn stock_move_projection_exposes_purchase_receipt_line_identity() {
         let entry = registry_get("stock-moves").expect("stock moves must be registered");
 

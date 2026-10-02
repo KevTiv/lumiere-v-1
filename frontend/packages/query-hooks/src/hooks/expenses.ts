@@ -25,7 +25,15 @@ import type {
 import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 
+import { scalarToU64 as toScalarU64 } from "@lumiere/erp-shared/u64"
+
 import { apiFetch, fetchQueryList, type QueryRows, rqBigIntKey } from "../http"
+import {
+  expenseSheetReimbursementMoveId,
+  resolveExpenseSheetEffect,
+  type ExpenseSheetEffectExpectation,
+} from "./expense-sheet-lifecycle"
+import type { CanonicalRecordRef } from "./operation-effect"
 import {
   finalizeCreateExpenseParams,
   finalizeCreateExpenseSheetParams,
@@ -303,13 +311,34 @@ export function useSubmitExpense(organizationId: bigint) {
   })
 }
 
+// ── COV-11 exact sheet effects ────────────────────────────────────────────────
+
+/**
+ * Scoped by organization and exact sheet id: the reducers enforce the sheet's
+ * organization and a sheet may belong to any of its companies, so the caller's
+ * default operating company is not a valid readback key.
+ */
+async function readExpenseSheetEffect(
+  organizationId: bigint,
+  sheetId: bigint,
+  expected: ExpenseSheetEffectExpectation,
+  failure: string,
+): Promise<CanonicalRecordRef> {
+  const rows = await fetchQueryList("/api/query/expense-sheets", "Failed to read expense sheet")
+  const effect = resolveExpenseSheetEffect(rows, organizationId, undefined, sheetId, expected)
+  if (!effect) throw new Error(failure)
+  return effect
+}
+
 export function useSubmitExpenseSheet(organizationId: bigint) {
   const qc = useQueryClient()
-  return useMutation({
-    mutationFn: async (sheetId: string | number | bigint) => {
-      const { urlPath, init } = stdbBffCommandPost("submit_expense_sheet", { sheetId: sheetId })
+  return useMutation<CanonicalRecordRef, Error, string | number | bigint>({
+    mutationFn: async (sheetId) => {
+      const id = toScalarU64(sheetId)
+      const { urlPath, init } = stdbBffCommandPost("submit_expense_sheet", { sheetId: id })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallErrorExpenses(r, 'Failed to submit expense sheet'))
+      return readExpenseSheetEffect(organizationId, id, { states: ["Submitted"] }, "Expense sheet did not read back as submitted")
     },
     onSuccess: async () => {
       const k = rqBigIntKey(organizationId)
@@ -325,11 +354,13 @@ export function useSubmitExpenseSheet(organizationId: bigint) {
 
 export function useApproveExpenseSheet(organizationId: bigint) {
   const qc = useQueryClient()
-  return useMutation({
-    mutationFn: async (sheetId: string | number | bigint) => {
-      const { urlPath, init } = stdbBffCommandPost("approve_expense_sheet", { sheetId: sheetId })
+  return useMutation<CanonicalRecordRef, Error, string | number | bigint>({
+    mutationFn: async (sheetId) => {
+      const id = toScalarU64(sheetId)
+      const { urlPath, init } = stdbBffCommandPost("approve_expense_sheet", { sheetId: id })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallErrorExpenses(r, 'Failed to approve expense sheet'))
+      return readExpenseSheetEffect(organizationId, id, { states: ["Approved"] }, "Expense sheet approval did not take effect; it may be waiting on a workflow review")
     },
     onSuccess: async () => {
       const k = rqBigIntKey(organizationId)
@@ -369,17 +400,23 @@ export function useRefuseExpenseSheet(organizationId: bigint) {
 
 export function usePostExpenseSheet(organizationId: bigint) {
   const qc = useQueryClient()
-  return useMutation({
-    mutationFn: async ({
-      sheetId,
-      params,
-    }: {
-      sheetId: string | number | bigint
-      params: Partial<PostExpenseSheetParams>
-    }) => {
-      const { urlPath, init } = stdbBffCommandPost("post_expense_sheet", { sheetId: sheetId, params: stdbParamsToJson(params, "PostExpenseSheetParams") })
+  return useMutation<
+    CanonicalRecordRef,
+    Error,
+    { sheetId: string | number | bigint; params: Partial<PostExpenseSheetParams> }
+  >({
+    mutationFn: async ({ sheetId, params }) => {
+      const id = toScalarU64(sheetId)
+      const { urlPath, init } = stdbBffCommandPost("post_expense_sheet", { sheetId: id, params: stdbParamsToJson(params, "PostExpenseSheetParams") })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallErrorExpenses(r, 'Failed to post expense sheet'))
+      // Resolve through the sheet's own posting move, never the newest account move.
+      return readExpenseSheetEffect(
+        organizationId,
+        id,
+        { states: ["Posted"], requirePostingMove: true },
+        "Expense sheet did not read back as posted with its journal entry",
+      )
     },
     onSuccess: async () => {
       await Promise.all([
@@ -392,17 +429,29 @@ export function usePostExpenseSheet(organizationId: bigint) {
 
 export function useCreateExpenseReimbursementPayment(organizationId: bigint) {
   const qc = useQueryClient()
-  return useMutation({
-    mutationFn: async ({
-      sheetId,
-      params,
-    }: {
-      sheetId: string | number | bigint
-      params: Partial<CreateExpenseReimbursementParams>
-    }) => {
-      const { urlPath, init } = stdbBffCommandPost("create_expense_reimbursement_payment", { sheetId: sheetId, params: stdbParamsToJson(params, "CreateExpenseReimbursementParams") })
+  return useMutation<
+    CanonicalRecordRef,
+    Error,
+    { sheetId: string | number | bigint; params: Partial<CreateExpenseReimbursementParams> }
+  >({
+    mutationFn: async ({ sheetId, params }) => {
+      const id = toScalarU64(sheetId)
+      // A partial reimbursement leaves the sheet Posted with a move already
+      // attached, so remember it and require the move to change.
+      const before = expenseSheetReimbursementMoveId(
+        await fetchQueryList("/api/query/expense-sheets", "Failed to read expense sheet"),
+        organizationId,
+        id,
+      )
+      const { urlPath, init } = stdbBffCommandPost("create_expense_reimbursement_payment", { sheetId: id, params: stdbParamsToJson(params, "CreateExpenseReimbursementParams") })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallErrorExpenses(r, 'Failed to reimburse expense sheet'))
+      return readExpenseSheetEffect(
+        organizationId,
+        id,
+        { states: ["Posted", "Done"], requirePostingMove: true, reimbursementMoveChangedFrom: before },
+        "Expense sheet did not read back with a new reimbursement entry",
+      )
     },
     onSuccess: async () => {
       const k = rqBigIntKey(organizationId)

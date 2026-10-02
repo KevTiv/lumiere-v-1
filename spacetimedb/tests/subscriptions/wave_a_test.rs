@@ -493,6 +493,114 @@ pub fn test_subscription_create_lines_bill_idempotent(ctx: &ReducerContext) -> R
     Ok(())
 }
 
+/// COV-12: a replayed invoice run (same default billing-run key) resolves the
+/// same run row and invoice move, never bills twice, and the default key is
+/// `sub:{subscription id}:period:{invoice date seconds}` — the key the client
+/// uses to read the run back.
+pub fn test_subscription_invoice_run_replay_is_exact(ctx: &ReducerContext) -> Result<(), String> {
+    ensure_test_superuser(ctx)?;
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let org_id = fixture.organization_id;
+    let company_id = fixture.company_id;
+    let journal_id = seed_journal(ctx, &fixture)?;
+    let plan_id = seed_plan(ctx, &fixture, journal_id)?;
+    let so_id = seed_confirmed_so(ctx, &fixture, "SUB-COV12-SO")?;
+    let sub_id = create_draft_subscription(ctx, &fixture, plan_id, so_id)?;
+    activate_subscription(ctx, org_id, company_id, sub_id)?;
+    let income_id = *fixture
+        .chart_account_ids
+        .get(chart_keys::REVENUE)
+        .ok_or("missing REVENUE")?;
+    let ar_id = *fixture
+        .chart_account_ids
+        .get(chart_keys::AR)
+        .ok_or("missing AR")?;
+    let params = || GenerateSubscriptionInvoiceParams {
+        invoice_date: ctx.timestamp,
+        billing_run_key: None,
+        journal_id: Some(journal_id),
+        income_account_id: income_id,
+        receivable_account_id: ar_id,
+        tax_account_id: None,
+    };
+    let runs = |ctx: &ReducerContext| {
+        ctx.db
+            .subscription_billing_run()
+            .iter()
+            .filter(|r| r.organization_id == org_id && r.subscription_id == sub_id)
+            .collect::<Vec<_>>()
+    };
+
+    generate_subscription_invoice(ctx, org_id, company_id, sub_id, params())?;
+    let first = runs(ctx);
+    if first.len() != 1 {
+        return Err(format!("expected 1 billing run, got {}", first.len()));
+    }
+    let run = &first[0];
+    let secs = ctx
+        .timestamp
+        .to_duration_since_unix_epoch()
+        .unwrap_or_default()
+        .as_secs();
+    if run.billing_run_key != format!("sub:{sub_id}:period:{secs}") {
+        return Err(format!("unexpected default run key {}", run.billing_run_key));
+    }
+    if run.company_id != company_id || run.invoice_move_id == 0 {
+        return Err("billing run must carry its company and invoice move".into());
+    }
+    let move_before = ctx
+        .db
+        .account_move()
+        .id()
+        .find(&run.invoice_move_id)
+        .ok_or("invoice move missing")?;
+    if move_before.move_type != MoveType::OutInvoice || move_before.company_id != company_id {
+        return Err("run must point at its company's OutInvoice".into());
+    }
+    let sub_before = ctx
+        .db
+        .subscription()
+        .id()
+        .find(&sub_id)
+        .ok_or("sub after bill")?;
+
+    // Scheduler/operator retry with the same period: no second run, move or count.
+    generate_subscription_invoice(ctx, org_id, company_id, sub_id, params())?;
+    let again = runs(ctx);
+    if again.len() != 1
+        || again[0].id != run.id
+        || again[0].invoice_move_id != run.invoice_move_id
+        || again[0].period_start != run.period_start
+        || again[0].period_end != run.period_end
+    {
+        return Err("replayed run changed or duplicated the billing run".into());
+    }
+    let move_after = ctx
+        .db
+        .account_move()
+        .id()
+        .find(&run.invoice_move_id)
+        .ok_or("invoice move missing after replay")?;
+    if move_after.amount_total != move_before.amount_total
+        || move_after.state != move_before.state
+        || move_after.amount_residual != move_before.amount_residual
+    {
+        return Err("replayed run changed the invoice move".into());
+    }
+    let sub_after = ctx
+        .db
+        .subscription()
+        .id()
+        .find(&sub_id)
+        .ok_or("sub after replay")?;
+    if sub_after.invoice_count != sub_before.invoice_count
+        || sub_after.invoice_ids != sub_before.invoice_ids
+    {
+        return Err("replayed run changed the subscription invoice links".into());
+    }
+    Ok(())
+}
+
 pub fn test_company_isolation_on_activate(ctx: &ReducerContext) -> Result<(), String> {
     ensure_test_superuser(ctx)?;
     let fixture_a = OrgFixture::seed_minimal(ctx)?;

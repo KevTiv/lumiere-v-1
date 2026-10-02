@@ -101,6 +101,7 @@ pub struct HrExpense {
     index(accessor = sheet_by_state, btree(columns = [state])),
     index(accessor = sheet_by_org, btree(columns = [organization_id]))
 )]
+#[derive(PartialEq)]
 pub struct HrExpenseSheet {
     #[primary_key]
     #[auto_inc]
