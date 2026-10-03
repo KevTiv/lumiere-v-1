@@ -167,7 +167,9 @@ help-legacy:
 	@echo "  check-c2-commit-coverage Validate registered C2 reducer commit coverage (required by check-codegen)"
 	@echo "  check-reducer-contracts-drift  CI-safe live-schema drift check for reducer-manifest.json"
 	@echo "  check-contracts-drift   Full bindings/manifests drift check (requires spacetime CLI)"
-	@echo "  publish-contracts VERSION=x.y.z  Transitional release: publish canonical IR plus current generated packages"
+	@echo "  contracts-module-ci     Build the reusable fast-profile contracts WASM"
+	@echo "  publish-contracts VERSION=x.y.z  Generate, verify, and publish canonical IR plus generated packages"
+	@echo "  publish-contracts-prepared VERSION=x.y.z  Publish an already generated and verified staging tree"
 	@echo ""
 	@echo "  --- Cloud ---"
 	@echo "  publish-cloud        Publish to maincloud"
@@ -1236,8 +1238,24 @@ check-contracts-drift: clean-contracts-live-staging generate-presentation-schema
 
 # Publish freshly generated bindings + manifests to lumiere-contracts as a new
 # tagged release, then print the Cargo.toml dependency line to bump.
+contracts-module-ci:
+	mkdir -p .ci
+	@cargo build --quiet --manifest-path spacetimedb/Cargo.toml --target wasm32-unknown-unknown --profile ci-contracts \
+		2>.ci/contracts-module-build.log || \
+		(cat .ci/contracts-module-build.log >&2; exit 1)
+	cp spacetimedb/target/wasm32-unknown-unknown/ci-contracts/lumiere_v1.wasm .ci/contracts-module.wasm
+
 publish-contracts: generate-presentation-contracts schema-snapshot generate-stdb-rust-sdk generate-stdb-ts-sdk codegen
 	@if [ -z "$(VERSION)" ]; then echo "usage: make publish-contracts VERSION=x.y.z" >&2; exit 1; fi
+	bash scripts/publish-contracts.sh "$(VERSION)"
+
+# Release CI performs two complete generation passes before this target. Keep
+# publication separate so a verified staging tree is not regenerated a third
+# time. This target is also useful after an explicit local `make check-codegen`.
+publish-contracts-prepared:
+	@if [ -z "$(VERSION)" ]; then echo "usage: make publish-contracts-prepared VERSION=x.y.z" >&2; exit 1; fi
+	@test -f .contracts-staging/ir/lumiere-contract-ir-v2.json || \
+		(echo "prepared contracts staging is missing; run make check-codegen first" >&2; exit 1)
 	bash scripts/publish-contracts.sh "$(VERSION)"
 
 # Presentation wire contracts are generated from crates/presentation-core Rust
