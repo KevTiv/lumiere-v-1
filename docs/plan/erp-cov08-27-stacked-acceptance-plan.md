@@ -5,6 +5,11 @@ status page with the contract disposition, D/A/O/E proof, stale/retry and denial
 effect preservation, and an explicit accepted or pending statement. A track is
 not promoted to U5 merely because one bounded slice is accepted.
 
+The 2026-10-03 same-head run for COV-05 through COV-10 and COV-13 through
+COV-25 is recorded in
+[`cov05-10-cov13-25-runtime-acceptance-2026-10-03.md`](../evidence/cov05-10-cov13-25-runtime-acceptance-2026-10-03.md).
+The run completed but is not accepted: all 43 requested browser tests failed.
+
 ## Required PR completion card
 
 1. **Boundary:** one named operator transition and its canonical effect.
