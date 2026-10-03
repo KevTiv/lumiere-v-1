@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "audited_base": "77f94ef5ea0bd912863acb0a7d12884ad3ad8ecb",
+  "audited_base": "f6071f67a17e9973ff7bbd95cf26510aa5d80d32",
   "status": "acceptance-candidate",
   "scope": "Current-tree classification and downstream ownership; runtime repair remains with the named implementation packages.",
   "defects": [
@@ -24,156 +24,160 @@
     {
       "id": "COV-D02",
       "class": "heuristic-effect-correlation",
-      "status": "open",
+      "status": "resolved",
       "severity": "P0",
-      "launch_impact": "AI draft persistence can attach the wrong pending draft under concurrency or replay and therefore remains launch-blocking for governed draft execution.",
+      "launch_impact": "All governed AI draft paths now bind persistence and readback to a durable run-scoped request key and reject ambiguous mappings.",
       "affected_surfaces": ["AI action drafts", "governed action approval"],
       "owner": "GOV/CAP exact-effect owner",
       "downstream_packages": ["COH-02", "GOV/CAP", "COV-01-adoption"],
-      "closure_gate": "Persist and read back a stable request/effect identity; never select the highest pending reducer row.",
+      "closure_gate": "Keep durable organization/company/run/request identity, exact 0..1 readback, payload-bound replay, and the ban on zero-run or latest-row fallback.",
       "evidence": [
         {
           "path": "frontend/packages/query-hooks/src/hooks/ai-action-drafts.ts",
-          "markers": ["resolveLatestDraftId", ".sort((a, b) => Number(b.id) - Number(a.id))[0]"]
+          "markers": ["resolvePersistedActionDrafts", "Missing stable draft id", "Ambiguous stable draft id"]
+        },
+        {
+          "path": "ai-gateway/src/routes/actions.rs",
+          "markers": ["ai_spend::create_run_action_draft", "read exact action draft effect", "draft.draft_id = Some(request.draft_id)"]
+        },
+        {
+          "path": "ai-gateway/src/routes/action_draft_bridge.rs",
+          "markers": ["bridge_draft_request_key", "SpendReader::new(reader)", "read exact action draft effect failed"]
+        },
+        {
+          "path": "ai-gateway/src/tools/action_draft.rs",
+          "markers": ["require_durable_run_id", "create_run_correlated_draft", "action drafts require a durable run"]
         }
       ]
     },
     {
       "id": "COV-D03",
       "class": "ambiguous-empty-read-state",
-      "status": "open",
+      "status": "resolved",
       "severity": "P0",
-      "launch_impact": "Authentication, company scope, and admitted module SSR reads can render denied or unavailable data as a legitimate empty state.",
+      "launch_impact": "Critical T0 reads now preserve legitimate empty, denied, and unavailable states; optional compatibility reads remain fail-closed or client-refetched.",
       "affected_surfaces": ["application shell", "company scope", "first-org T0 module SSR", "Fleet map"],
       "owner": "UX shared resource-state owner + COV-26",
       "downstream_packages": ["UX-03", "COV-23", "COV-26"],
-      "closure_gate": "Every classified caller must adopt explicit ready/empty/denied/unavailable state or document a genuinely optional degraded-safe read.",
+      "closure_gate": "Critical reads must retain explicit ready/empty/denied/unavailable state; allow-empty use is limited to optional seeds or fail-closed checks.",
       "evidence": [
         {
-          "path": "frontend/packages/api-client/src/create-client.ts",
-          "markers": ["fetchQueryListAllowEmpty", "if (!r.ok) return []"]
+          "path": "frontend/packages/api-client/src/query-resource-state.ts",
+          "markers": ["export type QueryResourceState<Row>", "readonly status: \"denied\"", "readonly status: \"unavailable\""]
         },
         {
           "path": "frontend/web/lib/server-query.ts",
-          "markers": ["serverFetchQueryListAllowEmpty", "catch {", "return []"]
+          "markers": ["serverFetchQueryListsRequired", "requireServerQueryRows", "serverFetchQueryListState"]
         }
       ]
     },
     {
       "id": "COV-D04",
       "class": "degraded-runtime-form-dependency",
-      "status": "open",
+      "status": "resolved",
       "severity": "P0",
-      "launch_impact": "A runtime configuration failure can silently substitute a static form and still perform a consequential mutation.",
+      "launch_impact": "Runtime configuration failure now leaves the form inspectable but disables submission unless a caller explicitly opts into a classified static fallback.",
       "affected_surfaces": ["ModuleView forms", "CRM", "Sales", "Purchasing", "Accounting", "Messages"],
       "owner": "UX-07 + COV-22",
       "downstream_packages": ["UX-07", "COV-22"],
-      "closure_gate": "Critical forms must expose dependency failure and disable submission unless an explicitly classified degraded-safe mode exists.",
+      "closure_gate": "The fail-closed default and explicit use-static opt-in must remain; every opt-in requires degraded-safe classification.",
       "evidence": [
         {
           "path": "frontend/packages/ui/src/forms/runtime-form-modal.tsx",
-          "markers": ["config={error ? staticConfig : resolvedConfig}", "onSubmit={error ? onSubmit : handleSubmit}"]
+          "markers": ["runtimeConfigFailureMode = \"block\"", "submissionDisabled={submissionBlocked}", "onSubmit={submissionBlocked ? undefined"]
         }
       ]
     },
     {
       "id": "COV-D05",
       "class": "analytics-filter-truthfulness",
-      "status": "open",
+      "status": "resolved",
       "severity": "P0",
-      "launch_impact": "Malformed domains and unknown operators can broaden admitted report data while presenting plausible totals.",
+      "launch_impact": "Malformed domains, unknown operators, invalid sorts, aggregations, and chart types now produce an explicit invalid-definition state and block export.",
       "affected_surfaces": ["Reports stored dashboards", "report query builder", "dashboard exports"],
       "owner": "UX-08 + COV-20",
       "downstream_packages": ["UX-08", "COV-20"],
-      "closure_gate": "Malformed definitions and unsupported operators must yield an explicit invalid-definition state, never all rows or a truthy filter.",
+      "closure_gate": "Invalid stored definitions must fail closed, remain visible, and block export.",
       "evidence": [
         {
           "path": "frontend/packages/ui/src/lib/stored-dashboard-resolver.ts",
-          "markers": ["return true", "catch {", "return rows"]
+          "markers": ["invalid-definition", "The filter operator ${operator} is not supported.", "storedDashboardExportGate"]
         }
       ]
     },
     {
       "id": "COV-D06",
       "class": "analytics-completeness",
-      "status": "open",
+      "status": "resolved",
       "severity": "P0",
-      "launch_impact": "Rows without timestamps remain in bounded periods and missing measures become zero, allowing incomplete data to appear complete.",
+      "launch_impact": "Bounded periods and numeric measures now exclude incomplete rows, report rejected row counts, and block export as partial data.",
       "affected_surfaces": ["Reports stored dashboards", "KPI widgets", "chart aggregations", "dashboard exports"],
       "owner": "UX-08 + COV-20",
       "downstream_packages": ["UX-08", "COV-20"],
-      "closure_gate": "Each admitted metric must declare timestamp and measure completeness policy and surface rejected/incomplete rows.",
+      "closure_gate": "Missing timestamp and measure rows must stay excluded and explicitly partial.",
       "evidence": [
         {
           "path": "frontend/packages/ui/src/lib/stored-dashboard-resolver.ts",
-          "markers": ["if (ms == null) return true", "Number(rowField(row, field) ?? 0)"]
+          "markers": ["kind: \"missing-timestamp\"", "kind: \"missing-measure\"", "rejectedRows"]
         }
       ]
     },
     {
       "id": "COV-D07",
       "class": "partial-source-masking",
-      "status": "open",
+      "status": "resolved",
       "severity": "P0",
-      "launch_impact": "A failed dashboard source is indexed as an empty row set because the shared hook returns loading but no source error or partial-state contract.",
+      "launch_impact": "Per-source loading, ready, empty, denied, unavailable, and partial states now reach rendering, query building, and export gating.",
       "affected_surfaces": ["Reports stored dashboards", "report query builder", "dashboard exports"],
       "owner": "UX-08 + COV-20/COV-26",
       "downstream_packages": ["UX-08", "COV-20", "COV-26"],
-      "closure_gate": "The renderer and exporter must receive per-source ready/empty/denied/unavailable/partial state.",
+      "closure_gate": "The renderer, query builder, and exporter must preserve every per-source state.",
       "evidence": [
         {
           "path": "frontend/web/hooks/use-stored-dashboard-data-sources.ts",
-          "markers": ["queries[index]?.data ?? []", "return { dataSources, isLoading }"]
+          "markers": ["sourceStates: StoredDashboardSourceStates", "return { dataSources, sourceStates, isLoading }"]
         }
       ]
     },
     {
       "id": "COV-D08",
       "class": "test-only-operator-bypass",
-      "status": "open",
+      "status": "resolved",
       "severity": "P1",
-      "launch_impact": "Browser-named evidence can overstate operator readiness when the principal transition is performed through a reducer/BFF helper.",
+      "launch_impact": "The COV-00D ratchet now prevents API-driven or route-only evidence from proving a principal operator transition.",
       "affected_surfaces": ["CRM", "Sales", "Purchasing", "Inventory", "Manufacturing", "Accounting", "HR/Payroll", "Projects", "Expenses", "Documents", "Helpdesk", "IoT", "Proposals", "Workflows", "Distributor"],
       "owner": "owning COV-03..24 module + COV-27",
       "downstream_packages": ["COV-03..24", "COV-27"],
-      "closure_gate": "COV-00D must classify each principal transition; U4/U5 requires the actual operator action while setup-only helper use stays explicitly labeled.",
+      "closure_gate": "Every O item must retain an evidence role; U4/U5 and admitted surfaces require complete D/A/O/E and principal UI evidence.",
       "evidence": [
         {
-          "path": "frontend/web/tests/e2e/hr-wave-lifecycle.spec.ts",
-          "markers": ["callReducerBff", "create_payslip"]
+          "path": "scripts/validate-cov00d-evidence-matrix.py",
+          "markers": ["proven O requires ui-primary mode", "principal-operator-transition", "direct-BFF file cannot be sole proven operator evidence"]
         },
         {
-          "path": "frontend/web/tests/e2e/projects-wave-lifecycle.spec.ts",
-          "markers": ["callReducerBff"]
-        },
-        {
-          "path": "frontend/web/tests/e2e/iot-lifecycle.spec.ts",
-          "markers": ["callReducerBff"]
-        },
-        {
-          "path": "frontend/web/tests/e2e/proposals-lifecycle.spec.ts",
-          "markers": ["callReducerBff"]
+          "path": "docs/evidence/cov-00d-lifecycle-evidence.json",
+          "markers": ["operator_evidence_mode", "api-driven-transition", "partial-operator-transition"]
         }
       ]
     },
     {
       "id": "COV-D09",
       "class": "test-heuristic-effect-identity",
-      "status": "partially-resolved",
+      "status": "resolved",
       "severity": "P1",
-      "launch_impact": "CRM to Sales now rejects duplicate exact effects, but HR, P2P, accounting, manufacturing, and older certification helpers can still select newest/highest IDs.",
+      "launch_impact": "Current certification paths use exact producer-owned relations or unique request fields and reject duplicate 0..1 matches.",
       "affected_surfaces": ["HR/Payroll", "Sales", "Purchasing", "Accounting", "Manufacturing"],
       "owner": "COV-01 + owning module test owner",
       "downstream_packages": ["COV-01", "COV-04", "COV-05", "COV-07", "COV-08", "COV-09"],
-      "closure_gate": "Every 0..1 certification effect must use a stable relation and fail on multiple matches; latest-row helpers must be retired from certification paths.",
+      "closure_gate": "Every 0..1 certification effect must keep a stable relation and fail on multiple matches; newest/latest selection remains forbidden.",
       "evidence": [
         {
           "path": "frontend/web/tests/e2e/hr-wave-lifecycle.spec.ts",
-          "markers": [".sort((a, b) => Number(b.id) - Number(a.id))[0]?.id", "scalarQueryId(b.id)"]
+          "markers": ["expected one payslip for employee", "payslipTag"]
         },
         {
           "path": "frontend/web/tests/e2e/helpers-legacy.ts",
-          "markers": ["fetchLatestPurchaseOrderIdByPartner", "fetchLatestPurchaseOrderLineIdByOrder", "fetchLatestPaymentIdByPartner"]
+          "markers": ["fetchPurchaseOrderIdByExactOrigin", "fetchOnlyPurchaseOrderLineId", "fetchPaymentIdByExactReference", "fetchDraftInvoiceMoveIdForSaleOrder", "fetchDraftVendorBillMoveIdForPurchaseOrder"]
         },
         {
           "path": "frontend/web/tests/e2e/helpers-exact-sale-order.ts",
@@ -186,7 +190,7 @@
       "class": "transport-success-semantic-overclaim",
       "status": "partially-resolved",
       "severity": "P0",
-      "launch_impact": "The CRM reference path returns exact semantic outcomes, while the remaining generated-dispatch hook baseline can still resolve void/transport success without effect disposition.",
+      "launch_impact": "CRM conversion and account-move posting return exact semantic outcomes, while the remaining generated-dispatch baseline can still resolve void/transport success without effect disposition.",
       "affected_surfaces": ["all consequential T0 module actions not yet migrated to the COV-01 seam"],
       "owner": "COH-02/10 + COV-01 + owning module COV owner",
       "downstream_packages": ["COH-02", "COH-10", "COV-01", "COV-03..24"],
@@ -199,6 +203,10 @@
         {
           "path": "frontend/packages/query-hooks/src/hooks/crm.ts",
           "markers": ["stdbBffCommandPost("]
+        },
+        {
+          "path": "frontend/packages/query-hooks/src/hooks/accounting/moves.ts",
+          "markers": ["resolvePostedAccountMoveEffect", "executeOperationWithCanonicalReadback", "requireResolvedOperationEffect"]
         }
       ]
     },
@@ -223,32 +231,7 @@
   "inventories": {
     "allow_empty_files": [
       "frontend/packages/api-client/src/create-client.ts",
-      "frontend/packages/query-hooks/src/hooks/map.ts",
       "frontend/packages/query-hooks/src/http.ts",
-      "frontend/web/app/(modules)/accounting/page.tsx",
-      "frontend/web/app/(modules)/ai-harness/page.tsx",
-      "frontend/web/app/(modules)/calendar/page.tsx",
-      "frontend/web/app/(modules)/crm/page.tsx",
-      "frontend/web/app/(modules)/documents/page.tsx",
-      "frontend/web/app/(modules)/expenses/page.tsx",
-      "frontend/web/app/(modules)/fleet/page.tsx",
-      "frontend/web/app/(modules)/helpdesk/page.tsx",
-      "frontend/web/app/(modules)/hr/page.tsx",
-      "frontend/web/app/(modules)/inventory/page.tsx",
-      "frontend/web/app/(modules)/iot/page.tsx",
-      "frontend/web/app/(modules)/manufacturing/page.tsx",
-      "frontend/web/app/(modules)/messages/page.tsx",
-      "frontend/web/app/(modules)/overview/page.tsx",
-      "frontend/web/app/(modules)/pos/page.tsx",
-      "frontend/web/app/(modules)/projects/page.tsx",
-      "frontend/web/app/(modules)/proposals/page.tsx",
-      "frontend/web/app/(modules)/purchasing/page.tsx",
-      "frontend/web/app/(modules)/reports/page.tsx",
-      "frontend/web/app/(modules)/sales/page.tsx",
-      "frontend/web/app/(modules)/subscriptions/page.tsx",
-      "frontend/web/app/(modules)/tasks/page.tsx",
-      "frontend/web/app/(modules)/workflows/page.tsx",
-      "frontend/web/app/layout.tsx",
       "frontend/web/lib/company-scope-server.ts",
       "frontend/web/lib/query-fetch.ts",
       "frontend/web/lib/server-query.ts",
@@ -256,6 +239,7 @@
     ],
     "runtime_form_modal_files": [
       "frontend/packages/ui/src/pages/module-view.tsx",
+      "frontend/packages/ui/src/forms/runtime-form-modal.test.tsx",
       "frontend/web/app/(modules)/accounting/accounting-client.tsx",
       "frontend/web/app/(modules)/accounting/payment-operations-panel.tsx",
       "frontend/web/app/(modules)/crm/contact-identities-panel.tsx",
@@ -317,20 +301,13 @@
       "frontend/web/tests/e2e/workflows-gate-ui.spec.ts"
     ],
     "latest_function_sites": [
-      "frontend/packages/query-hooks/src/hooks/ai-action-drafts.ts::resolveLatestDraftId",
       "frontend/packages/query-hooks/src/hooks/ai-skill-registry.ts::latestCertificationFor",
-      "frontend/packages/query-hooks/src/hooks/import-jobs.ts::findLatestImportJob",
-      "frontend/web/tests/e2e/helpers-legacy.ts::fetchLatestPaymentIdByPartner",
-      "frontend/web/tests/e2e/helpers-legacy.ts::fetchLatestPurchaseOrderIdByPartner",
-      "frontend/web/tests/e2e/helpers-legacy.ts::fetchLatestPurchaseOrderLineIdByOrder",
-      "frontend/web/tests/e2e/manufacturing-mutations.spec.ts::fetchLatestMoIdByProduct",
-      "frontend/web/tests/e2e/purchasing-module.spec.ts::fetchLatestLandedCostId",
-      "frontend/web/tests/e2e/sales-invoice-flow.spec.ts::fetchLatestSaleOrderIdByPartnerId"
+      "frontend/packages/query-hooks/src/hooks/import-jobs.ts::findLatestImportJob"
     ],
     "semantic_dispatch_baseline": {
       "root": "frontend/packages/query-hooks/src/hooks",
       "token": "stdbBffCommandPost(",
-      "max_occurrences": 866,
+      "max_occurrences": 865,
       "classification": "Legacy dispatch baseline owned by COV-01 and module adoption packages; count may decrease but not grow without updating the owned census."
     }
   }
