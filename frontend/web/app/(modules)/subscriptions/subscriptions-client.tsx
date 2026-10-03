@@ -58,6 +58,7 @@ import { subscriptionsModuleConfig } from "@/lib/module-dashboard-configs"
 import { useSubscriptionsModuleSubscription } from "@/lib/module-subscription-hooks"
 import {
   useSubscriptions,
+  useSubscriptionBillingRuns,
   useSubscriptionPlans,
   useSubscriptionLines,
   useSubscriptionAmendments,
@@ -140,8 +141,20 @@ import {
   currencyOptionsFromRows,
 } from "@/lib/form-lookup"
 
+function subscriptionState(row: unknown): string {
+  if (!row || typeof row !== "object" || !("state" in row)) return ""
+  const value = row.state
+  if (typeof value === "string") return value.toLowerCase()
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    if ("tag" in value && typeof value.tag === "string") return value.tag.toLowerCase()
+    const keys = Object.keys(value)
+    if (keys.length === 1) return keys[0]!.toLowerCase()
+  }
+  return ""
+}
+
 function isSubscriptionActiveForMetrics(row: Record<string, unknown>): boolean {
-  const state = String(row.state ?? "")
+  const state = subscriptionState(row)
   if (state === "closed") return false
   return state === "active" || state === "open"
 }
@@ -204,6 +217,7 @@ function SubscriptionsClientLoaded({
   const [recognizeMoveId, setRecognizeMoveId] = useState("")
 
   const { data: subscriptions = [] } = useSubscriptions(orgId, initialSubscriptions)
+  const { data: billingRuns = [] } = useSubscriptionBillingRuns(orgId)
   const { data: plans = [] } = useSubscriptionPlans(orgId, initialPlans)
   const { data: subscriptionLines = [] } = useSubscriptionLines(orgId)
   const { data: subscriptionAmendments = [] } = useSubscriptionAmendments(orgId)
@@ -400,7 +414,7 @@ function SubscriptionsClientLoaded({
         requiresSelection: true,
         onClick: (rows) => {
           const r = rows[0]
-          if (!r || String(r.state) !== "draft") return
+          if (!r || subscriptionState(r) !== "draft") return
           void activateSubscription.mutate({ subscriptionId: BigInt(String(r.id)) })
         },
       },
@@ -413,7 +427,7 @@ function SubscriptionsClientLoaded({
         onClick: (rows) => {
           const r = rows[0]
           if (!r) return
-          if (String(r.state) === "closed") return
+          if (subscriptionState(r) === "closed") return
           setCloseTargetId(Number(r.id))
         },
       },
@@ -426,7 +440,7 @@ function SubscriptionsClientLoaded({
         onClick: (rows) => {
           const r = rows[0]
           if (!r) return
-          if (String(r.state) !== "active") return
+          if (subscriptionState(r) !== "active") return
           setGenerateTargetId(Number(r.id))
         },
       },
@@ -439,7 +453,7 @@ function SubscriptionsClientLoaded({
         onClick: (rows) => {
           const r = rows[0]
           if (!r) return
-          if (String(r.state) !== "active") return
+          if (subscriptionState(r) !== "active") return
           setPayTargetId(Number(r.id))
         },
       },
@@ -452,7 +466,8 @@ function SubscriptionsClientLoaded({
         onClick: (rows) => {
           const r = rows[0]
           if (!r) return
-          if (String(r.state) !== "active" && String(r.state) !== "paused") return
+          const state = subscriptionState(r)
+          if (state !== "active" && state !== "paused") return
           setAmendTargetId(Number(r.id))
         },
       },
@@ -464,7 +479,7 @@ function SubscriptionsClientLoaded({
         requiresSelection: true,
         onClick: (rows) => {
           const r = rows[0]
-          if (!r || String(r.state) !== "active") return
+          if (!r || subscriptionState(r) !== "active") return
           void pauseSubscription.mutate({
             subscriptionId: BigInt(String(r.id)),
           })
@@ -478,7 +493,7 @@ function SubscriptionsClientLoaded({
         requiresSelection: true,
         onClick: (rows) => {
           const r = rows[0]
-          if (!r || String(r.state) !== "paused") return
+          if (!r || subscriptionState(r) !== "paused") return
           void resumeSubscription.mutate({
             subscriptionId: BigInt(String(r.id)),
           })
@@ -493,7 +508,8 @@ function SubscriptionsClientLoaded({
         onClick: (rows) => {
           const r = rows[0]
           if (!r) return
-          if (String(r.state) !== "active" && String(r.state) !== "paused") return
+          const state = subscriptionState(r)
+          if (state !== "active" && state !== "paused") return
           setRenewTargetId(Number(r.id))
         },
       },
@@ -505,7 +521,7 @@ function SubscriptionsClientLoaded({
         requiresSelection: true,
         onClick: (rows) => {
           const r = rows[0]
-          if (!r || String(r.state) === "closed") return
+          if (!r || subscriptionState(r) === "closed") return
           setCancelTargetId(Number(r.id))
         },
       },
@@ -517,7 +533,7 @@ function SubscriptionsClientLoaded({
         requiresSelection: true,
         onClick: (rows) => {
           const r = rows[0]
-          if (!r || String(r.state) === "closed") return
+          if (!r || subscriptionState(r) === "closed") return
           setIngestUsageTargetId(Number(r.id))
         },
       },
@@ -544,7 +560,7 @@ function SubscriptionsClientLoaded({
         requiresSelection: true,
         onClick: (rows) => {
           const r = rows[0]
-          if (!r || String(r.state) === "closed") return
+          if (!r || subscriptionState(r) === "closed") return
           setCommitmentTargetId(Number(r.id))
         },
       },
@@ -556,7 +572,7 @@ function SubscriptionsClientLoaded({
         requiresSelection: true,
         onClick: (rows) => {
           const r = rows[0]
-          if (!r || String(r.state) === "closed") return
+          if (!r || subscriptionState(r) === "closed") return
           void recordPaymentFailure.mutate({
             subscriptionId: BigInt(String(r.id)),
             params: { reason: "manual", pastDueDays: 1 },
@@ -735,6 +751,12 @@ function SubscriptionsClientLoaded({
       ({
         ...moduleConfig,
         tabs: withDashboardSections(moduleConfig, liveSections).tabs.map((tab) => {
+          if (tab.id === "subscriptions")
+            return {
+              ...tab,
+              createForm: subscriptionFormConfig,
+              entityConfig: subscriptionsTableConfig(t, subscriptionRowActions),
+            }
           if (tab.id === "plans") return { ...tab, createForm: planFormConfig }
           if (tab.id === "lines")
             return { ...tab, entityConfig: subscriptionLinesTableConfig(t) }
@@ -883,18 +905,23 @@ function SubscriptionsClientLoaded({
   )
   const payInvoiceMoveOptions = useMemo(() => {
     if (payTargetId == null) return [{ value: "", label: "—", disabled: true }]
-    const sub = (subscriptions as Record<string, unknown>[]).find(
-      (s) => Number(s.id) === payTargetId,
+    const ids = new Set(
+      (billingRuns as Record<string, unknown>[])
+        .filter(
+          (run) =>
+            Number(run.subscriptionId ?? run.subscription_id) === payTargetId,
+        )
+        .map((run) => run.invoiceMoveId ?? run.invoice_move_id)
+        .filter((id) => id != null)
+        .map(String),
     )
-    const ids = (sub?.invoiceIds ?? sub?.invoice_ids ?? []) as unknown[]
-    const idSet = new Set(ids.map((id) => String(id)))
-    const moves = (accountMoves as Record<string, unknown>[]).filter((m) =>
-      idSet.has(String(m.id)),
+    const moves = (accountMoves as Record<string, unknown>[]).filter((move) =>
+      ids.has(String(move.id)),
     )
     const fromApi = accountMoveRowsToSelectOptions(moves)
     if (fromApi.length > 0) return fromApi
     return [{ value: "", label: t("common.lookup.noAccounts"), disabled: true }]
-  }, [payTargetId, subscriptions, accountMoves, t])
+  }, [payTargetId, billingRuns, accountMoves, t])
   const payForm = useMemo(
     () =>
       mergeSelectOptionsForFields(paySubscriptionInvoiceForm(t), {

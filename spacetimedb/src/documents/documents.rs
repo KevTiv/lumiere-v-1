@@ -843,6 +843,16 @@ pub fn add_document_version(
     let new_version_number = old_version_count + 1;
     let checksum = params.checksum.trim().to_lowercase();
 
+    // COV-18: re-registering the blob that is already the current version is a
+    // stale replay, not a new revision.
+    if let Some(current) =
+        current_version_id.and_then(|vid| ctx.db.document_version().id().find(&vid))
+    {
+        if current.url == params.url && current.checksum.as_deref() == Some(checksum.as_str()) {
+            return Err("Document version is identical to the current version".to_string());
+        }
+    }
+
     let version = ctx.db.document_version().insert(DocumentVersion {
         id: 0,
         organization_id,
@@ -1042,8 +1052,10 @@ pub fn unlock_document(
 
     let doc = refresh_expired_lock(ctx, doc);
 
+    // COV-18: unlocking an unlocked (or lease-expired) document is a stale
+    // replay, not a no-op success — it must not look like a second transition.
     if !doc.is_locked {
-        return Ok(());
+        return Err("Document is not locked".to_string());
     }
 
     if doc.locked_by != Some(ctx.sender()) {

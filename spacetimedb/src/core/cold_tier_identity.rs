@@ -37,6 +37,8 @@ pub(crate) const WORKFLOW_WORKER_SERVICE: &str = "workflow_worker";
 /// Dedicated identity used by the IoT gateway after a hub proves its opaque
 /// post-pair credential.
 pub(crate) const IOT_GATEWAY_SERVICE: &str = "iot_gateway";
+/// Dedicated identity allowed to query the sender-scoped H5b spend views.
+pub(crate) const AI_SPEND_READER_SERVICE: &str = "ai_spend_reader";
 
 #[derive(Clone)]
 #[spacetimedb::table(
@@ -53,6 +55,10 @@ pub(crate) const IOT_GATEWAY_SERVICE: &str = "iot_gateway";
     index(
         accessor = cold_tier_service_identity_by_platform_identity,
         btree(columns = [organization_id, identity])
+    ),
+    index(
+        accessor = cold_tier_service_identity_by_identity,
+        btree(columns = [identity])
     )
 )]
 pub struct ColdTierServiceIdentity {

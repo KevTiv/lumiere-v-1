@@ -1,5 +1,5 @@
 import { getStdbSession } from "@/lib/api-session"
-import { serverFetchQueryListsAllowEmpty } from "@/lib/server-query"
+import { serverFetchQueryListsRequired } from "@/lib/server-query"
 import { CrmClient } from "./crm-client"
 
 const SSR_RESOURCES = ["leads", "opportunities", "contacts"] as const
@@ -10,7 +10,7 @@ export default async function CrmPage() {
     return <CrmClient />
   }
 
-  const [leads, opportunities, contacts] = await serverFetchQueryListsAllowEmpty(
+  const [leads, opportunities, contacts] = await serverFetchQueryListsRequired(
     session,
     SSR_RESOURCES,
   )

@@ -86,8 +86,7 @@ fn validate_body(body: &RecordUserContributionBody) -> Result<(), ApiError> {
             "introducedKind must be source_version or concept".into(),
         ));
     }
-    if body.source_version_id.is_some_and(|id| id == 0)
-        || body.passage_id.is_some_and(|id| id == 0)
+    if body.source_version_id.is_some_and(|id| id == 0) || body.passage_id.is_some_and(|id| id == 0)
     {
         return Err(ApiError::BadRequest(
             "sourceVersionId and passageId must be positive when present".into(),

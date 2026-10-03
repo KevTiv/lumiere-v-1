@@ -66,7 +66,11 @@ export function EntityRecordSheet({
                 <TabsList variant="default" className="w-full flex flex-wrap justify-start gap-2">
                   <TabsTrigger value="overview">Overview</TabsTrigger>
                   {config.customTabs?.map((tab) => (
-                    <TabsTrigger key={tab.id} value={tab.id}>
+                    <TabsTrigger
+                      key={tab.id}
+                      value={tab.id}
+                      data-testid={`entity-record-sheet-tab-${tab.id}`}
+                    >
                       {tab.label}
                     </TabsTrigger>
                   ))}

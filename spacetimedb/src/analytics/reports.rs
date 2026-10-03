@@ -1316,6 +1316,20 @@ pub fn record_report_run(
         return Err("Scheduled report does not belong to this organization".to_string());
     }
 
+    // COV-20: owner-report schedules advance through their run ledger
+    // (complete_scheduled_owner_report_run), never by a manual run record.
+    if report.owner_report_key.is_some() {
+        return Err("Owner-report schedules record runs through the run ledger".to_string());
+    }
+    if !report.is_active {
+        return Err("Cannot record a run for an inactive scheduled report".to_string());
+    }
+    // A recorded run must advance the schedule; re-sending the same next_run
+    // is a stale replay and must not bump run_count again.
+    if next_run.to_micros_since_unix_epoch() <= report.next_run.to_micros_since_unix_epoch() {
+        return Err("next_run must be later than the current next_run".to_string());
+    }
+
     ctx.db.scheduled_report().id().update(ScheduledReport {
         last_run: Some(ctx.timestamp),
         next_run,

@@ -1,6 +1,6 @@
 import { Suspense } from "react"
 import { getStdbSession } from "@/lib/api-session"
-import { serverFetchQueryListsAllowEmpty } from "@/lib/server-query"
+import { serverFetchQueryListsRequired } from "@/lib/server-query"
 import { ManufacturingClient } from "./manufacturing-client"
 
 const SSR_RESOURCES = [
@@ -35,7 +35,7 @@ export default async function ManufacturingPage() {
     warehouses,
     stockPickings,
     stockQuants,
-  ] = await serverFetchQueryListsAllowEmpty(session, SSR_RESOURCES)
+  ] = await serverFetchQueryListsRequired(session, SSR_RESOURCES)
 
   return (
     <Suspense>

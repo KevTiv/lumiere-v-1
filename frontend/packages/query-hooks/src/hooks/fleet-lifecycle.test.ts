@@ -23,7 +23,10 @@ const RESOURCE_REGISTRY = JSON.parse(
     ),
     "utf8",
   ),
-) as Record<string, { table?: string; mandatory?: string[] }>
+) as Record<
+  string,
+  { table?: string; mandatory?: string[]; default_restricted?: string[] }
+>
 
 function exportedFunction(name: string): string {
   const start = HOOK_SOURCE.indexOf(`export function ${name}(`)
@@ -58,6 +61,36 @@ describe("Fleet lifecycle query and command contracts", () => {
         entry.mandatory?.includes("company_id"),
         `${resource} must retain company_id for company isolation`,
       )
+    }
+  })
+
+  it("projects stable request identity and original timestamp for exact readback", () => {
+    for (const resource of [
+      "fleet-service-records",
+      "fleet-inspections",
+    ] as const) {
+      assert.ok(
+        RESOURCE_REGISTRY[resource]?.default_restricted?.includes(
+          "client_request_id",
+        ),
+        `${resource} must expose client_request_id for exact idempotent readback`,
+      )
+      assert.ok(
+        RESOURCE_REGISTRY[resource]?.default_restricted?.includes("create_date"),
+        `${resource} must expose create_date for omitted-timestamp replay`,
+      )
+    }
+  })
+
+  it("projects monetary service cost and canonical accounting linkage", () => {
+    const fields = RESOURCE_REGISTRY["fleet-service-records"]?.default_restricted ?? []
+    for (const field of [
+      "cost_amount",
+      "currency_id",
+      "account_move_id",
+      "client_request_id",
+    ]) {
+      assert.ok(fields.includes(field), `fleet-service-records must expose ${field}`)
     }
   })
 

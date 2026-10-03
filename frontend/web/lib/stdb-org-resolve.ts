@@ -50,6 +50,8 @@ export async function serverQueryUserOrganizationWithFallback(
   }
 
   const admin = process.env["STDB_SERVER_TOKEN"]
+  // Degraded-safe classification: no trusted fallback means no organization
+  // membership. Session bootstrap then denies entry instead of widening scope.
   if (!isUsableAdminToken(admin)) return []
 
   try {

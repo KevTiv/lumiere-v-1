@@ -13,6 +13,7 @@ import {
   CREATE_RETURN_ORDER_AFFECTS,
   createReturnOrderAction,
   observeCreatedReturnOrder,
+  returnExchangeOrderIds,
   observeConfirmedReturn,
   observeExchangeOrder,
   observeReturnCreditNote,
@@ -58,15 +59,18 @@ test("an exchange order is tied to its return by metadata or by origin", () => {
   assert.equal(exchangeSourceReturnId({}), undefined)
 })
 
-test("the newest exchange order created from this return is opened", () => {
-  const observed = observeExchangeOrder("3", [
+test("the one exchange order added since the snapshot is opened, never the newest", () => {
+  const orders = [
     { id: 10, origin: "exchange:RMA/3" },
     { id: 12, metadata: '{"exchange_return_id":3}' },
     { id: 13, origin: "exchange:RMA/30" },
-    { id: 14, metadata: '{"exchange_return_id":30}' },
-  ])
-  assert.deepEqual(observed.next, { resource: "sale_order", id: "12", module: "sales" })
-  assert.deepEqual(observeExchangeOrder("3", []), {})
+  ]
+  assert.deepEqual(returnExchangeOrderIds("3", orders), ["10", "12"])
+  const observed = observeExchangeOrder("3", ["12"], orders)
+  assert.deepEqual(observed.next, { resource: "sale_order", id: "10", module: "sales" })
+  assert.deepEqual(observeExchangeOrder("3", ["10", "12"], orders), {})
+  assert.deepEqual(observeExchangeOrder("3", [], orders), {})
+  assert.deepEqual(observeExchangeOrder("3", [], []), {})
 })
 
 test("a picking is taken to done only through the steps it has not passed", () => {
@@ -76,23 +80,30 @@ test("a picking is taken to done only through the steps it has not passed", () =
   assert.equal(pickingStepsToDone({ state: "cancel" }), undefined)
 })
 
-test("the newest return for the sale order is the one just created, and it can be opened", () => {
-  const observed = observeCreatedReturnOrder("5", [
-    { id: 11, saleOrderId: 5 },
-    { id: 14, saleOrderId: 5 },
-    { id: 15, saleOrderId: 6 },
-  ])
-  const ref = { resource: "return_order", id: "14", module: "sales" }
+test("the return a keyed create produced is the one its creation row names, and it can be opened", () => {
+  const returns = [{ id: 11 }, { id: 14 }]
+  const creations = [
+    { id: 1, idempotencyKey: "k-1", returnOrderId: 11 },
+    { id: 2, idempotency_key: "k-2", return_order_id: 14 },
+  ]
+  const observed = observeCreatedReturnOrder(" k-1 ", creations, returns)
+  const ref = { resource: "return_order", id: "11", module: "sales" }
   assert.equal(observed.outcome, "applied")
   assert.deepEqual(observed.createdRecords, [ref])
   assert.deepEqual(observed.next, ref)
-  assert.deepEqual(resolveRecordLocation(ref), { module: "sales", tab: "returns", filter: { id: "14" } })
+  assert.deepEqual(resolveRecordLocation(ref), { module: "sales", tab: "returns", filter: { id: "11" } })
+  assert.equal(observeCreatedReturnOrder("k-2", creations, returns).next?.id, "14")
 })
 
-test("a return raised without a sale order, or not yet visible, claims nothing", () => {
-  assert.deepEqual(observeCreatedReturnOrder(undefined, [{ id: 1, saleOrderId: 5 }]), {})
-  assert.deepEqual(observeCreatedReturnOrder("5", [{ id: 1, saleOrderId: 6 }]), {})
-  assert.deepEqual(observeCreatedReturnOrder("5", []), {})
+test("an unknown, blank, duplicated or dangling key claims nothing", () => {
+  const returns = [{ id: 11 }]
+  assert.deepEqual(observeCreatedReturnOrder("k-9", [{ idempotencyKey: "k-1", returnOrderId: 11 }], returns), {})
+  assert.deepEqual(observeCreatedReturnOrder(" ", [{ idempotencyKey: "", returnOrderId: 11 }], returns), {})
+  assert.deepEqual(
+    observeCreatedReturnOrder("k-1", [{ idempotencyKey: "k-1", returnOrderId: 11 }, { idempotencyKey: "k-1", returnOrderId: 11 }], returns),
+    {},
+  )
+  assert.deepEqual(observeCreatedReturnOrder("k-1", [{ idempotencyKey: "k-1", returnOrderId: 99 }], returns), {})
 })
 
 test("creating a return is form-backed, offered against a confirmed order, and refreshes returns only", async () => {

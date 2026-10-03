@@ -20,7 +20,7 @@ import {
   smokeName,
   waitForMovePosted,
   waitForPaymentPosted,
-  fetchLatestPaymentIdByPartner,
+  fetchPaymentIdByExactReference,
 } from "./helpers"
 
 /**
@@ -339,6 +339,7 @@ async function adminCreateDraftPayment(page: Page): Promise<number> {
   const partnerId = await fetchVendorPartnerIdByName(page, "Globex Corp")
   const journalId = await fetchPaymentJournalId(page)
   const amount = 42.5
+  const paymentReference = smokeName("perm-pay")
   await callReducerBff(page, "create_payment", [
     orgId,
     {
@@ -351,10 +352,12 @@ async function adminCreateDraftPayment(page: Page): Promise<number> {
       currencyId,
       date: { some: { microsSinceUnixEpoch: Date.now() * 1000 } },
       journalId,
-      ref: smokeName("perm-pay"),
+      ref: paymentReference,
     },
   ])
-  return fetchLatestPaymentIdByPartner(page, partnerId, { state: "NotPaid" })
+  return fetchPaymentIdByExactReference(page, partnerId, paymentReference, {
+    state: "NotPaid",
+  })
 }
 
 async function adminPrepareAssignedPicking(page: Page): Promise<number> {
@@ -376,6 +379,7 @@ async function adminPrepareAssignedPicking(page: Page): Promise<number> {
   const warehouseId = await fetchFirstWarehouseId(page)
   const uomId = await fetchFirstUomId(page)
 
+  const orderOrigin = smokeName("perm-so")
   await callReducerBff(
     page,
     "create_sale_order",
@@ -390,18 +394,32 @@ async function adminPrepareAssignedPicking(page: Page): Promise<number> {
         currency_id: currencyId,
         warehouse_id: warehouseId,
         order_lines: [],
-        origin: smokeName("perm-so"),
+        origin: orderOrigin,
       },
     ],
   )
 
   const soRes = await page.request.get("/api/query/sale-orders")
   if (!soRes.ok()) throw new Error(`sale-orders query failed: ${soRes.status()}`)
-  const soJson = (await soRes.json()) as { data?: Array<{ id?: unknown; partnerId?: unknown; partner_id?: unknown }> }
-  const order = [...(soJson.data ?? [])]
-    .filter((o) => scalarQueryId(o.partnerId ?? o.partner_id) === partnerId)
-    .sort((a, b) => (scalarQueryId(b.id) ?? 0) - (scalarQueryId(a.id) ?? 0))[0]
-  const orderId = scalarQueryId(order?.id)
+  const soJson = (await soRes.json()) as {
+    data?: Array<{
+      id?: unknown
+      partnerId?: unknown
+      partner_id?: unknown
+      origin?: unknown
+    }>
+  }
+  const orders = (soJson.data ?? []).filter(
+    (order) =>
+      scalarQueryId(order.partnerId ?? order.partner_id) === partnerId &&
+      String(order.origin ?? "") === orderOrigin,
+  )
+  if (orders.length !== 1) {
+    throw new Error(
+      `expected one sale order for partner ${partnerId} and origin ${orderOrigin}, found ${orders.length}`,
+    )
+  }
+  const orderId = scalarQueryId(orders[0]?.id)
   if (orderId == null) throw new Error("sale order not found after create_sale_order")
 
   await callReducerBff(

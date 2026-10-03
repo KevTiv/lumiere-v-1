@@ -227,11 +227,15 @@ export function usePurchaseReturns(
   })
 }
 
+export const purchaseRfqsQueryOptions = (organizationId: bigint) => ({
+  queryKey: ['purchase-rfqs', rqBigIntKey(organizationId)] as const,
+  queryFn: () => fetchQueryList('/api/query/purchase-rfqs', 'Failed to fetch purchase RFQs'),
+  staleTime: 30_000,
+})
+
 export function usePurchaseRfqs(organizationId: bigint, initialData?: PurchaseRfq[]) {
   return useQuery<PurchaseRfq[]>({
-    queryKey: ['purchase-rfqs', rqBigIntKey(organizationId)],
-    queryFn: () => fetchQueryList('/api/query/purchase-rfqs', 'Failed to fetch purchase RFQs'),
-    staleTime: 30_000,
+    ...purchaseRfqsQueryOptions(organizationId),
     initialData: coalesceQueryInitialData(initialData),
   })
 }

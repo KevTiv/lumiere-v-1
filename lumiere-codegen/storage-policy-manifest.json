@@ -8779,7 +8779,9 @@
       "table": "mrp_bom_byproduct",
       "module": "manufacturing",
       "rationale": "Reviewed child aggregate: bom_id references mrp_bom.id.",
-      "authoritative_resources": [],
+      "authoritative_resources": [
+        "mrp-bom-byproducts"
+      ],
       "durability_class": "durable_business_record",
       "organization_ownership": "direct",
       "organization_column": "organization_id",
@@ -12519,7 +12521,9 @@
       "table": "replenishment_run_job",
       "module": "inventory",
       "rationale": "Scheduled replenishment job owned by the rule's organization and company; independent aggregate root.",
-      "authoritative_resources": [],
+      "authoritative_resources": [
+        "replenishment-run-jobs"
+      ],
       "durability_class": "durable_operational_state",
       "organization_ownership": "direct",
       "organization_column": "organization_id",
@@ -12740,6 +12744,43 @@
       "cooling_eligibility": "never",
       "cooling_eligibility_source": "reviewed:c5/finance-commercial/always-hot/missing-semantic-safety-contract",
       "dependency_behavior": "independent",
+      "hydration_policy": "not_applicable",
+      "delete_behavior": "tombstone",
+      "postgres_access_path": "organization_index"
+    },
+    {
+      "table": "return_order_creation",
+      "module": "sales",
+      "rationale": "Reviewed child aggregate: return_order_id references return_order.id.",
+      "authoritative_resources": [
+        "return-order-creations"
+      ],
+      "durability_class": "durable_business_record",
+      "organization_ownership": "direct",
+      "organization_column": "organization_id",
+      "company_ownership": "direct",
+      "company_column_path": [
+        "company_id"
+      ],
+      "company_column_nullable": false,
+      "aggregate": {
+        "kind": "child",
+        "parent": {
+          "table": "return_order",
+          "child_column": "return_order_id",
+          "parent_column": "id"
+        }
+      },
+      "primary_key": {
+        "strategy": "auto_increment",
+        "column": "id",
+        "version_strategy": "none"
+      },
+      "projection_mode": "upsert-current",
+      "hot_retention": "always",
+      "cooling_eligibility": "never",
+      "cooling_eligibility_source": "reviewed:c5/finance-commercial/always-hot/missing-semantic-safety-contract",
+      "dependency_behavior": "follow_parent",
       "hydration_policy": "not_applicable",
       "delete_behavior": "tombstone",
       "postgres_access_path": "organization_index"
@@ -13697,7 +13738,9 @@
       "table": "stock_landed_cost_application",
       "module": "inventory",
       "rationale": "Reviewed child aggregate: landed_cost_id references stock_landed_cost.id.",
-      "authoritative_resources": [],
+      "authoritative_resources": [
+        "landed-cost-applications"
+      ],
       "durability_class": "durable_business_record",
       "organization_ownership": "direct",
       "organization_column": "organization_id",

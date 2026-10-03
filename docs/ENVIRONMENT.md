@@ -21,7 +21,7 @@ This doc summarizes how **SpacetimeDB**, **Next.js**, **api-server**, and **gate
 | `STDB_IOT_GATEWAY_TOKEN` | iot-gateway | Dedicated identity registered as `iot_gateway` for every organization served; must not reuse the owner or another worker token. |
 | `AI_CERTIFICATION_STDB_TOKEN` | ai-gateway | Dedicated SpacetimeDB token whose identity alone may claim and complete certification jobs. Required with `AI_CERTIFICATION_RUNTIME_HASH`. |
 | `AI_CERTIFICATION_RUNTIME_HASH` | ai-gateway | Immutable executor build/profile digest (`sha256:` plus 64 lowercase hex characters). Required with `AI_CERTIFICATION_STDB_TOKEN`. |
-| `AI_SPEND_READ_STDB_TOKEN` | ai-gateway | Optional dedicated read-only identity for private H5b spend, price and draft-request tables; must differ from `STDB_TOKEN` and `AI_CERTIFICATION_STDB_TOKEN`. Required before run-correlated action drafts or spend admission are enabled. |
+| `AI_SPEND_READ_STDB_TOKEN` | ai-gateway | Dedicated identity registered as `ai_spend_reader` for the sender-scoped H5b read views; must differ from `STDB_TOKEN` and `AI_CERTIFICATION_STDB_TOKEN`. Never grant this identity database-owner access. |
 
 ### AI gateway (`ai-gateway`)
 

@@ -36,6 +36,9 @@ E2E_SPEC_FILES     ?=
 # Playwright shard for e2e-smoke, e.g. 2/3 (CI splits the p0/full suites across runners).
 E2E_SHARD          ?=
 E2E_WORKERS        ?= 1
+# Run reducer/domain validation before browser fixture seeding. Set to 0 when
+# reducer proof is run separately and the browser suite needs a pristine seed.
+E2E_RUN_DOMAIN_TESTS ?= 1
 # Some interactive shells in Cursor can inherit a literal "$$PATH"; use a known-good command path for E2E orchestration.
 E2E_PATH           ?= /Users/kevintivert/.nvm/versions/node/v21.7.0/bin:/Users/kevintivert/.cargo/bin:/Users/kevintivert/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin
 
@@ -108,7 +111,8 @@ E2E_DOMAIN_TEST_REDUCERS := \
 	e2e-wipe-local-stdb e2e-single e2e-single-test e2e-p2p e2e-mvp-golden \
 	e2e-crm-isolation e2e-dx-test e2e-web-dev e2e-single-running \
 	e2e-pretenant pretenant-cert-stdb pretenant-cert-native \
-	init-stack docker-dev docker-dev-iot \
+	init-stack refresh-stack-tokens docker-dev docker-dev-iot \
+	register-stack-identities \
 	codegen check-codegen check-codegen-pinned check-contract-ir check-operation-history check-release-compatibility check-tenant-ownership check-storage-policy check-c2-commit-coverage check-cov00c-correctness-census check-cov00d-evidence-matrix check-cov02-seed-inventory check-cov02-first-org-fixture check-reducer-contracts-drift check-contracts-source-drift check-contracts-drift check-c9-isolation-matrix lint-trusted-route-boundaries \
 	clean-contracts-live-staging generate-presentation-schemas generate-presentation-contracts lint-reducer-call-literals api-server-run \
 	lint-no-magic-fk-zero lint-accounting-as-unknown-as lint-accounting-currency-refs \
@@ -166,7 +170,9 @@ help-legacy:
 	@echo "  check-c2-commit-coverage Validate registered C2 reducer commit coverage (required by check-codegen)"
 	@echo "  check-reducer-contracts-drift  CI-safe live-schema drift check for reducer-manifest.json"
 	@echo "  check-contracts-drift   Full bindings/manifests drift check (requires spacetime CLI)"
-	@echo "  publish-contracts VERSION=x.y.z  Transitional release: publish canonical IR plus current generated packages"
+	@echo "  contracts-module-ci     Build the reusable fast-profile contracts WASM"
+	@echo "  publish-contracts VERSION=x.y.z  Generate, verify, and publish canonical IR plus generated packages"
+	@echo "  publish-contracts-prepared VERSION=x.y.z  Publish an already generated and verified staging tree"
 	@echo ""
 	@echo "  --- Cloud ---"
 	@echo "  publish-cloud        Publish to maincloud"
@@ -348,7 +354,7 @@ e2e-smoke-setup:
 		STDB_HASH_FILE="$$LOG_DIR/stdb.hash"; \
 		CUR_STDB_HASH="$$(E2E_BUILD_MODULE="$(E2E_DB)" E2E_BUILD_HOST="$$E2E_STDB_HOST" "$$ROOT/scripts/e2e-dx.sh" stdb-fingerprint)"; \
 		STDB_FAST_PATH=0; \
-		if [ "$${E2E_CLEAR_DB:-0}" != "1" ] && [ "$${E2E_FORCE_REBUILD:-0}" != "1" ] && [ -f "$$STDB_HASH_FILE" ] && [ "$$(cat "$$STDB_HASH_FILE")" = "$$CUR_STDB_HASH" ] && spacetime describe "$(E2E_DB)" --json --server local --no-config >/dev/null 2>&1; then \
+		if [ "$${E2E_CLEAR_DB:-0}" != "1" ] && [ "$${E2E_FORCE_REBUILD:-0}" != "1" ] && [ "$${E2E_RUN_DOMAIN_AGGREGATES:-0}" != "1" ] && [ -f "$$STDB_HASH_FILE" ] && [ "$$(cat "$$STDB_HASH_FILE")" = "$$CUR_STDB_HASH" ] && spacetime describe "$(E2E_DB)" --json --server local --no-config >/dev/null 2>&1; then \
 			STDB_FAST_PATH=1; \
 		fi; \
 		if [ "$$STDB_FAST_PATH" = "1" ]; then \
@@ -365,31 +371,35 @@ e2e-smoke-setup:
 				echo "[e2e] Preserving existing DB (set E2E_CLEAR_DB=1 to wipe + full re-seed)."; \
 				LUMIERE_ENABLE_DEV_REDUCERS=1 spacetime publish "$(E2E_DB)" --bin-path "$(MODULE)/target/wasm32-unknown-unknown/release/lumiere_v1.wasm" --server local -y --no-config; \
 			fi; \
-			if spacetime call "$(E2E_DB)" run_all_core_tests --server local --no-config; then \
-				echo "[e2e] Core reducer tests passed."; \
-			else \
-				echo "[e2e] run_all_core_tests is unavailable or failed; continuing with browser smoke tests."; \
-			fi; \
-			echo "[e2e] Running domain test reducers (one case per call)..."; \
-			for _domain_reducer in $(E2E_DOMAIN_TEST_REDUCERS); do \
-				echo "[e2e] Calling $$_domain_reducer..."; \
-				if ! spacetime call "$(E2E_DB)" "$$_domain_reducer" --server local --no-config; then \
-					echo "[e2e] $$_domain_reducer failed — tail of SpacetimeDB logs:"; \
-					spacetime logs "$(E2E_DB)" --server local --no-config 2>/dev/null | tail -40 || true; \
-					exit 1; \
+			if [ "$${E2E_RUN_DOMAIN_TESTS:-1}" = "1" ]; then \
+				if spacetime call "$(E2E_DB)" run_all_core_tests --server local --no-config; then \
+					echo "[e2e] Core reducer tests passed."; \
+				else \
+					echo "[e2e] run_all_core_tests is unavailable or failed; continuing with browser smoke tests."; \
 				fi; \
-			done; \
-			echo "[e2e] Domain reducer tests passed."; \
-			if [ "${E2E_RUN_DOMAIN_AGGREGATES:-0}" = "1" ]; then \
-				for _aggregate_reducer in run_all_inventory_tests run_all_analytics_tests; do \
-					echo "[e2e] Calling $_aggregate_reducer aggregate..."; \
-					if ! spacetime call "$(E2E_DB)" "$_aggregate_reducer" --server local --no-config; then \
-						echo "[e2e] $_aggregate_reducer failed — tail of SpacetimeDB logs:"; \
-						spacetime logs "$(E2E_DB)" --server local --no-config 2>/dev/null | tail -80 || true; \
+				echo "[e2e] Running domain test reducers (one case per call)..."; \
+				for _domain_reducer in $(E2E_DOMAIN_TEST_REDUCERS); do \
+					echo "[e2e] Calling $$_domain_reducer..."; \
+					if ! spacetime call "$(E2E_DB)" "$$_domain_reducer" --server local --no-config; then \
+						echo "[e2e] $$_domain_reducer failed — tail of SpacetimeDB logs:"; \
+						spacetime logs "$(E2E_DB)" --server local --no-config 2>/dev/null | tail -40 || true; \
 						exit 1; \
 					fi; \
 				done; \
-				echo "[e2e] Inventory and Analytics aggregate tests passed."; \
+				echo "[e2e] Domain reducer tests passed."; \
+				if [ "$${E2E_RUN_DOMAIN_AGGREGATES:-0}" = "1" ]; then \
+					for _aggregate_reducer in run_all_inventory_tests run_all_analytics_tests; do \
+						echo "[e2e] Calling $$_aggregate_reducer aggregate..."; \
+						if ! spacetime call "$(E2E_DB)" "$$_aggregate_reducer" --server local --no-config; then \
+							echo "[e2e] $$_aggregate_reducer failed — tail of SpacetimeDB logs:"; \
+							spacetime logs "$(E2E_DB)" --server local --no-config 2>/dev/null | tail -80 || true; \
+							exit 1; \
+						fi; \
+					done; \
+					echo "[e2e] Inventory and Analytics aggregate tests passed."; \
+				fi; \
+			else \
+				echo "[e2e] Skipping reducer/domain tests; browser fixture will seed a pristine database."; \
 			fi; \
 		fi; \
 		echo "[e2e] Obtaining local SpacetimeDB owner token (with private-table SQL preflight)..."; \
@@ -533,6 +543,7 @@ e2e-smoke-test:
 		NEXT_PUBLIC_STDB_MODULE="$(E2E_DB)" \
 		STDB_HOST="$$E2E_STDB_HOST" \
 		NEXT_PUBLIC_STDB_HOST="$$E2E_STDB_HOST" \
+		NEXT_PUBLIC_DEV_ADMIN="false" \
 		NEXT_PUBLIC_API_GATEWAY_URL="" \
 		"$$ROOT/scripts/e2e-dx.sh" frontend-build; \
 		echo "[e2e] Starting Next.js on :$(E2E_WEB_PORT)..."; \
@@ -545,6 +556,7 @@ e2e-smoke-test:
 		NEXT_PUBLIC_STDB_MODULE="$(E2E_DB)" \
 		STDB_HOST="$$E2E_STDB_HOST" \
 		NEXT_PUBLIC_STDB_HOST="$$E2E_STDB_HOST" \
+		NEXT_PUBLIC_DEV_ADMIN="false" \
 		NEXT_PUBLIC_API_GATEWAY_URL="" \
 		pnpm exec next start --hostname 127.0.0.1 --port $(E2E_WEB_PORT) >"$$LOG_DIR/next.log" 2>&1 & \
 		WEB_PID="$$!"; \
@@ -577,6 +589,7 @@ e2e-smoke-test:
 		NEXT_PUBLIC_STDB_MODULE="$(E2E_DB)" \
 		STDB_HOST="$$E2E_STDB_HOST" \
 		NEXT_PUBLIC_STDB_HOST="$$E2E_STDB_HOST" \
+		NEXT_PUBLIC_DEV_ADMIN="false" \
 		NEXT_PUBLIC_API_GATEWAY_URL="" \
 		E2E_WORKERS="$$E2E_WORKERS" \
 		pnpm exec playwright test "$${PW_ARGS[@]}"; \
@@ -673,6 +686,7 @@ e2e-single-test:
 		echo "[e2e] Building Next.js for single-spec run..."; \
 		PORT="" \
 		PLAYWRIGHT_PORT="$(E2E_WEB_PORT)" \
+		NEXT_PUBLIC_DEV_ADMIN="false" \
 		LUMIERE_API_SERVER_URL="http://127.0.0.1:$(E2E_API_PORT)" \
 		STDB_SERVER_TOKEN="$$E2E_STDB_TOKEN" \
 		STDB_CREDENTIAL_ENCRYPTION_KEY="$$STDB_CREDENTIAL_ENCRYPTION_KEY" \
@@ -736,7 +750,7 @@ e2e-web-dev: e2e-smoke-setup
 		LUMIERE_API_SERVER_URL="http://127.0.0.1:$(E2E_API_PORT)" \
 		STDB_SERVER_TOKEN="$$E2E_STDB_TOKEN" STDB_MODULE="$(E2E_DB)" \
 		NEXT_PUBLIC_STDB_MODULE="$(E2E_DB)" STDB_HOST="$$E2E_STDB_HOST" \
-		NEXT_PUBLIC_STDB_HOST="$$E2E_STDB_HOST" NEXT_PUBLIC_API_GATEWAY_URL="" \
+		NEXT_PUBLIC_STDB_HOST="$$E2E_STDB_HOST" NEXT_PUBLIC_DEV_ADMIN="false" NEXT_PUBLIC_API_GATEWAY_URL="" \
 		pnpm exec next dev --hostname 127.0.0.1 --port $(E2E_WEB_PORT); \
 	'
 
@@ -847,31 +861,35 @@ e2e-smoke:
 			echo "[e2e] Preserving existing DB (set E2E_CLEAR_DB=1 to wipe + full re-seed)."; \
 			LUMIERE_ENABLE_DEV_REDUCERS=1 spacetime publish "$(E2E_DB)" --bin-path "$(MODULE)/target/wasm32-unknown-unknown/release/lumiere_v1.wasm" --server local -y --no-config; \
 		fi; \
-		if spacetime call "$(E2E_DB)" run_all_core_tests --server local --no-config; then \
-			echo "[e2e] Core reducer tests passed."; \
-		else \
-			echo "[e2e] run_all_core_tests is unavailable or failed; continuing with browser smoke tests."; \
-		fi; \
-		echo "[e2e] Running domain test reducers (one case per call)..."; \
-		for _domain_reducer in $(E2E_DOMAIN_TEST_REDUCERS); do \
-			echo "[e2e] Calling $$_domain_reducer..."; \
-			if ! spacetime call "$(E2E_DB)" "$$_domain_reducer" --server local --no-config; then \
-				echo "[e2e] $$_domain_reducer failed — tail of SpacetimeDB logs:"; \
-				spacetime logs "$(E2E_DB)" --server local --no-config 2>/dev/null | tail -40 || true; \
-				exit 1; \
+		if [ "$${E2E_RUN_DOMAIN_TESTS:-1}" = "1" ]; then \
+			if spacetime call "$(E2E_DB)" run_all_core_tests --server local --no-config; then \
+				echo "[e2e] Core reducer tests passed."; \
+			else \
+				echo "[e2e] run_all_core_tests is unavailable or failed; continuing with browser smoke tests."; \
 			fi; \
-		done; \
-		echo "[e2e] Domain reducer tests passed."; \
-		if [ "${E2E_RUN_DOMAIN_AGGREGATES:-0}" = "1" ]; then \
-			for _aggregate_reducer in run_all_inventory_tests run_all_analytics_tests; do \
-				echo "[e2e] Calling $_aggregate_reducer aggregate..."; \
-				if ! spacetime call "$(E2E_DB)" "$_aggregate_reducer" --server local --no-config; then \
-					echo "[e2e] $_aggregate_reducer failed — tail of SpacetimeDB logs:"; \
-					spacetime logs "$(E2E_DB)" --server local --no-config 2>/dev/null | tail -80 || true; \
+			echo "[e2e] Running domain test reducers (one case per call)..."; \
+			for _domain_reducer in $(E2E_DOMAIN_TEST_REDUCERS); do \
+				echo "[e2e] Calling $$_domain_reducer..."; \
+				if ! spacetime call "$(E2E_DB)" "$$_domain_reducer" --server local --no-config; then \
+					echo "[e2e] $$_domain_reducer failed — tail of SpacetimeDB logs:"; \
+					spacetime logs "$(E2E_DB)" --server local --no-config 2>/dev/null | tail -40 || true; \
 					exit 1; \
 				fi; \
 			done; \
-			echo "[e2e] Inventory and Analytics aggregate tests passed."; \
+			echo "[e2e] Domain reducer tests passed."; \
+			if [ "$${E2E_RUN_DOMAIN_AGGREGATES:-0}" = "1" ]; then \
+				for _aggregate_reducer in run_all_inventory_tests run_all_analytics_tests; do \
+					echo "[e2e] Calling $$_aggregate_reducer aggregate..."; \
+					if ! spacetime call "$(E2E_DB)" "$$_aggregate_reducer" --server local --no-config; then \
+						echo "[e2e] $$_aggregate_reducer failed — tail of SpacetimeDB logs:"; \
+						spacetime logs "$(E2E_DB)" --server local --no-config 2>/dev/null | tail -80 || true; \
+						exit 1; \
+					fi; \
+				done; \
+				echo "[e2e] Inventory and Analytics aggregate tests passed."; \
+			fi; \
+		else \
+			echo "[e2e] Skipping reducer/domain tests; browser fixture will seed a pristine database."; \
 		fi; \
 		echo "[e2e] Obtaining local SpacetimeDB owner token (with private-table SQL preflight)..."; \
 		STDB_SERVER_TOKEN="$$(E2E_STDB_HOST="$$E2E_STDB_HOST" STDB_MODULE="$(E2E_DB)" node "$$ROOT/scripts/e2e-local-stdb-token.mjs")"; \
@@ -928,6 +946,7 @@ e2e-smoke:
 		echo "[e2e] Building Next.js (once, before Playwright)..."; \
 		PORT="" \
 		PLAYWRIGHT_PORT="$(E2E_WEB_PORT)" \
+		NEXT_PUBLIC_DEV_ADMIN="false" \
 		LUMIERE_API_SERVER_URL="http://127.0.0.1:$(E2E_API_PORT)" \
 		STDB_SERVER_TOKEN="$$E2E_STDB_TOKEN" \
 		STDB_CREDENTIAL_ENCRYPTION_KEY="$$STDB_CREDENTIAL_ENCRYPTION_KEY" \
@@ -970,7 +989,7 @@ e2e-smoke:
 			read -r -a SPEC_FILES <<< "$${E2E_SPEC_FILES:-}"; \
 			if [ "$${#SPEC_FILES[@]}" -eq 0 ]; then echo "[e2e] E2E_SUITE=targeted requires E2E_SPEC_FILES" >&2; exit 1; fi; \
 			echo "[e2e] Targeted specs: $${SPEC_FILES[*]}"; \
-			if [ "$${E2E_REQUIRE_AI:-0}" = "1" ]; then PW_ARGS+=(--grep-invert @dev-fixture); else PW_ARGS+=(--grep-invert "@dev-fixture|@ai-live"); fi; \
+			if [ "$${E2E_REQUIRE_AI:-0}" != "1" ]; then PW_ARGS+=(--grep-invert @ai-live); fi; \
 			PW_ARGS+=("$${SPEC_FILES[@]}"); \
 		elif [ "$${E2E_REQUIRE_AI:-0}" != "1" ]; then \
 			PW_ARGS+=(--grep-invert @ai-live); \
@@ -1001,6 +1020,12 @@ schema-snapshot:
 
 init-stack:
 	STDB_MODULE="$(STDB_MODULE)" bash scripts/init-stack.sh
+
+refresh-stack-tokens:
+	bash scripts/init-stack.sh --refresh-tokens
+
+register-stack-identities:
+	node scripts/register-local-service-identities.mjs .env.docker
 
 docker-dev:
 	docker compose --env-file .env.docker -f docker-compose.dev.yml up --build
@@ -1224,8 +1249,24 @@ check-contracts-drift: clean-contracts-live-staging generate-presentation-schema
 
 # Publish freshly generated bindings + manifests to lumiere-contracts as a new
 # tagged release, then print the Cargo.toml dependency line to bump.
+contracts-module-ci:
+	mkdir -p .ci
+	@cargo build --quiet --manifest-path spacetimedb/Cargo.toml --target wasm32-unknown-unknown --profile ci-contracts \
+		2>.ci/contracts-module-build.log || \
+		(cat .ci/contracts-module-build.log >&2; exit 1)
+	cp spacetimedb/target/wasm32-unknown-unknown/ci-contracts/lumiere_v1.wasm .ci/contracts-module.wasm
+
 publish-contracts: generate-presentation-contracts schema-snapshot generate-stdb-rust-sdk generate-stdb-ts-sdk codegen
 	@if [ -z "$(VERSION)" ]; then echo "usage: make publish-contracts VERSION=x.y.z" >&2; exit 1; fi
+	bash scripts/publish-contracts.sh "$(VERSION)"
+
+# Release CI performs two complete generation passes before this target. Keep
+# publication separate so a verified staging tree is not regenerated a third
+# time. This target is also useful after an explicit local `make check-codegen`.
+publish-contracts-prepared:
+	@if [ -z "$(VERSION)" ]; then echo "usage: make publish-contracts-prepared VERSION=x.y.z" >&2; exit 1; fi
+	@test -f .contracts-staging/ir/lumiere-contract-ir-v2.json || \
+		(echo "prepared contracts staging is missing; run make check-codegen first" >&2; exit 1)
 	bash scripts/publish-contracts.sh "$(VERSION)"
 
 # Presentation wire contracts are generated from crates/presentation-core Rust

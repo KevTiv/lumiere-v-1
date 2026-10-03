@@ -366,7 +366,14 @@ mod tests {
         let release = release_metadata().expect("valid release metadata");
         assert_eq!(release.contract_version, "ir-v2");
         assert_eq!(release.migration_version, 10);
-        assert_eq!(release.contract_release, "0.3.48");
+        // The pin step rewrites the manifest and the workspace dependency tag together; the
+        // manifest must name the contracts release this binary actually compiles against.
+        let workspace = include_str!("../../../Cargo.toml");
+        assert!(
+            workspace.contains(&format!("tag = \"v{}\"", release.contract_release)),
+            "release manifest pins v{} but Cargo.toml compiles a different lumiere-contracts tag",
+            release.contract_release
+        );
     }
 
     #[test]

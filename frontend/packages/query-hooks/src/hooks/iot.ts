@@ -31,8 +31,14 @@ import type {
 type ScalarId = bigint | number | string;
 
 import { responseErrorMessage as parseCallError } from '@lumiere/api-client/response-error';
+import { decodeOperationDispatch } from '@lumiere/api-client';
 import { scalarToU64 } from '@lumiere/erp-shared/u64';
 import { resolveResolvedIotAlertEffect } from './iot-alert-resolution';
+import { resolveAcknowledgedIotActionEffect } from './partial-slice-effects';
+import {
+  executeOperationWithCanonicalReadback,
+  requireResolvedOperationEffect,
+} from './operation-effect';
 
 // ── Reads ────────────────────────────────────────────────────────────────────
 
@@ -126,12 +132,12 @@ export function useIotThresholds(
 
 // ── Query invalidation helper ───────────────────────────────────────────────
 
-function invalidateIotQueries(
+async function invalidateIotQueries(
   qc: ReturnType<typeof useQueryClient>,
   organizationId: bigint,
-) {
+): Promise<void> {
   const k = rqBigIntKey(organizationId);
-  return Promise.all([
+  await Promise.all([
     qc.invalidateQueries({ queryKey: ['iot-devices', k] }),
     qc.invalidateQueries({ queryKey: ['iot-hubs', k] }),
     qc.invalidateQueries({ queryKey: ['iot-pairing-tokens', k] }),
@@ -435,14 +441,33 @@ export function useAcknowledgeIotAction(organizationId: bigint) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (actionId: ScalarId) => {
-      const { urlPath, init } = stdbBffCommandPost('acknowledge_iot_action', {
-        actionId,
-        resultPayload: null,
+      const id = scalarToU64(actionId);
+      const outcome = await executeOperationWithCanonicalReadback({
+        resolveEffect: async () =>
+          resolveAcknowledgedIotActionEffect(
+            await fetchQueryList(
+              '/api/query/iot-actions',
+              'Failed to read IoT actions',
+            ),
+            organizationId,
+            id,
+          ),
+        dispatch: async () => {
+          const { urlPath, init } = stdbBffCommandPost(
+            'acknowledge_iot_action',
+            { actionId: id, resultPayload: null },
+          );
+          return decodeOperationDispatch(
+            await apiFetch(urlPath, init),
+            'Failed to acknowledge IoT action',
+          );
+        },
+        afterDispatch: () => invalidateIotQueries(qc, organizationId),
+        readbackAttempts: 6,
+        readbackDelayMs: 150,
       });
-      const r = await apiFetch(urlPath, init);
-      if (!r.ok) throw new Error(await parseCallError(r));
+      return requireResolvedOperationEffect(outcome);
     },
-    onSuccess: () => invalidateIotQueries(qc, organizationId),
   });
 }
 

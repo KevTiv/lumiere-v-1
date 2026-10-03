@@ -66,7 +66,7 @@ describe("Projects timesheet approval timeline", () => {
     assert.match(rejection, /stdbBffCommandPost\(\s*['"]reject_timesheets['"]/)
     assert.match(
       rejection,
-      /onSuccess:\s*\(\)\s*=>\s*invalidateTimesheetQueues\(qc,\s*organizationId\)/,
+      /afterDispatch:\s*\(\)\s*=>\s*invalidateTimesheetQueues\(qc,\s*organizationId\)/,
     )
     assert.match(
       invalidation,

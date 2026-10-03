@@ -6,6 +6,7 @@ pub mod gap_fixes_test;
 pub mod o2c_certification_test;
 pub mod oms_extensions_test;
 pub mod pos_order_finalize_test;
+pub mod pos_session_close_test;
 pub mod sale_order_update_test;
 pub mod sales_core_test;
 
@@ -42,6 +43,8 @@ pub fn run_all_sales_tests(ctx: &ReducerContext) -> Result<(), String> {
     run_sales_cancel_cross_org_rejected_test(ctx)?;
     run_sales_cancel_nonexistent_rejected_test(ctx)?;
     run_pos_order_finalize_test(ctx)?;
+    pos_session_close_test::test_pos_session_close_is_exact_and_replay_safe(ctx)
+        .map_err(|e| format!("pos_session_close_exact_effect: {e}"))?;
     log::info!("✅ run_all_sales_tests complete");
     Ok(())
 }
@@ -188,7 +191,9 @@ pub fn run_sales_pricelist_company_scope_test(ctx: &ReducerContext) -> Result<()
 #[spacetimedb::reducer]
 pub fn run_sales_exchange_from_return_test(ctx: &ReducerContext) -> Result<(), String> {
     gap_fixes_test::test_exchange_order_from_return(ctx)
-        .map_err(|e| format!("exchange_from_return: {e}"))
+        .map_err(|e| format!("exchange_from_return: {e}"))?;
+    gap_fixes_test::test_keyed_return_order_replay(ctx)
+        .map_err(|e| format!("keyed_return_order_replay: {e}"))
 }
 
 #[spacetimedb::reducer]

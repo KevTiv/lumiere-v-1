@@ -151,9 +151,11 @@ claimed by this release.
 
 ### Gate 4 gateway primitives (`codex/ai-harness-h5b-gateway`)
 
-The four H5b tables are private, so the gateway reads them through a dedicated
-`AI_SPEND_READ_STDB_TOKEN` identity (rejected when it equals `STDB_TOKEN` or the
-certification token), following the api-server `workflow_reads` pattern.
+The H5b spend, price, attempt, and draft-request tables are private. The gateway
+reads the required fields through five public sender-scoped views and a
+dedicated `AI_SPEND_READ_STDB_TOKEN` identity. Each view returns rows only for
+organizations where that caller is the active registered `ai_spend_reader`.
+The token is rejected when it equals `STDB_TOKEN` or the certification token.
 Writes stay on the gateway principal.
 
 - `ai-gateway/src/ai_spend.rs` derives deterministic run-scoped request keys,
@@ -161,6 +163,11 @@ Writes stay on the gateway principal.
   `settle_ai_spend` and `create_ai_run_action_draft`, and performs scoped reads
   with numeric-only SQL filters; string bindings are matched in gateway code and
   foreign-organization, duplicate or cross-company rows fail closed.
+- Local proof on 2026-10-03 used one non-empty budget and price snapshot: the
+  registered reader saw one row, a different registered worker saw zero rows,
+  and direct reader access to the private source table remained denied. This
+  view/index delta requires the next immutable contracts release and consumer
+  pin before production activation.
 - `run_recorded_loop` requires a spend ledger and binding and dispatches every
   provider attempt through `SpendAdmittedLlm`. After the loop, failure stops
   (malformed call, denied tool, policy or tool failure, provider failure, round,

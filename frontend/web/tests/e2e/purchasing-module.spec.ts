@@ -15,8 +15,8 @@ import {
   fetchCurrencyIdByCode,
   fetchDefaultCompanyId,
   fetchFirstUomId,
-  fetchLatestPurchaseOrderLineIdByOrder,
-  fetchLatestPurchaseOrderIdByPartner,
+  fetchOnlyPurchaseOrderLineId,
+  fetchPurchaseOrderIdByExactOrigin,
   fetchProductIdByName,
   fetchSessionOrganizationId,
   fetchVendorPartnerIdByName,
@@ -168,7 +168,10 @@ async function fetchPurchaseOrderPickingIds(page: Page, orderId: number): Promis
   throw new Error(`purchase order ${orderId} has no pickings`)
 }
 
-async function fetchLatestLandedCostId(page: Page, description: string): Promise<number> {
+async function fetchLandedCostIdByExactDescription(
+  page: Page,
+  description: string,
+): Promise<number> {
   const deadline = Date.now() + 30_000
   let lastStatus = 0
   let lastDescriptions: string[] = []
@@ -183,10 +186,12 @@ async function fetchLatestLandedCostId(page: Page, description: string): Promise
       const matches = (json.data ?? []).filter(
         (r) => scalarQueryString(r.description) === description,
       )
-      const newest = [...matches].sort(
-        (a, b) => (scalarQueryId(b.id) ?? 0) - (scalarQueryId(a.id) ?? 0),
-      )[0]
-      const id = scalarQueryId(newest?.id)
+      if (matches.length > 1) {
+        throw new Error(
+          `expected one landed cost for description ${description}, found ${matches.length}`,
+        )
+      }
+      const id = scalarQueryId(matches[0]?.id)
       if (id != null) return id
     }
     await page.waitForTimeout(250)
@@ -249,7 +254,7 @@ test.describe("PUR-007: PO → Receipt → Landed Cost flow", { tag: "@p0" }, ()
       },
     ])
 
-    const orderId = await fetchLatestPurchaseOrderIdByPartner(page, vendorPartnerId, origin)
+    const orderId = await fetchPurchaseOrderIdByExactOrigin(page, vendorPartnerId, origin)
 
     await callReducerBff(page, "add_purchase_order_line", [
       organizationId,
@@ -273,7 +278,7 @@ test.describe("PUR-007: PO → Receipt → Landed Cost flow", { tag: "@p0" }, ()
       },
     ])
 
-    const lineId = await fetchLatestPurchaseOrderLineIdByOrder(page, orderId)
+    const lineId = await fetchOnlyPurchaseOrderLineId(page, orderId)
 
     await callReducerBff(page, "confirm_purchase_order", [organizationId, orderId])
     await waitForPurchaseOrderState(page, orderId, "Purchase")
@@ -325,7 +330,7 @@ test.describe("PUR-007: PO → Receipt → Landed Cost flow", { tag: "@p0" }, ()
       },
     ])
 
-    const landedCostId = await fetchLatestLandedCostId(page, lcDescription)
+    const landedCostId = await fetchLandedCostIdByExactDescription(page, lcDescription)
 
     await callReducerBff(page, "add_landed_cost_line", [
       organizationId,

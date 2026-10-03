@@ -28,6 +28,10 @@ import type {
 
 import { responseErrorMessage as parseCallErrorDocuments } from "@lumiere/api-client/response-error"
 
+import { resolveDocumentVersionEffect } from "./document-version-effect"
+import { resolveDocumentLockEffect, type DocumentLockProjection } from "./document-lock-effect"
+import type { CanonicalRecordRef } from "./operation-effect"
+
 // ── Reads ────────────────────────────────────────────────────────────────────
 
 export function useDocuments(
@@ -193,13 +197,13 @@ export function useRestoreDocument(organizationId: bigint) {
 
 export function useLockDocument(organizationId: bigint) {
   const qc = useQueryClient()
-  return useMutation({
-    mutationFn: async (
-      input:
-        | ScalarId
-        | { documentId: ScalarId; leaseSeconds?: number | null },
-    ) => {
-      const documentId =
+  return useMutation<
+    CanonicalRecordRef,
+    Error,
+    ScalarId | { documentId: ScalarId; leaseSeconds?: number | null }
+  >({
+    mutationFn: async (input) => {
+      const rawId =
         typeof input === "object" && input !== null && "documentId" in input
           ? input.documentId
           : input
@@ -207,9 +211,14 @@ export function useLockDocument(organizationId: bigint) {
         typeof input === "object" && input !== null && "documentId" in input
           ? (input.leaseSeconds ?? null)
           : null
-      const { urlPath, init } = stdbBffCommandPost("lock_document", { documentId: toScalarU64(documentId), leaseSeconds: leaseSeconds == null ? null : Number(leaseSeconds) })
+      const documentId = toScalarU64(rawId)
+      const { urlPath, init } = stdbBffCommandPost("lock_document", { documentId, leaseSeconds: leaseSeconds == null ? null : Number(leaseSeconds) })
       const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error('Failed to lock document')
+      if (!r.ok) throw new Error(await parseCallErrorDocuments(r))
+      const rows = await fetchQueryList("/api/query/documents", "Failed to read document")
+      const effect = resolveDocumentLockEffect(rows, organizationId, documentId, "locked")
+      if (!effect) throw new Error("Document did not read back as locked")
+      return effect
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['documents', rqBigIntKey(organizationId)] }),
   })
@@ -217,11 +226,16 @@ export function useLockDocument(organizationId: bigint) {
 
 export function useUnlockDocument(organizationId: bigint) {
   const qc = useQueryClient()
-  return useMutation({
-    mutationFn: async (documentId: bigint | number | string) => {
-      const { urlPath, init } = stdbBffCommandPost("unlock_document", { documentId: toScalarU64(documentId) })
+  return useMutation<CanonicalRecordRef, Error, ScalarId>({
+    mutationFn: async (rawId) => {
+      const documentId = toScalarU64(rawId)
+      const { urlPath, init } = stdbBffCommandPost("unlock_document", { documentId })
       const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error('Failed to unlock document')
+      if (!r.ok) throw new Error(await parseCallErrorDocuments(r))
+      const rows = await fetchQueryList("/api/query/documents", "Failed to read document")
+      const effect = resolveDocumentLockEffect(rows, organizationId, documentId, "unlocked")
+      if (!effect) throw new Error("Document did not read back as unlocked")
+      return effect
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['documents', rqBigIntKey(organizationId)] }),
   })
@@ -229,17 +243,23 @@ export function useUnlockDocument(organizationId: bigint) {
 
 export function useAddDocumentVersion(organizationId: bigint) {
   const qc = useQueryClient()
-  return useMutation({
-    mutationFn: async ({
-      documentId,
-      params,
-    }: {
-      documentId: bigint | number | string
-      params: Record<string, unknown>
-    }) => {
-      const { urlPath, init } = stdbBffCommandPost("add_document_version", { documentId: toScalarU64(documentId), params: stdbParamsToJson(params as object, "AddDocumentVersionParams") })
+  return useMutation<
+    CanonicalRecordRef,
+    Error,
+    { documentId: bigint | number | string; params: Record<string, unknown> }
+  >({
+    mutationFn: async ({ documentId: rawId, params }) => {
+      const documentId = toScalarU64(rawId)
+      const url = typeof params.url === "string" ? params.url : ""
+      const checksum = typeof params.checksum === "string" ? params.checksum : ""
+      const before = await fetchQueryList("/api/query/document-versions", "Failed to read document versions")
+      const { urlPath, init } = stdbBffCommandPost("add_document_version", { documentId, params: stdbParamsToJson(params as object, "AddDocumentVersionParams") })
       const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error('Failed to add document version')
+      if (!r.ok) throw new Error(await parseCallErrorDocuments(r))
+      const after = await fetchQueryList("/api/query/document-versions", "Failed to read document versions")
+      const effect = resolveDocumentVersionEffect(before, after, organizationId, documentId, { url, checksum })
+      if (!effect) throw new Error("Document version did not read back")
+      return effect
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['documents', rqBigIntKey(organizationId)] })

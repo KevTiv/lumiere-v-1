@@ -5,7 +5,7 @@
 import { stdbBffCommandPost } from "@lumiere/stdb/commands"
 import { apiFetch } from "../http"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
+import { encodeOptionalString, stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
 import type { ClearablePatch } from "@lumiere/erp-shared/accounting-create-params"
 import type {
   CreateCompanyParams,
@@ -202,7 +202,7 @@ export function useSetCompanyVerticalPack() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (args: { companyId: bigint; organizationId: number; packKey: "distributor_wholesaler"; enabled: boolean; configuration?: string }) => {
-      const { urlPath, init } = stdbBffCommandPost("set_company_vertical_pack", { companyId: args.companyId, params: stdbParamsToJson({ packKey: args.packKey, enabled: args.enabled, configuration: args.configuration }, "SetCompanyVerticalPackParams") })
+      const { urlPath, init } = stdbBffCommandPost("set_company_vertical_pack", { companyId: args.companyId, params: stdbParamsToJson({ packKey: args.packKey, enabled: args.enabled, configuration: encodeOptionalString(args.configuration) }, "SetCompanyVerticalPackParams") })
       const response = await apiFetch(urlPath, init)
       if (!response.ok) throw new Error(await parseCallError(response))
       return args.organizationId

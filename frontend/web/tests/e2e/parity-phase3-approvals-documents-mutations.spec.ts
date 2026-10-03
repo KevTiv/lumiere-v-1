@@ -13,7 +13,7 @@ import {
   expectNoAppError,
   fetchAdminRoleId,
   fetchDefaultCompanyId,
-  fetchLatestPurchaseOrderIdByPartner,
+  fetchPurchaseOrderIdByExactOrigin,
   fetchPurchaseOrderSelectLabel,
   fetchSessionOrganizationId,
   fetchVendorPartnerIdByName,
@@ -119,7 +119,7 @@ test.describe(
       ])
       expect(createPoRes.ok()).toBe(true)
 
-      const orderId = await fetchLatestPurchaseOrderIdByPartner(page, vendorPartnerId, origin)
+      const orderId = await fetchPurchaseOrderIdByExactOrigin(page, vendorPartnerId, origin)
       const orderLabel = await fetchPurchaseOrderSelectLabel(page, orderId)
 
       await page.getByTestId("module-tab-purchasing-lines").click()

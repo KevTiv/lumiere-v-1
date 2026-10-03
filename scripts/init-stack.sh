@@ -10,22 +10,42 @@ env_file="$root/.env.docker"
 compose=(docker compose --env-file "$env_file" -f "$root/docker-compose.dev.yml")
 module_name="${STDB_MODULE:-lumiere-v1}"
 force=false
+refresh_tokens=false
 
 usage() {
   echo "Usage: make init-stack [STDB_MODULE=local-module-name]"
-  echo "       bash scripts/init-stack.sh [--force] [module-name]"
+  echo "       bash scripts/init-stack.sh [--force|--refresh-tokens] [module-name]"
 }
 
 for arg in "$@"; do
   case "$arg" in
     --force) force=true ;;
+    --refresh-tokens) refresh_tokens=true ;;
     -h|--help) usage; exit 0 ;;
     -*) usage >&2; exit 2 ;;
     *) module_name="$arg" ;;
   esac
 done
 
-if [[ -e "$env_file" && "$force" != true ]]; then
+if [[ "$force" == true && "$refresh_tokens" == true ]]; then
+  echo "--force and --refresh-tokens cannot be used together" >&2
+  exit 2
+fi
+
+if [[ "$refresh_tokens" == true && ! -e "$env_file" ]]; then
+  echo "$env_file does not exist; run 'make init-stack' first." >&2
+  exit 1
+fi
+
+if [[ "$refresh_tokens" == true ]]; then
+  module_name="$(sed -n 's/^STDB_MODULE=//p' "$env_file" | head -n 1)"
+  if [[ -z "$module_name" ]]; then
+    echo "$env_file does not define STDB_MODULE" >&2
+    exit 1
+  fi
+fi
+
+if [[ -e "$env_file" && "$force" != true && "$refresh_tokens" != true ]]; then
   echo "$env_file already exists; keeping its credentials." >&2
   echo "Use 'bash scripts/init-stack.sh --force $module_name' to replace it." >&2
   exit 1
@@ -36,18 +56,20 @@ if ! command -v openssl >/dev/null; then
   exit 1
 fi
 
-secret="$(openssl rand -hex 32)"
 temp_file="$(mktemp "${env_file}.XXXXXX")"
 trap 'rm -f "$temp_file"' EXIT
 
-sed \
-  -e "s|^STDB_MODULE=.*|STDB_MODULE=$module_name|" \
-  -e 's|^STDB_SERVER_TOKEN=.*|STDB_SERVER_TOKEN=replace-with-local-owner-token|' \
-  -e 's|^STDB_TOKEN=.*|STDB_TOKEN=replace-with-local-owner-token|' \
-  -e "s|^LUMIERE_AI_GATEWAY_INTERNAL_SECRET=.*|LUMIERE_AI_GATEWAY_INTERNAL_SECRET=$secret|" \
-  "$root/.env.docker.example" >"$temp_file"
-chmod 600 "$temp_file"
-mv "$temp_file" "$env_file"
+if [[ "$refresh_tokens" != true ]]; then
+  secret="$(openssl rand -hex 32)"
+  sed \
+    -e "s|^STDB_MODULE=.*|STDB_MODULE=$module_name|" \
+    -e 's|^STDB_SERVER_TOKEN=.*|STDB_SERVER_TOKEN=replace-with-local-owner-token|' \
+    -e 's|^STDB_TOKEN=.*|STDB_TOKEN=replace-with-local-owner-token|' \
+    -e "s|^LUMIERE_AI_GATEWAY_INTERNAL_SECRET=.*|LUMIERE_AI_GATEWAY_INTERNAL_SECRET=$secret|" \
+    "$root/.env.docker.example" >"$temp_file"
+  chmod 600 "$temp_file"
+  mv "$temp_file" "$env_file"
+fi
 
 echo "[init-stack] Starting local SpacetimeDB..."
 "${compose[@]}" up -d spacetimedb
@@ -65,14 +87,34 @@ if ! curl -fsS -X POST http://127.0.0.1:3000/v1/identity >/dev/null 2>&1; then
   exit 1
 fi
 
-echo "[init-stack] Registering a local SpacetimeDB identity..."
-spacetime login --server-issued-login local --no-browser
+if [[ "$refresh_tokens" != true ]]; then
+  echo "[init-stack] Registering a local SpacetimeDB identity..."
+  spacetime login --server-issued-login local --no-browser
+fi
 
-echo "[init-stack] Publishing module '$module_name' (the first Rust/WASM build can take a while)..."
-spacetime publish "$module_name" --module-path "$root/spacetimedb" --server local -y
+if [[ "$refresh_tokens" != true ]]; then
+  echo "[init-stack] Building module '$module_name' (the first Rust/WASM build can take a while)..."
+  (
+    cd "$root/spacetimedb"
+    LUMIERE_ENABLE_DEV_REDUCERS=1 \
+      cargo build --locked --target wasm32-unknown-unknown --release
+  )
+  echo "[init-stack] Publishing module '$module_name'..."
+  spacetime publish "$module_name" \
+    --bin-path "$root/spacetimedb/target/wasm32-unknown-unknown/release/lumiere_v1.wasm" \
+    --server local \
+    -y
+fi
 
 echo "[init-stack] Reading and validating the local owner token..."
-token="$(STDB_MODULE="$module_name" E2E_STDB_HOST=http://127.0.0.1:3000 node "$root/scripts/e2e-local-stdb-token.mjs")"
+if [[ "$refresh_tokens" == true ]]; then
+  token="$(sed -n 's/^STDB_SERVER_TOKEN=//p' "$env_file" | head -n 1)"
+  STDB_SERVER_TOKEN="$token" STDB_MODULE="$module_name" \
+    E2E_STDB_HOST=http://127.0.0.1:3000 \
+    node "$root/scripts/e2e-local-stdb-token.mjs" --verify
+else
+  token="$(STDB_MODULE="$module_name" E2E_STDB_HOST=http://127.0.0.1:3000 node "$root/scripts/e2e-local-stdb-token.mjs")"
+fi
 if [[ -z "$token" ]]; then
   echo "Could not obtain a local SpacetimeDB owner token" >&2
   exit 1
@@ -96,6 +138,7 @@ expense_worker_token="$(mint_worker_token)"
 hr_worker_token="$(mint_worker_token)"
 project_worker_token="$(mint_worker_token)"
 iot_gateway_token="$(mint_worker_token)"
+ai_spend_reader_token="$(mint_worker_token)"
 worker_tokens=(
   "$worker_token"
   "$owner_report_worker_token"
@@ -104,6 +147,7 @@ worker_tokens=(
   "$hr_worker_token"
   "$project_worker_token"
   "$iot_gateway_token"
+  "$ai_spend_reader_token"
 )
 for worker_candidate in "${worker_tokens[@]}"; do
   if [[ -z "$worker_candidate" || "$worker_candidate" == "$token" ]]; then
@@ -125,9 +169,17 @@ sed \
   -e "s|^STDB_HR_WORKER_TOKEN=.*|STDB_HR_WORKER_TOKEN=$hr_worker_token|" \
   -e "s|^STDB_PROJECT_WORKER_TOKEN=.*|STDB_PROJECT_WORKER_TOKEN=$project_worker_token|" \
   -e "s|^STDB_IOT_GATEWAY_TOKEN=.*|STDB_IOT_GATEWAY_TOKEN=$iot_gateway_token|" \
+  -e "s|^AI_SPEND_READ_STDB_TOKEN=.*|AI_SPEND_READ_STDB_TOKEN=$ai_spend_reader_token|" \
   -e "s|^STDB_TOKEN=.*|STDB_TOKEN=$token|" \
   "$env_file" >"$temp_file"
 chmod 600 "$temp_file"
 mv "$temp_file" "$env_file"
 
-echo "[init-stack] Complete. Register each worker identity for the organizations it processes, then start the full stack with: make docker-dev"
+echo "[init-stack] Registering dedicated local service identities for existing organizations..."
+node "$root/scripts/register-local-service-identities.mjs" "$env_file"
+
+if [[ "$refresh_tokens" == true ]]; then
+  echo "[init-stack] Token refresh complete. Recreate the affected services with: make docker-dev"
+else
+  echo "[init-stack] Complete. Seed the local fixture, then run 'make register-stack-identities' before starting workers."
+fi

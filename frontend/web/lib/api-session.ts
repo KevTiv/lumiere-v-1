@@ -110,24 +110,26 @@ export async function resolveApiSession(req?: Request): Promise<ApiSession | nul
     const mockOrgId = process.env['DEV_MOCK_ORG_ID']
     const mockToken = process.env['STDB_SERVER_TOKEN']?.trim()
     if (mockOrgId && mockToken) {
-      const opts: StdbHttpOptions = { token: mockToken }
-      const organizationId = Number(mockOrgId)
-      const identityHex = 'dev-mock-identity'
-      let fieldAccess: FieldAccessContext | undefined
-      try {
-        fieldAccess = await fetchFieldAccessFromApiServer({
-          token: mockToken,
+      const identityHex = decodeIdentityHexFromStdbToken(mockToken)
+      if (identityHex) {
+        const opts: StdbHttpOptions = { token: mockToken }
+        const organizationId = Number(mockOrgId)
+        let fieldAccess: FieldAccessContext | undefined
+        try {
+          fieldAccess = await fetchFieldAccessFromApiServer({
+            token: mockToken,
+            identityHex,
+          })
+        } catch {
+          fieldAccess = undefined
+        }
+        return {
+          stdbToken: mockToken,
           identityHex,
-        })
-      } catch {
-        fieldAccess = undefined
-      }
-      return {
-        stdbToken: mockToken,
-        identityHex,
-        organizationId,
-        opts,
-        fieldAccess,
+          organizationId,
+          opts,
+          fieldAccess,
+        }
       }
     }
   }

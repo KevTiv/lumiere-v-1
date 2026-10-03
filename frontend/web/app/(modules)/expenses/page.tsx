@@ -1,5 +1,5 @@
 import { getStdbSession } from "@/lib/api-session"
-import { serverFetchQueryListsAllowEmpty } from "@/lib/server-query"
+import { serverFetchQueryListsRequired } from "@/lib/server-query"
 import { ExpensesClient } from "./expenses-client"
 
 const SSR_RESOURCES = ["expenses", "expense-sheets", "pricelists", "employees"] as const
@@ -10,7 +10,7 @@ export default async function ExpensesPage() {
     return <ExpensesClient />
   }
 
-  const [expenses, sheets, pricelists, employees] = await serverFetchQueryListsAllowEmpty(
+  const [expenses, sheets, pricelists, employees] = await serverFetchQueryListsRequired(
     session,
     SSR_RESOURCES,
   )

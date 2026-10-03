@@ -1,4 +1,5 @@
 "use client"
+import { accountMoveHref } from "@lumiere/erp-shared/record-links"
 import { mapDashboardWidgets, withDashboardSections } from "@lumiere/ui/lib/dashboard-sections"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
@@ -215,11 +216,14 @@ function ExpensesClientLoaded({
     [createExpenseReceipt],
   )
   const submitExpense = useSubmitExpense(orgId)
-  const submitExpenseSheet = useSubmitExpenseSheet(orgId)
-  const approveExpenseSheet = useApproveExpenseSheet(orgId)
+  const submitExpenseSheet = useSubmitExpenseSheet(orgId, operatingCompanyId)
+  const approveExpenseSheet = useApproveExpenseSheet(orgId, operatingCompanyId)
   const refuseExpenseSheet = useRefuseExpenseSheet(orgId)
-  const postExpenseSheet = usePostExpenseSheet(orgId)
-  const reimburseExpenseSheet = useCreateExpenseReimbursementPayment(orgId)
+  const postExpenseSheet = usePostExpenseSheet(orgId, operatingCompanyId)
+  const reimburseExpenseSheet = useCreateExpenseReimbursementPayment(
+    orgId,
+    operatingCompanyId,
+  )
   const setExpenseAllocations = useSetExpenseAllocations(orgId)
   const projectRebill = useCreateExpenseProjectRebill(orgId)
   const csvImports = useExpensesCsvImportMutations(orgId)
@@ -832,6 +836,7 @@ function ExpensesClientLoaded({
           payableAccountId: BigInt(String(payableAccountId)),
           liquidityAccountId: BigInt(String(liquidityAccountId)),
           ...(amount != null && Number.isFinite(amount) ? { amount } : {}),
+          clientRequestId: `exp-reimburse-${rowId(workflowForm.row)}`,
         },
       })
     } else if (workflowForm.kind === "setAllocations") {
@@ -1055,7 +1060,7 @@ function ExpensesClientLoaded({
                       {idStr ? (
                         <a
                           className="font-mono text-xs underline underline-offset-2"
-                          href={`/accounting?tab=journal-entries&highlight=${encodeURIComponent(idStr)}`}
+                          href={accountMoveHref(idStr)}
                           data-testid={`expenses-move-link-${camel}`}
                         >
                           #{idStr}

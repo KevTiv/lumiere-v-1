@@ -497,6 +497,11 @@
       "reason": "invoked by an enumerated frontend BFF call site"
     },
     {
+      "name": "cancel_replenishment_run",
+      "exposure": "session",
+      "reason": "invoked by an enumerated frontend BFF call site"
+    },
+    {
       "name": "cancel_return_order",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
@@ -974,6 +979,11 @@
     },
     {
       "name": "create_bom",
+      "exposure": "session",
+      "reason": "invoked by an enumerated frontend BFF call site"
+    },
+    {
+      "name": "create_bom_byproduct",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
     },
@@ -1954,6 +1964,11 @@
       "reason": "invoked by an enumerated frontend BFF call site"
     },
     {
+      "name": "create_workorder_quality_check",
+      "exposure": "session",
+      "reason": "invoked by an enumerated frontend BFF call site"
+    },
+    {
       "name": "deactivate_pos_config",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
@@ -2376,6 +2391,11 @@
     },
     {
       "name": "fail_warehouse_sync_intent",
+      "exposure": "session",
+      "reason": "invoked by an enumerated frontend BFF call site"
+    },
+    {
+      "name": "fail_workorder_quality_check",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
     },
@@ -3525,12 +3545,22 @@
       "reason": "invoked by an enumerated frontend BFF call site"
     },
     {
+      "name": "schedule_replenishment_run",
+      "exposure": "session",
+      "reason": "invoked by an enumerated frontend BFF call site"
+    },
+    {
       "name": "schedule_sales_sla_escalation",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
     },
     {
       "name": "schedule_tax_deadline_updates",
+      "exposure": "session",
+      "reason": "invoked by an enumerated frontend BFF call site"
+    },
+    {
+      "name": "scrap_finished_manufacturing_output",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
     },

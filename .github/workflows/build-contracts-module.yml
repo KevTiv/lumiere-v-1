@@ -1,0 +1,52 @@
+name: Build contracts module
+
+on:
+  workflow_call:
+
+env:
+  CONTRACTS_MODULE_ARTIFACT: contracts-module
+
+jobs:
+  build:
+    name: Build contracts module
+    runs-on: ubuntu-latest
+    # Release and pull-request validation can start for the same branch at the
+    # same time. Serialize only this build job so the first caller fills the
+    # exact-source cache and the second caller restores it instead of compiling
+    # the same WASM again.
+    concurrency:
+      group: contracts-module-${{ github.head_ref || github.ref_name }}
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Restore compiled contracts module
+        id: contracts-module
+        uses: actions/cache@v4
+        with:
+          path: .ci/contracts-module.wasm
+          key: contracts-module-v1-${{ runner.os }}-${{ hashFiles('spacetimedb/src/**', 'spacetimedb/assets/**', 'spacetimedb/Cargo.toml', 'spacetimedb/Cargo.lock', 'crates/presentation-core/src/**', 'crates/presentation-core/Cargo.toml') }}
+
+      - uses: Swatinem/rust-cache@v2
+        if: steps.contracts-module.outputs.cache-hit != 'true'
+        with:
+          workspaces: spacetimedb
+          cache-on-failure: true
+
+      # Schema extraction is optimization-independent. This profile avoids the
+      # size-optimized release build, which is substantially slower.
+      - name: Compile contracts module
+        if: steps.contracts-module.outputs.cache-hit != 'true'
+        run: make contracts-module-ci
+
+      - name: Export contracts module
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.CONTRACTS_MODULE_ARTIFACT }}
+          path: .ci/contracts-module.wasm
+          if-no-files-found: error
+          retention-days: 1

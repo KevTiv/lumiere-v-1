@@ -6,8 +6,8 @@
         "id": "spacetimedb-sats-json",
         "version": 1
       },
-      "evidence": "spacetimedb/src/iot/actions.rs:278 reducer body shows keyed overwrite/delete or recomputation; session-exposed.",
-      "idempotency": "idempotent",
+      "evidence": "spacetimedb/src/iot/actions.rs:274 reducer accepts only Sent actions and rejects replay after acknowledgement; session-exposed.",
+      "idempotency": "state_guarded",
       "semantic_kind": "command"
     },
     "activate_consignment_agreement": {
@@ -221,12 +221,12 @@
       "semantic_kind": "command"
     },
     "cancel_replenishment_run": {
-      "client_facing": false,
+      "client_facing": true,
       "codec": {
         "id": "spacetimedb-sats-json",
         "version": 1
       },
-      "evidence": "spacetimedb/src/inventory/replenishment.rs:912 reducer deletes the rule's pending runs and succeeds as a no-op when none exist; denied until a session call site exists.",
+      "evidence": "spacetimedb/src/inventory/replenishment.rs:912 reducer deletes the rule's pending runs and succeeds as a no-op when none exist; exposed through the Inventory replenishment scheduler UI.",
       "idempotency": "idempotent",
       "semantic_kind": "command"
     },
@@ -451,12 +451,12 @@
       "semantic_kind": "command"
     },
     "create_bom_byproduct": {
-      "client_facing": false,
+      "client_facing": true,
       "codec": {
         "id": "spacetimedb-sats-json",
         "version": 1
       },
-      "evidence": "spacetimedb/src/manufacturing/bill_of_materials.rs:664 reducer rejects a duplicate byproduct for the same BOM and cost shares above 100; denied until a session call site exists.",
+      "evidence": "spacetimedb/src/manufacturing/bill_of_materials.rs:664 reducer rejects a duplicate byproduct for the same BOM and cost shares above 100; exposed through the BOM row action.",
       "idempotency": "state_guarded",
       "semantic_kind": "command"
     },
@@ -1161,12 +1161,12 @@
       "semantic_kind": "command"
     },
     "create_workorder_quality_check": {
-      "client_facing": false,
+      "client_facing": true,
       "codec": {
         "id": "spacetimedb-sats-json",
         "version": 1
       },
-      "evidence": "spacetimedb/src/inventory/quality.rs:405 reducer requires an in-progress work order without an existing quality check; denied until a session call site exists.",
+      "evidence": "spacetimedb/src/inventory/quality.rs:405 reducer requires an in-progress work order without an existing quality check; exposed through the workorder quality action.",
       "idempotency": "state_guarded",
       "semantic_kind": "command"
     },
@@ -1511,12 +1511,12 @@
       "semantic_kind": "operator"
     },
     "fail_workorder_quality_check": {
-      "client_facing": false,
+      "client_facing": true,
       "codec": {
         "id": "spacetimedb-sats-json",
         "version": 1
       },
-      "evidence": "spacetimedb/src/inventory/quality.rs:507 reducer rejects an already completed check; denied until a session call site exists.",
+      "evidence": "spacetimedb/src/inventory/quality.rs:507 reducer rejects an already completed check; exposed through the workorder quality action.",
       "idempotency": "state_guarded",
       "semantic_kind": "command"
     },
@@ -2331,22 +2331,22 @@
       "semantic_kind": "operator"
     },
     "schedule_replenishment_run": {
-      "client_facing": false,
+      "client_facing": true,
       "codec": {
         "id": "spacetimedb-sats-json",
         "version": 1
       },
-      "evidence": "spacetimedb/src/inventory/replenishment.rs:853 reducer rejects a rule that already has a pending scheduled run; denied until a session call site exists.",
+      "evidence": "spacetimedb/src/inventory/replenishment.rs:853 reducer rejects a rule that already has a pending scheduled run; exposed through the Inventory replenishment scheduler UI.",
       "idempotency": "state_guarded",
       "semantic_kind": "command"
     },
     "scrap_finished_manufacturing_output": {
-      "client_facing": false,
+      "client_facing": true,
       "codec": {
         "id": "spacetimedb-sats-json",
         "version": 1
       },
-      "evidence": "spacetimedb/src/manufacturing/manufacturing_orders.rs:1200 reducer takes a caller idempotency key and rejects a reused key; denied until a session call site exists.",
+      "evidence": "spacetimedb/src/manufacturing/manufacturing_orders.rs:1200 reducer takes a caller idempotency key and rejects a reused key; exposed through the manufacturing-order scrap action.",
       "idempotency": "request_guarded",
       "semantic_kind": "command"
     },

@@ -1,6 +1,6 @@
 # COV-07f — exact finished-output scrap
 
-**Status:** BACKEND IMPLEMENTED — contract/UI and runtime acceptance pending  
+**Status:** IMPLEMENTED — runtime acceptance pending
 **Branch:** `codex/cov07f-finished-output-scrap`  
 **Stack base:** COV-07e / `codex/cov07e-manufacturing-quality-gate`
 
@@ -26,8 +26,10 @@ and preservation of the effect set after rejected calls.
 
 - This slice handles untracked finished goods only. Lot/serial attribution,
   scrap during production, byproducts, and full cost valuation are separate.
-- The versioned `@lumiere/contracts` operation needs regeneration and release
-  before the Manufacturing UI can dispatch it. Add exact canonical readback,
-  warehouse persona and read-only browser proof after the contract release.
+- The Manufacturing order row exposes finished-output scrap for Done orders.
+  The client supplies a request UUID and resolves the exact stock move by the
+  reducer-owned `MO/{mo}/SCRAP/{request}` reference; it never selects the newest
+  move.
+- Warehouse persona and read-only browser proof remain runtime acceptance work.
 - Run native persisted tests and browser acceptance during stacked-PR integration.
   The current workspace does not provide `cargo` or SpacetimeDB tooling.

@@ -1229,10 +1229,16 @@ mod tests {
             .iter()
             .map(|migration| applied(*migration, migration_checksum(migration.sql)))
             .collect::<Vec<_>>();
+        // The next release opens a new change set after the current catalog's last one.
+        let next_change_set = MIGRATIONS
+            .last()
+            .expect("migration catalog is non-empty")
+            .change_set
+            + 1;
         history.push(AppliedMigration {
             version: MIGRATIONS.len() as i64 + 1,
             name: "next_release_expand".into(),
-            change_set: 2,
+            change_set: next_change_set,
             phase: "expand".into(),
             checksum: migration_checksum("alter table example add column additive bigint"),
         });

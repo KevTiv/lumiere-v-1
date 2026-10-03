@@ -351,35 +351,19 @@ async fn create_run_with_program_ref(
     .context("create_ai_agent_run")?;
 
     let run_id = lookup_run_id(stdb, run_key).await?;
-    let checkpoint_hash = format!(
-        "{:x}",
-        Sha256::digest(serde_json::to_vec(&serde_json::json!({
-            "organization_id": org_id,
-            "company_id": company_id,
-            "run_id": run_id,
-            "skill_id": skill.id,
-            "agent_id": agent_id,
-            "team_member_id": team_member_id,
-            "run_key": run_key,
-            "inputs_json": inputs_json,
-            "triggered_by_hex": triggered_by_hex,
-        }))?)
-    );
-    stdb.call_reducer(stdb_client::reducer_call!(
-        "initialize_ai_run_lifecycle",
-        serde_json::json!([
-            org_id,
-            company_id,
-            run_id,
-            {
-                "checkpoint_hash": checkpoint_hash,
-                "cursor": 0,
-                "idempotency_key": format!("run-created:{run_id}"),
-            }
-        ]),
-    ))
-    .await
-    .context("initialize durable AI run lifecycle")?;
+    initialize_run_lifecycle(
+        stdb,
+        org_id,
+        company_id,
+        run_id,
+        skill.id,
+        agent_id,
+        team_member_id,
+        run_key,
+        inputs_json,
+        triggered_by_hex,
+    )
+    .await?;
     Ok(GovernedRunRef {
         run_id,
         run_key: run_key.to_string(),
@@ -431,6 +415,245 @@ pub async fn create_generation_surface_run(
         Some(catalog.program_ref),
     )
     .await
+}
+
+/// Resolve a generation surface and reuse its exact durable run when a caller
+/// retries the same stable run key. A concurrent create that loses the
+/// `run_key` race recovers only an exact tenant-, payload-, and actor-bound
+/// match; it never selects a latest run.
+#[allow(clippy::too_many_arguments)]
+pub async fn create_or_recover_generation_surface_run(
+    stdb: &StdbClient,
+    org_id: u64,
+    company_id: u64,
+    skill_key: &str,
+    agent_id: u64,
+    team_member_id: Option<u64>,
+    run_key: &str,
+    inputs_json: &str,
+    triggered_by_hex: &str,
+) -> Result<GovernedRunRef> {
+    let skill = load_skill(stdb, org_id, company_id, skill_key).await?;
+    if skill.id == 0 {
+        anyhow::bail!(
+            "generation surface skill '{skill_key}' is not provisioned; sync bundled skills before serving this route"
+        );
+    }
+    if !skill.enabled {
+        anyhow::bail!("generation surface skill '{skill_key}' is disabled");
+    }
+    let catalog = super::governed_programs::governed_program_for_skill(skill_key)
+        .with_context(|| format!(
+            "generation surface skill '{skill_key}' is not registered in the governed program catalog"
+        ))?;
+    let binding = GenerationSurfaceRunBinding {
+        organization_id: org_id,
+        company_id,
+        skill_id: skill.id,
+        skill_config_id: skill.skill_config_id,
+        agent_id,
+        team_member_id,
+        run_key,
+        inputs_json,
+        triggered_by_hex,
+        intelligence_policy_ref: intelligence_policy_ref(&skill.config_json)?,
+        program_ref: Some(catalog.program_ref),
+    };
+
+    if let Some(run) = load_exact_generation_surface_run(stdb, &binding).await? {
+        initialize_bound_run_lifecycle(stdb, &binding, run.run_id).await?;
+        return Ok(run);
+    }
+
+    let create_result = create_run_with_program_ref(
+        stdb,
+        org_id,
+        company_id,
+        &skill,
+        agent_id,
+        team_member_id,
+        run_key,
+        inputs_json,
+        triggered_by_hex,
+        Some(catalog.program_ref),
+    )
+    .await;
+    match create_result {
+        Ok(run) => Ok(run),
+        Err(create_error) => match load_exact_generation_surface_run(stdb, &binding).await {
+            Ok(Some(run)) => {
+                initialize_bound_run_lifecycle(stdb, &binding, run.run_id).await?;
+                Ok(run)
+            }
+            Ok(None) | Err(_) => Err(create_error),
+        },
+    }
+}
+
+struct GenerationSurfaceRunBinding<'a> {
+    organization_id: u64,
+    company_id: u64,
+    skill_id: u64,
+    skill_config_id: Option<u64>,
+    agent_id: u64,
+    team_member_id: Option<u64>,
+    run_key: &'a str,
+    inputs_json: &'a str,
+    triggered_by_hex: &'a str,
+    intelligence_policy_ref: Option<String>,
+    program_ref: Option<&'a str>,
+}
+
+async fn initialize_bound_run_lifecycle(
+    stdb: &StdbClient,
+    binding: &GenerationSurfaceRunBinding<'_>,
+    run_id: u64,
+) -> Result<()> {
+    initialize_run_lifecycle(
+        stdb,
+        binding.organization_id,
+        binding.company_id,
+        run_id,
+        binding.skill_id,
+        binding.agent_id,
+        binding.team_member_id,
+        binding.run_key,
+        binding.inputs_json,
+        binding.triggered_by_hex,
+    )
+    .await
+}
+
+#[allow(clippy::too_many_arguments)]
+async fn initialize_run_lifecycle(
+    stdb: &StdbClient,
+    organization_id: u64,
+    company_id: u64,
+    run_id: u64,
+    skill_id: u64,
+    agent_id: u64,
+    team_member_id: Option<u64>,
+    run_key: &str,
+    inputs_json: &str,
+    triggered_by_hex: &str,
+) -> Result<()> {
+    let checkpoint_hash = format!(
+        "{:x}",
+        Sha256::digest(serde_json::to_vec(&serde_json::json!({
+            "organization_id": organization_id,
+            "company_id": company_id,
+            "run_id": run_id,
+            "skill_id": skill_id,
+            "agent_id": agent_id,
+            "team_member_id": team_member_id,
+            "run_key": run_key,
+            "inputs_json": inputs_json,
+            "triggered_by_hex": triggered_by_hex,
+        }))?)
+    );
+    stdb.call_reducer(stdb_client::reducer_call!(
+        "initialize_ai_run_lifecycle",
+        serde_json::json!([
+            organization_id,
+            company_id,
+            run_id,
+            {
+                "checkpoint_hash": checkpoint_hash,
+                "cursor": 0,
+                "idempotency_key": format!("run-created:{run_id}"),
+            }
+        ]),
+    ))
+    .await
+    .context("initialize durable AI run lifecycle")?;
+    Ok(())
+}
+
+async fn load_exact_generation_surface_run(
+    stdb: &StdbClient,
+    binding: &GenerationSurfaceRunBinding<'_>,
+) -> Result<Option<GovernedRunRef>> {
+    let escaped = binding.run_key.replace('\'', "''");
+    let rows = stdb
+        .query_sql(&format!(
+            "SELECT * FROM ai_agent_run WHERE run_key = '{escaped}'"
+        ))
+        .await
+        .context("lookup exact generation-surface run")?;
+    select_exact_generation_surface_run(&rows, binding)
+}
+
+fn select_exact_generation_surface_run(
+    rows: &[Value],
+    binding: &GenerationSurfaceRunBinding<'_>,
+) -> Result<Option<GovernedRunRef>> {
+    let Some(row) = rows.first() else {
+        return Ok(None);
+    };
+    if rows.len() != 1 {
+        anyhow::bail!(
+            "multiple ai_agent_run rows found for stable run key '{}'",
+            binding.run_key
+        );
+    }
+
+    let metadata = row
+        .get("metadata")
+        .and_then(Value::as_str)
+        .map(serde_json::from_str::<Value>)
+        .transpose()
+        .context("parse generation-surface run metadata")?
+        .unwrap_or(Value::Null);
+    let actual_policy_ref = metadata
+        .get("intelligence_policy_ref")
+        .and_then(Value::as_str);
+    let actual_program_ref = metadata.get("program_ref").and_then(Value::as_str);
+    let expected_policy_ref = binding.intelligence_policy_ref.as_deref();
+
+    let matches = row_u64(row, "organizationId") == binding.organization_id
+        && row_u64(row, "companyId") == binding.company_id
+        && row_u64(row, "skillId") == binding.skill_id
+        && row_optional_u64(row, "skillConfigId") == binding.skill_config_id
+        && row_u64(row, "agentId") == binding.agent_id
+        && row_optional_u64(row, "teamMemberId") == binding.team_member_id
+        && row_string(row, "runKey") == binding.run_key
+        && row_string(row, "inputsJson") == binding.inputs_json
+        && row_string(row, "triggeredByHex") == binding.triggered_by_hex
+        && actual_policy_ref == expected_policy_ref
+        && actual_program_ref == binding.program_ref;
+    if !matches {
+        anyhow::bail!(
+            "stable run key '{}' is already bound to a different tenant, payload, actor, or policy",
+            binding.run_key
+        );
+    }
+
+    let run_id = row_u64(row, "id");
+    if run_id == 0 {
+        anyhow::bail!(
+            "stable run key '{}' resolved to an invalid run id",
+            binding.run_key
+        );
+    }
+
+    Ok(Some(GovernedRunRef {
+        run_id,
+        run_key: binding.run_key.to_string(),
+        skill_id: binding.skill_id,
+        skill_config_id: binding.skill_config_id,
+        intelligence_policy_ref: binding.intelligence_policy_ref.clone(),
+        program_ref: binding.program_ref.map(str::to_string),
+    }))
+}
+
+fn row_optional_u64(row: &Value, key: &str) -> Option<u64> {
+    row.get(key)
+        .filter(|value| !value.is_null())
+        .and_then(|value| {
+            value
+                .as_u64()
+                .or_else(|| value.as_i64().and_then(|number| u64::try_from(number).ok()))
+        })
 }
 
 pub async fn complete_run(
@@ -609,20 +832,24 @@ pub async fn sync_bundled_skills(stdb: &StdbClient, organization_id: u64) -> Res
                 {
                     "skill_key": payload.skill_key,
                     "name": payload.name,
-                    "description": payload.description,
+                    "description": sats_option(payload.description.map(Value::String)),
                     "category": payload.category,
                     "prompt_template": payload.prompt_template,
                     "required_tools": payload.required_tools,
                     "optional_tools": payload.optional_tools,
                     "default_max_steps": payload.default_max_steps,
                     "default_max_tool_calls": payload.default_max_tool_calls,
-                    "output_schema": r#"{"type":"object","properties":{"summary":{"type":"string"}}}"#,
-                    "config_schema": r#"{"type":"object","properties":{"default_limit":{"type":"integer"},"max_snapshots":{"type":"integer"}}}"#,
-                    "dataset_specs": payload.dataset_specs,
+                    "output_schema": sats_option(Some(Value::String(
+                        r#"{"type":"object","properties":{"summary":{"type":"string"}}}"#.to_string(),
+                    ))),
+                    "config_schema": sats_option(Some(Value::String(
+                        r#"{"type":"object","properties":{"default_limit":{"type":"integer"},"max_snapshots":{"type":"integer"}}}"#.to_string(),
+                    ))),
+                    "dataset_specs": sats_option(payload.dataset_specs.map(Value::String)),
                     "allowed_action_drafts": payload.allowed_action_drafts,
                     "is_active": true,
                     "is_system": organization_id == 0,
-                    "metadata": payload.metadata,
+                    "metadata": sats_option(Some(Value::String(payload.metadata))),
                 }
             ]),))
         .await
@@ -723,6 +950,87 @@ mod tests {
             select_skill_config(vec![serde_json::json!({"id": 1, "companyId": null})], 999)
                 .unwrap();
         assert_eq!(row_u64(&fallback, "id"), 1);
+    }
+
+    fn generation_run_binding(inputs_json: &str) -> GenerationSurfaceRunBinding<'_> {
+        GenerationSurfaceRunBinding {
+            organization_id: 9,
+            company_id: 7,
+            skill_id: 5,
+            skill_config_id: Some(3),
+            agent_id: 11,
+            team_member_id: None,
+            run_key: "harness-action-draft:stable",
+            inputs_json,
+            triggered_by_hex: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+            intelligence_policy_ref: Some("generation-default@1".to_string()),
+            program_ref: Some("skill:action_draft_generation@1"),
+        }
+    }
+
+    fn generation_run_row(inputs_json: &str) -> Value {
+        serde_json::json!({
+            "id": 41,
+            "organizationId": 9,
+            "companyId": 7,
+            "skillId": 5,
+            "skillConfigId": 3,
+            "agentId": 11,
+            "teamMemberId": null,
+            "runKey": "harness-action-draft:stable",
+            "inputsJson": inputs_json,
+            "triggeredByHex": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+            "metadata": serde_json::json!({
+                "intelligence_policy_ref": "generation-default@1",
+                "program_ref": "skill:action_draft_generation@1",
+            }).to_string(),
+        })
+    }
+
+    #[test]
+    fn exact_generation_run_replay_recovers_one_matching_row() {
+        let inputs = r#"{"surface":"harness_action_draft_bridge","correlation_id":"corr-41"}"#;
+        let run = select_exact_generation_surface_run(
+            &[generation_run_row(inputs)],
+            &generation_run_binding(inputs),
+        )
+        .expect("exact replay")
+        .expect("existing run");
+
+        assert_eq!(run.run_id, 41);
+        assert_eq!(run.run_key, "harness-action-draft:stable");
+    }
+
+    #[test]
+    fn exact_generation_run_replay_rejects_payload_change() {
+        let original = r#"{"surface":"harness_action_draft_bridge","correlation_id":"corr-41"}"#;
+        let changed = r#"{"surface":"harness_action_draft_bridge","correlation_id":"corr-41","input":{"customer_id":12}}"#;
+
+        let error = select_exact_generation_surface_run(
+            &[generation_run_row(original)],
+            &generation_run_binding(changed),
+        )
+        .expect_err("changed payload must conflict");
+
+        assert!(error
+            .to_string()
+            .contains("different tenant, payload, actor, or policy"));
+    }
+
+    #[test]
+    fn exact_generation_run_replay_rejects_ambiguous_identity() {
+        let inputs = r#"{"surface":"harness_action_draft_bridge","correlation_id":"corr-41"}"#;
+        let row = generation_run_row(inputs);
+
+        let error = select_exact_generation_surface_run(
+            &[row.clone(), row],
+            &generation_run_binding(inputs),
+        )
+        .expect_err("duplicate stable run identity must fail closed");
+
+        assert!(error
+            .to_string()
+            .contains("multiple ai_agent_run rows found"));
     }
 
     #[test]

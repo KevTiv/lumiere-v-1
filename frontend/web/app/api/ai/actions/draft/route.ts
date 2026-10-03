@@ -34,6 +34,11 @@ export async function POST(request: NextRequest) {
 
   const uiContext = sanitizeRagUiContext(body.uiContext ?? body.ui_context)
   const allowedReducers = sanitizeStringList(body.allowedReducers ?? body.allowed_reducers, 50, 120)
+  const allowedEntityTypes = sanitizeStringList(
+    body.allowedEntityTypes ?? body.allowed_entity_types,
+    50,
+    120,
+  )
   const agentId = optionalPositiveInteger(body.agentId ?? body.agent_id)
   const teamMemberId = optionalPositiveInteger(body.teamMemberId ?? body.team_member_id)
 
@@ -45,6 +50,7 @@ export async function POST(request: NextRequest) {
     identity_hex: session.identityHex,
     ...(uiContext ? { ui_context: uiContext } : {}),
     ...(allowedReducers?.length ? { allowed_reducers: allowedReducers } : {}),
+    ...(allowedEntityTypes?.length ? { allowed_entity_types: allowedEntityTypes } : {}),
     ...(agentId != null ? { agent_id: agentId } : {}),
     ...(teamMemberId != null ? { team_member_id: teamMemberId } : {}),
   })
