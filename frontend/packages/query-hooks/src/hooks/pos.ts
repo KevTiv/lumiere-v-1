@@ -26,6 +26,10 @@ import {
   type CanonicalRecordRef,
   type ResolvedOperationEffectOutcome,
 } from './operation-effect';
+import {
+  resolvePosConfigStateEffect,
+  type PosConfigStateRef,
+} from './pos-config-state-effect';
 
 // ── Reads ────────────────────────────────────────────────────────────────────
 
@@ -151,32 +155,58 @@ export function useCreatePosConfig(organizationId: bigint, companyId: bigint) {
   });
 }
 
-export function useActivatePosConfig(organizationId: bigint) {
+function useSetPosConfigActive(organizationId: bigint, isActive: boolean) {
   const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async (configId: bigint | number | string) => {
-      const { urlPath, init } = stdbBffCommandPost('activate_pos_config', {
-        configId: toScalarU64(configId),
+  return useMutation<
+    ResolvedOperationEffectOutcome<PosConfigStateRef>,
+    Error,
+    ScalarId
+  >({
+    mutationFn: async (configIdInput) => {
+      const configId = parseStrictU64(configIdInput);
+      if (configId == null) throw new Error('Invalid POS config id');
+
+      const resolveEffect = async () =>
+        resolvePosConfigStateEffect(
+          await fetchQueryList(
+            '/api/query/pos-configs',
+            'Failed to read POS configs',
+          ),
+          organizationId,
+          configId,
+          isActive,
+        );
+
+      const outcome = await executeOperationWithCanonicalReadback({
+        resolveEffect,
+        dispatch: async () => {
+          const operation = isActive
+            ? 'activate_pos_config'
+            : 'deactivate_pos_config';
+          const { urlPath, init } = stdbBffCommandPost(operation, {
+            configId,
+          });
+          return decodeOperationDispatch(
+            await apiFetch(urlPath, init),
+            `Failed to ${isActive ? 'activate' : 'deactivate'} POS config`,
+          );
+        },
+        afterDispatch: () => invalidatePosQueries(qc, organizationId),
+        readbackAttempts: 6,
+        readbackDelayMs: 150,
       });
-      const r = await apiFetch(urlPath, init);
-      if (!r.ok) throw new Error('Failed to activate POS config');
+
+      return requireResolvedOperationEffect(outcome);
     },
-    onSuccess: () => invalidatePosQueries(qc, organizationId),
   });
 }
 
+export function useActivatePosConfig(organizationId: bigint) {
+  return useSetPosConfigActive(organizationId, true);
+}
+
 export function useDeactivatePosConfig(organizationId: bigint) {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async (configId: bigint | number | string) => {
-      const { urlPath, init } = stdbBffCommandPost('deactivate_pos_config', {
-        configId: toScalarU64(configId),
-      });
-      const r = await apiFetch(urlPath, init);
-      if (!r.ok) throw new Error('Failed to deactivate POS config');
-    },
-    onSuccess: () => invalidatePosQueries(qc, organizationId),
-  });
+  return useSetPosConfigActive(organizationId, false);
 }
 
 export function useOpenPosSession(organizationId: bigint) {

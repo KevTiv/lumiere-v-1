@@ -29,10 +29,31 @@ fn field_to_sql_column(field: &str) -> String {
 }
 
 fn snakeify_base(s: &str) -> String {
-    let mut out = apply_pattern_lz(s);
+    let normalized_units = s.replace("1K", "1k");
+    let mut out = apply_pattern_acronym_word(&normalized_units);
+    out = apply_pattern_lz(&out);
     out = apply_pattern_dz(&out);
     out = apply_pattern_az_z(&out);
     out.to_lowercase()
+}
+
+/// `([A-Z]+)([A-Z][a-z])` → `$1_$2`
+fn apply_pattern_acronym_word(s: &str) -> String {
+    let chars: Vec<char> = s.chars().collect();
+    let mut out = String::new();
+    for (i, ch) in chars.iter().enumerate() {
+        if i > 0
+            && chars[i - 1].is_ascii_uppercase()
+            && ch.is_ascii_uppercase()
+            && chars
+                .get(i + 1)
+                .is_some_and(|next| next.is_ascii_lowercase())
+        {
+            out.push('_');
+        }
+        out.push(*ch);
+    }
+    out
 }
 
 /// `([a-z])(\d)` → `$1_$2`
@@ -449,7 +470,15 @@ export const AccountAccount = __t.object("AccountAccount", {
         assert_eq!(camel_to_snake("showLotsM2O"), "show_lots_m2o");
         assert_eq!(camel_to_snake("image1920Url"), "image_1920_url");
         assert_eq!(camel_to_snake("image128Url"), "image_128_url");
-        assert_eq!(camel_to_snake("costPer1KTokens"), "cost_per_1_ktokens");
+        assert_eq!(camel_to_snake("costPer1KTokens"), "cost_per_1k_tokens");
+        assert_eq!(
+            camel_to_snake("inputCostPer1KMicrounits"),
+            "input_cost_per_1k_microunits"
+        );
+        assert_eq!(
+            camel_to_snake("outputCostPer1KMicrounits"),
+            "output_cost_per_1k_microunits"
+        );
     }
 
     #[test]

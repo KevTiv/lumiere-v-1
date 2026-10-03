@@ -3,9 +3,8 @@
 
 import { stdbBffCommandPost } from "@lumiere/stdb/commands"
 import { resolveActionDraftRecordHref } from "@lumiere/erp-shared/action-draft-links"
-import { toCreateAiActionDraftParams } from "@lumiere/erp-shared/ai-create-params"
+import { toCamelCase } from "@lumiere/erp-shared/row-values"
 import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
-import { i18n } from "@lumiere/i18n"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
 import { apiFetch } from "../http"
@@ -33,31 +32,20 @@ function invalidateDraftQueries(
 export type AiActionDraftRow = {
   id: number | string
   organizationId?: number
-  organization_id?: number
   companyId?: number
-  company_id?: number
   status?: string
   reducerName?: string
-  reducer_name?: string
   paramsJson?: string
-  params_json?: string
   summary?: string
   confidence?: number
   elevated?: boolean
   warningsJson?: string | null
-  warnings_json?: string | null
   sourceQuery?: string | null
-  source_query?: string | null
   executionError?: string | null
-  execution_error?: string | null
   executionRecordId?: number | string | null
-  execution_record_id?: number | string | null
   expiresAt?: number | string | null
-  expires_at?: number | string | null
   createDate?: number | string | null
-  create_date?: number | string | null
   rejectReason?: string | null
-  reject_reason?: string | null
   metadata?: string | null
 }
 
@@ -79,9 +67,22 @@ export type AiActionDraftPayload = {
   workflowInstanceId?: number
 }
 
-export type GatewayActionDraft = {
+/** Raw JSON returned by the AI gateway HTTP endpoint. */
+export type GatewayActionDraftWireDto = {
+  draft_id: number
   reducer_name: string
   params_json: Record<string, unknown>
+  confidence: number
+  warnings: string[]
+  summary: string
+  elevated: boolean
+}
+
+/** Camel-case application DTO used after the HTTP boundary. */
+export type GatewayActionDraft = {
+  draftId: number
+  reducerName: string
+  paramsJson: Record<string, unknown>
   confidence: number
   warnings: string[]
   summary: string
@@ -91,6 +92,39 @@ export type GatewayActionDraft = {
 export type PersistedActionDraft = {
   gateway: GatewayActionDraft
   draftId: number
+}
+
+export function normalizeGatewayActionDraft(
+  wire: GatewayActionDraftWireDto,
+): GatewayActionDraft {
+  return {
+    draftId: Number(wire.draft_id),
+    reducerName: wire.reducer_name,
+    paramsJson: normalizeWireParams(wire.params_json),
+    confidence: wire.confidence,
+    warnings: wire.warnings,
+    summary: wire.summary,
+    elevated: wire.elevated,
+  }
+}
+
+function normalizeWireJson(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(normalizeWireJson)
+  if (value === null || typeof value !== "object") return value
+
+  return Object.fromEntries(
+    Object.entries(value).map(([key, nested]) => [toCamelCase(key), normalizeWireJson(nested)]),
+  )
+}
+
+function normalizeWireParams(value: Record<string, unknown>): Record<string, unknown> {
+  return normalizeWireJson(value) as Record<string, unknown>
+}
+
+export function normalizeGatewayActionDraftResponse(
+  wire: { drafts?: GatewayActionDraftWireDto[] },
+): { drafts: GatewayActionDraft[] } {
+  return { drafts: (wire.drafts ?? []).map(normalizeGatewayActionDraft) }
 }
 
 function parseWarnings(raw?: string | null): string[] {
@@ -110,7 +144,7 @@ function parseParamsJson(raw?: string | null): Record<string, unknown> {
   try {
     const parsed = JSON.parse(raw) as unknown
     if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
-      return parsed as Record<string, unknown>
+      return normalizeWireParams(parsed as Record<string, unknown>)
     }
   } catch {
     /* ignore */
@@ -141,8 +175,8 @@ function parseDraftMetadata(raw?: string | null): { workflowInstanceId?: number 
 
 export function aiActionDraftRowToPayload(row: AiActionDraftRow): AiActionDraftPayload {
   const draftId = Number(row.id)
-  const reducerName = row.reducerName ?? row.reducer_name ?? ""
-  const executionRecordIdRaw = row.executionRecordId ?? row.execution_record_id
+  const reducerName = row.reducerName ?? ""
+  const executionRecordIdRaw = row.executionRecordId
   const executionRecordId =
     executionRecordIdRaw != null && executionRecordIdRaw !== ""
       ? Number(executionRecordIdRaw)
@@ -154,12 +188,12 @@ export function aiActionDraftRowToPayload(row: AiActionDraftRow): AiActionDraftP
     draftId,
     reducerName,
     summary: row.summary ?? "",
-    paramsJson: parseParamsJson(row.paramsJson ?? row.params_json),
+    paramsJson: parseParamsJson(row.paramsJson),
     confidence: Number(row.confidence ?? 0),
-    warnings: parseWarnings(row.warningsJson ?? row.warnings_json),
+    warnings: parseWarnings(row.warningsJson),
     elevated: Boolean(row.elevated),
     status,
-    executionError: row.executionError ?? row.execution_error ?? null,
+    executionError: row.executionError ?? null,
     executionRecordId:
       executionRecordId != null && Number.isFinite(executionRecordId)
         ? executionRecordId
@@ -170,9 +204,9 @@ export function aiActionDraftRowToPayload(row: AiActionDraftRow): AiActionDraftP
         ? executionRecordId
         : null,
     ),
-    expiresAt: timestampToIso(row.expiresAt ?? row.expires_at),
-    sourceQuery: row.sourceQuery ?? row.source_query ?? null,
-    companyId: Number(row.companyId ?? row.company_id ?? 0) || undefined,
+    expiresAt: timestampToIso(row.expiresAt),
+    sourceQuery: row.sourceQuery ?? null,
+    companyId: Number(row.companyId ?? 0) || undefined,
     workflowInstanceId,
   }
 }
@@ -210,7 +244,7 @@ export function useAiActionDraftNotifications(organizationId: number, enabled = 
       const j = (await r.json()) as { data?: Array<Record<string, unknown>> }
       return (j.data ?? []).filter((row) => {
         const model = String(row.model ?? "").toLowerCase()
-        const messageType = String(row.messageType ?? row.message_type ?? "").toLowerCase()
+        const messageType = String(row.messageType ?? "").toLowerCase()
         const subtype = String(row.subtype ?? "")
         return (
           model === "ai_action_draft" &&
@@ -227,30 +261,7 @@ export function useExpireAiActionDrafts(organizationId: number, companyId: numbe
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async () => {
-      const { urlPath, init } = stdbBffCommandPost("expire_ai_action_drafts", { companyId: companyId })
-      const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error(await parseCallError(r))
-    },
-    onSuccess: () => {
-      invalidateDraftQueries(qc, organizationId, companyId)
-    },
-  })
-}
-
-export function useCreateAiActionDraft(organizationId: number, companyId: number) {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: async (args: {
-      gateway: GatewayActionDraft
-      sourceQuery?: string
-      uiContextJson?: string | null
-    }) => {
-      const params = toCreateAiActionDraftParams(args.gateway, {
-        sourceQuery: args.sourceQuery,
-        uiContextJson: args.uiContextJson,
-      })
-      if (!params) throw new Error(i18n.t("common.paramsMapper.invalidAiActionDraft"))
-      const { urlPath, init } = stdbBffCommandPost("create_ai_action_draft", { companyId: companyId, params: stdbParamsToJson(params, "CreateAiActionDraftParams") })
+      const { urlPath, init } = stdbBffCommandPost("expire_ai_action_drafts", { companyId })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -265,7 +276,10 @@ export function useApproveAiActionDraft(organizationId: number, companyId: numbe
   return useMutation({
     mutationFn: async (args: number | { draftId: number; companyId?: number }) => {
       const draftId = typeof args === "number" ? args : args.draftId
-      const { urlPath, init } = stdbBffCommandPost("approve_ai_action_draft", { companyId: companyId, draftId: draftId })
+      const { urlPath, init } = stdbBffCommandPost("approve_ai_action_draft", {
+        companyId,
+        draftId,
+      })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -284,7 +298,11 @@ export function useRejectAiActionDraft(organizationId: number, companyId: number
       reason?: string
       companyId?: number
     }) => {
-      const { urlPath, init } = stdbBffCommandPost("reject_ai_action_draft", { companyId: companyId, draftId: args.draftId, reason: args.reason?.trim() || "Rejected by user" })
+      const { urlPath, init } = stdbBffCommandPost("reject_ai_action_draft", {
+        companyId,
+        draftId: args.draftId,
+        reason: args.reason?.trim() || "Rejected by user",
+      })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -303,10 +321,17 @@ export function useUpdateAiActionDraftParams(organizationId: number, companyId: 
       summary?: string
       companyId?: number
     }) => {
-      const { urlPath, init } = stdbBffCommandPost("update_ai_action_draft_params", { companyId: companyId, draftId: args.draftId, params: stdbParamsToJson({
-          params_json: args.paramsJson,
-          summary: args.summary ?? null,
-        }, "UpdateAiActionDraftParamsParams") })
+      const { urlPath, init } = stdbBffCommandPost("update_ai_action_draft_params", {
+        companyId,
+        draftId: args.draftId,
+        params: stdbParamsToJson(
+          {
+            paramsJson: args.paramsJson,
+            summary: args.summary ?? null,
+          },
+          "UpdateAiActionDraftParamsParams",
+        ),
+      })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -316,53 +341,38 @@ export function useUpdateAiActionDraftParams(organizationId: number, companyId: 
   })
 }
 
-/** Fetch latest pending drafts for a company (best-effort after create). */
-export async function fetchAiActionDraftRows(): Promise<AiActionDraftRow[]> {
-  const r = await apiFetch("/api/query/ai-action-drafts")
-  if (!r.ok) throw new Error(await parseCallError(r))
-  const j = (await r.json()) as { data?: AiActionDraftRow[] }
-  return j.data ?? []
-}
-
 export function usePersistGatewayActionDrafts(organizationId: number, companyId: number) {
-  const createDraft = useCreateAiActionDraft(organizationId, companyId)
+  const qc = useQueryClient()
   return useMutation({
     mutationFn: async (args: {
       drafts: GatewayActionDraft[]
       sourceQuery?: string
       uiContextJson?: string | null
-    }): Promise<PersistedActionDraft[]> => {
-      const persisted: PersistedActionDraft[] = []
-      for (const gateway of args.drafts) {
-        await createDraft.mutateAsync({
-          gateway,
-          sourceQuery: args.sourceQuery,
-          uiContextJson: args.uiContextJson,
-        })
-        const rows = await fetchAiActionDraftRows()
-        const draftId = resolveLatestDraftId(rows, gateway)
-        if (draftId == null) {
-          throw new Error(`Failed to resolve draft id for ${gateway.reducer_name}`)
-        }
-        persisted.push({ gateway, draftId })
-      }
-      return persisted
+    }): Promise<PersistedActionDraft[]> => resolvePersistedActionDrafts(args.drafts),
+    onSuccess: () => {
+      invalidateDraftQueries(qc, organizationId, companyId)
     },
   })
 }
 
-export function resolveLatestDraftId(
-  rows: AiActionDraftRow[],
-  gateway: GatewayActionDraft,
-): number | null {
-  const match = rows
-    .filter((row) => {
-      const reducer = row.reducerName ?? row.reducer_name
-      const status = row.status ?? "pending"
-      return reducer === gateway.reducer_name && status === "pending"
-    })
-    .sort((a, b) => Number(b.id) - Number(a.id))[0]
-  if (!match?.id) return null
-  const id = Number(match.id)
-  return Number.isFinite(id) ? id : null
+/**
+ * Accept only server-persisted drafts with an exact request/effect result.
+ * Duplicate ids are an invariant failure; choosing one would hide an
+ * ambiguous server response under concurrency or replay.
+ */
+export function resolvePersistedActionDrafts(
+  drafts: GatewayActionDraft[],
+): PersistedActionDraft[] {
+  const seenDraftIds = new Set<number>()
+  return drafts.map((gateway) => {
+    const draftId = Number(gateway.draftId)
+    if (!Number.isSafeInteger(draftId) || draftId <= 0) {
+      throw new Error(`Missing stable draft id for ${gateway.reducerName}`)
+    }
+    if (seenDraftIds.has(draftId)) {
+      throw new Error(`Ambiguous stable draft id ${draftId}`)
+    }
+    seenDraftIds.add(draftId)
+    return { gateway, draftId }
+  })
 }

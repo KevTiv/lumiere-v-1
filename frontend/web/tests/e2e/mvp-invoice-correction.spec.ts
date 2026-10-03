@@ -7,7 +7,7 @@ import {
   expectFormModalVisible,
   fetchAccountSelectLabelByInternalType,
   fetchDraftCreditNoteMoveIdForInvoice,
-  fetchDraftInvoiceMoveIdByPartner,
+  fetchDraftInvoiceMoveIdForSaleOrder,
   fetchFulfillmentPickingIdBySaleOrderId,
   fetchLeadIdByName,
   fetchOpportunityIdByName,
@@ -186,8 +186,8 @@ test.describe("MVP invoice correction", { tag: "@p0" }, () => {
       submitForm(page, "create-invoice-from-sale-order"),
     ])
 
-    await fetchDraftInvoiceMoveIdByPartner(page, leadName)
-    const invoiceMoveId = await postDraftInvoiceViaUi(page, leadName)
+    const draftInvoiceMoveId = await fetchDraftInvoiceMoveIdForSaleOrder(page, orderId)
+    const invoiceMoveId = await postDraftInvoiceViaUi(page, draftInvoiceMoveId)
     expect(invoiceMoveId).toBeGreaterThan(0)
 
     await gotoModule(page, "/accounting", "accounting")

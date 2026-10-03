@@ -1,5 +1,16 @@
-import { parseQueryListResponse, type QueryRows } from "./query-list"
+import {
+  decodeQueryListResponse,
+  parseQueryListResponse,
+  QueryResponseDecodeError,
+  type QueryRows,
+} from "./query-list"
+import {
+  queryResourceFailure,
+  queryResourceRows,
+  type QueryResourceState,
+} from "./query-resource-state"
 import { resolveRequestUrl } from "./resolve-url"
+import { responseErrorMessage } from "./response-error"
 
 export type LumiereApiClientConfig = {
   /**
@@ -24,6 +35,7 @@ export type LumiereApiClientConfig = {
 export type LumiereApiClient = {
   apiFetch: (input: string | URL | Request, init?: RequestInit) => Promise<Response>
   fetchQueryList: (path: string, errorMessage: string) => Promise<QueryRows>
+  fetchQueryListState: (path: string) => Promise<QueryResourceState<Record<string, unknown>>>
   fetchQueryListAllowEmpty: (path: string) => Promise<QueryRows>
   parseQueryListResponse: typeof parseQueryListResponse
 }
@@ -64,9 +76,31 @@ export function createLumiereApiClient(config: LumiereApiClientConfig): LumiereA
     return parseQueryListResponse(json)
   }
 
+  async function fetchQueryListState(path: string): Promise<QueryResourceState<Record<string, unknown>>> {
+    try {
+      const response = await apiFetch(path)
+      if (!response.ok) {
+        const message = await responseErrorMessage(response, `Query ${path} failed`)
+        return queryResourceFailure(response.status, message)
+      }
+      const payload: unknown = await response.json()
+      const rows = decodeQueryListResponse(payload, (row, index) => {
+        if (row === null || typeof row !== "object" || Array.isArray(row)) {
+          throw new QueryResponseDecodeError(`query response row ${index} must be an object`)
+        }
+        return row as Record<string, unknown>
+      })
+      return queryResourceRows(rows)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      return queryResourceFailure(undefined, message)
+    }
+  }
+
   return {
     apiFetch,
     fetchQueryList,
+    fetchQueryListState,
     fetchQueryListAllowEmpty,
     parseQueryListResponse,
   }

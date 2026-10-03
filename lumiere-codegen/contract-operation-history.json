@@ -150,6 +150,26 @@
       "name": "advance_subscription_dunning",
       "shape_fingerprint": "sha256:d724ae524f8aecb34eb7817a4c0f2d11a71bbb434e7cde5066990ad4292ee56b"
     },
+    "erp.ai_action_draft_request_read": {
+      "name": "ai_action_draft_request_read",
+      "shape_fingerprint": "sha256:975aa264f505422c8b4939dd5bfc8b3b6321ea0b3e59cf5483a52ce3e6003d27"
+    },
+    "erp.ai_provider_attempt_read": {
+      "name": "ai_provider_attempt_read",
+      "shape_fingerprint": "sha256:fc2c3b2e62055e5115a05d85187dc74ce77612a7bba148fe8f85ad526ad86e25"
+    },
+    "erp.ai_spend_budget_read": {
+      "name": "ai_spend_budget_read",
+      "shape_fingerprint": "sha256:d80d6a4aa5847ba783cc92902f7e2e6c4e634b321527b9ddeaf3e6fd99574531"
+    },
+    "erp.ai_spend_price_snapshot_read": {
+      "name": "ai_spend_price_snapshot_read",
+      "shape_fingerprint": "sha256:5670b74e3deec747ce1d106bb521fc5efcdc02a554d8fb9289415162a5bdeffb"
+    },
+    "erp.ai_spend_reservation_read": {
+      "name": "ai_spend_reservation_read",
+      "shape_fingerprint": "sha256:e71682b5f6e69fb53bac7ac84210539d3c8a2d52371b2c6b8d1114dbe63b7d08"
+    },
     "erp.allocate_payment_transaction": {
       "name": "allocate_payment_transaction",
       "shape_fingerprint": "sha256:c081bbb722d43509b060a33cd0b2c089f93872591faa3e7c05d23506ed8e3a41"
@@ -5804,6 +5824,14 @@
       "current_operations_fingerprint": "sha256:78a0c9bbb46b904ae870ef4ea2b350489d956b53105c40a9f51972f3dfcb3878",
       "operation_count": 1415,
       "reason": "release on top of v0.3.65: add none; change the shape of post_message"
+    },
+    {
+      "previous_release": "v0.3.80",
+      "previous_ir_sha256": "sha256:2b83c626f956be84c8480116e7624a3efb04555e5250e797040efec3d28939f9",
+      "previous_operations_fingerprint": "sha256:78a0c9bbb46b904ae870ef4ea2b350489d956b53105c40a9f51972f3dfcb3878",
+      "current_operations_fingerprint": "sha256:e7c86f78845353da08d291b49600f30631c91495a1a3a620c2fc573a8eaa1a63",
+      "operation_count": 1420,
+      "reason": "add five sender-scoped AI spend and action-draft read views on top of released v0.3.80; preserve every existing operation shape"
     }
   ]
 }

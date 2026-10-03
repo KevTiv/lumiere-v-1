@@ -149,21 +149,8 @@ pub async fn execute(ctx: &ToolContext, input: &Value) -> ToolResult {
         ),
     });
 
-    let draft_id = if ctx.run_id > 0 {
-        create_run_correlated_draft(ctx, input, params).await?
-    } else {
-        // Runs without a durable id keep the legacy path until they are migrated.
-        ctx.stdb
-            .call_reducer(stdb_client::reducer_call!(
-                "create_ai_action_draft",
-                json!([ctx.org_id, ctx.company_id, params]),
-            ))
-            .await
-            .map_err(|e| anyhow::anyhow!("create_ai_action_draft failed: {e}"))?;
-        lookup_latest_draft_id(&ctx.stdb, ctx.org_id, ctx.company_id, &reducer_name)
-            .await
-            .unwrap_or(0)
-    };
+    require_durable_run_id(ctx.run_id)?;
+    let draft_id = create_run_correlated_draft(ctx, input, params).await?;
 
     Ok(ToolOutput {
         summary: format!("Created action draft for {reducer_name}"),
@@ -180,6 +167,13 @@ pub async fn execute(ctx: &ToolContext, input: &Value) -> ToolResult {
         citations: vec![],
         row_count: Some(1),
     })
+}
+
+fn require_durable_run_id(run_id: u64) -> anyhow::Result<()> {
+    if run_id == 0 {
+        anyhow::bail!("action drafts require a durable run for exact effect identity");
+    }
+    Ok(())
 }
 
 /// Create the draft bound to the durable run and an input-derived request key,
@@ -212,21 +206,16 @@ async fn create_run_correlated_draft(
     Ok(request.draft_id)
 }
 
-async fn lookup_latest_draft_id(
-    stdb: &stdb_client::StdbClient,
-    org_id: u64,
-    company_id: u64,
-    reducer_name: &str,
-) -> anyhow::Result<u64> {
-    let escaped = reducer_name.replace('\'', "''");
-    let sql = format!(
-        "SELECT id FROM ai_action_draft \
-         WHERE organization_id = {org_id} AND company_id = {company_id} \
-         AND reducer_name = '{escaped}' ORDER BY id DESC LIMIT 1"
-    );
-    let rows = stdb.query_sql(&sql).await?;
-    Ok(rows
-        .first()
-        .and_then(|row| row.get("id").and_then(|v| v.as_u64()))
-        .unwrap_or(0))
+#[cfg(test)]
+mod tests {
+    use super::require_durable_run_id;
+
+    #[test]
+    fn action_draft_requires_durable_run_identity() {
+        let error = require_durable_run_id(0).expect_err("zero run id must fail closed");
+        assert!(error
+            .to_string()
+            .contains("require a durable run for exact effect identity"));
+        require_durable_run_id(42).expect("durable run id");
+    }
 }

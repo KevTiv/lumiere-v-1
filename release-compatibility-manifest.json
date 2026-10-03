@@ -19,7 +19,7 @@
   },
   "operation_history": {
     "path": "lumiere-codegen/contract-operation-history.json",
-    "checksum": "sha256:63ced4cf29c929f1f23d88a84272286e519b0229e6976cf8d82f2cfbc7b13000"
+    "checksum": "sha256:6a321cb09d4c51e7b6a8090b418039e7b4bda4b9f4394e14e409808dd055d697"
   },
   "stdb_module": {
     "name": "lumiere_v1",
@@ -58,7 +58,7 @@
     "config_sources": [
       {
         "path": ".env.docker.example",
-        "sha256": "804dd2eeea31a63008c07e0f698cf572617c1fe97e5e96ca2d9cc7481c2478b5"
+        "sha256": "59217e1ee78c7fe6a43e0ece19851eb7c7512c89eab2120973d2437ee9cd0bac"
       },
       {
         "path": "frontend/web/.env.example",

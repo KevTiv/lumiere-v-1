@@ -42,16 +42,19 @@ pub async fn run() -> anyhow::Result<()> {
 
 /// Run the standalone scheduled owner-report worker service.
 pub async fn run_owner_report_worker() -> anyhow::Result<()> {
+    http_app::init_tracing();
     owner_report_worker::serve().await
 }
 
 /// Run the standalone expense OCR/email/card intent worker service.
 pub async fn run_expense_integration_worker() -> anyhow::Result<()> {
+    http_app::init_tracing();
     expense_integration_worker::serve().await
 }
 
 /// Run the standalone bounded SpacetimeDB-to-PostgreSQL projection worker.
 pub async fn run_projection_worker() -> anyhow::Result<()> {
+    http_app::init_tracing();
     cold_tier::projection_worker::serve().await
 }
 
@@ -72,15 +75,18 @@ pub async fn run_organization_reconstruction(organization_id: u64) -> anyhow::Re
 
 /// Run the standalone project payroll/calendar/e-invoice intent worker service.
 pub async fn run_project_integration_worker() -> anyhow::Result<()> {
+    http_app::init_tracing();
     project_integration_worker::serve().await
 }
 
 /// Run the standalone HR statutory/partner payroll integration worker service.
 pub async fn run_hr_integration_worker() -> anyhow::Result<()> {
+    http_app::init_tracing();
     hr_integration_worker::serve().await
 }
 
 /// Run the standalone workflow timer/outbox worker service.
 pub async fn run_workflow_worker() -> anyhow::Result<()> {
+    http_app::init_tracing();
     workflow_worker::serve().await
 }

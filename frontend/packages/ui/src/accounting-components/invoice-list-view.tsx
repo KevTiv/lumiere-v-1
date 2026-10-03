@@ -225,7 +225,12 @@ export function InvoiceListView({
                 const status = getMoveStatus(inv)
                 const conf = statusConfig[status]
                 return (
-                  <TableRow key={String(inv.id)} className="cursor-pointer hover:bg-muted/50" onClick={() => onSelectInvoice?.(inv)}>
+                  <TableRow
+                    key={String(inv.id)}
+                    data-testid={`entity-row-${inv.id}`}
+                    className="cursor-pointer hover:bg-muted/50"
+                    onClick={() => onSelectInvoice?.(inv)}
+                  >
                     <TableCell className="font-medium">{inv.name}</TableCell>
                     <TableCell>
                       <p className="font-medium">{inv.invoicePartnerDisplayName ?? `Partner #${inv.partnerId}`}</p>

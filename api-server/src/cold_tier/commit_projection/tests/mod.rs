@@ -194,7 +194,8 @@ fn pinned_projection_codecs_are_parsed_once_and_reused() {
     let manifest = projection_worker::PROJECTION_CODEC_MANIFEST_JSON;
     let parsed = projection_codecs(manifest).expect("pinned projection codecs");
     // Every projected (non-snapshot) table in the pinned manifest gets exactly one codec.
-    let projected = serde_json::from_str::<Value>(manifest).expect("pinned codec manifest JSON")["tables"]
+    let projected = serde_json::from_str::<Value>(manifest).expect("pinned codec manifest JSON")
+        ["tables"]
         .as_object()
         .expect("codec manifest tables")
         .values()

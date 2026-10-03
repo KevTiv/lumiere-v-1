@@ -1,17 +1,15 @@
-export type QueryBuilderSourceState = "unselected" | "loading" | "empty" | "ready"
+import type { StoredDashboardSourceState } from "@lumiere/ui"
+
+export type QueryBuilderSourceState = "unselected" | StoredDashboardSourceState["status"]
 
 /**
  * Keep an unloaded report source distinct from a successfully loaded source
- * with no rows. Query failures are intentionally not represented here: the
- * shared data-source hook must expose them before this view can render them
- * truthfully.
+ * with no rows. Preserve the hook's denied, unavailable, and partial states.
  */
 export function queryBuilderSourceState(
   model: string,
-  isLoading: boolean,
-  rowCount: number,
+  sourceState?: StoredDashboardSourceState,
 ): QueryBuilderSourceState {
   if (!model) return "unselected"
-  if (isLoading) return "loading"
-  return rowCount === 0 ? "empty" : "ready"
+  return sourceState?.status ?? "loading"
 }

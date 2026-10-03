@@ -26,6 +26,8 @@ import {
   mergeFieldDefaultValues,
   StoredDashboardView,
   widgetModelsForDashboard,
+  resolveStoredDashboard,
+  storedDashboardExportGate,
   exportDashboardToPng,
   timeRangeToMs,
   Button,
@@ -276,22 +278,48 @@ function ReportsClientLoaded({
     )
   }, [viewDashboard, dashboardWidgets])
 
-  const { dataSources: storedDashboardDataSources, isLoading: storedDashboardLoading } =
-    useStoredDashboardDataSources(orgId, viewDashboardModels)
+  const {
+    dataSources: storedDashboardDataSources,
+    sourceStates: storedDashboardSourceStates,
+    isLoading: storedDashboardLoading,
+  } = useStoredDashboardDataSources(orgId, viewDashboardModels)
 
   const viewDashboardTimeRange = useMemo(
     () => (viewDashboardRange === "all" ? undefined : timeRangeToMs(viewDashboardRange)),
     [viewDashboardRange],
   )
 
+  const storedDashboardResolution = useMemo(() => {
+    if (!viewDashboard) return null
+    const widgetIds = (viewDashboard.widgetIds ?? viewDashboard.widget_ids) as
+      | Array<bigint | number>
+      | undefined
+    return resolveStoredDashboard(
+      dashboardWidgets as unknown as Record<string, unknown>[],
+      widgetIds ?? [],
+      storedDashboardDataSources,
+      {
+        ...(viewDashboardTimeRange ?? {}),
+        sourceStates: storedDashboardSourceStates,
+      },
+    )
+  }, [viewDashboard, dashboardWidgets, storedDashboardDataSources, storedDashboardSourceStates, viewDashboardTimeRange])
+
+  const storedDashboardExport = useMemo(
+    () => storedDashboardResolution
+      ? storedDashboardExportGate(storedDashboardResolution)
+      : { allowed: false, reason: "No dashboard is selected." },
+    [storedDashboardResolution],
+  )
+
   const storedDashboardRef = useRef<HTMLDivElement>(null)
   const handleStoredDashboardExport = useCallback(async () => {
-    if (!storedDashboardRef.current || !viewDashboard) return
+    if (!storedDashboardRef.current || !viewDashboard || !storedDashboardExport.allowed) return
     await exportDashboardToPng(
       storedDashboardRef.current,
       String(viewDashboard.name ?? "dashboard"),
     )
-  }, [viewDashboard])
+  }, [viewDashboard, storedDashboardExport.allowed])
 
   const addWidgetFormConfig = useMemo(
     () =>
@@ -1267,7 +1295,8 @@ function ReportsClientLoaded({
                     size="sm"
                     className="gap-2"
                     onClick={() => void handleStoredDashboardExport()}
-                    disabled={storedDashboardLoading}
+                    disabled={storedDashboardLoading || !storedDashboardExport.allowed}
+                    title={storedDashboardExport.reason}
                   >
                     <Download className="h-4 w-4" />
                     {t("reports.actions.exportDashboard")}
@@ -1282,6 +1311,8 @@ function ReportsClientLoaded({
               dashboard={viewDashboard}
               widgets={dashboardWidgets as unknown as Record<string, unknown>[]}
               dataSources={storedDashboardDataSources}
+              sourceStates={storedDashboardSourceStates}
+              resolution={storedDashboardResolution ?? undefined}
               timeRange={viewDashboardTimeRange}
             />
           ) : null}

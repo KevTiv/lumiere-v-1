@@ -1,5 +1,5 @@
 import { getStdbSession } from "@/lib/api-session"
-import { serverFetchQueryListsAllowEmpty } from "@/lib/server-query"
+import { serverFetchQueryListsRequired } from "@/lib/server-query"
 import { TasksClient } from "./tasks-client"
 
 const SSR_RESOURCES = ["projects", "tasks"] as const
@@ -10,7 +10,7 @@ export default async function TasksPage() {
     return <TasksClient />
   }
 
-  const [projects, tasks] = await serverFetchQueryListsAllowEmpty(session, SSR_RESOURCES)
+  const [projects, tasks] = await serverFetchQueryListsRequired(session, SSR_RESOURCES)
 
   return (
     <TasksClient

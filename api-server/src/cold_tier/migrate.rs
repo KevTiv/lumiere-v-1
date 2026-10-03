@@ -1230,7 +1230,11 @@ mod tests {
             .map(|migration| applied(*migration, migration_checksum(migration.sql)))
             .collect::<Vec<_>>();
         // The next release opens a new change set after the current catalog's last one.
-        let next_change_set = MIGRATIONS.last().expect("migration catalog is non-empty").change_set + 1;
+        let next_change_set = MIGRATIONS
+            .last()
+            .expect("migration catalog is non-empty")
+            .change_set
+            + 1;
         history.push(AppliedMigration {
             version: MIGRATIONS.len() as i64 + 1,
             name: "next_release_expand".into(),

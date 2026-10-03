@@ -31,7 +31,7 @@ import {
   waitForSaleOrderDraftInQuery,
   waitForSaleOrderLineExists,
   waitForSaleOrderLineQtyDelivered,
-  fetchDraftInvoiceMoveIdByPartner,
+  fetchDraftInvoiceMoveIdForSaleOrder,
 } from "./helpers"
 
 /**
@@ -184,8 +184,8 @@ test.describe("MVP sales returns (RMA)", { tag: "@p0" }, () => {
       ),
       submitForm(page, "create-invoice-from-sale-order"),
     ])
-    await fetchDraftInvoiceMoveIdByPartner(page, leadName)
-    await postDraftInvoiceViaUi(page, leadName)
+    const invoiceMoveId = await fetchDraftInvoiceMoveIdForSaleOrder(page, orderId)
+    await postDraftInvoiceViaUi(page, invoiceMoveId)
 
     const saleOrderLabel = await fetchSaleOrderSelectLabel(page, orderId)
 

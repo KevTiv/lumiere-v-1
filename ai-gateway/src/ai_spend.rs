@@ -2,11 +2,10 @@
 //!
 //! Writes go through the gateway principal (`STDB_TOKEN`), which must hold the
 //! separately provisioned `ai_spend/reserve` and `ai_spend/settle` grants.
-//! The spend, price and draft-request tables are private, so reads use a
-//! dedicated read principal (`AI_SPEND_READ_STDB_TOKEN`), following the
-//! api-server `workflow_reads` pattern: fixed column lists, numeric-only SQL
-//! filters, and every string binding (request key, provider, model, currency,
-//! billing period) matched here rather than interpolated into SQL.
+//! The spend, price and draft-request tables are private, so reads use narrow
+//! sender-scoped views and a dedicated principal (`AI_SPEND_READ_STDB_TOKEN`).
+//! Queries keep fixed column lists and numeric-only SQL filters; every string
+//! binding is matched here rather than interpolated into SQL.
 //!
 //! Recovering an existing reservation does not authorize dispatching the same
 //! provider attempt again; attempt dispatch state is a separate H5 gate.
@@ -38,7 +37,7 @@ pub const ATTEMPT_OUTCOME_UNKNOWN: &str = "outcome_unknown";
 pub const ATTEMPT_NOTE_MAX_LEN: usize = 1_024;
 
 const PRICE_SNAPSHOT_COLS: &str = "id, organization_id, agent_id, provider, model, currency, \
-input_units_per_1k, output_units_per_1k, version";
+input_units_per_1_k, output_units_per_1_k, version";
 const BUDGET_COLS: &str = "id, organization_id, agent_id, billing_period, currency, limit_units, \
 settled_units, outstanding_units";
 const RESERVATION_COLS: &str = "id, organization_id, company_id, agent_id, run_id, request_key, \
@@ -305,14 +304,14 @@ impl<'a> SpendReader<'a> {
         billing_period: &str,
     ) -> Result<Option<SpendBudget>> {
         let sql = format!(
-            "SELECT {BUDGET_COLS} FROM ai_spend_budget \
+            "SELECT {BUDGET_COLS} FROM ai_spend_budget_read \
              WHERE organization_id = {organization_id} AND agent_id = {agent_id}"
         );
         let rows = self
             .stdb
             .query_sql(&sql)
             .await
-            .context("read ai_spend_budget")?;
+            .context("read ai_spend_budget_read")?;
         select_budget(&rows, organization_id, agent_id, billing_period)
     }
 
@@ -325,14 +324,14 @@ impl<'a> SpendReader<'a> {
         currency: &str,
     ) -> Result<Option<PriceSnapshot>> {
         let sql = format!(
-            "SELECT {PRICE_SNAPSHOT_COLS} FROM ai_price_snapshot \
+            "SELECT {PRICE_SNAPSHOT_COLS} FROM ai_spend_price_snapshot_read \
              WHERE organization_id = {organization_id} AND agent_id = {agent_id}"
         );
         let rows = self
             .stdb
             .query_sql(&sql)
             .await
-            .context("read ai_price_snapshot")?;
+            .context("read ai_spend_price_snapshot_read")?;
         select_latest_snapshot(&rows, organization_id, agent_id, provider, model, currency)
     }
 
@@ -344,14 +343,14 @@ impl<'a> SpendReader<'a> {
     ) -> Result<Option<Reservation>> {
         validate_request_key(request_key)?;
         let sql = format!(
-            "SELECT {RESERVATION_COLS} FROM ai_spend_reservation \
+            "SELECT {RESERVATION_COLS} FROM ai_spend_reservation_read \
              WHERE organization_id = {organization_id} AND run_id = {run_id}"
         );
         let rows = self
             .stdb
             .query_sql(&sql)
             .await
-            .context("read ai_spend_reservation")?;
+            .context("read ai_spend_reservation_read")?;
         find_reservation(&rows, organization_id, run_id, request_key)
     }
 
@@ -364,14 +363,14 @@ impl<'a> SpendReader<'a> {
     ) -> Result<Option<DraftRequest>> {
         validate_request_key(request_key)?;
         let sql = format!(
-            "SELECT {DRAFT_REQUEST_COLS} FROM ai_action_draft_request \
+            "SELECT {DRAFT_REQUEST_COLS} FROM ai_action_draft_request_read \
              WHERE organization_id = {organization_id} AND run_id = {run_id}"
         );
         let rows = self
             .stdb
             .query_sql(&sql)
             .await
-            .context("read ai_action_draft_request")?;
+            .context("read ai_action_draft_request_read")?;
         find_draft_request(&rows, organization_id, company_id, run_id, request_key)
     }
 
@@ -385,14 +384,14 @@ impl<'a> SpendReader<'a> {
     ) -> Result<Option<ProviderAttempt>> {
         validate_request_key(request_key)?;
         let sql = format!(
-            "SELECT {ATTEMPT_COLS} FROM ai_provider_attempt \
+            "SELECT {ATTEMPT_COLS} FROM ai_provider_attempt_read \
              WHERE organization_id = {organization_id} AND run_id = {run_id}"
         );
         let rows = self
             .stdb
             .query_sql(&sql)
             .await
-            .context("read ai_provider_attempt")?;
+            .context("read ai_provider_attempt_read")?;
         find_attempt(&rows, organization_id, run_id, request_key)
     }
 }
@@ -538,15 +537,38 @@ pub async fn create_run_action_draft(
         bail!("run-correlated drafts require a durable nonzero run_id");
     }
     validate_request_key(request_key)?;
-    if !params.is_object() {
-        bail!("draft params must be an object");
-    }
+    let params = draft_params_with_sats_options(params)?;
     stdb.call_reducer(stdb_client::reducer_call!(
         "create_ai_run_action_draft",
         json!([organization_id, company_id, run_id, request_key, params]),
     ))
     .await
     .context("create_ai_run_action_draft reducer failed")
+}
+
+fn draft_params_with_sats_options(params: Value) -> Result<Value> {
+    let mut params = params
+        .as_object()
+        .cloned()
+        .context("draft params must be an object")?;
+    for field in [
+        "warnings_json",
+        "source_query",
+        "ui_context_json",
+        "expires_at",
+        "metadata",
+    ] {
+        let value = params.remove(field).unwrap_or(Value::Null);
+        let encoded = if value.get("some").is_some() || value.get("none").is_some() {
+            value
+        } else if value.is_null() {
+            json!({ "none": [] })
+        } else {
+            json!({ "some": value })
+        };
+        params.insert(field.to_string(), encoded);
+    }
+    Ok(Value::Object(params))
 }
 
 fn select_budget(
@@ -589,7 +611,7 @@ fn select_latest_snapshot(
     for row in rows {
         require_owner(row, organization_id)?;
         if req_u64(row, "agentId", "agent_id")? != agent_id
-            || req_str(row, "provider", "provider")? != provider
+            || !req_str(row, "provider", "provider")?.eq_ignore_ascii_case(provider)
             || req_str(row, "model", "model")? != model
             || req_str(row, "currency", "currency")? != currency
         {
@@ -598,8 +620,8 @@ fn select_latest_snapshot(
         let snapshot = PriceSnapshot {
             id: req_u64(row, "id", "id")?,
             version: req_u64(row, "version", "version")?,
-            input_units_per_1k: req_u64(row, "inputUnitsPer1k", "input_units_per_1k")?,
-            output_units_per_1k: req_u64(row, "outputUnitsPer1k", "output_units_per_1k")?,
+            input_units_per_1k: req_u64(row, "inputUnitsPer1K", "input_units_per_1_k")?,
+            output_units_per_1k: req_u64(row, "outputUnitsPer1K", "output_units_per_1_k")?,
         };
         match &latest {
             Some(current) if current.version == snapshot.version => {
@@ -787,9 +809,9 @@ mod tests {
 
     fn snapshot_row(id: u64, org: u64, version: u64, model: &str) -> Value {
         json!({
-            "id": id, "organization_id": org, "agent_id": 7, "provider": "mistral",
-            "model": model, "currency": "EUR", "input_units_per_1k": 200,
-            "output_units_per_1k": 600, "version": version
+            "id": id, "organization_id": org, "agent_id": 7, "provider": "Mistral",
+            "model": model, "currency": "EUR", "input_units_per_1_k": 200,
+            "output_units_per_1_k": 600, "version": version
         })
     }
 
@@ -834,6 +856,23 @@ mod tests {
             input_request_key(RequestKind::Draft, 43, &input).unwrap()
         );
         assert!(input_request_key(RequestKind::Draft, 0, &input).is_err());
+    }
+
+    #[test]
+    fn draft_params_encode_nested_sats_options_once() {
+        let encoded = draft_params_with_sats_options(json!({
+            "warnings_json": "[]",
+            "source_query": null,
+            "ui_context_json": { "some": "{}" },
+            "expires_at": { "none": [] },
+            "metadata": "{}",
+        }))
+        .unwrap();
+        assert_eq!(encoded["warnings_json"], json!({ "some": "[]" }));
+        assert_eq!(encoded["source_query"], json!({ "none": [] }));
+        assert_eq!(encoded["ui_context_json"], json!({ "some": "{}" }));
+        assert_eq!(encoded["expires_at"], json!({ "none": [] }));
+        assert_eq!(encoded["metadata"], json!({ "some": "{}" }));
     }
 
     #[test]
@@ -940,6 +979,23 @@ mod tests {
                 .unwrap()
                 .is_none()
         );
+    }
+
+    #[test]
+    fn draft_request_lookup_rejects_ambiguous_exact_matches() {
+        let key = "h5:draft:run:42:step:4:attempt:0";
+        let row = |id: u64, draft_id: u64| {
+            json!({
+                "id": id, "organization_id": 9, "company_id": 3, "run_id": 42,
+                "request_key": key, "draft_id": draft_id, "creation_payload_hash": "abc"
+            })
+        };
+
+        let error = find_draft_request(&[row(5, 77), row(6, 78)], 9, 3, 42, key)
+            .expect_err("duplicate exact effects must fail closed");
+        assert!(error
+            .to_string()
+            .contains("multiple draft requests share one request key"));
     }
 
     #[test]

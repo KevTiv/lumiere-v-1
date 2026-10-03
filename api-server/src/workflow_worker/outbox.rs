@@ -11,39 +11,45 @@ use sha2::{Digest, Sha256};
 use std::sync::atomic::{AtomicBool, Ordering};
 
 #[derive(Debug, Deserialize, Clone)]
-struct QueueJobRow {
-    id: u64,
-    revision: u64,
-    payload: String,
+pub(super) struct QueueJobRow {
+    pub(super) id: u64,
+    #[serde(alias = "organizationId")]
+    pub(super) organization_id: u64,
+    pub(super) revision: u64,
+    pub(super) payload: String,
+    pub(super) status: String,
 }
 
 pub(super) async fn dispatch_external_jobs(
     state: &AppState,
+    source_stdb: &stdb_client::StdbClient,
     service: &ScheduledService,
     worker_id: u64,
     shutting_down: &AtomicBool,
 ) -> anyhow::Result<()> {
     let organization_id = service.organization_id();
-    let rows = service
-        .client()
+    let rows = source_stdb
         .query_sql(&format!(
-            "SELECT id, organization_id, revision, payload FROM queue_job \
+            "SELECT id, organization_id, revision, payload, status FROM queue_job \
              WHERE organization_id = {organization_id} \
-             AND queue_name = '{QUEUE_NAME}' AND job_type = '{JOB_TYPE}' \
-             AND status = 'Pending' LIMIT {BATCH_SIZE}"
+             AND queue_name = '{QUEUE_NAME}' AND job_type = '{JOB_TYPE}'"
         ))
         .await?;
+    let mut jobs = Vec::with_capacity(rows.len());
     for row in rows {
-        if shutting_down.load(Ordering::Relaxed) {
-            break;
-        }
-        let job: QueueJobRow = match serde_json::from_value(row) {
-            Ok(j) => j,
+        let job = match serde_json::from_value::<QueueJobRow>(row) {
+            Ok(job) => job,
             Err(error) => {
                 tracing::warn!(%error, "skip malformed queue_job row");
                 continue;
             }
         };
+        jobs.push(job);
+    }
+    for job in select_pending_jobs(jobs, organization_id) {
+        if shutting_down.load(Ordering::Relaxed) {
+            break;
+        }
         let preview: OutboxPayload = match serde_json::from_str(&job.payload) {
             Ok(p) => p,
             Err(error) => {
@@ -92,7 +98,7 @@ pub(super) async fn dispatch_external_jobs(
         }
 
         let mut payload = preview;
-        let outbox_id = match resolve_outbox_id(service.client(), &payload, job.id).await {
+        let outbox_id = match resolve_outbox_id(source_stdb, &payload, job.id).await {
             Ok(id) => id,
             Err(error) => {
                 tracing::error!(job_id = job.id, %error, "outbox id unresolved");
@@ -117,7 +123,7 @@ pub(super) async fn dispatch_external_jobs(
             Err(error) => ("RetryableFailure", None, Some(error.to_string()), "Failed"),
         };
 
-        let instance_revision = instance_revision_for_outbox(service.client(), outbox_id)
+        let instance_revision = instance_revision_for_outbox(source_stdb, outbox_id)
             .await
             .unwrap_or(1);
         let record_key = outbox_record_idempotency_key(&payload);
@@ -168,6 +174,16 @@ pub(super) async fn dispatch_external_jobs(
             .await;
     }
     Ok(())
+}
+
+pub(super) fn select_pending_jobs(
+    mut rows: Vec<QueueJobRow>,
+    organization_id: u64,
+) -> Vec<QueueJobRow> {
+    rows.retain(|row| row.organization_id == organization_id && row.status == "Pending");
+    rows.sort_by_key(|row| row.id);
+    rows.truncate(BATCH_SIZE);
+    rows
 }
 
 async fn complete_failed(

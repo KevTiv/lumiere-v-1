@@ -9,7 +9,7 @@ import {
   fetchAccountSelectLabelByInternalType,
   fetchCurrencyIdByCode,
   fetchDefaultCompanyId,
-  fetchDraftInvoiceMoveIdByPartner,
+  fetchDraftInvoiceMoveIdForSaleOrder,
   fetchFirstPricelistId,
   fetchFirstWarehouseId,
   fetchSalesInvoiceJournalLabel,
@@ -84,10 +84,10 @@ const none = { none: [] as [] }
 const some = <T,>(value: T) => ({ some: value })
 
 /**
- * Poll until the sale-orders query contains the given order id.
- * Returns the newest matching row id.
+ * Poll until the sale-orders query contains exactly one order for the test-only
+ * customer. Duplicate matches fail instead of selecting the newest row.
  */
-async function fetchLatestSaleOrderIdByPartnerId(
+async function fetchUniqueSaleOrderIdByPartnerId(
   page: Parameters<typeof callReducerBff>[0],
   partnerId: number,
 ): Promise<number> {
@@ -101,10 +101,12 @@ async function fetchLatestSaleOrderIdByPartnerId(
       const matches = (json.data ?? []).filter(
         (row) => scalarQueryId(row.partnerId ?? row.partner_id) === partnerId,
       )
-      const newest = [...matches].sort(
-        (a, b) => (scalarQueryId(b.id) ?? 0) - (scalarQueryId(a.id) ?? 0),
-      )[0]
-      const id = scalarQueryId(newest?.id)
+      if (matches.length > 1) {
+        throw new Error(
+          `expected one sale order for partner ${partnerId}, found ${matches.length}`,
+        )
+      }
+      const id = scalarQueryId(matches[0]?.id)
       if (id != null) return id
     }
     await page.waitForTimeout(250)
@@ -327,7 +329,7 @@ test.describe("SAL-004: Full SO → Invoice creation flow", { tag: "@p0" }, () =
       ])
 
       // Poll until the new SO appears in the query for this partner.
-      const orderId = await fetchLatestSaleOrderIdByPartnerId(page, customer.id)
+      const orderId = await fetchUniqueSaleOrderIdByPartnerId(page, customer.id)
 
       // ── Step 5: Confirm sale order via BFF ───────────────────────────────────
       await callReducerBff(page, "confirm_sales_order", [
@@ -378,9 +380,7 @@ test.describe("SAL-004: Full SO → Invoice creation flow", { tag: "@p0" }, () =
       expect(invoiceRes.ok()).toBe(true)
 
       // ── Step 10: Assert draft invoice was created ─────────────────────────────
-      // fetchDraftInvoiceMoveIdByPartner matches by invoicePartnerDisplayName which
-      // the create_invoice_from_sale_order reducer copies from the SO partner.
-      const invoiceMoveId = await fetchDraftInvoiceMoveIdByPartner(page, customerName)
+      const invoiceMoveId = await fetchDraftInvoiceMoveIdForSaleOrder(page, orderId)
       expect(invoiceMoveId).toBeGreaterThan(0)
 
       // Verify the draft invoice appears in the account-moves query with residual > 0,

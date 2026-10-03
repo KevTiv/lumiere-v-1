@@ -256,7 +256,10 @@ pub async fn resolve_api_session(
         ) {
             if !tok.is_empty() {
                 let client = state.client_with_token(tok);
-                let identity_hex = "dev-mock-identity".to_string();
+                let identity_hex = client
+                    .authenticated_identity()
+                    .await
+                    .map_err(|_| ApiError::Unauthorized)?;
                 let fa = load_field_access_context(&client, &identity_hex, org)
                     .await
                     .ok()

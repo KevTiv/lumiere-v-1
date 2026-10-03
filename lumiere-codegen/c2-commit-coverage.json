@@ -167,7 +167,16 @@
       "function": "create_pos_order",
       "operation": "create_pos_order",
       "operation_id": "erp.create_pos_order",
-      "change_constructors": ["upsert_stdb_row"]
+      "change_constructors": ["upsert_stdb_row"],
+      "change_helpers": ["pos_order_projection_changes"]
+    },
+    {
+      "source": "spacetimedb/src/sales/pos_transactions.rs",
+      "function": "record_pos_order_projection_commit",
+      "operation": "create_pos_order",
+      "operation_id": "erp.create_pos_order",
+      "change_constructors": ["upsert_stdb_row"],
+      "change_helpers": ["pos_order_projection_changes"]
     },
     {
       "source": "spacetimedb/src/sales/pos_transactions.rs",

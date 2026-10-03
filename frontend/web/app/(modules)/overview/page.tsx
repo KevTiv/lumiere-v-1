@@ -1,5 +1,5 @@
 import { getStdbSession } from "@/lib/api-session"
-import { serverFetchQueryListsAllowEmpty } from "@/lib/server-query"
+import { serverFetchQueryListsRequired } from "@/lib/server-query"
 import { OverviewClient } from "./overview-client"
 
 const SSR_RESOURCES = [
@@ -26,7 +26,7 @@ export default async function OverviewPage() {
     projects,
     purchaseOrders,
     contacts,
-  ] = await serverFetchQueryListsAllowEmpty(session, SSR_RESOURCES)
+  ] = await serverFetchQueryListsRequired(session, SSR_RESOURCES)
 
   return (
     <OverviewClient

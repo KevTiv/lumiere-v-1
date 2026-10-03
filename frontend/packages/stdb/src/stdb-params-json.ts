@@ -70,6 +70,8 @@ export function camelToSnakeIdentifier(s: string): string {
   }
 
   return s
+    .replace(/1K/g, "1k")
+    .replace(/([A-Z]+)([A-Z][a-z])/g, "$1_$2")
     .replace(/([a-z])(\d)/g, "$1_$2")
     .replace(/(\d)([A-Z])/g, "$1_$2")
     .replace(/([a-z0-9])([A-Z])/g, "$1_$2")

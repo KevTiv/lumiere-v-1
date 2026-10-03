@@ -67,26 +67,39 @@ async function fetchFirstStockPicking(page: Page): Promise<{
   return { pickingTypeId, locationSrcId, locationDestId }
 }
 
-async function fetchLatestMoIdByProduct(page: Page, productId: number): Promise<number> {
+async function fetchManufacturingOrderIdByExactOrigin(
+  page: Page,
+  productId: number,
+  origin: string,
+): Promise<number> {
   const deadline = Date.now() + 30_000
   while (Date.now() < deadline) {
     const res = await page.request.get("/api/query/mrp-productions")
     if (res.ok()) {
       const json = (await res.json()) as {
-        data?: Array<{ id?: unknown; productId?: unknown; product_id?: unknown }>
+        data?: Array<{
+          id?: unknown
+          productId?: unknown
+          product_id?: unknown
+          origin?: unknown
+        }>
       }
       const matches = (json.data ?? []).filter(
-        (r) => scalarQueryId(r.productId ?? r.product_id) === productId,
+        (r) =>
+          scalarQueryId(r.productId ?? r.product_id) === productId &&
+          String(r.origin ?? "") === origin,
       )
-      const newest = [...matches].sort(
-        (a, b) => (scalarQueryId(b.id) ?? 0) - (scalarQueryId(a.id) ?? 0),
-      )[0]
-      const id = scalarQueryId(newest?.id)
+      if (matches.length > 1) {
+        throw new Error(
+          `expected one manufacturing order for product ${productId} and origin ${origin}, found ${matches.length}`,
+        )
+      }
+      const id = scalarQueryId(matches[0]?.id)
       if (id != null) return id
     }
     await page.waitForTimeout(250)
   }
-  throw new Error(`no manufacturing order found for product ${productId}`)
+  throw new Error(`no manufacturing order found for product ${productId} and origin ${origin}`)
 }
 
 async function fetchMoState(page: Page, moId: number): Promise<string> {
@@ -246,6 +259,7 @@ test.describe(
       const planned = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
       const plannedTs = stdbTimestampMicros(planned)
 
+      const origin = smokeName("mfg009-origin")
       await callReducerBff(page, "create_manufacturing_order", [
         organizationId,
         {
@@ -265,13 +279,13 @@ test.describe(
           proc_group_id: none,
           procurement_group_id: none,
           date_deadline: none,
-          origin: some(smokeName("mfg009-origin")),
+          origin: some(origin),
           responsible_user_id: none,
           metadata: none,
         },
       ])
 
-      const moId = await fetchLatestMoIdByProduct(page, productId)
+      const moId = await fetchManufacturingOrderIdByExactOrigin(page, productId, origin)
 
       await expect.poll(async () => fetchMoState(page, moId), { timeout: 30_000 }).toBe("Draft")
 

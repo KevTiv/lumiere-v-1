@@ -24,7 +24,7 @@ const sizeClasses: Record<string, string> = {
   xl: "sm:max-w-[920px]",
 }
 
-interface FormModalProps {
+export interface FormModalProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   config: FormConfig
@@ -49,6 +49,8 @@ interface FormModalProps {
   formLeadingActions?: React.ReactNode
   /** Forwarded to {@link ModularForm} — e.g. parent mutation `isPending`. */
   isPending?: boolean
+  /** Blocks submission while leaving cancel and inspection available. */
+  submissionDisabled?: boolean
   /** Forwarded to {@link ModularForm} to enable advisory AI form fill. */
   aiAssist?: AiFormAssistConfig
   /** Forwarded to {@link ModularForm} — e.g. swap dependent select options when a field changes. */
@@ -79,6 +81,7 @@ export function FormModal({
   submitError,
   formLeadingActions,
   isPending,
+  submissionDisabled,
   aiAssist,
   onValuesChange,
 }: FormModalProps) {
@@ -180,6 +183,7 @@ export function FormModal({
             onCancel={handleCancel}
             leadingActions={formLeadingActions}
             isPending={isPending}
+            submissionDisabled={submissionDisabled}
             aiAssist={aiAssist}
             onValuesChange={onValuesChange}
           />
