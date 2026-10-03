@@ -343,6 +343,10 @@ jobs:
           sed -i "s/v$PREVIOUS_VERSION/v$VERSION/g" api-server/src/presentation_dictionary.rs
           cargo update -p lumiere-contracts
           grep -q "tag=v$VERSION#$REVISION" Cargo.lock
+          # Migration SQL ships in lumiere-contracts, so the application catalog
+          # checksum moves with the pin; compute it with the runtime's own function.
+          export CATALOG_CHECKSUM="$(cargo run -q --locked -p api-server --example migration_catalog_checksum)"
+          case "$CATALOG_CHECKSUM" in sha256:*) ;; *) echo "bad catalog checksum: $CATALOG_CHECKSUM"; exit 1 ;; esac
           CHECKOUT="$(bash scripts/resolve-pinned-contracts.sh)"
           python3 - "$CHECKOUT" "$REVISION" <<'PY'
           import hashlib
@@ -364,6 +368,7 @@ jobs:
           })
           durable = manifest["durable_postgres"]
           durable["checksum"] = "sha256:" + hashlib.sha256((checkout / durable["sql_path"]).read_bytes()).hexdigest()
+          durable["application_catalog_checksum"] = os.environ["CATALOG_CHECKSUM"]
           manifest["lumiere_contracts"].update({"version": version, "tag": f"v{version}", "revision": revision})
           history = Path(manifest["operation_history"]["path"]).read_bytes()
           manifest["operation_history"]["checksum"] = "sha256:" + hashlib.sha256(history).hexdigest()
@@ -393,7 +398,9 @@ jobs:
             if git push origin "HEAD:${GITHUB_REF_NAME}"; then
               exit 0
             fi
-            git pull --rebase origin "${GITHUB_REF_NAME}"
+            # A rebase recommits the pin, so it needs the same identity as the commit.
+            git -c user.name="github-actions[bot]" -c user.email="41898+github-actions[bot]@users.noreply.github.com" \
+              pull --rebase origin "${GITHUB_REF_NAME}"
           done
           echo "::error::could not push the v$VERSION pin to ${GITHUB_REF_NAME}; pin it by hand."
           exit 1

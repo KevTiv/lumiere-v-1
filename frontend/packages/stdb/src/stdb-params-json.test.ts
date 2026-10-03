@@ -509,6 +509,58 @@ describe("stdbParamsToJson", () => {
       active: false,
     })
   })
+
+  it("encodes subscription invoice option fields", () => {
+    assert.deepEqual(
+      stdbParamsToJson(
+        {
+          invoiceDate: { microsSinceUnixEpoch: 1_790_985_600_000_000n },
+          billingRunKey: "run-41",
+          incomeAccountId: 807n,
+          receivableAccountId: 805n,
+        },
+        "GenerateSubscriptionInvoiceParams",
+      ),
+      {
+        invoice_date: {
+          __timestamp_micros_since_unix_epoch__: 1_790_985_600_000_000,
+        },
+        billing_run_key: { some: "run-41" },
+        journal_id: { none: [] },
+        income_account_id: 807,
+        receivable_account_id: 805,
+        tax_account_id: { none: [] },
+      },
+    )
+  })
+
+  it("emits every optional subscription payment field", () => {
+    assert.deepEqual(
+      stdbParamsToJson(
+        {
+          invoiceMoveId: 41n,
+          paymentJournalId: 7n,
+          bankAccountId: 1200n,
+          receivableAccountId: 805n,
+          cogsAccountId: 808n,
+          inventoryAccountId: 809n,
+        },
+        "ApplySubscriptionInvoicePaymentParams",
+      ),
+      {
+        invoice_move_id: 41,
+        payment_journal_id: 7,
+        bank_account_id: 1200,
+        receivable_account_id: 805,
+        amount: { none: [] },
+        payment_date: { none: [] },
+        cogs_account_id: 808,
+        inventory_account_id: 809,
+        ref: { none: [] },
+        memo: { none: [] },
+      },
+    )
+  })
 })
 
 describe("encodeTaggedUnitEnum", () => {

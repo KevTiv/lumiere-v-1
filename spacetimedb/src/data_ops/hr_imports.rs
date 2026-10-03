@@ -4,7 +4,10 @@
 use spacetimedb::{ReducerContext, Table};
 
 use crate::data_ops::helpers::*;
-use crate::data_ops::import_tracker::{begin_import_job, finish_import_job, record_import_error};
+use crate::data_ops::import_tracker::{
+    begin_import_job, finish_import_job, import_content_sha256, record_import_error,
+    reject_committed_import_replay, stamp_import_sha256,
+};
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 use crate::hr::contracts::{hr_contract, HrContract};
 use crate::hr::employees::{
@@ -699,7 +702,10 @@ pub fn import_hr_payslip_csv(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "hr_payroll", "create")?;
     let (headers, rows) = parse_csv(&csv_data)?;
+    let sha256 = import_content_sha256(&csv_data);
+    reject_committed_import_replay(ctx, organization_id, "hr_payslip", &sha256)?;
     let job = begin_import_job(ctx, organization_id, "hr_payslip", None, rows.len() as u32);
+    let job = stamp_import_sha256(ctx, job, &sha256);
     let mut imported = 0u32;
     let mut errors = 0u32;
 

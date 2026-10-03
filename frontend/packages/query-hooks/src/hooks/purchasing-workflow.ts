@@ -38,10 +38,18 @@ import {
   observeConfirmedPurchaseOrder,
   observeConfirmedPurchaseReturn,
   observeConvertedRequisition,
+  observeLandedCostApplied,
   observeCreatedBill,
   purchaseOrderInvoiceIds,
+  landedCostWorkflow,
+  purchaseOrderWorkflow,
+  purchaseRequisitionWorkflow,
+  recordRef,
+  supplierIntakeWorkflow,
+  requisitionPurchaseIds,
   observeReceivedLine,
   observeReturnVendorCredit,
+  observeSameRecord,
   observeSentPurchaseOrder,
   postLandedCostAction,
   receivePurchaseLineAction,
@@ -50,12 +58,14 @@ import {
   releaseBlanketAction,
   reviewSupplierIntakeAction,
   sendPurchaseOrderAction,
+  stateIs,
   submitRequisitionAction,
   type AnyWorkflowAction,
   type ApproveSupplierIntakeInput,
   type AwardRfqBidInput,
   type CreateBillFromPurchaseOrderInput,
   type CreateVendorCreditInput,
+  type ObservedTransition,
   type ReceiptTarget,
   type ReceivePurchaseLineInput,
   type ReleaseBlanketInput,
@@ -65,6 +75,7 @@ import {
   type TransitionSpec,
 } from "@lumiere/erp-workflows"
 
+import { fetchQueryList } from "../http"
 import { stockMovesQueryOptions } from "./inventory/stock-operations"
 import {
   applyLandedCostsCommand,
@@ -86,6 +97,7 @@ import {
   purchaseOrdersQueryOptions,
   purchaseRequisitionsQueryOptions,
   purchaseReturnsQueryOptions,
+  purchaseRfqsQueryOptions,
   receivePurchaseOrderLineCommand,
   rejectSupplierIntakeCommand,
   releaseBlanketToPoCommand,
@@ -127,9 +139,14 @@ export interface PurchasingWorkflowLabels {
 
 type BillInput = CreateBillFromPurchaseOrderInput<CreateBillFromPurchaseOrderParams>
 type BillRunInput = BillInput & { invoiceIdsBefore: string[] }
+type ConvertRunInput = { requisitionId: string; purchaseIdsBefore: string[] }
 type ReceiveRunInput = ReceivePurchaseLineInput & { receiptTarget?: ReceiptTarget }
 type VendorCreditInput = CreateVendorCreditInput<VendorCreditFromReturnParams>
 type ReleaseInput = ReleaseBlanketInput<ReleaseBlanketToPoParams>
+
+type Readback<TInput> =
+  | { observe(input: TInput): Promise<ObservedTransition> }
+  | { noReadback: string }
 
 /** Pins a spec's input type to the workflow action's (commands accept wider scalar ids). */
 const typed = <TInput,>(spec: TransitionSpec<TInput>) => spec
@@ -155,6 +172,7 @@ export function usePurchasingWorkflow(
     const fresh = <T,>(options: { queryKey: readonly unknown[]; queryFn: () => Promise<unknown>; staleTime: number }) =>
       qc.fetchQuery({ ...options, staleTime: 0 }) as Promise<T>
     const orders = () => fresh<RowValueMap[]>(purchaseOrdersQueryOptions(organizationId))
+    const requisitions = () => fresh<RowValueMap[]>(purchaseRequisitionsQueryOptions(organizationId))
     const requireCompany = (what: string) => {
       if (companyId == null || companyId === 0n) throw companyRequired(what)
       return companyId
@@ -164,32 +182,54 @@ export function usePurchasingWorkflow(
       id: string,
       command: (id: string) => Promise<void>,
       affects: readonly string[],
-      observe?: TransitionSpec<string>["observe"],
-    ): TransitionSpec<string> => ({ id, command, affects, observe })
+      readback: Readback<string>,
+    ): TransitionSpec<string> => ({ id, command, affects, ...readback })
+
+    /** In-place transitions: the same record must read back in `state`. */
+    const sameRecordIn =
+      (workflow: { resource: string; module: string }, rows: () => Promise<RowValueMap[]>, state: string) =>
+      async (id: string | bigint | number) =>
+        observeSameRecord(recordRef(workflow.resource, id, workflow.module), await rows(), stateIs(state))
+    const requisitionIn = (state: string) => sameRecordIn(purchaseRequisitionWorkflow, requisitions, state)
+    const orderIn = (state: string) => sameRecordIn(purchaseOrderWorkflow, orders, state)
+    const intakes = () => fetchQueryList("/api/query/supplier-intakes", "Failed to read supplier intakes")
+    const intakeIn = (state: string) => sameRecordIn(supplierIntakeWorkflow, intakes, state)
+    const landedCosts = () => fetchQueryList("/api/query/landed-costs", "Failed to read landed costs")
+    const landedCostIn = (state: string) => sameRecordIn(landedCostWorkflow, landedCosts, state)
 
     return {
-      submitRequisition: idSpec("purchasing.requisition.submit", submitPurchaseRequisitionCommand, REQUISITION_TRANSITION_AFFECTS),
-      approveRequisition: idSpec("purchasing.requisition.approve", approvePurchaseRequisitionCommand, REQUISITION_TRANSITION_AFFECTS),
-      closeRequisition: idSpec("purchasing.requisition.close", closePurchaseRequisitionCommand, REQUISITION_TRANSITION_AFFECTS),
-      cancelRequisition: idSpec("purchasing.requisition.cancel", cancelPurchaseRequisitionCommand, REQUISITION_TRANSITION_AFFECTS),
-      convertRequisition: idSpec(
-        "purchasing.requisition.convert",
-        (id) => convertPurchaseRequisitionToPoCommand(companyId, id),
-        CONVERT_REQUISITION_AFFECTS,
-        async (id) =>
-          observeConvertedRequisition(id, await fresh<RowValueMap[]>(purchaseRequisitionsQueryOptions(organizationId))),
-      ),
+      submitRequisition: idSpec("purchasing.requisition.submit", submitPurchaseRequisitionCommand, REQUISITION_TRANSITION_AFFECTS, {
+        observe: requisitionIn("InProgress"),
+      }),
+      approveRequisition: idSpec("purchasing.requisition.approve", approvePurchaseRequisitionCommand, REQUISITION_TRANSITION_AFFECTS, {
+        observe: requisitionIn("Approved"),
+      }),
+      closeRequisition: idSpec("purchasing.requisition.close", closePurchaseRequisitionCommand, REQUISITION_TRANSITION_AFFECTS, {
+        observe: requisitionIn("Closed"),
+      }),
+      cancelRequisition: idSpec("purchasing.requisition.cancel", cancelPurchaseRequisitionCommand, REQUISITION_TRANSITION_AFFECTS, {
+        observe: requisitionIn("Cancelled"),
+      }),
+      convertRequisition: typed<ConvertRunInput>({
+        id: "purchasing.requisition.convert",
+        command: ({ requisitionId }) => convertPurchaseRequisitionToPoCommand(companyId, requisitionId),
+        affects: CONVERT_REQUISITION_AFFECTS,
+        observe: async ({ requisitionId, purchaseIdsBefore }) =>
+          observeConvertedRequisition(requisitionId, purchaseIdsBefore, await requisitions()),
+      }),
 
-      sendOrder: idSpec("purchasing.order.send", sendPurchaseOrderCommand, SEND_PURCHASE_ORDER_AFFECTS, async (id) =>
-        observeSentPurchaseOrder(id, await orders()),
-      ),
+      sendOrder: idSpec("purchasing.order.send", sendPurchaseOrderCommand, SEND_PURCHASE_ORDER_AFFECTS, {
+        observe: async (id) => observeSentPurchaseOrder(id, await orders()),
+      }),
       confirmOrder: idSpec(
         "purchasing.order.confirm",
         confirmPurchaseOrderCommand,
         CONFIRM_PURCHASE_ORDER_AFFECTS,
-        async (id) => observeConfirmedPurchaseOrder(id, await orders()),
+        { observe: async (id) => observeConfirmedPurchaseOrder(id, await orders()) },
       ),
-      cancelOrder: idSpec("purchasing.order.cancel", cancelPurchaseOrderCommand, CANCEL_PURCHASE_ORDER_AFFECTS),
+      cancelOrder: idSpec("purchasing.order.cancel", cancelPurchaseOrderCommand, CANCEL_PURCHASE_ORDER_AFFECTS, {
+        observe: orderIn("Cancelled"),
+      }),
 
       createBill: typed<BillRunInput>({
         id: "purchasing.order.create-bill",
@@ -224,45 +264,70 @@ export function usePurchasingWorkflow(
         id: "purchasing.rfq.award",
         command: (input) => awardPurchaseRfqBidCommand(requireCompany("award an RFQ bid"), input),
         affects: AWARD_RFQ_BID_AFFECTS,
-        observe: async ({ rfqId }) => observeAwardedRfq(rfqId, await orders()),
+        observe: async ({ rfqId }) => {
+          const [rfqs, currentOrders] = await Promise.all([
+            fresh<RowValueMap[]>(purchaseRfqsQueryOptions(organizationId)),
+            orders(),
+          ])
+          return observeAwardedRfq(rfqId, rfqs, currentOrders)
+        },
       }),
 
       reviewIntake: typed<ReviewSupplierIntakeInput>({
         id: "purchasing.supplier-intake.review",
         command: reviewSupplierIntakeCommand,
         affects: SUPPLIER_INTAKE_TRANSITION_AFFECTS,
+        observe: ({ intakeId }) => intakeIn("UnderReview")(intakeId),
       }),
       approveIntake: typed<ApproveSupplierIntakeInput>({
         id: "purchasing.supplier-intake.approve",
         command: approveSupplierIntakeCommand,
         affects: SUPPLIER_INTAKE_TRANSITION_AFFECTS,
+        observe: ({ intakeId }) => intakeIn("Approved")(intakeId),
       }),
       holdIntake: typed<SupplierIntakeReasonInput>({
         id: "purchasing.supplier-intake.hold",
         command: holdSupplierIntakeCommand,
         affects: SUPPLIER_INTAKE_TRANSITION_AFFECTS,
+        observe: ({ intakeId }) => intakeIn("OnHold")(intakeId),
       }),
       rejectIntake: typed<SupplierIntakeReasonInput>({
         id: "purchasing.supplier-intake.reject",
         command: rejectSupplierIntakeCommand,
         affects: SUPPLIER_INTAKE_TRANSITION_AFFECTS,
+        observe: ({ intakeId }) => intakeIn("Rejected")(intakeId),
       }),
 
-      computeLandedCost: idSpec("purchasing.landed-cost.compute", computeLandedCostsCommand, LANDED_COST_DRAFT_AFFECTS),
-      postLandedCost: idSpec("purchasing.landed-cost.post", postLandedCostsCommand, POST_LANDED_COST_AFFECTS),
+      computeLandedCost: idSpec("purchasing.landed-cost.compute", computeLandedCostsCommand, LANDED_COST_DRAFT_AFFECTS, {
+        noReadback: "Idempotent recompute of draft cost lines: an unchanged allocation is a valid result.",
+      }),
+      postLandedCost: idSpec("purchasing.landed-cost.post", postLandedCostsCommand, POST_LANDED_COST_AFFECTS, {
+        observe: landedCostIn("Posted"),
+      }),
       applyLandedCost: idSpec(
         "purchasing.landed-cost.apply",
         (id) => applyLandedCostsCommand(companyId, id),
         APPLY_LANDED_COST_AFFECTS,
+        {
+          observe: async (id) =>
+            observeLandedCostApplied(
+              id,
+              await fetchQueryList("/api/query/landed-cost-applications", "Failed to read landed cost applications"),
+            ),
+        },
       ),
-      cancelLandedCost: idSpec("purchasing.landed-cost.cancel", cancelLandedCostCommand, LANDED_COST_DRAFT_AFFECTS),
+      cancelLandedCost: idSpec("purchasing.landed-cost.cancel", cancelLandedCostCommand, LANDED_COST_DRAFT_AFFECTS, {
+        observe: landedCostIn("Cancelled"),
+      }),
 
       confirmReturn: idSpec(
         "purchasing.return.confirm",
         (id) => confirmPurchaseReturnCommand(requireCompany("confirm a purchase return"), id),
         CONFIRM_PURCHASE_RETURN_AFFECTS,
-        async (id) =>
-          observeConfirmedPurchaseReturn(id, await fresh<RowValueMap[]>(purchaseReturnsQueryOptions(organizationId))),
+        {
+          observe: async (id) =>
+            observeConfirmedPurchaseReturn(id, await fresh<RowValueMap[]>(purchaseReturnsQueryOptions(organizationId))),
+        },
       ),
       createVendorCredit: typed<VendorCreditInput>({
         id: "purchasing.return.create-vendor-credit",
@@ -277,7 +342,13 @@ export function usePurchasingWorkflow(
         id: "purchasing.blanket.release",
         command: (input) => releaseBlanketToPoCommand(requireCompany("release a blanket order"), input),
         affects: RELEASE_BLANKET_AFFECTS,
-        observe: async ({ blanketOrderId }) => observeBlanketRelease(blanketOrderId, await orders()),
+        observe: async ({ blanketOrderId, params }) => {
+          const [releases, currentOrders] = await Promise.all([
+            fetchQueryList("/api/query/purchase-blanket-releases", "Failed to read blanket release"),
+            orders(),
+          ])
+          return observeBlanketRelease(blanketOrderId, params.idempotencyKey, releases, currentOrders)
+        },
       }),
     }
   }, [qc, organizationId, companyId])
@@ -300,7 +371,24 @@ export function usePurchasingWorkflow(
       requisition: [
         submitRequisitionAction({ label: labels.submitRequisition, execute: byId(specs.submitRequisition) }),
         approveRequisitionAction({ label: labels.approveRequisition, execute: byId(specs.approveRequisition) }),
-        convertRequisitionAction({ label: labels.convertRequisition, execute: byId(specs.convertRequisition) }),
+        convertRequisitionAction({
+          label: labels.convertRequisition,
+          execute: async (requisitionId, context) => {
+            const purchaseIdsBefore = requisitionPurchaseIds(
+              requisitionId,
+              (await qc.fetchQuery({ ...purchaseRequisitionsQueryOptions(organizationId), staleTime: 0 })) as RowValueMap[],
+            )
+            if (!purchaseIdsBefore) {
+              throw new WorkflowError("validation", "Requisition is unavailable for purchase order readback")
+            }
+            return runner.run(
+              `${specs.convertRequisition.id}:${requisitionId}`,
+              specs.convertRequisition,
+              { requisitionId, purchaseIdsBefore },
+              { navigateToNext: context?.navigateToNext },
+            )
+          },
+        }),
         closeRequisitionAction({ label: labels.closeRequisition, execute: byId(specs.closeRequisition) }),
         cancelRequisitionAction({ label: labels.cancelRequisition, execute: byId(specs.cancelRequisition) }),
       ] as Array<AnyWorkflowAction<RowValueMap>>,

@@ -1,6 +1,6 @@
 # COV-07g — exact BOM byproduct output
 
-**Status:** BACKEND IMPLEMENTED — contract/UI and runtime acceptance pending  
+**Status:** IMPLEMENTED — runtime acceptance pending
 **Branch:** `codex/cov07g-bom-byproduct-output`  
 **Stack base:** COV-07f / `codex/cov07f-finished-output-scrap`
 
@@ -30,7 +30,9 @@ the exact primary product move from the expanded finished-move relation.
   produced-lot attribution.
 - Cost share is recorded on the output move; accounting valuation allocation is
   part of the later manufacturing costing slice.
-- Regenerate and release the versioned contract, then wire BOM authoring and
-  exact MO output readback in the UI with replay and permission coverage.
+- BOM row actions now author a byproduct through the generated reducer input and
+  resolve the exact `(BOM, product, company)` row from the registered
+  `mrp-bom-byproducts` resource. Duplicate relations fail closed.
+- Exact output browser replay and permission coverage remain runtime acceptance.
 - Run native and browser acceptance during stacked integration. This workspace
   does not provide `cargo` or SpacetimeDB tooling.

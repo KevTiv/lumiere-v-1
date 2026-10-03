@@ -15,6 +15,7 @@ import {
   observeAwardedRfq,
   observeConfirmedPurchaseOrder,
   observeConvertedRequisition,
+  requisitionPurchaseIds,
   observeCreatedBill,
   observeReceivedLine,
   observeSentPurchaseOrder,
@@ -80,25 +81,36 @@ test("an order left unconfirmed by the approval gate is approval_pending", () =>
   assert.deepEqual(observed.next, { resource: "purchase_order", id: "5", module: "purchasing" })
 })
 
-test("a converted requisition opens the newest PO it produced", () => {
-  const observed = observeConvertedRequisition("3", [{ id: 3, purchaseIds: [7, 9] }])
+test("a converted requisition opens the one PO added since the snapshot, never the last entry", () => {
+  const before = requisitionPurchaseIds("3", [{ id: 3, purchaseIds: [7] }])
+  assert.deepEqual(before, ["7"])
+  const observed = observeConvertedRequisition("3", before!, [{ id: 3, purchaseIds: [9, 7] }])
   assert.deepEqual(observed.next, { resource: "purchase_order", id: "9", module: "purchasing" })
   assert.deepEqual(observed.createdRecords, [observed.next])
-  assert.deepEqual(observeConvertedRequisition("3", [{ id: 3, purchase_ids: [] }]), {})
+  assert.equal(requisitionPurchaseIds("3", []), undefined)
+  assert.deepEqual(observeConvertedRequisition("3", ["7"], [{ id: 3, purchase_ids: [7] }]), {})
+  assert.deepEqual(observeConvertedRequisition("3", ["7"], [{ id: 3, purchase_ids: [7, 9, 11] }]), {})
+  assert.deepEqual(observeConvertedRequisition("3", [], []), {})
 })
 
-test("the PO an RFQ award created is found by its rfq_id stamp, newest first", () => {
+test("an RFQ award is confirmed by the RFQ's own purchase_order_id, not the newest stamped PO", () => {
   assert.equal(poSourceRfqId({ metadata: '{"rfq_id":4,"awarded_bid_id":2}' }), "4")
   assert.equal(poSourceRfqId({ metadata: "not json" }), undefined)
   assert.equal(poSourceRfqId({}), undefined)
-  const observed = observeAwardedRfq("4", [
+  const orders = [
     { id: 10, metadata: '{"rfq_id":4}' },
     { id: 12, metadata: '{"rfq_id":4}' },
     { id: 13, metadata: '{"rfq_id":5}' },
-    { id: 14, metadata: null },
-  ])
-  assert.deepEqual(observed.next, { resource: "purchase_order", id: "12", module: "purchasing" })
-  assert.deepEqual(observeAwardedRfq("99", []), {})
+  ]
+  const observed = observeAwardedRfq("4", [{ id: 4, state: "awarded", purchaseOrderId: 10 }], orders)
+  assert.equal(observed.outcome, "applied")
+  assert.deepEqual(observed.next, { resource: "purchase_order", id: "10", module: "purchasing" })
+  assert.deepEqual(observed.createdRecords, [observed.next])
+  assert.deepEqual(observeAwardedRfq("4", [{ id: 4, state: "open", purchaseOrderId: null }], orders), {})
+  assert.deepEqual(observeAwardedRfq("4", [{ id: 4, state: "awarded", purchase_order_id: null }], orders), {})
+  assert.deepEqual(observeAwardedRfq("4", [{ id: 4, state: "awarded", purchaseOrderId: 13 }], orders), {})
+  assert.deepEqual(observeAwardedRfq("4", [{ id: 4, state: "awarded", purchaseOrderId: 99 }], orders), {})
+  assert.deepEqual(observeAwardedRfq("99", [], []), {})
 })
 
 test("vendor bill identity is the one exact new id in the PO relation", () => {

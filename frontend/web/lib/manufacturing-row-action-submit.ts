@@ -1,6 +1,7 @@
 import type { ManufacturingMutations } from "@lumiere/query-hooks/hooks/manufacturing"
 import { i18n } from "@lumiere/i18n"
 import {
+  toCreateBomByproductParams,
   toCreateWorkcenterProductivityParams,
   toCreateWorkorderParams,
 } from "@lumiere/erp-shared/manufacturing-create-params"
@@ -8,33 +9,38 @@ import { optionalBigIntU64 } from "@lumiere/erp-shared/form-coercion"
 
 /** Coverage tracker: manufacturing reducers reachable via row actions + create/import forms. */
 export const MANUFACTURING_UI_REDUCERS = [
-  "block_workcenter",
-  "cancel_manufacturing_order",
-  "check_mo_availability",
-  "compute_bom_cost",
-  "confirm_manufacturing_order",
-  "consume_mo_materials",
-  "create_bom",
-  "create_manufacturing_order",
-  "create_routing_workcenter",
-  "create_workcenter",
-  "delete_bom",
-  "explode_bom",
-  "finish_manufacturing_order",
-  "finish_workorder",
-  "import_bom_csv",
-  "import_bom_line_csv",
-  "import_manufacturing_order_csv",
-  "import_workcenter_csv",
-  "link_device_to_workcenter",
-  "log_workcenter_productivity",
-  "produce_manufacturing_order",
-  "start_manufacturing_order",
-  "start_workorder",
-  "unblock_workcenter",
-  "update_bom",
-  "update_workcenter",
-] as const
+  'block_workcenter',
+  'cancel_manufacturing_order',
+  'check_mo_availability',
+  'compute_bom_cost',
+  'confirm_manufacturing_order',
+  'consume_mo_materials',
+  'create_bom',
+  'create_bom_byproduct',
+  'create_manufacturing_order',
+  'create_routing_workcenter',
+  'create_workcenter',
+  'create_workorder_quality_check',
+  'delete_bom',
+  'explode_bom',
+  'fail_workorder_quality_check',
+  'finish_manufacturing_order',
+  'finish_workorder',
+  'import_bom_csv',
+  'import_bom_line_csv',
+  'import_manufacturing_order_csv',
+  'import_workcenter_csv',
+  'link_device_to_workcenter',
+  'log_workcenter_productivity',
+  'pass_quality_check',
+  'produce_manufacturing_order',
+  'scrap_finished_manufacturing_output',
+  'start_manufacturing_order',
+  'start_workorder',
+  'unblock_workcenter',
+  'update_bom',
+  'update_workcenter',
+] as const;
 
 function num(v: unknown, fallback = 0): number {
   if (v === "" || v === null || v === undefined) return fallback
@@ -75,32 +81,57 @@ export async function submitManufacturingRowAction(
     const moId = idFrom(values, ["moRecordId"])
     const action = String(values.moAction ?? "")
     switch (action) {
-      case "check_availability":
-        await m.checkMoAvailability.mutateAsync(moId)
-        return
-      case "confirm":
-        await m.confirmMo.mutateAsync(moId)
-        return
-      case "start":
-        await m.startMo.mutateAsync(moId)
-        return
-      case "produce":
-        await m.produceMo.mutateAsync({ moId, qty: num(values.produceQty, 0) || 0.0001 })
-        return
-      case "consume":
-        await m.consumeMoMaterials.mutateAsync(moId)
-        return
-      case "finish":
-        await m.finishMo.mutateAsync(moId)
-        return
-      case "cancel":
-        await m.cancelMo.mutateAsync(moId)
-        return
-      case "create_workorder": {
-        const wcRaw = optionalBigIntU64(values.woWorkcenterId)
-        const moRaw = optionalBigIntU64(moId)
-        if (!wcRaw) throw new Error("Select a work center")
-        if (!moRaw) throw new Error("Manufacturing order ID is required")
+      case 'check_availability':
+        await m.checkMoAvailability.mutateAsync(moId);
+        return;
+      case 'confirm':
+        await m.confirmMo.mutateAsync(moId);
+        return;
+      case 'start':
+        await m.startMo.mutateAsync(moId);
+        return;
+      case 'produce':
+        await m.produceMo.mutateAsync({
+          moId,
+          qty: num(values.produceQty, 0) || 0.0001,
+        });
+        return;
+      case 'consume':
+        await m.consumeMoMaterials.mutateAsync(moId);
+        return;
+      case 'finish':
+        await m.finishMo.mutateAsync(moId);
+        return;
+      case 'cancel':
+        await m.cancelMo.mutateAsync(moId);
+        return;
+      case 'scrap_output': {
+        const scrapLocationId = idFrom(values, ['scrapLocationId']);
+        const quantity = num(values.scrapQuantity, 0);
+        if (!scrapLocationId || quantity <= 0) {
+          throw new Error(
+            'A scrap location and positive quantity are required',
+          );
+        }
+        if (
+          typeof globalThis.crypto === 'undefined' ||
+          typeof globalThis.crypto.randomUUID !== 'function'
+        ) {
+          throw new Error('A secure scrap request id could not be created');
+        }
+        await m.scrapFinishedOutput.mutateAsync({
+          moId,
+          scrapLocationId,
+          quantity,
+          requestId: globalThis.crypto.randomUUID(),
+        });
+        return;
+      }
+      case 'create_workorder': {
+        const wcRaw = optionalBigIntU64(values.woWorkcenterId);
+        const moRaw = optionalBigIntU64(moId);
+        if (!wcRaw) throw new Error('Select a work center');
+        if (!moRaw) throw new Error('Manufacturing order ID is required');
         const params = toCreateWorkorderParams(values, {
           productionId: moRaw,
           workcenterId: wcRaw,
@@ -126,13 +157,25 @@ export async function submitManufacturingRowAction(
         })
         return
       }
-      case "compute_cost":
-        await m.computeBomCost.mutateAsync(bomId)
-        return
-      case "explode":
-        await m.explodeBom.mutateAsync(bomId)
-        return
-      case "delete":
+      case 'compute_cost':
+        await m.computeBomCost.mutateAsync(bomId);
+        return;
+      case 'explode':
+        await m.explodeBom.mutateAsync(bomId);
+        return;
+      case 'add_byproduct': {
+        const params = toCreateBomByproductParams({
+          productId: values.byproductProductId as string,
+          productUomId: values.byproductUomId as string,
+          productQty: values.byproductQuantity as number,
+          costShare: values.byproductCostShare as number,
+        });
+        if (!params)
+          throw new Error('Select a byproduct, UOM and positive quantity');
+        await m.createBomByproduct.mutateAsync({ bomId, params });
+        return;
+      }
+      case 'delete':
         if (values.bomDeleteConfirmed !== true) {
           throw new Error("Confirm deletion before deleting this BOM")
         }
@@ -170,7 +213,36 @@ export async function submitManufacturingRowAction(
       await m.finishWo.mutateAsync(woId)
       return
     }
-    throw new Error("Unknown action")
+    if (action === 'require_quality') {
+      const name = String(values.woQualityName ?? '').trim();
+      if (!name) throw new Error('Quality check name is required');
+      await m.createWorkorderQualityCheck.mutateAsync({
+        workorderId: woId,
+        name,
+      });
+      return;
+    }
+    if (action === 'pass_quality' || action === 'fail_quality') {
+      const checkId = idFrom(values, ['woQualityCheckId']);
+      if (!checkId) throw new Error('Quality check ID is required');
+      const note = String(values.woQualityNote ?? '').trim();
+      if (action === 'pass_quality') {
+        await m.passWorkorderQualityCheck.mutateAsync({
+          checkId,
+          workorderId: woId,
+          note: note || null,
+        });
+      } else {
+        if (!note) throw new Error('Failure note is required');
+        await m.failWorkorderQualityCheck.mutateAsync({
+          checkId,
+          workorderId: woId,
+          note,
+        });
+      }
+      return;
+    }
+    throw new Error('Unknown action');
   }
 
   if (tabId === "workcenters") {

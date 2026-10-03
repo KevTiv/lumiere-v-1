@@ -351,6 +351,7 @@ pub(crate) fn purchasing_resource(resource: &str) -> bool {
             | "purchase-order-lines-over-billed"
             | "landed-costs"
             | "landed-cost-lines"
+            | "landed-cost-applications"
             | "partner-banks"
             | "purchase-requisitions"
             | "purchase-requisition-lines"

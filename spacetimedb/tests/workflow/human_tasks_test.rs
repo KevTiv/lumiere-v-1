@@ -419,6 +419,61 @@ fn authorization_is_rechecked_at_decision_time(ctx: &ReducerContext) -> Result<(
     .err()
     .ok_or("SOD-conflicting task decision succeeded")?;
     assert_contains(&sod_error, "segregation of duties")?;
+
+    // Authorization is evaluated before closed-task validation so an outsider
+    // cannot use stale decision attempts to probe task state.
+    let closed_fixture = OrgFixture::seed_minimal(ctx)?;
+    let approver_role_id = seed_role(
+        ctx,
+        closed_fixture.organization_id,
+        vec!["workflow_task:approve"],
+    );
+    let approver = seed_member(ctx, &closed_fixture, approver_role_id, None);
+    let reader_role_id = seed_role(
+        ctx,
+        closed_fixture.organization_id,
+        vec!["workflow_task:read"],
+    );
+    let reader = seed_member(ctx, &closed_fixture, reader_role_id, None);
+    let closed = seed_task_runtime(
+        ctx,
+        &closed_fixture,
+        approver_role_id,
+        new_identity(ctx),
+        WorkflowTaskAssignment::AnyCandidate,
+        false,
+        None,
+    )?;
+    decide_workflow_human_task_for_actor(
+        ctx,
+        closed_fixture.organization_id,
+        approver,
+        decision(
+            &closed_fixture,
+            &closed,
+            WorkflowHumanTaskDecision::Approve,
+            None,
+        ),
+    )?;
+    let denied = decide_workflow_human_task_for_actor(
+        ctx,
+        closed_fixture.organization_id,
+        reader,
+        decision(
+            &closed_fixture,
+            &closed,
+            WorkflowHumanTaskDecision::Approve,
+            None,
+        ),
+    )
+    .err()
+    .ok_or("reader learned closed task state instead of being denied")?;
+    assert_contains(&denied, "Permission denied")?;
+    if denied.contains("not open") || denied.contains("stale") {
+        return Err(format!(
+            "authorization ran after task-state validation: {denied}"
+        ));
+    }
     Ok(())
 }
 

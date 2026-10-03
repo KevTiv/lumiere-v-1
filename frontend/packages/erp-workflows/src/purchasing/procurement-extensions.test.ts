@@ -13,6 +13,7 @@ import {
   isPurchaseReturnConfirmable,
   isPurchaseReturnCreditable,
   observeBlanketRelease,
+  observeLandedCostApplied,
   observeConfirmedPurchaseReturn,
   observeReturnVendorCredit,
   reviewSupplierIntakeAction,
@@ -70,15 +71,41 @@ test("a confirmed return opens its return picking and a vendor credit opens in a
   assert.deepEqual(observeReturnVendorCredit("2", [{ id: 2, credit_move_id: null }]), {})
 })
 
-test("only draft blankets release, and the newest PO stamped blanket:<id> is the release", () => {
+test("only draft blankets release, and the release is the exact (blanket, idempotency key) row", () => {
   assert.ok(isBlanketReleasable({ state: "draft" }))
   assert.ok(!isBlanketReleasable({ state: "closed" }))
-  const observed = observeBlanketRelease("7", [
+  const orders = [
     { id: 10, origin: "blanket:7" },
     { id: 12, origin: "blanket:7" },
     { id: 13, origin: "blanket:70" },
-    { id: 14, origin: "requisition:7" },
-  ])
-  assert.deepEqual(observed.next, { resource: "purchase_order", id: "12", module: "purchasing" })
-  assert.deepEqual(observeBlanketRelease("8", []), {})
+  ]
+  const releases = [
+    { id: 1, blanketOrderId: 7, idempotencyKey: "rel-a", purchaseOrderId: 10 },
+    { id: 2, blanket_order_id: 7, idempotency_key: "rel-b", purchase_order_id: 12 },
+  ]
+  const observed = observeBlanketRelease("7", " rel-a ", releases, orders)
+  assert.equal(observed.outcome, "applied")
+  assert.deepEqual(observed.next, { resource: "purchase_order", id: "10", module: "purchasing" })
+  assert.deepEqual(observed.createdRecords, [observed.next])
+  assert.equal(observeBlanketRelease("7", "rel-b", releases, orders).next?.id, "12")
+  assert.deepEqual(observeBlanketRelease("7", "rel-c", releases, orders), {})
+  assert.deepEqual(observeBlanketRelease("70", "rel-a", releases, orders), {})
+  assert.deepEqual(
+    observeBlanketRelease("7", "rel-a", [...releases, { id: 3, blanketOrderId: 7, idempotencyKey: "rel-a", purchaseOrderId: 12 }], orders),
+    {},
+  )
+  assert.deepEqual(
+    observeBlanketRelease("7", "x", [{ blanketOrderId: 7, idempotencyKey: "x", purchaseOrderId: 13 }], orders),
+    {},
+  )
+  assert.deepEqual(observeBlanketRelease("7", "rel-a", releases, []), {})
+})
+
+test("a landed cost apply is confirmed by its one committed application row", () => {
+  assert.deepEqual(observeLandedCostApplied("4", [{ id: 1, landedCostId: 4 }, { id: 2, landed_cost_id: 5 }]), {
+    outcome: "applied",
+    next: { resource: "stock_landed_cost", id: "4", module: "purchasing" },
+  })
+  assert.deepEqual(observeLandedCostApplied("4", [{ id: 2, landedCostId: 5 }]), {})
+  assert.deepEqual(observeLandedCostApplied("4", [{ id: 1, landedCostId: 4 }, { id: 3, landedCostId: 4 }]), {})
 })

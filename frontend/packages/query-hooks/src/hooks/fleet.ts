@@ -1,6 +1,7 @@
 "use client"
 
 
+import { decodeOperationDispatch } from "@lumiere/api-client"
 import { stdbBffCommandPost } from "@lumiere/stdb/commands"
 import {
   encodeOptionalString,
@@ -11,7 +12,15 @@ import {
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 
 import { apiFetch, fetchQueryList, rqBigIntKey, type QueryRows } from "../http"
+import { parseStrictU64 } from "@lumiere/erp-shared/u64"
 import type { FleetVehicle } from "@lumiere/stdb/types"
+import {
+  AmbiguousOperationEffectError,
+  executeOperationWithCanonicalReadback,
+  requireResolvedOperationEffect,
+  type CanonicalRecordRef,
+  type ResolvedOperationEffectOutcome,
+} from "./operation-effect"
 
 // ── Reads ────────────────────────────────────────────────────────────────────
 
@@ -189,28 +198,445 @@ export interface RecordFleetServiceInput {
   odometerKm?: number
   provider?: string
   notes?: string
+  costAmount?: number
+  journalId?: bigint
+  expenseAccountId?: bigint
+  offsetAccountId?: bigint
   clientRequestId?: string
+}
+
+export interface FleetHistoryEffectProjection {
+  readonly id?: unknown
+  readonly organizationId?: unknown
+  readonly organization_id?: unknown
+  readonly companyId?: unknown
+  readonly company_id?: unknown
+  readonly vehicleId?: unknown
+  readonly vehicle_id?: unknown
+  readonly serviceTypeId?: unknown
+  readonly service_type_id?: unknown
+  readonly servicedAt?: unknown
+  readonly serviced_at?: unknown
+  readonly inspectedAt?: unknown
+  readonly inspected_at?: unknown
+  readonly createDate?: unknown
+  readonly create_date?: unknown
+  readonly odometerKm?: unknown
+  readonly odometer_km?: unknown
+  readonly provider?: unknown
+  readonly notes?: unknown
+  readonly inspectorId?: unknown
+  readonly inspector_id?: unknown
+  readonly outcome?: unknown
+  readonly costAmount?: unknown
+  readonly cost_amount?: unknown
+  readonly currencyId?: unknown
+  readonly currency_id?: unknown
+  readonly accountMoveId?: unknown
+  readonly account_move_id?: unknown
+  readonly clientRequestId?: unknown
+  readonly client_request_id?: unknown
+}
+
+export interface FleetHistoryEffectRef extends CanonicalRecordRef {
+  readonly resource: "fleet-service-records" | "fleet-inspections"
+  readonly vehicleId: string
+  readonly companyId: string
+  readonly clientRequestId: string
+  readonly costAmount?: number
+  readonly currencyId?: string
+  readonly accountMoveId?: string
+}
+
+function normalizedOptionalString(value: unknown): string {
+  if (typeof value === "string") return value.trim()
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    if ("some" in value) {
+      return String((value as { some?: unknown }).some ?? "").trim()
+    }
+    if ("none" in value) return ""
+  }
+  return ""
+}
+
+function fleetOutcomeTag(value: unknown): string {
+  const normalize = (tag: unknown) =>
+    String(tag ?? "")
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, "")
+  if (typeof value === "string") return normalize(value)
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    if ("tag" in value) {
+      return normalize((value as { tag?: unknown }).tag)
+    }
+    const keys = Object.keys(value)
+    if (keys.length === 1) return normalize(keys[0])
+  }
+  return ""
+}
+
+function requireFleetRequestId(value?: string): string {
+  const normalized = value?.trim()
+  if (normalized) return normalized
+  return crypto.randomUUID()
+}
+function numericField(value: unknown): number | null {
+  if (value == null || value === "") return null
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    if ("some" in value) value = (value as { some?: unknown }).some
+    else if ("none" in value) return null
+  }
+  if (value == null || value === "" || (typeof value !== "number" && typeof value !== "string")) return null
+  const parsed = Number(value)
+  return Number.isFinite(parsed) ? parsed : null
+}
+
+// Preserve explicit absence; an omitted projection column is not evidence.
+function historyField(row: FleetHistoryEffectProjection, camel: keyof FleetHistoryEffectProjection, snake = camel) {
+  return Object.hasOwn(row, camel) ? row[camel] : row[snake]
+}
+
+function optionalValue(value: unknown): unknown {
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    if ("some" in value) return (value as { some: unknown }).some
+    if ("none" in value) return null
+  }
+  return value
+}
+
+function optionalNumberMatches(actual: unknown, expected: unknown): boolean {
+  actual = optionalValue(actual)
+  expected = optionalValue(expected)
+  if (actual === undefined || expected === undefined) return false
+  if (actual == null || expected == null) return actual === expected
+  const parsed = numericField(actual)
+  return parsed != null && parsed === numericField(expected)
+}
+
+function optionalTextMatches(actual: unknown, expected: unknown): boolean {
+  actual = optionalValue(actual)
+  expected = optionalValue(expected)
+  if (actual === undefined || expected === undefined) return false
+  if (actual != null && typeof actual !== "string") return false
+  if (expected != null && typeof expected !== "string") return false
+  return normalizedOptionalString(actual) === normalizedOptionalString(expected)
+}
+
+function timestampMicros(value: unknown): bigint | null {
+  value = optionalValue(value)
+  if (value && typeof value === "object") {
+    const timestamp = value as {
+      readonly __timestamp_micros_since_unix_epoch__?: unknown
+      readonly microsSinceUnixEpoch?: unknown
+      readonly micros_since_unix_epoch?: unknown
+    }
+    value = timestamp.__timestamp_micros_since_unix_epoch__ ?? timestamp.microsSinceUnixEpoch ?? timestamp.micros_since_unix_epoch
+  } else if (typeof value === "string" && !/^-?\d+$/.test(value)) {
+    const milliseconds = Date.parse(value)
+    if (!Number.isFinite(milliseconds)) return null
+    // Date.parse truncates ISO fractions to milliseconds; readback identity
+    // must retain SpacetimeDB's remaining microseconds.
+    const fraction = /\.(\d+)(?:Z|[+-]\d{2}:?\d{2})$/i.exec(value)?.[1] ?? ""
+    if (fraction.length > 6) return null
+    const submillis = fraction.padEnd(6, "0").slice(3)
+    return BigInt(milliseconds) * 1000n + BigInt(submillis || "0")
+  }
+  if (typeof value !== "string" && typeof value !== "number" && typeof value !== "bigint") return null
+  try { return BigInt(value) } catch { return null }
+}
+
+export interface FleetAccountMoveProjection {
+  readonly id?: unknown
+  readonly organizationId?: unknown
+  readonly organization_id?: unknown
+  readonly companyId?: unknown
+  readonly company_id?: unknown
+  readonly currencyId?: unknown
+  readonly currency_id?: unknown
+  readonly journalId?: unknown
+  readonly journal_id?: unknown
+  readonly state?: unknown
+}
+
+export interface FleetAccountMoveLineProjection {
+  readonly moveId?: unknown
+  readonly move_id?: unknown
+  readonly accountId?: unknown
+  readonly account_id?: unknown
+  readonly debit?: unknown
+  readonly credit?: unknown
+}
+
+function resolveFleetServiceAccountingMove(
+  moves: readonly FleetAccountMoveProjection[],
+  lines: readonly FleetAccountMoveLineProjection[],
+  organizationId: bigint,
+  companyId: bigint,
+  moveId: bigint,
+  currencyId: bigint,
+  journalId: bigint,
+  expenseAccountId: bigint,
+  offsetAccountId: bigint,
+  costAmount: number,
+): boolean {
+  const matches = moves.filter((row) => parseStrictU64(row.id) === moveId)
+  if (matches.length > 1) {
+    throw new AmbiguousOperationEffectError(
+      `Expected one fleet service account move, found ${matches.length}`,
+    )
+  }
+  const row = matches[0]
+  if (
+    !row ||
+    parseStrictU64(row.organizationId ?? row.organization_id) !== organizationId ||
+    parseStrictU64(row.companyId ?? row.company_id) !== companyId ||
+    parseStrictU64(row.currencyId ?? row.currency_id) !== currencyId ||
+    parseStrictU64(row.journalId ?? row.journal_id) !== journalId ||
+    fleetOutcomeTag(row.state) !== "posted"
+  ) {
+    return false
+  }
+
+  const moveLines = lines.filter(
+    (line) => parseStrictU64(line.moveId ?? line.move_id) === moveId,
+  )
+  if (moveLines.length !== 2) return false
+
+  const amount = (value: unknown) => {
+    return numericField(value) ?? Number.NaN
+  }
+  const expenseLine = moveLines.find(
+    (line) =>
+      parseStrictU64(line.accountId ?? line.account_id) === expenseAccountId &&
+      Math.abs(amount(line.debit) - costAmount) <= 0.0001 &&
+      Math.abs(amount(line.credit)) <= 0.0001,
+  )
+  const offsetLine = moveLines.find(
+    (line) =>
+      parseStrictU64(line.accountId ?? line.account_id) === offsetAccountId &&
+      Math.abs(amount(line.credit) - costAmount) <= 0.0001 &&
+      Math.abs(amount(line.debit)) <= 0.0001,
+  )
+  return Boolean(expenseLine && offsetLine)
+}
+
+
+export function resolveFleetHistoryEffect(
+  rows: readonly FleetHistoryEffectProjection[],
+  resource: "fleet-service-records" | "fleet-inspections",
+  organizationId: bigint,
+  companyId: bigint,
+  vehicleId: bigint,
+  clientRequestId: string,
+  expected?: {
+    readonly serviceTypeId?: bigint
+    readonly servicedAt?: ReturnType<typeof optionalTimestamp>
+    readonly inspectedAt?: ReturnType<typeof optionalTimestamp>
+    readonly odometerKm?: ReturnType<typeof optionalNumber>
+    readonly provider?: ReturnType<typeof optionalText>
+    readonly notes?: ReturnType<typeof optionalText>
+    readonly inspectorId?: ReturnType<typeof encodeOptionalU64>
+    readonly outcome?: FleetInspectionOutcome
+    readonly costAmount?: number
+    readonly journalId?: bigint
+    readonly expenseAccountId?: bigint
+    readonly offsetAccountId?: bigint
+    readonly accountMoves?: readonly FleetAccountMoveProjection[]
+    readonly accountMoveLines?: readonly FleetAccountMoveLineProjection[]
+  },
+): FleetHistoryEffectRef | null {
+  const matches = rows.filter(
+    (row) =>
+      parseStrictU64(row.organizationId ?? row.organization_id) === organizationId &&
+      parseStrictU64(row.companyId ?? row.company_id) === companyId &&
+      normalizedOptionalString(row.clientRequestId ?? row.client_request_id) === clientRequestId,
+  )
+
+  if (matches.length > 1) {
+    throw new AmbiguousOperationEffectError(
+      `Expected one ${resource} effect, found ${matches.length}`,
+    )
+  }
+
+  const row = matches[0]
+  if (!row || parseStrictU64(row.vehicleId ?? row.vehicle_id) !== vehicleId) return null
+
+  if (!expected) return null
+  const service = resource === "fleet-service-records"
+  const submittedTime = service ? expected.servicedAt : expected.inspectedAt
+  const time = timestampMicros(historyField(row, service ? "servicedAt" : "inspectedAt", service ? "serviced_at" : "inspected_at"))
+  const expectedTime = submittedTime && "none" in submittedTime
+    ? timestampMicros(historyField(row, "createDate", "create_date")) ?? time
+    : timestampMicros(submittedTime)
+  const odometer = historyField(row, "odometerKm", "odometer_km")
+  const notes = historyField(row, "notes")
+  if (
+    time == null || expectedTime == null || time !== expectedTime ||
+    odometer === undefined || expected.odometerKm === undefined ||
+    !optionalNumberMatches(odometer, expected.odometerKm) ||
+    notes === undefined || expected.notes === undefined ||
+    !optionalTextMatches(notes, expected.notes)
+  ) return null
+  if (service) {
+    const provider = historyField(row, "provider")
+    if (expected.serviceTypeId == null || provider === undefined || expected.provider === undefined ||
+      !optionalTextMatches(provider, expected.provider)) return null
+    if (expected.costAmount == null &&
+      (expected.journalId != null || expected.expenseAccountId != null || expected.offsetAccountId != null ||
+       historyField(row, "costAmount", "cost_amount") === undefined ||
+       optionalValue(historyField(row, "costAmount", "cost_amount")) != null ||
+       historyField(row, "accountMoveId", "account_move_id") === undefined ||
+       optionalValue(historyField(row, "accountMoveId", "account_move_id")) != null ||
+       historyField(row, "currencyId", "currency_id") === undefined ||
+       optionalValue(historyField(row, "currencyId", "currency_id")) != null)) return null
+  } else {
+    const inspector = historyField(row, "inspectorId", "inspector_id")
+    if (expected.outcome == null || inspector === undefined || expected.inspectorId === undefined ||
+      (optionalValue(inspector) == null) !== (optionalValue(expected.inspectorId) == null) ||
+      (optionalValue(inspector) != null && parseStrictU64(optionalValue(inspector)) == null) ||
+      parseStrictU64(optionalValue(inspector)) !== parseStrictU64(optionalValue(expected.inspectorId))) return null
+  }
+
+  if (
+    expected?.serviceTypeId != null &&
+    parseStrictU64(row.serviceTypeId ?? row.service_type_id) !== expected.serviceTypeId
+  ) {
+    return null
+  }
+  if (
+    expected?.outcome != null &&
+    fleetOutcomeTag(row.outcome) !== fleetOutcomeTag(expected.outcome)
+  ) {
+    return null
+  }
+
+  const id = parseStrictU64(row.id)
+  if (id == null) return null
+
+  if (expected?.costAmount != null) {
+    const costAmount = numericField(row.costAmount ?? row.cost_amount)
+    const currencyId = parseStrictU64(row.currencyId ?? row.currency_id)
+    const accountMoveId = parseStrictU64(row.accountMoveId ?? row.account_move_id)
+    if (
+      costAmount == null ||
+      costAmount !== expected.costAmount ||
+      currencyId == null ||
+      accountMoveId == null ||
+      expected.journalId == null ||
+      expected.expenseAccountId == null ||
+      expected.offsetAccountId == null ||
+      expected.accountMoves == null ||
+      expected.accountMoveLines == null ||
+      !resolveFleetServiceAccountingMove(
+        expected.accountMoves,
+        expected.accountMoveLines,
+        organizationId,
+        companyId,
+        accountMoveId,
+        currencyId,
+        expected.journalId,
+        expected.expenseAccountId,
+        expected.offsetAccountId,
+        costAmount,
+      )
+    ) {
+      return null
+    }
+    return {
+      resource,
+      id: id.toString(),
+      vehicleId: vehicleId.toString(),
+      companyId: companyId.toString(),
+      clientRequestId,
+      costAmount,
+      currencyId: currencyId.toString(),
+      accountMoveId: accountMoveId.toString(),
+    }
+  }
+
+  return {
+    resource,
+    id: id.toString(),
+    vehicleId: vehicleId.toString(),
+    companyId: companyId.toString(),
+    clientRequestId,
+  }
 }
 
 export function useRecordFleetService(organizationId: bigint, companyId?: bigint) {
   const qc = useQueryClient()
-  return useMutation<void, Error, RecordFleetServiceInput>({
+  return useMutation<
+    ResolvedOperationEffectOutcome<FleetHistoryEffectRef>,
+    Error,
+    RecordFleetServiceInput
+  >({
     mutationFn: async (input) => {
       const scopedCompanyId = requireCompany(companyId, "record fleet service")
-      const { urlPath, init } = stdbBffCommandPost("record_fleet_service", {
-        companyId: scopedCompanyId,
-        params: stdbParamsToJson({
-          vehicleId: input.vehicleId,
-          serviceTypeId: input.serviceTypeId,
-          servicedAt: optionalTimestamp(input.servicedAt),
-          odometerKm: optionalNumber(input.odometerKm),
-          provider: optionalText(input.provider),
-          notes: optionalText(input.notes),
-          clientRequestId: optionalText(input.clientRequestId),
-        }),
+      input = { ...input }
+      const clientRequestId = requireFleetRequestId(input.clientRequestId)
+      const params = {
+        vehicleId: input.vehicleId,
+        serviceTypeId: input.serviceTypeId,
+        servicedAt: optionalTimestamp(input.servicedAt),
+        odometerKm: optionalNumber(input.odometerKm),
+        provider: optionalText(input.provider),
+        notes: optionalText(input.notes),
+        costAmount: optionalNumber(input.costAmount),
+        journalId: encodeOptionalU64(input.journalId),
+        expenseAccountId: encodeOptionalU64(input.expenseAccountId),
+        offsetAccountId: encodeOptionalU64(input.offsetAccountId),
+        clientRequestId: optionalText(clientRequestId),
+      }
+      const outcome = await executeOperationWithCanonicalReadback({
+        resolveEffect: async () =>
+          resolveFleetHistoryEffect(
+            await fetchQueryList(
+              "/api/query/fleet-service-records",
+              "Failed to read fleet service records",
+            ),
+            "fleet-service-records",
+            organizationId,
+            scopedCompanyId,
+            input.vehicleId,
+            clientRequestId,
+            {
+              servicedAt: params.servicedAt,
+              odometerKm: params.odometerKm,
+              provider: params.provider,
+              notes: params.notes,
+              serviceTypeId: input.serviceTypeId,
+              journalId: input.journalId,
+              expenseAccountId: input.expenseAccountId,
+              offsetAccountId: input.offsetAccountId,
+              ...(input.costAmount != null
+                ? {
+                    costAmount: input.costAmount,
+                    accountMoves: await fetchQueryList(
+                      "/api/query/account-moves",
+                      "Failed to read fleet service accounting move",
+                    ),
+                    accountMoveLines: await fetchQueryList(
+                      "/api/query/account-move-lines",
+                      "Failed to read fleet service accounting lines",
+                    ),
+                  }
+                : {}),
+            },
+          ),
+        dispatch: async () => {
+          const { urlPath, init } = stdbBffCommandPost("record_fleet_service", {
+            companyId: scopedCompanyId,
+            params: stdbParamsToJson(params),
+          })
+          return decodeOperationDispatch(
+            await apiFetch(urlPath, init),
+            "Failed to record fleet service",
+          )
+        },
+        readbackAttempts: 6,
+        readbackDelayMs: 150,
       })
-      const response = await apiFetch(urlPath, init)
-      if (!response.ok) throw new Error("Failed to record fleet service")
+      return requireResolvedOperationEffect(outcome)
     },
     onSuccess: () => invalidateFleetLifecycleQueries(qc, organizationId),
   })
@@ -230,23 +656,52 @@ export interface RecordFleetInspectionInput {
 
 export function useRecordFleetInspection(organizationId: bigint, companyId?: bigint) {
   const qc = useQueryClient()
-  return useMutation<void, Error, RecordFleetInspectionInput>({
+  return useMutation<
+    ResolvedOperationEffectOutcome<FleetHistoryEffectRef>,
+    Error,
+    RecordFleetInspectionInput
+  >({
     mutationFn: async (input) => {
       const scopedCompanyId = requireCompany(companyId, "record a fleet inspection")
-      const { urlPath, init } = stdbBffCommandPost("record_fleet_inspection", {
-        companyId: scopedCompanyId,
-        params: stdbParamsToJson({
-          vehicleId: input.vehicleId,
-          inspectorId: encodeOptionalU64(input.inspectorId),
-          inspectedAt: optionalTimestamp(input.inspectedAt),
-          outcome: input.outcome,
-          odometerKm: optionalNumber(input.odometerKm),
-          notes: optionalText(input.notes),
-          clientRequestId: optionalText(input.clientRequestId),
-        }),
+      input = { ...input }
+      const clientRequestId = requireFleetRequestId(input.clientRequestId)
+      const params = {
+        vehicleId: input.vehicleId,
+        inspectorId: encodeOptionalU64(input.inspectorId),
+        inspectedAt: optionalTimestamp(input.inspectedAt),
+        outcome: input.outcome,
+        odometerKm: optionalNumber(input.odometerKm),
+        notes: optionalText(input.notes),
+        clientRequestId: optionalText(clientRequestId),
+      }
+      const outcome = await executeOperationWithCanonicalReadback({
+        resolveEffect: async () =>
+          resolveFleetHistoryEffect(
+            await fetchQueryList(
+              "/api/query/fleet-inspections",
+              "Failed to read fleet inspections",
+            ),
+            "fleet-inspections",
+            organizationId,
+            scopedCompanyId,
+            input.vehicleId,
+            clientRequestId,
+            params,
+          ),
+        dispatch: async () => {
+          const { urlPath, init } = stdbBffCommandPost("record_fleet_inspection", {
+            companyId: scopedCompanyId,
+            params: stdbParamsToJson(params),
+          })
+          return decodeOperationDispatch(
+            await apiFetch(urlPath, init),
+            "Failed to record fleet inspection",
+          )
+        },
+        readbackAttempts: 6,
+        readbackDelayMs: 150,
       })
-      const response = await apiFetch(urlPath, init)
-      if (!response.ok) throw new Error("Failed to record fleet inspection")
+      return requireResolvedOperationEffect(outcome)
     },
     onSuccess: () => invalidateFleetLifecycleQueries(qc, organizationId),
   })

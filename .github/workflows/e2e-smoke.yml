@@ -56,6 +56,8 @@ jobs:
         run: python3 scripts/ci-change-scope.py --github-output "$GITHUB_OUTPUT"
       - name: Test change classifier
         run: python3 -m unittest discover -s scripts/tests -p 'test_ci_change_scope.py'
+      - name: Test domain aggregate certification execution
+        run: python3 -m unittest discover -s scripts/tests -p 'test_e2e_domain_aggregates.py'
 
   plan:
     name: Plan E2E matrix
@@ -302,10 +304,22 @@ jobs:
           PG_PASSWORD: lumiere
           PG_TLS_MODE: disable
         run: |
+          set -euo pipefail
           # Makefile defaults to a macOS dev PATH; use the runner PATH in CI.
           export E2E_PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:${HOME}/.cargo/bin:${HOME}/.local/bin:${PNPM_HOME}"
           echo "E2E_SUITE=${E2E_SUITE} E2E_CLEAR_DB=${E2E_CLEAR_DB} E2E_SHARD=${E2E_SHARD} E2E_SPEC_FILES=${E2E_SPEC_FILES}"
-          make e2e-smoke
+          make e2e-smoke | tee "$RUNNER_TEMP/e2e-smoke.log"
+          if [ "${E2E_RUN_DOMAIN_AGGREGATES:-0}" = "1" ]; then
+            for marker in \
+              "[e2e] Calling run_all_inventory_tests aggregate..." \
+              "[e2e] Calling run_all_analytics_tests aggregate..." \
+              "[e2e] Inventory and Analytics aggregate tests passed."; do
+              if ! grep -Fxq "$marker" "$RUNNER_TEMP/e2e-smoke.log"; then
+                echo "::error::Requested domain certification missing: $marker"
+                exit 1
+              fi
+            done
+          fi
 
       - name: Upload Playwright report
         if: failure()

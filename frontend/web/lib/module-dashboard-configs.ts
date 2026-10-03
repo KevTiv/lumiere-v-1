@@ -3216,11 +3216,19 @@ export interface FleetModuleOptions {
   vehicles?: FleetFormOption[]
   employees?: FleetFormOption[]
   serviceTypes?: FleetFormOption[]
+  journals?: FleetFormOption[]
+  accounts?: FleetFormOption[]
 }
 
 export const fleetModuleConfig = (
   t: TFunction,
-  { vehicles = [], employees = [], serviceTypes = [] }: FleetModuleOptions = {},
+  {
+    vehicles = [],
+    employees = [],
+    serviceTypes = [],
+    journals = [],
+    accounts = [],
+  }: FleetModuleOptions = {},
 ): ModuleConfig => ({
   id: "fleet",
   title: t("fleet.title"),
@@ -3250,7 +3258,13 @@ export const fleetModuleConfig = (
       label: t("fleet.lifecycle.service.title"),
       type: "entity",
       entityConfig: fleetServiceRecordsTableConfig(t),
-      createForm: recordFleetServiceForm(t, vehicles, serviceTypes),
+      createForm: recordFleetServiceForm(
+        t,
+        vehicles,
+        serviceTypes,
+        journals,
+        accounts,
+      ),
       createLabel: t("fleet.lifecycle.service.action"),
       createAction: "recordFleetService",
     },

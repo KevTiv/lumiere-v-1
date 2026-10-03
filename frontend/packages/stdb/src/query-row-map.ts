@@ -160,6 +160,7 @@ import type {
   MessageBatch,
   MessageTemplate,
   MrpBom,
+  MrpBomByproduct,
   MrpBomLine,
   MrpProduction,
   MrpRoutingWorkcenter,
@@ -242,12 +243,14 @@ import type {
   QualityTeam,
   RecordCustomFieldValue,
   ReplenishmentRule,
+  ReplenishmentRunJob,
   ReportTemplate,
   ResPartnerBank,
   ResourceAllocation,
   ResourceCapacitySnapshot,
   ResourceUtilisationSnapshot,
   ReturnOrder,
+  ReturnOrderCreation,
   ReturnOrderLine,
   RevenueRecognitionRule,
   Role,
@@ -263,6 +266,7 @@ import type {
   StockCycleCount,
   StockInventory,
   StockLandedCost,
+  StockLandedCostApplication,
   StockLandedCostLines,
   StockLocation,
   StockMove,
@@ -464,6 +468,7 @@ export interface QueryRowMap {
   "knowledge-articles": KnowledgeArticle
   "knowledge-categories": KnowledgeArticleCategory
   "labor-cost-snapshots": HrLaborCostSnapshot
+  "landed-cost-applications": StockLandedCostApplication
   "landed-cost-lines": StockLandedCostLines
   "landed-costs": StockLandedCost
   "lead-lost-reasons": LeadLostReason
@@ -479,6 +484,7 @@ export interface QueryRowMap {
   "mail-templates": MailTemplate
   "message-batches": MessageBatch
   "message-templates": MessageTemplate
+  "mrp-bom-byproducts": MrpBomByproduct
   "mrp-bom-lines": MrpBomLine
   "mrp-boms": MrpBom
   "mrp-productions": MrpProduction
@@ -576,10 +582,12 @@ export interface QueryRowMap {
   "quality-teams": QualityTeam
   "record-custom-field-values": RecordCustomFieldValue
   "replenishment-rules": ReplenishmentRule
+  "replenishment-run-jobs": ReplenishmentRunJob
   "report-templates": ReportTemplate
   "resource-allocations": ResourceAllocation
   "resource-capacity-by-employee": ResourceCapacitySnapshot
   "resource-utilisation-by-employee": ResourceUtilisationSnapshot
+  "return-order-creations": ReturnOrderCreation
   "return-order-lines": ReturnOrderLine
   "return-orders": ReturnOrder
   "revenue-recognition-rules": RevenueRecognitionRule

@@ -69,6 +69,12 @@
     "write_date",
     "metadata"
   ],
+  "ApplySubscriptionInvoicePaymentParams": [
+    "amount",
+    "payment_date",
+    "ref",
+    "memo"
+  ],
   "AccountAsset": [
     "parent_id",
     "account_analytic_id",
@@ -1788,7 +1794,8 @@
   ],
   "CreateReturnOrderParams": [
     "sale_order_id",
-    "return_reason"
+    "return_reason",
+    "idempotency_key"
   ],
   "CreateRevenueRecognitionRuleParams": [
     "expense_account_id",
@@ -5130,6 +5137,11 @@
     "license_plate",
     "driver_name",
     "metadata"
+  ],
+  "GenerateSubscriptionInvoiceParams": [
+    "billing_run_key",
+    "journal_id",
+    "tax_account_id"
   ],
   "UpdateVehiclePositionParams": []
 }

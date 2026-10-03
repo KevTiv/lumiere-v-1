@@ -460,14 +460,25 @@ pub fn test_subscription_create_lines_bill_idempotent(ctx: &ReducerContext) -> R
             mv.amount_total
         ));
     }
-    let runs = ctx
+    let run_rows: Vec<_> = ctx
         .db
         .subscription_billing_run()
         .iter()
         .filter(|r| r.subscription_id == sub_id)
-        .count();
-    if runs != 1 {
-        return Err(format!("expected 1 billing run row, got {runs}"));
+        .collect();
+    if run_rows.len() != 1 {
+        return Err(format!(
+            "expected 1 billing run row, got {}",
+            run_rows.len()
+        ));
+    }
+    let run = &run_rows[0];
+    if run.organization_id != org_id
+        || run.company_id != company_id
+        || run.billing_run_key != format!("test-run-{sub_id}")
+        || run.invoice_move_id != move_id
+    {
+        return Err("billing run did not preserve the exact subscription→invoice relation".into());
     }
 
     close_subscription(

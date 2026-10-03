@@ -91,4 +91,27 @@ mod tests {
             );
         }
     }
+
+    #[test]
+    fn workflow_readback_projections_expose_exact_effect_fields() {
+        for (resource, fields) in [
+            (
+                "account-payments",
+                &["reconciled_invoice_ids", "reconciled_bill_ids"][..],
+            ),
+            ("sale-orders", &["order_line"][..]),
+            ("stock-production-serials", &["is_locked"][..]),
+        ] {
+            let entry = registry_get(resource).expect("workflow resource must be registered");
+            for field in fields {
+                assert!(
+                    entry
+                        .default_restricted
+                        .iter()
+                        .any(|candidate| candidate == field),
+                    "{resource} projection must expose {field} for exact workflow readback"
+                );
+            }
+        }
+    }
 }

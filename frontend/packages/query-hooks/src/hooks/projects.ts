@@ -15,8 +15,11 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { apiFetch, fetchQueryList, type QueryRows, rqBigIntKey } from "../http"
 import { withCompanyScope } from "@lumiere/erp-shared/org-scoped"
 import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
-import { scalarToU64 as toScalarU64 } from "@lumiere/erp-shared/u64"
+import { parseStrictU64, scalarToU64 as toScalarU64 } from "@lumiere/erp-shared/u64"
 import { stbTimestampFromDate } from "@lumiere/erp-shared/stb-timestamp"
+import { decodeOperationDispatch } from '@lumiere/api-client'
+import { executeOperationWithCanonicalReadback, requireResolvedOperationEffect, type CanonicalRecordRef, type ResolvedOperationEffectOutcome } from './operation-effect'
+import { resolveTimesheetBillingEffect, resolveTimesheetStatusEffect } from './partial-slice-effects'
 import type {
   HrResource,
   ProjectProject,
@@ -35,6 +38,27 @@ function invalidateTimesheetQueues(
   void qc.invalidateQueries({ queryKey: ['project-timesheet-approvals', k] })
   void qc.invalidateQueries({ queryKey: ['project-margin-by-project', k] })
   void qc.invalidateQueries({ queryKey: ['resource-utilisation-by-employee', k] })
+}
+
+function resolveTimesheetBatchStatus(
+  rows: readonly ProjectTimesheet[],
+  organizationId: bigint,
+  companyId: bigint | null,
+  timesheetIds: readonly bigint[],
+  status: 'validated' | 'rejected',
+): CanonicalRecordRef | null {
+  return timesheetIds.every((id) =>
+    resolveTimesheetStatusEffect(rows, organizationId, companyId, id, status),
+  )
+    ? { resource: 'timesheets', id: timesheetIds.join(',') }
+    : null;
+}
+
+function requireUniqueTimesheetIds(ids: readonly bigint[]) {
+  if (ids.length === 0) throw new Error('Select at least one timesheet');
+  if (new Set(ids.map(String)).size !== ids.length) {
+    throw new Error('Timesheet selection contains duplicates');
+  }
 }
 
 // ── Reads ────────────────────────────────────────────────────────────────────
@@ -526,7 +550,7 @@ export type ValidateTimesheetsInput = {
 
 export function useValidateTimesheets(organizationId: bigint) {
   const qc = useQueryClient()
-  return useMutation<void, Error, ValidateTimesheetsInput>({
+  return useMutation<ResolvedOperationEffectOutcome, Error, ValidateTimesheetsInput>({
     mutationFn: async ({
       timesheetIds,
       companyId,
@@ -534,27 +558,55 @@ export function useValidateTimesheets(organizationId: bigint) {
       wipAccountId,
       wipLaborAccountId,
     }) => {
-      const { urlPath, init } = stdbBffCommandPost("validate_timesheets", { params: stdbParamsToJson({
-          companyId: companyId != null ? toScalarU64(companyId) : null,
-          timesheetIds: timesheetIds.map((id) => toScalarU64(id)),
-          wipJournalId:
-            wipJournalId != null && wipJournalId !== ""
-              ? toScalarU64(wipJournalId)
-              : null,
-          wipAccountId:
-            wipAccountId != null && wipAccountId !== ""
-              ? toScalarU64(wipAccountId)
-              : null,
-          wipLaborAccountId:
-            wipLaborAccountId != null && wipLaborAccountId !== ""
-              ? toScalarU64(wipLaborAccountId)
-              : null,
-        }, "ValidateTimesheetsParams") })
-      const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error('Failed to validate timesheets')
+      const scope = companyId != null ? toScalarU64(companyId) : null;
+      const ids = timesheetIds.map((id) => toScalarU64(id));
+      requireUniqueTimesheetIds(ids);
+      const outcome = await executeOperationWithCanonicalReadback({
+        resolveEffect: async () =>
+          resolveTimesheetBatchStatus(
+            await fetchQueryList(
+            '/api/query/timesheets',
+            'Failed to read timesheets',
+          ),
+            organizationId,
+            scope,
+            ids,
+            'validated',
+          ),
+        dispatch: async () => {
+          const { urlPath, init } = stdbBffCommandPost('validate_timesheets', {
+            params: stdbParamsToJson(
+              {
+                companyId: scope,
+                timesheetIds: ids,
+                wipJournalId:
+                  wipJournalId != null && wipJournalId !== ''
+                    ? toScalarU64(wipJournalId)
+                    : null,
+                wipAccountId:
+                  wipAccountId != null && wipAccountId !== ''
+                    ? toScalarU64(wipAccountId)
+                    : null,
+                wipLaborAccountId:
+                  wipLaborAccountId != null && wipLaborAccountId !== ''
+                    ? toScalarU64(wipLaborAccountId)
+                    : null,
+              },
+              'ValidateTimesheetsParams',
+            ),
+          });
+          return decodeOperationDispatch(
+            await apiFetch(urlPath, init),
+            'Failed to validate timesheets',
+          );
+        },
+        afterDispatch: () => invalidateTimesheetQueues(qc, organizationId),
+        readbackAttempts: 6,
+        readbackDelayMs: 150,
+      });
+      return requireResolvedOperationEffect(outcome);
     },
-    onSuccess: () => invalidateTimesheetQueues(qc, organizationId),
-  })
+  });
 }
 
 export type RejectTimesheetsInput = {
@@ -565,17 +617,41 @@ export type RejectTimesheetsInput = {
 
 export function useRejectTimesheets(organizationId: bigint) {
   const qc = useQueryClient()
-  return useMutation<void, Error, RejectTimesheetsInput>({
+  return useMutation<ResolvedOperationEffectOutcome, Error, RejectTimesheetsInput>({
     mutationFn: async ({ timesheetIds, companyId, reason }) => {
-      const { urlPath, init } = stdbBffCommandPost("reject_timesheets", { params: stdbParamsToJson({
-          companyId: companyId != null ? toScalarU64(companyId) : null,
-          timesheetIds: timesheetIds.map((id) => toScalarU64(id)),
-          reason,
-        }, "RejectTimesheetsParams") })
-      const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error('Failed to reject timesheets')
+      const scope = companyId != null ? toScalarU64(companyId) : null
+      const ids = timesheetIds.map((id) => toScalarU64(id))
+      requireUniqueTimesheetIds(ids)
+      const outcome = await executeOperationWithCanonicalReadback({
+        resolveEffect: async () =>
+          resolveTimesheetBatchStatus(
+            await fetchQueryList(
+            '/api/query/timesheets',
+            'Failed to read timesheets',
+          ),
+            organizationId,
+            scope,
+            ids,
+            'rejected',
+          ),
+        dispatch: async () => {
+          const { urlPath, init } = stdbBffCommandPost('reject_timesheets', {
+            params: stdbParamsToJson(
+              { companyId: scope, timesheetIds: ids, reason },
+              'RejectTimesheetsParams',
+            ),
+          })
+          return decodeOperationDispatch(
+            await apiFetch(urlPath, init),
+            'Failed to reject timesheets',
+          )
+        },
+        afterDispatch: () => invalidateTimesheetQueues(qc, organizationId),
+        readbackAttempts: 6,
+        readbackDelayMs: 150,
+      })
+      return requireResolvedOperationEffect(outcome)
     },
-    onSuccess: () => invalidateTimesheetQueues(qc, organizationId),
   })
 }
 
@@ -615,7 +691,7 @@ export type BillTimesheetsInput = {
 
 export function useBillTimesheets(organizationId: bigint) {
   const qc = useQueryClient()
-  return useMutation<void, Error, BillTimesheetsInput>({
+  return useMutation<ResolvedOperationEffectOutcome, Error, BillTimesheetsInput>({
     mutationFn: async ({
       timesheetIds,
       companyId,
@@ -626,29 +702,81 @@ export function useBillTimesheets(organizationId: bigint) {
       taxIds,
       fiscalPositionId,
     }) => {
-      const { urlPath, init } = stdbBffCommandPost("bill_timesheets", { params: stdbParamsToJson({
-            companyId: toScalarU64(companyId),
-            timesheetIds: timesheetIds.map((id) => toScalarU64(id)),
-            journalId: toScalarU64(journalId),
-            incomeAccountId: toScalarU64(incomeAccountId),
-            partnerId: toScalarU64(partnerId),
-            invoiceDate: stbTimestampFromDate(
-              invoiceDate instanceof Date ? invoiceDate : new Date(invoiceDate),
+      const scope = toScalarU64(companyId);
+      const ids = timesheetIds.map((id) => toScalarU64(id));
+      requireUniqueTimesheetIds(ids);
+      const outcome = await executeOperationWithCanonicalReadback({
+        resolveEffect: async () => {
+          const rows = await fetchQueryList(
+            '/api/query/timesheets',
+            'Failed to read timesheets',
+          );
+          const effects = ids.map((id) =>
+            resolveTimesheetBillingEffect(rows, organizationId, scope, id),
+          );
+          if (effects.some((effect) => effect == null)) return null;
+          const invoiceIds = new Set(
+            effects.map((effect) => effect?.invoiceId),
+          );
+          if (invoiceIds.size !== 1) return null;
+          const invoiceId = BigInt([...invoiceIds][0]!);
+          const invoices = await fetchQueryList(
+            '/api/query/account-moves',
+            'Failed to read billing invoice',
+          );
+          const matchingInvoices = invoices.filter(
+            (invoice) =>
+              parseStrictU64(invoice.id) === invoiceId &&
+              parseStrictU64(invoice.organizationId) === organizationId &&
+              parseStrictU64(invoice.companyId) === scope,
+          );
+          if (matchingInvoices.length !== 1) return null;
+          return { resource: 'account-moves', id: invoiceId.toString() };
+        },
+        dispatch: async () => {
+          const { urlPath, init } = stdbBffCommandPost('bill_timesheets', {
+            params: stdbParamsToJson(
+              {
+                companyId: scope,
+                timesheetIds: ids,
+                journalId: toScalarU64(journalId),
+                incomeAccountId: toScalarU64(incomeAccountId),
+                partnerId: toScalarU64(partnerId),
+                invoiceDate: stbTimestampFromDate(
+                  invoiceDate instanceof Date
+                    ? invoiceDate
+                    : new Date(invoiceDate),
+                ),
+                taxIds: (taxIds ?? []).map((id) => toScalarU64(id)),
+                fiscalPositionId:
+                  fiscalPositionId != null &&
+                  String(fiscalPositionId).trim() !== ''
+                    ? toScalarU64(fiscalPositionId)
+                    : null,
+              },
+              'BillTimesheetsParams',
             ),
-            taxIds: (taxIds ?? []).map((id) => toScalarU64(id)),
-            fiscalPositionId:
-              fiscalPositionId != null && String(fiscalPositionId).trim() !== ""
-                ? toScalarU64(fiscalPositionId)
-                : null,
-          }, "BillTimesheetsParams") })
-
-      const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error('Failed to bill timesheets')
-    },
-    onSuccess: () => {
-      invalidateTimesheetQueues(qc, organizationId)
-      void qc.invalidateQueries({ queryKey: ['sale-orders', rqBigIntKey(organizationId)] })
-      void qc.invalidateQueries({ queryKey: ['account-moves', rqBigIntKey(organizationId)] })
+          });
+          return decodeOperationDispatch(
+            await apiFetch(urlPath, init),
+            'Failed to bill timesheets',
+          );
+        },
+        afterDispatch: async () => {
+          invalidateTimesheetQueues(qc, organizationId);
+          await Promise.all([
+            qc.invalidateQueries({
+              queryKey: ['sale-orders', rqBigIntKey(organizationId)],
+            }),
+            qc.invalidateQueries({
+              queryKey: ['account-moves', rqBigIntKey(organizationId)],
+            }),
+          ]);
+        },
+        readbackAttempts: 6,
+        readbackDelayMs: 150,
+      });
+      return requireResolvedOperationEffect(outcome);
     },
   })
 }

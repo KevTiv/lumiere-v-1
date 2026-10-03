@@ -268,6 +268,11 @@
         }
       ]
     },
+    "return-order-creations": {
+      "table": "return_order_creation",
+      "predicates": [],
+      "order_by": []
+    },
     "pos-loyalty-programs": {
       "table": "pos_loyalty_program",
       "predicates": [],
@@ -1021,6 +1026,11 @@
     },
     "landed-cost-lines": {
       "table": "stock_landed_cost_lines",
+      "predicates": [],
+      "order_by": []
+    },
+    "landed-cost-applications": {
+      "table": "stock_landed_cost_application",
       "predicates": [],
       "order_by": []
     },

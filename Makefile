@@ -348,7 +348,7 @@ e2e-smoke-setup:
 		STDB_HASH_FILE="$$LOG_DIR/stdb.hash"; \
 		CUR_STDB_HASH="$$(E2E_BUILD_MODULE="$(E2E_DB)" E2E_BUILD_HOST="$$E2E_STDB_HOST" "$$ROOT/scripts/e2e-dx.sh" stdb-fingerprint)"; \
 		STDB_FAST_PATH=0; \
-		if [ "$${E2E_CLEAR_DB:-0}" != "1" ] && [ "$${E2E_FORCE_REBUILD:-0}" != "1" ] && [ -f "$$STDB_HASH_FILE" ] && [ "$$(cat "$$STDB_HASH_FILE")" = "$$CUR_STDB_HASH" ] && spacetime describe "$(E2E_DB)" --json --server local --no-config >/dev/null 2>&1; then \
+		if [ "$${E2E_CLEAR_DB:-0}" != "1" ] && [ "$${E2E_FORCE_REBUILD:-0}" != "1" ] && [ "$${E2E_RUN_DOMAIN_AGGREGATES:-0}" != "1" ] && [ -f "$$STDB_HASH_FILE" ] && [ "$$(cat "$$STDB_HASH_FILE")" = "$$CUR_STDB_HASH" ] && spacetime describe "$(E2E_DB)" --json --server local --no-config >/dev/null 2>&1; then \
 			STDB_FAST_PATH=1; \
 		fi; \
 		if [ "$$STDB_FAST_PATH" = "1" ]; then \
@@ -380,11 +380,11 @@ e2e-smoke-setup:
 				fi; \
 			done; \
 			echo "[e2e] Domain reducer tests passed."; \
-			if [ "${E2E_RUN_DOMAIN_AGGREGATES:-0}" = "1" ]; then \
+			if [ "$${E2E_RUN_DOMAIN_AGGREGATES:-0}" = "1" ]; then \
 				for _aggregate_reducer in run_all_inventory_tests run_all_analytics_tests; do \
-					echo "[e2e] Calling $_aggregate_reducer aggregate..."; \
-					if ! spacetime call "$(E2E_DB)" "$_aggregate_reducer" --server local --no-config; then \
-						echo "[e2e] $_aggregate_reducer failed — tail of SpacetimeDB logs:"; \
+					echo "[e2e] Calling $$_aggregate_reducer aggregate..."; \
+					if ! spacetime call "$(E2E_DB)" "$$_aggregate_reducer" --server local --no-config; then \
+						echo "[e2e] $$_aggregate_reducer failed — tail of SpacetimeDB logs:"; \
 						spacetime logs "$(E2E_DB)" --server local --no-config 2>/dev/null | tail -80 || true; \
 						exit 1; \
 					fi; \
@@ -533,6 +533,7 @@ e2e-smoke-test:
 		NEXT_PUBLIC_STDB_MODULE="$(E2E_DB)" \
 		STDB_HOST="$$E2E_STDB_HOST" \
 		NEXT_PUBLIC_STDB_HOST="$$E2E_STDB_HOST" \
+		NEXT_PUBLIC_DEV_ADMIN="false" \
 		NEXT_PUBLIC_API_GATEWAY_URL="" \
 		"$$ROOT/scripts/e2e-dx.sh" frontend-build; \
 		echo "[e2e] Starting Next.js on :$(E2E_WEB_PORT)..."; \
@@ -545,6 +546,7 @@ e2e-smoke-test:
 		NEXT_PUBLIC_STDB_MODULE="$(E2E_DB)" \
 		STDB_HOST="$$E2E_STDB_HOST" \
 		NEXT_PUBLIC_STDB_HOST="$$E2E_STDB_HOST" \
+		NEXT_PUBLIC_DEV_ADMIN="false" \
 		NEXT_PUBLIC_API_GATEWAY_URL="" \
 		pnpm exec next start --hostname 127.0.0.1 --port $(E2E_WEB_PORT) >"$$LOG_DIR/next.log" 2>&1 & \
 		WEB_PID="$$!"; \
@@ -577,6 +579,7 @@ e2e-smoke-test:
 		NEXT_PUBLIC_STDB_MODULE="$(E2E_DB)" \
 		STDB_HOST="$$E2E_STDB_HOST" \
 		NEXT_PUBLIC_STDB_HOST="$$E2E_STDB_HOST" \
+		NEXT_PUBLIC_DEV_ADMIN="false" \
 		NEXT_PUBLIC_API_GATEWAY_URL="" \
 		E2E_WORKERS="$$E2E_WORKERS" \
 		pnpm exec playwright test "$${PW_ARGS[@]}"; \
@@ -673,6 +676,7 @@ e2e-single-test:
 		echo "[e2e] Building Next.js for single-spec run..."; \
 		PORT="" \
 		PLAYWRIGHT_PORT="$(E2E_WEB_PORT)" \
+		NEXT_PUBLIC_DEV_ADMIN="false" \
 		LUMIERE_API_SERVER_URL="http://127.0.0.1:$(E2E_API_PORT)" \
 		STDB_SERVER_TOKEN="$$E2E_STDB_TOKEN" \
 		STDB_CREDENTIAL_ENCRYPTION_KEY="$$STDB_CREDENTIAL_ENCRYPTION_KEY" \
@@ -736,7 +740,7 @@ e2e-web-dev: e2e-smoke-setup
 		LUMIERE_API_SERVER_URL="http://127.0.0.1:$(E2E_API_PORT)" \
 		STDB_SERVER_TOKEN="$$E2E_STDB_TOKEN" STDB_MODULE="$(E2E_DB)" \
 		NEXT_PUBLIC_STDB_MODULE="$(E2E_DB)" STDB_HOST="$$E2E_STDB_HOST" \
-		NEXT_PUBLIC_STDB_HOST="$$E2E_STDB_HOST" NEXT_PUBLIC_API_GATEWAY_URL="" \
+		NEXT_PUBLIC_STDB_HOST="$$E2E_STDB_HOST" NEXT_PUBLIC_DEV_ADMIN="false" NEXT_PUBLIC_API_GATEWAY_URL="" \
 		pnpm exec next dev --hostname 127.0.0.1 --port $(E2E_WEB_PORT); \
 	'
 
@@ -862,11 +866,11 @@ e2e-smoke:
 			fi; \
 		done; \
 		echo "[e2e] Domain reducer tests passed."; \
-		if [ "${E2E_RUN_DOMAIN_AGGREGATES:-0}" = "1" ]; then \
+		if [ "$${E2E_RUN_DOMAIN_AGGREGATES:-0}" = "1" ]; then \
 			for _aggregate_reducer in run_all_inventory_tests run_all_analytics_tests; do \
-				echo "[e2e] Calling $_aggregate_reducer aggregate..."; \
-				if ! spacetime call "$(E2E_DB)" "$_aggregate_reducer" --server local --no-config; then \
-					echo "[e2e] $_aggregate_reducer failed — tail of SpacetimeDB logs:"; \
+				echo "[e2e] Calling $$_aggregate_reducer aggregate..."; \
+				if ! spacetime call "$(E2E_DB)" "$$_aggregate_reducer" --server local --no-config; then \
+					echo "[e2e] $$_aggregate_reducer failed — tail of SpacetimeDB logs:"; \
 					spacetime logs "$(E2E_DB)" --server local --no-config 2>/dev/null | tail -80 || true; \
 					exit 1; \
 				fi; \
@@ -928,6 +932,7 @@ e2e-smoke:
 		echo "[e2e] Building Next.js (once, before Playwright)..."; \
 		PORT="" \
 		PLAYWRIGHT_PORT="$(E2E_WEB_PORT)" \
+		NEXT_PUBLIC_DEV_ADMIN="false" \
 		LUMIERE_API_SERVER_URL="http://127.0.0.1:$(E2E_API_PORT)" \
 		STDB_SERVER_TOKEN="$$E2E_STDB_TOKEN" \
 		STDB_CREDENTIAL_ENCRYPTION_KEY="$$STDB_CREDENTIAL_ENCRYPTION_KEY" \
@@ -970,7 +975,7 @@ e2e-smoke:
 			read -r -a SPEC_FILES <<< "$${E2E_SPEC_FILES:-}"; \
 			if [ "$${#SPEC_FILES[@]}" -eq 0 ]; then echo "[e2e] E2E_SUITE=targeted requires E2E_SPEC_FILES" >&2; exit 1; fi; \
 			echo "[e2e] Targeted specs: $${SPEC_FILES[*]}"; \
-			if [ "$${E2E_REQUIRE_AI:-0}" = "1" ]; then PW_ARGS+=(--grep-invert @dev-fixture); else PW_ARGS+=(--grep-invert "@dev-fixture|@ai-live"); fi; \
+			if [ "$${E2E_REQUIRE_AI:-0}" != "1" ]; then PW_ARGS+=(--grep-invert @ai-live); fi; \
 			PW_ARGS+=("$${SPEC_FILES[@]}"); \
 		elif [ "$${E2E_REQUIRE_AI:-0}" != "1" ]; then \
 			PW_ARGS+=(--grep-invert @ai-live); \

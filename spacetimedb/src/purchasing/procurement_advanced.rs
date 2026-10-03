@@ -13,7 +13,7 @@ use crate::inventory::product::product;
 use crate::inventory::stock::{require_product_in_org, require_warehouse_in_org_and_company};
 use crate::manufacturing::relations::{require_uom_compatible, require_uom_in_org};
 use crate::purchasing::purchase_orders::{
-    add_purchase_order_line, create_purchase_order, purchase_order, purchase_order_line,
+    add_purchase_order_line, create_purchase_order_record, purchase_order, purchase_order_line,
     AddPurchaseOrderLineParams, CreatePurchaseOrderParams,
 };
 use crate::purchasing::require_purchasing_ri_phase0_unsafe_actions_enabled;
@@ -692,7 +692,7 @@ pub fn release_blanket_to_po(
     }
 
     let origin = format!("blanket:{blanket_order_id}");
-    create_purchase_order(
+    let po_id = create_purchase_order_record(
         ctx,
         organization_id,
         CreatePurchaseOrderParams {
@@ -720,17 +720,12 @@ pub fn release_blanket_to_po(
         },
     )?;
 
+    // The release owns the exact PO it just created; never rediscover it as the newest match.
     let po = ctx
         .db
         .purchase_order()
-        .iter()
-        .filter(|p| {
-            p.organization_id == organization_id
-                && p.company_id == company_id
-                && p.partner_id == blanket.partner_id
-                && p.origin.as_deref() == Some(origin.as_str())
-        })
-        .max_by_key(|p| p.id)
+        .id()
+        .find(&po_id)
         .ok_or("Purchase order not found after blanket release")?;
 
     for (line, quantity) in &release_lines {
@@ -786,7 +781,6 @@ pub fn release_blanket_to_po(
         });
 
     let release_count = blanket.release_count.saturating_add(1);
-    let po_id = po.id;
     ctx.db
         .purchase_blanket_order()
         .id()

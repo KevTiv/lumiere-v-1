@@ -5,21 +5,21 @@
     "ir_version": 2,
     "ir_path": "ir/lumiere-contract-ir-v2.json",
     "pin_path": "ir/PIN.json",
-    "artifact_sha256": "684a4c380decb4cedb7d4fa3dbc58f38e5144b81d395815c8b3bf953c49b4b6a",
-    "schema_hash": "sha256:3c871efd937360e68b9e975490cb0c3bbbd595002a7b0309ec03622ff55d6497",
-    "source_commit": "904a80afdf496c64d8ac425393516ec82dcae7c5",
+    "artifact_sha256": "2b83c626f956be84c8480116e7624a3efb04555e5250e797040efec3d28939f9",
+    "schema_hash": "sha256:622031b9a81efb82d97bdd0819538c8513430d53cda3798a51168350ae2410aa",
+    "source_commit": "93b56481da15c391c0f868730ed243243d6be1e5",
     "source_repository": "https://github.com/KevTiv/lumiere-v-1"
   },
   "lumiere_contracts": {
     "package": "lumiere-contracts",
-    "version": "0.3.60",
-    "tag": "v0.3.60",
-    "revision": "6772b18b4072124b787ea704def2b5a785d74304",
+    "version": "0.3.80",
+    "tag": "v0.3.80",
+    "revision": "4922acfab1b312646edcad2e464213cb961295db",
     "repository": "ssh://git@github.com/KevTiv/lumiere-contracts.git"
   },
   "operation_history": {
     "path": "lumiere-codegen/contract-operation-history.json",
-    "checksum": "sha256:fa53085056611a72f8fd59db678143aa5087cdc5bd0054e433511563010a0620"
+    "checksum": "sha256:63ced4cf29c929f1f23d88a84272286e519b0229e6976cf8d82f2cfbc7b13000"
   },
   "stdb_module": {
     "name": "lumiere_v1",
@@ -33,10 +33,10 @@
     "migration_name": "0001_durable_projection",
     "sql_path": "manifests/pg_ddl/migrations/0001_durable_projection.sql",
     "manifest_path": "manifests/durable-pg-schema-manifest.json",
-    "checksum": "sha256:827d8098716934708aa999968603e3e6a49fcbc585dfb95133a230db3cc3942a",
+    "checksum": "sha256:5598834cc650011744abb9b9ad090e6ba09bfc824bc6d853f89f34930ef8d9ab",
     "application_catalog_path": "api-server/src/cold_tier/migrate.rs",
     "application_catalog_version": 10,
-    "application_catalog_checksum": "sha256:a9ac5f133582216bf99c21e05251229f2a3f8991aca44d157b7bcd0ccdb2da8d"
+    "application_catalog_checksum": "sha256:45dfbfe5cca383987591671dae6bebf301c7fdff5533c602d0b41ed36019a0e1"
   },
   "services": {
     "api_server": {
@@ -51,7 +51,7 @@
   "minimum_client_contract": {
     "version": "ir-v2",
     "ir_version": 2,
-    "generated_contract_release": "0.3.60"
+    "generated_contract_release": "0.3.80"
   },
   "deployment": {
     "config_generation": 2,

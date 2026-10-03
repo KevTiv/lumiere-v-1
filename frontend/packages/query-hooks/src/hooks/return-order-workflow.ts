@@ -16,10 +16,17 @@ import {
   observeConfirmedReturn,
   observeCreatedReturnOrder,
   observeExchangeOrder,
+  observePickingState,
   observeReturnCreditNote,
+  newCorrelationId,
+  observeSameRecord,
   pickingStepsToDone,
   receiveReturnAction,
+  recordRef,
+  returnOrderWorkflow,
+  returnExchangeOrderIds,
   rowId,
+  stateIs,
   type AnyWorkflowAction,
   type CreateReturnCreditNoteInput,
   type CreateReturnOrderInput,
@@ -44,6 +51,7 @@ import {
   returnOrdersQueryOptions,
   saleOrdersQueryOptions,
 } from "./sales"
+import { fetchQueryList } from "../http"
 import { useWorkflowRunner, type WorkflowSurfaceCallbacks } from "./workflow"
 
 export interface ReturnOrderWorkflowLabels {
@@ -59,6 +67,8 @@ export interface ReturnOrderWorkflowLabels {
 
 type CreditNoteInput = CreateReturnCreditNoteInput<CreateCreditNoteFromReturnOrderParams>
 type CreateInput = CreateReturnOrderInput<CreateReturnOrderParams>
+type CreateRunInput = CreateInput & { idempotencyKey: string }
+type ExchangeRunInput = { returnOrderId: string; exchangeOrderIdsBefore: string[] }
 
 /**
  * `sales.return` record workflow: RMA confirm → receive (return picking to done) → credit note,
@@ -83,12 +93,20 @@ export function useReturnOrderWorkflow(
       validate: (id) => validateStockPickingCommand(companyId, id),
     }
 
-    const create: TransitionSpec<CreateInput> = {
+    // One key per submission, kept in the run input: a retry re-sends the same key and the server
+    // converges on the return it already created, which the creation row names exactly.
+    const create: TransitionSpec<CreateRunInput> = {
       id: "sales.return.create",
-      command: ({ params }) => createReturnOrderCommand(companyId, params),
+      idempotent: true,
+      command: ({ params, idempotencyKey }) => createReturnOrderCommand(companyId, { ...params, idempotencyKey }),
       affects: CREATE_RETURN_ORDER_AFFECTS,
-      observe: async ({ saleOrderId }) =>
-        observeCreatedReturnOrder(saleOrderId, await fresh<RowValueMap[]>(returnOrdersQueryOptions(organizationId))),
+      observe: async ({ idempotencyKey }) => {
+        const [creations, returns] = await Promise.all([
+          fetchQueryList("/api/query/return-order-creations", "Failed to read return order creations"),
+          fresh<RowValueMap[]>(returnOrdersQueryOptions(organizationId)),
+        ])
+        return observeCreatedReturnOrder(idempotencyKey, creations, returns)
+      },
     }
 
     const confirm: TransitionSpec<string> = {
@@ -112,20 +130,32 @@ export function useReturnOrderWorkflow(
         for (const step of steps) await stepCommands[step](pickingId)
       },
       affects: RECEIVE_RETURN_AFFECTS,
+      observe: async (pickingId) =>
+        observePickingState(pickingId, "done", await fresh<RowValueMap[]>(stockPickingsQueryOptions(organizationId))),
     }
 
     const cancel: TransitionSpec<string> = {
       id: "sales.return.cancel",
       command: (id) => cancelReturnOrderCommand(companyId, id),
       affects: CANCEL_RETURN_AFFECTS,
+      observe: async (id) =>
+        observeSameRecord(
+          recordRef(returnOrderWorkflow.resource, id, returnOrderWorkflow.module),
+          await fresh<RowValueMap[]>(returnOrdersQueryOptions(organizationId)),
+          stateIs("cancelled"),
+        ),
     }
 
-    const exchange: TransitionSpec<string> = {
+    const exchange: TransitionSpec<ExchangeRunInput> = {
       id: "sales.return.exchange",
-      command: (id) => createExchangeOrderFromReturnCommand(companyId, id),
+      command: ({ returnOrderId }) => createExchangeOrderFromReturnCommand(companyId, returnOrderId),
       affects: EXCHANGE_FROM_RETURN_AFFECTS,
-      observe: async (id) =>
-        observeExchangeOrder(id, await fresh<RowValueMap[]>(saleOrdersQueryOptions(organizationId))),
+      observe: async ({ returnOrderId, exchangeOrderIdsBefore }) =>
+        observeExchangeOrder(
+          returnOrderId,
+          exchangeOrderIdsBefore,
+          await fresh<RowValueMap[]>(saleOrdersQueryOptions(organizationId)),
+        ),
     }
 
     const creditNote: TransitionSpec<CreditNoteInput> = {
@@ -144,9 +174,12 @@ export function useReturnOrderWorkflow(
       createReturnOrderAction<CreateReturnOrderParams>({
         label: labels.create,
         execute: (input, context) =>
-          runner.run(`sales.return.create:${input.saleOrderId ?? "none"}`, specs.create, input, {
-            navigateToNext: context?.navigateToNext,
-          }),
+          runner.run(
+            `sales.return.create:${input.saleOrderId ?? "none"}`,
+            specs.create,
+            { ...input, idempotencyKey: newCorrelationId() },
+            { navigateToNext: context?.navigateToNext },
+          ),
       }),
     [labels.create, runner, specs],
   )
@@ -169,11 +202,25 @@ export function useReturnOrderWorkflow(
     return [
       confirmReturnAction({ label: labels.confirm, execute: run("sales.return.confirm", specs.confirm) }),
       receiveReturnAction({ label: labels.receive, execute: run("sales.return.receive", specs.receive) }),
-      exchangeReturnAction({ label: labels.exchange, execute: run("sales.return.exchange", specs.exchange) }),
+      exchangeReturnAction({
+        label: labels.exchange,
+        execute: async (returnOrderId, context) => {
+          const exchangeOrderIdsBefore = returnExchangeOrderIds(
+            returnOrderId,
+            (await qc.fetchQuery({ ...saleOrdersQueryOptions(organizationId), staleTime: 0 })) as RowValueMap[],
+          )
+          return runner.run(
+            `sales.return.exchange:${returnOrderId}`,
+            specs.exchange,
+            { returnOrderId, exchangeOrderIdsBefore },
+            { navigateToNext: context?.navigateToNext },
+          )
+        },
+      }),
       cancelReturnAction({ label: labels.cancel, execute: run("sales.return.cancel", specs.cancel) }),
       createCreditNote,
     ]
-  }, [labels.confirm, labels.receive, labels.exchange, labels.cancel, runner, specs, createCreditNote])
+  }, [labels.confirm, labels.receive, labels.exchange, labels.cancel, runner, specs, createCreditNote, qc, organizationId])
 
   return { actions, create, createCreditNote, isRunning: runner.isRunning, isPending: runner.isPending }
 }
