@@ -13,7 +13,7 @@ This is the COV-00 source/evidence census required before broad T0 module work. 
 
 The audit deliberately does **not** infer U4/U5 from route existence, reducer count, a CRUD form, or a historical plan. Existing tests are treated according to what they actually prove. In particular, browser specs that drive lifecycle transitions through direct BFF/reducer helpers prove backend/transport behavior but do not by themselves prove a complete operator UI lifecycle.
 
-No new seeded stack, browser suite, accessibility pass, or human usability session was executed in this documentation PR. Existing integrated evidence remains authoritative where cited by the BASE program.
+The original documentation audit did not execute a new seeded stack, browser suite, accessibility pass, or human usability session. The integrated review later added clean local P0 evidence and same-head targeted CI evidence. No accessibility pass or human usability session has run.
 
 ## 2. Executive finding
 
@@ -30,7 +30,7 @@ Lumière's T0 gap is no longer mainly backend breadth. The repository already co
 
 No audited T0 surface can be called U4 or U5 yet under the parity definition.
 
-> **COV-00D current-head calibration (base `80cbfd29f9c9f4a82a848cd3d873a89d06d01ce4`):** the per-owner lifecycle calibration is recorded in [`erp-cov00d-evidence-calibration-status.md`](./erp-cov00d-evidence-calibration-status.md) with machine-readable evidence in [`../evidence/cov-00d-lifecycle-evidence.json`](../evidence/cov-00d-lifecycle-evidence.json). All 22 COV-03..24 owners are covered. Manufacturing now has partial operator/exact-effect proof, Subscriptions has partial exact billing-run proof, and Fleet reaches a U2 evidence floor, but every first-org surface remains at `review` because applicable dimensions are still incomplete.
+> **COV-00D current-head calibration (base `e23bac1c0420ae2c15b190a678f2198285fb5df6`):** the per-owner lifecycle calibration is recorded in [`erp-cov00d-evidence-calibration-status.md`](./erp-cov00d-evidence-calibration-status.md) with machine-readable evidence in [`../evidence/cov-00d-lifecycle-evidence.json`](../evidence/cov-00d-lifecycle-evidence.json). All 22 COV-03..24 owners are covered. Manufacturing now has partial operator/exact-effect proof, Subscriptions has partial exact billing-run proof, and Fleet reaches a U2 evidence floor, but every first-org surface remains at `review` because applicable dimensions are still incomplete.
 
 ## 3. Current surface census
 
@@ -152,7 +152,7 @@ These are **source/evidence floors, not certification awards**. `U3` below means
 | COV-08 | Accounting / Finance / Assets | **U3** | journal/invoice/payment/reconcile/close/assets breadth; accounting/reconciliation/payment specs | BASE-04 payment/import semantics; PAY-06 overpayment defect; U4 money/idempotency/lost-response certification |
 | COV-09 | HR / Payroll | **U2** | broad UI/domain; leave and payroll lifecycle specs | browser lifecycle still uses direct BFF transitions for key states; SoD/persona fixture + sensitive-data/stale/retry proof |
 | COV-10 | Projects / Tasks | **U2** | Projects and Tasks routes; project/timesheet lifecycle spec; domain SoD coverage | operator-reachable create→time→validate→bill path and canonical Sales/Accounting handoff |
-| COV-11 | Expenses | **U2** | visible submit→approve→post→reimburse transitions with a second persona; exact source/reimbursement moves; stale/idempotent/reader-denial preservation | operator receipt/sheet/line capture; direct linked-record navigation; same-head CI/human UX review |
+| COV-11 | Expenses | **U2** | visible submit→approve→post→reimburse transitions with a second persona; exact source/reimbursement moves; stale/idempotent/reader-denial preservation; same-head CI | operator receipt/sheet/line capture; direct linked-record navigation; human UX/accessibility review |
 | COV-12 | Subscriptions | **U2** | visible recurring invoice generation/payment; exact billing-run→invoice relation, same-key double-bill prevention and paid residual | operator activate/amend/renew/cancel/dunning lifecycle and exact continuation effects |
 | COV-13 | POS | **U2** | POS route/config/domain surfaces and cross-domain stock/accounting primitives | seeded session→order→payment→close/reconcile lifecycle + duplicate/reconnect proof |
 | COV-14 | Helpdesk | **U2** | ticket/team UI and mutation coverage | complete intake→assign/SLA→resolve→close/reopen browser lifecycle + tenant/stale/notification proof |

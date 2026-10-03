@@ -2,7 +2,7 @@
 
 **Package:** `COV-00D`
 **Disposition:** integrated acceptance candidate
-**Audited base:** `80cbfd29f9c9f4a82a848cd3d873a89d06d01ce4`
+**Audited base:** `e23bac1c0420ae2c15b190a678f2198285fb5df6`
 **Machine evidence:** [`../evidence/cov-00d-lifecycle-evidence.json`](../evidence/cov-00d-lifecycle-evidence.json)
 **Ratchet:** [`../../scripts/validate-cov00d-evidence-matrix.py`](../../scripts/validate-cov00d-evidence-matrix.py)
 
@@ -68,7 +68,7 @@ All current catalog entries remain `review`, consistent with the incomplete appl
 
 ## Evidence limits
 
-This remains an evidence calibration rather than a production-certification award. On audited base `80cbfd29f9c9f4a82a848cd3d873a89d06d01ce4`, the clean P0 run recorded 130 passes, 5 annotated capability skips and 0 failures. That runtime evidence upgrades the selected Manufacturing, Subscriptions and Fleet slices above route/API-only evidence, but it does not prove their broader owner lifecycles, close operator/configuration prerequisites, or promote any module to U4/U5.
+This remains an evidence calibration rather than a production-certification award. The clean local P0 run on `80cbfd29f9c9f4a82a848cd3d873a89d06d01ce4` recorded 130 passes, 5 annotated capability skips and 0 failures. On final review head `e23bac1c0420ae2c15b190a678f2198285fb5df6`, GitHub Actions targeted run `37116733371` recorded 54 passes, 17 annotated capability skips and 0 failures; its aggregate E2E gate also passed. This evidence upgrades the selected Manufacturing, Subscriptions and Fleet slices above route/API-only evidence, but it does not prove their broader owner lifecycles, close operator/configuration prerequisites, complete human usability/accessibility review, or promote any module to U4/U5.
 
 ## COV-00 disposition
 

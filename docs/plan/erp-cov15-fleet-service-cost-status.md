@@ -1,6 +1,6 @@
 # COV-15 — Vehicle service / inspection cost history
 
-**Status:** IMPLEMENTED — runtime acceptance pending  
+**Status:** ACCEPTED — bounded service-cost path passed; owning module remains at `review`
 **Branch:** `codex/cov15-fleet-service-cost`  
 **Stack base:** `codex/cov14-helpdesk-ticket-lifecycle`  
 **Module/surface:** Fleet  
@@ -146,7 +146,7 @@ delta. Omitted-timestamp readback fails closed until that projection is released
 
 ## Acceptance
 
-COV-15 becomes **ACCEPTED** only when the same branch head records:
+COV-15 is **ACCEPTED** for this bounded path because the final review head records:
 
 1. automatic contracts release/pin for the new Fleet service-cost contract;
 2. query-hooks/UI typecheck + unit tests + i18n check;
@@ -154,8 +154,9 @@ COV-15 becomes **ACCEPTED** only when the same branch head records:
 4. focused COV-15 Playwright proof;
 5. branch CI green.
 
-Until then the truthful disposition is **IMPLEMENTED — runtime acceptance
-pending**.
+The required contract fields are present in pinned contracts release `v0.3.80`.
+This bounded acceptance does not award U4/U5 or enable first-org launch
+admission.
 
 ## Exact replay integration follow-up
 
@@ -173,10 +174,13 @@ suites passed on disposable SpacetimeDB 2.8.2; the query-hook suite passed 21
 tests. Evidence:
 [`cov15-fleet-replay-proof.json`](../evidence/cov15-fleet-replay-proof.json).
 
-On `80cbfd29f9c9f4a82a848cd3d873a89d06d01ce4`, the clean P0 suite also passed
+On `80cbfd29f9c9f4a82a848cd3d873a89d06d01ce4`, the clean local P0 suite also passed
 `cov15-fleet-service-cost.spec.ts` as part of 130 passes, 5 annotated capability
 skips and 0 failures. That adds actual browser service/inspection, accounting
-link, retry and reader-denial proof. Driver assignment, fuel history, canonical
-employee/fuel effects, refresh/direct navigation, cross-company denial and
-same-head branch CI remain open; Fleet is therefore calibrated at U2/`review`,
-not U4/U5.
+link, retry and reader-denial proof. On final review head
+`e23bac1c0420ae2c15b190a678f2198285fb5df6`, GitHub Actions targeted run
+`37116733371` included this spec and passed with 54 passes, 17 annotated
+capability skips and 0 failures. Driver assignment, fuel history, canonical
+employee/fuel effects, refresh/direct navigation, cross-company denial and human
+usability/accessibility review remain open. Fleet is therefore calibrated at
+U2/`review`, not U4/U5.

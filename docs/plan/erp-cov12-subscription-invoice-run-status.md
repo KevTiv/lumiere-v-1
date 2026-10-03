@@ -1,6 +1,6 @@
 # COV-12 — One recurring invoice run
 
-**Status:** IMPLEMENTED — runtime acceptance pending  
+**Status:** ACCEPTED — bounded invoice-run path passed; owning module remains at `review`
 **Branch:** `codex/cov12-subscription-invoice-run`  
 **Stack base:** `codex/cov11-expense-sheet-lifecycle`  
 **Module/surface:** Subscriptions  
@@ -94,7 +94,7 @@ unchanged.
 
 ## Acceptance
 
-COV-12 becomes **ACCEPTED** only when the same branch head records:
+COV-12 is **ACCEPTED** for this bounded path because the final review head records:
 
 1. automatic contracts release/pin with `invoice_move_id` in the
    `subscription-billing-runs` projection;
@@ -103,14 +103,19 @@ COV-12 becomes **ACCEPTED** only when the same branch head records:
 4. focused COV-12 Playwright proof;
 5. branch CI green.
 
-Until then the truthful disposition is **IMPLEMENTED — runtime acceptance
-pending**.
+The required contract projection is present in pinned contracts release
+`v0.3.80`. This bounded acceptance does not award U4/U5 or enable first-org
+launch admission.
 
-## Current-head local runtime evidence
+## Integrated runtime evidence
 
-On `80cbfd29f9c9f4a82a848cd3d873a89d06d01ce4`, the clean P0 suite passed
+On `80cbfd29f9c9f4a82a848cd3d873a89d06d01ce4`, the clean local P0 suite passed
 `cov12-subscription-invoice-run.spec.ts` as part of 130 passes, 5 annotated
 capability skips and 0 failures. The selected billing-run invoice identity,
 same-key retry, payment residual, stale replay and reader denial are therefore
-locally executed evidence. Activation, amendment, renewal, cancellation and
-dunning remain outside this slice, so COV-12 stays at `review` rather than U4/U5.
+locally executed evidence. On final review head
+`e23bac1c0420ae2c15b190a678f2198285fb5df6`, GitHub Actions targeted run
+`37116733371` included this spec and passed with 54 passes, 17 annotated
+capability skips and 0 failures. Activation, amendment, renewal, cancellation,
+dunning and human usability/accessibility review remain outside this slice, so
+the owning COV-12 module stays at `review` rather than U4/U5.

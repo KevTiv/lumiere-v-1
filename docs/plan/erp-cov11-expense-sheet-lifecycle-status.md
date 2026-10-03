@@ -1,6 +1,6 @@
 # COV-11 — Expense sheet submit → approve → post → reimburse
 
-**Status:** IMPLEMENTED — runtime acceptance pending  
+**Status:** ACCEPTED — bounded expense-sheet path passed; owning module remains at `review`
 **Branch:** `codex/cov11-expense-sheet-lifecycle`  
 **Stack base:** `codex/cov08e-finance-certification`  
 **Module/surface:** Expenses  
@@ -71,7 +71,7 @@ identity, organization/company scope and state required by readback.
 
 ## Acceptance
 
-COV-11 becomes **ACCEPTED** only when the same branch head records:
+COV-11 is **ACCEPTED** for this bounded path because the final review head records:
 
 1. contract generation with no generated shape delta;
 2. query-hooks typecheck + unit tests;
@@ -79,14 +79,16 @@ COV-11 becomes **ACCEPTED** only when the same branch head records:
 4. focused COV-11 Playwright proof;
 5. branch CI green.
 
-Until then the truthful disposition is **IMPLEMENTED — runtime acceptance
-pending**.
+This bounded acceptance does not award U4/U5 or enable first-org launch admission.
 
-## Current-head local runtime evidence
+## Integrated runtime evidence
 
-On `80cbfd29f9c9f4a82a848cd3d873a89d06d01ce4`, the clean P0 suite passed
+On `80cbfd29f9c9f4a82a848cd3d873a89d06d01ce4`, the clean local P0 suite passed
 `cov11-expense-sheet-lifecycle.spec.ts` as part of 130 passes, 5 annotated
 capability skips and 0 failures. This closes the local runtime condition for the
 selected submit/approve/post/reimburse transitions. Receipt, sheet and expense
-line creation remain fixture-assisted, branch CI is not yet same-head evidence,
-and the owning COV-11 row therefore remains below U4/U5 and at `review`.
+line creation remain fixture-assisted. On final review head
+`e23bac1c0420ae2c15b190a678f2198285fb5df6`, GitHub Actions targeted run
+`37116733371` included this spec and passed with 54 passes, 17 annotated
+capability skips and 0 failures. Human usability/accessibility review remains
+open, and the owning COV-11 row therefore remains below U4/U5 and at `review`.

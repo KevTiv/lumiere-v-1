@@ -1,9 +1,9 @@
 # COV-07e — manufacturing quality gate
 
-**Status:** REVIEW — clean-stack operator proof passed; same-head CI acceptance pending
+**Status:** ACCEPTED — bounded quality-gate path passed; owning module remains at `review`
 **Branch:** `codex/cov07e-manufacturing-quality-gate`  
 **Stack base:** COV-07d / `codex/cov07d-workorder-execution`
-**Current review base:** `80cbfd29f9c9f4a82a848cd3d873a89d06d01ce4`
+**Current review base:** `e23bac1c0420ae2c15b190a678f2198285fb5df6`
 
 ## Bounded path
 
@@ -39,9 +39,12 @@ actions for the warehouse operator to require and pass the exact in-process
 check. It verifies the canonical quality-check readback in the
 Manufacturing quality tab, proves pending quality blocks finish, rejects
 duplicate creation and disposition replay, and confirms a limited reader cannot
-create or disposition the check. The spec passed in the clean current-head P0
-run. This supplies local operator runtime evidence, not branch-CI, production,
-or full COV-07 lifecycle certification.
+create or disposition the check. The spec passed in the clean local P0 run on
+`80cbfd29f9c9f4a82a848cd3d873a89d06d01ce4` and in GitHub Actions targeted run
+`37116733371` on final review head
+`e23bac1c0420ae2c15b190a678f2198285fb5df6`. This supplies same-head operator
+runtime and branch-CI evidence, not production or full COV-07 lifecycle
+certification.
 
 The first-org warehouse/manufacturing persona now has the existing reducer's
 required `quality_check:create`, `quality_check:read`, and

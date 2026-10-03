@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "audited_base": "80cbfd29f9c9f4a82a848cd3d873a89d06d01ce4",
+  "audited_base": "e23bac1c0420ae2c15b190a678f2198285fb5df6",
   "status": "acceptance-candidate",
   "vocabulary": {
     "D": "domain invariant",
@@ -159,7 +159,7 @@
         "O": {"status": "partial", "reason": "The browser drives Submit, Approve, Post and Reimburse through visible Expense sheets actions and forms, while receipt, sheet and expense-line capture remain fixture-assisted.", "evidence": [{"path": "frontend/web/tests/e2e/cov11-expense-sheet-lifecycle.spec.ts", "role": "partial-operator-transition", "claim": "visible submit-to-reimburse transitions under distinct submitter and approver personas"}]},
         "E": {"status": "partial", "reason": "The selected sheet, source move and reimbursement move are resolved by exact scoped IDs and replay/denial preserve the canonical snapshot; exact receipt and expense-line creation effects remain outside the operator slice.", "evidence": [{"path": "frontend/packages/query-hooks/src/hooks/expenses-lifecycle-effect.test.ts", "claim": "zero, one, scope, relation and ambiguity coverage for expense transition effects"}, {"path": "frontend/web/tests/e2e/cov11-expense-sheet-lifecycle.spec.ts", "claim": "exact sheet and accounting-move readback across replay and denial"}]}
       },
-      "missing_proof": ["operator receipt/blob capture owned by the Documents lifecycle", "direct navigation to linked accounting records", "same-head branch CI and human usability/accessibility review"],
+      "missing_proof": ["operator receipt/blob capture owned by the Documents lifecycle", "direct navigation to linked accounting records", "human usability/accessibility review"],
       "next_packages": ["COV-11", "COV-08", "COV-02", "COV-27"]
     },
     {
@@ -176,7 +176,7 @@
         "O": {"status": "partial", "reason": "The browser generates and pays the exact recurring invoice through visible Subscriptions actions and forms, while activation, amendment and cancellation remain outside this operator slice.", "evidence": [{"path": "frontend/web/tests/e2e/cov12-subscription-invoice-run.spec.ts", "role": "partial-operator-transition", "claim": "visible recurring invoice generation and payment transitions"}]},
         "E": {"status": "partial", "reason": "The billing slice proves one exact billing-run to invoice relation, same-key double-bill prevention, exact paid residual and replay/denial preservation; amendment and cancellation effects remain unproven.", "evidence": [{"path": "frontend/packages/query-hooks/src/hooks/subscriptions-invoice-effect.test.ts", "claim": "exact billing-run, invoice, scope and residual effect resolution"}, {"path": "frontend/web/tests/e2e/cov12-subscription-invoice-run.spec.ts", "claim": "exact run and invoice readback across generation retry, payment replay and reader denial"}]}
       },
-      "missing_proof": ["operator activation, amendment and cancellation lifecycle", "exact amendment and cancellation effects", "same-head branch CI and human usability/accessibility review"],
+      "missing_proof": ["operator activation, amendment and cancellation lifecycle", "exact amendment and cancellation effects", "human usability/accessibility review"],
       "next_packages": ["COV-12", "COV-08", "COV-27"]
     },
     {
