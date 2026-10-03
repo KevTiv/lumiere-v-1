@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "audited_base": "ed4987d3d99a89c2a3f2a7cddc8ca212548b1831",
+  "audited_base": "80cbfd29f9c9f4a82a848cd3d873a89d06d01ce4",
   "status": "acceptance-candidate",
   "vocabulary": {
     "D": "domain invariant",
@@ -84,14 +84,14 @@
       "primary_lifecycle": "BOM to manufacturing order, consume, produce, quality and close",
       "current_floor": "U2",
       "launch_admission": "review",
-      "operator_evidence_mode": "api-driven",
+      "operator_evidence_mode": "mixed",
       "dimensions": {
         "D": {"status": "partial", "reason": "Relational and work-center tests exist, but the complete production lifecycle invariant is not represented as one domain proof.", "evidence": [{"path": "spacetimedb/tests/manufacturing/relational_integrity_test.rs", "claim": "manufacturing relationship invariants"}]},
-        "A": {"status": "partial", "reason": "The browser lifecycle invokes compatibility reducers rather than the generated operator boundary.", "evidence": [{"path": "frontend/web/tests/e2e/manufacturing-mutations.spec.ts", "claim": "API-driven manufacturing lifecycle"}]},
-        "O": {"status": "absent", "reason": "The create-confirm-produce-close certification transition is explicitly driven by BFF reducers.", "evidence": [{"path": "frontend/web/tests/e2e/manufacturing-mutations.spec.ts", "role": "api-driven-transition", "claim": "principal lifecycle bypasses operator UI"}]},
-        "E": {"status": "absent", "reason": "Manufacturing order discovery selects the latest matching row and lacks replay recovery.", "evidence": []}
+        "A": {"status": "partial", "reason": "Production close and the required quality gate use generated authenticated operations, while BOM and manufacturing-order setup still do not establish one complete generated-operation lifecycle.", "evidence": [{"path": "frontend/web/tests/e2e/cov07-manufacturing-production-close.spec.ts", "claim": "authenticated generated-operation production close with canonical readback"}, {"path": "frontend/web/tests/e2e/cov07-manufacturing-workorder-execution.spec.ts", "claim": "authenticated quality-check and workorder operations with reader denial"}]},
+        "O": {"status": "partial", "reason": "The warehouse operator records output, requires and passes the exact quality check, finishes the workorder, and closes production through visible actions; BOM and manufacturing-order setup are still fixture-assisted.", "evidence": [{"path": "frontend/web/tests/e2e/cov07-manufacturing-production-close.spec.ts", "role": "partial-operator-transition", "claim": "visible output and production-close transitions"}, {"path": "frontend/web/tests/e2e/cov07-manufacturing-workorder-execution.spec.ts", "role": "partial-operator-transition", "claim": "visible require-quality, pass-quality and workorder-finish transitions"}]},
+        "E": {"status": "partial", "reason": "The selected production and quality slices prove exact manufacturing-order, finished-move, destination-quant, workorder and quality-check identities plus replay preservation, but complete stock and cost identity across BOM-to-close remains open.", "evidence": [{"path": "frontend/web/tests/e2e/cov07-manufacturing-production-close.spec.ts", "claim": "exact finished-move and destination-quant effects with replay rejection"}, {"path": "frontend/web/tests/e2e/cov07-manufacturing-workorder-execution.spec.ts", "claim": "exact workorder-owned quality effect with duplicate, replay and reader-denial proof"}]}
       },
-      "missing_proof": ["one domain lifecycle invariant", "operator BOM-to-close transition", "exact MO and stock/cost effect identities"],
+      "missing_proof": ["one domain lifecycle invariant spanning BOM through close", "operator BOM and manufacturing-order creation", "complete material-consumption and cost-effect identities"],
       "next_packages": ["COV-07", "COV-06", "COV-27"]
     },
     {
@@ -152,14 +152,14 @@
       "primary_lifecycle": "capture and expense through submit, approve, post and reimburse",
       "current_floor": "U2",
       "launch_admission": "review",
-      "operator_evidence_mode": "api-driven",
+      "operator_evidence_mode": "mixed",
       "dimensions": {
         "D": {"status": "proven", "reason": "Expense wave suites cover approval, posting, reimbursement and duplicate guards.", "evidence": [{"path": "spacetimedb/tests/expenses/wave_f_test.rs", "claim": "expense posting and close integrity"}]},
-        "A": {"status": "partial", "reason": "The lifecycle is persisted but principal transitions largely use compatibility reducer calls.", "evidence": [{"path": "frontend/web/tests/e2e/expenses-wave-lifecycle.spec.ts", "claim": "authenticated expense lifecycle integration"}]},
-        "O": {"status": "partial", "reason": "Capture and forms are user-visible while submit, approve and posting proof remains API-driven.", "evidence": [{"path": "frontend/web/tests/e2e/expenses-wave-lifecycle.spec.ts", "role": "api-driven-transition", "claim": "mixed UI setup and API-driven principal lifecycle"}]},
-        "E": {"status": "partial", "reason": "State convergence is observed without one canonical reimbursement/post result contract and lost-response proof.", "evidence": [{"path": "frontend/web/tests/e2e/expenses-wave-lifecycle.spec.ts", "claim": "persisted state readback with incomplete exact result identity"}]}
+        "A": {"status": "partial", "reason": "Submit, approve, post and reimburse use generated operations under current authorization, including a distinct finance actor and reader denial; receipt, sheet and line creation remain fixture-assisted.", "evidence": [{"path": "frontend/packages/query-hooks/src/hooks/expenses.ts", "claim": "generated expense transition dispatch with canonical readback"}, {"path": "frontend/web/tests/e2e/cov11-expense-sheet-lifecycle.spec.ts", "claim": "authenticated multi-person transition path and reader-denial preservation"}]},
+        "O": {"status": "partial", "reason": "The browser drives Submit, Approve, Post and Reimburse through visible Expense sheets actions and forms, while receipt, sheet and expense-line capture remain fixture-assisted.", "evidence": [{"path": "frontend/web/tests/e2e/cov11-expense-sheet-lifecycle.spec.ts", "role": "partial-operator-transition", "claim": "visible submit-to-reimburse transitions under distinct submitter and approver personas"}]},
+        "E": {"status": "partial", "reason": "The selected sheet, source move and reimbursement move are resolved by exact scoped IDs and replay/denial preserve the canonical snapshot; exact receipt and expense-line creation effects remain outside the operator slice.", "evidence": [{"path": "frontend/packages/query-hooks/src/hooks/expenses-lifecycle-effect.test.ts", "claim": "zero, one, scope, relation and ambiguity coverage for expense transition effects"}, {"path": "frontend/web/tests/e2e/cov11-expense-sheet-lifecycle.spec.ts", "claim": "exact sheet and accounting-move readback across replay and denial"}]}
       },
-      "missing_proof": ["operator submit-to-reimburse path", "receipt/document link", "exact post and reimbursement refs with duplicate recovery"],
+      "missing_proof": ["operator receipt/blob capture owned by the Documents lifecycle", "direct navigation to linked accounting records", "same-head branch CI and human usability/accessibility review"],
       "next_packages": ["COV-11", "COV-08", "COV-02", "COV-27"]
     },
     {
@@ -169,14 +169,14 @@
       "primary_lifecycle": "plan and subscription through recurring billing, payment, amendment and cancellation",
       "current_floor": "U2",
       "launch_admission": "review",
-      "operator_evidence_mode": "route-only",
+      "operator_evidence_mode": "mixed",
       "dimensions": {
         "D": {"status": "proven", "reason": "Subscription wave suites cover lifecycle and billing-domain behavior.", "evidence": [{"path": "spacetimedb/tests/subscriptions/wave_a_test.rs", "claim": "subscription lifecycle domain invariants"}]},
-        "A": {"status": "partial", "reason": "Command breadth exists, but the selected browser evidence does not prove the complete generated-operation lifecycle.", "evidence": [{"path": "frontend/web/tests/e2e/subscriptions-wave-lifecycle.spec.ts", "claim": "subscription route and action integration smoke"}]},
-        "O": {"status": "partial", "reason": "The browser proves tabs and invoice affordances rather than the subscription lifecycle.", "evidence": [{"path": "frontend/web/tests/e2e/subscriptions-wave-lifecycle.spec.ts", "role": "route-or-affordance-only", "claim": "tabs and form affordances only"}]},
-        "E": {"status": "absent", "reason": "No selected evidence proves exact billing-run invoice identity or replay-safe double-bill prevention.", "evidence": []}
+        "A": {"status": "partial", "reason": "Recurring invoice generation and payment use generated authenticated operations with reader denial; activation, amendment and cancellation are not yet one complete generated-operation proof.", "evidence": [{"path": "frontend/web/tests/e2e/cov12-subscription-invoice-run.spec.ts", "claim": "authenticated generated-operation billing and payment path with reader denial"}]},
+        "O": {"status": "partial", "reason": "The browser generates and pays the exact recurring invoice through visible Subscriptions actions and forms, while activation, amendment and cancellation remain outside this operator slice.", "evidence": [{"path": "frontend/web/tests/e2e/cov12-subscription-invoice-run.spec.ts", "role": "partial-operator-transition", "claim": "visible recurring invoice generation and payment transitions"}]},
+        "E": {"status": "partial", "reason": "The billing slice proves one exact billing-run to invoice relation, same-key double-bill prevention, exact paid residual and replay/denial preservation; amendment and cancellation effects remain unproven.", "evidence": [{"path": "frontend/packages/query-hooks/src/hooks/subscriptions-invoice-effect.test.ts", "claim": "exact billing-run, invoice, scope and residual effect resolution"}, {"path": "frontend/web/tests/e2e/cov12-subscription-invoice-run.spec.ts", "claim": "exact run and invoice readback across generation retry, payment replay and reader denial"}]}
       },
-      "missing_proof": ["operator activate-to-cancel lifecycle", "billing-run idempotency", "canonical invoice/payment links"],
+      "missing_proof": ["operator activation, amendment and cancellation lifecycle", "exact amendment and cancellation effects", "same-head branch CI and human usability/accessibility review"],
       "next_packages": ["COV-12", "COV-08", "COV-27"]
     },
     {
@@ -218,16 +218,16 @@
       "surface": "Fleet",
       "surface_ids": ["fleet"],
       "primary_lifecycle": "vehicle and driver assignment through service, inspection, fuel and cost history",
-      "current_floor": "U1",
+      "current_floor": "U2",
       "launch_admission": "review",
-      "operator_evidence_mode": "route-only",
+      "operator_evidence_mode": "mixed",
       "dimensions": {
         "D": {"status": "proven", "reason": "Fleet lifecycle and relational integrity have focused domain tests.", "evidence": [{"path": "spacetimedb/tests/fleet/lifecycle_test.rs", "claim": "fleet lifecycle invariants"}]},
-        "A": {"status": "partial", "reason": "Fleet named commands, hooks and focused hook tests exist without one full API lifecycle proof.", "evidence": [{"path": "frontend/packages/query-hooks/src/hooks/fleet-lifecycle.test.ts", "claim": "fleet command and invalidation integration"}]},
-        "O": {"status": "partial", "reason": "The dedicated Fleet route and lifecycle affordances exist but lack a persisted operator lifecycle spec.", "evidence": [{"path": "frontend/web/app/(modules)/fleet/fleet-client.tsx", "role": "route-or-affordance-only", "claim": "canonical Fleet workspace and lifecycle affordances"}]},
-        "E": {"status": "partial", "reason": "Hook-level result handling exists without browser refresh, replay, or cross-company effect proof.", "evidence": [{"path": "frontend/packages/query-hooks/src/hooks/fleet-lifecycle.test.ts", "claim": "focused lifecycle hook result handling"}]}
+        "A": {"status": "partial", "reason": "Service-cost and inspection writes use generated authenticated operations with exact readback and reader denial; driver assignment and fuel history are not yet one complete API lifecycle proof.", "evidence": [{"path": "frontend/packages/query-hooks/src/hooks/fleet.ts", "claim": "generated service and inspection operations with canonical readback"}, {"path": "frontend/web/tests/e2e/cov15-fleet-service-cost.spec.ts", "claim": "authenticated service and inspection integration with reader denial"}]},
+        "O": {"status": "partial", "reason": "The operator records a cost-bearing service and an inspection through visible Fleet forms, while driver assignment and fuel history remain outside the selected slice.", "evidence": [{"path": "frontend/web/tests/e2e/cov15-fleet-service-cost.spec.ts", "role": "partial-operator-transition", "claim": "visible service-cost and inspection transitions"}]},
+        "E": {"status": "partial", "reason": "Service and inspection resolve by stable request ID with exact vehicle, scope and payload; service also proves one balanced Posted accounting move, and retry/reader denial preserve both effects. Driver, employee and fuel effects remain open.", "evidence": [{"path": "frontend/packages/query-hooks/src/hooks/fleet-history-effect.test.ts", "claim": "exact service and inspection effect identity, payload, scope and ambiguity coverage"}, {"path": "frontend/web/tests/e2e/cov15-fleet-service-cost.spec.ts", "claim": "exact service, inspection and accounting readback across retry and denial"}]}
       },
-      "missing_proof": ["operator assignment-to-cost-history lifecycle", "finance and employee record refs", "refresh and cross-company denial"],
+      "missing_proof": ["operator driver assignment and fuel-history lifecycle", "canonical employee assignment and fuel effects", "refresh/direct navigation and cross-company denial"],
       "next_packages": ["COV-15", "COV-08", "COV-09", "COV-27"]
     },
     {

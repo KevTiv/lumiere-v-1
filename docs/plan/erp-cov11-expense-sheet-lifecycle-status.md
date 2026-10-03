@@ -81,3 +81,12 @@ COV-11 becomes **ACCEPTED** only when the same branch head records:
 
 Until then the truthful disposition is **IMPLEMENTED — runtime acceptance
 pending**.
+
+## Current-head local runtime evidence
+
+On `80cbfd29f9c9f4a82a848cd3d873a89d06d01ce4`, the clean P0 suite passed
+`cov11-expense-sheet-lifecycle.spec.ts` as part of 130 passes, 5 annotated
+capability skips and 0 failures. This closes the local runtime condition for the
+selected submit/approve/post/reimburse transitions. Receipt, sheet and expense
+line creation remain fixture-assisted, branch CI is not yet same-head evidence,
+and the owning COV-11 row therefore remains below U4/U5 and at `review`.

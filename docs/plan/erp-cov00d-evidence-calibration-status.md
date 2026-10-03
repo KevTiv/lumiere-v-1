@@ -2,7 +2,7 @@
 
 **Package:** `COV-00D`
 **Disposition:** integrated acceptance candidate
-**Audited base:** `ed4987d3d99a89c2a3f2a7cddc8ca212548b1831`
+**Audited base:** `80cbfd29f9c9f4a82a848cd3d873a89d06d01ce4`
 **Machine evidence:** [`../evidence/cov-00d-lifecycle-evidence.json`](../evidence/cov-00d-lifecycle-evidence.json)
 **Ratchet:** [`../../scripts/validate-cov00d-evidence-matrix.py`](../../scripts/validate-cov00d-evidence-matrix.py)
 
@@ -27,15 +27,15 @@ The matrix does not infer operator proof from route rendering, action presence, 
 | COV-04 | Sales | U3 | proven | partial | partial | partial | review |
 | COV-05 | Purchasing | U3 | proven | partial | partial | partial | review |
 | COV-06 | Inventory / WMS | U2 | proven | partial | partial | absent | review |
-| COV-07 | Manufacturing / Quality | U2 | partial | partial | absent | absent | review |
+| COV-07 | Manufacturing / Quality | U2 | partial | partial | partial | partial | review |
 | COV-08 | Accounting / Finance / Assets | U3 | proven | partial | partial | partial | review |
 | COV-09 | HR / Payroll | U2 | proven | partial | partial | partial | review |
 | COV-10 | Projects / Tasks | U2 | proven | partial | partial | partial | review |
 | COV-11 | Expenses | U2 | proven | partial | partial | partial | review |
-| COV-12 | Subscriptions | U2 | proven | partial | partial | absent | review |
+| COV-12 | Subscriptions | U2 | proven | partial | partial | partial | review |
 | COV-13 | POS | U2 | proven | partial | partial | absent | review |
 | COV-14 | Helpdesk | U2 | partial | partial | partial | absent | review |
-| COV-15 | Fleet | U1 | proven | partial | partial | partial | review |
+| COV-15 | Fleet | U2 | proven | partial | partial | partial | review |
 | COV-16 | IoT | U2 | partial | partial | partial | partial | review |
 | COV-17 | Proposals | U3 | proven | partial | partial | partial | review |
 | COV-18 | Documents / Knowledge | U2 | partial | partial | partial | partial | review |
@@ -50,8 +50,8 @@ Dimension totals:
 
 - `D`: 16 proven, 6 partial;
 - `A`: 2 proven, 20 partial;
-- `O`: 1 proven, 20 partial, 1 absent;
-- `E`: 15 partial, 7 absent.
+- `O`: 1 proven, 21 partial;
+- `E`: 17 partial, 5 absent.
 
 ## Promotion and launch ratchet
 
@@ -68,7 +68,7 @@ All current catalog entries remain `review`, consistent with the incomplete appl
 
 ## Evidence limits
 
-This slice is source and evidence calibration. It does not repair the runtime defects owned by COV-01/UX/module/GOV packages, execute browser tests, or promote any module to U4/U5. Strong domain and API evidence is retained even where operator or recovery evidence is incomplete.
+This remains an evidence calibration rather than a production-certification award. On audited base `80cbfd29f9c9f4a82a848cd3d873a89d06d01ce4`, the clean P0 run recorded 130 passes, 5 annotated capability skips and 0 failures. That runtime evidence upgrades the selected Manufacturing, Subscriptions and Fleet slices above route/API-only evidence, but it does not prove their broader owner lifecycles, close operator/configuration prerequisites, or promote any module to U4/U5.
 
 ## COV-00 disposition
 

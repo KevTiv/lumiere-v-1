@@ -173,5 +173,10 @@ suites passed on disposable SpacetimeDB 2.8.2; the query-hook suite passed 21
 tests. Evidence:
 [`cov15-fleet-replay-proof.json`](../evidence/cov15-fleet-replay-proof.json).
 
-This is D/exact-readback evidence only. The release/pin, generated BFF denial,
-actual browser proof and same-head CI conditions above still apply.
+On `80cbfd29f9c9f4a82a848cd3d873a89d06d01ce4`, the clean P0 suite also passed
+`cov15-fleet-service-cost.spec.ts` as part of 130 passes, 5 annotated capability
+skips and 0 failures. That adds actual browser service/inspection, accounting
+link, retry and reader-denial proof. Driver assignment, fuel history, canonical
+employee/fuel effects, refresh/direct navigation, cross-company denial and
+same-head branch CI remain open; Fleet is therefore calibrated at U2/`review`,
+not U4/U5.

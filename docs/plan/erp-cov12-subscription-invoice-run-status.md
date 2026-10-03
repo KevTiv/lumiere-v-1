@@ -105,3 +105,12 @@ COV-12 becomes **ACCEPTED** only when the same branch head records:
 
 Until then the truthful disposition is **IMPLEMENTED — runtime acceptance
 pending**.
+
+## Current-head local runtime evidence
+
+On `80cbfd29f9c9f4a82a848cd3d873a89d06d01ce4`, the clean P0 suite passed
+`cov12-subscription-invoice-run.spec.ts` as part of 130 passes, 5 annotated
+capability skips and 0 failures. The selected billing-run invoice identity,
+same-key retry, payment residual, stale replay and reader denial are therefore
+locally executed evidence. Activation, amendment, renewal, cancellation and
+dunning remain outside this slice, so COV-12 stays at `review` rather than U4/U5.
