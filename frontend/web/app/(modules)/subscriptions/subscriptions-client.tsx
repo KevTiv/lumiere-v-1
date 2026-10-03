@@ -141,13 +141,13 @@ import {
   currencyOptionsFromRows,
 } from "@/lib/form-lookup"
 
-function subscriptionState(row: Record<string, unknown>): string {
+function subscriptionState(row: unknown): string {
+  if (!row || typeof row !== "object" || !("state" in row)) return ""
   const value = row.state
   if (typeof value === "string") return value.toLowerCase()
   if (value && typeof value === "object" && !Array.isArray(value)) {
-    const tagged = value as Record<string, unknown>
-    if (typeof tagged.tag === "string") return tagged.tag.toLowerCase()
-    const keys = Object.keys(tagged)
+    if ("tag" in value && typeof value.tag === "string") return value.tag.toLowerCase()
+    const keys = Object.keys(value)
     if (keys.length === 1) return keys[0]!.toLowerCase()
   }
   return ""
