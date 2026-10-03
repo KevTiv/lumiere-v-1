@@ -681,7 +681,12 @@ export async function chooseSelectOptionByLabel(
   await expect
     .poll(
       async () => {
-        await field.click()
+        // Keep an open Radix selector open while its async options load.
+        // Clicking the trigger again closes the selector and can leave its
+        // overlay intercepting the next poll attempt.
+        if (!(await listbox.isVisible().catch(() => false))) {
+          await field.click()
+        }
         if (!(await listbox.isVisible().catch(() => false))) return 0
         return await option.count()
       },

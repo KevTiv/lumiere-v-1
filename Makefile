@@ -36,6 +36,9 @@ E2E_SPEC_FILES     ?=
 # Playwright shard for e2e-smoke, e.g. 2/3 (CI splits the p0/full suites across runners).
 E2E_SHARD          ?=
 E2E_WORKERS        ?= 1
+# Run reducer/domain validation before browser fixture seeding. Set to 0 when
+# reducer proof is run separately and the browser suite needs a pristine seed.
+E2E_RUN_DOMAIN_TESTS ?= 1
 # Some interactive shells in Cursor can inherit a literal "$$PATH"; use a known-good command path for E2E orchestration.
 E2E_PATH           ?= /Users/kevintivert/.nvm/versions/node/v21.7.0/bin:/Users/kevintivert/.cargo/bin:/Users/kevintivert/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin
 
@@ -368,31 +371,35 @@ e2e-smoke-setup:
 				echo "[e2e] Preserving existing DB (set E2E_CLEAR_DB=1 to wipe + full re-seed)."; \
 				LUMIERE_ENABLE_DEV_REDUCERS=1 spacetime publish "$(E2E_DB)" --bin-path "$(MODULE)/target/wasm32-unknown-unknown/release/lumiere_v1.wasm" --server local -y --no-config; \
 			fi; \
-			if spacetime call "$(E2E_DB)" run_all_core_tests --server local --no-config; then \
-				echo "[e2e] Core reducer tests passed."; \
-			else \
-				echo "[e2e] run_all_core_tests is unavailable or failed; continuing with browser smoke tests."; \
-			fi; \
-			echo "[e2e] Running domain test reducers (one case per call)..."; \
-			for _domain_reducer in $(E2E_DOMAIN_TEST_REDUCERS); do \
-				echo "[e2e] Calling $$_domain_reducer..."; \
-				if ! spacetime call "$(E2E_DB)" "$$_domain_reducer" --server local --no-config; then \
-					echo "[e2e] $$_domain_reducer failed — tail of SpacetimeDB logs:"; \
-					spacetime logs "$(E2E_DB)" --server local --no-config 2>/dev/null | tail -40 || true; \
-					exit 1; \
+			if [ "$${E2E_RUN_DOMAIN_TESTS:-1}" = "1" ]; then \
+				if spacetime call "$(E2E_DB)" run_all_core_tests --server local --no-config; then \
+					echo "[e2e] Core reducer tests passed."; \
+				else \
+					echo "[e2e] run_all_core_tests is unavailable or failed; continuing with browser smoke tests."; \
 				fi; \
-			done; \
-			echo "[e2e] Domain reducer tests passed."; \
-			if [ "$${E2E_RUN_DOMAIN_AGGREGATES:-0}" = "1" ]; then \
-				for _aggregate_reducer in run_all_inventory_tests run_all_analytics_tests; do \
-					echo "[e2e] Calling $$_aggregate_reducer aggregate..."; \
-					if ! spacetime call "$(E2E_DB)" "$$_aggregate_reducer" --server local --no-config; then \
-						echo "[e2e] $$_aggregate_reducer failed — tail of SpacetimeDB logs:"; \
-						spacetime logs "$(E2E_DB)" --server local --no-config 2>/dev/null | tail -80 || true; \
+				echo "[e2e] Running domain test reducers (one case per call)..."; \
+				for _domain_reducer in $(E2E_DOMAIN_TEST_REDUCERS); do \
+					echo "[e2e] Calling $$_domain_reducer..."; \
+					if ! spacetime call "$(E2E_DB)" "$$_domain_reducer" --server local --no-config; then \
+						echo "[e2e] $$_domain_reducer failed — tail of SpacetimeDB logs:"; \
+						spacetime logs "$(E2E_DB)" --server local --no-config 2>/dev/null | tail -40 || true; \
 						exit 1; \
 					fi; \
 				done; \
-				echo "[e2e] Inventory and Analytics aggregate tests passed."; \
+				echo "[e2e] Domain reducer tests passed."; \
+				if [ "$${E2E_RUN_DOMAIN_AGGREGATES:-0}" = "1" ]; then \
+					for _aggregate_reducer in run_all_inventory_tests run_all_analytics_tests; do \
+						echo "[e2e] Calling $$_aggregate_reducer aggregate..."; \
+						if ! spacetime call "$(E2E_DB)" "$$_aggregate_reducer" --server local --no-config; then \
+							echo "[e2e] $$_aggregate_reducer failed — tail of SpacetimeDB logs:"; \
+							spacetime logs "$(E2E_DB)" --server local --no-config 2>/dev/null | tail -80 || true; \
+							exit 1; \
+						fi; \
+					done; \
+					echo "[e2e] Inventory and Analytics aggregate tests passed."; \
+				fi; \
+			else \
+				echo "[e2e] Skipping reducer/domain tests; browser fixture will seed a pristine database."; \
 			fi; \
 		fi; \
 		echo "[e2e] Obtaining local SpacetimeDB owner token (with private-table SQL preflight)..."; \
@@ -854,31 +861,35 @@ e2e-smoke:
 			echo "[e2e] Preserving existing DB (set E2E_CLEAR_DB=1 to wipe + full re-seed)."; \
 			LUMIERE_ENABLE_DEV_REDUCERS=1 spacetime publish "$(E2E_DB)" --bin-path "$(MODULE)/target/wasm32-unknown-unknown/release/lumiere_v1.wasm" --server local -y --no-config; \
 		fi; \
-		if spacetime call "$(E2E_DB)" run_all_core_tests --server local --no-config; then \
-			echo "[e2e] Core reducer tests passed."; \
-		else \
-			echo "[e2e] run_all_core_tests is unavailable or failed; continuing with browser smoke tests."; \
-		fi; \
-		echo "[e2e] Running domain test reducers (one case per call)..."; \
-		for _domain_reducer in $(E2E_DOMAIN_TEST_REDUCERS); do \
-			echo "[e2e] Calling $$_domain_reducer..."; \
-			if ! spacetime call "$(E2E_DB)" "$$_domain_reducer" --server local --no-config; then \
-				echo "[e2e] $$_domain_reducer failed — tail of SpacetimeDB logs:"; \
-				spacetime logs "$(E2E_DB)" --server local --no-config 2>/dev/null | tail -40 || true; \
-				exit 1; \
+		if [ "$${E2E_RUN_DOMAIN_TESTS:-1}" = "1" ]; then \
+			if spacetime call "$(E2E_DB)" run_all_core_tests --server local --no-config; then \
+				echo "[e2e] Core reducer tests passed."; \
+			else \
+				echo "[e2e] run_all_core_tests is unavailable or failed; continuing with browser smoke tests."; \
 			fi; \
-		done; \
-		echo "[e2e] Domain reducer tests passed."; \
-		if [ "$${E2E_RUN_DOMAIN_AGGREGATES:-0}" = "1" ]; then \
-			for _aggregate_reducer in run_all_inventory_tests run_all_analytics_tests; do \
-				echo "[e2e] Calling $$_aggregate_reducer aggregate..."; \
-				if ! spacetime call "$(E2E_DB)" "$$_aggregate_reducer" --server local --no-config; then \
-					echo "[e2e] $$_aggregate_reducer failed — tail of SpacetimeDB logs:"; \
-					spacetime logs "$(E2E_DB)" --server local --no-config 2>/dev/null | tail -80 || true; \
+			echo "[e2e] Running domain test reducers (one case per call)..."; \
+			for _domain_reducer in $(E2E_DOMAIN_TEST_REDUCERS); do \
+				echo "[e2e] Calling $$_domain_reducer..."; \
+				if ! spacetime call "$(E2E_DB)" "$$_domain_reducer" --server local --no-config; then \
+					echo "[e2e] $$_domain_reducer failed — tail of SpacetimeDB logs:"; \
+					spacetime logs "$(E2E_DB)" --server local --no-config 2>/dev/null | tail -40 || true; \
 					exit 1; \
 				fi; \
 			done; \
-			echo "[e2e] Inventory and Analytics aggregate tests passed."; \
+			echo "[e2e] Domain reducer tests passed."; \
+			if [ "$${E2E_RUN_DOMAIN_AGGREGATES:-0}" = "1" ]; then \
+				for _aggregate_reducer in run_all_inventory_tests run_all_analytics_tests; do \
+					echo "[e2e] Calling $$_aggregate_reducer aggregate..."; \
+					if ! spacetime call "$(E2E_DB)" "$$_aggregate_reducer" --server local --no-config; then \
+						echo "[e2e] $$_aggregate_reducer failed — tail of SpacetimeDB logs:"; \
+						spacetime logs "$(E2E_DB)" --server local --no-config 2>/dev/null | tail -80 || true; \
+						exit 1; \
+					fi; \
+				done; \
+				echo "[e2e] Inventory and Analytics aggregate tests passed."; \
+			fi; \
+		else \
+			echo "[e2e] Skipping reducer/domain tests; browser fixture will seed a pristine database."; \
 		fi; \
 		echo "[e2e] Obtaining local SpacetimeDB owner token (with private-table SQL preflight)..."; \
 		STDB_SERVER_TOKEN="$$(E2E_STDB_HOST="$$E2E_STDB_HOST" STDB_MODULE="$(E2E_DB)" node "$$ROOT/scripts/e2e-local-stdb-token.mjs")"; \
