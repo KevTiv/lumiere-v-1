@@ -2,6 +2,7 @@ import {
   decodeQueryListResponse,
   parseQueryListResponse,
   QueryResponseDecodeError,
+  type QueryRow,
   type QueryRows,
 } from "./query-list"
 import {
@@ -35,7 +36,7 @@ export type LumiereApiClientConfig = {
 export type LumiereApiClient = {
   apiFetch: (input: string | URL | Request, init?: RequestInit) => Promise<Response>
   fetchQueryList: (path: string, errorMessage: string) => Promise<QueryRows>
-  fetchQueryListState: (path: string) => Promise<QueryResourceState<Record<string, unknown>>>
+  fetchQueryListState: (path: string) => Promise<QueryResourceState<QueryRow>>
   fetchQueryListAllowEmpty: (path: string) => Promise<QueryRows>
   parseQueryListResponse: typeof parseQueryListResponse
 }
@@ -76,7 +77,7 @@ export function createLumiereApiClient(config: LumiereApiClientConfig): LumiereA
     return parseQueryListResponse(json)
   }
 
-  async function fetchQueryListState(path: string): Promise<QueryResourceState<Record<string, unknown>>> {
+  async function fetchQueryListState(path: string): Promise<QueryResourceState<QueryRow>> {
     try {
       const response = await apiFetch(path)
       if (!response.ok) {
@@ -88,7 +89,7 @@ export function createLumiereApiClient(config: LumiereApiClientConfig): LumiereA
         if (row === null || typeof row !== "object" || Array.isArray(row)) {
           throw new QueryResponseDecodeError(`query response row ${index} must be an object`)
         }
-        return row as Record<string, unknown>
+        return row as QueryRow
       })
       return queryResourceRows(rows)
     } catch (error) {

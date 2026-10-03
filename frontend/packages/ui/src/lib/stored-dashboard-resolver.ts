@@ -1,5 +1,7 @@
 import type { DashboardWidget, GridWidth } from "./dashboard-types"
 
+type DashboardRecord = { [key: string]: unknown }
+
 export type StoredDashboardDataSources = Record<string, Record<string, unknown>[]>
 
 export type StoredDashboardSourceStatus =
@@ -82,7 +84,7 @@ function rowField(row: Record<string, unknown>, key: string): unknown {
   return undefined
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
+function isRecord(value: unknown): value is DashboardRecord {
   return value !== null && typeof value === "object" && !Array.isArray(value)
 }
 

@@ -2,6 +2,7 @@
 
 
 import { stdbBffCommandPost } from "@lumiere/stdb/commands"
+import type { JsonObject } from "@lumiere/api-client/json-object"
 import { resolveActionDraftRecordHref } from "@lumiere/erp-shared/action-draft-links"
 import { toCamelCase } from "@lumiere/erp-shared/row-values"
 import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
@@ -82,7 +83,7 @@ export type GatewayActionDraftWireDto = {
 export type GatewayActionDraft = {
   draftId: number
   reducerName: string
-  paramsJson: Record<string, unknown>
+  paramsJson: JsonObject
   confidence: number
   warnings: string[]
   summary: string
@@ -117,8 +118,8 @@ function normalizeWireJson(value: unknown): unknown {
   )
 }
 
-function normalizeWireParams(value: Record<string, unknown>): Record<string, unknown> {
-  return normalizeWireJson(value) as Record<string, unknown>
+function normalizeWireParams(value: JsonObject): JsonObject {
+  return normalizeWireJson(value) as JsonObject
 }
 
 export function normalizeGatewayActionDraftResponse(

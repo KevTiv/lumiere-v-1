@@ -135,6 +135,8 @@ import { OwnerReportsPanel } from "./owner-reports-panel"
 
 export { REPORTS_UI_REDUCERS } from "@/lib/reports-ui-reducers"
 
+type DashboardRecord = { [key: string]: unknown }
+
 interface ReportsClientProps {
   initialReports?: FinancialReport[]
   initialBalances?: TrialBalance[]
@@ -274,7 +276,7 @@ function ReportsClientLoaded({
     if (!viewDashboard) return []
     return widgetModelsForDashboard(
       viewDashboard,
-      dashboardWidgets as unknown as Record<string, unknown>[],
+      dashboardWidgets as unknown as DashboardRecord[],
     )
   }, [viewDashboard, dashboardWidgets])
 
