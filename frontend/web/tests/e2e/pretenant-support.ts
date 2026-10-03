@@ -113,16 +113,27 @@ export const CAPABILITIES = {
     ],
   },
   agentLoop: {
-    id: "agent-loop",
-    prerequisite: "Requires H4 bounded agent loop and event persistence (PR #23).",
+    id: "governed-proposal-loop",
+    prerequisite:
+      "Requires the live governed proposal/capability runtime plus GOV-01/GOV-05 capability admission; the retained agent_loop.rs interfaces are not an execution loop.",
     probes: [
-      { kind: "source", path: "ai-gateway/src/orchestrator/agent_loop.rs" },
+      {
+        kind: "source",
+        path: "ai-gateway/src/orchestrator/proposal_loop.rs",
+        contains: "GovernedCapabilityService",
+      },
+      {
+        kind: "source",
+        path: "ai-gateway/src/orchestrator/governed_services.rs",
+        contains: "GovernedCapabilityService",
+      },
       { kind: "ai-gateway" },
     ],
   },
   agentPolicy: {
     id: "agent-per-call-policy",
-    prerequisite: "Requires H5a per-call policy enforcement and approval stops (PR #24).",
+    prerequisite:
+      "Requires a live governed runtime plus GOV-01 current-authorization resolution and next-call revocation enforcement.",
     probes: [
       { kind: "source", path: "ai-gateway/src/orchestrator/invocation_policy.rs" },
       { kind: "ai-gateway" },
@@ -131,7 +142,7 @@ export const CAPABILITIES = {
   agentBudgetPersistence: {
     id: "agent-budget-persistence",
     prerequisite:
-      "Requires H5 durable agent budget/run-draft persistence after AI harness stack merges (PR #26).",
+      "Requires live GOV-02 spend/provider-attempt provisioning and GOV-03 exact run-correlated drafts; AG-09 additionally requires a fresh-STDB reconstruction drill.",
     probes: [
       { kind: "source", path: "spacetimedb/src/ai/spend.rs" },
       { kind: "reducer", pattern: /^reserve_ai_spend$/ },
