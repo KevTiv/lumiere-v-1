@@ -108,7 +108,8 @@ E2E_DOMAIN_TEST_REDUCERS := \
 	e2e-wipe-local-stdb e2e-single e2e-single-test e2e-p2p e2e-mvp-golden \
 	e2e-crm-isolation e2e-dx-test e2e-web-dev e2e-single-running \
 	e2e-pretenant pretenant-cert-stdb pretenant-cert-native \
-	init-stack docker-dev docker-dev-iot \
+	init-stack refresh-stack-tokens docker-dev docker-dev-iot \
+	register-stack-identities \
 	codegen check-codegen check-codegen-pinned check-contract-ir check-operation-history check-release-compatibility check-tenant-ownership check-storage-policy check-c2-commit-coverage check-cov00c-correctness-census check-cov00d-evidence-matrix check-cov02-seed-inventory check-cov02-first-org-fixture check-reducer-contracts-drift check-contracts-source-drift check-contracts-drift check-c9-isolation-matrix lint-trusted-route-boundaries \
 	clean-contracts-live-staging generate-presentation-schemas generate-presentation-contracts lint-reducer-call-literals api-server-run \
 	lint-no-magic-fk-zero lint-accounting-as-unknown-as lint-accounting-currency-refs \
@@ -1006,6 +1007,12 @@ schema-snapshot:
 
 init-stack:
 	STDB_MODULE="$(STDB_MODULE)" bash scripts/init-stack.sh
+
+refresh-stack-tokens:
+	bash scripts/init-stack.sh --refresh-tokens
+
+register-stack-identities:
+	node scripts/register-local-service-identities.mjs .env.docker
 
 docker-dev:
 	docker compose --env-file .env.docker -f docker-compose.dev.yml up --build
