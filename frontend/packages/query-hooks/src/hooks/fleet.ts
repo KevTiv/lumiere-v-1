@@ -260,13 +260,17 @@ function normalizedOptionalString(value: unknown): string {
 }
 
 function fleetOutcomeTag(value: unknown): string {
-  if (typeof value === "string") return value.toLowerCase()
+  const normalize = (tag: unknown) =>
+    String(tag ?? "")
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, "")
+  if (typeof value === "string") return normalize(value)
   if (value && typeof value === "object" && !Array.isArray(value)) {
     if ("tag" in value) {
-      return String((value as { tag?: unknown }).tag ?? "").toLowerCase()
+      return normalize((value as { tag?: unknown }).tag)
     }
     const keys = Object.keys(value)
-    if (keys.length === 1) return keys[0]!.toLowerCase()
+    if (keys.length === 1) return normalize(keys[0])
   }
   return ""
 }
@@ -462,7 +466,7 @@ export function resolveFleetHistoryEffect(
   const submittedTime = service ? expected.servicedAt : expected.inspectedAt
   const time = timestampMicros(historyField(row, service ? "servicedAt" : "inspectedAt", service ? "serviced_at" : "inspected_at"))
   const expectedTime = submittedTime && "none" in submittedTime
-    ? timestampMicros(historyField(row, "createDate", "create_date"))
+    ? timestampMicros(historyField(row, "createDate", "create_date")) ?? time
     : timestampMicros(submittedTime)
   const odometer = historyField(row, "odometerKm", "odometer_km")
   const notes = historyField(row, "notes")
@@ -501,7 +505,7 @@ export function resolveFleetHistoryEffect(
   }
   if (
     expected?.outcome != null &&
-    fleetOutcomeTag(row.outcome) !== expected.outcome.toLowerCase()
+    fleetOutcomeTag(row.outcome) !== fleetOutcomeTag(expected.outcome)
   ) {
     return null
   }

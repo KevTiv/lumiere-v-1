@@ -69,6 +69,12 @@
     "write_date",
     "metadata"
   ],
+  "ApplySubscriptionInvoicePaymentParams": [
+    "amount",
+    "payment_date",
+    "ref",
+    "memo"
+  ],
   "AccountAsset": [
     "parent_id",
     "account_analytic_id",
@@ -5131,6 +5137,11 @@
     "license_plate",
     "driver_name",
     "metadata"
+  ],
+  "GenerateSubscriptionInvoiceParams": [
+    "billing_run_key",
+    "journal_id",
+    "tax_account_id"
   ],
   "UpdateVehiclePositionParams": []
 }

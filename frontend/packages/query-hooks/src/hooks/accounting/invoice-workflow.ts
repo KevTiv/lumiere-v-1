@@ -5,7 +5,6 @@ import {
   RECONCILE_PAYMENT_AFFECTS,
   WorkflowError,
   invoiceWorkflow,
-  isPaymentReconciledWith,
   observePostedInvoice,
   observeSameRecord,
   paymentWorkflow,
@@ -46,6 +45,26 @@ export interface RegisterPaymentInput {
   isBill: boolean
 }
 
+export interface PaymentRegistrationProjection {
+  readonly id?: unknown
+  readonly companyId?: unknown
+  readonly company_id?: unknown
+  readonly state?: unknown
+}
+
+export interface RegisteredInvoiceProjection {
+  readonly id?: unknown
+  readonly companyId?: unknown
+  readonly company_id?: unknown
+  readonly moveType?: unknown
+  readonly move_type?: unknown
+  readonly state?: unknown
+  readonly paymentState?: unknown
+  readonly payment_state?: unknown
+  readonly amountResidual?: unknown
+  readonly amount_residual?: unknown
+}
+
 /** Payments read back from the canonical list, bypassing any cached view. */
 async function observePayment(
   paymentId: bigint | string,
@@ -76,17 +95,89 @@ export interface ReconciliationMoveProjection {
 
 function stateTag(value: unknown): string {
   if (value == null) return ""
-  if (typeof value === "string") return value.toLowerCase()
+  if (typeof value === "string") return value.toLowerCase().replace(/[^a-z0-9]/g, "")
   if (typeof value === "object" && !Array.isArray(value) && "tag" in value) {
-    return String((value as { tag?: unknown }).tag ?? "").toLowerCase()
+    return String((value as { tag?: unknown }).tag ?? "")
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, "")
   }
-  return String(value).toLowerCase()
+  return String(value).toLowerCase().replace(/[^a-z0-9]/g, "")
 }
 
 function finiteNonnegative(value: unknown): boolean {
   if (value == null || value === "") return false
   const number = Number(value)
   return Number.isFinite(number) && number >= 0
+}
+
+/**
+ * Confirm payment registration from fields available to the operator: the exact payment and every
+ * exact invoice/bill must share a company, be posted, and expose a settled payment state/residual.
+ * The payment's reconciled-id arrays are field-policy protected and are therefore not a usable
+ * browser readback contract for ordinary accounting operators.
+ */
+export function resolveRegisteredPaymentEffect(
+  payments: readonly PaymentRegistrationProjection[],
+  moves: readonly RegisteredInvoiceProjection[],
+  input: RegisterPaymentInput,
+): ObservedTransition | null {
+  if (input.invoiceIds.length === 0) return null
+
+  const exactRow = <T extends { readonly id?: unknown }>(
+    rows: readonly T[],
+    id: bigint,
+    resource: string,
+  ): T | null => {
+    const matches = rows.filter((row) => parseStrictU64(row.id) === id)
+    if (matches.length > 1) {
+      throw new AmbiguousOperationEffectError(
+        `Expected one ${resource} ${id}, found ${matches.length}`,
+      )
+    }
+    return matches[0] ?? null
+  }
+
+  const payment = exactRow(payments, input.paymentId, "account payment")
+  const paymentCompany = parseStrictU64(payment?.companyId ?? payment?.company_id)
+  if (!payment || paymentCompany == null || stateTag(payment.state) !== "paid") return null
+
+  const expectedMoveTypes = input.isBill
+    ? new Set(["ininvoice", "inrefund"])
+    : new Set(["outinvoice", "outrefund"])
+
+  for (const invoiceId of new Set(input.invoiceIds)) {
+    const move = exactRow(moves, invoiceId, input.isBill ? "bill" : "invoice")
+    if (!move) return null
+
+    const company = parseStrictU64(move.companyId ?? move.company_id)
+    const paymentState = stateTag(move.paymentState ?? move.payment_state)
+    const residualValue = move.amountResidual ?? move.amount_residual
+    const residual = Number(residualValue)
+    if (
+      company !== paymentCompany ||
+      stateTag(move.state) !== "posted" ||
+      !expectedMoveTypes.has(stateTag(move.moveType ?? move.move_type)) ||
+      !["paid", "partial"].includes(paymentState) ||
+      !finiteNonnegative(residualValue) ||
+      (paymentState === "paid" && residual !== 0) ||
+      (paymentState === "partial" && residual === 0)
+    ) {
+      return null
+    }
+  }
+
+  return {
+    outcome: "applied",
+    next: recordRef(paymentWorkflow.resource, input.paymentId, paymentWorkflow.module),
+  }
+}
+
+async function readRegisteredPaymentEffect(input: RegisterPaymentInput) {
+  const [payments, moves] = await Promise.all([
+    fetchQueryList("/api/query/account-payments", "Failed to read registered payment"),
+    fetchQueryList("/api/query/account-moves", "Failed to read reconciled invoices"),
+  ])
+  return resolveRegisteredPaymentEffect(payments, moves, input) ?? {}
 }
 
 /** Resolve only the exact posted payment/invoice pair in one company. */
@@ -188,8 +279,7 @@ export function useInvoiceToPaymentWorkflow(
       id: "accounting.payment.register",
       command: registerPaymentOnInvoiceCommand,
       affects: RECONCILE_PAYMENT_AFFECTS,
-      observe: ({ paymentId, invoiceIds, isBill }) =>
-        observePayment(paymentId, isPaymentReconciledWith(invoiceIds, isBill)),
+      observe: readRegisteredPaymentEffect,
     }),
     [],
   )

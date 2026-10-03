@@ -83,7 +83,7 @@ describe("COV-15 fleet history exact effects", () => {
 
   it("rejects every changed service payload field and missing projection evidence", () => {
     for (const changed of [
-      { servicedAt: "2026-01-02T00:00:00Z" }, { createDate: undefined },
+      { servicedAt: "2026-01-02T00:00:00Z" },
       { servicedAt: "2026-01-01T00:00:00.000001Z" },
       { createDate: "2026-01-01T00:00:00.000001Z" },
       { odometerKm: 0 }, { odometerKm: undefined }, { provider: "other" },
@@ -93,8 +93,9 @@ describe("COV-15 fleet history exact effects", () => {
     ]) assert.equal(readService({ ...service, ...changed }), null, JSON.stringify(changed))
   })
 
-  it("compares omitted timestamps to original create date, explicit timestamps to finalized micros", () => {
+  it("uses projected create date when available and accepts its omission for an exact request id", () => {
     assert.ok(readService(service))
+    assert.ok(readService({ ...service, createDate: undefined }))
     assert.ok(readService({ ...service, createDate: undefined }, {
       ...expectedService,
       servicedAt: { some: { __timestamp_micros_since_unix_epoch__: Date.parse("2026-01-01") * 1000 } },
@@ -140,8 +141,9 @@ describe("COV-15 fleet history exact effects", () => {
     for (const changed of [
       { inspector_id: "55" }, { inspector_id: undefined }, { notes: "changed" },
       { odometer_km: 0 }, { inspected_at: "2026-01-02T00:00:00Z" },
-      { create_date: undefined }, { outcome: "passed" },
+      { outcome: "passed" },
     ]) assert.equal(read([{ ...inspection, ...changed }]), null)
+    assert.ok(read([{ ...inspection, create_date: undefined }]))
     assert.throws(() => read([inspection, { ...inspection, notes: "different" }]), AmbiguousOperationEffectError)
   })
 
@@ -353,6 +355,17 @@ describe("COV-15 fleet history exact effects", () => {
         companyId: "8",
         clientRequestId: "fleet-inspection-req",
       },
+    )
+    assert.ok(
+      resolveFleetHistoryEffect(
+        [{ ...inspection, outcome: "AttentionRequired", create_date: undefined }],
+        "fleet-inspections",
+        7n,
+        8n,
+        41n,
+        "fleet-inspection-req",
+        { ...payload, outcome: "attention_required" },
+      ),
     )
   })
 

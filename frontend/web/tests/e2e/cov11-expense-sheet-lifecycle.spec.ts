@@ -25,6 +25,56 @@ const some = <T>(value: T) => ({ some: value })
 const none = { none: [] as [] }
 type Row = Record<string, unknown>
 
+/**
+ * Trusted fixture call for linking the finance persona to its employee row.
+ * The session compatibility route cannot faithfully encode Option<Identity>.
+ */
+async function callOwnerRaw(reducer: string, args: unknown[]): Promise<void> {
+  const host = (
+    process.env.E2E_STDB_HOST ??
+    process.env.STDB_HOST ??
+    "http://127.0.0.1:3000"
+  ).replace(/\/$/, "")
+  const moduleName = (
+    process.env.STDB_MODULE ?? process.env.E2E_STDB_MODULE
+  )?.trim()
+  const token = process.env.STDB_SERVER_TOKEN?.trim()
+  if (!moduleName || !token) {
+    throw new Error(
+      `trusted fixture call ${reducer} requires STDB_MODULE and STDB_SERVER_TOKEN`,
+    )
+  }
+  const response = await fetch(
+    `${host}/v1/database/${moduleName}/call/${reducer}`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(args),
+    },
+  )
+  if (!response.ok) {
+    throw new Error(
+      `trusted fixture reducer ${reducer} failed (${response.status}): ${await response.text()}`,
+    )
+  }
+}
+
+function identityHex(value: unknown): string {
+  if (value && typeof value === "object") {
+    const record = value as Record<string, unknown>
+    return identityHex(
+      record.hex ?? record.Hex ?? record.__identity__ ?? "",
+    )
+  }
+  return String(value ?? "")
+    .trim()
+    .replace(/^0x/i, "")
+    .toLowerCase()
+}
+
 function stateTag(value: unknown): string {
   if (typeof value === "string") return value
   if (value && typeof value === "object" && !Array.isArray(value)) {
@@ -161,12 +211,13 @@ test.describe(
           accounting_date: none,
         },
       ])
-      const sheetId = scalarQueryId(
-        (await rows(page, "expense-sheets")).find(
-          (row) => row.name === sheetName,
-        )?.id,
+      const sheet = (await rows(page, "expense-sheets")).find(
+        (row) => row.name === sheetName,
       )
+      const sheetId = scalarQueryId(sheet?.id)
+      const companyId = scalarQueryId(sheet?.companyId ?? sheet?.company_id)
       if (sheetId == null) throw new Error("created expense sheet not found")
+      if (companyId == null) throw new Error("created expense sheet has no company")
 
       await callReducerBff(page, "create_expense", [
         organizationId,
@@ -177,7 +228,8 @@ test.describe(
           date: {
             __timestamp_micros_since_unix_epoch__: Date.now() * 1000,
           },
-          unit_amount: 73.17 + (Date.now() % 1000) / 1000,
+          // Guarded-action snapshots use exact currency scale 2.
+          unit_amount: 73.17,
           quantity: 1,
           currency_id: currencyId,
           product_id: none,
@@ -244,6 +296,78 @@ test.describe(
           "fixture.finance@example.test",
           PERSONA_PASSWORD,
         )
+        const financeIdentity = identityHex(
+          (await financeContext.cookies()).find(
+            (cookie) => cookie.name === "stdb_identity",
+          )?.value,
+        )
+        expect(financeIdentity).toMatch(/^[0-9a-f]{64}$/)
+
+        const existingFinanceEmployee = (await rows(page, "employees")).find(
+          (employee) =>
+            identityHex(employee.userId ?? employee.user_id) === financeIdentity,
+        )
+        if (!existingFinanceEmployee) {
+          const financeEmployeeName = smokeName("cov11-finance-approver")
+          await callReducerBff(page, "create_employee", [
+            organizationId,
+            {
+              company_id: some(companyId),
+              name: financeEmployeeName,
+              job_id: none,
+              department_id: none,
+              employment_type: { tag: "FullTime" },
+              work_email: some("fixture.finance@example.test"),
+              employee_number: none,
+              job_title: some("Expense approver"),
+              parent_id: none,
+              coach_id: none,
+              work_phone: none,
+              mobile_phone: none,
+              work_location: none,
+              work_contact_partner_id: none,
+              date_hired: none,
+              gender: none,
+              birthday: none,
+              marital: none,
+              emergency_contact: none,
+              emergency_phone: none,
+              barcode: none,
+              pin: none,
+              image_url: none,
+              color: none,
+              is_active: true,
+              metadata: none,
+            },
+          ])
+          const financeEmployeeId = scalarQueryId(
+            (await rows(page, "employees")).find(
+              (employee) => employee.name === financeEmployeeName,
+            )?.id,
+          )
+          if (financeEmployeeId == null) {
+            throw new Error("created finance employee not found")
+          }
+          await callOwnerRaw("update_employee", [
+            organizationId,
+            companyId,
+            financeEmployeeId,
+            {
+              name: none,
+              job_title: none,
+              job_id: none,
+              department_id: none,
+              parent_id: none,
+              work_email: none,
+              work_phone: none,
+              mobile_phone: none,
+              work_location: none,
+              work_contact_partner_id: none,
+              employment_type: none,
+              user_id: some({ __identity__: `0x${financeIdentity}` }),
+            },
+          ])
+        }
         const approveAction = await openSheetAction(
           financePage,
           sheetId,
@@ -257,7 +381,7 @@ test.describe(
           ),
           approveAction.click(),
         ])
-        expect(approved.ok()).toBe(true)
+        expect(approved.ok(), await approved.text()).toBe(true)
         approvedRequest = approved.request()
 
         await expect

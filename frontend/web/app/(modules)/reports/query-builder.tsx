@@ -29,6 +29,7 @@ import {
 import { apiFetch } from "@lumiere/query-hooks/http"
 import { useStoredDashboardDataSources } from "@/hooks/use-stored-dashboard-data-sources"
 import { Plus, Save, Trash2 } from "lucide-react"
+import { queryBuilderSourceState } from "./query-builder-source-state"
 
 type QueryBuilderProps = {
   organizationId: bigint
@@ -164,6 +165,7 @@ export function QueryBuilder({ organizationId, dashboards }: QueryBuilderProps) 
   const models = useMemo(() => (model ? [model] : []), [model])
   const { dataSources, isLoading } = useStoredDashboardDataSources(organizationId, models)
   const rows = useMemo(() => (model ? dataSources[model] ?? [] : []), [dataSources, model])
+  const sourceState = queryBuilderSourceState(model, isLoading, rows.length)
 
   const fields = useMemo(() => discoverFields(rows), [rows])
   const numericFields = useMemo(() => fields.filter((f) => f.numeric), [fields])
@@ -307,11 +309,17 @@ export function QueryBuilder({ organizationId, dashboards }: QueryBuilderProps) 
                   ))}
                 </SelectContent>
               </Select>
-              {model ? (
-                <p className="text-xs text-muted-foreground">
-                  {isLoading
-                    ? "…"
-                    : t("reports.queryBuilder.rowsLoaded", { count: rows.length })}
+              {sourceState === "loading" ? (
+                <p
+                  className="text-xs text-muted-foreground"
+                  role="status"
+                  data-testid="qb-source-loading"
+                >
+                  {t("common.loading", "Loading…")}
+                </p>
+              ) : sourceState === "empty" || sourceState === "ready" ? (
+                <p className="text-xs text-muted-foreground" data-testid="qb-source-row-count">
+                  {t("reports.queryBuilder.rowsLoaded", { count: rows.length })}
                 </p>
               ) : null}
             </div>
@@ -601,7 +609,22 @@ export function QueryBuilder({ organizationId, dashboards }: QueryBuilderProps) 
           <CardTitle>{t("reports.queryBuilder.preview")}</CardTitle>
         </CardHeader>
         <CardContent>
-          {previewWidget ? (
+          {sourceState === "loading" ? (
+            <p
+              className="text-sm text-muted-foreground"
+              role="status"
+              data-testid="qb-preview-loading"
+            >
+              {t("common.loading", "Loading…")}
+            </p>
+          ) : sourceState === "empty" ? (
+            <p
+              className="text-sm text-muted-foreground"
+              data-testid="qb-preview-empty"
+            >
+              {t("reports.queryBuilder.previewNoRows")}
+            </p>
+          ) : previewWidget ? (
             <div className="grid grid-cols-1 gap-4">
               <DashboardWidgetRenderer
                 widget={previewWidget}
@@ -611,9 +634,7 @@ export function QueryBuilder({ organizationId, dashboards }: QueryBuilderProps) 
             </div>
           ) : (
             <p className="text-sm text-muted-foreground">
-              {model && rows.length === 0 && !isLoading
-                ? t("reports.queryBuilder.previewNoRows")
-                : t("reports.queryBuilder.previewEmpty")}
+              {t("reports.queryBuilder.previewEmpty")}
             </p>
           )}
         </CardContent>

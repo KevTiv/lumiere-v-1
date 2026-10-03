@@ -65,7 +65,6 @@ function PosClientLoaded({
   const moduleConfig = useMemo(() => posModuleConfig(t), [t])
   const [activeTab, setActiveTab] = useState("register")
   const [posAction, setPosAction] = useState<PosFormAction | null>(null)
-
   const pos = usePOS(
     orgId,
     operatingCompanyId,
@@ -134,7 +133,11 @@ function PosClientLoaded({
   ]
 
   return (
-    <div className="flex h-full flex-col gap-4">
+    <div
+      className="flex h-full flex-col gap-4"
+      data-testid="module-view-pos"
+      data-hydrated={pos.isHydrated ? "true" : "false"}
+    >
       <DashboardHeader title={moduleConfig.title} description={moduleConfig.description} />
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="flex min-h-0 flex-1 flex-col">

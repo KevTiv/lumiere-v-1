@@ -8,8 +8,8 @@ import {
   fetchSessionOrganizationId,
   fillField,
   gotoModule,
+  openEntityCreate,
   scalarQueryId,
-  selectModuleTab,
   signIn,
   smokeName,
   submitForm,
@@ -85,13 +85,19 @@ function enumTag(value: unknown): string {
 }
 
 function outcomeTag(value: unknown): string {
-  if (typeof value === "string") return value.toLowerCase()
+  const normalize = (tag: unknown) =>
+    String(tag ?? "")
+      .replace(/([a-z0-9])([A-Z])/g, "$1_$2")
+      .replace(/[^a-z0-9]+/gi, "_")
+      .replace(/^_+|_+$/g, "")
+      .toLowerCase()
+  if (typeof value === "string") return normalize(value)
   if (value && typeof value === "object" && !Array.isArray(value)) {
     if ("tag" in value) {
-      return String((value as { tag?: unknown }).tag ?? "").toLowerCase()
+      return normalize((value as { tag?: unknown }).tag)
     }
     const keys = Object.keys(value)
-    if (keys.length === 1) return keys[0]!.toLowerCase()
+    if (keys.length === 1) return normalize(keys[0])
   }
   return ""
 }
@@ -185,12 +191,13 @@ test.describe(
       ])
       const serviceTypeId = await waitForServiceType(page, serviceTypeName)
 
-      await gotoModule(page, "/fleet", "fleet")
-      await selectModuleTab(page, "fleet", "fleet-service-records")
-      await page.getByTestId("module-create-fleet-service-records").click()
-      await expect(
-        page.getByTestId("form-modal-record-fleet-service"),
-      ).toBeVisible({ timeout: 15_000 })
+      await openEntityCreate(
+        page,
+        "/fleet",
+        "fleet",
+        "fleet-service-records",
+        "record-fleet-service",
+      )
 
       await chooseSelectOptionByValue(page, "vehicle_id", vehicleId)
       await chooseSelectOptionByValue(
@@ -312,12 +319,13 @@ test.describe(
         ),
       ).toEqual(serviceEffect)
 
-      await gotoModule(page, "/fleet", "fleet")
-      await selectModuleTab(page, "fleet", "fleet-inspections")
-      await page.getByTestId("module-create-fleet-inspections").click()
-      await expect(
-        page.getByTestId("form-modal-record-fleet-inspection"),
-      ).toBeVisible({ timeout: 15_000 })
+      await openEntityCreate(
+        page,
+        "/fleet",
+        "fleet",
+        "fleet-inspections",
+        "record-fleet-inspection",
+      )
 
       await chooseSelectOptionByValue(page, "vehicle_id", vehicleId)
       await chooseSelectOptionByValue(
