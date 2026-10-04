@@ -1,4 +1,5 @@
 "use client"
+import { projectTimesheetsHref } from "@lumiere/erp-shared/record-links"
 import { mapDashboardWidgets, withDashboardSections } from "@lumiere/ui/lib/dashboard-sections"
 
 import { useMemo, useState, useCallback, useEffect } from "react"
@@ -911,7 +912,7 @@ function ProjectsClientLoaded({
               Budget: Math.round(Number(m.budgetPlanned ?? 0)),
               Spent: Math.round(Number(m.budgetActual ?? 0)),
               Margin: Math.round(Number(m.marginPercent ?? 0)),
-              href: `/projects?tab=timesheets&projectId=${m.projectId ?? ""}`,
+              href: m.projectId == null ? "/projects?tab=timesheets" : projectTimesheetsHref(String(m.projectId)),
             }))
           return {
             ...w,
