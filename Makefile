@@ -1300,7 +1300,10 @@ publish-contracts: generate-presentation-contracts schema-snapshot generate-stdb
 # Release CI performs two complete generation passes before this target. Keep
 # publication separate so a verified staging tree is not regenerated a third
 # time. This target is also useful after an explicit local `make check-codegen`.
-publish-contracts-prepared:
+# The presentation TypeScript contracts are not part of that staging tree (the
+# generation passes only emit their schemas), so produce them here: the publisher
+# requires them and they need only node plus the frontend dependencies.
+publish-contracts-prepared: generate-presentation-contracts
 	@if [ -z "$(VERSION)" ]; then echo "usage: make publish-contracts-prepared VERSION=x.y.z" >&2; exit 1; fi
 	@test -f .contracts-staging/ir/lumiere-contract-ir-v2.json || \
 		(echo "prepared contracts staging is missing; run make check-codegen first" >&2; exit 1)
