@@ -7,6 +7,7 @@
     ".": "./src/index.ts",
     "./node-sqlite": "./src/node-sqlite.ts",
     "./browser": "./src/browser.ts",
+    "./offline-grant": "./src/offline-grant.ts",
     "./opfs-sqlite": "./src/opfs-sqlite.ts"
   },
   "scripts": {

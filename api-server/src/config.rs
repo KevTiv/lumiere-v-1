@@ -11,6 +11,8 @@ use crate::organization_placement::{
 
 #[derive(Clone, Debug)]
 pub struct Config {
+    /// Optional explicit offline-read policy. Debug output redacts the signing key.
+    pub offline_grants: Option<std::sync::Arc<crate::offline::grant::OfflineGrantSigner>>,
     pub port: u16,
     pub stdb_host: String,
     pub stdb_module: String,
@@ -339,6 +341,7 @@ impl Config {
         }
 
         Ok(Config {
+            offline_grants: crate::offline::grant::OfflineGrantSigner::from_env()?,
             port,
             stdb_host,
             stdb_module,

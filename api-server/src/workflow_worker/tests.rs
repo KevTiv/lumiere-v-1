@@ -123,6 +123,7 @@ fn outbox_payload_parses_camel_and_snake() {
 #[test]
 fn dispatch_allowlist_fail_closed_with_webhook() {
     let mut config = Config {
+        offline_grants: None,
         port: 1,
         stdb_host: String::new(),
         stdb_module: String::new(),

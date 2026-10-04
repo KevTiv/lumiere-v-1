@@ -7,10 +7,17 @@ import { buildCategoryApp } from "../../scripts/build-category-app.ts";
 import { fileURLToPath } from "node:url";
 import { scope, snapshot, pull } from "./fixture.ts";
 import { projectionSchemaHash } from "../../src/generated/product-category.ts";
+import { grantFixture } from "../grant-fixture.ts";
 
 const outputs = new Map<string, Uint8Array>();
 const app = await buildCategoryApp(
   await mkdtemp(path.join(tmpdir(), "lumiere-category-app-")),
+  null,
+);
+const signer = await grantFixture();
+const grantedApp = await buildCategoryApp(
+  await mkdtemp(path.join(tmpdir(), "lumiere-granted-app-")),
+  signer.trust,
 );
 for (const [url, entry] of [
   ["/client.js", "tests/browser/client.ts"],
@@ -36,10 +43,21 @@ let delay = false;
 let actor = "actor-a";
 let swGeneration = "initial";
 let missingAsset = false;
+let grantsEnabled = false;
+let grantTtl = 3600;
+let grantStatus = 200;
 const waiting = new Set<() => void>();
 const server = createServer(async (request, response) => {
   const url = new URL(request.url ?? "/", "http://127.0.0.1:4179");
   response.setHeader("Cache-Control", "no-store");
+  if (url.pathname === "/fixture/grants") {
+    grantsEnabled = url.searchParams.get("enabled") === "true";
+    grantTtl = Number(url.searchParams.get("ttl") ?? 3600);
+    grantStatus = Number(url.searchParams.get("status") ?? 200);
+    response.end("ok");
+    return;
+  }
+  const activeApp = grantsEnabled ? grantedApp : app;
   if (url.pathname === "/fixture/sw-generation") {
     swGeneration = url.searchParams.get("value") ?? "initial";
     response.end("ok");
@@ -52,7 +70,7 @@ const server = createServer(async (request, response) => {
   }
   if (url.pathname === "/fixture/app") {
     response.setHeader("Content-Type", "application/json");
-    response.end(JSON.stringify(app));
+    response.end(JSON.stringify(activeApp));
     return;
   }
   if (url.pathname === "/fixture/actor") {
@@ -74,14 +92,16 @@ const server = createServer(async (request, response) => {
       return;
     }
     try {
-      let bytes = await readFile(path.join(app.output, name));
+      let bytes = await readFile(path.join(activeApp.output, name)).catch(() =>
+        readFile(path.join((grantsEnabled ? app : grantedApp).output, name)),
+      );
       if (name === "sw.js" && swGeneration !== "initial")
         bytes = Buffer.from(
           bytes
             .toString()
             .replace(
-              `lumiere-category-shell-${app.version}`,
-              `lumiere-category-shell-${app.version}-${swGeneration}`,
+              `lumiere-category-shell-${activeApp.version}`,
+              `lumiere-category-shell-${activeApp.version}-${swGeneration}`,
             ),
         );
       response.setHeader(
@@ -142,6 +162,34 @@ const server = createServer(async (request, response) => {
         });
       });
     const currentScope = isApp ? { ...scope, actorId: actor } : scope;
+    if (url.pathname.endsWith("/grant")) {
+      if (!grantsEnabled || grantStatus !== 200) {
+        response.writeHead(grantsEnabled ? grantStatus : 404);
+        response.end("{}");
+        return;
+      }
+      if (
+        url.searchParams.get("authorizationVersion") !==
+        currentScope.authorizationVersion
+      ) {
+        response.writeHead(409);
+        response.end("{}");
+        return;
+      }
+      const issuedAt = Math.floor(Date.now() / 1000);
+      response.end(
+        JSON.stringify(
+          await signer.sign({
+            ...signer.claims,
+            audience: "http://127.0.0.1:4179",
+            scope: currentScope,
+            issuedAt,
+            expiresAt: issuedAt + grantTtl,
+          }),
+        ),
+      );
+      return;
+    }
     const result = url.pathname.endsWith("/scope")
       ? { scope: currentScope, schemaHash: projectionSchemaHash }
       : url.pathname.endsWith("/snapshot")
