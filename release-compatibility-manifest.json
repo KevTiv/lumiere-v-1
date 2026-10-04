@@ -5,16 +5,16 @@
     "ir_version": 2,
     "ir_path": "ir/lumiere-contract-ir-v2.json",
     "pin_path": "ir/PIN.json",
-    "artifact_sha256": "e3b816f035eaed04449320636d1da00f81350fa9b0b013235d013c8e1163618f",
+    "artifact_sha256": "7c6197f588cd5a19ef9e1a52c8a397a959aee566d1820c4bd2f080287e87f61f",
     "schema_hash": "sha256:13be7cb717bee0761e3f3f7842fe78acd330cf04a6b919fb10c8c04748c82194",
-    "source_commit": "f38f0be5d0a4bd4c4b14e0422a34800690ccbb1d",
+    "source_commit": "2ed5d1296e790273e6809c59f34cd908e02ca4e7",
     "source_repository": "https://github.com/KevTiv/lumiere-v-1"
   },
   "lumiere_contracts": {
     "package": "lumiere-contracts",
-    "version": "0.3.81",
-    "tag": "v0.3.81",
-    "revision": "6fc1086a036797067ecb29dd113e13c0a82a9bca",
+    "version": "0.3.82",
+    "tag": "v0.3.82",
+    "revision": "ef44b2111845cd56df1dcf4dbd1d6d13426dc8a4",
     "repository": "ssh://git@github.com/KevTiv/lumiere-contracts.git"
   },
   "operation_history": {
@@ -33,10 +33,10 @@
     "migration_name": "0001_durable_projection",
     "sql_path": "manifests/pg_ddl/migrations/0001_durable_projection.sql",
     "manifest_path": "manifests/durable-pg-schema-manifest.json",
-    "checksum": "sha256:e8b8177d16a0408b13772fc87d5346f83b0d9251b1ab9679a61575c9a0b09a43",
+    "checksum": "sha256:5598834cc650011744abb9b9ad090e6ba09bfc824bc6d853f89f34930ef8d9ab",
     "application_catalog_path": "api-server/src/cold_tier/migrate.rs",
     "application_catalog_version": 11,
-    "application_catalog_checksum": "sha256:f7d153d0116fce7950f452dd1c82ec9fe47ae345b2603ca5d65ebcb46f6ffd5f"
+    "application_catalog_checksum": "sha256:a45f4ea1ae3e5b7f7093960dec0eb1ea475741b7f0e5d6380c5aea21bcf65ab5"
   },
   "services": {
     "api_server": {
@@ -51,7 +51,7 @@
   "minimum_client_contract": {
     "version": "ir-v2",
     "ir_version": 2,
-    "generated_contract_release": "0.3.81"
+    "generated_contract_release": "0.3.82"
   },
   "deployment": {
     "config_generation": 2,
