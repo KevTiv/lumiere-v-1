@@ -775,14 +775,14 @@ function SubscriptionsClientLoaded({
                 customTabs: [{
                   id: "handoffs",
                   label: "Billing run invoices & reconciled payments",
-                  content: (record: Record<string, unknown>) => billingRunsLoading || accountMovesLoading
+                  content: (record) => billingRunsLoading || accountMovesLoading
                     ? <p>Loading linked records…</p>
                     : <CrossRecordLinks testIdPrefix="subscription-handoff"
                         result={billingRunsError || accountMovesError
                           ? { status: "unavailable", links: [], reason: "Linked billing records are unavailable" }
                           : subscriptionRecordLinks(record, { organizationId: orgId, companyId: operatingCompanyId },
-                              billingRuns as unknown as Record<string, unknown>[], accountMoves as unknown as Record<string, unknown>[],
-                              accountPaymentsError || accountPaymentsLoading ? undefined : accountPayments as unknown as Record<string, unknown>[])}
+                              billingRuns, accountMoves,
+                              accountPaymentsError || accountPaymentsLoading ? undefined : accountPayments)}
                       />,
                 }],
               },

@@ -1224,7 +1224,7 @@ function PurchasingClientLoaded({
               result={accountMovesError || stockPickingsError
                 ? { status: "unavailable", links: [], reason: "Linked records are unavailable" }
                 : purchaseOrderLinks(record, { organizationId: orgId, companyId: operatingCompanyId },
-                    stockPickings as unknown as Record<string, unknown>[], accountMoves as unknown as Record<string, unknown>[])}
+                    stockPickings, accountMoves)}
             />
           ),
         },

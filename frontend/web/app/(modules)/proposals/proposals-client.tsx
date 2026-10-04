@@ -392,11 +392,11 @@ function ProposalsClientLoaded({ initialProposals, organizationId }: ProposalsCl
               customTabs: [{
                 id: "handoffs",
                 label: "Sale order",
-                content: (record: Record<string, unknown>) => saleOrdersLoading ? <p>Loading linked records…</p> : (
+                content: (record) => saleOrdersLoading ? <p>Loading linked records…</p> : (
                   <CrossRecordLinks testIdPrefix="proposal-handoff"
                     result={saleOrdersError
                       ? { status: "unavailable", links: [], reason: "Linked sales records are unavailable" }
-                      : proposalOrderLinks(record, { organizationId: orgId, companyId: operatingCompanyId }, saleOrders as unknown as Record<string, unknown>[])}
+                      : proposalOrderLinks(record, { organizationId: orgId, companyId: operatingCompanyId }, saleOrders)}
                   />
                 ),
               }],
