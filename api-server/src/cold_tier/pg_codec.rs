@@ -560,6 +560,29 @@ pub(crate) fn snake_to_camel(s: &str) -> String {
     out
 }
 
+/// SpacetimeDB row key for a generated PostgreSQL column.
+///
+/// Row JSON produced by the module (`RowChange::upsert_stdb_row`) uses the Rust
+/// field names, which differ from the generated column names for Rust keywords
+/// (`type` -> `type_`) and for digit-adjacent identifiers (`street_2` ->
+/// `street2`). Reconstruction writes these keys and projection reads them, so
+/// the mapping lives here once.
+pub(crate) fn rust_field_name(column_name: &str) -> &str {
+    match column_name {
+        "cost_per_1_k_tokens" => "cost_per_1k_tokens",
+        "iso_3" => "iso3",
+        "kpi_1_month_mrr" => "kpi_1month_mrr",
+        "kpi_3_months_mrr" => "kpi_3months_mrr",
+        "kpi_12_months_mrr" => "kpi_12months_mrr",
+        "normalized_e_164" => "normalized_e164",
+        "ref" => "ref_",
+        "show_lots_m_2_o" => "show_lots_m2o",
+        "street_2" => "street2",
+        "type" => "type_",
+        name => name,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
