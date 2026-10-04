@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "resource": "product-categories",
+  "table": "product_category",
+  "fields": [
+    "id",
+    "organization_id",
+    "company_id",
+    "name",
+    "parent_id",
+    "sequence"
+  ],
+  "mode": "read-only"
+}

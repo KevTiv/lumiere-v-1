@@ -1010,6 +1010,18 @@ docker-dev-iot:
 
 codegen: schema-snapshot
 	cargo run -p lumiere-codegen
+	python3 scripts/generate-offline-projection.py .contracts-staging/manifests/lumiere-schema-manifest.json
+
+# Offline artifacts consume the existing Rust schema manifest. Override the
+# input for fixture/local checks; production generation uses coherent staging.
+.PHONY: generate-offline-projection check-offline-projection
+OFFLINE_SCHEMA_MANIFEST ?= .contracts-staging/manifests/lumiere-schema-manifest.json
+generate-offline-projection:
+	python3 scripts/generate-offline-projection.py $(OFFLINE_SCHEMA_MANIFEST)
+
+check-offline-projection:
+	python3 scripts/generate-offline-projection.py $(OFFLINE_SCHEMA_MANIFEST) --check
+	PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts/tests/test_offline_projection.py
 
 check-agent-capabilities: codegen
 	python3 scripts/verify-agent-capability-artifact.py .contracts-staging/ir/agent-capability-registry-v1.json
@@ -1072,7 +1084,9 @@ check-c2-commit-coverage:
 	python3 lumiere-codegen/tests/test_c2_commit_coverage.py
 
 check-codegen: codegen check-contract-ir check-tenant-ownership check-storage-policy check-c2-commit-coverage check-c8-contract-ratchet lint-reducer-call-literals lint-trusted-route-boundaries
+	$(MAKE) check-offline-projection
 	@git add -N \
+		frontend/packages/offline/src/generated/product-category.ts \
 		frontend/packages/stdb/src/query-resource-row-type.json \
 		frontend/packages/stdb/src/query-row-map.ts \
 		frontend/packages/stdb/src/generated/org-subscription-descriptors.ts \
@@ -1081,6 +1095,7 @@ check-codegen: codegen check-contract-ir check-tenant-ownership check-storage-po
 		crates/stdb-auth/assets/query_exec_non_registry.json \
 		2>/dev/null || true
 	@git diff --exit-code -- \
+		frontend/packages/offline/src/generated/product-category.ts \
 		frontend/packages/stdb/src/query-resource-row-type.json \
 		frontend/packages/stdb/src/query-row-map.ts \
 		frontend/packages/stdb/src/generated/org-subscription-descriptors.ts \
@@ -1094,6 +1109,7 @@ check-codegen: codegen check-contract-ir check-tenant-ownership check-storage-po
 # must not couple ordinary Rust checks to whichever module is currently deployed.
 check-codegen-pinned: check-agent-capabilities-pinned check-operation-history-pinned check-release-compatibility check-tenant-ownership check-c2-commit-coverage check-c8-contract-ratchet lint-reducer-call-literals lint-trusted-route-boundaries
 	python3 scripts/verify-contract-ir.py .contracts-staging/ir/lumiere-contract-ir-v2.json --require-clean
+	$(MAKE) check-offline-projection
 	python3 lumiere-codegen/tests/test_contract_ir_pin.py
 	node scripts/bootstrap-storage-policies.mjs --check
 	@git diff --exit-code -- \

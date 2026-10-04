@@ -292,6 +292,13 @@ jobs:
       - name: Unit tests (erp-shared)
         run: pnpm --dir packages/erp-shared test
 
+      - name: Unit tests (offline SQLite projection)
+        run: pnpm --dir packages/offline test
+
+      - name: Offline projection emitter tests
+        working-directory: .
+        run: PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts/tests/test_offline_projection.py
+
       - name: Unit tests (query-hooks params)
         run: pnpm --dir packages/query-hooks test
 
