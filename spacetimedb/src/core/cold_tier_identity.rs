@@ -115,6 +115,25 @@ pub fn register_cold_tier_service_identity(
         require_empty_target_reconstruction_bootstrap(ctx, &service_name, identity)?;
     }
 
+    // `platform_id` is the primary key. A duplicate insert panics the module
+    // (HTTP 530) instead of failing the call, so resolve it first: repeating an
+    // identical active binding is a no-op and any other reuse is an error.
+    if let Some(existing) = ctx
+        .db
+        .cold_tier_service_identity()
+        .platform_id()
+        .find(&platform_id)
+    {
+        if existing.is_active
+            && existing.organization_id == organization_id
+            && existing.service_name == service_name
+            && existing.identity == identity
+        {
+            return Ok(());
+        }
+        return Err("platform_id is already registered for a different binding".to_string());
+    }
+
     let active: Vec<_> = ctx
         .db
         .cold_tier_service_identity()
