@@ -183,21 +183,38 @@ pub fn run(paths: &Paths) -> Result<()> {
 
     // ── 4b. Versioned durable PG schema and migration ────────────────────
 
-    let durable_migration =
-        pg_migration_emit::emit_durable_migration(&schema_manifest, &storage_policy_manifest)
-            .context("generating durable PostgreSQL migration")?;
-    let migration_path = paths
-        .durable_migration_dir
-        .join(format!("{}.sql", pg_migration_emit::DURABLE_MIGRATION_NAME));
-    write_file(&migration_path, &durable_migration.sql)?;
+    let ledger = pg_migration_emit::MigrationLedger::load(&paths.durable_migration_ledger_dir)
+        .context("loading the released durable migration ledger")?;
+    let durable_migration = pg_migration_emit::emit_durable_migrations(
+        &schema_manifest,
+        &storage_policy_manifest,
+        &ledger,
+    )
+    .context("generating durable PostgreSQL migrations")?;
+    for migration in &durable_migration.migrations {
+        let migration_path = paths
+            .durable_migration_dir
+            .join(format!("{}.sql", migration.name));
+        write_file(&migration_path, &migration.sql)?;
+        println!(
+            "Wrote {} ({}, checksum {})",
+            migration_path.display(),
+            if migration.released {
+                "released, frozen"
+            } else {
+                "pending"
+            },
+            migration.checksum
+        );
+    }
     write_file(
         &paths.durable_migration_manifest_out,
         &durable_migration.manifest,
     )?;
-    println!("Wrote {}", migration_path.display());
     println!(
-        "Wrote {} durable PG tables (checksum {})",
-        durable_migration.applicable_table_count, durable_migration.sql_checksum
+        "Wrote {} durable PG tables across {} migration(s)",
+        durable_migration.applicable_table_count,
+        durable_migration.migrations.len()
     );
 
     // ── 5. Hydration manifest: reducers that may target archived rows ──────
