@@ -15,10 +15,10 @@ the same tree, natively
 ([`cov-runtime-browser-acceptance-2026-10-04.md`](../evidence/cov-runtime-browser-acceptance-2026-10-04.md))
 and on the Docker stack
 ([`cov-runtime-docker-acceptance-2026-10-04.md`](../evidence/cov-runtime-docker-acceptance-2026-10-04.md)).
-Runtime acceptance stays at `REVIEW`: an unresolved projection defect
-(`mrp_bom` `type`/`type_`) and the contracts `v0.3.81` change to released
-migration 1 are open, and the Docker run did not attach the projection worker
-to its module.
+The projection defect (`mrp_bom` `type`/`type_`) is fixed and the Docker run
+converged all organizations with the projection worker attached. Runtime
+acceptance stays at `REVIEW`: the contracts `v0.3.81` change to released
+migration 1 is open for existing databases.
 
 ## Required PR completion card
 

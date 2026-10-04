@@ -1,6 +1,6 @@
 # COV browser acceptance on the Docker stack — 2026-10-04
 
-**Browser lane: PASS (46 passed, 0 failed, 0 skipped). Overall runtime acceptance: REVIEW.**
+**Browser lane: PASS twice (46 passed, 0 failed, 0 skipped). Durable projection: CONVERGED on the second run. Overall runtime acceptance: REVIEW (released-migration compatibility open).**
 
 This is a second, independent browser pass of the same repair. It complements
 [`cov-runtime-browser-acceptance-2026-10-04.md`](./cov-runtime-browser-acceptance-2026-10-04.md),
@@ -78,14 +78,48 @@ All four failure classes recorded on 2026-10-03 produced no failures: missing
 runtime form configuration, denied mutations returning 422 or 200 instead of
 403, and the separation-of-duties / second-person transitions.
 
+## Second run: projection worker attached (head `5545f8d7e`)
+
+The first run left the projection path unproven (below), and the companion run
+had recorded a blocked organization (`mrp_bom` row key `type` expected, `type_`
+present). Root cause: `RowChange::upsert_stdb_row` serializes the Rust struct,
+so keyword-escaped or digit-adjacent fields arrive as `type_`, `ref_`,
+`street2`, `iso3`, while the generated codec names the columns `type`, `ref`,
+`street_2`, `iso_3`; `validate_full_row` compared the key sets strictly by
+column name. This affected every table with such a column, not only `mrp_bom`
+(the regression test fails on `account_account_type` without the fix). Fixed in
+`df029c136`: projection resolves columns through the `rust_field_name` mapping
+that reconstruction already used, still rejecting missing, extra and
+duplicate-spelling keys.
+
+Run: same Docker stack and tree as `5545f8d7e` (no non-documentation file
+modified after the Playwright start, checked by modification time), the
+projection worker started on `lumiere-v1-local-e2e` -> `lumiere_e2e` after
+registering the service identities on that module.
+
+- Setup (publish with `--clear-database`, reducer tests, seed, stack, 10/10
+  migrations) came from a `make e2e-docker` invocation that stopped at identity
+  registration: `register-local-service-identities.mjs` used a `platform_id`
+  without the organization, which is the table's primary key, so the second
+  organization's insert panicked the reducer (HTTP 530). Fixed in `5545f8d7e`.
+  The remaining steps then ran from a script with the same commands as the
+  recipe (register, start worker, the 45 specs, settle) rather than through
+  `make`, because setup had already completed.
+- Browser: **46 passed, 14.8 minutes, one worker, no retries.**
+- Projection: **37 organizations at their SpacetimeDB head** (`durable_sequence`
+  equals `stdb_head_sequence`), no `last_error`, no quarantine; the worker
+  container reports healthy. 5 `mrp_bom` rows were projected to PostgreSQL.
+  Registration covered the 274 organizations the reducer suites create; only the
+  37 with commits have a status row.
+- Not shown: row-level equality between SpacetimeDB and PostgreSQL beyond that
+  counter state, and tables the specs never write (for example `contact` had no
+  rows in PostgreSQL after the run).
+
 ## What this does not establish
 
-- **Projection.** The Docker `projection-worker` was attached to the developer
-  module and `lumiere` database, not to `lumiere-v1-local-e2e`, so nothing
-  projected from the e2e module during this run. `projectionLag: healthy` here
-  therefore proves little. The companion run recorded an unhealthy projection
-  after its browser pass (`mrp_bom` commit rejected: row key `type` expected,
-  `type_` present). That defect is open and unexercised by this run.
+- **Projection (first run).** In the first run the Docker `projection-worker`
+  was attached to the developer module, so nothing projected from the e2e
+  module. The second run above closes that for the tables the specs write.
 - **Migration 1.** Contracts `v0.3.81` adds one index to the already released
   migration 1 (`cold_tier_service_identity_identity`), so databases initialized
   before `v0.3.81` refuse to start (`migration 1 checksum mismatch`). This run
@@ -98,8 +132,8 @@ runtime form configuration, denied mutations returning 422 or 200 instead of
 
 ## Disposition
 
-No status page changes disposition on this evidence. The browser lane passed on
-an identical tree, but runtime acceptance stays at `REVIEW` until the projection
-defect is closed and verified with the projection worker attached to the
-acceptance module, and the migration 1 issue is resolved for existing
-databases.
+No status page changes disposition on this evidence. The browser lane passed
+twice on an identical tree and the projection converged, but runtime acceptance
+stays at `REVIEW` until the released-migration issue is resolved for existing
+databases (contracts `v0.3.81` changes migration 1 in place) and the remaining
+coverage limits recorded in the companion document are accepted or closed.
