@@ -1,6 +1,6 @@
 # COV-16 — Device alert → acknowledge/resolve
 
-**Status:** PARTIAL — alert resolution IMPLEMENTED (runtime acceptance pending); action acknowledge still scaffolded  
+**Status:** IMPLEMENTED — alert resolve and action acknowledge wired; runtime acceptance pending
 **Module/surface:** IoT  
 **Plan target:** device association, alert and acknowledge  
 **Scaffold source:** [`erp-cov08-27-scaffold.md`](./erp-cov08-27-scaffold.md)
@@ -27,7 +27,9 @@ COV-08d for the minimal form). Never correlate by newest row, name or timestamp.
 
 ## Contract disposition
 
-**No generated contract delta expected.** `iot-alerts` exposes resolved_at, `iot-actions` exposes status (both organization-scoped; company scope via device)
+The action readback uses the existing `status`/`acknowledged_at` fields and now
+projects `result_payload` so the UI can preserve acknowledgement evidence. This is
+a generated contract delta; alert resolution itself needs no projection change.
 
 
 
@@ -56,10 +58,12 @@ Owned-device fixture; degraded telemetry must be explicit.
 | O | Playwright drives the transition through the visible UI action (setup calls allowed only for fixtures) | DONE — IoT → Alerts → `entity-action-resolve-alert` in `frontend/web/tests/e2e/cov16-iot-alert-resolve.spec.ts` |
 | E | Exact-effect resolver unit test (state/scope/identity/ambiguity) and browser snapshot preserved after stale (422) and denied (403) replay | DONE — `iot-alert-resolution.test.ts`; spec asserts the snapshot (including the `resolved_at` value) after both replays |
 
-## Slice 2 — action acknowledge (still scaffolded)
+## Slice 2 — action acknowledge (implemented)
 
-`acknowledge_iot_action` needs the same treatment against `iot-actions.status`: confirm the
-reducer rejects a non-pending action, then add the readback and proofs.
+`acknowledge_iot_action` now accepts only `Sent` actions, so Pending, Failed and
+already-Acknowledged calls cannot overwrite result evidence. The UI permits one
+Sent action and the hook resolves the exact id with `status = Acknowledged` and
+non-null `acknowledged_at`.
 
 ## Acceptance
 

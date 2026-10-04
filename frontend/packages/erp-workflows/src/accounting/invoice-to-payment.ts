@@ -8,8 +8,10 @@
 
 import { firstNonNullKey, type RowValueMap } from "@lumiere/erp-shared/row-values"
 import type { WorkflowAction, WorkflowExecuteContext } from "../core/action"
+import { recordRef } from "../core/record-ref"
 import type { WorkflowResult } from "../core/result"
 import { normalizedTag, rowId } from "../core/row"
+import type { ObservedTransition } from "../core/transition"
 import { defineWorkflow } from "../core/workflow"
 
 export const invoiceWorkflow = defineWorkflow({
@@ -52,6 +54,17 @@ export function isInvoicePostable(row: RowValueMap): boolean {
   )
 }
 
+/**
+ * `post_invoice` has no approval hand-off: an accepted post leaves the same move `Posted`.
+ * Anything else (missing, still draft) is unconfirmed. Posting is where the customer is asked
+ * to pay, so the user stays on the invoice.
+ */
+export function observePostedInvoice(moveId: string, moves: readonly RowValueMap[]): ObservedTransition {
+  const move = moves.find((row) => rowId(row) === moveId)
+  if (!move || normalizedTag(firstNonNullKey(move, "state")) !== "posted") return {}
+  return { outcome: "applied", next: recordRef(invoiceWorkflow.resource, moveId, invoiceWorkflow.module) }
+}
+
 /** `PaymentState::NotPaid` is a payment that has not been posted yet. */
 export function isPaymentPostable(row: RowValueMap): boolean {
   return normalizedTag(firstNonNullKey(row, "state")) === "notpaid"
@@ -61,6 +74,18 @@ export function isPaymentPostable(row: RowValueMap): boolean {
 export function isPaymentRegistrable(row: RowValueMap): boolean {
   return normalizedTag(firstNonNullKey(row, "state")) === "paid"
 }
+
+/** `register_payment_on_invoice` records every applied invoice (or bill) on the payment. */
+export const isPaymentReconciledWith =
+  (invoiceIds: readonly (string | number | bigint)[], isBill: boolean) =>
+  (row: RowValueMap): boolean => {
+    const value = isBill
+      ? firstNonNullKey(row, "reconciledBillIds", "reconciled_bill_ids")
+      : firstNonNullKey(row, "reconciledInvoiceIds", "reconciled_invoice_ids")
+    if (invoiceIds.length === 0 || !Array.isArray(value)) return false
+    const reconciled = new Set(value.map(String))
+    return invoiceIds.every((id) => reconciled.has(String(id)))
+  }
 
 export function postInvoiceAction(options: {
   label: string

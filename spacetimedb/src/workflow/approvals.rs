@@ -615,6 +615,14 @@ pub(crate) fn decide_workflow_human_task_for_actor(
     validate_key(&params.correlation_id, "correlation id")?;
     let comment = normalize_comment(params.comment.clone())?;
     let input_hash = decision_input_hash(organization_id, &params, comment.as_deref());
+    let task = require_task(ctx, organization_id, params.company_id, params.task_id)?;
+    let permission = match params.decision {
+        WorkflowHumanTaskDecision::Approve => "workflow_task:approve",
+        WorkflowHumanTaskDecision::Reject => "workflow_task:reject",
+        WorkflowHumanTaskDecision::Complete => "workflow_task:complete",
+    };
+    let authorization = authorize_task_actor(ctx, actor, &task, params.acting_for, permission)
+        .map_err(|error| format!("Permission denied: {error}"))?;
     if let Some(receipt) = replay_receipt(
         ctx,
         organization_id,
@@ -623,10 +631,14 @@ pub(crate) fn decide_workflow_human_task_for_actor(
         &params.idempotency_key,
         &input_hash,
     )? {
-        return require_task(ctx, organization_id, params.company_id, receipt.task_id);
+        if receipt.created_by != actor {
+            return Err(
+                "Permission denied: workflow task receipt belongs to another actor".to_string(),
+            );
+        }
+        return Ok(task);
     }
 
-    let task = require_task(ctx, organization_id, params.company_id, params.task_id)?;
     require_revision(&task, params.expected_task_revision)?;
     if !matches!(
         task.status,
@@ -640,12 +652,6 @@ pub(crate) fn decide_workflow_human_task_for_actor(
         return Err("workflow task is claimed by another actor".to_string());
     }
     validate_decision(&task, &params.decision, comment.as_deref())?;
-    let permission = match params.decision {
-        WorkflowHumanTaskDecision::Approve => "workflow_task:approve",
-        WorkflowHumanTaskDecision::Reject => "workflow_task:reject",
-        WorkflowHumanTaskDecision::Complete => "workflow_task:complete",
-    };
-    let authorization = authorize_task_actor(ctx, actor, &task, params.acting_for, permission)?;
     let principal = authorization.acting_for_identity.unwrap_or(actor);
 
     if task.assignment == WorkflowTaskAssignment::AllCandidates {

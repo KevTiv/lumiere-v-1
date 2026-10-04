@@ -1,6 +1,6 @@
 # COV-10 — Approved timesheet validation → billing handoff
 
-**Status:** PARTIAL — validate/reject proven (runtime acceptance pending); hook-level exact readback and billing handoff need a contract release  
+**Status:** IMPLEMENTED — validate/reject and billing handoff wired; runtime acceptance pending
 **Module/surface:** Projects / Tasks  
 **Plan target:** approved timesheet → billing/cost handoff  
 **Scaffold source:** [`erp-cov08-27-scaffold.md`](./erp-cov08-27-scaffold.md)
@@ -14,11 +14,12 @@ Existing operations (already reachable from the frontend command layer):
 - `validate_timesheets` — hook: `frontend/packages/query-hooks/src/hooks/projects.ts`
 - `reject_timesheets` — hook: `frontend/packages/query-hooks/src/hooks/projects.ts`
 
-Canonical resources: timesheets-to-validate, timesheets-unbilled
+Canonical resources: timesheets, account-moves
 
 ## Effect contract
 
-Same timesheet ids read back `validation_status`; billing handoff proven through `timesheet_invoice_id` on `timesheets-unbilled`.
+Same timesheet ids read back `validation_status`; billing handoff is proven by a shared
+`timesheet_invoice_id` on every selected timesheet and the exact scoped account-move row.
 
 Implementation pattern: wrap the mutation's readback with `resolveUniqueEffect` /
 `executeOperationWithCanonicalReadback` from
@@ -35,9 +36,9 @@ server-filtered worklists (`api-server/src/query_exec/worklists.rs`): the first 
 - a validated **billable** timesheet reads back exactly from `timesheets-unbilled`;
 - a validated non-billable or a **rejected** timesheet is not visible in any projection.
 
-Exact hook-level readback for both operations therefore needs `validation_status` added to the
+Exact hook-level readback uses `validation_status` and `timesheet_invoice_id` on the
 `timesheets` default projection in `crates/stdb-auth/assets/resource_registry.json` — a
-**contract delta** (batch it into the next `lumiere-contracts` release).
+**contract delta** included in this slice.
 
 ## Prerequisites / decisions
 
@@ -49,8 +50,9 @@ Seed project + employee + timesheet fixture.
   already rejected wrong-state transitions (so replays fail), billed entries, an empty
   rejection reason, and self-validation (validator = logger). No domain change was needed.
   `ProjectTimesheet` now derives `PartialEq` (Rust trait only; no schema or contract change).
-- **Hooks:** unchanged. A readback inside `useValidateTimesheets` would falsely fail for
-  non-billable entries until `validation_status` is projected (see above).
+- **Hooks:** `useValidateTimesheets` and `useRejectTimesheets` now read the canonical
+  `timesheets` projection and require every selected id to reach the requested status.
+  Empty and duplicate selections fail before dispatch.
 
 ## D/A/O/E proof checklist (slice 1)
 
@@ -59,12 +61,14 @@ Seed project + employee + timesheet fixture.
 | D | Native domain test: transition, replay rejection leaving the row unchanged, invariant/denial cases | DONE — `test_validate_reject_rejects_replay` in `spacetimedb/tests/projects/wave_a_test.rs`: validate/reject replays, reject-after-validate and validate-after-reject, empty reason and self-validation — each rejected with the row unchanged |
 | A | Generated operation keeps permission + organization/company scope; reader persona denied (403) | DONE — `check_permission(project_timesheet, validate)` + org/company guards; reader replays of validate and reject asserted 403 |
 | O | Playwright drives the transition through the visible UI action (setup calls allowed only for fixtures) | DONE — Projects → Timesheets toolbar in `frontend/web/tests/e2e/cov10-project-timesheet-validation.spec.ts`: the admin (logger) is refused (422) through the UI, the `hr-project` persona validates and rejects |
-| E | Exact-effect resolver unit test (state/scope/identity/ambiguity) and browser snapshot preserved after stale (422) and denied (403) replay | PARTIAL — the spec asserts the exact worklist placement (validated entry in `timesheets-unbilled` with org/company/status; rejected entry in neither worklist) after every replay. A resolver + hook readback waits on the `validation_status` projection |
+| E | Exact-effect resolver unit test (state/scope/identity/ambiguity) and browser snapshot preserved after stale (422) and denied (403) replay | DONE — `partial-slice-effects.test.ts` covers exact status and billing resolution; the existing browser spec preserves the worklist snapshot after stale and denied replay |
 
-## Slice 2 — billing handoff (pending)
+## Slice 2 — billing handoff (implemented)
 
-Bill the validated entry (`bill-timesheets` toolbar action) and prove `timesheet_invoice_id`
-links to exactly one invoice; `timesheets-unbilled` drops the entry once billed.
+The validate/reject hooks now resolve every requested timesheet from the default
+projection. Billing resolves every requested row and requires one shared,
+non-null `timesheet_invoice_id`; mixed or missing invoice identities remain
+unresolved. The existing toolbar action uses this hook.
 
 ## Acceptance
 

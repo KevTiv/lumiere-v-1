@@ -127,6 +127,10 @@ static HTTP_SQL_INCLUDED_COLUMNS: Lazy<HashMap<String, HashSet<String>>> = Lazy:
         ["metadata"].into_iter().map(String::from).collect(),
     );
     m.insert(
+        "mail-messages".to_string(),
+        ["metadata"].into_iter().map(String::from).collect(),
+    );
+    m.insert(
         "bank-statement-lines".to_string(),
         ["move_ids"].into_iter().map(String::from).collect(),
     );
@@ -857,6 +861,15 @@ mod tests {
                 "expected {field} in account-moves projection, got: {cols:?}"
             );
         }
+    }
+
+    #[test]
+    fn resolve_http_sql_columns_includes_message_idempotency_metadata() {
+        let cols = resolve_http_sql_columns("mail-messages", None).expect("mail-messages columns");
+        assert!(
+            cols.iter().any(|column| column == "metadata"),
+            "expected metadata in mail-messages projection, got: {cols:?}"
+        );
     }
 
     #[test]

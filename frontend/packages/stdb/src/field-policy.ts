@@ -289,6 +289,7 @@ const HTTP_SQL_EXCLUDED_COLUMNS: Record<string, Set<string>> = {
 /** Per-resource columns selected even when globally excluded (e.g. metadata for credit-note linkage). */
 const HTTP_SQL_INCLUDED_COLUMNS: Record<string, Set<string>> = {
   'account-moves': new Set(['metadata']),
+  'mail-messages': new Set(['metadata']),
 }
 
 /** Columns unsafe in SpacetimeDB HTTP SQL across most tables (audit, vecs, identity refs). */

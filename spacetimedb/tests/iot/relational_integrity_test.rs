@@ -3,7 +3,9 @@
 use spacetimedb::{ReducerContext, Table};
 
 use crate::core::persistence::{organization_commit, organization_row_change};
-use crate::iot::actions::{create_iot_action, iot_action, CreateActionParams};
+use crate::iot::actions::{
+    acknowledge_iot_action, create_iot_action, iot_action, CreateActionParams,
+};
 use crate::iot::alerts::{create_iot_alert, iot_alert, resolve_iot_alert};
 use crate::iot::integrations::link_device_to_location;
 use crate::iot::registry::{
@@ -385,6 +387,71 @@ pub fn test_resolve_alert_rejects_replay(ctx: &ReducerContext) -> Result<(), Str
         .ok_or("alert vanished after replay")?;
     if after_replay != resolved {
         return Err("rejected replay mutated the resolved alert".to_string());
+    }
+    Ok(())
+}
+
+/// COV-16: device acknowledgement is only valid after Sent and cannot be
+/// replayed to overwrite the original acknowledgement/result.
+pub fn test_acknowledge_action_rejects_stale_state(ctx: &ReducerContext) -> Result<(), String> {
+    ensure_test_superuser(ctx)?;
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let device_id = seed_device(ctx, &fixture, "Cov16 Action Device", "Scale")?;
+    create_iot_action(
+        ctx,
+        fixture.organization_id,
+        device_id,
+        CreateActionParams {
+            action_type: "ReadWeight".to_string(),
+            payload: "{}".to_string(),
+            triggered_by: "cov16".to_string(),
+        },
+    )?;
+    let pending = ctx
+        .db
+        .iot_action()
+        .iter()
+        .find(|action| action.device_id == device_id)
+        .ok_or("COV-16 action missing after create")?;
+
+    // Gateway may acknowledge before mark_action_sent lands: Pending is accepted.
+    acknowledge_iot_action(
+        ctx,
+        fixture.organization_id,
+        pending.id,
+        Some(r#"{"value":12.5}"#.to_string()),
+    )?;
+    let acknowledged = ctx
+        .db
+        .iot_action()
+        .id()
+        .find(&pending.id)
+        .ok_or("COV-16 action vanished after acknowledgement")?;
+    if acknowledged.status != "Acknowledged" || acknowledged.acknowledged_at.is_none() {
+        return Err("action acknowledgement was not persisted".to_string());
+    }
+
+    if acknowledge_iot_action(
+        ctx,
+        fixture.organization_id,
+        pending.id,
+        Some(r#"{"value":99}"#.to_string()),
+    )
+    .is_ok()
+    {
+        return Err("acknowledged action replay must be rejected".to_string());
+    }
+    let after_replay = ctx
+        .db
+        .iot_action()
+        .id()
+        .find(&pending.id)
+        .ok_or("COV-16 action vanished after replay")?;
+    if after_replay.status != acknowledged.status
+        || after_replay.acknowledged_at != acknowledged.acknowledged_at
+        || after_replay.result_payload != acknowledged.result_payload
+    {
+        return Err("rejected acknowledgement replay mutated the action".to_string());
     }
     Ok(())
 }

@@ -31,7 +31,13 @@ function field(row: Record<string, unknown>, ...keys: string[]): string {
  * Bounded-SQL inbox queues: sheets to approve, missing receipts, unmatched cards.
  * Row actions reuse existing approve/refuse/match mutations.
  */
-export function ExpensesInboxPanel({ organizationId }: { organizationId: number }) {
+export function ExpensesInboxPanel({
+  organizationId,
+  companyId,
+}: {
+  organizationId: number
+  companyId: bigint
+}) {
   const { t } = useTranslation()
   const { orgId } = orgBigInts(organizationId)
   const [queue, setQueue] = useState<InboxQueue>("to-approve")
@@ -43,7 +49,7 @@ export function ExpensesInboxPanel({ organizationId }: { organizationId: number 
   const { data: missingReceipt = [] } = useExpensesMissingReceipt(orgId)
   const { data: unmatchedCards = [] } = useExpenseCardStatementUnmatched(orgId)
 
-  const approveSheet = useApproveExpenseSheet(orgId)
+  const approveSheet = useApproveExpenseSheet(orgId, companyId)
   const refuseSheet = useRefuseExpenseSheet(orgId)
   const matchCard = useMatchExpenseCardStatementLine(orgId)
 
@@ -152,7 +158,9 @@ export function ExpensesInboxPanel({ organizationId }: { organizationId: number 
                     onClick={() =>
                       void run(
                         id,
-                        () => approveSheet.mutateAsync(id),
+                        async () => {
+                          await approveSheet.mutateAsync(id)
+                        },
                         t("expenses.inbox.approved", { defaultValue: "Report approved." }),
                       )
                     }

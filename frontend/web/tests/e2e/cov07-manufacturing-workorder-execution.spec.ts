@@ -16,11 +16,15 @@ import {
   type WorkorderExecutionProjection,
   type WorkorderParentProjection,
 } from "@lumiere/query-hooks/hooks/manufacturing-workorder-execution"
+import {
+  resolveWorkorderQualityEffect,
+} from "@lumiere/query-hooks/hooks/partial-slice-effects"
 import { stdbBffCommandPost } from "@lumiere/stdb/commands"
 
 import {
   fetchDefaultCompanyId,
   fetchFirstWarehouseId,
+  fetchSessionOrganizationId,
   gotoModule,
   scalarQueryId,
   signIn,
@@ -38,6 +42,19 @@ type ProductRow = {
   uom_id?: unknown
   type?: unknown
   type_?: unknown
+}
+
+type QualityCheckProjection = {
+  id?: unknown
+  organizationId?: unknown
+  organization_id?: unknown
+  companyId?: unknown
+  company_id?: unknown
+  workorderId?: unknown
+  workorder_id?: unknown
+  qualityState?: unknown
+  quality_state?: unknown
+  status?: unknown
 }
 
 function stateTag(value: unknown): string {
@@ -302,7 +319,12 @@ async function executionRows(page: Page) {
 async function runWorkorderAction(
   page: Page,
   workorderId: number,
-  action: "start" | "log_productivity" | "finish",
+  action:
+    | "start"
+    | "log_productivity"
+    | "require_quality"
+    | "pass_quality"
+    | "finish",
   duration?: number,
 ) {
   await gotoModule(page, "/manufacturing", "manufacturing")
@@ -326,9 +348,13 @@ async function runWorkorderAction(
   const reducer =
     action === "start"
       ? "start_workorder"
-      : action === "finish"
-        ? "finish_workorder"
-        : "log_workcenter_productivity"
+      : action === "require_quality"
+        ? "create_workorder_quality_check"
+        : action === "pass_quality"
+          ? "pass_quality_check"
+          : action === "finish"
+            ? "finish_workorder"
+            : "log_workcenter_productivity"
   const [response] = await Promise.all([
     page.waitForResponse(
       (candidate) => matchesOperationResponse(candidate, reducer) && candidate.ok(),
@@ -340,16 +366,17 @@ async function runWorkorderAction(
 }
 
 test.describe(
-  "COV-07d exact workorder execution",
+  "COV-07d/e exact workorder execution and quality gate",
   { tag: ["@p0", "@cov07", "@unauthenticated"] },
   () => {
-    test("warehouse operator starts, logs productivity, and finishes the exact MO-owned workorder", async ({
+    test("warehouse operator passes required quality before finishing the exact MO-owned workorder", async ({
       browser,
       page,
     }) => {
       test.setTimeout(180_000)
 
       await signIn(page)
+      const organizationId = await fetchSessionOrganizationId(page)
       const companyId = await fetchDefaultCompanyId(page)
       const warehouseId = await fetchFirstWarehouseId(page)
       const product = await fetchProduct(page)
@@ -409,6 +436,11 @@ test.describe(
           "fixture.warehouse@example.test",
           PERSONA_PASSWORD,
         )
+        await signIn(
+          readerPage,
+          "fixture.reader@example.test",
+          PERSONA_PASSWORD,
+        )
 
         await runWorkorderAction(
           warehousePage,
@@ -438,6 +470,111 @@ test.describe(
           }),
         )
         expect(staleStart.status()).toBe(422)
+
+        const deniedQualityCreate = await postPreparedCommand(
+          readerPage,
+          stdbBffCommandPost("create_workorder_quality_check", {
+            companyId: BigInt(companyId),
+            workorderId: BigInt(workorderId),
+            name: "Denied reader quality check",
+          }),
+        )
+        expect(deniedQualityCreate.status()).toBe(403)
+
+        await runWorkorderAction(
+          warehousePage,
+          workorderId,
+          "require_quality",
+        )
+
+        let qualityCheckId: string | undefined
+        await expect
+          .poll(async () => {
+            const effect = resolveWorkorderQualityEffect(
+              await queryRows<QualityCheckProjection>(page, "quality-checks"),
+              BigInt(organizationId),
+              BigInt(companyId),
+              BigInt(workorderId),
+              "none",
+            )
+            qualityCheckId = effect?.id
+            return effect
+              ? { id: effect.id, state: effect.state }
+              : null
+          })
+          .toEqual({ id: expect.any(String), state: "none" })
+        if (!qualityCheckId) throw new Error("quality check disappeared")
+
+        const duplicateCheck = await postPreparedCommand(
+          warehousePage,
+          stdbBffCommandPost("create_workorder_quality_check", {
+            companyId: BigInt(companyId),
+            workorderId: BigInt(workorderId),
+            name: "Duplicate in-process check",
+          }),
+        )
+        expect(duplicateCheck.status()).toBe(422)
+
+        const blockedFinish = await postPreparedCommand(
+          warehousePage,
+          stdbBffCommandPost("finish_workorder", {
+            companyId: BigInt(companyId),
+            workorderId: BigInt(workorderId),
+          }),
+        )
+        expect(blockedFinish.status()).toBe(422)
+
+        const deniedQuality = await postPreparedCommand(
+          readerPage,
+          stdbBffCommandPost("pass_quality_check", {
+            companyId: BigInt(companyId),
+            checkId: BigInt(qualityCheckId),
+            measure: null,
+            note: null,
+            picture: null,
+          }),
+        )
+        expect(deniedQuality.status()).toBe(403)
+
+        await runWorkorderAction(
+          warehousePage,
+          workorderId,
+          "pass_quality",
+        )
+
+        await expect
+          .poll(async () =>
+            resolveWorkorderQualityEffect(
+              await queryRows<QualityCheckProjection>(page, "quality-checks"),
+              BigInt(organizationId),
+              BigInt(companyId),
+              BigInt(workorderId),
+              "pass",
+            )?.id,
+          )
+          .toBe(qualityCheckId)
+
+        await gotoModule(warehousePage, "/manufacturing", "manufacturing")
+        await warehousePage
+          .getByTestId("module-tab-manufacturing-quality")
+          .click()
+        await expect(
+          warehousePage
+            .locator('[role="tabpanel"]:visible')
+            .getByTestId(`entity-row-${qualityCheckId}`),
+        ).toBeVisible()
+
+        const staleQuality = await postPreparedCommand(
+          warehousePage,
+          stdbBffCommandPost("pass_quality_check", {
+            companyId: BigInt(companyId),
+            checkId: BigInt(qualityCheckId),
+            measure: null,
+            note: null,
+            picture: null,
+          }),
+        )
+        expect(staleQuality.status()).toBe(422)
 
         const beforeProductivityRows = await executionRows(page)
         const beforeWorkorder = beforeProductivityRows.workorders.find(
@@ -492,11 +629,6 @@ test.describe(
         })
         if (!params) throw new Error("failed to build denied productivity params")
 
-        await signIn(
-          readerPage,
-          "fixture.reader@example.test",
-          PERSONA_PASSWORD,
-        )
         const deniedLog = await postPreparedCommand(
           readerPage,
           stdbBffCommandPost("log_workcenter_productivity", {

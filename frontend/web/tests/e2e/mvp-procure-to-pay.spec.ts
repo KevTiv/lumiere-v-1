@@ -3,6 +3,10 @@ import { expect, test } from "@playwright/test"
 import type { QueryRowFor } from "@lumiere/stdb/query-row-map"
 
 import {
+  fetchPurchaseOrderInvoiceIds,
+  fetchVendorBillById,
+} from "./purchasing-order-fixtures"
+import {
   chooseFirstEnabledOption,
   chooseSelectOptionByLabel,
   chooseSelectOptionByValue,
@@ -118,6 +122,7 @@ async function receivePoLineQty(
   qty: string,
 ) {
   const receiveLabel = await fetchPurchaseOrderLineReceiveLabel(page, orderId, lineId)
+  await gotoModule(page, "/purchasing", "purchasing")
   await selectModuleTab(page, "purchasing", "lines")
   await page.getByTestId("entity-action-pol-receive-form").click()
   await expect(page.getByTestId("form-modal-receive-purchase-order-line")).toBeVisible()
@@ -286,7 +291,7 @@ test.describe("MVP procure-to-pay workflow", { tag: "@p0" }, () => {
     await expectNoAppError(page)
   })
 
-  test("blocks bill post when billed qty exceeds received", async ({ page }) => {
+  test("blocks an over-billed post and recovers after the remaining receipt", async ({ page }) => {
     test.setTimeout(240_000)
 
     const origin = smokeName("mvp-po-overbill")
@@ -297,7 +302,17 @@ test.describe("MVP procure-to-pay workflow", { tag: "@p0" }, () => {
     const lineId = await fetchLatestPurchaseOrderLineIdByOrder(page, orderId)
     await receivePoLineQty(page, orderId, lineId, "5")
 
+    const invoiceIdsBefore = await fetchPurchaseOrderInvoiceIds(page, orderId)
     await createBillFromPo(page, orderId)
+    let invoiceIdsAfter: number[] = []
+    await expect
+      .poll(async () => {
+        invoiceIdsAfter = await fetchPurchaseOrderInvoiceIds(page, orderId)
+        return invoiceIdsAfter.filter((id) => !invoiceIdsBefore.includes(id))
+      })
+      .toHaveLength(1)
+    const billId = invoiceIdsAfter.find((id) => !invoiceIdsBefore.includes(id))
+    if (billId == null) throw new Error("Expected one PO-owned vendor bill")
 
     const orgId = await fetchSessionOrganizationId(page)
     await callReducerBff(page, "invoice_po_line", [orgId, lineId, 5])
@@ -312,5 +327,23 @@ test.describe("MVP procure-to-pay workflow", { tag: "@p0" }, () => {
     })
 
     await expectPostDraftBillRejected(page, VENDOR_NAME, /three-way match failed/i)
+    expect(await fetchVendorBillById(page, billId)).toMatchObject({ state: "Draft" })
+
+    // The rejected post is non-destructive: purchasing can resolve the exact exception by
+    // receiving the outstanding quantity through the operator form. The persisted match state
+    // must then converge before the same canonical vendor bill can be posted.
+    await receivePoLineQty(page, orderId, lineId, "5")
+    await waitForPoLineMatchStatus(page, lineId, "matched")
+
+    await page.reload()
+    await gotoModule(page, "/purchasing", "purchasing")
+    await selectModuleTab(page, "purchasing", "lines")
+    await expect(page.getByTestId(`entity-row-${lineId}`)).toContainText("Matched", {
+      timeout: 30_000,
+    })
+
+    expect(await postDraftBillViaUi(page, VENDOR_NAME)).toBe(billId)
+    expect(await fetchVendorBillById(page, billId)).toMatchObject({ state: "Posted" })
+    await expectNoAppError(page)
   })
 })

@@ -1,19 +1,18 @@
-import { toWorkflowError, type WorkflowError, type WorkflowErrorKind } from "./errors"
+import { WorkflowError, toWorkflowError, type WorkflowErrorKind } from "./errors"
 import type { ErpRecordRef } from "./record-ref"
 import type { WorkflowOutcome, WorkflowResult } from "./result"
 
-/** What the canonical readback found after a command was accepted. */
+/**
+ * What the canonical readback found after a command was accepted. An observation without an
+ * `outcome` means the effect could not be confirmed, and the run fails as `outcome_unknown`.
+ */
 export interface ObservedTransition {
   outcome?: WorkflowOutcome
   createdRecords?: ErpRecordRef[]
   next?: ErpRecordRef
 }
 
-/**
- * One command's contract with the rest of the app. The command is a generated operation; this
- * only declares what it touches and how to find what it produced.
- */
-export interface TransitionSpec<TInput> {
+interface TransitionSpecBase<TInput> {
   id: string
   /** Executes the generated command. Throw a `WorkflowError`, or anything `toWorkflowError` accepts. */
   command(input: TInput): Promise<void>
@@ -21,9 +20,32 @@ export interface TransitionSpec<TInput> {
   affects: readonly string[]
   /** True when re-issuing the command cannot duplicate its effect. */
   idempotent?: boolean
-  /** Read canonical state after invalidation to resolve outcome and created/next records. */
-  observe?(input: TInput): Promise<ObservedTransition>
 }
+
+interface ObservedTransitionSpec<TInput> extends TransitionSpecBase<TInput> {
+  /**
+   * Read canonical state after invalidation to resolve outcome and created/next records. It must
+   * confirm the effect: a throw or a missing `outcome` is `outcome_unknown`.
+   */
+  observe(input: TInput): Promise<ObservedTransition>
+  noReadback?: never
+}
+
+interface UnobservedTransitionSpec<TInput> extends TransitionSpecBase<TInput> {
+  observe?: never
+  /**
+   * Why transport acceptance is the whole contract for this command (no exact canonical effect to
+   * read back yet). Required so skipping readback is a reviewed decision, never a default.
+   */
+  noReadback: string
+}
+
+/**
+ * One command's contract with the rest of the app. The command is a generated operation; this
+ * declares what it touches and either how to confirm its effect (`observe`) or why it cannot yet
+ * (`noReadback`).
+ */
+export type TransitionSpec<TInput> = ObservedTransitionSpec<TInput> | UnobservedTransitionSpec<TInput>
 
 export interface TransitionNotice {
   kind: "success" | "info" | "error"
@@ -141,11 +163,24 @@ export async function completeTransition<TInput>(
   const affectedResources = [...spec.affects]
   await ports.invalidate(affectedResources)
 
+  // The command was accepted, but its effect could not be confirmed: never report it as applied.
+  const unresolved = (message: string, cause?: unknown): WorkflowError => {
+    const error = new WorkflowError("outcome_unknown", message, cause === undefined ? undefined : { cause })
+    record({ status: "failed", errorKind: error.kind, refreshed: true, affectedResources })
+    ports.notify?.({ kind: "error", transitionId: spec.id, correlationId, attempt, error, refreshed: true })
+    return error
+  }
+
   let observed: ObservedTransition = {}
-  try {
-    observed = (await spec.observe?.(input)) ?? {}
-  } catch {
-    // The command succeeded; a failed readback must not turn success into failure.
+  if (spec.observe) {
+    try {
+      observed = (await spec.observe(input)) ?? {}
+    } catch (cause) {
+      throw unresolved("Command was accepted but canonical readback failed", cause)
+    }
+    if (observed.outcome === undefined) {
+      throw unresolved("Command was accepted but canonical readback did not confirm its effect")
+    }
   }
 
   const result: WorkflowResult = {

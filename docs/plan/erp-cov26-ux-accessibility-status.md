@@ -28,6 +28,23 @@ COV-08d for the minimal form). Never correlate by newest row, name or timestamp.
 
 **No generated contract delta expected.** none
 
+## Reports / Analytics bounded pass (2026-10-03)
+
+**State:** REVIEW — one source-state distinction implemented; module quality pass remains open.
+
+The self-serve query builder now renders an accessible loading status separately
+from a successfully loaded source with zero rows. A focused pure-state test keeps
+unselected, loading, legitimate-empty and ready states distinct.
+
+This does not certify Reports COV-26. The shared stored-dashboard source hook does
+not expose query failures, so denied, dependency/query-error and reconnect states
+still collapse into the empty data source seen by the Reports view. The existing
+create-and-attach widget path also rediscovers the created row by name and newest
+id instead of a stable effect identity; it was not changed or accepted in this
+slice. Malformed persisted filters/operators, missing timestamp/measure semantics,
+keyboard/focus, responsive viewport and browser reconnect/readback proof remain
+open.
+
 
 
 ## Prerequisites / decisions
