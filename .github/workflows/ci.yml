@@ -295,6 +295,9 @@ jobs:
       - name: Unit tests (offline SQLite projection)
         run: pnpm --dir packages/offline test
 
+      - name: Validate offline browser storage tests load
+        run: pnpm --dir packages/offline exec playwright test --list
+
       - name: Offline projection emitter tests
         working-directory: .
         run: PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts/tests/test_offline_projection.py
