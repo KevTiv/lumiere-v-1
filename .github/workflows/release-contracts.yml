@@ -334,6 +334,13 @@ jobs:
           restore-keys: |
             contracts-release-npm-v1-${{ runner.os }}-
 
+      # The generation passes emit only the presentation schemas, but the
+      # publisher also requires the TypeScript contracts. They need only node and
+      # the frontend dependencies installed above.
+      - name: Generate presentation contracts
+        if: steps.changes.outputs.release == 'true'
+        run: make generate-presentation-contracts
+
       # Build and check the full candidate first; nothing remote changes if it fails.
       - name: Prepare contracts release
         if: steps.changes.outputs.release == 'true'
