@@ -5451,6 +5451,14 @@
     }
   },
   "purchasing": {
+    "handoffs": {
+      "title": "Receipts & vendor bills",
+      "empty": "No receipts or vendor bills yet",
+      "receipt": "Receipt",
+      "bill": "Vendor bill",
+      "loading": "Loading receipts and vendor bills…",
+      "error": "Receipts or vendor bills could not be loaded. Check your access and try again."
+    },
     "csvImport": {
       "ordersTitle": "Import purchase orders (CSV)",
       "toolbarOrders": "Import orders (CSV)",

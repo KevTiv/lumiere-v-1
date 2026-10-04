@@ -142,7 +142,7 @@ import {
 } from "@lumiere/query-hooks/hooks/purchasing"
 import { usePricelists, type ProductPricelist } from "@lumiere/query-hooks/hooks/sales"
 import type { Contact } from "@lumiere/query-hooks/hooks/crm"
-import { useAccountAccounts, useAccountJournals, useAccountPaymentTerms } from "@lumiere/query-hooks/hooks/accounting"
+import { useAccountAccounts, useAccountJournals, useAccountPaymentTerms, useAccountMoves } from "@lumiere/query-hooks/hooks/accounting"
 import { useProducts, useUoms, useStockPickings, useWarehouses } from "@lumiere/query-hooks/hooks/inventory"
 import { useDepartments, type HrDepartment } from "@lumiere/query-hooks/hooks/hr"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
@@ -183,6 +183,8 @@ import {
   toUpdateLandedCostParams,
   toUpdatePurchaseOrderLineParams,
 } from "@/lib/purchasing-create-params"
+import { purchaseOrderHandoffs } from "@lumiere/query-hooks/hooks/purchase-order-handoffs"
+import { OrderHandoffLinks } from "../../../components/order-handoff-links"
 import { stbTimestampFromDate } from "@/lib/stb-timestamp"
 import {
   toCreatePartnerBankParams,
@@ -524,7 +526,10 @@ function PurchasingClientLoaded({
   const { data: pricelists = [] } = usePricelists(orgId, initialPricelists)
   const { data: products = [] } = useProducts(orgId, initialProducts)
   const { data: uoms = [] } = useUoms(orgId, initialUoms)
-  const { data: stockPickings = [] } = useStockPickings(orgId)
+  const receiptQuery = useStockPickings(orgId)
+  const { data: stockPickings = [] } = receiptQuery
+  const billQuery = useAccountMoves(orgId)
+  const { data: accountMoves = [] } = billQuery
   const { data: landedCosts = [] } = useLandedCosts(orgId)
   const { data: landedCostLines = [] } = useLandedCostLines(orgId)
   const { data: supplierIntakes = [] } = useSupplierIntakes(orgId)
@@ -1195,9 +1200,35 @@ function PurchasingClientLoaded({
             )
           },
         },
+        {
+          id: "handoffs",
+          label: t("purchasing.handoffs.title"),
+          content: (record) => (
+            <div className="p-4" data-testid="purchase-order-handoffs">
+              {receiptQuery.isError || billQuery.isError ? (
+                <p role="alert">{t("purchasing.handoffs.error")}</p>
+              ) : receiptQuery.isPending || billQuery.isPending ? (
+                <p role="status">{t("purchasing.handoffs.loading")}</p>
+              ) : (
+                <OrderHandoffLinks
+                  testIdPrefix="purchase-order-handoff"
+                  emptyLabel={t("purchasing.handoffs.empty")}
+                  pickingLabel={t("purchasing.handoffs.receipt")}
+                  invoiceLabel={t("purchasing.handoffs.bill")}
+                  handoffs={purchaseOrderHandoffs(
+                    record,
+                    { organizationId: orgId, companyId: operatingCompanyId },
+                    stockPickings,
+                    accountMoves,
+                  )}
+                />
+              )}
+            </div>
+          ),
+        },
       ],
     }
-  }, [t, lines, vendorLabelById])
+  }, [t, lines, vendorLabelById, orgId, operatingCompanyId, stockPickings, accountMoves, receiptQuery.isError, receiptQuery.isPending, billQuery.isError, billQuery.isPending])
 
   const purchaseRequisitionFormConfig = useMemo(
     () =>
