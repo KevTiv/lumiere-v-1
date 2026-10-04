@@ -10,6 +10,16 @@ COV-25 is recorded in
 [`cov05-10-cov13-25-runtime-acceptance-2026-10-03.md`](../evidence/cov05-10-cov13-25-runtime-acceptance-2026-10-03.md).
 The run completed but is not accepted: all 43 requested browser tests failed.
 
+The 2026-10-04 repair reruns pass the browser lane (45 COV tests plus setup) on
+the same tree, natively
+([`cov-runtime-browser-acceptance-2026-10-04.md`](../evidence/cov-runtime-browser-acceptance-2026-10-04.md))
+and on the Docker stack
+([`cov-runtime-docker-acceptance-2026-10-04.md`](../evidence/cov-runtime-docker-acceptance-2026-10-04.md)).
+Runtime acceptance stays at `REVIEW`: an unresolved projection defect
+(`mrp_bom` `type`/`type_`) and the contracts `v0.3.81` change to released
+migration 1 are open, and the Docker run did not attach the projection worker
+to its module.
+
 ## Required PR completion card
 
 1. **Boundary:** one named operator transition and its canonical effect.
