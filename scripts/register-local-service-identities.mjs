@@ -161,7 +161,8 @@ try {
       if (active.length === 1 && normalizeIdentity(active[0]?.identity) === identity) continue
       await reducer(adminToken, 'register_cold_tier_service_identity', [
         organizationId,
-        `local-${service}-${identity.slice(0, 16)}`,
+        // platform_id is the table's primary key, so it must be per organization.
+        `local-${service}-org${organizationId}-${identity.slice(0, 16)}`,
         service,
         { __identity__: `0x${identity}` },
       ])

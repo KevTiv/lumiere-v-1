@@ -39,3 +39,11 @@ services:
       NEXT_PUBLIC_APP_URL: http://127.0.0.1:3001
     healthcheck:
       start_period: 600s
+
+  # Projects the e2e module into the dedicated database so acceptance proves the
+  # durable projection converges (started by scripts/e2e-docker-projection.sh).
+  projection-worker:
+    environment:
+      STDB_MODULE: ${E2E_STDB_MODULE:-lumiere-v1-local-e2e}
+      STDB_SERVER_TOKEN: ${E2E_STDB_TOKEN:?run through make e2e-docker}
+      PG_DATABASE: ${E2E_PG_DATABASE:-lumiere_e2e}

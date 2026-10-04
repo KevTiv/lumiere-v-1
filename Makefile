@@ -821,6 +821,7 @@ e2e-docker:
 	@env PATH="$(E2E_PATH):$$PATH" E2E_SPEC_FILES="$(E2E_SPEC_FILES)" E2E_GREP="$(E2E_GREP)" E2E_WORKERS="$(E2E_WORKERS)" /bin/bash -c 'set -euo pipefail; \
 		ROOT="$$(pwd)"; LOG_DIR="$$ROOT/.tmp/e2e"; \
 		set -a; . "$$LOG_DIR/env.sh"; set +a; \
+		E2E_STDB_MODULE="$(E2E_DB)" "$$ROOT/scripts/e2e-docker-projection.sh" start; \
 		cd "$$ROOT/frontend/web"; \
 		PW_ARGS=(--workers "$$E2E_WORKERS"); \
 		for f in $$E2E_SPEC_FILES; do PW_ARGS+=("tests/e2e/$$f"); done; \
@@ -837,6 +838,8 @@ e2e-docker:
 		STDB_HOST="$$E2E_STDB_HOST" NEXT_PUBLIC_STDB_HOST="$$E2E_STDB_HOST" \
 		NEXT_PUBLIC_API_GATEWAY_URL="" \
 		pnpm exec playwright test "$${PW_ARGS[@]}"; \
+		cd "$$ROOT"; \
+		E2E_STDB_MODULE="$(E2E_DB)" "$$ROOT/scripts/e2e-docker-projection.sh" settle; \
 	'
 
 e2e-smoke:
