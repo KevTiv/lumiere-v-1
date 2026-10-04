@@ -1059,7 +1059,7 @@ function ExpensesClientLoaded({
                       {idStr ? (
                         <a
                           className="font-mono text-xs underline underline-offset-2"
-                          href={`/accounting?tab=journal-entries&highlight=${encodeURIComponent(idStr)}`}
+                          href={`/accounting?tab=journal-entries&filter=${encodeURIComponent(`id:${idStr}`)}`}
                           data-testid={`expenses-move-link-${camel}`}
                         >
                           #{idStr}
