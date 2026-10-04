@@ -534,6 +534,7 @@ pub fn close_pos_session(
     session_id: u64,
     cash_register_balance_end_real: f64,
 ) -> Result<(), String> {
+    check_permission(ctx, organization_id, "pos_session", "close")?;
     let session = ctx
         .db
         .pos_session()
@@ -555,8 +556,6 @@ pub fn close_pos_session(
     {
         return Err("POS session and config do not belong to this organization".to_string());
     }
-
-    check_permission(ctx, organization_id, "pos_session", "close")?;
 
     if session.user_id != ctx.sender() {
         return Err("Only the session opener can close the session".to_string());
@@ -761,6 +760,7 @@ pub fn create_pos_order(
     organization_id: u64,
     params: CreatePosOrderParams,
 ) -> Result<(), String> {
+    check_permission(ctx, organization_id, "pos_order", "create")?;
     let session = ctx
         .db
         .pos_session()
@@ -786,8 +786,6 @@ pub fn create_pos_order(
     {
         return Err("POS session and config do not belong to this organization".to_string());
     }
-
-    check_permission(ctx, organization_id, "pos_order", "create")?;
 
     let uid = format!("{}-{}-{}", config.id, session.id, session.sequence_number);
     let sequence_number = session.sequence_number + 1;

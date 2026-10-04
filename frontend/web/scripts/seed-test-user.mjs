@@ -537,6 +537,8 @@ async function main() {
   console.log('[seed-test-user] dev_promote_caller_superuser OK (HTTP token identity is superuser).')
 
   const orgId = await resolveTargetOrg(host, moduleName, adminToken, manifest)
+  await callStdbReducer(host, moduleName, adminToken, 'seed_organization_form_configs', [orgId])
+  console.log('[seed-test-user] Governed organization form configurations verified.')
   const companyId = await resolveTargetCompany(host, moduleName, adminToken, orgId, manifest)
   const allPersonas = process.argv.includes('--all-personas')
   const selectedPersonas = allPersonas

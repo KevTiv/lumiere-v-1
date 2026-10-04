@@ -11,6 +11,7 @@ import {
   smokeName,
 } from "./helpers"
 import { matchesOperationResponse } from "./operation-response"
+import { actorIdentity, canonicalRow, sessionActor } from "./sod-evidence"
 
 // COV-10 — see docs/plan/erp-cov10-project-timesheet-validation-status.md.
 const PERSONA_PASSWORD = process.env.E2E_FIRST_ORG_PERSONA_PASSWORD ?? "Password123$"
@@ -236,6 +237,11 @@ test.describe("COV-10 exact timesheet validation / rejection", { tag: ["@p0", "@
     }
     const toValidate = await logHours(`${tag}-validate`)
     const toReject = await logHours(`${tag}-reject`)
+    const loggerIdentity = await sessionActor(page)
+    for (const id of [toValidate, toReject]) {
+      const entry = await canonicalRow(page, "timesheets", id)
+      expect(actorIdentity(entry.userId ?? entry.user_id)).toBe(loggerIdentity)
+    }
 
     const draft = { organizationId, companyId, validationStatus: "draft", invoiceId: null }
     for (const id of [toValidate, toReject]) {
@@ -243,9 +249,11 @@ test.describe("COV-10 exact timesheet validation / rejection", { tag: ["@p0", "@
     }
 
     // Separation of duties through the UI: the logger cannot validate.
+    const beforeSelfValidation = await canonicalRow(page, "timesheets", toValidate)
     const selfValidation = await runTimesheetAction(page, toValidate, "validate-timesheets", "validate_timesheets")
     expect(selfValidation.status()).toBe(422)
     expect(await worklistSnapshot(page, toValidate)).toEqual({ toValidate: draft, unbilled: null })
+    expect(await canonicalRow(page, "timesheets", toValidate)).toEqual(beforeSelfValidation)
 
     const validatorContext = await browser.newContext({ storageState: { cookies: [], origins: [] } })
     const validatorPage = await validatorContext.newPage()
@@ -253,6 +261,8 @@ test.describe("COV-10 exact timesheet validation / rejection", { tag: ["@p0", "@
     const readerPage = await readerContext.newPage()
     try {
       await signIn(validatorPage, VALIDATOR_EMAIL, PERSONA_PASSWORD)
+      const validatorIdentity = await sessionActor(validatorPage)
+      expect(validatorIdentity).not.toBe(loggerIdentity)
 
       const validated = await runTimesheetAction(validatorPage, toValidate, "validate-timesheets", "validate_timesheets")
       expect(validated.ok()).toBe(true)
@@ -261,6 +271,9 @@ test.describe("COV-10 exact timesheet validation / rejection", { tag: ["@p0", "@
         unbilled: { organizationId, companyId, validationStatus: "validated", invoiceId: null },
       }
       await expect.poll(() => worklistSnapshot(page, toValidate), { timeout: 30_000 }).toEqual(validatedEffect)
+      const validatedRow = await canonicalRow(page, "timesheets", toValidate)
+      expect(actorIdentity(validatedRow.validatedBy ?? validatedRow.validated_by)).toBe(validatorIdentity)
+      expect(actorIdentity(validatedRow.userId ?? validatedRow.user_id)).toBe(loggerIdentity)
       const staleValidate = await replay(validatorPage, validated.request())
       expect(staleValidate.status()).toBe(422)
       expect(await worklistSnapshot(page, toValidate)).toEqual(validatedEffect)
@@ -280,9 +293,11 @@ test.describe("COV-10 exact timesheet validation / rejection", { tag: ["@p0", "@
         [validated.request(), toValidate, validatedEffect],
         [rejected.request(), toReject, rejectedEffect],
       ] as const) {
+        const beforeDenial = await canonicalRow(page, "timesheets", id)
         const denied = await replay(readerPage, request)
         expect(denied.status()).toBe(403)
         expect(await worklistSnapshot(page, id)).toEqual(effect)
+        expect(await canonicalRow(page, "timesheets", id)).toEqual(beforeDenial)
       }
     } finally {
       await readerContext.close()

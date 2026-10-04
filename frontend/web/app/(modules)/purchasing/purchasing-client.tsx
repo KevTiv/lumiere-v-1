@@ -2,6 +2,7 @@
 import { mapDashboardWidgets, withDashboardSections } from "@lumiere/ui/lib/dashboard-sections"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
+import type { QueryResourceState } from "@lumiere/api-client"
 import { useModuleTab } from "@/hooks/use-module-tab"
 import { useTranslation } from "@lumiere/i18n"
 import { Badge } from "@lumiere/ui/components/badge"
@@ -142,7 +143,9 @@ import {
 } from "@lumiere/query-hooks/hooks/purchasing"
 import { usePricelists, type ProductPricelist } from "@lumiere/query-hooks/hooks/sales"
 import type { Contact } from "@lumiere/query-hooks/hooks/crm"
-import { useAccountAccounts, useAccountJournals, useAccountPaymentTerms } from "@lumiere/query-hooks/hooks/accounting"
+import { useAccountAccounts, useAccountJournals, useAccountPaymentTerms, useAccountMoves } from "@lumiere/query-hooks/hooks/accounting"
+import { purchaseOrderLinks } from "@lumiere/query-hooks/hooks/cross-record-links"
+import { CrossRecordLinks } from "../../../components/order-handoff-links"
 import { useProducts, useUoms, useStockPickings, useWarehouses } from "@lumiere/query-hooks/hooks/inventory"
 import { useDepartments, type HrDepartment } from "@lumiere/query-hooks/hooks/hr"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
@@ -411,7 +414,7 @@ interface PurchasingClientProps {
   initialOrders?: PurchaseOrder[]
   initialLines?: PurchaseOrderLine[]
   initialRequisitions?: PurchaseRequisition[]
-  initialContacts?: Contact[]
+  initialContactsState?: QueryResourceState<Contact>
   initialPricelists?: ProductPricelist[]
   initialProducts?: Product[]
   initialUoms?: Uom[]
@@ -448,7 +451,7 @@ function PurchasingClientLoaded({
   initialOrders,
   initialLines,
   initialRequisitions,
-  initialContacts,
+  initialContactsState,
   initialPricelists,
   initialProducts,
   initialUoms,
@@ -520,11 +523,24 @@ function PurchasingClientLoaded({
   const { data: linesOverBilled = [] } = usePurchaseOrderLinesOverBilled(orgId)
   const { data: lines = [] } = usePurchaseOrderLines(orgId, initialLines)
   const { data: requisitions = [] } = usePurchaseRequisitions(orgId, initialRequisitions)
-  const { data: allContacts = [] } = useContacts(orgId, initialContacts)
+  const contactsQuery = useContacts(
+    orgId,
+    initialContactsState?.status === "ready" || initialContactsState?.status === "empty"
+      ? initialContactsState.rows
+      : undefined,
+  )
+  const { data: allContacts = [] } = contactsQuery
+  const contactsReferenceStatus = contactsQuery.status === "success"
+    ? undefined
+    : initialContactsState?.status === "denied"
+      ? "Access denied"
+      : contactsQuery.status === "error" || initialContactsState?.status === "unavailable"
+        ? "Unavailable"
+        : "Loading"
   const { data: pricelists = [] } = usePricelists(orgId, initialPricelists)
   const { data: products = [] } = useProducts(orgId, initialProducts)
   const { data: uoms = [] } = useUoms(orgId, initialUoms)
-  const { data: stockPickings = [] } = useStockPickings(orgId)
+  const { data: stockPickings = [], isLoading: stockPickingsLoading, isError: stockPickingsError } = useStockPickings(orgId)
   const { data: landedCosts = [] } = useLandedCosts(orgId)
   const { data: landedCostLines = [] } = useLandedCostLines(orgId)
   const { data: supplierIntakes = [] } = useSupplierIntakes(orgId)
@@ -536,6 +552,7 @@ function PurchasingClientLoaded({
   const { data: accountJournals = [] } = useAccountJournals(orgId)
   const { data: accountAccounts = [] } = useAccountAccounts(orgId)
   const { data: paymentTerms = [] } = useAccountPaymentTerms(orgId)
+  const { data: accountMoves = [], isLoading: accountMovesLoading, isError: accountMovesError } = useAccountMoves(orgId)
   const { data: currencies = [] } = useCurrencies()
   const { data: blanketOrders = [] } = usePurchaseBlanketOrders(orgId)
   const { data: blanketOrderLines = [] } = usePurchaseBlanketOrderLines(orgId)
@@ -1007,10 +1024,13 @@ function PurchasingClientLoaded({
   }, [products])
 
   const vendorFieldOptions = useMemo(() => {
+    if (contactsReferenceStatus) {
+      return [{ value: "", label: `Contacts: ${contactsReferenceStatus}`, disabled: true }]
+    }
     const fromApi = contactRowsToVendorSelectOptions(allContacts)
     if (fromApi.length > 0) return fromApi
     return [{ value: "", label: t("common.lookup.noVendors"), disabled: true }]
-  }, [allContacts, t])
+  }, [allContacts, contactsReferenceStatus, t])
 
   const departmentFieldOptions = useMemo(() => {
     const fromApi = departmentRowsToSelectOptions(departments as Record<string, unknown>[])
@@ -1195,9 +1215,22 @@ function PurchasingClientLoaded({
             )
           },
         },
+        {
+          id: "handoffs",
+          label: "Receipts & vendor bills",
+          content: (record) => accountMovesLoading || stockPickingsLoading ? <p>Loading linked records…</p> : (
+            <CrossRecordLinks
+              testIdPrefix="purchase-order-handoff"
+              result={accountMovesError || stockPickingsError
+                ? { status: "unavailable", links: [], reason: "Linked records are unavailable" }
+                : purchaseOrderLinks(record, { organizationId: orgId, companyId: operatingCompanyId },
+                    stockPickings as unknown as Record<string, unknown>[], accountMoves as unknown as Record<string, unknown>[])}
+            />
+          ),
+        },
       ],
     }
-  }, [t, lines, vendorLabelById])
+  }, [t, lines, vendorLabelById, orgId, operatingCompanyId, stockPickings, stockPickingsLoading, stockPickingsError, accountMoves, accountMovesLoading, accountMovesError])
 
   const purchaseRequisitionFormConfig = useMemo(
     () =>
@@ -2652,6 +2685,11 @@ function PurchasingClientLoaded({
 
   return (
     <>
+      {contactsReferenceStatus && (
+        <p role="status" className="text-sm text-muted-foreground">
+          Contacts reference data: {contactsReferenceStatus}. Supplier selection requires CRM contact read access; existing purchasing records remain available.
+        </p>
+      )}
       {(activeTab === "dashboard" || activeTab === "orders") && (
         <PurchasingOpsSod
           orders={enrichedOrders}

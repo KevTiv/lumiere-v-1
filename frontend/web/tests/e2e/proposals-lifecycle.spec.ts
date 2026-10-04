@@ -25,6 +25,7 @@ import {
   selectEntityRowByText,
   smokeName,
 } from "./helpers"
+import { actorIdentity, canonicalRow, sessionActor } from "./sod-evidence"
 
 const some = <T,>(value: T) => ({ some: value })
 const none = { none: [] as [] }
@@ -130,6 +131,9 @@ test.describe("PRO-007 proposal → publish → convert lifecycle @proposals @p0
 
     const proposalId = await fetchProposalIdByTitle(page, proposalTitle)
     expect(proposalId).toBeGreaterThan(0)
+    const approverIdentity = await sessionActor(page)
+    const authored = await canonicalRow(page, "proposals", proposalId)
+    expect(actorIdentity(authored.createUid ?? authored.create_uid)).not.toBe(approverIdentity)
 
     await callReducerBff(page, "add_proposal_line_item", [
       organizationId,
@@ -194,6 +198,8 @@ test.describe("PRO-007 proposal → publish → convert lifecycle @proposals @p0
       companyId,
       proposalId,
     ])
+    const approved = await canonicalRow(page, "proposals", proposalId)
+    expect(actorIdentity(approved.awardApprovedBy ?? approved.award_approved_by)).toBe(approverIdentity)
 
     await callReducerBff(page, "update_proposal_status", [
       organizationId,

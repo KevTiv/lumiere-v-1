@@ -39,7 +39,7 @@ services:
   # Cold-tier storage (docs/plans/sliding-window-cold-tier.md). NoTls locally —
   # api-server/src/cold_tier/pg_pool.rs enforces PG_TLS_MODE=require in production.
   postgres:
-    image: postgres:16-alpine
+    image: postgres:18-alpine
     environment:
       POSTGRES_DB: ${PG_DATABASE:-lumiere}
       POSTGRES_USER: ${PG_USER:-lumiere}
@@ -53,7 +53,10 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - postgres-data:/var/lib/postgresql/data
+      # PG18 images keep PGDATA under /var/lib/postgresql/<major>/docker, so the
+      # mount moves up a level and uses a fresh volume (the old PG16 `postgres-data`
+      # volume is left in place as a rollback).
+      - postgres-data-18:/var/lib/postgresql
       - ./scripts/postgres/init-runtime-roles.sh:/docker-entrypoint-initdb.d/20-runtime-roles.sh:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${PG_USER:-lumiere} -d ${PG_DATABASE:-lumiere}"]
@@ -451,7 +454,7 @@ volumes:
   web-node-modules:
   spacetimedb-data:
   qdrant-data:
-  postgres-data:
+  postgres-data-18:
   owner-report-artifacts:
 
 secrets:

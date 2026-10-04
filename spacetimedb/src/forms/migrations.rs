@@ -6,9 +6,9 @@
 use spacetimedb::{ReducerContext, Table};
 
 use crate::forms::{
-    add_form_field, create_form_configuration, form_config, set_form_role_config,
-    CreateFormConfigParams, CreateFormFieldParams, CreateRoleConfigParams, FieldOption, FieldType,
-    FieldValidation, FieldWidth,
+    add_form_field, create_form_configuration, form_config, publish_form_configuration,
+    set_form_role_config, CreateFormConfigParams, CreateFormFieldParams, CreateRoleConfigParams,
+    FieldOption, FieldType, FieldValidation, FieldWidth, PublishFormConfigurationParams,
 };
 use crate::helpers::check_permission;
 
@@ -19,15 +19,14 @@ pub(crate) fn run_seed_organization_form_configs(
 ) -> Result<(), String> {
     // Initialize Journal form
     seed_journal_form(ctx, organization_id)?;
+    seed_operator_workflow_forms(ctx, organization_id)?;
 
     for module_id in [
         "forensic",
         "crm",
-        "sales",
         "inventory",
         "accounting",
         "hr",
-        "purchasing",
         "projects",
         "documents",
         "manufacturing",
@@ -61,6 +60,357 @@ pub fn seed_organization_form_configs(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "form_configuration", "create")?;
     run_seed_organization_form_configs(ctx, organization_id)
+}
+
+/// Governed defaults for order-line entry and sales/purchase accounting handoffs.
+/// Relation options remain current-company query data supplied by the form owner.
+/// No role IDs are guessed: the tenant's form/field policy owns role restrictions.
+fn seed_operator_workflow_forms(ctx: &ReducerContext, organization_id: u64) -> Result<(), String> {
+    for (module_id, form_id, name) in [
+        ("sales", "add-sale-order-line", "Add sale order line"),
+        (
+            "purchasing",
+            "add-purchase-order-line",
+            "Add purchase order line",
+        ),
+        (
+            "sales",
+            "create-invoice-from-sale-order",
+            "Create invoice from sale order",
+        ),
+        (
+            "purchasing",
+            "create-bill-from-purchase-order",
+            "Create bill from purchase order",
+        ),
+    ] {
+        let existing: Vec<_> = ctx
+            .db
+            .form_config()
+            .iter()
+            .filter(|config| {
+                config.organization_id == organization_id
+                    && config.module_id == module_id
+                    && config.form_id == form_id
+            })
+            .collect();
+        match existing.len() {
+            0 => {}
+            1 => continue, // Preserve operator edits, versions, and deliberate deactivation.
+            count => {
+                return Err(format!(
+                    "Duplicate governed form identity {organization_id}/{module_id}/{form_id}: {count}"
+                ));
+            }
+        }
+
+        publish_form_configuration(
+            ctx,
+            organization_id,
+            PublishFormConfigurationParams {
+                module_id: module_id.to_string(),
+                form_id: form_id.to_string(),
+                name: name.to_string(),
+                description: Some(name.to_string()),
+                is_system_default: true,
+                fields: workflow_form_fields(module_id, form_id),
+                role_configs: vec![],
+                expected_updated_at_micros: None,
+                replace_missing_fields: false,
+            },
+        )?;
+    }
+    Ok(())
+}
+
+/// Field identities match sales/purchasing-form-configs.ts. Presentation and
+/// relation choices are merged by the existing runtime form owner, not seeded IDs.
+fn workflow_form_fields(module_id: &str, form_id: &str) -> Vec<CreateFormFieldParams> {
+    let mut definitions = if form_id == "create-invoice-from-sale-order" {
+        vec![
+            ("journalId", "Journal", FieldType::Select, true, None),
+            (
+                "defaultIncomeAccountId",
+                "Income account",
+                FieldType::Select,
+                true,
+                None,
+            ),
+            (
+                "receivableAccountId",
+                "Receivable account",
+                FieldType::Select,
+                true,
+                None,
+            ),
+            (
+                "receivableLineName",
+                "Receivable line name",
+                FieldType::Text,
+                false,
+                None,
+            ),
+            ("narration", "Narration", FieldType::Textarea, false, None),
+            (
+                "incomeExcludeFromInvoiceTab",
+                "Exclude income from invoice tab",
+                FieldType::Checkbox,
+                false,
+                Some("false"),
+            ),
+            (
+                "incomeBlocked",
+                "Block income line",
+                FieldType::Checkbox,
+                false,
+                Some("false"),
+            ),
+            (
+                "receivableExcludeFromInvoiceTab",
+                "Exclude receivable from invoice tab",
+                FieldType::Checkbox,
+                false,
+                Some("true"),
+            ),
+            (
+                "receivableBlocked",
+                "Block receivable line",
+                FieldType::Checkbox,
+                false,
+                Some("false"),
+            ),
+        ]
+    } else if form_id == "create-bill-from-purchase-order" {
+        vec![
+            ("journalId", "Journal", FieldType::Select, true, None),
+            (
+                "defaultExpenseAccountId",
+                "Expense account",
+                FieldType::Select,
+                true,
+                None,
+            ),
+            (
+                "payableAccountId",
+                "Payable account",
+                FieldType::Select,
+                true,
+                None,
+            ),
+            ("invoiceDate", "Invoice date", FieldType::Date, true, None),
+            (
+                "payableLineName",
+                "Payable line name",
+                FieldType::Text,
+                false,
+                None,
+            ),
+            ("narration", "Narration", FieldType::Textarea, false, None),
+            (
+                "expenseExcludeFromInvoiceTab",
+                "Exclude expense from invoice tab",
+                FieldType::Checkbox,
+                false,
+                Some("false"),
+            ),
+            (
+                "expenseBlocked",
+                "Block expense line",
+                FieldType::Checkbox,
+                false,
+                Some("false"),
+            ),
+            (
+                "payableExcludeFromInvoiceTab",
+                "Exclude payable from invoice tab",
+                FieldType::Checkbox,
+                false,
+                Some("true"),
+            ),
+            (
+                "payableBlocked",
+                "Block payable line",
+                FieldType::Checkbox,
+                false,
+                Some("false"),
+            ),
+        ]
+    } else {
+        vec![
+            ("orderId", "Order", FieldType::Select, true, None),
+            ("productId", "Product", FieldType::Select, true, None),
+            ("uomId", "Unit of measure", FieldType::Select, true, None),
+            ("quantity", "Quantity", FieldType::Number, true, None),
+            ("priceUnit", "Unit price", FieldType::Number, true, None),
+        ]
+    };
+    if module_id == "sales" && form_id == "add-sale-order-line" {
+        definitions.extend([
+            ("discount", "Discount", FieldType::Number, false, Some("0")),
+            ("sequence", "Sequence", FieldType::Number, false, Some("10")),
+            ("name", "Description", FieldType::Text, false, None),
+            ("taxIds", "Tax IDs", FieldType::Textarea, false, None),
+        ]);
+    }
+    definitions
+        .into_iter()
+        .enumerate()
+        .map(
+            |(index, (field_id, label, field_type, required, default_value))| {
+                CreateFormFieldParams {
+                    field_id: field_id.to_string(),
+                    name: field_id.to_string(),
+                    label: label.to_string(),
+                    field_type,
+                    description: None,
+                    placeholder: None,
+                    default_value: default_value.map(str::to_string),
+                    options: vec![],
+                    validation: FieldValidation {
+                        required,
+                        ..Default::default()
+                    },
+                    ai_suggestions: vec![],
+                    order: (index + 1) as u32,
+                    is_system: true,
+                    is_enabled: true,
+                    category: None,
+                    show_in_list: false,
+                    width: FieldWidth::Full,
+                    section_id: None,
+                    visibility_json: None,
+                }
+            },
+        )
+        .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn order_line_defaults_match_operator_field_identities() {
+        for (module, expected) in [
+            (
+                "purchasing",
+                vec!["orderId", "productId", "uomId", "quantity", "priceUnit"],
+            ),
+            (
+                "sales",
+                vec![
+                    "orderId",
+                    "productId",
+                    "uomId",
+                    "quantity",
+                    "priceUnit",
+                    "discount",
+                    "sequence",
+                    "name",
+                    "taxIds",
+                ],
+            ),
+        ] {
+            let form_id = if module == "sales" {
+                "add-sale-order-line"
+            } else {
+                "add-purchase-order-line"
+            };
+            let fields = workflow_form_fields(module, form_id);
+            assert_eq!(
+                fields
+                    .iter()
+                    .map(|field| field.field_id.as_str())
+                    .collect::<Vec<_>>(),
+                expected
+            );
+            for (index, field) in fields.iter().enumerate() {
+                assert_eq!(field.name, field.field_id);
+                assert_eq!(field.validation.required, index < 5);
+                assert!(field.is_system && field.is_enabled);
+                assert!(
+                    field.options.is_empty(),
+                    "relation choices must not contain seeded tenant IDs"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn invoice_defaults_match_operator_fields_and_checkbox_defaults() {
+        let fields = workflow_form_fields("sales", "create-invoice-from-sale-order");
+        let expected = [
+            ("journalId", FieldType::Select, true, None),
+            ("defaultIncomeAccountId", FieldType::Select, true, None),
+            ("receivableAccountId", FieldType::Select, true, None),
+            ("receivableLineName", FieldType::Text, false, None),
+            ("narration", FieldType::Textarea, false, None),
+            (
+                "incomeExcludeFromInvoiceTab",
+                FieldType::Checkbox,
+                false,
+                Some("false"),
+            ),
+            ("incomeBlocked", FieldType::Checkbox, false, Some("false")),
+            (
+                "receivableExcludeFromInvoiceTab",
+                FieldType::Checkbox,
+                false,
+                Some("true"),
+            ),
+            (
+                "receivableBlocked",
+                FieldType::Checkbox,
+                false,
+                Some("false"),
+            ),
+        ];
+        assert_eq!(fields.len(), expected.len());
+        for (field, (id, field_type, required, default)) in fields.iter().zip(expected) {
+            assert_eq!(field.field_id, id);
+            assert_eq!(field.name, id);
+            assert_eq!(field.field_type, field_type);
+            assert_eq!(field.validation.required, required);
+            assert_eq!(field.default_value.as_deref(), default);
+            assert!(field.is_enabled && field.is_system && field.options.is_empty());
+        }
+    }
+
+    #[test]
+    fn bill_defaults_match_operator_fields_and_checkbox_defaults() {
+        let fields = workflow_form_fields("purchasing", "create-bill-from-purchase-order");
+        let expected = [
+            ("journalId", FieldType::Select, true, None),
+            ("defaultExpenseAccountId", FieldType::Select, true, None),
+            ("payableAccountId", FieldType::Select, true, None),
+            ("invoiceDate", FieldType::Date, true, None),
+            ("payableLineName", FieldType::Text, false, None),
+            ("narration", FieldType::Textarea, false, None),
+            (
+                "expenseExcludeFromInvoiceTab",
+                FieldType::Checkbox,
+                false,
+                Some("false"),
+            ),
+            ("expenseBlocked", FieldType::Checkbox, false, Some("false")),
+            (
+                "payableExcludeFromInvoiceTab",
+                FieldType::Checkbox,
+                false,
+                Some("true"),
+            ),
+            ("payableBlocked", FieldType::Checkbox, false, Some("false")),
+        ];
+        assert_eq!(fields.len(), expected.len());
+        for (field, (id, field_type, required, default)) in fields.iter().zip(expected) {
+            assert_eq!(field.field_id, id);
+            assert_eq!(field.name, id);
+            assert_eq!(field.field_type, field_type);
+            assert_eq!(field.validation.required, required);
+            assert_eq!(field.default_value.as_deref(), default);
+            assert!(field.is_enabled && field.is_system && field.options.is_empty());
+        }
+    }
 }
 
 /// Seed Journal form configuration

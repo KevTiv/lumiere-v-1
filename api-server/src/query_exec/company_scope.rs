@@ -336,6 +336,7 @@ pub(crate) fn inventory_resource(resource: &str) -> bool {
             | "quality-checks"
             | "quality-alerts"
             | "replenishment-rules"
+            | "replenishment-run-jobs"
             | "picking-batches"
             | "product-categories"
     )

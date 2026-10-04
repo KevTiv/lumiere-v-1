@@ -109,7 +109,7 @@ E2E_DOMAIN_TEST_REDUCERS := \
 	generate-stdb-ts-sdk generate-stdb-rust-sdk schema-snapshot \
 	e2e-smoke e2e-smoke-setup e2e-smoke-test e2e-playwright-only \
 	e2e-wipe-local-stdb e2e-single e2e-single-test e2e-p2p e2e-mvp-golden \
-	e2e-crm-isolation e2e-dx-test e2e-web-dev e2e-single-running \
+	e2e-crm-isolation e2e-dx-test e2e-web-dev e2e-single-running e2e-docker \
 	e2e-pretenant pretenant-cert-stdb pretenant-cert-native \
 	init-stack refresh-stack-tokens docker-dev docker-dev-iot \
 	register-stack-identities \
@@ -418,6 +418,10 @@ e2e-smoke-setup:
 			cd "$$ROOT"; \
 			echo "$$CUR_STDB_HASH" >"$$STDB_HASH_FILE"; \
 		fi; \
+		if [ "$${E2E_DOCKER:-0}" = "1" ]; then \
+			echo "[e2e] E2E_DOCKER=1: using the Docker api-server and web (no native api-server)."; \
+			E2E_STDB_TOKEN="$$E2E_STDB_TOKEN" E2E_STDB_MODULE="$(E2E_DB)" "$$ROOT/scripts/e2e-docker-stack.sh"; \
+		else \
 		API_HASH_FILE="$$LOG_DIR/api.hash"; \
 		set -a; [ ! -f "$$ROOT/frontend/web/.env.local" ] || . "$$ROOT/frontend/web/.env.local"; set +a; \
 		CUR_API_HASH="$$(STDB_SERVER_TOKEN="$$E2E_STDB_TOKEN" E2E_BUILD_MODULE="$(E2E_DB)" E2E_BUILD_HOST="$$E2E_STDB_HOST" E2E_BUILD_API_PORT="$(E2E_API_PORT)" E2E_BUILD_WEB_PORT="$(E2E_WEB_PORT)" "$$ROOT/scripts/e2e-dx.sh" api-fingerprint)"; \
@@ -460,6 +464,7 @@ e2e-smoke-setup:
 		fi; \
 		echo "[e2e] Applying checksum-verified PostgreSQL migrations..."; \
 		"$$ROOT/scripts/e2e-dx.sh" storage-migrate; \
+		fi; \
 		echo "[e2e] Seeding browser test user through the running API server..."; \
 		cd "$$ROOT/frontend/web"; \
 		set -a; [ ! -f "$$ROOT/frontend/web/.env.local" ] || . "$$ROOT/frontend/web/.env.local"; set +a; \
@@ -803,6 +808,35 @@ e2e-playwright-only:
 		NEXT_PUBLIC_API_GATEWAY_URL="" \
 		pnpm run "$$E2E_PNPM_SCRIPT" "$${PW_ARGS[@]}"; \
 		echo "[e2e] Smoke tests passed."; \
+	'
+
+# Acceptance proof entirely on the Docker dev stack: SpacetimeDB, api-server, web
+# and PostgreSQL are the OrbStack containers (docker-compose.e2e.yml retargets
+# api-server/web to the e2e module with dev bypasses off). Only the Playwright
+# browser runs on the host. Needs `make docker-dev` (or compose up) done once.
+#   make e2e-docker E2E_SPEC_FILES="cov05-purchase-order-confirmation.spec.ts cov09-hr-leave-approval.spec.ts"
+# Set E2E_CLEAR_DB=1 for a pristine module (clears lumiere-v1-local-e2e only).
+e2e-docker:
+	@$(MAKE) e2e-smoke-setup E2E_DOCKER=1
+	@env PATH="$(E2E_PATH):$$PATH" E2E_SPEC_FILES="$(E2E_SPEC_FILES)" E2E_GREP="$(E2E_GREP)" E2E_WORKERS="$(E2E_WORKERS)" /bin/bash -c 'set -euo pipefail; \
+		ROOT="$$(pwd)"; LOG_DIR="$$ROOT/.tmp/e2e"; \
+		set -a; . "$$LOG_DIR/env.sh"; set +a; \
+		cd "$$ROOT/frontend/web"; \
+		PW_ARGS=(--workers "$$E2E_WORKERS"); \
+		for f in $$E2E_SPEC_FILES; do PW_ARGS+=("tests/e2e/$$f"); done; \
+		if [ -n "$$E2E_GREP" ]; then PW_ARGS+=(--grep "$$E2E_GREP"); fi; \
+		echo "[e2e-docker] Playwright against Docker web :3001 / api-server :8082 ($${E2E_SPEC_FILES:-full suite})"; \
+		pnpm exec playwright install chromium; \
+		PORT="" \
+		PLAYWRIGHT_PORT=3001 \
+		PLAYWRIGHT_BASE_URL="http://127.0.0.1:3001" \
+		LUMIERE_API_SERVER_URL="http://127.0.0.1:$(E2E_API_PORT)" \
+		STDB_SERVER_TOKEN="$$E2E_STDB_TOKEN" \
+		STDB_CREDENTIAL_ENCRYPTION_KEY="$$STDB_CREDENTIAL_ENCRYPTION_KEY" \
+		STDB_MODULE="$(E2E_DB)" NEXT_PUBLIC_STDB_MODULE="$(E2E_DB)" \
+		STDB_HOST="$$E2E_STDB_HOST" NEXT_PUBLIC_STDB_HOST="$$E2E_STDB_HOST" \
+		NEXT_PUBLIC_API_GATEWAY_URL="" \
+		pnpm exec playwright test "$${PW_ARGS[@]}"; \
 	'
 
 e2e-smoke:

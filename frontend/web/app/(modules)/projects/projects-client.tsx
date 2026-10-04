@@ -3,6 +3,7 @@ import { projectTimesheetsHref } from "@lumiere/erp-shared/record-links"
 import { mapDashboardWidgets, withDashboardSections } from "@lumiere/ui/lib/dashboard-sections"
 
 import { useMemo, useState, useCallback, useEffect } from "react"
+import type { QueryResourceState } from "@lumiere/api-client"
 import { useTranslation } from "@lumiere/i18n"
 import {
   ModuleView,
@@ -135,7 +136,7 @@ interface ProjectsClientProps {
   initialTasks?: ProjectTask[]
   initialTimesheets?: ProjectTimesheet[]
   initialPricelists?: ProductPricelist[]
-  initialContacts?: Contact[]
+  initialContactsState?: QueryResourceState<Contact>
   organizationId?: number
 }
 
@@ -295,7 +296,7 @@ function ProjectsClientLoaded({
   initialTasks,
   initialTimesheets,
   initialPricelists,
-  initialContacts,
+  initialContactsState,
   organizationId,
 }: ProjectsClientLoadedProps) {
   useProjectsModuleSubscription()
@@ -329,7 +330,20 @@ function ProjectsClientLoaded({
   const { data: employees = [] } = useEmployees(orgId)
   const { data: uoms = [] } = useUoms(orgId)
   const { data: pricelists = [] } = usePricelists(orgId, initialPricelists)
-  const { data: contacts = [] } = useContacts(orgId, initialContacts)
+  const contactsQuery = useContacts(
+    orgId,
+    initialContactsState?.status === "ready" || initialContactsState?.status === "empty"
+      ? initialContactsState.rows
+      : undefined,
+  )
+  const { data: contacts = [] } = contactsQuery
+  const contactsReferenceStatus = contactsQuery.status === "success"
+    ? undefined
+    : initialContactsState?.status === "denied"
+      ? "Access denied"
+      : contactsQuery.status === "error" || initialContactsState?.status === "unavailable"
+        ? "Unavailable"
+        : "Loading"
   const { data: users = [] } = useUsers(orgId)
   const { data: accountJournals = [] } = useAccountJournals(orgId)
   const { data: accountAccounts = [] } = useAccountAccounts(orgId)
@@ -390,11 +404,14 @@ function ProjectsClientLoaded({
   }, [pricelists, t])
 
   const partnerFieldOptions = useMemo(() => {
+    if (contactsReferenceStatus) {
+      return [{ value: "", label: `Contacts: ${contactsReferenceStatus}`, disabled: true }]
+    }
     const fromApi = contactRowsToPartnerSelectOptions(contacts)
     const optional = { value: "", label: "—" }
     if (fromApi.length > 0) return [optional, ...fromApi]
     return [{ value: "", label: t("common.lookup.noPartners"), disabled: true }]
-  }, [contacts, t])
+  }, [contacts, contactsReferenceStatus, t])
 
   const employeeFieldOptions = useMemo(() => {
     const fromApi = employeeRowsToSelectOptions(employees as Record<string, unknown>[])
@@ -1252,6 +1269,11 @@ function ProjectsClientLoaded({
 
   return (
     <>
+      {contactsReferenceStatus && (
+        <p role="status" className="text-sm text-muted-foreground">
+          Contacts reference data: {contactsReferenceStatus}. Partner selection requires CRM contact read access; project and timesheet workflows remain available.
+        </p>
+      )}
       <ModuleView
         config={config}
         data={data}

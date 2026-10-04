@@ -2504,27 +2504,6 @@ function InventoryClientLoaded({
                     });
                   },
                 },
-                {
-                  id: 'schedule-replenishment-run',
-                  label: t('inventory.replenishmentActions.scheduleRun'),
-                  icon: ListChecks,
-                  requiresSelection: true,
-                  onClick: (rows) => {
-                    const id = rows[0]?.id as ScalarId | undefined;
-                    if (id != null)
-                      void scheduleReplenishmentRun.mutateAsync(id);
-                  },
-                },
-                {
-                  id: 'cancel-replenishment-run',
-                  label: t('inventory.replenishmentActions.cancelSchedule'),
-                  icon: ListChecks,
-                  requiresSelection: true,
-                  onClick: (rows) => {
-                    const id = rows[0]?.id as ScalarId | undefined;
-                    if (id != null) void cancelReplenishmentRun.mutateAsync(id);
-                  },
-                },
               ],
             },
           },
@@ -3584,6 +3563,27 @@ function InventoryClientLoaded({
                     }
                   },
                 },
+                {
+                  id: 'schedule-replenishment-run',
+                  label: t('inventory.replenishmentActions.scheduleRun'),
+                  icon: ListChecks,
+                  requiresSelection: true,
+                  onClick: (rows) => {
+                    const id = rows[0]?.id as ScalarId | undefined;
+                    if (id != null)
+                      void scheduleReplenishmentRun.mutateAsync(id);
+                  },
+                },
+                {
+                  id: 'cancel-replenishment-run',
+                  label: t('inventory.replenishmentActions.cancelSchedule'),
+                  icon: ListChecks,
+                  requiresSelection: true,
+                  onClick: (rows) => {
+                    const id = rows[0]?.id as ScalarId | undefined;
+                    if (id != null) void cancelReplenishmentRun.mutateAsync(id);
+                  },
+                },
               ],
             },
           },
@@ -4141,6 +4141,8 @@ function InventoryClientLoaded({
     cancelWarehouseTask,
     updateWarehouseTaskStatus,
     executeReplenishmentRule,
+    scheduleReplenishmentRun,
+    cancelReplenishmentRun,
     startQualityCheck,
     openQualityAlert,
     solveQualityAlert,
