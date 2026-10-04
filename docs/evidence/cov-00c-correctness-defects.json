@@ -267,6 +267,7 @@
       "frontend/web/tests/e2e/cov20-report-run.spec.ts",
       "frontend/web/tests/e2e/cov21-approval-decision.spec.ts",
       "frontend/web/tests/e2e/cov23-role-assignment.spec.ts",
+      "frontend/web/tests/e2e/cov25-proposal-handoff-links.spec.ts",
       "frontend/web/tests/e2e/crm-opportunity-stage.spec.ts",
       "frontend/web/tests/e2e/crm-read-isolation.spec.ts",
       "frontend/web/tests/e2e/documents-wave-a-lifecycle.spec.ts",
