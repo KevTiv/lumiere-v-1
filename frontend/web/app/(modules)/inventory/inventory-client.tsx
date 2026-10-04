@@ -481,7 +481,9 @@ function InventoryClientLoaded({
     () => [
       ...inventoryModuleConfig(t).tabs.map((tab) => tab.id),
       'cycle-wizard',
+      'location-tree',
       'quality-alerts',
+      '3d-view',
     ],
     [t],
   );
