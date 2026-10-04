@@ -198,6 +198,48 @@
       "change_constructors": [
         "upsert_stdb_row"
       ]
+    },
+    {
+      "source": "spacetimedb/src/inventory/product_category.rs",
+      "function": "create_product_category",
+      "operation": "create_product_category",
+      "operation_id": "erp.create_product_category",
+      "change_constructors": ["upsert_stdb_row"]
+    },
+    {
+      "source": "spacetimedb/src/inventory/product_category.rs",
+      "function": "update_product_category",
+      "operation": "update_product_category",
+      "operation_id": "erp.update_product_category",
+      "change_constructors": ["upsert_stdb_row"]
+    },
+    {
+      "source": "spacetimedb/src/inventory/product_category.rs",
+      "function": "delete_product_category",
+      "operation": "delete_product_category",
+      "operation_id": "erp.delete_product_category",
+      "change_constructors": ["upsert_stdb_row"]
+    },
+    {
+      "source": "spacetimedb/src/inventory/product_category.rs",
+      "function": "restore_product_category",
+      "operation": "restore_product_category",
+      "operation_id": "erp.restore_product_category",
+      "change_constructors": ["upsert_stdb_row"]
+    },
+    {
+      "source": "spacetimedb/src/data_ops/inventory_imports.rs",
+      "function": "import_product_category_csv",
+      "operation": "import_product_category_csv",
+      "operation_id": "erp.import_product_category_csv",
+      "change_constructors": ["upsert_stdb_row"]
+    },
+    {
+      "source": "spacetimedb/src/inventory/product_category.rs",
+      "function": "record_seed_categories",
+      "operation": "seed_dev_data",
+      "operation_id": "erp.seed_dev_data",
+      "change_constructors": ["upsert_stdb_row"]
     }
   ]
 }

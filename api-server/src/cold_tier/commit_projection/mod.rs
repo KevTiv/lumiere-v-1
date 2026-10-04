@@ -11,6 +11,20 @@ mod tests;
 pub use apply::apply_commit;
 pub(crate) use checksum::{canonical_json, change_checksum, commit_checksum_from_changes};
 
+/// Read-side consumers share the projector's exact envelope, ordering, schema
+/// and checksum validation before exposing any selected canonical row.
+pub(crate) fn validate_replay(
+    commit: &OrganizationCommitEnvelope,
+    changes: &[OrganizationRowChangeInput],
+) -> anyhow::Result<()> {
+    prepare::validate_commit(
+        super::projection_worker::PROJECTION_CODEC_MANIFEST_JSON,
+        commit,
+        changes,
+    )?;
+    Ok(())
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct OrganizationCommitEnvelope {
     pub id: String,
