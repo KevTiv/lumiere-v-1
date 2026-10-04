@@ -138,6 +138,19 @@ pub const MIGRATIONS: &[Migration] = &[
         phase: MigrationPhase::ProjectBackfill,
         sql: ORGANIZATION_COMMIT_CURSOR_BACKFILL_SQL,
     },
+    // What the durable schema gained after the frozen migration 1. The file is
+    // the released artifact in the migration ledger, which lumiere-codegen
+    // republishes verbatim in the contracts release (see
+    // lumiere-codegen/pg-migration-ledger/README.md).
+    Migration {
+        version: 11,
+        name: "durable_projection_delta",
+        change_set: 3,
+        phase: MigrationPhase::Expand,
+        sql: include_str!(
+            "../../../lumiere-codegen/pg-migration-ledger/0011_durable_projection_delta.sql"
+        ),
+    },
 ];
 
 /// SQL used to bootstrap the migration history itself.
@@ -1257,7 +1270,11 @@ mod tests {
         history.push(AppliedMigration {
             version: MIGRATIONS.len() as i64 + 1,
             name: "next_release_contract".into(),
-            change_set: 2,
+            change_set: MIGRATIONS
+                .last()
+                .expect("migration catalog is non-empty")
+                .change_set
+                + 1,
             phase: "contract".into(),
             checksum: migration_checksum("alter table example drop column removed"),
         });

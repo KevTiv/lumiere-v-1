@@ -23,19 +23,19 @@ to `released`, and advance `pending`.
 
 ## Landing a follow-up
 
-The pending file ships in the next contracts release, and api-server can only
-reference it (`lumiere_contracts::manifests::PG_DDL_MIGRATIONS_00NN_...`) once
-that release is pinned. Land it in two steps so no branch ever fails to build:
+1. Run codegen. It prints the pending file it generated and writes it to the
+   staging directory.
+2. Promote it in the same commit as its consumer: copy the file here, add it to
+   `released` in `ledger.json`, and advance `pending`.
+3. In `api-server/src/cold_tier/migrate.rs` add the `Migration` entry (a new
+   change set, `Expand` phase) with
+   `sql: include_str!("../../../lumiere-codegen/pg-migration-ledger/<file>.sql")`,
+   and raise `durable_postgres.application_catalog_version` in
+   `release-compatibility-manifest.json`. The release workflow recomputes the
+   catalog checksum when it pins.
 
-1. Push the schema/generator change. `release-contracts.yml` publishes the next
-   contracts version (it releases on a change to the durable migrations even
-   when the IR hash is unchanged) and pins it.
-2. After the pin, add the `Migration` entry to the catalog in
-   `api-server/src/cold_tier/migrate.rs` (a new change set, `Expand` phase), raise
-   `durable_postgres.application_catalog_version` in
-   `release-compatibility-manifest.json`, and promote the published pending file
-   into this directory.
-
-Editing `migrate.rs` before the pin breaks every service that runs
-`cargo watch -w api-server` (the Docker dev stack), because the constant does not
-exist in the pinned crate yet.
+The ledger file is the single source of truth: api-server embeds it and the
+contracts release republishes the same bytes, so the catalog never depends on a
+contracts constant that is not pinned yet. (A constant from the pinned crate would
+break every `cargo watch -w api-server` service until the release landed.)
+`Dockerfile.rust` copies this directory for the same reason.

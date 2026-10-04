@@ -296,6 +296,25 @@ jobs:
           python3 scripts/verify-operation-history.py
           python3 scripts/verify-contract-ir.py .contracts-staging/ir/lumiere-contract-ir-v2.json --require-clean
 
+      # api-server consumes durable follow-up migrations from the migration
+      # ledger. A pending one has no catalog entry, so publishing it would fail
+      # every database's startup verification; stop before anything is published.
+      - name: Require promoted durable migrations
+        if: steps.changes.outputs.release == 'true'
+        run: |
+          python3 - <<'PY'
+          import json
+          import sys
+
+          manifest = json.load(open(".contracts-staging/manifests/durable-pg-schema-manifest.json", encoding="utf-8"))
+          pending = [entry["name"] for entry in manifest.get("migrations", []) if entry.get("state") != "released"]
+          if pending:
+              sys.exit(
+                  "Durable PostgreSQL migrations must be promoted into lumiere-codegen/pg-migration-ledger "
+                  "and added to the api-server catalog before release: " + ", ".join(pending)
+              )
+          PY
+
       # The presentation contract generator imports frontend dev dependencies
       # (json-schema-to-typescript).
       - uses: ./.github/actions/setup-frontend
