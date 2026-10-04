@@ -38,7 +38,7 @@ import {
   deferredRevenueLinesTableConfig,
   revenueRecognitionRulesTableConfig,
 } from "@lumiere/ui"
-import type { EntityAction, FormConfig, ModuleConfig } from "@lumiere/ui"
+import type { EntityAction, EntityRecordSheetConfig, FormConfig, ModuleConfig } from "@lumiere/ui"
 import {
   PlayCircle,
   PauseCircle,
@@ -54,6 +54,8 @@ import {
   AlertTriangle,
   Shield,
 } from "lucide-react"
+import { subscriptionHandoffs } from "@lumiere/query-hooks/hooks/subscription-handoffs"
+import { SubscriptionHandoffLinks } from "../../../components/subscription-handoff-links"
 import { subscriptionsModuleConfig } from "@/lib/module-dashboard-configs"
 import { useSubscriptionsModuleSubscription } from "@/lib/module-subscription-hooks"
 import {
@@ -127,7 +129,7 @@ import { useDefaultOperatingCompanyBigInt } from "@lumiere/query-hooks/hooks/use
 import { useSaleOrders, usePricelists, type SaleOrder, type ProductPricelist } from "@lumiere/query-hooks/hooks/sales"
 import { useProducts } from "@lumiere/query-hooks/hooks/inventory"
 import { useCurrencies } from "@lumiere/query-hooks/hooks/settings"
-import { useAccountJournals, useAccountAccounts, useAccountMoves, useAccountMoveLines } from "@lumiere/query-hooks/hooks/accounting"
+import { useAccountJournals, useAccountAccounts, useAccountMoves, useAccountMoveLines, useAccountPayments } from "@lumiere/query-hooks/hooks/accounting"
 import type { Product } from "@lumiere/stdb/types"
 import {
   saleOrderRowsToSelectOptions,
@@ -217,7 +219,8 @@ function SubscriptionsClientLoaded({
   const [recognizeMoveId, setRecognizeMoveId] = useState("")
 
   const { data: subscriptions = [] } = useSubscriptions(orgId, initialSubscriptions)
-  const { data: billingRuns = [] } = useSubscriptionBillingRuns(orgId)
+  const billingRunQuery = useSubscriptionBillingRuns(orgId)
+  const { data: billingRuns = [] } = billingRunQuery
   const { data: plans = [] } = useSubscriptionPlans(orgId, initialPlans)
   const { data: subscriptionLines = [] } = useSubscriptionLines(orgId)
   const { data: subscriptionAmendments = [] } = useSubscriptionAmendments(orgId)
@@ -237,7 +240,10 @@ function SubscriptionsClientLoaded({
   const { data: products = [] } = useProducts(orgId, initialProducts)
   const { data: journals = [] } = useAccountJournals(orgId)
   const { data: accounts = [] } = useAccountAccounts(orgId)
-  const { data: accountMoves = [] } = useAccountMoves(orgId)
+  const invoiceQuery = useAccountMoves(orgId)
+  const { data: accountMoves = [] } = invoiceQuery
+  const paymentQuery = useAccountPayments(orgId)
+  const { data: accountPayments = [] } = paymentQuery
   const { data: accountMoveLines = [] } = useAccountMoveLines(orgId)
   const { data: currencies = [] } = useCurrencies()
 
@@ -746,6 +752,34 @@ function SubscriptionsClientLoaded({
     importSubscriptionCsvFormConfig,
   ])
 
+  const subscriptionRecordSheet = useMemo((): EntityRecordSheetConfig => ({
+    titleKey: "code",
+    auditTableName: "subscription",
+    customTabs: [{
+      id: "handoffs",
+      label: t("subscriptions.handoffs.title"),
+      content: (record) => (
+        <div className="p-4">
+          {billingRunQuery.isError || invoiceQuery.isError || paymentQuery.isError ? (
+            <p role="alert">{t("subscriptions.handoffs.error")}</p>
+          ) : billingRunQuery.isPending || invoiceQuery.isPending || paymentQuery.isPending ? (
+            <p role="status">{t("subscriptions.handoffs.loading")}</p>
+          ) : (
+            <SubscriptionHandoffLinks handoffs={subscriptionHandoffs(
+              record,
+              { organizationId: orgId, companyId: operatingCompanyId },
+              billingRuns,
+              accountMoves,
+              accountPayments,
+            )} />
+          )}
+        </div>
+      ),
+    }],
+  }), [t, orgId, operatingCompanyId, billingRuns, accountMoves, accountPayments,
+    billingRunQuery.isError, billingRunQuery.isPending, invoiceQuery.isError,
+    invoiceQuery.isPending, paymentQuery.isError, paymentQuery.isPending])
+
   const config = useMemo(
     () =>
       ({
@@ -756,6 +790,7 @@ function SubscriptionsClientLoaded({
               ...tab,
               createForm: subscriptionFormConfig,
               entityConfig: subscriptionsTableConfig(t, subscriptionRowActions),
+              recordSheet: subscriptionRecordSheet,
             }
           if (tab.id === "plans") return { ...tab, createForm: planFormConfig }
           if (tab.id === "lines")
@@ -810,6 +845,7 @@ function SubscriptionsClientLoaded({
       recognitionRuleFormConfig,
       t,
       subscriptionRowActions,
+      subscriptionRecordSheet,
       deferredLineActions,
       recognitionRuleActions,
       plans,

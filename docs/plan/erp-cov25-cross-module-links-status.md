@@ -1,6 +1,6 @@
 # COV-25 — Close one missing downstream record link per PR
 
-**Status:** IMPLEMENTED for sale order → delivery/invoice and purchase order → receipt/vendor bill (runtime acceptance pending); further links are one per PR  
+**Status:** IMPLEMENTED for sale order → delivery/invoice and purchase order → receipt/vendor bill, and subscription → invoice/payment (runtime acceptance pending); further links are one per PR  
 **Module/surface:** Cross-module  
 **Plan target:** direct navigation for primary handoffs  
 **Scaffold source:** [`erp-cov08-27-scaffold.md`](./erp-cov08-27-scaffold.md)
@@ -41,8 +41,7 @@ delivery and customer invoice with its state and open balance, linking to the ca
 `orderHandoffs` builder and `OrderHandoffLinks` component as the COV-24 workspace, so there is one definition of
 "this order's downstream records". No contract delta (the relation fields are already projected).
 
-**Next links (one per PR, not done):** subscription → invoice and payment, proposal →
-sale order, ticket → record.
+**Next links (one per PR, not done):** proposal → sale order, ticket → record.
 
 ## Prerequisites / decisions
 
@@ -110,3 +109,35 @@ Validation:
 
 This link remains **IMPLEMENTED — runtime acceptance pending** until same-head
 CI and the focused browser proof pass; it does not promote the whole COV-25 track.
+
+## Implementation — link 3: subscription → invoices and reconciled payments
+
+Stacked on the purchase-order slice (#149). The subscription record sheet adds
+**Invoices & payments**. Invoices resolve from the exact scoped billing run's
+`invoice_move_id`; payments require an exact `reconciled_invoice_ids` intersection
+with those resolved invoices and state Paid. Parent, runs, moves and payments
+must all match organization and company. Duplicate billing runs deduplicate the
+same invoice; ambiguous target rows are withheld with an unavailable-record alert.
+Refunds, cancelled invoices, pending approval payments and reversed payments are
+excluded. Names, references and timestamps never select records. A shared payment
+may appear for several subscriptions; no payment total is presented as allocation.
+
+The tab distinguishes loading, failed/denied reads, successful empty results and
+unresolved billing relations. It uses existing authorized projections and canonical
+`accountMoveHref` / `accountPaymentHref` links. There is no mutation, domain state,
+generated contract delta or new native-domain test requirement.
+
+Validation:
+- `subscription-handoffs.test.ts`: five passing focused tests for exact relations,
+  independent scope checks, multiple/shared payments, deduplication, ambiguity,
+  missing targets, excluded states, snake-case fields and large option IDs.
+  Executed with Node TypeScript support using temporary import-path substitutions.
+- Existing COV-12 browser proof gains COV-25 assertions after its visible billing
+  and payment actions: exact invoice/payment hrefs, filtered target focus and
+  focus preserved after refresh. Existing stale (422) and reader (403) replay
+  assertions remain.
+- Full workspace typecheck and browser execution require GitHub CI; dependencies
+  and network access are unavailable locally.
+
+Status remains **IMPLEMENTED — runtime acceptance pending** until same-head CI
+and browser proof pass. This does not promote the whole cross-module track.

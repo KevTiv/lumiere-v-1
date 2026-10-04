@@ -8249,6 +8249,15 @@
     }
   },
   "subscriptions": {
+    "handoffs": {
+      "title": "Invoices & payments",
+      "empty": "No billing invoices or reconciled payments yet",
+      "invoice": "Invoice #{{id}}",
+      "payment": "Payment #{{id}}",
+      "loading": "Loading invoices and payments…",
+      "error": "Invoices or payments could not be loaded. Check your access and try again.",
+      "unavailable": "Some linked billing records are unavailable. Refresh or check your access."
+    },
     "subscriptions": {
       "title": "Subscriptions",
       "description": "Customer subscriptions and recurring billing",

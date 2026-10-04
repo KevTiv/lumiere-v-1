@@ -1,6 +1,9 @@
 import { expect, test, type Page, type Request } from "@playwright/test"
 
+import { accountMoveHref, accountPaymentHref } from "@lumiere/erp-shared/record-links"
+
 import {
+  activeTabEntityTable,
   chooseSelectOptionByLabel,
   fetchAccountSelectLabelByInternalType,
   fetchSalesInvoiceJournalLabel,
@@ -128,9 +131,33 @@ async function invoiceSnapshot(page: Page, moveId: number) {
   }
 }
 
+
+async function openSubscriptionHandoffs(page: Page, subscriptionId: number) {
+  await gotoModule(page, `/subscriptions?tab=subscriptions&filter=${encodeURIComponent(`id:${subscriptionId}`)}`, "subscriptions")
+  const row = activeTabEntityTable(page).getByTestId(`entity-row-${subscriptionId}`)
+  await expect(row).toBeVisible({ timeout: 30_000 })
+  await row.click()
+  const sheet = page.locator('[data-slot="sheet-content"]:visible')
+  await expect(sheet).toBeVisible()
+  await sheet.getByTestId("entity-record-sheet-tab-handoffs").click()
+  await expect(sheet.getByTestId("subscription-handoffs")).toBeVisible()
+  return sheet
+}
+
+async function expectAccountingFocus(page: Page, tab: string, id: number) {
+  await expect(page).toHaveURL((url) => url.pathname === "/accounting"
+    && url.searchParams.get("tab") === tab
+    && url.searchParams.getAll("filter").length === 1
+    && url.searchParams.get("filter") === `id:${id}`)
+  await expect(page.getByTestId(`module-tab-accounting-${tab}`)).toHaveAttribute("aria-selected", "true")
+  const table = activeTabEntityTable(page)
+  await expect(table.getByTestId(`entity-row-${id}`)).toBeVisible()
+  await expect(table.locator('[data-testid^="entity-row-"]')).toHaveCount(1)
+}
+
 test.describe(
   "COV-12 recurring subscription invoice run",
-  { tag: ["@p0", "@cov12"] },
+  { tag: ["@p0", "@cov12", "@cov25"] },
   () => {
     test("generates one exact billing run, reuses it on retry, pays its invoice, and denies reader replay", async ({
       browser,
@@ -327,6 +354,36 @@ test.describe(
       } finally {
         await readerContext.close()
       }
+
+      // Follow only durable billing-run and reconciled-invoice relations.
+      const payments = (await rows(page, "account-payments")).filter((row) => {
+        const invoiceIds = row.reconciledInvoiceIds ?? row.reconciled_invoice_ids
+        return scalarQueryId(row.organizationId ?? row.organization_id) === organizationId
+          && scalarQueryId(row.companyId ?? row.company_id) === companyId
+          && tagged(row.state) === "Paid"
+          && Array.isArray(invoiceIds)
+          && invoiceIds.some((id) => scalarQueryId(id) === invoiceMoveId)
+      })
+      expect(payments).toHaveLength(1)
+      const paymentId = scalarQueryId(payments[0]!.id)
+      if (paymentId == null) throw new Error("Reconciled payment has no ID")
+
+      const sheet = await openSubscriptionHandoffs(page, subscriptionId)
+      const invoiceLink = sheet.getByTestId(`subscription-handoff-invoice-${invoiceMoveId}`)
+      await expect(invoiceLink).toHaveCount(1)
+      await expect(invoiceLink).toHaveAttribute("href", accountMoveHref(invoiceMoveId))
+      await expect(sheet.getByTestId(`subscription-handoff-payment-${paymentId}`))
+        .toHaveAttribute("href", accountPaymentHref(paymentId))
+      await invoiceLink.click()
+      await expectAccountingFocus(page, "journal-entries", invoiceMoveId)
+      await page.reload()
+      await expectAccountingFocus(page, "journal-entries", invoiceMoveId)
+
+      const reopened = await openSubscriptionHandoffs(page, subscriptionId)
+      await reopened.getByTestId(`subscription-handoff-payment-${paymentId}`).click()
+      await expectAccountingFocus(page, "payments", paymentId)
+      await page.reload()
+      await expectAccountingFocus(page, "payments", paymentId)
     })
   },
 )
