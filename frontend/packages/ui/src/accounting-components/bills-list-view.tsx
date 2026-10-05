@@ -45,6 +45,7 @@ import {
   Calculator,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { StatCard, StatCardGrid } from "../components/stat-card"
 import { TablePager, usePagedRows } from "../components/table-pager"
 import { accountingListStatusBadgeClass } from "../lib/theme-colors"
 import type { AccountMove } from "../lib/accounting-types"
@@ -138,48 +139,14 @@ export function BillsListView({
   return (
     <div className="space-y-6">
       {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card><CardContent className="p-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-info/10"><FileText className="h-5 w-5 text-info" /></div>
-            <div><p className="text-sm text-muted-foreground">{t("accounting.bills.totalBills")}</p><p className="text-2xl font-bold">{stats.total}</p></div>
-          </div>
-        </CardContent></Card>
-        <Card><CardContent className="p-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-success/10"><CheckCircle2 className="h-5 w-5 text-success" /></div>
-            <div><p className="text-sm text-muted-foreground">{t("accounting.states.paid")}</p><p className="text-2xl font-bold">{stats.paid}</p></div>
-          </div>
-        </CardContent></Card>
-        <Card><CardContent className="p-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-warning/10"><Clock className="h-5 w-5 text-warning" /></div>
-            <div><p className="text-sm text-muted-foreground">{t("accounting.states.pending")}</p><p className="text-2xl font-bold">{stats.pending}</p></div>
-          </div>
-        </CardContent></Card>
-        <Card><CardContent className="p-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-destructive/10"><AlertTriangle className="h-5 w-5 text-destructive" /></div>
-            <div><p className="text-sm text-muted-foreground">{t("accounting.states.overdue")}</p><p className="text-2xl font-bold">{stats.overdue}</p></div>
-          </div>
-        </CardContent></Card>
-      </div>
-
-      {/* Summary */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Card><CardContent className="p-4">
-          <div className="flex items-center justify-between">
-            <div><p className="text-sm text-muted-foreground">{t("accounting.bills.totalBilled")}</p><p className="text-2xl font-bold">{formatCurrency(stats.totalAmount)}</p></div>
-            <Building className="h-8 w-8 text-muted-foreground/30" />
-          </div>
-        </CardContent></Card>
-        <Card><CardContent className="p-4">
-          <div className="flex items-center justify-between">
-            <div><p className="text-sm text-muted-foreground">{t("accounting.bills.amountOwed")}</p><p className="text-2xl font-bold">{formatCurrency(stats.totalDue)}</p></div>
-            <DollarSign className="h-8 w-8 text-muted-foreground/30" />
-          </div>
-        </CardContent></Card>
-      </div>
+      <StatCardGrid className="lg:grid-cols-6">
+        <StatCard label={t("accounting.bills.totalBills")} value={stats.total} icon={FileText} tone="info" />
+        <StatCard label={t("accounting.states.paid")} value={stats.paid} icon={CheckCircle2} tone="success" />
+        <StatCard label={t("accounting.states.pending")} value={stats.pending} icon={Clock} tone="warning" />
+        <StatCard label={t("accounting.states.overdue")} value={stats.overdue} icon={AlertTriangle} tone="destructive" />
+        <StatCard label={t("accounting.bills.totalBilled")} value={formatCurrency(stats.totalAmount)} icon={Building} />
+        <StatCard label={t("accounting.bills.amountOwed")} value={formatCurrency(stats.totalDue)} icon={DollarSign} />
+      </StatCardGrid>
 
       {/* Table */}
       <Card>

@@ -1151,12 +1151,14 @@ function PurchasingClientLoaded({
   )
 
   const vendorLabelById = useMemo(() => {
+    // Any contact can be a PO partner, not only those flagged as vendors.
     const map = new Map<string, string>()
-    for (const vendor of vendors) {
-      map.set(String(vendor.id), String(vendor.name ?? vendor.displayName ?? vendor.id))
+    for (const contact of [...(allContacts as Record<string, unknown>[]), ...(vendors as Record<string, unknown>[])]) {
+      const label = contact.name ?? contact.displayName
+      if (contact.id != null && label != null) map.set(String(contact.id), String(label))
     }
     return map
-  }, [vendors])
+  }, [allContacts, vendors])
 
   const purchaseOrderRecordSheet = useMemo((): EntityRecordSheetConfig => {
     const status = purchaseOrderStatusBadges(t)

@@ -61,6 +61,7 @@ import {
   previousPeriodMs,
   timeRangeToMs,
 } from '@lumiere/ui';
+import { formNumber, formText, recordOptions, useFormDialog } from '@lumiere/ui';
 import type {
   EntityTableConfig,
   EntityViewConfig,
@@ -437,6 +438,7 @@ function InventoryClientLoaded({
 }: InventoryClientLoadedProps) {
   useInventoryModuleSubscription();
   const { t } = useTranslation();
+  const { askForm, formDialog } = useFormDialog();
   const { orgId } = orgBigInts(organizationId);
   const selectedOperatingCompanyId =
     useDefaultOperatingCompanyBigInt(organizationId);
@@ -1978,23 +1980,32 @@ function InventoryClientLoaded({
               type="button"
               variant="outline"
               size="sm"
-              onClick={() => {
-                if (typeof window === 'undefined') return;
-                const zid = window.prompt(
-                  t('inventory.z3dActions.zoneIdPrompt'),
-                );
-                if (zid == null || zid.trim() === '') return;
-                const zoneId = Number(zid);
-                if (!Number.isFinite(zoneId)) return;
-                const color = window.prompt(
-                  'Color hex (optional, leave empty to skip)',
-                );
+              onClick={async () => {
+                const values = await askForm({
+                  title: t('inventory.z3dActions.editZone'),
+                  fields: [
+                    {
+                    id: 'zoneId',
+                    name: 'zoneId',
+                    label: t('inventory.byRecord.zone', { defaultValue: 'Zone' }),
+                    type: 'select',
+                    required: true,
+                    options: recordOptions(zones, (zone) => zone.name || `#${zone.id}`),
+                  },
+                    {
+                      id: 'color',
+                      name: 'color',
+                      label: t('inventory.byRecord.color', { defaultValue: 'Color (hex)' }),
+                      type: 'text',
+                      placeholder: '#3b82f6',
+                    },
+                  ],
+                });
+                if (!values) return;
+                const color = formText(values.color);
                 void updateWarehouse3dZone.mutateAsync({
-                  zoneId,
-                  params:
-                    color != null && color.trim() !== ''
-                      ? { color: color.trim() }
-                      : {},
+                  zoneId: Number(values.zoneId),
+                  params: color ? { color } : {},
                 });
               }}
             >
@@ -2004,19 +2015,21 @@ function InventoryClientLoaded({
               type="button"
               variant="destructive"
               size="sm"
-              onClick={() => {
-                if (typeof window === 'undefined') return;
-                const zid = window.prompt(
-                  t('inventory.z3dActions.zoneIdPrompt'),
-                );
-                if (zid == null || zid.trim() === '') return;
-                const zoneId = Number(zid);
-                if (!Number.isFinite(zoneId)) return;
-                if (
-                  window.confirm(t('inventory.z3dActions.deleteZone') + '?')
-                ) {
-                  void deleteWarehouse3dZone.mutateAsync(zoneId);
-                }
+              onClick={async () => {
+                const values = await askForm({
+                  title: t('inventory.z3dActions.deleteZone'),
+                  submitLabel: t('inventory.byRecord.deactivate', { defaultValue: 'Deactivate' }),
+                  fields: [{
+                    id: 'zoneId',
+                    name: 'zoneId',
+                    label: t('inventory.byRecord.zone', { defaultValue: 'Zone' }),
+                    type: 'select',
+                    required: true,
+                    options: recordOptions(zones, (zone) => zone.name || `#${zone.id}`),
+                  }],
+                });
+                if (!values) return;
+                void deleteWarehouse3dZone.mutateAsync(Number(values.zoneId));
               }}
             >
               {t('inventory.z3dActions.deleteZone')}
@@ -2348,24 +2361,29 @@ function InventoryClientLoaded({
                   id: 'update-product-variant',
                   label: t('inventory.productActions.updateVariantById'),
                   requiresSelection: false,
-                  onClick: () => {
-                    const variantId = promptScalarId(
-                      t('inventory.productActions.variantIdPrompt'),
-                    );
-                    if (variantId == null) return;
-                    const name = promptText(
-                      t('inventory.productActions.variantNamePrompt'),
-                    );
-                    const standardPrice = promptOptionalNumber(
-                      t('inventory.productActions.standardPricePrompt'),
-                    );
+                  onClick: async () => {
+                    const values = await askForm({
+                      title: t('inventory.productActions.updateVariantById'),
+                      fields: [
+                        {
+                          id: 'recordId',
+                          name: 'recordId',
+                          label: t('inventory.byRecord.variantId', { defaultValue: 'Variant ID' }),
+                          type: 'number',
+                          required: true,
+                          min: 1,
+                        },
+                        { id: 'name', name: 'name', label: t('inventory.byRecord.name', { defaultValue: 'Name' }), type: 'text' },
+                        { id: 'standardPrice', name: 'standardPrice', label: t('inventory.byRecord.standardPrice', { defaultValue: 'Standard price' }), type: 'number', min: 0, step: 0.01 },
+                      ],
+                    });
+                    if (!values) return;
+                    const name = formText(values.name);
+                    const standardPrice = formNumber(values.standardPrice);
                     if (name == null && standardPrice == null) return;
                     void updateProductVariant.mutateAsync({
-                      variantId,
-                      params: {
-                        name: name ?? undefined,
-                        standardPrice: standardPrice,
-                      },
+                      variantId: Number(values.recordId),
+                      params: { name, standardPrice },
                     });
                   },
                 },
@@ -2457,28 +2475,26 @@ function InventoryClientLoaded({
                   id: 'update-supplier-line',
                   label: t('inventory.productActions.updateSupplierLineById'),
                   requiresSelection: false,
-                  onClick: () => {
-                    if (typeof window === 'undefined') return;
-                    const raw = window.prompt(
-                      t('inventory.productActions.supplierLineIdPrompt'),
-                    );
-                    if (raw == null || raw.trim() === '') return;
-                    const supplierInfoId = Number(raw);
-                    if (!Number.isFinite(supplierInfoId)) return;
-                    const priceS = window.prompt('New price (empty to skip)');
-                    const minS = window.prompt('New min qty (empty to skip)');
+                  onClick: async () => {
+                    const values = await askForm({
+                      title: t('inventory.productActions.updateSupplierLineById'),
+                      fields: [
+                        {
+                          id: 'recordId',
+                          name: 'recordId',
+                          label: t('inventory.byRecord.supplierLineId', { defaultValue: 'Supplier line ID' }),
+                          type: 'number',
+                          required: true,
+                          min: 1,
+                        },
+                        { id: 'price', name: 'price', label: t('inventory.byRecord.price', { defaultValue: 'Price' }), type: 'number', min: 0, step: 0.01 },
+                        { id: 'minQty', name: 'minQty', label: t('inventory.byRecord.minQty', { defaultValue: 'Minimum quantity' }), type: 'number', min: 0 },
+                      ],
+                    });
+                    if (!values) return;
                     void updateProductSupplierInfo.mutateAsync({
-                      supplierInfoId,
-                      params: {
-                        price:
-                          priceS != null && priceS.trim() !== ''
-                            ? Number(priceS)
-                            : undefined,
-                        minQty:
-                          minS != null && minS.trim() !== ''
-                            ? Number(minS)
-                            : undefined,
-                      },
+                      supplierInfoId: Number(values.recordId),
+                      params: { price: formNumber(values.price), minQty: formNumber(values.minQty) },
                     });
                   },
                 },
@@ -2486,23 +2502,25 @@ function InventoryClientLoaded({
                   id: 'update-packaging-row',
                   label: t('inventory.productActions.updatePackagingById'),
                   requiresSelection: false,
-                  onClick: () => {
-                    if (typeof window === 'undefined') return;
-                    const raw = window.prompt(
-                      t('inventory.productActions.packagingIdPrompt'),
-                    );
-                    if (raw == null || raw.trim() === '') return;
-                    const packagingId = Number(raw);
-                    if (!Number.isFinite(packagingId)) return;
-                    const name = window.prompt('New name (empty to skip)');
+                  onClick: async () => {
+                    const values = await askForm({
+                      title: t('inventory.productActions.updatePackagingById'),
+                      fields: [
+                        {
+                          id: 'recordId',
+                          name: 'recordId',
+                          label: t('inventory.byRecord.packagingId', { defaultValue: 'Packaging ID' }),
+                          type: 'number',
+                          required: true,
+                          min: 1,
+                        },
+                        { id: 'name', name: 'name', label: t('inventory.byRecord.name', { defaultValue: 'Name' }), type: 'text', required: true },
+                      ],
+                    });
+                    if (!values) return;
                     void updateProductPackaging.mutateAsync({
-                      packagingId,
-                      params: {
-                        name:
-                          name != null && name.trim() !== ''
-                            ? name.trim()
-                            : undefined,
-                      },
+                      packagingId: Number(values.recordId),
+                      params: { name: formText(values.name) },
                     });
                   },
                 },
@@ -3375,25 +3393,25 @@ function InventoryClientLoaded({
                   id: 'update-alert-reason',
                   label: t('inventory.qualityActions.updateAlertReason'),
                   requiresSelection: false,
-                  onClick: () => {
-                    if (typeof window === 'undefined') return;
-                    const rid = window.prompt(
-                      t('inventory.qualityActions.reasonIdPrompt'),
-                    );
-                    if (rid == null || rid.trim() === '') return;
-                    const reasonId = Number(rid);
-                    if (!Number.isFinite(reasonId)) return;
-                    const name = window.prompt(
-                      t('inventory.qualityActions.newReasonNamePrompt'),
-                    );
+                  onClick: async () => {
+                    const values = await askForm({
+                      title: t('inventory.qualityActions.updateAlertReason'),
+                      fields: [
+                        {
+                          id: 'recordId',
+                          name: 'recordId',
+                          label: t('inventory.byRecord.reasonId', { defaultValue: 'Alert reason ID' }),
+                          type: 'number',
+                          required: true,
+                          min: 1,
+                        },
+                        { id: 'name', name: 'name', label: t('inventory.byRecord.name', { defaultValue: 'Name' }), type: 'text', required: true },
+                      ],
+                    });
+                    if (!values) return;
                     void updateQualityAlertReason.mutateAsync({
-                      reasonId,
-                      params: {
-                        name:
-                          name != null && name.trim() !== ''
-                            ? name.trim()
-                            : null,
-                      },
+                      reasonId: Number(values.recordId),
+                      params: { name: formText(values.name) ?? null },
                     });
                   },
                 },
@@ -3402,38 +3420,49 @@ function InventoryClientLoaded({
                   label: t('inventory.qualityActions.deleteAlertReason'),
                   variant: 'destructive',
                   requiresSelection: false,
-                  onClick: () => {
-                    if (typeof window === 'undefined') return;
-                    const rid = window.prompt(
-                      t('inventory.qualityActions.reasonIdPrompt'),
-                    );
-                    if (rid == null || rid.trim() === '') return;
-                    const reasonId = Number(rid);
-                    if (!Number.isFinite(reasonId)) return;
-                    if (window.confirm(t('common.delete') + '?')) {
-                      void deleteQualityAlertReason.mutateAsync(reasonId);
-                    }
+                  onClick: async () => {
+                    const values = await askForm({
+                      title: t('inventory.qualityActions.deleteAlertReason'),
+                      submitLabel: t('common.delete'),
+                      fields: [{
+                          id: 'recordId',
+                          name: 'recordId',
+                          label: t('inventory.byRecord.reasonId', { defaultValue: 'Alert reason ID' }),
+                          type: 'number',
+                          required: true,
+                          min: 1,
+                        }],
+                    });
+                    if (!values) return;
+                    void deleteQualityAlertReason.mutateAsync(Number(values.recordId));
                   },
                 },
                 {
                   id: 'add-team-member',
                   label: t('inventory.qualityActions.addTeamMember'),
                   requiresSelection: false,
-                  onClick: () => {
-                    if (typeof window === 'undefined') return;
-                    const tid = window.prompt(
-                      t('inventory.qualityActions.teamIdPrompt'),
-                    );
-                    if (tid == null || tid.trim() === '') return;
-                    const teamId = Number(tid);
-                    if (!Number.isFinite(teamId)) return;
-                    const hex = window.prompt(
-                      t('inventory.qualityActions.memberIdentityPrompt'),
-                    );
-                    if (hex == null || hex.trim() === '') return;
+                  onClick: async () => {
+                    const values = await askForm({
+                      title: t('inventory.qualityActions.addTeamMember'),
+                      fields: [{
+                          id: 'teamId',
+                          name: 'teamId',
+                          label: t('inventory.byRecord.team', { defaultValue: 'Quality team' }),
+                          type: 'select',
+                          required: true,
+                          options: recordOptions(qualityTeams as Record<string, unknown>[], (row) => String(row.name ?? row.id)),
+                        }, {
+                          id: 'member',
+                          name: 'member',
+                          label: t('inventory.byRecord.member', { defaultValue: 'Member identity' }),
+                          type: 'text',
+                          required: true,
+                        }],
+                    });
+                    if (!values) return;
                     void addMemberToQualityTeam.mutateAsync({
-                      teamId,
-                      memberIdentityHex: hex.trim(),
+                      teamId: Number(values.teamId),
+                      memberIdentityHex: String(values.member).trim(),
                     });
                   },
                 },
@@ -3442,24 +3471,29 @@ function InventoryClientLoaded({
                   label: t('inventory.qualityActions.updatePoint'),
                   icon: Pencil,
                   requiresSelection: false,
-                  onClick: () => {
-                    const pointId = promptScalarId(
-                      t('inventory.qualityActions.pointIdPrompt'),
-                    );
-                    if (pointId == null) return;
-                    const name = promptText(
-                      t('inventory.qualityActions.pointNamePrompt'),
-                    );
-                    const testType = promptText(
-                      t('inventory.qualityActions.testTypePrompt'),
-                    );
+                  onClick: async () => {
+                    const values = await askForm({
+                      title: t('inventory.qualityActions.updatePoint'),
+                      fields: [
+                        {
+                          id: 'recordId',
+                          name: 'recordId',
+                          label: t('inventory.byRecord.pointId', { defaultValue: 'Quality point ID' }),
+                          type: 'number',
+                          required: true,
+                          min: 1,
+                        },
+                        { id: 'name', name: 'name', label: t('inventory.byRecord.name', { defaultValue: 'Name' }), type: 'text' },
+                        { id: 'testType', name: 'testType', label: t('inventory.byRecord.testType', { defaultValue: 'Test type' }), type: 'text' },
+                      ],
+                    });
+                    if (!values) return;
+                    const name = formText(values.name);
+                    const testType = formText(values.testType);
                     if (name == null && testType == null) return;
                     void updateQualityPoint.mutateAsync({
-                      pointId,
-                      params: {
-                        name: name ?? undefined,
-                        testType: testType ?? undefined,
-                      },
+                      pointId: Number(values.recordId),
+                      params: { name, testType },
                     });
                   },
                 },
@@ -3468,24 +3502,29 @@ function InventoryClientLoaded({
                   label: t('inventory.qualityActions.updateTeam'),
                   icon: Pencil,
                   requiresSelection: false,
-                  onClick: () => {
-                    const teamId = promptScalarId(
-                      t('inventory.qualityActions.teamIdPrompt'),
-                    );
-                    if (teamId == null) return;
-                    const name = promptText(
-                      t('inventory.qualityActions.teamNamePrompt'),
-                    );
-                    const email = promptText(
-                      t('inventory.qualityActions.teamEmailPrompt'),
-                    );
+                  onClick: async () => {
+                    const values = await askForm({
+                      title: t('inventory.qualityActions.updateTeam'),
+                      fields: [
+                        {
+                          id: 'teamId',
+                          name: 'teamId',
+                          label: t('inventory.byRecord.team', { defaultValue: 'Quality team' }),
+                          type: 'select',
+                          required: true,
+                          options: recordOptions(qualityTeams as Record<string, unknown>[], (row) => String(row.name ?? row.id)),
+                        },
+                        { id: 'name', name: 'name', label: t('inventory.byRecord.name', { defaultValue: 'Name' }), type: 'text' },
+                        { id: 'email', name: 'email', label: t('inventory.byRecord.email', { defaultValue: 'Email' }), type: 'email' },
+                      ],
+                    });
+                    if (!values) return;
+                    const name = formText(values.name);
+                    const email = formText(values.email);
                     if (name == null && email == null) return;
                     void updateQualityTeam.mutateAsync({
-                      teamId,
-                      params: {
-                        name: name ?? undefined,
-                        email: email ?? undefined,
-                      },
+                      teamId: Number(values.teamId),
+                      params: { name, email },
                     });
                   },
                 },
@@ -3494,21 +3533,29 @@ function InventoryClientLoaded({
                   label: t('inventory.qualityActions.removeTeamMember'),
                   variant: 'destructive',
                   requiresSelection: false,
-                  onClick: () => {
-                    if (typeof window === 'undefined') return;
-                    const tid = window.prompt(
-                      t('inventory.qualityActions.teamIdPrompt'),
-                    );
-                    if (tid == null || tid.trim() === '') return;
-                    const teamId = Number(tid);
-                    if (!Number.isFinite(teamId)) return;
-                    const hex = window.prompt(
-                      t('inventory.qualityActions.memberIdentityPrompt'),
-                    );
-                    if (hex == null || hex.trim() === '') return;
+                  onClick: async () => {
+                    const values = await askForm({
+                      title: t('inventory.qualityActions.removeTeamMember'),
+                      submitLabel: t('common.remove', { defaultValue: 'Remove' }),
+                      fields: [{
+                          id: 'teamId',
+                          name: 'teamId',
+                          label: t('inventory.byRecord.team', { defaultValue: 'Quality team' }),
+                          type: 'select',
+                          required: true,
+                          options: recordOptions(qualityTeams as Record<string, unknown>[], (row) => String(row.name ?? row.id)),
+                        }, {
+                          id: 'member',
+                          name: 'member',
+                          label: t('inventory.byRecord.member', { defaultValue: 'Member identity' }),
+                          type: 'text',
+                          required: true,
+                        }],
+                    });
+                    if (!values) return;
                     void removeMemberFromQualityTeam.mutateAsync({
-                      teamId,
-                      memberIdentityHex: hex.trim(),
+                      teamId: Number(values.teamId),
+                      memberIdentityHex: String(values.member).trim(),
                     });
                   },
                 },
@@ -3671,15 +3718,25 @@ function InventoryClientLoaded({
                   id: 'restore-category',
                   label: t('inventory.categoryActions.restoreById'),
                   requiresSelection: false,
-                  onClick: () => {
-                    if (typeof window === 'undefined') return;
-                    const raw = window.prompt(
-                      t('inventory.categoryActions.categoryIdPrompt'),
+                  onClick: async () => {
+                    const deleted = (productCategories as Record<string, unknown>[]).filter(
+                      (row) => row.deletedAt != null || row.deleted_at != null,
                     );
-                    if (raw == null || raw.trim() === '') return;
-                    const categoryId = Number(raw);
-                    if (!Number.isFinite(categoryId)) return;
-                    void restoreProductCategory.mutateAsync(categoryId);
+                    const values = await askForm({
+                      title: t('inventory.categoryActions.restoreById'),
+                      fields: [
+                        {
+                          id: 'categoryId',
+                          name: 'categoryId',
+                          label: t('inventory.byRecord.category', { defaultValue: 'Archived category' }),
+                          type: 'select',
+                          required: true,
+                          options: recordOptions(deleted, (row) => String(row.name ?? row.id)),
+                        },
+                      ],
+                    });
+                    if (!values) return;
+                    void restoreProductCategory.mutateAsync(Number(values.categoryId));
                   },
                 },
               ],
@@ -4621,6 +4678,7 @@ function InventoryClientLoaded({
 
   return (
     <>
+      {formDialog}
       {/* key={operatingCompanyId} forces React to remount ModuleView when the operating company
           changes, preventing stale inventory rows from a previous company leaking into the new view. */}
       <ModuleView

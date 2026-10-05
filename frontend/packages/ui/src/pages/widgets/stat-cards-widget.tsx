@@ -19,7 +19,7 @@ import {
 } from "lucide-react"
 import { TrendBadge } from "../../components/trend-badge"
 import type { StatCardsWidget as StatCardsWidgetType } from "../../lib/dashboard-types"
-import { cn } from "../../lib/utils"
+import { StatCard, StatCardGrid } from "../../components/stat-card"
 
 const iconMap: Record<string, ComponentType<{ className?: string }>> = {
   dollar: DollarSign,
@@ -42,43 +42,18 @@ const iconMap: Record<string, ComponentType<{ className?: string }>> = {
 
 export function StatCardsWidget({ data }: { data: StatCardsWidgetType["data"] }) {
   return (
-    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-      {data.stats.map((stat, index) => {
-        const Icon = stat.icon ? iconMap[stat.icon] : null
-        const statTestId = stat.testId ?? `stat-${index}`
-        const clickable = typeof stat.onClick === "function"
-
-        return (
-          <div
-            key={index}
-            data-testid={statTestId}
-            role={clickable ? "button" : undefined}
-            tabIndex={clickable ? 0 : undefined}
-            onClick={clickable ? stat.onClick : undefined}
-            onKeyDown={
-              clickable
-                ? (e) => {
-                    if (e.key === "Enter" || e.key === " ") {
-                      e.preventDefault()
-                      stat.onClick?.()
-                    }
-                  }
-                : undefined
-            }
-            className={cn(
-              "p-4 rounded-xl bg-secondary/50 border border-border/50",
-              clickable && "cursor-pointer transition-colors hover:bg-secondary/80",
-            )}
-          >
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs text-muted-foreground">{stat.label}</span>
-              {Icon && <Icon className="h-4 w-4 text-muted-foreground" />}
-            </div>
-            <p className="text-xl font-bold">{stat.value}</p>
-            <TrendBadge change={stat.change} />
-          </div>
-        )
-      })}
-    </div>
+    <StatCardGrid>
+      {data.stats.map((stat, index) => (
+        <StatCard
+          key={index}
+          testId={stat.testId ?? `stat-${index}`}
+          label={stat.label}
+          value={stat.value}
+          icon={stat.icon ? iconMap[stat.icon] : undefined}
+          onClick={stat.onClick}
+          footer={stat.change != null ? <TrendBadge change={stat.change} /> : undefined}
+        />
+      ))}
+    </StatCardGrid>
   )
 }

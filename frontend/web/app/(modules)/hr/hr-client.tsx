@@ -895,7 +895,13 @@ function HrClientLoaded({
               return { ...w, data: { ...(w.data as Record<string, unknown>), values } }
             }
             if (w.id === "hr-leave-usage") {
-              const byType = groupBy(leaves, (l) => `Type ${String(l.leaveTypeId ?? "0").slice(-4)}`)
+              const leaveTypeNames = new Map(
+                (leaveTypes as Record<string, unknown>[]).map((lt) => [String(lt.id), String(lt.name ?? "")]),
+              )
+              const byType = groupBy(
+                leaves,
+                (l) => leaveTypeNames.get(String(l.leaveTypeId ?? "")) || "Unspecified",
+              )
               const colors = ["#6366f1", "#f59e0b", "#22c55e", "#8b5cf6"]
               const totalDays = leaves.reduce((s, l) => s + Number(l.numberOfDays ?? 0), 0)
               const metrics = Object.entries(byType)
@@ -955,6 +961,7 @@ function HrClientLoaded({
               })
   }, [
     employees,
+    leaveTypes,
     departments,
     leaves,
     leavesToApprove,

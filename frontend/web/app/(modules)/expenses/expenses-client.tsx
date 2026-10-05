@@ -576,13 +576,21 @@ function ExpensesClientLoaded({
     ],
   )
 
-  const data = useMemo(
-    () => ({
-      expenses: expenses as unknown as Record<string, unknown>[],
-      "expense-sheets": sheets as unknown as Record<string, unknown>[],
-    }),
-    [expenses, sheets],
-  )
+  const data = useMemo(() => {
+    // Show the employee's name in the Employee column instead of their id.
+    const employeeNames = new Map(
+      (employees as Record<string, unknown>[]).map((e) => [String(e.id), String(e.name ?? "")]),
+    )
+    const withEmployeeName = (rows: Record<string, unknown>[]) =>
+      rows.map((row) => {
+        const name = employeeNames.get(String(row.employeeId ?? ""))
+        return { ...row, employeeName: name || String(row.employeeId ?? "") }
+      })
+    return {
+      expenses: withEmployeeName(expenses as unknown as Record<string, unknown>[]),
+      "expense-sheets": withEmployeeName(sheets as unknown as Record<string, unknown>[]),
+    }
+  }, [expenses, sheets, employees])
 
   const handleFormSubmit = async (
     _tabId: string,

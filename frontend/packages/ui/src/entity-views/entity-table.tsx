@@ -43,7 +43,7 @@ import {
 } from "../components/empty"
 import { Skeleton } from "../components/skeleton"
 import { TooltipProvider } from "../components/tooltip"
-import { Search, ArrowUp, ArrowDown, ArrowUpDown, FileDown, X } from "lucide-react"
+import { Search, ArrowUp, ArrowDown, ArrowUpDown, FileDown, X, Inbox, SearchX } from "lucide-react"
 import {
   radixSelectControlledValue,
   radixSelectItemValue,
@@ -334,8 +334,19 @@ export function EntityTable({
     )
   }
 
-  const emptyTitle =
-    config.emptyState?.title ?? config.emptyMessage ?? "No records found."
+  // Rows exist but the search/filters hide them all: say so instead of "empty".
+  const filteredOut = data.length > 0 && sorted.length === 0
+  const emptyTitle = filteredOut
+    ? "No matching records"
+    : (config.emptyState?.title ?? config.emptyMessage ?? "No records yet")
+  const emptyDescription = filteredOut
+    ? "Try a different search or clear the filters."
+    : config.emptyState?.description
+  const emptyIcon = filteredOut ? (
+    <SearchX />
+  ) : (
+    config.emptyState?.icon ?? <Inbox />
+  )
 
   const handleCsvExport = () => {
     const csv = rowsToCsv(
@@ -512,13 +523,9 @@ export function EntityTable({
                   <TableCell colSpan={Math.max(columns.length, 1)} className="p-0">
                     <Empty className="border-0 py-12">
                       <EmptyHeader>
-                        {config.emptyState?.icon ? (
-                          <EmptyMedia variant="icon">{config.emptyState.icon}</EmptyMedia>
-                        ) : null}
+                        <EmptyMedia variant="icon">{emptyIcon}</EmptyMedia>
                         <EmptyTitle>{emptyTitle}</EmptyTitle>
-                        {config.emptyState?.description ? (
-                          <EmptyDescription>{config.emptyState.description}</EmptyDescription>
-                        ) : null}
+                        {emptyDescription ? <EmptyDescription>{emptyDescription}</EmptyDescription> : null}
                       </EmptyHeader>
                       {config.emptyState?.actionLabel && config.emptyState.onAction ? (
                         <EmptyContent>

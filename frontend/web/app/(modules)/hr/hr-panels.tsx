@@ -3,6 +3,8 @@
 import { useMemo } from "react"
 import { useTranslation } from "@lumiere/i18n"
 import type { QueryRows } from "@lumiere/query-hooks/http"
+import { StatCard, StatCardGrid } from "@lumiere/ui/components/stat-card"
+import { CalendarClock, CalendarRange, Coins, FileOutput, Globe2, Plug, TrendingUp } from "lucide-react"
 
 type DeptNode = {
   id: string
@@ -243,23 +245,14 @@ export function HrOpsQueuePanel({
   hrIntegrationIntentsPending?: number
 }) {
   return (
-    <div
-      className="rounded-lg border p-4 mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3"
-      data-testid="hr-ops-queue-panel"
-    >
-      <div className="rounded-md border px-3 py-2">
-        <div className="text-xs text-muted-foreground">Leaves to approve</div>
-        <div className="text-2xl font-semibold tabular-nums">{leavesToApprove}</div>
-      </div>
-      <div className="rounded-md border px-3 py-2">
-        <div className="text-xs text-muted-foreground">Payslips to export</div>
-        <div className="text-2xl font-semibold tabular-nums">{payslipsToExport}</div>
-      </div>
-      <div className="rounded-md border px-3 py-2">
-        <div className="text-xs text-muted-foreground">Integration intents pending</div>
-        <div className="text-2xl font-semibold tabular-nums">{hrIntegrationIntentsPending ?? 0}</div>
-      </div>
-    </div>
+    <section className="space-y-3" data-testid="hr-ops-queue-panel">
+      <h3 className="text-sm font-semibold text-foreground">Work queues</h3>
+      <StatCardGrid className="lg:grid-cols-3">
+        <StatCard label="Leave requests to approve" value={leavesToApprove} icon={CalendarClock} tone="warning" />
+        <StatCard label="Payslips to export" value={payslipsToExport} icon={FileOutput} tone="info" />
+        <StatCard label="Pending payroll integrations" value={hrIntegrationIntentsPending ?? 0} icon={Plug} />
+      </StatCardGrid>
+    </section>
   )
 }
 
@@ -275,26 +268,14 @@ export function HrAdvancedWfmPanel({
   capacityForecast: number
 }) {
   return (
-    <div
-      className="rounded-lg border p-4 mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4"
-      data-testid="hr-advanced-wfm-panel"
-    >
-      <div className="rounded-md border px-3 py-2">
-        <div className="text-xs text-muted-foreground">Labor cost snapshots</div>
-        <div className="text-2xl font-semibold tabular-nums">{laborCostSnapshots}</div>
-      </div>
-      <div className="rounded-md border px-3 py-2">
-        <div className="text-xs text-muted-foreground">Shift opt jobs</div>
-        <div className="text-2xl font-semibold tabular-nums">{shiftOptJobs}</div>
-      </div>
-      <div className="rounded-md border px-3 py-2">
-        <div className="text-xs text-muted-foreground">Global assignments</div>
-        <div className="text-2xl font-semibold tabular-nums">{globalAssignments}</div>
-      </div>
-      <div className="rounded-md border px-3 py-2">
-        <div className="text-xs text-muted-foreground">Capacity forecast rows</div>
-        <div className="text-2xl font-semibold tabular-nums">{capacityForecast}</div>
-      </div>
-    </div>
+    <section className="space-y-3" data-testid="hr-advanced-wfm-panel">
+      <h3 className="text-sm font-semibold text-foreground">Workforce planning</h3>
+      <StatCardGrid>
+        <StatCard label="Labor cost snapshots" value={laborCostSnapshots} icon={Coins} />
+        <StatCard label="Shift optimization jobs" value={shiftOptJobs} icon={CalendarRange} />
+        <StatCard label="Global assignments" value={globalAssignments} icon={Globe2} />
+        <StatCard label="Capacity forecast entries" value={capacityForecast} icon={TrendingUp} />
+      </StatCardGrid>
+    </section>
   )
 }

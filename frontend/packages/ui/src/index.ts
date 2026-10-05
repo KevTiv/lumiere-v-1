@@ -33,6 +33,7 @@ export * from "./lib/entity-configs";
 export * from "./forms/modular-form";
 export * from "./forms/form-modal";
 export * from "./forms/runtime-form-modal";
+export * from "./forms/use-form-dialog";
 export * from "./lib/runtime-form-config";
 export * from "./lib/runtime-list-config";
 // form-types: exclude FieldWidth (already in entity-view-types), include everything else
