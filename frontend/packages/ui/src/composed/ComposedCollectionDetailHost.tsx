@@ -5,6 +5,7 @@ import type { PageNode, PreviewCollection, PreviewResponse } from "@lumiere/pres
 import { Button } from "../components/button"
 import { Card, CardContent, CardHeader, CardTitle } from "../components/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/table"
+import { TablePager, usePagedRows } from "../components/table-pager"
 
 export interface ComposedCollectionDetailHostProps {
   preview: PreviewResponse | null
@@ -46,6 +47,7 @@ function CollectionPreview({
   onSelect: (id: string) => void
 }) {
   const fields = nodeFields(node)
+  const rowsPager = usePagedRows(collection?.rows ?? [])
   return (
     <Card data-testid={`composed-collection-${node.id}`}>
       <CardHeader><CardTitle>{nodeTitle(node)} · {node.id}</CardTitle></CardHeader>
@@ -58,7 +60,7 @@ function CollectionPreview({
           <Table>
             <TableHeader><TableRow>{fields.map((field) => <TableHead key={field}>{field}</TableHead>)}</TableRow></TableHeader>
             <TableBody>
-              {collection.rows.map((row) => {
+              {rowsPager.pageRows.map((row) => {
                 const values = fieldsForRow(row)
                 const selected = selectedId === row.id
                 return (
@@ -90,6 +92,7 @@ function CollectionPreview({
             </TableBody>
           </Table>
         )}
+        <TablePager {...rowsPager} />
         {collection?.truncated ? <p className="mt-3 text-sm text-muted-foreground" data-testid={`composed-truncated-${node.id}`}>Preview limit reached. Increase the limit to see more records.</p> : null}
       </CardContent>
     </Card>

@@ -44,6 +44,7 @@ import {
   type Task,
   type TaskStatus,
 } from "@/lib/task-board-types"
+import { TablePager, usePagedRows } from "../components/table-pager"
 
 interface TaskBoardViewProps {
   className?: string
@@ -112,6 +113,7 @@ export function TaskBoardView({ className }: TaskBoardViewProps) {
     setIsCreateModalOpen(false)
   }
 
+  const tasksPager = usePagedRows(filteredTasks)
   return (
     <div className={cn("flex flex-col h-full", className)}>
       {/* Sprint Header */}
@@ -315,7 +317,7 @@ export function TaskBoardView({ className }: TaskBoardViewProps) {
               </tr>
             </thead>
             <tbody>
-              {filteredTasks.map((task) => (
+              {tasksPager.pageRows.map((task) => (
                 <tr
                   key={task.id}
                   className="border-b border-border hover:bg-muted/50 cursor-pointer"
@@ -392,6 +394,7 @@ export function TaskBoardView({ className }: TaskBoardViewProps) {
               ))}
             </tbody>
           </table>
+          <TablePager {...tasksPager} />
         </div>
       )}
 

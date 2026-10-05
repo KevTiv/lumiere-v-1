@@ -22,6 +22,7 @@ import {
 import { Eye } from "lucide-react"
 import type { AccountAccount, AccountMove } from "../lib/accounting-types"
 import { useTranslation } from "@lumiere/i18n"
+import { TablePager, usePagedRows } from "../components/table-pager"
 
 function formatTimestamp(ts?: { microsSinceUnixEpoch: bigint } | null): string {
   if (!ts) return "—"
@@ -112,6 +113,7 @@ export function AccountGlDrilldownPanel({
     setSelectedMove(move)
   }
 
+  const linesPager = usePagedRows(linesWithBalance)
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
@@ -166,7 +168,7 @@ export function AccountGlDrilldownPanel({
                     </TableCell>
                   </TableRow>
                 ) : (
-                  linesWithBalance.map(({ line, runningBalance }) => {
+                  linesPager.pageRows.map(({ line, runningBalance }) => {
                     const moveId = lineMoveId(line)
                     const move = moveById.get(moveId)
                     const moveName = String(line.moveName ?? line.move_name ?? move?.name ?? moveId)
@@ -201,6 +203,7 @@ export function AccountGlDrilldownPanel({
                 )}
               </TableBody>
             </Table>
+            <TablePager {...linesPager} />
           </div>
         </DialogContent>
       </Dialog>
