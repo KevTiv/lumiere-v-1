@@ -24,6 +24,7 @@ import {
   waitForSaleOrderBillableLines,
   waitForSaleOrderConfirmed,
 } from "./helpers"
+import { saleOrderHref } from "@lumiere/erp-shared/record-links"
 
 /**
  * Smoke-level sales → invoice linkage checks.
@@ -40,8 +41,15 @@ import {
  */
 test.describe("Sales and invoice flow e2e", { tag: "@dev-fixture" }, () => {
   test("seeded sale order is visible on Sales Orders tab", { tag: "@dev-fixture" }, async ({ page }) => {
-    await gotoModule(page, "/sales", "sales")
-    await page.getByTestId("module-tab-sales-orders").click()
+    const soRes = await page.request.get("/api/query/sale-orders")
+    expect(soRes.ok()).toBe(true)
+    const soJson = (await soRes.json()) as { data?: Array<{ id?: unknown; reference?: unknown }> }
+    const seededId = scalarQueryId(
+      (soJson.data ?? []).find((row) => String(row.reference ?? "") === "SO/2024/0001")?.id,
+    )
+    expect(seededId).not.toBeNull()
+    // Tables list newest first; focus the seeded (oldest) order exactly.
+    await gotoModule(page, saleOrderHref(seededId!), "sales")
 
     await expectSeededText(page, "SO/2024/0001", "/api/query/sale-orders")
     await expect(page.getByText("ACME-2024-001")).toBeVisible()

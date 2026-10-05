@@ -9,6 +9,7 @@ import { expect, test, type Page } from "@playwright/test"
 /** @dev-fixture — excluded from E2E_SUITE=p0; requires seed_dev_data fixture rows. */
 
 import {
+  activeTabEntityTable,
   callReducerBff,
   expectNoAppError,
   expectSeededText,
@@ -54,29 +55,29 @@ async function assertPurchasingTabRenders(page: Page, tabId: string) {
       break
     case "orders":
       await expect(page.getByTestId("module-create-purchasing-orders")).toBeVisible()
-      await expect(page.getByTestId("entity-table")).toBeVisible()
+      await expect(activeTabEntityTable(page)).toBeVisible()
       break
     case "lines":
-      await expect(page.getByTestId("entity-table")).toBeVisible({ timeout: 30_000 })
+      await expect(activeTabEntityTable(page)).toBeVisible({ timeout: 30_000 })
       break
     case "requisitions":
       await expect(page.getByTestId("module-create-purchasing-requisitions")).toBeVisible()
-      await expect(page.getByTestId("entity-table")).toBeVisible()
+      await expect(activeTabEntityTable(page)).toBeVisible()
       break
     case "vendors":
-      await expect(page.getByTestId("entity-table")).toBeVisible()
+      await expect(activeTabEntityTable(page)).toBeVisible()
       break
     case "partner-banks":
       await expect(page.getByTestId("module-create-purchasing-partner-banks")).toBeVisible()
-      await expect(page.getByTestId("entity-table")).toBeVisible()
+      await expect(activeTabEntityTable(page)).toBeVisible()
       break
     case "landed-costs":
       await expect(page.getByTestId("module-create-purchasing-landed-costs")).toBeVisible()
-      await expect(page.getByTestId("entity-table")).toBeVisible()
+      await expect(activeTabEntityTable(page)).toBeVisible()
       break
     case "supplier-intakes":
       await expect(page.getByTestId("module-create-purchasing-supplier-intakes")).toBeVisible()
-      await expect(page.getByTestId("entity-table")).toBeVisible()
+      await expect(activeTabEntityTable(page)).toBeVisible()
       break
     default:
       break
