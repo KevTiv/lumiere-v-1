@@ -350,8 +350,6 @@ function ProposalsClientLoaded({ initialProposals, organizationId }: ProposalsCl
           const handlers: Record<string, () => void> = {
             new_proposal: () => setQuickActionForm({ form: proposalCreateForm, action: "createProposal" }),
             use_template: () => setActiveTab("templates"),
-            // Label is "Import RFP (coming soon)" — still opens create form as a create-only shortcut
-            import_rfp: () => setQuickActionForm({ form: proposalCreateForm, action: "createProposal" }),
             review_pending: () => {
               const pending = proposals.find((p) => normalizeProposalStatus(p.status) === "Review")
               if (pending) router.push(`/proposals/${pending.id}`)

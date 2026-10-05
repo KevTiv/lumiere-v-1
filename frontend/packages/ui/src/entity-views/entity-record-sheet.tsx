@@ -12,6 +12,7 @@ import { EntityDetail } from "./entity-detail"
 import { RecordAuditTab } from "./record-audit-tab"
 import type { EntityRecordSheetConfig } from "../lib/module-types"
 import type { BadgeVariant } from "../lib/entity-view-types"
+import { humanizeEnumValue, statusTone } from "../lib/entity-row-values"
 
 interface EntityRecordSheetProps {
   open: boolean
@@ -38,8 +39,10 @@ export function EntityRecordSheet({
   const statusRaw =
     record && config.statusKey ? resolveStatusValue(record, config.statusKey) : ""
   const statusVariant: BadgeVariant =
-    (config.statusBadgeVariants?.[statusRaw] as BadgeVariant | undefined) ?? "secondary"
-  const statusLabel = config.statusBadgeLabels?.[statusRaw] ?? statusRaw
+    statusTone(statusRaw) ??
+    (config.statusBadgeVariants?.[statusRaw] as BadgeVariant | undefined) ??
+    "secondary"
+  const statusLabel = config.statusBadgeLabels?.[statusRaw] ?? humanizeEnumValue(statusRaw)
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -50,7 +53,7 @@ export function EntityRecordSheet({
               <SheetTitle>{title}</SheetTitle>
             </SheetHeader>
 
-            <div className="mt-4 space-y-4">
+            <div className="mt-2 space-y-4 px-4 pb-6">
               {(config.statusKey || config.actions) && (
                 <div className="flex flex-wrap items-center gap-2">
                   {config.statusKey && statusRaw && (

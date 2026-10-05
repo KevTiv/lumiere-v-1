@@ -56,6 +56,28 @@ export function useAuditRules(organizationId: bigint, initialData?: AuditRule[])
   })
 }
 
+/** Signed-in user's canonical profile (platform-control), for shell display. */
+export interface CurrentUserProfile {
+  email: string
+  name: string
+  firstName: string | null
+  lastName: string | null
+}
+
+export function useCurrentUserProfile(enabled = true) {
+  return useQuery<CurrentUserProfile>({
+    queryKey: ['current-user-profile'],
+    queryFn: async () => {
+      const r = await apiFetch("/api/auth/profile")
+      if (!r.ok) throw new Error('Failed to fetch user profile')
+      const json = (await r.json()) as { data: CurrentUserProfile }
+      return json.data
+    },
+    enabled,
+    staleTime: 5 * 60_000,
+  })
+}
+
 export function useUserSessions(organizationId: bigint, initialData?: QueryRows) {
   return useQuery<QueryRows>({
     queryKey: ['user-sessions', rqBigIntKey(organizationId)],
@@ -84,6 +106,7 @@ function invalidateAuthModule(
     qc.invalidateQueries({ queryKey: ['audit-rules', org] }),
     qc.invalidateQueries({ queryKey: ['user-sessions', org] }),
     qc.invalidateQueries({ queryKey: ['user-invites', org] }),
+    qc.invalidateQueries({ queryKey: ['current-user-profile'] }),
     ...invalidateSettingsQueries(qc, organizationId),
   ])
 }

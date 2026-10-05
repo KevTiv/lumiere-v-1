@@ -197,7 +197,8 @@
     "aiAssistant": "AI Assistant",
     "noRole": "No Role",
     "signOut": "Sign out",
-    "erpSystem": "ERP System",
+    "signedIn": "Signed in",
+    "erpSystem": "Lumiere ERP",
     "companySwitcher": {
       "switchCompany": "Switch company",
       "current": "Active",
@@ -216,7 +217,7 @@
   },
   "dashboard": {
     "title": "Dashboard",
-    "erpSystem": "ERP System",
+    "erpSystem": "Lumiere ERP",
     "vsLastMonth": "vs last month",
     "timeRange": {
       "today": "Today",
@@ -804,7 +805,7 @@
       "totalInvoices": "Total Invoices",
       "totalInvoiced": "Total Invoiced",
       "outstandingBalance": "Outstanding Balance",
-      "allStatus": "All Status",
+      "allStatus": "All statuses",
       "issueDate": "Issue Date",
       "amount": "Amount",
       "customer": "Customer",
@@ -3910,6 +3911,8 @@
       "description": "Department hierarchy and reporting lines",
       "emptyMessage": "No departments found. Add departments to build the org chart.",
       "employees": "employees",
+      "employeeCount_one": "{{count}} employee",
+      "employeeCount_other": "{{count}} employees",
       "manager": "Manager"
     },
     "recruitment": {
@@ -5465,7 +5468,7 @@
       "pendingReceipt": "Pending Receipt",
       "awaitingApproval": "Awaiting Approval",
       "vendorLabel": "Vendor {{id}}",
-      "onTimePct": "On-time (MVP)",
+      "onTimePct": "On-time %",
       "overBilled": "Over-billed lines",
       "partialReceipt": "Partial receipt"
     },
@@ -9903,6 +9906,7 @@
     "emptyDataHint": "No live map pins yet — create fleet vehicles (with position), POS terminals, or warehouse geo to populate coordinates.",
     "fleet": {
       "title": "Fleet",
+      "description": "Vehicles, drivers, fuel and maintenance",
       "subtitle": "Vehicles",
       "empty": "No vehicles yet.",
       "create": "Add vehicle",
@@ -11775,7 +11779,7 @@
       "tabAnalytics": "Analytics",
       "searchPlaceholder": "Search reports...",
       "filterStatus": "Status",
-      "filterStatusAll": "All Status",
+      "filterStatusAll": "All statuses",
       "filterStatusOpen": "Open",
       "filterStatusInvestigating": "Investigating",
       "filterStatusResolved": "Resolved",

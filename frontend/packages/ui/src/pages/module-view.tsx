@@ -155,7 +155,12 @@ export function ModuleView({
         {config.tabs.map((tab) => (
           <TabsContent key={tab.id} value={tab.id} className="mt-6">
             {tab.type === "dashboard" && tab.sections && (
-              <DashboardGrid ref={dashboardGridRef} sections={tab.sections} />
+              <DashboardGrid
+                ref={dashboardGridRef}
+                sections={tab.sections}
+                // Dashboard figures derive from the module's collections.
+                isLoading={Object.values(dataLoading ?? {}).some(Boolean)}
+              />
             )}
 
             {tab.type === "custom" && tab.customContent}

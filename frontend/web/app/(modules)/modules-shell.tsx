@@ -45,6 +45,7 @@ import { useCompanies } from "@lumiere/query-hooks/hooks/organization-company"
 import { useOperatingCompanyId } from "@lumiere/query-hooks/hooks/use-operating-company"
 import { ErpAiRouteContextProvider, ErpAiChatControllerProvider, useErpAiRouteContext } from "@/lib/erp-ai-context"
 import { performSignOut } from "@/lib/auth-sign-out"
+import { useCurrentUserProfile } from "@lumiere/query-hooks/hooks/auth"
 
 const AI_CHAT_SESSION_KEY_STORAGE = "lumiere:erp-ai-chat-session-key"
 
@@ -536,6 +537,8 @@ function ModulesContent({
     orgId,
     orgReady && operatingCompanyId != null && operatingCompanyId > 0,
   )
+  const currentUserProfile = useCurrentUserProfile()
+
   const navBadges = useMemo(() => {
     const badges: Record<string, number> = {}
     if (approvalInboxCountQuery.count > 0) badges["/approvals"] = approvalInboxCountQuery.count
@@ -557,6 +560,7 @@ function ModulesContent({
           onOpenNotebook={() => setIsNotebookOpen(true)}
           onOpenAIChat={openAiChat}
           onSignOut={() => void performSignOut()}
+          userProfile={currentUserProfile.data}
         />
         <main className="flex-1 overflow-auto scroll-smooth">
           <div className="mx-auto w-full max-w-[1600px] px-4 py-5 sm:px-6 lg:px-8 lg:py-7">{children}</div>

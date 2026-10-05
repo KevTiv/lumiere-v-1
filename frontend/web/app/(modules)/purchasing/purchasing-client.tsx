@@ -2121,7 +2121,7 @@ function PurchasingClientLoaded({
                 },
                 {
                   label: t("purchasing.dashboard.onTimePct", {
-                    defaultValue: "On-time (MVP)",
+                    defaultValue: "On-time %",
                   }),
                   value: onTimePct == null ? "—" : `${onTimePct}%`,
                   icon: "Gauge",

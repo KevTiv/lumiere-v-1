@@ -86,7 +86,7 @@ function OrgChartRow({ node, depth }: { node: DeptNode; depth: number }) {
         ) : null}
         {node.employees.length > 0 ? (
           <div className="text-xs text-muted-foreground mt-1">
-            {node.employees.length} {t("hr.orgChart.employees")}
+            {t("hr.orgChart.employeeCount", { count: node.employees.length })}
             <ul className="mt-1 space-y-0.5 pl-3">
               {node.employees.slice(0, 8).map((e) => (
                 <li key={e.id}>

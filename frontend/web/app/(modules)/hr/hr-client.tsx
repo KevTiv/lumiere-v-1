@@ -981,10 +981,6 @@ function HrClientLoaded({
       ({
         ...moduleConfig,
         tabs: [
-          orgChartTab,
-          performanceTab,
-          benefitsTab,
-          recruitmentTab,
           ...withDashboardSections(moduleConfig, liveSections).tabs.map((tab) => {
           if (tab.id === "recruitment") return null
           if (tab.id === "departments" && tab.entityConfig) {
@@ -1305,6 +1301,10 @@ function HrClientLoaded({
           }
           return tab
         }).filter((tab): tab is NonNullable<typeof tab> => tab != null),
+          orgChartTab,
+          performanceTab,
+          benefitsTab,
+          recruitmentTab,
         ],
       }) as ModuleConfig,
     [

@@ -56,7 +56,7 @@ export type ColumnType =
   | "percent"
   | "custom"
 
-export type BadgeVariant = "default" | "secondary" | "destructive" | "outline"
+export type BadgeVariant = "default" | "secondary" | "destructive" | "outline" | "success" | "warning" | "info"
 
 // ─── Column (table view) ────────────────────────────────────────────────────
 

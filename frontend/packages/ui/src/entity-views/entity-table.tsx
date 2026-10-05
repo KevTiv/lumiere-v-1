@@ -75,6 +75,16 @@ interface EntityTableProps {
   onInitialFilterClear?: (key: string) => void
 }
 
+/** "Status" → "All statuses", "Priority" → "All priorities". */
+export function allFilterLabel(label: string): string {
+  const lower = label.toLowerCase()
+  let plural: string
+  if (/[^aeiou]y$/.test(lower)) plural = `${lower.slice(0, -1)}ies`
+  else if (/(s|x|z|ch|sh)$/.test(lower)) plural = `${lower}es`
+  else plural = `${lower}s`
+  return `All ${plural}`
+}
+
 function rowFilterValue(row: EntityRow, key: string): string {
   const val = row[key]
   if (val == null) return ""
@@ -273,6 +283,25 @@ export function EntityTable({
   }
 
   const hasActions = actions.length > 0
+  // Row actions only appear once rows are selected; inapplicable ones stay
+  // visible but disabled so the selection's state is still explained.
+  const selectionActions = actions.filter((action) => action.requiresSelection)
+  const renderActionButton = (action: EntityAction) => {
+    const Icon = action.icon
+    return (
+      <Button
+        key={action.id}
+        variant={action.variant ?? "outline"}
+        size="sm"
+        disabled={selectedRows.length > 0 && action.isApplicable?.(selectedRows) === false}
+        onClick={() => runAction(action)}
+        data-testid={`entity-action-${action.id}`}
+      >
+        {Icon && <Icon className="mr-2 h-4 w-4" />}
+        {action.label}
+      </Button>
+    )
+  }
   const selectionToggleOnRowClick =
     config.rowSelectionToggleOnClick ??
     (hasActions && actions.some((a) => a.requiresSelection === true))
@@ -383,7 +412,7 @@ export function EntityTable({
                     <SelectValue placeholder={f.placeholder ?? f.label} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="__all__">All {f.label}s</SelectItem>
+                    <SelectItem value="__all__">{allFilterLabel(f.label)}</SelectItem>
                     {f.options?.map((o, idx) => (
                       <SelectItem
                         key={`${radixSelectItemValue(o, idx)}-${idx}`}
@@ -409,26 +438,20 @@ export function EntityTable({
                   Export CSV
                 </Button>
               )}
-              {actions.map((action) => {
-                const Icon = action.icon
-                return (
-                  <Button
-                    key={action.id}
-                    variant={action.variant ?? "outline"}
-                    size="sm"
-                    disabled={
-                      (action.requiresSelection && selectedRows.length === 0) ||
-                      (selectedRows.length > 0 && action.isApplicable?.(selectedRows) === false)
-                    }
-                    onClick={() => runAction(action)}
-                    data-testid={`entity-action-${action.id}`}
-                  >
-                    {Icon && <Icon className="mr-2 h-4 w-4" />}
-                    {action.label}
-                  </Button>
-                )
-              })}
+              {actions.filter((action) => !action.requiresSelection).map(renderActionButton)}
             </div>
+          </div>
+        )}
+
+        {selectedRows.length > 0 && selectionActions.length > 0 && (
+          <div
+            className="flex flex-wrap items-center gap-2 rounded-xl border border-primary/20 bg-primary/5 px-3 py-2"
+            data-testid="entity-selection-actions"
+          >
+            <span className="mr-1 text-sm font-medium text-foreground">
+              {selectedRows.length} selected
+            </span>
+            {selectionActions.map(renderActionButton)}
           </div>
         )}
 

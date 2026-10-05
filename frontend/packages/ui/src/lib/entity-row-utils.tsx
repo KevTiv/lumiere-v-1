@@ -5,8 +5,15 @@ import { Progress } from "../components/progress"
 import { Tooltip, TooltipContent, TooltipTrigger } from "../components/tooltip"
 import { cn } from "./utils"
 import { entryTableStatusDotClass } from "./theme-colors"
-import type { EntityViewConfig } from "./entity-view-types"
-import { getRowField, formatTimestampLike } from "./entity-row-values"
+import type { BadgeVariant, EntityViewConfig } from "./entity-view-types"
+import {
+  getRowField,
+  formatTimestampLike,
+  unwrapEntityValue,
+  humanizeEnumValue,
+  displayEntityValue,
+  statusTone,
+} from "./entity-row-values"
 export { getRowField, formatTimestampLike } from "./entity-row-values"
 
 export function getEntityRowKey(config: EntityViewConfig): string | undefined {
@@ -65,11 +72,12 @@ function isLikelyImageSrc(value: string): boolean {
 }
 
 export function formatEntityFieldValue(
-  value: unknown,
+  rawValue: unknown,
   type: string | undefined,
   badgeVariants?: Record<string, string>,
   badgeLabels?: Record<string, string>,
 ): ReactNode {
+  const value = unwrapEntityValue(rawValue)
   if (value === null || value === undefined || value === "") {
     return <span className="text-muted-foreground">—</span>
   }
@@ -122,19 +130,15 @@ export function formatEntityFieldValue(
 
     case "badge": {
       const raw = String(value)
-      const variant = (badgeVariants?.[raw] ?? "secondary") as
-        | "default"
-        | "secondary"
-        | "destructive"
-        | "outline"
-      const label = badgeLabels?.[raw] ?? raw
+      const variant = (statusTone(raw) ?? badgeVariants?.[raw] ?? "secondary") as BadgeVariant
+      const label = badgeLabels?.[raw] ?? humanizeEnumValue(raw)
       return <Badge variant={variant}>{label}</Badge>
     }
 
     case "status": {
       const raw = String(value)
-      const variantKey = badgeVariants?.[raw] ?? "secondary"
-      const label = badgeLabels?.[raw] ?? raw
+      const variantKey = statusTone(raw) ?? badgeVariants?.[raw] ?? "secondary"
+      const label = badgeLabels?.[raw] ?? humanizeEnumValue(raw)
       return (
         <div className="flex items-center gap-2">
           <span className={cn("h-2 w-2 shrink-0 rounded-full", statusDotClass(variantKey))} />
@@ -172,6 +176,6 @@ export function formatEntityFieldValue(
     }
 
     default:
-      return String(value)
+      return displayEntityValue(value)
   }
 }

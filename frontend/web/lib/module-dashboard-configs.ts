@@ -2064,7 +2064,7 @@ export const iotDashboard: DashboardConfig = {
               },
               { id: "register_hub", label: "Register hub", icon: "plus", color: "green" },
               { id: "register_device", label: "Register device", icon: "package", color: "purple" },
-              { id: "sync_devices_dev", label: "Sync devices (dev)", icon: "template", color: "teal" },
+              { id: "sync_devices_dev", label: "Sync devices", icon: "template", color: "teal" },
             ],
           },
         },
@@ -3136,11 +3136,10 @@ export const proposalsModuleConfig = (t: TFunction): ModuleConfig => ({
               title: "Quick Actions",
               width: "full",
               data: {
-                columns: 4,
+                columns: 3,
                 actions: [
                   { id: "new_proposal", label: "New Proposal", icon: "plus", color: "blue" },
                   { id: "use_template", label: "Use Template", icon: "file", color: "green" },
-                  { id: "import_rfp", label: "Import RFP (coming soon)", icon: "upload", color: "orange" },
                   { id: "review_pending", label: "Review Pending", icon: "eye", color: "purple" },
                 ],
               },
@@ -3232,7 +3231,7 @@ export const fleetModuleConfig = (
 ): ModuleConfig => ({
   id: "fleet",
   title: t("fleet.title"),
-  description: t("fleet.forms.newVehicle.description"),
+  description: t("fleet.description"),
   defaultTab: "fleet-vehicles",
   tabs: [
     {
