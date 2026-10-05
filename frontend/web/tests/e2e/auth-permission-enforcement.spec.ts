@@ -395,6 +395,9 @@ async function adminPrepareAssignedPicking(page: Page): Promise<number> {
         warehouse_id: warehouseId,
         order_lines: [],
         origin: orderOrigin,
+        // `origin` is not in the governed sale-orders read projection;
+        // `client_order_ref` is, so it carries the exact readback key.
+        client_order_ref: orderOrigin,
       },
     ],
   )
@@ -406,17 +409,17 @@ async function adminPrepareAssignedPicking(page: Page): Promise<number> {
       id?: unknown
       partnerId?: unknown
       partner_id?: unknown
-      origin?: unknown
+      clientOrderRef?: unknown
     }>
   }
   const orders = (soJson.data ?? []).filter(
     (order) =>
       scalarQueryId(order.partnerId ?? order.partner_id) === partnerId &&
-      String(order.origin ?? "") === orderOrigin,
+      String(order.clientOrderRef ?? "") === orderOrigin,
   )
   if (orders.length !== 1) {
     throw new Error(
-      `expected one sale order for partner ${partnerId} and origin ${orderOrigin}, found ${orders.length}`,
+      `expected one sale order for partner ${partnerId} and client ref ${orderOrigin}, found ${orders.length}`,
     )
   }
   const orderId = scalarQueryId(orders[0]?.id)
