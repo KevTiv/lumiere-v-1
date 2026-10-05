@@ -9816,6 +9816,8 @@
     }
   },
   "aiHarness": {
+    "title": "AI Workbench",
+    "description": "Compose AI reports, scan stock and review AI-proposed actions with their evidence",
     "tabs": {
       "reportComposer": "Report composer",
       "lowStock": "Low stock",

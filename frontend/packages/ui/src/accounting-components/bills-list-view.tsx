@@ -245,7 +245,7 @@ export function BillsListView({
                     <TableCell>{formatTimestamp(bill.invoiceDateDue)}</TableCell>
                     <TableCell className="font-medium">{formatCurrency(bill.amountTotal ?? 0)}</TableCell>
                     <TableCell>
-                      <span className={cn("font-medium", (bill.amountResidual ?? 0) > 0 ? "text-destructive" : "text-success")}>
+                      <span className={cn("font-medium", (bill.amountResidual ?? 0) > 0 ? "text-foreground" : "text-success")}>
                         {formatCurrency(bill.amountResidual ?? 0)}
                       </span>
                     </TableCell>

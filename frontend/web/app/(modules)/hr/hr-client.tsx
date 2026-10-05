@@ -1305,6 +1305,30 @@ function HrClientLoaded({
           performanceTab,
           benefitsTab,
           recruitmentTab,
+          {
+            // Work queues and workforce-planning counters, kept off the header.
+            id: "operations",
+            label: t("hr.operationsTab", { defaultValue: "Operations" }),
+            type: "custom" as const,
+            description: t("hr.operationsTabDescription", {
+              defaultValue: "Approval and export queues, workforce planning",
+            }),
+            customContent: (
+              <div className="space-y-4">
+                <HrOpsQueuePanel
+                  leavesToApprove={leavesToApprove.length}
+                  payslipsToExport={payslipsToExport.length}
+                  hrIntegrationIntentsPending={hrIntegrationIntentsPending.length}
+                />
+                <HrAdvancedWfmPanel
+                  laborCostSnapshots={laborCostSnapshots.length}
+                  shiftOptJobs={shiftOptJobs.length}
+                  globalAssignments={globalAssignments.length}
+                  capacityForecast={hrCapacityForecast.length}
+                />
+              </div>
+            ),
+          },
         ],
       }) as ModuleConfig,
     [
@@ -1313,6 +1337,13 @@ function HrClientLoaded({
       performanceTab,
       benefitsTab,
       recruitmentTab,
+      leavesToApprove.length,
+      payslipsToExport.length,
+      hrIntegrationIntentsPending.length,
+      laborCostSnapshots.length,
+      shiftOptJobs.length,
+      globalAssignments.length,
+      hrCapacityForecast.length,
       liveSections,
       employeeFormConfig,
       leaveFormConfig,
@@ -1475,17 +1506,6 @@ function HrClientLoaded({
           {toolbarError}
         </p>
       ) : null}
-      <HrOpsQueuePanel
-        leavesToApprove={leavesToApprove.length}
-        payslipsToExport={payslipsToExport.length}
-        hrIntegrationIntentsPending={hrIntegrationIntentsPending.length}
-      />
-      <HrAdvancedWfmPanel
-        laborCostSnapshots={laborCostSnapshots.length}
-        shiftOptJobs={shiftOptJobs.length}
-        globalAssignments={globalAssignments.length}
-        capacityForecast={hrCapacityForecast.length}
-      />
       <ModuleView
         config={config}
         data={data}

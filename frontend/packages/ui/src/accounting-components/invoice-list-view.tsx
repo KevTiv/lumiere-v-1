@@ -244,7 +244,7 @@ export function InvoiceListView({
                     <TableCell>{formatTimestamp(inv.invoiceDateDue)}</TableCell>
                     <TableCell className="font-medium">{formatCurrency(inv.amountTotal ?? 0)}</TableCell>
                     <TableCell>
-                      <span className={cn("font-medium", (inv.amountResidual ?? 0) > 0 ? "text-warning" : "text-success")}>
+                      <span className={cn("font-medium", (inv.amountResidual ?? 0) > 0 ? "text-foreground" : "text-success")}>
                         {formatCurrency(inv.amountResidual ?? 0)}
                       </span>
                     </TableCell>

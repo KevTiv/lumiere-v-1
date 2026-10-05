@@ -119,6 +119,31 @@ export function activeTabEntityTable(page: Page) {
   return page.locator('[role="tabpanel"]:visible [data-testid="entity-table"]').first()
 }
 
+/**
+ * Row actions only render once a row is selected. Select the first row of the
+ * active table when there is one and expect the actions; with an empty table
+ * expect none to be offered.
+ */
+export async function expectRowActionsOffered(page: Page, actionIds: readonly string[]) {
+  const table = activeTabEntityTable(page)
+  await expect(table).toBeVisible()
+  const firstRow = table.locator('[data-testid^="entity-row-"]').first()
+  const hasRow = await firstRow
+    .waitFor({ state: "visible", timeout: 5_000 })
+    .then(() => true)
+    .catch(() => false)
+  for (const actionId of actionIds) {
+    if (!hasRow) {
+      await expect(page.getByTestId(`entity-action-${actionId}`)).toHaveCount(0)
+    }
+  }
+  if (!hasRow) return
+  await firstRow.click()
+  for (const actionId of actionIds) {
+    await expect(page.getByTestId(`entity-action-${actionId}`)).toBeVisible()
+  }
+}
+
 /** Rows in a custom tab panel table (e.g. accounting InvoiceListView). */
 export function activeTabCustomTableRows(page: Page) {
   return page.locator('[role="tabpanel"]:visible table tbody tr')

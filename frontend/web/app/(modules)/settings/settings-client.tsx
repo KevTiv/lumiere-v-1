@@ -997,9 +997,9 @@ function SettingsLoaded({
       <section className="rounded-xl border border-dashed border-border bg-card">
         <div className="border-b border-border px-4 py-4">
           <p className="text-xs font-medium uppercase tracking-[0.08em] text-muted-foreground">Advanced</p>
-          <h2 className="mt-1 text-base font-semibold tracking-[-0.01em]">Admin action coverage</h2>
+          <h2 className="mt-1 text-base font-semibold tracking-[-0.01em]">More administrative actions</h2>
           <p className="mt-1 max-w-2xl text-sm leading-6 text-muted-foreground">
-            Direct form-builder surfaces for settings reducers that are not yet embedded in the polished settings sections.
+            Less common administration tasks that are not part of the sections above.
           </p>
         </div>
         <div className="grid gap-2 p-4 md:grid-cols-2 xl:grid-cols-3">

@@ -39,6 +39,8 @@ export interface ModuleTab {
   id: string
   label: string
   type: "dashboard" | "entity" | "custom"
+  /** Subtitle shown in the page header while this tab is active. */
+  description?: string
   /** For type='dashboard': sections rendered by DashboardGrid */
   sections?: DashboardSection[]
   /** For type='entity': EntityView config */
@@ -63,4 +65,40 @@ export interface ModuleConfig {
   description?: string
   defaultTab?: string
   tabs: ModuleTab[]
+  /**
+   * Optional labelled groups for the tab row. Tabs not listed keep their place:
+   * those before the first grouped tab lead the row, the rest trail it.
+   */
+  tabGroups?: ModuleTabGroup[]
+}
+
+export interface ModuleTabGroup {
+  label: string
+  tabIds: readonly string[]
+}
+
+export type ModuleTabRowItem =
+  | { kind: "group"; label: string }
+  | { kind: "tab"; tab: ModuleTab }
+
+/** Tab row in display order, with a group label before each group's tabs. */
+export function buildModuleTabRow(
+  tabs: readonly ModuleTab[],
+  groups: readonly ModuleTabGroup[] | undefined,
+): ModuleTabRowItem[] {
+  if (!groups?.length) return tabs.map((tab) => ({ kind: "tab", tab }))
+  const groupOf = new Map<string, number>()
+  groups.forEach((group, index) => group.tabIds.forEach((id) => groupOf.set(id, index)))
+  const firstGrouped = tabs.findIndex((tab) => groupOf.has(tab.id))
+  const leading = tabs.filter((tab, index) => !groupOf.has(tab.id) && (firstGrouped < 0 || index < firstGrouped))
+  const trailing = tabs.filter((tab, index) => !groupOf.has(tab.id) && firstGrouped >= 0 && index > firstGrouped)
+  const row: ModuleTabRowItem[] = leading.map((tab) => ({ kind: "tab", tab }))
+  groups.forEach((group, index) => {
+    const members = tabs.filter((tab) => groupOf.get(tab.id) === index)
+    if (members.length === 0) return
+    row.push({ kind: "group", label: group.label })
+    members.forEach((tab) => row.push({ kind: "tab", tab }))
+  })
+  trailing.forEach((tab) => row.push({ kind: "tab", tab }))
+  return row
 }

@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useMemo, useState, type ReactNode } from "react"
 import { LayoutGrid, List } from "lucide-react"
 import { cn } from "../lib/utils"
 import type {
@@ -24,6 +24,8 @@ interface EntityViewProps {
   data?: Record<string, unknown>[]
   record?: Record<string, unknown>
   useCard?: boolean
+  /** Rendered on the title row, right-aligned (e.g. the tab's create button). */
+  headerAction?: ReactNode
   aiFocusRowKey?: string
   onRowClick?: (row: Record<string, unknown>) => void
   className?: string
@@ -122,6 +124,7 @@ export function EntityView({
   data = [],
   record = {},
   useCard = true,
+  headerAction,
   aiFocusRowKey,
   onRowClick,
   className,
@@ -233,11 +236,14 @@ export function EntityView({
   if (!useCard) {
     return (
       <div className={cn("space-y-4", className)}>
-        <div className="space-y-1">
-          <h2 className="text-xl font-semibold text-foreground">{config.title}</h2>
-          {config.description ? (
-            <p className="text-sm text-muted-foreground">{config.description}</p>
-          ) : null}
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div className="min-w-0 space-y-1">
+            <h2 className="text-lg font-semibold tracking-tight text-foreground">{config.title}</h2>
+            {config.description ? (
+              <p className="text-sm text-muted-foreground">{config.description}</p>
+            ) : null}
+          </div>
+          {headerAction ? <div className="flex shrink-0 items-center gap-2">{headerAction}</div> : null}
         </div>
         {content}
       </div>
@@ -246,9 +252,12 @@ export function EntityView({
 
   return (
     <Card className={cn("bg-card border-border/50", className)}>
-      <CardHeader>
-        <CardTitle>{config.title}</CardTitle>
-        {config.description ? <CardDescription>{config.description}</CardDescription> : null}
+      <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0 space-y-1.5">
+          <CardTitle>{config.title}</CardTitle>
+          {config.description ? <CardDescription>{config.description}</CardDescription> : null}
+        </div>
+        {headerAction ? <div className="flex shrink-0 items-center gap-2">{headerAction}</div> : null}
       </CardHeader>
       <CardContent>{content}</CardContent>
     </Card>

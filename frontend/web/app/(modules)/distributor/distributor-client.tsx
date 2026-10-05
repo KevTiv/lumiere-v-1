@@ -2,6 +2,7 @@
 
 import { useMemo, type ReactNode } from "react"
 import Link from "next/link"
+import { DashboardHeader } from "@lumiere/ui"
 import { BoxesIcon, CircleDollarSignIcon, PackageIcon, ReceiptTextIcon, StoreIcon } from "lucide-react"
 
 import { useErpSession } from "@lumiere/erp-session"
@@ -105,6 +106,10 @@ export function DistributorClient() {
       data-testid="module-view-distributor"
       data-hydrated={packs.isSuccess ? "true" : "false"}
     >
+      <DashboardHeader
+        title="Distributor"
+        description="Cash, credit, order-to-cash and stock control for distribution companies"
+      />
       <Card>
         <CardHeader>
           <div>

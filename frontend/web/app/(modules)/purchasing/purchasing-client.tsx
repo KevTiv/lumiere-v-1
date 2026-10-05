@@ -476,7 +476,7 @@ function PurchasingClientLoaded({
   })
   const moduleConfig = useMemo(() => purchasingModuleConfig(t), [t])
   const purchasingTabIds = useMemo(
-    () => [...moduleConfig.tabs.map((tab) => tab.id), "rfqs", "rfq-bids", "purchase-returns", "landed-costs", "supplier-intakes", "blanket-orders"],
+    () => [...moduleConfig.tabs.map((tab) => tab.id), "rfqs", "rfq-bids", "purchase-returns", "landed-costs", "supplier-intakes", "blanket-orders", "operations"],
     [moduleConfig],
   )
   const { activeTab, setActiveTab } = useModuleTab(
@@ -2683,6 +2683,82 @@ function PurchasingClientLoaded({
     return landedCostLines.filter((line) => String(line.landedCostId ?? "") === costId)
   }, [landedCostDetailRow, landedCostLines])
 
+  // RFQs, returns, blanket orders and supplier configuration get their own
+  // tab instead of a toolbar above the module header.
+  // Built each render: the action handlers below are not memoized.
+  const configWithOperations = {
+        ...config,
+        tabs: [
+          ...config.tabs,
+          {
+            id: "operations",
+            label: t("purchasing.operationsTab", { defaultValue: "Operations" }),
+            type: "custom" as const,
+            description: t("purchasing.operationsTabDescription", {
+              defaultValue: "RFQs, returns, blanket orders and supplier configuration",
+            }),
+            customContent: (
+          <PurchasingOpsSod
+            orders={enrichedOrders}
+            ordersToApprove={
+              ordersToApprove.length > 0
+                ? (ordersToApprove as Record<string, unknown>[])
+                : undefined
+            }
+            onCreatePurchaseRfq={() => openCreateRfqFromRequisition()}
+            onAddPurchaseRfqBid={openAddRfqBid}
+            onAwardPurchaseRfqBid={promptAwardRfqBid}
+            onCreatePurchaseReturn={openCreatePurchaseReturn}
+            onConfirmPurchaseReturn={openPurchaseReturns}
+            onCreateVendorCreditFromReturn={openVendorCreditFromReturn}
+            onCreateBlanketOrder={openBlanketOrderCreate}
+            onReleaseBlanketToPo={openBlanketRelease}
+            onCreatePurchaseContract={() => openPurchasingConfiguration("contract")}
+            onUpsertVendorScorecard={() => openPurchasingConfiguration("scorecard")}
+            onSetVendorRiskFlag={() => openPurchasingConfiguration("riskFlag")}
+            onCreateConsignmentAgreement={() => openPurchasingConfiguration("consignment")}
+            onSetApprovalDelegate={() => openPurchasingConfiguration("approvalDelegate")}
+            onSetCommodityPriceIndex={() => openPurchasingConfiguration("commodityIndex")}
+            onCreateIntegrationIntent={() => openPurchasingConfiguration("integrationIntent")}
+            onRecordIntegrationResult={promptRecordIntegrationResult}
+          >
+            <>
+              <PurchasingBlanketWorkspace
+                embedded
+                actionRequest={blanketActionRequest}
+                blanketOrders={blanketOrders as EntityRow[]}
+                blanketLines={blanketOrderLines as EntityRow[]}
+                blanketReleases={blanketReleases as EntityRow[]}
+                vendors={vendors as EntityRow[]}
+                products={products as EntityRow[]}
+                uoms={uoms as EntityRow[]}
+                currencies={currencies as EntityRow[]}
+                createBlanket={(params) => createPurchaseBlanketOrder.mutateAsync(params)}
+                releaseBlanket={releaseBlanket}
+                onOpenPurchaseOrder={openPurchaseOrder}
+              />
+              <PurchasingConfigurationWorkspace
+                embedded
+                actionRequest={configurationActionRequest}
+                vendors={vendors as EntityRow[]}
+                products={products as EntityRow[]}
+                warehouses={warehouses as EntityRow[]}
+                purchaseOrders={orders as EntityRow[]}
+                onCreateContract={(params) => createPurchaseContract.mutateAsync(params)}
+                onUpsertScorecard={(params) => upsertVendorScorecard.mutateAsync(params)}
+                onSetRiskFlag={(params) => setVendorRiskFlag.mutateAsync(params)}
+                onSetApprovalDelegate={(params) => setPurchaseApprovalDelegate.mutateAsync(params)}
+                onSetCommodityIndex={(params) => setCommodityPriceIndex.mutateAsync(params)}
+                onCreateConsignment={(params) => createConsignmentAgreement.mutateAsync(params)}
+                onCreateIntegrationIntent={(params) => createPurchasingIntegrationIntent.mutateAsync(params)}
+              />
+            </>
+          </PurchasingOpsSod>
+            ),
+          },
+        ],
+  } as ModuleConfig
+
   return (
     <>
       {contactsReferenceStatus && (
@@ -2690,66 +2766,8 @@ function PurchasingClientLoaded({
           Contacts reference data: {contactsReferenceStatus}. Supplier selection requires CRM contact read access; existing purchasing records remain available.
         </p>
       )}
-      {(activeTab === "dashboard" || activeTab === "orders") && (
-        <PurchasingOpsSod
-          orders={enrichedOrders}
-          ordersToApprove={
-            ordersToApprove.length > 0
-              ? (ordersToApprove as Record<string, unknown>[])
-              : undefined
-          }
-          onCreatePurchaseRfq={() => openCreateRfqFromRequisition()}
-          onAddPurchaseRfqBid={openAddRfqBid}
-          onAwardPurchaseRfqBid={promptAwardRfqBid}
-          onCreatePurchaseReturn={openCreatePurchaseReturn}
-          onConfirmPurchaseReturn={openPurchaseReturns}
-          onCreateVendorCreditFromReturn={openVendorCreditFromReturn}
-          onCreateBlanketOrder={openBlanketOrderCreate}
-          onReleaseBlanketToPo={openBlanketRelease}
-          onCreatePurchaseContract={() => openPurchasingConfiguration("contract")}
-          onUpsertVendorScorecard={() => openPurchasingConfiguration("scorecard")}
-          onSetVendorRiskFlag={() => openPurchasingConfiguration("riskFlag")}
-          onCreateConsignmentAgreement={() => openPurchasingConfiguration("consignment")}
-          onSetApprovalDelegate={() => openPurchasingConfiguration("approvalDelegate")}
-          onSetCommodityPriceIndex={() => openPurchasingConfiguration("commodityIndex")}
-          onCreateIntegrationIntent={() => openPurchasingConfiguration("integrationIntent")}
-          onRecordIntegrationResult={promptRecordIntegrationResult}
-        >
-          <>
-            <PurchasingBlanketWorkspace
-              embedded
-              actionRequest={blanketActionRequest}
-              blanketOrders={blanketOrders as EntityRow[]}
-              blanketLines={blanketOrderLines as EntityRow[]}
-              blanketReleases={blanketReleases as EntityRow[]}
-              vendors={vendors as EntityRow[]}
-              products={products as EntityRow[]}
-              uoms={uoms as EntityRow[]}
-              currencies={currencies as EntityRow[]}
-              createBlanket={(params) => createPurchaseBlanketOrder.mutateAsync(params)}
-              releaseBlanket={releaseBlanket}
-              onOpenPurchaseOrder={openPurchaseOrder}
-            />
-            <PurchasingConfigurationWorkspace
-              embedded
-              actionRequest={configurationActionRequest}
-              vendors={vendors as EntityRow[]}
-              products={products as EntityRow[]}
-              warehouses={warehouses as EntityRow[]}
-              purchaseOrders={orders as EntityRow[]}
-              onCreateContract={(params) => createPurchaseContract.mutateAsync(params)}
-              onUpsertScorecard={(params) => upsertVendorScorecard.mutateAsync(params)}
-              onSetRiskFlag={(params) => setVendorRiskFlag.mutateAsync(params)}
-              onSetApprovalDelegate={(params) => setPurchaseApprovalDelegate.mutateAsync(params)}
-              onSetCommodityIndex={(params) => setCommodityPriceIndex.mutateAsync(params)}
-              onCreateConsignment={(params) => createConsignmentAgreement.mutateAsync(params)}
-              onCreateIntegrationIntent={(params) => createPurchasingIntegrationIntent.mutateAsync(params)}
-            />
-          </>
-        </PurchasingOpsSod>
-      )}
       <ModuleView
-        config={config}
+        config={configWithOperations}
         data={data}
         dataLoading={{ orders: ordersLoading }}
         onFormSubmit={handleFormSubmit}

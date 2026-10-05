@@ -545,6 +545,22 @@ function ExpensesClientLoaded({
             }
           }
           return tab
+        }).concat({
+          // Capture queue, statement/FX operations and admin settings live in
+          // their own tab rather than above the module header.
+          id: "operations",
+          label: t("expenses.operationsTab", { defaultValue: "Operations" }),
+          type: "custom" as const,
+          description: t("expenses.operationsTabDescription", {
+            defaultValue: "Receipt capture queue, card statements and expense settings",
+          }),
+          customContent: (
+            <div className="space-y-6">
+              <ExpensesCapturePanel organizationId={organizationId} />
+              <ExpensesOpsPanel organizationId={organizationId} />
+              <ExpensesAdminPanel organizationId={organizationId} />
+            </div>
+          ),
         }),
       }) as ModuleConfig,
     [
@@ -898,9 +914,6 @@ function ExpensesClientLoaded({
           {toolbarError}
         </p>
       ) : null}
-      <ExpensesCapturePanel organizationId={organizationId} />
-      <ExpensesOpsPanel organizationId={organizationId} />
-      <ExpensesAdminPanel organizationId={organizationId} />
       <ModuleView
         config={config}
         data={data}
