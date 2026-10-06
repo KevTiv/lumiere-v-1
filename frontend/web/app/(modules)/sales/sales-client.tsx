@@ -53,6 +53,10 @@ import {
   percentChange,
   previousPeriodMs,
   timeRangeToMs,
+  formNumber,
+  formText,
+  recordOptions,
+  useFormDialog,
 } from '@lumiere/ui';
 import type {
   EntityRow,
@@ -357,6 +361,7 @@ function SalesClientLoaded({
   const { currentUser } = useRBAC();
   const runtimeRoleId = currentUser?.roles[0];
   const { orgId } = orgBigInts(organizationId)
+  const { askForm, formDialog } = useFormDialog();
   const operatingCompanyId = useDefaultOperatingCompanyBigInt(organizationId) ?? 0n;
 
   const saleOrdersTableRuntime = useRuntimeListConfig({
@@ -477,27 +482,29 @@ function SalesClientLoaded({
     operatingCompanyId,
   );
 
+  const label = (key: string, defaultValue: string) => t(`sales.ops.prompt.${key}`, { defaultValue });
+
   const promptCreateCommissionPlan = async () => {
-    const name =
-      window
-        .prompt(
-          t('sales.ops.prompt.commissionPlanName', {
-            defaultValue: 'Commission plan name',
-          }),
-        )
-        ?.trim() ?? '';
-    if (!name) return;
-    const rateRaw =
-      window.prompt(
-        t('sales.ops.prompt.commissionPlanRate', {
-          defaultValue: 'Default rate percent (e.g. 5)',
-        }),
-        '5',
-      ) ?? '';
-    const defaultRatePercent = Number(rateRaw);
-    if (!Number.isFinite(defaultRatePercent)) {
-      throw new Error('Invalid rate percent');
-    }
+    const values = await askForm({
+      title: t('sales.ops.createCommissionPlan', { defaultValue: 'New commission plan' }),
+      fields: [
+        { id: 'name', name: 'name', label: label('commissionPlanName', 'Commission plan name'), type: 'text', required: true },
+        {
+          id: 'rate',
+          name: 'rate',
+          label: label('commissionPlanRate', 'Default rate percent (e.g. 5)'),
+          type: 'number',
+          required: true,
+          min: 0,
+          max: 100,
+          step: 0.01,
+          defaultValue: 5,
+        },
+      ],
+    });
+    const name = formText(values?.name);
+    const defaultRatePercent = formNumber(values?.rate);
+    if (name == null || defaultRatePercent == null) return;
     await createSaleCommissionPlan.mutateAsync({
       companyId: operatingCompanyId,
       name,
@@ -507,31 +514,30 @@ function SalesClientLoaded({
     });
   };
 
+  // Commission plans have no list query yet, so a plan is still identified by its id.
   const promptCreateCommissionPlanSplit = async () => {
-    const planId =
-      window
-        .prompt(
-          t('sales.ops.prompt.planId', { defaultValue: 'Commission plan id' }),
-        )
-        ?.trim() ?? '';
-    const partnerId =
-      window
-        .prompt(
-          t('sales.ops.prompt.partnerId', { defaultValue: 'Partner id' }),
-        )
-        ?.trim() ?? '';
-    const shareRaw =
-      window.prompt(
-        t('sales.ops.prompt.sharePercent', {
-          defaultValue: 'Share percent (0–100)',
-        }),
-        '50',
-      ) ?? '';
-    if (!planId || !partnerId) return;
-    const sharePercent = Number(shareRaw);
-    if (!Number.isFinite(sharePercent)) {
-      throw new Error('Invalid share percent');
-    }
+    const values = await askForm({
+      title: t('sales.ops.createCommissionSplit', { defaultValue: 'New commission split' }),
+      fields: [
+        { id: 'planId', name: 'planId', label: label('planId', 'Commission plan id'), type: 'number', required: true, min: 1 },
+        { id: 'partnerId', name: 'partnerId', label: label('partnerId', 'Partner'), type: 'select', required: true, searchable: true, options: partnerFieldOptions },
+        {
+          id: 'share',
+          name: 'share',
+          label: label('sharePercent', 'Share percent (0–100)'),
+          type: 'number',
+          required: true,
+          min: 0,
+          max: 100,
+          step: 0.01,
+          defaultValue: 50,
+        },
+      ],
+    });
+    const planId = formText(values?.planId);
+    const partnerId = formText(values?.partnerId);
+    const sharePercent = formNumber(values?.share);
+    if (planId == null || partnerId == null || sharePercent == null) return;
     await createSaleCommissionPlanSplit.mutateAsync({
       planId: BigInt(planId),
       partnerId: BigInt(partnerId),
@@ -541,21 +547,16 @@ function SalesClientLoaded({
   };
 
   const promptCreateSaleContract = async () => {
-    const name =
-      window
-        .prompt(
-          t('sales.ops.prompt.contractName', {
-            defaultValue: 'Contract name',
-          }),
-        )
-        ?.trim() ?? '';
-    const partnerId =
-      window
-        .prompt(
-          t('sales.ops.prompt.partnerId', { defaultValue: 'Partner id' }),
-        )
-        ?.trim() ?? '';
-    if (!name || !partnerId) return;
+    const values = await askForm({
+      title: t('sales.ops.createContract', { defaultValue: 'New sale contract' }),
+      fields: [
+        { id: 'name', name: 'name', label: label('contractName', 'Contract name'), type: 'text', required: true },
+        { id: 'partnerId', name: 'partnerId', label: label('partnerId', 'Partner'), type: 'select', required: true, searchable: true, options: partnerFieldOptions },
+      ],
+    });
+    const name = formText(values?.name);
+    const partnerId = formText(values?.partnerId);
+    if (name == null || partnerId == null) return;
     await createSaleContract.mutateAsync({
       companyId: operatingCompanyId,
       name,
@@ -568,24 +569,34 @@ function SalesClientLoaded({
   };
 
   const promptCreateCpqConstraint = async () => {
-    const name =
-      window
-        .prompt(
-          t('sales.ops.prompt.cpqName', {
-            defaultValue: 'CPQ constraint name',
-          }),
-        )
-        ?.trim() ?? '';
-    const ruleJson =
-      window
-        .prompt(
-          t('sales.ops.prompt.cpqRuleJson', {
-            defaultValue: 'Rule JSON (e.g. {})',
-          }),
-          '{}',
-        )
-        ?.trim() ?? '';
-    if (!name || !ruleJson) return;
+    const values = await askForm({
+      title: t('sales.ops.createCpqConstraint', { defaultValue: 'New CPQ constraint' }),
+      fields: [
+        { id: 'name', name: 'name', label: label('cpqName', 'CPQ constraint name'), type: 'text', required: true },
+        {
+          id: 'ruleJson',
+          name: 'ruleJson',
+          label: label('cpqRuleJson', 'Rule JSON (e.g. {})'),
+          type: 'textarea',
+          rows: 4,
+          required: true,
+          defaultValue: '{}',
+          validation: {
+            custom: (value) => {
+              try {
+                JSON.parse(String(value ?? ''));
+                return null;
+              } catch {
+                return t('sales.ops.invalidJson', { defaultValue: 'Not valid JSON' });
+              }
+            },
+          },
+        },
+      ],
+    });
+    const name = formText(values?.name);
+    const ruleJson = formText(values?.ruleJson);
+    if (name == null || ruleJson == null) return;
     await createSaleCpqConstraint.mutateAsync({
       companyId: operatingCompanyId,
       name,
@@ -596,42 +607,26 @@ function SalesClientLoaded({
   };
 
   const promptCreateIntegrationIntent = async () => {
-    const provider =
-      window
-        .prompt(
-          t('sales.ops.prompt.intentProvider', {
-            defaultValue: 'Provider (e.g. fiscal, carrier)',
-          }),
-          'fiscal',
-        )
-        ?.trim() ?? '';
-    const intentType =
-      window
-        .prompt(
-          t('sales.ops.prompt.intentType', {
-            defaultValue: 'Intent type (e.g. submit, book)',
-          }),
-          'submit',
-        )
-        ?.trim() ?? '';
-    const orderRaw =
-      window
-        .prompt(
-          t('sales.ops.prompt.intentOrderId', {
-            defaultValue: 'Sale order id (optional)',
-          }),
-        )
-        ?.trim() ?? '';
-    const idempotencyKey =
-      window
-        .prompt(
-          t('sales.ops.prompt.idempotencyKey', {
-            defaultValue: 'Idempotency key',
-          }),
-          `intent-${Date.now()}`,
-        )
-        ?.trim() ?? '';
-    if (!provider || !intentType || !idempotencyKey) return;
+    const orderOptions = [
+      { value: '', label: t('sales.ops.noOrder', { defaultValue: 'No sale order' }) },
+      ...recordOptions(orders as unknown as Record<string, unknown>[], (order) =>
+        saleOrderPrimaryLabel(order as never) || `#${String(order.id)}`,
+      ),
+    ];
+    const values = await askForm({
+      title: t('sales.ops.createIntegrationIntent', { defaultValue: 'New integration intent' }),
+      fields: [
+        { id: 'provider', name: 'provider', label: label('intentProvider', 'Provider (e.g. fiscal, carrier)'), type: 'text', required: true, defaultValue: 'fiscal' },
+        { id: 'intentType', name: 'intentType', label: label('intentType', 'Intent type (e.g. submit, book)'), type: 'text', required: true, defaultValue: 'submit' },
+        { id: 'orderId', name: 'orderId', label: label('intentOrderId', 'Sale order (optional)'), type: 'select', searchable: true, options: orderOptions },
+        { id: 'idempotencyKey', name: 'idempotencyKey', label: label('idempotencyKey', 'Idempotency key'), type: 'text', required: true, defaultValue: `intent-${Date.now()}` },
+      ],
+    });
+    const provider = formText(values?.provider);
+    const intentType = formText(values?.intentType);
+    const idempotencyKey = formText(values?.idempotencyKey);
+    if (provider == null || intentType == null || idempotencyKey == null) return;
+    const orderRaw = formText(values?.orderId);
     await createSalesIntegrationIntent.mutateAsync({
       companyId: operatingCompanyId,
       provider,
@@ -643,38 +638,24 @@ function SalesClientLoaded({
     });
   };
 
+  // Integration intents have no list query yet, so an intent is still identified by its id.
   const promptRecordIntegrationResult = async () => {
-    const intentId =
-      window
-        .prompt(
-          t('sales.ops.prompt.intentId', {
-            defaultValue: 'Integration intent id',
-          }),
-        )
-        ?.trim() ?? '';
-    const status =
-      window
-        .prompt(
-          t('sales.ops.prompt.intentStatus', {
-            defaultValue: 'Status (e.g. succeeded, failed)',
-          }),
-          'succeeded',
-        )
-        ?.trim() ?? '';
-    if (!intentId || !status) return;
-    const externalReference =
-      window
-        .prompt(
-          t('sales.ops.prompt.externalRef', {
-            defaultValue: 'External reference (optional)',
-          }),
-        )
-        ?.trim() || undefined;
+    const values = await askForm({
+      title: t('sales.ops.recordIntegrationResult', { defaultValue: 'Record integration result' }),
+      fields: [
+        { id: 'intentId', name: 'intentId', label: label('intentId', 'Integration intent id'), type: 'number', required: true, min: 1 },
+        { id: 'status', name: 'status', label: label('intentStatus', 'Status (e.g. succeeded, failed)'), type: 'text', required: true, defaultValue: 'succeeded' },
+        { id: 'externalReference', name: 'externalReference', label: label('externalRef', 'External reference (optional)'), type: 'text' },
+      ],
+    });
+    const intentId = formText(values?.intentId);
+    const status = formText(values?.status);
+    if (intentId == null || status == null) return;
     await recordSalesIntegrationResult.mutateAsync({
       intentId,
       params: {
         status,
-        externalReference,
+        externalReference: formText(values?.externalReference),
         lastError: status === 'failed' ? 'recorded via Ops' : undefined,
         metadata: undefined,
       },
@@ -682,17 +663,22 @@ function SalesClientLoaded({
   };
 
   const promptScheduleSlaEscalation = async () => {
-    const delayRaw =
-      window.prompt(
-        t('sales.ops.prompt.slaDelaySecs', {
-          defaultValue: 'Delay seconds (min 60)',
-        }),
-        '300',
-      ) ?? '';
-    const delaySecs = Number(delayRaw);
-    if (!Number.isFinite(delaySecs) || delaySecs <= 0) {
-      throw new Error('Invalid delay');
-    }
+    const values = await askForm({
+      title: t('sales.ops.scheduleSlaEscalation', { defaultValue: 'Schedule SLA escalation' }),
+      fields: [
+        {
+          id: 'delay',
+          name: 'delay',
+          label: label('slaDelaySecs', 'Delay seconds (min 60)'),
+          type: 'number',
+          required: true,
+          min: 60,
+          defaultValue: 300,
+        },
+      ],
+    });
+    const delaySecs = formNumber(values?.delay);
+    if (delaySecs == null) return;
     await scheduleSalesSlaEscalation.mutateAsync({ delaySecs });
   };
 
@@ -2546,6 +2532,7 @@ function SalesClientLoaded({
           }}
         />
       ) : null}
+      {formDialog}
       <FormModal
         open={openReturnForm}
         onOpenChange={(open) => {

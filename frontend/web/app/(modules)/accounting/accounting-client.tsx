@@ -323,7 +323,7 @@ import { useToast } from "@/hooks/use-toast"
 import { useWorkflowSurface } from "@/hooks/use-workflow-surface"
 import { useInvoiceToPaymentWorkflow } from "@lumiere/query-hooks/hooks/accounting/invoice-workflow"
 import { isPaymentRegistrable } from "@lumiere/erp-workflows"
-import { workflowActionsToEntityActions } from "@lumiere/ui"
+import { formText, useFormDialog, workflowActionsToEntityActions } from "@lumiere/ui"
 import type {
   AccountAnalyticAccount,
   AccountFiscalYear,
@@ -646,6 +646,7 @@ function AccountingClientReady({
   useAccountingModuleSubscription()
   const { t } = useTranslation()
   const { toast } = useToast()
+  const { askForm, formDialog } = useFormDialog()
   const { currentUser } = useRBAC()
   const runtimeRoleId = currentUser?.roles[0]
   const moduleConfigBase = useMemo(() => accountingModuleConfig(t), [t])
@@ -2751,8 +2752,20 @@ function AccountingClientReady({
 
   const handleInvoiceSendEmail = useCallback(async () => {
     if (!selectedInvoice?.id) return
-    const recipient = window.prompt("Recipient email address")
-    if (!recipient?.trim()) return
+    const values = await askForm({
+      title: t("accounting.invoices.invoiceActions.send"),
+      fields: [
+        {
+          id: "recipient",
+          name: "recipient",
+          label: "Recipient email address",
+          type: "email",
+          required: true,
+        },
+      ],
+    })
+    const recipient = formText(values?.recipient)
+    if (recipient == null) return
     const template = (mailTemplatesQuery.data ?? []).find(
       (row) =>
         (row.model ?? "") === "account_move" &&
@@ -2772,7 +2785,7 @@ function AccountingClientReady({
         templateId: Number(template.id),
         model: "account_move",
         resId: Number(selectedInvoice.id),
-        recipientEmail: recipient.trim(),
+        recipientEmail: recipient,
       })
       const dispatchResult = await dispatchQueuedMail.mutateAsync()
       toast({
@@ -2793,6 +2806,7 @@ function AccountingClientReady({
     mailTemplatesQuery.data,
     queueMailFromTemplate,
     dispatchQueuedMail,
+    askForm,
     toast,
     t,
   ])
@@ -3932,6 +3946,7 @@ function AccountingClientReady({
 
   return (
     <>
+      {formDialog}
       <ModuleView
         config={config}
         data={data}

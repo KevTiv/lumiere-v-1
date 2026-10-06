@@ -55,6 +55,9 @@ import {
   percentChange,
   previousPeriodMs,
   timeRangeToMs,
+  formNumber,
+  formText,
+  useFormDialog,
 } from "@lumiere/ui"
 import type { EntityRow, EntityViewConfig, EntityTableConfig, EntityRecordSheetConfig, FormConfig, ModuleConfig } from "@lumiere/ui"
 import type { Product, Uom } from "@lumiere/stdb/types"
@@ -162,6 +165,7 @@ import {
   contactRowsToVendorSelectOptions,
   pricelistRowsToSelectOptions,
   productRowsToSelectOptions,
+  warehouseRowsToSelectOptions,
   uomRowsToSelectOptions,
   purchaseOrderRowsToSelectOptions,
   purchaseOrderLineRowsToEditOptions,
@@ -465,6 +469,7 @@ function PurchasingClientLoaded({
   const { currentUser } = useRBAC()
   const runtimeRoleId = currentUser?.roles[0]
   const { orgId } = orgBigInts(organizationId)
+  const { askForm, formDialog } = useFormDialog()
 
   const purchaseOrdersTableRuntime = useRuntimeListConfig({
     base: purchaseOrdersTableConfig(t).view as EntityTableConfig,
@@ -683,16 +688,18 @@ function PurchasingClientLoaded({
     setOperationDialogRequest({ kind: "add-rfq-bid" })
   }
 
+  // RFQs and bids have no list query yet, so both are still identified by id.
   const promptAwardRfqBid = async () => {
-    const rfqId = window
-      .prompt(t("purchasing.ops.prompt.rfqId", { defaultValue: "RFQ id" }))
-      ?.trim()
-    const bidId = window
-      .prompt(
-        t("purchasing.ops.prompt.bidId", { defaultValue: "Bid id to award" }),
-      )
-      ?.trim()
-    if (!rfqId || !bidId) return
+    const values = await askForm({
+      title: t("purchasing.ops.awardRfqBid", { defaultValue: "Award RFQ bid" }),
+      fields: [
+        { id: "rfqId", name: "rfqId", label: t("purchasing.ops.prompt.rfqId", { defaultValue: "RFQ id" }), type: "number", required: true, min: 1 },
+        { id: "bidId", name: "bidId", label: t("purchasing.ops.prompt.bidId", { defaultValue: "Bid id to award" }), type: "number", required: true, min: 1 },
+      ],
+    })
+    const rfqId = formText(values?.rfqId)
+    const bidId = formText(values?.bidId)
+    if (rfqId == null || bidId == null) return
     await purchasingWorkflow.awardBid.execute({ rfqId, bidId }, { navigateToNext: true })
   }
 
@@ -737,21 +744,16 @@ function PurchasingClientLoaded({
   }
 
   const promptCreatePurchaseContract = async () => {
-    const name =
-      window
-        .prompt(
-          t("purchasing.ops.prompt.contractName", {
-            defaultValue: "Purchase contract name",
-          }),
-        )
-        ?.trim() ?? ""
-    const partnerId =
-      window
-        .prompt(
-          t("purchasing.ops.prompt.partnerId", { defaultValue: "Vendor partner id" }),
-        )
-        ?.trim() ?? ""
-    if (!name || !partnerId) return
+    const values = await askForm({
+      title: t("purchasing.ops.createContract", { defaultValue: "New purchase contract" }),
+      fields: [
+        { id: "name", name: "name", label: t("purchasing.ops.prompt.contractName", { defaultValue: "Purchase contract name" }), type: "text", required: true },
+        { id: "partnerId", name: "partnerId", label: t("purchasing.ops.prompt.partnerId", { defaultValue: "Vendor" }), type: "select", required: true, searchable: true, options: vendorFieldOptions },
+      ],
+    })
+    const name = formText(values?.name)
+    const partnerId = formText(values?.partnerId)
+    if (name == null || partnerId == null) return
     await createPurchaseContract.mutateAsync({
       name,
       partnerId: BigInt(partnerId),
@@ -762,32 +764,18 @@ function PurchasingClientLoaded({
   }
 
   const promptUpsertVendorScorecard = async () => {
-    const partnerId =
-      window
-        .prompt(
-          t("purchasing.ops.prompt.partnerId", { defaultValue: "Vendor partner id" }),
-        )
-        ?.trim() ?? ""
-    const otifRaw =
-      window.prompt(
-        t("purchasing.ops.prompt.otifScore", {
-          defaultValue: "OTIF score (0–100)",
-        }),
-        "95",
-      ) ?? ""
-    const qualityRaw =
-      window.prompt(
-        t("purchasing.ops.prompt.qualityScore", {
-          defaultValue: "Quality score (0–100)",
-        }),
-        "90",
-      ) ?? ""
-    if (!partnerId) return
-    const otifScore = Number(otifRaw)
-    const qualityScore = Number(qualityRaw)
-    if (!Number.isFinite(otifScore) || !Number.isFinite(qualityScore)) {
-      throw new Error("Invalid score")
-    }
+    const values = await askForm({
+      title: t("purchasing.ops.vendorScorecard", { defaultValue: "Vendor scorecard" }),
+      fields: [
+        { id: "partnerId", name: "partnerId", label: t("purchasing.ops.prompt.partnerId", { defaultValue: "Vendor" }), type: "select", required: true, searchable: true, options: vendorFieldOptions },
+        { id: "otif", name: "otif", label: t("purchasing.ops.prompt.otifScore", { defaultValue: "OTIF score (0–100)" }), type: "number", required: true, min: 0, max: 100, defaultValue: 95, width: "1/2" },
+        { id: "quality", name: "quality", label: t("purchasing.ops.prompt.qualityScore", { defaultValue: "Quality score (0–100)" }), type: "number", required: true, min: 0, max: 100, defaultValue: 90, width: "1/2" },
+      ],
+    })
+    const partnerId = formText(values?.partnerId)
+    const otifScore = formNumber(values?.otif)
+    const qualityScore = formNumber(values?.quality)
+    if (partnerId == null || otifScore == null || qualityScore == null) return
     await upsertVendorScorecard.mutateAsync({
       partnerId: BigInt(partnerId),
       otifScore,
@@ -797,22 +785,28 @@ function PurchasingClientLoaded({
   }
 
   const promptSetVendorRiskFlag = async () => {
-    const partnerId =
-      window
-        .prompt(
-          t("purchasing.ops.prompt.partnerId", { defaultValue: "Vendor partner id" }),
-        )
-        ?.trim() ?? ""
-    const riskLevel =
-      window
-        .prompt(
-          t("purchasing.ops.prompt.riskLevel", {
-            defaultValue: "Risk level (e.g. low, medium, high)",
-          }),
-          "medium",
-        )
-        ?.trim() ?? ""
-    if (!partnerId || !riskLevel) return
+    const values = await askForm({
+      title: t("purchasing.ops.vendorRiskFlag", { defaultValue: "Flag vendor risk" }),
+      fields: [
+        { id: "partnerId", name: "partnerId", label: t("purchasing.ops.prompt.partnerId", { defaultValue: "Vendor" }), type: "select", required: true, searchable: true, options: vendorFieldOptions },
+        {
+          id: "riskLevel",
+          name: "riskLevel",
+          label: t("purchasing.ops.prompt.riskLevel", { defaultValue: "Risk level" }),
+          type: "select",
+          required: true,
+          defaultValue: "medium",
+          options: [
+            { value: "low", label: "Low" },
+            { value: "medium", label: "Medium" },
+            { value: "high", label: "High" },
+          ],
+        },
+      ],
+    })
+    const partnerId = formText(values?.partnerId)
+    const riskLevel = formText(values?.riskLevel)
+    if (partnerId == null || riskLevel == null) return
     await setVendorRiskFlag.mutateAsync({
       partnerId: BigInt(partnerId),
       isFlagged: true,
@@ -823,33 +817,20 @@ function PurchasingClientLoaded({
   }
 
   const promptCreateConsignmentAgreement = async () => {
-    const name =
-      window
-        .prompt(
-          t("purchasing.ops.prompt.consignmentName", {
-            defaultValue: "Consignment agreement name",
-          }),
-        )
-        ?.trim() ?? ""
-    const partnerId =
-      window
-        .prompt(
-          t("purchasing.ops.prompt.partnerId", { defaultValue: "Vendor partner id" }),
-        )
-        ?.trim() ?? ""
-    const productId =
-      window
-        .prompt(
-          t("purchasing.ops.prompt.productId", { defaultValue: "Product id" }),
-        )
-        ?.trim() ?? ""
-    const warehouseId =
-      window
-        .prompt(
-          t("purchasing.ops.prompt.warehouseId", { defaultValue: "Warehouse id" }),
-        )
-        ?.trim() ?? ""
-    if (!name || !partnerId || !productId || !warehouseId) return
+    const values = await askForm({
+      title: t("purchasing.ops.createConsignment", { defaultValue: "New consignment agreement" }),
+      fields: [
+        { id: "name", name: "name", label: t("purchasing.ops.prompt.consignmentName", { defaultValue: "Consignment agreement name" }), type: "text", required: true },
+        { id: "partnerId", name: "partnerId", label: t("purchasing.ops.prompt.partnerId", { defaultValue: "Vendor" }), type: "select", required: true, searchable: true, options: vendorFieldOptions },
+        { id: "productId", name: "productId", label: t("purchasing.ops.prompt.productId", { defaultValue: "Product" }), type: "select", required: true, searchable: true, options: productFieldOptions },
+        { id: "warehouseId", name: "warehouseId", label: t("purchasing.ops.prompt.warehouseId", { defaultValue: "Warehouse" }), type: "select", required: true, options: warehouseSelectOptions },
+      ],
+    })
+    const name = formText(values?.name)
+    const partnerId = formText(values?.partnerId)
+    const productId = formText(values?.productId)
+    const warehouseId = formText(values?.warehouseId)
+    if (name == null || partnerId == null || productId == null || warehouseId == null) return
     await createConsignmentAgreement.mutateAsync({
       name,
       partnerId: BigInt(partnerId),
@@ -859,24 +840,22 @@ function PurchasingClientLoaded({
     })
   }
 
+  // Users are identified by their 64-character identity hex, which no list here carries yet.
   const promptSetApprovalDelegate = async () => {
-    const principalIdentity =
-      window
-        .prompt(
-          t("purchasing.ops.prompt.principalIdentity", {
-            defaultValue: "Principal identity hex (64 chars)",
-          }),
-        )
-        ?.trim() ?? ""
-    const delegateIdentity =
-      window
-        .prompt(
-          t("purchasing.ops.prompt.delegateIdentity", {
-            defaultValue: "Delegate identity hex (64 chars)",
-          }),
-        )
-        ?.trim() ?? ""
-    if (!principalIdentity || !delegateIdentity) return
+    const hex64 = (value: unknown) =>
+      /^[0-9a-fA-F]{64}$/.test(String(value ?? "").trim())
+        ? null
+        : t("purchasing.ops.identityHexInvalid", { defaultValue: "Enter the 64-character identity hex" })
+    const values = await askForm({
+      title: t("purchasing.ops.approvalDelegate", { defaultValue: "Set approval delegate" }),
+      fields: [
+        { id: "principal", name: "principal", label: t("purchasing.ops.prompt.principalIdentity", { defaultValue: "Principal identity hex (64 chars)" }), type: "text", required: true, validation: { custom: hex64 } },
+        { id: "delegate", name: "delegate", label: t("purchasing.ops.prompt.delegateIdentity", { defaultValue: "Delegate identity hex (64 chars)" }), type: "text", required: true, validation: { custom: hex64 } },
+      ],
+    })
+    const principalIdentity = formText(values?.principal)
+    const delegateIdentity = formText(values?.delegate)
+    if (principalIdentity == null || delegateIdentity == null) return
     await setPurchaseApprovalDelegate.mutateAsync({
       principalIdentity,
       delegateIdentity,
@@ -886,24 +865,16 @@ function PurchasingClientLoaded({
   }
 
   const promptSetCommodityPriceIndex = async () => {
-    const code =
-      window
-        .prompt(
-          t("purchasing.ops.prompt.commodityCode", {
-            defaultValue: "Commodity code (e.g. WTI, CU)",
-          }),
-        )
-        ?.trim() ?? ""
-    const rateRaw =
-      window.prompt(
-        t("purchasing.ops.prompt.commodityRate", {
-          defaultValue: "Rate",
-        }),
-        "1",
-      ) ?? ""
-    if (!code) return
-    const rate = Number(rateRaw)
-    if (!Number.isFinite(rate)) throw new Error("Invalid rate")
+    const values = await askForm({
+      title: t("purchasing.ops.commodityPriceIndex", { defaultValue: "Commodity price index" }),
+      fields: [
+        { id: "code", name: "code", label: t("purchasing.ops.prompt.commodityCode", { defaultValue: "Commodity code (e.g. WTI, CU)" }), type: "text", required: true },
+        { id: "rate", name: "rate", label: t("purchasing.ops.prompt.commodityRate", { defaultValue: "Rate" }), type: "number", required: true, step: 0.0001, defaultValue: 1 },
+      ],
+    })
+    const code = formText(values?.code)
+    const rate = formNumber(values?.rate)
+    if (code == null || rate == null) return
     await setCommodityPriceIndex.mutateAsync({
       code,
       rate,
@@ -913,42 +884,24 @@ function PurchasingClientLoaded({
   }
 
   const promptCreateIntegrationIntent = async () => {
-    const provider =
-      window
-        .prompt(
-          t("purchasing.ops.prompt.intentProvider", {
-            defaultValue: "Provider (e.g. customs, e-invoice)",
-          }),
-          "customs",
-        )
-        ?.trim() ?? ""
-    const intentType =
-      window
-        .prompt(
-          t("purchasing.ops.prompt.intentType", {
-            defaultValue: "Intent type (e.g. submit, declare)",
-          }),
-          "submit",
-        )
-        ?.trim() ?? ""
-    const orderRaw =
-      window
-        .prompt(
-          t("purchasing.ops.prompt.intentPoId", {
-            defaultValue: "Purchase order id (optional)",
-          }),
-        )
-        ?.trim() ?? ""
-    const idempotencyKey =
-      window
-        .prompt(
-          t("purchasing.ops.prompt.idempotencyKey", {
-            defaultValue: "Idempotency key",
-          }),
-          `pur-intent-${Date.now()}`,
-        )
-        ?.trim() ?? ""
-    if (!provider || !intentType || !idempotencyKey) return
+    const orderOptions = [
+      { value: "", label: t("purchasing.ops.noOrder", { defaultValue: "No purchase order" }) },
+      ...purchaseOrderRowsToSelectOptions(orders as Record<string, unknown>[]),
+    ]
+    const values = await askForm({
+      title: t("purchasing.ops.createIntegrationIntent", { defaultValue: "New integration intent" }),
+      fields: [
+        { id: "provider", name: "provider", label: t("purchasing.ops.prompt.intentProvider", { defaultValue: "Provider (e.g. customs, e-invoice)" }), type: "text", required: true, defaultValue: "customs" },
+        { id: "intentType", name: "intentType", label: t("purchasing.ops.prompt.intentType", { defaultValue: "Intent type (e.g. submit, declare)" }), type: "text", required: true, defaultValue: "submit" },
+        { id: "orderId", name: "orderId", label: t("purchasing.ops.prompt.intentPoId", { defaultValue: "Purchase order (optional)" }), type: "select", searchable: true, options: orderOptions },
+        { id: "idempotencyKey", name: "idempotencyKey", label: t("purchasing.ops.prompt.idempotencyKey", { defaultValue: "Idempotency key" }), type: "text", required: true, defaultValue: `pur-intent-${Date.now()}` },
+      ],
+    })
+    const provider = formText(values?.provider)
+    const intentType = formText(values?.intentType)
+    const idempotencyKey = formText(values?.idempotencyKey)
+    if (provider == null || intentType == null || idempotencyKey == null) return
+    const orderRaw = formText(values?.orderId)
     await createPurchasingIntegrationIntent.mutateAsync({
       provider,
       intentType,
@@ -959,38 +912,24 @@ function PurchasingClientLoaded({
     })
   }
 
+  // Integration intents have no list query yet, so an intent is still identified by its id.
   const promptRecordIntegrationResult = async () => {
-    const intentId =
-      window
-        .prompt(
-          t("purchasing.ops.prompt.intentId", {
-            defaultValue: "Integration intent id",
-          }),
-        )
-        ?.trim() ?? ""
-    const status =
-      window
-        .prompt(
-          t("purchasing.ops.prompt.intentStatus", {
-            defaultValue: "Status (e.g. succeeded, failed)",
-          }),
-          "succeeded",
-        )
-        ?.trim() ?? ""
-    if (!intentId || !status) return
-    const externalReference =
-      window
-        .prompt(
-          t("purchasing.ops.prompt.externalRef", {
-            defaultValue: "External reference (optional)",
-          }),
-        )
-        ?.trim() || null
+    const values = await askForm({
+      title: t("purchasing.ops.recordIntegrationResult", { defaultValue: "Record integration result" }),
+      fields: [
+        { id: "intentId", name: "intentId", label: t("purchasing.ops.prompt.intentId", { defaultValue: "Integration intent id" }), type: "number", required: true, min: 1 },
+        { id: "status", name: "status", label: t("purchasing.ops.prompt.intentStatus", { defaultValue: "Status (e.g. succeeded, failed)" }), type: "text", required: true, defaultValue: "succeeded" },
+        { id: "externalReference", name: "externalReference", label: t("purchasing.ops.prompt.externalRef", { defaultValue: "External reference (optional)" }), type: "text" },
+      ],
+    })
+    const intentId = formText(values?.intentId)
+    const status = formText(values?.status)
+    if (intentId == null || status == null) return
     await recordPurchasingIntegrationResult.mutateAsync({
       intentId,
       params: {
         status,
-        externalReference,
+        externalReference: formText(values?.externalReference) ?? null,
         lastError: status === "failed" ? "recorded via Ops" : null,
         metadata: null,
       },
@@ -1043,6 +982,12 @@ function PurchasingClientLoaded({
     if (fromApi.length > 0) return fromApi
     return [{ value: "", label: t("common.lookup.noPricelists"), disabled: true }]
   }, [pricelists, t])
+
+  const warehouseSelectOptions = useMemo(() => {
+    const fromApi = warehouseRowsToSelectOptions(warehouses as Record<string, unknown>[])
+    if (fromApi.length > 0) return fromApi
+    return [{ value: "", label: t("common.lookup.noWarehouses", { defaultValue: "No warehouses" }), disabled: true }]
+  }, [warehouses, t])
 
   const productFieldOptions = useMemo(() => {
     const fromApi = productRowsToSelectOptions(products)
@@ -2771,6 +2716,7 @@ function PurchasingClientLoaded({
 
   return (
     <>
+      {formDialog}
       {contactsReferenceStatus && (
         <p role="status" className="text-sm text-muted-foreground">
           Contacts reference data: {contactsReferenceStatus}. Supplier selection requires CRM contact read access; existing purchasing records remain available.
