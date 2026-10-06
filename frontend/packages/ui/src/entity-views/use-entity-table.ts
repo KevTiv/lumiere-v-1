@@ -30,9 +30,15 @@ export interface UseEntityTableOptions {
   search: string
   /** Column filters: row key → required value (case-insensitive). `__all__` and "" mean none. */
   filters: Readonly<Record<string, string>>
+  /** Order shown until the user picks a column. Defaults to newest first (descending row key). */
+  defaultSorting?: SortingState
 }
 
 const NO_KEYS: readonly string[] = []
+
+function newestFirst(rowKey: string): SortingState {
+  return [{ id: rowKey, desc: true }]
+}
 
 /**
  * Sorting, filtering, paging and selection for a record table, run by TanStack Table. Search and
@@ -50,6 +56,7 @@ export function useEntityTable({
   searchKeys = NO_KEYS,
   search,
   filters,
+  defaultSorting,
 }: UseEntityTableOptions) {
   const [userSorting, setUserSorting] = useState<SortingState>([])
   const [pageIndex, setPageIndex] = useState(0)
@@ -63,16 +70,23 @@ export function useEntityTable({
     [filters],
   )
 
-  // The row key sorts the default order and each filter key needs a column to filter on.
+  const fallbackSorting = useMemo(() => defaultSorting ?? newestFirst(rowKey), [defaultSorting, rowKey])
+
+  // The default order's keys and each filter key need a column to read from.
   const engineColumns = useMemo(
-    () => buildEngineColumns(columns, [rowKey, ...activeFilters.map((filter) => filter.id)]),
-    [columns, rowKey, activeFilters],
+    () =>
+      buildEngineColumns(columns, [
+        rowKey,
+        ...fallbackSorting.map((sort) => sort.id),
+        ...activeFilters.map((filter) => filter.id),
+      ]),
+    [columns, rowKey, fallbackSorting, activeFilters],
   )
   const globalFilterFn = useMemo(() => searchFilterFn(searchKeys), [searchKeys])
 
   const sorting = useMemo<SortingState>(
-    () => (userSorting.length > 0 ? userSorting : [{ id: rowKey, desc: true }]),
-    [userSorting, rowKey],
+    () => (userSorting.length > 0 ? userSorting : fallbackSorting),
+    [userSorting, fallbackSorting],
   )
   const pagination = useMemo<PaginationState>(() => ({ pageIndex, pageSize }), [pageIndex, pageSize])
   const globalFilter = searchKeys.length > 0 ? search : ""
@@ -90,10 +104,10 @@ export function useEntityTable({
     // The default order is not a user choice: toggling is computed against what is on screen, and
     // only the result is remembered.
     setUserSorting((previous) => {
-      const shown = previous.length > 0 ? previous : [{ id: rowKey, desc: true }]
+      const shown = previous.length > 0 ? previous : fallbackSorting
       return typeof updater === "function" ? updater(shown) : updater
     })
-  }, [rowKey])
+  }, [fallbackSorting])
 
   const onPaginationChange = useCallback<OnChangeFn<PaginationState>>(
     (updater) => {

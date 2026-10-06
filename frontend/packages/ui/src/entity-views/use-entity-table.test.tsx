@@ -223,3 +223,17 @@ describe("useEntityTable selection", () => {
     expect(result.current.selectedCount).toBe(0)
   })
 })
+
+describe("useEntityTable defaultSorting", () => {
+  it("uses the given order instead of newest first", () => {
+    const { result } = setup({ defaultSorting: [{ id: "id", desc: false }] })
+    expect(ids(result)).toEqual([1, 2, 3, 4])
+  })
+
+  it("still lets the user sort another column", () => {
+    const { result } = setup({ defaultSorting: [{ id: "id", desc: false }] })
+    act(() => result.current.toggleSort("name"))
+    expect(result.current.sortedBy).toEqual({ id: "name", desc: false })
+    expect(ids(result)).toEqual([1, 2, 3, 4])
+  })
+})

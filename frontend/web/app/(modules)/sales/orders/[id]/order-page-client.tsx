@@ -13,14 +13,13 @@ import {
   EmptyDescription,
   EmptyHeader,
   EmptyTitle,
-  EntityView,
   MissingOrganization,
   RecordAuditTab,
   RecordPage,
   RecordWorkflowActions,
+  SaleOrderLineGrid,
   StatusBar,
   buildModuleTabHref,
-  saleOrderLinesTableConfig,
   useFormDialog,
 } from '@lumiere/ui';
 import {
@@ -54,7 +53,7 @@ import type { StockPicking } from '@lumiere/stdb/types';
 import { useAccountMoves } from '@lumiere/query-hooks/hooks/accounting';
 import { useContacts, type Contact } from '@lumiere/query-hooks/hooks/crm';
 import { useCreateDocument } from '@lumiere/query-hooks/hooks/documents';
-import { useStockPickings } from '@lumiere/query-hooks/hooks/inventory';
+import { useProducts, useStockPickings } from '@lumiere/query-hooks/hooks/inventory';
 import { orderHandoffs } from '@lumiere/query-hooks/hooks/order-to-cash';
 import {
   useAccrueSaleCommission,
@@ -66,6 +65,7 @@ import {
   type SaleOrder,
   type SaleOrderLine,
 } from '@lumiere/query-hooks/hooks/sales';
+import { useSaleOrderLineWorkflow } from '@lumiere/query-hooks/hooks/sale-order-line-workflow';
 import { useSaleOrderWorkflow } from '@lumiere/query-hooks/hooks/sales-order-workflow';
 import { downloadDocumentPdf } from '@lumiere/query-hooks/hooks/templates';
 import { useDefaultOperatingCompanyBigInt } from '@lumiere/query-hooks/hooks/use-operating-company';
@@ -73,6 +73,7 @@ import { useWorkflowSurface } from '@/hooks/use-workflow-surface';
 import { archiveRenderedPdfAsDocument } from '@/lib/archive-document-pdf';
 import { useSalesModuleSubscription } from '@/lib/module-subscription-hooks';
 import { hasValidOrganizationId, orgBigInts } from '@/lib/org-scoped';
+import { toCreateSaleOrderLineParams, toUpdateSaleOrderLineParams } from '@/lib/sales-create-params';
 import { phCapture } from '@/lib/posthog-browser';
 import { OrderHandoffLinks } from '../../../../../components/order-handoff-links';
 import { CreateInvoiceFromOrderDialog, EditSaleOrderDialog } from '../../sale-order-dialogs';
@@ -140,6 +141,7 @@ function SaleOrderPageLoaded({
   const { data: stockPickings = [] } = useStockPickings(orgId, initialStockPickings);
   const { data: accountMoves = [] } = useAccountMoves(orgId);
   const { data: contacts = [] } = useContacts(orgId, initialContacts);
+  const { data: productRows = [] } = useProducts(orgId);
 
   const applySalePromotion = useApplySalePromotion(orgId);
   const applySaleOrderOptions = useApplySaleOrderOptions(orgId);
@@ -178,6 +180,17 @@ function SaleOrderPageLoaded({
     },
   );
 
+  const lineWorkflow = useSaleOrderLineWorkflow(
+    orgId,
+    operatingCompanyId,
+    {
+      create: t('sales.orderLines.add', { defaultValue: 'Add line' }),
+      update: t('sales.orderLines.update', { defaultValue: 'Update line' }),
+      delete: t('sales.orderLines.delete', { defaultValue: 'Remove line' }),
+    },
+    { navigate: workflowSurface.navigate, record: workflowSurface.record, notify: workflowSurface.notify },
+  );
+
   const [dialog, setDialog] = useState<'invoice' | 'edit' | null>(null);
   const [pendingConfirm, setPendingConfirm] = useState<WorkflowAction | null>(null);
 
@@ -188,6 +201,16 @@ function SaleOrderPageLoaded({
   const lines = useMemo(
     () => linesOfOrder(orderLines as unknown as OrderRow[], orderId),
     [orderLines, orderId],
+  );
+  const gridProducts = useMemo(
+    () =>
+      (productRows as unknown as OrderRow[]).map((row) => ({
+        id: String(row.id),
+        label: String(row.displayName ?? row.name ?? row.defaultCode ?? row.code ?? row.id),
+        uomId: row.uomId == null ? undefined : String(row.uomId),
+        listPrice: typeof row.listPrice === 'number' ? row.listPrice : undefined,
+      })),
+    [productRows],
   );
   const partnerLabelById = useMemo(() => {
     const map = new Map<string, string>();
@@ -443,8 +466,6 @@ function SaleOrderPageLoaded({
     },
   ].filter((action) => action.show);
 
-  const linesConfig = saleOrderLinesTableConfig(t);
-
   return (
     <>
       <RecordPage
@@ -510,10 +531,29 @@ function SaleOrderPageLoaded({
             id: 'lines',
             label: t('sales.orderLines.title'),
             content: (
-              <EntityView
-                config={{ ...linesConfig, title: '', description: undefined }}
-                data={lines}
-                useCard={false}
+              <SaleOrderLineGrid
+                lines={lines}
+                products={gridProducts}
+                editable={editable}
+                onUpdateLine={async (lineId, patch) => {
+                  const params = toUpdateSaleOrderLineParams(patch as Record<string, unknown>);
+                  if (!params) throw new Error('Enter a valid quantity, price or discount.');
+                  await lineWorkflow.update.execute({ lineId, params });
+                }}
+                onCreateLine={async (line) => {
+                  const params = toCreateSaleOrderLineParams({
+                    productId: line.productId,
+                    uomId: line.uomId,
+                    quantity: line.quantity,
+                    priceUnit: line.priceUnit,
+                    discount: line.discount,
+                  });
+                  if (!params) throw new Error('Choose a product and a quantity above zero.');
+                  await lineWorkflow.create.execute({ orderId, params });
+                }}
+                onDeleteLine={async (lineId) => {
+                  await lineWorkflow.remove.execute(lineId);
+                }}
               />
             ),
           },
