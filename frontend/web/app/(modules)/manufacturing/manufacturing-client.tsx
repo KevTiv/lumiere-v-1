@@ -39,6 +39,8 @@ import type {
   MrpWorkcenter,
   MrpWorkorder,
 } from "@lumiere/query-hooks/hooks/manufacturing"
+import Link from "next/link"
+import { manufacturingOrderHref } from "./manufacturing-order"
 import { ManufacturingRowDialog } from "./manufacturing-row-dialog"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
 import {
@@ -403,6 +405,41 @@ function ManufacturingClientLoaded({
       ({
         ...moduleConfig,
         tabs: withDashboardSections(moduleConfig, liveSections).tabs.map((tab) => {
+          if (tab.id === "orders" && tab.entityConfig && tab.entityConfig.view.mode === "table") {
+            // The row opens the action form; the order's name opens its page.
+            const view = tab.entityConfig.view
+            return {
+              ...tab,
+              entityConfig: {
+                ...tab.entityConfig,
+                view: {
+                  ...view,
+                  columns: view.columns.map((column) =>
+                    column.key === "name"
+                      ? {
+                          ...column,
+                          render: (_value: unknown, row: Record<string, unknown>) => {
+                            const href = manufacturingOrderHref(row)
+                            const shown = String(row.name ?? "").trim()
+                            if (!href || !shown) return shown || "—"
+                            return (
+                              <Link
+                                href={href}
+                                className="font-medium text-primary hover:underline"
+                                data-testid={`manufacturing-order-link-${String(row.id)}`}
+                                onClick={(event) => event.stopPropagation()}
+                              >
+                                {shown}
+                              </Link>
+                            )
+                          },
+                        }
+                      : column,
+                  ),
+                },
+              },
+            }
+          }
           if (tab.id === "boms" && tab.entityConfig) {
             return {
               ...tab,

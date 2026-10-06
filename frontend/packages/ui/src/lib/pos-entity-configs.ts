@@ -1,4 +1,6 @@
 import type { TFunction } from "i18next"
+import Link from "next/link"
+import { createElement } from "react"
 import type { EntityViewConfig } from "./entity-view-types"
 
 export const posTerminalsAdminTableConfig = (t: TFunction): EntityViewConfig => ({
@@ -41,7 +43,15 @@ export const posConfigsAdminTableConfig = (t: TFunction): EntityViewConfig => ({
   },
 })
 
-export const posSessionsAdminTableConfig = (t: TFunction): EntityViewConfig => ({
+export type PosSessionsAdminTableConfigOptions = {
+  /** Where a session has a page of its own: its name then links to it. */
+  recordHref?: (row: Record<string, unknown>) => string | undefined
+}
+
+export const posSessionsAdminTableConfig = (
+  t: TFunction,
+  options?: PosSessionsAdminTableConfigOptions,
+): EntityViewConfig => ({
   id: "pos-sessions-admin-table",
   title: t("pos.admin.sessions.title"),
   description: t("pos.admin.sessions.description"),
@@ -52,7 +62,26 @@ export const posSessionsAdminTableConfig = (t: TFunction): EntityViewConfig => (
     searchPlaceholder: t("pos.admin.sessions.searchPlaceholder"),
     searchKeys: ["name", "state"],
     columns: [
-      { key: "name", label: t("pos.admin.sessions.columns.name"), width: "min-w-32" },
+      {
+        key: "name",
+        label: t("pos.admin.sessions.columns.name"),
+        width: "min-w-32",
+        ...(options?.recordHref
+          ? {
+              render: (_value: unknown, row: Record<string, unknown>) => {
+                const shown = String(row.name ?? "").trim()
+                const href = options.recordHref?.(row)
+                if (!shown || !href) return shown || "—"
+                const linkProps = {
+                  href,
+                  className: "font-medium text-primary hover:underline",
+                  "data-testid": `pos-session-link-${String(row.id)}`,
+                }
+                return createElement(Link, linkProps, shown)
+              },
+            }
+          : {}),
+      },
       { key: "configId", label: t("pos.admin.sessions.columns.configId"), width: "min-w-20" },
       { key: "state", label: t("pos.admin.sessions.columns.state"), type: "badge", width: "min-w-24" },
       { key: "orderCount", label: t("pos.admin.sessions.columns.orderCount"), type: "number", align: "right" },

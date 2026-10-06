@@ -29,6 +29,7 @@ import {
 import { useDefaultOperatingCompanyBigInt } from "@lumiere/query-hooks/hooks/use-operating-company"
 import { usePosLoyaltyPrograms } from "@lumiere/query-hooks/hooks/sales"
 import { usePOS } from "./use-pos"
+import { posSessionHref } from "./pos-session"
 import type { PosConfig, PosSession, PosTerminal, Product } from "@lumiere/stdb/types"
 
 interface PosClientProps {
@@ -185,7 +186,7 @@ function PosClientLoaded({
 
           <EntityView config={posTerminalsAdminTableConfig(t)} data={pos.terminals} />
           <EntityView config={posConfigsAdminTableConfig(t)} data={pos.configs} />
-          <EntityView config={posSessionsAdminTableConfig(t)} data={pos.sessions} />
+          <EntityView config={posSessionsAdminTableConfig(t, { recordHref: posSessionHref })} data={pos.sessions} />
         </TabsContent>
       </Tabs>
 

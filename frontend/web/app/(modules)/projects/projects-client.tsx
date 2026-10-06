@@ -38,6 +38,8 @@ import {
   toStartTimesheetTimerParams,
 } from "@/lib/projects-create-params"
 import { projectsModuleConfig } from "@/lib/module-dashboard-configs"
+import Link from "next/link"
+import { getProjectFieldValue, projectHref } from "./project-record"
 import { useProjectsModuleSubscription } from "@/lib/module-subscription-hooks"
 import {
   useProjects,
@@ -989,6 +991,41 @@ function ProjectsClientLoaded({
         ...moduleConfig,
         tabs: [
           ...withDashboardSections(moduleConfig, liveSections).tabs.map((tab) => {
+          if (tab.id === "projects" && tab.entityConfig && tab.entityConfig.view.mode === "table") {
+            // The row opens the edit form; the project's name opens its page.
+            const view = tab.entityConfig.view
+            return {
+              ...tab,
+              entityConfig: {
+                ...tab.entityConfig,
+                view: {
+                  ...view,
+                  columns: view.columns.map((column) =>
+                    column.key === "name"
+                      ? {
+                          ...column,
+                          render: (_value: unknown, row: Record<string, unknown>) => {
+                            const href = projectHref(row)
+                            const shown = String(row.name ?? "").trim()
+                            if (!href || !shown) return shown || "—"
+                            return (
+                              <Link
+                                href={href}
+                                className="font-medium text-primary hover:underline"
+                                data-testid={`project-link-${String(row.id)}`}
+                                onClick={(event) => event.stopPropagation()}
+                              >
+                                {shown}
+                              </Link>
+                            )
+                          },
+                        }
+                      : column,
+                  ),
+                },
+              },
+            }
+          }
           if (tab.id === "rate-cards" && tab.entityConfig) {
             return {
               ...tab,
@@ -1568,33 +1605,6 @@ function ProjectsClientLoaded({
 }
 
 // Helper functions to extract field values from entities
-function getProjectFieldValue(project: Record<string, unknown>, fieldName: string): unknown {
-  switch (fieldName) {
-    case 'name':
-      return project.name ?? ''
-    case 'pricelistId':
-      return String(project.pricelistId ?? '')
-    case 'partnerId':
-      return String(project.partnerId ?? '')
-    case 'billType':
-      return String(project.billType ?? 'customer_task')
-    case 'pricingType':
-      return String(project.pricingType ?? 'task_rate')
-    case 'allocatedHours':
-      return project.allocatedHours ?? ''
-    case 'dateStart':
-      return project.dateStart ? new Date(Number(project.dateStart) / 1000).toISOString().split('T')[0] : ''
-    case 'dateEnd':
-      return project.dateEnd ? new Date(Number(project.dateEnd) / 1000).toISOString().split('T')[0] : ''
-    case 'description':
-      return project.description ?? ''
-    case 'active':
-      return project.active ?? true
-    default:
-      return ''
-  }
-}
-
 function getTaskFieldValue(task: Record<string, unknown>, fieldName: string): unknown {
   switch (fieldName) {
     case 'name':

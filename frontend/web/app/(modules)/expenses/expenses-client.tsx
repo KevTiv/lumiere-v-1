@@ -30,6 +30,8 @@ import {
 } from "@lumiere/ui"
 import type { EntityAction, EntityViewConfig, FormConfig, ModuleConfig } from "@lumiere/ui"
 import { expensesModuleConfig } from "@/lib/module-dashboard-configs"
+import Link from "next/link"
+import { expenseReportHref } from "./expense-report"
 import { useExpensesModuleSubscription } from "@/lib/module-subscription-hooks"
 import {
   useExpenses,
@@ -125,6 +127,39 @@ function numField(row: Record<string, unknown>, ...keys: string[]): number {
     if (v != null && v !== "") return Number(v)
   }
   return 0
+}
+
+/** The report's name opens its page; the row itself still opens the actions dialog. */
+function withReportLink(ec: EntityViewConfig): EntityViewConfig {
+  if (ec.view.mode !== "table") return ec
+  return {
+    ...ec,
+    view: {
+      ...ec.view,
+      columns: ec.view.columns.map((column) =>
+        column.key === "name"
+          ? {
+              ...column,
+              render: (_value: unknown, row: Record<string, unknown>) => {
+                const href = expenseReportHref(row)
+                const shown = String(row.name ?? "").trim()
+                if (!href || !shown) return shown || "—"
+                return (
+                  <Link
+                    href={href}
+                    className="font-medium text-primary hover:underline"
+                    data-testid={`expense-report-link-${String(row.id)}`}
+                    onClick={(event) => event.stopPropagation()}
+                  >
+                    {shown}
+                  </Link>
+                )
+              },
+            }
+          : column,
+      ),
+    },
+  }
 }
 
 function ExpensesClientLoaded({
@@ -446,7 +481,7 @@ function ExpensesClientLoaded({
             return {
               ...tab,
               createForm: expenseSheetFormConfig,
-              entityConfig: addCsvToolbar(tab.entityConfig, [
+              entityConfig: addCsvToolbar(withReportLink(tab.entityConfig), [
                 {
                   id: "csv-sheets",
                   label: t("expenses.csvImport.toolbarSheets"),

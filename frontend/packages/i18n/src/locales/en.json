@@ -7401,6 +7401,13 @@
           "oeeTargetPlaceholder": "85"
         }
       }
+    },
+    "page": {
+      "backToOrders": "Back to manufacturing orders",
+      "discussion": "Discussion",
+      "notFound": "Manufacturing order not found",
+      "notFoundHint": "It may have been deleted, or belong to another organization.",
+      "produced": "produced"
     }
   },
   "projects": {
@@ -7697,6 +7704,13 @@
           "descriptionPlaceholder": "What did you work on?"
         }
       }
+    },
+    "page": {
+      "backToProjects": "Back to projects",
+      "discussion": "Discussion",
+      "edit": "Edit",
+      "notFound": "Project not found",
+      "notFoundHint": "It may have been deleted, or belong to another organization."
     }
   },
   "calendar": {
@@ -9351,7 +9365,16 @@
       }
     },
     "operationsTab": "Operations",
-    "operationsTabDescription": "Receipt capture queue, card statements and expense settings"
+    "operationsTabDescription": "Receipt capture queue, card statements and expense settings",
+    "page": {
+      "backToReports": "Back to expense reports",
+      "discussion": "Discussion",
+      "moreInList": "Post or reimburse in the list",
+      "moreInListHint": "Posting, reimbursing and rebilling ask for details and are done from the list.",
+      "notFound": "Expense report not found",
+      "notFoundHint": "It may have been deleted, or belong to another organization.",
+      "refuseReason": "Reason (optional)"
+    }
   },
   "workflows": {
     "workflows": {
@@ -9952,6 +9975,24 @@
         }
       },
       "operations": "Operations"
+    },
+    "session": {
+      "backToSessions": "Back to sessions",
+      "cashDifference": "Difference",
+      "cashEnd": "Counted cash",
+      "cashStart": "Opening cash",
+      "discussion": "Discussion",
+      "notFound": "Session not found",
+      "notFoundHint": "It may have been deleted, or belong to another organization.",
+      "startAt": "Opened",
+      "states": {
+        "closed": "Closed",
+        "closingControl": "Closing control",
+        "new": "New",
+        "opened": "Open",
+        "openingControl": "Opening control"
+      },
+      "stopAt": "Closed"
     }
   },
   "aiChat": {

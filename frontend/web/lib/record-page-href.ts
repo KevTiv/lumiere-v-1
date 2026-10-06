@@ -8,6 +8,10 @@ const RECORD_PAGE: Record<string, (id: string) => string> = {
   document: (id) => `/documents/${id}`,
   fleet_vehicle: (id) => `/fleet/vehicles/${id}`,
   calendar_event: (id) => `/calendar/events/${id}`,
+  pos_session: (id) => `/pos/sessions/${id}`,
+  mrp_production: (id) => `/manufacturing/orders/${id}`,
+  hr_expense_sheet: (id) => `/expenses/reports/${id}`,
+  project_project: (id) => `/projects/${id}`,
 };
 
 /** Where a record of `model` has a page of its own, or undefined when it has none. */
