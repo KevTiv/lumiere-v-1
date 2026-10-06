@@ -155,7 +155,10 @@
       "rollbackImport": "Rollback import",
       "rollbackComplete": "This import was rolled back.",
       "rollbackFailed": "Rollback failed"
-    }
+    },
+    "audit": "Audit",
+    "overview": "Overview",
+    "remove": "Remove"
   },
   "navigation": {
     "overview": "Overview",
@@ -835,13 +838,25 @@
         "postDraft": "Post",
         "recalculateTotals": "Recalculate totals",
         "createCreditNote": "Create credit note",
-        "createExchange": "Create exchange order"
+        "createExchange": "Create exchange order",
+        "archive": "Archive PDF to Documents",
+        "recalculate": "Recalculate totals",
+        "registerPayment": "Register payment"
       },
       "recordSheet": {
         "actionsTab": "Actions",
         "openActions": "Open document actions"
       },
-      "postMissingCogsAccounts": "Cannot post: chart of accounts is missing COGS and inventory GL accounts. Add expense (COGS) and asset (inventory) accounts first."
+      "postMissingCogsAccounts": "Cannot post: chart of accounts is missing COGS and inventory GL accounts. Add expense (COGS) and asset (inventory) accounts first.",
+      "attachments": "Attachments",
+      "backToInvoices": "Back to invoices",
+      "discussion": "Discussion",
+      "draftName": "Draft",
+      "moreActions": "More",
+      "notFound": "Document not found",
+      "notFoundHint": "It may have been deleted, or belong to another company.",
+      "purchaseOrder": "Purchase order",
+      "saleOrder": "Sales order"
     },
     "bills": {
       "title": "Bills (Accounts Payable)",
@@ -3914,7 +3929,8 @@
       "employees": "employees",
       "employeeCount_one": "{{count}} employee",
       "employeeCount_other": "{{count}} employees",
-      "manager": "Manager"
+      "manager": "Manager",
+      "employeeCount": "{{count}} employees"
     },
     "recruitment": {
       "title": "Recruitment Pipeline",
@@ -4194,7 +4210,9 @@
     },
     "workflow": {
       "approvalTimeline": "Approval timeline"
-    }
+    },
+    "operationsTab": "Operations",
+    "operationsTabDescription": "Approval and export queues, workforce planning"
   },
   "inventory": {
     "csvImport": {
@@ -4347,7 +4365,15 @@
         "assigned": "Ready",
         "done": "Done",
         "cancel": "Cancelled"
-      }
+      },
+      "attachments": "Attachments",
+      "backorderOf": "Backorder of",
+      "backToTransfers": "Back to transfers",
+      "discussion": "Discussion",
+      "notFound": "Transfer not found",
+      "notFoundHint": "It may have been deleted, or belong to another organization.",
+      "purchaseOrder": "Purchase order",
+      "saleOrder": "Sales order"
     },
     "warehouses": {
       "title": "Warehouses",
@@ -5452,6 +5478,46 @@
           "maxWeight": "Max weight"
         }
       }
+    },
+    "byRecord": {
+      "barcodeRule": "Barcode rule",
+      "category": "Archived category",
+      "color": "Color (hex)",
+      "deactivate": "Deactivate",
+      "destLocation": "Destination location",
+      "device": "IoT device",
+      "email": "Email",
+      "failReason": "Reason for failure",
+      "fromUom": "From unit",
+      "inventoryCount": "Inventory count",
+      "location": "Location",
+      "member": "Member identity",
+      "minQty": "Minimum quantity",
+      "name": "Name",
+      "packagingId": "Packaging ID",
+      "pointId": "Quality point ID",
+      "price": "Price",
+      "product": "Product",
+      "qualityRating": "Quality rating",
+      "quarantineLocation": "Quarantine location",
+      "reasonId": "Alert reason ID",
+      "sourceLocation": "Source location",
+      "standardPrice": "Standard price",
+      "status": "Status",
+      "supplierLineId": "Supplier line ID",
+      "taskCancelled": "Cancelled",
+      "taskDone": "Done",
+      "taskInProgress": "In progress",
+      "taskPending": "Pending",
+      "team": "Quality team",
+      "testType": "Test type",
+      "toUom": "To unit",
+      "uom": "Unit of measure",
+      "uomCategory": "Category",
+      "uomConversionHint": "Both units must be in the same category.",
+      "variantId": "Variant ID",
+      "whatsappAccountId": "WhatsApp account ID",
+      "zone": "Zone"
     }
   },
   "purchasing": {
@@ -5519,7 +5585,8 @@
         "ToApprove": "To Approve",
         "Approved": "Purchase Order",
         "Done": "Done",
-        "Cancelled": "Cancelled"
+        "Cancelled": "Cancelled",
+        "Purchase": "Purchase order"
       },
       "fulfillment": {
         "dropship": "Dropship",
@@ -6111,7 +6178,15 @@
       "toApproveHelp": "Approve or reject workflow requests for ToApprove POs (SoD).",
       "toApproveTitle": "Purchase orders awaiting approval",
       "upsertScorecard": "Upsert vendor scorecard",
-      "vendorCreditFromReturn": "Vendor credit from return"
+      "vendorCreditFromReturn": "Vendor credit from return",
+      "approvalDelegate": "Set approval delegate",
+      "commodityPriceIndex": "Commodity price index",
+      "createIntegrationIntent": "New integration intent",
+      "identityHexInvalid": "Enter the 64-character identity hex",
+      "noOrder": "No purchase order",
+      "recordIntegrationResult": "Record integration result",
+      "vendorRiskFlag": "Flag vendor risk",
+      "vendorScorecard": "Vendor scorecard"
     },
     "purchaseReturns": {
       "title": "Purchase returns",
@@ -6137,6 +6212,27 @@
         "pickingId": "Receipt",
         "creditMoveId": "Vendor credit",
         "createDate": "Created"
+      }
+    },
+    "operationsTab": "Operations",
+    "operationsTabDescription": "RFQs, returns, blanket orders and supplier configuration",
+    "order": {
+      "attachments": "Attachments",
+      "backToOrders": "Back to purchase orders",
+      "bills": "Vendor bills",
+      "createBill": "Create bill",
+      "discussion": "Discussion",
+      "handoffs": "Receipts & vendor bills",
+      "notFound": "Purchase order not found",
+      "notFoundHint": "It may have been deleted, or belong to another organization.",
+      "receipts": "Receipts",
+      "status": {
+        "cancelled": "Cancelled",
+        "done": "Done",
+        "purchase": "Purchase order",
+        "rfq": "RFQ",
+        "sent": "RFQ sent",
+        "toApprove": "To approve"
       }
     }
   },
@@ -6172,7 +6268,23 @@
   },
   "sales": {
     "order": {
-      "handoffs": "Deliveries & invoices"
+      "handoffs": "Deliveries & invoices",
+      "attachments": "Attachments",
+      "backToOrders": "Back to orders",
+      "deliveries": "Deliveries",
+      "discussion": "Discussion",
+      "invoices": "Invoices",
+      "moreActions": "More",
+      "notFound": "Order not found",
+      "notFoundHint": "It may have been deleted, or belong to another organization.",
+      "status": {
+        "cancelled": "Cancelled",
+        "locked": "Locked",
+        "quotation": "Quotation",
+        "sale": "Sales order",
+        "sent": "Quotation sent",
+        "toApprove": "To approve"
+      }
     },
     "dashboard": {
       "ordersByState": "Orders by State",
@@ -6252,7 +6364,10 @@
       "recordIntegrationResult": "Record integration result",
       "reject": "Reject",
       "rejectReasonPrompt": "Reason for rejection",
-      "scheduleSla": "Schedule SLA escalation"
+      "scheduleSla": "Schedule SLA escalation",
+      "invalidJson": "Not valid JSON",
+      "noOrder": "No sale order",
+      "scheduleSlaEscalation": "Schedule SLA escalation"
     },
     "csvImport": {
       "ordersTitle": "Import sale orders (CSV)",
@@ -6347,7 +6462,10 @@
         "priceUnit": "Unit Price",
         "priceSubtotal": "Subtotal",
         "discount": "Disc %"
-      }
+      },
+      "add": "Add line",
+      "delete": "Remove line",
+      "update": "Update line"
     },
     "pricelistItems": {
       "title": "Pricelist rules",
@@ -6946,7 +7064,9 @@
       "deleteOrderLines": "Delete lines",
       "exportCommercialPacket": "Export commercial packet",
       "omnichannelChannelPrompt": "Channel (optional, e.g. web, store)",
-      "omnichannelRoutePrompt": "Preferred route id (optional)"
+      "omnichannelRoutePrompt": "Preferred route id (optional)",
+      "archivePdfToDocuments": "Archive PDF to Documents",
+      "downloadPdf": "Download PDF"
     }
   },
   "manufacturing": {
@@ -7692,7 +7812,9 @@
         "createDate": "Created",
         "fiscalKind": "Fiscal kind",
         "residencyRegion": "Residency",
-        "retentionDays": "Retention"
+        "retentionDays": "Retention",
+        "description": "Description",
+        "resName": "Attached to"
       },
       "filters": {
         "isDeleted": {
@@ -8019,6 +8141,29 @@
           "classificationIdHint": "Optional data_classification row id"
         }
       }
+    },
+    "backToDocuments": "Back to documents",
+    "notFound": "Document not found",
+    "notFoundHint": "It may have been purged, or belong to another organization.",
+    "page": {
+      "delete": "Delete",
+      "deleted": "In recycle bin",
+      "deleteHint": "You can restore it from the recycle bin.",
+      "deleteTitle": "Move to recycle bin?",
+      "discussion": "Discussion",
+      "edit": "Edit",
+      "favorite": "Favorite",
+      "linkedRecord": "Attached record",
+      "lock": "Lock",
+      "locked": "Locked",
+      "noVersions": "No versions yet",
+      "openFile": "Open file",
+      "restore": "Restore",
+      "setRetention": "Set retention",
+      "shared": "Shared",
+      "unlock": "Unlock",
+      "uploadVersion": "Upload version",
+      "versions": "Versions"
     }
   },
   "helpdesk": {
@@ -8242,7 +8387,8 @@
           "description": "Headers must match the server import template for SLAs."
         }
       }
-    }
+    },
+    "discussion": "Discussion"
   },
   "subscriptions": {
     "subscriptions": {
@@ -8756,6 +8902,16 @@
       "emptyMessage": "No usage events yet.",
       "tabLabel": "Usage events",
       "title": "Usage events"
+    },
+    "backToSubscriptions": "Back to subscriptions",
+    "notFound": "Subscription not found",
+    "notFoundHint": "It may have been deleted, or belong to another organization.",
+    "page": {
+      "attachments": "Attachments",
+      "billing": "Invoices & payments",
+      "discussion": "Discussion",
+      "moreInList": "More actions",
+      "moreInListHint": "Close, invoice, amend, renew and the other actions that ask for details are in the list."
     }
   },
   "expenses": {
@@ -9186,7 +9342,9 @@
           "incomeAccountId": "Income account"
         }
       }
-    }
+    },
+    "operationsTab": "Operations",
+    "operationsTabDescription": "Receipt capture queue, card statements and expense settings"
   },
   "workflows": {
     "workflows": {
@@ -10055,7 +10213,8 @@
         "failed": "Failed",
         "attentionRequired": "Attention required"
       }
-    }
+    },
+    "description": "Vehicles, drivers, fuel and maintenance"
   },
   "tasks": {
     "page": {
@@ -12090,6 +12249,29 @@
     "nav": {
       "backToSignIn": "Back to sign in",
       "requestNewLink": "Request a new link"
+    }
+  },
+  "modules": {
+    "tabGroups": {
+      "banking": "Banking",
+      "billing": "Billing",
+      "close": "Close",
+      "fulfillment": "Fulfillment",
+      "invoicing": "Invoicing",
+      "ledger": "Ledger",
+      "movements": "Movements",
+      "orders": "Orders",
+      "pay": "Pay",
+      "people": "People",
+      "planning": "Planning",
+      "pricing": "Pricing",
+      "quality": "Quality",
+      "revenue": "Revenue",
+      "setup": "Setup",
+      "stock": "Stock",
+      "subscriptions": "Subscriptions",
+      "timeoff": "Time off",
+      "warehouse": "Warehouse"
     }
   }
 }
