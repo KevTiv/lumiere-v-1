@@ -98,6 +98,7 @@ import {
   toUpdateDocumentFolderParams,
   toSetDocumentRetentionParams,
 } from "@/lib/documents-create-params"
+import { documentRecordHref, formatFileSize } from "./document-record"
 import { optionalBigIntU64 } from "@lumiere/erp-shared/form-coercion"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
 import { useDefaultOperatingCompanyBigInt } from "@lumiere/query-hooks/hooks/use-operating-company"
@@ -443,6 +444,27 @@ function DocumentsClientLoaded({
           // never set `data-state="selected"` for the lock actions below.
           return {
             ...tab,
+            recordSheet: {
+              titleKey: "name",
+              auditTableName: "document",
+              discussion: {},
+              openHref: documentRecordHref,
+              detailConfig: {
+                mode: "detail" as const,
+                sections: [
+                  {
+                    id: "document",
+                    fields: [
+                      { key: "fileName", label: t("documents.documents.columns.fileName") },
+                      { key: "mimetype", label: t("documents.documents.columns.mimetype") },
+                      { key: "fileSize", label: t("documents.documents.columns.fileSize"), render: (value: unknown) => formatFileSize(value) },
+                      { key: "resName", label: "Attached to" },
+                      { key: "description", label: "Description" },
+                    ],
+                  },
+                ],
+              },
+            },
             entityConfig: withTableActions(
               tab.entityConfig,
               [
