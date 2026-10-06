@@ -26,16 +26,13 @@ import {
   newReturnOrderForm,
   addSaleOrderLineForm,
   editSaleOrderLineForm,
-  createInvoiceFromSaleOrderForm,
   buildPartialDeliveryForm,
   cancelPickingConfirmForm,
-  editSaleOrderForm,
   InvoiceListView,
   MissingOrganization,
   mergeSelectOptionsForFields,
   mergeFieldDefaultValues,
   saleOrdersTableConfig,
-  saleOrderDetailConfig,
   saleOrderStatusBadges,
   saleOrderLinesTableConfig,
   pricelistsTableConfig,
@@ -73,7 +70,6 @@ import {
   toCreateSaleOrderLineParams,
   toUpdateSaleOrderLineParams,
   toCreateCreditNoteFromReturnOrderParams,
-  toCreateInvoiceFromSaleOrderParams,
   toCreateReturnOrderParams,
 } from '@/lib/sales-create-params';
 import { saleOrderPrimaryLabel } from '@lumiere/stdb/read-models';
@@ -96,7 +92,6 @@ import {
 } from '@lumiere/erp-shared/csv-import-bundles';
 import {
   planPartialDelivery,
-  isSaleOrderConfirmed,
   withOrderCashSummary,
   type TransitionNotice,
 } from '@lumiere/erp-workflows';
@@ -110,7 +105,6 @@ import {
   useCreatePricelist,
   useCreatePricelistItem,
   useCreatePickingBatch,
-  useApplySalePromotion,
   useApplySaleOrderOptions,
   useUpdatePricelist,
   useDeletePricelist,
@@ -149,7 +143,6 @@ import {
   useCreateSaleCpqConstraint,
   useCreateSalesIntegrationIntent,
   useRecordSalesIntegrationResult,
-  useApplyOmnichannelAllocation,
   useScheduleSalesSlaEscalation,
   type SaleOrder,
   type SaleOrderLine,
@@ -208,9 +201,10 @@ import {
   SalesOpsPanel,
   parseOpsQueueFilter,
   parseCommissionRatePercent,
-  mergeCommissionRateIntoMetadata,
   type SalesOpsQueueId,
 } from './sales-ops-panel';
+import { useInvoiceFormConfig } from './sale-order-dialogs';
+import { saleOrderDetailWithPartners, saleOrderRecordHref } from './sale-order-record';
 import {
   contactRowsToPartnerSelectOptions,
   pricelistRowsToSelectOptions,
@@ -368,6 +362,7 @@ function SalesClientLoaded({
   const saleOrdersTableRuntime = useRuntimeListConfig({
     base: saleOrdersTableConfig(t, {
       formatSaleOrderDisplayName: saleOrderPrimaryLabel,
+      recordHref: saleOrderRecordHref,
     }).view as EntityTableConfig,
     moduleId: 'sales',
     formId: 'new-sale-order',
@@ -380,8 +375,6 @@ function SalesClientLoaded({
     action: string;
   } | null>(null);
   const [csvKind, setCsvKind] = useState<SalesCsvImportKind | null>(null);
-  const [invoiceOrderId, setInvoiceOrderId] = useState<bigint | null>(null);
-  const [invoiceOrderError, setInvoiceOrderError] = useState<string | null>(null);
   const [chatterTarget, setChatterTarget] = useState<ChatterTarget | null>(null);
   const [partialDeliveryPicking, setPartialDeliveryPicking] =
     useState<Record<string, unknown> | null>(null);
@@ -389,9 +382,6 @@ function SalesClientLoaded({
   const [cancelPickingTarget, setCancelPickingTarget] =
     useState<Record<string, unknown> | null>(null);
   const [cancelPickingError, setCancelPickingError] = useState<string | null>(null);
-  const [editSaleOrderTarget, setEditSaleOrderTarget] =
-    useState<Record<string, unknown> | null>(null);
-  const [editSaleOrderError, setEditSaleOrderError] = useState<string | null>(null);
   const [selectedReturnOrderId, setSelectedReturnOrderId] = useState<string | null>(null);
   const [dashboardTimeRange, setDashboardTimeRange] = useState<TimeRangeValue>('30d');
   const [creditReturnOrderId, setCreditReturnOrderId] = useState<bigint | null>(null);
@@ -469,7 +459,6 @@ function SalesClientLoaded({
     orgId,
     operatingCompanyId,
   );
-  const createDocument = useCreateDocument(orgId, operatingCompanyId);
   const createSaleContract = useCreateSaleContract(orgId, operatingCompanyId);
   const createSaleCpqConstraint = useCreateSaleCpqConstraint(
     orgId,
@@ -480,10 +469,6 @@ function SalesClientLoaded({
     operatingCompanyId,
   );
   const recordSalesIntegrationResult = useRecordSalesIntegrationResult(
-    orgId,
-    operatingCompanyId,
-  );
-  const applyOmnichannelAllocation = useApplyOmnichannelAllocation(
     orgId,
     operatingCompanyId,
   );
@@ -757,7 +742,6 @@ function SalesClientLoaded({
     },
     workflowCallbacks,
   );
-  const applySalePromotion = useApplySalePromotion(orgId);
   const applySaleOrderOptions = useApplySaleOrderOptions(orgId);
   const updatePricelist = useUpdatePricelist(orgId);
   const deletePricelist = useDeletePricelist(orgId);
@@ -776,6 +760,7 @@ function SalesClientLoaded({
   const createPaymentMethod = useCreatePaymentMethod(orgId, operatingCompanyId);
   const createLoyaltyProgram = useCreateLoyaltyProgram(orgId, operatingCompanyId);
   const createLoyaltyCard = useCreateLoyaltyCard(orgId, operatingCompanyId);
+  const createInvoiceFormConfig = useInvoiceFormConfig(organizationId);
   const returnOrderWorkflow = useReturnOrderWorkflow(
     orgId,
     operatingCompanyId,
@@ -1086,35 +1071,7 @@ function SalesClientLoaded({
   const saleOrderRecordSheet = useMemo((): EntityRecordSheetConfig => {
     const status = saleOrderStatusBadges(t);
     const linesConfig = saleOrderLinesTableConfig(t);
-    const baseDetail = saleOrderDetailConfig(t);
-    const detailConfig = {
-      ...baseDetail,
-      sections: baseDetail.sections.map((section) =>
-        section.id === 'customer'
-          ? {
-              ...section,
-              fields: section.fields.map((field) =>
-                field.key === 'partnerName'
-                  ? {
-                      ...field,
-                      render: (_value: unknown, record: Record<string, unknown>) => {
-                        const direct = String(
-                          record.partnerName ?? record.partner_name ?? '',
-                        ).trim();
-                        if (direct) return direct;
-                        const partnerId = record.partnerId ?? record.partner_id;
-                        if (partnerId == null) return '—';
-                        return (
-                          partnerLabelById.get(String(partnerId)) ?? `Partner ${String(partnerId)}`
-                        );
-                      },
-                    }
-                  : field,
-              ),
-            }
-          : section,
-      ),
-    };
+    const detailConfig = saleOrderDetailWithPartners(t, partnerLabelById);
     return {
       titleKey: 'sheetTitle',
       statusKey: 'state',
@@ -1122,6 +1079,7 @@ function SalesClientLoaded({
       statusBadgeLabels: status.badgeLabels,
       detailConfig,
       auditTableName: 'sale_order',
+      openHref: saleOrderRecordHref,
       customTabs: [
         {
           id: 'lines',
@@ -1219,48 +1177,6 @@ function SalesClientLoaded({
   const returnOrderLinesEntityConfig = useMemo(
     () => returnOrderLinesTableConfig(t),
     [t],
-  );
-
-  const incomeAccountFieldOptions = useMemo(() => {
-    const fromApi = accountAccountRowsToSelectOptions(
-      accountAccounts as Record<string, unknown>[],
-    );
-    if (fromApi.length > 0) return fromApi;
-    return [
-      { value: '', label: t('sales.forms.createInvoiceFromOrder.noAccounts'), disabled: true },
-    ];
-  }, [accountAccounts, t]);
-
-  const receivableAccountFieldOptions = useMemo(() => {
-    const receivableRows = (accountAccounts as Record<string, unknown>[]).filter(
-      (row) => {
-        const v = row.internalType ?? row.internal_type;
-        const tag =
-          v != null && typeof v === 'object' && 'tag' in v
-            ? String((v as { tag: string }).tag).toLowerCase()
-            : String(v ?? '').toLowerCase();
-        return tag === 'receivable';
-      },
-    );
-    const fromApi = accountAccountRowsToSelectOptions(receivableRows);
-    if (fromApi.length > 0) return fromApi;
-    return [
-      {
-        value: '',
-        label: t('sales.forms.createInvoiceFromOrder.noReceivableAccounts'),
-        disabled: true,
-      },
-    ];
-  }, [accountAccounts, t]);
-
-  const createInvoiceFormConfig = useMemo(
-    () =>
-      mergeSelectOptionsForFields(createInvoiceFromSaleOrderForm(t), {
-        journalId: journalFieldOptions,
-        defaultIncomeAccountId: incomeAccountFieldOptions,
-        receivableAccountId: receivableAccountFieldOptions,
-      }),
-    [t, journalFieldOptions, incomeAccountFieldOptions, receivableAccountFieldOptions],
   );
 
   const productLabelById = useMemo(() => {
@@ -1389,6 +1305,7 @@ function SalesClientLoaded({
   const ordersEntityConfig = useMemo((): EntityViewConfig => {
     const base = saleOrdersTableConfig(t, {
       formatSaleOrderDisplayName: saleOrderPrimaryLabel,
+      recordHref: saleOrderRecordHref,
       onEmptyAction: openCreateSaleOrder,
     });
     const runtimeView = saleOrdersTableRuntime;
@@ -1414,67 +1331,6 @@ function SalesClientLoaded({
             },
           }),
           {
-            id: 'accept-quotation',
-            label: saleOrderWorkflow.acceptQuotation.label,
-            requiresSelection: true,
-            selection: 'multiple',
-            isApplicable: (rows) =>
-              rows.some((r) => saleOrderWorkflow.acceptQuotation.canPresent(r as EntityRow)),
-            onClick: (rows) => {
-              for (const r of rows) {
-                if (!saleOrderWorkflow.acceptQuotation.canPresent(r as EntityRow)) continue;
-                const signedBy =
-                  window.prompt(
-                    t('sales.actions.acceptQuotationPrompt', {
-                      defaultValue: 'Accepted by (name)',
-                    }),
-                  )?.trim() ?? '';
-                if (!signedBy) continue;
-                // The workflow surface already reports the typed failure.
-                saleOrderWorkflow.acceptQuotation
-                  .execute({ orderId: String(r.id), signedBy })
-                  .catch(() => undefined);
-              }
-            },
-          },
-          {
-            id: 'view-deliveries',
-            label: t('sales.actions.viewDeliveries'),
-            requiresSelection: true,
-            // Only a confirmed order has fulfillment; the fulfillment tab lists its pickings and backorders.
-            isApplicable: (rows) => rows.length === 1 && isSaleOrderConfirmed(rows[0] as EntityRow),
-            onClick: (rows) => {
-              if (rows.length !== 1) return;
-              navigateToSalesTab('fulfillment', { saleId: String(rows[0]?.id) });
-            },
-          },
-          {
-            id: 'apply-promotion',
-            label: t('sales.actions.applyPromotion', { defaultValue: 'Apply promotion' }),
-            requiresSelection: true,
-            onClick: (rows) => {
-              if (rows.length !== 1) return;
-              const r = rows[0];
-              const st = saleOrderState(r);
-              if (st !== 'Draft' && st !== 'Sent') return;
-              const code =
-                window.prompt(
-                  t('sales.actions.applyPromotionPrompt', {
-                    defaultValue: 'Promotion code',
-                  }),
-                )?.trim() ?? '';
-              if (!code) return;
-              void applySalePromotion
-                .mutateAsync({
-                  orderId: r.id as string | number | bigint,
-                  promotionCode: code,
-                })
-                .catch((e: unknown) => {
-                  window.alert(e instanceof Error ? e.message : String(e));
-                });
-            },
-          },
-          {
             id: 'apply-options',
             label: t('sales.actions.applyOptions', { defaultValue: 'Apply CPQ options' }),
             requiresSelection: true,
@@ -1489,49 +1345,6 @@ function SalesClientLoaded({
                     window.alert(e instanceof Error ? e.message : String(e));
                   });
               }
-            },
-          },
-          {
-            id: 'export-commercial-packet',
-            label: t('sales.actions.exportCommercialPacket', {
-              defaultValue: 'Export commercial packet',
-            }),
-            requiresSelection: true,
-            onClick: (rows) => {
-              if (rows.length !== 1) return;
-              const order = rows[0] as Record<string, unknown>;
-              const orderId = String(order.id ?? '');
-              const lines = (orderLines as Record<string, unknown>[]).filter(
-                (l) => String(l.orderId ?? l.order_id ?? '') === orderId,
-              );
-              const packet = {
-                documentType: 'commercial_invoice_packet',
-                generatedAt: new Date().toISOString(),
-                order,
-                lines,
-                note: 'Fiscal submit remains a worker/procedure; this packet is export data only.',
-              };
-              const blob = new Blob([JSON.stringify(packet, null, 2)], {
-                type: 'application/json',
-              });
-              const url = URL.createObjectURL(blob);
-              const a = document.createElement('a');
-              a.href = url;
-              a.download = `commercial-packet-SO-${orderId}.json`;
-              a.click();
-              URL.revokeObjectURL(url);
-            },
-          },
-          {
-            id: 'edit-order',
-            label: t('sales.actions.editOrder'),
-            requiresSelection: true,
-            onClick: (rows) => {
-              if (rows.length !== 1) return;
-              const r = rows[0] as Record<string, unknown>;
-              if (!saleOrderWorkflow.update.canPresent(r)) return;
-              setEditSaleOrderError(null);
-              setEditSaleOrderTarget(r);
             },
           },
           ...workflowActionsToEntityActions([saleOrderWorkflow.cancel], {
@@ -1561,96 +1374,6 @@ function SalesClientLoaded({
               }
             },
           },
-          {
-            id: 'apply-omnichannel',
-            label: t('sales.actions.applyOmnichannel', {
-              defaultValue: 'Apply omnichannel allocation',
-            }),
-            requiresSelection: true,
-            onClick: (rows) => {
-              if (rows.length !== 1) return;
-              const r = rows[0] as Record<string, unknown>;
-              const channel =
-                window
-                  .prompt(
-                    t('sales.actions.omnichannelChannelPrompt', {
-                      defaultValue: 'Channel (optional, e.g. web, store)',
-                    }),
-                  )
-                  ?.trim() || undefined;
-              const routeRaw =
-                window
-                  .prompt(
-                    t('sales.actions.omnichannelRoutePrompt', {
-                      defaultValue: 'Preferred route id (optional)',
-                    }),
-                  )
-                  ?.trim() ?? '';
-              void applyOmnichannelAllocation
-                .mutateAsync({
-                  orderId: r.id as string | number | bigint,
-                  params: {
-                    preferredRouteId: routeRaw ? BigInt(routeRaw) : undefined,
-                    channel,
-                    metadata: undefined,
-                  },
-                })
-                .catch((e: unknown) => {
-                  window.alert(e instanceof Error ? e.message : String(e));
-                });
-            },
-          },
-          {
-            id: 'create-invoice',
-            label: t('sales.actions.createInvoice'),
-            requiresSelection: true,
-            isApplicable: (rows) =>
-              rows.length === 1 && saleOrderWorkflow.createInvoice.canPresent(rows[0] as EntityRow),
-            onClick: (rows) => {
-              if (rows.length !== 1) return;
-              if (!saleOrderWorkflow.createInvoice.canPresent(rows[0] as EntityRow)) return;
-              const id = rows[0]?.id;
-              if (id == null) return;
-              setInvoiceOrderError(null);
-              setInvoiceOrderId(BigInt(String(id)));
-            },
-          },
-          {
-            id: 'download-pdf',
-            label: 'Download PDF',
-            requiresSelection: true,
-            onClick: async (rows) => {
-              if (rows.length !== 1) return;
-              const id = rows[0]?.id;
-              if (id == null) return;
-              await downloadDocumentPdf('sale-order', Number(id)).catch((e) => {
-                window.alert(e instanceof Error ? e.message : String(e));
-              });
-            },
-          },
-          {
-            id: 'archive-pdf-dms',
-            label: 'Archive PDF to Documents',
-            requiresSelection: true,
-            onClick: (rows) => {
-              if (rows.length !== 1) return;
-              const id = rows[0]?.id;
-              if (id == null) return;
-              void (async () => {
-                try {
-                  const params = await archiveRenderedPdfAsDocument({
-                    kind: 'sale-order',
-                    recordId: Number(id),
-                    companyId: operatingCompanyId,
-                    name: String(rows[0]?.name ?? `Sale order ${id}`),
-                  });
-                  await createDocument.mutateAsync(params);
-                } catch (e) {
-                  window.alert(e instanceof Error ? e.message : String(e));
-                }
-              })();
-            },
-          },
           ...workflowActionsToEntityActions([saleOrderWorkflow.lock, saleOrderWorkflow.unlock], {
             ids: { 'sales.order.lock': 'lock-orders', 'sales.order.unlock': 'unlock-orders' },
           }),
@@ -1662,18 +1385,12 @@ function SalesClientLoaded({
     saleOrdersTableRuntime,
     openCreateSaleOrder,
     saleOrderWorkflow.actions,
-    saleOrderWorkflow.createInvoice,
-    saleOrderWorkflow.acceptQuotation,
     saleOrderWorkflow.cancel,
     saleOrderWorkflow.totals,
     saleOrderWorkflow.lock,
     saleOrderWorkflow.unlock,
-    saleOrderWorkflow.update,
-    navigateToSalesTab,
-    applySalePromotion,
     applySaleOrderOptions,
     accrueSaleCommission,
-    applyOmnichannelAllocation,
     orderLines,
     setCsvKind,
     organizationId,
@@ -2752,54 +2469,6 @@ function SalesClientLoaded({
           }}
         />
       ) : null}
-      {invoiceOrderId != null ? (
-        <RuntimeFormModal
-          key={`invoice-order-${invoiceOrderId.toString()}`}
-          open
-          onOpenChange={(o) => {
-            if (!o) {
-              setInvoiceOrderId(null);
-              setInvoiceOrderError(null);
-            }
-          }}
-          staticConfig={createInvoiceFormConfig}
-          moduleId="sales"
-          formId="create-invoice-from-sale-order"
-          organizationId={organizationId}
-          roleId={runtimeRoleId}
-          preferStdbVisibility
-          foldCustomFieldsIntoMetadata={false}
-          closeOnSubmit={false}
-          submitError={invoiceOrderError}
-          isPending={saleOrderWorkflow.isPending}
-          onSubmit={async (formData) => {
-            setInvoiceOrderError(null);
-            const orderRow = (orders as Record<string, unknown>[]).find(
-              (o) => String(o.id) === String(invoiceOrderId),
-            );
-            const partnerInvoiceId =
-              orderRow?.partnerInvoiceId != null
-                ? BigInt(String(orderRow.partnerInvoiceId))
-                : undefined;
-            const params = toCreateInvoiceFromSaleOrderParams(formData, {
-              partnerInvoiceId,
-            });
-            if (!params) {
-              setInvoiceOrderError(t('common.validation.required'));
-              return;
-            }
-            try {
-              await saleOrderWorkflow.createInvoice.execute(
-                { orderId: String(invoiceOrderId), params },
-                { navigateToNext: true },
-              );
-              setInvoiceOrderId(null);
-            } catch (e) {
-              setInvoiceOrderError(e instanceof Error ? e.message : String(e));
-            }
-          }}
-        />
-      ) : null}
       {partialDeliveryPicking != null && partialDeliveryFormConfig ? (
         <FormModal
           key={`partial-delivery-${String(pickingRowId(partialDeliveryPicking))}`}
@@ -2873,112 +2542,6 @@ function SalesClientLoaded({
               setCancelPickingTarget(null);
             } catch (e) {
               setCancelPickingError(e instanceof Error ? e.message : String(e));
-            }
-          }}
-        />
-      ) : null}
-      {editSaleOrderTarget != null ? (
-        <RuntimeFormModal
-          key={`edit-sale-order-${String(editSaleOrderTarget.id)}`}
-          open
-          onOpenChange={(o) => {
-            if (!o) {
-              setEditSaleOrderTarget(null);
-              setEditSaleOrderError(null);
-            }
-          }}
-          staticConfig={editSaleOrderForm(t)}
-          moduleId="sales"
-          formId="edit-sale-order"
-          organizationId={organizationId}
-          roleId={runtimeRoleId}
-          preferStdbVisibility
-          transformConfig={(cfg) =>
-            mergeFieldDefaultValues(cfg, {
-              clientOrderRef: String(
-                editSaleOrderTarget.clientOrderRef ??
-                  editSaleOrderTarget.client_order_ref ??
-                  '',
-              ),
-              note: String(editSaleOrderTarget.note ?? ''),
-              incoterm: String(editSaleOrderTarget.incoterm ?? ''),
-              incotermLocation: String(
-                editSaleOrderTarget.incotermLocation ??
-                  editSaleOrderTarget.incoterm_location ??
-                  '',
-              ),
-              commissionRatePercent:
-                parseCommissionRatePercent(editSaleOrderTarget) || '',
-            })
-          }
-          closeOnSubmit={false}
-          submitError={editSaleOrderError}
-          isPending={saleOrderWorkflow.isPending}
-          onSubmit={async (formData) => {
-            setEditSaleOrderError(null);
-            const id = editSaleOrderTarget.id;
-            if (id == null) return;
-            try {
-              const rateRaw = formData.commissionRatePercent;
-              const rate =
-                rateRaw === '' || rateRaw == null
-                  ? null
-                  : Number(rateRaw);
-              const metadata = mergeCommissionRateIntoMetadata(
-                editSaleOrderTarget.metadata,
-                rate != null && Number.isFinite(rate) ? rate : null,
-              );
-              let mergedMeta = metadata;
-              try {
-                const customRaw = formData.metadata;
-                const customObj =
-                  typeof customRaw === 'string'
-                    ? (JSON.parse(customRaw) as Record<string, unknown>)
-                    : customRaw != null && typeof customRaw === 'object'
-                      ? (customRaw as Record<string, unknown>)
-                      : null;
-                const baseObj = metadata
-                  ? (JSON.parse(metadata) as Record<string, unknown>)
-                  : {};
-                if (customObj) {
-                  mergedMeta = JSON.stringify({ ...baseObj, ...customObj });
-                }
-              } catch {
-                mergedMeta = metadata;
-              }
-              await saleOrderWorkflow.update.execute({
-                orderId: String(id),
-                params: {
-                  clientOrderRef:
-                    typeof formData.clientOrderRef === 'string'
-                      ? formData.clientOrderRef
-                      : undefined,
-                  note: typeof formData.note === 'string' ? formData.note : undefined,
-                  incoterm:
-                    typeof formData.incoterm === 'string' ? formData.incoterm : undefined,
-                  incotermLocation:
-                    typeof formData.incotermLocation === 'string'
-                      ? formData.incotermLocation
-                      : undefined,
-                  metadata: mergedMeta,
-                },
-              });
-              if (
-                operatingCompanyId &&
-                operatingCompanyId !== 0n &&
-                customFieldEntriesFromMetadata(mergedMeta).length > 0
-              ) {
-                await persistCustomFieldsToEav({
-                  organizationId,
-                  companyId: operatingCompanyId,
-                  model: 'sale_order',
-                  recordId: BigInt(String(id)),
-                  metadata: mergedMeta,
-                });
-              }
-              setEditSaleOrderTarget(null);
-            } catch (e) {
-              setEditSaleOrderError(e instanceof Error ? e.message : String(e));
             }
           }}
         />

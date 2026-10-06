@@ -823,6 +823,21 @@ export async function waitForEntityActionEnabled(page: Page, actionTestId: strin
   await expect(page.getByTestId(actionTestId)).toBeEnabled({ timeout: 30_000 })
 }
 
+/** Open a sale order's own page and wait for its header. */
+export async function openSaleOrderPage(page: Page, orderId: number | string) {
+  await page.goto(`/sales/orders/${orderId}`)
+  await expect(page.getByTestId("sale-order-title")).toBeVisible({ timeout: 30_000 })
+}
+
+/** Start "Create invoice" from a sale order's page and wait for its form. */
+export async function openCreateInvoiceFromOrder(page: Page, orderId: number | string) {
+  await openSaleOrderPage(page, orderId)
+  const action = page.getByTestId("record-workflow-action-sales.order.create-invoice")
+  await expect(action).toBeEnabled({ timeout: 30_000 })
+  await action.click()
+  await expect(page.getByTestId("form-modal-create-invoice-from-sale-order")).toBeVisible({ timeout: 15_000 })
+}
+
 /** Confirm the table's confirmation dialog, shown after clicking a confirm-gated row action. */
 export async function acceptEntityActionConfirm(page: Page) {
   const dialog = page.getByTestId("entity-action-confirm")

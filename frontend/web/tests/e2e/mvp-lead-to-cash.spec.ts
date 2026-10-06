@@ -47,6 +47,7 @@ import {
   waitForBffQueryMinRows,
   expectFormModalVisible,
   fetchSaleOrderSelectLabel,
+  openCreateInvoiceFromOrder,
 } from "./helpers"
 
 const SEEDED_CUSTOMER_NAME = "Acme Corporation"
@@ -331,10 +332,7 @@ test.describe("MVP lead-to-cash workflow", { tag: "@p0" }, () => {
     const receivableLabel = await fetchAccountSelectLabelByInternalType(page, "receivable")
     await gotoModule(page, "/sales", "sales")
     await page.getByTestId("module-tab-sales-orders").click()
-    await selectEntityRowById(page, orderId)
-    await waitForEntityActionEnabled(page, "entity-action-create-invoice")
-    await page.getByTestId("entity-action-create-invoice").click()
-    await expect(page.getByTestId("form-modal-create-invoice-from-sale-order")).toBeVisible()
+    await openCreateInvoiceFromOrder(page, orderId)
     await chooseSelectOptionByLabel(page, "journalId", journalLabel)
     await chooseSelectOptionByLabel(page, "defaultIncomeAccountId", incomeLabel)
     await chooseSelectOptionByLabel(page, "receivableAccountId", receivableLabel)
@@ -652,10 +650,7 @@ test.describe("MVP lead-to-cash workflow", { tag: "@p0" }, () => {
     const receivableLabel = await fetchAccountSelectLabelByInternalType(page, "receivable")
     await gotoModule(page, "/sales", "sales")
     await page.getByTestId("module-tab-sales-orders").click()
-    await selectEntityRowById(page, orderId)
-    await waitForEntityActionEnabled(page, "entity-action-create-invoice")
-    await page.getByTestId("entity-action-create-invoice").click()
-    await expect(page.getByTestId("form-modal-create-invoice-from-sale-order")).toBeVisible()
+    await openCreateInvoiceFromOrder(page, orderId)
     await chooseSelectOptionByLabel(page, "journalId", journalLabel)
     await chooseSelectOptionByLabel(page, "defaultIncomeAccountId", incomeLabel)
     await chooseSelectOptionByLabel(page, "receivableAccountId", receivableLabel)

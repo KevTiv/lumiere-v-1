@@ -1,4 +1,5 @@
 import type { TFunction } from "i18next"
+import Link from "next/link"
 import { createElement } from "react"
 import type { EntityDetailConfig, EntityViewConfig, EntityTableConfig } from "./entity-view-types"
 import { transfersTableConfig } from "./inventory-entity-configs"
@@ -85,6 +86,8 @@ export type SaleOrdersTableConfigOptions = {
   formatSaleOrderDisplayName?: (row: Record<string, unknown>) => string
   /** Empty-state CTA — wired by the module client (opens create form). */
   onEmptyAction?: () => void
+  /** Where an order has a page of its own: the reference then links to it. */
+  recordHref?: (row: Record<string, unknown>) => string | undefined
 }
 
 export const saleOrderDetailConfig = (t: TFunction): EntityDetailConfig => ({
@@ -133,16 +136,17 @@ export const saleOrdersTableConfig = (
   options?: SaleOrdersTableConfigOptions,
 ): EntityViewConfig => {
   const formatName = options?.formatSaleOrderDisplayName
+  const recordHref = options?.recordHref
 
   const referenceColumn = {
     key: "reference",
     label: t("sales.salesOrders.columns.reference"),
     width: "min-w-28",
     sortable: true,
-    ...(formatName
+    ...(formatName || recordHref
       ? {
           render: (_value: unknown, row: Record<string, unknown>) => {
-            const formatted = formatName(row).trim()
+            const formatted = formatName ? formatName(row).trim() : ""
             const fallback = String(row.reference ?? "").trim()
             const shown = formatted || fallback
             if (!shown)
@@ -151,7 +155,16 @@ export const saleOrdersTableConfig = (
                 { className: "text-muted-foreground" },
                 "—",
               )
-            return shown
+            const href = recordHref?.(row)
+            if (!href) return shown
+            // The row itself opens a preview; the reference opens the page.
+            const linkProps = {
+              href,
+              className: "font-medium text-primary hover:underline",
+              onClick: (event: { stopPropagation: () => void }) => event.stopPropagation(),
+              "data-testid": `sale-order-link-${String(row.id)}`,
+            }
+            return createElement(Link, linkProps, shown)
           },
         }
       : {}),

@@ -27,6 +27,8 @@ export interface EntityRecordSheetConfig {
   actions?: ReactNode
   /** SpacetimeDB snake_case table name for the Audit tab filter */
   auditTableName?: string
+  /** Where the record has a page of its own: the sheet then offers an "Open" link to it. */
+  openHref?: (record: Record<string, unknown>) => string | undefined
 }
 
 export interface EntityBoardRuntimeContext {

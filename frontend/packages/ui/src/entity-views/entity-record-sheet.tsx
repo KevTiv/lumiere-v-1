@@ -1,6 +1,9 @@
 "use client"
 
+import Link from "next/link"
+import { ExternalLink } from "lucide-react"
 import { Badge } from "../components/badge"
+import { Button } from "../components/button"
 import {
   Sheet,
   SheetContent,
@@ -43,6 +46,7 @@ export function EntityRecordSheet({
     (config.statusBadgeVariants?.[statusRaw] as BadgeVariant | undefined) ??
     "secondary"
   const statusLabel = config.statusBadgeLabels?.[statusRaw] ?? humanizeEnumValue(statusRaw)
+  const openHref = record ? config.openHref?.(record) : undefined
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -54,13 +58,26 @@ export function EntityRecordSheet({
             </SheetHeader>
 
             <div className="mt-2 space-y-4 px-4 pb-6">
-              {(config.statusKey || config.actions) && (
+              {(config.statusKey || config.actions || openHref) && (
                 <div className="flex flex-wrap items-center gap-2">
                   {config.statusKey && statusRaw && (
                     <Badge variant={statusVariant}>{statusLabel}</Badge>
                   )}
                   {config.actions && (
                     <div className="flex flex-wrap gap-2">{config.actions}</div>
+                  )}
+                  {openHref && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="ml-auto"
+                      nativeButton={false}
+                      render={<Link href={openHref} />}
+                      data-testid="entity-record-sheet-open"
+                    >
+                      <ExternalLink className="mr-1 h-3.5 w-3.5" />
+                      Open
+                    </Button>
                   )}
                 </div>
               )}

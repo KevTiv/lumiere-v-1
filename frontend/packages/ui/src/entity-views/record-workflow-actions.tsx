@@ -10,6 +10,8 @@ export interface RecordWorkflowActionsProps<TRecord> {
   /** Runs an action for this record; the surface owns confirmation/forms for non-immediate kinds. */
   onRun: (action: AnyWorkflowAction<TRecord>, record: TRecord) => void
   pendingActionIds?: ReadonlySet<string>
+  /** Actions shown as the record's main next step; the rest are outlined. */
+  primaryActionIds?: ReadonlySet<string>
   className?: string
 }
 
@@ -22,6 +24,7 @@ export function RecordWorkflowActions<TRecord>({
   record,
   onRun,
   pendingActionIds,
+  primaryActionIds,
   className,
 }: RecordWorkflowActionsProps<TRecord>) {
   const presentable = presentableActions(actions, record)
@@ -34,7 +37,13 @@ export function RecordWorkflowActions<TRecord>({
           <Button
             key={action.id}
             size="sm"
-            variant={action.kind === "destructive" ? "destructive" : "outline"}
+            variant={
+              action.kind === "destructive"
+                ? "destructive"
+                : primaryActionIds?.has(action.id)
+                  ? "default"
+                  : "outline"
+            }
             disabled={blocked != null || pendingActionIds?.has(action.id)}
             title={blocked}
             onClick={() => onRun(action, record)}
