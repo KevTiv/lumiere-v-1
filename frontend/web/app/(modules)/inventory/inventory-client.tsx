@@ -82,6 +82,7 @@ import { useSerialUseWorkflow } from '@lumiere/query-hooks/hooks/serial-use-work
 import { useSerialBlockWorkflow } from '@lumiere/query-hooks/hooks/serial-block-workflow';
 import { planPartialDelivery } from '@lumiere/erp-workflows';
 import { groupBy } from '@/lib/utils';
+import { transferRecordHref } from './transfer-record';
 import { InventoryOpsPanel } from './inventory-ops-panel';
 import {
   useProducts,
@@ -1677,6 +1678,7 @@ function InventoryClientLoaded({
       detailConfig,
       auditTableName: 'stock_picking',
       discussion: {},
+      openHref: transferRecordHref,
       customTabs: [
         {
           id: 'moves',

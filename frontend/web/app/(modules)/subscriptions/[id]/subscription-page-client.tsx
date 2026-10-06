@@ -1,0 +1,388 @@
+'use client';
+
+import { useCallback, useMemo } from 'react';
+import Link from 'next/link';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { ListOrdered, MoreHorizontal } from 'lucide-react';
+import { useTranslation } from '@lumiere/i18n';
+import {
+  Button,
+  EntityDetail,
+  EntityView,
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyTitle,
+  MissingOrganization,
+  RecordAuditTab,
+  RecordChatter,
+  RecordPage,
+  SmartButtons,
+  StatusBar,
+  buildModuleTabHref,
+  subscriptionAmendmentsTableConfig,
+  subscriptionLinesTableConfig,
+  subscriptionsTableConfig,
+} from '@lumiere/ui';
+import { Badge } from '@lumiere/ui/components/badge';
+import { Skeleton } from '@lumiere/ui/components/skeleton';
+import { showWorkflowToast } from '@lumiere/ui/lib/workflow-toast';
+import { useAccountMoves, useAccountPayments } from '@lumiere/query-hooks/hooks/accounting';
+import { subscriptionRecordLinks } from '@lumiere/query-hooks/hooks/cross-record-links';
+import {
+  useActivateSubscription,
+  usePauseSubscription,
+  useRateSubscriptionUsageEvents,
+  useResumeSubscription,
+  useSubscriptionAmendments,
+  useSubscriptionBillingRuns,
+  useSubscriptionLines,
+  useSubscriptions,
+  type Subscription,
+} from '@lumiere/query-hooks/hooks/subscriptions';
+import { useDefaultOperatingCompanyBigInt } from '@lumiere/query-hooks/hooks/use-operating-company';
+import { useSubscriptionsModuleSubscription } from '@/lib/module-subscription-hooks';
+import { hasValidOrganizationId, orgBigInts } from '@/lib/org-scoped';
+import { RecordDocumentAttachments } from '../../../../components/record-document-attachments';
+import { CrossRecordLinks } from '../../../../components/order-handoff-links';
+import { subscriptionStateOf, subscriptionStatusBar } from '../subscription-status';
+
+interface SubscriptionPageClientProps {
+  subscriptionId: string;
+  initialSubscriptions?: Subscription[];
+  organizationId?: number;
+}
+
+type Row = Record<string, unknown>;
+
+const TAB_IDS = ['overview', 'lines', 'amendments', 'billing', 'discussion', 'audit'] as const;
+type TabId = (typeof TAB_IDS)[number];
+
+export function SubscriptionPageClient(props: SubscriptionPageClientProps) {
+  if (!hasValidOrganizationId(props.organizationId)) {
+    return <MissingOrganization />;
+  }
+  return <SubscriptionPageLoaded {...props} organizationId={props.organizationId} />;
+}
+
+function SubscriptionPageLoaded({
+  subscriptionId,
+  initialSubscriptions,
+  organizationId,
+}: SubscriptionPageClientProps & { organizationId: number }) {
+  useSubscriptionsModuleSubscription();
+  const { t } = useTranslation();
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const { orgId } = orgBigInts(organizationId);
+  const operatingCompanyId = useDefaultOperatingCompanyBigInt(organizationId) ?? 0n;
+
+  const { data: subscriptions = [], isLoading } = useSubscriptions(orgId, initialSubscriptions);
+  const { data: lines = [] } = useSubscriptionLines(orgId);
+  const { data: amendments = [] } = useSubscriptionAmendments(orgId);
+  const { data: billingRuns = [], isLoading: runsLoading, isError: runsError } = useSubscriptionBillingRuns(orgId);
+  const { data: accountMoves = [], isLoading: movesLoading, isError: movesError } = useAccountMoves(orgId);
+  const { data: accountPayments = [], isLoading: paymentsLoading, isError: paymentsError } = useAccountPayments(orgId);
+
+  const activate = useActivateSubscription(orgId, operatingCompanyId);
+  const pause = usePauseSubscription(orgId, operatingCompanyId);
+  const resume = useResumeSubscription(orgId, operatingCompanyId);
+  const rateUsage = useRateSubscriptionUsageEvents(orgId, operatingCompanyId);
+
+  const subscription = useMemo(
+    () => (subscriptions as unknown as Row[]).find((row) => String(row.id) === subscriptionId),
+    [subscriptions, subscriptionId],
+  );
+  const ownRows = useCallback(
+    (rows: unknown) =>
+      (rows as Row[]).filter((row) => String(row.subscriptionId ?? row.subscription_id ?? '') === subscriptionId),
+    [subscriptionId],
+  );
+  const ownLines = useMemo(() => ownRows(lines), [lines, ownRows]);
+  const ownAmendments = useMemo(() => ownRows(amendments), [amendments, ownRows]);
+
+  const navigation = useMemo(() => {
+    const sorted = [...(subscriptions as unknown as Row[])].sort((a, b) =>
+      Number(BigInt(String(b.id)) - BigInt(String(a.id))),
+    );
+    const index = sorted.findIndex((row) => String(row.id) === subscriptionId);
+    if (index === -1) return undefined;
+    const link = (row: Row | undefined) =>
+      row ? { href: `/subscriptions/${String(row.id)}`, label: String(row.code || row.id) } : undefined;
+    return {
+      position: index + 1,
+      total: sorted.length,
+      previous: link(sorted[index - 1]),
+      next: link(sorted[index + 1]),
+    };
+  }, [subscriptions, subscriptionId]);
+
+  const requestedTab = searchParams.get('tab');
+  const activeTab: TabId = (TAB_IDS as readonly string[]).includes(requestedTab ?? '')
+    ? (requestedTab as TabId)
+    : 'overview';
+  const setActiveTab = useCallback(
+    (tab: string) => {
+      const next = new URLSearchParams(searchParams.toString());
+      if (tab === 'overview') next.delete('tab');
+      else next.set('tab', tab);
+      const query = next.toString();
+      router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
+    },
+    [pathname, router, searchParams],
+  );
+
+  const run = useCallback(async (title: string, work: () => Promise<unknown>) => {
+    try {
+      await work();
+      showWorkflowToast({ kind: 'success', title, description: '' });
+    } catch (error) {
+      showWorkflowToast({
+        kind: 'error',
+        title,
+        description: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }, []);
+
+  if (!subscription) {
+    if (isLoading) {
+      return (
+        <div className="space-y-4" data-testid="subscription-page-loading">
+          <Skeleton className="h-6 w-64" />
+          <Skeleton className="h-10 w-96" />
+          <Skeleton className="h-64 w-full" />
+        </div>
+      );
+    }
+    return (
+      <Empty data-testid="subscription-page-not-found">
+        <EmptyHeader>
+          <EmptyTitle>{t('subscriptions.notFound', { defaultValue: 'Subscription not found' })}</EmptyTitle>
+          <EmptyDescription>
+            {t('subscriptions.notFoundHint', {
+              defaultValue: 'It may have been deleted, or belong to another organization.',
+            })}
+          </EmptyDescription>
+        </EmptyHeader>
+        <EmptyContent>
+          <Button variant="outline" render={<Link href={buildModuleTabHref('subscriptions', 'subscriptions')} />} nativeButton={false}>
+            {t('subscriptions.backToSubscriptions', { defaultValue: 'Back to subscriptions' })}
+          </Button>
+        </EmptyContent>
+      </Empty>
+    );
+  }
+
+  const state = subscriptionStateOf(subscription);
+  const label = String(subscription.code || '').trim() || `#${subscriptionId}`;
+  const status = subscriptionStatusBar(subscription, t);
+  const tableConfig = subscriptionsTableConfig(t);
+  const columns = tableConfig.view.mode === 'table' ? tableConfig.view.columns : [];
+  const stateColumn = columns.find((column) => column.key === 'state');
+  const stateBadge = stateColumn
+    ? {
+        variant: (stateColumn.badgeVariants?.[state] ?? 'secondary') as 'default' | 'secondary' | 'outline' | 'destructive',
+        label: stateColumn.badgeLabels?.[state] ?? state,
+      }
+    : { variant: 'secondary' as const, label: state };
+  const detailConfig = {
+    mode: 'detail' as const,
+    sections: [{ id: 'subscription', fields: columns.map(({ width: _width, ...field }) => field) }],
+  };
+  const billingLinks = subscriptionRecordLinks(
+    subscription as never,
+    { organizationId: orgId, companyId: operatingCompanyId },
+    billingRuns as never,
+    accountMoves as never,
+    paymentsError || paymentsLoading ? undefined : (accountPayments as never),
+  );
+
+  const busy = activate.isPending || pause.isPending || resume.isPending || rateUsage.isPending;
+  const id = BigInt(subscriptionId);
+
+  return (
+    <RecordPage
+      testIdPrefix="subscription"
+      breadcrumbs={[
+        { label: t('nav.subscriptions', { defaultValue: 'Subscriptions' }), href: '/subscriptions' },
+        { label: t('subscriptions.subscriptions.title'), href: buildModuleTabHref('subscriptions', 'subscriptions') },
+        { label },
+      ]}
+      title={label}
+      subtitle={String(subscription.description ?? '').trim() || undefined}
+      badge={<Badge variant={stateBadge.variant}>{stateBadge.label}</Badge>}
+      statusBar={<StatusBar steps={status.steps} current={status.current} />}
+      navigation={navigation}
+      smartButtons={
+        <SmartButtons
+          testIdPrefix="subscription"
+          buttons={[
+            {
+              id: 'lines',
+              label: t('subscriptions.lines.title', { defaultValue: 'Lines' }),
+              count: ownLines.length,
+              icon: <ListOrdered className="h-4 w-4" />,
+              onClick: () => setActiveTab('lines'),
+            },
+            {
+              id: 'amendments',
+              label: t('subscriptions.amendments.title', { defaultValue: 'Amendments' }),
+              count: ownAmendments.length,
+              onClick: () => setActiveTab('amendments'),
+              hideWhenZero: true,
+            },
+          ]}
+        />
+      }
+      actions={
+        <>
+          {state === 'draft' ? (
+            <Button
+              size="sm"
+              disabled={busy}
+              data-testid="subscription-action-activate"
+              onClick={() =>
+                void run(t('subscriptions.actions.activate'), () => activate.mutateAsync({ subscriptionId: id }))
+              }
+            >
+              {t('subscriptions.actions.activate')}
+            </Button>
+          ) : null}
+          {state === 'active' ? (
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={busy}
+              data-testid="subscription-action-pause"
+              onClick={() =>
+                void run(t('subscriptions.actions.pause', { defaultValue: 'Pause' }), () =>
+                  pause.mutateAsync({ subscriptionId: id }),
+                )
+              }
+            >
+              {t('subscriptions.actions.pause', { defaultValue: 'Pause' })}
+            </Button>
+          ) : null}
+          {state === 'paused' ? (
+            <Button
+              size="sm"
+              disabled={busy}
+              data-testid="subscription-action-resume"
+              onClick={() =>
+                void run(t('subscriptions.actions.resume', { defaultValue: 'Resume' }), () =>
+                  resume.mutateAsync({ subscriptionId: id }),
+                )
+              }
+            >
+              {t('subscriptions.actions.resume', { defaultValue: 'Resume' })}
+            </Button>
+          ) : null}
+          {state !== 'draft' && state !== 'closed' ? (
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={busy}
+              data-testid="subscription-action-rate-usage"
+              onClick={() =>
+                void run(t('subscriptions.actions.rateUsage', { defaultValue: 'Rate usage' }), () =>
+                  rateUsage.mutateAsync({ subscriptionId: id, params: { limit: 100 } }),
+                )
+              }
+            >
+              {t('subscriptions.actions.rateUsage', { defaultValue: 'Rate usage' })}
+            </Button>
+          ) : null}
+          <Button
+            variant="outline"
+            size="sm"
+            nativeButton={false}
+            render={<Link href={buildModuleTabHref('subscriptions', 'subscriptions')} />}
+            data-testid="subscription-more-in-list"
+            title={t('subscriptions.page.moreInListHint', {
+              defaultValue: 'Close, invoice, amend, renew and the other actions that ask for details are in the list.',
+            })}
+          >
+            <MoreHorizontal className="mr-1 h-4 w-4" />
+            {t('subscriptions.page.moreInList', { defaultValue: 'More actions' })}
+          </Button>
+        </>
+      }
+      activeTab={activeTab}
+      onTabChange={setActiveTab}
+      tabs={[
+        {
+          id: 'overview',
+          label: t('common.overview', { defaultValue: 'Overview' }),
+          content: <EntityDetail config={detailConfig} data={subscription} />,
+        },
+        {
+          id: 'lines',
+          label: t('subscriptions.lines.title', { defaultValue: 'Lines' }),
+          content: (
+            <EntityView
+              config={{ ...subscriptionLinesTableConfig(t), title: '', description: undefined }}
+              data={ownLines}
+              useCard={false}
+            />
+          ),
+        },
+        {
+          id: 'amendments',
+          label: t('subscriptions.amendments.title', { defaultValue: 'Amendments' }),
+          content: (
+            <EntityView
+              config={{ ...subscriptionAmendmentsTableConfig(t), title: '', description: undefined }}
+              data={ownAmendments}
+              useCard={false}
+            />
+          ),
+        },
+        {
+          id: 'billing',
+          label: t('subscriptions.page.billing', { defaultValue: 'Invoices & payments' }),
+          content:
+            runsLoading || movesLoading ? (
+              <p>{t('common.loading', { defaultValue: 'Loading…' })}</p>
+            ) : (
+              <CrossRecordLinks
+                testIdPrefix="subscription-handoff"
+                result={
+                  runsError || movesError
+                    ? { status: 'unavailable', links: [], reason: 'Linked billing records are unavailable' }
+                    : billingLinks
+                }
+              />
+            ),
+        },
+        {
+          id: 'discussion',
+          label: t('subscriptions.page.discussion', { defaultValue: 'Discussion' }),
+          content: (
+            <div className="grid gap-6 lg:grid-cols-2" data-testid="subscription-discussion">
+              <RecordChatter
+                organizationId={organizationId}
+                resModel="subscription"
+                resId={id}
+                recordTitle={label}
+              />
+              <RecordDocumentAttachments
+                organizationId={orgId}
+                resModel="subscription"
+                resId={id}
+                title={t('subscriptions.page.attachments', { defaultValue: 'Attachments' })}
+              />
+            </div>
+          ),
+        },
+        {
+          id: 'audit',
+          label: t('common.audit', { defaultValue: 'Audit' }),
+          content: <RecordAuditTab tableName="subscription" recordId={subscriptionId} />,
+        },
+      ]}
+    />
+  );
+}

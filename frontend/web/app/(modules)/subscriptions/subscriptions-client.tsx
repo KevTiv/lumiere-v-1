@@ -778,6 +778,7 @@ function SubscriptionsClientLoaded({
                 statusKey: "state",
                 auditTableName: "subscription",
                 discussion: {},
+                openHref: (record) => (record.id == null ? undefined : `/subscriptions/${String(record.id)}`),
                 detailConfig: { mode: "detail", sections: [{ id: "subscription", fields: [
                   { key: "code", label: t("subscriptions.subscriptions.columns.code") },
                   { key: "description", label: t("subscriptions.subscriptions.columns.description") },
