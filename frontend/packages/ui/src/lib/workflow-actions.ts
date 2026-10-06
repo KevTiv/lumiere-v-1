@@ -45,9 +45,9 @@ export function workflowActionsToEntityActions(
           )
           for (const outcome of outcomes) {
             if (outcome.status !== "rejected") continue
-            // The surface decides how to present typed errors; without one the table reports it.
-            if (options.onError) options.onError(outcome.reason, action)
-            else throw outcome.reason
+            // The workflow runner has already told the surface (its `notify` port), so rethrowing
+            // would show the same failure in a second toast. `onError` is for extra handling.
+            options.onError?.(outcome.reason, action)
           }
         },
       },

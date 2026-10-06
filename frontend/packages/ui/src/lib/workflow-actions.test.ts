@@ -53,13 +53,13 @@ describe("workflowActionsToEntityActions", () => {
     expect(onError.mock.calls[0]?.[0]).toBeInstanceOf(Error)
   })
 
-  it("rejects when the surface gave no onError, so the table can report it", async () => {
+  it("does not rethrow a failure the workflow runner already reported to the surface", async () => {
     const execute = vi.fn(async () => {
       throw new Error("refused")
     })
     const [action] = workflowActionsToEntityActions([workflowAction(execute)])
 
-    await expect(action?.onClick(rows)).rejects.toThrow("refused")
+    await expect(action?.onClick(rows)).resolves.toBeUndefined()
   })
 })
 
