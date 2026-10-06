@@ -7776,7 +7776,8 @@
       "edit": "Edit",
       "delete": "Delete",
       "closeAria": "Close",
-      "relatedTo": "Related {{type}}"
+      "relatedTo": "Related {{type}}",
+      "open": "Open"
     },
     "view": {
       "today": "Today",
@@ -7793,6 +7794,12 @@
         "fri": "Fri",
         "sat": "Sat"
       }
+    },
+    "page": {
+      "backToCalendar": "Back to calendar",
+      "discussion": "Discussion",
+      "notFound": "Event not found",
+      "notFoundHint": "It may have been deleted, or belong to another organization."
     }
   },
   "documents": {

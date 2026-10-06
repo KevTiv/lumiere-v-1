@@ -14,6 +14,7 @@ import { FormModal, ModuleView, newCalendarEventForm, newActivityForm, MissingOr
 import { useEffect, useMemo, useState } from "react"
 import { CalendarView } from "../../../../packages/ui/src/calendar-components/calendar-view"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
+import { calendarEventHref } from "./calendar-event"
 
 interface CalendarClientProps {
   initialEvents?: StdbCalendarEvent[]
@@ -105,6 +106,31 @@ function CalendarClientLoaded({ initialEvents, organizationId }: CalendarClientL
             createForm: newActivityForm(t),
           }
         }
+        if (tab.id === "events") {
+          return {
+            ...tab,
+            recordSheet: {
+              titleKey: "name",
+              auditTableName: "calendar_event",
+              discussion: {},
+              openHref: calendarEventHref,
+              detailConfig: {
+                mode: "detail" as const,
+                sections: [
+                  {
+                    id: "event",
+                    fields: [
+                      { key: "start", label: t("calendar.events.columns.start"), type: "datetime" as const },
+                      { key: "stop", label: t("calendar.events.columns.stop"), type: "datetime" as const },
+                      { key: "location", label: t("calendar.events.columns.location") },
+                      { key: "description", label: "Description" },
+                    ],
+                  },
+                ],
+              },
+            },
+          }
+        }
         if (tab.id === "calendar") {
           const uiEvents: UICalendarEvent[] = events.map((e) => ({
             id: String(e.id),
@@ -157,6 +183,7 @@ function CalendarClientLoaded({ initialEvents, organizationId }: CalendarClientL
                     })
                   }
                 }}
+                eventHref={(eventId) => calendarEventHref({ id: eventId })}
                 onDeleteEvent={(eventId) => {
                   if (confirm(t("calendar.confirmDelete"))) {
                     deleteCalendarEvent.mutate(eventId, {

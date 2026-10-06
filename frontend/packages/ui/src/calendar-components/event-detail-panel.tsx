@@ -1,5 +1,6 @@
 "use client"
 
+import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Clock, MapPin, Users } from "lucide-react"
@@ -13,9 +14,11 @@ interface EventDetailPanelProps {
   onClose: () => void
   onEdit?: () => void
   onDelete?: () => void
+  /** Where the event has a page of its own. */
+  openHref?: string
 }
 
-export function EventDetailPanel({ event, onClose, onEdit, onDelete }: EventDetailPanelProps) {
+export function EventDetailPanel({ event, onClose, onEdit, onDelete, openHref }: EventDetailPanelProps) {
   const { t, i18n } = useTranslation()
   const config = eventTypeConfig[event.type]
 
@@ -80,6 +83,18 @@ export function EventDetailPanel({ event, onClose, onEdit, onDelete }: EventDeta
             {t("calendar.eventDetail.delete")}
           </Button>
         </div>
+        {openHref ? (
+          <Button
+            size="sm"
+            variant="ghost"
+            className="mt-2 w-full"
+            nativeButton={false}
+            render={<Link href={openHref} />}
+            data-testid="calendar-event-open"
+          >
+            {t("calendar.eventDetail.open", { defaultValue: "Open" })}
+          </Button>
+        ) : null}
       </div>
     </div>
   )
