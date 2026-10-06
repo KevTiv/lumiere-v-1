@@ -15,6 +15,7 @@ import {
 } from "@lumiere/ui"
 import type { FormConfig } from "@lumiere/ui"
 import { messagesModuleConfig } from "@/lib/module-dashboard-configs"
+import { messageRecordHref } from "./message-record"
 import { MessageBatchesPanel } from "./message-batches-panel"
 import { useMessagesModuleSubscription } from "@/lib/module-subscription-hooks"
 import {
@@ -179,6 +180,29 @@ function MessagesClientLoaded({ initialMessages, initialFollowers, organizationI
           return {
             ...tab,
             customContent: <MessageBatchesPanel organizationId={organizationId} companyId={activeCompanyId != null ? BigInt(activeCompanyId) : 0n} contacts={contacts as Record<string, unknown>[]} invoices={accountMoves as Record<string, unknown>[]} />,
+          }
+        }
+        if (tab.id === "messages" || tab.id === "notifications") {
+          return {
+            ...tab,
+            recordSheet: {
+              titleKey: "body",
+              openHref: messageRecordHref,
+              detailConfig: {
+                mode: "detail" as const,
+                sections: [
+                  {
+                    id: "message",
+                    fields: [
+                      { key: "model", label: t("messages.messages.columns.model") },
+                      { key: "resId", label: t("messages.messages.columns.resId") },
+                      { key: "messageType", label: t("messages.messages.columns.messageType") },
+                      { key: "date", label: t("messages.messages.columns.date"), type: "datetime" as const },
+                    ],
+                  },
+                ],
+              },
+            },
           }
         }
         return tab

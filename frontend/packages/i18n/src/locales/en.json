@@ -9795,6 +9795,18 @@
       "description": "Chatter notifications for records you follow",
       "searchPlaceholder": "Search notifications…",
       "emptyMessage": "No notifications for you yet. Follow a record and post a note to receive updates."
+    },
+    "page": {
+      "backToMessages": "Back to messages",
+      "filedOn": "Filed on",
+      "inReplyTo": "In reply to",
+      "noReplies": "No replies yet.",
+      "notFound": "Message not found",
+      "notFoundHint": "It may have been deleted, or belong to another organization.",
+      "openReply": "Open",
+      "replies": "Replies",
+      "reply": "Reply",
+      "thread": "Replies"
     }
   },
   "pos": {
