@@ -26,3 +26,15 @@ export function formatFileSize(bytes: unknown): string {
   }
   return `${value.toFixed(value >= 10 ? 0 : 1)} ${units[unit]}`;
 }
+
+/** `update_document` params for a folder move; an empty choice is refused (the backend cannot clear a folder). */
+export function moveDocumentParams(folderValue: unknown): { folderId: string } | null {
+  const folderId = String(folderValue ?? '').trim();
+  return folderId ? { folderId } : null;
+}
+
+/** Trimmed legal-hold reason, or null when blank (the reducer requires one). */
+export function legalHoldReason(value: unknown): string | null {
+  const reason = String(value ?? '').trim();
+  return reason || null;
+}

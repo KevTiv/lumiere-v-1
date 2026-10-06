@@ -2,7 +2,7 @@
 
 import { useMemo } from "react"
 import { useTranslation } from "@lumiere/i18n"
-import { ModuleView, MissingOrganization, type EntityRow } from "@lumiere/ui"
+import { ModuleView, MissingOrganization, type EntityRow, type ModuleConfig } from "@lumiere/ui"
 import { fleetModuleConfig } from "@/lib/module-dashboard-configs"
 import { useFleetModuleSubscription } from "@/lib/module-subscription-hooks"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
@@ -13,7 +13,7 @@ import {
   useFleetServiceRecords,
   useFleetInspections,
 } from "@lumiere/query-hooks/hooks/fleet"
-import { fleetVehicleRecordHref } from "./fleet-record"
+import { fleetVehicleRecordHref, showVehicleNameColumn, withVehicleNames } from "./fleet-record"
 import { useFleetActions } from "./fleet-actions"
 import { useEmployees } from "@lumiere/query-hooks/hooks/hr/employees"
 import {
@@ -33,6 +33,18 @@ interface FleetClientProps {
 
 type FleetClientLoadedProps = Omit<FleetClientProps, "organizationId"> & {
   organizationId: number
+}
+
+const withVehicleNameColumn = <Tab extends ModuleConfig["tabs"][number]>(tab: Tab): Tab => {
+  const entityConfig = tab.entityConfig
+  if (!entityConfig || entityConfig.view.mode !== "table") return tab
+  return {
+    ...tab,
+    entityConfig: {
+      ...entityConfig,
+      view: { ...entityConfig.view, columns: showVehicleNameColumn(entityConfig.view.columns) },
+    },
+  }
 }
 
 function FleetClientLoaded({ initialVehicles, organizationId }: FleetClientLoadedProps) {
@@ -90,7 +102,9 @@ function FleetClientLoaded({ initialVehicles, organizationId }: FleetClientLoade
     () => ({
       ...moduleConfig,
       tabs: moduleConfig.tabs.map((tab) =>
-        tab.id === "fleet-vehicles"
+        tab.id === "fleet-service-records" || tab.id === "fleet-inspections"
+          ? withVehicleNameColumn(tab)
+          : tab.id === "fleet-vehicles"
           ? {
               ...tab,
               recordSheet: {
@@ -127,8 +141,8 @@ function FleetClientLoaded({ initialVehicles, organizationId }: FleetClientLoade
       data={{
         "fleet-vehicles": vehicleRows,
         "fleet-driver-assignment": vehicleRows,
-        "fleet-service-records": serviceRecordRows,
-        "fleet-inspections": inspectionRows,
+        "fleet-service-records": withVehicleNames(serviceRecordRows as unknown as EntityRow[], vehicleRows),
+        "fleet-inspections": withVehicleNames(inspectionRows as unknown as EntityRow[], vehicleRows),
       }}
       isPending={fleetActions.isPending}
       onFormSubmit={async (_tabId, action, formData) => {

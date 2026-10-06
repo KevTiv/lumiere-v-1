@@ -18,3 +18,28 @@ export function fleetEnumTag(value: unknown): string {
 export function rowsOfVehicle(rows: ReadonlyArray<Record<string, unknown>>, vehicleId: string): Record<string, unknown>[] {
   return rows.filter((row) => String(row.vehicle_id ?? row.vehicleId ?? '') === vehicleId);
 }
+
+/** Adds `vehicle_name` to service/inspection rows (falls back to `#id` when the vehicle is unknown). */
+export function withVehicleNames<T extends Record<string, unknown>>(
+  rows: ReadonlyArray<T>,
+  vehicles: ReadonlyArray<Record<string, unknown>>,
+): Array<T & { vehicle_name: string }> {
+  const names = new Map<string, string>();
+  for (const vehicle of vehicles) {
+    const name = String(vehicle.name ?? '').trim();
+    if (vehicle.id != null && name) names.set(String(vehicle.id), name);
+  }
+  return rows.map((row) => {
+    const id = String(row.vehicle_id ?? row.vehicleId ?? '');
+    return { ...row, vehicle_name: names.get(id) ?? (id ? `#${id}` : '') };
+  });
+}
+
+/** Swaps the numeric `vehicle_id` column of a table config for the text `vehicle_name` column. */
+export function showVehicleNameColumn<C extends { key: string; type?: string; align?: string }>(columns: ReadonlyArray<C>): C[] {
+  return columns.map((column) => {
+    if (column.key !== 'vehicle_id') return column;
+    const { type: _type, align: _align, ...rest } = column;
+    return { ...rest, key: 'vehicle_name' } as C;
+  });
+}

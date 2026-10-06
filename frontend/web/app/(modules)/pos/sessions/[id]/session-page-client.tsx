@@ -19,6 +19,9 @@ import {
   RecordPage,
   StatusBar,
   buildModuleTabHref,
+  mergeFieldDefaultValues,
+  mergeSelectOptionsForFields,
+  posFormConfigs,
   type FormConfig,
 } from '@lumiere/ui';
 import { Badge } from '@lumiere/ui/components/badge';
@@ -27,6 +30,7 @@ import { showWorkflowToast } from '@lumiere/ui/lib/workflow-toast';
 import {
   useClosePosSession,
   useComputePosSessionTotals,
+  useOpenPosSession,
   usePosConfigs,
   usePosSessions,
 } from '@lumiere/query-hooks/hooks/pos';
@@ -73,8 +77,11 @@ function PosSessionPageLoaded({
   const { data: configs = [] } = usePosConfigs(orgId, initialConfigs);
   const closeSession = useClosePosSession(orgId, operatingCompanyId);
   const computeTotals = useComputePosSessionTotals(orgId);
+  const openSession = useOpenPosSession(orgId);
 
   const [closing, setClosing] = useState(false);
+  const [opening, setOpening] = useState(false);
+  const [openError, setOpenError] = useState<string | null>(null);
   const [closeError, setCloseError] = useState<string | null>(null);
 
   const session = useMemo(
@@ -158,6 +165,14 @@ function PosSessionPageLoaded({
     ],
   };
 
+  const configId = String(session.configId ?? session.config_id ?? '');
+  const openForm: FormConfig = mergeFieldDefaultValues(
+    mergeSelectOptionsForFields(posFormConfigs(t).openSession, {
+      configId: [{ value: configId, label: configName || configId }],
+    }),
+    { configId },
+  );
+
   const detailConfig = {
     mode: 'detail' as const,
     sections: [
@@ -215,6 +230,10 @@ function PosSessionPageLoaded({
                 {t('pos.admin.forms.closeSession.title')}
               </Button>
             </>
+          ) : configId ? (
+            <Button variant="outline" size="sm" data-testid="pos-session-open-new" onClick={() => setOpening(true)}>
+              {t('pos.session.openNew', { defaultValue: 'Open a new session' })}
+            </Button>
           ) : undefined
         }
         activeTab={activeTab}
@@ -241,6 +260,31 @@ function PosSessionPageLoaded({
           },
         ]}
       />
+
+      {opening ? (
+        <FormModal
+          open
+          onOpenChange={(next) => {
+            if (!next) {
+              setOpening(false);
+              setOpenError(null);
+            }
+          }}
+          config={openForm}
+          isPending={openSession.isPending}
+          closeOnSubmit={false}
+          submitError={openError}
+          onSubmit={async (formData) => {
+            setOpenError(null);
+            try {
+              await openSession.mutateAsync({ configId, openingBalance: Number(formData.openingBalance) || 0 });
+              setOpening(false);
+            } catch (error) {
+              setOpenError(error instanceof Error ? error.message : String(error));
+            }
+          }}
+        />
+      ) : null}
 
       {closing ? (
         <FormModal

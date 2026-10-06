@@ -24,6 +24,7 @@ import {
   buildModuleTabHref,
   stockMovesTableConfig,
   transferDetailConfig,
+  transfersTableConfig,
   transferStatusBadges,
 } from '@lumiere/ui';
 import {
@@ -47,6 +48,7 @@ import { useWorkflowSurface } from '@/hooks/use-workflow-surface';
 import { useInventoryModuleSubscription } from '@/lib/module-subscription-hooks';
 import { hasValidOrganizationId, orgBigInts } from '@/lib/org-scoped';
 import { RecordDocumentAttachments } from '../../../../../components/record-document-attachments';
+import { transferBackorders } from '../../transfer-record';
 import { transferStatusBar } from '../../transfer-status';
 
 interface TransferPageClientProps {
@@ -66,7 +68,7 @@ const PRIMARY_ACTION_IDS: ReadonlySet<string> = new Set([
   'inventory.picking.confirm',
 ]);
 
-const TAB_IDS = ['overview', 'moves', 'discussion', 'audit'] as const;
+const TAB_IDS = ['overview', 'moves', 'backorders', 'discussion', 'audit'] as const;
 type TabId = (typeof TAB_IDS)[number];
 
 export function TransferPageClient(props: TransferPageClientProps) {
@@ -120,6 +122,10 @@ function TransferPageLoaded({
   const transferMoves = useMemo(
     () => (moves as unknown as Row[]).filter((move) => String(move.pickingId ?? move.picking_id) === transferId),
     [moves, transferId],
+  );
+  const backorders = useMemo(
+    () => transferBackorders(transfer ?? {}, pickings as unknown as Row[]),
+    [transfer, pickings],
   );
   const locationLabelById = useMemo(() => {
     const map = new Map<string, string>();
@@ -237,6 +243,7 @@ function TransferPageLoaded({
     ),
   };
   const movesConfig = stockMovesTableConfig(t);
+  const backordersConfig = transfersTableConfig(t);
 
   return (
     <>
@@ -289,6 +296,17 @@ function TransferPageLoaded({
                     },
                   ]
                 : []),
+              ...(backorders.length > 0
+                ? [
+                    {
+                      id: 'backorders',
+                      label: t('inventory.transfers.backorders', { defaultValue: 'Backorders' }),
+                      count: backorders.length,
+                      icon: <ArrowLeftRight className="h-4 w-4" />,
+                      onClick: () => setActiveTab('backorders'),
+                    },
+                  ]
+                : []),
               ...(backorderId != null
                 ? [
                     {
@@ -325,6 +343,18 @@ function TransferPageLoaded({
             label: t('inventory.stockMoves.title'),
             content: (
               <EntityView config={{ ...movesConfig, title: '', description: undefined }} data={transferMoves} useCard={false} />
+            ),
+          },
+          {
+            id: 'backorders',
+            label: t('inventory.transfers.backorders', { defaultValue: 'Backorders' }),
+            content: (
+              <EntityView
+                config={{ ...backordersConfig, title: '', description: undefined }}
+                data={backorders}
+                useCard={false}
+                onRowClick={(row) => router.push(`/inventory/transfers/${String((row as Row).id)}`)}
+              />
             ),
           },
           {

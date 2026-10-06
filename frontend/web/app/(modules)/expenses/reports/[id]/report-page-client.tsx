@@ -51,6 +51,8 @@ import { accountMoveHref } from '@lumiere/erp-shared/record-links';
 import { expenseVariantTag, mapExpenseRow, mapExpenseSheetRow } from '@/lib/expense-state';
 import { useExpensesModuleSubscription } from '@/lib/module-subscription-hooks';
 import { hasValidOrganizationId, orgBigInts } from '@/lib/org-scoped';
+import { financeKindsFor } from '../../expense-report-finance';
+import { useExpenseReportFinance } from '../../expense-report-finance-dialogs';
 import { expenseReportStatusBar, expensesOfReport, reportMoveIds } from '../../expense-report';
 
 interface ExpenseReportPageClientProps {
@@ -96,6 +98,8 @@ function ExpenseReportPageLoaded({
   const submitSheet = useSubmitExpenseSheet(orgId, operatingCompanyId);
   const approveSheet = useApproveExpenseSheet(orgId, operatingCompanyId);
   const refuseSheet = useRefuseExpenseSheet(orgId);
+
+  const finance = useExpenseReportFinance(orgId, operatingCompanyId);
 
   const [confirm, setConfirm] = useState<Confirm | null>(null);
   const [reason, setReason] = useState('');
@@ -197,7 +201,8 @@ function ExpenseReportPageLoaded({
     }
   };
 
-  const busy = submitSheet.isPending || approveSheet.isPending || refuseSheet.isPending;
+  const busy = submitSheet.isPending || approveSheet.isPending || refuseSheet.isPending || finance.isPending;
+  const financeKinds = financeKindsFor(sheet.state);
 
   return (
     <>
@@ -255,20 +260,18 @@ function ExpenseReportPageLoaded({
                 </Button>
               </>
             ) : null}
-            {state === 'Approved' || state === 'Posted' ? (
+            {financeKinds.map((kind) => (
               <Button
-                variant="outline"
+                key={kind}
                 size="sm"
-                nativeButton={false}
-                render={<Link href={buildModuleTabHref('expenses', 'expense-sheets')} />}
-                data-testid="expense-report-more-in-list"
-                title={t('expenses.page.moreInListHint', {
-                  defaultValue: 'Posting, reimbursing and rebilling ask for details and are done from the list.',
-                })}
+                variant={kind === 'projectRebill' ? 'outline' : 'default'}
+                disabled={busy}
+                data-testid={`expense-report-${kind === 'postReport' ? 'post' : kind === 'reimburseReport' ? 'reimburse' : 'rebill'}`}
+                onClick={() => finance.open(kind, sheet)}
               >
-                {t('expenses.page.moreInList', { defaultValue: 'Post or reimburse in the list' })}
+                {t(`expenses.workflow.${kind}`)}
               </Button>
-            ) : null}
+            ))}
           </>
         }
         activeTab={activeTab}
@@ -332,6 +335,8 @@ function ExpenseReportPageLoaded({
           },
         ]}
       />
+
+      {finance.modal}
 
       <AlertDialog open={confirm != null} onOpenChange={(open) => !open && setConfirm(null)}>
         <AlertDialogContent data-testid="expense-report-confirm">

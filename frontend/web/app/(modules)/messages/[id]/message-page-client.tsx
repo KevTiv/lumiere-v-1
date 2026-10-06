@@ -22,10 +22,12 @@ import {
 } from '@lumiere/ui';
 import { Badge } from '@lumiere/ui/components/badge';
 import { Skeleton } from '@lumiere/ui/components/skeleton';
+import { useUsers } from '@lumiere/query-hooks/hooks/crm';
 import { useMailMessages, usePostMessage, type MailMessage } from '@lumiere/query-hooks/hooks/messages';
 import { useMessagesModuleSubscription } from '@/lib/module-subscription-hooks';
 import { hasValidOrganizationId, orgBigInts } from '@/lib/org-scoped';
 import {
+  messageAuthorName,
   messageKind,
   messageRecordPageHref,
   messageTitle,
@@ -64,6 +66,7 @@ function MessagePageLoaded({
   const { orgId } = orgBigInts(organizationId);
 
   const { data: messages = [], isLoading } = useMailMessages(orgId, initialMessages);
+  const { data: users = [] } = useUsers(orgId);
   const postMessage = usePostMessage(orgId);
 
   const [replying, setReplying] = useState(false);
@@ -126,6 +129,8 @@ function MessagePageLoaded({
 
   const title = messageTitle(message);
   const kind = messageKind(message);
+  const authorOf = (row: Row) => messageAuthorName(row, users as unknown as Row[]);
+  const author = authorOf(message);
   const parentId = optionalId(message.parentId ?? message.parent_id);
   const recordHref = messageRecordPageHref(message);
   const when = new Date(Number(message.date ?? 0) / 1000).toLocaleString(i18n.language);
@@ -172,7 +177,7 @@ function MessagePageLoaded({
           { label: title },
         ]}
         title={title}
-        subtitle={`${when} · ${model} #${resId}`}
+        subtitle={[author, when, `${model} #${resId}`].filter(Boolean).join(' · ')}
         badge={<Badge variant="secondary">{kind}</Badge>}
         navigation={navigation}
         smartButtons={
@@ -244,7 +249,9 @@ function MessagePageLoaded({
                   {replies.map((reply) => (
                     <li key={String(reply.id)} className="rounded-md border bg-muted/20 px-3 py-2 text-sm">
                       <div className="mb-1 flex items-center justify-between gap-2 text-xs text-muted-foreground">
-                        <span className="uppercase">{messageKind(reply)}</span>
+                        <span>
+                          {[authorOf(reply), messageKind(reply)].filter(Boolean).join(' · ')}
+                        </span>
                         <span>{new Date(Number(reply.date ?? 0) / 1000).toLocaleString(i18n.language)}</span>
                       </div>
                       <p className="whitespace-pre-wrap break-words">{String(reply.body ?? '')}</p>

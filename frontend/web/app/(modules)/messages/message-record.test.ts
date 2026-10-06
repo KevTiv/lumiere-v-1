@@ -39,3 +39,14 @@ test('the message type reads as a lower-case word', () => {
   assert.equal(messageKind({ messageType: { tag: 'Comment' } }), 'comment');
   assert.equal(messageKind({}), 'message');
 });
+
+import { messageAuthorName } from './message-record';
+
+test('an author reads as the matching user name, else a short identity', () => {
+  const users = [{ id: 'ABCDEF0123456789', name: 'Ada' }, { id: 'ff00', email: 'bo@x.io' }];
+
+  assert.equal(messageAuthorName({ authorId: '0xabcdef0123456789' }, users), 'Ada');
+  assert.equal(messageAuthorName({ author_id: 'ff00' }, users), 'bo@x.io');
+  assert.equal(messageAuthorName({ authorId: '1234567890abcdef' }, users), '12345678…');
+  assert.equal(messageAuthorName({}, users), '');
+});

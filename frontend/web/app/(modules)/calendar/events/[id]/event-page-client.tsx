@@ -42,7 +42,17 @@ import {
 } from '@lumiere/query-hooks/hooks/calendar';
 import { useCalendarModuleSubscription } from '@/lib/module-subscription-hooks';
 import { hasValidOrganizationId, orgBigInts } from '@/lib/org-scoped';
-import { eventInputValue, eventMicros, eventStatusBar, updateCalendarEventParams } from '../../calendar-event';
+import { useContacts } from '@lumiere/query-hooks/hooks/crm';
+import {
+  eventAttendees,
+  eventInputValue,
+  eventMicros,
+  eventStateActions,
+  eventStateParams,
+  eventStateTag,
+  eventStatusBar,
+  updateCalendarEventParams,
+} from '../../calendar-event';
 
 interface CalendarEventPageClientProps {
   eventId: string;
@@ -75,12 +85,14 @@ function CalendarEventPageLoaded({
   const { orgId } = orgBigInts(organizationId);
 
   const { data: events = [], isLoading } = useCalendarEvents(orgId, initialEvents);
+  const { data: contacts = [] } = useContacts(orgId);
   const updateEvent = useUpdateCalendarEvent(orgId);
   const deleteEvent = useDeleteCalendarEvent(orgId);
 
   const [editing, setEditing] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [confirmCancel, setConfirmCancel] = useState(false);
 
   const event = useMemo(
     () => (events as unknown as Row[]).find((row) => String(row.id) === eventId),
@@ -141,6 +153,16 @@ function CalendarEventPageLoaded({
   const id = BigInt(eventId);
   const label = String(event.name || '').trim() || `#${eventId}`;
   const status = eventStatusBar(event, t);
+  const stateActions = eventStateActions(event);
+  const attendees = eventAttendees(event, contacts as unknown as Row[]);
+  const changeState = (state: 'confirmed' | 'cancelled', title: string) =>
+    updateEvent.mutate(
+      { eventId: id, params: eventStateParams(state) },
+      {
+        onSuccess: () => showWorkflowToast({ kind: 'success', title, description: label }),
+        onError: (error) => showWorkflowToast({ kind: 'error', title, description: error.message }),
+      },
+    );
   const when = (value: unknown) => new Date(eventMicros(value) / 1000).toLocaleString(i18n.language);
   const subtitle = event.allday
     ? `${new Date(eventMicros(event.start) / 1000).toLocaleDateString(i18n.language)} · ${t('calendar.events.columns.allday')}`
@@ -184,9 +206,30 @@ function CalendarEventPageLoaded({
         navigation={navigation}
         actions={
           <>
-            <Button size="sm" data-testid="calendar-event-edit" onClick={() => setEditing(true)}>
+            {stateActions.confirm ? (
+              <Button
+                size="sm"
+                disabled={updateEvent.isPending}
+                data-testid="calendar-event-confirm"
+                onClick={() => changeState('confirmed', t('calendar.eventDetail.confirm', { defaultValue: 'Confirm event' }))}
+              >
+                {t('calendar.eventDetail.confirm', { defaultValue: 'Confirm event' })}
+              </Button>
+            ) : null}
+            <Button variant={stateActions.confirm ? 'outline' : 'default'} size="sm" data-testid="calendar-event-edit" onClick={() => setEditing(true)}>
               {t('calendar.eventDetail.edit')}
             </Button>
+            {stateActions.cancel ? (
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={updateEvent.isPending}
+                data-testid="calendar-event-cancel"
+                onClick={() => setConfirmCancel(true)}
+              >
+                {t('calendar.eventDetail.cancel', { defaultValue: 'Cancel event' })}
+              </Button>
+            ) : null}
             <Button
               variant="outline"
               size="sm"
@@ -204,7 +247,27 @@ function CalendarEventPageLoaded({
           {
             id: 'overview',
             label: t('common.overview', { defaultValue: 'Overview' }),
-            content: <EntityDetail config={detailConfig} data={event} />,
+            content: (
+              <div className="space-y-6">
+                <EntityDetail config={detailConfig} data={event} />
+                <section data-testid="calendar-event-attendees" className="space-y-2">
+                  <h3 className="text-sm font-medium">{t('calendar.eventDetail.attendees', { defaultValue: 'Attendees' })}</h3>
+                  {attendees.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">
+                      {t('calendar.eventDetail.noAttendees', { defaultValue: 'No attendees' })}
+                    </p>
+                  ) : (
+                    <div className="flex flex-wrap gap-2">
+                      {attendees.map((attendee) => (
+                        <Badge key={attendee.id} variant="secondary">
+                          {attendee.label}
+                        </Badge>
+                      ))}
+                    </div>
+                  )}
+                </section>
+              </div>
+            ),
           },
           {
             id: 'discussion',
@@ -246,7 +309,7 @@ function CalendarEventPageLoaded({
           submitError={editError}
           onSubmit={async (formData) => {
             setEditError(null);
-            const params = updateCalendarEventParams(formData);
+            const params = updateCalendarEventParams(formData, eventStateTag(event) || 'confirmed');
             if (!params) {
               setEditError(t('common.validation.required'));
               return;
@@ -260,6 +323,26 @@ function CalendarEventPageLoaded({
           }}
         />
       ) : null}
+
+      <AlertDialog open={confirmCancel} onOpenChange={setConfirmCancel}>
+        <AlertDialogContent data-testid="calendar-event-cancel-confirm">
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t('calendar.eventDetail.cancelConfirm', { defaultValue: 'Cancel this event?' })}</AlertDialogTitle>
+            <AlertDialogDescription>{label}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t('erpWorkflow.confirm.dismiss')}</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                setConfirmCancel(false);
+                changeState('cancelled', t('calendar.eventDetail.cancel', { defaultValue: 'Cancel event' }));
+              }}
+            >
+              {t('calendar.eventDetail.cancel', { defaultValue: 'Cancel event' })}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
         <AlertDialogContent data-testid="calendar-event-delete-confirm">

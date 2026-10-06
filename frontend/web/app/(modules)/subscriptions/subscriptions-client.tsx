@@ -11,15 +11,7 @@ import {
   newSubscriptionPlanForm,
   newDeferredRevenueScheduleForm,
   newRevenueRecognitionRuleForm,
-  closeSubscriptionForm,
-  generateSubscriptionInvoiceForm,
-  paySubscriptionInvoiceForm,
-  amendSubscriptionForm,
-  renewSubscriptionForm,
-  cancelSubscriptionForm,
-  ingestSubscriptionUsageEventForm,
   createSubscriptionPriceTierForm,
-  setSubscriptionCommitmentForm,
   recognizeDeferredRevenueLineForm,
   importSubscriptionPlanCsvForm,
   importSubscriptionCsvForm,
@@ -67,31 +59,16 @@ import {
   useSubscriptionUsageCharges,
   useSubscriptionRatingBacklog,
   useSubscriptionPriceTiers,
-  useIngestSubscriptionUsageEvent,
-  useRateSubscriptionUsageEvents,
   useCreateSubscriptionPriceTier,
-  useSetSubscriptionCommitment,
   useSubscriptionPastDue,
   useSubscriptionDueToBill,
   useSubscriptionEntitlements,
   useSubscriptionPaymentIntents,
-  useAdvanceSubscriptionDunning,
-  useRecordSubscriptionPaymentFailure,
-  useRefreshSubscriptionExceptionFlags,
   useCreateSubscription,
   useCreateSubscriptionPlan,
   useDeferredRevenueSchedules,
   useDeferredRevenueLines,
   useRevenueRecognitionRules,
-  useActivateSubscription,
-  useCloseSubscription,
-  useGenerateSubscriptionInvoice,
-  usePaySubscriptionInvoice,
-  useAmendSubscription,
-  usePauseSubscription,
-  useResumeSubscription,
-  useRenewSubscription,
-  useCancelSubscription,
   useCreateDeferredRevenueSchedule,
   useRecognizeDeferredRevenue,
   useCreateRevenueRecognitionRule,
@@ -110,20 +87,14 @@ import {
   toCreateSubscriptionPlanParams,
 } from "@/lib/subscriptions-create-params"
 import {
-  buildCloseSubscriptionParams,
   buildCreateDeferredRevenueScheduleParams,
   buildCreateRevenueRecognitionRuleParams,
-  buildGenerateSubscriptionInvoiceParams,
-  buildPaySubscriptionInvoiceParams,
-  buildAmendSubscriptionParams,
-  buildRenewSubscriptionParams,
-  buildCancelSubscriptionParams,
-  buildIngestSubscriptionUsageEventParams,
   buildCreateSubscriptionPriceTierParams,
-  buildSetSubscriptionCommitmentParams,
   buildRecognizeDeferredRevenueParams,
 } from "@/lib/subscriptions-revenue-params"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
+import { isSubscriptionActionApplicable, type SubscriptionActionId } from "./subscription-actions"
+import { useSubscriptionActions, type SubscriptionDialogAction } from "./use-subscription-actions"
 import { useDefaultOperatingCompanyBigInt } from "@lumiere/query-hooks/hooks/use-operating-company"
 import { useSaleOrders, usePricelists, type SaleOrder, type ProductPricelist } from "@lumiere/query-hooks/hooks/sales"
 import { useProducts } from "@lumiere/query-hooks/hooks/inventory"
@@ -217,14 +188,6 @@ function SubscriptionsClientLoaded({
   const [quickActionForm, setQuickActionForm] = useState<{ form: FormConfig; action: string } | null>(
     null,
   )
-  const [closeTargetId, setCloseTargetId] = useState<number | null>(null)
-  const [generateTargetId, setGenerateTargetId] = useState<number | null>(null)
-  const [payTargetId, setPayTargetId] = useState<number | null>(null)
-  const [amendTargetId, setAmendTargetId] = useState<number | null>(null)
-  const [renewTargetId, setRenewTargetId] = useState<number | null>(null)
-  const [cancelTargetId, setCancelTargetId] = useState<number | null>(null)
-  const [ingestUsageTargetId, setIngestUsageTargetId] = useState<number | null>(null)
-  const [commitmentTargetId, setCommitmentTargetId] = useState<number | null>(null)
   const [recognizeLineId, setRecognizeLineId] = useState<number | null>(null)
   const [recognizeMoveId, setRecognizeMoveId] = useState("")
 
@@ -256,22 +219,8 @@ function SubscriptionsClientLoaded({
 
   const createSubscription = useCreateSubscription(orgId, operatingCompanyId)
   const createPlan = useCreateSubscriptionPlan(orgId, operatingCompanyId)
-  const activateSubscription = useActivateSubscription(orgId, operatingCompanyId)
-  const closeSubscription = useCloseSubscription(orgId, operatingCompanyId)
-  const generateInvoice = useGenerateSubscriptionInvoice(orgId, operatingCompanyId)
-  const paySubscriptionInvoice = usePaySubscriptionInvoice(orgId, operatingCompanyId)
-  const amendSubscription = useAmendSubscription(orgId, operatingCompanyId)
-  const pauseSubscription = usePauseSubscription(orgId, operatingCompanyId)
-  const resumeSubscription = useResumeSubscription(orgId, operatingCompanyId)
-  const renewSubscription = useRenewSubscription(orgId, operatingCompanyId)
-  const cancelSubscription = useCancelSubscription(orgId, operatingCompanyId)
-  const ingestUsage = useIngestSubscriptionUsageEvent(orgId, operatingCompanyId)
-  const rateUsage = useRateSubscriptionUsageEvents(orgId, operatingCompanyId)
+  const subscriptionActions = useSubscriptionActions(orgId, operatingCompanyId)
   const createPriceTier = useCreateSubscriptionPriceTier(orgId, operatingCompanyId)
-  const setCommitment = useSetSubscriptionCommitment(orgId, operatingCompanyId)
-  const advanceDunning = useAdvanceSubscriptionDunning(orgId, operatingCompanyId)
-  const recordPaymentFailure = useRecordSubscriptionPaymentFailure(orgId, operatingCompanyId)
-  const refreshExceptionFlags = useRefreshSubscriptionExceptionFlags(orgId, operatingCompanyId)
   const createDeferredSchedule = useCreateDeferredRevenueSchedule(orgId, operatingCompanyId)
   const recognizeDeferred = useRecognizeDeferredRevenue(orgId, operatingCompanyId)
   const createRecognitionRule = useCreateRevenueRecognitionRule(orgId, operatingCompanyId)
@@ -281,24 +230,10 @@ function SubscriptionsClientLoaded({
   const importSubscriptionCsv = useImportSubscriptionCsv(orgId, operatingCompanyId)
 
   const isFormMutationPending =
+    subscriptionActions.pending ||
     createSubscription.isPending ||
     createPlan.isPending ||
-    activateSubscription.isPending ||
-    closeSubscription.isPending ||
-    generateInvoice.isPending ||
-    paySubscriptionInvoice.isPending ||
-    amendSubscription.isPending ||
-    pauseSubscription.isPending ||
-    resumeSubscription.isPending ||
-    renewSubscription.isPending ||
-    cancelSubscription.isPending ||
-    ingestUsage.isPending ||
-    rateUsage.isPending ||
     createPriceTier.isPending ||
-    setCommitment.isPending ||
-    advanceDunning.isPending ||
-    recordPaymentFailure.isPending ||
-    refreshExceptionFlags.isPending ||
     createDeferredSchedule.isPending ||
     recognizeDeferred.isPending ||
     createRecognitionRule.isPending ||
@@ -418,239 +353,64 @@ function SubscriptionsClientLoaded({
   const importSubscriptionCsvFormConfig = useMemo(() => importSubscriptionCsvForm(t), [t])
 
   const subscriptionRowActions = useMemo((): EntityAction[] => {
+    const gate = (id: SubscriptionActionId) => (rows: Record<string, unknown>[]) =>
+      rows.every((row) => isSubscriptionActionApplicable(id, subscriptionState(row)))
+    const direct = (
+      id: string,
+      action: Exclude<SubscriptionActionId, SubscriptionDialogAction>,
+      label: string,
+      icon: EntityAction["icon"],
+      opts: { gated?: boolean; toast?: boolean } = {},
+    ): EntityAction => ({
+      id,
+      label,
+      icon,
+      variant: "outline",
+      requiresSelection: true,
+      ...(opts.gated === false ? {} : { isApplicable: gate(action) }),
+      ...(opts.toast === false ? {} : { successMessage: t("common.actionCompleted", { action: label }) }),
+      onClick: async (rows) => {
+        const r = rows[0]
+        if (!r || (opts.gated !== false && !isSubscriptionActionApplicable(action, subscriptionState(r)))) return
+        await subscriptionActions.runDirect(action, BigInt(String(r.id)))
+      },
+    })
+    const dialog = (
+      id: string,
+      action: SubscriptionDialogAction,
+      label: string,
+      icon: EntityAction["icon"],
+    ): EntityAction => ({
+      id,
+      label,
+      icon,
+      variant: "outline",
+      requiresSelection: true,
+      isApplicable: gate(action),
+      onClick: (rows) => {
+        const r = rows[0]
+        if (!r || !isSubscriptionActionApplicable(action, subscriptionState(r))) return
+        subscriptionActions.openDialog(action, Number(r.id))
+      },
+    })
     return [
-      {
-        id: "activate-sub",
-        label: t("subscriptions.actions.activate"),
-        icon: PlayCircle,
-        variant: "outline",
-        requiresSelection: true,
-        isApplicable: (rows) => rows.every((row) => subscriptionState(row) === "draft"),
-        successMessage: t("common.actionCompleted", { action: t("subscriptions.actions.activate") }),
-        onClick: async (rows) => {
-          const r = rows[0]
-          if (!r || subscriptionState(r) !== "draft") return
-          await activateSubscription.mutateAsync({ subscriptionId: BigInt(String(r.id)) })
-        },
-      },
-      {
-        id: "close-sub",
-        label: t("subscriptions.actions.close"),
-        icon: XCircle,
-        variant: "outline",
-        requiresSelection: true,
-        isApplicable: (rows) => rows.every((row) => subscriptionState(row) !== "closed"),
-        onClick: (rows) => {
-          const r = rows[0]
-          if (!r) return
-          if (subscriptionState(r) === "closed") return
-          setCloseTargetId(Number(r.id))
-        },
-      },
-      {
-        id: "gen-inv",
-        label: t("subscriptions.actions.generateInvoice"),
-        icon: FileText,
-        variant: "outline",
-        requiresSelection: true,
-        isApplicable: (rows) => rows.every((row) => subscriptionState(row) === "active"),
-        onClick: (rows) => {
-          const r = rows[0]
-          if (!r) return
-          if (subscriptionState(r) !== "active") return
-          setGenerateTargetId(Number(r.id))
-        },
-      },
-      {
-        id: "pay-inv",
-        label: t("subscriptions.actions.payInvoice", { defaultValue: "Apply payment" }),
-        icon: CheckCircle2,
-        variant: "outline",
-        requiresSelection: true,
-        isApplicable: (rows) => rows.every((row) => subscriptionState(row) === "active"),
-        onClick: (rows) => {
-          const r = rows[0]
-          if (!r) return
-          if (subscriptionState(r) !== "active") return
-          setPayTargetId(Number(r.id))
-        },
-      },
-      {
-        id: "amend-sub",
-        label: t("subscriptions.actions.amend", { defaultValue: "Amend" }),
-        icon: Pencil,
-        variant: "outline",
-        requiresSelection: true,
-        isApplicable: (rows) => rows.every((row) => ["active", "paused"].includes(subscriptionState(row))),
-        onClick: (rows) => {
-          const r = rows[0]
-          if (!r) return
-          const state = subscriptionState(r)
-          if (state !== "active" && state !== "paused") return
-          setAmendTargetId(Number(r.id))
-        },
-      },
-      {
-        id: "pause-sub",
-        label: t("subscriptions.actions.pause", { defaultValue: "Pause" }),
-        icon: PauseCircle,
-        variant: "outline",
-        requiresSelection: true,
-        isApplicable: (rows) => rows.every((row) => subscriptionState(row) === "active"),
-        successMessage: t("common.actionCompleted", { action: t("subscriptions.actions.pause", { defaultValue: "Pause" }) }),
-        onClick: async (rows) => {
-          const r = rows[0]
-          if (!r || subscriptionState(r) !== "active") return
-          await pauseSubscription.mutateAsync({
-            subscriptionId: BigInt(String(r.id)),
-          })
-        },
-      },
-      {
-        id: "resume-sub",
-        label: t("subscriptions.actions.resume", { defaultValue: "Resume" }),
-        icon: PlayCircle,
-        variant: "outline",
-        requiresSelection: true,
-        isApplicable: (rows) => rows.every((row) => subscriptionState(row) === "paused"),
-        successMessage: t("common.actionCompleted", { action: t("subscriptions.actions.resume", { defaultValue: "Resume" }) }),
-        onClick: async (rows) => {
-          const r = rows[0]
-          if (!r || subscriptionState(r) !== "paused") return
-          await resumeSubscription.mutateAsync({
-            subscriptionId: BigInt(String(r.id)),
-          })
-        },
-      },
-      {
-        id: "renew-sub",
-        label: t("subscriptions.actions.renew", { defaultValue: "Renew" }),
-        icon: RefreshCw,
-        variant: "outline",
-        requiresSelection: true,
-        isApplicable: (rows) => rows.every((row) => ["active", "paused"].includes(subscriptionState(row))),
-        onClick: (rows) => {
-          const r = rows[0]
-          if (!r) return
-          const state = subscriptionState(r)
-          if (state !== "active" && state !== "paused") return
-          setRenewTargetId(Number(r.id))
-        },
-      },
-      {
-        id: "cancel-sub",
-        label: t("subscriptions.actions.cancel", { defaultValue: "Cancel + credit" }),
-        icon: XCircle,
-        variant: "outline",
-        requiresSelection: true,
-        isApplicable: (rows) => rows.every((row) => subscriptionState(row) !== "closed"),
-        onClick: (rows) => {
-          const r = rows[0]
-          if (!r || subscriptionState(r) === "closed") return
-          setCancelTargetId(Number(r.id))
-        },
-      },
-      {
-        id: "ingest-usage",
-        label: t("subscriptions.actions.ingestUsage", { defaultValue: "Ingest usage" }),
-        icon: Activity,
-        variant: "outline",
-        requiresSelection: true,
-        isApplicable: (rows) => rows.every((row) => subscriptionState(row) !== "closed"),
-        onClick: (rows) => {
-          const r = rows[0]
-          if (!r || subscriptionState(r) === "closed") return
-          setIngestUsageTargetId(Number(r.id))
-        },
-      },
-      {
-        id: "rate-usage",
-        label: t("subscriptions.actions.rateUsage", { defaultValue: "Rate usage" }),
-        icon: Gauge,
-        variant: "outline",
-        requiresSelection: true,
-        successMessage: t("common.actionCompleted", { action: t("subscriptions.actions.rateUsage", { defaultValue: "Rate usage" }) }),
-        onClick: async (rows) => {
-          const r = rows[0]
-          if (!r) return
-          await rateUsage.mutateAsync({
-            subscriptionId: BigInt(String(r.id)),
-            params: { limit: 100 },
-          })
-        },
-      },
-      {
-        id: "set-commitment",
-        label: t("subscriptions.actions.setCommitment", { defaultValue: "Set commitment" }),
-        icon: CheckCircle2,
-        variant: "outline",
-        requiresSelection: true,
-        isApplicable: (rows) => rows.every((row) => subscriptionState(row) !== "closed"),
-        onClick: (rows) => {
-          const r = rows[0]
-          if (!r || subscriptionState(r) === "closed") return
-          setCommitmentTargetId(Number(r.id))
-        },
-      },
-      {
-        id: "record-failure",
-        label: t("subscriptions.actions.recordFailure", { defaultValue: "Record payment fail" }),
-        icon: AlertTriangle,
-        variant: "outline",
-        requiresSelection: true,
-        isApplicable: (rows) => rows.every((row) => subscriptionState(row) !== "closed"),
-        successMessage: t("common.actionCompleted", { action: t("subscriptions.actions.recordFailure", { defaultValue: "Record payment fail" }) }),
-        onClick: async (rows) => {
-          const r = rows[0]
-          if (!r || subscriptionState(r) === "closed") return
-          await recordPaymentFailure.mutateAsync({
-            subscriptionId: BigInt(String(r.id)),
-            params: { reason: "manual", pastDueDays: 1 },
-          })
-        },
-      },
-      {
-        id: "advance-dunning",
-        label: t("subscriptions.actions.advanceDunning", { defaultValue: "Advance dunning" }),
-        icon: Shield,
-        variant: "outline",
-        requiresSelection: true,
-        successMessage: t("common.actionCompleted", { action: t("subscriptions.actions.advanceDunning", { defaultValue: "Advance dunning" }) }),
-        onClick: async (rows) => {
-          const r = rows[0]
-          if (!r) return
-          await advanceDunning.mutateAsync({
-            subscriptionId: BigInt(String(r.id)),
-            params: {},
-          })
-        },
-      },
-      {
-        id: "refresh-flags",
-        label: t("subscriptions.actions.refreshFlags", { defaultValue: "Refresh exception flags" }),
-        icon: RefreshCw,
-        variant: "outline",
-        requiresSelection: true,
-        successMessage: t("common.actionCompleted", { action: t("subscriptions.actions.refreshFlags", { defaultValue: "Refresh exception flags" }) }),
-        onClick: async (rows) => {
-          const r = rows[0]
-          if (!r) return
-          await refreshExceptionFlags.mutateAsync({
-            subscriptionId: BigInt(String(r.id)),
-          })
-        },
-      },
+      direct("activate-sub", "activate", t("subscriptions.actions.activate"), PlayCircle, { toast: true }),
+      dialog("close-sub", "close", t("subscriptions.actions.close"), XCircle),
+      dialog("gen-inv", "generate-invoice", t("subscriptions.actions.generateInvoice"), FileText),
+      dialog("pay-inv", "pay-invoice", t("subscriptions.actions.payInvoice", { defaultValue: "Apply payment" }), CheckCircle2),
+      dialog("amend-sub", "amend", t("subscriptions.actions.amend", { defaultValue: "Amend" }), Pencil),
+      direct("pause-sub", "pause", t("subscriptions.actions.pause", { defaultValue: "Pause" }), PauseCircle),
+      direct("resume-sub", "resume", t("subscriptions.actions.resume", { defaultValue: "Resume" }), PlayCircle),
+      dialog("renew-sub", "renew", t("subscriptions.actions.renew", { defaultValue: "Renew" }), RefreshCw),
+      dialog("cancel-sub", "cancel", t("subscriptions.actions.cancel", { defaultValue: "Cancel + credit" }), XCircle),
+      dialog("ingest-usage", "ingest-usage", t("subscriptions.actions.ingestUsage", { defaultValue: "Ingest usage" }), Activity),
+      direct("rate-usage", "rate-usage", t("subscriptions.actions.rateUsage", { defaultValue: "Rate usage" }), Gauge, { gated: false }),
+      dialog("set-commitment", "set-commitment", t("subscriptions.actions.setCommitment", { defaultValue: "Set commitment" }), CheckCircle2),
+      direct("record-failure", "record-failure", t("subscriptions.actions.recordFailure", { defaultValue: "Record payment fail" }), AlertTriangle),
+      direct("advance-dunning", "advance-dunning", t("subscriptions.actions.advanceDunning", { defaultValue: "Advance dunning" }), Shield, { gated: false }),
+      direct("refresh-flags", "refresh-flags", t("subscriptions.actions.refreshFlags", { defaultValue: "Refresh exception flags" }), RefreshCw, { gated: false }),
     ]
-  }, [
-    t,
-    activateSubscription,
-    pauseSubscription,
-    resumeSubscription,
-    rateUsage,
-    recordPaymentFailure,
-    advanceDunning,
-    refreshExceptionFlags,
-  ])
+  }, [t, subscriptionActions])
 
   const deferredLineActions = useMemo((): EntityAction[] => {
     return [
@@ -962,90 +722,6 @@ function SubscriptionsClientLoaded({
     }
   }
 
-  const closeForm = useMemo(() => closeSubscriptionForm(t), [t])
-  const generateForm = useMemo(
-    () =>
-      mergeSelectOptionsForFields(generateSubscriptionInvoiceForm(t), {
-        journalId: journalFieldOptions,
-        incomeAccountId: accountFieldOptions,
-        receivableAccountId: accountFieldOptions,
-        taxAccountId: [{ value: "", label: "—" }, ...accountFieldOptions.filter((o) => o.value !== "")],
-      }),
-    [t, journalFieldOptions, accountFieldOptions],
-  )
-  const payInvoiceMoveOptions = useMemo(() => {
-    if (payTargetId == null) return [{ value: "", label: "—", disabled: true }]
-    const ids = new Set(
-      (billingRuns as Record<string, unknown>[])
-        .filter(
-          (run) =>
-            Number(run.subscriptionId ?? run.subscription_id) === payTargetId,
-        )
-        .map((run) => run.invoiceMoveId ?? run.invoice_move_id)
-        .filter((id) => id != null)
-        .map(String),
-    )
-    const moves = (accountMoves as Record<string, unknown>[]).filter((move) =>
-      ids.has(String(move.id)),
-    )
-    const fromApi = accountMoveRowsToSelectOptions(moves)
-    if (fromApi.length > 0) return fromApi
-    return [{ value: "", label: t("common.lookup.noAccounts"), disabled: true }]
-  }, [payTargetId, billingRuns, accountMoves, t])
-  const payForm = useMemo(
-    () =>
-      mergeSelectOptionsForFields(paySubscriptionInvoiceForm(t), {
-        invoiceMoveId: payInvoiceMoveOptions,
-        paymentJournalId: journalFieldOptions,
-        bankAccountId: accountFieldOptions,
-        receivableAccountId: accountFieldOptions,
-        cogsAccountId: accountFieldOptions,
-        inventoryAccountId: accountFieldOptions,
-      }),
-    [t, payInvoiceMoveOptions, journalFieldOptions, accountFieldOptions],
-  )
-  const amendLineOptions = useMemo(() => {
-    if (amendTargetId == null) return [{ value: "", label: "—", disabled: true }]
-    const lines = (subscriptionLines as Record<string, unknown>[]).filter(
-      (l) => Number(l.subscriptionId ?? l.subscription_id) === amendTargetId,
-    )
-    if (lines.length === 0) return [{ value: "", label: "No lines", disabled: true }]
-    return lines.map((l) => ({
-      value: String(l.id),
-      label: `${l.name ?? "Line"} (#${l.id})`,
-    }))
-  }, [amendTargetId, subscriptionLines])
-  const amendForm = useMemo(
-    () =>
-      mergeSelectOptionsForFields(amendSubscriptionForm(t), {
-        lineId: amendLineOptions,
-        journalId: journalFieldOptions,
-        incomeAccountId: accountFieldOptions,
-        receivableAccountId: accountFieldOptions,
-      }),
-    [t, amendLineOptions, journalFieldOptions, accountFieldOptions],
-  )
-  const renewForm = useMemo(() => renewSubscriptionForm(t), [t])
-  const cancelInvoiceOptions = useMemo(() => {
-    if (cancelTargetId == null) return [{ value: "", label: "—" }]
-    const sub = (subscriptions as Record<string, unknown>[]).find(
-      (s) => Number(s.id) === cancelTargetId,
-    )
-    const ids = (sub?.invoiceIds ?? sub?.invoice_ids ?? []) as unknown[]
-    const idSet = new Set(ids.map((id) => String(id)))
-    const moves = (accountMoves as Record<string, unknown>[]).filter((m) =>
-      idSet.has(String(m.id)),
-    )
-    const fromApi = accountMoveRowsToSelectOptions(moves)
-    return [{ value: "", label: "—" }, ...fromApi.filter((o) => o.value !== "")]
-  }, [cancelTargetId, subscriptions, accountMoves])
-  const cancelForm = useMemo(
-    () =>
-      mergeSelectOptionsForFields(cancelSubscriptionForm(t), {
-        invoiceMoveId: cancelInvoiceOptions,
-      }),
-    [t, cancelInvoiceOptions],
-  )
   const recognizeForm = useMemo(
     () =>
       mergeSelectOptionsForFields(recognizeDeferredRevenueLineForm(t), {
@@ -1069,127 +745,7 @@ function SubscriptionsClientLoaded({
           }
         }}
       />
-      <FormModal
-        open={closeTargetId !== null}
-        onOpenChange={(open) => !open && setCloseTargetId(null)}
-        config={closeForm}
-        onSubmit={(formData) => {
-          if (closeTargetId == null) return
-          const params = buildCloseSubscriptionParams(formData)
-          closeSubscription.mutate({
-            subscriptionId: BigInt(closeTargetId),
-            params,
-          }, mutationErrorOptions)
-          setCloseTargetId(null)
-        }}
-      />
-      <FormModal
-        open={generateTargetId !== null}
-        onOpenChange={(open) => !open && setGenerateTargetId(null)}
-        config={generateForm}
-        onSubmit={(formData) => {
-          if (generateTargetId == null) return
-          if (!formData.incomeAccountId || !formData.receivableAccountId) return
-          const params = buildGenerateSubscriptionInvoiceParams(formData)
-          generateInvoice.mutate({
-            subscriptionId: BigInt(generateTargetId),
-            params,
-          }, mutationErrorOptions)
-          setGenerateTargetId(null)
-        }}
-      />
-      <FormModal
-        open={payTargetId !== null}
-        onOpenChange={(open) => !open && setPayTargetId(null)}
-        config={payForm}
-        onSubmit={(formData) => {
-          if (payTargetId == null) return
-          if (
-            !formData.invoiceMoveId ||
-            !formData.paymentJournalId ||
-            !formData.bankAccountId ||
-            !formData.receivableAccountId
-          ) {
-            return
-          }
-          const params = buildPaySubscriptionInvoiceParams(formData)
-          paySubscriptionInvoice.mutate({
-            subscriptionId: BigInt(payTargetId),
-            params,
-          }, mutationErrorOptions)
-          setPayTargetId(null)
-        }}
-      />
-      <FormModal
-        open={amendTargetId !== null}
-        onOpenChange={(open) => !open && setAmendTargetId(null)}
-        config={amendForm}
-        onSubmit={(formData) => {
-          if (amendTargetId == null || !formData.lineId) return
-          const params = buildAmendSubscriptionParams(formData)
-          amendSubscription.mutate({
-            subscriptionId: BigInt(amendTargetId),
-            params,
-          }, mutationErrorOptions)
-          setAmendTargetId(null)
-        }}
-      />
-      <FormModal
-        open={renewTargetId !== null}
-        onOpenChange={(open) => !open && setRenewTargetId(null)}
-        config={renewForm}
-        onSubmit={(formData) => {
-          if (renewTargetId == null) return
-          const params = buildRenewSubscriptionParams(formData)
-          renewSubscription.mutate({
-            subscriptionId: BigInt(renewTargetId),
-            params,
-          }, mutationErrorOptions)
-          setRenewTargetId(null)
-        }}
-      />
-      <FormModal
-        open={cancelTargetId !== null}
-        onOpenChange={(open) => !open && setCancelTargetId(null)}
-        config={cancelForm}
-        onSubmit={(formData) => {
-          if (cancelTargetId == null) return
-          const params = buildCancelSubscriptionParams(formData)
-          cancelSubscription.mutate({
-            subscriptionId: BigInt(cancelTargetId),
-            params,
-          }, mutationErrorOptions)
-          setCancelTargetId(null)
-        }}
-      />
-      <FormModal
-        open={ingestUsageTargetId !== null}
-        onOpenChange={(open) => !open && setIngestUsageTargetId(null)}
-        config={ingestSubscriptionUsageEventForm(t)}
-        onSubmit={(formData) => {
-          if (ingestUsageTargetId == null || !formData.eventId) return
-          const params = buildIngestSubscriptionUsageEventParams(formData)
-          ingestUsage.mutate({
-            subscriptionId: BigInt(ingestUsageTargetId),
-            params,
-          }, mutationErrorOptions)
-          setIngestUsageTargetId(null)
-        }}
-      />
-      <FormModal
-        open={commitmentTargetId !== null}
-        onOpenChange={(open) => !open && setCommitmentTargetId(null)}
-        config={setSubscriptionCommitmentForm(t)}
-        onSubmit={(formData) => {
-          if (commitmentTargetId == null) return
-          const params = buildSetSubscriptionCommitmentParams(formData)
-          setCommitment.mutate({
-            subscriptionId: BigInt(commitmentTargetId),
-            params,
-          }, mutationErrorOptions)
-          setCommitmentTargetId(null)
-        }}
-      />
+      {subscriptionActions.dialogs}
       <FormModal
         key={recognizeLineId != null ? `recognize-${recognizeMoveId || "new"}` : "recognize-closed"}
         open={recognizeLineId !== null}

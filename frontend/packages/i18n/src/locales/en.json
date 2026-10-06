@@ -841,7 +841,8 @@
         "createExchange": "Create exchange order",
         "archive": "Archive PDF to Documents",
         "recalculate": "Recalculate totals",
-        "registerPayment": "Register payment"
+        "registerPayment": "Register payment",
+        "cancel": "Cancel document"
       },
       "recordSheet": {
         "actionsTab": "Actions",
@@ -856,7 +857,11 @@
       "notFound": "Document not found",
       "notFoundHint": "It may have been deleted, or belong to another company.",
       "purchaseOrder": "Purchase order",
-      "saleOrder": "Sales order"
+      "saleOrder": "Sales order",
+      "cancelConfirm": "This cancels the document and its lines. This cannot be undone.",
+      "noRegistrablePayments": "No posted payments available",
+      "payment": "Payment",
+      "registerPaymentHint": "Apply a posted payment to this document."
     },
     "bills": {
       "title": "Bills (Accounts Payable)",
@@ -4373,7 +4378,8 @@
       "notFound": "Transfer not found",
       "notFoundHint": "It may have been deleted, or belong to another organization.",
       "purchaseOrder": "Purchase order",
-      "saleOrder": "Sales order"
+      "saleOrder": "Sales order",
+      "backorders": "Backorders"
     },
     "warehouses": {
       "title": "Warehouses",
@@ -6233,7 +6239,10 @@
         "rfq": "RFQ",
         "sent": "RFQ sent",
         "toApprove": "To approve"
-      }
+      },
+      "moreActions": "More",
+      "removeLinesDescription": "The lines are deleted from this order and its totals are recomputed.",
+      "removeLinesTitle": "Remove the selected lines?"
     }
   },
   "erpWorkflow": {
@@ -7710,7 +7719,8 @@
       "discussion": "Discussion",
       "edit": "Edit",
       "notFound": "Project not found",
-      "notFoundHint": "It may have been deleted, or belong to another organization."
+      "notFoundHint": "It may have been deleted, or belong to another organization.",
+      "openTasksBoard": "Open tasks board"
     }
   },
   "calendar": {
@@ -7791,7 +7801,12 @@
       "delete": "Delete",
       "closeAria": "Close",
       "relatedTo": "Related {{type}}",
-      "open": "Open"
+      "open": "Open",
+      "attendees": "Attendees",
+      "cancel": "Cancel event",
+      "cancelConfirm": "Cancel this event?",
+      "confirm": "Confirm event",
+      "noAttendees": "No attendees"
     },
     "view": {
       "today": "Today",
@@ -8184,7 +8199,9 @@
       "shared": "Shared",
       "unlock": "Unlock",
       "uploadVersion": "Upload version",
-      "versions": "Versions"
+      "versions": "Versions",
+      "legalHold": "Legal hold",
+      "move": "Move to folder"
     }
   },
   "helpdesk": {
@@ -8932,7 +8949,8 @@
       "billing": "Invoices & payments",
       "discussion": "Discussion",
       "moreInList": "More actions",
-      "moreInListHint": "Close, invoice, amend, renew and the other actions that ask for details are in the list."
+      "moreInListHint": "Close, invoice, amend, renew and the other actions that ask for details are in the list.",
+      "moreActions": "More"
     }
   },
   "expenses": {
@@ -9050,7 +9068,8 @@
       "noApprovalRequests": "No workflow approval requests for this report yet.",
       "setAllocations": "Split allocations",
       "projectRebill": "Project rebill invoice",
-      "accountingMoves": "Accounting moves"
+      "accountingMoves": "Accounting moves",
+      "financeFailed": "Expense report action failed"
     },
     "capture": {
       "title": "Mobile capture (delayed sync)",
@@ -9992,7 +10011,8 @@
         "opened": "Open",
         "openingControl": "Opening control"
       },
-      "stopAt": "Closed"
+      "stopAt": "Closed",
+      "openNew": "Open a new session"
     }
   },
   "aiChat": {

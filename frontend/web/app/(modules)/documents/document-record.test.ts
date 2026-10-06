@@ -27,3 +27,16 @@ test('file sizes read in the largest fitting unit', () => {
   assert.equal(formatFileSize(20 * 1024 * 1024), '20 MB');
   assert.equal(formatFileSize('x'), '—');
 });
+
+import { legalHoldReason, moveDocumentParams } from './document-record';
+
+test('a folder move needs a chosen folder', () => {
+  assert.deepEqual(moveDocumentParams(' 4 '), { folderId: '4' });
+  assert.equal(moveDocumentParams(''), null);
+  assert.equal(moveDocumentParams(undefined), null);
+});
+
+test('a legal hold needs a reason', () => {
+  assert.equal(legalHoldReason('  litigation '), 'litigation');
+  assert.equal(legalHoldReason('   '), null);
+});

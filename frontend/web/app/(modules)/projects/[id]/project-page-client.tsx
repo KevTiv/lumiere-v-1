@@ -235,7 +235,16 @@ function ProjectPageLoaded({
           {
             id: 'tasks',
             label: t('projects.tasks.title', { defaultValue: 'Tasks' }),
-            content: <EntityView config={{ ...tasksTableConfig(t), title: '', description: undefined }} data={ownTasks} useCard={false} />,
+            content: (
+              <div className="space-y-3">
+                <div className="flex justify-end">
+                  <Button variant="outline" size="sm" render={<Link href="/tasks" />} nativeButton={false} data-testid="project-open-tasks-board">
+                    {t('projects.page.openTasksBoard', { defaultValue: 'Open tasks board' })}
+                  </Button>
+                </div>
+                <EntityView config={{ ...tasksTableConfig(t), title: '', description: undefined }} data={ownTasks} useCard={false} />
+              </div>
+            ),
           },
           {
             id: 'timesheets',

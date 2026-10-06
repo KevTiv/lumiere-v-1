@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { calendarEventHref, eventInputValue, eventMicros, eventStatusBar, updateCalendarEventParams } from './calendar-event';
+import { calendarEventHref, eventInputValue, eventMicros, eventStatusBar, updateCalendarEventParams, eventStateActions, eventStateParams, eventAttendees } from './calendar-event';
 
 const t = (_key: string, options?: Record<string, unknown>) => String(options?.defaultValue ?? _key);
 
@@ -41,4 +41,25 @@ test('status bar runs draft to confirmed, cancelled outside the flow', () => {
   assert.equal(eventStatusBar({ state: 'confirmed' }, t).current, 'confirmed');
   assert.equal(eventStatusBar({ state: { tag: 'draft' } }, t).current, 'draft');
   assert.equal(eventStatusBar({ state: 'cancelled' }, t).terminal?.label, 'Cancelled');
+});
+
+test('the edit keeps the given state', () => {
+  const form = { name: 'x', start: '2026-10-06T09:00', stop: '2026-10-06T10:00' };
+
+  assert.equal(updateCalendarEventParams(form)?.state, 'confirmed');
+  assert.equal(updateCalendarEventParams(form, 'cancelled')?.state, 'cancelled');
+});
+
+test('confirm and cancel are offered by state', () => {
+  assert.deepEqual(eventStateActions({ state: 'draft' }), { confirm: true, cancel: true });
+  assert.deepEqual(eventStateActions({ state: 'confirmed' }), { confirm: false, cancel: true });
+  assert.deepEqual(eventStateActions({ state: 'cancelled' }), { confirm: true, cancel: false });
+  assert.deepEqual(eventStateParams('cancelled'), { state: 'cancelled' });
+});
+
+test('attendees resolve to contact names, else the id', () => {
+  const attendees = eventAttendees({ partner_ids: [1n, 2] }, [{ id: 1, display_name: 'Ada' }]);
+
+  assert.deepEqual(attendees, [{ id: '1', label: 'Ada' }, { id: '2', label: '#2' }]);
+  assert.deepEqual(eventAttendees({}, []), []);
 });

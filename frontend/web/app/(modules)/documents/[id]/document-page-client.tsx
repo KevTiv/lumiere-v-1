@@ -43,7 +43,9 @@ import { optionalBigIntU64 } from '@lumiere/erp-shared/form-coercion';
 import {
   useAddDocumentVersion,
   useDeleteDocument,
+  useApplyDocumentLegalHold,
   useDeletedDocuments,
+  useDocumentFolders,
   useDocumentVersions,
   useDocuments,
   useIngestDocumentEvidence,
@@ -58,7 +60,8 @@ import { firstFileFromFormValue, uploadDocumentBlob } from '@/lib/document-blob-
 import { toAddDocumentVersionParams, toSetDocumentRetentionParams } from '@/lib/documents-create-params';
 import { useDocumentsModuleSubscription } from '@/lib/module-subscription-hooks';
 import { hasValidOrganizationId, orgBigInts } from '@/lib/org-scoped';
-import { formatFileSize, linkedRecordHref } from '../document-record';
+import { documentFolderRowsToSelectOptions } from '@/lib/form-lookup';
+import { formatFileSize, legalHoldReason, linkedRecordHref, moveDocumentParams } from '../document-record';
 
 interface DocumentPageClientProps {
   documentId: string;
@@ -69,7 +72,7 @@ interface DocumentPageClientProps {
 }
 
 type Row = Record<string, unknown>;
-type FormAction = 'edit' | 'uploadVersion' | 'setRetention';
+type FormAction = 'edit' | 'uploadVersion' | 'setRetention' | 'move' | 'legalHold';
 
 const TAB_IDS = ['overview', 'versions', 'discussion', 'audit'] as const;
 type TabId = (typeof TAB_IDS)[number];
@@ -99,6 +102,45 @@ function editDocumentForm(row: Row): FormConfig {
   };
 }
 
+function moveDocumentForm(row: Row, folders: Array<{ value: string; label: string }>): FormConfig {
+  return {
+    id: 'move-document',
+    title: 'Move to folder',
+    submitLabel: 'Move',
+    sections: [
+      {
+        id: 'move',
+        fields: [
+          {
+            id: 'doc-folder',
+            name: 'folderId',
+            type: 'select',
+            label: 'Folder',
+            required: true,
+            defaultValue: row.folderId == null ? '' : String(row.folderId),
+            options: folders,
+            width: 'full',
+          },
+        ],
+      },
+    ],
+  };
+}
+
+function legalHoldForm(): FormConfig {
+  return {
+    id: 'document-legal-hold',
+    title: 'Apply legal hold',
+    submitLabel: 'Apply hold',
+    sections: [
+      {
+        id: 'hold',
+        fields: [{ id: 'hold-reason', name: 'reason', type: 'textarea', label: 'Reason', required: true, rows: 3, width: 'full' }],
+      },
+    ],
+  };
+}
+
 function DocumentPageLoaded({
   documentId,
   initialDocuments,
@@ -116,6 +158,7 @@ function DocumentPageLoaded({
 
   const { data: documents = [], isLoading } = useDocuments(orgId, initialDocuments as never);
   const { data: deleted = [] } = useDeletedDocuments(orgId, initialDeleted as never);
+  const { data: folders = [] } = useDocumentFolders(orgId);
   const { data: versions = [] } = useDocumentVersions(orgId, initialVersions as never);
 
   const lockDocument = useLockDocument(orgId);
@@ -126,6 +169,7 @@ function DocumentPageLoaded({
   const addVersion = useAddDocumentVersion(orgId);
   const ingestEvidence = useIngestDocumentEvidence(orgId);
   const setRetention = useSetDocumentRetention(orgId);
+  const applyLegalHold = useApplyDocumentLegalHold(orgId);
 
   const [formAction, setFormAction] = useState<FormAction | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
@@ -232,7 +276,11 @@ function DocumentPageLoaded({
         ? uploadDocumentVersionForm(t)
         : formAction === 'setRetention'
           ? setDocumentRetentionForm(t)
-          : null;
+          : formAction === 'move'
+            ? moveDocumentForm(document, documentFolderRowsToSelectOptions(folders as unknown as Row[]))
+            : formAction === 'legalHold'
+              ? legalHoldForm()
+              : null;
 
   const submitForm = async (formData: Record<string, unknown>) => {
     setFormError(null);
@@ -271,6 +319,15 @@ function DocumentPageLoaded({
         if (formData.unlockAfter !== false && isLocked) await unlockDocument.mutateAsync(id);
       } else if (formAction === 'setRetention') {
         await setRetention.mutateAsync({ documentId: id, params: toSetDocumentRetentionParams(formData) });
+      } else if (formAction === 'move') {
+        const params = moveDocumentParams(formData.folderId);
+        if (!params) throw new Error('Select a folder');
+        await updateDocument.mutateAsync({ documentId: id, params: { folderId: optionalBigIntU64(params.folderId) } });
+      } else if (formAction === 'legalHold') {
+        const reason = legalHoldReason(formData.reason);
+        if (!reason) throw new Error('A reason is required');
+        await applyLegalHold.mutateAsync({ documentId: id, reason });
+        showWorkflowToast({ kind: 'success', title: 'Legal hold', description: label });
       }
       setFormAction(null);
     } catch (error) {
@@ -381,6 +438,12 @@ function DocumentPageLoaded({
                 <Button variant="outline" size="sm" data-testid="document-action-retention" onClick={() => setFormAction('setRetention')}>
                   {t('documents.page.setRetention', { defaultValue: 'Set retention' })}
                 </Button>
+                <Button variant="outline" size="sm" data-testid="document-action-move" onClick={() => setFormAction('move')}>
+                  {t('documents.page.move', { defaultValue: 'Move to folder' })}
+                </Button>
+                <Button variant="outline" size="sm" data-testid="document-action-legal-hold" onClick={() => setFormAction('legalHold')}>
+                  {t('documents.page.legalHold', { defaultValue: 'Legal hold' })}
+                </Button>
                 <Button
                   variant="outline"
                   size="sm"
@@ -457,7 +520,7 @@ function DocumentPageLoaded({
             }
           }}
           config={formConfig}
-          isPending={addVersion.isPending || updateDocument.isPending || setRetention.isPending}
+          isPending={addVersion.isPending || updateDocument.isPending || setRetention.isPending || applyLegalHold.isPending}
           closeOnSubmit={false}
           submitError={formError}
           onSubmit={submitForm}

@@ -25,9 +25,9 @@ export function eventInputValue(value: unknown): string {
 
 /**
  * Parameters for `update_calendar_event` from the edit form; null when the title is empty or a
- * date does not parse. The event stays confirmed and busy, as the list's edit does.
+ * date does not parse. The event keeps `state` (confirmed by default, as the list's edit does).
  */
-export function updateCalendarEventParams(formData: Row): Row | null {
+export function updateCalendarEventParams(formData: Row, state = 'confirmed'): Row | null {
   const name = String(formData.name ?? '').trim();
   const start = new Date(String(formData.start ?? ''));
   const stop = new Date(String(formData.stop ?? ''));
@@ -39,7 +39,7 @@ export function updateCalendarEventParams(formData: Row): Row | null {
     allday: Boolean(formData.allday),
     privacy: (formData.privacy as string) ?? 'public',
     show_as: 'busy',
-    state: 'confirmed',
+    state,
     location: formData.location ? String(formData.location) : undefined,
     description: formData.description ? String(formData.description) : undefined,
   };
@@ -63,4 +63,32 @@ export function eventStatusBar(
     };
   }
   return { steps, current: state };
+}
+
+/** Lower-cased state of an event row (`draft`, `confirmed`, `cancelled`, ...), or ''. */
+export function eventStateTag(event: Row): string {
+  return variantTag(event.state).toLowerCase();
+}
+
+/** Which state changes the page offers: confirm unless confirmed, cancel unless cancelled. */
+export function eventStateActions(event: Row): { confirm: boolean; cancel: boolean } {
+  const state = eventStateTag(event);
+  const cancelled = state === 'cancelled' || state === 'cancel';
+  return { confirm: state !== 'confirmed', cancel: !cancelled };
+}
+
+/** Parameters for a state-only `update_calendar_event` (every other field is optional). */
+export function eventStateParams(state: 'confirmed' | 'cancelled'): Row {
+  return { state };
+}
+
+/** Attendee names of an event (`partner_ids` are contact ids); unknown ids read `#id`. */
+export function eventAttendees(event: Row, contacts: ReadonlyArray<Row>): Array<{ id: string; label: string }> {
+  const raw = event.partner_ids ?? event.partnerIds;
+  if (!Array.isArray(raw)) return [];
+  const names = new Map(contacts.map((c) => [String(c.id), String(c.display_name ?? c.displayName ?? c.name ?? '').trim()]));
+  return raw.map((value) => {
+    const id = String(value);
+    return { id, label: names.get(id) || `#${id}` };
+  });
 }

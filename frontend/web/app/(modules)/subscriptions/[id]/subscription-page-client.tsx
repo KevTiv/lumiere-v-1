@@ -26,15 +26,18 @@ import {
   subscriptionsTableConfig,
 } from '@lumiere/ui';
 import { Badge } from '@lumiere/ui/components/badge';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@lumiere/ui/components/dropdown-menu';
 import { Skeleton } from '@lumiere/ui/components/skeleton';
 import { showWorkflowToast } from '@lumiere/ui/lib/workflow-toast';
 import { useAccountMoves, useAccountPayments } from '@lumiere/query-hooks/hooks/accounting';
 import { subscriptionRecordLinks } from '@lumiere/query-hooks/hooks/cross-record-links';
 import {
-  useActivateSubscription,
-  usePauseSubscription,
-  useRateSubscriptionUsageEvents,
-  useResumeSubscription,
   useSubscriptionAmendments,
   useSubscriptionBillingRuns,
   useSubscriptionLines,
@@ -47,6 +50,8 @@ import { hasValidOrganizationId, orgBigInts } from '@/lib/org-scoped';
 import { RecordDocumentAttachments } from '../../../../components/record-document-attachments';
 import { CrossRecordLinks } from '../../../../components/order-handoff-links';
 import { subscriptionStateOf, subscriptionStatusBar } from '../subscription-status';
+import { subscriptionPageActions, type SubscriptionActionId } from '../subscription-actions';
+import { isSubscriptionDialogAction, useSubscriptionActions } from '../use-subscription-actions';
 
 interface SubscriptionPageClientProps {
   subscriptionId: string;
@@ -86,10 +91,7 @@ function SubscriptionPageLoaded({
   const { data: accountMoves = [], isLoading: movesLoading, isError: movesError } = useAccountMoves(orgId);
   const { data: accountPayments = [], isLoading: paymentsLoading, isError: paymentsError } = useAccountPayments(orgId);
 
-  const activate = useActivateSubscription(orgId, operatingCompanyId);
-  const pause = usePauseSubscription(orgId, operatingCompanyId);
-  const resume = useResumeSubscription(orgId, operatingCompanyId);
-  const rateUsage = useRateSubscriptionUsageEvents(orgId, operatingCompanyId);
+  const subscriptionActions = useSubscriptionActions(orgId, operatingCompanyId);
 
   const subscription = useMemo(
     () => (subscriptions as unknown as Row[]).find((row) => String(row.id) === subscriptionId),
@@ -200,7 +202,34 @@ function SubscriptionPageLoaded({
     paymentsError || paymentsLoading ? undefined : (accountPayments as never),
   );
 
-  const busy = activate.isPending || pause.isPending || resume.isPending || rateUsage.isPending;
+  const busy = subscriptionActions.pending;
+  const actionLabels: Record<SubscriptionActionId, string> = {
+    activate: t('subscriptions.actions.activate'),
+    pause: t('subscriptions.actions.pause', { defaultValue: 'Pause' }),
+    resume: t('subscriptions.actions.resume', { defaultValue: 'Resume' }),
+    close: t('subscriptions.actions.close'),
+    'generate-invoice': t('subscriptions.actions.generateInvoice'),
+    'pay-invoice': t('subscriptions.actions.payInvoice', { defaultValue: 'Apply payment' }),
+    amend: t('subscriptions.actions.amend', { defaultValue: 'Amend' }),
+    renew: t('subscriptions.actions.renew', { defaultValue: 'Renew' }),
+    cancel: t('subscriptions.actions.cancel', { defaultValue: 'Cancel + credit' }),
+    'ingest-usage': t('subscriptions.actions.ingestUsage', { defaultValue: 'Ingest usage' }),
+    'rate-usage': t('subscriptions.actions.rateUsage', { defaultValue: 'Rate usage' }),
+    'set-commitment': t('subscriptions.actions.setCommitment', { defaultValue: 'Set commitment' }),
+    'record-failure': t('subscriptions.actions.recordFailure', { defaultValue: 'Record payment fail' }),
+    'advance-dunning': t('subscriptions.actions.advanceDunning', { defaultValue: 'Advance dunning' }),
+    'refresh-flags': t('subscriptions.actions.refreshFlags', { defaultValue: 'Refresh exception flags' }),
+  };
+  const runAction = (action: SubscriptionActionId) => {
+    if (isSubscriptionDialogAction(action)) {
+      subscriptionActions.openDialog(action, id);
+      return;
+    }
+    void run(actionLabels[action], () => subscriptionActions.runDirect(action, id));
+  };
+  const headerActions = subscriptionPageActions(state);
+  const primaryActions = headerActions.filter((a) => a.primary);
+  const moreActions = headerActions.filter((a) => !a.primary);
   const id = BigInt(subscriptionId);
 
   return (
@@ -239,75 +268,41 @@ function SubscriptionPageLoaded({
       }
       actions={
         <>
-          {state === 'draft' ? (
+          {subscriptionActions.dialogs}
+          {primaryActions.map((action) => (
             <Button
+              key={action.id}
               size="sm"
               disabled={busy}
-              data-testid="subscription-action-activate"
-              onClick={() =>
-                void run(t('subscriptions.actions.activate'), () => activate.mutateAsync({ subscriptionId: id }))
-              }
+              data-testid={`subscription-action-${action.id}`}
+              onClick={() => runAction(action.id)}
             >
-              {t('subscriptions.actions.activate')}
+              {actionLabels[action.id]}
             </Button>
+          ))}
+          {moreActions.length > 0 ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" disabled={busy} data-testid="subscription-more-actions">
+                  <MoreHorizontal className="mr-1 h-4 w-4" />
+                  {t('subscriptions.page.moreActions', { defaultValue: 'More' })}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                {moreActions.map((action, index) => (
+                  <div key={action.id}>
+                    {action.id === 'cancel' && index > 0 ? <DropdownMenuSeparator /> : null}
+                    <DropdownMenuItem
+                      data-testid={`subscription-action-${action.id}`}
+                      onSelect={() => runAction(action.id)}
+                    >
+                      {actionLabels[action.id]}
+                    </DropdownMenuItem>
+                  </div>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
           ) : null}
-          {state === 'active' ? (
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={busy}
-              data-testid="subscription-action-pause"
-              onClick={() =>
-                void run(t('subscriptions.actions.pause', { defaultValue: 'Pause' }), () =>
-                  pause.mutateAsync({ subscriptionId: id }),
-                )
-              }
-            >
-              {t('subscriptions.actions.pause', { defaultValue: 'Pause' })}
-            </Button>
-          ) : null}
-          {state === 'paused' ? (
-            <Button
-              size="sm"
-              disabled={busy}
-              data-testid="subscription-action-resume"
-              onClick={() =>
-                void run(t('subscriptions.actions.resume', { defaultValue: 'Resume' }), () =>
-                  resume.mutateAsync({ subscriptionId: id }),
-                )
-              }
-            >
-              {t('subscriptions.actions.resume', { defaultValue: 'Resume' })}
-            </Button>
-          ) : null}
-          {state !== 'draft' && state !== 'closed' ? (
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={busy}
-              data-testid="subscription-action-rate-usage"
-              onClick={() =>
-                void run(t('subscriptions.actions.rateUsage', { defaultValue: 'Rate usage' }), () =>
-                  rateUsage.mutateAsync({ subscriptionId: id, params: { limit: 100 } }),
-                )
-              }
-            >
-              {t('subscriptions.actions.rateUsage', { defaultValue: 'Rate usage' })}
-            </Button>
-          ) : null}
-          <Button
-            variant="outline"
-            size="sm"
-            nativeButton={false}
-            render={<Link href={buildModuleTabHref('subscriptions', 'subscriptions')} />}
-            data-testid="subscription-more-in-list"
-            title={t('subscriptions.page.moreInListHint', {
-              defaultValue: 'Close, invoice, amend, renew and the other actions that ask for details are in the list.',
-            })}
-          >
-            <MoreHorizontal className="mr-1 h-4 w-4" />
-            {t('subscriptions.page.moreInList', { defaultValue: 'More actions' })}
-          </Button>
         </>
       }
       activeTab={activeTab}

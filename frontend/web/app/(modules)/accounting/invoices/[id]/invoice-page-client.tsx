@@ -32,6 +32,16 @@ import {
 } from '@lumiere/ui';
 import { Badge } from '@lumiere/ui/components/badge';
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@lumiere/ui/components/alert-dialog';
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -45,6 +55,7 @@ import {
   useAccountAccounts,
   useAccountMoveLines,
   useAccountMoves,
+  useCancelAccountMove,
   useComputeInvoiceTotals,
   useCreateCreditNoteFromInvoice,
 } from '@lumiere/query-hooks/hooks/accounting';
@@ -66,7 +77,9 @@ import { archiveRenderedPdfAsDocument } from '@/lib/archive-document-pdf';
 import { useAccountingModuleSubscription } from '@/lib/module-subscription-hooks';
 import { hasValidOrganizationId, orgBigInts } from '@/lib/org-scoped';
 import { RecordDocumentAttachments } from '../../../../../components/record-document-attachments';
+import { canCancelMove, canRegisterPayment } from '../../invoice-actions';
 import { invoiceKind, invoiceStatus } from '../../invoice-status';
+import { RegisterPaymentOnInvoiceDialog } from '../../register-payment-on-invoice-dialog';
 
 interface InvoicePageClientProps {
   moveId: string;
@@ -131,6 +144,7 @@ function InvoicePageLoaded({
   const dispatchMail = useDispatchQueuedMail();
   const createDocument = useCreateDocument(orgId, operatingCompanyId);
   const createCreditNote = useCreateCreditNoteFromInvoice(organizationId);
+  const cancelMove = useCancelAccountMove(organizationId);
   const computeTotals = useComputeInvoiceTotals(organizationId, operatingCompanyId);
 
   const workflowSurface = useWorkflowSurface({ organizationId });
@@ -154,6 +168,8 @@ function InvoicePageLoaded({
   );
 
   const [creditNoteOpen, setCreditNoteOpen] = useState(false);
+  const [registerOpen, setRegisterOpen] = useState(false);
+  const [cancelOpen, setCancelOpen] = useState(false);
   const [docBusy, setDocBusy] = useState<'download' | 'archive' | 'send' | null>(null);
 
   const move = useMemo(
@@ -316,8 +332,14 @@ function InvoicePageLoaded({
     {
       id: 'register-payment',
       label: t('accounting.invoices.invoiceActions.registerPayment', { defaultValue: 'Register payment' }),
-      show: state === 'Posted' && Number(move.amountResidual ?? 0) > 0 && (kind === 'invoice' || kind === 'bill'),
-      run: () => router.push(buildModuleTabHref('accounting', 'payments')),
+      show: canRegisterPayment(move, kind),
+      run: () => setRegisterOpen(true),
+    },
+    {
+      id: 'cancel',
+      label: t('accounting.invoices.invoiceActions.cancel', { defaultValue: 'Cancel document' }),
+      show: canCancelMove(move),
+      run: () => setCancelOpen(true),
     },
     {
       id: 'download-pdf',
@@ -514,6 +536,53 @@ function InvoicePageLoaded({
           }}
         />
       ) : null}
+      {registerOpen ? (
+        <RegisterPaymentOnInvoiceDialog
+          organizationId={orgId}
+          move={move}
+          isBill={kind === 'bill'}
+          registerPayment={workflow.registerPayment}
+          isPending={workflow.isPending}
+          onClose={() => setRegisterOpen(false)}
+        />
+      ) : null}
+      <AlertDialog open={cancelOpen} onOpenChange={setCancelOpen}>
+        <AlertDialogContent data-testid="invoice-cancel-confirm">
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {t('accounting.invoices.invoiceActions.cancel', { defaultValue: 'Cancel document' })}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {t('accounting.invoices.cancelConfirm', {
+                defaultValue: 'This cancels the document and its lines. This cannot be undone.',
+              })}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t('erpWorkflow.confirm.dismiss')}</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={cancelMove.isPending}
+              onClick={() => {
+                setCancelOpen(false);
+                void cancelMove
+                  .mutateAsync(BigInt(moveId))
+                  .then(() =>
+                    showWorkflowToast({
+                      kind: 'success',
+                      title: t('accounting.invoices.invoiceActions.cancel', { defaultValue: 'Cancel document' }),
+                      description: label,
+                    }),
+                  )
+                  .catch((error: unknown) =>
+                    report(error, t('accounting.invoices.invoiceActions.cancel', { defaultValue: 'Cancel document' })),
+                  );
+              }}
+            >
+              {t('erpWorkflow.confirm.confirm')}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       {formDialog}
     </>
   );

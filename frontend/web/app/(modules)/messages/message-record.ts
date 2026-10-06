@@ -43,3 +43,23 @@ export function messageTitle(message: Row, max = 80): string {
 export function messageKind(message: Row): string {
   return variantTag(message.messageType ?? message.message_type).toLowerCase() || 'message';
 }
+
+const hexOf = (value: unknown): string => {
+  if (value && typeof value === 'object' && '__identity__' in value) return hexOf((value as { __identity__: unknown }).__identity__);
+  if (value && typeof value === 'object' && typeof (value as { toHexString?: unknown }).toHexString === 'function') {
+    return (value as { toHexString: () => string }).toHexString().toLowerCase();
+  }
+  return String(value ?? '').trim().toLowerCase().replace(/^0x/, '');
+};
+
+/**
+ * Display name of a message author from the users list (matched on the identity or the user id);
+ * unknown authors read as a shortened identity, and a message without one as ''.
+ */
+export function messageAuthorName(message: Row, users: ReadonlyArray<Row>): string {
+  const authorHex = hexOf(message.authorId ?? message.author_id);
+  if (!authorHex) return '';
+  const user = users.find((row) => [row.identity, row.id, row.userId, row.user_id].some((v) => v != null && hexOf(v) === authorHex));
+  const name = String(user?.name ?? user?.displayName ?? user?.display_name ?? user?.email ?? '').trim();
+  return name || (authorHex.length > 12 ? `${authorHex.slice(0, 8)}…` : authorHex);
+}

@@ -20,3 +20,17 @@ test('related rows are matched to a vehicle whichever way the id is spelled', ()
 
   assert.deepEqual(rowsOfVehicle(rows, '7').map((row) => row.id), [1, 2]);
 });
+
+import { showVehicleNameColumn, withVehicleNames } from './fleet-record';
+
+test('service rows carry the vehicle name, falling back to the id', () => {
+  const rows = withVehicleNames([{ id: 1, vehicle_id: 7 }, { id: 2, vehicleId: 9 }], [{ id: 7, name: 'Van 1' }]);
+
+  assert.deepEqual(rows.map((row) => row.vehicle_name), ['Van 1', '#9']);
+});
+
+test('the vehicle id column becomes a text name column', () => {
+  const columns = showVehicleNameColumn([{ key: 'vehicle_id', type: 'number' }, { key: 'notes' }]);
+
+  assert.deepEqual(columns, [{ key: 'vehicle_name' }, { key: 'notes' }]);
+});

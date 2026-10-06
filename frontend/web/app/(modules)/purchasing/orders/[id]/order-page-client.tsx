@@ -3,8 +3,9 @@
 import { useCallback, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { FileText, ListOrdered, PackageCheck } from 'lucide-react';
+import { FileText, ListOrdered, MoreHorizontal, PackageCheck } from 'lucide-react';
 import { useTranslation } from '@lumiere/i18n';
+import type { EntityAction, EntityTableConfig } from '@lumiere/ui';
 import {
   Button,
   EntityDetail,
@@ -37,7 +38,14 @@ import {
   AlertDialogTitle,
 } from '@lumiere/ui/components/alert-dialog';
 import { Badge } from '@lumiere/ui/components/badge';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@lumiere/ui/components/dropdown-menu';
 import { Skeleton } from '@lumiere/ui/components/skeleton';
+import { showWorkflowToast } from '@lumiere/ui/lib/workflow-toast';
 import {
   variantTag,
   type AnyWorkflowAction,
@@ -50,8 +58,14 @@ import { useContacts, type Contact } from '@lumiere/query-hooks/hooks/crm';
 import { purchaseOrderLinks } from '@lumiere/query-hooks/hooks/cross-record-links';
 import { useStockPickings } from '@lumiere/query-hooks/hooks/inventory';
 import {
+  useComputePurchaseOrderTotals,
+  useLockPurchaseOrder,
   usePurchaseOrderLines,
   usePurchaseOrders,
+  useRemovePurchaseOrderLine,
+  useUnlockPurchaseOrder,
+  useUpdatePoInvoiceStatus,
+  useUpdatePoReceiptStatus,
   type PurchaseOrder,
   type PurchaseOrderLine,
 } from '@lumiere/query-hooks/hooks/purchasing';
@@ -62,7 +76,20 @@ import { usePurchasingModuleSubscription } from '@/lib/module-subscription-hooks
 import { hasValidOrganizationId, orgBigInts } from '@/lib/org-scoped';
 import { RecordDocumentAttachments } from '../../../../../components/record-document-attachments';
 import { CrossRecordLinks } from '../../../../../components/order-handoff-links';
-import { CreateBillFromPurchaseOrderDialog } from '../../purchase-order-dialogs';
+import {
+  CreateBillFromPurchaseOrderDialog,
+  PurchaseOrderFormDialog,
+  type PurchaseOrderDialogKind,
+} from '../../purchase-order-dialogs';
+import {
+  canAddPurchaseOrderLine,
+  canEditPurchaseOrder,
+  canLockPurchaseOrder,
+  canRemovePurchaseOrderLine,
+  canUnlockPurchaseOrder,
+  enumTag,
+  linesOfOrder,
+} from '../../purchase-order-forms';
 import { purchaseOrderStatusBar } from '../../purchase-order-status';
 
 interface PurchaseOrderPageClientProps {
@@ -167,19 +194,20 @@ function PurchaseOrderPageLoaded({
   );
 
   const [billDialogOpen, setBillDialogOpen] = useState(false);
+  const [formDialog, setFormDialog] = useState<{ kind: PurchaseOrderDialogKind; line?: Row } | null>(null);
+  const lockOrder = useLockPurchaseOrder(orgId);
+  const unlockOrder = useUnlockPurchaseOrder(orgId);
+  const computeTotals = useComputePurchaseOrderTotals(orgId);
+  const refreshReceiptStatus = useUpdatePoReceiptStatus(orgId);
+  const refreshInvoiceStatus = useUpdatePoInvoiceStatus(orgId);
+  const removeLine = useRemovePurchaseOrderLine(orgId);
   const [pendingConfirm, setPendingConfirm] = useState<WorkflowAction | null>(null);
 
   const order = useMemo(
     () => (orders as unknown as Row[]).find((row) => String(row.id) === orderId),
     [orders, orderId],
   );
-  const lines = useMemo(
-    () =>
-      (orderLines as unknown as Row[]).filter(
-        (line) => String(line.orderId ?? line.order_id ?? '') === orderId,
-      ),
-    [orderLines, orderId],
-  );
+  const lines = useMemo(() => linesOfOrder(orderLines as unknown as Row[], orderId), [orderLines, orderId]);
   const vendorLabelById = useMemo(() => {
     const map = new Map<string, string>();
     for (const contact of contacts as unknown as Row[]) {
@@ -308,7 +336,120 @@ function PurchaseOrderPageLoaded({
         : section,
     ),
   };
-  const linesConfig = purchaseOrderLinesTableConfig(t);
+  const linesBase = purchaseOrderLinesTableConfig(t);
+  const editable = canEditPurchaseOrder(order);
+  const report = (error: unknown, title: string) =>
+    showWorkflowToast({
+      kind: 'error',
+      title,
+      description: error instanceof Error ? error.message : String(error),
+    });
+  const receivable = lines.filter((line) => workflow.receiveLine.canPresent(line as RowValueMap));
+  const asRow = (row: unknown) => row as Row;
+
+  const lineActions: EntityAction[] = [
+    ...(canAddPurchaseOrderLine(order)
+      ? [
+          {
+            id: 'pol-add-form',
+            label: t('purchasing.actions.addLineForm'),
+            onClick: () => setFormDialog({ kind: 'addLine' }),
+          },
+        ]
+      : []),
+    ...(editable
+      ? [
+          {
+            id: 'pol-edit-form',
+            label: t('purchasing.actions.editLineForm'),
+            requiresSelection: true,
+            isApplicable: (rows) => rows.length === 1 && enumTag(rows[0]?.state) === 'Draft',
+            onClick: (rows) => setFormDialog({ kind: 'editLine', line: asRow(rows[0]) }),
+          } satisfies EntityAction,
+        ]
+      : []),
+    ...(receivable.length > 0
+      ? [
+          {
+            id: 'pol-receive-form',
+            label: t('purchasing.actions.receiveGoodsForm'),
+            requiresSelection: true,
+            isApplicable: (rows) => rows.length === 1 && workflow.receiveLine.canPresent(rows[0] as RowValueMap),
+            onClick: (rows) => setFormDialog({ kind: 'receive', line: asRow(rows[0]) }),
+          } satisfies EntityAction,
+          {
+            id: 'pol-receive-qty',
+            label: t('purchasing.actions.receiveFullOpenQty'),
+            requiresSelection: true,
+            isApplicable: (rows) => rows.length === 1 && workflow.receiveLine.canPresent(rows[0] as RowValueMap),
+            onClick: async (rows) => {
+              const line = rows[0] as RowValueMap | undefined;
+              if (!line || !workflow.receiveLine.prepare) return;
+              // The workflow surface reports a typed failure.
+              await workflow.receiveLine.execute(workflow.receiveLine.prepare(line), { navigateToNext: true }).catch(() => undefined);
+            },
+          } satisfies EntityAction,
+        ]
+      : []),
+    ...(canRemovePurchaseOrderLine(order)
+      ? [
+          {
+            id: 'pol-remove',
+            label: t('common.delete'),
+            requiresSelection: true,
+            selection: 'multiple',
+            variant: 'destructive',
+            confirm: {
+              title: t('purchasing.order.removeLinesTitle', { defaultValue: 'Remove the selected lines?' }),
+              description: t('purchasing.order.removeLinesDescription', {
+                defaultValue: 'The lines are deleted from this order and its totals are recomputed.',
+              }),
+              confirmLabel: t('common.delete'),
+              cancelLabel: t('erpWorkflow.confirm.dismiss'),
+            },
+            successMessage: t('common.actionCompleted', { action: t('common.delete') }),
+            onClick: async (rows) => {
+              for (const row of rows) await removeLine.mutateAsync(row.id as string | number | bigint);
+            },
+          } satisfies EntityAction,
+        ]
+      : []),
+  ];
+  const linesView = linesBase.view as EntityTableConfig;
+  const linesConfig = { ...linesBase, view: { ...linesView, actions: [...(linesView.actions ?? []), ...lineActions] } };
+
+  const moreActions: Array<{ id: string; label: string; show: boolean; run: () => Promise<unknown> }> = [
+    {
+      id: 'recalc',
+      label: t('purchasing.actions.recalculateTotals'),
+      show: true,
+      run: () => computeTotals.mutateAsync(orderId),
+    },
+    {
+      id: 'refresh-receipt-status',
+      label: t('purchasing.actions.refreshReceiptStatus'),
+      show: true,
+      run: () => refreshReceiptStatus.mutateAsync(orderId),
+    },
+    {
+      id: 'refresh-invoice-status',
+      label: t('purchasing.actions.refreshInvoiceStatus'),
+      show: true,
+      run: () => refreshInvoiceStatus.mutateAsync(orderId),
+    },
+    {
+      id: 'lock',
+      label: t('purchasing.actions.lockSelected'),
+      show: canLockPurchaseOrder(order),
+      run: () => lockOrder.mutateAsync(orderId),
+    },
+    {
+      id: 'unlock',
+      label: t('purchasing.actions.unlockSelected'),
+      show: canUnlockPurchaseOrder(order),
+      run: () => unlockOrder.mutateAsync(orderId),
+    },
+  ].filter((action) => action.show);
 
   return (
     <>
@@ -362,13 +503,59 @@ function PurchaseOrderPageLoaded({
           />
         }
         actions={
-          <RecordWorkflowActions
-            actions={headerActions}
-            record={record}
-            onRun={(action, row) => void runWorkflowAction(action, row)}
-            primaryActionIds={PRIMARY_ACTION_IDS}
-            pendingActionIds={workflow.isPending ? new Set(headerActions.map((action) => action.id)) : undefined}
-          />
+          <div className="flex flex-wrap items-center gap-2">
+            <RecordWorkflowActions
+              actions={headerActions}
+              record={record}
+              onRun={(action, row) => void runWorkflowAction(action, row)}
+              primaryActionIds={PRIMARY_ACTION_IDS}
+              pendingActionIds={workflow.isPending ? new Set(headerActions.map((action) => action.id)) : undefined}
+            />
+            {receivable.length > 0 ? (
+              <Button
+                size="sm"
+                variant="outline"
+                data-testid="purchase-order-receive-goods"
+                onClick={() => setFormDialog({ kind: 'receive' })}
+              >
+                <PackageCheck className="mr-1 h-4 w-4" />
+                {t('purchasing.actions.receiveGoodsForm')}
+              </Button>
+            ) : null}
+            {editable ? (
+              <Button
+                size="sm"
+                variant="outline"
+                data-testid="purchase-order-edit-header"
+                onClick={() => setFormDialog({ kind: 'header' })}
+              >
+                {t('purchasing.actions.editHeader', { defaultValue: 'Edit header' })}
+              </Button>
+            ) : null}
+            {moreActions.length > 0 ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" data-testid="purchase-order-more-actions">
+                    <MoreHorizontal className="mr-1 h-4 w-4" />
+                    {t('purchasing.order.moreActions', { defaultValue: 'More' })}
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  {moreActions.map((action) => (
+                    <DropdownMenuItem
+                      key={action.id}
+                      data-testid={`purchase-order-action-${action.id}`}
+                      onSelect={() => {
+                        void Promise.resolve(action.run()).catch((error: unknown) => report(error, action.label));
+                      }}
+                    >
+                      {action.label}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : null}
+          </div>
         }
         activeTab={activeTab}
         onTabChange={setActiveTab}
@@ -440,6 +627,19 @@ function PurchaseOrderPageLoaded({
           organizationId={organizationId}
           workflow={workflow}
           onClose={() => setBillDialogOpen(false)}
+        />
+      ) : null}
+
+      {formDialog ? (
+        <PurchaseOrderFormDialog
+          kind={formDialog.kind}
+          order={order}
+          lines={lines}
+          line={formDialog.line}
+          organizationId={organizationId}
+          operatingCompanyId={operatingCompanyId}
+          workflow={workflow}
+          onClose={() => setFormDialog(null)}
         />
       ) : null}
 
