@@ -65,7 +65,8 @@ export interface FormDialogRequest {
 function toFormConfig(request: FormDialogRequest): FormConfig {
   return {
     id: request.id ?? "form-dialog",
-    title: request.title,
+    // Button labels end in "…" to signal a dialog; the dialog title should not.
+    title: request.title.replace(/\s*(…|\.\.\.)$/, ""),
     description: request.description,
     submitLabel: request.submitLabel,
     sections: [{ id: "main", fields: request.fields }],

@@ -142,6 +142,12 @@ export async function expectRowActionsOffered(page: Page, actionIds: readonly st
   for (const actionId of actionIds) {
     await expect(page.getByTestId(`entity-action-${actionId}`)).toBeVisible()
   }
+  // A row click may also open the record sheet; close it so the page stays usable.
+  const dialog = page.getByRole("dialog")
+  if (await dialog.isVisible().catch(() => false)) {
+    await page.keyboard.press("Escape")
+    await expect(dialog).toBeHidden()
+  }
 }
 
 /** Rows in a custom tab panel table (e.g. accounting InvoiceListView). */
@@ -362,9 +368,13 @@ export async function openTabAndCancelCreate(
   tabId: string,
   formId: string,
 ) {
-  await page.getByTestId(`module-tab-${moduleId}-${tabId}`).click()
+  const tab = page.getByTestId(`module-tab-${moduleId}-${tabId}`)
+  await tab.click()
+  await expect(tab).toHaveAttribute("aria-selected", "true")
+  // The tab switch also updates ?tab=, which can re-render the panel; click
+  // (unlike scrollIntoViewIfNeeded) re-resolves a replaced element.
   const createBtn = page.getByTestId(`module-create-${moduleId}-${tabId}`)
-  await createBtn.scrollIntoViewIfNeeded()
+  await expect(createBtn).toBeVisible()
   await createBtn.click()
   await expect(page.getByTestId(`form-modal-${formId}`)).toBeVisible()
   await page.getByTestId(`form-modal-${formId}`).getByRole("button", { name: /^cancel$/i }).click()
