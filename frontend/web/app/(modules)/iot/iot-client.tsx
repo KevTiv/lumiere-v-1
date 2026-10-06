@@ -560,13 +560,18 @@ function IotClientLoaded({
                   label: t('common.delete'),
                   variant: 'destructive',
                   requiresSelection: true,
+                  confirm: {
+                    title: t('common.delete'),
+                    description: t('iot.hubs.confirmDeleteHub'),
+                    confirmLabel: t('common.confirm'),
+                    cancelLabel: t('common.cancel'),
+                  },
                   onClick: async (rows) => {
                     setToolbarError(null);
                     if (rows.length !== 1) {
                       setToolbarError(t('iot.toolbar.selectOneHub'));
                       return;
                     }
-                    if (!confirm(t('iot.hubs.confirmDeleteHub'))) return;
                     const id = numField(rows[0]!, 'id', 'Id');
                     deleteHub.mutate(id, {
                       onSuccess: () =>
