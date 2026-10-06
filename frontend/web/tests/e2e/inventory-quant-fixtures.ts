@@ -1,5 +1,5 @@
 import { expect } from "@playwright/test"
-import type { Dialog, Page } from "@playwright/test"
+import type { Page } from "@playwright/test"
 import { stdbBffCommandPost } from "@lumiere/stdb/commands"
 import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
 
@@ -433,22 +433,6 @@ export async function fetchWarehouseStockLocationId(
   return locationId
 }
 
-/**
- * Answer the next `answers.length` browser prompts in order. One listener is
- * registered up front: a UI that opens prompts back to back would otherwise
- * race a handler registered from inside the previous one (an unhandled
- * dialog is dismissed and the action silently aborts).
- */
-function answerPromptsInOrder(page: Page, answers: string[]): void {
-  const queue = [...answers]
-  const onDialog = (dialog: Dialog) => {
-    const answer = queue.shift() ?? ""
-    if (queue.length === 0) page.off("dialog", onDialog)
-    void dialog.accept(answer)
-  }
-  page.on("dialog", onDialog)
-}
-
 export async function createStockQuantFixture(
   page: Page,
   companyId: number,
@@ -682,20 +666,24 @@ export async function createQualityCheckViaUi(
 
 /**
  * Fail a quality check through the Quality checks tab's row action. The action
- * prompts for a quarantine location id then a failure reason, in that order.
+ * opens a dialog asking for the quarantine location (when the warehouse has no
+ * QC location configured) and a failure reason.
  */
 export async function failQualityCheckViaUi(
   page: Page,
   checkId: number,
-  quarantineLocationId: number,
+  quarantineLocationName: string,
   reason: string,
 ): Promise<void> {
   await gotoModule(page, "/inventory", "inventory")
   await selectModuleTab(page, "inventory", "quality")
   await selectEntityRowById(page, checkId)
 
-  const prompts = [String(quarantineLocationId), reason]
-  answerPromptsInOrder(page, prompts)
+  await page.getByTestId("entity-action-fail-check").click()
+  await expect(page.getByTestId("form-modal-form-dialog")).toBeVisible()
+  await page.getByTestId("form-field-quarantineLocationId").click()
+  await page.getByRole("option", { name: quarantineLocationName }).click()
+  await fillField(page, "reason", reason)
 
   await Promise.all([
     page.waitForResponse(
@@ -704,7 +692,7 @@ export async function failQualityCheckViaUi(
         response.ok(),
       { timeout: 30_000 },
     ),
-    page.getByTestId("entity-action-fail-check").click(),
+    page.getByTestId("form-submit-form-dialog").click(),
   ])
 }
 
@@ -821,17 +809,20 @@ export async function executeReplenishmentRuleViaUi(
   ])
 }
 
-/** Create a serial through the Serial numbers tab's row action (prompts: name, then product id). */
+/** Create a serial through the Serial numbers tab's action dialog (serial number, then product). */
 export async function createSerialViaUi(
   page: Page,
-  productId: number,
+  productName: string,
   name: string,
 ): Promise<void> {
   await gotoModule(page, "/inventory", "inventory")
   await selectModuleTab(page, "inventory", "serials")
 
-  const prompts = [name, String(productId)]
-  answerPromptsInOrder(page, prompts)
+  await page.getByTestId("entity-action-create-serial").click()
+  await expect(page.getByTestId("form-modal-form-dialog")).toBeVisible()
+  await fillField(page, "name", name)
+  await page.getByTestId("form-field-productId").click()
+  await page.getByRole("option", { name: productName }).click()
 
   await Promise.all([
     page.waitForResponse(
@@ -840,7 +831,7 @@ export async function createSerialViaUi(
         response.ok(),
       { timeout: 30_000 },
     ),
-    page.getByTestId("entity-action-create-serial").click(),
+    page.getByTestId("form-submit-form-dialog").click(),
   ])
 }
 
