@@ -777,6 +777,7 @@ function SubscriptionsClientLoaded({
                 titleKey: "code",
                 statusKey: "state",
                 auditTableName: "subscription",
+                discussion: {},
                 detailConfig: { mode: "detail", sections: [{ id: "subscription", fields: [
                   { key: "code", label: t("subscriptions.subscriptions.columns.code") },
                   { key: "description", label: t("subscriptions.subscriptions.columns.description") },

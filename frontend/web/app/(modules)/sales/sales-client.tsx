@@ -1065,6 +1065,16 @@ function SalesClientLoaded({
       statusBadgeLabels: status.badgeLabels,
       detailConfig,
       auditTableName: 'sale_order',
+      discussion: {
+        attachments: (record) => (
+          <RecordDocumentAttachments
+            organizationId={orgId}
+            resModel='sale_order'
+            resId={BigInt(String(record.id))}
+            title='Attachments'
+          />
+        ),
+      },
       openHref: saleOrderRecordHref,
       customTabs: [
         {

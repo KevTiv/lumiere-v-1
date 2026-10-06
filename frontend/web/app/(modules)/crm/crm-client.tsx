@@ -1045,6 +1045,7 @@ function CrmClientLoaded({
       },
       detailConfig: leadDetailConfig(t),
       auditTableName: "lead",
+      discussion: {},
       customTabs: [
         {
           id: "score",
@@ -1085,6 +1086,7 @@ function CrmClientLoaded({
       },
       detailConfig: opportunityDetailConfig(t),
       auditTableName: "opportunity",
+      discussion: {},
       customTabs: [
         {
           id: "activity",
@@ -1115,6 +1117,7 @@ function CrmClientLoaded({
       titleKey: "name",
       detailConfig: contactDetailConfig(t),
       auditTableName: "contact",
+      discussion: {},
       customTabs: [
         {
           id: "phones-and-roles",

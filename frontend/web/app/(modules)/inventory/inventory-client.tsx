@@ -1558,6 +1558,7 @@ function InventoryClientLoaded({
       statusBadgeLabels: status.badgeLabels,
       detailConfig: productDetailConfig(t),
       auditTableName: 'product',
+      discussion: {},
     };
   }, [t]);
 
@@ -1675,6 +1676,7 @@ function InventoryClientLoaded({
       statusBadgeLabels: status.badgeLabels,
       detailConfig,
       auditTableName: 'stock_picking',
+      discussion: {},
       customTabs: [
         {
           id: 'moves',

@@ -10,6 +10,13 @@ export interface EntityRecordSheetTab {
   content: (record: Record<string, unknown>) => ReactNode
 }
 
+export interface EntityRecordSheetDiscussion {
+  /** Record model the notes are filed under; defaults to `auditTableName`. */
+  resModel?: string
+  /** Attachments for the record, shown under the notes (the web app supplies its document panel). */
+  attachments?: (record: Record<string, unknown>) => ReactNode
+}
+
 export interface EntityRecordSheetConfig {
   /** Record field key used for the sheet title */
   titleKey: string
@@ -27,6 +34,8 @@ export interface EntityRecordSheetConfig {
   actions?: ReactNode
   /** SpacetimeDB snake_case table name for the Audit tab filter */
   auditTableName?: string
+  /** Adds a Discussion tab with the record's notes, followers and attachments. */
+  discussion?: EntityRecordSheetDiscussion
   /** Where the record has a page of its own: the sheet then offers an "Open" link to it. */
   openHref?: (record: Record<string, unknown>) => string | undefined
 }

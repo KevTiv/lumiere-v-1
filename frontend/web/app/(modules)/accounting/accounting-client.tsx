@@ -1080,6 +1080,7 @@ function AccountingClientReady({
         currencyLabelMap,
       }),
       auditTableName: "account_payment",
+      discussion: {},
     }
   }, [t, partnerLabelMap, journalLabelMap, currencyLabelMap])
 
@@ -1092,6 +1093,7 @@ function AccountingClientReady({
       statusBadgeLabels: status.badgeLabels,
       detailConfig: bankStatementDetailConfig(t),
       auditTableName: "account_bank_statement",
+      discussion: {},
       customTabs: [
         {
           id: "lines",
@@ -1178,6 +1180,7 @@ function AccountingClientReady({
       statusBadgeLabels: moveStatus.badgeLabels,
       detailConfig: accountMoveDetailConfig(t),
       auditTableName: "account_move",
+      discussion: {},
       customTabs: [
         {
           id: "lines",

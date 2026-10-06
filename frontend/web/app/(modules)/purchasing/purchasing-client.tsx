@@ -1140,6 +1140,16 @@ function PurchasingClientLoaded({
       statusBadgeLabels: status.badgeLabels,
       detailConfig,
       auditTableName: "purchase_order",
+      discussion: {
+        attachments: (record) => (
+          <RecordDocumentAttachments
+            organizationId={orgId}
+            resModel="purchase_order"
+            resId={BigInt(String(record.id))}
+            title="Attachments"
+          />
+        ),
+      },
       customTabs: [
         {
           id: "lines",

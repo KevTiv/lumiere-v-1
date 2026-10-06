@@ -673,6 +673,7 @@ function HrClientLoaded({
       statusBadgeLabels: status.badgeLabels,
       detailConfig: employeeDetailConfig(t),
       auditTableName: "hr_employee",
+      discussion: {},
       customTabs: [
         {
           id: "onboarding",
@@ -709,6 +710,7 @@ function HrClientLoaded({
       statusBadgeLabels: status.badgeLabels,
       detailConfig: leaveDetailConfig(t),
       auditTableName: "hr_leave",
+      discussion: {},
       customTabs: [
         {
           id: "approval",
@@ -728,6 +730,7 @@ function HrClientLoaded({
       statusBadgeLabels: status.badgeLabels,
       detailConfig: contractDetailConfig(t),
       auditTableName: "hr_contract",
+      discussion: {},
       customTabs: [
         {
           id: "compensation",

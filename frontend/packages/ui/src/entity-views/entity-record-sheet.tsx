@@ -11,6 +11,8 @@ import {
   SheetTitle,
 } from "../components/sheet"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/tabs"
+import { useErpSession } from "@lumiere/erp-session"
+import { RecordChatter } from "../crm-components/crm-record-chatter"
 import { EntityDetail } from "./entity-detail"
 import { RecordAuditTab } from "./record-audit-tab"
 import type { EntityRecordSheetConfig } from "../lib/module-types"
@@ -46,6 +48,10 @@ export function EntityRecordSheet({
     (config.statusBadgeVariants?.[statusRaw] as BadgeVariant | undefined) ??
     "secondary"
   const statusLabel = config.statusBadgeLabels?.[statusRaw] ?? humanizeEnumValue(statusRaw)
+  const { organizationId } = useErpSession()
+  const discussionModel = config.discussion ? (config.discussion.resModel ?? config.auditTableName) : undefined
+  const recordId = record ? String(record.id ?? record.Id ?? "") : ""
+  const showDiscussion = Boolean(discussionModel && organizationId && /^\d+$/.test(recordId))
   const openHref = record ? config.openHref?.(record) : undefined
 
   return (
@@ -94,6 +100,11 @@ export function EntityRecordSheet({
                       {tab.label}
                     </TabsTrigger>
                   ))}
+                  {showDiscussion && (
+                    <TabsTrigger value="discussion" data-testid="entity-record-sheet-tab-discussion">
+                      Discussion
+                    </TabsTrigger>
+                  )}
                   <TabsTrigger value="audit">Audit</TabsTrigger>
                 </TabsList>
 
@@ -106,6 +117,18 @@ export function EntityRecordSheet({
                     {tab.content(record)}
                   </TabsContent>
                 ))}
+
+                {showDiscussion && discussionModel && organizationId ? (
+                  <TabsContent value="discussion" className="mt-4 space-y-6">
+                    <RecordChatter
+                      organizationId={organizationId}
+                      resModel={discussionModel}
+                      resId={BigInt(recordId)}
+                      recordTitle={title}
+                    />
+                    {config.discussion?.attachments?.(record)}
+                  </TabsContent>
+                ) : null}
 
                 <TabsContent value="audit" className="mt-4">
                   {config.auditTableName ? (
