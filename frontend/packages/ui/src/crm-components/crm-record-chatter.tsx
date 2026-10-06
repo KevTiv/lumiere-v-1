@@ -35,6 +35,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { cn } from "@/lib/utils"
+import { showWorkflowToast } from "../lib/workflow-toast"
 import {
   formatTimelineDate,
   mergeRecordTimeline,
@@ -60,6 +61,14 @@ function messageTypeLabel(v: unknown): string {
   if (s === "email") return "email"
   if (s === "notification" || s === "user_notification") return "notification"
   return s || "message"
+}
+
+function reportError(error: unknown, title: string) {
+  showWorkflowToast({
+    kind: "error",
+    title,
+    description: error instanceof Error ? error.message : String(error),
+  })
 }
 
 function parseAttachmentIds(raw: string): bigint[] {
@@ -301,7 +310,7 @@ export function CrmRecordChatter({
       try {
         attachmentIds = parseAttachmentIds(attachmentIdsRaw)
       } catch {
-        window.alert(t("crm.chatter.attachmentIdsInvalid"))
+        reportError(new Error(t("crm.chatter.attachmentIdsInvalid")), t("crm.chatter.postNote"))
         return
       }
     }
@@ -319,7 +328,7 @@ export function CrmRecordChatter({
       setAttachmentIdsRaw("")
       reloadMessages()
     } catch (e) {
-      window.alert(e instanceof Error ? e.message : String(e))
+      reportError(e, t("crm.chatter.postNote"))
     } finally {
       setBusy(false)
     }
@@ -349,7 +358,7 @@ export function CrmRecordChatter({
       setActivityDeadline("")
       reloadActivities()
     } catch (e) {
-      window.alert(e instanceof Error ? e.message : String(e))
+      reportError(e, t("crm.chatter.scheduleActivity"))
     } finally {
       setBusy(false)
     }
@@ -361,7 +370,7 @@ export function CrmRecordChatter({
       await completeActivity.mutateAsync(activityId)
       reloadActivities()
     } catch (e) {
-      window.alert(e instanceof Error ? e.message : String(e))
+      reportError(e, t("crm.chatter.markDone"))
     } finally {
       setBusy(false)
     }
@@ -377,12 +386,16 @@ export function CrmRecordChatter({
         await subscribeToRecord(org, resModel, resId, [...FOLLOW_SUBTYPES])
       }
     } catch (e) {
-      window.alert(e instanceof Error ? e.message : String(e))
+      reportError(e, t("crm.chatter.follow"))
     } finally {
       setBusy(false)
       reloadFollower()
     }
   }
+
+  // The backend attaches activities only to contacts, leads and opportunities. On any other
+  // record a scheduled activity would be saved unattached and never show here, so don't offer it.
+  const canScheduleActivities = crmActivityTargetFor(resModel, resId) !== undefined
 
   const heading = useMemo(() => {
     if (recordTitle?.trim()) return recordTitle.trim()
@@ -439,6 +452,7 @@ export function CrmRecordChatter({
         </Button>
       </div>
 
+      {canScheduleActivities ? (
       <div className="space-y-3 rounded-md border p-3 bg-muted/20">
         <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
           {t("crm.chatter.logActivity")}
@@ -501,6 +515,7 @@ export function CrmRecordChatter({
           {t("crm.chatter.scheduleActivity")}
         </Button>
       </div>
+      ) : null}
 
       <div className="border-t pt-3 space-y-2 max-h-72 overflow-y-auto">
         <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">

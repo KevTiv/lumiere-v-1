@@ -15,6 +15,7 @@ import {
   EmptyTitle,
   MissingOrganization,
   RecordAuditTab,
+  RecordChatter,
   RecordPage,
   RecordWorkflowActions,
   SaleOrderLineGrid,
@@ -75,6 +76,7 @@ import { useSalesModuleSubscription } from '@/lib/module-subscription-hooks';
 import { hasValidOrganizationId, orgBigInts } from '@/lib/org-scoped';
 import { toCreateSaleOrderLineParams, toUpdateSaleOrderLineParams } from '@/lib/sales-create-params';
 import { phCapture } from '@/lib/posthog-browser';
+import { RecordDocumentAttachments } from '../../../../../components/record-document-attachments';
 import { OrderHandoffLinks } from '../../../../../components/order-handoff-links';
 import { CreateInvoiceFromOrderDialog, EditSaleOrderDialog } from '../../sale-order-dialogs';
 import {
@@ -109,7 +111,7 @@ const PRIMARY_ACTION_IDS: ReadonlySet<string> = new Set([
   'sales.order.create-invoice',
 ]);
 
-const TAB_IDS = ['overview', 'lines', 'handoffs', 'audit'] as const;
+const TAB_IDS = ['overview', 'lines', 'handoffs', 'discussion', 'audit'] as const;
 type TabId = (typeof TAB_IDS)[number];
 
 export function SaleOrderPageClient(props: SaleOrderPageClientProps) {
@@ -570,6 +572,26 @@ function SaleOrderPageLoaded({
                     stockPickings as never,
                     accountMoves as never,
                   )}
+                />
+              </div>
+            ),
+          },
+          {
+            id: 'discussion',
+            label: t('sales.order.discussion', { defaultValue: 'Discussion' }),
+            content: (
+              <div className="grid gap-6 lg:grid-cols-2" data-testid="sale-order-discussion">
+                <RecordChatter
+                  organizationId={organizationId}
+                  resModel="sale_order"
+                  resId={BigInt(orderId)}
+                  recordTitle={label}
+                />
+                <RecordDocumentAttachments
+                  organizationId={orgId}
+                  resModel="sale_order"
+                  resId={BigInt(orderId)}
+                  title={t('sales.order.attachments', { defaultValue: 'Attachments' })}
                 />
               </div>
             ),
