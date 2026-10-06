@@ -113,6 +113,7 @@ export function VatReportPanel({ organizationId, companyId, financialReports }: 
           icon: FileDown,
           requiresSelection: true,
           selection: "multiple",
+          isApplicable: (rows) => rows.some((row) => vatRowIsExportable(row)),
           onClick: (rows) => {
             for (const r of rows) {
               if (!vatRowIsExportable(r)) {
@@ -144,6 +145,7 @@ export function VatReportPanel({ organizationId, companyId, financialReports }: 
           icon: FileSpreadsheet,
           requiresSelection: true,
           selection: "multiple",
+          isApplicable: (rows) => rows.some((row) => vatRowIsExportable(row)),
           onClick: (rows) => {
             for (const r of rows) {
               if (!vatRowIsExportable(r)) {
@@ -175,6 +177,7 @@ export function VatReportPanel({ organizationId, companyId, financialReports }: 
           icon: Archive,
           requiresSelection: true,
           selection: "multiple",
+          isApplicable: (rows) => rows.some((row) => vatRowIsArchivable(row)),
           onClick: (rows) => {
             for (const r of rows) {
               const st = reportStateTag(r.state)

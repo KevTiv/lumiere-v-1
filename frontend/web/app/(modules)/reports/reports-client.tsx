@@ -454,6 +454,8 @@ function ReportsClientLoaded({
             icon: FileDown,
             requiresSelection: true,
             selection: "multiple",
+            isApplicable: (rows) => rows.some((row) => String(row.state) === "generated"),
+            successMessage: t("common.actionCompleted", { action: t("reports.actions.exportPdf") }),
             onClick: async (rows) => {
               for (const r of rows) {
                 if (String(r.state) === "generated") {
@@ -471,6 +473,8 @@ function ReportsClientLoaded({
             icon: FileSpreadsheet,
             requiresSelection: true,
             selection: "multiple",
+            isApplicable: (rows) => rows.some((row) => String(row.state) === "generated"),
+            successMessage: t("common.actionCompleted", { action: t("reports.actions.exportXlsx") }),
             onClick: async (rows) => {
               for (const r of rows) {
                 if (String(r.state) === "generated") {
@@ -488,6 +492,8 @@ function ReportsClientLoaded({
             icon: FileText,
             requiresSelection: true,
             selection: "multiple",
+            isApplicable: (rows) => rows.some((row) => String(row.state) === "generated"),
+            successMessage: t("common.actionCompleted", { action: t("reports.actions.exportCsv") }),
             onClick: async (rows) => {
               for (const r of rows) {
                 if (String(r.state) === "generated") {
@@ -505,6 +511,8 @@ function ReportsClientLoaded({
             icon: RefreshCw,
             requiresSelection: true,
             selection: "multiple",
+            isApplicable: (rows) => rows.some((row) => String(row.state) === "draft"),
+            successMessage: t("common.actionCompleted", { action: t("reports.actions.regenerate") }),
             onClick: async (rows) => {
               for (const r of rows) {
                 if (String(r.state) === "draft") {
@@ -519,6 +527,8 @@ function ReportsClientLoaded({
             icon: Archive,
             requiresSelection: true,
             selection: "multiple",
+            isApplicable: (rows) => rows.some((row) => String(row.state) === "exported"),
+            successMessage: t("common.actionCompleted", { action: t("reports.actions.archive") }),
             onClick: async (rows) => {
               for (const r of rows) {
                 if (String(r.state) === "exported") {
@@ -534,6 +544,8 @@ function ReportsClientLoaded({
             requiresSelection: true,
             selection: "multiple",
             variant: "destructive",
+            isApplicable: (rows) => rows.some((row) => String(row.state) !== "archived"),
+            successMessage: t("common.actionCompleted", { action: t("reports.actions.delete") }),
             onClick: async (rows) => {
               for (const r of rows) {
                 const st = String(r.state)

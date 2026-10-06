@@ -1438,6 +1438,7 @@ function PurchasingClientLoaded({
               defaultValue: "Edit header",
             }),
             requiresSelection: true,
+            isApplicable: (rows) => rows.every((r) => poState(r) === "Draft"),
             onClick: (rows) => {
               const first = rows[0]
               if (!first || poState(first) !== "Draft") return
@@ -1470,6 +1471,7 @@ function PurchasingClientLoaded({
             label: t("purchasing.actions.recalculateTotals"),
             requiresSelection: true,
             selection: "multiple",
+            successMessage: t("common.actionCompleted", { action: t("purchasing.actions.recalculateTotals") }),
             onClick: async (rows) => {
               for (const r of rows) {
                 await computePoTotals.mutateAsync(r.id as string | number | bigint)
@@ -1481,6 +1483,7 @@ function PurchasingClientLoaded({
             label: t("purchasing.actions.recalculateLineTotals"),
             requiresSelection: true,
             selection: "multiple",
+            successMessage: t("common.actionCompleted", { action: t("purchasing.actions.recalculateLineTotals") }),
             onClick: async (rows) => {
               for (const r of rows) {
                 await computePoLineTotals.mutateAsync(r.id as string | number | bigint)
@@ -1492,6 +1495,7 @@ function PurchasingClientLoaded({
             label: t("purchasing.actions.refreshReceiptStatus"),
             requiresSelection: true,
             selection: "multiple",
+            successMessage: t("common.actionCompleted", { action: t("purchasing.actions.refreshReceiptStatus") }),
             onClick: async (rows) => {
               for (const r of rows) {
                 await updatePoReceiptStatus.mutateAsync(r.id as string | number | bigint)
@@ -1503,6 +1507,7 @@ function PurchasingClientLoaded({
             label: t("purchasing.actions.refreshInvoiceStatus"),
             requiresSelection: true,
             selection: "multiple",
+            successMessage: t("common.actionCompleted", { action: t("purchasing.actions.refreshInvoiceStatus") }),
             onClick: async (rows) => {
               for (const r of rows) {
                 await updatePoInvoiceStatus.mutateAsync(r.id as string | number | bigint)
@@ -1514,6 +1519,8 @@ function PurchasingClientLoaded({
             label: t("purchasing.actions.lockSelected"),
             requiresSelection: true,
             selection: "multiple",
+            isApplicable: (rows) => rows.every((r) => poState(r) !== "Done" && poState(r) !== "Cancelled"),
+            successMessage: t("common.actionCompleted", { action: t("purchasing.actions.lockSelected") }),
             onClick: async (rows) => {
               for (const r of rows) {
                 await lockPurchaseOrder.mutateAsync(r.id as string | number | bigint)
@@ -1525,6 +1532,7 @@ function PurchasingClientLoaded({
             label: t("purchasing.actions.unlockSelected"),
             requiresSelection: true,
             selection: "multiple",
+            successMessage: t("common.actionCompleted", { action: t("purchasing.actions.unlockSelected") }),
             onClick: async (rows) => {
               for (const r of rows) {
                 await unlockPurchaseOrder.mutateAsync(r.id as string | number | bigint)
@@ -1699,6 +1707,7 @@ function PurchasingClientLoaded({
             requiresSelection: true,
             selection: "multiple",
             variant: "destructive",
+            successMessage: t("common.actionCompleted", { action: t("common.delete") }),
             onClick: async (rows) => {
               for (const r of rows) {
                 await removePurchaseOrderLine.mutateAsync(r.id as string | number | bigint)
@@ -1829,6 +1838,8 @@ function PurchasingClientLoaded({
           requiresSelection: true,
           selection: "multiple",
           variant: "destructive",
+          isApplicable: (rows) => rows.some((r) => landedCostState(r) === "Draft"),
+          successMessage: t("common.actionCompleted", { action: t("common.delete") }),
           onClick: async (rows) => {
             for (const r of rows) {
               if (landedCostState(r) === "Draft") {
@@ -1968,6 +1979,9 @@ function PurchasingClientLoaded({
           requiresSelection: true,
           selection: "multiple",
           variant: "destructive",
+          isApplicable: (rows) =>
+            rows.every((r) => !["Approved", "Rejected", "Onboarded"].includes(supplierIntakeState(r))),
+          successMessage: t("common.actionCompleted", { action: t("common.delete") }),
           onClick: async (rows) => {
             for (const r of rows) {
               await deleteSupplierIntake.mutateAsync(r.id as string | number | bigint)
@@ -2246,6 +2260,7 @@ function PurchasingClientLoaded({
                         requiresSelection: true,
                         selection: "multiple",
                         variant: "destructive",
+                        successMessage: t("common.actionCompleted", { action: t("common.delete") }),
                         confirm: {
                           title: t("common.delete"),
                           description: (rows: Record<string, unknown>[]) => t("purchasing.partnerBanks.deleteConfirm", { count: rows.length }),

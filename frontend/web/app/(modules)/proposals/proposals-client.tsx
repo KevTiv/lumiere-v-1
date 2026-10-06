@@ -237,6 +237,8 @@ function ProposalsClientLoaded({ initialProposals, organizationId }: ProposalsCl
         icon: Eye,
         variant: "outline",
         requiresSelection: true,
+        isApplicable: (rows) => rows.every((row) => normalizeProposalStatus(row.status) === "Draft"),
+        successMessage: t("common.actionCompleted", { action: t("proposals.actions.submitForReview") }),
         onClick: async (rows) => {
           const row = rows[0]
           if (!row?.id || normalizeProposalStatus(row.status) !== "Draft") return
@@ -249,6 +251,8 @@ function ProposalsClientLoaded({ initialProposals, organizationId }: ProposalsCl
         icon: Send,
         variant: "outline",
         requiresSelection: true,
+        isApplicable: (rows) => rows.every((row) => normalizeProposalStatus(row.status) === "Review"),
+        successMessage: t("common.actionCompleted", { action: t("proposals.actions.submit") }),
         onClick: async (rows) => {
           const row = rows[0]
           if (!row?.id || normalizeProposalStatus(row.status) !== "Review") return
@@ -261,13 +265,13 @@ function ProposalsClientLoaded({ initialProposals, organizationId }: ProposalsCl
         icon: Award,
         variant: "default",
         requiresSelection: true,
-        onClick: (rows) => {
+        isApplicable: (rows) => rows.every((row) => normalizeProposalStatus(row.status) === "Submitted"),
+        successMessage: t("common.actionCompleted", { action: t("proposals.actions.award") }),
+        onClick: async (rows) => {
           const row = rows[0]
           if (!row?.id || normalizeProposalStatus(row.status) !== "Submitted") return
-          void (async () => {
-            await approveProposal.mutateAsync(row.id as string | number)
-            await setStatus(row.id as string | number, "awarded")
-          })()
+          await approveProposal.mutateAsync(row.id as string | number)
+          await setStatus(row.id as string | number, "awarded")
         },
       },
       {
@@ -276,6 +280,8 @@ function ProposalsClientLoaded({ initialProposals, organizationId }: ProposalsCl
         icon: FileOutput,
         variant: "outline",
         requiresSelection: true,
+        isApplicable: (rows) =>
+          rows.every((row) => normalizeProposalStatus(row.status) === "Awarded" && row.saleOrderId == null && row.sale_order_id == null),
         onClick: (rows) => {
           const row = rows[0]
           if (!row?.id || normalizeProposalStatus(row.status) !== "Awarded") return
@@ -289,6 +295,12 @@ function ProposalsClientLoaded({ initialProposals, organizationId }: ProposalsCl
         icon: ThumbsDown,
         variant: "outline",
         requiresSelection: true,
+        isApplicable: (rows) =>
+          rows.every((row) => {
+            const s = normalizeProposalStatus(row.status)
+            return s !== "Rejected" && s !== "Archived"
+          }),
+        successMessage: t("common.actionCompleted", { action: t("proposals.actions.reject") }),
         onClick: async (rows) => {
           const row = rows[0]
           if (!row?.id) return
@@ -303,6 +315,12 @@ function ProposalsClientLoaded({ initialProposals, organizationId }: ProposalsCl
         icon: Archive,
         variant: "outline",
         requiresSelection: true,
+        isApplicable: (rows) =>
+          rows.every((row) => {
+            const s = normalizeProposalStatus(row.status)
+            return s === "Awarded" || s === "Rejected"
+          }),
+        successMessage: t("common.actionCompleted", { action: t("proposals.actions.archive") }),
         onClick: async (rows) => {
           const row = rows[0]
           if (!row?.id) return

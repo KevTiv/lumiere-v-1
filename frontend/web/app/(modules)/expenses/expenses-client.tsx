@@ -492,6 +492,7 @@ function ExpensesClientLoaded({
                   label: t("expenses.workflow.submitReport"),
                   requiresSelection: true,
                   selection: "multiple",
+                  isApplicable: (rows) => rows.some((r) => rowState(r) === "Draft"),
                   onClick: async (rows) => {
                     const draft = rows.filter((r) => rowState(r) === "Draft")
                     if (draft.length === 0) {
@@ -508,6 +509,7 @@ function ExpensesClientLoaded({
                   label: t("expenses.workflow.approveReport"),
                   requiresSelection: true,
                   selection: "multiple",
+                  isApplicable: (rows) => rows.some((r) => rowState(r) === "Submitted"),
                   onClick: async (rows) => {
                     const submitted = rows.filter((r) => rowState(r) === "Submitted")
                     if (submitted.length === 0) {
@@ -524,6 +526,7 @@ function ExpensesClientLoaded({
                   label: t("expenses.workflow.refuseReport"),
                   requiresSelection: true,
                   selection: "multiple",
+                  isApplicable: (rows) => rows.some((r) => rowState(r) === "Submitted"),
                   variant: "destructive",
                   onClick: (rows) => {
                     const submitted = rows.filter((r) => rowState(r) === "Submitted")
@@ -544,6 +547,7 @@ function ExpensesClientLoaded({
                   label: t("expenses.workflow.postReport"),
                   requiresSelection: true,
                   selection: "multiple",
+                  isApplicable: (rows) => rows.some((r) => rowState(r) === "Approved"),
                   onClick: (rows) => {
                     const approved = rows.filter((r) => rowState(r) === "Approved")
                     if (approved.length === 0) {
@@ -562,6 +566,7 @@ function ExpensesClientLoaded({
                   label: t("expenses.workflow.reimburseReport"),
                   requiresSelection: true,
                   selection: "multiple",
+                  isApplicable: (rows) => rows.some((r) => rowState(r) === "Posted"),
                   onClick: (rows) => {
                     const posted = rows.filter((r) => rowState(r) === "Posted")
                     if (posted.length === 0) {

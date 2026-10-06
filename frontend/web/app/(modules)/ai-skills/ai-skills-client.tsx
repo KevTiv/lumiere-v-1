@@ -442,7 +442,7 @@ function AiSkillsLoaded({ organizationId }: { organizationId: number }) {
                     disabled={unassignSkill.isPending}
                     onClick={() => {
                       if (!window.confirm("Remove this skill assignment?")) return
-                      void unassignSkill.mutateAsync(assignmentId)
+                      unassignSkill.mutateAsync(assignmentId).catch((e) => setSubmitError(String(e)))
                     }}
                   >
                     Unassign

@@ -39,6 +39,7 @@ import {
 } from "@/lib/projects-create-params"
 import { projectsModuleConfig } from "@/lib/module-dashboard-configs"
 import Link from "next/link"
+import { showWorkflowToast } from "@lumiere/ui/lib/workflow-toast"
 import { getProjectFieldValue, projectHref } from "./project-record"
 import { useProjectsModuleSubscription } from "@/lib/module-subscription-hooks"
 import {
@@ -276,6 +277,10 @@ function idLines(value: unknown): Array<string | number | bigint> {
     .split(/\r?\n/)
     .map((line) => line.trim())
     .filter(Boolean)
+}
+
+function timesheetStatus(row: Record<string, unknown>): string {
+  return String(row.validationStatus ?? row.validation_status ?? "")
 }
 
 export function ProjectsClient(props: ProjectsClientProps) {
@@ -622,20 +627,36 @@ function ProjectsClientLoaded({
                 form: integrationIntentFormConfig,
               })
             }
-            onRefreshForecast={() =>
-              void refreshForecast.mutateAsync({
-                employeeId: null,
-                periodStart: null,
-                periodEnd: null,
-                metadata: null,
-              })
-            }
-            onRefreshEvm={() =>
-              void refreshEvm.mutateAsync({
-                projectIds: [],
-                metadata: null,
-              })
-            }
+            onRefreshForecast={async () => {
+              try {
+                await refreshForecast.mutateAsync({
+                  employeeId: null,
+                  periodStart: null,
+                  periodEnd: null,
+                  metadata: null,
+                })
+              } catch (error) {
+                showWorkflowToast({
+                  kind: "error",
+                  title: "Capacity forecast refresh failed",
+                  description: error instanceof Error ? error.message : String(error),
+                })
+              }
+            }}
+            onRefreshEvm={async () => {
+              try {
+                await refreshEvm.mutateAsync({
+                  projectIds: [],
+                  metadata: null,
+                })
+              } catch (error) {
+                showWorkflowToast({
+                  kind: "error",
+                  title: "Earned value refresh failed",
+                  description: error instanceof Error ? error.message : String(error),
+                })
+              }
+            }}
           />
           <TimesheetCapturePanel organizationId={organizationId} />
         </div>
@@ -1104,6 +1125,9 @@ function ProjectsClientLoaded({
                   label: "Stop timer",
                   requiresSelection: true,
                   selection: "multiple",
+                  isApplicable: (rows) =>
+                    rows.every((row) => (row.isTimerRunning ?? row.is_timer_running) === true),
+                  successMessage: t("common.actionCompleted", { action: "Stop timer" }),
                   onClick: (rows) => runForSelectedIds(rows, (id) => stopTimer.mutateAsync(id)),
                 },
                 {
@@ -1111,6 +1135,8 @@ function ProjectsClientLoaded({
                   label: "Validate",
                   requiresSelection: true,
                   selection: "multiple",
+                  isApplicable: (rows) => rows.every((row) => timesheetStatus(row) === "draft"),
+                  successMessage: t("common.actionCompleted", { action: "Validate" }),
                   onClick: (rows) =>
                     validateTimesheets.mutateAsync({
                       companyId: operatingCompanyId,
@@ -1122,6 +1148,12 @@ function ProjectsClientLoaded({
                   label: "Reject",
                   requiresSelection: true,
                   selection: "multiple",
+                  isApplicable: (rows) =>
+                    rows.every((row) => {
+                      const status = timesheetStatus(row)
+                      return status === "draft" || status === "submitted"
+                    }),
+                  successMessage: t("common.actionCompleted", { action: "Reject" }),
                   variant: "destructive" as const,
                   onClick: (rows) =>
                     rejectTimesheets.mutateAsync({
@@ -1135,6 +1167,12 @@ function ProjectsClientLoaded({
                   label: "Bill",
                   requiresSelection: true,
                   selection: "multiple",
+                  isApplicable: (rows) =>
+                    rows.every(
+                      (row) =>
+                        timesheetStatus(row) === "validated" &&
+                        (row.timesheetInvoiceId ?? row.timesheet_invoice_id) == null,
+                    ),
                   onClick: (rows) => {
                     setLifecycleError(null)
                     setLifecycleModal({ type: "billTimesheets", rows, form: billTimesheetsFormConfig })

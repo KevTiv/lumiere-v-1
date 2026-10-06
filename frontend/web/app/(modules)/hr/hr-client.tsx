@@ -169,6 +169,12 @@ function payslipState(row: Record<string, unknown>): string {
   return String(row.state ?? row.State ?? "")
 }
 
+function hrRowState(row: Record<string, unknown>): string {
+  const value = row.state ?? row.State
+  if (value && typeof value === "object" && "tag" in value) return String((value as { tag: unknown }).tag)
+  return String(value ?? "")
+}
+
 function employeeRowId(row: Record<string, unknown>): number {
   return Number(row.id ?? row.Id ?? 0)
 }
@@ -486,6 +492,7 @@ function HrClientLoaded({
       for (const row of rows) await fn(row)
     } catch (e) {
       setToolbarError(e instanceof Error ? e.message : String(e))
+      throw e
     }
   }
 
@@ -1031,6 +1038,8 @@ function HrClientLoaded({
                   label: "Submit",
                   requiresSelection: true,
                   selection: "multiple",
+                  isApplicable: (rows) => rows.every((row) => ["Draft"].includes(hrRowState(row))),
+                  successMessage: t("common.actionCompleted", { action: "Submit" }),
                   onClick: (rows) => runSelectedRows(rows, "leave", (row) => submitLeave.mutateAsync(row.id as string | number)),
                 },
                 {
@@ -1038,6 +1047,8 @@ function HrClientLoaded({
                   label: "Approve",
                   requiresSelection: true,
                   selection: "multiple",
+                  isApplicable: (rows) => rows.every((row) => ["Confirm", "ValidatedOne"].includes(hrRowState(row))),
+                  successMessage: t("common.actionCompleted", { action: "Approve" }),
                   onClick: (rows) => runSelectedRows(rows, "leave", (row) => approveLeave.mutateAsync(row.id as string | number)),
                 },
                 {
@@ -1045,6 +1056,8 @@ function HrClientLoaded({
                   label: "Refuse",
                   requiresSelection: true,
                   selection: "multiple",
+                  isApplicable: (rows) => rows.every((row) => ["Confirm", "ValidatedOne"].includes(hrRowState(row))),
+                  successMessage: t("common.actionCompleted", { action: "Refuse" }),
                   onClick: (rows) => runSelectedRows(rows, "leave", (row) => refuseLeave.mutateAsync(row.id as string | number)),
                 },
                 {
@@ -1052,6 +1065,8 @@ function HrClientLoaded({
                   label: "Reset to draft",
                   requiresSelection: true,
                   selection: "multiple",
+                  isApplicable: (rows) => rows.every((row) => ["Refused", "Confirm", "ValidatedOne"].includes(hrRowState(row))),
+                  successMessage: t("common.actionCompleted", { action: "Reset to draft" }),
                   onClick: (rows) => runSelectedRows(rows, "leave", (row) => resetLeave.mutateAsync(row.id as string | number)),
                 },
               ]),
@@ -1091,6 +1106,8 @@ function HrClientLoaded({
                   label: "Open",
                   requiresSelection: true,
                   selection: "multiple",
+                  isApplicable: (rows) => rows.every((row) => ["New"].includes(hrRowState(row))),
+                  successMessage: t("common.actionCompleted", { action: "Open" }),
                   onClick: (rows) => runSelectedRows(rows, "contract", (row) => openContract.mutateAsync(Number(row.id))),
                 },
                 {
@@ -1098,6 +1115,8 @@ function HrClientLoaded({
                   label: "Expire",
                   requiresSelection: true,
                   selection: "multiple",
+                  isApplicable: (rows) => rows.every((row) => ["Open"].includes(hrRowState(row))),
+                  successMessage: t("common.actionCompleted", { action: "Expire" }),
                   onClick: (rows) => runSelectedRows(rows, "contract", (row) => expireContract.mutateAsync({ contractId: Number(row.id) })),
                 },
                 {
@@ -1105,6 +1124,8 @@ function HrClientLoaded({
                   label: "Cancel",
                   requiresSelection: true,
                   selection: "multiple",
+                  isApplicable: (rows) => rows.every((row) => ["New", "Open"].includes(hrRowState(row))),
+                  successMessage: t("common.actionCompleted", { action: "Cancel" }),
                   onClick: (rows) => runSelectedRows(rows, "contract", (row) => cancelContract.mutateAsync(Number(row.id))),
                 },
               ]),
@@ -1137,6 +1158,7 @@ function HrClientLoaded({
                   label: "Approve for export",
                   requiresSelection: true,
                   selection: "multiple",
+                  isApplicable: (rows) => rows.some((row) => hrRowState(row) === "Draft"),
                   onClick: (rows) => {
                     setToolbarError(null)
                     const draftRows = rows.filter((row) => payslipState(row) === "Draft")
@@ -1153,32 +1175,33 @@ function HrClientLoaded({
                   label: "Create STP intent",
                   requiresSelection: true,
                   selection: "multiple",
-                  onClick: (rows) => {
+                  isApplicable: (rows) => rows.some((row) => hrRowState(row) === "Verify"),
+                  successMessage: t("common.actionCompleted", { action: "Create STP intent" }),
+                  onClick: async (rows) => {
                     setToolbarError(null)
                     const verifyRows = rows.filter((row) => payslipState(row) === "Verify")
                     if (verifyRows.length === 0) {
                       setToolbarError("Select Verify (approved) payslips for STP integration.")
                       return
                     }
-                    void (async () => {
-                      try {
-                        for (const row of verifyRows) {
-                          const payslipId = Number(row.id)
-                          await createHrIntegrationIntent.mutateAsync({
-                            intentKind: "stp",
-                            idempotencyKey: `stp-${payslipId}-${Date.now()}`,
+                    try {
+                      for (const row of verifyRows) {
+                        const payslipId = Number(row.id)
+                        await createHrIntegrationIntent.mutateAsync({
+                          intentKind: "stp",
+                          idempotencyKey: `stp-${payslipId}-${Date.now()}`,
+                          payslipId,
+                          payload: JSON.stringify({
                             payslipId,
-                            payload: JSON.stringify({
-                              payslipId,
-                              exportStatus: "sent",
-                              submissionId: `stp-stub-${payslipId}`,
-                            }),
-                          })
-                        }
-                      } catch (e) {
-                        setToolbarError(e instanceof Error ? e.message : String(e))
+                            exportStatus: "sent",
+                            submissionId: `stp-stub-${payslipId}`,
+                          }),
+                        })
                       }
-                    })()
+                    } catch (e) {
+                      setToolbarError(e instanceof Error ? e.message : String(e))
+                      throw e
+                    }
                   },
                 },
                 {
@@ -1186,31 +1209,32 @@ function HrClientLoaded({
                   label: "Create export intent",
                   requiresSelection: true,
                   selection: "multiple",
-                  onClick: (rows) => {
+                  isApplicable: (rows) => rows.some((row) => hrRowState(row) === "Verify"),
+                  successMessage: t("common.actionCompleted", { action: "Create export intent" }),
+                  onClick: async (rows) => {
                     setToolbarError(null)
                     const verifyRows = rows.filter((row) => payslipState(row) === "Verify")
                     if (verifyRows.length === 0) {
                       setToolbarError("Select Verify (approved) payslips to export.")
                       return
                     }
-                    void (async () => {
-                      try {
-                        for (const row of verifyRows) {
-                          const payslipId = Number(row.id)
-                          await createPayrollExportIntent.mutateAsync({
+                    try {
+                      for (const row of verifyRows) {
+                        const payslipId = Number(row.id)
+                        await createPayrollExportIntent.mutateAsync({
+                          payslipId,
+                          idempotencyKey: `payslip-export-${payslipId}-${Date.now()}`,
+                          payload: JSON.stringify({
                             payslipId,
-                            idempotencyKey: `payslip-export-${payslipId}-${Date.now()}`,
-                            payload: JSON.stringify({
-                              payslipId,
-                              grossWage: row.grossWage ?? row.gross_wage,
-                              netWage: row.netWage ?? row.net_wage,
-                            }),
-                          })
-                        }
-                      } catch (e) {
-                        setToolbarError(e instanceof Error ? e.message : String(e))
+                            grossWage: row.grossWage ?? row.gross_wage,
+                            netWage: row.netWage ?? row.net_wage,
+                          }),
+                        })
                       }
-                    })()
+                    } catch (e) {
+                      setToolbarError(e instanceof Error ? e.message : String(e))
+                      throw e
+                    }
                   },
                 },
                 {
@@ -1218,6 +1242,7 @@ function HrClientLoaded({
                   label: "Post to GL",
                   requiresSelection: true,
                   selection: "multiple",
+                  isApplicable: (rows) => rows.some((row) => hrRowState(row) === "Verify"),
                   onClick: (rows) => {
                     setToolbarError(null)
                     const verifyRows = rows.filter((row) => payslipState(row) === "Verify")
@@ -1234,6 +1259,8 @@ function HrClientLoaded({
                   label: "Cancel",
                   requiresSelection: true,
                   selection: "multiple",
+                  isApplicable: (rows) => rows.every((row) => !["Cancelled", "Done"].includes(hrRowState(row))),
+                  successMessage: t("common.actionCompleted", { action: "Cancel" }),
                   onClick: (rows) => runSelectedRows(rows, "payslip", (row) => cancelPayslip.mutateAsync(Number(row.id))),
                 },
               ]),

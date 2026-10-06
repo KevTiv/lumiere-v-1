@@ -597,6 +597,8 @@ function IotClientLoaded({
                   id: 'mark-sent',
                   label: t('iot.actions.markSent'),
                   requiresSelection: true,
+                  isApplicable: (rows) =>
+                    rows.every((row) => str(row.status) === 'Pending'),
                   onClick: async (rows) => {
                     setToolbarError(null);
                     if (rows.length !== 1) {
@@ -626,6 +628,8 @@ function IotClientLoaded({
                   id: 'ack-action',
                   label: 'Acknowledge',
                   requiresSelection: true,
+                  isApplicable: (rows) =>
+                    rows.every((row) => str(row.status) === 'Sent'),
                   onClick: async (rows) => {
                     setToolbarError(null);
                     if (rows.length !== 1 || str(rows[0]?.status) !== 'Sent') {
@@ -652,6 +656,8 @@ function IotClientLoaded({
                   label: 'Retry',
                   requiresSelection: true,
                   selection: 'multiple',
+                  isApplicable: (rows) =>
+                    rows.every((row) => str(row.status) === 'Failed'),
                   onClick: async (rows) => {
                     setToolbarError(null);
                     await Promise.all(
@@ -698,6 +704,8 @@ function IotClientLoaded({
                   label: 'Resolve',
                   requiresSelection: true,
                   selection: 'multiple',
+                  isApplicable: (rows) =>
+                    rows.every((row) => (row.resolvedAt ?? row.resolved_at) == null),
                   onClick: async (rows) => {
                     setToolbarError(null);
                     await Promise.all(

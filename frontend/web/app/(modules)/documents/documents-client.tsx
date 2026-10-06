@@ -473,6 +473,8 @@ function DocumentsClientLoaded({
                   label: "Lock",
                   requiresSelection: true,
                   selection: "multiple",
+                  isApplicable: (rows) => rows.every((row) => !(row.isLocked === true)),
+                  successMessage: t("common.actionCompleted", { action: "Lock" }),
                   onClick: async (rows) => {
                     setDocumentToolbarError(null)
                     try {
@@ -481,6 +483,7 @@ function DocumentsClientLoaded({
                       }
                     } catch (e) {
                       setDocumentToolbarError(e instanceof Error ? e.message : String(e))
+                      throw e
                     }
                   },
                 },
@@ -489,6 +492,8 @@ function DocumentsClientLoaded({
                   label: "Unlock",
                   requiresSelection: true,
                   selection: "multiple",
+                  isApplicable: (rows) => rows.every((row) => row.isLocked === true),
+                  successMessage: t("common.actionCompleted", { action: "Unlock" }),
                   onClick: async (rows) => {
                     setDocumentToolbarError(null)
                     try {
@@ -497,6 +502,7 @@ function DocumentsClientLoaded({
                       }
                     } catch (e) {
                       setDocumentToolbarError(e instanceof Error ? e.message : String(e))
+                      throw e
                     }
                   },
                 },
@@ -566,6 +572,7 @@ function DocumentsClientLoaded({
                   label: "Publish",
                   requiresSelection: true,
                   selection: "multiple",
+                  successMessage: t("common.actionCompleted", { action: "Publish" }),
                   onClick: async (rows) => {
                     setDocumentToolbarError(null)
                     try {
@@ -577,6 +584,7 @@ function DocumentsClientLoaded({
                       }
                     } catch (e) {
                       setDocumentToolbarError(e instanceof Error ? e.message : String(e))
+                      throw e
                     }
                   },
                 },
@@ -585,6 +593,7 @@ function DocumentsClientLoaded({
                   label: "Unpublish",
                   requiresSelection: true,
                   selection: "multiple",
+                  successMessage: t("common.actionCompleted", { action: "Unpublish" }),
                   onClick: async (rows) => {
                     setDocumentToolbarError(null)
                     try {
@@ -596,6 +605,7 @@ function DocumentsClientLoaded({
                       }
                     } catch (e) {
                       setDocumentToolbarError(e instanceof Error ? e.message : String(e))
+                      throw e
                     }
                   },
                 },
@@ -604,6 +614,8 @@ function DocumentsClientLoaded({
                   label: "Lock",
                   requiresSelection: true,
                   selection: "multiple",
+                  isApplicable: (rows) => rows.every((row) => !(row.isLocked === true)),
+                  successMessage: t("common.actionCompleted", { action: "Lock" }),
                   onClick: async (rows) => {
                     setDocumentToolbarError(null)
                     try {
@@ -612,6 +624,7 @@ function DocumentsClientLoaded({
                       }
                     } catch (e) {
                       setDocumentToolbarError(e instanceof Error ? e.message : String(e))
+                      throw e
                     }
                   },
                 },
@@ -620,6 +633,7 @@ function DocumentsClientLoaded({
                   label: "Unlock",
                   requiresSelection: true,
                   selection: "multiple",
+                  successMessage: t("common.actionCompleted", { action: "Unlock" }),
                   onClick: async (rows) => {
                     setDocumentToolbarError(null)
                     try {
@@ -628,6 +642,7 @@ function DocumentsClientLoaded({
                       }
                     } catch (e) {
                       setDocumentToolbarError(e instanceof Error ? e.message : String(e))
+                      throw e
                     }
                   },
                 },
@@ -649,6 +664,7 @@ function DocumentsClientLoaded({
                   label: "Delete",
                   requiresSelection: true,
                   selection: "multiple",
+                  successMessage: t("common.actionCompleted", { action: "Delete" }),
                   onClick: async (rows) => {
                     setDocumentToolbarError(null)
                     try {
@@ -657,6 +673,7 @@ function DocumentsClientLoaded({
                       }
                     } catch (e) {
                       setDocumentToolbarError(e instanceof Error ? e.message : String(e))
+                      throw e
                     }
                   },
                 },
@@ -705,6 +722,7 @@ function DocumentsClientLoaded({
                   label: "Delete folder",
                   requiresSelection: true,
                   selection: "multiple",
+                  successMessage: t("common.actionCompleted", { action: "Delete folder" }),
                   onClick: async (rows) => {
                     setDocumentToolbarError(null)
                     try {
@@ -713,6 +731,7 @@ function DocumentsClientLoaded({
                       }
                     } catch (e) {
                       setDocumentToolbarError(e instanceof Error ? e.message : String(e))
+                      throw e
                     }
                   },
                 },
@@ -732,6 +751,7 @@ function DocumentsClientLoaded({
                   label: "Restore",
                   requiresSelection: true,
                   selection: "multiple",
+                  successMessage: t("common.actionCompleted", { action: "Restore" }),
                   onClick: async (rows) => {
                     setDocumentToolbarError(null)
                     try {
@@ -740,6 +760,7 @@ function DocumentsClientLoaded({
                       }
                     } catch (e) {
                       setDocumentToolbarError(e instanceof Error ? e.message : String(e))
+                      throw e
                     }
                   },
                 },
@@ -747,12 +768,14 @@ function DocumentsClientLoaded({
                   id: "purge-expired",
                   label: "Purge expired",
                   requiresSelection: false,
+                  successMessage: t("common.actionCompleted", { action: "Purge expired" }),
                   onClick: async () => {
                     setDocumentToolbarError(null)
                     try {
                       await purgeExpiredDocuments.mutateAsync()
                     } catch (e) {
                       setDocumentToolbarError(e instanceof Error ? e.message : String(e))
+                      throw e
                     }
                   },
                 },

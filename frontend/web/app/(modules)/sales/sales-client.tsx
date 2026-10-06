@@ -180,6 +180,7 @@ import { useContacts, useUsers, type Contact } from '@lumiere/query-hooks/hooks/
 import { useWarehouses, useProducts, useUoms, useProductCategories } from '@lumiere/query-hooks/hooks/inventory';
 import { hasValidOrganizationId, orgBigInts } from '@/lib/org-scoped';
 import { useRuntimeListConfig } from '@lumiere/ui/forms';
+import { showWorkflowToast } from '@lumiere/ui/lib/workflow-toast';
 import {
   customFieldEntriesFromMetadata,
   findNewestRowByField,
@@ -1331,6 +1332,11 @@ function SalesClientLoaded({
             label: t('sales.actions.applyOptions', { defaultValue: 'Apply CPQ options' }),
             requiresSelection: true,
             selection: 'multiple',
+            isApplicable: (rows) =>
+              rows.some((r) => {
+                const st = saleOrderState(r);
+                return st === 'Draft' || st === 'Sent';
+              }),
             onClick: (rows) => {
               for (const r of rows) {
                 const st = saleOrderState(r);
@@ -1356,6 +1362,14 @@ function SalesClientLoaded({
             }),
             requiresSelection: true,
             selection: 'multiple',
+            isApplicable: (rows) =>
+              rows.some((r) => {
+                const st = saleOrderState(r);
+                return st === 'Sale' || st === 'Done';
+              }),
+            successMessage: t('common.actionCompleted', {
+              action: t('sales.actions.accrueCommission', { defaultValue: 'Accrue commission' }),
+            }),
             onClick: async (rows) => {
               for (const r of rows) {
                 const row = r as Record<string, unknown>;
@@ -1406,6 +1420,7 @@ function SalesClientLoaded({
             label: t('sales.actions.togglePricelistActive'),
             requiresSelection: true,
             selection: 'multiple',
+            successMessage: t('common.actionCompleted', { action: t('sales.actions.togglePricelistActive') }),
             onClick: async (rows) => {
               for (const r of rows) {
                 const id = r.id as string | number | bigint;
@@ -1420,6 +1435,7 @@ function SalesClientLoaded({
             requiresSelection: true,
             selection: 'multiple',
             variant: 'destructive',
+            successMessage: t('common.actionCompleted', { action: t('sales.actions.deletePricelists') }),
             confirm: {
               title: t('sales.actions.deletePricelists'),
               description: (rows) =>
@@ -1452,6 +1468,7 @@ function SalesClientLoaded({
             requiresSelection: true,
             selection: 'multiple',
             variant: 'destructive',
+            successMessage: t('common.actionCompleted', { action: t('sales.actions.deletePricelistRules') }),
             confirm: {
               title: t('sales.actions.deletePricelistRules'),
               description: (rows) =>
@@ -1483,6 +1500,8 @@ function SalesClientLoaded({
             label: t('sales.actions.startBatches'),
             requiresSelection: true,
             selection: 'multiple',
+            isApplicable: (rows) => rows.some((r) => deliveryBatchState(r) === 'Draft'),
+            successMessage: t('common.actionCompleted', { action: t('sales.actions.startBatches') }),
             onClick: async (rows) => {
               for (const r of rows) {
                 if (deliveryBatchState(r) === 'Draft') {
@@ -1496,6 +1515,8 @@ function SalesClientLoaded({
             label: t('sales.actions.completeBatches'),
             requiresSelection: true,
             selection: 'multiple',
+            isApplicable: (rows) => rows.some((r) => deliveryBatchState(r) === 'InProgress'),
+            successMessage: t('common.actionCompleted', { action: t('sales.actions.completeBatches') }),
             onClick: async (rows) => {
               for (const r of rows) {
                 if (deliveryBatchState(r) === 'InProgress') {
@@ -1509,6 +1530,8 @@ function SalesClientLoaded({
             label: t('sales.actions.cancelBatches'),
             requiresSelection: true,
             selection: 'multiple',
+            isApplicable: (rows) => rows.some((r) => deliveryBatchState(r) !== 'Done'),
+            successMessage: t('common.actionCompleted', { action: t('sales.actions.cancelBatches') }),
             variant: 'destructive',
             onClick: async (rows) => {
               for (const r of rows) {
@@ -2028,9 +2051,15 @@ function SalesClientLoaded({
                 <InvoiceListView
                   invoices={salesInvoices}
                   onRecalculateTotals={(inv) =>
-                    void computeInvoiceTotals.mutateAsync(
-                      inv.id as string | number | bigint,
-                    )
+                    void computeInvoiceTotals
+                      .mutateAsync(inv.id as string | number | bigint)
+                      .catch((error: unknown) => {
+                        showWorkflowToast({
+                          kind: 'error',
+                          title: t('common.error.title'),
+                          description: error instanceof Error ? error.message : String(error),
+                        });
+                      })
                   }
                 />
               ),

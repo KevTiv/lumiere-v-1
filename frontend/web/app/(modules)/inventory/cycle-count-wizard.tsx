@@ -17,6 +17,8 @@ import {
   useCancelQualityAlert,
 } from '@lumiere/query-hooks/hooks/inventory';
 import { useCycleCountAdjustmentWorkflow } from '@lumiere/query-hooks/hooks/cycle-count-adjustment-workflow';
+import { variantTag } from '@lumiere/erp-workflows';
+import { showWorkflowToast } from '@lumiere/ui/lib/workflow-toast';
 import { useWorkflowSurface } from '@/hooks/use-workflow-surface';
 import type { QueryRows } from '@/lib/query-fetch';
 import { ChevronRight, MapPin, Package } from 'lucide-react';
@@ -35,6 +37,29 @@ function strId(v: unknown): string {
 type WizardStep = 1 | 2 | 3 | 4 | 5;
 
 const WIZARD_STEPS: WizardStep[] = [1, 2, 3, 4, 5];
+
+/** Lower-cased state of a row (handles `{tag}` enum values), for action gating. */
+function rowState(row: Record<string, unknown>, key = 'state'): string {
+  return variantTag(row[key]).toLowerCase();
+}
+
+/** Runs a wizard mutation; failures surface as an error toast and the wizard stays on its step. */
+async function runStep(
+  run: () => Promise<unknown>,
+  title: string,
+  onDone?: () => void,
+): Promise<void> {
+  try {
+    await run();
+    onDone?.();
+  } catch (error) {
+    showWorkflowToast({
+      kind: 'error',
+      title,
+      description: error instanceof Error ? error.message : undefined,
+    });
+  }
+}
 
 export function CycleCountWizard({
   organizationId,
@@ -297,26 +322,29 @@ export function CycleCountWizard({
                     .map((c) => num(c.id)),
                 ),
               );
-              void createPlan
-                .mutateAsync({
-                  locationId: lid,
-                  params: {
-                    name: planName.trim() ? planName.trim() : undefined,
-                    countBy,
-                    frequency,
-                    tolerancePercentage: num(tolPct),
-                    toleranceValue: num(tolVal),
-                    nextCountDate: undefined,
-                    userId: undefined,
-                    teamId: undefined,
-                    productIds: [],
-                    productCategoryIds: [],
-                    reason: undefined,
-                    notes: undefined,
-                    metadata: undefined,
-                  },
-                })
-                .then(() => setPlanCreatedAt(Date.now()));
+              void runStep(
+                () =>
+                  createPlan.mutateAsync({
+                    locationId: lid,
+                    params: {
+                      name: planName.trim() ? planName.trim() : undefined,
+                      countBy,
+                      frequency,
+                      tolerancePercentage: num(tolPct),
+                      toleranceValue: num(tolVal),
+                      nextCountDate: undefined,
+                      userId: undefined,
+                      teamId: undefined,
+                      productIds: [],
+                      productCategoryIds: [],
+                      reason: undefined,
+                      notes: undefined,
+                      metadata: undefined,
+                    },
+                  }),
+                t('inventory.cycleCountWizard.createPlan'),
+                () => setPlanCreatedAt(Date.now()),
+              );
             }}
           >
             {t('inventory.cycleCountWizard.createPlan')}
@@ -348,7 +376,11 @@ export function CycleCountWizard({
             data-testid="cycle-wizard-start-session"
             disabled={startSession.isPending || cycleCountId === ''}
             onClick={() =>
-              void startSession.mutateAsync(cycleCountId).then(goNext)
+              void runStep(
+                () => startSession.mutateAsync(cycleCountId),
+                t('inventory.cycleCountWizard.startSession'),
+                goNext,
+              )
             }
           >
             {t('inventory.cycleCountWizard.startSession')}
@@ -418,20 +450,23 @@ export function CycleCountWizard({
             data-testid="cycle-wizard-record-line"
             disabled={recordLine.isPending || cycleCountId === ''}
             onClick={() =>
-              void recordLine
-                .mutateAsync({
-                  cycleCountId,
-                  params: {
-                    productId: BigInt(num(recProductId)),
-                    locationId: BigInt(num(recLocId)),
-                    lotId: undefined,
-                    qtyCounted: num(recQty),
-                    uomId: BigInt(num(recUom)),
-                    notes: undefined,
-                    metadata: undefined,
-                  },
-                })
-                .then(goNext)
+              void runStep(
+                () =>
+                  recordLine.mutateAsync({
+                    cycleCountId,
+                    params: {
+                      productId: BigInt(num(recProductId)),
+                      locationId: BigInt(num(recLocId)),
+                      lotId: undefined,
+                      qtyCounted: num(recQty),
+                      uomId: BigInt(num(recUom)),
+                      notes: undefined,
+                      metadata: undefined,
+                    },
+                  }),
+                t('inventory.cycleCountWizard.recordLine'),
+                goNext,
+              )
             }
           >
             {t('inventory.cycleCountWizard.recordLine')}
@@ -450,7 +485,13 @@ export function CycleCountWizard({
             variant="secondary"
             data-testid="cycle-wizard-validate"
             disabled={validate.isPending || cycleCountId === ''}
-            onClick={() => void validate.mutateAsync(cycleCountId).then(goNext)}
+            onClick={() =>
+              void runStep(
+                () => validate.mutateAsync(cycleCountId),
+                t('inventory.cycleCountWizard.validate'),
+                goNext,
+              )
+            }
           >
             {t('inventory.cycleCountWizard.validate')}
           </Button>
@@ -718,6 +759,11 @@ export function QualityAlertsPanel({
             id: 'open-alert',
             label: t('inventory.qualityAlerts.actions.open'),
             requiresSelection: true,
+            isApplicable: (rows) =>
+              rows.every((row) => ['draft'].includes(rowState(row, 'state'))),
+            successMessage: t('common.actionCompleted', {
+              action: t('inventory.qualityAlerts.actions.open'),
+            }),
             onClick: async (rows: Record<string, unknown>[]) => {
               const id = rows[0]?.id as ScalarId | undefined;
               if (id != null) await openAlert.mutateAsync(id);
@@ -736,6 +782,11 @@ export function QualityAlertsPanel({
             id: 'solve-alert',
             label: t('inventory.qualityAlerts.actions.solve'),
             requiresSelection: true,
+            isApplicable: (rows) =>
+              rows.every(
+                (row) =>
+                  !['solved', 'cancelled'].includes(rowState(row, 'state')),
+              ),
             onClick: (rows: Record<string, unknown>[]) => {
               const id = rows[0]?.id as ScalarId | undefined;
               if (id != null) onSolveAlert(id);
@@ -746,6 +797,14 @@ export function QualityAlertsPanel({
             label: t('inventory.qualityAlerts.actions.cancel'),
             variant: 'destructive' as const,
             requiresSelection: true,
+            isApplicable: (rows) =>
+              rows.every(
+                (row) =>
+                  !['solved', 'cancelled'].includes(rowState(row, 'state')),
+              ),
+            successMessage: t('common.actionCompleted', {
+              action: t('inventory.qualityAlerts.actions.cancel'),
+            }),
             onClick: async (rows: Record<string, unknown>[]) => {
               const id = rows[0]?.id as ScalarId | undefined;
               if (id != null) await cancelAlert.mutateAsync({ alertId: id });

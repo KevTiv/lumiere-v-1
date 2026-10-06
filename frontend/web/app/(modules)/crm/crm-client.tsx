@@ -59,6 +59,7 @@ import { useTranslation } from "@lumiere/i18n"
 import { stbTimestampFromDate } from "@lumiere/erp-shared/stb-timestamp"
 import type { CreateCrmForecastSnapshotParams } from "@lumiere/stdb/types"
 import { useRuntimeListConfig } from "@lumiere/ui/forms"
+import { showWorkflowToast } from "@lumiere/ui/lib/workflow-toast"
 import { contactPrimaryLabel } from "@lumiere/stdb/read-models"
 import {
   useActivities,
@@ -1237,6 +1238,7 @@ function CrmClientLoaded({
             id: "convert-lead",
             label: t("crm.actions.convertToCustomer"),
             requiresSelection: true,
+            isApplicable: (rows) => rows.every((row) => leadStateRaw(row) === "qualified"),
             onClick: openConvertLeadModal,
           },
           {
@@ -1244,6 +1246,7 @@ function CrmClientLoaded({
             label: t("crm.actions.deleteLead"),
             requiresSelection: true,
             variant: "destructive",
+            successMessage: t("common.actionCompleted", { action: t("crm.actions.deleteLead") }),
             confirm: {
               title: t("crm.actions.deleteLead"),
               description: t("crm.actions.deleteLeadConfirm"),
@@ -1287,12 +1290,14 @@ function CrmClientLoaded({
                       id: "change-stage",
                       label: t("crm.actions.changeStage"),
                       requiresSelection: true,
+                      isApplicable: (rows) => rows.every((row) => !oppIsClosed(row)),
                       onClick: openChangeStageModal,
                     },
                     {
                       id: "mark-won",
                       label: t("crm.actions.markWon"),
                       requiresSelection: true,
+                      isApplicable: (rows) => rows.every((row) => !oppIsClosed(row)),
                       onClick: async (rows) => {
                         await markOpportunityWon(rows)
                       },
@@ -1301,6 +1306,7 @@ function CrmClientLoaded({
                       id: "mark-lost",
                       label: t("crm.actions.markLost"),
                       requiresSelection: true,
+                      isApplicable: (rows) => rows.every((row) => !oppIsClosed(row)),
                       variant: "destructive",
                       onClick: async (rows) => {
                         await markOpportunityLost(rows)
@@ -1388,6 +1394,7 @@ function CrmClientLoaded({
             label: t("crm.actions.deleteContact"),
             requiresSelection: true,
             variant: "destructive",
+            successMessage: t("common.actionCompleted", { action: t("crm.actions.deleteContact") }),
             confirm: {
               title: t("crm.actions.deleteContact"),
               description: t("crm.actions.deleteContactConfirm"),
@@ -1415,6 +1422,9 @@ function CrmClientLoaded({
             id: "complete-activity",
             label: t("crm.actions.markComplete"),
             requiresSelection: true,
+            isApplicable: (rows) =>
+              rows.every((row) => !(row.isDone === true || String(row.state ?? "").toLowerCase() === "done")),
+            successMessage: t("common.actionCompleted", { action: t("crm.actions.markComplete") }),
             onClick: async (rows) => {
               const row = rows[0]
               if (!row) return
@@ -1696,15 +1706,23 @@ function CrmClientLoaded({
               if (!operatingCompanyId || operatingCompanyId === 0n) return
               const now = Date.now()
               const endMsSafe = endMs > startMs ? endMs : now
-              void createForecastSnapshot.mutateAsync({
-                companyId: operatingCompanyId,
-                params: {
-                  periodStart: stbTimestampFromDate(new Date(startMs)),
-                  periodEnd: stbTimestampFromDate(new Date(endMsSafe)),
-                  ownerId: undefined,
-                  metadata: undefined,
-                } satisfies CreateCrmForecastSnapshotParams,
-              })
+              createForecastSnapshot
+                .mutateAsync({
+                  companyId: operatingCompanyId,
+                  params: {
+                    periodStart: stbTimestampFromDate(new Date(startMs)),
+                    periodEnd: stbTimestampFromDate(new Date(endMsSafe)),
+                    ownerId: undefined,
+                    metadata: undefined,
+                  } satisfies CreateCrmForecastSnapshotParams,
+                })
+                .catch((error: unknown) => {
+                  showWorkflowToast({
+                    kind: "error",
+                    title: t("common.error.title"),
+                    description: error instanceof Error ? error.message : String(error),
+                  })
+                })
             },
           }
           return {

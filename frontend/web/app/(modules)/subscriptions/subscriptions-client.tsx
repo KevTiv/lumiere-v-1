@@ -3,6 +3,7 @@ import { mapDashboardWidgets, withDashboardSections } from "@lumiere/ui/lib/dash
 
 import { useMemo, useState } from "react"
 import { useTranslation } from "@lumiere/i18n"
+import { showWorkflowToast } from "@lumiere/ui/lib/workflow-toast"
 import {
   ModuleView,
   FormModal,
@@ -202,6 +203,10 @@ function SubscriptionsClientLoaded({
 }: SubscriptionsClientLoadedProps) {
   useSubscriptionsModuleSubscription()
   const { t } = useTranslation()
+  const mutationErrorOptions = {
+    onError: (error: Error) =>
+      showWorkflowToast({ kind: "error", title: t("common.error.title"), description: error.message }),
+  }
   const moduleConfig = useMemo(() => subscriptionsModuleConfig(t), [t])
   const { activeTab, setActiveTab } = useModuleTab(
     moduleConfig.defaultTab ?? "dashboard",
@@ -420,6 +425,7 @@ function SubscriptionsClientLoaded({
         icon: PlayCircle,
         variant: "outline",
         requiresSelection: true,
+        isApplicable: (rows) => rows.every((row) => subscriptionState(row) === "draft"),
         successMessage: t("common.actionCompleted", { action: t("subscriptions.actions.activate") }),
         onClick: async (rows) => {
           const r = rows[0]
@@ -433,6 +439,7 @@ function SubscriptionsClientLoaded({
         icon: XCircle,
         variant: "outline",
         requiresSelection: true,
+        isApplicable: (rows) => rows.every((row) => subscriptionState(row) !== "closed"),
         onClick: (rows) => {
           const r = rows[0]
           if (!r) return
@@ -446,6 +453,7 @@ function SubscriptionsClientLoaded({
         icon: FileText,
         variant: "outline",
         requiresSelection: true,
+        isApplicable: (rows) => rows.every((row) => subscriptionState(row) === "active"),
         onClick: (rows) => {
           const r = rows[0]
           if (!r) return
@@ -459,6 +467,7 @@ function SubscriptionsClientLoaded({
         icon: CheckCircle2,
         variant: "outline",
         requiresSelection: true,
+        isApplicable: (rows) => rows.every((row) => subscriptionState(row) === "active"),
         onClick: (rows) => {
           const r = rows[0]
           if (!r) return
@@ -472,6 +481,7 @@ function SubscriptionsClientLoaded({
         icon: Pencil,
         variant: "outline",
         requiresSelection: true,
+        isApplicable: (rows) => rows.every((row) => ["active", "paused"].includes(subscriptionState(row))),
         onClick: (rows) => {
           const r = rows[0]
           if (!r) return
@@ -486,6 +496,7 @@ function SubscriptionsClientLoaded({
         icon: PauseCircle,
         variant: "outline",
         requiresSelection: true,
+        isApplicable: (rows) => rows.every((row) => subscriptionState(row) === "active"),
         successMessage: t("common.actionCompleted", { action: t("subscriptions.actions.pause", { defaultValue: "Pause" }) }),
         onClick: async (rows) => {
           const r = rows[0]
@@ -501,6 +512,7 @@ function SubscriptionsClientLoaded({
         icon: PlayCircle,
         variant: "outline",
         requiresSelection: true,
+        isApplicable: (rows) => rows.every((row) => subscriptionState(row) === "paused"),
         successMessage: t("common.actionCompleted", { action: t("subscriptions.actions.resume", { defaultValue: "Resume" }) }),
         onClick: async (rows) => {
           const r = rows[0]
@@ -516,6 +528,7 @@ function SubscriptionsClientLoaded({
         icon: RefreshCw,
         variant: "outline",
         requiresSelection: true,
+        isApplicable: (rows) => rows.every((row) => ["active", "paused"].includes(subscriptionState(row))),
         onClick: (rows) => {
           const r = rows[0]
           if (!r) return
@@ -530,6 +543,7 @@ function SubscriptionsClientLoaded({
         icon: XCircle,
         variant: "outline",
         requiresSelection: true,
+        isApplicable: (rows) => rows.every((row) => subscriptionState(row) !== "closed"),
         onClick: (rows) => {
           const r = rows[0]
           if (!r || subscriptionState(r) === "closed") return
@@ -542,6 +556,7 @@ function SubscriptionsClientLoaded({
         icon: Activity,
         variant: "outline",
         requiresSelection: true,
+        isApplicable: (rows) => rows.every((row) => subscriptionState(row) !== "closed"),
         onClick: (rows) => {
           const r = rows[0]
           if (!r || subscriptionState(r) === "closed") return
@@ -570,6 +585,7 @@ function SubscriptionsClientLoaded({
         icon: CheckCircle2,
         variant: "outline",
         requiresSelection: true,
+        isApplicable: (rows) => rows.every((row) => subscriptionState(row) !== "closed"),
         onClick: (rows) => {
           const r = rows[0]
           if (!r || subscriptionState(r) === "closed") return
@@ -582,6 +598,7 @@ function SubscriptionsClientLoaded({
         icon: AlertTriangle,
         variant: "outline",
         requiresSelection: true,
+        isApplicable: (rows) => rows.every((row) => subscriptionState(row) !== "closed"),
         successMessage: t("common.actionCompleted", { action: t("subscriptions.actions.recordFailure", { defaultValue: "Record payment fail" }) }),
         onClick: async (rows) => {
           const r = rows[0]
@@ -643,6 +660,7 @@ function SubscriptionsClientLoaded({
         icon: ClipboardCheck,
         variant: "default",
         requiresSelection: true,
+        isApplicable: (rows) => rows.every((row) => !(row.recognized === true || row.recognized === 1)),
         onClick: (rows) => {
           const r = rows[0]
           if (!r) return
@@ -913,17 +931,17 @@ function SubscriptionsClientLoaded({
     if (action === "createSubscription") {
       const params = toCreateSubscriptionFromSaleOrderParams(formData, saleOrders, orgId)
       if (!params) return
-      createSubscription.mutate(params)
+      createSubscription.mutate(params, mutationErrorOptions)
     } else if (action === "createPlan") {
       const params = toCreateSubscriptionPlanParams(formData, pricelists, orgId)
       if (!params) return
-      createPlan.mutate(params)
+      createPlan.mutate(params, mutationErrorOptions)
     } else if (action === "createPriceTier") {
       const params = buildCreateSubscriptionPriceTierParams(formData)
-      void createPriceTier.mutate(params)
+      createPriceTier.mutate(params, mutationErrorOptions)
     } else if (action === "createDeferredSchedule") {
       const params = buildCreateDeferredRevenueScheduleParams(formData)
-      void createDeferredSchedule.mutate(params)
+      createDeferredSchedule.mutate(params, mutationErrorOptions)
     } else if (action === "createRecognitionRule") {
       const raw = { ...formData }
       if (raw.expenseAccountId != null && String(raw.expenseAccountId).trim() !== "") {
@@ -932,15 +950,15 @@ function SubscriptionsClientLoaded({
         delete raw.expenseAccountId
       }
       const params = buildCreateRevenueRecognitionRuleParams(raw)
-      void createRecognitionRule.mutate(params)
+      createRecognitionRule.mutate(params, mutationErrorOptions)
     } else if (action === "importPlanCsv") {
       const raw = formData.csvData
       if (raw == null || String(raw).trim() === "") return
-      void importPlanCsv.mutate({ csvData: String(raw) })
+      importPlanCsv.mutate({ csvData: String(raw) }, mutationErrorOptions)
     } else if (action === "importSubscriptionCsv") {
       const raw = formData.csvData
       if (raw == null || String(raw).trim() === "") return
-      void importSubscriptionCsv.mutate({ csvData: String(raw) })
+      importSubscriptionCsv.mutate({ csvData: String(raw) }, mutationErrorOptions)
     }
   }
 
@@ -1058,10 +1076,10 @@ function SubscriptionsClientLoaded({
         onSubmit={(formData) => {
           if (closeTargetId == null) return
           const params = buildCloseSubscriptionParams(formData)
-          void closeSubscription.mutate({
+          closeSubscription.mutate({
             subscriptionId: BigInt(closeTargetId),
             params,
-          })
+          }, mutationErrorOptions)
           setCloseTargetId(null)
         }}
       />
@@ -1073,10 +1091,10 @@ function SubscriptionsClientLoaded({
           if (generateTargetId == null) return
           if (!formData.incomeAccountId || !formData.receivableAccountId) return
           const params = buildGenerateSubscriptionInvoiceParams(formData)
-          void generateInvoice.mutate({
+          generateInvoice.mutate({
             subscriptionId: BigInt(generateTargetId),
             params,
-          })
+          }, mutationErrorOptions)
           setGenerateTargetId(null)
         }}
       />
@@ -1095,10 +1113,10 @@ function SubscriptionsClientLoaded({
             return
           }
           const params = buildPaySubscriptionInvoiceParams(formData)
-          void paySubscriptionInvoice.mutate({
+          paySubscriptionInvoice.mutate({
             subscriptionId: BigInt(payTargetId),
             params,
-          })
+          }, mutationErrorOptions)
           setPayTargetId(null)
         }}
       />
@@ -1109,10 +1127,10 @@ function SubscriptionsClientLoaded({
         onSubmit={(formData) => {
           if (amendTargetId == null || !formData.lineId) return
           const params = buildAmendSubscriptionParams(formData)
-          void amendSubscription.mutate({
+          amendSubscription.mutate({
             subscriptionId: BigInt(amendTargetId),
             params,
-          })
+          }, mutationErrorOptions)
           setAmendTargetId(null)
         }}
       />
@@ -1123,10 +1141,10 @@ function SubscriptionsClientLoaded({
         onSubmit={(formData) => {
           if (renewTargetId == null) return
           const params = buildRenewSubscriptionParams(formData)
-          void renewSubscription.mutate({
+          renewSubscription.mutate({
             subscriptionId: BigInt(renewTargetId),
             params,
-          })
+          }, mutationErrorOptions)
           setRenewTargetId(null)
         }}
       />
@@ -1137,10 +1155,10 @@ function SubscriptionsClientLoaded({
         onSubmit={(formData) => {
           if (cancelTargetId == null) return
           const params = buildCancelSubscriptionParams(formData)
-          void cancelSubscription.mutate({
+          cancelSubscription.mutate({
             subscriptionId: BigInt(cancelTargetId),
             params,
-          })
+          }, mutationErrorOptions)
           setCancelTargetId(null)
         }}
       />
@@ -1151,10 +1169,10 @@ function SubscriptionsClientLoaded({
         onSubmit={(formData) => {
           if (ingestUsageTargetId == null || !formData.eventId) return
           const params = buildIngestSubscriptionUsageEventParams(formData)
-          void ingestUsage.mutate({
+          ingestUsage.mutate({
             subscriptionId: BigInt(ingestUsageTargetId),
             params,
-          })
+          }, mutationErrorOptions)
           setIngestUsageTargetId(null)
         }}
       />
@@ -1165,10 +1183,10 @@ function SubscriptionsClientLoaded({
         onSubmit={(formData) => {
           if (commitmentTargetId == null) return
           const params = buildSetSubscriptionCommitmentParams(formData)
-          void setCommitment.mutate({
+          setCommitment.mutate({
             subscriptionId: BigInt(commitmentTargetId),
             params,
-          })
+          }, mutationErrorOptions)
           setCommitmentTargetId(null)
         }}
       />
@@ -1191,10 +1209,10 @@ function SubscriptionsClientLoaded({
           const moveId = formData.moveId
           const moveLineId = formData.moveLineId
           const params = buildRecognizeDeferredRevenueParams({ moveId, moveLineId })
-          void recognizeDeferred.mutate({
+          recognizeDeferred.mutate({
             lineId: BigInt(recognizeLineId),
             params,
-          })
+          }, mutationErrorOptions)
           setRecognizeLineId(null)
         }}
       />

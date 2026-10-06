@@ -80,7 +80,8 @@ import { useReplenishmentExecutionWorkflow } from '@lumiere/query-hooks/hooks/re
 import { useSerialReserveWorkflow } from '@lumiere/query-hooks/hooks/serial-reserve-workflow';
 import { useSerialUseWorkflow } from '@lumiere/query-hooks/hooks/serial-use-workflow';
 import { useSerialBlockWorkflow } from '@lumiere/query-hooks/hooks/serial-block-workflow';
-import { planPartialDelivery } from '@lumiere/erp-workflows';
+import { planPartialDelivery, variantTag } from '@lumiere/erp-workflows';
+import { showWorkflowToast } from '@lumiere/ui/lib/workflow-toast';
 import { groupBy } from '@/lib/utils';
 import { transferRecordHref } from './transfer-record';
 import { InventoryOpsPanel } from './inventory-ops-panel';
@@ -243,6 +244,11 @@ import { useDefaultOperatingCompanyBigInt } from '@lumiere/query-hooks/hooks/use
 import { inventoryProductPrimaryLabel } from '@lumiere/stdb/read-models';
 
 type ScalarId = bigint | number | string;
+
+/** Lower-cased state/status of a row (handles `{tag}` enum values), for action gating. */
+function rowState(row: Record<string, unknown>, key = 'state'): string {
+  return variantTag(row[key]).toLowerCase();
+}
 
 type InventoryCsvImportKind =
   | 'uomCategory'
@@ -2071,10 +2077,19 @@ function InventoryClientLoaded({
                 });
                 if (!values) return;
                 const color = formText(values.color);
-                void updateWarehouse3dZone.mutateAsync({
-                  zoneId: Number(values.zoneId),
-                  params: color ? { color } : {},
-                });
+                try {
+                  await updateWarehouse3dZone.mutateAsync({
+                    zoneId: Number(values.zoneId),
+                    params: color ? { color } : {},
+                  });
+                } catch (error) {
+                  showWorkflowToast({
+                    kind: 'error',
+                    title: t('inventory.z3dActions.editZone'),
+                    description:
+                      error instanceof Error ? error.message : undefined,
+                  });
+                }
               }}
             >
               {t('inventory.z3dActions.editZone')}
@@ -2097,7 +2112,16 @@ function InventoryClientLoaded({
                   }],
                 });
                 if (!values) return;
-                void deleteWarehouse3dZone.mutateAsync(Number(values.zoneId));
+                try {
+                  await deleteWarehouse3dZone.mutateAsync(Number(values.zoneId));
+                } catch (error) {
+                  showWorkflowToast({
+                    kind: 'error',
+                    title: t('inventory.z3dActions.deleteZone'),
+                    description:
+                      error instanceof Error ? error.message : undefined,
+                  });
+                }
               }}
             >
               {t('inventory.z3dActions.deleteZone')}
@@ -2314,6 +2338,7 @@ function InventoryClientLoaded({
                   icon: Trash2,
                   variant: 'destructive',
                   requiresSelection: true,
+                  successMessage: t('common.actionCompleted', { action: t('common.delete') }),
                   confirm: {
                     title: t('common.delete'),
                     description: t('inventory.productActions.confirmDelete'),
@@ -2719,6 +2744,7 @@ function InventoryClientLoaded({
                   icon: Trash2,
                   variant: 'destructive',
                   requiresSelection: true,
+                  successMessage: t('common.actionCompleted', { action: t('common.delete') }),
                   confirm: {
                     title: t('common.delete'),
                     description: t('inventory.warehouseActions.confirmDelete'),
@@ -2879,6 +2905,9 @@ function InventoryClientLoaded({
                   label: t('inventory.stockMoveActions.confirm'),
                   icon: CheckCircle,
                   requiresSelection: true,
+                  isApplicable: (rows) =>
+                    rows.every((row) => ['draft'].includes(rowState(row, 'state'))),
+                  successMessage: t('common.actionCompleted', { action: t('inventory.stockMoveActions.confirm') }),
                   onClick: async (rows) => {
                     const id = rows[0]?.id as ScalarId | undefined;
                     if (id != null) await confirmStockMove.mutateAsync(id);
@@ -2889,6 +2918,9 @@ function InventoryClientLoaded({
                   label: t('inventory.stockMoveActions.assign'),
                   icon: UserCircle2,
                   requiresSelection: true,
+                  isApplicable: (rows) =>
+                    rows.every((row) => ['confirmed'].includes(rowState(row, 'state'))),
+                  successMessage: t('common.actionCompleted', { action: t('inventory.stockMoveActions.assign') }),
                   onClick: async (rows) => {
                     const id = rows[0]?.id as ScalarId | undefined;
                     if (id != null) await assignStockMove.mutateAsync(id);
@@ -2899,6 +2931,8 @@ function InventoryClientLoaded({
                   label: t('inventory.stockMoveActions.done'),
                   icon: CheckCircle,
                   requiresSelection: true,
+                  isApplicable: (rows) =>
+                    rows.every((row) => ['assigned'].includes(rowState(row, 'state'))),
                   onClick: async (rows) => {
                     const row = rows[0] as Record<string, unknown> | undefined;
                     const id = row?.id as ScalarId | undefined;
@@ -2935,6 +2969,9 @@ function InventoryClientLoaded({
                   icon: XCircle,
                   variant: 'destructive',
                   requiresSelection: true,
+                  isApplicable: (rows) =>
+                    rows.every((row) => !['done', 'cancel', 'cancelled'].includes(rowState(row, 'state'))),
+                  successMessage: t('common.actionCompleted', { action: t('inventory.stockMoveActions.cancel') }),
                   onClick: async (rows) => {
                     const id = rows[0]?.id as ScalarId | undefined;
                     if (id != null) await cancelStockMove.mutateAsync(id);
@@ -3216,6 +3253,9 @@ function InventoryClientLoaded({
                   id: 'process-adjustment',
                   label: t('inventory.adjustmentActions.process'),
                   requiresSelection: true,
+                  isApplicable: (rows) =>
+                    rows.every((row) => ['draft'].includes(rowState(row, 'state'))),
+                  successMessage: t('common.actionCompleted', { action: t('inventory.adjustmentActions.process') }),
                   onClick: async (rows) => {
                     const id = rows[0]?.id as ScalarId | undefined;
                     if (id != null) await processAdjustment.mutateAsync(id);
@@ -3283,6 +3323,7 @@ function InventoryClientLoaded({
                   label: t('common.delete'),
                   variant: 'destructive',
                   requiresSelection: true,
+                  successMessage: t('common.actionCompleted', { action: t('common.delete') }),
                   onClick: async (rows) => {
                     const id = rows[0]?.id as ScalarId | undefined;
                     if (id != null) await deleteStockLocation.mutateAsync(id);
@@ -3400,6 +3441,7 @@ function InventoryClientLoaded({
                   icon: Trash2,
                   variant: 'destructive',
                   requiresSelection: true,
+                  successMessage: t('common.actionCompleted', { action: t('common.delete') }),
                   confirm: {
                     title: t('common.delete'),
                     description: t('inventory.lotActions.confirmDelete'),
@@ -3497,6 +3539,8 @@ function InventoryClientLoaded({
                   label: t('inventory.productionSerials.actions.reserve'),
                   icon: ListChecks,
                   requiresSelection: true,
+                  isApplicable: (rows) =>
+                    rows.every((row) => ['free'].includes(rowState(row, 'state'))),
                   onClick: async (rows) => {
                     const id = rows[0]?.id as ScalarId | undefined;
                     if (id != null)
@@ -3511,6 +3555,8 @@ function InventoryClientLoaded({
                   label: t('inventory.productionSerials.actions.markInUse'),
                   icon: CheckCircle,
                   requiresSelection: true,
+                  isApplicable: (rows) =>
+                    rows.every((row) => ['reserved'].includes(rowState(row, 'state'))),
                   onClick: async (rows) => {
                     const id = rows[0]?.id as ScalarId | undefined;
                     if (id != null)
@@ -3558,6 +3604,7 @@ function InventoryClientLoaded({
                   icon: Trash2,
                   variant: 'destructive',
                   requiresSelection: true,
+                  successMessage: t('common.actionCompleted', { action: t('common.delete') }),
                   confirm: {
                     title: t('common.delete'),
                     description: t('inventory.serialActions.confirmDelete'),
@@ -3634,6 +3681,9 @@ function InventoryClientLoaded({
                   label: t('inventory.qualityActions.pass'),
                   icon: ShieldCheck,
                   requiresSelection: true,
+                  isApplicable: (rows) =>
+                    rows.every((row) => !['completed'].includes(rowState(row, 'status'))),
+                  successMessage: t('common.actionCompleted', { action: t('inventory.qualityActions.pass') }),
                   onClick: async (rows) => {
                     const id = rows[0]?.id as ScalarId | undefined;
                     if (id != null)
@@ -3646,6 +3696,8 @@ function InventoryClientLoaded({
                   icon: AlertTriangle,
                   variant: 'destructive',
                   requiresSelection: true,
+                  isApplicable: (rows) =>
+                    rows.every((row) => !['completed'].includes(rowState(row, 'status'))),
                   onClick: async (rows) => {
                     const row = rows[0];
                     const id = row?.id;
@@ -3712,6 +3764,9 @@ function InventoryClientLoaded({
                   label: t('inventory.qualityActions.startCheck'),
                   icon: ListChecks,
                   requiresSelection: true,
+                  isApplicable: (rows) =>
+                    rows.every((row) => ['draft'].includes(rowState(row, 'status'))),
+                  successMessage: t('common.actionCompleted', { action: t('inventory.qualityActions.startCheck') }),
                   onClick: async (rows) => {
                     const id = rows[0]?.id as ScalarId | undefined;
                     if (id != null) await startQualityCheck.mutateAsync(id);
@@ -4006,6 +4061,7 @@ function InventoryClientLoaded({
                   label: t('inventory.replenishmentActions.scheduleRun'),
                   icon: ListChecks,
                   requiresSelection: true,
+                  successMessage: t('common.actionCompleted', { action: t('inventory.replenishmentActions.scheduleRun') }),
                   onClick: async (rows) => {
                     const id = rows[0]?.id as ScalarId | undefined;
                     if (id != null)
@@ -4017,6 +4073,7 @@ function InventoryClientLoaded({
                   label: t('inventory.replenishmentActions.cancelSchedule'),
                   icon: ListChecks,
                   requiresSelection: true,
+                  successMessage: t('common.actionCompleted', { action: t('inventory.replenishmentActions.cancelSchedule') }),
                   onClick: async (rows) => {
                     const id = rows[0]?.id as ScalarId | undefined;
                     if (id != null) await cancelReplenishmentRun.mutateAsync(id);
@@ -4045,6 +4102,9 @@ function InventoryClientLoaded({
                   label: t('inventory.pickingWaveActions.confirm'),
                   icon: CheckCircle,
                   requiresSelection: true,
+                  isApplicable: (rows) =>
+                    rows.every((row) => !['done', 'cancelled'].includes(rowState(row, 'state'))),
+                  successMessage: t('common.actionCompleted', { action: t('inventory.pickingWaveActions.confirm') }),
                   onClick: async (rows) => {
                     const id = rows[0]?.id as ScalarId | undefined;
                     if (id != null) await confirmPickingWave.mutateAsync(id);
@@ -4055,6 +4115,9 @@ function InventoryClientLoaded({
                   label: t('inventory.pickingWaveActions.complete'),
                   icon: ListChecks,
                   requiresSelection: true,
+                  isApplicable: (rows) =>
+                    rows.every((row) => ['in_progress'].includes(rowState(row, 'state'))),
+                  successMessage: t('common.actionCompleted', { action: t('inventory.pickingWaveActions.complete') }),
                   onClick: async (rows) => {
                     const id = rows[0]?.id as ScalarId | undefined;
                     if (id != null) await completePickingWave.mutateAsync(id);
@@ -4090,6 +4153,7 @@ function InventoryClientLoaded({
                   icon: Trash2,
                   variant: 'destructive',
                   requiresSelection: true,
+                  successMessage: t('common.actionCompleted', { action: t('common.delete') }),
                   confirm: {
                     title: t('common.delete'),
                     description: t('inventory.categoryActions.confirmDelete'),
@@ -4147,6 +4211,7 @@ function InventoryClientLoaded({
                   icon: Trash2,
                   variant: 'destructive',
                   requiresSelection: true,
+                  successMessage: t('common.actionCompleted', { action: t('common.delete') }),
                   confirm: {
                     title: t('common.delete'),
                     description: t('inventory.routeActions.confirmDelete'),
@@ -4179,6 +4244,7 @@ function InventoryClientLoaded({
                   icon: Trash2,
                   variant: 'destructive',
                   requiresSelection: true,
+                  successMessage: t('common.actionCompleted', { action: t('common.delete') }),
                   confirm: {
                     title: t('common.delete'),
                     description: t('inventory.ruleActions.confirmDelete'),
@@ -4256,6 +4322,7 @@ function InventoryClientLoaded({
                   icon: Trash2,
                   variant: 'destructive',
                   requiresSelection: true,
+                  successMessage: t('common.actionCompleted', { action: t('common.delete') }),
                   confirm: {
                     title: t('common.delete'),
                     description: t('inventory.barcodeActions.confirmDelete'),
@@ -4411,6 +4478,7 @@ function InventoryClientLoaded({
                   icon: Trash2,
                   variant: 'destructive',
                   requiresSelection: true,
+                  successMessage: t('common.actionCompleted', { action: t('common.delete') }),
                   confirm: {
                     title: t('common.delete'),
                     description: t(
@@ -4446,6 +4514,9 @@ function InventoryClientLoaded({
                   label: t('inventory.traceabilityReports.actions.runSelected'),
                   icon: Play,
                   requiresSelection: true,
+                  isApplicable: (rows) =>
+                    rows.every((row) => ['draft'].includes(rowState(row, 'state'))),
+                  successMessage: t('common.actionCompleted', { action: t('inventory.traceabilityReports.actions.runSelected') }),
                   onClick: async (rows) => {
                     const row = rows[0] as Record<string, unknown> | undefined;
                     const id = row?.id as ScalarId | undefined;
@@ -4473,6 +4544,7 @@ function InventoryClientLoaded({
                   label: t('inventory.taskActions.start'),
                   icon: CheckCircle,
                   requiresSelection: true,
+                  successMessage: t('common.actionCompleted', { action: t('inventory.taskActions.start') }),
                   onClick: async (rows) => {
                     const id = rows[0]?.id as ScalarId | undefined;
                     if (id != null) await startWarehouseTask.mutateAsync(id);
@@ -4483,6 +4555,7 @@ function InventoryClientLoaded({
                   label: t('inventory.taskActions.complete'),
                   icon: ListChecks,
                   requiresSelection: true,
+                  successMessage: t('common.actionCompleted', { action: t('inventory.taskActions.complete') }),
                   onClick: async (rows) => {
                     const id = rows[0]?.id as ScalarId | undefined;
                     if (id != null)
@@ -4498,6 +4571,7 @@ function InventoryClientLoaded({
                   icon: XCircle,
                   variant: 'destructive',
                   requiresSelection: true,
+                  successMessage: t('common.actionCompleted', { action: t('inventory.taskActions.cancel') }),
                   onClick: async (rows) => {
                     const id = rows[0]?.id as ScalarId | undefined;
                     if (id != null) await cancelWarehouseTask.mutateAsync(id);
