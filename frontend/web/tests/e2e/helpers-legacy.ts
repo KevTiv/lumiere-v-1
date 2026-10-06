@@ -823,6 +823,13 @@ export async function waitForEntityActionEnabled(page: Page, actionTestId: strin
   await expect(page.getByTestId(actionTestId)).toBeEnabled({ timeout: 30_000 })
 }
 
+/** Confirm the table's confirmation dialog, shown after clicking a confirm-gated row action. */
+export async function acceptEntityActionConfirm(page: Page) {
+  const dialog = page.getByTestId("entity-action-confirm")
+  await expect(dialog).toBeVisible({ timeout: 15_000 })
+  await dialog.getByRole("button", { name: "Confirm", exact: true }).click()
+}
+
 /** Click a toolbar action and wait for the matching reducer HTTP call. */
 export async function clickEntityActionAndWaitForReducer(
   page: Page,

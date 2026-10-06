@@ -453,10 +453,11 @@ function ReportsClientLoaded({
             label: t("reports.actions.exportPdf"),
             icon: FileDown,
             requiresSelection: true,
-            onClick: (rows) => {
+            selection: "multiple",
+            onClick: async (rows) => {
               for (const r of rows) {
                 if (String(r.state) === "generated") {
-                  void exportFinancialReport.mutateAsync({
+                  await exportFinancialReport.mutateAsync({
                     reportId: r.id as string | number | bigint,
                     exportFormat: "pdf",
                   })
@@ -469,10 +470,11 @@ function ReportsClientLoaded({
             label: t("reports.actions.exportXlsx"),
             icon: FileSpreadsheet,
             requiresSelection: true,
-            onClick: (rows) => {
+            selection: "multiple",
+            onClick: async (rows) => {
               for (const r of rows) {
                 if (String(r.state) === "generated") {
-                  void exportFinancialReport.mutateAsync({
+                  await exportFinancialReport.mutateAsync({
                     reportId: r.id as string | number | bigint,
                     exportFormat: "xlsx",
                   })
@@ -485,10 +487,11 @@ function ReportsClientLoaded({
             label: t("reports.actions.exportCsv"),
             icon: FileText,
             requiresSelection: true,
-            onClick: (rows) => {
+            selection: "multiple",
+            onClick: async (rows) => {
               for (const r of rows) {
                 if (String(r.state) === "generated") {
-                  void exportFinancialReport.mutateAsync({
+                  await exportFinancialReport.mutateAsync({
                     reportId: r.id as string | number | bigint,
                     exportFormat: "csv",
                   })
@@ -501,10 +504,11 @@ function ReportsClientLoaded({
             label: t("reports.actions.regenerate"),
             icon: RefreshCw,
             requiresSelection: true,
-            onClick: (rows) => {
+            selection: "multiple",
+            onClick: async (rows) => {
               for (const r of rows) {
                 if (String(r.state) === "draft") {
-                  void generateFinancialReport.mutateAsync(r.id as string | number | bigint)
+                  await generateFinancialReport.mutateAsync(r.id as string | number | bigint)
                 }
               }
             },
@@ -514,10 +518,11 @@ function ReportsClientLoaded({
             label: t("reports.actions.archive"),
             icon: Archive,
             requiresSelection: true,
-            onClick: (rows) => {
+            selection: "multiple",
+            onClick: async (rows) => {
               for (const r of rows) {
                 if (String(r.state) === "exported") {
-                  void archiveFinancialReport.mutateAsync(r.id as string | number | bigint)
+                  await archiveFinancialReport.mutateAsync(r.id as string | number | bigint)
                 }
               }
             },
@@ -527,12 +532,13 @@ function ReportsClientLoaded({
             label: t("reports.actions.delete"),
             icon: Trash2,
             requiresSelection: true,
+            selection: "multiple",
             variant: "destructive",
-            onClick: (rows) => {
+            onClick: async (rows) => {
               for (const r of rows) {
                 const st = String(r.state)
                 if (st !== "archived") {
-                  void deleteFinancialReport.mutateAsync(r.id as string | number | bigint)
+                  await deleteFinancialReport.mutateAsync(r.id as string | number | bigint)
                 }
               }
             },

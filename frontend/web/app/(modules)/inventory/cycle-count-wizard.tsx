@@ -718,9 +718,9 @@ export function QualityAlertsPanel({
             id: 'open-alert',
             label: t('inventory.qualityAlerts.actions.open'),
             requiresSelection: true,
-            onClick: (rows: Record<string, unknown>[]) => {
+            onClick: async (rows: Record<string, unknown>[]) => {
               const id = rows[0]?.id as ScalarId | undefined;
-              if (id != null) void openAlert.mutateAsync(id);
+              if (id != null) await openAlert.mutateAsync(id);
             },
           },
           {
@@ -746,9 +746,9 @@ export function QualityAlertsPanel({
             label: t('inventory.qualityAlerts.actions.cancel'),
             variant: 'destructive' as const,
             requiresSelection: true,
-            onClick: (rows: Record<string, unknown>[]) => {
+            onClick: async (rows: Record<string, unknown>[]) => {
               const id = rows[0]?.id as ScalarId | undefined;
-              if (id != null) void cancelAlert.mutateAsync({ alertId: id });
+              if (id != null) await cancelAlert.mutateAsync({ alertId: id });
             },
           },
         ],

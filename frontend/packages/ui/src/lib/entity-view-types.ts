@@ -100,14 +100,27 @@ export interface EntityAction extends EntityPermissioned {
    * disabled. Never a permission check — the server re-validates every command.
    */
   isApplicable?: (selectedRows: EntityRow[]) => boolean
+  /**
+   * Which selections the action accepts, for actions with `requiresSelection`. "single" (the
+   * default) is disabled while more than one row is selected, so an action that only reads the
+   * first row never silently ignores the rest; "multiple" receives every selected row.
+   */
+  selection?: "single" | "multiple"
   /** Ask before running: the table shows this dialog and only calls `onClick` on confirm. */
   confirm?: EntityActionConfirmation
-  onClick: (selectedRows: EntityRow[]) => void
+  /** Toast shown when `onClick` completes without throwing. */
+  successMessage?: string
+  /**
+   * Return the promise of the work: the table keeps the button pending until it settles and
+   * reports a rejection as an error toast. Actions that handle their own errors may swallow them.
+   */
+  onClick: (selectedRows: EntityRow[]) => void | Promise<unknown>
 }
 
 export interface EntityActionConfirmation {
   title: string
-  description: string
+  /** Text, or a function of the selected rows for wording that depends on the selection. */
+  description: string | ((selectedRows: EntityRow[]) => string)
   confirmLabel: string
   cancelLabel: string
 }

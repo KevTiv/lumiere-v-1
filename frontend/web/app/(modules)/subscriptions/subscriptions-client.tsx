@@ -420,10 +420,11 @@ function SubscriptionsClientLoaded({
         icon: PlayCircle,
         variant: "outline",
         requiresSelection: true,
-        onClick: (rows) => {
+        successMessage: t("common.actionCompleted", { action: t("subscriptions.actions.activate") }),
+        onClick: async (rows) => {
           const r = rows[0]
           if (!r || subscriptionState(r) !== "draft") return
-          void activateSubscription.mutate({ subscriptionId: BigInt(String(r.id)) })
+          await activateSubscription.mutateAsync({ subscriptionId: BigInt(String(r.id)) })
         },
       },
       {
@@ -485,10 +486,11 @@ function SubscriptionsClientLoaded({
         icon: PauseCircle,
         variant: "outline",
         requiresSelection: true,
-        onClick: (rows) => {
+        successMessage: t("common.actionCompleted", { action: t("subscriptions.actions.pause", { defaultValue: "Pause" }) }),
+        onClick: async (rows) => {
           const r = rows[0]
           if (!r || subscriptionState(r) !== "active") return
-          void pauseSubscription.mutate({
+          await pauseSubscription.mutateAsync({
             subscriptionId: BigInt(String(r.id)),
           })
         },
@@ -499,10 +501,11 @@ function SubscriptionsClientLoaded({
         icon: PlayCircle,
         variant: "outline",
         requiresSelection: true,
-        onClick: (rows) => {
+        successMessage: t("common.actionCompleted", { action: t("subscriptions.actions.resume", { defaultValue: "Resume" }) }),
+        onClick: async (rows) => {
           const r = rows[0]
           if (!r || subscriptionState(r) !== "paused") return
-          void resumeSubscription.mutate({
+          await resumeSubscription.mutateAsync({
             subscriptionId: BigInt(String(r.id)),
           })
         },
@@ -551,10 +554,11 @@ function SubscriptionsClientLoaded({
         icon: Gauge,
         variant: "outline",
         requiresSelection: true,
-        onClick: (rows) => {
+        successMessage: t("common.actionCompleted", { action: t("subscriptions.actions.rateUsage", { defaultValue: "Rate usage" }) }),
+        onClick: async (rows) => {
           const r = rows[0]
           if (!r) return
-          void rateUsage.mutate({
+          await rateUsage.mutateAsync({
             subscriptionId: BigInt(String(r.id)),
             params: { limit: 100 },
           })
@@ -578,10 +582,11 @@ function SubscriptionsClientLoaded({
         icon: AlertTriangle,
         variant: "outline",
         requiresSelection: true,
-        onClick: (rows) => {
+        successMessage: t("common.actionCompleted", { action: t("subscriptions.actions.recordFailure", { defaultValue: "Record payment fail" }) }),
+        onClick: async (rows) => {
           const r = rows[0]
           if (!r || subscriptionState(r) === "closed") return
-          void recordPaymentFailure.mutate({
+          await recordPaymentFailure.mutateAsync({
             subscriptionId: BigInt(String(r.id)),
             params: { reason: "manual", pastDueDays: 1 },
           })
@@ -593,10 +598,11 @@ function SubscriptionsClientLoaded({
         icon: Shield,
         variant: "outline",
         requiresSelection: true,
-        onClick: (rows) => {
+        successMessage: t("common.actionCompleted", { action: t("subscriptions.actions.advanceDunning", { defaultValue: "Advance dunning" }) }),
+        onClick: async (rows) => {
           const r = rows[0]
           if (!r) return
-          void advanceDunning.mutate({
+          await advanceDunning.mutateAsync({
             subscriptionId: BigInt(String(r.id)),
             params: {},
           })
@@ -608,10 +614,11 @@ function SubscriptionsClientLoaded({
         icon: RefreshCw,
         variant: "outline",
         requiresSelection: true,
-        onClick: (rows) => {
+        successMessage: t("common.actionCompleted", { action: t("subscriptions.actions.refreshFlags", { defaultValue: "Refresh exception flags" }) }),
+        onClick: async (rows) => {
           const r = rows[0]
           if (!r) return
-          void refreshExceptionFlags.mutate({
+          await refreshExceptionFlags.mutateAsync({
             subscriptionId: BigInt(String(r.id)),
           })
         },
@@ -654,10 +661,11 @@ function SubscriptionsClientLoaded({
         icon: CheckCircle2,
         variant: "outline",
         requiresSelection: true,
-        onClick: (rows) => {
+        successMessage: t("common.actionCompleted", { action: t("subscriptions.actions.activateRule") }),
+        onClick: async (rows) => {
           const r = rows[0]
           if (!r) return
-          void activateRule.mutate({ ruleId: BigInt(String(r.id)) })
+          await activateRule.mutateAsync({ ruleId: BigInt(String(r.id)) })
         },
       },
       {
@@ -666,10 +674,11 @@ function SubscriptionsClientLoaded({
         icon: CircleSlash,
         variant: "outline",
         requiresSelection: true,
-        onClick: (rows) => {
+        successMessage: t("common.actionCompleted", { action: t("subscriptions.actions.deactivateRule") }),
+        onClick: async (rows) => {
           const r = rows[0]
           if (!r) return
-          void deactivateRule.mutate({ ruleId: BigInt(String(r.id)) })
+          await deactivateRule.mutateAsync({ ruleId: BigInt(String(r.id)) })
         },
       },
     ]

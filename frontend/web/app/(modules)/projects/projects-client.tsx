@@ -27,7 +27,7 @@ import {
   projectsCsvImportForm,
   ImportAssistantWizard,
 } from "@lumiere/ui"
-import type { EntityRow, EntityViewConfig, FormConfig, ModuleConfig, ProjectsCsvImportKind } from "@lumiere/ui"
+import type { EntityAction, EntityRow, EntityViewConfig, FormConfig, ModuleConfig, ProjectsCsvImportKind } from "@lumiere/ui"
 import {
   projectsParamsToJson,
   toCreateProjectParams,
@@ -163,14 +163,6 @@ type LifecycleModalState =
   | { type: "changeOrder"; rows: Record<string, unknown>[]; form: FormConfig }
   | { type: "subcontractorCost"; rows: Record<string, unknown>[]; form: FormConfig }
   | { type: "integrationIntent"; rows: Record<string, unknown>[]; form: FormConfig }
-
-type ProjectToolbarAction = {
-  id: string
-  label: string
-  requiresSelection?: boolean
-  variant?: "default" | "destructive"
-  onClick: (rows: Record<string, unknown>[]) => void
-}
 
 const taskStateForm: FormConfig = {
   id: "projects-update-task-state",
@@ -381,7 +373,7 @@ function ProjectsClientLoaded({
 
   const addCsvToolbar = (
     ec: EntityViewConfig,
-    actions: ProjectToolbarAction[],
+    actions: EntityAction[],
     // Tabs whose row click opens an editor keep selection off the row click;
     // tabs without one (timesheets) need it, or selection actions stay disabled.
     options: { selectOnRowClick?: boolean } = {},
@@ -1031,6 +1023,7 @@ function ProjectsClientLoaded({
                   id: "task-state",
                   label: "Update state",
                   requiresSelection: true,
+                  selection: "multiple",
                   onClick: (rows) => {
                     setLifecycleError(null)
                     setLifecycleModal({ type: "taskState", rows, form: taskStateForm })
@@ -1040,6 +1033,7 @@ function ProjectsClientLoaded({
                   id: "task-parent",
                   label: "Set parent",
                   requiresSelection: true,
+                  selection: "multiple",
                   onClick: (rows) => {
                     setLifecycleError(null)
                     setLifecycleModal({ type: "taskParent", rows, form: taskParentFormConfig })
@@ -1049,6 +1043,7 @@ function ProjectsClientLoaded({
                   id: "assign-users",
                   label: "Assign users",
                   requiresSelection: true,
+                  selection: "multiple",
                   onClick: (rows) => {
                     setLifecycleError(null)
                     setLifecycleModal({ type: "assignUsers", rows, form: assignUsersFormConfig })
@@ -1071,14 +1066,16 @@ function ProjectsClientLoaded({
                   id: "stop-timer",
                   label: "Stop timer",
                   requiresSelection: true,
-                  onClick: (rows) => void runForSelectedIds(rows, (id) => stopTimer.mutateAsync(id)),
+                  selection: "multiple",
+                  onClick: (rows) => runForSelectedIds(rows, (id) => stopTimer.mutateAsync(id)),
                 },
                 {
                   id: "validate-timesheets",
                   label: "Validate",
                   requiresSelection: true,
+                  selection: "multiple",
                   onClick: (rows) =>
-                    void validateTimesheets.mutateAsync({
+                    validateTimesheets.mutateAsync({
                       companyId: operatingCompanyId,
                       timesheetIds: selectedIds(rows),
                     }),
@@ -1087,9 +1084,10 @@ function ProjectsClientLoaded({
                   id: "reject-timesheets",
                   label: "Reject",
                   requiresSelection: true,
+                  selection: "multiple",
                   variant: "destructive" as const,
                   onClick: (rows) =>
-                    void rejectTimesheets.mutateAsync({
+                    rejectTimesheets.mutateAsync({
                       companyId: operatingCompanyId,
                       timesheetIds: selectedIds(rows),
                       reason: "Rejected by manager",
@@ -1099,6 +1097,7 @@ function ProjectsClientLoaded({
                   id: "bill-timesheets",
                   label: "Bill",
                   requiresSelection: true,
+                  selection: "multiple",
                   onClick: (rows) => {
                     setLifecycleError(null)
                     setLifecycleModal({ type: "billTimesheets", rows, form: billTimesheetsFormConfig })

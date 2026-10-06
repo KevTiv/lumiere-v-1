@@ -26,7 +26,7 @@ import {
   acknowledgeDocumentInsightForm,
   formatStdbTaggedValue,
 } from "@lumiere/ui"
-import type { EntityViewConfig, FormConfig } from "@lumiere/ui"
+import type { EntityAction, EntityViewConfig, FormConfig } from "@lumiere/ui"
 import { documentsModuleConfig } from "@/lib/module-dashboard-configs"
 import { useDocumentsModuleSubscription } from "@/lib/module-subscription-hooks"
 import {
@@ -208,12 +208,7 @@ function truthyRowBool(v: unknown): boolean {
 
 function withTableActions(
   ec: EntityViewConfig,
-  actions: Array<{
-    id: string
-    label: string
-    requiresSelection?: boolean
-    onClick: (selectedRows: Record<string, unknown>[]) => void
-  }>,
+  actions: EntityAction[],
   rowSelectionToggleOnClick?: boolean,
 ): EntityViewConfig {
   if (ec.view.mode !== "table") return ec
@@ -455,6 +450,7 @@ function DocumentsClientLoaded({
                   id: "lock-document",
                   label: "Lock",
                   requiresSelection: true,
+                  selection: "multiple",
                   onClick: async (rows) => {
                     setDocumentToolbarError(null)
                     try {
@@ -470,6 +466,7 @@ function DocumentsClientLoaded({
                   id: "unlock-document",
                   label: "Unlock",
                   requiresSelection: true,
+                  selection: "multiple",
                   onClick: async (rows) => {
                     setDocumentToolbarError(null)
                     try {
@@ -546,6 +543,7 @@ function DocumentsClientLoaded({
                   id: "publish-article",
                   label: "Publish",
                   requiresSelection: true,
+                  selection: "multiple",
                   onClick: async (rows) => {
                     setDocumentToolbarError(null)
                     try {
@@ -564,6 +562,7 @@ function DocumentsClientLoaded({
                   id: "unpublish-article",
                   label: "Unpublish",
                   requiresSelection: true,
+                  selection: "multiple",
                   onClick: async (rows) => {
                     setDocumentToolbarError(null)
                     try {
@@ -582,6 +581,7 @@ function DocumentsClientLoaded({
                   id: "lock-article",
                   label: "Lock",
                   requiresSelection: true,
+                  selection: "multiple",
                   onClick: async (rows) => {
                     setDocumentToolbarError(null)
                     try {
@@ -597,6 +597,7 @@ function DocumentsClientLoaded({
                   id: "unlock-article",
                   label: "Unlock",
                   requiresSelection: true,
+                  selection: "multiple",
                   onClick: async (rows) => {
                     setDocumentToolbarError(null)
                     try {
@@ -625,6 +626,7 @@ function DocumentsClientLoaded({
                   id: "delete-article",
                   label: "Delete",
                   requiresSelection: true,
+                  selection: "multiple",
                   onClick: async (rows) => {
                     setDocumentToolbarError(null)
                     try {
@@ -680,6 +682,7 @@ function DocumentsClientLoaded({
                   id: "delete-folder",
                   label: "Delete folder",
                   requiresSelection: true,
+                  selection: "multiple",
                   onClick: async (rows) => {
                     setDocumentToolbarError(null)
                     try {
@@ -706,6 +709,7 @@ function DocumentsClientLoaded({
                   id: "restore-document",
                   label: "Restore",
                   requiresSelection: true,
+                  selection: "multiple",
                   onClick: async (rows) => {
                     setDocumentToolbarError(null)
                     try {
@@ -772,6 +776,7 @@ function DocumentsClientLoaded({
                   id: "approve-job",
                   label: t("documents.processing.actions.approve"),
                   requiresSelection: true,
+                  selection: "multiple",
                   onClick: async (rows) => {
                     setProcessingToolbarError(null)
                     const eligible = rows.filter(
@@ -807,6 +812,7 @@ function DocumentsClientLoaded({
                   id: "ack-insight",
                   label: t("documents.insights.actions.acknowledge"),
                   requiresSelection: true,
+                  selection: "multiple",
                   onClick: (rows) => {
                     setProcessingToolbarError(null)
                     const eligible = rows.filter(

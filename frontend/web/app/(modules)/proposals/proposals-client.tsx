@@ -237,10 +237,10 @@ function ProposalsClientLoaded({ initialProposals, organizationId }: ProposalsCl
         icon: Eye,
         variant: "outline",
         requiresSelection: true,
-        onClick: (rows) => {
+        onClick: async (rows) => {
           const row = rows[0]
           if (!row?.id || normalizeProposalStatus(row.status) !== "Draft") return
-          void setStatus(row.id as string | number, "review")
+          await setStatus(row.id as string | number, "review")
         },
       },
       {
@@ -249,10 +249,10 @@ function ProposalsClientLoaded({ initialProposals, organizationId }: ProposalsCl
         icon: Send,
         variant: "outline",
         requiresSelection: true,
-        onClick: (rows) => {
+        onClick: async (rows) => {
           const row = rows[0]
           if (!row?.id || normalizeProposalStatus(row.status) !== "Review") return
-          void setStatus(row.id as string | number, "submitted")
+          await setStatus(row.id as string | number, "submitted")
         },
       },
       {
@@ -289,12 +289,12 @@ function ProposalsClientLoaded({ initialProposals, organizationId }: ProposalsCl
         icon: ThumbsDown,
         variant: "outline",
         requiresSelection: true,
-        onClick: (rows) => {
+        onClick: async (rows) => {
           const row = rows[0]
           if (!row?.id) return
           const s = normalizeProposalStatus(row.status)
           if (s === "Rejected" || s === "Archived") return
-          void setStatus(row.id as string | number, "rejected")
+          await setStatus(row.id as string | number, "rejected")
         },
       },
       {
@@ -303,13 +303,13 @@ function ProposalsClientLoaded({ initialProposals, organizationId }: ProposalsCl
         icon: Archive,
         variant: "outline",
         requiresSelection: true,
-        onClick: (rows) => {
+        onClick: async (rows) => {
           const row = rows[0]
           if (!row?.id) return
           const s = normalizeProposalStatus(row.status)
           if (s === "Archived") return
           if (s !== "Awarded" && s !== "Rejected") return
-          void setStatus(row.id as string | number, "archived")
+          await setStatus(row.id as string | number, "archived")
         },
       },
     ]

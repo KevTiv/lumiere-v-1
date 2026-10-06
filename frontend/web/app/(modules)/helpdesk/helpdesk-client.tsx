@@ -253,10 +253,11 @@ function HelpdeskClientLoaded({
         label: t("helpdesk.forms.ticketDetail.closeTicket"),
         icon: XCircle,
         requiresSelection: true,
+        isApplicable: (rows) => rows.every((row) => helpdeskEnumTag(row.state) !== "Closed"),
+        successMessage: t("common.actionCompleted", { action: t("helpdesk.forms.ticketDetail.closeTicket") }),
         onClick: async (rows) => {
           const row = rows[0]
           if (!row?.id) return
-          if (helpdeskEnumTag(row.state) === "Closed") return
           await closeTicket.mutateAsync({ ticketId: Number(row.id) })
         },
       },
@@ -265,11 +266,15 @@ function HelpdeskClientLoaded({
         label: t("helpdesk.forms.ticketDetail.reopenTicket"),
         icon: RotateCcw,
         requiresSelection: true,
+        isApplicable: (rows) =>
+          rows.every((row) => {
+            const st = helpdeskEnumTag(row.state)
+            return st === "Closed" || st === "Cancelled"
+          }),
+        successMessage: t("common.actionCompleted", { action: t("helpdesk.forms.ticketDetail.reopenTicket") }),
         onClick: async (rows) => {
           const row = rows[0]
           if (!row?.id) return
-          const st = helpdeskEnumTag(row.state)
-          if (st !== "Closed" && st !== "Cancelled") return
           await reopenTicket.mutateAsync({ ticketId: Number(row.id) })
         },
       },

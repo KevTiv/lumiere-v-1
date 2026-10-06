@@ -2310,17 +2310,16 @@ function InventoryClientLoaded({
                   icon: Trash2,
                   variant: 'destructive',
                   requiresSelection: true,
-                  onClick: (rows) => {
+                  confirm: {
+                    title: t('common.delete'),
+                    description: t('inventory.productActions.confirmDelete'),
+                    confirmLabel: t('common.confirm'),
+                    cancelLabel: t('common.cancel'),
+                  },
+                  onClick: async (rows) => {
                     const id = rows[0]?.id as ScalarId | undefined;
                     if (id == null) return;
-                    if (
-                      typeof window !== 'undefined' &&
-                      window.confirm(
-                        t('inventory.productActions.confirmDelete'),
-                      )
-                    ) {
-                      void deleteProduct.mutateAsync(id);
-                    }
+                    await deleteProduct.mutateAsync(id);
                   },
                 },
                 {
@@ -2408,7 +2407,7 @@ function InventoryClientLoaded({
                     const standardPrice = formNumber(values.standardPrice);
                     const listPrice = formNumber(values.listPrice);
                     if (standardPrice == null && listPrice == null) return;
-                    void updateProductPricing.mutateAsync({
+                    await updateProductPricing.mutateAsync({
                       productId,
                       params: { standardPrice, listPrice },
                     });
@@ -2446,7 +2445,7 @@ function InventoryClientLoaded({
                     const qtyAvailable = formNumber(values.qtyAvailable);
                     const virtualAvailable = formNumber(values.virtualAvailable);
                     if (qtyAvailable == null && virtualAvailable == null) return;
-                    void updateProductInventoryData.mutateAsync({
+                    await updateProductInventoryData.mutateAsync({
                       productId,
                       params: { qtyAvailable, virtualAvailable },
                     });
@@ -2476,7 +2475,7 @@ function InventoryClientLoaded({
                     const name = formText(values.name);
                     const standardPrice = formNumber(values.standardPrice);
                     if (name == null && standardPrice == null) return;
-                    void updateProductVariant.mutateAsync({
+                    await updateProductVariant.mutateAsync({
                       variantId: Number(values.recordId),
                       params: { name, standardPrice },
                     });
@@ -2501,7 +2500,7 @@ function InventoryClientLoaded({
                     });
                     const name = formText(values?.name);
                     if (name == null) return;
-                    void createUomCategory.mutateAsync({
+                    await createUomCategory.mutateAsync({
                       name,
                       description: null,
                       sequence: 10,
@@ -2557,7 +2556,7 @@ function InventoryClientLoaded({
                     const symbol = formText(values.symbol);
                     if (categoryId == null || name == null || symbol == null)
                       return;
-                    void createUom.mutateAsync({
+                    await createUom.mutateAsync({
                       category_id: categoryId,
                       name,
                       symbol,
@@ -2615,7 +2614,7 @@ function InventoryClientLoaded({
                     const categoryId = fromUom?.categoryId ?? fromUom?.category_id;
                     const factor = formNumber(values.factor);
                     if (categoryId == null || factor == null) return;
-                    void createUomConversion.mutateAsync({
+                    await createUomConversion.mutateAsync({
                       categoryId: categoryId as ScalarId,
                       params: {
                         from_uom_id: Number(values.fromUomId),
@@ -2649,7 +2648,7 @@ function InventoryClientLoaded({
                       ],
                     });
                     if (!values) return;
-                    void updateProductSupplierInfo.mutateAsync({
+                    await updateProductSupplierInfo.mutateAsync({
                       supplierInfoId: Number(values.recordId),
                       params: { price: formNumber(values.price), minQty: formNumber(values.minQty) },
                     });
@@ -2675,7 +2674,7 @@ function InventoryClientLoaded({
                       ],
                     });
                     if (!values) return;
-                    void updateProductPackaging.mutateAsync({
+                    await updateProductPackaging.mutateAsync({
                       packagingId: Number(values.recordId),
                       params: { name: formText(values.name) },
                     });
@@ -2716,17 +2715,16 @@ function InventoryClientLoaded({
                   icon: Trash2,
                   variant: 'destructive',
                   requiresSelection: true,
-                  onClick: (rows) => {
+                  confirm: {
+                    title: t('common.delete'),
+                    description: t('inventory.warehouseActions.confirmDelete'),
+                    confirmLabel: t('common.confirm'),
+                    cancelLabel: t('common.cancel'),
+                  },
+                  onClick: async (rows) => {
                     const id = rows[0]?.id as ScalarId | undefined;
                     if (id == null) return;
-                    if (
-                      typeof window !== 'undefined' &&
-                      window.confirm(
-                        t('inventory.warehouseActions.confirmDelete'),
-                      )
-                    ) {
-                      void deleteWarehouse.mutateAsync(id);
-                    }
+                    await deleteWarehouse.mutateAsync(id);
                   },
                 },
                 {
@@ -2772,7 +2770,7 @@ function InventoryClientLoaded({
                     const latitude = formNumber(values.latitude);
                     const longitude = formNumber(values.longitude);
                     if (latitude == null || longitude == null) return;
-                    void upsertWarehouseGeo.mutateAsync({
+                    await upsertWarehouseGeo.mutateAsync({
                       warehouseId: id,
                       latitude,
                       longitude,
@@ -2859,7 +2857,7 @@ function InventoryClientLoaded({
                     if (!values) return;
                     const quantity = formNumber(values.quantity);
                     if (quantity == null) return;
-                    void createStockMove.mutateAsync(
+                    await createStockMove.mutateAsync(
                       toCreateStockMoveParams({
                         companyId: operatingCompanyId,
                         name: formText(values.name) ?? 'Manual Stock Move',
@@ -2877,9 +2875,9 @@ function InventoryClientLoaded({
                   label: t('inventory.stockMoveActions.confirm'),
                   icon: CheckCircle,
                   requiresSelection: true,
-                  onClick: (rows) => {
+                  onClick: async (rows) => {
                     const id = rows[0]?.id as ScalarId | undefined;
-                    if (id != null) void confirmStockMove.mutateAsync(id);
+                    if (id != null) await confirmStockMove.mutateAsync(id);
                   },
                 },
                 {
@@ -2887,9 +2885,9 @@ function InventoryClientLoaded({
                   label: t('inventory.stockMoveActions.assign'),
                   icon: UserCircle2,
                   requiresSelection: true,
-                  onClick: (rows) => {
+                  onClick: async (rows) => {
                     const id = rows[0]?.id as ScalarId | undefined;
-                    if (id != null) void assignStockMove.mutateAsync(id);
+                    if (id != null) await assignStockMove.mutateAsync(id);
                   },
                 },
                 {
@@ -2921,7 +2919,7 @@ function InventoryClientLoaded({
                     if (!values) return;
                     const qty = formNumber(values.quantityDone);
                     if (qty == null) return;
-                    void doneStockMove.mutateAsync({
+                    await doneStockMove.mutateAsync({
                       moveId: id,
                       quantityDone: qty,
                     });
@@ -2933,9 +2931,9 @@ function InventoryClientLoaded({
                   icon: XCircle,
                   variant: 'destructive',
                   requiresSelection: true,
-                  onClick: (rows) => {
+                  onClick: async (rows) => {
                     const id = rows[0]?.id as ScalarId | undefined;
-                    if (id != null) void cancelStockMove.mutateAsync(id);
+                    if (id != null) await cancelStockMove.mutateAsync(id);
                   },
                 },
               ],
@@ -2964,10 +2962,10 @@ function InventoryClientLoaded({
                   label: t('inventory.stockActions.reserve'),
                   icon: CheckCircle,
                   requiresSelection: true,
-                  onClick: (rows) => {
+                  onClick: async (rows) => {
                     const id = rows[0]?.id as ScalarId | undefined;
                     if (id != null)
-                      void reserveQuant.mutateAsync({
+                      await reserveQuant.mutateAsync({
                         quantId: id,
                         reserveQty: 1,
                       });
@@ -2978,10 +2976,10 @@ function InventoryClientLoaded({
                   label: t('inventory.stockActions.unreserve'),
                   icon: XCircle,
                   requiresSelection: true,
-                  onClick: (rows) => {
+                  onClick: async (rows) => {
                     const id = rows[0]?.id as ScalarId | undefined;
                     if (id != null)
-                      void unreserveQuant.mutateAsync({
+                      await unreserveQuant.mutateAsync({
                         quantId: id,
                         unreserveQty: 1,
                       });
@@ -3012,7 +3010,7 @@ function InventoryClientLoaded({
                     if (!values) return;
                     const qty = formNumber(values.quantity);
                     if (qty == null) return;
-                    void updateStockQuantQuantity.mutateAsync({
+                    await updateStockQuantQuantity.mutateAsync({
                       quantId: id,
                       quantity: qty,
                     });
@@ -3053,7 +3051,7 @@ function InventoryClientLoaded({
                     });
                     const name = formText(values?.name);
                     if (name == null || operatingCompanyId == null) return;
-                    void createStockInventory.mutateAsync({
+                    await createStockInventory.mutateAsync({
                       company_id: Number(operatingCompanyId),
                       name,
                       location_ids: [],
@@ -3137,7 +3135,7 @@ function InventoryClientLoaded({
                       qty == null
                     )
                       return;
-                    void createStockInventoryLine.mutateAsync({
+                    await createStockInventoryLine.mutateAsync({
                       inventoryId,
                       params: {
                         product_id: Number(productId),
@@ -3204,7 +3202,7 @@ function InventoryClientLoaded({
                     const inventoryId = formText(values.inventoryId);
                     const newState = formText(values.newState);
                     if (inventoryId == null || newState == null) return;
-                    void updateStockInventoryState.mutateAsync({
+                    await updateStockInventoryState.mutateAsync({
                       inventoryId,
                       newState,
                     });
@@ -3214,9 +3212,9 @@ function InventoryClientLoaded({
                   id: 'process-adjustment',
                   label: t('inventory.adjustmentActions.process'),
                   requiresSelection: true,
-                  onClick: (rows) => {
+                  onClick: async (rows) => {
                     const id = rows[0]?.id as ScalarId | undefined;
-                    if (id != null) void processAdjustment.mutateAsync(id);
+                    if (id != null) await processAdjustment.mutateAsync(id);
                   },
                 },
               ],
@@ -3270,7 +3268,7 @@ function InventoryClientLoaded({
                     const name = formText(values.name);
                     const barcode = formText(values.barcode);
                     if (name == null && barcode == null) return;
-                    void updateStockLocation.mutateAsync({
+                    await updateStockLocation.mutateAsync({
                       locationId,
                       params: { name, barcode },
                     });
@@ -3281,9 +3279,9 @@ function InventoryClientLoaded({
                   label: t('common.delete'),
                   variant: 'destructive',
                   requiresSelection: true,
-                  onClick: (rows) => {
+                  onClick: async (rows) => {
                     const id = rows[0]?.id as ScalarId | undefined;
-                    if (id != null) void deleteStockLocation.mutateAsync(id);
+                    if (id != null) await deleteStockLocation.mutateAsync(id);
                   },
                 },
               ],
@@ -3339,7 +3337,7 @@ function InventoryClientLoaded({
                       operatingCompanyId == null
                     )
                       return;
-                    void createStockProductionLot.mutateAsync({
+                    await createStockProductionLot.mutateAsync({
                       companyId: BigInt(operatingCompanyId),
                       name,
                       productId: BigInt(Number(productId)),
@@ -3383,7 +3381,7 @@ function InventoryClientLoaded({
                       ],
                     });
                     if (!values) return;
-                    void updateStockProductionLot.mutateAsync({
+                    await updateStockProductionLot.mutateAsync({
                       lotId: id,
                       params: {
                         companyId: undefined,
@@ -3398,14 +3396,16 @@ function InventoryClientLoaded({
                   icon: Trash2,
                   variant: 'destructive',
                   requiresSelection: true,
-                  onClick: (rows) => {
+                  confirm: {
+                    title: t('common.delete'),
+                    description: t('inventory.lotActions.confirmDelete'),
+                    confirmLabel: t('common.confirm'),
+                    cancelLabel: t('common.cancel'),
+                  },
+                  onClick: async (rows) => {
                     const id = rows[0]?.id as ScalarId | undefined;
-                    if (id == null || typeof window === 'undefined') return;
-                    if (
-                      window.confirm(t('inventory.lotActions.confirmDelete'))
-                    ) {
-                      void deleteStockProductionLot.mutateAsync(id);
-                    }
+                    if (id == null) return;
+                    await deleteStockProductionLot.mutateAsync(id);
                   },
                 },
               ],
@@ -3456,7 +3456,7 @@ function InventoryClientLoaded({
                       operatingCompanyId == null
                     )
                       return;
-                    void createStockProductionSerial.mutateAsync({
+                    await createStockProductionSerial.mutateAsync({
                       companyId: BigInt(operatingCompanyId),
                       name,
                       productId: BigInt(Number(productId)),
@@ -3493,10 +3493,10 @@ function InventoryClientLoaded({
                   label: t('inventory.productionSerials.actions.reserve'),
                   icon: ListChecks,
                   requiresSelection: true,
-                  onClick: (rows) => {
+                  onClick: async (rows) => {
                     const id = rows[0]?.id as ScalarId | undefined;
                     if (id != null)
-                      void reserveSerial.reserve(
+                      await reserveSerial.reserve(
                         { serialId: String(id) },
                         { navigateToNext: true },
                       );
@@ -3507,10 +3507,10 @@ function InventoryClientLoaded({
                   label: t('inventory.productionSerials.actions.markInUse'),
                   icon: CheckCircle,
                   requiresSelection: true,
-                  onClick: (rows) => {
+                  onClick: async (rows) => {
                     const id = rows[0]?.id as ScalarId | undefined;
                     if (id != null)
-                      void useSerial.markInUse(
+                      await useSerial.markInUse(
                         { serialId: String(id) },
                         { navigateToNext: true },
                       );
@@ -3539,7 +3539,7 @@ function InventoryClientLoaded({
                       ],
                     });
                     if (!values) return;
-                    void updateStockProductionSerial.mutateAsync({
+                    await updateStockProductionSerial.mutateAsync({
                       serialId: id,
                       params: {
                         companyId: undefined,
@@ -3554,14 +3554,16 @@ function InventoryClientLoaded({
                   icon: Trash2,
                   variant: 'destructive',
                   requiresSelection: true,
-                  onClick: (rows) => {
+                  confirm: {
+                    title: t('common.delete'),
+                    description: t('inventory.serialActions.confirmDelete'),
+                    confirmLabel: t('common.confirm'),
+                    cancelLabel: t('common.cancel'),
+                  },
+                  onClick: async (rows) => {
                     const id = rows[0]?.id as ScalarId | undefined;
-                    if (id == null || typeof window === 'undefined') return;
-                    if (
-                      window.confirm(t('inventory.serialActions.confirmDelete'))
-                    ) {
-                      void deleteStockProductionSerial.mutateAsync(id);
-                    }
+                    if (id == null) return;
+                    await deleteStockProductionSerial.mutateAsync(id);
                   },
                 },
               ],
@@ -3628,10 +3630,10 @@ function InventoryClientLoaded({
                   label: t('inventory.qualityActions.pass'),
                   icon: ShieldCheck,
                   requiresSelection: true,
-                  onClick: (rows) => {
+                  onClick: async (rows) => {
                     const id = rows[0]?.id as ScalarId | undefined;
                     if (id != null)
-                      void passQualityCheck.mutateAsync({ checkId: id });
+                      await passQualityCheck.mutateAsync({ checkId: id });
                   },
                 },
                 {
@@ -3687,7 +3689,7 @@ function InventoryClientLoaded({
                       configuredQuarantineLocationId ??
                       formText(values.quarantineLocationId);
                     if (quarantineLocationId == null) return;
-                    void failQualityCheck.fail(
+                    await failQualityCheck.fail(
                       {
                         checkId: String(id),
                         productId: String(productId),
@@ -3706,9 +3708,9 @@ function InventoryClientLoaded({
                   label: t('inventory.qualityActions.startCheck'),
                   icon: ListChecks,
                   requiresSelection: true,
-                  onClick: (rows) => {
+                  onClick: async (rows) => {
                     const id = rows[0]?.id as ScalarId | undefined;
-                    if (id != null) void startQualityCheck.mutateAsync(id);
+                    if (id != null) await startQualityCheck.mutateAsync(id);
                   },
                 },
                 {
@@ -3734,7 +3736,7 @@ function InventoryClientLoaded({
                     });
                     const deviceId = formNumber(values?.deviceId);
                     if (deviceId == null) return;
-                    void linkDeviceToQualityCheck.mutateAsync({
+                    await linkDeviceToQualityCheck.mutateAsync({
                       deviceId,
                       checkId,
                     });
@@ -3766,7 +3768,7 @@ function InventoryClientLoaded({
                     });
                     const name = formText(values?.name);
                     if (name == null) return;
-                    void createQualityAlertReason.mutateAsync({
+                    await createQualityAlertReason.mutateAsync({
                       name,
                       description: formText(values?.description) ?? null,
                     });
@@ -3792,7 +3794,7 @@ function InventoryClientLoaded({
                       ],
                     });
                     if (!values) return;
-                    void updateQualityAlertReason.mutateAsync({
+                    await updateQualityAlertReason.mutateAsync({
                       reasonId: Number(values.recordId),
                       params: { name: formText(values.name) ?? null },
                     });
@@ -3817,7 +3819,7 @@ function InventoryClientLoaded({
                         }],
                     });
                     if (!values) return;
-                    void deleteQualityAlertReason.mutateAsync(Number(values.recordId));
+                    await deleteQualityAlertReason.mutateAsync(Number(values.recordId));
                   },
                 },
                 {
@@ -3843,7 +3845,7 @@ function InventoryClientLoaded({
                         }],
                     });
                     if (!values) return;
-                    void addMemberToQualityTeam.mutateAsync({
+                    await addMemberToQualityTeam.mutateAsync({
                       teamId: Number(values.teamId),
                       memberIdentityHex: String(values.member).trim(),
                     });
@@ -3874,7 +3876,7 @@ function InventoryClientLoaded({
                     const name = formText(values.name);
                     const testType = formText(values.testType);
                     if (name == null && testType == null) return;
-                    void updateQualityPoint.mutateAsync({
+                    await updateQualityPoint.mutateAsync({
                       pointId: Number(values.recordId),
                       params: { name, testType },
                     });
@@ -3905,7 +3907,7 @@ function InventoryClientLoaded({
                     const name = formText(values.name);
                     const email = formText(values.email);
                     if (name == null && email == null) return;
-                    void updateQualityTeam.mutateAsync({
+                    await updateQualityTeam.mutateAsync({
                       teamId: Number(values.teamId),
                       params: { name, email },
                     });
@@ -3936,7 +3938,7 @@ function InventoryClientLoaded({
                         }],
                     });
                     if (!values) return;
-                    void removeMemberFromQualityTeam.mutateAsync({
+                    await removeMemberFromQualityTeam.mutateAsync({
                       teamId: Number(values.teamId),
                       memberIdentityHex: String(values.member).trim(),
                     });
@@ -3971,28 +3973,28 @@ function InventoryClientLoaded({
                   label: t('inventory.replenishmentActions.executeRule'),
                   icon: ListChecks,
                   requiresSelection: true,
-                  onClick: (rows) => {
+                  confirm: {
+                    title: t('inventory.replenishmentActions.executeRule'),
+                    description: `${t('inventory.replenishmentActions.executeRule')}\n${t('inventory.replenishmentActions.executeRuleHint')}`,
+                    confirmLabel: t('common.confirm'),
+                    cancelLabel: t('common.cancel'),
+                  },
+                  onClick: async (rows) => {
                     const id = rows[0]?.id as ScalarId | undefined;
-                    if (id == null || typeof window === 'undefined') return;
+                    if (id == null) return;
                     if (
-                      window.confirm(
-                        `${t('inventory.replenishmentActions.executeRule')}\n${t('inventory.replenishmentActions.executeRuleHint')}`,
-                      )
+                      typeof globalThis.crypto === 'undefined' ||
+                      typeof globalThis.crypto.randomUUID !== 'function'
                     ) {
-                      if (
-                        typeof globalThis.crypto === 'undefined' ||
-                        typeof globalThis.crypto.randomUUID !== 'function'
-                      ) {
-                        return;
-                      }
-                      void executeReplenishmentRule.execute(
-                        {
-                          ruleId: String(id),
-                          idempotencyKey: globalThis.crypto.randomUUID(),
-                        },
-                        { navigateToNext: true },
-                      );
+                      return;
                     }
+                    await executeReplenishmentRule.execute(
+                      {
+                        ruleId: String(id),
+                        idempotencyKey: globalThis.crypto.randomUUID(),
+                      },
+                      { navigateToNext: true },
+                    );
                   },
                 },
                 {
@@ -4000,10 +4002,10 @@ function InventoryClientLoaded({
                   label: t('inventory.replenishmentActions.scheduleRun'),
                   icon: ListChecks,
                   requiresSelection: true,
-                  onClick: (rows) => {
+                  onClick: async (rows) => {
                     const id = rows[0]?.id as ScalarId | undefined;
                     if (id != null)
-                      void scheduleReplenishmentRun.mutateAsync(id);
+                      await scheduleReplenishmentRun.mutateAsync(id);
                   },
                 },
                 {
@@ -4011,9 +4013,9 @@ function InventoryClientLoaded({
                   label: t('inventory.replenishmentActions.cancelSchedule'),
                   icon: ListChecks,
                   requiresSelection: true,
-                  onClick: (rows) => {
+                  onClick: async (rows) => {
                     const id = rows[0]?.id as ScalarId | undefined;
-                    if (id != null) void cancelReplenishmentRun.mutateAsync(id);
+                    if (id != null) await cancelReplenishmentRun.mutateAsync(id);
                   },
                 },
               ],
@@ -4039,9 +4041,9 @@ function InventoryClientLoaded({
                   label: t('inventory.pickingWaveActions.confirm'),
                   icon: CheckCircle,
                   requiresSelection: true,
-                  onClick: (rows) => {
+                  onClick: async (rows) => {
                     const id = rows[0]?.id as ScalarId | undefined;
-                    if (id != null) void confirmPickingWave.mutateAsync(id);
+                    if (id != null) await confirmPickingWave.mutateAsync(id);
                   },
                 },
                 {
@@ -4049,9 +4051,9 @@ function InventoryClientLoaded({
                   label: t('inventory.pickingWaveActions.complete'),
                   icon: ListChecks,
                   requiresSelection: true,
-                  onClick: (rows) => {
+                  onClick: async (rows) => {
                     const id = rows[0]?.id as ScalarId | undefined;
-                    if (id != null) void completePickingWave.mutateAsync(id);
+                    if (id != null) await completePickingWave.mutateAsync(id);
                   },
                 },
               ],
@@ -4084,17 +4086,16 @@ function InventoryClientLoaded({
                   icon: Trash2,
                   variant: 'destructive',
                   requiresSelection: true,
-                  onClick: (rows) => {
+                  confirm: {
+                    title: t('common.delete'),
+                    description: t('inventory.categoryActions.confirmDelete'),
+                    confirmLabel: t('common.confirm'),
+                    cancelLabel: t('common.cancel'),
+                  },
+                  onClick: async (rows) => {
                     const id = rows[0]?.id as ScalarId | undefined;
-                    if (
-                      id != null &&
-                      typeof window !== 'undefined' &&
-                      window.confirm(
-                        t('inventory.categoryActions.confirmDelete'),
-                      )
-                    ) {
-                      void deleteProductCategory.mutateAsync(id);
-                    }
+                    if (id == null) return;
+                    await deleteProductCategory.mutateAsync(id);
                   },
                 },
                 {
@@ -4119,7 +4120,7 @@ function InventoryClientLoaded({
                       ],
                     });
                     if (!values) return;
-                    void restoreProductCategory.mutateAsync(Number(values.categoryId));
+                    await restoreProductCategory.mutateAsync(Number(values.categoryId));
                   },
                 },
               ],
@@ -4142,15 +4143,16 @@ function InventoryClientLoaded({
                   icon: Trash2,
                   variant: 'destructive',
                   requiresSelection: true,
-                  onClick: (rows) => {
+                  confirm: {
+                    title: t('common.delete'),
+                    description: t('inventory.routeActions.confirmDelete'),
+                    confirmLabel: t('common.confirm'),
+                    cancelLabel: t('common.cancel'),
+                  },
+                  onClick: async (rows) => {
                     const id = rows[0]?.id as ScalarId | undefined;
-                    if (
-                      id != null &&
-                      typeof window !== 'undefined' &&
-                      window.confirm(t('inventory.routeActions.confirmDelete'))
-                    ) {
-                      void deleteStockRoute.mutateAsync(id);
-                    }
+                    if (id == null) return;
+                    await deleteStockRoute.mutateAsync(id);
                   },
                 },
               ],
@@ -4173,15 +4175,16 @@ function InventoryClientLoaded({
                   icon: Trash2,
                   variant: 'destructive',
                   requiresSelection: true,
-                  onClick: (rows) => {
+                  confirm: {
+                    title: t('common.delete'),
+                    description: t('inventory.ruleActions.confirmDelete'),
+                    confirmLabel: t('common.confirm'),
+                    cancelLabel: t('common.cancel'),
+                  },
+                  onClick: async (rows) => {
                     const id = rows[0]?.id as ScalarId | undefined;
-                    if (
-                      id != null &&
-                      typeof window !== 'undefined' &&
-                      window.confirm(t('inventory.ruleActions.confirmDelete'))
-                    ) {
-                      void deleteStockRule.mutateAsync(id);
-                    }
+                    if (id == null) return;
+                    await deleteStockRule.mutateAsync(id);
                   },
                 },
               ],
@@ -4237,7 +4240,7 @@ function InventoryClientLoaded({
                     const accountId = formText(values.accountId);
                     const qualityScore = formText(values.qualityScore);
                     if (accountId == null || qualityScore == null) return;
-                    void updateWhatsappQualityScore.mutateAsync({
+                    await updateWhatsappQualityScore.mutateAsync({
                       accountId,
                       qualityScore,
                     });
@@ -4249,17 +4252,16 @@ function InventoryClientLoaded({
                   icon: Trash2,
                   variant: 'destructive',
                   requiresSelection: true,
-                  onClick: (rows) => {
+                  confirm: {
+                    title: t('common.delete'),
+                    description: t('inventory.barcodeActions.confirmDelete'),
+                    confirmLabel: t('common.confirm'),
+                    cancelLabel: t('common.cancel'),
+                  },
+                  onClick: async (rows) => {
                     const id = rows[0]?.id as ScalarId | undefined;
-                    if (
-                      id != null &&
-                      typeof window !== 'undefined' &&
-                      window.confirm(
-                        t('inventory.barcodeActions.confirmDelete'),
-                      )
-                    ) {
-                      void deleteBarcodeRule.mutateAsync(id);
-                    }
+                    if (id == null) return;
+                    await deleteBarcodeRule.mutateAsync(id);
                   },
                 },
               ],
@@ -4301,7 +4303,7 @@ function InventoryClientLoaded({
                     });
                     const name = formText(values?.name);
                     if (name == null) return;
-                    void createBarcodeNomenclature.mutateAsync({
+                    await createBarcodeNomenclature.mutateAsync({
                       name,
                       description: null,
                       is_default: false,
@@ -4335,7 +4337,7 @@ function InventoryClientLoaded({
                     });
                     const name = formText(values?.name);
                     if (name == null) return;
-                    void updateBarcodeNomenclature.mutateAsync({
+                    await updateBarcodeNomenclature.mutateAsync({
                       nomenclatureId,
                       params: { name, isActive: true },
                     });
@@ -4364,7 +4366,7 @@ function InventoryClientLoaded({
                     });
                     const ruleId = formText(values?.ruleId);
                     if (ruleId == null) return;
-                    void addRuleToNomenclature.mutateAsync({
+                    await addRuleToNomenclature.mutateAsync({
                       nomenclatureId,
                       ruleId,
                     });
@@ -4393,7 +4395,7 @@ function InventoryClientLoaded({
                     });
                     const ruleId = formNumber(values?.ruleId);
                     if (ruleId == null) return;
-                    void removeRuleFromNomenclature.mutateAsync({
+                    await removeRuleFromNomenclature.mutateAsync({
                       nomenclatureId,
                       ruleId,
                     });
@@ -4405,21 +4407,21 @@ function InventoryClientLoaded({
                   icon: Trash2,
                   variant: 'destructive',
                   requiresSelection: true,
-                  onClick: (rows) => {
-                    const nomenclatureId = rows[0]?.id as ScalarId | undefined;
-                    if (nomenclatureId == null || typeof window === 'undefined')
-                      return;
-                    if (
-                      window.confirm(
-                        t(
+                  confirm: {
+                    title: t('common.delete'),
+                    description: t(
                           'inventory.barcodeNomenclatures.actions.confirmDelete',
                         ),
-                      )
-                    ) {
-                      void deleteBarcodeNomenclature.mutateAsync(
-                        nomenclatureId,
-                      );
-                    }
+                    confirmLabel: t('common.confirm'),
+                    cancelLabel: t('common.cancel'),
+                  },
+                  onClick: async (rows) => {
+                    const nomenclatureId = rows[0]?.id as ScalarId | undefined;
+                    if (nomenclatureId == null)
+                      return;
+                    await deleteBarcodeNomenclature.mutateAsync(
+                      nomenclatureId,
+                    );
                   },
                 },
               ],
@@ -4440,12 +4442,12 @@ function InventoryClientLoaded({
                   label: t('inventory.traceabilityReports.actions.runSelected'),
                   icon: Play,
                   requiresSelection: true,
-                  onClick: (rows) => {
+                  onClick: async (rows) => {
                     const row = rows[0] as Record<string, unknown> | undefined;
                     const id = row?.id as ScalarId | undefined;
                     if (id == null || String(row?.state ?? '') !== 'draft')
                       return;
-                    void runTraceabilityReport.mutateAsync(id);
+                    await runTraceabilityReport.mutateAsync(id);
                   },
                 },
               ],
@@ -4467,9 +4469,9 @@ function InventoryClientLoaded({
                   label: t('inventory.taskActions.start'),
                   icon: CheckCircle,
                   requiresSelection: true,
-                  onClick: (rows) => {
+                  onClick: async (rows) => {
                     const id = rows[0]?.id as ScalarId | undefined;
-                    if (id != null) void startWarehouseTask.mutateAsync(id);
+                    if (id != null) await startWarehouseTask.mutateAsync(id);
                   },
                 },
                 {
@@ -4477,10 +4479,10 @@ function InventoryClientLoaded({
                   label: t('inventory.taskActions.complete'),
                   icon: ListChecks,
                   requiresSelection: true,
-                  onClick: (rows) => {
+                  onClick: async (rows) => {
                     const id = rows[0]?.id as ScalarId | undefined;
                     if (id != null)
-                      void completeWarehouseTask.mutateAsync({
+                      await completeWarehouseTask.mutateAsync({
                         taskId: id,
                         result: {},
                       });
@@ -4492,9 +4494,9 @@ function InventoryClientLoaded({
                   icon: XCircle,
                   variant: 'destructive',
                   requiresSelection: true,
-                  onClick: (rows) => {
+                  onClick: async (rows) => {
                     const id = rows[0]?.id as ScalarId | undefined;
-                    if (id != null) void cancelWarehouseTask.mutateAsync(id);
+                    if (id != null) await cancelWarehouseTask.mutateAsync(id);
                   },
                 },
                 {
@@ -4520,7 +4522,7 @@ function InventoryClientLoaded({
                     });
                     const newStatus = formText(values?.status);
                     if (newStatus == null) return;
-                    void updateWarehouseTaskStatus.mutateAsync({
+                    await updateWarehouseTaskStatus.mutateAsync({
                       taskId: id,
                       newStatus,
                     });

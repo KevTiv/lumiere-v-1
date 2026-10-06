@@ -2014,10 +2014,11 @@ function AccountingClientReady({
             id: "fy-open",
             label: t("accounting.entities.fiscalYears.actions.openSelected"),
             requiresSelection: true,
-            onClick: (rows) => {
+            selection: "multiple",
+            onClick: async (rows) => {
               for (const r of rows) {
                 if (fiscalYearStateTag(r as Record<string, unknown>) === "Draft") {
-                  void openFiscalYear.mutateAsync(BigInt(String(r.id)))
+                  await openFiscalYear.mutateAsync(BigInt(String(r.id)))
                 }
               }
             },
@@ -2026,10 +2027,11 @@ function AccountingClientReady({
             id: "fy-close",
             label: t("accounting.entities.fiscalYears.actions.closeSelected"),
             requiresSelection: true,
-            onClick: (rows) => {
+            selection: "multiple",
+            onClick: async (rows) => {
               for (const r of rows) {
                 if (fiscalYearStateTag(r as Record<string, unknown>) === "Running") {
-                  void closeFiscalYear.mutateAsync(BigInt(String(r.id)))
+                  await closeFiscalYear.mutateAsync(BigInt(String(r.id)))
                 }
               }
             },
@@ -2038,11 +2040,12 @@ function AccountingClientReady({
             id: "fy-delete",
             label: t("accounting.entities.fiscalYears.actions.deleteSelected"),
             requiresSelection: true,
+            selection: "multiple",
             variant: "destructive",
-            onClick: (rows) => {
+            onClick: async (rows) => {
               for (const r of rows) {
                 if (fiscalYearStateTag(r as Record<string, unknown>) === "Draft") {
-                  void deleteFiscalYear.mutateAsync(BigInt(String(r.id)))
+                  await deleteFiscalYear.mutateAsync(BigInt(String(r.id)))
                 }
               }
             },
@@ -2112,10 +2115,11 @@ function AccountingClientReady({
             id: "ap-open",
             label: t("accounting.entities.accountPeriods.actions.openSelected"),
             requiresSelection: true,
-            onClick: (rows) => {
+            selection: "multiple",
+            onClick: async (rows) => {
               for (const r of rows) {
                 if (accountPeriodStateTag(r as Record<string, unknown>) === "Draft") {
-                  void openAccountPeriod.mutateAsync(BigInt(String(r.id)))
+                  await openAccountPeriod.mutateAsync(BigInt(String(r.id)))
                 }
               }
             },
@@ -2124,10 +2128,11 @@ function AccountingClientReady({
             id: "ap-close",
             label: t("accounting.entities.accountPeriods.actions.closeSelected"),
             requiresSelection: true,
-            onClick: (rows) => {
+            selection: "multiple",
+            onClick: async (rows) => {
               for (const r of rows) {
                 if (accountPeriodStateTag(r as Record<string, unknown>) === "Open") {
-                  void closeAccountPeriod.mutateAsync(BigInt(String(r.id)))
+                  await closeAccountPeriod.mutateAsync(BigInt(String(r.id)))
                 }
               }
             },
@@ -2136,11 +2141,12 @@ function AccountingClientReady({
             id: "ap-delete",
             label: t("accounting.entities.accountPeriods.actions.deleteSelected"),
             requiresSelection: true,
+            selection: "multiple",
             variant: "destructive",
-            onClick: (rows) => {
+            onClick: async (rows) => {
               for (const r of rows) {
                 if (accountPeriodStateTag(r as Record<string, unknown>) !== "Closed") {
-                  void deleteAccountPeriod.mutateAsync(BigInt(String(r.id)))
+                  await deleteAccountPeriod.mutateAsync(BigInt(String(r.id)))
                 }
               }
             },
@@ -2162,11 +2168,12 @@ function AccountingClientReady({
             id: "asset-activate",
             label: t("accounting.entities.fixedAssets.actions.activateSelected"),
             requiresSelection: true,
-            onClick: (rows) => {
+            selection: "multiple",
+            onClick: async (rows) => {
               for (const r of rows) {
                 const row = r as Record<string, unknown>
                 if (row.active === false) {
-                  void setAccountAssetActive.mutateAsync({
+                  await setAccountAssetActive.mutateAsync({
                     assetId: BigInt(String(row.id)),
                     active: true,
                   })
@@ -2178,11 +2185,12 @@ function AccountingClientReady({
             id: "asset-deactivate",
             label: t("accounting.entities.fixedAssets.actions.deactivateSelected"),
             requiresSelection: true,
-            onClick: (rows) => {
+            selection: "multiple",
+            onClick: async (rows) => {
               for (const r of rows) {
                 const row = r as Record<string, unknown>
                 if (row.active === true) {
-                  void setAccountAssetActive.mutateAsync({
+                  await setAccountAssetActive.mutateAsync({
                     assetId: BigInt(String(row.id)),
                     active: false,
                   })
@@ -2194,10 +2202,11 @@ function AccountingClientReady({
             id: "asset-confirm",
             label: t("accounting.entities.fixedAssets.actions.confirmSelected"),
             requiresSelection: true,
-            onClick: (rows) => {
+            selection: "multiple",
+            onClick: async (rows) => {
               for (const r of rows) {
                 if (assetStateTag(r as Record<string, unknown>) === "Draft") {
-                  void confirmAccountAsset.mutateAsync(BigInt(String(r.id)))
+                  await confirmAccountAsset.mutateAsync(BigInt(String(r.id)))
                 }
               }
             },
@@ -2206,10 +2215,11 @@ function AccountingClientReady({
             id: "asset-close",
             label: t("accounting.entities.fixedAssets.actions.closeSelected"),
             requiresSelection: true,
-            onClick: (rows) => {
+            selection: "multiple",
+            onClick: async (rows) => {
               for (const r of rows) {
                 if (assetStateTag(r as Record<string, unknown>) === "Running") {
-                  void closeAccountAsset.mutateAsync(BigInt(String(r.id)))
+                  await closeAccountAsset.mutateAsync(BigInt(String(r.id)))
                 }
               }
             },
@@ -2218,16 +2228,17 @@ function AccountingClientReady({
             id: "asset-compute-depreciation",
             label: t("accounting.entities.fixedAssets.actions.computeDepreciation"),
             requiresSelection: true,
+            selection: "multiple",
             isApplicable: (rows) =>
               rows.length > 0 &&
               rows.every(
                 (row) =>
                   assetStateTag(row as EntityRow) === "Running",
               ),
-            onClick: (rows) => {
+            onClick: async (rows) => {
               for (const r of rows) {
                 if (assetStateTag(r as EntityRow) === "Running") {
-                  void computeDepreciationBoard.mutateAsync(BigInt(String(r.id)))
+                  await computeDepreciationBoard.mutateAsync(BigInt(String(r.id)))
                 }
               }
             },
@@ -2236,6 +2247,7 @@ function AccountingClientReady({
             id: "asset-dispose",
             label: t("accounting.entities.fixedAssets.actions.disposeSelected"),
             requiresSelection: true,
+            selection: "multiple",
             variant: "destructive",
             isApplicable: (rows) =>
               rows.length > 0 &&
@@ -2243,11 +2255,11 @@ function AccountingClientReady({
                 const state = assetStateTag(row as EntityRow)
                 return state === "Running" || state === "Close"
               }),
-            onClick: (rows) => {
+            onClick: async (rows) => {
               for (const r of rows) {
                 const state = assetStateTag(r as EntityRow)
                 if (state === "Running" || state === "Close") {
-                  void disposeAccountAsset.mutateAsync({
+                  await disposeAccountAsset.mutateAsync({
                     assetId: BigInt(String(r.id)),
                     disposalDate: new Date(),
                   })
@@ -2259,11 +2271,12 @@ function AccountingClientReady({
             id: "asset-delete",
             label: t("accounting.entities.fixedAssets.actions.deleteSelected"),
             requiresSelection: true,
+            selection: "multiple",
             variant: "destructive",
-            onClick: (rows) => {
+            onClick: async (rows) => {
               for (const r of rows) {
                 if (assetStateTag(r as Record<string, unknown>) === "Draft") {
-                  void deleteAccountAsset.mutateAsync(BigInt(String(r.id)))
+                  await deleteAccountAsset.mutateAsync(BigInt(String(r.id)))
                 }
               }
             },
@@ -2301,12 +2314,13 @@ function AccountingClientReady({
             id: "pay-cancel",
             label: t("accounting.entities.payments.actions.cancelSelected"),
             requiresSelection: true,
+            selection: "multiple",
             variant: "destructive",
-            onClick: (rows) => {
+            onClick: async (rows) => {
               for (const r of rows) {
                 const st = paymentStateTag(r as Record<string, unknown>)
                 if (st === "NotPaid" || st === "Paid") {
-                  void cancelAccountPayment.mutateAsync(BigInt(String((r as Record<string, unknown>).id)))
+                  await cancelAccountPayment.mutateAsync(BigInt(String((r as Record<string, unknown>).id)))
                 }
               }
             },
@@ -2358,10 +2372,11 @@ function AccountingClientReady({
             id: "pt-activate",
             label: t("accounting.entities.paymentTerms.actions.activateSelected"),
             requiresSelection: true,
-            onClick: (rows) => {
+            selection: "multiple",
+            onClick: async (rows) => {
               for (const r of rows) {
                 if (!paymentTermIsActive(r as Record<string, unknown>)) {
-                  void updatePaymentTerm.mutateAsync({
+                  await updatePaymentTerm.mutateAsync({
                     termId: BigInt(String((r as Record<string, unknown>).id)),
                     name: null,
                     note: null,
@@ -2375,10 +2390,11 @@ function AccountingClientReady({
             id: "pt-deactivate",
             label: t("accounting.entities.paymentTerms.actions.deactivateSelected"),
             requiresSelection: true,
-            onClick: (rows) => {
+            selection: "multiple",
+            onClick: async (rows) => {
               for (const r of rows) {
                 if (paymentTermIsActive(r as Record<string, unknown>)) {
-                  void updatePaymentTerm.mutateAsync({
+                  await updatePaymentTerm.mutateAsync({
                     termId: BigInt(String((r as Record<string, unknown>).id)),
                     name: null,
                     note: null,
@@ -2392,10 +2408,11 @@ function AccountingClientReady({
             id: "pt-delete",
             label: t("accounting.entities.paymentTerms.actions.deleteSelected"),
             requiresSelection: true,
+            selection: "multiple",
             variant: "destructive",
-            onClick: (rows) => {
+            onClick: async (rows) => {
               for (const r of rows) {
-                void deletePaymentTerm.mutateAsync(BigInt(String((r as Record<string, unknown>).id)))
+                await deletePaymentTerm.mutateAsync(BigInt(String((r as Record<string, unknown>).id)))
               }
             },
           },
@@ -2425,10 +2442,11 @@ function AccountingClientReady({
             id: "ptl-delete",
             label: t("accounting.entities.paymentTerms.actions.deleteLinesSelected"),
             requiresSelection: true,
+            selection: "multiple",
             variant: "destructive",
-            onClick: (rows) => {
+            onClick: async (rows) => {
               for (const r of rows) {
-                void deletePaymentTermLine.mutateAsync(BigInt(String((r as Record<string, unknown>).id)))
+                await deletePaymentTermLine.mutateAsync(BigInt(String((r as Record<string, unknown>).id)))
               }
             },
           },
@@ -2474,10 +2492,11 @@ function AccountingClientReady({
             id: "move-line-delete",
             label: t("accounting.entities.moveLines.actions.deleteSelected"),
             requiresSelection: true,
+            selection: "multiple",
             variant: "destructive",
-            onClick: (rows) => {
+            onClick: async (rows) => {
               for (const r of rows) {
-                void deleteAccountMoveLine.mutateAsync({
+                await deleteAccountMoveLine.mutateAsync({
                   lineId: BigInt(String((r as Record<string, unknown>).id)),
                   params: { companyId: operatingCompanyId },
                 })
@@ -2506,10 +2525,11 @@ function AccountingClientReady({
             id: "ic-rule-activate",
             label: t("accounting.entities.intercompanyRules.actions.activateSelected"),
             requiresSelection: true,
-            onClick: (rows) => {
+            selection: "multiple",
+            onClick: async (rows) => {
               for (const r of rows) {
                 if (!intercompanyRuleIsActive(r as Record<string, unknown>)) {
-                  void setIntercompanyRuleActive.mutateAsync({
+                  await setIntercompanyRuleActive.mutateAsync({
                     ruleId: BigInt(String(r.id)),
                     isActive: true,
                   })
@@ -2521,10 +2541,11 @@ function AccountingClientReady({
             id: "ic-rule-deactivate",
             label: t("accounting.entities.intercompanyRules.actions.deactivateSelected"),
             requiresSelection: true,
-            onClick: (rows) => {
+            selection: "multiple",
+            onClick: async (rows) => {
               for (const r of rows) {
                 if (intercompanyRuleIsActive(r as Record<string, unknown>)) {
-                  void setIntercompanyRuleActive.mutateAsync({
+                  await setIntercompanyRuleActive.mutateAsync({
                     ruleId: BigInt(String(r.id)),
                     isActive: false,
                   })
@@ -2536,10 +2557,11 @@ function AccountingClientReady({
             id: "ic-rule-delete",
             label: t("accounting.entities.intercompanyRules.actions.deleteSelected"),
             requiresSelection: true,
+            selection: "multiple",
             variant: "destructive",
-            onClick: (rows) => {
+            onClick: async (rows) => {
               for (const r of rows) {
-                void deleteIntercompanyRule.mutateAsync(BigInt(String(r.id)))
+                await deleteIntercompanyRule.mutateAsync(BigInt(String(r.id)))
               }
             },
           },
@@ -2571,11 +2593,12 @@ function AccountingClientReady({
             id: "ic-tx-approve",
             label: t("accounting.entities.intercompanyTransactions.actions.approveSelected"),
             requiresSelection: true,
-            onClick: (rows) => {
+            selection: "multiple",
+            onClick: async (rows) => {
               for (const r of rows) {
                 const state = intercompanyTransactionState(r as Record<string, unknown>)
                 if (state === "Pending" || state === "Draft") {
-                  void approveIntercompanyTransaction.mutateAsync(BigInt(String(r.id)))
+                  await approveIntercompanyTransaction.mutateAsync(BigInt(String(r.id)))
                 }
               }
             },
@@ -2584,11 +2607,12 @@ function AccountingClientReady({
             id: "ic-tx-process",
             label: t("accounting.entities.intercompanyTransactions.actions.processSelected"),
             requiresSelection: true,
-            onClick: (rows) => {
+            selection: "multiple",
+            onClick: async (rows) => {
               for (const r of rows) {
                 const state = intercompanyTransactionState(r as Record<string, unknown>)
                 if (state === "Approved") {
-                  void processIntercompanyTransaction.mutateAsync({
+                  await processIntercompanyTransaction.mutateAsync({
                     transactionId: BigInt(String(r.id)),
                     params: {}, // Process params would come from a modal in a full implementation
                   })
@@ -2600,11 +2624,12 @@ function AccountingClientReady({
             id: "ic-tx-complete",
             label: t("accounting.entities.intercompanyTransactions.actions.completeSelected"),
             requiresSelection: true,
-            onClick: (rows) => {
+            selection: "multiple",
+            onClick: async (rows) => {
               for (const r of rows) {
                 const state = intercompanyTransactionState(r as Record<string, unknown>)
                 if (state === "Processing") {
-                  void completeIntercompanyTransaction.mutateAsync(BigInt(String(r.id)))
+                  await completeIntercompanyTransaction.mutateAsync(BigInt(String(r.id)))
                 }
               }
             },
@@ -2613,11 +2638,12 @@ function AccountingClientReady({
             id: "ic-tx-retry",
             label: t("accounting.entities.intercompanyTransactions.actions.retrySelected"),
             requiresSelection: true,
-            onClick: (rows) => {
+            selection: "multiple",
+            onClick: async (rows) => {
               for (const r of rows) {
                 const state = intercompanyTransactionState(r as Record<string, unknown>)
                 if (state === "Error") {
-                  void retryIntercompanyTransaction.mutateAsync(BigInt(String(r.id)))
+                  await retryIntercompanyTransaction.mutateAsync(BigInt(String(r.id)))
                 }
               }
             },
@@ -2626,12 +2652,13 @@ function AccountingClientReady({
             id: "ic-tx-cancel",
             label: t("accounting.entities.intercompanyTransactions.actions.cancelSelected"),
             requiresSelection: true,
+            selection: "multiple",
             variant: "destructive",
-            onClick: (rows) => {
+            onClick: async (rows) => {
               for (const r of rows) {
                 const state = intercompanyTransactionState(r as Record<string, unknown>)
                 if (state !== "Completed" && state !== "Cancelled") {
-                  void cancelIntercompanyTransaction.mutateAsync({
+                  await cancelIntercompanyTransaction.mutateAsync({
                     transactionId: BigInt(String(r.id)),
                     reason: "Cancelled by user",
                   })
@@ -3349,12 +3376,12 @@ function AccountingClientReady({
                   {
                     id: "tax-refresh-deadline-statuses",
                     label: t("accounting.taxes.refreshDeadlineStatuses"),
-                    onClick: () => void refreshTaxDeadlineStatuses.mutateAsync(),
+                    onClick: () => refreshTaxDeadlineStatuses.mutateAsync(),
                   },
                   {
                     id: "tax-schedule-deadline-updates",
                     label: t("accounting.taxes.scheduleDeadlineUpdates"),
-                    onClick: () => void scheduleTaxDeadlineUpdates.mutateAsync(),
+                    onClick: () => scheduleTaxDeadlineUpdates.mutateAsync(),
                   },
                 ]),
               }

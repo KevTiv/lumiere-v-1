@@ -6,6 +6,7 @@ import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
 import { matchesOperationResponse } from "./operation-response"
 import { SEEDED_MOUSE_PRODUCT } from "./sales-order-fixtures"
 import {
+  acceptEntityActionConfirm,
   activeTabEntityTable,
   chooseFirstEnabledOption,
   chooseSelectOptionByLabel,
@@ -794,19 +795,15 @@ export async function executeReplenishmentRuleViaUi(
   await selectModuleTab(page, "inventory", "replenishment")
   await selectEntityRowById(page, ruleId)
 
-  page.once("dialog", (dialog) => {
-    void dialog.accept()
-  })
-
-  await Promise.all([
-    page.waitForResponse(
-      (response) =>
-        matchesOperationResponse(response, "execute_replenishment_rule") &&
-        response.ok(),
-      { timeout: 30_000 },
-    ),
-    page.getByTestId("entity-action-execute-replenishment-rule").click(),
-  ])
+  const executed = page.waitForResponse(
+    (response) =>
+      matchesOperationResponse(response, "execute_replenishment_rule") &&
+      response.ok(),
+    { timeout: 30_000 },
+  )
+  await page.getByTestId("entity-action-execute-replenishment-rule").click()
+  await acceptEntityActionConfirm(page)
+  await executed
 }
 
 /** Create a serial through the Serial numbers tab's action dialog (serial number, then product). */

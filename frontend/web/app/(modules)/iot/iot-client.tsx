@@ -532,7 +532,7 @@ function IotClientLoaded({
                   id: 'hub-heartbeat',
                   label: t('iot.hubs.pingHeartbeat'),
                   requiresSelection: true,
-                  onClick: (rows) => {
+                  onClick: async (rows) => {
                     setToolbarError(null);
                     if (rows.length !== 1) {
                       setToolbarError(t('iot.toolbar.selectOneHub'));
@@ -560,7 +560,7 @@ function IotClientLoaded({
                   label: t('common.delete'),
                   variant: 'destructive',
                   requiresSelection: true,
-                  onClick: (rows) => {
+                  onClick: async (rows) => {
                     setToolbarError(null);
                     if (rows.length !== 1) {
                       setToolbarError(t('iot.toolbar.selectOneHub'));
@@ -592,7 +592,7 @@ function IotClientLoaded({
                   id: 'mark-sent',
                   label: t('iot.actions.markSent'),
                   requiresSelection: true,
-                  onClick: (rows) => {
+                  onClick: async (rows) => {
                     setToolbarError(null);
                     if (rows.length !== 1) {
                       setToolbarError(t('iot.toolbar.selectOneAction'));
@@ -621,7 +621,7 @@ function IotClientLoaded({
                   id: 'ack-action',
                   label: 'Acknowledge',
                   requiresSelection: true,
-                  onClick: (rows) => {
+                  onClick: async (rows) => {
                     setToolbarError(null);
                     if (rows.length !== 1 || str(rows[0]?.status) !== 'Sent') {
                       setToolbarError(t('iot.toolbar.actionNotSent'));
@@ -629,7 +629,7 @@ function IotClientLoaded({
                     }
                     const actionId = selectedIds(rows)[0];
                     if (actionId == null) return;
-                    void acknowledgeAction.mutateAsync(actionId).then(
+                    await acknowledgeAction.mutateAsync(actionId).then(
                       () =>
                         setBanner({
                           kind: 'ok',
@@ -646,9 +646,10 @@ function IotClientLoaded({
                   id: 'retry-action',
                   label: 'Retry',
                   requiresSelection: true,
-                  onClick: (rows) => {
+                  selection: 'multiple',
+                  onClick: async (rows) => {
                     setToolbarError(null);
-                    void Promise.all(
+                    await Promise.all(
                       selectedIds(rows).map((actionId) =>
                         retryAction.mutateAsync(actionId),
                       ),
@@ -669,6 +670,7 @@ function IotClientLoaded({
                   id: 'fail-action',
                   label: 'Fail',
                   requiresSelection: true,
+                  selection: 'multiple',
                   variant: 'destructive',
                   onClick: (rows) => {
                     setIotModalError(null);
@@ -690,9 +692,10 @@ function IotClientLoaded({
                   id: 'resolve-alert',
                   label: 'Resolve',
                   requiresSelection: true,
-                  onClick: (rows) => {
+                  selection: 'multiple',
+                  onClick: async (rows) => {
                     setToolbarError(null);
-                    void Promise.all(
+                    await Promise.all(
                       selectedIds(rows).map((alertId) =>
                         resolveAlert.mutateAsync(alertId),
                       ),

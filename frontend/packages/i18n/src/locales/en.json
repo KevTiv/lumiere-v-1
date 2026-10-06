@@ -12,6 +12,7 @@
     "settings": "Settings",
     "back": "Back",
     "next": "Next",
+    "actionCompleted": "{{action}} completed",
     "active": "Active",
     "inactive": "Inactive",
     "none": "None",

@@ -1417,6 +1417,7 @@ function SalesClientLoaded({
             id: 'accept-quotation',
             label: saleOrderWorkflow.acceptQuotation.label,
             requiresSelection: true,
+            selection: 'multiple',
             isApplicable: (rows) =>
               rows.some((r) => saleOrderWorkflow.acceptQuotation.canPresent(r as EntityRow)),
             onClick: (rows) => {
@@ -1477,6 +1478,7 @@ function SalesClientLoaded({
             id: 'apply-options',
             label: t('sales.actions.applyOptions', { defaultValue: 'Apply CPQ options' }),
             requiresSelection: true,
+            selection: 'multiple',
             onClick: (rows) => {
               for (const r of rows) {
                 const st = saleOrderState(r);
@@ -1544,14 +1546,15 @@ function SalesClientLoaded({
               defaultValue: 'Accrue commission',
             }),
             requiresSelection: true,
-            onClick: (rows) => {
+            selection: 'multiple',
+            onClick: async (rows) => {
               for (const r of rows) {
                 const row = r as Record<string, unknown>;
                 const st = saleOrderState(row);
                 if (st !== 'Sale' && st !== 'Done') continue;
                 const rate = parseCommissionRatePercent(row);
                 if (rate <= 0) continue;
-                void accrueSaleCommission.mutateAsync({
+                await accrueSaleCommission.mutateAsync({
                   orderId: row.id as string | number | bigint,
                   ratePercent: rate,
                 });
@@ -1616,11 +1619,11 @@ function SalesClientLoaded({
             id: 'download-pdf',
             label: 'Download PDF',
             requiresSelection: true,
-            onClick: (rows) => {
+            onClick: async (rows) => {
               if (rows.length !== 1) return;
               const id = rows[0]?.id;
               if (id == null) return;
-              void downloadDocumentPdf('sale-order', Number(id)).catch((e) => {
+              await downloadDocumentPdf('sale-order', Number(id)).catch((e) => {
                 window.alert(e instanceof Error ? e.message : String(e));
               });
             },
@@ -1689,11 +1692,12 @@ function SalesClientLoaded({
             id: 'toggle-active',
             label: t('sales.actions.togglePricelistActive'),
             requiresSelection: true,
-            onClick: (rows) => {
+            selection: 'multiple',
+            onClick: async (rows) => {
               for (const r of rows) {
                 const id = r.id as string | number | bigint;
                 const active = Boolean(r.active);
-                updatePricelist.mutate({ pricelistId: id, isActive: !active });
+                await updatePricelist.mutateAsync({ pricelistId: id, isActive: !active });
               }
             },
           },
@@ -1701,20 +1705,18 @@ function SalesClientLoaded({
             id: 'delete-pricelists',
             label: t('sales.actions.deletePricelists'),
             requiresSelection: true,
+            selection: 'multiple',
             variant: 'destructive',
-            onClick: (rows) => {
-              if (
-                typeof window !== 'undefined' &&
-                !window.confirm(
-                  t('sales.actions.deletePricelistsConfirm', {
-                    count: rows.length,
-                  }),
-                )
-              ) {
-                return;
-              }
+            confirm: {
+              title: t('sales.actions.deletePricelists'),
+              description: (rows) =>
+                t('sales.actions.deletePricelistsConfirm', { count: rows.length }),
+              confirmLabel: t('common.confirm'),
+              cancelLabel: t('common.cancel'),
+            },
+            onClick: async (rows) => {
               for (const r of rows) {
-                deletePricelist.mutate(r.id as string | number | bigint);
+                await deletePricelist.mutateAsync(r.id as string | number | bigint);
               }
             },
           },
@@ -1735,20 +1737,18 @@ function SalesClientLoaded({
             id: 'delete-pricelist-rules',
             label: t('sales.actions.deletePricelistRules'),
             requiresSelection: true,
+            selection: 'multiple',
             variant: 'destructive',
-            onClick: (rows) => {
-              if (
-                typeof window !== 'undefined' &&
-                !window.confirm(
-                  t('sales.actions.deletePricelistRulesConfirm', {
-                    count: rows.length,
-                  }),
-                )
-              ) {
-                return;
-              }
+            confirm: {
+              title: t('sales.actions.deletePricelistRules'),
+              description: (rows) =>
+                t('sales.actions.deletePricelistRulesConfirm', { count: rows.length }),
+              confirmLabel: t('common.confirm'),
+              cancelLabel: t('common.cancel'),
+            },
+            onClick: async (rows) => {
               for (const r of rows) {
-                deletePricelistItem.mutate(r.id as string | number | bigint);
+                await deletePricelistItem.mutateAsync(r.id as string | number | bigint);
               }
             },
           },
@@ -1769,10 +1769,11 @@ function SalesClientLoaded({
             id: 'start-batches',
             label: t('sales.actions.startBatches'),
             requiresSelection: true,
-            onClick: (rows) => {
+            selection: 'multiple',
+            onClick: async (rows) => {
               for (const r of rows) {
                 if (deliveryBatchState(r) === 'Draft') {
-                  startPickingBatch.mutate(r.id as string | number | bigint);
+                  await startPickingBatch.mutateAsync(r.id as string | number | bigint);
                 }
               }
             },
@@ -1781,10 +1782,11 @@ function SalesClientLoaded({
             id: 'complete-batches',
             label: t('sales.actions.completeBatches'),
             requiresSelection: true,
-            onClick: (rows) => {
+            selection: 'multiple',
+            onClick: async (rows) => {
               for (const r of rows) {
                 if (deliveryBatchState(r) === 'InProgress') {
-                  completePickingBatch.mutate(r.id as string | number | bigint);
+                  await completePickingBatch.mutateAsync(r.id as string | number | bigint);
                 }
               }
             },
@@ -1793,12 +1795,13 @@ function SalesClientLoaded({
             id: 'cancel-batches',
             label: t('sales.actions.cancelBatches'),
             requiresSelection: true,
+            selection: 'multiple',
             variant: 'destructive',
-            onClick: (rows) => {
+            onClick: async (rows) => {
               for (const r of rows) {
                 const st = deliveryBatchState(r);
                 if (st !== 'Done') {
-                  cancelPickingBatch.mutate(r.id as string | number | bigint);
+                  await cancelPickingBatch.mutateAsync(r.id as string | number | bigint);
                 }
               }
             },
@@ -2232,6 +2235,7 @@ function SalesClientLoaded({
                         defaultValue: 'Delete lines',
                       }),
                       requiresSelection: true,
+                      selection: 'multiple',
                       variant: 'destructive' as const,
                       onClick: (rows) => {
                         for (const r of rows) {

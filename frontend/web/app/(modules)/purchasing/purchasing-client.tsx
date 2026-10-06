@@ -1512,9 +1512,10 @@ function PurchasingClientLoaded({
             id: "po-recalc",
             label: t("purchasing.actions.recalculateTotals"),
             requiresSelection: true,
-            onClick: (rows) => {
+            selection: "multiple",
+            onClick: async (rows) => {
               for (const r of rows) {
-                void computePoTotals.mutateAsync(r.id as string | number | bigint)
+                await computePoTotals.mutateAsync(r.id as string | number | bigint)
               }
             },
           },
@@ -1522,9 +1523,10 @@ function PurchasingClientLoaded({
             id: "po-recalc-lines",
             label: t("purchasing.actions.recalculateLineTotals"),
             requiresSelection: true,
-            onClick: (rows) => {
+            selection: "multiple",
+            onClick: async (rows) => {
               for (const r of rows) {
-                void computePoLineTotals.mutateAsync(r.id as string | number | bigint)
+                await computePoLineTotals.mutateAsync(r.id as string | number | bigint)
               }
             },
           },
@@ -1532,9 +1534,10 @@ function PurchasingClientLoaded({
             id: "po-refresh-receipt-status",
             label: t("purchasing.actions.refreshReceiptStatus"),
             requiresSelection: true,
-            onClick: (rows) => {
+            selection: "multiple",
+            onClick: async (rows) => {
               for (const r of rows) {
-                void updatePoReceiptStatus.mutateAsync(r.id as string | number | bigint)
+                await updatePoReceiptStatus.mutateAsync(r.id as string | number | bigint)
               }
             },
           },
@@ -1542,9 +1545,10 @@ function PurchasingClientLoaded({
             id: "po-refresh-invoice-status",
             label: t("purchasing.actions.refreshInvoiceStatus"),
             requiresSelection: true,
-            onClick: (rows) => {
+            selection: "multiple",
+            onClick: async (rows) => {
               for (const r of rows) {
-                void updatePoInvoiceStatus.mutateAsync(r.id as string | number | bigint)
+                await updatePoInvoiceStatus.mutateAsync(r.id as string | number | bigint)
               }
             },
           },
@@ -1552,9 +1556,10 @@ function PurchasingClientLoaded({
             id: "po-lock",
             label: t("purchasing.actions.lockSelected"),
             requiresSelection: true,
-            onClick: (rows) => {
+            selection: "multiple",
+            onClick: async (rows) => {
               for (const r of rows) {
-                void lockPurchaseOrder.mutateAsync(r.id as string | number | bigint)
+                await lockPurchaseOrder.mutateAsync(r.id as string | number | bigint)
               }
             },
           },
@@ -1562,9 +1567,10 @@ function PurchasingClientLoaded({
             id: "po-unlock",
             label: t("purchasing.actions.unlockSelected"),
             requiresSelection: true,
-            onClick: (rows) => {
+            selection: "multiple",
+            onClick: async (rows) => {
               for (const r of rows) {
-                void unlockPurchaseOrder.mutateAsync(r.id as string | number | bigint)
+                await unlockPurchaseOrder.mutateAsync(r.id as string | number | bigint)
               }
             },
           },
@@ -1734,10 +1740,11 @@ function PurchasingClientLoaded({
             id: "pol-remove",
             label: t("common.delete"),
             requiresSelection: true,
+            selection: "multiple",
             variant: "destructive",
-            onClick: (rows) => {
+            onClick: async (rows) => {
               for (const r of rows) {
-                void removePurchaseOrderLine.mutateAsync(r.id as string | number | bigint)
+                await removePurchaseOrderLine.mutateAsync(r.id as string | number | bigint)
               }
             },
           },
@@ -1746,11 +1753,11 @@ function PurchasingClientLoaded({
             label: t("purchasing.actions.receiveFullOpenQty"),
             requiresSelection: true,
             isApplicable: (rows) => rows.length === 1 && purchasingWorkflow.receiveLine.canPresent(rows[0] as EntityRow),
-            onClick: (rows) => {
+            onClick: async (rows) => {
               const first = rows[0] as EntityRow | undefined
               const receiveLine = purchasingWorkflow.receiveLine
               if (!first || !receiveLine.canPresent(first) || !receiveLine.prepare) return
-              void receiveLine.execute(receiveLine.prepare(first), { navigateToNext: true }).catch(() => undefined)
+              await receiveLine.execute(receiveLine.prepare(first), { navigateToNext: true }).catch(() => undefined)
             },
           },
         ],
@@ -1791,10 +1798,10 @@ function PurchasingClientLoaded({
               defaultValue: "Create RFQ",
             }),
             requiresSelection: true,
-            onClick: (rows) => {
+            onClick: async (rows) => {
               const first = rows[0]
               if (!first) return
-              void openCreateRfqFromRequisition(String(first.id)).catch(
+              await openCreateRfqFromRequisition(String(first.id)).catch(
                 (e: unknown) => {
                   window.alert(e instanceof Error ? e.message : String(e))
                 },
@@ -1863,11 +1870,12 @@ function PurchasingClientLoaded({
           id: "lc-delete",
           label: t("common.delete"),
           requiresSelection: true,
+          selection: "multiple",
           variant: "destructive",
-          onClick: (rows) => {
+          onClick: async (rows) => {
             for (const r of rows) {
               if (landedCostState(r) === "Draft") {
-                void deleteLandedCost.mutateAsync(r.id as string | number | bigint)
+                await deleteLandedCost.mutateAsync(r.id as string | number | bigint)
               }
             }
           },
@@ -2001,10 +2009,11 @@ function PurchasingClientLoaded({
           id: "si-delete",
           label: t("common.delete"),
           requiresSelection: true,
+          selection: "multiple",
           variant: "destructive",
-          onClick: (rows) => {
+          onClick: async (rows) => {
             for (const r of rows) {
-              void deleteSupplierIntake.mutateAsync(r.id as string | number | bigint)
+              await deleteSupplierIntake.mutateAsync(r.id as string | number | bigint)
             }
           },
         },
@@ -2278,18 +2287,17 @@ function PurchasingClientLoaded({
                         id: "pb-delete",
                         label: t("common.delete"),
                         requiresSelection: true,
+                        selection: "multiple",
                         variant: "destructive",
-                        onClick: (rows: Record<string, unknown>[]) => {
-                          if (
-                            typeof window !== "undefined" &&
-                            !window.confirm(
-                              t("purchasing.partnerBanks.deleteConfirm", { count: rows.length }),
-                            )
-                          ) {
-                            return
-                          }
+                        confirm: {
+                          title: t("common.delete"),
+                          description: (rows: Record<string, unknown>[]) => t("purchasing.partnerBanks.deleteConfirm", { count: rows.length }),
+                          confirmLabel: t("common.confirm"),
+                          cancelLabel: t("common.cancel"),
+                        },
+                        onClick: async (rows: Record<string, unknown>[]) => {
                           for (const r of rows) {
-                            void deletePartnerBank.mutateAsync(r.id as string | number | bigint)
+                            await deletePartnerBank.mutateAsync(r.id as string | number | bigint)
                           }
                         },
                       },

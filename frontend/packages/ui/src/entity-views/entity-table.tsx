@@ -42,8 +42,10 @@ import {
   EmptyTitle,
 } from "../components/empty"
 import { Skeleton } from "../components/skeleton"
+import { Checkbox } from "../components/checkbox"
+import { showWorkflowToast } from "../lib/workflow-toast"
 import { TooltipProvider } from "../components/tooltip"
-import { Search, ArrowUp, ArrowDown, ArrowUpDown, FileDown, X, Inbox, SearchX } from "lucide-react"
+import { Search, ArrowUp, ArrowDown, ArrowUpDown, FileDown, X, Inbox, SearchX, Loader2 } from "lucide-react"
 import {
   radixSelectControlledValue,
   radixSelectItemValue,
@@ -154,6 +156,7 @@ export function EntityTable({
   const [persistedFilters, setPersistedFilters] = useState<Record<string, string>>({})
   const [loadedListViewKey, setLoadedListViewKey] = useState<string | null>(null)
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set())
+  const [pendingActionIds, setPendingActionIds] = useState<ReadonlySet<string>>(new Set())
   const [sortKey, setSortKey] = useState<string | null>(null)
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc")
   const [page, setPage] = useState(1)
@@ -277,9 +280,33 @@ export function EntityTable({
     rows: EntityRow[]
   } | null>(null)
 
+  /** Runs the action, keeps its button pending until it settles, and reports failures. */
+  const executeAction = async (action: EntityAction, rows: EntityRow[]) => {
+    if (pendingActionIds.has(action.id)) return
+    setPendingActionIds((prev) => new Set(prev).add(action.id))
+    try {
+      await action.onClick(rows)
+      if (action.successMessage) {
+        showWorkflowToast({ kind: "success", title: action.successMessage })
+      }
+    } catch (error) {
+      showWorkflowToast({
+        kind: "error",
+        title: `${action.label} failed`,
+        description: error instanceof Error ? error.message : String(error),
+      })
+    } finally {
+      setPendingActionIds((prev) => {
+        const next = new Set(prev)
+        next.delete(action.id)
+        return next
+      })
+    }
+  }
+
   const runAction = (action: EntityAction) => {
     if (action.confirm) setPendingConfirm({ action, rows: selectedRows })
-    else action.onClick(selectedRows)
+    else void executeAction(action, selectedRows)
   }
 
   const hasActions = actions.length > 0
@@ -288,16 +315,31 @@ export function EntityTable({
   const selectionActions = actions.filter((action) => action.requiresSelection)
   const renderActionButton = (action: EntityAction) => {
     const Icon = action.icon
+    const isPending = pendingActionIds.has(action.id)
+    const needsSingleRow =
+      action.requiresSelection === true &&
+      (action.selection ?? "single") === "single" &&
+      selectedRows.length > 1
     return (
       <Button
         key={action.id}
         variant={action.variant ?? "outline"}
         size="sm"
-        disabled={selectedRows.length > 0 && action.isApplicable?.(selectedRows) === false}
+        disabled={
+          isPending ||
+          needsSingleRow ||
+          (selectedRows.length > 0 && action.isApplicable?.(selectedRows) === false)
+        }
+        title={needsSingleRow ? "Select a single record to use this action" : undefined}
+        aria-busy={isPending || undefined}
         onClick={() => runAction(action)}
         data-testid={`entity-action-${action.id}`}
       >
-        {Icon && <Icon className="mr-2 h-4 w-4" />}
+        {isPending ? (
+          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+        ) : (
+          Icon && <Icon className="mr-2 h-4 w-4" />
+        )}
         {action.label}
       </Button>
     )
@@ -306,6 +348,31 @@ export function EntityTable({
     config.rowSelectionToggleOnClick ??
     (hasActions && actions.some((a) => a.requiresSelection === true))
   const rowsAreInteractive = Boolean(onRowClick || selectionToggleOnRowClick)
+  // Rows can be ticked individually, and the whole page at once, whenever the table has actions
+  // that run on a selection.
+  const showSelectColumn = selectionActions.length > 0
+  const pageKeys = paginated.map((row, i) => String(getRowField(row, rowKey) ?? i))
+  const selectedOnPage = pageKeys.filter((key) => selectedKeys.has(key)).length
+  const allPageSelected = pageKeys.length > 0 && selectedOnPage === pageKeys.length
+  const setRowSelected = (key: string, selected: boolean) => {
+    setSelectedKeys((prev) => {
+      const next = new Set(prev)
+      if (selected) next.add(key)
+      else next.delete(key)
+      return next
+    })
+  }
+  const setPageSelected = (selected: boolean) => {
+    setSelectedKeys((prev) => {
+      const next = new Set(prev)
+      for (const key of pageKeys) {
+        if (selected) next.add(key)
+        else next.delete(key)
+      }
+      return next
+    })
+  }
+  const selectColumnCount = showSelectColumn ? 1 : 0
 
   const activateRow = (key: string, row: EntityRow) => {
     if (selectionToggleOnRowClick) toggleRow(key)
@@ -463,6 +530,15 @@ export function EntityTable({
               {selectedRows.length} selected
             </span>
             {selectionActions.map(renderActionButton)}
+            <Button
+              variant="ghost"
+              size="sm"
+              className="ml-auto"
+              onClick={() => setSelectedKeys(new Set())}
+              data-testid="entity-selection-clear"
+            >
+              Clear selection
+            </Button>
           </div>
         )}
 
@@ -470,6 +546,18 @@ export function EntityTable({
           <Table>
             <TableHeader className="bg-muted/25">
               <TableRow>
+                {showSelectColumn && (
+                  <TableHead className="w-10">
+                    <Checkbox
+                      aria-label="Select all rows on this page"
+                      data-testid="entity-select-all"
+                      checked={allPageSelected}
+                      indeterminate={selectedOnPage > 0 && !allPageSelected}
+                      disabled={pageKeys.length === 0}
+                      onCheckedChange={(checked) => setPageSelected(checked === true)}
+                    />
+                  </TableHead>
+                )}
                 {columns.map((col) => (
                   <TableHead
                     key={col.key}
@@ -511,6 +599,11 @@ export function EntityTable({
               {isLoading ? (
                 Array.from({ length: LOADING_ROW_COUNT }, (_, rowIndex) => (
                   <TableRow key={`loading-${rowIndex}`}>
+                    {showSelectColumn && (
+                      <TableCell className="w-10">
+                        <Skeleton className="h-4 w-4" />
+                      </TableCell>
+                    )}
                     {columns.map((col) => (
                       <TableCell key={col.key}>
                         <Skeleton className="h-4 w-full max-w-32" />
@@ -520,7 +613,7 @@ export function EntityTable({
                 ))
               ) : sorted.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={Math.max(columns.length, 1)} className="p-0">
+                  <TableCell colSpan={Math.max(columns.length + selectColumnCount, 1)} className="p-0">
                     <Empty className="border-0 py-12">
                       <EmptyHeader>
                         <EmptyMedia variant="icon">{emptyIcon}</EmptyMedia>
@@ -555,6 +648,9 @@ export function EntityTable({
                       onClick={rowsAreInteractive ? () => activateRow(key, row) : undefined}
                       onKeyDown={(event) => {
                         if (!rowsAreInteractive) return
+                        // Keys pressed on a control inside the row (the checkbox, a link) are that
+                        // control's own.
+                        if (event.target !== event.currentTarget) return
                         if (event.key === "Enter" || event.key === " ") {
                           event.preventDefault()
                           activateRow(key, row)
@@ -570,6 +666,16 @@ export function EntityTable({
                         isSelected && !isAiFocused && "bg-muted/50",
                       )}
                     >
+                      {showSelectColumn && (
+                        <TableCell className="w-10" onClick={(event) => event.stopPropagation()}>
+                          <Checkbox
+                            aria-label="Select row"
+                            data-testid={`entity-select-row-${key}`}
+                            checked={isSelected}
+                            onCheckedChange={(checked) => setRowSelected(key, checked === true)}
+                          />
+                        </TableCell>
+                      )}
                       {columns.map((col) => {
                         const value = getRowField(row, col.key)
                         return (
@@ -624,13 +730,17 @@ export function EntityTable({
         <AlertDialogContent data-testid="entity-action-confirm">
           <AlertDialogHeader>
             <AlertDialogTitle>{pendingConfirm?.action.confirm?.title}</AlertDialogTitle>
-            <AlertDialogDescription>{pendingConfirm?.action.confirm?.description}</AlertDialogDescription>
+            <AlertDialogDescription>
+              {typeof pendingConfirm?.action.confirm?.description === "function"
+                ? pendingConfirm.action.confirm.description(pendingConfirm.rows)
+                : pendingConfirm?.action.confirm?.description}
+            </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>{pendingConfirm?.action.confirm?.cancelLabel}</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => {
-                if (pendingConfirm) pendingConfirm.action.onClick(pendingConfirm.rows)
+                if (pendingConfirm) void executeAction(pendingConfirm.action, pendingConfirm.rows)
               }}
             >
               {pendingConfirm?.action.confirm?.confirmLabel}

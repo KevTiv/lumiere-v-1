@@ -28,7 +28,7 @@ import {
   DialogTitle,
   csvImportForm,
 } from "@lumiere/ui"
-import type { EntityViewConfig, FormConfig, ModuleConfig } from "@lumiere/ui"
+import type { EntityAction, EntityViewConfig, FormConfig, ModuleConfig } from "@lumiere/ui"
 import { expensesModuleConfig } from "@/lib/module-dashboard-configs"
 import { useExpensesModuleSubscription } from "@/lib/module-subscription-hooks"
 import {
@@ -230,13 +230,7 @@ function ExpensesClientLoaded({
 
   const addCsvToolbar = (
     ec: EntityViewConfig,
-    actions: Array<{
-      id: string
-      label: string
-      requiresSelection?: boolean
-      variant?: "default" | "destructive"
-      onClick: (selectedRows: Record<string, unknown>[]) => void
-    }>,
+    actions: EntityAction[],
   ): EntityViewConfig => {
     if (ec.view.mode !== "table") return ec
     return {
@@ -462,13 +456,14 @@ function ExpensesClientLoaded({
                   id: "submit-sheets",
                   label: t("expenses.workflow.submitReport"),
                   requiresSelection: true,
-                  onClick: (rows) => {
+                  selection: "multiple",
+                  onClick: async (rows) => {
                     const draft = rows.filter((r) => rowState(r) === "Draft")
                     if (draft.length === 0) {
                       setToolbarError(t("expenses.workflow.noDraftSheets"))
                       return
                     }
-                    void runSheetAction(draft, "report", (row) =>
+                    await runSheetAction(draft, "report", (row) =>
                       submitExpenseSheet.mutateAsync(rowId(row)),
                     )
                   },
@@ -477,13 +472,14 @@ function ExpensesClientLoaded({
                   id: "approve-sheets",
                   label: t("expenses.workflow.approveReport"),
                   requiresSelection: true,
-                  onClick: (rows) => {
+                  selection: "multiple",
+                  onClick: async (rows) => {
                     const submitted = rows.filter((r) => rowState(r) === "Submitted")
                     if (submitted.length === 0) {
                       setToolbarError(t("expenses.workflow.noSubmittedSheets"))
                       return
                     }
-                    void runSheetAction(submitted, "report", (row) =>
+                    await runSheetAction(submitted, "report", (row) =>
                       approveExpenseSheet.mutateAsync(rowId(row)),
                     )
                   },
@@ -492,6 +488,7 @@ function ExpensesClientLoaded({
                   id: "refuse-sheets",
                   label: t("expenses.workflow.refuseReport"),
                   requiresSelection: true,
+                  selection: "multiple",
                   variant: "destructive",
                   onClick: (rows) => {
                     const submitted = rows.filter((r) => rowState(r) === "Submitted")
@@ -511,6 +508,7 @@ function ExpensesClientLoaded({
                   id: "post-sheets",
                   label: t("expenses.workflow.postReport"),
                   requiresSelection: true,
+                  selection: "multiple",
                   onClick: (rows) => {
                     const approved = rows.filter((r) => rowState(r) === "Approved")
                     if (approved.length === 0) {
@@ -528,6 +526,7 @@ function ExpensesClientLoaded({
                   id: "reimburse-sheets",
                   label: t("expenses.workflow.reimburseReport"),
                   requiresSelection: true,
+                  selection: "multiple",
                   onClick: (rows) => {
                     const posted = rows.filter((r) => rowState(r) === "Posted")
                     if (posted.length === 0) {

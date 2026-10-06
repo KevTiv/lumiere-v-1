@@ -13,6 +13,7 @@ import {
   smokeName,
   submitForm,
   waitForEntityActionEnabled,
+  acceptEntityActionConfirm,
 } from "./helpers"
 
 test.describe("CRM update/delete mutations", { tag: ["@p0", "@phase-1"] }, () => {
@@ -62,18 +63,13 @@ test.describe("CRM update/delete mutations", { tag: ["@p0", "@phase-1"] }, () =>
     await selectEntityRowById(page, leadId)
     await waitForEntityActionEnabled(page, "entity-action-delete-lead")
 
-    page.once("dialog", (dialog) => {
-      expect(dialog.type()).toBe("confirm")
-      void dialog.accept()
-    })
-
-    const [deleteLeadRes] = await Promise.all([
-      page.waitForResponse(
-        (res) => matchesOperationResponse(res, "delete_lead") && res.ok(),
-        { timeout: 30_000 },
-      ),
-      page.getByTestId("entity-action-delete-lead").click(),
-    ])
+    const deleteLeadResponse = page.waitForResponse(
+      (res) => matchesOperationResponse(res, "delete_lead") && res.ok(),
+      { timeout: 30_000 },
+    )
+    await page.getByTestId("entity-action-delete-lead").click()
+    await acceptEntityActionConfirm(page)
+    const deleteLeadRes = await deleteLeadResponse
     expect(deleteLeadRes.ok()).toBe(true)
 
     await expectRecordAbsentFromQuery(page, "/api/query/leads", (row) => scalarQueryId(row.id) === leadId)

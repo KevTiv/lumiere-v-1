@@ -319,7 +319,7 @@ function AiSkillsLoaded({ organizationId }: { organizationId: number }) {
           },
           {
             label: syncSkills.isPending ? "Syncing…" : "Sync bundled skills → STDB",
-            onClick: () => void handleSync(),
+            onClick: () => handleSync(),
             variant: "outline",
           },
         ]}

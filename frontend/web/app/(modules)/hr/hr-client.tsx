@@ -38,7 +38,7 @@ import {
   previousPeriodMs,
   timeRangeToMs,
 } from "@lumiere/ui"
-import type { EntityRecordSheetConfig, EntityViewConfig, FormConfig, HrCsvImportKind, ModuleConfig } from "@lumiere/ui"
+import type { EntityAction, EntityRecordSheetConfig, EntityViewConfig, FormConfig, HrCsvImportKind, ModuleConfig } from "@lumiere/ui"
 import type { QueryRows } from "@lumiere/query-hooks/http"
 import { hrModuleConfig } from "@/lib/module-dashboard-configs"
 import { useHrModuleSubscription } from "@/lib/module-subscription-hooks"
@@ -458,12 +458,7 @@ function HrClientLoaded({
 
   const addCsvToolbar = (
     ec: EntityViewConfig,
-    actions: Array<{
-      id: string
-      label: string
-      requiresSelection?: boolean
-      onClick: (selectedRows: Record<string, unknown>[]) => void
-    }>,
+    actions: EntityAction[],
   ): EntityViewConfig => {
     if (ec.view.mode !== "table") return ec
     // No HR tab opens an editor on row click, so let the table's default apply:
@@ -1032,25 +1027,29 @@ function HrClientLoaded({
                   id: "submit-leave",
                   label: "Submit",
                   requiresSelection: true,
-                  onClick: (rows) => void runSelectedRows(rows, "leave", (row) => submitLeave.mutateAsync(row.id as string | number)),
+                  selection: "multiple",
+                  onClick: (rows) => runSelectedRows(rows, "leave", (row) => submitLeave.mutateAsync(row.id as string | number)),
                 },
                 {
                   id: "approve-leave",
                   label: "Approve",
                   requiresSelection: true,
-                  onClick: (rows) => void runSelectedRows(rows, "leave", (row) => approveLeave.mutateAsync(row.id as string | number)),
+                  selection: "multiple",
+                  onClick: (rows) => runSelectedRows(rows, "leave", (row) => approveLeave.mutateAsync(row.id as string | number)),
                 },
                 {
                   id: "refuse-leave",
                   label: "Refuse",
                   requiresSelection: true,
-                  onClick: (rows) => void runSelectedRows(rows, "leave", (row) => refuseLeave.mutateAsync(row.id as string | number)),
+                  selection: "multiple",
+                  onClick: (rows) => runSelectedRows(rows, "leave", (row) => refuseLeave.mutateAsync(row.id as string | number)),
                 },
                 {
                   id: "reset-leave",
                   label: "Reset to draft",
                   requiresSelection: true,
-                  onClick: (rows) => void runSelectedRows(rows, "leave", (row) => resetLeave.mutateAsync(row.id as string | number)),
+                  selection: "multiple",
+                  onClick: (rows) => runSelectedRows(rows, "leave", (row) => resetLeave.mutateAsync(row.id as string | number)),
                 },
               ]),
                 openCreateLeaveRequest,
@@ -1088,19 +1087,22 @@ function HrClientLoaded({
                   id: "open-contract",
                   label: "Open",
                   requiresSelection: true,
-                  onClick: (rows) => void runSelectedRows(rows, "contract", (row) => openContract.mutateAsync(Number(row.id))),
+                  selection: "multiple",
+                  onClick: (rows) => runSelectedRows(rows, "contract", (row) => openContract.mutateAsync(Number(row.id))),
                 },
                 {
                   id: "expire-contract",
                   label: "Expire",
                   requiresSelection: true,
-                  onClick: (rows) => void runSelectedRows(rows, "contract", (row) => expireContract.mutateAsync({ contractId: Number(row.id) })),
+                  selection: "multiple",
+                  onClick: (rows) => runSelectedRows(rows, "contract", (row) => expireContract.mutateAsync({ contractId: Number(row.id) })),
                 },
                 {
                   id: "cancel-contract",
                   label: "Cancel",
                   requiresSelection: true,
-                  onClick: (rows) => void runSelectedRows(rows, "contract", (row) => cancelContract.mutateAsync(Number(row.id))),
+                  selection: "multiple",
+                  onClick: (rows) => runSelectedRows(rows, "contract", (row) => cancelContract.mutateAsync(Number(row.id))),
                 },
               ]),
                 openCreateContract,
@@ -1131,6 +1133,7 @@ function HrClientLoaded({
                   id: "approve-payslip",
                   label: "Approve for export",
                   requiresSelection: true,
+                  selection: "multiple",
                   onClick: (rows) => {
                     setToolbarError(null)
                     const draftRows = rows.filter((row) => payslipState(row) === "Draft")
@@ -1146,6 +1149,7 @@ function HrClientLoaded({
                   id: "create-stp-intent",
                   label: "Create STP intent",
                   requiresSelection: true,
+                  selection: "multiple",
                   onClick: (rows) => {
                     setToolbarError(null)
                     const verifyRows = rows.filter((row) => payslipState(row) === "Verify")
@@ -1178,6 +1182,7 @@ function HrClientLoaded({
                   id: "export-payslip",
                   label: "Create export intent",
                   requiresSelection: true,
+                  selection: "multiple",
                   onClick: (rows) => {
                     setToolbarError(null)
                     const verifyRows = rows.filter((row) => payslipState(row) === "Verify")
@@ -1209,6 +1214,7 @@ function HrClientLoaded({
                   id: "post-payslip",
                   label: "Post to GL",
                   requiresSelection: true,
+                  selection: "multiple",
                   onClick: (rows) => {
                     setToolbarError(null)
                     const verifyRows = rows.filter((row) => payslipState(row) === "Verify")
@@ -1224,7 +1230,8 @@ function HrClientLoaded({
                   id: "cancel-payslip",
                   label: "Cancel",
                   requiresSelection: true,
-                  onClick: (rows) => void runSelectedRows(rows, "payslip", (row) => cancelPayslip.mutateAsync(Number(row.id))),
+                  selection: "multiple",
+                  onClick: (rows) => runSelectedRows(rows, "payslip", (row) => cancelPayslip.mutateAsync(Number(row.id))),
                 },
               ]),
             }

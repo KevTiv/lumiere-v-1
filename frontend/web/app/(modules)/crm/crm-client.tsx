@@ -1241,11 +1241,16 @@ function CrmClientLoaded({
             label: t("crm.actions.deleteLead"),
             requiresSelection: true,
             variant: "destructive",
-            onClick: (rows) => {
+            confirm: {
+              title: t("crm.actions.deleteLead"),
+              description: t("crm.actions.deleteLeadConfirm"),
+              confirmLabel: t("common.confirm"),
+              cancelLabel: t("common.cancel"),
+            },
+            onClick: async (rows) => {
               const row = rows[0]
               if (!row) return
-              if (!window.confirm(t("crm.actions.deleteLeadConfirm"))) return
-              deleteLead.mutate(rowIdBigInt(row))
+              await deleteLead.mutateAsync(rowIdBigInt(row))
             },
           },
         ],
@@ -1285,8 +1290,8 @@ function CrmClientLoaded({
                       id: "mark-won",
                       label: t("crm.actions.markWon"),
                       requiresSelection: true,
-                      onClick: (rows) => {
-                        void markOpportunityWon(rows)
+                      onClick: async (rows) => {
+                        await markOpportunityWon(rows)
                       },
                     },
                     {
@@ -1294,8 +1299,8 @@ function CrmClientLoaded({
                       label: t("crm.actions.markLost"),
                       requiresSelection: true,
                       variant: "destructive",
-                      onClick: (rows) => {
-                        void markOpportunityLost(rows)
+                      onClick: async (rows) => {
+                        await markOpportunityLost(rows)
                       },
                     },
                     {
@@ -1380,11 +1385,16 @@ function CrmClientLoaded({
             label: t("crm.actions.deleteContact"),
             requiresSelection: true,
             variant: "destructive",
-            onClick: (rows) => {
+            confirm: {
+              title: t("crm.actions.deleteContact"),
+              description: t("crm.actions.deleteContactConfirm"),
+              confirmLabel: t("common.confirm"),
+              cancelLabel: t("common.cancel"),
+            },
+            onClick: async (rows) => {
               const row = rows[0]
               if (!row) return
-              if (!window.confirm(t("crm.actions.deleteContactConfirm"))) return
-              deleteContact.mutate(rowIdBigInt(row))
+              await deleteContact.mutateAsync(rowIdBigInt(row))
             },
           },
         ],
@@ -1402,14 +1412,14 @@ function CrmClientLoaded({
             id: "complete-activity",
             label: t("crm.actions.markComplete"),
             requiresSelection: true,
-            onClick: (rows) => {
+            onClick: async (rows) => {
               const row = rows[0]
               if (!row) return
               if (row.isDone === true || String(row.state ?? "").toLowerCase() === "done") {
                 window.alert(t("crm.actions.alreadyComplete"))
                 return
               }
-              completeActivity.mutate(rowIdBigInt(row))
+              await completeActivity.mutateAsync(rowIdBigInt(row))
             },
           },
         ],
