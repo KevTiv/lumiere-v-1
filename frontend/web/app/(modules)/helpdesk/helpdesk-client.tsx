@@ -5,6 +5,7 @@ import { useMemo, useState } from "react"
 import { useTranslation } from "@lumiere/i18n"
 import {
   ModuleView,
+  RecordChatter,
   FormModal,
   newHelpdeskTicketForm,
   newHelpdeskTeamForm,
@@ -504,6 +505,16 @@ function HelpdeskClientLoaded({
           formConfig={ticketDetailFormConfig}
           stateTag={helpdeskEnumTag(selectedTicket.state)}
           isBusy={ticketBusy}
+          discussion={
+            organizationId && /^\d+$/.test(String(selectedTicket.id)) ? (
+              <RecordChatter
+                organizationId={organizationId}
+                resModel="helpdesk_ticket"
+                resId={BigInt(String(selectedTicket.id))}
+                recordTitle={String(selectedTicket.name ?? "")}
+              />
+            ) : undefined
+          }
           onSave={handleTicketSave}
           onCloseTicket={async () => {
             if (!selectedTicket) return
