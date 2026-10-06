@@ -45,7 +45,14 @@ import { Skeleton } from "../components/skeleton"
 import { Checkbox } from "../components/checkbox"
 import { showWorkflowToast } from "../lib/workflow-toast"
 import { TooltipProvider } from "../components/tooltip"
-import { Search, ArrowUp, ArrowDown, ArrowUpDown, FileDown, X, Inbox, SearchX, Loader2 } from "lucide-react"
+import { Search, ArrowUp, ArrowDown, ArrowUpDown, Columns3, FileDown, X, Inbox, SearchX, Loader2 } from "lucide-react"
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuTrigger,
+} from "../components/dropdown-menu"
 import {
   radixSelectControlledValue,
   radixSelectItemValue,
@@ -58,6 +65,15 @@ import {
 } from "../lib/entity-row-utils"
 import { rowsToCsv, downloadCsv } from "../lib/export-csv"
 import { useEntityTable } from "./use-entity-table"
+import {
+  EMPTY_TABLE_VIEW,
+  countRowsBy,
+  groupRowsBy,
+  readTableView,
+  tableViewStorageKey,
+  toggleHiddenColumn,
+  type EntityTableViewState,
+} from "../lib/entity-table-view"
 
 const PAGE_SIZE = TABLE_PAGE_SIZE
 const LOADING_ROW_COUNT = 5
@@ -170,9 +186,50 @@ export function EntityTable({
     [initialFilters, persistedFilters],
   )
 
-  const columns = useMemo(
+  const permittedColumns = useMemo(
     () => filterEntitySurface(config.columns, checkPermission),
     [config.columns, checkPermission],
+  )
+  const groupableFilters = useMemo(
+    () => (config.filters ?? []).filter((filter) => (filter.options?.length ?? 0) > 0),
+    [config.filters],
+  )
+  const [view, setView] = useState<EntityTableViewState>(EMPTY_TABLE_VIEW)
+  const [loadedViewKey, setLoadedViewKey] = useState<string | null>(null)
+  const permittedColumnKeys = useMemo(() => permittedColumns.map((col) => col.key), [permittedColumns])
+  const groupKeys = useMemo(() => groupableFilters.map((filter) => filter.key), [groupableFilters])
+
+  useEffect(() => {
+    const key = config.listViewKey
+    if (!key || typeof window === "undefined") {
+      setView(EMPTY_TABLE_VIEW)
+      setLoadedViewKey(key ?? "")
+      return
+    }
+    let saved: EntityTableViewState = EMPTY_TABLE_VIEW
+    try {
+      const raw = window.localStorage.getItem(tableViewStorageKey(key))
+      if (raw) saved = readTableView(JSON.parse(raw) as unknown, permittedColumnKeys, groupKeys)
+    } catch {
+      // ignore corrupt saved view
+    }
+    setView(saved)
+    setLoadedViewKey(key)
+  }, [config.listViewKey, permittedColumnKeys, groupKeys])
+
+  useEffect(() => {
+    const key = config.listViewKey
+    if (!key || loadedViewKey !== key || typeof window === "undefined") return
+    try {
+      window.localStorage.setItem(tableViewStorageKey(key), JSON.stringify(view))
+    } catch {
+      // ignore quota errors
+    }
+  }, [config.listViewKey, loadedViewKey, view])
+
+  const columns = useMemo(
+    () => permittedColumns.filter((col) => !view.hiddenColumns.includes(col.key)),
+    [permittedColumns, view.hiddenColumns],
   )
   const actions = useMemo(
     () => filterEntitySurface(config.actions, checkPermission),
@@ -208,6 +265,20 @@ export function EntityTable({
     search,
     filters,
   })
+
+  const groupFilter = groupableFilters.find((filter) => filter.key === view.groupBy)
+  const groupCounts = useMemo(
+    () => (view.groupBy ? countRowsBy(sorted, view.groupBy) : null),
+    [sorted, view.groupBy],
+  )
+  const renderGroups = useMemo(
+    () => (view.groupBy ? groupRowsBy(pageRows, view.groupBy) : [{ value: "", rows: pageRows }]),
+    [pageRows, view.groupBy],
+  )
+  const groupLabel = (value: string): string =>
+    value === ""
+      ? "None"
+      : (groupFilter?.options?.find((option) => String(option.value) === value)?.label ?? value)
 
   const [pendingConfirm, setPendingConfirm] = useState<{
     action: EntityAction
@@ -415,6 +486,55 @@ export function EntityTable({
               )
             })}
             <div className="ml-auto flex items-center gap-2">
+              {groupableFilters.length > 0 && (
+                <Select
+                  value={view.groupBy ?? "__none__"}
+                  onValueChange={(val) =>
+                    setView((prev) => ({ ...prev, groupBy: val === "__none__" ? null : String(val) }))
+                  }
+                >
+                  <SelectTrigger className="w-40" aria-label="Group by" data-testid="entity-group-by">
+                    <SelectValue placeholder="Group by" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">No grouping</SelectItem>
+                    {groupableFilters.map((filter) => (
+                      <SelectItem key={filter.key} value={filter.key}>
+                        Group by {filter.label.toLowerCase()}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+              {permittedColumns.length > 1 && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="sm" aria-label="Choose columns" data-testid="entity-columns">
+                      <Columns3 className="mr-2 h-4 w-4" />
+                      Columns
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuLabel>Show columns</DropdownMenuLabel>
+                    {permittedColumns.map((col) => (
+                      <DropdownMenuCheckboxItem
+                        key={col.key}
+                        checked={!view.hiddenColumns.includes(col.key)}
+                        onSelect={(event) => event.preventDefault()}
+                        onCheckedChange={() =>
+                          setView((prev) => ({
+                            ...prev,
+                            hiddenColumns: toggleHiddenColumn(prev.hiddenColumns, col.key, permittedColumnKeys),
+                          }))
+                        }
+                        data-testid={`entity-column-toggle-${col.key}`}
+                      >
+                        {col.label}
+                      </DropdownMenuCheckboxItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
               {sorted.length > 0 && (
                 <Button
                   variant="outline"
@@ -546,7 +666,21 @@ export function EntityTable({
                   </TableCell>
                 </TableRow>
               ) : (
-                pageRows.map((tableRow) => {
+                renderGroups.flatMap((group) => [
+                  view.groupBy ? (
+                    <TableRow key={`group-${group.value}`} className="bg-muted/40 hover:bg-muted/40" data-testid="entity-group-row">
+                      <TableCell
+                        colSpan={Math.max(columns.length + selectColumnCount, 1)}
+                        className="py-2 text-sm font-medium"
+                      >
+                        {groupLabel(group.value)}
+                        <span className="ml-2 font-normal text-muted-foreground">
+                          {groupCounts?.get(group.value) ?? group.rows.length}
+                        </span>
+                      </TableCell>
+                    </TableRow>
+                  ) : null,
+                  ...group.rows.map((tableRow) => {
                   const row = tableRow.original
                   const key = tableRow.id
                   const isSelected = tableRow.getIsSelected()
@@ -611,7 +745,8 @@ export function EntityTable({
                       })}
                     </TableRow>
                   )
-                })
+                  }),
+                ])
               )}
             </TableBody>
           </Table>
