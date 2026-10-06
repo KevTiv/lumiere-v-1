@@ -10214,7 +10214,13 @@
         "attentionRequired": "Attention required"
       }
     },
-    "description": "Vehicles, drivers, fuel and maintenance"
+    "description": "Vehicles, drivers, fuel and maintenance",
+    "page": {
+      "backToVehicles": "Back to vehicles",
+      "discussion": "Discussion",
+      "notFound": "Vehicle not found",
+      "notFoundHint": "It may have been deleted, or belong to another company."
+    }
   },
   "tasks": {
     "page": {
