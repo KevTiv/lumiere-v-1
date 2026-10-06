@@ -57,11 +57,10 @@ import {
   getRowField,
 } from "../lib/entity-row-utils"
 import { rowsToCsv, downloadCsv } from "../lib/export-csv"
+import { useEntityTable } from "./use-entity-table"
 
 const PAGE_SIZE = TABLE_PAGE_SIZE
 const LOADING_ROW_COUNT = 5
-
-type SortDirection = "asc" | "desc"
 
 interface EntityTableProps {
   config: EntityTableConfig
@@ -87,17 +86,6 @@ export function allFilterLabel(label: string): string {
   return `All ${plural}`
 }
 
-function rowFilterValue(row: EntityRow, key: string): string {
-  const val = row[key]
-  if (val == null) return ""
-  if (typeof val === "object" && !Array.isArray(val)) {
-    const obj = val as EntityRow
-    if ("tag" in obj && typeof obj.tag === "string") return obj.tag
-    if ("some" in obj) return rowFilterValue({ [key]: obj.some }, key)
-  }
-  return String(val)
-}
-
 function csvCellValue(value: unknown): string | number {
   if (value == null) return ""
   if (typeof value === "string" || typeof value === "number") return value
@@ -110,21 +98,6 @@ function csvCellValue(value: unknown): string | number {
     if (d) return d.toISOString()
   }
   return String(value)
-}
-
-function compareRowValues(a: unknown, b: unknown, direction: SortDirection): number {
-  const mul = direction === "asc" ? 1 : -1
-  if (a == null && b == null) return 0
-  if (a == null) return 1
-  if (b == null) return -1
-
-  const dateA = formatTimestampLike(a)
-  const dateB = formatTimestampLike(b)
-  if (dateA && dateB) return mul * (dateA.getTime() - dateB.getTime())
-
-  if (typeof a === "number" && typeof b === "number") return mul * (a - b)
-
-  return mul * String(a).localeCompare(String(b), undefined, { numeric: true })
 }
 
 function readPersistedFilters(
@@ -155,11 +128,7 @@ export function EntityTable({
   const [search, setSearch] = useState("")
   const [persistedFilters, setPersistedFilters] = useState<Record<string, string>>({})
   const [loadedListViewKey, setLoadedListViewKey] = useState<string | null>(null)
-  const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set())
   const [pendingActionIds, setPendingActionIds] = useState<ReadonlySet<string>>(new Set())
-  const [sortKey, setSortKey] = useState<string | null>(null)
-  const [sortDirection, setSortDirection] = useState<SortDirection>("asc")
-  const [page, setPage] = useState(1)
   const persistedFilterKeys = useMemo(
     () => new Set(config.filters?.map((filter) => filter.key) ?? []),
     [config.filters],
@@ -201,10 +170,6 @@ export function EntityTable({
     [initialFilters, persistedFilters],
   )
 
-  useEffect(() => {
-    setPage(1)
-  }, [search, filters, sortKey, sortDirection, data.length])
-
   const columns = useMemo(
     () => filterEntitySurface(config.columns, checkPermission),
     [config.columns, checkPermission],
@@ -222,58 +187,27 @@ export function EntityTable({
     ([key, value]) => value && value !== "__all__" && !config.filters?.some((f) => f.key === key),
   )
 
-  const filtered = useMemo(() => {
-    let rows = data
-
-    if (search && config.searchKeys?.length) {
-      const q = search.toLowerCase()
-      rows = rows.filter((row) =>
-        config.searchKeys!.some((k) => String(row[k] ?? "").toLowerCase().includes(q)),
-      )
-    }
-
-    for (const [key, val] of Object.entries(filters)) {
-      if (val && val !== "__all__") {
-        rows = rows.filter(
-          (row) => rowFilterValue(row, key).toLowerCase() === val.toLowerCase(),
-        )
-      }
-    }
-
-    return rows
-  }, [data, search, filters, config.searchKeys])
-
-  const sorted = useMemo(() => {
-    // Without a user-chosen column, newest first. Read projections carry no
-    // creation timestamp, and SpacetimeDB auto-inc ids only ever increase
-    // (with gaps), so descending id is creation order.
-    const key = sortKey ?? "id"
-    const direction = sortKey ? sortDirection : "desc"
-    return [...filtered].sort((a, b) =>
-      compareRowValues(getRowField(a, key), getRowField(b, key), direction),
-    )
-  }, [filtered, sortKey, sortDirection])
-
-  const totalPages = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE))
-  const currentPage = Math.min(page, totalPages)
-
-  const paginated = useMemo(() => {
-    const start = (currentPage - 1) * PAGE_SIZE
-    return sorted.slice(start, start + PAGE_SIZE)
-  }, [sorted, currentPage])
-
-  const selectedRows = filtered.filter((row) =>
-    selectedKeys.has(String(getRowField(row, rowKey) ?? "")),
-  )
-
-  const toggleRow = (key: string) => {
-    setSelectedKeys((prev) => {
-      if (prev.size === 1 && prev.has(key)) return prev
-      const next = new Set(prev)
-      next.has(key) ? next.delete(key) : next.add(key)
-      return next
-    })
-  }
+  const {
+    table,
+    sortedRows: sorted,
+    pageRows,
+    selectedRows,
+    selectedCount,
+    currentPage,
+    pageCount: totalPages,
+    setPage,
+    sortedBy,
+    toggleSort,
+    clearSelection,
+  } = useEntityTable({
+    columns,
+    data,
+    rowKey,
+    pageSize: PAGE_SIZE,
+    searchKeys: config.searchKeys,
+    search,
+    filters,
+  })
 
   const [pendingConfirm, setPendingConfirm] = useState<{
     action: EntityAction
@@ -351,50 +285,27 @@ export function EntityTable({
   // Rows can be ticked individually, and the whole page at once, whenever the table has actions
   // that run on a selection.
   const showSelectColumn = selectionActions.length > 0
-  const pageKeys = paginated.map((row, i) => String(getRowField(row, rowKey) ?? i))
-  const selectedOnPage = pageKeys.filter((key) => selectedKeys.has(key)).length
-  const allPageSelected = pageKeys.length > 0 && selectedOnPage === pageKeys.length
-  const setRowSelected = (key: string, selected: boolean) => {
-    setSelectedKeys((prev) => {
-      const next = new Set(prev)
-      if (selected) next.add(key)
-      else next.delete(key)
-      return next
-    })
-  }
-  const setPageSelected = (selected: boolean) => {
-    setSelectedKeys((prev) => {
-      const next = new Set(prev)
-      for (const key of pageKeys) {
-        if (selected) next.add(key)
-        else next.delete(key)
-      }
-      return next
-    })
-  }
   const selectColumnCount = showSelectColumn ? 1 : 0
 
-  const activateRow = (key: string, row: EntityRow) => {
-    if (selectionToggleOnRowClick) toggleRow(key)
-    onRowClick?.(row)
+  const activateRow = (tableRow: (typeof pageRows)[number]) => {
+    // A click on the only selected row keeps it selected; untick it with its checkbox.
+    if (selectionToggleOnRowClick && !(selectedCount === 1 && tableRow.getIsSelected())) {
+      tableRow.toggleSelected()
+    }
+    onRowClick?.(tableRow.original)
   }
 
   const handleSort = (columnKey: string, sortable?: boolean) => {
     if (!sortable) return
-    if (sortKey === columnKey) {
-      setSortDirection((prev) => (prev === "asc" ? "desc" : "asc"))
-      return
-    }
-    setSortKey(columnKey)
-    setSortDirection("asc")
+    toggleSort(columnKey)
   }
 
   const getSortIcon = (columnKey: string, sortable?: boolean) => {
     if (!sortable) return null
-    if (sortKey !== columnKey) {
+    if (sortedBy?.id !== columnKey) {
       return <ArrowUpDown className="ml-1 h-4 w-4 opacity-50" />
     }
-    return sortDirection === "asc" ? (
+    return !sortedBy.desc ? (
       <ArrowUp className="ml-1 h-4 w-4" />
     ) : (
       <ArrowDown className="ml-1 h-4 w-4" />
@@ -534,7 +445,7 @@ export function EntityTable({
               variant="ghost"
               size="sm"
               className="ml-auto"
-              onClick={() => setSelectedKeys(new Set())}
+              onClick={clearSelection}
               data-testid="entity-selection-clear"
             >
               Clear selection
@@ -551,10 +462,10 @@ export function EntityTable({
                     <Checkbox
                       aria-label="Select all rows on this page"
                       data-testid="entity-select-all"
-                      checked={allPageSelected}
-                      indeterminate={selectedOnPage > 0 && !allPageSelected}
-                      disabled={pageKeys.length === 0}
-                      onCheckedChange={(checked) => setPageSelected(checked === true)}
+                      checked={table.getIsAllPageRowsSelected()}
+                      indeterminate={table.getIsSomePageRowsSelected()}
+                      disabled={pageRows.length === 0}
+                      onCheckedChange={(checked) => table.toggleAllPageRowsSelected(checked === true)}
                     />
                   </TableHead>
                 )}
@@ -578,10 +489,10 @@ export function EntityTable({
                         )}
                         onClick={() => handleSort(col.key, col.sortable)}
                         aria-sort={
-                          sortKey === col.key
-                            ? sortDirection === "asc"
-                              ? "ascending"
-                              : "descending"
+                          sortedBy?.id === col.key
+                            ? sortedBy.desc
+                              ? "descending"
+                              : "ascending"
                             : "none"
                         }
                       >
@@ -635,9 +546,10 @@ export function EntityTable({
                   </TableCell>
                 </TableRow>
               ) : (
-                paginated.map((row, i) => {
-                  const key = String(getRowField(row, rowKey) ?? i)
-                  const isSelected = selectedKeys.has(key)
+                pageRows.map((tableRow) => {
+                  const row = tableRow.original
+                  const key = tableRow.id
+                  const isSelected = tableRow.getIsSelected()
                   const isAiFocused =
                     aiFocusRowKey != null && aiFocusRowKey !== "" && key === aiFocusRowKey
                   return (
@@ -645,7 +557,7 @@ export function EntityTable({
                       key={key}
                       data-testid={`entity-row-${key}`}
                       data-ai-focus={isAiFocused ? "true" : undefined}
-                      onClick={rowsAreInteractive ? () => activateRow(key, row) : undefined}
+                      onClick={rowsAreInteractive ? () => activateRow(tableRow) : undefined}
                       onKeyDown={(event) => {
                         if (!rowsAreInteractive) return
                         // Keys pressed on a control inside the row (the checkbox, a link) are that
@@ -653,7 +565,7 @@ export function EntityTable({
                         if (event.target !== event.currentTarget) return
                         if (event.key === "Enter" || event.key === " ") {
                           event.preventDefault()
-                          activateRow(key, row)
+                          activateRow(tableRow)
                         }
                       }}
                       tabIndex={rowsAreInteractive ? 0 : undefined}
@@ -672,7 +584,7 @@ export function EntityTable({
                             aria-label="Select row"
                             data-testid={`entity-select-row-${key}`}
                             checked={isSelected}
-                            onCheckedChange={(checked) => setRowSelected(key, checked === true)}
+                            onCheckedChange={(checked) => tableRow.toggleSelected(checked === true)}
                           />
                         </TableCell>
                       )}
@@ -722,7 +634,7 @@ export function EntityTable({
               ? `${(currentPage - 1) * PAGE_SIZE + 1}-${Math.min(currentPage * PAGE_SIZE, sorted.length)} of ${sorted.length}`
               : `${sorted.length} of ${data.length}`}{" "}
             record{sorted.length !== 1 ? "s" : ""}
-            {selectedKeys.size > 0 && ` · ${selectedKeys.size} selected`}
+            {selectedCount > 0 && ` · ${selectedCount} selected`}
           </p>
         )}
       </div>

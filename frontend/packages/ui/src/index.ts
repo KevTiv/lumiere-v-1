@@ -279,6 +279,8 @@ export * from "./entity-views/entity-record-sheet";
 export * from "./entity-views/record-workflow-actions";
 export * from "./entity-views/record-page";
 export * from "./entity-views/status-bar";
+export * from "./entity-views/use-entity-table";
+export * from "./lib/entity-table-engine";
 export * from "./lib/workflow-actions";
 export * from "./lib/workflow-toast";
 export * from "./lib/module-url-filters";

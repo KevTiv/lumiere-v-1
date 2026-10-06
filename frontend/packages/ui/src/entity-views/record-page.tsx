@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import type { ReactNode } from "react"
+import { Fragment, type ReactNode } from "react"
 import { ChevronLeft, ChevronRight } from "lucide-react"
 
 import { cn } from "../lib/utils"
@@ -82,14 +82,16 @@ export function RecordPage({
             {breadcrumbs.map((crumb, index) => {
               const isLast = index === breadcrumbs.length - 1
               return (
-                <BreadcrumbItem key={`${crumb.label}-${index}`}>
-                  {isLast || !crumb.href ? (
-                    <BreadcrumbPage>{crumb.label}</BreadcrumbPage>
-                  ) : (
-                    <BreadcrumbLink render={<Link href={crumb.href} />}>{crumb.label}</BreadcrumbLink>
-                  )}
+                <Fragment key={`${crumb.label}-${index}`}>
+                  <BreadcrumbItem>
+                    {isLast || !crumb.href ? (
+                      <BreadcrumbPage>{crumb.label}</BreadcrumbPage>
+                    ) : (
+                      <BreadcrumbLink render={<Link href={crumb.href} />}>{crumb.label}</BreadcrumbLink>
+                    )}
+                  </BreadcrumbItem>
                   {isLast ? null : <BreadcrumbSeparator />}
-                </BreadcrumbItem>
+                </Fragment>
               )
             })}
           </BreadcrumbList>
