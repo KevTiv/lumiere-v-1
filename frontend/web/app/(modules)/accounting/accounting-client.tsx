@@ -162,6 +162,7 @@ import type {
   UpdateCrossoveredBudgetParams,
 } from "@lumiere/stdb/types"
 import { accountingModuleConfig } from "@/lib/module-dashboard-configs"
+import { invoiceRecordHref } from "./invoice-record"
 import { PaymentOperationsPanel } from "./payment-operations-panel"
 import { useAccountingModuleSubscription } from "@/lib/module-subscription-hooks"
 import { chatterTargetFromRow, type ChatterTarget } from "@/lib/record-chatter"
@@ -1181,6 +1182,7 @@ function AccountingClientReady({
       detailConfig: accountMoveDetailConfig(t),
       auditTableName: "account_move",
       discussion: {},
+      openHref: invoiceRecordHref,
       customTabs: [
         {
           id: "lines",
