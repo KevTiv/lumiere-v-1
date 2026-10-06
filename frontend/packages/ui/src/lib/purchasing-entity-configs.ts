@@ -1,4 +1,6 @@
 import type { TFunction } from "i18next"
+import Link from "next/link"
+import { createElement } from "react"
 import type { EntityDetailConfig, EntityViewConfig } from "./entity-view-types"
 
 // ── Badge maps ────────────────────────────────────────────────────────────────
@@ -21,6 +23,7 @@ const poStateBadges = (t: TFunction) => ({
     Sent: "outline",
     ToApprove: "outline",
     Approved: "default",
+    Purchase: "default",
     Done: "default",
     Cancelled: "destructive",
   },
@@ -29,6 +32,7 @@ const poStateBadges = (t: TFunction) => ({
     Sent: t("purchasing.purchaseOrders.states.Sent"),
     ToApprove: t("purchasing.purchaseOrders.states.ToApprove"),
     Approved: t("purchasing.purchaseOrders.states.Approved"),
+    Purchase: t("purchasing.purchaseOrders.states.Purchase", { defaultValue: "Purchase order" }),
     Done: t("purchasing.purchaseOrders.states.Done"),
     Cancelled: t("purchasing.purchaseOrders.states.Cancelled"),
   },
@@ -39,6 +43,8 @@ export const purchaseOrderStatusBadges = poStateBadges
 export type PurchaseOrdersTableConfigOptions = {
   /** Empty-state CTA — wired by the module client (opens create form). */
   onEmptyAction?: () => void
+  /** Where an order has a page of its own: the reference then links to it. */
+  recordHref?: (row: Record<string, unknown>) => string | undefined
 }
 
 export const purchaseOrderDetailConfig = (t: TFunction): EntityDetailConfig => ({
@@ -144,6 +150,23 @@ export const purchaseOrdersTableConfig = (
         label: t("purchasing.purchaseOrders.columns.name"),
         width: "min-w-32",
         sortable: true,
+        ...(options?.recordHref
+          ? {
+              render: (_value: unknown, row: Record<string, unknown>) => {
+                const shown = String(row.name ?? "").trim()
+                const href = options.recordHref?.(row)
+                if (!shown || !href) return shown || "—"
+                // The row itself opens a preview; the reference opens the page.
+                const linkProps = {
+                  href,
+                  className: "font-medium text-primary hover:underline",
+                  onClick: (event: { stopPropagation: () => void }) => event.stopPropagation(),
+                  "data-testid": `purchase-order-link-${String(row.id)}`,
+                }
+                return createElement(Link, linkProps, shown)
+              },
+            }
+          : {}),
       },
       { key: "partnerId", label: t("purchasing.purchaseOrders.columns.partnerId"), width: "min-w-32" },
       {

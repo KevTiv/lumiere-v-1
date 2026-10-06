@@ -46,6 +46,8 @@ export interface RecordPageProps {
   statusBar?: ReactNode
   /** The record's actions, shown in the header. */
   actions?: ReactNode
+  /** Related-record buttons, e.g. a `SmartButtons` row, shown under the title. */
+  smartButtons?: ReactNode
   navigation?: RecordPageNavigation
   tabs: ReadonlyArray<RecordPageTab>
   activeTab: string
@@ -67,6 +69,7 @@ export function RecordPage({
   badge,
   statusBar,
   actions,
+  smartButtons,
   navigation,
   tabs,
   activeTab,
@@ -125,6 +128,7 @@ export function RecordPage({
             </div>
           ) : null}
         </div>
+        {smartButtons}
         {statusBar}
       </header>
 

@@ -79,6 +79,7 @@ import { RecordDocumentAttachments } from "../../../components/record-document-a
 import { chatterTargetFromRow, type ChatterTarget } from "@/lib/record-chatter"
 import { groupBy } from "@/lib/utils"
 import { useWorkflowSurface } from "@/hooks/use-workflow-surface"
+import { purchaseOrderRecordHref } from "./purchase-order-record"
 import { usePurchasingWorkflow } from "@lumiere/query-hooks/hooks/purchasing-workflow"
 import { recordRef, type TransitionNotice } from "@lumiere/erp-workflows"
 import {
@@ -1140,6 +1141,7 @@ function PurchasingClientLoaded({
       statusBadgeLabels: status.badgeLabels,
       detailConfig,
       auditTableName: "purchase_order",
+      openHref: purchaseOrderRecordHref,
       discussion: {
         attachments: (record) => (
           <RecordDocumentAttachments
@@ -1414,7 +1416,7 @@ function PurchasingClientLoaded({
   )
 
   const ordersEntityConfig = useMemo((): EntityViewConfig => {
-    const base = purchaseOrdersTableConfig(t, { onEmptyAction: openCreatePurchaseOrder })
+    const base = purchaseOrdersTableConfig(t, { onEmptyAction: openCreatePurchaseOrder, recordHref: purchaseOrderRecordHref })
     const runtimeView = purchaseOrdersTableRuntime
     return {
       ...base,

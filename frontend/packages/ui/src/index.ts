@@ -279,6 +279,7 @@ export * from "./entity-views/entity-record-sheet";
 export * from "./entity-views/record-workflow-actions";
 export * from "./entity-views/record-page";
 export * from "./entity-views/status-bar";
+export * from "./entity-views/smart-buttons";
 export * from "./entity-views/use-entity-table";
 export * from "./components/record-picker";
 export * from "./components/editable-number";

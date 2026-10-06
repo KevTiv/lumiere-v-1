@@ -3,7 +3,7 @@
 import { useCallback, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { MoreHorizontal } from 'lucide-react';
+import { FileText, ListOrdered, MoreHorizontal, Truck } from 'lucide-react';
 import { useTranslation } from '@lumiere/i18n';
 import {
   Button,
@@ -19,6 +19,7 @@ import {
   RecordPage,
   RecordWorkflowActions,
   SaleOrderLineGrid,
+  SmartButtons,
   StatusBar,
   buildModuleTabHref,
   useFormDialog,
@@ -355,6 +356,12 @@ function SaleOrderPageLoaded({
   const status = saleOrderStatusBar(order, t);
   const editable = state === 'Draft' || state === 'Sent';
   const rate = parseCommissionRatePercent(order);
+  const handoffs = orderHandoffs(
+    BigInt(orderId),
+    { organizationId: orgId, companyId: operatingCompanyId },
+    stockPickings as never,
+    accountMoves as never,
+  );
 
   const moreActions: Array<{ id: string; label: string; show: boolean; run: () => Promise<void> | void }> = [
     {
@@ -481,6 +488,36 @@ function SaleOrderPageLoaded({
         subtitle={customer || undefined}
         statusBar={<StatusBar steps={status.steps} current={status.current} terminal={status.terminal} />}
         navigation={navigation}
+        smartButtons={
+          <SmartButtons
+            testIdPrefix="sale-order"
+            buttons={[
+              {
+                id: 'lines',
+                label: t('sales.orderLines.title'),
+                count: lines.length,
+                icon: <ListOrdered className="h-4 w-4" />,
+                onClick: () => setActiveTab('lines'),
+              },
+              {
+                id: 'deliveries',
+                label: t('sales.order.deliveries', { defaultValue: 'Deliveries' }),
+                count: handoffs.pickings.length,
+                icon: <Truck className="h-4 w-4" />,
+                onClick: () => setActiveTab('handoffs'),
+                hideWhenZero: true,
+              },
+              {
+                id: 'invoices',
+                label: t('sales.order.invoices', { defaultValue: 'Invoices' }),
+                count: handoffs.invoices.length,
+                icon: <FileText className="h-4 w-4" />,
+                onClick: () => setActiveTab('handoffs'),
+                hideWhenZero: true,
+              },
+            ]}
+          />
+        }
         actions={
           <>
             <RecordWorkflowActions
@@ -566,12 +603,7 @@ function SaleOrderPageLoaded({
               <div data-testid="sale-order-handoffs">
                 <OrderHandoffLinks
                   testIdPrefix="sale-order-handoff"
-                  handoffs={orderHandoffs(
-                    BigInt(orderId),
-                    { organizationId: orgId, companyId: operatingCompanyId },
-                    stockPickings as never,
-                    accountMoves as never,
-                  )}
+                  handoffs={handoffs}
                 />
               </div>
             ),
