@@ -31,14 +31,16 @@ This follow-up started from `claude/ui-polish-pass-1` at `31bfb557` and integrat
   employees and transfers through the backend's typed target enum. Unsupported
   record models cannot create unattached activities.
 - Transfer command exposure and invalidation declarations are reviewed producer
-  inputs; generated contracts are released through the repository workflow.
+  inputs; contracts v0.3.85 were published and pinned through the repository
+  workflow, including its regeneration drift check.
 
 ## Validation (2026-10-07)
 
-- Full UI Vitest suite: 304 tests passed; final guard regression run passed.
+- Full UI Vitest suite: 304 tests passed; final guard regression run: 11 tests passed.
 - Real Next.js/Chromium navigation fixture: 7 tests passed, covering push/replace,
   Next Link, browser back/forward, router back across pages, pending saves and
   inline-edit unload protection. Run with `pnpm --dir frontend/web test:e2e:navigation`.
+- UI, web and query-hooks TypeScript checks passed against contracts v0.3.85.
 - Web unit suite: 50 test files passed. Pass 9 payload/readback tests and existing
   canonical operation-effect tests passed.
 - Rust `cargo check --locked --manifest-path spacetimedb/Cargo.toml --tests` passed.
