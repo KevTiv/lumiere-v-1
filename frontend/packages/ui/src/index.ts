@@ -6,6 +6,8 @@ export * from "./components/input";
 export * from "./components/label";
 export * from "./components/theme-provider";
 export * from "./components/csv-import-modal";
+export * from "./lib/csv-import-preview";
+export * from "./lib/csv-import-columns";
 // form.tsx: exclude FormField (conflicts with lib/form-types FormField type)
 export { Form, FormItem, FormLabel, FormControl, FormDescription, FormMessage } from "./components/form";
 export * from "./components/toast";

@@ -9,6 +9,7 @@ import {
   ModuleView,
   FormModal,
   CsvImportModal,
+  CSV_IMPORT_CONTRACTS,
   newManufacturingOrderForm,
   newBomForm,
   newWorkcenterForm,
@@ -18,7 +19,7 @@ import {
   manufacturingOrdersWithBoard,
 } from "@lumiere/ui"
 import type { ManufacturingCsvImportKind } from "@lumiere/ui"
-import type { EntityViewConfig, FormConfig, ModuleConfig } from "@lumiere/ui"
+import type { EntitySurfacePermission, EntityViewConfig, FormConfig, ModuleConfig } from "@lumiere/ui"
 import type { Product, Warehouse, StockPicking, StockQuant } from "@lumiere/stdb/types"
 import { manufacturingModuleConfig } from "@/lib/module-dashboard-configs"
 import { useManufacturingModuleSubscription } from "@/lib/module-subscription-hooks"
@@ -170,7 +171,7 @@ function ManufacturingClientLoaded({
 
   const addCsvToolbar = (
     ec: EntityViewConfig,
-    actions: Array<{ id: string; label: string; onClick: () => void }>,
+    actions: Array<{ id: string; label: string; permission?: EntitySurfacePermission; onClick: () => void }>,
   ): EntityViewConfig => {
     if (ec.view.mode !== "table") return ec
     return {
@@ -449,11 +450,13 @@ function ManufacturingClientLoaded({
                 {
                   id: "csv-bom",
                   label: t("manufacturing.toolbar.importBomCsv"),
+                  permission: { resource: CSV_IMPORT_CONTRACTS.bom.resource, action: "create" },
                   onClick: () => setCsvKind("bom"),
                 },
                 {
                   id: "csv-bom-line",
                   label: t("manufacturing.toolbar.importBomLineCsv"),
+                  permission: { resource: CSV_IMPORT_CONTRACTS.bomLine.resource, action: "create" },
                   onClick: () => setCsvKind("bom_line"),
                 },
               ]),
@@ -467,6 +470,7 @@ function ManufacturingClientLoaded({
                 {
                   id: "csv-wc",
                   label: t("manufacturing.toolbar.importWorkcenterCsv"),
+                  permission: { resource: CSV_IMPORT_CONTRACTS.workcenter.resource, action: "create" },
                   onClick: () => setCsvKind("workcenter"),
                 },
               ]),
@@ -589,6 +593,12 @@ function ManufacturingClientLoaded({
           key={csvKind}
           onClose={() => setCsvKind(null)}
           config={csvFormConfig}
+          columns={
+            CSV_IMPORT_CONTRACTS[
+              csvKind === "mo" ? "manufacturingOrder" : csvKind === "bom" ? "bom" : csvKind === "bom_line" ? "bomLine" : "workcenter"
+            ]
+          }
+          templateFileName={`manufacturing-${csvKind}-import-template.csv`}
           isPending={isFormMutationPending}
           onImport={async (text) => {
             if (csvKind === "mo") await m.importMoCsv.mutateAsync(text)

@@ -10,6 +10,7 @@ import {
   ModuleView,
   FormModal,
   CsvImportModal,
+  CSV_IMPORT_CONTRACTS,
   RuntimeFormModal,
   useRBAC,
   workflowActionsToEntityActions,
@@ -1416,6 +1417,7 @@ function PurchasingClientLoaded({
           {
             id: "csv-purchase-orders",
             label: t("purchasing.csvImport.toolbarOrders"),
+            permission: { resource: CSV_IMPORT_CONTRACTS.purchaseOrder.resource, action: "create" },
             onClick: () => setCsvKind("order"),
           },
           {
@@ -1651,6 +1653,7 @@ function PurchasingClientLoaded({
           {
             id: "csv-purchase-order-lines",
             label: t("purchasing.csvImport.toolbarOrderLines"),
+            permission: { resource: CSV_IMPORT_CONTRACTS.purchaseOrderLine.resource, action: "create" },
             onClick: () => setCsvKind("orderLine"),
           },
           {
@@ -2216,6 +2219,7 @@ function PurchasingClientLoaded({
                       {
                         id: "csv-supplier-info",
                         label: t("purchasing.csvImport.toolbarSupplierInfo"),
+                        permission: { resource: CSV_IMPORT_CONTRACTS.supplierInfo.resource, action: "create" },
                         onClick: () => setCsvKind("supplierInfo"),
                       },
                       ...(view.actions ?? []),
@@ -2821,6 +2825,8 @@ function PurchasingClientLoaded({
           key={csvKind}
           onClose={() => setCsvKind(null)}
           config={csvFormConfig}
+          columns={CSV_IMPORT_CONTRACTS[csvKind === "order" ? "purchaseOrder" : csvKind === "orderLine" ? "purchaseOrderLine" : "supplierInfo"]}
+          templateFileName={`purchasing-${csvKind}-import-template.csv`}
           isPending={isFormMutationPending}
           onImport={async (text) => {
             if (csvKind === "order") await csvImports.importPurchaseOrder.mutateAsync(text)

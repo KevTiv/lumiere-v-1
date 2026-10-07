@@ -1230,6 +1230,7 @@ function CrmClientLoaded({
           {
             id: "csv-leads",
             label: t("crm.csvImport.toolbarLeads"),
+            permission: { resource: "lead", action: "create" },
             onClick: () => setCsvKind("lead"),
           },
           {
@@ -1361,6 +1362,7 @@ function CrmClientLoaded({
           {
             id: "csv-contacts",
             label: t("crm.csvImport.toolbarContacts"),
+            permission: { resource: "contact", action: "create" },
             onClick: () => setCsvKind("contact"),
           },
           {

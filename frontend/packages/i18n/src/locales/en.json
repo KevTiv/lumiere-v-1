@@ -189,7 +189,19 @@
       "title": "Discard changes?"
     },
     "loadFailed": "Could not load this list",
-    "loadFailedHint": "Try again in a moment."
+    "loadFailedHint": "Try again in a moment.",
+    "csvImportDialog": {
+      "downloadTemplate": "Download template",
+      "failure": "Import failed",
+      "fileLabel": "CSV file",
+      "missingColumns": "Missing required columns: {{columns}}",
+      "noRows": "The file has a header but no data rows.",
+      "rowCount": "{{count}} rows found",
+      "submit": "Import",
+      "success": "Import submitted",
+      "successDescription": "{{count}} rows from {{file}} were sent. Rows the server rejects are listed in the import job history.",
+      "unknownColumns": "These columns are not used and will be ignored: {{columns}}"
+    }
   },
   "navigation": {
     "overview": "Overview",
