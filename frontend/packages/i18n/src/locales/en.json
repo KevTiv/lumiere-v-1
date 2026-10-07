@@ -5,6 +5,7 @@
     "edit": "Edit",
     "delete": "Delete",
     "confirm": "Confirm",
+    "confirmAction": "Confirm action",
     "loading": "Loading...",
     "search": "Search",
     "export": "Export",
@@ -181,6 +182,7 @@
     },
     "retry": "Retry",
     "discardChanges": {
+      "navigate": "You have edits that were not saved. They will be lost if you leave this page.",
       "description": "You have edits that were not saved. They will be lost if you close this form.",
       "discard": "Discard",
       "keep": "Keep editing",
@@ -12493,7 +12495,8 @@
   "commandPalette": {
     "placeholder": "Search modules, actions and records...",
     "records": {
-      "loading": "Searching records..."
+      "loading": "Searching records...",
+      "failed": "Some records could not be searched. Try again."
     }
   }
 }

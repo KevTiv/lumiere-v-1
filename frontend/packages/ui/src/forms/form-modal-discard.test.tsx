@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react"
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest"
 
 import type { FormConfig } from "../lib/form-types"
@@ -52,6 +52,30 @@ const edit = (value: string) =>
 const cancel = () => fireEvent.click(screen.getByRole("button", { name: /cancel/i }))
 
 describe("FormModal unsaved-changes guard", () => {
+  it("keeps edits protected when the form has no submit binding", async () => {
+    const onOpenChange = vi.fn()
+    render(<FormModal open onOpenChange={onOpenChange} config={config} showSubmitSuccessToast={false} />)
+    edit("Changed")
+    fireEvent.click(screen.getByTestId("form-submit-new-note"))
+    await waitFor(() => expect(screen.getByTestId("form-submit-new-note").hasAttribute("disabled")).toBe(false))
+    cancel()
+    expect(await screen.findByTestId("discard-changes-dialog")).toBeTruthy()
+    expect(onOpenChange).not.toHaveBeenCalled()
+  })
+
+  it("ignores Escape during a save and protects edits after a rejected save", async () => {
+    let reject!: (reason: Error) => void
+    const { onOpenChange } = setup(() => new Promise<void>((_, fail) => { reject = fail }))
+    edit("Changed")
+    fireEvent.click(screen.getByTestId("form-submit-new-note"))
+    fireEvent.keyDown(screen.getByTestId("form-modal-new-note"), { key: "Escape" })
+    expect(onOpenChange).not.toHaveBeenCalled()
+    await act(async () => { reject(new Error("Save failed")) })
+    cancel()
+    expect(await screen.findByTestId("discard-changes-dialog")).toBeTruthy()
+    expect((screen.getByTestId("form-field-title") as HTMLInputElement).value).toBe("Changed")
+  })
+
   it("closes straight away when nothing was edited", () => {
     const { onOpenChange, unloadRegistrations } = setup()
     cancel()

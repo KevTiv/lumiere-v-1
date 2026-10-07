@@ -94,7 +94,7 @@ export function ErpCommandPalette({
     (model: string, id: string) => recordHref?.(model, id),
     [recordHref],
   )
-  const showEmpty = !recordSearchActive || (recordSummary != null && !recordSummary.loading && recordSummary.count === 0)
+  const showEmpty = !recordSearchActive || (recordSummary != null && !recordSummary.loading && !recordSummary.failed && recordSummary.count === 0)
 
   const runAction = useCallback((action: () => void) => {
     setOpen(false)

@@ -7,13 +7,14 @@ const hookCalls = vi.hoisted(() => ({ names: [] as string[] }))
 const rbac = vi.hoisted(() => ({ denied: new Set<string>() }))
 const data = vi.hoisted(() => ({
   loading: false,
+  failed: new Set<string>(),
   rows: {} as Record<string, unknown[]>,
 }))
 
 function rowsHook(name: string) {
   return () => {
     hookCalls.names.push(name)
-    return { data: data.rows[name] ?? [], isLoading: data.loading }
+    return { data: data.rows[name] ?? [], isLoading: data.loading, isError: data.failed.has(name) }
   }
 }
 
@@ -77,6 +78,7 @@ beforeEach(() => {
   hookCalls.names.length = 0
   rbac.denied.clear()
   data.loading = false
+  data.failed.clear()
   data.rows = {
     sale_order: [
       { id: 1, name: "SO001", partnerId: 10 },
@@ -105,6 +107,31 @@ function type(text: string) {
 }
 
 describe("ErpCommandPalette records", () => {
+  it("reports failed reads instead of claiming no results or displaying stale rows", () => {
+    data.failed.add("sale_order")
+    openPalette()
+    type("so00")
+    expect(screen.getByTestId("erp-command-palette-records-error")).toBeTruthy()
+    expect(screen.queryByTestId("erp-command-palette-record-sale_order-1")).toBeNull()
+    expect(screen.queryByText("No results found.")).toBeNull()
+  })
+
+  it("keeps healthy model results when another model fails", () => {
+    data.failed.add("purchase_order")
+    openPalette()
+    type("acme")
+    expect(screen.getByTestId("erp-command-palette-records-error")).toBeTruthy()
+    expect(screen.getByTestId("erp-command-palette-record-product-5")).toBeTruthy()
+  })
+
+  it("does not search other records using stale partner names after contacts fail", () => {
+    data.failed.add("contact")
+    openPalette()
+    type("bob")
+    expect(screen.queryByTestId("erp-command-palette-record-sale_order-2")).toBeNull()
+    expect(screen.getByTestId("erp-command-palette-records-error")).toBeTruthy()
+  })
+
   it("reads no record table while closed or with a one-character query", () => {
     render(<ErpCommandPalette recordHref={recordHref} />)
     expect(hookCalls.names).toEqual([])
