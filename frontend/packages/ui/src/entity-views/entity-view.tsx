@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState, type ReactNode } from "react"
+import { useEffect, useMemo, useState, type ReactNode } from "react"
 import { LayoutGrid, List } from "lucide-react"
 import { cn } from "../lib/utils"
 import type {
@@ -80,6 +80,27 @@ export function useScopedEntityDetailConfig(config: EntityDetailConfig): EntityD
 
 type EntitySurfaceMode = "table" | "board"
 
+const surfaceModeStorageKey = (configId: string) => `lumiere:entity-view-mode:${configId}`
+
+function readStoredSurfaceMode(configId: string): EntitySurfaceMode | null {
+  try {
+    const stored = window.localStorage.getItem(surfaceModeStorageKey(configId))
+    return stored === "table" || stored === "board" ? stored : null
+  } catch {
+    return null
+  }
+}
+
+/** Board columns from the table's group column badge labels (read-only boards). */
+function deriveBoardColumns(
+  table: EntityTableConfig,
+  groupKey: string,
+): KanbanColumnDef[] {
+  const labels = table.columns.find((column) => column.key === groupKey)?.badgeLabels
+  if (!labels) return []
+  return Object.entries(labels).map(([id, title]) => ({ id, title: String(title) }))
+}
+
 function EntityViewToggle({
   mode,
   onChange,
@@ -140,6 +161,20 @@ export function EntityView({
   const [surfaceMode, setSurfaceMode] = useState<EntitySurfaceMode>(
     hybrid?.defaultView ?? "table",
   )
+  // Restore the per-entity choice after mount (keeps SSR markup stable).
+  useEffect(() => {
+    if (!hybrid) return
+    const stored = readStoredSurfaceMode(config.id)
+    if (stored) setSurfaceMode(stored)
+  }, [config.id, hybrid !== null]) // eslint-disable-line react-hooks/exhaustive-deps
+  const changeSurfaceMode = (mode: EntitySurfaceMode) => {
+    setSurfaceMode(mode)
+    try {
+      window.localStorage.setItem(surfaceModeStorageKey(config.id), mode)
+    } catch {
+      /* storage unavailable: the choice just is not remembered */
+    }
+  }
 
   const plainTableConfig =
     config.view.mode === "table" ? config.view : hybrid ? hybrid.table : null
@@ -178,12 +213,15 @@ export function EntityView({
 
     if (hybrid) {
       const boardConfig = { ...hybrid.board, mode: "board" as const }
+      const effectiveBoardColumns = boardColumns.length
+        ? boardColumns
+        : deriveBoardColumns(hybrid.table, hybrid.board.groupKey)
       return (
         <div className="space-y-3">
           {hybrid.viewToggleLabels ? (
             <EntityViewToggle
               mode={surfaceMode}
-              onChange={setSurfaceMode}
+              onChange={changeSurfaceMode}
               labels={hybrid.viewToggleLabels}
             />
           ) : null}
@@ -198,18 +236,18 @@ export function EntityView({
               initialFilters={initialFilters}
               onInitialFilterClear={onInitialFilterClear}
             />
-          ) : boardColumns.length && onBoardMove ? (
+          ) : effectiveBoardColumns.length ? (
             <EntityBoardView
               config={boardConfig}
               data={data}
-              columns={boardColumns}
+              columns={effectiveBoardColumns}
               onMove={onBoardMove}
               filterItem={boardFilterItem}
               onCardClick={onRowClick}
             />
           ) : (
             <p className="text-sm text-muted-foreground">
-              Board view requires column definitions and a move handler.
+              Board view requires column definitions.
             </p>
           )}
         </div>

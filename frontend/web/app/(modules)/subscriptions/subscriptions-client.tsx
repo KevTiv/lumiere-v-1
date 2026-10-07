@@ -18,6 +18,7 @@ import {
   MissingOrganization,
   mergeSelectOptionsForFields,
   subscriptionsTableConfig,
+  subscriptionsWithBoard,
   subscriptionLinesTableConfig,
   subscriptionAmendmentsTableConfig,
   subscriptionUsageEventsTableConfig,
@@ -550,7 +551,7 @@ function SubscriptionsClientLoaded({
             return {
               ...tab,
               createForm: subscriptionFormConfig,
-              entityConfig: subscriptionsTableConfig(t, subscriptionRowActions),
+              entityConfig: subscriptionsWithBoard(t, subscriptionsTableConfig(t, subscriptionRowActions)),
               recordSheet: {
                 titleKey: "code",
                 statusKey: "state",

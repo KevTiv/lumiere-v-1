@@ -46,3 +46,56 @@ describe("entity table view state", () => {
     expect(countRowsBy(rows, "s").get("x")).toBe(2)
   })
 })
+
+import {
+  MAX_SAVED_FILTERS,
+  activeFilterEntries,
+  readSavedFilters,
+  removeSavedFilter,
+  savedFiltersStorageKey,
+  upsertSavedFilter,
+} from "./entity-table-view"
+
+describe("saved table filters", () => {
+  const allowed = new Set(["status", "owner"])
+
+  it("keys them next to the view state", () => {
+    expect(savedFiltersStorageKey("orders")).toBe("orders:saved-filters")
+  })
+
+  it("keeps well-formed entries and drops unknown filter keys", () => {
+    const read = readSavedFilters(
+      [
+        { name: "Open", search: "acme", filters: { status: "open", gone: "x", owner: 3 } },
+        { name: "Open", filters: {} },
+        { name: "  ", filters: {} },
+        "junk",
+      ],
+      allowed,
+    )
+    expect(read).toEqual([{ name: "Open", search: "acme", filters: { status: "open" } }])
+    expect(readSavedFilters({}, allowed)).toEqual([])
+  })
+
+  it("ignores 'all' filters and refuses to save an empty set", () => {
+    expect(activeFilterEntries({ status: "__all__", owner: "me", x: "" })).toEqual({ owner: "me" })
+    expect(upsertSavedFilter([], { name: "Nothing", search: " ", filters: { status: "__all__" } })).toEqual([])
+    expect(upsertSavedFilter([], { name: " ", search: "x", filters: {} })).toEqual([])
+  })
+
+  it("replaces a saved filter of the same name and removes by name", () => {
+    const first = upsertSavedFilter([], { name: "Mine", search: "", filters: { owner: "me" } })
+    const second = upsertSavedFilter(first, { name: "mine", search: "", filters: { owner: "you" } })
+    expect(second).toEqual([{ name: "mine", search: "", filters: { owner: "you" } }])
+    expect(removeSavedFilter(second, "mine")).toEqual([])
+  })
+
+  it("caps the list, dropping the oldest", () => {
+    let saved: ReturnType<typeof upsertSavedFilter> = []
+    for (let i = 0; i < MAX_SAVED_FILTERS + 3; i++) {
+      saved = upsertSavedFilter(saved, { name: `f${i}`, search: "", filters: { status: String(i) } })
+    }
+    expect(saved).toHaveLength(MAX_SAVED_FILTERS)
+    expect(saved[0]?.name).toBe("f3")
+  })
+})

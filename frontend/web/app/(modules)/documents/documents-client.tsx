@@ -26,7 +26,7 @@ import {
   acknowledgeDocumentInsightForm,
   formatStdbTaggedValue,
 } from "@lumiere/ui"
-import type { EntityAction, EntityViewConfig, FormConfig } from "@lumiere/ui"
+import type { EntityAction, EntityInlineEdit, EntityViewConfig, FormConfig } from "@lumiere/ui"
 import { documentsModuleConfig } from "@/lib/module-dashboard-configs"
 import { useDocumentsModuleSubscription } from "@/lib/module-subscription-hooks"
 import {
@@ -219,6 +219,21 @@ function withTableActions(
       ...ec.view,
       ...(rowSelectionToggleOnClick !== undefined ? { rowSelectionToggleOnClick } : {}),
       actions,
+    },
+  }
+}
+
+/** Makes the given columns of a table view editable in place. */
+function withInlineEdits(
+  ec: EntityViewConfig,
+  edits: Record<string, EntityInlineEdit>,
+): EntityViewConfig {
+  if (ec.view.mode !== "table") return ec
+  return {
+    ...ec,
+    view: {
+      ...ec.view,
+      columns: ec.view.columns.map((col) => (edits[col.key] ? { ...col, inlineEdit: edits[col.key] } : col)),
     },
   }
 }
@@ -465,7 +480,8 @@ function DocumentsClientLoaded({
                 ],
               },
             },
-            entityConfig: withTableActions(
+            entityConfig: withInlineEdits(
+              withTableActions(
               tab.entityConfig,
               [
                 {
@@ -534,6 +550,21 @@ function DocumentsClientLoaded({
                 },
               ],
               true,
+            ),
+              {
+                name: {
+                  kind: "text",
+                  canEdit: (row) => !truthyRowBool(row.isDeleted) && !truthyRowBool(row.isLocked),
+                  save: async (row, value) => {
+                    const name = String(value)
+                    if (!name) throw new Error("A document needs a name")
+                    await updateDocument.mutateAsync({
+                      documentId: row.id as string | number,
+                      params: { name },
+                    })
+                  },
+                },
+              },
             ),
           }
         }

@@ -15,6 +15,7 @@ import {
   MissingOrganization,
   mergeSelectOptionsForFields,
   manufacturingCsvImportForm,
+  manufacturingOrdersWithBoard,
 } from "@lumiere/ui"
 import type { ManufacturingCsvImportKind } from "@lumiere/ui"
 import type { EntityViewConfig, FormConfig, ModuleConfig } from "@lumiere/ui"
@@ -410,7 +411,7 @@ function ManufacturingClientLoaded({
             const view = tab.entityConfig.view
             return {
               ...tab,
-              entityConfig: {
+              entityConfig: manufacturingOrdersWithBoard(t, {
                 ...tab.entityConfig,
                 view: {
                   ...view,
@@ -437,7 +438,7 @@ function ManufacturingClientLoaded({
                       : column,
                   ),
                 },
-              },
+              }),
             }
           }
           if (tab.id === "boms" && tab.entityConfig) {

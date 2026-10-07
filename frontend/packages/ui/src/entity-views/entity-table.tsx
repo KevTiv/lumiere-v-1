@@ -45,7 +45,7 @@ import { Skeleton } from "../components/skeleton"
 import { Checkbox } from "../components/checkbox"
 import { showWorkflowToast } from "../lib/workflow-toast"
 import { TooltipProvider } from "../components/tooltip"
-import { Search, ArrowUp, ArrowDown, ArrowUpDown, Columns3, FileDown, X, Inbox, SearchX, Loader2 } from "lucide-react"
+import { Search, ArrowUp, ArrowDown, ArrowUpDown, Bookmark, Columns3, FileDown, Trash2, X, Inbox, SearchX, Loader2 } from "lucide-react"
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -65,15 +65,22 @@ import {
 } from "../lib/entity-row-utils"
 import { rowsToCsv, downloadCsv } from "../lib/export-csv"
 import { useEntityTable } from "./use-entity-table"
+import { InlineEditCell } from "./inline-edit-cell"
 import {
   EMPTY_TABLE_VIEW,
   countRowsBy,
   groupRowsBy,
   readTableView,
   tableViewStorageKey,
+  readSavedFilters,
+  removeSavedFilter,
+  savedFiltersStorageKey,
   toggleHiddenColumn,
+  upsertSavedFilter,
   type EntityTableViewState,
+  type SavedTableFilter,
 } from "../lib/entity-table-view"
+import { Popover, PopoverContent, PopoverTrigger } from "../components/popover"
 
 const PAGE_SIZE = TABLE_PAGE_SIZE
 const LOADING_ROW_COUNT = 5
@@ -180,6 +187,38 @@ export function EntityTable({
       // ignore quota errors
     }
   }, [config.listViewKey, loadedListViewKey, persistedFilters])
+
+  const [savedFilters, setSavedFilters] = useState<SavedTableFilter[]>([])
+  const [loadedSavedKey, setLoadedSavedKey] = useState<string | null>(null)
+  const [newFilterName, setNewFilterName] = useState("")
+
+  useEffect(() => {
+    const key = config.listViewKey
+    if (!key || typeof window === "undefined") {
+      setSavedFilters([])
+      setLoadedSavedKey(key ?? "")
+      return
+    }
+    let saved: SavedTableFilter[] = []
+    try {
+      const raw = window.localStorage.getItem(savedFiltersStorageKey(key))
+      if (raw) saved = readSavedFilters(JSON.parse(raw) as unknown, persistedFilterKeys)
+    } catch {
+      // ignore corrupt saved filters
+    }
+    setSavedFilters(saved)
+    setLoadedSavedKey(key)
+  }, [config.listViewKey, persistedFilterKeys])
+
+  useEffect(() => {
+    const key = config.listViewKey
+    if (!key || loadedSavedKey !== key || typeof window === "undefined") return
+    try {
+      window.localStorage.setItem(savedFiltersStorageKey(key), JSON.stringify(savedFilters))
+    } catch {
+      // ignore quota errors
+    }
+  }, [config.listViewKey, loadedSavedKey, savedFilters])
 
   const filters = useMemo(
     () => ({ ...persistedFilters, ...initialFilters }),
@@ -486,6 +525,82 @@ export function EntityTable({
               )
             })}
             <div className="ml-auto flex items-center gap-2">
+              {config.listViewKey && ((config.filters?.length ?? 0) > 0 || config.searchable) && (
+                <Popover>
+                  <PopoverTrigger
+                    render={
+                      <Button variant="outline" size="sm" aria-label="Saved filters" data-testid="entity-saved-filters" />
+                    }
+                  >
+                    <Bookmark className="mr-2 h-4 w-4" />
+                    Saved filters
+                  </PopoverTrigger>
+                  <PopoverContent align="end" className="w-72 space-y-3">
+                    {savedFilters.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">
+                        No saved filters yet. Set a search or filters, then save them under a name.
+                      </p>
+                    ) : (
+                      <ul className="space-y-1" data-testid="entity-saved-filter-list">
+                        {savedFilters.map((saved) => (
+                          <li key={saved.name} className="flex items-center gap-1">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="min-w-0 flex-1 justify-start truncate"
+                              data-testid={`entity-saved-filter-apply-${saved.name}`}
+                              onClick={() => {
+                                setSearch(saved.search)
+                                setPersistedFilters((prev) => ({
+                                  ...Object.fromEntries(Object.keys(prev).map((key) => [key, "__all__"])),
+                                  ...saved.filters,
+                                }))
+                              }}
+                            >
+                              {saved.name}
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              aria-label={`Delete saved filter ${saved.name}`}
+                              data-testid={`entity-saved-filter-delete-${saved.name}`}
+                              onClick={() => setSavedFilters((prev) => removeSavedFilter(prev, saved.name))}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                    <form
+                      className="flex items-center gap-2"
+                      onSubmit={(event) => {
+                        event.preventDefault()
+                        setSavedFilters((prev) =>
+                          upsertSavedFilter(prev, { name: newFilterName, search, filters }),
+                        )
+                        setNewFilterName("")
+                      }}
+                    >
+                      <Input
+                        aria-label="Name for the current filters"
+                        placeholder="Name for current filters"
+                        value={newFilterName}
+                        onChange={(event) => setNewFilterName(event.target.value)}
+                        data-testid="entity-saved-filter-name"
+                      />
+                      <Button
+                        type="submit"
+                        size="sm"
+                        disabled={!newFilterName.trim()}
+                        data-testid="entity-saved-filter-save"
+                      >
+                        Save
+                      </Button>
+                    </form>
+                  </PopoverContent>
+                </Popover>
+              )}
               {groupableFilters.length > 0 && (
                 <Select
                   value={view.groupBy ?? "__none__"}
@@ -732,14 +847,29 @@ export function EntityTable({
                               col.align === "center" && "text-center",
                             )}
                           >
-                            {col.render
-                              ? col.render(value, row)
-                              : formatEntityFieldValue(
-                                  value,
-                                  col.type,
-                                  col.badgeVariants,
-                                  col.badgeLabels,
-                                )}
+                            {(() => {
+                              const content = col.render
+                                ? col.render(value, row)
+                                : formatEntityFieldValue(
+                                    value,
+                                    col.type,
+                                    col.badgeVariants,
+                                    col.badgeLabels,
+                                  )
+                              return col.inlineEdit ? (
+                                <InlineEditCell
+                                  edit={col.inlineEdit}
+                                  row={row}
+                                  columnKey={col.key}
+                                  label={col.label}
+                                  value={value}
+                                >
+                                  {content}
+                                </InlineEditCell>
+                              ) : (
+                                content
+                              )
+                            })()}
                           </TableCell>
                         )
                       })}

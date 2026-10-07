@@ -33,6 +33,7 @@ import {
   mergeSelectOptionsForFields,
   mergeFieldDefaultValues,
   saleOrdersTableConfig,
+  saleOrdersWithBoard,
   saleOrderStatusBadges,
   saleOrderLinesTableConfig,
   pricelistsTableConfig,
@@ -1930,7 +1931,7 @@ function SalesClientLoaded({
           if (tab.id === 'orders' && tab.type === 'entity') {
             return {
               ...tab,
-              entityConfig: ordersEntityConfig,
+              entityConfig: saleOrdersWithBoard(t, ordersEntityConfig),
               createForm: saleOrderFormConfig,
               recordSheet: saleOrderRecordSheet,
             };

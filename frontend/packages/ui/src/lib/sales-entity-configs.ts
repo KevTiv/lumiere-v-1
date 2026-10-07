@@ -1,4 +1,5 @@
 import type { TFunction } from "i18next"
+import { withReadOnlyStateBoard } from "./entity-state-board"
 import Link from "next/link"
 import { createElement } from "react"
 import type { EntityDetailConfig, EntityViewConfig, EntityTableConfig } from "./entity-view-types"
@@ -653,3 +654,17 @@ export const salesEntityConfigs = (t: TFunction): Record<string, EntityViewConfi
   "pos-loyalty-programs-table": posLoyaltyProgramsTableConfig(t),
   "pos-loyalty-cards-table": posLoyaltyCardsTableConfig(t),
 })
+
+/** Read-only board of sale orders by state; state changes stay workflow actions. */
+export const saleOrdersWithBoard = (t: TFunction, config: EntityViewConfig): EntityViewConfig =>
+  withReadOnlyStateBoard(t, config, {
+    groupKey: "state",
+    card: {
+      titleKey: "reference",
+      fields: [{ key: "partnerName", label: t("sales.salesOrders.columns.partnerName", { defaultValue: "Customer" }) }],
+      footerFields: [
+        { key: "amountTotal", label: t("sales.salesOrders.columns.amountTotal"), type: "currency" },
+        { key: "dateOrder", label: t("sales.salesOrders.columns.dateOrder"), type: "relative-date" },
+      ],
+    },
+  })

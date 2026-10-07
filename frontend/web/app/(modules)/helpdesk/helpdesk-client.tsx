@@ -15,6 +15,7 @@ import {
   MissingOrganization,
   mergeSelectOptionsForFields,
   helpdeskTicketDetailForm,
+  helpdeskTicketsWithBoard,
 } from "@lumiere/ui"
 import type { FormConfig, ModuleConfig, EntityAction, EntityTableConfig, EntityViewConfig } from "@lumiere/ui"
 import { helpdeskModuleConfig } from "@/lib/module-dashboard-configs"
@@ -354,7 +355,7 @@ function HelpdeskClientLoaded({
             return {
               ...tab,
               createForm: ticketFormConfig,
-              entityConfig: ticketsEntityConfig,
+              entityConfig: helpdeskTicketsWithBoard(t, ticketsEntityConfig),
             }
           }
           if (tab.id === "teams") return { ...tab, createForm: teamFormConfig }

@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from "@testing-library/react"
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import type { ReactNode } from "react"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import type { EntityTableConfig } from "../lib/entity-view-types"
@@ -98,5 +98,25 @@ describe("EntityTable saved view", () => {
 
     const headers = await screen.findAllByTestId("entity-group-row")
     expect(headers.map((row) => row.textContent)).toEqual(["Confirmed1", "Draft2"])
+  })
+
+  it("saves the current filters under a name and applies them again", async () => {
+    window.localStorage.setItem(
+      LIST_VIEW_KEY,
+      JSON.stringify({ status: "draft" }),
+    )
+    renderTable()
+    await screen.findByText("SO-001")
+    expect(screen.queryByText("SO-003")).toBeNull()
+
+    fireEvent.click(screen.getByTestId("entity-saved-filters"))
+    fireEvent.change(await screen.findByTestId("entity-saved-filter-name"), { target: { value: "Drafts" } })
+    fireEvent.click(screen.getByTestId("entity-saved-filter-save"))
+
+    await waitFor(() => {
+      const stored = JSON.parse(window.localStorage.getItem(`${LIST_VIEW_KEY}:saved-filters`) ?? "[]")
+      expect(stored).toEqual([{ name: "Drafts", search: "", filters: { status: "draft" } }])
+    })
+    expect(screen.getByTestId("entity-saved-filter-apply-Drafts")).toBeTruthy()
   })
 })

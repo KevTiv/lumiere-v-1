@@ -158,7 +158,13 @@
     },
     "audit": "Audit",
     "overview": "Overview",
-    "remove": "Remove"
+    "remove": "Remove",
+    "entityView": {
+      "board": "Board",
+      "emptyColumn": "No records",
+      "table": "Table",
+      "toggleLabel": "Switch view"
+    }
   },
   "navigation": {
     "overview": "Overview",
@@ -6406,7 +6412,8 @@
         "deliverySummary": "Delivery",
         "invoiceSummary": "Invoicing",
         "paymentSummary": "Payment",
-        "outstandingAmount": "Balance due"
+        "outstandingAmount": "Balance due",
+        "partnerName": "Customer"
       },
       "cashSummary": {
         "delivery": {

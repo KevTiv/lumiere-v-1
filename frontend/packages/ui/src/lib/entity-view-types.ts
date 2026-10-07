@@ -74,6 +74,18 @@ export interface EntityColumn extends EntityPermissioned {
   badgeLabels?: Record<string, string>
   /** Override rendering entirely */
   render?: (value: unknown, row: EntityRow) => ReactNode
+  /** Makes the cell editable in place (double-click). The caller owns the write. */
+  inlineEdit?: EntityInlineEdit
+}
+
+export interface EntityInlineEdit {
+  kind: "text" | "number" | "select"
+  /** Choices for `kind: "select"`. */
+  options?: Array<{ value: string; label: string }>
+  /** Rows the cell may be edited on (e.g. only drafts). Defaults to every row. */
+  canEdit?: (row: EntityRow) => boolean
+  /** Persists the new value; a rejection puts the old value back and shows the error. */
+  save: (row: EntityRow, value: string | number) => Promise<unknown>
 }
 
 // ─── Filter ─────────────────────────────────────────────────────────────────

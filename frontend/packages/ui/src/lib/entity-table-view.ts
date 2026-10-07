@@ -70,3 +70,63 @@ export function countRowsBy(rows: readonly EntityRow[], key: string): Map<string
   }
   return counts
 }
+
+/** A named set of search text and filters a user saved for a list, kept per browser. */
+export interface SavedTableFilter {
+  name: string
+  search: string
+  filters: Record<string, string>
+}
+
+export const MAX_SAVED_FILTERS = 20
+
+export function savedFiltersStorageKey(listViewKey: string): string {
+  return `${listViewKey}:saved-filters`
+}
+
+/** Reads stored saved filters, dropping malformed entries and filter keys the table no longer has. */
+export function readSavedFilters(value: unknown, allowedKeys: ReadonlySet<string>): SavedTableFilter[] {
+  if (!Array.isArray(value)) return []
+  const result: SavedTableFilter[] = []
+  const seen = new Set<string>()
+  for (const item of value) {
+    if (item === null || typeof item !== "object") continue
+    const raw = item as { name?: unknown; search?: unknown; filters?: unknown }
+    if (typeof raw.name !== "string" || !raw.name.trim() || seen.has(raw.name)) continue
+    const filters: Record<string, string> = {}
+    if (raw.filters !== null && typeof raw.filters === "object" && !Array.isArray(raw.filters)) {
+      for (const [key, val] of Object.entries(raw.filters)) {
+        if (allowedKeys.has(key) && typeof val === "string") filters[key] = val
+      }
+    }
+    seen.add(raw.name)
+    result.push({ name: raw.name, search: typeof raw.search === "string" ? raw.search : "", filters })
+  }
+  return result.slice(0, MAX_SAVED_FILTERS)
+}
+
+/** Drops "all" entries so a saved set only holds what actually narrows the list. */
+export function activeFilterEntries(filters: Record<string, string>): Record<string, string> {
+  return Object.fromEntries(Object.entries(filters).filter(([, value]) => value && value !== "__all__"))
+}
+
+/**
+ * Adds or replaces (by name, case-insensitive) a saved filter. Returns the list unchanged when the
+ * name is blank or there is nothing to save.
+ */
+export function upsertSavedFilter(
+  saved: readonly SavedTableFilter[],
+  entry: SavedTableFilter,
+): SavedTableFilter[] {
+  const name = entry.name.trim()
+  const filters = activeFilterEntries(entry.filters)
+  const search = entry.search.trim()
+  if (!name || (Object.keys(filters).length === 0 && !search)) return [...saved]
+  const next = saved.filter((item) => item.name.toLowerCase() !== name.toLowerCase())
+  next.push({ name, search, filters })
+  return next.slice(-MAX_SAVED_FILTERS)
+}
+
+export function removeSavedFilter(saved: readonly SavedTableFilter[], name: string): SavedTableFilter[] {
+  return saved.filter((item) => item.name !== name)
+}
