@@ -2924,7 +2924,15 @@
       "editContactAddress": "Edit address",
       "editContactBusiness": "Edit business info",
       "editContactDetails": "Edit details",
-      "alreadyClosed": "This opportunity is already won or lost."
+      "alreadyClosed": "This opportunity is already won or lost.",
+      "archiveContactCategory": "Archive category",
+      "archiveContactCategoryConfirm": "Archive this category? Contacts already assigned to it keep it.",
+      "clearContactCategories": "Clear categories",
+      "clearContactCategoriesConfirm": "Remove every category from this contact?",
+      "editContactCategory": "Edit category",
+      "removeContactCategory": "Remove category",
+      "replaceContactCategories": "Replace categories",
+      "replaceContactCategoriesHint": "The contact keeps only the categories ticked here. Leave all unticked to clear them."
     },
     "duplicates": {
       "tabLabel": "Duplicates",

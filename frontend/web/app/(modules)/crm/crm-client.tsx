@@ -62,12 +62,19 @@ import { useTranslation } from "@lumiere/i18n"
 import { stbTimestampFromDate } from "@lumiere/erp-shared/stb-timestamp"
 import type { CreateCrmForecastSnapshotParams } from "@lumiere/stdb/types"
 import { useRuntimeListConfig } from "@lumiere/ui/forms"
+import { formText, recordOptions, useFormDialog } from "@lumiere/ui/forms/use-form-dialog"
+import { activeCategories, canArchiveCategory, canManageContactCategories } from "./contact-category-actions"
 import { showWorkflowToast } from "@lumiere/ui/lib/workflow-toast"
 import { contactPrimaryLabel } from "@lumiere/stdb/read-models"
 import {
   useActivities,
   useAddContactToSegment,
   useAddContactCategories,
+  useArchiveContactCategory,
+  useClearContactCategories,
+  useRemoveContactCategories,
+  useReplaceContactCategories,
+  useUpdateContactCategory,
   useAssignTagToContact,
   useCompleteActivity,
   useContactCategories,
@@ -631,6 +638,12 @@ function CrmClientLoaded({
   const updateContactBusiness = useUpdateContactBusiness(orgId)
   const updateContactDetails = useUpdateContactDetails(orgId)
   const updateLead = useUpdateLead(orgId)
+  const updateContactCategory = useUpdateContactCategory(orgId)
+  const archiveContactCategory = useArchiveContactCategory(orgId)
+  const replaceContactCategories = useReplaceContactCategories(orgId)
+  const removeContactCategories = useRemoveContactCategories(orgId)
+  const clearContactCategories = useClearContactCategories(orgId)
+  const { askForm, formDialog } = useFormDialog()
   const csvImports = useCrmCsvImportMutations(orgId)
   const { data: forecastSnapshots = [] } = useCrmForecastSnapshots(orgId)
   const createForecastSnapshot = useCreateForecastSnapshot(orgId)
@@ -1387,6 +1400,94 @@ function CrmClientLoaded({
             onClick: openAssignCategoryModal,
           },
           {
+            id: "replace-contact-categories",
+            label: t("crm.actions.replaceContactCategories", { defaultValue: "Replace categories" }),
+            requiresSelection: true,
+            isApplicable: (rows) => rows.every(canManageContactCategories),
+            successMessage: t("common.actionCompleted", {
+              action: t("crm.actions.replaceContactCategories", { defaultValue: "Replace categories" }),
+            }),
+            onClick: async (rows) => {
+              const row = rows[0]
+              if (!row) return
+              const active = activeCategories(contactCategories as Record<string, unknown>[])
+              if (active.length === 0) throw new Error(t("crm.contactCategories.emptyMessage"))
+              const values = await askForm({
+                title: t("crm.actions.replaceContactCategories", { defaultValue: "Replace categories" }),
+                description: t("crm.actions.replaceContactCategoriesHint", {
+                  defaultValue: "The contact keeps only the categories ticked here. Leave all unticked to clear them.",
+                }),
+                fields: active.map((c) => ({
+                  id: `cat-${String(c.id)}`,
+                  name: `cat-${String(c.id)}`,
+                  label: String(c.name ?? `#${String(c.id)}`),
+                  type: "checkbox" as const,
+                })),
+              })
+              if (!values) return
+              await replaceContactCategories.mutateAsync({
+                contactId: rowIdBigInt(row).toString(),
+                categoryIds: active.filter((c) => values[`cat-${String(c.id)}`] === true).map((c) => String(c.id)),
+              })
+            },
+          },
+          {
+            id: "remove-contact-category",
+            label: t("crm.actions.removeContactCategory", { defaultValue: "Remove category" }),
+            requiresSelection: true,
+            isApplicable: (rows) => rows.every(canManageContactCategories),
+            successMessage: t("common.actionCompleted", {
+              action: t("crm.actions.removeContactCategory", { defaultValue: "Remove category" }),
+            }),
+            onClick: async (rows) => {
+              const row = rows[0]
+              if (!row) return
+              const values = await askForm({
+                title: t("crm.actions.removeContactCategory", { defaultValue: "Remove category" }),
+                fields: [
+                  {
+                    id: "categoryId",
+                    name: "categoryId",
+                    label: t("crm.forms.assignCategory.fields.categoryId", { defaultValue: "Category" }),
+                    type: "select",
+                    required: true,
+                    searchable: true,
+                    options: recordOptions(contactCategories as Record<string, unknown>[], (c) => String(c.name ?? `#${String(c.id)}`)),
+                  },
+                ],
+              })
+              const categoryId = values ? formText(values.categoryId) : undefined
+              if (!categoryId) return
+              await removeContactCategories.mutateAsync({
+                contactId: rowIdBigInt(row).toString(),
+                categoryIds: [categoryId],
+              })
+            },
+          },
+          {
+            id: "clear-contact-categories",
+            label: t("crm.actions.clearContactCategories", { defaultValue: "Clear categories" }),
+            requiresSelection: true,
+            variant: "destructive",
+            isApplicable: (rows) => rows.every(canManageContactCategories),
+            successMessage: t("common.actionCompleted", {
+              action: t("crm.actions.clearContactCategories", { defaultValue: "Clear categories" }),
+            }),
+            confirm: {
+              title: t("crm.actions.clearContactCategories", { defaultValue: "Clear categories" }),
+              description: t("crm.actions.clearContactCategoriesConfirm", {
+                defaultValue: "Remove every category from this contact?",
+              }),
+              confirmLabel: t("common.confirm"),
+              cancelLabel: t("common.cancel"),
+            },
+            onClick: async (rows) => {
+              const row = rows[0]
+              if (!row) return
+              await clearContactCategories.mutateAsync(rowIdBigInt(row).toString())
+            },
+          },
+          {
             id: "add-segment",
             label: t("crm.actions.addToSegment"),
             requiresSelection: true,
@@ -1436,6 +1537,79 @@ function CrmClientLoaded({
                 return
               }
               await completeActivity.mutateAsync(rowIdBigInt(row))
+            },
+          },
+        ],
+      },
+    }
+
+    const contactCategoriesBase = contactCategoriesTableConfig(t)
+    const contactCategoriesEntity: EntityViewConfig = {
+      ...contactCategoriesBase,
+      view: {
+        ...(contactCategoriesBase.view as EntityTableConfig),
+        actions: [
+          {
+            id: "edit-contact-category",
+            label: t("crm.actions.editContactCategory", { defaultValue: "Edit category" }),
+            requiresSelection: true,
+            successMessage: t("common.actionCompleted", {
+              action: t("crm.actions.editContactCategory", { defaultValue: "Edit category" }),
+            }),
+            onClick: async (rows) => {
+              const row = rows[0]
+              if (!row) return
+              const values = await askForm({
+                title: t("crm.actions.editContactCategory", { defaultValue: "Edit category" }),
+                fields: [
+                  {
+                    id: "name",
+                    name: "name",
+                    label: t("crm.contactCategories.columns.name"),
+                    type: "text",
+                    required: true,
+                    defaultValue: String(row.name ?? ""),
+                  },
+                  {
+                    id: "color",
+                    name: "color",
+                    label: t("crm.contactCategories.columns.color"),
+                    type: "text",
+                    placeholder: "#3b82f6",
+                    defaultValue: String(row.color ?? ""),
+                  },
+                ],
+              })
+              if (!values) return
+              const name = formText(values.name)
+              if (!name) throw new Error(t("crm.inlineEdit.nameRequired", { defaultValue: "A name is required" }))
+              await updateContactCategory.mutateAsync({
+                categoryId: rowIdBigInt(row).toString(),
+                params: { name, color: formText(values.color) },
+              })
+            },
+          },
+          {
+            id: "archive-contact-category",
+            label: t("crm.actions.archiveContactCategory", { defaultValue: "Archive category" }),
+            requiresSelection: true,
+            variant: "destructive",
+            isApplicable: (rows) => rows.every(canArchiveCategory),
+            successMessage: t("common.actionCompleted", {
+              action: t("crm.actions.archiveContactCategory", { defaultValue: "Archive category" }),
+            }),
+            confirm: {
+              title: t("crm.actions.archiveContactCategory", { defaultValue: "Archive category" }),
+              description: t("crm.actions.archiveContactCategoryConfirm", {
+                defaultValue: "Archive this category? Contacts already assigned to it keep it.",
+              }),
+              confirmLabel: t("common.confirm"),
+              cancelLabel: t("common.cancel"),
+            },
+            onClick: async (rows) => {
+              const row = rows[0]
+              if (!row) return
+              await archiveContactCategory.mutateAsync(rowIdBigInt(row).toString())
             },
           },
         ],
@@ -1523,7 +1697,7 @@ function CrmClientLoaded({
           id: "contact-categories",
           label: t("crm.contactCategories.tabLabel"),
           type: "entity" as const,
-          entityConfig: contactCategoriesTableConfig(t),
+          entityConfig: contactCategoriesEntity,
           createForm: newContactCategoryForm(t),
           createLabel: t("crm.contactCategories.createLabel"),
           createAction: "createContactCategory",
@@ -1596,6 +1770,13 @@ function CrmClientLoaded({
     openEditLeadDetailsModal,
     openEditLeadAddressModal,
     openEditLeadRevenueModal,
+    askForm,
+    contactCategories,
+    updateContactCategory,
+    archiveContactCategory,
+    replaceContactCategories,
+    removeContactCategories,
+    clearContactCategories,
     markOpportunityWon,
     markOpportunityLost,
     opportunityStageOptions,
@@ -2283,6 +2464,7 @@ function CrmClientLoaded({
           }
         }}
       />
+      {formDialog}
       <RuntimeFormModal
         key={workflowModalKey}
         open={workflowModal !== null}
