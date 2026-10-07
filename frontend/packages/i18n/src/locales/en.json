@@ -885,7 +885,8 @@
         "archive": "Archive PDF to Documents",
         "recalculate": "Recalculate totals",
         "registerPayment": "Register payment",
-        "cancel": "Cancel document"
+        "cancel": "Cancel document",
+        "reconcilePayment": "Reconcile payment"
       },
       "recordSheet": {
         "actionsTab": "Actions",
@@ -913,7 +914,9 @@
         "partial": "Partial",
         "reversed": "Reversed",
         "unpaid": "Unpaid"
-      }
+      },
+      "noReconcilablePayments": "No posted payments available",
+      "reconcilePaymentHint": "Match a posted payment entry to this document. The lesser of the two open balances is applied."
     },
     "bills": {
       "title": "Bills (Accounts Payable)",
