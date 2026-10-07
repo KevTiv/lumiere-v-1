@@ -81,6 +81,7 @@ import {
   ProductVendorPricesTab,
 } from './product-record-read-tabs';
 import { packagingOptionLabel, vendorPriceOptionLabel } from './product-record-tabs';
+import { canReleaseWave } from './picking-wave-actions';
 import { useInventoryModuleSubscription } from '@/lib/module-subscription-hooks';
 import { useWorkflowSurface } from '@/hooks/use-workflow-surface';
 import { usePickingWorkflow } from '@lumiere/query-hooks/hooks/picking-workflow';
@@ -4196,8 +4197,7 @@ function InventoryClientLoaded({
                   label: t('inventory.pickingWaveActions.confirm'),
                   icon: CheckCircle,
                   requiresSelection: true,
-                  isApplicable: (rows) =>
-                    rows.every((row) => !['done', 'cancelled'].includes(rowState(row, 'state'))),
+                  isApplicable: (rows) => rows.length === 1 && canReleaseWave(rows[0]),
                   successMessage: t('common.actionCompleted', { action: t('inventory.pickingWaveActions.confirm') }),
                   onClick: async (rows) => {
                     const id = rows[0]?.id as ScalarId | undefined;

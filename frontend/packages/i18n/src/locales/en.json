@@ -5075,7 +5075,7 @@
       "confirmDelete": "Delete this replenishment rule?"
     },
     "pickingWaveActions": {
-      "confirm": "Confirm wave",
+      "confirm": "Release wave",
       "process": "Process wave",
       "complete": "Complete wave",
       "confirmDelete": "Delete this picking wave?"
