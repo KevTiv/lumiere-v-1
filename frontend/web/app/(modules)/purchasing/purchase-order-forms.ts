@@ -28,6 +28,16 @@ export function canLockPurchaseOrder(order: Row): boolean {
 }
 export const canUnlockPurchaseOrder = (order: Row): boolean => isPurchaseOrderLocked(order);
 
+/**
+ * Invoiced quantity can be recorded on a line only once more has been received than invoiced
+ * (the list's invoice-quantity form offers exactly these lines; the reducer caps it at the ordered qty).
+ */
+export function canInvoicePurchaseOrderLine(line: Row): boolean {
+  const received = Number(line.qtyReceived ?? line.qty_received ?? 0);
+  const invoiced = Number(line.qtyInvoiced ?? line.qty_invoiced ?? 0);
+  return received > invoiced;
+}
+
 const text = (value: unknown): string => (value == null ? '' : String(value));
 
 /** Starting values of the edit-header form for a draft order. */

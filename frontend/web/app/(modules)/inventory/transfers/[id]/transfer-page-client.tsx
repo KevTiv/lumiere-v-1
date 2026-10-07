@@ -45,6 +45,7 @@ import { useStockLocations, useStockMoves, useStockPickings } from '@lumiere/que
 import { usePickingWorkflow } from '@lumiere/query-hooks/hooks/picking-workflow';
 import { useDefaultOperatingCompanyBigInt } from '@lumiere/query-hooks/hooks/use-operating-company';
 import { useWorkflowSurface } from '@/hooks/use-workflow-surface';
+import { useRecordNavigation } from '@/hooks/use-record-navigation';
 import { useInventoryModuleSubscription } from '@/lib/module-subscription-hooks';
 import { hasValidOrganizationId, orgBigInts } from '@/lib/org-scoped';
 import { RecordDocumentAttachments } from '../../../../../components/record-document-attachments';
@@ -135,22 +136,13 @@ function TransferPageLoaded({
     return map;
   }, [locations]);
 
-  // Previous / next follow the list's default order: newest first.
-  const navigation = useMemo(() => {
-    const sorted = [...(pickings as unknown as Row[])].sort((a, b) =>
-      Number(BigInt(String(b.id)) - BigInt(String(a.id))),
-    );
-    const index = sorted.findIndex((row) => String(row.id) === transferId);
-    if (index === -1) return undefined;
-    const link = (row: Row | undefined) =>
-      row ? { href: `/inventory/transfers/${String(row.id)}`, label: String(row.name || row.id) } : undefined;
-    return {
-      position: index + 1,
-      total: sorted.length,
-      previous: link(sorted[index - 1]),
-      next: link(sorted[index + 1]),
-    };
-  }, [pickings, transferId]);
+  // Previous / next follow the list the record was opened from, else newest first.
+  const navigation = useRecordNavigation<Row>({
+    rows: pickings as unknown as Row[],
+    currentId: transferId,
+    basePath: '/inventory/transfers',
+    labelOf: (row) => String(row.name || row.id),
+  });
 
   const requestedTab = searchParams.get('tab');
   const activeTab: TabId = (TAB_IDS as readonly string[]).includes(requestedTab ?? '')

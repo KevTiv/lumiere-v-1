@@ -14,6 +14,7 @@ import {
   EmptyDescription,
   EmptyHeader,
   EmptyTitle,
+  EntityRecordSheet,
   MissingOrganization,
   RecordAuditTab,
   RecordChatter,
@@ -49,6 +50,7 @@ import {
 import { useDefaultOperatingCompanyBigInt } from '@lumiere/query-hooks/hooks/use-operating-company';
 import { accountMoveHref } from '@lumiere/erp-shared/record-links';
 import { expenseVariantTag, mapExpenseRow, mapExpenseSheetRow } from '@/lib/expense-state';
+import { useRecordNavigation } from '@/hooks/use-record-navigation';
 import { useExpensesModuleSubscription } from '@/lib/module-subscription-hooks';
 import { hasValidOrganizationId, orgBigInts } from '@/lib/org-scoped';
 import { financeKindsFor } from '../../expense-report-finance';
@@ -103,6 +105,7 @@ function ExpenseReportPageLoaded({
 
   const [confirm, setConfirm] = useState<Confirm | null>(null);
   const [reason, setReason] = useState('');
+  const [selectedLine, setSelectedLine] = useState<Row | null>(null);
 
   const sheets = useMemo(() => sheetsRaw.map((row) => mapExpenseSheetRow(row as Row)), [sheetsRaw]);
   const sheet = useMemo(() => sheets.find((row) => String(row.id) === sheetId), [sheets, sheetId]);
@@ -111,14 +114,12 @@ function ExpenseReportPageLoaded({
     [expensesRaw, sheetId],
   );
 
-  const navigation = useMemo(() => {
-    const sorted = [...sheets].sort((a, b) => Number(BigInt(String(b.id)) - BigInt(String(a.id))));
-    const index = sorted.findIndex((row) => String(row.id) === sheetId);
-    if (index === -1) return undefined;
-    const link = (row: Row | undefined) =>
-      row ? { href: `/expenses/reports/${String(row.id)}`, label: String(row.name || row.id) } : undefined;
-    return { position: index + 1, total: sorted.length, previous: link(sorted[index - 1]), next: link(sorted[index + 1]) };
-  }, [sheets, sheetId]);
+  const navigation = useRecordNavigation<Row>({
+    rows: sheets as unknown as Row[],
+    currentId: sheetId,
+    basePath: '/expenses/reports',
+    labelOf: (row) => String(row.name || row.id),
+  });
 
   const requestedTab = searchParams.get('tab');
   const activeTab: TabId = (TAB_IDS as readonly string[]).includes(requestedTab ?? '')
@@ -204,6 +205,9 @@ function ExpenseReportPageLoaded({
   const busy = submitSheet.isPending || approveSheet.isPending || refuseSheet.isPending || finance.isPending;
   const financeKinds = financeKindsFor(sheet.state);
 
+  const lineTable = expensesTableConfig(t);
+  const lineColumns = lineTable.view.mode === 'table' ? lineTable.view.columns : [];
+
   return (
     <>
       <RecordPage
@@ -286,7 +290,12 @@ function ExpenseReportPageLoaded({
             id: 'expenses',
             label: t('expenses.expenses.title', { defaultValue: 'Expenses' }),
             content: (
-              <EntityView config={{ ...expensesTableConfig(t), title: '', description: undefined }} data={expenses} useCard={false} />
+              <EntityView
+                config={{ ...expensesTableConfig(t), title: '', description: undefined }}
+                data={expenses}
+                useCard={false}
+                onRowClick={(row) => setSelectedLine(row)}
+              />
             ),
           },
           {
@@ -334,6 +343,29 @@ function ExpenseReportPageLoaded({
             content: <RecordAuditTab tableName="hr_expense_sheet" recordId={sheetId} />,
           },
         ]}
+      />
+
+      <EntityRecordSheet
+        open={selectedLine != null}
+        onOpenChange={(open) => !open && setSelectedLine(null)}
+        record={selectedLine}
+        config={{
+          titleKey: 'name',
+          statusKey: 'state',
+          detailConfig: {
+            mode: 'detail',
+            sections: [
+              {
+                id: 'line',
+                fields: lineColumns
+                  .filter((column) => column.key !== 'name')
+                  .map(({ width: _width, ...field }) => field),
+              },
+            ],
+          },
+          auditTableName: 'hr_expense',
+          discussion: { resModel: 'hr_expense' },
+        }}
       />
 
       {finance.modal}

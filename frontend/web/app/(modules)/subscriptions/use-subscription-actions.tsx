@@ -84,10 +84,26 @@ export function isSubscriptionDialogAction(id: string): id is SubscriptionDialog
  */
 export function useSubscriptionActions(orgId: bigint, operatingCompanyId: bigint) {
   const { t } = useTranslation()
-  const mutationErrorOptions = {
+  const dialogLabels: Record<SubscriptionDialogAction, string> = {
+    close: t("subscriptions.actions.close"),
+    "generate-invoice": t("subscriptions.actions.generateInvoice"),
+    "pay-invoice": t("subscriptions.actions.payInvoice", { defaultValue: "Apply payment" }),
+    amend: t("subscriptions.actions.amend", { defaultValue: "Amend" }),
+    renew: t("subscriptions.actions.renew", { defaultValue: "Renew" }),
+    cancel: t("subscriptions.actions.cancel", { defaultValue: "Cancel + credit" }),
+    "ingest-usage": t("subscriptions.actions.ingestUsage", { defaultValue: "Ingest usage" }),
+    "set-commitment": t("subscriptions.actions.setCommitment", { defaultValue: "Set commitment" }),
+  }
+  const mutationOptions = (action: SubscriptionDialogAction) => ({
+    onSuccess: () =>
+      showWorkflowToast({
+        kind: "success",
+        title: t("common.actionCompleted", { action: dialogLabels[action] }),
+        description: "",
+      }),
     onError: (error: Error) =>
       showWorkflowToast({ kind: "error", title: t("common.error.title"), description: error.message }),
-  }
+  })
   const [target, setTarget] = useState<{ action: SubscriptionDialogAction; id: number } | null>(null)
   const targetFor = (action: SubscriptionDialogAction) => (target?.action === action ? target.id : null)
   const close = () => setTarget(null)
@@ -266,7 +282,7 @@ export function useSubscriptionActions(orgId: bigint, operatingCompanyId: bigint
           if (id == null) return
           closeSubscription.mutate(
             { subscriptionId: BigInt(id), params: buildCloseSubscriptionParams(formData) },
-            mutationErrorOptions,
+            mutationOptions("close"),
           )
           close()
         }}
@@ -281,7 +297,7 @@ export function useSubscriptionActions(orgId: bigint, operatingCompanyId: bigint
           if (!formData.incomeAccountId || !formData.receivableAccountId) return
           generateInvoice.mutate(
             { subscriptionId: BigInt(id), params: buildGenerateSubscriptionInvoiceParams(formData) },
-            mutationErrorOptions,
+            mutationOptions("generate-invoice"),
           )
           close()
         }}
@@ -302,7 +318,7 @@ export function useSubscriptionActions(orgId: bigint, operatingCompanyId: bigint
           }
           payInvoice.mutate(
             { subscriptionId: BigInt(payTargetId), params: buildPaySubscriptionInvoiceParams(formData) },
-            mutationErrorOptions,
+            mutationOptions("pay-invoice"),
           )
           close()
         }}
@@ -315,7 +331,7 @@ export function useSubscriptionActions(orgId: bigint, operatingCompanyId: bigint
           if (amendTargetId == null || !formData.lineId) return
           amend.mutate(
             { subscriptionId: BigInt(amendTargetId), params: buildAmendSubscriptionParams(formData) },
-            mutationErrorOptions,
+            mutationOptions("amend"),
           )
           close()
         }}
@@ -329,7 +345,7 @@ export function useSubscriptionActions(orgId: bigint, operatingCompanyId: bigint
           if (id == null) return
           renew.mutate(
             { subscriptionId: BigInt(id), params: buildRenewSubscriptionParams(formData) },
-            mutationErrorOptions,
+            mutationOptions("renew"),
           )
           close()
         }}
@@ -342,7 +358,7 @@ export function useSubscriptionActions(orgId: bigint, operatingCompanyId: bigint
           if (cancelTargetId == null) return
           cancel.mutate(
             { subscriptionId: BigInt(cancelTargetId), params: buildCancelSubscriptionParams(formData) },
-            mutationErrorOptions,
+            mutationOptions("cancel"),
           )
           close()
         }}
@@ -356,7 +372,7 @@ export function useSubscriptionActions(orgId: bigint, operatingCompanyId: bigint
           if (id == null || !formData.eventId) return
           ingestUsage.mutate(
             { subscriptionId: BigInt(id), params: buildIngestSubscriptionUsageEventParams(formData) },
-            mutationErrorOptions,
+            mutationOptions("ingest-usage"),
           )
           close()
         }}
@@ -370,7 +386,7 @@ export function useSubscriptionActions(orgId: bigint, operatingCompanyId: bigint
           if (id == null) return
           setCommitment.mutate(
             { subscriptionId: BigInt(id), params: buildSetSubscriptionCommitmentParams(formData) },
-            mutationErrorOptions,
+            mutationOptions("set-commitment"),
           )
           close()
         }}

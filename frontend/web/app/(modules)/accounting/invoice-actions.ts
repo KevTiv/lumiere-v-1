@@ -8,6 +8,16 @@ export function canCancelMove(move: Row): boolean {
   return state === 'Draft' || state === 'Posted';
 }
 
+/** `add_`, `update_` and `delete_account_move_line` accept only lines of a draft move. */
+export function canEditMoveLines(move: Row): boolean {
+  return variantTag(move.state) === 'Draft';
+}
+
+/** `compute_invoice_totals` rejects plain journal entries; invoices, bills and their refunds can recompute. */
+export function canRecomputeInvoiceTotals(kind: string): boolean {
+  return kind !== 'entry';
+}
+
 /** A posted customer invoice or vendor bill that still has an open balance can take a payment. */
 export function canRegisterPayment(move: Row, kind: string): boolean {
   return (

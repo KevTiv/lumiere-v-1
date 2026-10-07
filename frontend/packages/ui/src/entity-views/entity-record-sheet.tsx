@@ -17,6 +17,7 @@ import { EntityDetail } from "./entity-detail"
 import { RecordAuditTab } from "./record-audit-tab"
 import type { EntityRecordSheetConfig } from "../lib/module-types"
 import type { BadgeVariant } from "../lib/entity-view-types"
+import { commitRecordListFor } from "../lib/record-list-context"
 import { humanizeEnumValue, statusTone } from "../lib/entity-row-values"
 
 interface EntityRecordSheetProps {
@@ -78,7 +79,7 @@ export function EntityRecordSheet({
                       size="sm"
                       className="ml-auto"
                       nativeButton={false}
-                      render={<Link href={openHref} />}
+                      render={<Link href={openHref} onClick={() => commitRecordListFor(openHref)} />}
                       data-testid="entity-record-sheet-open"
                     >
                       <ExternalLink className="mr-1 h-3.5 w-3.5" />

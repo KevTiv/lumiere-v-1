@@ -92,3 +92,17 @@ export function eventAttendees(event: Row, contacts: ReadonlyArray<Row>): Array<
     return { id, label: names.get(id) || `#${id}` };
   });
 }
+
+/**
+ * Parameters for a recurrence-only `update_calendar_event`. The reducer keeps the stored rule
+ * when `rrule` / `rrule_type` are omitted (it cannot clear them), so empty text is left out.
+ */
+export function recurrenceParams(formData: Row): Row {
+  const rrule = String(formData.rrule ?? '').trim();
+  const rruleType = String(formData.rruleType ?? '').trim();
+  return {
+    recurrency: Boolean(formData.recurrency),
+    ...(rrule ? { rrule } : {}),
+    ...(rruleType ? { rrule_type: rruleType } : {}),
+  };
+}

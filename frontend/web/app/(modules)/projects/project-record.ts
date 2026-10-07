@@ -53,3 +53,13 @@ export function getProjectFieldValue(project: Record<string, unknown>, fieldName
   }
 }
 
+
+/** Task states in board column order (the `TaskState` enum of the backend). */
+export const TASK_BOARD_STATES = ['InProgress', 'ChangesRequested', 'Approved', 'Done', 'Cancelled'] as const;
+export type TaskBoardState = (typeof TASK_BOARD_STATES)[number];
+
+/** The board column a task row sits in: its `state` tag, `InProgress` when absent or unknown. */
+export function taskBoardState(task: Row): TaskBoardState {
+  const tag = projectStatusTag(task.state);
+  return (TASK_BOARD_STATES as readonly string[]).includes(tag) ? (tag as TaskBoardState) : 'InProgress';
+}

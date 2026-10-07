@@ -13,6 +13,7 @@ import {
   EmptyHeader,
   EmptyTitle,
   FormModal,
+  type FormConfig,
   MissingOrganization,
   RecordAuditTab,
   RecordChatter,
@@ -41,6 +42,7 @@ import {
   type CalendarEvent,
 } from '@lumiere/query-hooks/hooks/calendar';
 import { useCalendarModuleSubscription } from '@/lib/module-subscription-hooks';
+import { useRecordNavigation } from '@/hooks/use-record-navigation';
 import { hasValidOrganizationId, orgBigInts } from '@/lib/org-scoped';
 import { useContacts } from '@lumiere/query-hooks/hooks/crm';
 import {
@@ -51,6 +53,7 @@ import {
   eventStateParams,
   eventStateTag,
   eventStatusBar,
+  recurrenceParams,
   updateCalendarEventParams,
 } from '../../calendar-event';
 
@@ -90,6 +93,7 @@ function CalendarEventPageLoaded({
   const deleteEvent = useDeleteCalendarEvent(orgId);
 
   const [editing, setEditing] = useState(false);
+  const [editingRecurrence, setEditingRecurrence] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [confirmCancel, setConfirmCancel] = useState(false);
@@ -99,14 +103,13 @@ function CalendarEventPageLoaded({
     [events, eventId],
   );
 
-  const navigation = useMemo(() => {
-    const sorted = [...(events as unknown as Row[])].sort((a, b) => eventMicros(a.start) - eventMicros(b.start));
-    const index = sorted.findIndex((row) => String(row.id) === eventId);
-    if (index === -1) return undefined;
-    const link = (row: Row | undefined) =>
-      row ? { href: `/calendar/events/${String(row.id)}`, label: String(row.name || row.id) } : undefined;
-    return { position: index + 1, total: sorted.length, previous: link(sorted[index - 1]), next: link(sorted[index + 1]) };
-  }, [events, eventId]);
+  const navigation = useRecordNavigation<Row>({
+    rows: events as unknown as Row[],
+    currentId: eventId,
+    basePath: '/calendar/events',
+    labelOf: (row) => String(row.name || row.id),
+    compare: (a, b) => eventMicros(a.start) - eventMicros(b.start),
+  });
 
   const requestedTab = searchParams.get('tab');
   const activeTab: TabId = (TAB_IDS as readonly string[]).includes(requestedTab ?? '')
@@ -180,7 +183,47 @@ function CalendarEventPageLoaded({
           { key: 'allday', label: t('calendar.events.columns.allday'), type: 'boolean' as const },
           { key: 'privacy', label: t('calendar.events.columns.privacy') },
           { key: 'recurrency', label: t('calendar.events.columns.recurrency'), type: 'boolean' as const },
+          { key: 'rrule', label: t('calendar.eventDetail.rrule', { defaultValue: 'Recurrence rule' }) },
+          { key: 'rruleType', label: t('calendar.eventDetail.rruleType', { defaultValue: 'Recurrence type' }) },
           { key: 'description', label: t('calendar.forms.newEvent.fields.description', { defaultValue: 'Description' }) },
+        ],
+      },
+    ],
+  };
+
+  const recurrenceForm: FormConfig = {
+    id: 'edit-calendar-event-recurrence',
+    title: t('calendar.eventDetail.editRecurrence', { defaultValue: 'Edit recurrence' }),
+    submitLabel: t('common.save', { defaultValue: 'Save' }),
+    sections: [
+      {
+        id: 'recurrence',
+        fields: [
+          {
+            id: 'recurrency',
+            name: 'recurrency',
+            type: 'checkbox',
+            label: t('calendar.events.columns.recurrency'),
+            width: 'full',
+            defaultValue: Boolean(event.recurrency),
+          },
+          {
+            id: 'rrule',
+            name: 'rrule',
+            type: 'text',
+            label: t('calendar.eventDetail.rrule', { defaultValue: 'Recurrence rule' }),
+            placeholder: 'FREQ=WEEKLY;BYDAY=MO',
+            width: 'full',
+            defaultValue: String(event.rrule ?? ''),
+          },
+          {
+            id: 'rruleType',
+            name: 'rruleType',
+            type: 'text',
+            label: t('calendar.eventDetail.rruleType', { defaultValue: 'Recurrence type' }),
+            width: 'full',
+            defaultValue: String(event.rruleType ?? event.rrule_type ?? ''),
+          },
         ],
       },
     ],
@@ -218,6 +261,9 @@ function CalendarEventPageLoaded({
             ) : null}
             <Button variant={stateActions.confirm ? 'outline' : 'default'} size="sm" data-testid="calendar-event-edit" onClick={() => setEditing(true)}>
               {t('calendar.eventDetail.edit')}
+            </Button>
+            <Button variant="outline" size="sm" data-testid="calendar-event-recurrence" onClick={() => setEditingRecurrence(true)}>
+              {t('calendar.eventDetail.editRecurrence', { defaultValue: 'Edit recurrence' })}
             </Button>
             {stateActions.cancel ? (
               <Button
@@ -320,6 +366,33 @@ function CalendarEventPageLoaded({
             } catch (error) {
               setEditError(error instanceof Error ? error.message : String(error));
             }
+          }}
+        />
+      ) : null}
+
+      {editingRecurrence ? (
+        <FormModal
+          open
+          onOpenChange={(open) => !open && setEditingRecurrence(false)}
+          config={recurrenceForm}
+          isPending={updateEvent.isPending}
+          onSubmit={(formData) => {
+            updateEvent.mutate(
+              { eventId: id, params: recurrenceParams(formData) },
+              {
+                onSuccess: () =>
+                  showWorkflowToast({
+                    kind: 'success',
+                    title: t('common.actionCompleted', {
+                      action: t('calendar.eventDetail.editRecurrence', { defaultValue: 'Edit recurrence' }),
+                    }),
+                    description: label,
+                  }),
+                onError: (error) =>
+                  showWorkflowToast({ kind: 'error', title: t('common.error.title'), description: error.message }),
+              },
+            );
+            setEditingRecurrence(false);
           }}
         />
       ) : null}

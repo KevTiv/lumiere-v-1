@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { calendarEventHref, eventInputValue, eventMicros, eventStatusBar, updateCalendarEventParams, eventStateActions, eventStateParams, eventAttendees } from './calendar-event';
+import { calendarEventHref, eventInputValue, eventMicros, eventStatusBar, updateCalendarEventParams, eventStateActions, eventStateParams, eventAttendees, recurrenceParams } from './calendar-event';
 
 const t = (_key: string, options?: Record<string, unknown>) => String(options?.defaultValue ?? _key);
 
@@ -62,4 +62,9 @@ test('attendees resolve to contact names, else the id', () => {
 
   assert.deepEqual(attendees, [{ id: '1', label: 'Ada' }, { id: '2', label: '#2' }]);
   assert.deepEqual(eventAttendees({}, []), []);
+});
+
+test('recurrenceParams leaves empty rule text out', () => {
+  assert.deepEqual(recurrenceParams({ recurrency: true, rrule: ' FREQ=DAILY ', rruleType: '' }), { recurrency: true, rrule: 'FREQ=DAILY' });
+  assert.deepEqual(recurrenceParams({ recurrency: false }), { recurrency: false });
 });

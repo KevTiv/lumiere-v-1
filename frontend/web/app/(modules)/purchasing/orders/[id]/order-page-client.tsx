@@ -72,6 +72,7 @@ import {
 import { usePurchasingWorkflow } from '@lumiere/query-hooks/hooks/purchasing-workflow';
 import { useDefaultOperatingCompanyBigInt } from '@lumiere/query-hooks/hooks/use-operating-company';
 import { useWorkflowSurface } from '@/hooks/use-workflow-surface';
+import { useRecordNavigation } from '@/hooks/use-record-navigation';
 import { usePurchasingModuleSubscription } from '@/lib/module-subscription-hooks';
 import { hasValidOrganizationId, orgBigInts } from '@/lib/org-scoped';
 import { RecordDocumentAttachments } from '../../../../../components/record-document-attachments';
@@ -83,6 +84,7 @@ import {
 } from '../../purchase-order-dialogs';
 import {
   canAddPurchaseOrderLine,
+  canInvoicePurchaseOrderLine,
   canEditPurchaseOrder,
   canLockPurchaseOrder,
   canRemovePurchaseOrderLine,
@@ -216,22 +218,13 @@ function PurchaseOrderPageLoaded({
     return map;
   }, [contacts]);
 
-  // Previous / next follow the list's default order: newest first.
-  const navigation = useMemo(() => {
-    const sorted = [...(orders as unknown as Row[])].sort((a, b) =>
-      Number(BigInt(String(b.id)) - BigInt(String(a.id))),
-    );
-    const index = sorted.findIndex((row) => String(row.id) === orderId);
-    if (index === -1) return undefined;
-    const link = (row: Row | undefined) =>
-      row ? { href: `/purchasing/orders/${String(row.id)}`, label: String(row.name ?? row.id) } : undefined;
-    return {
-      position: index + 1,
-      total: sorted.length,
-      previous: link(sorted[index - 1]),
-      next: link(sorted[index + 1]),
-    };
-  }, [orders, orderId]);
+  // Previous / next follow the list the record was opened from, else newest first.
+  const navigation = useRecordNavigation<Row>({
+    rows: orders as unknown as Row[],
+    currentId: orderId,
+    basePath: '/purchasing/orders',
+    labelOf: (row) => String(row.name ?? row.id),
+  });
 
   const requestedTab = searchParams.get('tab');
   const activeTab: TabId = (TAB_IDS as readonly string[]).includes(requestedTab ?? '')
@@ -345,6 +338,7 @@ function PurchaseOrderPageLoaded({
       description: error instanceof Error ? error.message : String(error),
     });
   const receivable = lines.filter((line) => workflow.receiveLine.canPresent(line as RowValueMap));
+  const invoiceable = lines.filter(canInvoicePurchaseOrderLine);
   const asRow = (row: unknown) => row as Row;
 
   const lineActions: EntityAction[] = [
@@ -388,6 +382,17 @@ function PurchaseOrderPageLoaded({
               // The workflow surface reports a typed failure.
               await workflow.receiveLine.execute(workflow.receiveLine.prepare(line), { navigateToNext: true }).catch(() => undefined);
             },
+          } satisfies EntityAction,
+        ]
+      : []),
+    ...(invoiceable.length > 0
+      ? [
+          {
+            id: 'pol-invoice-form',
+            label: t('purchasing.actions.invoiceQtyForm'),
+            requiresSelection: true,
+            isApplicable: (rows) => rows.length === 1 && canInvoicePurchaseOrderLine(rows[0] as Row),
+            onClick: (rows) => setFormDialog({ kind: 'invoiceLine', line: asRow(rows[0]) }),
           } satisfies EntityAction,
         ]
       : []),

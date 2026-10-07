@@ -18,7 +18,6 @@ import {
   newPurchaseRequisitionForm,
   newPartnerBankForm,
   editPartnerBankForm,
-  invoicePurchaseOrderLineForm,
   newLandedCostForm,
   editLandedCostForm,
   addLandedCostLineForm,
@@ -1167,9 +1166,7 @@ function PurchasingClientLoaded({
 
   const invoiceLineFormConfig = useMemo(
     () =>
-      mergeSelectOptionsForFields(invoicePurchaseOrderLineForm(t), {
-        lineId: invoiceLineOptions,
-      }),
+      purchaseOrderFormConfigs.invoiceLine(t, { lineOptions: invoiceLineOptions }),
     [t, invoiceLineOptions],
   )
 

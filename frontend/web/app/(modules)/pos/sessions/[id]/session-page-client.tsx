@@ -37,6 +37,7 @@ import {
 import { useDefaultOperatingCompanyBigInt } from '@lumiere/query-hooks/hooks/use-operating-company';
 import type { PosConfig, PosSession } from '@lumiere/stdb/types';
 import { usePosModuleSubscription } from '@/lib/module-subscription-hooks';
+import { useRecordNavigation } from '@/hooks/use-record-navigation';
 import { hasValidOrganizationId, orgBigInts } from '@/lib/org-scoped';
 import { cashDifference, isPosSessionOpen, posSessionStatusBar } from '../../pos-session';
 
@@ -94,14 +95,12 @@ function PosSessionPageLoaded({
     return config ? String(config.name ?? id) : id;
   }, [configs, session]);
 
-  const navigation = useMemo(() => {
-    const sorted = [...(sessions as unknown as Row[])].sort((a, b) => Number(BigInt(String(b.id)) - BigInt(String(a.id))));
-    const index = sorted.findIndex((row) => String(row.id) === sessionId);
-    if (index === -1) return undefined;
-    const link = (row: Row | undefined) =>
-      row ? { href: `/pos/sessions/${String(row.id)}`, label: String(row.name || row.id) } : undefined;
-    return { position: index + 1, total: sorted.length, previous: link(sorted[index - 1]), next: link(sorted[index + 1]) };
-  }, [sessions, sessionId]);
+  const navigation = useRecordNavigation<Row>({
+    rows: sessions as unknown as Row[],
+    currentId: sessionId,
+    basePath: '/pos/sessions',
+    labelOf: (row) => String(row.name || row.id),
+  });
 
   const requestedTab = searchParams.get('tab');
   const activeTab: TabId = (TAB_IDS as readonly string[]).includes(requestedTab ?? '')

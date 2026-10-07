@@ -1,7 +1,7 @@
 "use client"
 import { mapDashboardWidgets, withDashboardSections } from "@lumiere/ui/lib/dashboard-sections"
 
-import { useMemo, useState } from "react"
+import { useCallback, useMemo, useState } from "react"
 import { useTranslation } from "@lumiere/i18n"
 import { useErpSession } from "@lumiere/erp-session"
 import {
@@ -15,7 +15,7 @@ import {
 } from "@lumiere/ui"
 import type { FormConfig } from "@lumiere/ui"
 import { messagesModuleConfig } from "@/lib/module-dashboard-configs"
-import { messageRecordHref } from "./message-record"
+import { messageAuthorName, messageRecordHref } from "./message-record"
 import { MessageBatchesPanel } from "./message-batches-panel"
 import { useMessagesModuleSubscription } from "@/lib/module-subscription-hooks"
 import {
@@ -27,7 +27,7 @@ import {
   type MailFollower,
   type MailMessage,
 } from "@lumiere/query-hooks/hooks/messages"
-import { useContacts } from "@lumiere/query-hooks/hooks/crm"
+import { useContacts, useUsers } from "@lumiere/query-hooks/hooks/crm"
 import { useAccountMoves } from "@lumiere/query-hooks/hooks/accounting"
 import { optionalBigIntU64 } from "@lumiere/erp-shared/form-coercion"
 import { mailMessageRowsToSelectOptions } from "@/lib/form-lookup"
@@ -97,6 +97,7 @@ function MessagesClientLoaded({ initialMessages, initialFollowers, organizationI
   const { data: messages = [] } = useMailMessages(orgId, initialMessages)
   const { data: followers = [] } = useMailFollowers(orgId, initialFollowers)
   const { data: contacts = [] } = useContacts(orgId)
+  const { data: users = [] } = useUsers(orgId)
   const { data: accountMoves = [] } = useAccountMoves(orgId)
   const postMessage = usePostMessage(orgId)
   const subscribeToRecord = useSubscribeToRecord(orgId)
@@ -183,8 +184,25 @@ function MessagesClientLoaded({ initialMessages, initialFollowers, organizationI
           }
         }
         if (tab.id === "messages" || tab.id === "notifications") {
+          const view = tab.entityConfig?.view
+          const withAuthor =
+            tab.entityConfig && view?.mode === "table"
+              ? {
+                  entityConfig: {
+                    ...tab.entityConfig,
+                    view: {
+                      ...view,
+                      columns: [
+                        ...view.columns,
+                        { key: "authorName", label: t("messages.messages.columns.author", { defaultValue: "Author" }), width: "min-w-32" },
+                      ],
+                    },
+                  },
+                }
+              : {}
           return {
             ...tab,
+            ...withAuthor,
             recordSheet: {
               titleKey: "body",
               openHref: messageRecordHref,
@@ -208,16 +226,25 @@ function MessagesClientLoaded({ initialMessages, initialFollowers, organizationI
         return tab
       }),
     }),
-    [accountMoves, activeCompanyId, contacts, liveSections, moduleConfig, mailMessageFormConfig, organizationId],
+    [accountMoves, activeCompanyId, contacts, liveSections, t, moduleConfig, mailMessageFormConfig, organizationId],
+  )
+
+  const withAuthorNames = useCallback(
+    (rows: MailMessage[]) =>
+      (rows as unknown as Record<string, unknown>[]).map((row) => ({
+        ...row,
+        authorName: messageAuthorName(row, users as unknown as Record<string, unknown>[]),
+      })),
+    [users],
   )
 
   const data = useMemo(
     () => ({
-      messages: messages as unknown as Record<string, unknown>[],
-      notifications: myNotifications as unknown as Record<string, unknown>[],
+      messages: withAuthorNames(messages),
+      notifications: withAuthorNames(myNotifications),
       followers: followers as unknown as Record<string, unknown>[],
     }),
-    [messages, myNotifications, followers],
+    [messages, myNotifications, followers, withAuthorNames],
   )
 
   const handleFormSubmit = async (

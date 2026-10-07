@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { canCancelMove, canRegisterPayment, paymentOptionLabel, registrablePayments } from './invoice-actions';
+import { canCancelMove, canEditMoveLines, canRecomputeInvoiceTotals, canRegisterPayment, paymentOptionLabel, registrablePayments } from './invoice-actions';
 
 const tag = (value: string) => ({ tag: value });
 
@@ -34,4 +34,11 @@ test('registrable payments are posted payments of the same company', () => {
 test('payment labels prefer the reference and fall back to the id', () => {
   assert.equal(paymentOptionLabel({ id: 7, ref: 'PAY/7', amount: 10 }), 'PAY/7 (10)');
   assert.equal(paymentOptionLabel({ id: 8 }), 'Payment #8');
+});
+
+test('lines are editable on a draft only, and plain entries have no totals to recompute', () => {
+  assert.equal(canEditMoveLines({ state: tag('Draft') }), true);
+  assert.equal(canEditMoveLines({ state: tag('Posted') }), false);
+  assert.equal(canRecomputeInvoiceTotals('bill'), true);
+  assert.equal(canRecomputeInvoiceTotals('entry'), false);
 });

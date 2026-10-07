@@ -46,6 +46,7 @@ import {
 } from '@lumiere/query-hooks/hooks/subscriptions';
 import { useDefaultOperatingCompanyBigInt } from '@lumiere/query-hooks/hooks/use-operating-company';
 import { useSubscriptionsModuleSubscription } from '@/lib/module-subscription-hooks';
+import { useRecordNavigation } from '@/hooks/use-record-navigation';
 import { hasValidOrganizationId, orgBigInts } from '@/lib/org-scoped';
 import { RecordDocumentAttachments } from '../../../../components/record-document-attachments';
 import { CrossRecordLinks } from '../../../../components/order-handoff-links';
@@ -105,21 +106,12 @@ function SubscriptionPageLoaded({
   const ownLines = useMemo(() => ownRows(lines), [lines, ownRows]);
   const ownAmendments = useMemo(() => ownRows(amendments), [amendments, ownRows]);
 
-  const navigation = useMemo(() => {
-    const sorted = [...(subscriptions as unknown as Row[])].sort((a, b) =>
-      Number(BigInt(String(b.id)) - BigInt(String(a.id))),
-    );
-    const index = sorted.findIndex((row) => String(row.id) === subscriptionId);
-    if (index === -1) return undefined;
-    const link = (row: Row | undefined) =>
-      row ? { href: `/subscriptions/${String(row.id)}`, label: String(row.code || row.id) } : undefined;
-    return {
-      position: index + 1,
-      total: sorted.length,
-      previous: link(sorted[index - 1]),
-      next: link(sorted[index + 1]),
-    };
-  }, [subscriptions, subscriptionId]);
+  const navigation = useRecordNavigation<Row>({
+    rows: subscriptions as unknown as Row[],
+    currentId: subscriptionId,
+    basePath: '/subscriptions',
+    labelOf: (row) => String(row.code || row.id),
+  });
 
   const requestedTab = searchParams.get('tab');
   const activeTab: TabId = (TAB_IDS as readonly string[]).includes(requestedTab ?? '')

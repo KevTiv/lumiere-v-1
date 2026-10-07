@@ -880,7 +880,9 @@
       "cancelConfirm": "This cancels the document and its lines. This cannot be undone.",
       "noRegistrablePayments": "No posted payments available",
       "payment": "Payment",
-      "registerPaymentHint": "Apply a posted payment to this document."
+      "registerPaymentHint": "Apply a posted payment to this document.",
+      "removeLinesDescription": "The lines are deleted from this draft and its totals are recomputed.",
+      "removeLinesTitle": "Delete the selected lines?"
     },
     "bills": {
       "title": "Bills (Accounts Payable)",
@@ -7540,7 +7542,8 @@
         "Changes": "Changes Requested",
         "Approved": "Approved",
         "Done": "Done",
-        "Cancelled": "Cancelled"
+        "Cancelled": "Cancelled",
+        "ChangesRequested": "Changes requested"
       },
       "priority": {
         "0": "Normal",
@@ -7753,7 +7756,8 @@
       "edit": "Edit",
       "notFound": "Project not found",
       "notFoundHint": "It may have been deleted, or belong to another organization.",
-      "openTasksBoard": "Open tasks board"
+      "openTasksBoard": "Open tasks board",
+      "board": "Board"
     },
     "inlineEdit": {
       "nameRequired": "A project needs a name"
@@ -7842,7 +7846,10 @@
       "cancel": "Cancel event",
       "cancelConfirm": "Cancel this event?",
       "confirm": "Confirm event",
-      "noAttendees": "No attendees"
+      "noAttendees": "No attendees",
+      "editRecurrence": "Edit recurrence",
+      "rrule": "Recurrence rule",
+      "rruleType": "Recurrence type"
     },
     "view": {
       "today": "Today",
@@ -9788,7 +9795,8 @@
         "resId": "Record ID",
         "messageType": "Type",
         "subtype": "Subtype",
-        "date": "Date"
+        "date": "Date",
+        "author": "Author"
       },
       "states": {
         "email": "Email",

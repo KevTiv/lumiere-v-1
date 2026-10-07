@@ -24,12 +24,16 @@ import {
   StatusBar,
   accountMoveDetailConfig,
   accountMoveLinesTableConfig,
+  addAccountMoveLineForm,
   buildModuleTabHref,
   createCreditNoteForm,
+  editAccountMoveLineForm,
   formText,
   mergeFieldDefaultValues,
+  mergeSelectOptionsForFields,
   useFormDialog,
 } from '@lumiere/ui';
+import type { EntityAction, EntityTableConfig, FormConfig } from '@lumiere/ui';
 import { Badge } from '@lumiere/ui/components/badge';
 import {
   AlertDialog,
@@ -53,11 +57,14 @@ import { variantTag, type AnyWorkflowAction, type RowValueMap } from '@lumiere/e
 import { buildAccountLabelMap, buildSourceDocumentLabelMap } from '@lumiere/stdb/read-models';
 import {
   useAccountAccounts,
+  useAddAccountMoveLine,
   useAccountMoveLines,
   useAccountMoves,
   useCancelAccountMove,
   useComputeInvoiceTotals,
   useCreateCreditNoteFromInvoice,
+  useDeleteAccountMoveLine,
+  useUpdateAccountMoveLine,
 } from '@lumiere/query-hooks/hooks/accounting';
 import { useInvoiceToPaymentWorkflow } from '@lumiere/query-hooks/hooks/accounting/invoice-workflow';
 import { useCreateDocument } from '@lumiere/query-hooks/hooks/documents';
@@ -71,13 +78,21 @@ import {
 } from '@lumiere/query-hooks/hooks/templates';
 import { useDefaultOperatingCompanyBigInt } from '@lumiere/query-hooks/hooks/use-operating-company';
 import { useWorkflowSurface } from '@/hooks/use-workflow-surface';
+import { useRecordNavigation } from '@/hooks/use-record-navigation';
+import { toUpdateAccountMoveLineParams, updateAccountMoveLineParamsToJson } from '@lumiere/erp-shared/accounting-create-params';
 import { toCreateCreditNoteParams } from '@/lib/accounting-create-params';
 import { resolveDefaultCogsInventoryAccountIds } from '@/lib/accounting-post-draft';
 import { archiveRenderedPdfAsDocument } from '@/lib/archive-document-pdf';
 import { useAccountingModuleSubscription } from '@/lib/module-subscription-hooks';
 import { hasValidOrganizationId, orgBigInts } from '@/lib/org-scoped';
 import { RecordDocumentAttachments } from '../../../../../components/record-document-attachments';
-import { canCancelMove, canRegisterPayment } from '../../invoice-actions';
+import { toAddAccountMoveLineParamsFromForm } from '../../account-move-line-forms';
+import {
+  canCancelMove,
+  canEditMoveLines,
+  canRecomputeInvoiceTotals,
+  canRegisterPayment,
+} from '../../invoice-actions';
 import { invoiceKind, invoiceStatus } from '../../invoice-status';
 import { RegisterPaymentOnInvoiceDialog } from '../../register-payment-on-invoice-dialog';
 
@@ -146,6 +161,9 @@ function InvoicePageLoaded({
   const createCreditNote = useCreateCreditNoteFromInvoice(organizationId);
   const cancelMove = useCancelAccountMove(organizationId);
   const computeTotals = useComputeInvoiceTotals(organizationId, operatingCompanyId);
+  const addLine = useAddAccountMoveLine(organizationId);
+  const updateLine = useUpdateAccountMoveLine(organizationId, operatingCompanyId);
+  const deleteLine = useDeleteAccountMoveLine(organizationId);
 
   const workflowSurface = useWorkflowSurface({ organizationId });
   const resolvePostingAccounts = useCallback(() => {
@@ -211,24 +229,18 @@ function InvoicePageLoaded({
 
   const headerActions = useMemo((): WorkflowAction[] => [workflow.postInvoice], [workflow.postInvoice]);
 
-  // Previous / next follow the document's own list, newest first.
+  // Previous / next follow the list the document was opened from, else its own kind, newest first.
   const kind = move ? invoiceKind(move) : 'entry';
-  const navigation = useMemo(() => {
-    if (!move) return undefined;
-    const siblings = (moves as unknown as Row[])
-      .filter((row) => invoiceKind(row) === kind)
-      .sort((a, b) => Number(BigInt(String(b.id)) - BigInt(String(a.id))));
-    const index = siblings.findIndex((row) => String(row.id) === moveId);
-    if (index === -1) return undefined;
-    const link = (row: Row | undefined) =>
-      row ? { href: `/accounting/invoices/${String(row.id)}`, label: String(row.name || row.id) } : undefined;
-    return {
-      position: index + 1,
-      total: siblings.length,
-      previous: link(siblings[index - 1]),
-      next: link(siblings[index + 1]),
-    };
-  }, [moves, move, kind, moveId]);
+  const siblings = useMemo(
+    () => (move ? (moves as unknown as Row[]).filter((row) => invoiceKind(row) === kind) : []),
+    [moves, move, kind],
+  );
+  const navigation = useRecordNavigation<Row>({
+    rows: siblings,
+    currentId: moveId,
+    basePath: '/accounting/invoices',
+    labelOf: (row) => String(row.name || row.id),
+  });
 
   if (!move) {
     if (movesLoading) {
@@ -379,7 +391,103 @@ function InvoicePageLoaded({
   ].filter((action) => action.show);
 
   const canCreditNote = kind === 'invoice' && state === 'Posted';
-  const linesConfig = accountMoveLinesTableConfig(t, { accountLabelMap, sourceDocumentLabelMap });
+  const linesBase = accountMoveLinesTableConfig(t, { accountLabelMap, sourceDocumentLabelMap });
+
+  // Lines of a draft are editable; the totals are recomputed through the same command as "Recalculate totals".
+  const refreshTotals = async () => {
+    if (canRecomputeInvoiceTotals(kind)) await computeTotals.mutateAsync(moveId);
+  };
+  const fieldsOf = (config: FormConfig) => config.sections.flatMap((section) => section.fields);
+  const accountOptions = (accounts as unknown as Row[]).map((account) => ({
+    value: String(account.id ?? ''),
+    label: `${String(account.code ?? '')} — ${String(account.name ?? account.id ?? '')}`,
+  }));
+  const lineActions: EntityAction[] = canEditMoveLines(move)
+    ? [
+        {
+          id: 'move-line-add',
+          label: t('accounting.actions.addMoveLine'),
+          onClick: async () => {
+            const base = mergeSelectOptionsForFields(addAccountMoveLineForm(t), {
+              accountId:
+                accountOptions.length > 0
+                  ? accountOptions
+                  : [{ value: '', label: t('common.noData'), disabled: true }],
+            });
+            const form = { ...base, sections: base.sections.map((s) => ({ ...s, fields: s.fields.filter((f) => f.name !== 'moveId') })) };
+            const values = await askForm({
+              id: form.id,
+              title: form.title ?? '',
+              description: form.description,
+              submitLabel: form.submitLabel,
+              fields: fieldsOf(form),
+            });
+            if (!values) return;
+            const parsed = toAddAccountMoveLineParamsFromForm({ ...values, moveId });
+            if (!parsed) throw new Error(t('common.validation.required'));
+            await addLine.mutateAsync(parsed);
+            await refreshTotals();
+          },
+        } satisfies EntityAction,
+        {
+          id: 'move-line-edit',
+          label: t('common.edit'),
+          requiresSelection: true,
+          isApplicable: (rows) => rows.length === 1,
+          onClick: async (rows) => {
+            const line = rows[0] as Row | undefined;
+            if (!line?.id) return;
+            const form = mergeFieldDefaultValues(editAccountMoveLineForm(t), {
+              name: String(line.name ?? ''),
+              debit: Number(line.debit ?? 0),
+              credit: Number(line.credit ?? 0),
+            });
+            const values = await askForm({
+              id: form.id,
+              title: form.title ?? '',
+              description: form.description,
+              submitLabel: form.submitLabel,
+              fields: fieldsOf(form),
+            });
+            if (!values) return;
+            await updateLine.mutateAsync({
+              lineId: BigInt(String(line.id)),
+              params: updateAccountMoveLineParamsToJson(
+                toUpdateAccountMoveLineParams({ ...values, companyId: operatingCompanyId }),
+              ),
+            });
+            await refreshTotals();
+          },
+        } satisfies EntityAction,
+        {
+          id: 'move-line-delete',
+          label: t('common.delete'),
+          requiresSelection: true,
+          selection: 'multiple',
+          variant: 'destructive',
+          confirm: {
+            title: t('accounting.invoices.removeLinesTitle', { defaultValue: 'Delete the selected lines?' }),
+            description: t('accounting.invoices.removeLinesDescription', {
+              defaultValue: 'The lines are deleted from this draft and its totals are recomputed.',
+            }),
+            confirmLabel: t('common.delete'),
+            cancelLabel: t('erpWorkflow.confirm.dismiss'),
+          },
+          successMessage: t('common.actionCompleted', { action: t('common.delete') }),
+          onClick: async (rows) => {
+            for (const row of rows) {
+              await deleteLine.mutateAsync({
+                lineId: BigInt(String(row.id)),
+                params: { companyId: operatingCompanyId },
+              });
+            }
+            await refreshTotals();
+          },
+        } satisfies EntityAction,
+      ]
+    : [];
+  const linesView = linesBase.view as EntityTableConfig;
+  const linesConfig = { ...linesBase, view: { ...linesView, actions: [...(linesView.actions ?? []), ...lineActions] } };
 
   return (
     <>

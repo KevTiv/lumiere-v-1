@@ -4,6 +4,7 @@ import test from 'node:test';
 import {
   canAddPurchaseOrderLine,
   canEditPurchaseOrder,
+  canInvoicePurchaseOrderLine,
   canLockPurchaseOrder,
   linesOfOrder,
   purchaseOrderHeaderDefaults,
@@ -71,4 +72,10 @@ test('lines are matched to their order by either column spelling', () => {
     linesOfOrder(lines, '7').map((line) => line.id),
     [1, 2],
   );
+});
+
+test('quantity can be invoiced only on lines received beyond what is invoiced', () => {
+  assert.equal(canInvoicePurchaseOrderLine({ qtyReceived: 5, qtyInvoiced: 2 }), true);
+  assert.equal(canInvoicePurchaseOrderLine({ qtyReceived: 5, qtyInvoiced: 5 }), false);
+  assert.equal(canInvoicePurchaseOrderLine({ qtyReceived: 0 }), false);
 });

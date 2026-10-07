@@ -9,6 +9,7 @@ import {
   editPurchaseOrderForm,
   editPurchaseOrderLineForm,
   mergeFieldDefaultValues,
+  invoicePurchaseOrderLineForm,
   mergeSelectOptionsForFields,
   receivePurchaseOrderLineForm,
   useRBAC,
@@ -24,6 +25,7 @@ import { useContacts } from '@lumiere/query-hooks/hooks/crm';
 import { useProducts, useUoms } from '@lumiere/query-hooks/hooks/inventory';
 import {
   useAddPurchaseOrderLine,
+  useInvoicePurchaseOrderLine,
   useUpdatePurchaseOrder,
   useUpdatePurchaseOrderLine,
 } from '@lumiere/query-hooks/hooks/purchasing';
@@ -33,6 +35,7 @@ import {
   accountJournalRowsToSelectOptions,
   contactRowsToVendorSelectOptions,
   productRowsToSelectOptions,
+  purchaseOrderLineRowsToInvoiceOptions,
   purchaseOrderLineRowsToReceiveOptions,
   purchaseOrderRowsToSelectOptions,
   uomRowsToSelectOptions,
@@ -41,6 +44,7 @@ import { orgBigInts } from '@/lib/org-scoped';
 import {
   toAddPurchaseOrderLineParams,
   toCreateBillFromPurchaseOrderParams,
+  toInvoicePoLineArgs,
   toReceivePoLineArgs,
   toUpdatePurchaseOrderLineParams,
 } from '@/lib/purchasing-create-params';
@@ -201,9 +205,11 @@ export const purchaseOrderFormConfigs = {
     }),
   receive: (t: Translate, lookups: { lineOptions: SelectOptions }): FormConfig =>
     mergeSelectOptionsForFields(receivePurchaseOrderLineForm(t), { lineId: lookups.lineOptions }),
+  invoiceLine: (t: Translate, lookups: { lineOptions: SelectOptions }): FormConfig =>
+    mergeSelectOptionsForFields(invoicePurchaseOrderLineForm(t), { lineId: lookups.lineOptions }),
 };
 
-export type PurchaseOrderDialogKind = 'header' | 'addLine' | 'editLine' | 'receive';
+export type PurchaseOrderDialogKind = 'header' | 'addLine' | 'editLine' | 'receive' | 'invoiceLine';
 
 interface PurchaseOrderFormDialogProps {
   kind: PurchaseOrderDialogKind;
@@ -239,6 +245,7 @@ export function PurchaseOrderFormDialog({
   const updateOrder = useUpdatePurchaseOrder(orgId, operatingCompanyId > 0n ? operatingCompanyId : undefined);
   const addLine = useAddPurchaseOrderLine(orgId);
   const updateLine = useUpdatePurchaseOrderLine(orgId);
+  const invoiceLine = useInvoicePurchaseOrderLine(orgId);
   const [error, setError] = useState<string | null>(null);
 
   const config = useMemo((): FormConfig => {
@@ -281,6 +288,14 @@ export function PurchaseOrderFormDialog({
         line ? purchaseOrderLineEditDefaults(line) : {},
       );
     }
+    if (kind === 'invoiceLine') {
+      return mergeFieldDefaultValues(
+        purchaseOrderFormConfigs.invoiceLine(t, {
+          lineOptions: purchaseOrderLineRowsToInvoiceOptions(lines, label),
+        }),
+        line ? { lineId: String(line.id) } : {},
+      );
+    }
     return mergeFieldDefaultValues(
       purchaseOrderFormConfigs.receive(t, {
         lineOptions: purchaseOrderLineRowsToReceiveOptions(lines, label),
@@ -307,6 +322,10 @@ export function PurchaseOrderFormDialog({
         const params = toUpdatePurchaseOrderLineParams(formData);
         if (!params) return required();
         await updateLine.mutateAsync({ lineId: String(formData.lineId), params });
+      } else if (kind === 'invoiceLine') {
+        const args = toInvoicePoLineArgs(formData);
+        if (!args) return required();
+        await invoiceLine.mutateAsync(args);
       } else {
         const input = toReceiveLineInput(toReceivePoLineArgs(formData));
         if (!input) return required();
@@ -335,7 +354,7 @@ export function PurchaseOrderFormDialog({
       preferStdbVisibility
       closeOnSubmit={false}
       submitError={error}
-      isPending={updateOrder.isPending || addLine.isPending || updateLine.isPending || workflow.isPending}
+      isPending={updateOrder.isPending || addLine.isPending || updateLine.isPending || invoiceLine.isPending || workflow.isPending}
       onSubmit={submit}
     />
   );

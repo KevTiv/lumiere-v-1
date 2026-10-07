@@ -15,6 +15,7 @@ import {
   EmptyHeader,
   EmptyTitle,
   FormModal,
+  KanbanBoard,
   MissingOrganization,
   RecordAuditTab,
   RecordChatter,
@@ -37,13 +38,23 @@ import {
   useTasks,
   useTimesheets,
   useUpdateProject,
+  useUpdateTaskState,
 } from '@lumiere/query-hooks/hooks/projects';
 import { useDefaultOperatingCompanyBigInt } from '@lumiere/query-hooks/hooks/use-operating-company';
 import { contactRowsToPartnerSelectOptions, pricelistRowsToSelectOptions } from '@/lib/form-lookup';
+import { useRecordNavigation } from '@/hooks/use-record-navigation';
 import { useProjectsModuleSubscription } from '@/lib/module-subscription-hooks';
 import { hasValidOrganizationId, orgBigInts } from '@/lib/org-scoped';
 import { projectsParamsToJson, toUpdateProjectParams } from '@/lib/projects-create-params';
-import { getProjectFieldValue, hoursLogged, projectStatusTag, rowsOfProject } from '../project-record';
+import { showWorkflowToast } from '@lumiere/ui/lib/workflow-toast';
+import {
+  TASK_BOARD_STATES,
+  getProjectFieldValue,
+  hoursLogged,
+  projectStatusTag,
+  rowsOfProject,
+  taskBoardState,
+} from '../project-record';
 
 interface ProjectPageClientProps {
   projectId: string;
@@ -56,7 +67,7 @@ interface ProjectPageClientProps {
 
 type Row = Record<string, unknown>;
 
-const TAB_IDS = ['overview', 'tasks', 'timesheets', 'discussion', 'audit'] as const;
+const TAB_IDS = ['overview', 'tasks', 'board', 'timesheets', 'discussion', 'audit'] as const;
 type TabId = (typeof TAB_IDS)[number];
 
 export function ProjectPageClient(props: ProjectPageClientProps) {
@@ -88,6 +99,7 @@ function ProjectPageLoaded({
   const { data: pricelists = [] } = usePricelists(orgId, initialPricelists as never);
   const { data: contacts = [] } = useContacts(orgId);
   const updateProject = useUpdateProject(orgId, operatingCompanyId);
+  const updateTaskState = useUpdateTaskState(orgId);
 
   const [editing, setEditing] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
@@ -99,14 +111,12 @@ function ProjectPageLoaded({
   const ownTasks = useMemo(() => rowsOfProject(tasks as unknown as Row[], projectId), [tasks, projectId]);
   const ownTimesheets = useMemo(() => rowsOfProject(timesheets as unknown as Row[], projectId), [timesheets, projectId]);
 
-  const navigation = useMemo(() => {
-    const sorted = [...(projects as unknown as Row[])].sort((a, b) => Number(BigInt(String(b.id)) - BigInt(String(a.id))));
-    const index = sorted.findIndex((row) => String(row.id) === projectId);
-    if (index === -1) return undefined;
-    const link = (row: Row | undefined) =>
-      row ? { href: `/projects/${String(row.id)}`, label: String(row.name || row.id) } : undefined;
-    return { position: index + 1, total: sorted.length, previous: link(sorted[index - 1]), next: link(sorted[index + 1]) };
-  }, [projects, projectId]);
+  const navigation = useRecordNavigation<Row>({
+    rows: projects as unknown as Row[],
+    currentId: projectId,
+    basePath: '/projects',
+    labelOf: (row) => String(row.name || row.id),
+  });
 
   const requestedTab = searchParams.get('tab');
   const activeTab: TabId = (TAB_IDS as readonly string[]).includes(requestedTab ?? '')
@@ -172,6 +182,19 @@ function ProjectPageLoaded({
       },
     ],
   };
+
+  const stateLabels: Record<string, string> = {
+    InProgress: t('projects.tasks.states.InProgress', { defaultValue: 'In progress' }),
+    ChangesRequested: t('projects.tasks.states.ChangesRequested', { defaultValue: 'Changes requested' }),
+    Approved: t('projects.tasks.states.Approved', { defaultValue: 'Approved' }),
+    Done: t('projects.tasks.states.Done', { defaultValue: 'Done' }),
+    Cancelled: t('projects.tasks.states.Cancelled', { defaultValue: 'Cancelled' }),
+  };
+  const boardColumns = TASK_BOARD_STATES.map((state, index) => ({
+    id: state,
+    title: stateLabels[state] ?? state,
+    colorClass: ['bg-info', 'bg-warning', 'bg-category-3', 'bg-success', 'bg-destructive'][index],
+  }));
 
   const base = mergeSelectOptionsForFields(editProjectForm(t), {
     pricelistId: pricelistRowsToSelectOptions(pricelists as never),
@@ -243,6 +266,36 @@ function ProjectPageLoaded({
                   </Button>
                 </div>
                 <EntityView config={{ ...tasksTableConfig(t), title: '', description: undefined }} data={ownTasks} useCard={false} />
+              </div>
+            ),
+          },
+          {
+            id: 'board',
+            label: t('projects.page.board', { defaultValue: 'Board' }),
+            content: (
+              <div data-testid="project-board">
+                <KanbanBoard
+                  columns={boardColumns}
+                  items={ownTasks}
+                  getItemId={(item) => String(item.id ?? '')}
+                  getColumnId={(item) => taskBoardState(item)}
+                  renderCard={(item) => (
+                    <div className="space-y-1 text-sm">
+                      <p className="font-medium">{String(item.name ?? `#${String(item.id)}`)}</p>
+                    </div>
+                  )}
+                  onMove={async ({ itemId, toColumnId }) => {
+                    try {
+                      await updateTaskState.mutateAsync({ taskId: itemId, state: toColumnId });
+                    } catch (error) {
+                      showWorkflowToast({
+                        kind: 'error',
+                        title: t('common.error.title'),
+                        description: error instanceof Error ? error.message : String(error),
+                      });
+                    }
+                  }}
+                />
               </div>
             ),
           },

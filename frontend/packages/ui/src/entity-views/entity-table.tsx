@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo, useEffect } from "react"
+import { useState, useMemo, useEffect, type MouseEvent } from "react"
 import { cn } from "../lib/utils"
 import type { EntityAction, EntityRow, EntityTableConfig } from "../lib/entity-view-types"
 import { filterEntitySurface } from "../lib/entity-view-types"
@@ -44,6 +44,7 @@ import {
 import { Skeleton } from "../components/skeleton"
 import { Checkbox } from "../components/checkbox"
 import { showWorkflowToast } from "../lib/workflow-toast"
+import { commitRecordListFor, rememberRecordList } from "../lib/record-list-context"
 import { TooltipProvider } from "../components/tooltip"
 import { Search, ArrowUp, ArrowDown, ArrowUpDown, Bookmark, Columns3, FileDown, Trash2, X, Inbox, SearchX, Loader2 } from "lucide-react"
 import {
@@ -453,6 +454,19 @@ export function EntityTable({
     config.emptyState?.icon ?? <Inbox />
   )
 
+  // Opening a record from this list (a name link, or a row whose sheet has an Open button) files
+  // the keys now shown, in order, so the record page's previous / next follow this list.
+  const publishRecordList = (event: MouseEvent<HTMLElement>) => {
+    try {
+      const ids = sorted.map((row) => String(row[rowKey] ?? ""))
+      rememberRecordList(ids)
+      const anchor = (event.target as Element | null)?.closest?.("a[href]")
+      commitRecordListFor(anchor?.getAttribute("href") ?? undefined, ids)
+    } catch {
+      // Navigation must never depend on this.
+    }
+  }
+
   const handleCsvExport = () => {
     const csv = rowsToCsv(
       columns.map((col) => col.label),
@@ -463,7 +477,11 @@ export function EntityTable({
 
   return (
     <TooltipProvider>
-      <div className={cn("space-y-4", className)} data-testid="entity-table">
+      <div
+        className={cn("space-y-4", className)}
+        data-testid="entity-table"
+        onClickCapture={publishRecordList}
+      >
         {hiddenFilters.length > 0 && (
           <div className="flex flex-wrap items-center gap-2" data-testid="entity-active-filters">
             {hiddenFilters.map(([key, value]) => (

@@ -41,6 +41,7 @@ import { useIotDevices } from '@lumiere/query-hooks/hooks/iot';
 import { useDefaultOperatingCompanyBigInt } from '@lumiere/query-hooks/hooks/use-operating-company';
 import type { Product } from '@lumiere/stdb/types';
 import { productRowsToSelectOptions } from '@/lib/form-lookup';
+import { useRecordNavigation } from '@/hooks/use-record-navigation';
 import { useManufacturingModuleSubscription } from '@/lib/module-subscription-hooks';
 import { hasValidOrganizationId, orgBigInts } from '@/lib/org-scoped';
 import { ManufacturingRowDialog } from '../../manufacturing-row-dialog';
@@ -102,14 +103,12 @@ function ManufacturingOrderPageLoaded({
   const ownWorkorders = useMemo(() => workordersOfOrder(workorders as unknown as Row[], orderId), [workorders, orderId]);
   const productOptions = useMemo(() => productRowsToSelectOptions(products as unknown as Row[]), [products]);
 
-  const navigation = useMemo(() => {
-    const sorted = [...(productions as unknown as Row[])].sort((a, b) => Number(BigInt(String(b.id)) - BigInt(String(a.id))));
-    const index = sorted.findIndex((row) => String(row.id) === orderId);
-    if (index === -1) return undefined;
-    const link = (row: Row | undefined) =>
-      row ? { href: `/manufacturing/orders/${String(row.id)}`, label: String(row.name || row.id) } : undefined;
-    return { position: index + 1, total: sorted.length, previous: link(sorted[index - 1]), next: link(sorted[index + 1]) };
-  }, [productions, orderId]);
+  const navigation = useRecordNavigation<Row>({
+    rows: productions as unknown as Row[],
+    currentId: orderId,
+    basePath: '/manufacturing/orders',
+    labelOf: (row) => String(row.name || row.id),
+  });
 
   const requestedTab = searchParams.get('tab');
   const activeTab: TabId = (TAB_IDS as readonly string[]).includes(requestedTab ?? '')

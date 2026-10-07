@@ -23,8 +23,18 @@ import {
 import { Badge } from '@lumiere/ui/components/badge';
 import { Skeleton } from '@lumiere/ui/components/skeleton';
 import { useUsers } from '@lumiere/query-hooks/hooks/crm';
-import { useMailMessages, usePostMessage, type MailMessage } from '@lumiere/query-hooks/hooks/messages';
+import {
+  useMailFollowers,
+  useMailMessages,
+  usePostMessage,
+  useSubscribeToRecord,
+  useUnsubscribeFromRecord,
+  type MailMessage,
+} from '@lumiere/query-hooks/hooks/messages';
+import { useErpSession } from '@lumiere/erp-session';
+import { showWorkflowToast } from '@lumiere/ui/lib/workflow-toast';
 import { useMessagesModuleSubscription } from '@/lib/module-subscription-hooks';
+import { useRecordNavigation } from '@/hooks/use-record-navigation';
 import { hasValidOrganizationId, orgBigInts } from '@/lib/org-scoped';
 import {
   messageAuthorName,
@@ -42,6 +52,18 @@ interface MessagePageClientProps {
 }
 
 type Row = Record<string, unknown>;
+
+/** Lowercase hex of a follower identity cell (string or identity object). */
+function followerHex(v: unknown): string {
+  if (v == null) return '';
+  if (typeof v === 'object' && typeof (v as { toHexString?: unknown }).toHexString === 'function') {
+    return (v as { toHexString: () => string }).toHexString().toLowerCase();
+  }
+  if (typeof v === 'object' && typeof (v as { toHex?: unknown }).toHex === 'function') {
+    return String((v as { toHex: () => unknown }).toHex()).toLowerCase();
+  }
+  return String(v).toLowerCase();
+}
 
 const TAB_IDS = ['overview', 'thread'] as const;
 type TabId = (typeof TAB_IDS)[number];
@@ -68,6 +90,10 @@ function MessagePageLoaded({
   const { data: messages = [], isLoading } = useMailMessages(orgId, initialMessages);
   const { data: users = [] } = useUsers(orgId);
   const postMessage = usePostMessage(orgId);
+  const { identity } = useErpSession();
+  const { data: followers = [] } = useMailFollowers(orgId);
+  const subscribeToRecord = useSubscribeToRecord(orgId);
+  const unsubscribeFromRecord = useUnsubscribeFromRecord(orgId);
 
   const [replying, setReplying] = useState(false);
   const [replyError, setReplyError] = useState<string | null>(null);
@@ -91,14 +117,12 @@ function MessagePageLoaded({
     [pathname, router, searchParams],
   );
 
-  const navigation = useMemo(() => {
-    const sorted = [...rows].sort((a, b) => Number(BigInt(String(b.id)) - BigInt(String(a.id))));
-    const index = sorted.findIndex((row) => String(row.id) === messageId);
-    if (index === -1) return undefined;
-    const link = (row: Row | undefined) =>
-      row ? { href: `/messages/${String(row.id)}`, label: messageTitle(row, 40) } : undefined;
-    return { position: index + 1, total: sorted.length, previous: link(sorted[index - 1]), next: link(sorted[index + 1]) };
-  }, [rows, messageId]);
+  const navigation = useRecordNavigation<Row>({
+    rows: rows as unknown as Row[],
+    currentId: messageId,
+    basePath: '/messages',
+    labelOf: (row) => messageTitle(row, 40),
+  });
 
   if (!message) {
     if (isLoading) {
@@ -136,6 +160,31 @@ function MessagePageLoaded({
   const when = new Date(Number(message.date ?? 0) / 1000).toLocaleString(i18n.language);
   const model = String(message.model ?? '');
   const resId = String(message.resId ?? message.res_id ?? '');
+
+  const recordTarget = model && /^\d+$/.test(resId) ? { resModel: model, resId: BigInt(resId) } : null;
+  const me = identity?.toLowerCase();
+  const following =
+    !!me &&
+    !!recordTarget &&
+    (followers as unknown as Row[]).some(
+      (f) =>
+        String(f.resModel) === model &&
+        String(f.resId) === resId &&
+        followerHex(f.partnerId) === me,
+    );
+  const toggleFollow = async () => {
+    if (!recordTarget) return;
+    try {
+      if (following) await unsubscribeFromRecord.mutateAsync(recordTarget);
+      else await subscribeToRecord.mutateAsync({ ...recordTarget, subtypes: ['comment', 'note'] });
+    } catch (error) {
+      showWorkflowToast({
+        kind: 'error',
+        title: t('crm.chatter.follow', { defaultValue: 'Follow' }),
+        description: error instanceof Error ? error.message : String(error),
+      });
+    }
+  };
 
   const replyForm: FormConfig = {
     id: 'reply-message',
@@ -217,9 +266,24 @@ function MessagePageLoaded({
           />
         }
         actions={
-          <Button size="sm" data-testid="message-reply" onClick={() => setReplying(true)}>
-            {t('messages.page.reply', { defaultValue: 'Reply' })}
-          </Button>
+          <>
+            {recordTarget ? (
+              <Button
+                size="sm"
+                variant="outline"
+                data-testid="message-follow"
+                disabled={!identity || subscribeToRecord.isPending || unsubscribeFromRecord.isPending}
+                onClick={toggleFollow}
+              >
+                {following
+                  ? t('crm.chatter.unfollow', { defaultValue: 'Unfollow' })
+                  : t('crm.chatter.follow', { defaultValue: 'Follow' })}
+              </Button>
+            ) : null}
+            <Button size="sm" data-testid="message-reply" onClick={() => setReplying(true)}>
+              {t('messages.page.reply', { defaultValue: 'Reply' })}
+            </Button>
+          </>
         }
         activeTab={activeTab}
         onTabChange={setActiveTab}

@@ -44,8 +44,10 @@ import { useAccountAccounts, useAccountJournals } from '@lumiere/query-hooks/hoo
 import { useOperatingCompanyBigInt } from '@lumiere/query-hooks/hooks/use-operating-company';
 import type { FleetVehicle } from '@lumiere/stdb/types';
 import { accountAccountRowsToSelectOptions, accountJournalRowsToSelectOptions } from '@/lib/form-lookup';
+import { useRecordNavigation } from '@/hooks/use-record-navigation';
 import { useFleetModuleSubscription } from '@/lib/module-subscription-hooks';
 import { hasValidOrganizationId, orgBigInts } from '@/lib/org-scoped';
+import { VehicleLocationMap } from './vehicle-location-map';
 import { useFleetActions } from '../../fleet-actions';
 import { fleetEnumTag, rowsOfVehicle } from '../../fleet-record';
 
@@ -100,14 +102,12 @@ function VehiclePageLoaded({
   const ownService = useMemo(() => rowsOfVehicle(serviceRecords as unknown as Row[], vehicleId), [serviceRecords, vehicleId]);
   const ownInspections = useMemo(() => rowsOfVehicle(inspections as unknown as Row[], vehicleId), [inspections, vehicleId]);
 
-  const navigation = useMemo(() => {
-    const sorted = [...(vehicles as unknown as Row[])].sort((a, b) => Number(BigInt(String(b.id)) - BigInt(String(a.id))));
-    const index = sorted.findIndex((row) => String(row.id) === vehicleId);
-    if (index === -1) return undefined;
-    const link = (row: Row | undefined) =>
-      row ? { href: `/fleet/vehicles/${String(row.id)}`, label: String(row.name || row.id) } : undefined;
-    return { position: index + 1, total: sorted.length, previous: link(sorted[index - 1]), next: link(sorted[index + 1]) };
-  }, [vehicles, vehicleId]);
+  const navigation = useRecordNavigation<Row>({
+    rows: vehicles as unknown as Row[],
+    currentId: vehicleId,
+    basePath: '/fleet/vehicles',
+    labelOf: (row) => String(row.name || row.id),
+  });
 
   const requestedTab = searchParams.get('tab');
   const activeTab: TabId = (TAB_IDS as readonly string[]).includes(requestedTab ?? '')
@@ -246,7 +246,12 @@ function VehiclePageLoaded({
           {
             id: 'overview',
             label: t('common.overview', { defaultValue: 'Overview' }),
-            content: <EntityDetail config={detailConfig} data={vehicle} />,
+            content: (
+              <div className="space-y-6">
+                <EntityDetail config={detailConfig} data={vehicle} />
+                <VehicleLocationMap vehicle={vehicle as unknown as Row} />
+              </div>
+            ),
           },
           {
             id: 'service',

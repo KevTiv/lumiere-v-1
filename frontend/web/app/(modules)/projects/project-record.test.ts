@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { getProjectFieldValue, hoursLogged, projectHref, projectStatusTag, rowsOfProject } from './project-record';
+import { getProjectFieldValue, hoursLogged, projectHref, projectStatusTag, rowsOfProject, taskBoardState } from './project-record';
 
 test('a project links to its own page', () => {
   assert.equal(projectHref({ id: 2 }), '/projects/2');
@@ -36,4 +36,11 @@ test('edit-form defaults come from the project row', () => {
   assert.equal(getProjectFieldValue(project, 'dateStart'), '2023-11-14');
   assert.equal(getProjectFieldValue(project, 'billType'), 'customer_task');
   assert.equal(getProjectFieldValue(project, 'unknown'), '');
+});
+
+test('taskBoardState reads the state tag and defaults to InProgress', () => {
+  assert.equal(taskBoardState({ state: { tag: 'Done' } }), 'Done');
+  assert.equal(taskBoardState({ state: 'ChangesRequested' }), 'ChangesRequested');
+  assert.equal(taskBoardState({}), 'InProgress');
+  assert.equal(taskBoardState({ state: { tag: 'Bogus' } }), 'InProgress');
 });

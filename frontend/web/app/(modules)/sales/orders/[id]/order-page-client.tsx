@@ -72,6 +72,7 @@ import { useSaleOrderWorkflow } from '@lumiere/query-hooks/hooks/sales-order-wor
 import { downloadDocumentPdf } from '@lumiere/query-hooks/hooks/templates';
 import { useDefaultOperatingCompanyBigInt } from '@lumiere/query-hooks/hooks/use-operating-company';
 import { useWorkflowSurface } from '@/hooks/use-workflow-surface';
+import { useRecordNavigation } from '@/hooks/use-record-navigation';
 import { archiveRenderedPdfAsDocument } from '@/lib/archive-document-pdf';
 import { useSalesModuleSubscription } from '@/lib/module-subscription-hooks';
 import { hasValidOrganizationId, orgBigInts } from '@/lib/org-scoped';
@@ -223,24 +224,13 @@ function SaleOrderPageLoaded({
     return map;
   }, [contacts]);
 
-  // Previous / next follow the list's default order: newest first.
-  const navigation = useMemo(() => {
-    const ids = [...(orders as unknown as OrderRow[])].sort((a, b) =>
-      Number(BigInt(String(b.id)) - BigInt(String(a.id))),
-    );
-    const index = ids.findIndex((row) => String(row.id) === orderId);
-    if (index === -1) return undefined;
-    const link = (row: OrderRow | undefined) =>
-      row
-        ? { href: `/sales/orders/${String(row.id)}`, label: saleOrderPrimaryLabel(row as never) || String(row.id) }
-        : undefined;
-    return {
-      position: index + 1,
-      total: ids.length,
-      previous: link(ids[index - 1]),
-      next: link(ids[index + 1]),
-    };
-  }, [orders, orderId]);
+  // Previous / next follow the list the record was opened from, else newest first.
+  const navigation = useRecordNavigation<OrderRow>({
+    rows: orders as unknown as OrderRow[],
+    currentId: orderId,
+    basePath: '/sales/orders',
+    labelOf: (row) => saleOrderPrimaryLabel(row as never) || String(row.id),
+  });
 
   const requestedTab = searchParams.get('tab');
   const activeTab: TabId = (TAB_IDS as readonly string[]).includes(requestedTab ?? '')
