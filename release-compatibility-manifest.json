@@ -5,16 +5,16 @@
     "ir_version": 2,
     "ir_path": "ir/lumiere-contract-ir-v2.json",
     "pin_path": "ir/PIN.json",
-    "artifact_sha256": "cccde8a16588a85110fdc46208720c262698f3205dc71fc9e62b1377c71132c4",
-    "schema_hash": "sha256:7728b9ba7d5dd2ea192697c17987707ffe1a3fd0be331baf416f5102bd7156d1",
-    "source_commit": "5596de31a7e0b12c2f11037b0e0f7196d04a6e77",
+    "artifact_sha256": "6f7ee6259a0f85fcce7a074caa48d033ea6bf93bd6da8cf278301ae57f997399",
+    "schema_hash": "sha256:c994a47a83461a500984ea5cb2ffbe7a9b804ec38d990b5dbd6607e1325e30a8",
+    "source_commit": "5f36c15bb48a1f93ae9f743a180d50ff50d205ba",
     "source_repository": "https://github.com/KevTiv/lumiere-v-1"
   },
   "lumiere_contracts": {
     "package": "lumiere-contracts",
-    "version": "0.3.85",
-    "tag": "v0.3.85",
-    "revision": "7a09c339a29dcc1cb62a09e10284f7ca4239d526",
+    "version": "0.3.86",
+    "tag": "v0.3.86",
+    "revision": "97c4c73203301eb6b32ac6d403bdbb2a9137bf53",
     "repository": "ssh://git@github.com/KevTiv/lumiere-contracts.git"
   },
   "operation_history": {
@@ -51,7 +51,7 @@
   "minimum_client_contract": {
     "version": "ir-v2",
     "ir_version": 2,
-    "generated_contract_release": "0.3.85"
+    "generated_contract_release": "0.3.86"
   },
   "deployment": {
     "config_generation": 2,
