@@ -1627,6 +1627,74 @@ pub fn cancel_account_move(
     Ok(())
 }
 
+/// Return a cancelled move to draft so its lines can be edited again.
+///
+/// Only `Cancelled -> Draft` is supported. `Posted -> Draft` is refused because posting is
+/// not exactly invertible from the code: `post_invoice` inserts COGS lines, may accrue sale
+/// commissions and re-derives totals, and `post_account_move` pushes budget actuals and may
+/// issue a document number. Such moves must be cancelled first (or reversed with a credit note).
+/// The document number (`name` / `move_name`) is kept, so no number is ever re-issued; the
+/// payment/residual fields are untouched because cancel does not modify them.
+#[spacetimedb::reducer]
+pub fn reset_account_move_to_draft(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    move_id: u64,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "account_move", "write")?;
+
+    let move_record = load_account_move_in_scope(ctx, organization_id, move_id)?;
+
+    match move_record.state {
+        AccountMoveState::Cancelled => {}
+        AccountMoveState::Draft => return Err("Move is already in draft state".to_string()),
+        AccountMoveState::Posted => {
+            return Err(
+                "Posted moves cannot be reset to draft; cancel the move first or issue a credit note"
+                    .to_string(),
+            )
+        }
+    }
+
+    let company_id = move_record.company_id;
+    let old_state = format!("{:?}", move_record.state);
+
+    let lines = load_move_lines_in_scope(ctx, organization_id, &move_record)?;
+
+    for line in lines {
+        ctx.db.account_move_line().id().update(AccountMoveLine {
+            parent_state: AccountMoveState::Draft,
+            write_uid: Some(ctx.sender()),
+            write_date: Some(ctx.timestamp),
+            ..line
+        });
+    }
+
+    ctx.db.account_move().id().update(AccountMove {
+        state: AccountMoveState::Draft,
+        write_uid: Some(ctx.sender()),
+        write_date: Some(ctx.timestamp),
+        ..move_record
+    });
+
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "account_move",
+            record_id: move_id,
+            action: "RESET_TO_DRAFT",
+            old_values: Some(serde_json::json!({ "state": old_state }).to_string()),
+            new_values: Some(serde_json::json!({ "state": "Draft" }).to_string()),
+            changed_fields: vec!["state".to_string()],
+            metadata: None,
+        },
+    );
+
+    Ok(())
+}
+
 #[spacetimedb::reducer]
 pub fn update_account_move_line(
     ctx: &ReducerContext,

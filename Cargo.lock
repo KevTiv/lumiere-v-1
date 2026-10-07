@@ -1968,8 +1968,8 @@ dependencies = [
 
 [[package]]
 name = "lumiere-contracts"
-version = "0.3.82"
-source = "git+ssh://git@github.com/KevTiv/lumiere-contracts.git?tag=v0.3.82#ef44b2111845cd56df1dcf4dbd1d6d13426dc8a4"
+version = "0.3.84"
+source = "git+ssh://git@github.com/KevTiv/lumiere-contracts.git?tag=v0.3.84#9d1631dce164d2a54115055d7be2610a43989581"
 dependencies = [
  "serde_json",
  "spacetimedb-sdk",

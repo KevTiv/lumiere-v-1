@@ -85,7 +85,9 @@ pub fn run_accounting_post_invoice_test(ctx: &ReducerContext) -> Result<(), Stri
     journal_entries_test::test_create_credit_note_rejects_cross_tenant_invoice(ctx)
         .map_err(|e| format!("ACC-RI-024 credit_note_cross_tenant: {e}"))?;
     journal_entries_test::test_add_account_move_line_rejects_invalid_and_cross_org_tax_id(ctx)
-        .map_err(|e| format!("ACC-004 tax_id_validation: {e}"))
+        .map_err(|e| format!("ACC-004 tax_id_validation: {e}"))?;
+    journal_entries_test::test_reset_account_move_to_draft_only_from_cancelled(ctx)
+        .map_err(|e| format!("reset_account_move_to_draft: {e}"))
 }
 
 #[spacetimedb::reducer]

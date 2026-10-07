@@ -7,9 +7,14 @@
 ///   - CalendarEvent
 use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
+use crate::accounting::journal_entries::account_move;
 use crate::crm::contacts::contact;
 use crate::crm::leads::lead;
 use crate::crm::opportunities::opportunity;
+use crate::hr::employees::hr_employee;
+use crate::inventory::stock::stock_picking;
+use crate::purchasing::purchase_orders::purchase_order;
+use crate::sales::sales_core::sale_order;
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -26,11 +31,23 @@ use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 /// elsewhere in the codebase (e.g. `sale_order`, `generated_owner_report`)
 /// belong to other modules and are intentionally not supported here — this
 /// reducer only has scoped loaders for entities `crm` owns.
+///
+/// Later variants (`SaleOrder` onward) are appended at the END so existing
+/// variant tags are unchanged. They persist as `res_model` = the owning table
+/// accessor name (`sale_order`, `purchase_order`, `account_move`,
+/// `hr_employee`, `stock_picking`), matching the record-chatter `resModel`.
+/// These tables carry no soft-delete column, so only existence and
+/// organization ownership are validated.
 #[derive(SpacetimeType, Clone, Debug, PartialEq)]
 pub enum CrmActivityTarget {
     Contact(u64),
     Lead(u64),
     Opportunity(u64),
+    SaleOrder(u64),
+    PurchaseOrder(u64),
+    AccountMove(u64),
+    Employee(u64),
+    StockPicking(u64),
 }
 
 /// Resolves and validates a `CrmActivityTarget`, returning the
@@ -102,6 +119,76 @@ fn resolve_activity_target(
                 return Err("activity target opportunity has been deleted".to_string());
             }
             Ok((Some("opportunity".to_string()), Some(opportunity_id)))
+        }
+        CrmActivityTarget::SaleOrder(sale_order_id) => {
+            let record = ctx
+                .db
+                .sale_order()
+                .id()
+                .find(&sale_order_id)
+                .ok_or("activity target sale order not found")?;
+            if record.organization_id != organization_id {
+                return Err(
+                    "activity target sale order does not belong to this organization".to_string(),
+                );
+            }
+            Ok((Some("sale_order".to_string()), Some(sale_order_id)))
+        }
+        CrmActivityTarget::PurchaseOrder(purchase_order_id) => {
+            let record = ctx
+                .db
+                .purchase_order()
+                .id()
+                .find(&purchase_order_id)
+                .ok_or("activity target purchase order not found")?;
+            if record.organization_id != organization_id {
+                return Err(
+                    "activity target purchase order does not belong to this organization".to_string(),
+                );
+            }
+            Ok((Some("purchase_order".to_string()), Some(purchase_order_id)))
+        }
+        CrmActivityTarget::AccountMove(account_move_id) => {
+            let record = ctx
+                .db
+                .account_move()
+                .id()
+                .find(&account_move_id)
+                .ok_or("activity target account move not found")?;
+            if record.organization_id != organization_id {
+                return Err(
+                    "activity target account move does not belong to this organization".to_string(),
+                );
+            }
+            Ok((Some("account_move".to_string()), Some(account_move_id)))
+        }
+        CrmActivityTarget::Employee(employee_id) => {
+            let record = ctx
+                .db
+                .hr_employee()
+                .id()
+                .find(&employee_id)
+                .ok_or("activity target employee not found")?;
+            if record.organization_id != organization_id {
+                return Err(
+                    "activity target employee does not belong to this organization".to_string(),
+                );
+            }
+            Ok((Some("hr_employee".to_string()), Some(employee_id)))
+        }
+        CrmActivityTarget::StockPicking(stock_picking_id) => {
+            let record = ctx
+                .db
+                .stock_picking()
+                .id()
+                .find(&stock_picking_id)
+                .ok_or("activity target stock picking not found")?;
+            if record.organization_id != organization_id {
+                return Err(
+                    "activity target stock picking does not belong to this organization".to_string(),
+                );
+            }
+            Ok((Some("stock_picking".to_string()), Some(stock_picking_id)))
         }
     }
 }

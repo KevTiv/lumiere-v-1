@@ -21,6 +21,8 @@ pub fn run_all_manufacturing_tests(ctx: &ReducerContext) -> Result<(), String> {
     run_manufacturing_workorder_quality_gate_test(ctx)?;
     run_manufacturing_finished_output_scrap_exact_effect_test(ctx)?;
     run_manufacturing_bom_byproduct_output_exact_effect_test(ctx)?;
+    relational_integrity_test::test_update_manufacturing_order_draft_only(ctx)
+        .map_err(|e| format!("update_manufacturing_order_draft_only: {e}"))?;
     log::info!("✅ run_all_manufacturing_tests complete");
     Ok(())
 }

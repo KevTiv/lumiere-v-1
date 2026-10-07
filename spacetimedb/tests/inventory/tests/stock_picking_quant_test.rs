@@ -8,8 +8,9 @@ use crate::core::organization::{company, CompanyScopeParams};
 use crate::crm::contacts::{contact, create_contact, CreateContactParams};
 use crate::inventory::product::product;
 use crate::inventory::stock::{
-    assign_stock_picking, confirm_stock_picking, resolve_warehouse_stock_location, stock_picking,
-    stock_quant, validate_stock_picking,
+    assign_stock_picking, confirm_stock_picking, resolve_warehouse_stock_location, stock_move,
+    stock_picking, stock_quant, unreserve_stock_picking, update_stock_picking,
+    validate_stock_picking, UpdateStockPickingParams,
 };
 use crate::purchasing::purchase_orders::{
     add_purchase_order_line, confirm_purchase_order, create_purchase_order, purchase_order,
@@ -407,6 +408,249 @@ pub fn test_delivery_decreases_reserved_or_moves_quant(ctx: &ReducerContext) -> 
             order_line.qty_delivered
         ));
     }
+
+    Ok(())
+}
+
+pub fn test_picking_unreserve_and_update(ctx: &ReducerContext) -> Result<(), String> {
+    ensure_test_superuser(ctx)?;
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let org_id = fixture.organization_id;
+    let company_id = fixture.company_id;
+    let currency_id = ctx
+        .db
+        .company()
+        .id()
+        .find(&company_id)
+        .ok_or("Harness company not found")?
+        .currency_id;
+
+    let product = ctx
+        .db
+        .product()
+        .id()
+        .find(&fixture.product_id)
+        .ok_or("Harness product not found")?;
+
+    create_pricelist(
+        ctx,
+        org_id,
+        CreatePricelistParams {
+            company_id: None,
+            name: "Unreserve Pricelist".to_string(),
+            currency_id,
+            discount_policy: DiscountPolicy::WithDiscount,
+        },
+    )?;
+
+    let pricelist_id = ctx
+        .db
+        .product_pricelist()
+        .iter()
+        .find(|p| p.organization_id == org_id && p.name == "Unreserve Pricelist")
+        .map(|p| p.id)
+        .ok_or("Pricelist not found")?;
+
+    create_sale_order(
+        ctx,
+        org_id,
+        CreateSaleOrderParams {
+            company_id: Some(company_id),
+            partner_id: fixture.partner_id,
+            partner_invoice_id: fixture.partner_id,
+            partner_shipping_id: fixture.partner_id,
+            pricelist_id,
+            currency_id,
+            warehouse_id: fixture.warehouse_id,
+            order_lines: vec![CreateSaleOrderLineParams {
+                product_id: fixture.product_id,
+                quantity: 1.0,
+                uom_id: product.uom_id,
+                price_unit: Some(product.list_price),
+                discount: 0.0,
+                tax_ids: vec![],
+                name: None,
+                sequence: 1,
+                is_downpayment: false,
+                display_type: None,
+                product_variant_id: None,
+                packaging_id: None,
+                route_id: None,
+                analytic_tag_ids: vec![],
+                customer_lead: None,
+                metadata: None,
+            }],
+            origin: Some("Unreserve SO".to_string()),
+            client_order_ref: Some("QTY-UNR-001".to_string()),
+            payment_term_id: None,
+            fiscal_position_id: None,
+            team_id: None,
+            opportunity_id: None,
+            proposal_id: None,
+            note: None,
+            terms_and_conditions: None,
+            validity_days: None,
+            shipping_policy: None,
+            picking_policy: None,
+            campaign_id: None,
+            medium_id: None,
+            source_id: None,
+            commitment_date: None,
+            expected_date: None,
+            incoterm_id: None,
+            incoterm: None,
+            incoterm_location: None,
+            carrier_id: None,
+            customer_lead: None,
+            analytic_account_id: None,
+            user_id: None,
+            is_printed: None,
+            is_locked: None,
+            is_dropship: None,
+            invoice_policy: None,
+            message_follower_ids: None,
+            message_partner_ids: None,
+            message_channel_ids: None,
+            activity_ids: None,
+            metadata: Some(r#"{"test":"picking_unreserve"}"#.to_string()),
+        },
+    )?;
+
+    let order = ctx
+        .db
+        .sale_order()
+        .iter()
+        .find(|o| {
+            o.organization_id == org_id && o.client_order_ref == Some("QTY-UNR-001".to_string())
+        })
+        .ok_or("Sale order not found")?;
+
+    confirm_sales_order(ctx, org_id, fixture.company_id, order.id)?;
+
+    let scope = CompanyScopeParams {
+        company_id: Some(company_id),
+    };
+
+    let picking = ctx
+        .db
+        .stock_picking()
+        .iter()
+        .find(|p| p.organization_id == org_id && p.sale_id == Some(order.id) && !p.is_return)
+        .ok_or("Delivery picking not found after confirm")?;
+
+    let reserved_at = |loc: u64| -> f64 {
+        ctx.db
+            .stock_quant()
+            .iter()
+            .filter(|q| {
+                q.organization_id == org_id
+                    && q.company_id == company_id
+                    && q.product_id == fixture.product_id
+                    && q.location_id == loc
+            })
+            .map(|q| q.reserved_quantity)
+            .sum::<f64>()
+    };
+    let source_loc = picking.location_id;
+    let reserved_before = reserved_at(source_loc);
+
+    // Draft: header fields are editable.
+    update_stock_picking(
+        ctx,
+        org_id,
+        picking.id,
+        UpdateStockPickingParams {
+            company_id: Some(company_id),
+            partner_id: None,
+            scheduled_date: None,
+            origin: Some("Edited origin".to_string()),
+            note: Some("Edited note".to_string()),
+        },
+    )?;
+    let edited = ctx
+        .db
+        .stock_picking()
+        .id()
+        .find(&picking.id)
+        .ok_or("Picking missing after update")?;
+    if edited.origin.as_deref() != Some("Edited origin")
+        || edited.note.as_deref() != Some("Edited note")
+    {
+        return Err("update_stock_picking did not apply origin/note".to_string());
+    }
+    if edited.partner_id != picking.partner_id || edited.scheduled_date != picking.scheduled_date {
+        return Err("update_stock_picking changed fields that were not supplied".to_string());
+    }
+
+    // Draft pickings hold no reservation and cannot be unreserved.
+    if unreserve_stock_picking(ctx, org_id, picking.id, scope.clone()).is_ok() {
+        return Err("unreserve must be rejected on a draft picking".to_string());
+    }
+
+    confirm_stock_picking(ctx, org_id, picking.id, scope.clone())?;
+
+    if update_stock_picking(
+        ctx,
+        org_id,
+        picking.id,
+        UpdateStockPickingParams {
+            company_id: Some(company_id),
+            partner_id: None,
+            scheduled_date: None,
+            origin: Some("Too late".to_string()),
+            note: None,
+        },
+    )
+    .is_ok()
+    {
+        return Err("update_stock_picking must be rejected after confirm".to_string());
+    }
+    if unreserve_stock_picking(ctx, org_id, picking.id, scope.clone()).is_ok() {
+        return Err("unreserve must be rejected on a confirmed picking".to_string());
+    }
+
+    assign_stock_picking(ctx, org_id, picking.id, scope.clone())?;
+    let reserved_assigned = reserved_at(source_loc);
+    if reserved_assigned <= reserved_before {
+        return Err(format!(
+            "Expected assign to reserve stock (before {}, after {})",
+            reserved_before, reserved_assigned
+        ));
+    }
+
+    unreserve_stock_picking(ctx, org_id, picking.id, scope.clone())?;
+    let reserved_after = reserved_at(source_loc);
+    if (reserved_after - reserved_before).abs() > 1e-9 {
+        return Err(format!(
+            "Expected unreserve to release the reservation (before {}, after {})",
+            reserved_before, reserved_after
+        ));
+    }
+    let unreserved = ctx
+        .db
+        .stock_picking()
+        .id()
+        .find(&picking.id)
+        .ok_or("Picking missing after unreserve")?;
+    if unreserved.state != "confirmed" {
+        return Err(format!(
+            "Expected confirmed picking after unreserve, got {}",
+            unreserved.state
+        ));
+    }
+    if ctx
+        .db
+        .stock_move()
+        .move_by_picking()
+        .filter(&picking.id)
+        .any(|m| m.state != "confirmed" || m.is_assigned)
+    {
+        return Err("Expected all moves confirmed after unreserve".to_string());
+    }
+
+    // The picking can be reserved again and then validated.
+    assign_stock_picking(ctx, org_id, picking.id, scope.clone())?;
+    validate_stock_picking(ctx, org_id, picking.id, scope)?;
 
     Ok(())
 }

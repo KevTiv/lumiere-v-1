@@ -74,6 +74,10 @@
     "account-moves",
     "account-move-lines"
   ],
+  "reset_account_move_to_draft": [
+    "account-moves",
+    "account-move-lines"
+  ],
   "post_invoice": [
     "account-moves",
     "account-move-lines"
