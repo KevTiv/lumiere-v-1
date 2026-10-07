@@ -518,6 +518,16 @@ pub struct AssignUserToPickingParams {
     pub user_id: Option<Identity>,
 }
 
+/// Editable header fields of a draft picking. Only `Some` values are applied.
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct UpdateStockPickingParams {
+    pub company_id: Option<u64>,
+    pub partner_id: Option<u64>,
+    pub scheduled_date: Option<Timestamp>,
+    pub origin: Option<String>,
+    pub note: Option<String>,
+}
+
 // ── Internal helpers (sales / picking integrity) ─────────────────────────────
 
 /// On-hand location for a warehouse (`lot_stock_id` when set; else warehouse id).
@@ -3197,6 +3207,98 @@ pub fn assign_stock_picking(
     Ok(())
 }
 
+/// Release the stock reserved by `assign_stock_picking` and return the picking and its
+/// assigned moves to "confirmed". Reserving a picking is `assign_stock_picking`.
+#[reducer]
+pub fn unreserve_stock_picking(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    picking_id: u64,
+    params: CompanyScopeParams,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "stock_picking", "write")?;
+    let company_id = company_id_from_scope(ctx, organization_id, params.company_id)?;
+
+    let picking = ctx
+        .db
+        .stock_picking()
+        .id()
+        .find(&picking_id)
+        .ok_or("Picking not found")?;
+
+    if picking.company_id != company_id {
+        return Err("Picking does not belong to this company".to_string());
+    }
+
+    if picking.state != "assigned" {
+        return Err("Picking must be assigned to release its reservation".to_string());
+    }
+
+    assert_inventory_writable(ctx, organization_id, company_id)?;
+
+    // Pre-flight: validate every child move belongs to the same company before releasing any stock
+    for move_record in ctx.db.stock_move().move_by_picking().filter(&picking_id) {
+        if move_record.organization_id != organization_id || move_record.company_id != company_id {
+            return Err(format!(
+                "Child move {} does not belong to this company; aborting unreserve",
+                move_record.id
+            ));
+        }
+    }
+
+    // `assign_stock_picking` reserves each outbound/internal move's quantity (receipts reserve
+    // nothing) and marks the move "assigned"; only those moves hold a reservation.
+    if picking.picking_code.as_deref() != Some("incoming") {
+        for move_record in ctx.db.stock_move().move_by_picking().filter(&picking_id) {
+            if move_record.state == "assigned" && product_requires_stock(ctx, move_record.product_id)
+            {
+                unreserve_quantity_at_location(
+                    ctx,
+                    organization_id,
+                    company_id,
+                    move_record.product_id,
+                    move_record.location_id,
+                    move_record.product_uom_qty,
+                )?;
+            }
+        }
+    }
+
+    ctx.db.stock_picking().id().update(StockPicking {
+        state: "confirmed".to_string(),
+        show_check_availability: true,
+        show_validate: false,
+        show_reserved: false,
+        updated_at: ctx.timestamp,
+        ..picking.clone()
+    });
+
+    for mut move_record in ctx.db.stock_move().move_by_picking().filter(&picking_id) {
+        if move_record.state == "assigned" {
+            move_record.state = "confirmed".to_string();
+            move_record.is_assigned = false;
+            ctx.db.stock_move().id().update(move_record);
+        }
+    }
+
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "stock_picking",
+            record_id: picking_id,
+            action: "UPDATE",
+            old_values: Some(serde_json::json!({ "state": picking.state }).to_string()),
+            new_values: Some(serde_json::json!({ "state": "confirmed" }).to_string()),
+            changed_fields: vec!["state".to_string()],
+            metadata: None,
+        },
+    );
+
+    Ok(())
+}
+
 #[reducer]
 pub fn validate_stock_picking(
     ctx: &ReducerContext,
@@ -3898,6 +4000,77 @@ pub fn assign_user_to_picking(
             old_values: None,
             new_values: None,
             changed_fields: vec!["user_id".to_string()],
+            metadata: None,
+        },
+    );
+
+    Ok(())
+}
+
+/// Edit the header of a draft picking (partner, scheduled date, origin, note).
+#[reducer]
+pub fn update_stock_picking(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    picking_id: u64,
+    params: UpdateStockPickingParams,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "stock_picking", "write")?;
+    let company_id = company_id_from_scope(ctx, organization_id, params.company_id)?;
+
+    let picking = ctx
+        .db
+        .stock_picking()
+        .id()
+        .find(&picking_id)
+        .ok_or("Picking not found")?;
+
+    if picking.company_id != company_id {
+        return Err("Picking does not belong to this company".to_string());
+    }
+
+    if picking.state != "draft" {
+        return Err("Only draft pickings can be edited".to_string());
+    }
+
+    if let Some(partner_id) = params.partner_id {
+        require_active_partner_in_org(ctx, organization_id, partner_id)?;
+    }
+
+    let mut changed_fields: Vec<String> = Vec::new();
+    if params.partner_id.is_some() {
+        changed_fields.push("partner_id".to_string());
+    }
+    if params.scheduled_date.is_some() {
+        changed_fields.push("scheduled_date".to_string());
+    }
+    if params.origin.is_some() {
+        changed_fields.push("origin".to_string());
+    }
+    if params.note.is_some() {
+        changed_fields.push("note".to_string());
+    }
+
+    ctx.db.stock_picking().id().update(StockPicking {
+        partner_id: params.partner_id.or(picking.partner_id),
+        scheduled_date: params.scheduled_date.or(picking.scheduled_date),
+        origin: params.origin.or_else(|| picking.origin.clone()),
+        note: params.note.or_else(|| picking.note.clone()),
+        updated_at: ctx.timestamp,
+        ..picking.clone()
+    });
+
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "stock_picking",
+            record_id: picking_id,
+            action: "UPDATE",
+            old_values: None,
+            new_values: None,
+            changed_fields,
             metadata: None,
         },
     );

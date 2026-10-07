@@ -21,6 +21,8 @@ pub fn run_fleet_relational_integrity_test(ctx: &ReducerContext) -> Result<(), S
         .map_err(|e| format!("driver_id_relations: {e}"))?;
     relational_integrity_test::test_service_type_id_relations(ctx)
         .map_err(|e| format!("service_type_id_relations: {e}"))?;
+    relational_integrity_test::test_update_fleet_vehicle_details(ctx)
+        .map_err(|e| format!("update_fleet_vehicle_details: {e}"))?;
     Ok(())
 }
 

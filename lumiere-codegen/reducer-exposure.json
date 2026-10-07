@@ -3380,6 +3380,11 @@
       "reason": "invoked by an enumerated frontend BFF call site"
     },
     {
+      "name": "reset_account_move_to_draft",
+      "exposure": "session",
+      "reason": "invoked by an enumerated frontend BFF call site"
+    },
+    {
       "name": "reset_leave_to_draft",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
@@ -4211,6 +4216,11 @@
       "reason": "reviewed Fleet assignment write guarded by permission and organization/company ownership checks"
     },
     {
+      "name": "update_fleet_vehicle_details",
+      "exposure": "session",
+      "reason": "reviewed Fleet details write guarded by permission and organization/company ownership checks"
+    },
+    {
       "name": "update_form_field",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
@@ -4294,6 +4304,11 @@
       "name": "update_leave_type",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
+    },
+    {
+      "name": "update_manufacturing_order",
+      "exposure": "session",
+      "reason": "reviewed Manufacturing Draft-order write guarded by permission, Draft-state and organization/company ownership checks"
     },
     {
       "name": "update_metric_values",

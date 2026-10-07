@@ -2580,6 +2580,16 @@
       "idempotency": "idempotent",
       "semantic_kind": "command"
     },
+    "unreserve_stock_picking": {
+      "client_facing": false,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/inventory/stock.rs:3213 reducer accepts only assigned pickings and returns them to confirmed; denied until a session call site exists.",
+      "idempotency": "state_guarded",
+      "semantic_kind": "command"
+    },
     "unreserve_stock_quant": {
       "client_facing": true,
       "codec": {
@@ -2680,6 +2690,16 @@
       "idempotency": "state_guarded",
       "semantic_kind": "command"
     },
+    "update_fleet_vehicle_details": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/fleet/fleet.rs:518 reducer body shows keyed overwrite with tenant/company guard; session-exposed.",
+      "idempotency": "idempotent",
+      "semantic_kind": "command"
+    },
     "update_google_drive_connection": {
       "client_facing": true,
       "codec": {
@@ -2759,6 +2779,16 @@
       "evidence": "spacetimedb/src/documents/templates.rs:356 reducer body shows keyed overwrite/delete or recomputation; denied.",
       "idempotency": "idempotent",
       "semantic_kind": "internal"
+    },
+    "update_manufacturing_order": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/manufacturing/manufacturing_orders.rs:651 reducer body shows Draft-state guard and tenant/company-scoped overwrite; session-exposed.",
+      "idempotency": "state_guarded",
+      "semantic_kind": "command"
     },
     "update_pos_terminal": {
       "client_facing": true,
@@ -2947,6 +2977,16 @@
         "version": 1
       },
       "evidence": "spacetimedb/src/inventory/warehouse.rs:722 reducer body shows keyed overwrite/delete or recomputation; session-exposed.",
+      "idempotency": "idempotent",
+      "semantic_kind": "command"
+    },
+    "update_stock_picking": {
+      "client_facing": false,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/inventory/stock.rs:4012 reducer accepts only draft pickings and overwrites the supplied header fields; denied until a session call site exists.",
       "idempotency": "idempotent",
       "semantic_kind": "command"
     },

@@ -212,6 +212,19 @@ pub struct UpdateFleetVehicleParams {
     pub service_type_id: Option<Option<u64>>,
 }
 
+/// Patch semantics for descriptive vehicle details: outer `None` = leave unchanged;
+/// `Some(None)` = clear (only for nullable columns); `Some(Some(v))` = set.
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct UpdateFleetVehicleDetailsParams {
+    pub name: Option<String>,
+    pub vehicle_type: Option<String>,
+    pub license_plate: Option<Option<String>>,
+    pub driver_name: Option<Option<String>>,
+    pub odometer_km: Option<Option<f64>>,
+    pub fuel_level: Option<Option<f64>>,
+    pub metadata: Option<Option<String>>,
+}
+
 #[derive(SpacetimeType, Clone, Debug)]
 pub struct UpdateVehiclePositionParams {
     pub latitude: f64,
@@ -492,6 +505,126 @@ pub fn update_fleet_vehicle(
                 .to_string(),
             ),
             changed_fields: vec!["driver_id".to_string(), "service_type_id".to_string()],
+            metadata: None,
+        },
+    );
+
+    Ok(())
+}
+
+/// Update a fleet vehicle's descriptive details (name, type, plate, driver name,
+/// odometer, fuel level, metadata). Driver/service-type FKs stay on `update_fleet_vehicle`.
+#[reducer]
+pub fn update_fleet_vehicle_details(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    vehicle_id: u64,
+    params: UpdateFleetVehicleDetailsParams,
+) -> Result<(), String> {
+    require_company_in_organization(ctx, organization_id, company_id)?;
+
+    let vehicle = ctx
+        .db
+        .fleet_vehicle()
+        .id()
+        .find(&vehicle_id)
+        .ok_or_else(|| format!("Vehicle {} not found", vehicle_id))?;
+
+    require_fleet_vehicle_company(&vehicle, organization_id, company_id)?;
+    check_permission(ctx, organization_id, "fleet_vehicle", "write")?;
+
+    let next_name = match params.name {
+        Some(name) => {
+            if name.trim().is_empty() {
+                return Err("Vehicle name cannot be empty".to_string());
+            }
+            name.trim().to_string()
+        }
+        None => vehicle.name.clone(),
+    };
+    let next_vehicle_type = match params.vehicle_type {
+        Some(vehicle_type) => {
+            if vehicle_type.trim().is_empty() {
+                return Err("Vehicle type cannot be empty".to_string());
+            }
+            vehicle_type.trim().to_string()
+        }
+        None => vehicle.vehicle_type.clone(),
+    };
+    let next_license_plate = match params.license_plate {
+        Some(v) => v,
+        None => vehicle.license_plate.clone(),
+    };
+    let next_driver_name = match params.driver_name {
+        Some(v) => v,
+        None => vehicle.driver_name.clone(),
+    };
+    let next_odometer_km = match params.odometer_km {
+        Some(v) => v,
+        None => vehicle.odometer_km,
+    };
+    if let Some(odometer_km) = next_odometer_km {
+        if !odometer_km.is_finite() || odometer_km < 0.0 {
+            return Err("odometer_km must be a non-negative number".to_string());
+        }
+    }
+    let next_fuel_level = match params.fuel_level {
+        Some(v) => v,
+        None => vehicle.fuel_level,
+    };
+    if let Some(fuel_level) = next_fuel_level {
+        if !fuel_level.is_finite() || !(0.0..=1.0).contains(&fuel_level) {
+            return Err("fuel_level must be between 0.0 and 1.0".to_string());
+        }
+    }
+    let next_metadata = match params.metadata {
+        Some(v) => v,
+        None => vehicle.metadata.clone(),
+    };
+
+    ctx.db.fleet_vehicle().id().update(FleetVehicle {
+        name: next_name.clone(),
+        vehicle_type: next_vehicle_type.clone(),
+        license_plate: next_license_plate.clone(),
+        driver_name: next_driver_name.clone(),
+        odometer_km: next_odometer_km,
+        fuel_level: next_fuel_level,
+        metadata: next_metadata,
+        write_uid: ctx.sender(),
+        write_date: ctx.timestamp,
+        ..vehicle
+    });
+
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "fleet_vehicle",
+            record_id: vehicle_id,
+            action: "UPDATE",
+            old_values: None,
+            new_values: Some(
+                serde_json::json!({
+                    "name": next_name,
+                    "vehicle_type": next_vehicle_type,
+                    "license_plate": next_license_plate,
+                    "driver_name": next_driver_name,
+                    "odometer_km": next_odometer_km,
+                    "fuel_level": next_fuel_level
+                })
+                .to_string(),
+            ),
+            changed_fields: vec![
+                "name".to_string(),
+                "vehicle_type".to_string(),
+                "license_plate".to_string(),
+                "driver_name".to_string(),
+                "odometer_km".to_string(),
+                "fuel_level".to_string(),
+                "metadata".to_string(),
+            ],
             metadata: None,
         },
     );

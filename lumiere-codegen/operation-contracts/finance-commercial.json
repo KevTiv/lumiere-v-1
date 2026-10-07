@@ -3321,6 +3321,16 @@
       },
       "evidence": "expenses/expense_wave_d.rs: reducer inserts/appends or performs an unguarded domain mutation"
     },
+    "reset_account_move_to_draft": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/journal_entries.rs: reducer checks current state or duplicate before transition"
+    },
     "resolve_proposal_comment": {
       "semantic_kind": "command",
       "client_facing": true,
