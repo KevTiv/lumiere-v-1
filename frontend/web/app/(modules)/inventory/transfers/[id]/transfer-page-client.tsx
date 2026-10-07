@@ -2,6 +2,7 @@
 
 import { useCallback, useMemo, useState } from 'react';
 import Link from 'next/link';
+import { RecordHeaderActions } from '../../../../../components/record-header-actions';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { ArrowLeftRight, ListOrdered, ShoppingCart } from 'lucide-react';
 import { useTranslation } from '@lumiere/i18n';
@@ -314,6 +315,8 @@ function TransferPageLoaded({
           />
         }
         actions={
+          <>
+          <RecordHeaderActions model="transfer" record={transfer} organizationId={orgId} companyId={operatingCompanyId ?? undefined} />
           <RecordWorkflowActions
             actions={headerActions}
             record={record}
@@ -321,6 +324,7 @@ function TransferPageLoaded({
             primaryActionIds={PRIMARY_ACTION_IDS}
             pendingActionIds={workflow.isPending ? new Set(headerActions.map((action) => action.id)) : undefined}
           />
+          </>
         }
         activeTab={activeTab}
         onTabChange={setActiveTab}

@@ -1,25 +1,31 @@
 "use client"
 
-import { useEffect, useRef, type ReactNode } from "react"
+import { useContext, useEffect, useLayoutEffect, useRef, type ReactNode } from "react"
 import { useTranslation } from "@lumiere/i18n"
+import { toast } from "sonner"
 import { useConfirmDialog } from "../hooks/use-confirm-dialog"
+import { NavigationEditorContext } from "./navigation-guard-context"
 
 /**
- * Protect reload/close and ordinary link navigation while there are unsaved edits.
- * Render the returned dialog. Modified clicks and new-tab links leave the editor intact.
- * Imperative router calls and browser history navigation need a router-level guard.
+ * Register with the shell's shared router/history guard, or protect unload/links
+ * when used outside the shell. Render the returned fallback dialog.
  */
-export function useUnsavedChangesGuard(active: boolean): ReactNode {
+export function useUnsavedChangesGuard(active: boolean, pending = false): ReactNode {
+  const shared = useContext(NavigationEditorContext)
+  const state = useRef({ dirty: active, pending })
+  state.current = { dirty: active, pending }
+  useLayoutEffect(() => shared?.register(() => state.current), [shared])
+  useLayoutEffect(() => { shared?.changed() }, [shared, active, pending])
   const { t } = useTranslation()
   const { confirm, dismiss, dialog } = useConfirmDialog()
   const activeRef = useRef(active)
-  activeRef.current = active
+  activeRef.current = active || pending
   const resumingRef = useRef(false)
   useEffect(() => {
-    if (!active) dismiss()
-  }, [active, dismiss])
+    if (!active && !pending) dismiss()
+  }, [active, pending, dismiss])
   useEffect(() => {
-    if (!active || typeof window === "undefined") return
+    if (shared || (!active && !pending) || typeof window === "undefined") return
     const handler = (event: BeforeUnloadEvent) => {
       if (resumingRef.current) return
       event.preventDefault()
@@ -36,13 +42,14 @@ export function useUnsavedChangesGuard(active: boolean): ReactNode {
       if (target.origin === window.location.origin && target.pathname === window.location.pathname && target.search === window.location.search) return
       event.preventDefault()
       event.stopImmediatePropagation()
+      if (state.current.pending) { toast.warning(t("common.formSubmit.busy")); return }
       void confirm({
         title: t("common.discardChanges.title", { defaultValue: "Discard changes?" }),
         description: t("common.discardChanges.navigate", { defaultValue: "You have edits that were not saved. They will be lost if you leave this page." }),
         confirmLabel: t("common.discardChanges.discard", { defaultValue: "Discard" }),
         cancelLabel: t("common.discardChanges.keep", { defaultValue: "Keep editing" }),
       }).then((discard) => {
-        if (!discard || !activeRef.current || !link.isConnected) return
+        if (!discard || state.current.pending || !activeRef.current || !link.isConnected) return
         // Replay through the original link so Next Link keeps its routing behavior.
         resumingRef.current = true
         try {
@@ -58,8 +65,8 @@ export function useUnsavedChangesGuard(active: boolean): ReactNode {
       window.removeEventListener("beforeunload", handler)
       document.removeEventListener("click", navigate, true)
     }
-  }, [active, confirm, t])
-  return dialog
+  }, [active, pending, confirm, t, shared])
+  return shared ? null : dialog
 }
 
 function sameValue(a: unknown, b: unknown): boolean {

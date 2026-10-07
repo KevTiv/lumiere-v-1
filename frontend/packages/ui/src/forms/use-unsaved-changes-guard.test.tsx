@@ -4,8 +4,8 @@ import { useUnsavedChangesGuard } from "./use-unsaved-changes-guard"
 
 afterEach(cleanup)
 
-function Harness({ active = true, onNavigate }: { active?: boolean; onNavigate: () => void }) {
-  const dialog = useUnsavedChangesGuard(active)
+function Harness({ active = true, pending = false, onNavigate }: { active?: boolean; pending?: boolean; onNavigate: () => void }) {
+  const dialog = useUnsavedChangesGuard(active, pending)
   return <>
     <a href="/other-record" onClick={(event) => { event.preventDefault(); onNavigate() }}>Other record</a>
     <a href="#details" onClick={(event) => { event.preventDefault(); onNavigate() }}>Details</a>
@@ -15,6 +15,20 @@ function Harness({ active = true, onNavigate }: { active?: boolean; onNavigate: 
 }
 
 describe("unsaved changes during link navigation", () => {
+  it("blocks links and unload during a save even when the draft is clean", () => {
+    const onNavigate = vi.fn()
+    const { rerender } = render(<Harness active={false} pending onNavigate={onNavigate} />)
+    fireEvent.click(screen.getByText("Other record"))
+    expect(onNavigate).not.toHaveBeenCalled()
+    expect(screen.queryByTestId("confirm-dialog")).toBeNull()
+    const unload = new Event("beforeunload", { cancelable: true })
+    window.dispatchEvent(unload)
+    expect(unload.defaultPrevented).toBe(true)
+    rerender(<Harness active={false} pending={false} onNavigate={onNavigate} />)
+    fireEvent.click(screen.getByText("Other record"))
+    expect(onNavigate).toHaveBeenCalledTimes(1)
+  })
+
   it("keeps the original link blocked on Keep editing", async () => {
     const onNavigate = vi.fn()
     render(<Harness onNavigate={onNavigate} />)

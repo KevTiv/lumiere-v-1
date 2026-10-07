@@ -299,3 +299,6 @@ export * from "./entity-views/record-audit-tab";
 export * from "./lib/audit-log-utils";
 export * from "./lib/identity-label";
 export * from "./hooks/use-identity-label-map";
+export * from "./forms/navigation-guard-provider";
+
+export { useUnsavedChangesGuard } from "./forms/use-unsaved-changes-guard"

@@ -2,6 +2,7 @@
 
 import { useCallback, useMemo, useState } from 'react';
 import Link from 'next/link';
+import { RecordHeaderActions } from '../../../../../components/record-header-actions';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { ClipboardList } from 'lucide-react';
 import { useTranslation } from '@lumiere/i18n';
@@ -199,9 +200,12 @@ function ManufacturingOrderPageLoaded({
           />
         }
         actions={
+          <>
+          <RecordHeaderActions model="manufacturing" record={order} organizationId={orgId} companyId={operatingCompanyId ?? undefined} />
           <Button size="sm" data-testid="manufacturing-order-actions" onClick={() => setActionsOpen(true)}>
             {t('manufacturing.rowActions.titleOrder')}
           </Button>
+          </>
         }
         activeTab={activeTab}
         onTabChange={setActiveTab}

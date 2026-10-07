@@ -1,49 +1,58 @@
-# Pass 11: search and consistency
+# Pass 11: search, navigation guards and backend actions
 
-This follow-up is based on `claude/ui-polish-pass-1` at `31bfb557`.
-The initial Pass 11 implementation is `6fed95b0`; the PR #151 description was
-still listing Pass 11 as planned when this work started.
+This follow-up started from `claude/ui-polish-pass-1` at `31bfb557` and integrates
+`claude/pass9-backend` at `ef01ac72`.
 
 ## Implemented
 
-- The command palette searches 14 record models using existing query hooks and
-  the module admission/RBAC gates. Queries begin only while the palette is open
-  with at least two characters. This searches the rows loaded by those hooks;
-  it is not an exhaustive server-side search.
-- Failed model reads now show an error instead of a misleading empty result.
-  Failed reads do not expose cached results or stale partner labels, while
-  results from healthy models remain usable.
-- Browser confirmation calls in the frontend have been replaced by the shared
-  AlertDialog hook. It now settles replaced requests, including requests made
-  before the next render, and cancels outstanding requests on unmount. It also
-  supplies a translated accessible title when callers only give a description.
-- Edited FormModal forms ask before dismissal and register a reload/close
-  warning. This follow-up also guards ordinary link navigation, replaying the
-  original link after confirmation to preserve Next Link handling. In-page
-  anchors, downloads and new-tab/modified clicks do not discard the editor.
-  A pending navigation prompt is cancelled when the editor becomes clean.
-- Form dismissal is blocked while a save is running. A failed save retains the
-  draft and its guard; a missing submit binding no longer marks edits as saved.
-- Existing state gates and standard actions are retained. Project pages have
-  duplicate and archive/unarchive; calendar event pages have duplicate. The
-  command requirements and remaining model gaps are recorded in
-  `lib/record-standard-actions.ts`.
+- The command palette searches 14 record models with module admission/RBAC gates.
+  Queries start while the palette is open with at least two characters. Search
+  covers loaded rows rather than an exhaustive server-side index. Failed reads
+  show an error and suppress stale results and partner labels.
+- Shared confirmation dialogs settle replaced requests and cancel outstanding
+  requests on unmount, with translated accessible titles.
+- A persistent root provider guards Next router push, replace and refresh,
+  ordinary links, browser/imperative back and forward, and document unload.
+  Multiple dirty editors share one prompt. Cancel keeps the editor and history
+  position; discard resumes the requested navigation. In-page anchors, downloads
+  and modified/new-tab clicks preserve their normal behavior.
+- FormModal and inline cell/number editors register drafts and pending saves.
+  Navigation and form dismissal stay blocked while a save runs; failed form saves
+  retain the draft and missing submit bindings cannot report success.
+- Draft transfers expose origin/note edits; assigned transfers expose confirmed
+  reservation release. Draft manufacturing orders expose quantity edits. Fleet
+  records expose name, type, plate, driver, odometer and fuel edits, including
+  explicit clearing of optional fields. Actions require write access and an
+  operating company and use generated operations plus exact fresh readbacks.
+- Cancelled accounting documents can reset to draft only if never posted. The
+  backend rejects previously posted documents because cancellation does not
+  reverse all posting side effects. The UI mirrors that gate and write access.
+- Scheduled activities now attach to sales orders, purchase orders, invoices,
+  employees and transfers through the backend's typed target enum. Unsupported
+  record models cannot create unattached activities.
+- Transfer command exposure and invalidation declarations are reviewed producer
+  inputs; generated contracts are released through the repository workflow.
 
 ## Validation (2026-10-07)
 
-- Full UI Vitest suite: 298 tests passed before the final two regression cases;
-  final focused run: 28 tests passed across four files.
-- UI and web TypeScript checks passed.
-- Action-gate and standard-action tests: all five test files passed.
+- Full UI Vitest suite: 304 tests passed; final guard regression run passed.
+- Real Next.js/Chromium navigation fixture: 7 tests passed, covering push/replace,
+  Next Link, browser back/forward, router back across pages, pending saves and
+  inline-edit unload protection. Run with `pnpm --dir frontend/web test:e2e:navigation`.
+- Web unit suite: 50 test files passed. Pass 9 payload/readback tests and existing
+  canonical operation-effect tests passed.
+- Rust `cargo check --locked --manifest-path spacetimedb/Cargo.toml --tests` passed.
+  The contracts workflow compiled and published the backend module to its local
+  SpacetimeDB instance before generating the release.
 - i18n duplicate/static-key checks and production operation transport check passed.
-- The opaque-record ratchet fails on both the unchanged base and this follow-up
-  with 2,226 occurrences against the 2,071 baseline; this work does not increase it.
+- The opaque-record ratchet remains identical to the unchanged base: 2,226
+  occurrences against the 2,071 baseline. This work does not increase it.
 
 ## Remaining acceptance work
 
-- Browser back/forward and imperative router navigation are not intercepted by
-  the link guard. Inline editors also need broader navigation protection.
-- Archive/duplicate actions requiring new domain commands or child-line copy
-  semantics remain documented gaps; they are not implemented as header-only copies.
-- Full seeded browser/runtime acceptance has not been run for this follow-up.
-  The DOM tests and typechecks do not establish full ERP runtime acceptance.
+- Full seeded ERP browser/runtime acceptance and native reducer execution have
+  not been run; the isolated navigation browser fixture covers the actual Next
+  router but does not exercise authenticated business workflows.
+- Archive/duplicate commands and child-line copy semantics remain separate work.
+- The provider integrates with the pinned Next 16 App Router context. Run the
+  navigation browser suite when upgrading Next or changing router providers.

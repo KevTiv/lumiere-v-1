@@ -100,6 +100,7 @@ export function FormModal({
   const [dirty, setDirty] = React.useState(false)
   const [confirmingDiscard, setConfirmingDiscard] = React.useState(false)
   const submittingRef = React.useRef(false)
+  const [submitting, setSubmitting] = React.useState(false)
 
   // Nothing survives a closed dialog, so nothing is left to protect.
   React.useEffect(() => {
@@ -109,7 +110,7 @@ export function FormModal({
     }
   }, [open])
 
-  const navigationDialog = useUnsavedChangesGuard(open && dirty)
+  const navigationDialog = useUnsavedChangesGuard(open && dirty, open && (submitting || !!isPending))
 
   /** Dismissals (Cancel, Escape, overlay, X) ask first when fields were edited. */
   const requestOpenChange = (next: boolean) => {
@@ -138,10 +139,12 @@ export function FormModal({
     }
 
     submittingRef.current = true
+    setSubmitting(true)
     try {
       await onSubmit(data)
     } finally {
       submittingRef.current = false
+      setSubmitting(false)
       if (typeof window !== "undefined") {
         window.removeEventListener(SEMANTIC_OPERATION_OUTCOME_EVENT, captureSemanticOutcome)
       }

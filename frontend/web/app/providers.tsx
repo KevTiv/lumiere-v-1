@@ -1,5 +1,7 @@
 "use client"
 
+import { NavigationGuardProvider } from "@lumiere/ui"
+
 import { QueryClient, QueryClientProvider, useQueryClient } from "@tanstack/react-query"
 import { Suspense, useMemo, useState } from "react"
 import { I18nProvider } from "@lumiere/i18n"
@@ -172,7 +174,7 @@ export function Providers({
                   serverRoleNames={serverRoleNames}
                   organizationId={organizationId}
                 >
-                  {children}
+                  <NavigationGuardProvider>{children}</NavigationGuardProvider>
                 </RBACBridge>
               </ErpSessionBridge>
             </StdbSubscriptionProvider>
