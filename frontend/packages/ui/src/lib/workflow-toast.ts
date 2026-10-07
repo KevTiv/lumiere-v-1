@@ -1,13 +1,15 @@
 import { toast } from "sonner"
 
-/** Toasts for workflow completion, on the same Sonner instance the app's Toaster renders. */
-export function showWorkflowToast(notice: {
+export interface WorkflowToastNotice {
   kind: "success" | "info" | "error"
   title: string
   description?: string
   /** A follow-up the user can take from the toast, such as retrying a failed transition. */
   action?: { label: string; onClick: () => void }
-}) {
+}
+
+/** Toasts for workflow completion, on the same Sonner instance the app's Toaster renders. */
+export function showWorkflowToast(notice: WorkflowToastNotice): void {
   const options =
     notice.description || notice.action
       ? {

@@ -408,6 +408,7 @@ function CrmClientLoaded({
   }
   const [quickActionForm, setQuickActionForm] = useState<{ form: FormConfig; action: string } | null>(null)
   const [workflowModal, setWorkflowModal] = useState<WorkflowModal>(null)
+  const [workflowSubmitError, setWorkflowSubmitError] = useState<string | null>(null)
   const [csvKind, setCsvKind] = useState<CrmCsvImportKind | null>(null)
   const [dashboardTimeRange, setDashboardTimeRange] = useState<TimeRangeValue>("30d")
 
@@ -1931,6 +1932,7 @@ function CrmClientLoaded({
 
   const handleWorkflowSubmit = async (formData: Record<string, unknown>) => {
     if (!workflowModal) return
+    setWorkflowSubmitError(null)
     try {
       if (workflowModal.kind === "convertLead") {
         const p = toConvertLeadParams({
@@ -2117,7 +2119,7 @@ function CrmClientLoaded({
       }
       setWorkflowModal(null)
     } catch (e) {
-      window.alert(e instanceof Error ? e.message : "Action failed")
+      setWorkflowSubmitError(e instanceof Error ? e.message : "Action failed")
       throw e
     }
   }
@@ -2209,13 +2211,19 @@ function CrmClientLoaded({
       <RuntimeFormModal
         key={workflowModalKey}
         open={workflowModal !== null}
-        onOpenChange={(open) => !open && setWorkflowModal(null)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setWorkflowModal(null)
+            setWorkflowSubmitError(null)
+          }
+        }}
         staticConfig={workflowStaticConfig}
         moduleId="crm"
         organizationId={organizationId}
         roleId={runtimeRoleId}
         preferStdbVisibility
         isPending={isFormMutationPending}
+        submitError={workflowSubmitError}
         onSubmit={(formData) => {
           return handleWorkflowSubmit(formData)
         }}

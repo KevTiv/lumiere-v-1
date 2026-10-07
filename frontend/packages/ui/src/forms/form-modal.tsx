@@ -15,6 +15,7 @@ import {
   DialogTitle,
 } from "../components/dialog"
 import type { AiFormAssistConfig, FormConfig } from "../lib/form-types"
+import { showSemanticOperationOutcome } from "../lib/semantic-operation-outcome"
 import { cn } from "../lib/utils"
 import { ModularForm } from "./modular-form"
 
@@ -55,18 +56,6 @@ export interface FormModalProps {
   aiAssist?: AiFormAssistConfig
   /** Forwarded to {@link ModularForm} — e.g. swap dependent select options when a field changes. */
   onValuesChange?: (values: Record<string, unknown>) => void
-}
-
-function showSemanticOutcome(detail: SemanticOperationOutcomeDetail): void {
-  const action =
-    detail.href && detail.actionLabel
-      ? {
-          label: detail.actionLabel,
-          onClick: () => window.location.assign(detail.href!),
-        }
-      : undefined
-
-  toast.success(detail.message, action ? { action } : undefined)
 }
 
 export function FormModal({
@@ -115,7 +104,7 @@ export function FormModal({
     }
 
     if (semanticOutcome) {
-      showSemanticOutcome(semanticOutcome)
+      showSemanticOperationOutcome(semanticOutcome)
       return
     }
 
