@@ -2581,12 +2581,12 @@
       "semantic_kind": "command"
     },
     "unreserve_stock_picking": {
-      "client_facing": false,
+      "client_facing": true,
       "codec": {
         "id": "spacetimedb-sats-json",
         "version": 1
       },
-      "evidence": "spacetimedb/src/inventory/stock.rs:3213 reducer accepts only assigned pickings and returns them to confirmed; denied until a session call site exists.",
+      "evidence": "spacetimedb/src/inventory/stock.rs:3213 reducer accepts only assigned pickings and returns them to confirmed; session-exposed for the transfer record page with exact canonical readback.",
       "idempotency": "state_guarded",
       "semantic_kind": "command"
     },
@@ -2981,12 +2981,12 @@
       "semantic_kind": "command"
     },
     "update_stock_picking": {
-      "client_facing": false,
+      "client_facing": true,
       "codec": {
         "id": "spacetimedb-sats-json",
         "version": 1
       },
-      "evidence": "spacetimedb/src/inventory/stock.rs:4012 reducer accepts only draft pickings and overwrites the supplied header fields; denied until a session call site exists.",
+      "evidence": "spacetimedb/src/inventory/stock.rs:4012 reducer accepts only draft pickings and overwrites the supplied header fields; session-exposed for the transfer record page with exact canonical readback.",
       "idempotency": "idempotent",
       "semantic_kind": "command"
     },

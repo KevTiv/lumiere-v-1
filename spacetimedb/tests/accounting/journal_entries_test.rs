@@ -483,6 +483,16 @@ pub fn test_reset_account_move_to_draft_only_from_cancelled(ctx: &ReducerContext
     }
 
     let other = OrgFixture::seed_minimal(ctx)?;
+    cancel_account_move(ctx, org_id, posted_id)?;
+    match reset_account_move_to_draft(ctx, org_id, posted_id) {
+        Err(error) if error.contains("Previously posted") => {}
+        Err(error) => return Err(format!("unexpected previously-posted reset error: {error}")),
+        Ok(()) => return Err("reset of a posted-then-cancelled move succeeded".to_string()),
+    }
+    let cancelled = ctx.db.account_move().id().find(&posted_id).ok_or("posted move missing")?;
+    if cancelled.state != AccountMoveState::Cancelled || !cancelled.posted_before {
+        return Err("rejected reset changed the previously-posted move".to_string());
+    }
     cancel_account_move(ctx, org_id, move_id)?;
     match reset_account_move_to_draft(ctx, other.organization_id, move_id) {
         Err(error) if error.contains("organization") => {}

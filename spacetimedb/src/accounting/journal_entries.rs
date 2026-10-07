@@ -1632,7 +1632,8 @@ pub fn cancel_account_move(
 /// Only `Cancelled -> Draft` is supported. `Posted -> Draft` is refused because posting is
 /// not exactly invertible from the code: `post_invoice` inserts COGS lines, may accrue sale
 /// commissions and re-derives totals, and `post_account_move` pushes budget actuals and may
-/// issue a document number. Such moves must be cancelled first (or reversed with a credit note).
+/// issue a document number. Previously posted moves must be reversed with a credit note;
+/// cancelling does not undo those posting effects and must not make them repostable.
 /// The document number (`name` / `move_name`) is kept, so no number is ever re-issued; the
 /// payment/residual fields are untouched because cancel does not modify them.
 #[spacetimedb::reducer]
@@ -1654,6 +1655,10 @@ pub fn reset_account_move_to_draft(
                     .to_string(),
             )
         }
+    }
+
+    if move_record.posted_before {
+        return Err("Previously posted moves cannot be reset to draft; issue a credit note".to_string());
     }
 
     let company_id = move_record.company_id;
