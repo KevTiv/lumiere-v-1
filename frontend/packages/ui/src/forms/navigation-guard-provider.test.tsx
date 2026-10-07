@@ -69,4 +69,48 @@ describe("shared App Router navigation guard", () => {
     expect(router.push).toHaveBeenCalledExactlyOnceWith("/another-record")
     expect(screen.queryByRole("alertdialog")).toBeNull()
   })
+
+  it("runs a navigation requested during a save once the save succeeds", async () => {
+    const router: AppRouterInstance = { push: vi.fn(), replace: vi.fn(), back: vi.fn(), forward: vi.fn(), refresh: vi.fn(), prefetch: vi.fn() }
+    const tree = (dirty: boolean, pending: boolean) => <AppRouterContext.Provider value={router}>
+      <NavigationGuardProvider><Editor dirty={dirty} pending={pending} /></NavigationGuardProvider>
+    </AppRouterContext.Provider>
+    const { rerender } = render(tree(false, true))
+    fireEvent.click(screen.getByText("Push"))
+    expect(router.push).not.toHaveBeenCalled()
+    rerender(tree(false, false))
+    await waitFor(() => expect(router.push).toHaveBeenCalledExactlyOnceWith("/another-record"))
+    expect(screen.queryByRole("alertdialog")).toBeNull()
+  })
+
+  it("still asks before a deferred navigation when edits remain after the save", async () => {
+    const router: AppRouterInstance = { push: vi.fn(), replace: vi.fn(), back: vi.fn(), forward: vi.fn(), refresh: vi.fn(), prefetch: vi.fn() }
+    const tree = (dirty: boolean, pending: boolean) => <AppRouterContext.Provider value={router}>
+      <NavigationGuardProvider><Editor dirty={dirty} pending={pending} /></NavigationGuardProvider>
+    </AppRouterContext.Provider>
+    const { rerender } = render(tree(true, true))
+    fireEvent.click(screen.getByText("Push"))
+    rerender(tree(true, false))
+    expect(await screen.findByTestId("confirm-dialog-confirm")).toBeTruthy()
+    expect(router.push).not.toHaveBeenCalled()
+  })
+
+  it("runs a deferred navigation when the saving form unmounts", async () => {
+    const router: AppRouterInstance = { push: vi.fn(), replace: vi.fn(), back: vi.fn(), forward: vi.fn(), refresh: vi.fn(), prefetch: vi.fn() }
+    function Page({ open }: { open: boolean }) {
+      return <>{open ? <Editor dirty={false} pending /> : null}<Pusher /></>
+    }
+    function Pusher() {
+      const r = useRouter()
+      return <button onClick={() => r.push("/focus")}>Go</button>
+    }
+    const tree = (open: boolean) => <AppRouterContext.Provider value={router}>
+      <NavigationGuardProvider><Page open={open} /></NavigationGuardProvider>
+    </AppRouterContext.Provider>
+    const { rerender } = render(tree(true))
+    fireEvent.click(screen.getByText("Go"))
+    expect(router.push).not.toHaveBeenCalled()
+    rerender(tree(false))
+    await waitFor(() => expect(router.push).toHaveBeenCalledExactlyOnceWith("/focus"))
+  })
 })

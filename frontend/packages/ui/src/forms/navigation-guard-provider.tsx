@@ -36,28 +36,45 @@ export function NavigationGuardProvider({ children }: { children: ReactNode }) {
     })
     return accepted && !isSaving()
   }, [confirm, hasEdits, isSaving, t])
-  const run = useCallback((action: () => void) => {
+  // Navigations the app itself requests while a form is still saving (for example the record
+  // page opened by a workflow once its transition succeeds) wait for the save to settle instead
+  // of being dropped; user-initiated link clicks and history moves stay blocked while saving.
+  const afterSave = useRef<Array<() => void>>([])
+  const flushAfterSave = useCallback(() => {
+    const ready = afterSave.current
+    afterSave.current = []
+    ready.forEach((resume) => resume())
+  }, [])
+  const run = useCallback((action: () => void, deferWhileSaving = false) => {
     if (bypass.current || !hasEdits()) { action(); return }
+    if (deferWhileSaving && isSaving()) {
+      afterSave.current.push(() => run(action))
+      return
+    }
     void allow().then((accepted) => {
       if (!accepted) return
       bypass.current = true
       try { action() } finally { bypass.current = false }
     })
-  }, [allow, hasEdits])
+  }, [allow, hasEdits, isSaving])
   const value = useMemo(() => ({
     register: (read: () => NavigationEditorState) => {
       editors.current.add(read)
       return () => {
         editors.current.delete(read)
         if (!hasEdits()) dismiss()
+        if (!isSaving()) flushAfterSave()
       }
     },
-    changed: () => { if (!hasEdits()) dismiss() },
-  }), [dismiss, hasEdits])
+    changed: () => {
+      if (!hasEdits()) dismiss()
+      if (!isSaving()) flushAfterSave()
+    },
+  }), [dismiss, hasEdits, isSaving, flushAfterSave])
   const guardedRouter = useMemo(() => router ? {
     ...router,
-    push: (...args: Parameters<typeof router.push>) => run(() => router.push(...args)),
-    replace: (...args: Parameters<typeof router.replace>) => run(() => router.replace(...args)),
+    push: (...args: Parameters<typeof router.push>) => run(() => router.push(...args), true),
+    replace: (...args: Parameters<typeof router.replace>) => run(() => router.replace(...args), true),
     // History traversal is guarded by the popstate handler, once, including browser controls.
     back: () => router.back(),
     forward: () => router.forward(),
