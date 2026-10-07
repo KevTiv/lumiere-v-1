@@ -15,6 +15,8 @@ import { useEffect, useMemo, useState } from "react"
 import { CalendarView } from "../../../../packages/ui/src/calendar-components/calendar-view"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
 import { calendarEventHref } from "./calendar-event"
+import { withInlineEdits } from "@lumiere/ui/lib/with-inline-edits"
+import { requiredInlineText } from "@/lib/inline-edit-params"
 
 interface CalendarClientProps {
   initialEvents?: StdbCalendarEvent[]
@@ -109,6 +111,20 @@ function CalendarClientLoaded({ initialEvents, organizationId }: CalendarClientL
         if (tab.id === "events") {
           return {
             ...tab,
+            entityConfig: tab.entityConfig
+              ? withInlineEdits(tab.entityConfig, {
+                  name: {
+                    kind: "text",
+                    save: async (row, value) => {
+                      const name = requiredInlineText(
+                        value,
+                        t("calendar.inlineEdit.nameRequired", { defaultValue: "An event needs a title" }),
+                      )
+                      await updateCalendarEvent.mutateAsync({ eventId: row.id as string | number, params: { name } })
+                    },
+                  },
+                })
+              : tab.entityConfig,
             recordSheet: {
               titleKey: "name",
               auditTableName: "calendar_event",
@@ -198,7 +214,7 @@ function CalendarClientLoaded({ initialEvents, organizationId }: CalendarClientL
         return tab
       }),
     }),
-    [viewMode, selectedEventId, selectedDate, searchTerm, events, currentDate, liveSections, moduleConfig, t],
+    [viewMode, selectedEventId, selectedDate, searchTerm, events, currentDate, liveSections, moduleConfig, t, updateCalendarEvent],
   )
 
   const data = useMemo(

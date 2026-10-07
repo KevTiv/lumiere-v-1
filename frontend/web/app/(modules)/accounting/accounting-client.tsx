@@ -10,6 +10,7 @@ import {
   CsvImportModal,
   RuntimeFormModal,
   EntityView,
+  ListPivotSwitch,
   useRBAC,
   newJournalEntryForm,
   newTaxForm,
@@ -163,6 +164,7 @@ import type {
 } from "@lumiere/stdb/types"
 import { accountingModuleConfig } from "@/lib/module-dashboard-configs"
 import { invoiceRecordHref } from "./invoice-record"
+import { accountMovePivotSetup } from "@lumiere/ui/lib/accounting-pivot-configs"
 import { PaymentOperationsPanel } from "./payment-operations-panel"
 import { useAccountingModuleSubscription } from "@/lib/module-subscription-hooks"
 import { chatterTargetFromRow, type ChatterTarget } from "@/lib/record-chatter"
@@ -3295,6 +3297,12 @@ function AccountingClientReady({
                 ...tabRest,
                 type: "custom" as const,
                 customContent: (
+                  <ListPivotSwitch
+                    storageId="accounting-invoices-list"
+                    t={t}
+                    rows={invoices as unknown as Record<string, unknown>[]}
+                    {...accountMovePivotSetup(t)}
+                  >
                   <InvoiceListView
                     invoices={invoices}
                     onSelectInvoice={(invoice) =>
@@ -3306,6 +3314,7 @@ function AccountingClientReady({
                       void runMutation(() => computeInvoiceTotals.mutateAsync(inv.id as string | number | bigint))
                     }
                   />
+                  </ListPivotSwitch>
                 ),
               }
             }
@@ -3315,6 +3324,12 @@ function AccountingClientReady({
                 ...tabRest,
                 type: "custom" as const,
                 customContent: (
+                  <ListPivotSwitch
+                    storageId="accounting-bills-list"
+                    t={t}
+                    rows={bills as unknown as Record<string, unknown>[]}
+                    {...accountMovePivotSetup(t)}
+                  >
                   <BillsListView
                     bills={bills}
                     onCreateBill={() => setShowCreateBill(true)}
@@ -3326,6 +3341,7 @@ function AccountingClientReady({
                       void runMutation(() => computeInvoiceTotals.mutateAsync(bill.id as string | number | bigint))
                     }
                   />
+                  </ListPivotSwitch>
                 ),
               }
             }

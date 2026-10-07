@@ -195,6 +195,8 @@ export interface EntityDetailConfig {
 
 export interface EntityBoardCardConfig {
   titleKey: string
+  /** Display title when the raw `titleKey` value is not what the table shows (e.g. a formatted name). */
+  title?: (row: EntityRow) => string
   fields?: EntityColumn[]
   footerFields?: EntityColumn[]
   render?: (row: EntityRow) => ReactNode
@@ -206,6 +208,33 @@ export interface EntityBoardConfig {
   rowKey?: string
   card: EntityBoardCardConfig
   emptyColumnMessage?: string
+  /** Title of the read-only board's catch-all column for rows whose state has no column. */
+  otherColumnLabel?: string
+  /** Placeholder of the read-only board's search box. */
+  searchPlaceholder?: string
+}
+
+// ─── Pivot view config ───────────────────────────────────────────────────────
+
+export interface EntityPivotConfig {
+  /** Keys to group by: filter keys with options, or columns with badge labels. */
+  groupKeys: string[]
+  /** Numeric column keys that are summed per group (the first one is graphed). */
+  measureKeys: string[]
+  /** Row field holding the row's currency; when present and mixed, a note is shown. */
+  currencyKey?: string
+  labels: {
+    groupBy: string
+    columnsBy: string
+    none: string
+    count: string
+    total: string
+    empty: string
+    noData: string
+    /** Receives the currencies found on the rows. */
+    mixedCurrencies: (currencies: string[]) => string
+    chartTitle: (measure: string) => string
+  }
 }
 
 // ─── Table + board hybrid ────────────────────────────────────────────────────
@@ -218,8 +247,12 @@ export interface EntityTableBoardViewConfig {
   viewToggleLabels?: {
     table: string
     board: string
+    /** Only needed when `pivot` is set. */
+    pivot?: string
     ariaLabel?: string
   }
+  /** Offers a third, summary (pivot) view in the toggle. */
+  pivot?: EntityPivotConfig
   /** Default surface when the tab opens */
   defaultView?: "table" | "board"
 }

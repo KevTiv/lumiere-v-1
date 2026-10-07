@@ -9,6 +9,8 @@ import { KanbanBoard } from "../kanban/kanban-board"
 import { KanbanColumn } from "../kanban/kanban-column"
 import { EntityBoardCard } from "./entity-board-card"
 
+const OTHER_COLUMN_ID = "__other__"
+
 export interface EntityBoardViewProps {
   config: EntityBoardConfig
   data: Record<string, unknown>[]
@@ -44,13 +46,22 @@ export function EntityBoardView({
   if (!onMove) {
     const grouped = new Map<string, Record<string, unknown>[]>()
     for (const column of columns) grouped.set(column.id, [])
+    // Rows whose state has no column must not vanish: they land in an extra "Other" column.
+    const other: Record<string, unknown>[] = []
     for (const row of filterItem ? data.filter(filterItem) : data) {
-      grouped.get(getColumnId(row))?.push(row)
+      const bucket = grouped.get(getColumnId(row))
+      if (bucket) bucket.push(row)
+      else other.push(row)
     }
+    const shownColumns =
+      other.length > 0
+        ? [...columns, { id: OTHER_COLUMN_ID, title: config.otherColumnLabel ?? "Other" }]
+        : columns
+    if (other.length > 0) grouped.set(OTHER_COLUMN_ID, other)
     return (
       <div className={cn("overflow-x-auto pb-4", className)} data-testid="entity-board-readonly">
         <div className="flex gap-4 min-h-[420px]">
-          {columns.map((column) => {
+          {shownColumns.map((column) => {
             const rows = grouped.get(column.id) ?? []
             return (
               <KanbanColumn

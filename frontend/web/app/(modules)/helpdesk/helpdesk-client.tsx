@@ -1,5 +1,7 @@
 "use client"
 import { mapDashboardWidgets, withDashboardSections } from "@lumiere/ui/lib/dashboard-sections"
+import { withInlineEdits } from "@lumiere/ui/lib/with-inline-edits"
+import { requiredInlineText, ticketPriorityPatch } from "@/lib/inline-edit-params"
 
 import { useMemo, useState } from "react"
 import { useTranslation } from "@lumiere/i18n"
@@ -294,14 +296,35 @@ function HelpdeskClientLoaded({
       }
     }
     const view = base.view as EntityTableConfig
-    return {
-      ...base,
-      view: {
-        ...view,
-        actions: ticketRowActions,
+    return withInlineEdits(
+      {
+        ...base,
+        view: {
+          ...view,
+          actions: ticketRowActions,
+        },
       },
-    }
-  }, [moduleConfig.tabs, t, ticketRowActions])
+      {
+        name: {
+          kind: "text",
+          save: async (row, value) => {
+            const name = requiredInlineText(
+              value,
+              t("helpdesk.inlineEdit.nameRequired", { defaultValue: "A ticket needs a subject" }),
+            )
+            await updateTicket.mutateAsync({ ticketId: Number(row.id), params: { name } })
+          },
+        },
+        priority: {
+          kind: "select",
+          options: priorityOptions,
+          save: async (row, value) => {
+            await updateTicket.mutateAsync({ ticketId: Number(row.id), params: ticketPriorityPatch(value) })
+          },
+        },
+      },
+    )
+  }, [moduleConfig.tabs, t, ticketRowActions, updateTicket, priorityOptions])
 
   const liveSections = useMemo(() => {
     const active = tickets.filter((tk) => {

@@ -656,11 +656,22 @@ export const salesEntityConfigs = (t: TFunction): Record<string, EntityViewConfi
 })
 
 /** Read-only board of sale orders by state; state changes stay workflow actions. */
-export const saleOrdersWithBoard = (t: TFunction, config: EntityViewConfig): EntityViewConfig =>
+export const saleOrdersWithBoard = (
+  t: TFunction,
+  config: EntityViewConfig,
+  /** Same display name the table's reference column shows. */
+  formatSaleOrderDisplayName?: (row: Record<string, unknown>) => string,
+): EntityViewConfig =>
   withReadOnlyStateBoard(t, config, {
     groupKey: "state",
+    pivot: {
+      groupKeys: ["state", "invoiceSummary", "deliverySummary", "paymentSummary"],
+      measureKeys: ["amountTotal", "amountResidual"],
+      currencyKey: "currencyId",
+    },
     card: {
       titleKey: "reference",
+      title: formatSaleOrderDisplayName,
       fields: [{ key: "partnerName", label: t("sales.salesOrders.columns.partnerName", { defaultValue: "Customer" }) }],
       footerFields: [
         { key: "amountTotal", label: t("sales.salesOrders.columns.amountTotal"), type: "currency" },

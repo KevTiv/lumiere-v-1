@@ -119,4 +119,33 @@ describe("EntityTable saved view", () => {
     })
     expect(screen.getByTestId("entity-saved-filter-apply-Drafts")).toBeTruthy()
   })
+
+  it("keeps a group together across pages and totals currency columns for the whole group", async () => {
+    const many = Array.from({ length: 30 }, (_, i) => ({
+      id: String(i + 1),
+      reference: `SO-${i + 1}`,
+      status: i % 2 === 0 ? "draft" : "confirmed",
+      total: 10,
+    }))
+    window.localStorage.setItem(
+      `${LIST_VIEW_KEY}:view`,
+      JSON.stringify({ hiddenColumns: [], groupBy: "status" }),
+    )
+    render(
+      <RBACProvider>
+        <EntityTable
+          config={{
+            ...config,
+            columns: [...config.columns, { key: "total", label: "Total", type: "currency", align: "right" }],
+          }}
+          data={many}
+        />
+      </RBACProvider>,
+    )
+
+    const headers = await screen.findAllByTestId("entity-group-row")
+    // Groups run in value order: "confirmed" fills the first page before "draft" starts.
+    expect(headers[0]?.textContent).toContain("Confirmed15")
+    expect(screen.getAllByTestId("entity-group-sum-total")[0]?.textContent).toBe("$150.00")
+  })
 })

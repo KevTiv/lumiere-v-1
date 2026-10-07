@@ -163,7 +163,20 @@
       "board": "Board",
       "emptyColumn": "No records",
       "table": "Table",
-      "toggleLabel": "Switch view"
+      "toggleLabel": "Switch view",
+      "boardSearch": "Search cards",
+      "list": "List",
+      "otherColumn": "Other",
+      "pivot": "Summary",
+      "pivotChartTitle": "{{measure}} by group",
+      "pivotColumnsBy": "Columns",
+      "pivotCount": "Count",
+      "pivotEmpty": "Not set",
+      "pivotGroupBy": "Group by",
+      "pivotMixedCurrencies": "These records use more than one currency ({{currencies}}). Totals add the amounts as they are, without converting.",
+      "pivotNoData": "No records to summarise",
+      "pivotNone": "None",
+      "pivotTotal": "Total"
     }
   },
   "navigation": {
@@ -3499,6 +3512,11 @@
       "noRules": "No rules yet.",
       "applySample": "Apply AU customer rules",
       "evaluate": "Evaluate"
+    },
+    "inlineEdit": {
+      "emailInvalid": "Enter a valid email address",
+      "nameRequired": "A contact needs a name",
+      "phoneRequired": "Enter a phone number"
     }
   },
   "iot": {
@@ -4223,7 +4241,11 @@
       "approvalTimeline": "Approval timeline"
     },
     "operationsTab": "Operations",
-    "operationsTabDescription": "Approval and export queues, workforce planning"
+    "operationsTabDescription": "Approval and export queues, workforce planning",
+    "inlineEdit": {
+      "jobTitleRequired": "Enter a job title",
+      "nameRequired": "An employee needs a name"
+    }
   },
   "inventory": {
     "csvImport": {
@@ -5530,6 +5552,10 @@
       "variantId": "Variant ID",
       "whatsappAccountId": "WhatsApp account ID",
       "zone": "Zone"
+    },
+    "inlineEdit": {
+      "nameRequired": "A product needs a name",
+      "priceInvalid": "Enter a price of 0 or more"
     }
   },
   "purchasing": {
@@ -7728,6 +7754,9 @@
       "notFound": "Project not found",
       "notFoundHint": "It may have been deleted, or belong to another organization.",
       "openTasksBoard": "Open tasks board"
+    },
+    "inlineEdit": {
+      "nameRequired": "A project needs a name"
     }
   },
   "calendar": {
@@ -7836,6 +7865,9 @@
       "discussion": "Discussion",
       "notFound": "Event not found",
       "notFoundHint": "It may have been deleted, or belong to another organization."
+    },
+    "inlineEdit": {
+      "nameRequired": "An event needs a title"
     }
   },
   "documents": {
@@ -8433,7 +8465,10 @@
         }
       }
     },
-    "discussion": "Discussion"
+    "discussion": "Discussion",
+    "inlineEdit": {
+      "nameRequired": "A ticket needs a subject"
+    }
   },
   "subscriptions": {
     "subscriptions": {
@@ -9400,6 +9435,10 @@
       "notFound": "Expense report not found",
       "notFoundHint": "It may have been deleted, or belong to another organization.",
       "refuseReason": "Reason (optional)"
+    },
+    "inlineEdit": {
+      "nameRequired": "An expense needs a description",
+      "quantityInvalid": "Quantity must be above 0"
     }
   },
   "workflows": {

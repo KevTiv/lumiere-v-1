@@ -3,6 +3,8 @@ import {
   mapDashboardWidgets,
   withDashboardSections,
 } from '@lumiere/ui/lib/dashboard-sections';
+import { withInlineEdits } from '@lumiere/ui/lib/with-inline-edits';
+import { inlineNumberAtLeast, requiredInlineText } from '@/lib/inline-edit-params';
 
 import { useMemo, useState, useEffect, useCallback } from 'react';
 import dynamic from 'next/dynamic';
@@ -1486,17 +1488,42 @@ function InventoryClientLoaded({
       onEmptyAction: openCreateProduct,
     });
     const view = base.view as EntityTableConfig;
-    return {
-      ...base,
-      view: {
-        ...view,
-        emptyState: {
-          ...view.emptyState,
-          onAction: openCreateProduct,
+    return withInlineEdits(
+      {
+        ...base,
+        view: {
+          ...view,
+          emptyState: {
+            ...view.emptyState,
+            onAction: openCreateProduct,
+          },
         },
       },
-    };
-  }, [t, openCreateProduct]);
+      {
+        name: {
+          kind: 'text',
+          save: async (row, value) => {
+            const name = requiredInlineText(
+              value,
+              t('inventory.inlineEdit.nameRequired', { defaultValue: 'A product needs a name' }),
+            );
+            await updateProduct.mutateAsync({ productId: row.id as string | number, params: { name } });
+          },
+        },
+        standardPrice: {
+          kind: 'number',
+          save: async (row, value) => {
+            const standardPrice = inlineNumberAtLeast(
+              value,
+              0,
+              t('inventory.inlineEdit.priceInvalid', { defaultValue: 'Enter a price of 0 or more' }),
+            );
+            await updateProduct.mutateAsync({ productId: row.id as string | number, params: { standardPrice } });
+          },
+        },
+      },
+    );
+  }, [t, openCreateProduct, updateProduct]);
 
   const stockEntityConfig = useMemo((): EntityViewConfig => {
     const base = stockQuantsTableConfig(t, {

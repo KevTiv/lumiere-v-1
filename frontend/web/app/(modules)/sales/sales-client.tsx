@@ -1931,7 +1931,7 @@ function SalesClientLoaded({
           if (tab.id === 'orders' && tab.type === 'entity') {
             return {
               ...tab,
-              entityConfig: saleOrdersWithBoard(t, ordersEntityConfig),
+              entityConfig: saleOrdersWithBoard(t, ordersEntityConfig, saleOrderPrimaryLabel),
               createForm: saleOrderFormConfig,
               recordSheet: saleOrderRecordSheet,
             };

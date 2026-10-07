@@ -1,6 +1,13 @@
 "use client"
 import { accountMoveHref } from "@lumiere/erp-shared/record-links"
 import { mapDashboardWidgets, withDashboardSections } from "@lumiere/ui/lib/dashboard-sections"
+import { withInlineEdits } from "@lumiere/ui/lib/with-inline-edits"
+import {
+  inlineNumberAbove,
+  isDraftExpense,
+  isDraftStandardExpense,
+  requiredInlineText,
+} from "@/lib/inline-edit-params"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { useTranslation } from "@lumiere/i18n"
@@ -407,13 +414,42 @@ function ExpensesClientLoaded({
             return {
               ...tab,
               createForm: expenseFormConfig,
-              entityConfig: addCsvToolbar(tab.entityConfig, [
+              entityConfig: withInlineEdits(
+                addCsvToolbar(tab.entityConfig, [
+                  {
+                    id: "csv-expenses",
+                    label: t("expenses.csvImport.toolbarExpenses"),
+                    onClick: () => setCsvKind("expense"),
+                  },
+                ]),
                 {
-                  id: "csv-expenses",
-                  label: t("expenses.csvImport.toolbarExpenses"),
-                  onClick: () => setCsvKind("expense"),
+                  // The backend only edits Draft expenses.
+                  name: {
+                    kind: "text",
+                    canEdit: isDraftExpense,
+                    save: async (row, value) => {
+                      const name = requiredInlineText(
+                        value,
+                        t("expenses.inlineEdit.nameRequired", { defaultValue: "An expense needs a description" }),
+                      )
+                      await updateExpense.mutateAsync({ expenseId: row.id as string | number, params: { name } })
+                    },
+                  },
+                  // Mileage and per diem lines derive their quantity, so only standard lines take it.
+                  quantity: {
+                    kind: "number",
+                    canEdit: isDraftStandardExpense,
+                    save: async (row, value) => {
+                      const quantity = inlineNumberAbove(
+                        value,
+                        0,
+                        t("expenses.inlineEdit.quantityInvalid", { defaultValue: "Quantity must be above 0" }),
+                      )
+                      await updateExpense.mutateAsync({ expenseId: row.id as string | number, params: { quantity } })
+                    },
+                  },
                 },
-              ]),
+              ),
             }
           }
           if (tab.id === "expense-sheets" && tab.entityConfig) {
@@ -551,6 +587,7 @@ function ExpensesClientLoaded({
       approveExpenseSheet,
       refuseExpenseSheet,
       organizationId,
+      updateExpense,
     ],
   )
 

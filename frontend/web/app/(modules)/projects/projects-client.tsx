@@ -1,6 +1,7 @@
 "use client"
 import { projectTimesheetsHref } from "@lumiere/erp-shared/record-links"
 import { mapDashboardWidgets, withDashboardSections } from "@lumiere/ui/lib/dashboard-sections"
+import { withInlineEdits } from "@lumiere/ui/lib/with-inline-edits"
 
 import { useMemo, useState, useCallback, useEffect } from "react"
 import type { QueryResourceState } from "@lumiere/api-client"
@@ -1017,7 +1018,7 @@ function ProjectsClientLoaded({
             const view = tab.entityConfig.view
             return {
               ...tab,
-              entityConfig: {
+              entityConfig: withInlineEdits({
                 ...tab.entityConfig,
                 view: {
                   ...view,
@@ -1044,7 +1045,16 @@ function ProjectsClientLoaded({
                       : column,
                   ),
                 },
-              },
+              }, {
+                name: {
+                  kind: "text",
+                  save: async (row, value) => {
+                    const name = String(value).trim()
+                    if (!name) throw new Error(t("projects.inlineEdit.nameRequired", { defaultValue: "A project needs a name" }))
+                    await updateProject.mutateAsync({ projectId: row.id as string | number, params: { name } })
+                  },
+                },
+              }),
             }
           }
           if (tab.id === "rate-cards" && tab.entityConfig) {
@@ -1213,6 +1223,7 @@ function ProjectsClientLoaded({
       billTimesheetsFormConfig,
       stopTimer,
       validateTimesheets,
+      updateProject,
       operatingCompanyId,
     ],
   )

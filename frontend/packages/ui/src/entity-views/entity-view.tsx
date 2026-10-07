@@ -1,11 +1,13 @@
 "use client"
 
 import { useEffect, useMemo, useState, type ReactNode } from "react"
-import { LayoutGrid, List } from "lucide-react"
+import type { TFunction } from "i18next"
+import { BarChart3, LayoutGrid, List } from "lucide-react"
 import { cn } from "../lib/utils"
 import type {
   EntityDetailConfig,
   EntityPermissioned,
+  EntityPivotConfig,
   EntityTableBoardViewConfig,
   EntityTableConfig,
   EntityViewConfig,
@@ -16,6 +18,9 @@ import { useRBAC } from "../lib/rbac-context"
 import { EntityTable } from "./entity-table"
 import { EntityDetail } from "./entity-detail"
 import { EntityBoardView } from "./entity-board"
+import { EntityPivotView } from "./entity-pivot"
+import { matchesSearch } from "../lib/entity-table-engine"
+import { Input } from "../components/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/card"
 import { Button } from "../components/button"
 
@@ -78,16 +83,27 @@ export function useScopedEntityDetailConfig(config: EntityDetailConfig): EntityD
   )
 }
 
-type EntitySurfaceMode = "table" | "board"
+export type EntitySurfaceMode = "table" | "board" | "pivot"
 
 const surfaceModeStorageKey = (configId: string) => `lumiere:entity-view-mode:${configId}`
 
-function readStoredSurfaceMode(configId: string): EntitySurfaceMode | null {
+export function readStoredSurfaceMode(
+  configId: string,
+  allowed: readonly EntitySurfaceMode[] = ["table", "board"],
+): EntitySurfaceMode | null {
   try {
     const stored = window.localStorage.getItem(surfaceModeStorageKey(configId))
-    return stored === "table" || stored === "board" ? stored : null
+    return allowed.find((mode) => mode === stored) ?? null
   } catch {
     return null
+  }
+}
+
+export function storeSurfaceMode(configId: string, mode: EntitySurfaceMode) {
+  try {
+    window.localStorage.setItem(surfaceModeStorageKey(configId), mode)
+  } catch {
+    /* storage unavailable: the choice just is not remembered */
   }
 }
 
@@ -101,14 +117,18 @@ function deriveBoardColumns(
   return Object.entries(labels).map(([id, title]) => ({ id, title: String(title) }))
 }
 
-function EntityViewToggle({
+export function EntityViewToggle({
   mode,
   onChange,
   labels,
+  showBoard = true,
+  showPivot = false,
 }: {
   mode: EntitySurfaceMode
   onChange: (mode: EntitySurfaceMode) => void
   labels: NonNullable<EntityTableBoardViewConfig["viewToggleLabels"]>
+  showBoard?: boolean
+  showPivot?: boolean
 }) {
   return (
     <div
@@ -126,16 +146,77 @@ function EntityViewToggle({
         <List className="h-4 w-4" />
         {labels.table}
       </Button>
-      <Button
-        variant={mode === "board" ? "secondary" : "ghost"}
-        size="sm"
-        className={cn("h-7 px-2 gap-1.5", mode === "board" && "shadow-sm")}
-        onClick={() => onChange("board")}
-        aria-pressed={mode === "board"}
-      >
-        <LayoutGrid className="h-4 w-4" />
-        {labels.board}
-      </Button>
+      {showBoard ? (
+        <Button
+          variant={mode === "board" ? "secondary" : "ghost"}
+          size="sm"
+          className={cn("h-7 px-2 gap-1.5", mode === "board" && "shadow-sm")}
+          onClick={() => onChange("board")}
+          aria-pressed={mode === "board"}
+        >
+          <LayoutGrid className="h-4 w-4" />
+          {labels.board}
+        </Button>
+      ) : null}
+      {showPivot ? (
+        <Button
+          variant={mode === "pivot" ? "secondary" : "ghost"}
+          size="sm"
+          className={cn("h-7 px-2 gap-1.5", mode === "pivot" && "shadow-sm")}
+          onClick={() => onChange("pivot")}
+          aria-pressed={mode === "pivot"}
+        >
+          <BarChart3 className="h-4 w-4" />
+          {labels.pivot}
+        </Button>
+      ) : null}
+    </div>
+  )
+}
+
+/**
+ * Adds a list / summary toggle in front of a custom list view (accounting invoices and bills).
+ * The choice is remembered per list, like the table/board mode of entity views.
+ */
+export function ListPivotSwitch({
+  storageId,
+  t,
+  rows,
+  table,
+  pivot,
+  children,
+}: {
+  storageId: string
+  t: TFunction
+  rows: Record<string, unknown>[]
+  table: EntityTableConfig
+  pivot: EntityPivotConfig
+  children: ReactNode
+}) {
+  const [mode, setMode] = useState<EntitySurfaceMode>("table")
+  useEffect(() => {
+    const stored = readStoredSurfaceMode(storageId, ["table", "pivot"])
+    if (stored) setMode(stored)
+  }, [storageId])
+  const change = (next: EntitySurfaceMode) => {
+    setMode(next)
+    storeSurfaceMode(storageId, next)
+  }
+  return (
+    <div className="space-y-3">
+      <EntityViewToggle
+        mode={mode}
+        onChange={change}
+        showBoard={false}
+        showPivot
+        labels={{
+          table: t("common.entityView.list", { defaultValue: "List" }),
+          board: "",
+          pivot: t("common.entityView.pivot", { defaultValue: "Summary" }),
+          ariaLabel: t("common.entityView.toggleLabel", { defaultValue: "Switch view" }),
+        }}
+      />
+      {mode === "pivot" ? <EntityPivotView rows={rows} table={table} pivot={pivot} /> : children}
     </div>
   )
 }
@@ -162,19 +243,20 @@ export function EntityView({
     hybrid?.defaultView ?? "table",
   )
   // Restore the per-entity choice after mount (keeps SSR markup stable).
+  const pivotConfig = hybrid?.pivot
   useEffect(() => {
     if (!hybrid) return
-    const stored = readStoredSurfaceMode(config.id)
+    const stored = readStoredSurfaceMode(
+      config.id,
+      pivotConfig ? ["table", "board", "pivot"] : ["table", "board"],
+    )
     if (stored) setSurfaceMode(stored)
-  }, [config.id, hybrid !== null]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [config.id, hybrid !== null, pivotConfig !== undefined]) // eslint-disable-line react-hooks/exhaustive-deps
   const changeSurfaceMode = (mode: EntitySurfaceMode) => {
     setSurfaceMode(mode)
-    try {
-      window.localStorage.setItem(surfaceModeStorageKey(config.id), mode)
-    } catch {
-      /* storage unavailable: the choice just is not remembered */
-    }
+    storeSurfaceMode(config.id, mode)
   }
+  const [boardSearch, setBoardSearch] = useState("")
 
   const plainTableConfig =
     config.view.mode === "table" ? config.view : hybrid ? hybrid.table : null
@@ -216,6 +298,9 @@ export function EntityView({
       const effectiveBoardColumns = boardColumns.length
         ? boardColumns
         : deriveBoardColumns(hybrid.table, hybrid.board.groupKey)
+      const searchKeys = tableConfig.searchKeys ?? []
+      const boardRowFilter = (row: Record<string, unknown>) =>
+        (boardFilterItem ? boardFilterItem(row) : true) && matchesSearch(row, searchKeys, boardSearch.trim())
       return (
         <div className="space-y-3">
           {hybrid.viewToggleLabels ? (
@@ -223,6 +308,7 @@ export function EntityView({
               mode={surfaceMode}
               onChange={changeSurfaceMode}
               labels={hybrid.viewToggleLabels}
+              showPivot={pivotConfig !== undefined}
             />
           ) : null}
 
@@ -236,15 +322,30 @@ export function EntityView({
               initialFilters={initialFilters}
               onInitialFilterClear={onInitialFilterClear}
             />
+          ) : surfaceMode === "pivot" && pivotConfig ? (
+            <EntityPivotView rows={data} table={tableConfig} pivot={pivotConfig} />
           ) : effectiveBoardColumns.length ? (
-            <EntityBoardView
-              config={boardConfig}
-              data={data}
-              columns={effectiveBoardColumns}
-              onMove={onBoardMove}
-              filterItem={boardFilterItem}
-              onCardClick={onRowClick}
-            />
+            <div className="space-y-3">
+              {!onBoardMove && searchKeys.length > 0 ? (
+                <Input
+                  type="search"
+                  value={boardSearch}
+                  onChange={(event) => setBoardSearch(event.target.value)}
+                  placeholder={hybrid.board.searchPlaceholder ?? tableConfig.searchPlaceholder}
+                  aria-label={hybrid.board.searchPlaceholder ?? tableConfig.searchPlaceholder ?? "Search"}
+                  className="h-8 max-w-xs"
+                  data-testid="entity-board-search"
+                />
+              ) : null}
+              <EntityBoardView
+                config={boardConfig}
+                data={data}
+                columns={effectiveBoardColumns}
+                onMove={onBoardMove}
+                filterItem={onBoardMove ? boardFilterItem : boardRowFilter}
+                onCardClick={onRowClick}
+              />
+            </div>
           ) : (
             <p className="text-sm text-muted-foreground">
               Board view requires column definitions.

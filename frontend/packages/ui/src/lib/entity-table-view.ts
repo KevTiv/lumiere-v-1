@@ -130,3 +130,15 @@ export function upsertSavedFilter(
 export function removeSavedFilter(saved: readonly SavedTableFilter[], name: string): SavedTableFilter[] {
   return saved.filter((item) => item.name !== name)
 }
+
+/** Sum of a numeric field per group value; rows whose field is not a finite number add nothing. */
+export function sumRowsBy(rows: readonly EntityRow[], groupKey: string, valueKey: string): Map<string, number> {
+  const sums = new Map<string, number>()
+  for (const row of rows) {
+    const value = row[valueKey]
+    const amount = typeof value === "number" ? value : typeof value === "bigint" ? Number(value) : NaN
+    const group = rowFilterValue(row, groupKey)
+    sums.set(group, (sums.get(group) ?? 0) + (Number.isFinite(amount) ? amount : 0))
+  }
+  return sums
+}

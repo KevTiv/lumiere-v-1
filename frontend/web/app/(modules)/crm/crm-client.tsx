@@ -1,5 +1,7 @@
 "use client"
 import { mapDashboardWidgets, withDashboardSections } from "@lumiere/ui/lib/dashboard-sections"
+import { withInlineEdits } from "@lumiere/ui/lib/with-inline-edits"
+import { requiredInlineEmail, requiredInlineText } from "@/lib/inline-edit-params"
 
 import { CrmDuplicateContacts } from "@/lib/crm-duplicate-contacts-panel"
 import { ContactIdentitiesPanel } from "./contact-identities-panel"
@@ -1461,7 +1463,43 @@ function CrmClientLoaded({
         }
       }
       if (tab.id === "contacts") {
-        return { ...tab, entityConfig: contactEntity, recordSheet: contactRecordSheet }
+        return {
+          ...tab,
+          entityConfig: withInlineEdits(contactEntity, {
+            // update_contact takes each of these on its own; omitted fields stay as they are.
+            name: {
+              kind: "text",
+              save: async (row, value) => {
+                const name = requiredInlineText(
+                  value,
+                  t("crm.inlineEdit.nameRequired", { defaultValue: "A contact needs a name" }),
+                )
+                await updateContact.mutateAsync({ contactId: row.id as string | number, params: { name } })
+              },
+            },
+            email: {
+              kind: "text",
+              save: async (row, value) => {
+                const email = requiredInlineEmail(
+                  value,
+                  t("crm.inlineEdit.emailInvalid", { defaultValue: "Enter a valid email address" }),
+                )
+                await updateContact.mutateAsync({ contactId: row.id as string | number, params: { email } })
+              },
+            },
+            phone: {
+              kind: "text",
+              save: async (row, value) => {
+                const phone = requiredInlineText(
+                  value,
+                  t("crm.inlineEdit.phoneRequired", { defaultValue: "Enter a phone number" }),
+                )
+                await updateContact.mutateAsync({ contactId: row.id as string | number, params: { phone } })
+              },
+            },
+          }),
+          recordSheet: contactRecordSheet,
+        }
       }
       if (tab.id === "activities") return { ...tab, entityConfig: activitiesEntity }
       return tab
@@ -1561,6 +1599,7 @@ function CrmClientLoaded({
     leadRecordSheet,
     opportunityRecordSheet,
     contactRecordSheet,
+    updateContact,
   ])
 
   const crmTabIds = useMemo(() => moduleConfig.tabs.map((tab) => tab.id), [moduleConfig])

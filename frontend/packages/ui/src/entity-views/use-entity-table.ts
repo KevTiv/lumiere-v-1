@@ -32,6 +32,11 @@ export interface UseEntityTableOptions {
   filters: Readonly<Record<string, string>>
   /** Order shown until the user picks a column. Defaults to newest first (descending row key). */
   defaultSorting?: SortingState
+  /**
+   * Row key whose values rows are kept together by, ahead of the chosen order, across every page.
+   * Groups run in the key's own order.
+   */
+  groupBy?: string | null
 }
 
 const NO_KEYS: readonly string[] = []
@@ -57,6 +62,7 @@ export function useEntityTable({
   search,
   filters,
   defaultSorting,
+  groupBy = null,
 }: UseEntityTableOptions) {
   const [userSorting, setUserSorting] = useState<SortingState>([])
   const [pageIndex, setPageIndex] = useState(0)
@@ -79,8 +85,9 @@ export function useEntityTable({
         rowKey,
         ...fallbackSorting.map((sort) => sort.id),
         ...activeFilters.map((filter) => filter.id),
+        ...(groupBy ? [groupBy] : []),
       ]),
-    [columns, rowKey, fallbackSorting, activeFilters],
+    [columns, rowKey, fallbackSorting, activeFilters, groupBy],
   )
   const globalFilterFn = useMemo(() => searchFilterFn(searchKeys), [searchKeys])
 
@@ -88,12 +95,17 @@ export function useEntityTable({
     () => (userSorting.length > 0 ? userSorting : fallbackSorting),
     [userSorting, fallbackSorting],
   )
+  // Grouping leads the order the table applies; the user's own sort still orders rows within a group.
+  const tableSorting = useMemo<SortingState>(
+    () => (groupBy ? [{ id: groupBy, desc: false }, ...sorting.filter((sort) => sort.id !== groupBy)] : sorting),
+    [groupBy, sorting],
+  )
   const pagination = useMemo<PaginationState>(() => ({ pageIndex, pageSize }), [pageIndex, pageSize])
   const globalFilter = searchKeys.length > 0 ? search : ""
 
   // Back to the first page whenever what is shown changes, set while rendering so a page that no
   // longer exists is never drawn.
-  const resetKey = JSON.stringify([globalFilter, activeFilters, userSorting, data.length])
+  const resetKey = JSON.stringify([globalFilter, activeFilters, userSorting, data.length, groupBy])
   const [previousResetKey, setPreviousResetKey] = useState(resetKey)
   if (previousResetKey !== resetKey) {
     setPreviousResetKey(resetKey)
@@ -124,7 +136,7 @@ export function useEntityTable({
     data,
     getRowId: (row, index) => String(getRowField(row, rowKey) ?? index),
     state: {
-      sorting,
+      sorting: tableSorting,
       pagination,
       rowSelection,
       globalFilter,

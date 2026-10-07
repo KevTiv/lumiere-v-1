@@ -99,3 +99,22 @@ describe("saved table filters", () => {
     expect(saved[0]?.name).toBe("f3")
   })
 })
+
+import { sumRowsBy } from "./entity-table-view"
+
+describe("sumRowsBy", () => {
+  it("sums a numeric field per group and ignores non-numbers", () => {
+    const sums = sumRowsBy(
+      [
+        { s: "a", n: 2 },
+        { s: "a", n: 3 },
+        { s: "b", n: "x" },
+        { s: "b", n: 4n },
+      ],
+      "s",
+      "n",
+    )
+    expect(sums.get("a")).toBe(5)
+    expect(sums.get("b")).toBe(4)
+  })
+})

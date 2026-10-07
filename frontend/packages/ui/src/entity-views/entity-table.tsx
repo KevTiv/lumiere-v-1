@@ -64,6 +64,7 @@ import {
   getRowField,
 } from "../lib/entity-row-utils"
 import { rowsToCsv, downloadCsv } from "../lib/export-csv"
+import { rowFilterValue } from "../lib/entity-table-engine"
 import { useEntityTable } from "./use-entity-table"
 import { InlineEditCell } from "./inline-edit-cell"
 import {
@@ -74,6 +75,7 @@ import {
   tableViewStorageKey,
   readSavedFilters,
   removeSavedFilter,
+  sumRowsBy,
   savedFiltersStorageKey,
   toggleHiddenColumn,
   upsertSavedFilter,
@@ -303,6 +305,7 @@ export function EntityTable({
     searchKeys: config.searchKeys,
     search,
     filters,
+    groupBy: view.groupBy,
   })
 
   const groupFilter = groupableFilters.find((filter) => filter.key === view.groupBy)
@@ -310,6 +313,20 @@ export function EntityTable({
     () => (view.groupBy ? countRowsBy(sorted, view.groupBy) : null),
     [sorted, view.groupBy],
   )
+  const currencyColumns = useMemo(() => columns.filter((col) => col.type === "currency"), [columns])
+  const groupSums = useMemo(() => {
+    const groupKey = view.groupBy
+    if (!groupKey) return null
+    return new Map(currencyColumns.map((col) => [col.key, sumRowsBy(sorted, groupKey, col.key)] as const))
+  }, [sorted, view.groupBy, currencyColumns])
+  // Rows of the group on top of this page that began on the previous one.
+  const continuedGroup = useMemo(() => {
+    const groupKey = view.groupBy
+    const start = (currentPage - 1) * PAGE_SIZE
+    if (!groupKey || start === 0) return null
+    const previous = sorted[start - 1]
+    return previous ? rowFilterValue(previous, groupKey) : null
+  }, [sorted, view.groupBy, currentPage])
   const renderGroups = useMemo(
     () => (view.groupBy ? groupRowsBy(pageRows, view.groupBy) : [{ value: "", rows: pageRows }]),
     [pageRows, view.groupBy],
@@ -784,15 +801,25 @@ export function EntityTable({
                 renderGroups.flatMap((group) => [
                   view.groupBy ? (
                     <TableRow key={`group-${group.value}`} className="bg-muted/40 hover:bg-muted/40" data-testid="entity-group-row">
-                      <TableCell
-                        colSpan={Math.max(columns.length + selectColumnCount, 1)}
-                        className="py-2 text-sm font-medium"
-                      >
+                      <TableCell colSpan={selectColumnCount + 1} className="py-2 text-sm font-medium">
                         {groupLabel(group.value)}
                         <span className="ml-2 font-normal text-muted-foreground">
                           {groupCounts?.get(group.value) ?? group.rows.length}
+                          {group.value === continuedGroup ? " · continued" : ""}
                         </span>
                       </TableCell>
+                      {columns.slice(1).map((col) => {
+                        const total = groupSums?.get(col.key)?.get(group.value)
+                        return (
+                          <TableCell
+                            key={col.key}
+                            className={cn("py-2 text-sm font-medium", col.align === "right" && "text-right")}
+                            data-testid={total === undefined ? undefined : `entity-group-sum-${col.key}`}
+                          >
+                            {total === undefined ? null : formatEntityFieldValue(total, col.type)}
+                          </TableCell>
+                        )
+                      })}
                     </TableRow>
                   ) : null,
                   ...group.rows.map((tableRow) => {

@@ -1,5 +1,6 @@
 "use client"
 import { mapDashboardWidgets, withDashboardSections } from "@lumiere/ui/lib/dashboard-sections"
+import { withInlineEdits } from "@lumiere/ui/lib/with-inline-edits"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { useTranslation } from "@lumiere/i18n"
@@ -1343,6 +1344,29 @@ function HrClientLoaded({
               createAction: "createOnboardingTemplate",
             }
           }
+          if (tab.id === "employees" && tab.entityConfig) {
+            return {
+              ...tab,
+              entityConfig: withInlineEdits(tab.entityConfig, {
+                name: {
+                  kind: "text",
+                  save: async (row, value) => {
+                    const name = String(value).trim()
+                    if (!name) throw new Error(t("hr.inlineEdit.nameRequired", { defaultValue: "An employee needs a name" }))
+                    await updateEmployee.mutateAsync({ employeeId: Number(row.id), params: { name } })
+                  },
+                },
+                jobTitle: {
+                  kind: "text",
+                  save: async (row, value) => {
+                    const jobTitle = String(value).trim()
+                    if (!jobTitle) throw new Error(t("hr.inlineEdit.jobTitleRequired", { defaultValue: "Enter a job title" }))
+                    await updateEmployee.mutateAsync({ employeeId: Number(row.id), params: { jobTitle } })
+                  },
+                },
+              }),
+            }
+          }
           return tab
         }).filter((tab): tab is NonNullable<typeof tab> => tab != null),
           orgChartTab,
@@ -1418,6 +1442,7 @@ function HrClientLoaded({
       buildEditJobPositionForm,
       buildEditContractForm,
       buildEditLeaveTypeForm,
+      updateEmployee,
     ],
   )
 
