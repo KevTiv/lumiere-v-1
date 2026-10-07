@@ -4932,7 +4932,7 @@
     },
     "erp.unreserve_stock_picking": {
       "name": "unreserve_stock_picking",
-      "shape_fingerprint": "sha256:716857e9c2cf317a1db35620a9978b8f36de5ced4186c1be1f1a0cb3c075d340"
+      "shape_fingerprint": "sha256:1d219a0eeb9efa97404e9753987fd44cbbb2bee6fb6d5ebf55afb665001b2220"
     },
     "erp.unreserve_stock_quant": {
       "name": "unreserve_stock_quant",
@@ -5468,7 +5468,7 @@
     },
     "erp.update_stock_picking": {
       "name": "update_stock_picking",
-      "shape_fingerprint": "sha256:9e6d9e447fb24276b18e688407292101f5a9b44151484436f0ffc7af67a51a6f"
+      "shape_fingerprint": "sha256:9c98ca933ec79c39f49e86e20a9a2209d096e4d379bdf78e94f29cf31b494d48"
     },
     "erp.update_stock_production_lot": {
       "name": "update_stock_production_lot",
@@ -5876,6 +5876,14 @@
       "current_operations_fingerprint": "sha256:125aea644da0b75d796e731eabe76b008322f17cbdfc9c15088f17d6dc889f42",
       "operation_count": 1427,
       "reason": "release on top of v0.3.83: add mark_all_notifications_read, mark_notification_read; change the shape of none"
+    },
+    {
+      "previous_release": "v0.3.84",
+      "previous_ir_sha256": "sha256:df6890804a8c8d72dae806931b52d06598fe19138e55f22d5517743e2330065b",
+      "previous_operations_fingerprint": "sha256:125aea644da0b75d796e731eabe76b008322f17cbdfc9c15088f17d6dc889f42",
+      "current_operations_fingerprint": "sha256:73a45e16698b877aee4bb418e0292459a4405e718618c3ff7ca1a45a0ff35432",
+      "operation_count": 1427,
+      "reason": "release on top of v0.3.84: add none; change the shape of unreserve_stock_picking, update_stock_picking"
     }
   ]
 }
