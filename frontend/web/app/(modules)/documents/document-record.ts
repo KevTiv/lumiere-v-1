@@ -38,3 +38,11 @@ export function legalHoldReason(value: unknown): string | null {
   const reason = String(value ?? '').trim();
   return reason || null;
 }
+
+/** The active legal hold of a document (newest first when data is inconsistent), or undefined. Rows are `document_legal_hold`. */
+export function activeLegalHold(holds: readonly Row[], documentId: unknown): Row | undefined {
+  const wanted = String(documentId ?? '');
+  return holds
+    .filter((hold) => hold.isActive === true && String(hold.documentId ?? hold.document_id ?? '') === wanted)
+    .sort((a, b) => Number(b.id ?? 0) - Number(a.id ?? 0))[0];
+}

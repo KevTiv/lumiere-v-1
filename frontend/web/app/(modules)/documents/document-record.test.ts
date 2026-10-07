@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { documentRecordHref, formatFileSize, linkedRecordHref } from './document-record';
+import { activeLegalHold, documentRecordHref, formatFileSize, linkedRecordHref } from './document-record';
 
 test('a document links to its own page by id', () => {
   assert.equal(documentRecordHref({ id: 7 }), '/documents/7');
@@ -39,4 +39,15 @@ test('a folder move needs a chosen folder', () => {
 test('a legal hold needs a reason', () => {
   assert.equal(legalHoldReason('  litigation '), 'litigation');
   assert.equal(legalHoldReason('   '), null);
+});
+
+test('the active legal hold is the active row of that document only', () => {
+  const holds = [
+    { id: 1, documentId: 5, isActive: false },
+    { id: 2, documentId: 6, isActive: true },
+    { id: 3, documentId: 5, isActive: true },
+  ];
+  assert.equal(activeLegalHold(holds, '5')?.id, 3);
+  assert.equal(activeLegalHold(holds.slice(0, 1), 5), undefined);
+  assert.equal(activeLegalHold([], 5), undefined);
 });

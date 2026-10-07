@@ -177,7 +177,8 @@
       "pivotNoData": "No records to summarise",
       "pivotNone": "None",
       "pivotTotal": "Total"
-    }
+    },
+    "retry": "Retry"
   },
   "navigation": {
     "overview": "Overview",
@@ -10066,7 +10067,24 @@
         "openingControl": "Opening control"
       },
       "stopAt": "Closed",
-      "openNew": "Open a new session"
+      "openNew": "Open a new session",
+      "orders": "Orders"
+    },
+    "orders": {
+      "columns": {
+        "date": "Date",
+        "partner": "Customer",
+        "reference": "Reference",
+        "state": "State",
+        "total": "Total"
+      },
+      "emptyMessage": "No orders in this session",
+      "error": "Orders could not be loaded",
+      "linesUnavailable": "Order lines and payments are not available here.",
+      "loadMore": "Load more",
+      "loadMoreHint": "No orders for this session in the pages loaded so far.",
+      "searchPlaceholder": "Search orders",
+      "title": "Orders"
     }
   },
   "aiChat": {

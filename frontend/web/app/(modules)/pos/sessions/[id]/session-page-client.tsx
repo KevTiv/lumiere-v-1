@@ -7,6 +7,7 @@ import { useTranslation } from '@lumiere/i18n';
 import {
   Button,
   EntityDetail,
+  EntityView,
   Empty,
   EmptyContent,
   EmptyDescription,
@@ -22,6 +23,7 @@ import {
   mergeFieldDefaultValues,
   mergeSelectOptionsForFields,
   posFormConfigs,
+  posOrdersTableConfig,
   type FormConfig,
 } from '@lumiere/ui';
 import { Badge } from '@lumiere/ui/components/badge';
@@ -34,11 +36,14 @@ import {
   usePosConfigs,
   usePosSessions,
 } from '@lumiere/query-hooks/hooks/pos';
+import { usePosOrders } from '@lumiere/query-hooks/hooks/pos-orders';
+import { filterPosOrdersBySession } from '@lumiere/query-hooks/hooks/pos-orders-pages';
 import { useDefaultOperatingCompanyBigInt } from '@lumiere/query-hooks/hooks/use-operating-company';
 import type { PosConfig, PosSession } from '@lumiere/stdb/types';
 import { usePosModuleSubscription } from '@/lib/module-subscription-hooks';
 import { useRecordNavigation } from '@/hooks/use-record-navigation';
 import { hasValidOrganizationId, orgBigInts } from '@/lib/org-scoped';
+import { posOrderDisplayRow } from '../../pos-order-rows';
 import { cashDifference, isPosSessionOpen, posSessionStatusBar } from '../../pos-session';
 
 interface PosSessionPageClientProps {
@@ -50,7 +55,7 @@ interface PosSessionPageClientProps {
 
 type Row = Record<string, unknown>;
 
-const TAB_IDS = ['overview', 'discussion', 'audit'] as const;
+const TAB_IDS = ['overview', 'orders', 'discussion', 'audit'] as const;
 type TabId = (typeof TAB_IDS)[number];
 
 export function PosSessionPageClient(props: PosSessionPageClientProps) {
@@ -76,6 +81,11 @@ function PosSessionPageLoaded({
 
   const { data: sessions = [], isLoading } = usePosSessions(orgId, initialSessions);
   const { data: configs = [] } = usePosConfigs(orgId, initialConfigs);
+  const orders = usePosOrders(orgId, operatingCompanyId);
+  const sessionOrders = useMemo(
+    () => filterPosOrdersBySession(orders.rows, sessionId).map(posOrderDisplayRow),
+    [orders.rows, sessionId],
+  );
   const closeSession = useClosePosSession(orgId, operatingCompanyId);
   const computeTotals = useComputePosSessionTotals(orgId);
   const openSession = useOpenPosSession(orgId);
@@ -242,6 +252,56 @@ function PosSessionPageLoaded({
             id: 'overview',
             label: t('common.overview', { defaultValue: 'Overview' }),
             content: <EntityDetail config={detailConfig} data={{ ...session, configName, cashDifference: difference }} />,
+          },
+          {
+            id: 'orders',
+            label: t('pos.session.orders', { defaultValue: 'Orders' }),
+            content: (
+              <div className="space-y-3" data-testid="pos-session-orders">
+                <p className="text-sm text-muted-foreground" data-testid="pos-session-orders-note">
+                  {t('pos.orders.linesUnavailable', { defaultValue: 'Order lines and payments are not available here.' })}
+                </p>
+                {orders.error ? (
+                  <Empty data-testid="pos-session-orders-error">
+                    <EmptyHeader>
+                      <EmptyTitle>{t('pos.orders.error', { defaultValue: 'Orders could not be loaded' })}</EmptyTitle>
+                      <EmptyDescription>{orders.error.message}</EmptyDescription>
+                    </EmptyHeader>
+                    <EmptyContent>
+                      <Button variant="outline" size="sm" onClick={orders.refetch}>
+                        {t('common.retry', { defaultValue: 'Retry' })}
+                      </Button>
+                    </EmptyContent>
+                  </Empty>
+                ) : orders.isLoading ? (
+                  <Skeleton className="h-40 w-full" />
+                ) : (
+                  <>
+                    <EntityView config={posOrdersTableConfig(t)} data={sessionOrders} />
+                    {orders.hasNextPage ? (
+                      <div className="flex items-center gap-3">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          disabled={orders.isFetchingNextPage}
+                          data-testid="pos-session-orders-load-more"
+                          onClick={orders.fetchNextPage}
+                        >
+                          {orders.isFetchingNextPage
+                            ? t('common.loading', { defaultValue: 'Loading...' })
+                            : t('pos.orders.loadMore', { defaultValue: 'Load more' })}
+                        </Button>
+                        {sessionOrders.length === 0 ? (
+                          <span className="text-sm text-muted-foreground">
+                            {t('pos.orders.loadMoreHint', { defaultValue: 'No orders for this session in the pages loaded so far.' })}
+                          </span>
+                        ) : null}
+                      </div>
+                    ) : null}
+                  </>
+                )}
+              </div>
+            ),
           },
           {
             id: 'discussion',

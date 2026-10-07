@@ -89,3 +89,23 @@ export const posSessionsAdminTableConfig = (
     emptyMessage: t("pos.admin.sessions.emptyMessage"),
   },
 })
+
+export const posOrdersTableConfig = (t: TFunction): EntityViewConfig => ({
+  id: "pos-orders-table",
+  title: t("pos.orders.title", { defaultValue: "Orders" }),
+  view: {
+    mode: "table",
+    rowKey: "id",
+    searchable: true,
+    searchPlaceholder: t("pos.orders.searchPlaceholder", { defaultValue: "Search orders" }),
+    searchKeys: ["reference", "state", "partner"],
+    columns: [
+      { key: "reference", label: t("pos.orders.columns.reference", { defaultValue: "Reference" }), width: "min-w-32" },
+      { key: "state", label: t("pos.orders.columns.state", { defaultValue: "State" }), type: "badge", width: "min-w-24" },
+      { key: "amountTotal", label: t("pos.orders.columns.total", { defaultValue: "Total" }), type: "currency", align: "right" },
+      { key: "partner", label: t("pos.orders.columns.partner", { defaultValue: "Customer" }), width: "min-w-24" },
+      { key: "dateOrder", label: t("pos.orders.columns.date", { defaultValue: "Date" }), type: "datetime", width: "min-w-36" },
+    ],
+    emptyMessage: t("pos.orders.emptyMessage", { defaultValue: "No orders in this session" }),
+  },
+})
