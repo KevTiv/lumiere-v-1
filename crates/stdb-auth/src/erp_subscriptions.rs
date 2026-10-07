@@ -376,8 +376,16 @@ pub fn subscription_queries_for_resource(
 
     // These resources require BFF-side company filtering that subscription SQL
     // cannot express: partner banks have optional company ownership and landed
-    // cost lines inherit ownership from their parent.
-    if matches!(r, "partner-banks" | "landed-cost-lines") {
+    // cost lines, bank statement import lines, tax deadline reminders and
+    // consolidation company rates inherit ownership from their parent.
+    if matches!(
+        r,
+        "partner-banks"
+            | "landed-cost-lines"
+            | "bank-statement-import-lines"
+            | "tax-deadline-reminders"
+            | "consolidation-company-rates"
+    ) {
         return Ok(None);
     }
 
@@ -678,6 +686,9 @@ mod tests {
         for resource in [
             "partner-banks",
             "landed-cost-lines",
+            "bank-statement-import-lines",
+            "tax-deadline-reminders",
+            "consolidation-company-rates",
             "depreciation-lines",
             "consolidation-journals",
             "consolidation-accounts",
