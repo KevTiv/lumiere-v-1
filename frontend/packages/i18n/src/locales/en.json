@@ -6491,7 +6491,13 @@
         "product": "Product",
         "quantity": "Quantity",
         "subtotal": "Subtotal"
-      }
+      },
+      "createReturn": "Create return",
+      "createReturnFailed": "Create return failed",
+      "createReturnHint": "Enter the quantity to return per delivered line; leave a line blank to keep it.",
+      "createReturnInvalid": "Enter a quantity above 0 for at least one line, no more than what was delivered.",
+      "createReturnLine": "{{name}} (delivered {{qty}})",
+      "createReturnReason": "Reason (optional)"
     },
     "dashboard": {
       "ordersByState": "Orders by State",

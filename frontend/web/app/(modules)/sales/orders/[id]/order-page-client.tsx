@@ -68,6 +68,7 @@ import {
   type SaleOrder,
   type SaleOrderLine,
 } from '@lumiere/query-hooks/hooks/sales';
+import { useReturnOrderWorkflow } from '@lumiere/query-hooks/hooks/return-order-workflow';
 import { useSaleOrderLineWorkflow } from '@lumiere/query-hooks/hooks/sale-order-line-workflow';
 import { useSaleOrderWorkflow } from '@lumiere/query-hooks/hooks/sales-order-workflow';
 import { downloadDocumentPdf } from '@lumiere/query-hooks/hooks/templates';
@@ -88,6 +89,7 @@ import {
   linesOfOrder,
   saleOrderDetailWithPartners,
 } from '../../sale-order-record';
+import { buildReturnParams, canCreateReturn, returnQtyFieldId, returnableLines } from '../../sale-order-return';
 import { saleOrderStatusBar } from '../../sale-order-status';
 import { parseCommissionRatePercent } from '../../sales-ops-panel';
 import { optionRowsForOrder } from '../../commission-plans';
@@ -195,6 +197,21 @@ function SaleOrderPageLoaded({
       create: t('sales.orderLines.add', { defaultValue: 'Add line' }),
       update: t('sales.orderLines.update', { defaultValue: 'Update line' }),
       delete: t('sales.orderLines.delete', { defaultValue: 'Remove line' }),
+    },
+    { navigate: workflowSurface.navigate, record: workflowSurface.record, notify: workflowSurface.notify },
+  );
+
+  const returnWorkflow = useReturnOrderWorkflow(
+    orgId,
+    operatingCompanyId,
+    {
+      create: t('sales.returnOrders.actions.create'),
+      confirm: t('sales.returnOrders.actions.confirm'),
+      receive: t('sales.returnOrders.actions.receive'),
+      exchange: t('sales.returnOrders.actions.createExchange', { defaultValue: 'Create exchange order' }),
+      cancel: t('sales.returnOrders.actions.cancel'),
+      createCreditNote: t('sales.returnOrders.actions.createCreditNote'),
+      notReceivable: t('sales.returnOrders.errors.notReceivable'),
     },
     { navigate: workflowSurface.navigate, record: workflowSurface.record, notify: workflowSurface.notify },
   );
@@ -364,12 +381,61 @@ function SaleOrderPageLoaded({
     accountMoves as never,
   );
 
+  const createReturnLabel = t('sales.order.createReturn', { defaultValue: 'Create return' });
+  const createReturn = async () => {
+    const values = await askForm({
+      title: createReturnLabel,
+      description: t('sales.order.createReturnHint', {
+        defaultValue: 'Enter the quantity to return per delivered line; leave a line blank to keep it.',
+      }),
+      fields: [
+        ...returnableLines(lines).map((line) => ({
+          id: returnQtyFieldId(line),
+          name: returnQtyFieldId(line),
+          label: t('sales.order.createReturnLine', {
+            defaultValue: '{{name}} (delivered {{qty}})',
+            name: String(line.name ?? line.id),
+            qty: String(line.qtyDelivered ?? line.qty_delivered ?? 0),
+          }),
+          type: 'number' as const,
+          min: 0,
+        })),
+        {
+          id: 'reason',
+          name: 'reason',
+          label: t('sales.order.createReturnReason', { defaultValue: 'Reason (optional)' }),
+          type: 'text' as const,
+        },
+      ],
+    });
+    if (!values) return;
+    const params = buildReturnParams(order, lines, values);
+    if (!params) {
+      showWorkflowToast({
+        kind: 'error',
+        title: t('sales.order.createReturnFailed', { defaultValue: 'Create return failed' }),
+        description: t('sales.order.createReturnInvalid', {
+          defaultValue: 'Enter a quantity above 0 for at least one line, no more than what was delivered.',
+        }),
+      });
+      return;
+    }
+    // The workflow surface reports a typed failure.
+    await returnWorkflow.create.execute({ saleOrderId: orderId, params }).catch(() => undefined);
+  };
+
   const moreActions: Array<{ id: string; label: string; show: boolean; run: () => Promise<void> | void }> = [
     {
       id: 'view-deliveries',
       label: t('sales.actions.viewDeliveries'),
       show: isSaleOrderConfirmed(record),
       run: () => router.push(buildModuleTabHref('sales', 'fulfillment', { saleId: orderId })),
+    },
+    {
+      id: 'create-return',
+      label: createReturnLabel,
+      show: canCreateReturn(order, lines),
+      run: createReturn,
     },
     {
       id: 'apply-promotion',
