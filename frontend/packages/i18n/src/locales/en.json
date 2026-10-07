@@ -7627,7 +7627,27 @@
       "discussion": "Discussion",
       "notFound": "Manufacturing order not found",
       "notFoundHint": "It may have been deleted, or belong to another organization.",
-      "produced": "produced"
+      "produced": "produced",
+      "actionDone": "{{action}} completed",
+      "actionFailed": "{{action}} failed",
+      "actions": {
+        "cancel": "Cancel order",
+        "cancelConfirm": "Cancel this manufacturing order? A done order cannot be cancelled.",
+        "confirm": "Confirm",
+        "consume": "Consume materials",
+        "consumeConfirm": "Consume the bill-of-materials components for this order from stock.",
+        "finish": "Finish",
+        "produce": "Record output",
+        "produceHint": "Quantity produced now. {{remaining}} remaining.",
+        "produceInvalid": "Enter a quantity above 0 and no more than the {{remaining}} remaining.",
+        "produceQty": "Quantity produced",
+        "start": "Start"
+      },
+      "workorderActions": {
+        "finish": "Finish work order",
+        "finishConfirm": "Stop the clock and mark this work order done. Open quality checks must already pass.",
+        "start": "Start work order"
+      }
     }
   },
   "projects": {
