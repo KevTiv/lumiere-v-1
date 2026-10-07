@@ -2334,8 +2334,12 @@ export async function revokePermissionViaSettings(page: Page, permissionId: numb
       { timeout: 30_000 },
     ),
     (async () => {
-      await submitForm(page, "settings-revoke-permission")
+      // The form stays open while the in-app confirmation is showing, so click through it
+      // before waiting for the form to close (submitForm would time out first).
+      await page.getByTestId("form-submit-settings-revoke-permission").click()
       await page.getByTestId("confirm-dialog-confirm").click()
+      await expect(page.getByTestId("form-modal-settings-revoke-permission")).toBeHidden({ timeout: 15_000 })
+      await expectNoAppError(page)
     })(),
   ])
   expect(res.ok()).toBe(true)
