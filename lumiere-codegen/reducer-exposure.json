@@ -2845,6 +2845,16 @@
       "reason": "invoked by an enumerated frontend BFF call site"
     },
     {
+      "name": "mark_all_notifications_read",
+      "exposure": "session",
+      "reason": "invoked by an enumerated frontend BFF call site"
+    },
+    {
+      "name": "mark_notification_read",
+      "exposure": "session",
+      "reason": "invoked by an enumerated frontend BFF call site"
+    },
+    {
       "name": "mark_onboarding_done",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
