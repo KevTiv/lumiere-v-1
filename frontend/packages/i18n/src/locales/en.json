@@ -6430,6 +6430,17 @@
       "moreActions": "More",
       "removeLinesDescription": "The lines are deleted from this order and its totals are recomputed.",
       "removeLinesTitle": "Remove the selected lines?"
+    },
+    "requisition": {
+      "addLine": {
+        "description": "Description (optional)",
+        "done": "Requisition line added",
+        "failed": "Add requisition line failed",
+        "invalid": "Choose a product, a unit and a quantity above zero.",
+        "quantity": "Quantity",
+        "title": "Add requisition line",
+        "uom": "Unit of measure"
+      }
     }
   },
   "erpWorkflow": {

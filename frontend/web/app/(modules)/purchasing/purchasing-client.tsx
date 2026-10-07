@@ -60,6 +60,8 @@ import { purchasingModuleConfig } from "@/lib/module-dashboard-configs"
 import { usePurchasingModuleSubscription } from "@/lib/module-subscription-hooks"
 import { PurchasingOpsSod } from "./purchasing-ops-sod"
 import { purchaseOrderLineCanBeRemoved, requisitionCanCreateRfq } from "./purchasing-action-gates"
+import { requisitionCanAddLine, toRequisitionLineInput } from "./purchase-requisition-line"
+import { showWorkflowToast } from "@lumiere/ui/lib/workflow-toast"
 import { PurchasingBlanketWorkspace } from "./purchasing-blanket-workspace"
 import {
   PurchasingOperationDialogs,
@@ -104,6 +106,7 @@ import {
   type ResPartnerBank,
   useCreatePurchaseOrder,
   useCreatePurchaseRequisition,
+  useAddPurchaseRequisitionLine,
   useAddPurchaseOrderLine,
   useRemovePurchaseOrderLine,
   useInvoicePurchaseOrderLine,
@@ -554,6 +557,7 @@ function PurchasingClientLoaded({
 
   const createPurchaseOrder = useCreatePurchaseOrder(orgId, { companyId: operatingCompanyId ?? undefined })
   const createPurchaseRequisition = useCreatePurchaseRequisition(orgId, { companyId: operatingCompanyId ?? undefined })
+  const addRequisitionLine = useAddPurchaseRequisitionLine(orgId, operatingCompanyId)
   const workflowSurface = useWorkflowSurface({ organizationId })
   const purchasingWorkflow = usePurchasingWorkflow(
     orgId,
@@ -667,6 +671,39 @@ function PurchasingClientLoaded({
     orgId,
     operatingCompanyId,
   )
+
+  const promptAddRequisitionLine = async (requisitionId: string) => {
+    const title = t("purchasing.requisition.addLine.title", { defaultValue: "Add requisition line" })
+    const values = await askForm({
+      title,
+      fields: [
+        { id: "productId", name: "productId", label: t("purchasing.ops.prompt.productId", { defaultValue: "Product" }), type: "select", required: true, searchable: true, options: productFieldOptions },
+        { id: "uomId", name: "uomId", label: t("purchasing.requisition.addLine.uom", { defaultValue: "Unit of measure" }), type: "select", required: true, searchable: true, options: uomFieldOptions },
+        { id: "quantity", name: "quantity", label: t("purchasing.requisition.addLine.quantity", { defaultValue: "Quantity" }), type: "number", required: true, min: 0, defaultValue: 1, width: "1/2" },
+        { id: "name", name: "name", label: t("purchasing.requisition.addLine.description", { defaultValue: "Description (optional)" }), type: "text" },
+      ],
+    })
+    if (values == null) return
+    const input = toRequisitionLineInput(values)
+    if (input == null) {
+      showWorkflowToast({
+        kind: "error",
+        title: t("purchasing.requisition.addLine.failed", { defaultValue: "Add requisition line failed" }),
+        description: t("purchasing.requisition.addLine.invalid", { defaultValue: "Choose a product, a unit and a quantity above zero." }),
+      })
+      return
+    }
+    try {
+      await addRequisitionLine.mutateAsync({ requisitionId, ...input })
+      showWorkflowToast({ kind: "success", title: t("purchasing.requisition.addLine.done", { defaultValue: "Requisition line added" }) })
+    } catch (error) {
+      showWorkflowToast({
+        kind: "error",
+        title: t("purchasing.requisition.addLine.failed", { defaultValue: "Add requisition line failed" }),
+        description: error instanceof Error ? error.message : String(error),
+      })
+    }
+  }
 
   const openCreateRfqFromRequisition = async (requisitionId?: string) => {
     setOperationDialogRequest({ kind: "create-rfq", requisitionId })
@@ -1700,6 +1737,17 @@ function PurchasingClientLoaded({
             confirmation: WORKFLOW_CONFIRMATION(t),
           }),
           {
+            id: "req-add-line",
+            label: t("purchasing.requisition.addLine.title", { defaultValue: "Add requisition line" }),
+            requiresSelection: true,
+            isApplicable: (rows) => rows.length === 1 && rows.every((r) => requisitionCanAddLine(r)),
+            onClick: async (rows) => {
+              const first = rows[0]
+              if (!first) return
+              await promptAddRequisitionLine(String(first.id))
+            },
+          },
+          {
             id: "req-create-rfq",
             label: t("purchasing.actions.createRfq", {
               defaultValue: "Create RFQ",
@@ -1719,7 +1767,7 @@ function PurchasingClientLoaded({
         ],
       },
     }
-  }, [t, purchasingWorkflow.requisitionActions, openCreateRfqFromRequisition])
+  }, [t, purchasingWorkflow.requisitionActions, openCreateRfqFromRequisition, promptAddRequisitionLine])
 
   const landedCostsEntityConfig = useMemo((): EntityViewConfig => {
     const view: EntityTableConfig = {
