@@ -4088,6 +4088,7 @@ function InventoryClientLoaded({
                   label: t('inventory.replenishmentActions.scheduleRun'),
                   icon: ListChecks,
                   requiresSelection: true,
+                  isApplicable: (rows) => rows.every((row) => row.active === true),
                   successMessage: t('common.actionCompleted', { action: t('inventory.replenishmentActions.scheduleRun') }),
                   onClick: async (rows) => {
                     const id = rows[0]?.id as ScalarId | undefined;

@@ -147,6 +147,7 @@ import {
 import type { ClearablePatch } from "@/lib/accounting-create-params"
 import { optionalBigIntU64 } from "@lumiere/erp-shared/form-coercion"
 import { toAddAccountMoveLineParamsFromForm } from "./account-move-line-forms"
+import { accountMoveLineCanBeDeleted } from "./account-move-line-gates"
 import { stdbParamsToJson } from "@/lib/stdb-params-json"
 import {
   buildAccountLabelMap,
@@ -2488,6 +2489,8 @@ function AccountingClientReady({
             requiresSelection: true,
             selection: "multiple",
             variant: "destructive",
+            isApplicable: (rows) =>
+              rows.every((r) => accountMoveLineCanBeDeleted(r as Record<string, unknown>, allMoves as Record<string, unknown>[])),
             successMessage: t("common.actionCompleted", { action: t("accounting.entities.moveLines.actions.deleteSelected") }),
             onClick: async (rows) => {
               for (const r of rows) {
@@ -2501,7 +2504,7 @@ function AccountingClientReady({
         ],
       },
     }
-  }, [t, deleteAccountMoveLine, organizationId, operatingCompanyId, accountLabelMap, sourceDocumentLabelMap])
+  }, [t, deleteAccountMoveLine, organizationId, operatingCompanyId, accountLabelMap, sourceDocumentLabelMap, allMoves])
 
   // Helper to get intercompany rule active state
   const intercompanyRuleIsActive = useCallback((row: Record<string, unknown>): boolean => {

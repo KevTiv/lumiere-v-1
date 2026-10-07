@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils"
 import type { SectionStatus } from "@/lib/proposal-workspace-types"
 import { SECTION_TEMPLATES } from "@/lib/proposal-workspace-types"
 import type { ProposalPresence, ProposalSourceDoc } from "@lumiere/stdb/proposal-row-types"
+import { CustomSectionDialog } from "./custom-section-dialog"
 import { rowBigint, rowNumber, rowString } from "./row-field-utils"
 
 type Section = Record<string, unknown>
@@ -69,6 +70,7 @@ export function SectionSidebar({
   const { t } = useTranslation()
   const [showTemplates, setShowTemplates] = useState(false)
   const [showDocs, setShowDocs] = useState(true)
+  const [showCustom, setShowCustom] = useState(false)
 
   const getStatusLabel = (status: SectionStatus): string => {
     const map: Record<SectionStatus, string> = {
@@ -142,13 +144,8 @@ export function SectionSidebar({
             <div className="border-t border-border">
               <button
                 type="button"
-                onClick={() => {
-                  const title = prompt("Section title:")
-                  if (title?.trim()) {
-                    onAddSection(title.trim())
-                    setShowTemplates(false)
-                  }
-                }}
+                data-testid="custom-section-button"
+                onClick={() => setShowCustom(true)}
                 className="w-full text-left px-3 py-1.5 text-xs hover:bg-muted transition-colors text-muted-foreground"
               >
                 {t("proposalWorkspace.sectionSidebar.customSection")}
@@ -278,6 +275,14 @@ export function SectionSidebar({
       )}
 
       {complianceSlot}
+      <CustomSectionDialog
+        open={showCustom}
+        onOpenChange={setShowCustom}
+        onSubmit={(title) => {
+          onAddSection(title)
+          setShowTemplates(false)
+        }}
+      />
     </aside>
   )
 }

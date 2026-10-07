@@ -1,4 +1,5 @@
 "use client"
+import { recordOptions, withLinkedPickers } from "@/lib/linked-options"
 import { mapDashboardWidgets, withDashboardSections } from "@lumiere/ui/lib/dashboard-sections"
 
 import { useMemo, useState } from "react"
@@ -100,6 +101,7 @@ import {
   toSetDocumentRetentionParams,
 } from "@/lib/documents-create-params"
 import { documentRecordHref, formatFileSize } from "./document-record"
+import { documentFolderCanBeDeleted } from "./document-folder-gates"
 import { optionalBigIntU64 } from "@lumiere/erp-shared/form-coercion"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
 import { useDefaultOperatingCompanyBigInt } from "@lumiere/query-hooks/hooks/use-operating-company"
@@ -392,10 +394,13 @@ function DocumentsClientLoaded({
 
   const processingJobFormConfig = useMemo(
     () =>
-      mergeSelectOptionsForFields(newDocumentProcessingJobForm(t), {
-        aiAgentId: aiAgentSelectOptions,
-      }),
-    [t, aiAgentSelectOptions],
+      withLinkedPickers(
+        mergeSelectOptionsForFields(newDocumentProcessingJobForm(t), {
+          aiAgentId: aiAgentSelectOptions,
+        }),
+        { documentId: recordOptions(documents as unknown as Record<string, unknown>[], (row) => row.name) },
+      ),
+    [t, aiAgentSelectOptions, documents],
   )
 
   const liveSections = useMemo(() => {
@@ -681,6 +686,7 @@ function DocumentsClientLoaded({
                   label: "Delete",
                   requiresSelection: true,
                   selection: "multiple",
+                  isApplicable: (rows) => rows.every((row) => !truthyRowBool(row.isLocked)),
                   successMessage: t("common.actionCompleted", { action: "Delete" }),
                   onClick: async (rows) => {
                     setDocumentToolbarError(null)
@@ -739,6 +745,8 @@ function DocumentsClientLoaded({
                   label: "Delete folder",
                   requiresSelection: true,
                   selection: "multiple",
+                  isApplicable: (rows) =>
+                    rows.every((row) => documentFolderCanBeDeleted(row, folders as Record<string, unknown>[])),
                   successMessage: t("common.actionCompleted", { action: "Delete folder" }),
                   onClick: async (rows) => {
                     setDocumentToolbarError(null)
@@ -839,6 +847,10 @@ function DocumentsClientLoaded({
                   label: t("documents.processing.actions.approve"),
                   requiresSelection: true,
                   selection: "multiple",
+                  isApplicable: (rows) =>
+                    rows.some(
+                      (r) => formatStdbTaggedValue(r.status) === "Completed" && !truthyRowBool(r.isApproved),
+                    ),
                   onClick: async (rows) => {
                     setProcessingToolbarError(null)
                     const eligible = rows.filter(
@@ -935,6 +947,7 @@ function DocumentsClientLoaded({
       knowledgeCategoryFormConfig,
       documentFolderFormConfig,
       processingJobFormConfig,
+      folders,
     ],
   )
 

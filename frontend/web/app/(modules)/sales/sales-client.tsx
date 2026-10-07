@@ -226,6 +226,7 @@ import {
   currencyOptionsFromRows,
 } from '@/lib/form-lookup';
 import { enumTag } from '@/lib/accounting-post-draft';
+import { saleOrderLineCanBeDeleted } from './sale-order-line-gates';
 
 function saleOrderState(row: Record<string, unknown>): string {
   const v = row.state;
@@ -1974,6 +1975,10 @@ function SalesClientLoaded({
                       requiresSelection: true,
                       selection: 'multiple',
                       variant: 'destructive' as const,
+                      isApplicable: (rows) =>
+                        rows.every((r) =>
+                          saleOrderLineCanBeDeleted(r, orders as Record<string, unknown>[]),
+                        ),
                       onClick: (rows) => {
                         for (const r of rows) {
                           // The workflow surface already reports the typed failure.

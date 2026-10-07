@@ -72,6 +72,12 @@ export interface EntityColumn extends EntityPermissioned {
   badgeVariants?: Record<string, string>
   /** Map raw value → display label for type="badge" */
   badgeLabels?: Record<string, string>
+  /**
+   * For `type: "currency"`: the row field holding the row's ISO 4217 code (e.g. "EUR"). The cell
+   * formats with that currency when the field is such a code and falls back to USD otherwise
+   * (numeric currency ids are not resolved here).
+   */
+  currencyKey?: string
   /** Override rendering entirely */
   render?: (value: unknown, row: EntityRow) => ReactNode
   /** Makes the cell editable in place (double-click). The caller owns the write. */
@@ -234,6 +240,8 @@ export interface EntityPivotConfig {
     /** Receives the currencies found on the rows. */
     mixedCurrencies: (currencies: string[]) => string
     chartTitle: (measure: string) => string
+    /** Label of the CSV export button; defaults to "Export CSV". */
+    exportCsv?: string
   }
 }
 

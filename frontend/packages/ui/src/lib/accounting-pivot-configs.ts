@@ -20,7 +20,7 @@ export function accountMovePivotSetup(t: TFunction): {
         ...base.columns,
         {
           key: "amountResidual",
-          label: t("accounting.journalEntries.residual"),
+          label: t("accounting.journalEntries.residual", { defaultValue: "Residual" }),
           type: "currency",
           align: "right",
         },

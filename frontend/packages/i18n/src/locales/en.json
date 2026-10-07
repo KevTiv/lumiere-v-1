@@ -176,7 +176,8 @@
       "pivotMixedCurrencies": "These records use more than one currency ({{currencies}}). Totals add the amounts as they are, without converting.",
       "pivotNoData": "No records to summarise",
       "pivotNone": "None",
-      "pivotTotal": "Total"
+      "pivotTotal": "Total",
+      "pivotExportCsv": "Export CSV"
     },
     "retry": "Retry"
   },
@@ -815,7 +816,19 @@
       "payment": "Payment",
       "postEntry": "Post",
       "cancelEntry": "Cancel",
-      "recalculateInvoiceTotals": "Recalculate totals"
+      "recalculateInvoiceTotals": "Recalculate totals",
+      "states": {
+        "cancelled": "Cancelled",
+        "draft": "Draft",
+        "posted": "Posted"
+      },
+      "types": {
+        "entry": "Journal Entry",
+        "inInvoice": "Vendor Bill",
+        "inRefund": "Vendor Credit",
+        "outInvoice": "Customer Invoice",
+        "outRefund": "Credit Note"
+      }
     },
     "invoices": {
       "title": "Invoices",
@@ -883,7 +896,14 @@
       "payment": "Payment",
       "registerPaymentHint": "Apply a posted payment to this document.",
       "removeLinesDescription": "The lines are deleted from this draft and its totals are recomputed.",
-      "removeLinesTitle": "Delete the selected lines?"
+      "removeLinesTitle": "Delete the selected lines?",
+      "paymentStates": {
+        "notPaid": "Not paid",
+        "paid": "Paid",
+        "partial": "Partial",
+        "reversed": "Reversed",
+        "unpaid": "Unpaid"
+      }
     },
     "bills": {
       "title": "Bills (Accounts Payable)",
@@ -2692,7 +2712,10 @@
         "email": "Email",
         "meeting": "Meeting",
         "todo": "To-do"
-      }
+      },
+      "attachFiles": "Attach files",
+      "attachmentsFailed": "Some files failed to upload. Remove them or retry.",
+      "removeAttachment": "Remove"
     },
     "csvImport": {
       "contactsTitle": "Import contacts (CSV)",
@@ -3520,6 +3543,12 @@
       "emailInvalid": "Enter a valid email address",
       "nameRequired": "A contact needs a name",
       "phoneRequired": "Enter a phone number"
+    },
+    "myActivities": {
+      "empty": "You have no open activities.",
+      "noDeadline": "No deadline",
+      "overdue": "Overdue",
+      "tabLabel": "My activities"
     }
   },
   "iot": {
@@ -11937,7 +11966,11 @@
       "untitled": "Untitled",
       "sourceDocs": "Source Docs ({{count}})",
       "addDocument": "Add document",
-      "proposalValue": "Proposal value"
+      "proposalValue": "Proposal value",
+      "customSectionAdd": "Add section",
+      "customSectionDescription": "Name the new proposal section.",
+      "customSectionPlaceholder": "Section title",
+      "customSectionTitle": "Section title"
     },
     "sectionEditor": {
       "statusEmpty": "Empty",
@@ -12430,6 +12463,14 @@
       "subscriptions": "Subscriptions",
       "timeoff": "Time off",
       "warehouse": "Warehouse"
+    }
+  },
+  "notifications": {
+    "bell": {
+      "empty": "No notifications.",
+      "label": "Notifications",
+      "recent": "Latest notifications",
+      "viewAll": "View all"
     }
   }
 }

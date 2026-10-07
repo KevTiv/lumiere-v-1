@@ -55,6 +55,7 @@ import { GuidedImportWizard } from "@/lib/guided-import-wizard"
 import { useSettingsModuleSubscription } from "@/lib/module-subscription-hooks"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
 import { currencyOptionsFromRows } from "@/lib/form-lookup"
+import { recordOptions, withLinkedPickers } from "@/lib/linked-options"
 import { useCompanies } from "@lumiere/query-hooks/hooks/organization-company"
 import { useCurrencies } from "@lumiere/query-hooks/hooks/settings"
 
@@ -630,32 +631,6 @@ export function SettingsClient({ organizationId }: { organizationId?: number }) 
   return <SettingsLoaded organizationId={organizationId} title={t("settings.page.title")} description={t("settings.page.description")} />
 }
 
-type LinkedOptions = {
-  companyId: ReadonlyArray<{ value: string; label: string }>
-  currencyId: ReadonlyArray<{ value: string; label: string }>
-}
-
-/** Number fields that ask for a company or currency id become searchable pickers over those records. */
-function withLinkedPickers(config: FormConfig, options: LinkedOptions): FormConfig {
-  return {
-    ...config,
-    sections: config.sections.map((section) => ({
-      ...section,
-      fields: section.fields.map((field) => {
-        const linked = field.type === "number" ? options[field.name as keyof LinkedOptions] : undefined
-        if (!linked || field.type !== "number") return field
-        const { type: _type, min: _min, max: _max, step: _step, defaultValue: _default, ...base } = field
-        return {
-          ...base,
-          type: "select" as const,
-          searchable: true,
-          options: linked.length > 0 ? linked : [{ value: "", label: "No records", disabled: true }],
-        }
-      }),
-    })),
-  }
-}
-
 function SettingsLoaded({
   organizationId,
   title,
@@ -673,14 +648,15 @@ function SettingsLoaded({
 
   const { data: companyRows = [] } = useCompanies(organizationId, true)
   const { data: currencyRows = [] } = useCurrencies()
-  const linkedOptions = useMemo<LinkedOptions>(
-    () => ({
-      companyId: (companyRows as unknown as Record<string, unknown>[]).map((row) => ({
-        value: String(row.id),
-        label: String(row.name ?? row.id),
-      })),
+  const linkedOptions = useMemo(() => {
+    const companyOptions = recordOptions(companyRows as unknown as Record<string, unknown>[], (row) => row.name)
+    return {
+      companyId: companyOptions,
+      // Company hierarchy: the parent is another company.
+      parentId: companyOptions,
       currencyId: currencyOptionsFromRows(currencyRows),
-    }),
+    }
+  },
     [companyRows, currencyRows],
   )
 

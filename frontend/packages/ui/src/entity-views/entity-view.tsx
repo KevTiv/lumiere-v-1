@@ -19,7 +19,8 @@ import { EntityTable } from "./entity-table"
 import { EntityDetail } from "./entity-detail"
 import { EntityBoardView } from "./entity-board"
 import { EntityPivotView } from "./entity-pivot"
-import { matchesSearch } from "../lib/entity-table-engine"
+import { ALL_FILTER_VALUE, matchesSearch, rowFilterValue } from "../lib/entity-table-engine"
+import { formatEntityFieldValue, getRowField, resolveCurrencyCode } from "../lib/entity-row-utils"
 import { Input } from "../components/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/card"
 import { Button } from "../components/button"
@@ -60,7 +61,22 @@ export function useScopedEntityTableConfig(config: EntityTableConfig): EntityTab
   return useMemo(
     () => ({
       ...config,
-      columns,
+      // Currency columns that name a row currency field format with that row's currency.
+      columns: columns.map((column) =>
+        column.type === "currency" && column.currencyKey && !column.render
+          ? {
+              ...column,
+              render: (value: unknown, row: Record<string, unknown>) =>
+                formatEntityFieldValue(
+                  value,
+                  "currency",
+                  undefined,
+                  undefined,
+                  resolveCurrencyCode(getRowField(row, column.currencyKey!)),
+                ),
+            }
+          : column,
+      ),
       actions: actions.length > 0 ? actions : undefined,
     }),
     [config, columns, actions],
@@ -87,21 +103,51 @@ export type EntitySurfaceMode = "table" | "board" | "pivot"
 
 const surfaceModeStorageKey = (configId: string) => `lumiere:entity-view-mode:${configId}`
 
-export function readStoredSurfaceMode(
+export interface StoredSurfaceState {
+  mode: EntitySurfaceMode
+  /** Pivot "columns by" key, when one was chosen. */
+  columnKey?: string
+}
+
+/**
+ * The remembered mode of a list (and its pivot "columns by" key). The entry is the plain mode
+ * name, or JSON `{ mode, columnKey }` once a pivot column grouping was chosen.
+ */
+export function readStoredSurfaceState(
   configId: string,
   allowed: readonly EntitySurfaceMode[] = ["table", "board"],
-): EntitySurfaceMode | null {
+): StoredSurfaceState | null {
   try {
     const stored = window.localStorage.getItem(surfaceModeStorageKey(configId))
-    return allowed.find((mode) => mode === stored) ?? null
+    if (!stored) return null
+    let mode: unknown = stored
+    let columnKey: unknown
+    if (stored.startsWith("{")) {
+      const parsed = JSON.parse(stored) as { mode?: unknown; columnKey?: unknown }
+      mode = parsed.mode
+      columnKey = parsed.columnKey
+    }
+    const found = allowed.find((candidate) => candidate === mode)
+    if (!found) return null
+    return typeof columnKey === "string" && columnKey ? { mode: found, columnKey } : { mode: found }
   } catch {
     return null
   }
 }
 
-export function storeSurfaceMode(configId: string, mode: EntitySurfaceMode) {
+export function readStoredSurfaceMode(
+  configId: string,
+  allowed: readonly EntitySurfaceMode[] = ["table", "board"],
+): EntitySurfaceMode | null {
+  return readStoredSurfaceState(configId, allowed)?.mode ?? null
+}
+
+export function storeSurfaceMode(configId: string, mode: EntitySurfaceMode, columnKey?: string) {
   try {
-    window.localStorage.setItem(surfaceModeStorageKey(configId), mode)
+    window.localStorage.setItem(
+      surfaceModeStorageKey(configId),
+      columnKey ? JSON.stringify({ mode, columnKey }) : mode,
+    )
   } catch {
     /* storage unavailable: the choice just is not remembered */
   }
@@ -194,13 +240,21 @@ export function ListPivotSwitch({
   children: ReactNode
 }) {
   const [mode, setMode] = useState<EntitySurfaceMode>("table")
+  const [pivotColumnKey, setPivotColumnKey] = useState("")
   useEffect(() => {
-    const stored = readStoredSurfaceMode(storageId, ["table", "pivot"])
-    if (stored) setMode(stored)
+    const stored = readStoredSurfaceState(storageId, ["table", "pivot"])
+    if (stored) {
+      setMode(stored.mode)
+      setPivotColumnKey(stored.columnKey ?? "")
+    }
   }, [storageId])
   const change = (next: EntitySurfaceMode) => {
     setMode(next)
-    storeSurfaceMode(storageId, next)
+    storeSurfaceMode(storageId, next, pivotColumnKey)
+  }
+  const changePivotColumn = (key: string) => {
+    setPivotColumnKey(key)
+    storeSurfaceMode(storageId, mode, key)
   }
   return (
     <div className="space-y-3">
@@ -216,7 +270,17 @@ export function ListPivotSwitch({
           ariaLabel: t("common.entityView.toggleLabel", { defaultValue: "Switch view" }),
         }}
       />
-      {mode === "pivot" ? <EntityPivotView rows={rows} table={table} pivot={pivot} /> : children}
+      {mode === "pivot" ? (
+        <EntityPivotView
+          rows={rows}
+          table={table}
+          pivot={pivot}
+          initialColumnKey={pivotColumnKey}
+          onColumnKeyChange={changePivotColumn}
+        />
+      ) : (
+        children
+      )}
     </div>
   )
 }
@@ -246,17 +310,27 @@ export function EntityView({
   const pivotConfig = hybrid?.pivot
   useEffect(() => {
     if (!hybrid) return
-    const stored = readStoredSurfaceMode(
+    const stored = readStoredSurfaceState(
       config.id,
       pivotConfig ? ["table", "board", "pivot"] : ["table", "board"],
     )
-    if (stored) setSurfaceMode(stored)
+    if (stored) {
+      setSurfaceMode(stored.mode)
+      setPivotColumnKey(stored.columnKey ?? "")
+    }
   }, [config.id, hybrid !== null, pivotConfig !== undefined]) // eslint-disable-line react-hooks/exhaustive-deps
+  const [pivotColumnKey, setPivotColumnKey] = useState("")
   const changeSurfaceMode = (mode: EntitySurfaceMode) => {
     setSurfaceMode(mode)
-    storeSurfaceMode(config.id, mode)
+    storeSurfaceMode(config.id, mode, pivotColumnKey)
+  }
+  const changePivotColumn = (key: string) => {
+    setPivotColumnKey(key)
+    storeSurfaceMode(config.id, surfaceMode, key)
   }
   const [boardSearch, setBoardSearch] = useState("")
+  // Board filters mirror the table's select filters; they are not persisted.
+  const [boardFilters, setBoardFilters] = useState<Record<string, string>>({})
 
   const plainTableConfig =
     config.view.mode === "table" ? config.view : hybrid ? hybrid.table : null
@@ -299,8 +373,20 @@ export function EntityView({
         ? boardColumns
         : deriveBoardColumns(hybrid.table, hybrid.board.groupKey)
       const searchKeys = tableConfig.searchKeys ?? []
+      const boardFilterDefs = (tableConfig.filters ?? []).filter(
+        (filter) => filter.type === "select" && filter.options && filter.options.length > 0,
+      )
       const boardRowFilter = (row: Record<string, unknown>) =>
-        (boardFilterItem ? boardFilterItem(row) : true) && matchesSearch(row, searchKeys, boardSearch.trim())
+        (boardFilterItem ? boardFilterItem(row) : true) &&
+        matchesSearch(row, searchKeys, boardSearch.trim()) &&
+        boardFilterDefs.every((filter) => {
+          const chosen = boardFilters[filter.key]
+          return (
+            !chosen ||
+            chosen === ALL_FILTER_VALUE ||
+            rowFilterValue(row, filter.key).toLowerCase() === chosen.toLowerCase()
+          )
+        })
       return (
         <div className="space-y-3">
           {hybrid.viewToggleLabels ? (
@@ -323,10 +409,18 @@ export function EntityView({
               onInitialFilterClear={onInitialFilterClear}
             />
           ) : surfaceMode === "pivot" && pivotConfig ? (
-            <EntityPivotView rows={data} table={tableConfig} pivot={pivotConfig} />
+            <EntityPivotView
+              rows={data}
+              table={tableConfig}
+              pivot={pivotConfig}
+              initialColumnKey={pivotColumnKey}
+              onColumnKeyChange={changePivotColumn}
+            />
           ) : effectiveBoardColumns.length ? (
             <div className="space-y-3">
-              {!onBoardMove && searchKeys.length > 0 ? (
+              {!onBoardMove && (searchKeys.length > 0 || boardFilterDefs.length > 0) ? (
+                <div className="flex flex-wrap items-center gap-2">
+              {searchKeys.length > 0 ? (
                 <Input
                   type="search"
                   value={boardSearch}
@@ -336,6 +430,25 @@ export function EntityView({
                   className="h-8 max-w-xs"
                   data-testid="entity-board-search"
                 />
+              ) : null}
+              {boardFilterDefs.map((filter) => (
+                <select
+                  key={filter.key}
+                  aria-label={filter.label}
+                  className="h-8 rounded-md border border-input bg-background px-2 text-sm text-foreground"
+                  data-testid={`entity-board-filter-${filter.key}`}
+                  value={boardFilters[filter.key] ?? ALL_FILTER_VALUE}
+                  onChange={(event) =>
+                    setBoardFilters((prev) => ({ ...prev, [filter.key]: event.target.value }))
+                  }
+                >
+                  <option value={ALL_FILTER_VALUE}>{filter.label}</option>
+                  {filter.options!.map((option) => (
+                    <option key={option.value} value={option.value}>{option.label}</option>
+                  ))}
+                </select>
+              ))}
+                </div>
               ) : null}
               <EntityBoardView
                 config={boardConfig}

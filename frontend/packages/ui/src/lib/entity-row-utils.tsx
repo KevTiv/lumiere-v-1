@@ -71,11 +71,36 @@ function isLikelyImageSrc(value: string): boolean {
   )
 }
 
+/**
+ * The ISO 4217 code in a row's currency field, upper-cased; undefined for anything else (missing,
+ * numeric ids, unknown codes) so callers fall back to the default currency.
+ */
+export function resolveCurrencyCode(raw: unknown): string | undefined {
+  const value = unwrapEntityValue(raw)
+  if (typeof value !== "string" || !/^[A-Za-z]{3}$/.test(value.trim())) return undefined
+  const code = value.trim().toUpperCase()
+  try {
+    new Intl.NumberFormat("en-US", { style: "currency", currency: code })
+    return code
+  } catch {
+    return undefined
+  }
+}
+
+export function formatCurrencyAmount(value: number, currencyCode?: string): string {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: resolveCurrencyCode(currencyCode) ?? "USD",
+  }).format(value)
+}
+
 export function formatEntityFieldValue(
   rawValue: unknown,
   type: string | undefined,
   badgeVariants?: Record<string, string>,
   badgeLabels?: Record<string, string>,
+  /** ISO code for `type: "currency"`; USD when absent or not a valid code. */
+  currencyCode?: string,
 ): ReactNode {
   const value = unwrapEntityValue(rawValue)
   if (value === null || value === undefined || value === "") {
@@ -84,9 +109,7 @@ export function formatEntityFieldValue(
 
   switch (type) {
     case "currency":
-      return typeof value === "number"
-        ? new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value)
-        : String(value)
+      return typeof value === "number" ? formatCurrencyAmount(value, currencyCode) : String(value)
 
     case "number":
       return typeof value === "number"

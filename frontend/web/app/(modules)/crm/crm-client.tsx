@@ -9,6 +9,7 @@ import { ContactPaymentsAndMessagesPanel } from "./contact-payments-and-messages
 import { ContactConsentPanel } from "./contact-consent-panel"
 import { ContactRelationshipsPanel } from "./contact-relationships-panel"
 import { OpportunityPresenceBanner } from "./opportunity-presence-banner"
+import { MyActivitiesPanel } from "./my-activities-panel"
 import { CrmPipelineAdminPanel } from "./crm-pipeline-admin-panel"
 import { CrmCountryPackPanel } from "./crm-country-pack-panel"
 import { LeadScorePanel } from "./lead-score-panel"
@@ -1541,6 +1542,12 @@ function CrmClientLoaded({
           label: t("crm.attribution.tabLabel"),
           type: "custom" as const,
           customContent: <CrmUtmSettings organizationId={organizationId} />,
+        },
+        {
+          id: "my-activities",
+          label: t("crm.myActivities.tabLabel", { defaultValue: "My activities" }),
+          type: "custom" as const,
+          customContent: <MyActivitiesPanel organizationId={organizationId} />,
         },
         {
           id: "pipeline-admin",

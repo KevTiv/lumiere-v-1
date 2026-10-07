@@ -75,6 +75,7 @@ export function pivotConfig(
         }),
       chartTitle: (measure) =>
         t("common.entityView.pivotChartTitle", { defaultValue: "{{measure}} by group", measure }),
+      exportCsv: t("common.entityView.pivotExportCsv", { defaultValue: "Export CSV" }),
     },
   }
 }

@@ -139,3 +139,39 @@ export function buildPivot(input: PivotInput): PivotResult {
     mixedCurrencies: currencies.size > 1,
   }
 }
+
+export interface PivotCsvLabels {
+  rowLabel: string
+  count: string
+  total: string
+  measures: readonly string[]
+}
+
+/** The pivot table as plain headers and rows (raw numbers, no currency formatting) for CSV export. */
+export function pivotToCsvTable(
+  result: PivotResult,
+  labels: PivotCsvLabels,
+): { headers: string[]; rows: Array<Array<string | number>> } {
+  const hasColumns = result.columns.length > 0
+  const heads = (prefix: string | null) => [
+    prefix !== null ? `${prefix} - ${labels.count}` : labels.count,
+    ...labels.measures.map((measure) => (prefix !== null ? `${prefix} - ${measure}` : measure)),
+  ]
+  const cellValues = (cell: PivotCell | undefined): Array<string | number> =>
+    cell ? [cell.count, ...labels.measures.map((_, i) => cell.sums[i] ?? 0)] : heads(null).map(() => "")
+  const headers = [
+    labels.rowLabel,
+    ...(hasColumns ? result.columns.flatMap((c) => heads(c.label)) : []),
+    ...heads(hasColumns ? labels.total : null),
+  ]
+  const line = (label: string, cells: Array<PivotCell | undefined>, total: PivotCell) => [
+    label,
+    ...cells.flatMap(cellValues),
+    ...cellValues(total),
+  ]
+  const rows = result.rows.map((row) =>
+    line(row.label, result.columns.map((c) => row.cells[c.value]), row.total),
+  )
+  rows.push(line(labels.total, result.columns.map((c) => result.columnTotals[c.value]), result.total))
+  return { headers, rows }
+}

@@ -3,8 +3,10 @@
 import { useMemo, useState } from "react"
 import { cn } from "../lib/utils"
 import type { EntityColumn, EntityPivotConfig, EntityTableConfig } from "../lib/entity-view-types"
-import { buildPivot, type PivotCell } from "../lib/entity-pivot"
-import { formatEntityFieldValue } from "../lib/entity-row-utils"
+import { buildPivot, pivotToCsvTable, type PivotCell } from "../lib/entity-pivot"
+import { formatEntityFieldValue, resolveCurrencyCode } from "../lib/entity-row-utils"
+import { downloadCsv, rowsToCsv } from "../lib/export-csv"
+import { Button } from "../components/button"
 import { humanizeEnumValue } from "../lib/entity-row-values"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/table"
 
@@ -13,16 +15,27 @@ export interface EntityPivotViewProps {
   /** The list's table config: column labels and types, filter option labels. */
   table: EntityTableConfig
   pivot: EntityPivotConfig
+  /** Column grouping to start with (e.g. the one remembered for this list). */
+  initialColumnKey?: string
+  /** Called when the user picks another column grouping ("" for none). */
+  onColumnKeyChange?: (key: string) => void
   className?: string
 }
 
 const selectClass =
   "h-8 rounded-md border border-input bg-background px-2 text-sm text-foreground"
 
-export function EntityPivotView({ rows, table, pivot, className }: EntityPivotViewProps) {
+export function EntityPivotView({
+  rows,
+  table,
+  pivot,
+  initialColumnKey,
+  onColumnKeyChange,
+  className,
+}: EntityPivotViewProps) {
   const { labels } = pivot
   const [groupKey, setGroupKey] = useState(pivot.groupKeys[0] ?? "")
-  const [columnKey, setColumnKey] = useState("")
+  const [columnKey, setColumnKey] = useState(initialColumnKey ?? "")
 
   const columnByKey = useMemo(() => {
     const map = new Map<string, EntityColumn>()
@@ -50,7 +63,9 @@ export function EntityPivotView({ rows, table, pivot, className }: EntityPivotVi
     return badge ? Object.keys(badge) : undefined
   }
 
-  const effectiveColumnKey = columnKey && columnKey !== groupKey ? columnKey : undefined
+  const effectiveColumnKey =
+    columnKey && columnKey !== groupKey && pivot.groupKeys.includes(columnKey) ? columnKey : undefined
+  const currencyKey = pivot.currencyKey ?? measures.find((column) => column.currencyKey)?.currencyKey
   const result = useMemo(
     () =>
       buildPivot({
@@ -58,17 +73,31 @@ export function EntityPivotView({ rows, table, pivot, className }: EntityPivotVi
         rowKey: groupKey,
         columnKey: effectiveColumnKey,
         measureKeys,
-        currencyKey: pivot.currencyKey,
+        currencyKey,
         labelFor,
         orderFor,
       }),
     // labelFor/orderFor derive from table, which is the dependency that matters.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [rows, groupKey, effectiveColumnKey, measureKeys.join("|"), pivot.currencyKey, table],
+    [rows, groupKey, effectiveColumnKey, measureKeys.join("|"), currencyKey, table],
   )
 
+  // Totals add amounts as they are: they are shown in the rows' currency only when there is a
+  // single one and it is an ISO code; otherwise (mixed, none, numeric ids) the default applies.
+  const currencyCode =
+    result.currencies.length === 1 ? resolveCurrencyCode(result.currencies[0]) : undefined
   const money = (value: number, column: EntityColumn) =>
-    formatEntityFieldValue(value, column.type ?? "number")
+    formatEntityFieldValue(value, column.type ?? "number", undefined, undefined, currencyCode)
+
+  const exportCsv = () => {
+    const { headers, rows: csvRows } = pivotToCsvTable(result, {
+      rowLabel: fieldLabel(groupKey),
+      count: labels.count,
+      total: labels.total,
+      measures: measures.map((column) => column.label),
+    })
+    downloadCsv(`pivot-${groupKey}`, rowsToCsv(headers, csvRows))
+  }
 
   const cellContent = (cell: PivotCell | undefined) =>
     cell
@@ -113,7 +142,10 @@ export function EntityPivotView({ rows, table, pivot, className }: EntityPivotVi
             className={selectClass}
             data-testid="entity-pivot-columns"
             value={effectiveColumnKey ?? ""}
-            onChange={(event) => setColumnKey(event.target.value)}
+            onChange={(event) => {
+              setColumnKey(event.target.value)
+              onColumnKeyChange?.(event.target.value)
+            }}
           >
             <option value="">{labels.none}</option>
             {pivot.groupKeys
@@ -123,6 +155,17 @@ export function EntityPivotView({ rows, table, pivot, className }: EntityPivotVi
               ))}
           </select>
         </label>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="ml-auto"
+          onClick={exportCsv}
+          disabled={result.rows.length === 0}
+          data-testid="entity-pivot-export"
+        >
+          {labels.exportCsv ?? "Export CSV"}
+        </Button>
       </div>
 
       {result.mixedCurrencies ? (

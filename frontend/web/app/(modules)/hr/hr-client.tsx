@@ -1,4 +1,5 @@
 "use client"
+import { recordOptions, withLinkedPickers } from "@/lib/linked-options"
 import { mapDashboardWidgets, withDashboardSections } from "@lumiere/ui/lib/dashboard-sections"
 import { withInlineEdits } from "@lumiere/ui/lib/with-inline-edits"
 
@@ -586,12 +587,18 @@ function HrClientLoaded({
     [t, departmentFieldOptions],
   )
 
+  // Employee, structure and contract are number fields in the config, so they become searchable pickers here.
   const payslipFormConfig = useMemo(
     () =>
-      mergeSelectOptionsForFields(newPayslipForm(t), {
-        structId: payrollStructureFieldOptions,
+      withLinkedPickers(newPayslipForm(t), {
+        employeeId: recordOptions(employees as Record<string, unknown>[], (row) => row.name ?? row.workEmail ?? row.workPhone),
+        structId: recordOptions(
+          (payrollStructures as Record<string, unknown>[]).filter((row) => row.isActive !== false && row.isActive !== 0),
+          (row) => row.name,
+        ),
+        contractId: recordOptions(contracts as Record<string, unknown>[], (row) => row.name),
       }),
-    [t, payrollStructureFieldOptions],
+    [t, employees, payrollStructures, contracts],
   )
 
   const salaryRuleFormConfig = useMemo(

@@ -7,7 +7,12 @@ import {
   AIChatPanel,
   NotebookPanel,
   JournalPanel,
+  ChatterUploaderProvider,
+  HeaderTrailingProvider,
+  NotificationBell,
+  recentNotifications,
 } from "@lumiere/ui"
+import { useWebChatterUploader } from "@/lib/chatter-attachment-uploader"
 import { useErpSession } from "@lumiere/erp-session"
 import type { ChatContext, ChatMessage, ChatMessageSourceRef, ChatAction } from "@lumiere/ui"
 import {
@@ -46,6 +51,7 @@ import { useOperatingCompanyId } from "@lumiere/query-hooks/hooks/use-operating-
 import { ErpAiRouteContextProvider, ErpAiChatControllerProvider, useErpAiRouteContext } from "@/lib/erp-ai-context"
 import { performSignOut } from "@/lib/auth-sign-out"
 import { useCurrentUserProfile } from "@lumiere/query-hooks/hooks/auth"
+import { useMailMessages } from "@lumiere/query-hooks/hooks/messages"
 
 const AI_CHAT_SESSION_KEY_STORAGE = "lumiere:erp-ai-chat-session-key"
 
@@ -518,6 +524,23 @@ function ErpAiChatPanel(props: Omit<ComponentProps<typeof AIChatPanel>, "onSendM
   )
 }
 
+/** Header bell: the latest notifications addressed to the signed-in user (the model has no read state). */
+function HeaderNotificationBell({ organizationId }: { organizationId: number }) {
+  const { identity } = useErpSession()
+  const { data: messages = [] } = useMailMessages(BigInt(organizationId))
+  const notifications = useMemo(
+    () => recentNotifications(messages as unknown as Record<string, unknown>[], identity),
+    [messages, identity],
+  )
+  return (
+    <NotificationBell
+      notifications={notifications}
+      viewAllHref="/messages"
+      itemHref={(n) => `/messages/${n.id}`}
+    />
+  )
+}
+
 function ModulesContent({
   children,
   firstOrgProfile,
@@ -551,6 +574,7 @@ function ModulesContent({
 
   return (
     <ErpAiChatControllerProvider open={openAiChat}>
+      <HeaderTrailingProvider value={orgReady ? <HeaderNotificationBell organizationId={orgId} /> : null}>
       <div className="flex h-screen overflow-hidden bg-muted/30 text-foreground">
         <DashboardSidebar
           firstOrgProfile={firstOrgProfile}
@@ -597,6 +621,7 @@ function ModulesContent({
           onOpenJournal={() => setIsJournalOpen(true)}
         />
       </div>
+      </HeaderTrailingProvider>
     </ErpAiChatControllerProvider>
   )
 }
@@ -611,7 +636,9 @@ export default function ModulesShell({
   return (
     <Suspense fallback={null}>
       <ErpAiRouteContextProvider>
-        <ModulesContent firstOrgProfile={firstOrgProfile}>{children}</ModulesContent>
+        <ChatterUploaderProvider value={useWebChatterUploader}>
+          <ModulesContent firstOrgProfile={firstOrgProfile}>{children}</ModulesContent>
+        </ChatterUploaderProvider>
       </ErpAiRouteContextProvider>
     </Suspense>
   )

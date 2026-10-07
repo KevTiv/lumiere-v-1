@@ -55,9 +55,11 @@ import {
 } from "@lumiere/ui"
 import type { EntityRow, EntityViewConfig, EntityTableConfig, EntityRecordSheetConfig, FormConfig, ModuleConfig } from "@lumiere/ui"
 import type { Product, Uom } from "@lumiere/stdb/types"
+import { awardBidOptions } from "@/lib/linked-options"
 import { purchasingModuleConfig } from "@/lib/module-dashboard-configs"
 import { usePurchasingModuleSubscription } from "@/lib/module-subscription-hooks"
 import { PurchasingOpsSod } from "./purchasing-ops-sod"
+import { purchaseOrderLineCanBeRemoved, requisitionCanCreateRfq } from "./purchasing-action-gates"
 import { PurchasingBlanketWorkspace } from "./purchasing-blanket-workspace"
 import {
   PurchasingOperationDialogs,
@@ -674,13 +676,34 @@ function PurchasingClientLoaded({
     setOperationDialogRequest({ kind: "add-rfq-bid" })
   }
 
-  // RFQs and bids have no list query yet, so both are still identified by id.
   const promptAwardRfqBid = async () => {
+    const vendorNames = new Map(vendorFieldOptions.map((option) => [option.value, option.label]))
+    const pickers = awardBidOptions(
+      rfqs as unknown as Record<string, unknown>[],
+      rfqBids as unknown as Record<string, unknown>[],
+      vendorNames,
+    )
     const values = await askForm({
       title: t("purchasing.ops.awardRfqBid", { defaultValue: "Award RFQ bid" }),
       fields: [
-        { id: "rfqId", name: "rfqId", label: t("purchasing.ops.prompt.rfqId", { defaultValue: "RFQ id" }), type: "number", required: true, min: 1 },
-        { id: "bidId", name: "bidId", label: t("purchasing.ops.prompt.bidId", { defaultValue: "Bid id to award" }), type: "number", required: true, min: 1 },
+        {
+          id: "rfqId",
+          name: "rfqId",
+          label: t("purchasing.ops.prompt.rfqId", { defaultValue: "RFQ id" }),
+          type: "select",
+          searchable: true,
+          required: true,
+          options: pickers.rfqId.length > 0 ? pickers.rfqId : [{ value: "", label: "No records", disabled: true }],
+        },
+        {
+          id: "bidId",
+          name: "bidId",
+          label: t("purchasing.ops.prompt.bidId", { defaultValue: "Bid id to award" }),
+          type: "select",
+          searchable: true,
+          required: true,
+          options: pickers.bidId.length > 0 ? pickers.bidId : [{ value: "", label: "No records", disabled: true }],
+        },
       ],
     })
     const rfqId = formText(values?.rfqId)
@@ -1623,6 +1646,7 @@ function PurchasingClientLoaded({
             requiresSelection: true,
             selection: "multiple",
             variant: "destructive",
+            isApplicable: (rows) => rows.every((r) => purchaseOrderLineCanBeRemoved(r, orders as Record<string, unknown>[])),
             successMessage: t("common.actionCompleted", { action: t("common.delete") }),
             onClick: async (rows) => {
               for (const r of rows) {
@@ -1652,6 +1676,7 @@ function PurchasingClientLoaded({
     receiveLineFormConfig,
     invoiceLineFormConfig,
     removePurchaseOrderLine,
+    orders,
     purchasingWorkflow.receiveLine,
   ])
 
@@ -1680,6 +1705,7 @@ function PurchasingClientLoaded({
               defaultValue: "Create RFQ",
             }),
             requiresSelection: true,
+            isApplicable: (rows) => rows.every((r) => requisitionCanCreateRfq(r)),
             onClick: async (rows) => {
               const first = rows[0]
               if (!first) return

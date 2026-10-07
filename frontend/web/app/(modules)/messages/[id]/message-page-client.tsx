@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { CornerUpLeft, ExternalLink, MessagesSquare } from 'lucide-react';
@@ -18,6 +18,12 @@ import {
   RecordPage,
   SmartButtons,
   buildModuleTabHref,
+  attachmentDocumentIds,
+  filesFromFormValue,
+  itemsForFiles,
+  uploadPendingAttachments,
+  useChatterUploader,
+  type AttachmentItem,
   type FormConfig,
 } from '@lumiere/ui';
 import { Badge } from '@lumiere/ui/components/badge';
@@ -97,6 +103,8 @@ function MessagePageLoaded({
 
   const [replying, setReplying] = useState(false);
   const [replyError, setReplyError] = useState<string | null>(null);
+  const replyUpload = useChatterUploader(organizationId);
+  const replyAttempt = useRef<AttachmentItem[]>([]);
 
   const rows = messages as unknown as Row[];
   const message = useMemo(() => rows.find((row) => String(row.id) === messageId), [rows, messageId]);
@@ -195,6 +203,9 @@ function MessagePageLoaded({
         id: 'reply',
         fields: [
           { id: 'body', name: 'body', type: 'textarea', label: t('messages.messages.columns.body'), required: true, rows: 5, width: 'full' },
+          ...(replyUpload
+            ? [{ id: 'attachments', name: 'attachments', type: 'file' as const, label: t('crm.chatter.attachFiles', { defaultValue: 'Attach files' }), multiple: true, width: 'full' as const }]
+            : []),
         ],
       },
     ],
@@ -351,14 +362,36 @@ function MessagePageLoaded({
               return;
             }
             try {
+              let attachmentIds: bigint[] = [];
+              const files = filesFromFormValue(formData.attachments);
+              if (files.length > 0) {
+                if (!replyUpload) {
+                  setReplyError(t('crm.chatter.attachmentsFailed', { defaultValue: 'Some files failed to upload. Remove them or retry.' }));
+                  return;
+                }
+                const result = await uploadPendingAttachments(
+                  itemsForFiles(files, replyAttempt.current),
+                  replyUpload,
+                  { resModel: model, resId: BigInt(resId) },
+                  () => undefined,
+                );
+                replyAttempt.current = result;
+                const failed = result.filter((item) => item.status === 'error');
+                if (failed.length > 0) {
+                  setReplyError(failed.map((item) => `${item.file.name}: ${item.error ?? ''}`).join('; '));
+                  return;
+                }
+                attachmentIds = attachmentDocumentIds(result);
+              }
               await postMessage.mutateAsync({
                 model,
                 resId,
                 body,
                 messageType: 'comment',
                 parentId: messageId,
-                attachmentIds: [],
+                attachmentIds,
               });
+              replyAttempt.current = [];
               setReplying(false);
               setActiveTab('thread');
             } catch (error) {

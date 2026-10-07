@@ -1,5 +1,6 @@
 "use client"
 
+import { recordOptions, withLinkedPickers } from "@/lib/linked-options"
 import { useMemo, useState } from "react"
 import { useTranslation } from "@lumiere/i18n"
 import { toCreateAiSkillParams } from "@lumiere/erp-shared/ai-create-params"
@@ -235,6 +236,15 @@ function AiSkillsLoaded({ organizationId }: { organizationId: number }) {
     }
     return map
   }, [teamMembers])
+
+  const assignSkillPickerForm = useMemo(
+    () =>
+      withLinkedPickers(assignSkillForm, {
+        teamMemberId: recordOptions(teamMembers as unknown as Record<string, unknown>[], (row) => row.name),
+        skillId: recordOptions(skills as unknown as Record<string, unknown>[], (row) => row.name),
+      }),
+    [teamMembers, skills],
+  )
 
   const skillNameById = useMemo(() => {
     const map = new Map<number, string>()
@@ -488,7 +498,7 @@ function AiSkillsLoaded({ organizationId }: { organizationId: number }) {
           onOpenChange={(open) => {
             if (!open) closeModal()
           }}
-          config={assignSkillForm}
+          config={assignSkillPickerForm}
           isPending={isPending}
           closeOnSubmit={false}
           submitError={submitError}

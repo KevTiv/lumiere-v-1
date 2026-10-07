@@ -37,6 +37,11 @@ import {
 import { cn } from "@/lib/utils"
 import { showWorkflowToast } from "../lib/workflow-toast"
 import {
+  ChatterAttachmentPicker,
+  useChatterAttachments,
+  useChatterUploader,
+} from "./chatter-attachments"
+import {
   formatTimelineDate,
   mergeRecordTimeline,
   type TimelineEntry,
@@ -147,6 +152,8 @@ export function CrmRecordChatter({
     }>
   >([])
   const [following, setFollowing] = useState(false)
+  const upload = useChatterUploader(organizationId)
+  const attachments = useChatterAttachments(upload, { resModel, resId })
 
   const reloadMessages = useCallback(() => {
     if (!organizationId || !resModel) {
@@ -306,7 +313,19 @@ export function CrmRecordChatter({
     const body = noteBody.trim()
     if (!body || !identity) return
     let attachmentIds: bigint[] = []
-    if (attachmentIdsRaw.trim()) {
+    if (upload) {
+      try {
+        setBusy(true)
+        const uploaded = await attachments.uploadAll()
+        if (!uploaded) {
+          reportError(new Error(t("crm.chatter.attachmentsFailed", { defaultValue: "Some files failed to upload. Remove them or retry." })), t("crm.chatter.postNote"))
+          return
+        }
+        attachmentIds = uploaded
+      } finally {
+        setBusy(false)
+      }
+    } else if (attachmentIdsRaw.trim()) {
       try {
         attachmentIds = parseAttachmentIds(attachmentIdsRaw)
       } catch {
@@ -326,6 +345,7 @@ export function CrmRecordChatter({
       })
       setNoteBody("")
       setAttachmentIdsRaw("")
+      attachments.reset()
       reloadMessages()
     } catch (e) {
       reportError(e, t("crm.chatter.postNote"))
@@ -435,12 +455,21 @@ export function CrmRecordChatter({
           className="resize-y min-h-[4.5rem]"
           data-testid="record-chatter-note"
         />
-        <input
-          className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm"
-          placeholder={t("crm.chatter.attachmentIdsPlaceholder")}
-          value={attachmentIdsRaw}
-          onChange={(e) => setAttachmentIdsRaw(e.target.value)}
-        />
+        {upload ? (
+          <ChatterAttachmentPicker
+            items={attachments.items}
+            onAdd={attachments.add}
+            onRemove={attachments.remove}
+            disabled={busy}
+          />
+        ) : (
+          <input
+            className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm"
+            placeholder={t("crm.chatter.attachmentIdsPlaceholder")}
+            value={attachmentIdsRaw}
+            onChange={(e) => setAttachmentIdsRaw(e.target.value)}
+          />
+        )}
         <Button
           type="button"
           size="sm"

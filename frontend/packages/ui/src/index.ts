@@ -116,6 +116,8 @@ export * from "./lib/iot-form-configs";
 // Dashboard pages & widgets
 export * from "./pages/dashboard-grid";
 export * from "./pages/dashboard-header";
+export * from "./pages/notification-bell";
+export * from "./lib/notification-bell-model";
 export * from "./lib/dashboard-time-range";
 export * from "./components/trend-badge";
 export * from "./pages/dashboard-sidebar";
@@ -232,6 +234,7 @@ export * from "./accounting-components/create-invoice-modal";
 export * from "./accounting-components/bills-list-view";
 export * from "./crm-components/crm-utm-settings";
 export * from "./crm-components/crm-record-chatter";
+export * from "./crm-components/chatter-attachments";
 export * from "./accounting-components/chart-of-accounts-view";
 export * from "./accounting-components/chart-structure-workspace";
 export * from "./accounting-components/general-ledger-view";

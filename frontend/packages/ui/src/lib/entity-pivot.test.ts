@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { buildPivot, pivotMeasureValue } from "./entity-pivot"
+import { buildPivot, pivotMeasureValue, pivotToCsvTable } from "./entity-pivot"
 
 const rows = [
   { id: 1, state: "Draft", kind: "A", amount: 10, residual: 1, currencyId: "USD" },
@@ -63,5 +63,36 @@ describe("buildPivot", () => {
     expect(empty.total).toEqual({ count: 0, sums: [0] })
     expect(pivotMeasureValue({ amount: 5n }, "amount")).toBe(5)
     expect(pivotMeasureValue({ amount: NaN }, "amount")).toBeNull()
+  })
+})
+
+describe("pivotToCsvTable", () => {
+  const labels = { rowLabel: "State", count: "Count", total: "Total", measures: ["Amount"] }
+
+  it("flattens rows and the total row without columns", () => {
+    const result = buildPivot({ rows, rowKey: "kind", measureKeys: ["amount"] })
+    const table = pivotToCsvTable(result, labels)
+    expect(table.headers).toEqual(["State", "Count", "Amount"])
+    expect(table.rows).toEqual([
+      ["A", 2, 30.5],
+      ["B", 2, 5],
+      ["Total", 4, 35.5],
+    ])
+  })
+
+  it("adds a block per column group plus a total block, leaving empty cells blank", () => {
+    const result = buildPivot({ rows, rowKey: "kind", columnKey: "state", measureKeys: ["amount"] })
+    const table = pivotToCsvTable(result, labels)
+    expect(table.headers).toEqual([
+      "State",
+      ...result.columns.flatMap((c) => [`${c.label} - Count`, `${c.label} - Amount`]),
+      "Total - Count",
+      "Total - Amount",
+    ])
+    const bRow = table.rows[1]!
+    expect(bRow[0]).toBe("B")
+    expect(bRow).toContain("")
+    expect(bRow.slice(-2)).toEqual([2, 5])
+    expect(table.rows.at(-1)!.slice(-2)).toEqual([4, 35.5])
   })
 })
