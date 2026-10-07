@@ -11,7 +11,7 @@ use crate::accounting::tax_management::{account_tax, create_account_tax, CreateA
 use crate::test_harness::{chart_keys, ensure_test_superuser, OrgFixture};
 use crate::types::{AccountMoveState, PaymentState, TaxAmountType, TaxTypeUse};
 
-use super::helpers::create_balanced_customer_invoice;
+use super::helpers::{create_balanced_customer_invoice, create_balanced_customer_invoice_on_account};
 
 pub fn test_post_customer_invoice_creates_move_lines(ctx: &ReducerContext) -> Result<(), String> {
     ensure_test_superuser(ctx)?;
@@ -475,7 +475,23 @@ pub fn test_reset_account_move_to_draft_only_from_cancelled(ctx: &ReducerContext
         return Err("move lines were not returned to Draft".to_string());
     }
 
-    let posted_id = create_balanced_customer_invoice(ctx, &fixture, 50.0, true)?;
+    // `create_balanced_customer_invoice` keys the move by its reference label, so a second call
+    // with the default label returns the first move again; a distinct label gives a distinct move.
+    let ar_id = *fixture
+        .chart_account_ids
+        .get(chart_keys::AR)
+        .ok_or("Harness missing AR account")?;
+    let posted_id = create_balanced_customer_invoice_on_account(
+        ctx,
+        &fixture,
+        50.0,
+        ar_id,
+        "Harness posted invoice",
+        true,
+    )?;
+    if posted_id == move_id {
+        return Err("the posted invoice reused the first move".to_string());
+    }
     match reset_account_move_to_draft(ctx, org_id, posted_id) {
         Err(error) if error.contains("Posted") => {}
         Err(error) => return Err(format!("unexpected posted reset error: {error}")),
