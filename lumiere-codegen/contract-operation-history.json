@@ -3450,6 +3450,10 @@
       "name": "reserve_stock_quant",
       "shape_fingerprint": "sha256:3a36080157acd7684c12596d58da2fac40062be5156d34e5f859e931f5a919bf"
     },
+    "erp.reset_account_move_to_draft": {
+      "name": "reset_account_move_to_draft",
+      "shape_fingerprint": "sha256:cfe918d8dcd2d3e30cb9c1b18f57100db0dc1f6dc0e37bde325f7a480c842c13"
+    },
     "erp.reset_leave_to_draft": {
       "name": "reset_leave_to_draft",
       "shape_fingerprint": "sha256:c7a13b03c787a0cad24105097f71e0263ec124fbb1115a4f6dec15c2e8c64f17"
@@ -4918,6 +4922,10 @@
       "name": "unreconciled_account_bank_statement_line",
       "shape_fingerprint": "sha256:4bca3cc278e1dc27e504efa61f4f99b41a97c48e9205cdc90ce18eb7495b7b95"
     },
+    "erp.unreserve_stock_picking": {
+      "name": "unreserve_stock_picking",
+      "shape_fingerprint": "sha256:716857e9c2cf317a1db35620a9978b8f36de5ced4186c1be1f1a0cb3c075d340"
+    },
     "erp.unreserve_stock_quant": {
       "name": "unreserve_stock_quant",
       "shape_fingerprint": "sha256:1a4bec5982823a16bbb12692272c204efc4e8fd0c1b768219674c6635147ae83"
@@ -5146,6 +5154,10 @@
       "name": "update_fleet_vehicle",
       "shape_fingerprint": "sha256:26f673a2902b82e76e72bb96bf91bd1e72071727fd7f03213e46b0833e58dc6a"
     },
+    "erp.update_fleet_vehicle_details": {
+      "name": "update_fleet_vehicle_details",
+      "shape_fingerprint": "sha256:05dccde3d46d3b3508952167691e5c65cd601ae0d1c386d05775cf750ae947a0"
+    },
     "erp.update_form_field": {
       "name": "update_form_field",
       "shape_fingerprint": "sha256:113310e21d5784d06795ce777117010d5d8f49286e0a15b2c0988ab3b913fc78"
@@ -5237,6 +5249,10 @@
     "erp.update_mail_template": {
       "name": "update_mail_template",
       "shape_fingerprint": "sha256:3f64d20088a1f5a2762557fd10fa9f9f1d24488c5230c6d884ebe32dc2ff343f"
+    },
+    "erp.update_manufacturing_order": {
+      "name": "update_manufacturing_order",
+      "shape_fingerprint": "sha256:3929ede0f4828992ca3537f91136472e50d3d41bce4438cd498c6bdf93bb44ca"
     },
     "erp.update_message_template": {
       "name": "update_message_template",
@@ -5441,6 +5457,10 @@
     "erp.update_stock_location": {
       "name": "update_stock_location",
       "shape_fingerprint": "sha256:2aa371667ceef6dffe7baa825acc0033ec8b775cd10b684df74a89c78ed3c56f"
+    },
+    "erp.update_stock_picking": {
+      "name": "update_stock_picking",
+      "shape_fingerprint": "sha256:9e6d9e447fb24276b18e688407292101f5a9b44151484436f0ffc7af67a51a6f"
     },
     "erp.update_stock_production_lot": {
       "name": "update_stock_production_lot",
@@ -5832,6 +5852,14 @@
       "current_operations_fingerprint": "sha256:e7c86f78845353da08d291b49600f30631c91495a1a3a620c2fc573a8eaa1a63",
       "operation_count": 1420,
       "reason": "add five sender-scoped AI spend and action-draft read views on top of released v0.3.80; preserve every existing operation shape"
+    },
+    {
+      "previous_release": "v0.3.82",
+      "previous_ir_sha256": "sha256:7c6197f588cd5a19ef9e1a52c8a397a959aee566d1820c4bd2f080287e87f61f",
+      "previous_operations_fingerprint": "sha256:e7c86f78845353da08d291b49600f30631c91495a1a3a620c2fc573a8eaa1a63",
+      "current_operations_fingerprint": "sha256:44e343a4c0eb4c49da02a25ae6d10782311c490fa8c59a764733ad676226307d",
+      "operation_count": 1425,
+      "reason": "release on top of v0.3.82: add reset_account_move_to_draft, unreserve_stock_picking, update_fleet_vehicle_details, update_manufacturing_order, update_stock_picking; change the shape of none"
     }
   ]
 }
