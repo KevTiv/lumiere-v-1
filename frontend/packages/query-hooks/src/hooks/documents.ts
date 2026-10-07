@@ -120,6 +120,36 @@ export function useDocumentVersions(organizationId: bigint, initialData?: QueryR
   })
 }
 
+export function useDocumentLegalHolds(organizationId: bigint, initialData?: QueryRows) {
+  return useQuery<QueryRows>({
+    queryKey: ['document-legal-holds', rqBigIntKey(organizationId)],
+    queryFn: () =>
+      fetchQueryList('/api/query/document-legal-holds', 'Failed to fetch document legal holds'),
+    staleTime: 30_000,
+    initialData,
+  })
+}
+
+export function useDocumentSignatureRequests(organizationId: bigint, initialData?: QueryRows) {
+  return useQuery<QueryRows>({
+    queryKey: ['document-signature-requests', rqBigIntKey(organizationId)],
+    queryFn: () =>
+      fetchQueryList('/api/query/document-signature-requests', 'Failed to fetch document signature requests'),
+    staleTime: 30_000,
+    initialData,
+  })
+}
+
+export function useDocumentExternalRefs(organizationId: bigint, initialData?: QueryRows) {
+  return useQuery<QueryRows>({
+    queryKey: ['document-external-refs', rqBigIntKey(organizationId)],
+    queryFn: () =>
+      fetchQueryList('/api/query/document-external-refs', 'Failed to fetch document external references'),
+    staleTime: 30_000,
+    initialData,
+  })
+}
+
 export function useDeletedDocuments(organizationId: bigint, initialData?: QueryRows) {
   return useQuery<QueryRows>({
     queryKey: ['documents-deleted', rqBigIntKey(organizationId)],
@@ -415,7 +445,33 @@ export function useApplyDocumentLegalHold(organizationId: bigint) {
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallErrorDocuments(r))
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['documents', rqBigIntKey(organizationId)] }),
+    onSuccess: () => {
+      const k = rqBigIntKey(organizationId)
+      void qc.invalidateQueries({ queryKey: ['documents', k] })
+      void qc.invalidateQueries({ queryKey: ['document-legal-holds', k] })
+    },
+  })
+}
+
+export function useReleaseDocumentLegalHold(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({
+      holdId,
+      metadata,
+    }: {
+      holdId: bigint | number | string
+      metadata?: string
+    }) => {
+      const { urlPath, init } = stdbBffCommandPost("release_document_legal_hold", { holdId: toScalarU64(holdId), params: stdbParamsToJson({ metadata } as object, "ReleaseDocumentLegalHoldParams") })
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error(await parseCallErrorDocuments(r))
+    },
+    onSuccess: () => {
+      const k = rqBigIntKey(organizationId)
+      void qc.invalidateQueries({ queryKey: ['documents', k] })
+      void qc.invalidateQueries({ queryKey: ['document-legal-holds', k] })
+    },
   })
 }
 

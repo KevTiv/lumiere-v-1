@@ -3,7 +3,7 @@
 import { useCallback, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { FileText, ListOrdered, MoreHorizontal, Truck } from 'lucide-react';
+import { FileText, ListOrdered, MoreHorizontal, PackagePlus, Truck } from 'lucide-react';
 import { useTranslation } from '@lumiere/i18n';
 import {
   Button,
@@ -63,6 +63,7 @@ import {
   useApplySaleOrderOptions,
   useApplySalePromotion,
   useSaleOrderLines,
+  useSaleOrderOptions,
   useSaleOrders,
   type SaleOrder,
   type SaleOrderLine,
@@ -79,6 +80,7 @@ import { hasValidOrganizationId, orgBigInts } from '@/lib/org-scoped';
 import { toCreateSaleOrderLineParams, toUpdateSaleOrderLineParams } from '@/lib/sales-create-params';
 import { phCapture } from '@/lib/posthog-browser';
 import { RecordDocumentAttachments } from '../../../../../components/record-document-attachments';
+import { ReadOnlyRows } from '../../../../../components/read-only-rows';
 import { OrderHandoffLinks } from '../../../../../components/order-handoff-links';
 import { CreateInvoiceFromOrderDialog, EditSaleOrderDialog } from '../../sale-order-dialogs';
 import {
@@ -88,6 +90,7 @@ import {
 } from '../../sale-order-record';
 import { saleOrderStatusBar } from '../../sale-order-status';
 import { parseCommissionRatePercent } from '../../sales-ops-panel';
+import { optionRowsForOrder } from '../../commission-plans';
 
 interface SaleOrderPageClientProps {
   orderId: string;
@@ -113,7 +116,7 @@ const PRIMARY_ACTION_IDS: ReadonlySet<string> = new Set([
   'sales.order.create-invoice',
 ]);
 
-const TAB_IDS = ['overview', 'lines', 'handoffs', 'discussion', 'audit'] as const;
+const TAB_IDS = ['overview', 'lines', 'options', 'handoffs', 'discussion', 'audit'] as const;
 type TabId = (typeof TAB_IDS)[number];
 
 export function SaleOrderPageClient(props: SaleOrderPageClientProps) {
@@ -146,6 +149,7 @@ function SaleOrderPageLoaded({
   const { data: accountMoves = [] } = useAccountMoves(orgId);
   const { data: contacts = [] } = useContacts(orgId, initialContacts);
   const { data: productRows = [] } = useProducts(orgId);
+  const orderOptionsQuery = useSaleOrderOptions(orgId);
 
   const applySalePromotion = useApplySalePromotion(orgId);
   const applySaleOrderOptions = useApplySaleOrderOptions(orgId);
@@ -216,6 +220,13 @@ function SaleOrderPageLoaded({
       })),
     [productRows],
   );
+  const optionRows = useMemo(() => {
+    const productNameById = new Map<string, string>();
+    for (const product of gridProducts) {
+      if (product.label) productNameById.set(product.id, product.label);
+    }
+    return optionRowsForOrder(orderId, (orderOptionsQuery.data ?? []) as OrderRow[], productNameById);
+  }, [orderId, orderOptionsQuery.data, gridProducts]);
   const partnerLabelById = useMemo(() => {
     const map = new Map<string, string>();
     for (const contact of contacts as unknown as OrderRow[]) {
@@ -490,6 +501,14 @@ function SaleOrderPageLoaded({
                 onClick: () => setActiveTab('lines'),
               },
               {
+                id: 'options',
+                label: t('sales.order.optionalProducts', { defaultValue: 'Optional products' }),
+                count: optionRows.length,
+                icon: <PackagePlus className="h-4 w-4" />,
+                onClick: () => setActiveTab('options'),
+                hideWhenZero: true,
+              },
+              {
                 id: 'deliveries',
                 label: t('sales.order.deliveries', { defaultValue: 'Deliveries' }),
                 count: handoffs.pickings.length,
@@ -583,6 +602,31 @@ function SaleOrderPageLoaded({
                 onDeleteLine={async (lineId) => {
                   await lineWorkflow.remove.execute(lineId);
                 }}
+              />
+            ),
+          },
+          {
+            id: 'options',
+            label: t('sales.order.optionalProducts', { defaultValue: 'Optional products' }),
+            content: (
+              <ReadOnlyRows
+                id="sale-order-options"
+                testId="sale-order-options"
+                isLoading={orderOptionsQuery.isLoading}
+                error={orderOptionsQuery.error}
+                rows={optionRows}
+                emptyMessage={t('sales.order.optionalProductsEmpty', {
+                  defaultValue: 'No optional products offered on this order.',
+                })}
+                columns={[
+                  { key: 'product', label: t('sales.order.options.product', { defaultValue: 'Product' }), width: 'min-w-40' },
+                  { key: 'description', label: t('sales.order.options.description', { defaultValue: 'Description' }), width: 'min-w-48' },
+                  { key: 'quantity', label: t('sales.order.options.quantity', { defaultValue: 'Quantity' }), type: 'number', align: 'right' },
+                  { key: 'priceUnit', label: t('sales.order.options.priceUnit', { defaultValue: 'Unit price' }), type: 'number', align: 'right' },
+                  { key: 'discount', label: t('sales.order.options.discount', { defaultValue: 'Discount %' }), type: 'number', align: 'right' },
+                  { key: 'subtotal', label: t('sales.order.options.subtotal', { defaultValue: 'Subtotal' }), type: 'number', align: 'right' },
+                  { key: 'isPresent', label: t('sales.order.options.added', { defaultValue: 'Added to order' }), type: 'boolean' },
+                ]}
               />
             ),
           },

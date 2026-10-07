@@ -528,6 +528,71 @@ export const leaveTypesTableConfig = (t: TFunction): EntityViewConfig => ({
   },
 })
 
+// ── Leave Allocations ─────────────────────────────────────────────────────────
+export interface LeaveAllocationsConfigOptions {
+  employeeOptions?: Array<{ value: string; label: string }>
+  leaveTypeOptions?: Array<{ value: string; label: string }>
+  /** Optional columns, shown only when at least one row carries the data. */
+  showPeriod?: boolean
+  showValidity?: boolean
+  showState?: boolean
+  /** Replaces the empty message (e.g. a load error). */
+  emptyMessage?: string
+}
+
+export const leaveAllocationsTableConfig = (
+  t: TFunction,
+  opts: LeaveAllocationsConfigOptions = {},
+): EntityViewConfig => ({
+  id: "leave-allocations-table",
+  title: t("hr.leaveAllocations.title", { defaultValue: "Leave Allocations" }),
+  description: t("hr.leaveAllocations.description", {
+    defaultValue: "Days allocated to each employee per leave type, with usage and remaining balance.",
+  }),
+  view: {
+    mode: "table",
+    rowKey: "id",
+    searchable: true,
+    searchPlaceholder: t("hr.leaveAllocations.searchPlaceholder", { defaultValue: "Search by employee or leave type" }),
+    searchKeys: ["employeeName", "leaveTypeName"],
+    filters: [
+      {
+        key: "employeeId",
+        label: t("hr.leaveAllocations.filters.employee", { defaultValue: "Employee" }),
+        type: "select",
+        options: opts.employeeOptions ?? [],
+      },
+      {
+        key: "leaveTypeId",
+        label: t("hr.leaveAllocations.filters.leaveType", { defaultValue: "Leave type" }),
+        type: "select",
+        options: opts.leaveTypeOptions ?? [],
+      },
+    ],
+    columns: [
+      { key: "employeeName", label: t("hr.leaveAllocations.columns.employee", { defaultValue: "Employee" }), width: "min-w-36", sortable: true },
+      { key: "leaveTypeName", label: t("hr.leaveAllocations.columns.leaveType", { defaultValue: "Leave type" }), width: "min-w-32", sortable: true },
+      ...(opts.showPeriod
+        ? [{ key: "periodYear", label: t("hr.leaveAllocations.columns.period", { defaultValue: "Year" }), align: "right" as const, sortable: true }]
+        : []),
+      { key: "allocatedDays", label: t("hr.leaveAllocations.columns.allocated", { defaultValue: "Allocated" }), type: "number", align: "right", sortable: true },
+      { key: "usedDays", label: t("hr.leaveAllocations.columns.used", { defaultValue: "Used" }), type: "number", align: "right", sortable: true },
+      { key: "remainingDays", label: t("hr.leaveAllocations.columns.remaining", { defaultValue: "Remaining" }), type: "number", align: "right", sortable: true },
+      ...(opts.showValidity
+        ? [
+            { key: "validFrom", label: t("hr.leaveAllocations.columns.validFrom", { defaultValue: "Valid from" }), width: "min-w-28" },
+            { key: "validTo", label: t("hr.leaveAllocations.columns.validTo", { defaultValue: "Valid to" }), width: "min-w-28" },
+          ]
+        : []),
+      ...(opts.showState
+        ? [{ key: "state", label: t("hr.leaveAllocations.columns.state", { defaultValue: "State" }) }]
+        : []),
+    ],
+    emptyMessage:
+      opts.emptyMessage ?? t("hr.leaveAllocations.emptyMessage", { defaultValue: "No leave allocations yet." }),
+  },
+})
+
 // ── Payroll Structures ────────────────────────────────────────────────────────
 export const payrollStructuresTableConfig = (t: TFunction): EntityViewConfig => ({
   id: "payroll-structures-table",

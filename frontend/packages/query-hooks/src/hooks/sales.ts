@@ -4,7 +4,7 @@
 import { stdbBffCommandPost } from "@lumiere/stdb/commands"
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 
-import { apiFetch, fetchQueryList, coalesceQueryInitialData, rqBigIntKey } from "../http"
+import { apiFetch, fetchQueryList, coalesceQueryInitialData, type QueryRows, rqBigIntKey } from "../http"
 import { withCompanyScope } from "@lumiere/erp-shared/org-scoped"
 import { scalarToU64 as toScalarU64 } from "@lumiere/erp-shared/u64"
 import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
@@ -214,6 +214,33 @@ export function useSaleCommissions(organizationId: bigint, initialData?: SaleCom
     staleTime: 30_000,
     initialData: coalesceQueryInitialData(initialData),
   })
+}
+
+/** Read-only list served by the authorized HTTP query path (`/api/query/sale-commission-plans`). */
+export function useSaleCommissionPlans(organizationId: bigint) {
+  return useQuery<QueryRows>({
+    queryKey: ['sale-commission-plans', rqBigIntKey(organizationId)],
+    queryFn: () => fetchQueryList('/api/query/sale-commission-plans', 'Failed to read commission plans'),
+    staleTime: 30_000,
+  });
+}
+
+/** Read-only list served by the authorized HTTP query path (`/api/query/sale-commission-plan-splits`). */
+export function useSaleCommissionPlanSplits(organizationId: bigint) {
+  return useQuery<QueryRows>({
+    queryKey: ['sale-commission-plan-splits', rqBigIntKey(organizationId)],
+    queryFn: () => fetchQueryList('/api/query/sale-commission-plan-splits', 'Failed to read commission plan splits'),
+    staleTime: 30_000,
+  });
+}
+
+/** Read-only list served by the authorized HTTP query path (`/api/query/sale-order-options`). */
+export function useSaleOrderOptions(organizationId: bigint) {
+  return useQuery<QueryRows>({
+    queryKey: ['sale-order-options', rqBigIntKey(organizationId)],
+    queryFn: () => fetchQueryList('/api/query/sale-order-options', 'Failed to read optional products'),
+    staleTime: 30_000,
+  });
 }
 
 /** Server-bounded: `sale_order.state = ToApprove`. */
@@ -1088,7 +1115,7 @@ export function useReverseSaleCommissionSettlement(
   })
 }
 
-// ── OMS advanced (Wave D) — creates via BFF; no QueryResourceKey list hooks yet ─
+// ── OMS advanced (Wave D) — creates via BFF; plan/split/option lists: useSaleCommissionPlans & co. ─
 
 export function useCreateSaleCommissionPlan(
   organizationId: bigint,

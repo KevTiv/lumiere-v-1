@@ -69,10 +69,18 @@ import type {
   EntityViewConfig,
   EntityRecordSheetConfig,
   FormConfig,
+  FormField,
   ModuleConfig,
 } from '@lumiere/ui';
 import { inventoryModuleConfig } from '@/lib/module-dashboard-configs';
 import { useModuleTab } from '@/hooks/use-module-tab';
+import { recordOptions as linkedRecordOptions, withLinkedPickers } from '@/lib/linked-options';
+import {
+  ProductPackagingTab,
+  ProductVariantsTab,
+  ProductVendorPricesTab,
+} from './product-record-read-tabs';
+import { packagingOptionLabel, vendorPriceOptionLabel } from './product-record-tabs';
 import { useInventoryModuleSubscription } from '@/lib/module-subscription-hooks';
 import { useWorkflowSurface } from '@/hooks/use-workflow-surface';
 import { usePickingWorkflow } from '@lumiere/query-hooks/hooks/picking-workflow';
@@ -222,6 +230,8 @@ import {
   useCreateProductSupplierInfo,
   useUpdateProductSupplierInfo,
   useCreateProductPackaging,
+  useProductPackagings,
+  useProductSupplierInfos,
   useUpdateProductPackaging,
   useRestoreProductCategory,
   useUpsertWarehouseGeo,
@@ -246,6 +256,18 @@ import { useDefaultOperatingCompanyBigInt } from '@lumiere/query-hooks/hooks/use
 import { inventoryProductPrimaryLabel } from '@lumiere/stdb/read-models';
 
 type ScalarId = bigint | number | string;
+
+/** Swaps number fields that ask for a record id for searchable pickers (via `withLinkedPickers`). */
+function recordPickerFields(
+  fields: FormField[],
+  options: Record<string, ReturnType<typeof linkedRecordOptions>>,
+): FormField[] {
+  const picked = withLinkedPickers(
+    { id: 'record-picker', title: '', sections: [{ id: 'main', fields }] } as FormConfig,
+    options,
+  );
+  return picked.sections[0].fields;
+}
 
 /** Lower-cased state/status of a row (handles `{tag}` enum values), for action gating. */
 function rowState(row: Record<string, unknown>, key = 'state'): string {
@@ -583,6 +605,8 @@ function InventoryClientLoaded({
   const { data: orgUsers = [] } = useOrgUsers();
   const { data: pricelists = [] } = usePricelists(orgId, initialPricelists);
   const { data: contacts = [] } = useContacts(orgId);
+  const { data: productSupplierInfos = [] } = useProductSupplierInfos(orgId);
+  const { data: productPackagings = [] } = useProductPackagings(orgId);
   const { data: erpDocuments = [] } = useDocuments(orgId);
   const csvImports = {
     importUomCategory: useImportUomCategoryCsv(orgId),
@@ -668,6 +692,15 @@ function InventoryClientLoaded({
     if (fromApi.length > 0) return fromApi;
     return [{ value: '', label: t('common.lookup.noVendors'), disabled: true }];
   }, [contacts, t]);
+
+  const vendorNameById = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const contact of contacts as Record<string, unknown>[]) {
+      const name = String(contact.displayName ?? contact.name ?? '').trim();
+      if (contact.id != null && name) map.set(String(contact.id), name);
+    }
+    return map;
+  }, [contacts]);
 
   const documentSelectOptions = useMemo(
     () =>
@@ -1593,8 +1626,27 @@ function InventoryClientLoaded({
       detailConfig: productDetailConfig(t),
       auditTableName: 'product',
       discussion: {},
+      customTabs: [
+        {
+          id: 'variants',
+          label: t('inventory.productTabs.variants.title', { defaultValue: 'Variants' }),
+          content: (record) => <ProductVariantsTab orgId={orgId} record={record} />,
+        },
+        {
+          id: 'vendor-prices',
+          label: t('inventory.productTabs.vendors.title', { defaultValue: 'Vendor prices' }),
+          content: (record) => (
+            <ProductVendorPricesTab orgId={orgId} record={record} vendorNameById={vendorNameById} />
+          ),
+        },
+        {
+          id: 'packaging',
+          label: t('inventory.productTabs.packaging.title', { defaultValue: 'Packaging' }),
+          content: (record) => <ProductPackagingTab orgId={orgId} record={record} />,
+        },
+      ],
     };
-  }, [t]);
+  }, [t, orgId, vendorNameById]);
 
   const stockQuantRecordSheet = useMemo((): EntityRecordSheetConfig => {
     const baseDetail = stockQuantDetailConfig(t);
@@ -2690,18 +2742,25 @@ function InventoryClientLoaded({
                   onClick: async () => {
                     const values = await askForm({
                       title: t('inventory.productActions.updateSupplierLineById'),
-                      fields: [
+                      fields: recordPickerFields(
+                        [
+                          {
+                            id: 'recordId',
+                            name: 'recordId',
+                            label: t('inventory.byRecord.supplierLineId', { defaultValue: 'Supplier line ID' }),
+                            type: 'number',
+                            required: true,
+                            min: 1,
+                          },
+                          { id: 'price', name: 'price', label: t('inventory.byRecord.price', { defaultValue: 'Price' }), type: 'number', min: 0, step: 0.01 },
+                          { id: 'minQty', name: 'minQty', label: t('inventory.byRecord.minQty', { defaultValue: 'Minimum quantity' }), type: 'number', min: 0 },
+                        ],
                         {
-                          id: 'recordId',
-                          name: 'recordId',
-                          label: t('inventory.byRecord.supplierLineId', { defaultValue: 'Supplier line ID' }),
-                          type: 'number',
-                          required: true,
-                          min: 1,
+                          recordId: linkedRecordOptions(productSupplierInfos as Record<string, unknown>[], (row) =>
+                            vendorPriceOptionLabel(row, vendorNameById, productLabelById),
+                          ),
                         },
-                        { id: 'price', name: 'price', label: t('inventory.byRecord.price', { defaultValue: 'Price' }), type: 'number', min: 0, step: 0.01 },
-                        { id: 'minQty', name: 'minQty', label: t('inventory.byRecord.minQty', { defaultValue: 'Minimum quantity' }), type: 'number', min: 0 },
-                      ],
+                      ),
                     });
                     if (!values) return;
                     await updateProductSupplierInfo.mutateAsync({
@@ -2717,17 +2776,24 @@ function InventoryClientLoaded({
                   onClick: async () => {
                     const values = await askForm({
                       title: t('inventory.productActions.updatePackagingById'),
-                      fields: [
+                      fields: recordPickerFields(
+                        [
+                          {
+                            id: 'recordId',
+                            name: 'recordId',
+                            label: t('inventory.byRecord.packagingId', { defaultValue: 'Packaging ID' }),
+                            type: 'number',
+                            required: true,
+                            min: 1,
+                          },
+                          { id: 'name', name: 'name', label: t('inventory.byRecord.name', { defaultValue: 'Name' }), type: 'text', required: true },
+                        ],
                         {
-                          id: 'recordId',
-                          name: 'recordId',
-                          label: t('inventory.byRecord.packagingId', { defaultValue: 'Packaging ID' }),
-                          type: 'number',
-                          required: true,
-                          min: 1,
+                          recordId: linkedRecordOptions(productPackagings as Record<string, unknown>[], (row) =>
+                            packagingOptionLabel(row, productLabelById),
+                          ),
                         },
-                        { id: 'name', name: 'name', label: t('inventory.byRecord.name', { defaultValue: 'Name' }), type: 'text', required: true },
-                      ],
+                      ),
                     });
                     if (!values) return;
                     await updateProductPackaging.mutateAsync({
@@ -4789,6 +4855,10 @@ function InventoryClientLoaded({
     restoreProductCategory,
     updateProductSupplierInfo,
     updateProductPackaging,
+    productSupplierInfos,
+    productPackagings,
+    vendorNameById,
+    productLabelById,
     stockQuantFormConfig,
     traceRecordFormConfig,
     useSerial,

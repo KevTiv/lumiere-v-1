@@ -43,6 +43,48 @@ export function legalHoldReason(value: unknown): string | null {
 export function activeLegalHold(holds: readonly Row[], documentId: unknown): Row | undefined {
   const wanted = String(documentId ?? '');
   return holds
-    .filter((hold) => hold.isActive === true && String(hold.documentId ?? hold.document_id ?? '') === wanted)
+    .filter((hold) => (hold.isActive ?? hold.is_active) === true && String(hold.documentId ?? hold.document_id ?? '') === wanted)
     .sort((a, b) => Number(b.id ?? 0) - Number(a.id ?? 0))[0];
+}
+
+/** Rows (signature requests, external refs, ...) belonging to one document, newest id first. */
+export function rowsForDocument(rows: readonly Row[], documentId: unknown): Row[] {
+  const wanted = String(documentId ?? '');
+  return rows
+    .filter((row) => String(row.documentId ?? row.document_id ?? '') === wanted)
+    .sort((a, b) => Number(b.id ?? 0) - Number(a.id ?? 0));
+}
+
+/** Number of signers in a `signers_json` payload; never exposes who they are. 0 when absent or unparsable. */
+export function signerCount(signersJson: unknown): number {
+  if (typeof signersJson !== 'string' || !signersJson.trim()) return 0;
+  try {
+    const parsed: unknown = JSON.parse(signersJson);
+    return Array.isArray(parsed) ? parsed.length : 0;
+  } catch {
+    return 0;
+  }
+}
+
+/** Signature request rows reduced to the non-personal columns shown on the document page. */
+export function signatureRequestRows(rows: readonly Row[]): Row[] {
+  return rows.map((row) => ({
+    id: row.id,
+    status: row.status,
+    provider: row.provider,
+    requestedAt: row.requestedAt ?? row.requested_at,
+    completedAt: row.completedAt ?? row.completed_at,
+    signerCount: signerCount(row.signersJson ?? row.signers_json),
+  }));
+}
+
+/** External reference rows reduced to the columns the row actually carries. */
+export function externalRefRows(rows: readonly Row[]): Row[] {
+  return rows.map((row) => ({
+    id: row.id,
+    provider: row.provider,
+    externalId: row.externalId ?? row.external_id,
+    lastDirection: row.lastDirection ?? row.last_direction,
+    lastSyncAt: row.lastSyncAt ?? row.last_sync_at,
+  }));
 }

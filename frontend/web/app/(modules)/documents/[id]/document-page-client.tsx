@@ -1,9 +1,9 @@
 'use client';
 
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { ExternalLink, Layers, Link2 } from 'lucide-react';
+import { ExternalLink, Layers, Link2, PenLine } from 'lucide-react';
 import { useTranslation } from '@lumiere/i18n';
 import {
   Button,
@@ -37,6 +37,9 @@ import {
   AlertDialogTitle,
 } from '@lumiere/ui/components/alert-dialog';
 import { Badge } from '@lumiere/ui/components/badge';
+import { formatTimestampLike } from '@lumiere/ui/lib/entity-row-values';
+import { Textarea } from '@lumiere/ui/components/textarea';
+import { useConfirmDialog } from '@lumiere/ui/hooks/use-confirm-dialog';
 import { Skeleton } from '@lumiere/ui/components/skeleton';
 import { showWorkflowToast } from '@lumiere/ui/lib/workflow-toast';
 import { optionalBigIntU64 } from '@lumiere/erp-shared/form-coercion';
@@ -45,6 +48,10 @@ import {
   useDeleteDocument,
   useApplyDocumentLegalHold,
   useDeletedDocuments,
+  useDocumentExternalRefs,
+  useDocumentLegalHolds,
+  useDocumentSignatureRequests,
+  useReleaseDocumentLegalHold,
   useDocumentFolders,
   useDocumentVersions,
   useDocuments,
@@ -61,7 +68,16 @@ import { toAddDocumentVersionParams, toSetDocumentRetentionParams } from '@/lib/
 import { useDocumentsModuleSubscription } from '@/lib/module-subscription-hooks';
 import { hasValidOrganizationId, orgBigInts } from '@/lib/org-scoped';
 import { documentFolderRowsToSelectOptions } from '@/lib/form-lookup';
-import { formatFileSize, legalHoldReason, linkedRecordHref, moveDocumentParams } from '../document-record';
+import {
+  activeLegalHold,
+  externalRefRows,
+  formatFileSize,
+  legalHoldReason,
+  linkedRecordHref,
+  moveDocumentParams,
+  rowsForDocument,
+  signatureRequestRows,
+} from '../document-record';
 
 interface DocumentPageClientProps {
   documentId: string;
@@ -74,7 +90,7 @@ interface DocumentPageClientProps {
 type Row = Record<string, unknown>;
 type FormAction = 'edit' | 'uploadVersion' | 'setRetention' | 'move' | 'legalHold';
 
-const TAB_IDS = ['overview', 'versions', 'discussion', 'audit'] as const;
+const TAB_IDS = ['overview', 'versions', 'signatures', 'externalRefs', 'discussion', 'audit'] as const;
 type TabId = (typeof TAB_IDS)[number];
 
 export function DocumentPageClient(props: DocumentPageClientProps) {
@@ -160,6 +176,9 @@ function DocumentPageLoaded({
   const { data: deleted = [] } = useDeletedDocuments(orgId, initialDeleted as never);
   const { data: folders = [] } = useDocumentFolders(orgId);
   const { data: versions = [] } = useDocumentVersions(orgId, initialVersions as never);
+  const holdsQuery = useDocumentLegalHolds(orgId);
+  const signaturesQuery = useDocumentSignatureRequests(orgId);
+  const externalRefsQuery = useDocumentExternalRefs(orgId);
 
   const lockDocument = useLockDocument(orgId);
   const unlockDocument = useUnlockDocument(orgId);
@@ -170,6 +189,9 @@ function DocumentPageLoaded({
   const ingestEvidence = useIngestDocumentEvidence(orgId);
   const setRetention = useSetDocumentRetention(orgId);
   const applyLegalHold = useApplyDocumentLegalHold(orgId);
+  const releaseLegalHold = useReleaseDocumentLegalHold(orgId);
+  const { confirm, dialog: confirmDialog } = useConfirmDialog();
+  const releaseNoteRef = useRef<HTMLTextAreaElement | null>(null);
 
   const [formAction, setFormAction] = useState<FormAction | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
@@ -188,6 +210,19 @@ function DocumentPageLoaded({
         .filter((row) => String(row.documentId ?? row.document_id ?? '') === documentId)
         .sort((a, b) => Number(b.versionNumber ?? 0) - Number(a.versionNumber ?? 0)),
     [versions, documentId],
+  );
+
+  const activeHold = useMemo(
+    () => activeLegalHold((holdsQuery.data ?? []) as unknown as Row[], documentId),
+    [holdsQuery.data, documentId],
+  );
+  const signatures = useMemo(
+    () => signatureRequestRows(rowsForDocument((signaturesQuery.data ?? []) as unknown as Row[], documentId)),
+    [signaturesQuery.data, documentId],
+  );
+  const externalRefs = useMemo(
+    () => externalRefRows(rowsForDocument((externalRefsQuery.data ?? []) as unknown as Row[], documentId)),
+    [externalRefsQuery.data, documentId],
   );
 
   const requestedTab = searchParams.get('tab');
@@ -267,6 +302,43 @@ function DocumentPageLoaded({
         ],
       },
     ],
+  };
+
+  const isHeld = Boolean(activeHold);
+  const holdReason = activeHold && typeof activeHold.reason === 'string' ? activeHold.reason : undefined;
+  const holdDate = activeHold?.heldAt ?? activeHold?.held_at;
+  const heldTitle = t('documents.page.heldHint', {
+    defaultValue: 'Not allowed while a legal hold is active. Release the hold first.',
+  });
+
+  const releaseHold = async () => {
+    if (!activeHold) return;
+    const ok = await confirm({
+      title: t('documents.page.releaseHoldTitle', { defaultValue: 'Release legal hold?' }),
+      description: (
+        <span className="block space-y-2">
+          <span className="block">
+            {t('documents.page.releaseHoldHint', {
+              defaultValue: 'The document can be changed, deleted or purged again once the hold is released.',
+            })}
+          </span>
+          <Textarea
+            ref={releaseNoteRef}
+            rows={2}
+            defaultValue=""
+            placeholder={t('documents.page.releaseNote', { defaultValue: 'Note (optional)' })}
+            data-testid="document-release-hold-note"
+          />
+        </span>
+      ),
+      confirmLabel: t('documents.page.releaseHold', { defaultValue: 'Release hold' }),
+    });
+    const note = releaseNoteRef.current?.value.trim();
+    if (!ok) return;
+    await run('Release legal hold', async () => {
+      await releaseLegalHold.mutateAsync({ holdId: activeHold.id as bigint | number | string, metadata: note || undefined });
+      showWorkflowToast({ kind: 'success', title: 'Legal hold released', description: label });
+    });
   };
 
   const formConfig: FormConfig | null =
@@ -354,6 +426,7 @@ function DocumentPageLoaded({
         badge={
           <span className="flex flex-wrap items-center gap-1.5">
             {isDeleted ? <Badge variant="destructive">{t('documents.page.deleted', { defaultValue: 'In recycle bin' })}</Badge> : null}
+            {isHeld ? <Badge variant="destructive" data-testid="document-legal-hold-badge">{t('documents.page.legalHoldBadge', { defaultValue: 'Legal hold' })}</Badge> : null}
             {isLocked ? <Badge variant="outline">{t('documents.page.locked', { defaultValue: 'Locked' })}</Badge> : null}
             {document.isShared === true ? <Badge variant="secondary">{t('documents.page.shared', { defaultValue: 'Shared' })}</Badge> : null}
             {document.isFavorite === true ? <Badge variant="secondary">{t('documents.page.favorite', { defaultValue: 'Favorite' })}</Badge> : null}
@@ -370,6 +443,17 @@ function DocumentPageLoaded({
                 icon: <Layers className="h-4 w-4" />,
                 onClick: () => setActiveTab('versions'),
               },
+              ...(signatures.length > 0
+                ? [
+                    {
+                      id: 'signatures',
+                      label: t('documents.page.signatures', { defaultValue: 'Signatures' }),
+                      count: signatures.length,
+                      icon: <PenLine className="h-4 w-4" />,
+                      onClick: () => setActiveTab('signatures'),
+                    },
+                  ]
+                : []),
               ...(linkedHref
                 ? [
                     {
@@ -441,13 +525,26 @@ function DocumentPageLoaded({
                 <Button variant="outline" size="sm" data-testid="document-action-move" onClick={() => setFormAction('move')}>
                   {t('documents.page.move', { defaultValue: 'Move to folder' })}
                 </Button>
-                <Button variant="outline" size="sm" data-testid="document-action-legal-hold" onClick={() => setFormAction('legalHold')}>
-                  {t('documents.page.legalHold', { defaultValue: 'Legal hold' })}
-                </Button>
+                {isHeld ? (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={releaseLegalHold.isPending}
+                    data-testid="document-action-release-hold"
+                    onClick={() => void releaseHold()}
+                  >
+                    {t('documents.page.releaseHold', { defaultValue: 'Release hold' })}
+                  </Button>
+                ) : (
+                  <Button variant="outline" size="sm" data-testid="document-action-legal-hold" onClick={() => setFormAction('legalHold')}>
+                    {t('documents.page.legalHold', { defaultValue: 'Legal hold' })}
+                  </Button>
+                )}
                 <Button
                   variant="outline"
                   size="sm"
-                  disabled={busy}
+                  disabled={busy || isHeld}
+                  title={isHeld ? heldTitle : undefined}
                   data-testid="document-action-delete"
                   onClick={() => setConfirmDelete(true)}
                 >
@@ -463,7 +560,20 @@ function DocumentPageLoaded({
           {
             id: 'overview',
             label: t('common.overview', { defaultValue: 'Overview' }),
-            content: <EntityDetail config={detailConfig} data={document} />,
+            content: (
+              <div className="space-y-4">
+                {isHeld ? (
+                  <div className="rounded-md border p-3 text-sm" data-testid="document-legal-hold-row">
+                    <p className="font-medium">{t('documents.page.legalHoldActive', { defaultValue: 'Legal hold' })}</p>
+                    {holdReason ? <p>{t('documents.page.holdReason', { defaultValue: 'Reason' })}: {holdReason}</p> : null}
+                    {holdDate != null ? (
+                      <p>{t('documents.page.holdDate', { defaultValue: 'Held since' })}: {formatHoldDate(holdDate)}</p>
+                    ) : null}
+                  </div>
+                ) : null}
+                <EntityDetail config={detailConfig} data={document} />
+              </div>
+            ),
           },
           {
             id: 'versions',
@@ -489,6 +599,46 @@ function DocumentPageLoaded({
                 }}
                 data={documentVersions}
                 useCard={false}
+              />
+            ),
+          },
+          {
+            id: 'signatures',
+            label: t('documents.page.signatures', { defaultValue: 'Signatures' }),
+            content: (
+              <DocumentRowsTab
+                loading={signaturesQuery.isLoading}
+                error={signaturesQuery.isError}
+                id="document-signatures-table"
+                rows={signatures}
+                emptyMessage={t('documents.page.noSignatures', { defaultValue: 'No signature requests' })}
+                errorMessage={t('documents.page.loadError', { defaultValue: 'Could not load this data.' })}
+                columns={[
+                  { key: 'status', label: t('documents.page.signatureStatus', { defaultValue: 'Status' }) },
+                  { key: 'requestedAt', label: t('documents.page.signatureRequested', { defaultValue: 'Requested' }), type: 'date' },
+                  { key: 'completedAt', label: t('documents.page.signatureCompleted', { defaultValue: 'Completed' }), type: 'date' },
+                  { key: 'signerCount', label: t('documents.page.signerCount', { defaultValue: 'Signers' }), type: 'number', align: 'right' },
+                ]}
+              />
+            ),
+          },
+          {
+            id: 'externalRefs',
+            label: t('documents.page.externalRefs', { defaultValue: 'External references' }),
+            content: (
+              <DocumentRowsTab
+                loading={externalRefsQuery.isLoading}
+                error={externalRefsQuery.isError}
+                id="document-external-refs-table"
+                rows={externalRefs}
+                emptyMessage={t('documents.page.noExternalRefs', { defaultValue: 'No external references' })}
+                errorMessage={t('documents.page.loadError', { defaultValue: 'Could not load this data.' })}
+                columns={[
+                  { key: 'provider', label: t('documents.page.refSystem', { defaultValue: 'System' }) },
+                  { key: 'externalId', label: t('documents.page.refExternalId', { defaultValue: 'External ID' }) },
+                  { key: 'lastDirection', label: t('documents.page.refDirection', { defaultValue: 'Last sync direction' }) },
+                  { key: 'lastSyncAt', label: t('documents.page.refLastSync', { defaultValue: 'Last synced' }), type: 'date' },
+                ]}
               />
             ),
           },
@@ -527,6 +677,8 @@ function DocumentPageLoaded({
         />
       ) : null}
 
+      {confirmDialog}
+
       <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
         <AlertDialogContent data-testid="document-delete-confirm">
           <AlertDialogHeader>
@@ -549,5 +701,37 @@ function DocumentPageLoaded({
         </AlertDialogContent>
       </AlertDialog>
     </>
+  );
+}
+
+function formatHoldDate(value: unknown): string {
+  return formatTimestampLike(value)?.toLocaleDateString() ?? '';
+}
+
+function DocumentRowsTab({
+  loading,
+  error,
+  id,
+  rows,
+  columns,
+  emptyMessage,
+  errorMessage,
+}: {
+  loading: boolean;
+  error: boolean;
+  id: string;
+  rows: Row[];
+  columns: Array<{ key: string; label: string; type?: 'date' | 'number'; align?: 'right' }>;
+  emptyMessage: string;
+  errorMessage: string;
+}) {
+  if (loading) return <Skeleton className="h-24 w-full" data-testid={`${id}-loading`} />;
+  if (error) return <p className="text-sm text-destructive" data-testid={`${id}-error`}>{errorMessage}</p>;
+  return (
+    <EntityView
+      config={{ id, title: '', view: { mode: 'table', rowKey: 'id', columns, emptyMessage } }}
+      data={rows}
+      useCard={false}
+    />
   );
 }
