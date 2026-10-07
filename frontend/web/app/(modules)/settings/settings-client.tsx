@@ -1,6 +1,7 @@
 "use client"
 
 import { useMemo, useState } from "react"
+import { useConfirmDialog } from "@lumiere/ui/hooks/use-confirm-dialog"
 import { useTranslation, i18n } from "@lumiere/i18n"
 import { DashboardHeader, FormModal, MissingOrganization, SettingsModule, type FormConfig } from "@lumiere/ui"
 import {
@@ -640,6 +641,7 @@ function SettingsLoaded({
   title: string
   description: string
 }) {
+  const { confirm: confirmDialog, dialog: confirmDialogNode } = useConfirmDialog()
   useSettingsModuleSubscription()
   const { orgId } = orgBigInts(organizationId)
   const [activeAction, setActiveAction] = useState<SettingsAction | null>(null)
@@ -777,7 +779,7 @@ function SettingsLoaded({
             formData.syncFrequencyMinutes === undefined || formData.syncFrequencyMinutes === "" ? undefined : Number(formData.syncFrequencyMinutes),
         })
       } else if (activeAction === "deleteIntegration") {
-        if (!confirm("Delete this integration?")) return
+        if (!(await confirmDialog({ description: "Delete this integration?" }))) return
         await deleteIntegration(
           orgId,
           toBigIntId(formData.integrationId, "Integration ID"),
@@ -806,7 +808,7 @@ function SettingsLoaded({
           mediaProvider: optionalText(formData.mediaProvider),
         })
       } else if (activeAction === "deleteWhatsappBusinessAccount") {
-        if (!confirm("Delete this WhatsApp Business account?")) return
+        if (!(await confirmDialog({ description: "Delete this WhatsApp Business account?" }))) return
         await deleteWhatsAppBusinessAccount(orgId, toBigIntId(formData.accountId, "Account ID"))
       } else if (activeAction === "setWhatsappPrimaryAccount") {
         await setWhatsAppPrimaryAccount(orgId, toBigIntId(formData.accountId, "Account ID"))
@@ -820,7 +822,7 @@ function SettingsLoaded({
           effect: String(formData.effect ?? "Allow") as "Allow" | "Deny",
         })
       } else if (activeAction === "revokePermission") {
-        if (!confirm("Revoke this permission?")) return
+        if (!(await confirmDialog({ description: "Revoke this permission?" }))) return
         await revokePermission(orgId, toBigIntId(formData.permissionId, "Permission ID"))
       } else if (activeAction === "archiveAiChatSession") {
         await archiveAiChatSession(
@@ -867,7 +869,7 @@ function SettingsLoaded({
           },
         })
       } else if (activeAction === "deleteCompany") {
-        if (!confirm("Delete this company?")) return
+        if (!(await confirmDialog({ description: "Delete this company?" }))) return
         await deleteCompany.mutateAsync({
           companyId: toBigIntId(formData.companyId, "Company ID"),
           organizationId,
@@ -1052,6 +1054,7 @@ function SettingsLoaded({
           onSubmit={handleSubmit}
         />
       ) : null}
+      {confirmDialogNode}
     </div>
   )
 }

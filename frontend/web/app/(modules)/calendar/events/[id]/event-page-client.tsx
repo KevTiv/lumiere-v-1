@@ -3,6 +3,7 @@
 import { useCallback, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { MoreHorizontal } from 'lucide-react';
 import { useTranslation } from '@lumiere/i18n';
 import {
   Button,
@@ -33,14 +34,23 @@ import {
   AlertDialogTitle,
 } from '@lumiere/ui/components/alert-dialog';
 import { Badge } from '@lumiere/ui/components/badge';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@lumiere/ui/components/dropdown-menu';
 import { Skeleton } from '@lumiere/ui/components/skeleton';
 import { showWorkflowToast } from '@lumiere/ui/lib/workflow-toast';
 import {
   useCalendarEvents,
+  useCreateCalendarEvent,
   useDeleteCalendarEvent,
   useUpdateCalendarEvent,
   type CalendarEvent,
 } from '@lumiere/query-hooks/hooks/calendar';
+import { toCreateCalendarEventParams } from '@/lib/calendar-create-params';
+import { duplicateName } from '@/lib/record-standard-actions';
 import { useCalendarModuleSubscription } from '@/lib/module-subscription-hooks';
 import { useRecordNavigation } from '@/hooks/use-record-navigation';
 import { hasValidOrganizationId, orgBigInts } from '@/lib/org-scoped';
@@ -91,12 +101,15 @@ function CalendarEventPageLoaded({
   const { data: contacts = [] } = useContacts(orgId);
   const updateEvent = useUpdateCalendarEvent(orgId);
   const deleteEvent = useDeleteCalendarEvent(orgId);
+  const createEvent = useCreateCalendarEvent(orgId);
 
   const [editing, setEditing] = useState(false);
   const [editingRecurrence, setEditingRecurrence] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [confirmCancel, setConfirmCancel] = useState(false);
+  const [duplicating, setDuplicating] = useState(false);
+  const [duplicateError, setDuplicateError] = useState<string | null>(null);
 
   const event = useMemo(
     () => (events as unknown as Row[]).find((row) => String(row.id) === eventId),
@@ -276,6 +289,19 @@ function CalendarEventPageLoaded({
                 {t('calendar.eventDetail.cancel', { defaultValue: 'Cancel event' })}
               </Button>
             ) : null}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" data-testid="calendar-event-more-actions">
+                  <MoreHorizontal className="mr-1 h-4 w-4" />
+                  {t('calendar.eventDetail.moreActions', { defaultValue: 'More' })}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem data-testid="calendar-event-action-duplicate" onSelect={() => setDuplicating(true)}>
+                  {t('calendar.eventDetail.duplicate', { defaultValue: 'Duplicate' })}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
             <Button
               variant="outline"
               size="sm"
@@ -365,6 +391,49 @@ function CalendarEventPageLoaded({
               setEditing(false);
             } catch (error) {
               setEditError(error instanceof Error ? error.message : String(error));
+            }
+          }}
+        />
+      ) : null}
+
+      {duplicating ? (
+        <FormModal
+          open
+          onOpenChange={(open) => {
+            if (!open) {
+              setDuplicating(false);
+              setDuplicateError(null);
+            }
+          }}
+          config={newCalendarEventForm(t, {
+            name: duplicateName('calendar.events', event.name),
+            start: eventInputValue(event.start),
+            stop: eventInputValue(event.stop),
+            allday: Boolean(event.allday),
+            privacy: String(event.privacy ?? 'public'),
+            location: event.location ? String(event.location) : '',
+            description: event.description ? String(event.description) : '',
+          })}
+          isPending={createEvent.isPending}
+          closeOnSubmit={false}
+          submitError={duplicateError}
+          onSubmit={async (formData) => {
+            setDuplicateError(null);
+            const params = toCreateCalendarEventParams(formData);
+            if (!params) {
+              setDuplicateError(t('common.validation.required'));
+              return;
+            }
+            try {
+              await createEvent.mutateAsync(params);
+              setDuplicating(false);
+              showWorkflowToast({
+                kind: 'success',
+                title: t('calendar.eventDetail.duplicated', { defaultValue: 'Event duplicated' }),
+                description: String(formData.name ?? ''),
+              });
+            } catch (error) {
+              setDuplicateError(error instanceof Error ? error.message : String(error));
             }
           }}
         />

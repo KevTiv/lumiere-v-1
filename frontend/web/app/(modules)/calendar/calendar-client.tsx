@@ -6,6 +6,7 @@ import { useCalendarModuleSubscription } from "@/lib/module-subscription-hooks"
 import { toCreateCalendarEventParams } from "@/lib/calendar-create-params"
 import { toCreateActivityParams } from "@/lib/crm-create-params"
 import { useTranslation } from "@lumiere/i18n"
+import { useConfirmDialog } from "@lumiere/ui/hooks/use-confirm-dialog"
 import { useCalendarEvents, useCreateCalendarEvent, useUpdateCalendarEvent, useDeleteCalendarEvent } from "@lumiere/query-hooks/hooks/calendar"
 import type { UpdateCalendarEventParams, CalendarEvent as StdbCalendarEvent } from "@lumiere/query-hooks/hooks/calendar"
 import { useActivities, useCreateActivity } from "@lumiere/query-hooks/hooks/crm"
@@ -41,6 +42,7 @@ export function CalendarClient(props: CalendarClientProps) {
 function CalendarClientLoaded({ initialEvents, organizationId }: CalendarClientLoadedProps) {
   useCalendarModuleSubscription()
   const { t } = useTranslation()
+  const { confirm: confirmDialog, dialog: confirmDialogNode } = useConfirmDialog()
   const moduleConfig = useMemo(() => calendarModuleConfig(t), [t])
   const { orgId } = orgBigInts(organizationId)
   const [quickActionForm, setQuickActionForm] = useState<{ form: FormConfig; action: string; eventId?: string } | null>(null)
@@ -200,8 +202,8 @@ function CalendarClientLoaded({ initialEvents, organizationId }: CalendarClientL
                   }
                 }}
                 eventHref={(eventId) => calendarEventHref({ id: eventId })}
-                onDeleteEvent={(eventId) => {
-                  if (confirm(t("calendar.confirmDelete"))) {
+                onDeleteEvent={async (eventId) => {
+                  if (await confirmDialog({ description: t("calendar.confirmDelete") })) {
                     deleteCalendarEvent.mutate(eventId, {
                       onSuccess: () => setSelectedEventId(null),
                     })
@@ -214,7 +216,7 @@ function CalendarClientLoaded({ initialEvents, organizationId }: CalendarClientL
         return tab
       }),
     }),
-    [viewMode, selectedEventId, selectedDate, searchTerm, events, currentDate, liveSections, moduleConfig, t, updateCalendarEvent],
+    [viewMode, selectedEventId, selectedDate, searchTerm, events, currentDate, liveSections, moduleConfig, t, updateCalendarEvent, confirmDialog],
   )
 
   const data = useMemo(
@@ -290,6 +292,7 @@ function CalendarClientLoaded({ initialEvents, organizationId }: CalendarClientL
           }
         }}
       />
+      {confirmDialogNode}
     </>
   )
 }

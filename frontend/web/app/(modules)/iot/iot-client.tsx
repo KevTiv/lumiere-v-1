@@ -6,6 +6,7 @@ import {
 
 import { useMemo, useState } from 'react';
 import { useTranslation } from '@lumiere/i18n';
+import { useConfirmDialog } from '@lumiere/ui/hooks/use-confirm-dialog';
 import {
   ModuleView,
   FormModal,
@@ -339,6 +340,7 @@ function IotClientLoaded({
 }: Loaded) {
   useIotModuleSubscription();
   const { t } = useTranslation();
+  const { confirm: confirmDialog, dialog: confirmDialogNode } = useConfirmDialog();
   const { orgId } = orgBigInts(organizationId);
   const operatingCompanyId = useOperatingCompanyBigInt(organizationId);
   const moduleConfigBase = useMemo(() => iotModuleConfig(t), [t]);
@@ -826,7 +828,7 @@ function IotClientLoaded({
     } else if (op === 'test') {
       await testDevice.mutateAsync(deviceId);
     } else if (op === 'delete') {
-      if (!confirm(t('iot.devices.confirmDelete'))) return;
+      if (!(await confirmDialog({ description: t('iot.devices.confirmDelete') }))) return;
       await deleteDevice.mutateAsync(deviceId);
       setDeviceRow(null);
     } else {
@@ -1055,6 +1057,7 @@ function IotClientLoaded({
           onSubmit={handleIotModalSubmit}
         />
       ) : null}
+      {confirmDialogNode}
     </>
   );
 }

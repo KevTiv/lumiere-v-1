@@ -3,7 +3,7 @@
 import { useCallback, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { Clock, ListTodo } from 'lucide-react';
+import { Clock, ListTodo, MoreHorizontal } from 'lucide-react';
 import { useTranslation } from '@lumiere/i18n';
 import {
   Button,
@@ -24,17 +24,36 @@ import {
   buildModuleTabHref,
   editProjectForm,
   mergeSelectOptionsForFields,
+  newProjectForm,
   projectsTableConfig,
   tasksTableConfig,
   timesheetsTableConfig,
   type FormConfig,
 } from '@lumiere/ui';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@lumiere/ui/components/alert-dialog';
 import { Badge } from '@lumiere/ui/components/badge';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@lumiere/ui/components/dropdown-menu';
 import { Skeleton } from '@lumiere/ui/components/skeleton';
 import { useContacts } from '@lumiere/query-hooks/hooks/crm';
 import { usePricelists } from '@lumiere/query-hooks/hooks/sales';
 import {
+  useCreateProject,
   useProjects,
+  useSetProjectActive,
   useTasks,
   useTimesheets,
   useUpdateProject,
@@ -45,7 +64,8 @@ import { contactRowsToPartnerSelectOptions, pricelistRowsToSelectOptions } from 
 import { useRecordNavigation } from '@/hooks/use-record-navigation';
 import { useProjectsModuleSubscription } from '@/lib/module-subscription-hooks';
 import { hasValidOrganizationId, orgBigInts } from '@/lib/org-scoped';
-import { projectsParamsToJson, toUpdateProjectParams } from '@/lib/projects-create-params';
+import { projectsParamsToJson, toCreateProjectParams, toUpdateProjectParams } from '@/lib/projects-create-params';
+import { archiveAction, archiveTargetActive, duplicateName } from '@/lib/record-standard-actions';
 import { showWorkflowToast } from '@lumiere/ui/lib/workflow-toast';
 import {
   TASK_BOARD_STATES,
@@ -100,9 +120,14 @@ function ProjectPageLoaded({
   const { data: contacts = [] } = useContacts(orgId);
   const updateProject = useUpdateProject(orgId, operatingCompanyId);
   const updateTaskState = useUpdateTaskState(orgId);
+  const setProjectActive = useSetProjectActive(orgId);
+  const createProject = useCreateProject(orgId, operatingCompanyId);
 
   const [editing, setEditing] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
+  const [duplicating, setDuplicating] = useState(false);
+  const [duplicateError, setDuplicateError] = useState<string | null>(null);
+  const [confirmArchive, setConfirmArchive] = useState(false);
 
   const project = useMemo(
     () => (projects as unknown as Row[]).find((row) => String(row.id) === projectId),
@@ -208,6 +233,37 @@ function ProjectPageLoaded({
     })) as typeof base.sections,
   };
 
+  const archive = archiveAction('projects', project);
+  const archiveLabel =
+    archive === 'unarchive'
+      ? t('projects.page.unarchive', { defaultValue: 'Unarchive' })
+      : t('projects.page.archive', { defaultValue: 'Archive' });
+  const duplicateBase = mergeSelectOptionsForFields(newProjectForm(t), {
+    pricelistId: pricelistRowsToSelectOptions(pricelists as never),
+    partnerId: [{ value: '', label: '—' }, ...contactRowsToPartnerSelectOptions(contacts as never)],
+  });
+  const duplicateForm: FormConfig = {
+    ...duplicateBase,
+    sections: duplicateBase.sections.map((section) => ({
+      ...section,
+      fields: section.fields.map((field) => {
+        const value = field.name === 'name' ? duplicateName('projects', project.name) : getProjectFieldValue(project, field.name);
+        return { ...field, defaultValue: value } as typeof field;
+      }),
+    })) as typeof duplicateBase.sections,
+  };
+  const changeActive = (action: 'archive' | 'unarchive') =>
+    setProjectActive.mutate(
+      { projectId: id, active: archiveTargetActive(action) },
+      {
+        onSuccess: () => {
+          showWorkflowToast({ kind: 'success', title: action === 'archive' ? t('projects.page.archived', { defaultValue: 'Project archived' }) : t('projects.page.unarchived', { defaultValue: 'Project unarchived' }), description: label });
+          if (action === 'archive') router.push(buildModuleTabHref('projects', 'projects'));
+        },
+        onError: (error) => showWorkflowToast({ kind: 'error', title: t('common.error.title'), description: error.message }),
+      },
+    );
+
   return (
     <>
       <RecordPage
@@ -243,9 +299,33 @@ function ProjectPageLoaded({
           />
         }
         actions={
-          <Button size="sm" data-testid="project-edit" onClick={() => setEditing(true)}>
-            {t('projects.page.edit', { defaultValue: 'Edit' })}
-          </Button>
+          <>
+            <Button size="sm" data-testid="project-edit" onClick={() => setEditing(true)}>
+              {t('projects.page.edit', { defaultValue: 'Edit' })}
+            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" data-testid="project-more-actions">
+                  <MoreHorizontal className="mr-1 h-4 w-4" />
+                  {t('projects.page.moreActions', { defaultValue: 'More' })}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem data-testid="project-action-duplicate" onSelect={() => setDuplicating(true)}>
+                  {t('projects.page.duplicate', { defaultValue: 'Duplicate' })}
+                </DropdownMenuItem>
+                {archive ? (
+                  <DropdownMenuItem
+                    data-testid={`project-action-${archive}`}
+                    disabled={setProjectActive.isPending}
+                    onSelect={() => (archive === 'archive' ? setConfirmArchive(true) : changeActive('unarchive'))}
+                  >
+                    {archiveLabel}
+                  </DropdownMenuItem>
+                ) : null}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </>
         }
         activeTab={activeTab}
         onTabChange={setActiveTab}
@@ -352,6 +432,61 @@ function ProjectPageLoaded({
           }}
         />
       ) : null}
+
+      {duplicating ? (
+        <FormModal
+          open
+          onOpenChange={(open) => {
+            if (!open) {
+              setDuplicating(false);
+              setDuplicateError(null);
+            }
+          }}
+          config={duplicateForm}
+          isPending={createProject.isPending}
+          closeOnSubmit={false}
+          submitError={duplicateError}
+          onSubmit={async (formData) => {
+            setDuplicateError(null);
+            const params = toCreateProjectParams(formData, pricelists as unknown as Row[], operatingCompanyId);
+            if (!params) {
+              setDuplicateError(t('common.validation.required'));
+              return;
+            }
+            try {
+              await createProject.mutateAsync(projectsParamsToJson(params));
+              setDuplicating(false);
+              showWorkflowToast({
+                kind: 'success',
+                title: t('projects.page.duplicated', { defaultValue: 'Project duplicated' }),
+                description: String(formData.name ?? ''),
+              });
+            } catch (error) {
+              setDuplicateError(error instanceof Error ? error.message : String(error));
+            }
+          }}
+        />
+      ) : null}
+
+      <AlertDialog open={confirmArchive} onOpenChange={setConfirmArchive}>
+        <AlertDialogContent data-testid="project-archive-confirm">
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t('projects.page.archiveConfirm', { defaultValue: 'Archive this project?' })}</AlertDialogTitle>
+            <AlertDialogDescription>{label}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t('erpWorkflow.confirm.dismiss')}</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                setConfirmArchive(false);
+                changeActive('archive');
+              }}
+            >
+              {t('projects.page.archive', { defaultValue: 'Archive' })}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }

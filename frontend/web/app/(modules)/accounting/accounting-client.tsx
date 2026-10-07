@@ -4,6 +4,7 @@ import { useModuleTab } from "@/hooks/use-module-tab"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { useTranslation } from "@lumiere/i18n"
+import { useConfirmDialog } from "@lumiere/ui/hooks/use-confirm-dialog"
 import {
   ModuleView,
   FormModal,
@@ -600,6 +601,7 @@ function AccountingClientReady({
 }: AccountingClientReadyProps) {
   useAccountingModuleSubscription()
   const { t } = useTranslation()
+  const { confirm: confirmDialog, dialog: confirmDialogNode } = useConfirmDialog()
   const { toast } = useToast()
   const { askForm, formDialog } = useFormDialog()
   const { currentUser } = useRBAC()
@@ -4515,7 +4517,7 @@ function AccountingClientReady({
             disabled={!analyticLineEdit?.id || deleteAnalyticLine.isPending}
             onClick={async () => {
               if (!analyticLineEdit?.id) return
-              if (!window.confirm(`${t("common.delete")}?`)) return
+              if (!(await confirmDialog({ description: `${t("common.delete")}?` }))) return
               await deleteAnalyticLine.mutateAsync(BigInt(String(analyticLineEdit.id)))
               setAnalyticLineEdit(null)
             }}
@@ -4551,7 +4553,7 @@ function AccountingClientReady({
             disabled={!reconciliationWidgetEdit?.id || deleteReconciliationWidget.isPending}
             onClick={async () => {
               if (!reconciliationWidgetEdit?.id) return
-              if (!window.confirm(`${t("common.delete")}?`)) return
+              if (!(await confirmDialog({ description: `${t("common.delete")}?` }))) return
               await deleteReconciliationWidget.mutateAsync(BigInt(String(reconciliationWidgetEdit.id)))
               setReconciliationWidgetEdit(null)
             }}
@@ -4636,9 +4638,9 @@ function AccountingClientReady({
                   size="sm"
                   variant="secondary"
                   disabled={bankStatementStateStr(bankStatementDetail) === "Posted" || deleteBankStatement.isPending}
-                  onClick={() => {
+                  onClick={async () => {
                     if (!bankStatementDetail.id) return
-                    if (!window.confirm(t("accounting.bankStatementDetail.deleteStatementConfirm"))) return
+                    if (!(await confirmDialog({ description: t("accounting.bankStatementDetail.deleteStatementConfirm") }))) return
                     void runMutation(() => deleteBankStatement.mutateAsync(BigInt(String(bankStatementDetail.id)))).then(
                       (ok) => {
                         if (ok) setBankStatementDetail(null)
@@ -4720,9 +4722,9 @@ function AccountingClientReady({
                                       variant="ghost"
                                       className="h-7 px-2"
                                       disabled={unreconcileBankLine.isPending}
-                                      onClick={() => {
+                                      onClick={async () => {
                                         if (!line.id) return
-                                        if (!window.confirm(t("accounting.bankStatementDetail.unreconcileConfirm")))
+                                        if (!(await confirmDialog({ description: t("accounting.bankStatementDetail.unreconcileConfirm") })))
                                           return
                                         const lid = BigInt(String(line.id))
                                         const amt = Number(line.amount ?? 0)
@@ -4760,9 +4762,9 @@ function AccountingClientReady({
                                       bankStatementStateStr(bankStatementDetail) === "Posted" ||
                                       deleteBankStatementLine.isPending
                                     }
-                                    onClick={() => {
+                                    onClick={async () => {
                                       if (!line.id) return
-                                      if (!window.confirm(t("accounting.bankStatementDetail.deleteLineConfirm")))
+                                      if (!(await confirmDialog({ description: t("accounting.bankStatementDetail.deleteLineConfirm") })))
                                         return
                                       void runMutation(() => deleteBankStatementLine.mutateAsync(BigInt(String(line.id))))
                                     }}
@@ -4981,6 +4983,7 @@ function AccountingClientReady({
         config={editBankStatementLineFormConfig}
         onSubmit={onSubmitEditBankStatementLine}
       />
+      {confirmDialogNode}
     </>
   )
 }

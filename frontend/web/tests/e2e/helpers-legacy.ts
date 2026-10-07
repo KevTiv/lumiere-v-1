@@ -304,6 +304,9 @@ export async function dismissBlockingDialogs(page: Page) {
       async () => {
         if ((await overlay.count()) === 0) return true
         await page.keyboard.press("Escape")
+        // An edited form asks before closing; this helper's job is to clear the screen.
+        const discard = page.getByTestId("discard-changes-confirm")
+        if (await discard.isVisible().catch(() => false)) await discard.click()
         return (await overlay.count()) === 0
       },
       { timeout: 15_000 },
@@ -2322,9 +2325,6 @@ export async function waitForOrgPermissionAbsent(
 
 export async function revokePermissionViaSettings(page: Page, permissionId: number) {
   await gotoModule(page, "/settings")
-  page.once("dialog", (dialog) => {
-    void dialog.accept()
-  })
   await page.getByTestId("settings-admin-action-revokePermission").click()
   await expect(page.getByTestId("form-modal-settings-revoke-permission")).toBeVisible()
   await fillField(page, "permissionId", String(permissionId))
@@ -2333,7 +2333,10 @@ export async function revokePermissionViaSettings(page: Page, permissionId: numb
       (r) => matchesOperationResponse(r, "revoke_permission") && r.ok(),
       { timeout: 30_000 },
     ),
-    submitForm(page, "settings-revoke-permission"),
+    (async () => {
+      await submitForm(page, "settings-revoke-permission")
+      await page.getByTestId("confirm-dialog-confirm").click()
+    })(),
   ])
   expect(res.ok()).toBe(true)
 }

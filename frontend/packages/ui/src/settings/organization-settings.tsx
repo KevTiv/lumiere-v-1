@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react"
 import { useTranslation } from "@lumiere/i18n"
+import { useConfirmDialog } from "@lumiere/ui/hooks/use-confirm-dialog"
 import { toCreateCompanyParams } from "@lumiere/erp-shared/settings-create-params"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -76,6 +77,7 @@ function companyIdFromForm(data: Record<string, unknown>): string {
  */
 export function OrganizationSettings() {
   const { t } = useTranslation()
+  const { confirm: confirmDialog, dialog: confirmDialogNode } = useConfirmDialog()
   const { toast } = useToast()
   const [isLoading, setIsLoading] = useState(false)
   const { organizationId } = useErpSession()
@@ -585,9 +587,9 @@ export function OrganizationSettings() {
                       size="sm"
                       className="gap-2"
                       disabled={deleteCompany.isPending || !selectedCompanyId}
-                      onClick={() => {
+                      onClick={async () => {
                         if (!selectedCompanyId) return
-                        if (!window.confirm(t("settings.organization.company.deleteConfirm"))) return
+                        if (!(await confirmDialog({ description: t("settings.organization.company.deleteConfirm") }))) return
                         void deleteCompany
                           .mutateAsync({
                             companyId: BigInt(selectedCompanyId),
@@ -1044,8 +1046,8 @@ export function OrganizationSettings() {
                     variant="destructive"
                     size="sm"
                     disabled={executeRetentionPurge.isPending}
-                    onClick={() => {
-                      if (!window.confirm(t("settings.organization.privacy.retentionPurgeConfirm"))) return
+                    onClick={async () => {
+                      if (!(await confirmDialog({ description: t("settings.organization.privacy.retentionPurgeConfirm") }))) return
                       void executeRetentionPurge
                         .mutateAsync()
                         .then(() => {
@@ -1416,6 +1418,7 @@ export function OrganizationSettings() {
           }}
         />
       ) : null}
+      {confirmDialogNode}
     </div>
   )
 }

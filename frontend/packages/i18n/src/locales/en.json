@@ -179,7 +179,13 @@
       "pivotTotal": "Total",
       "pivotExportCsv": "Export CSV"
     },
-    "retry": "Retry"
+    "retry": "Retry",
+    "discardChanges": {
+      "description": "You have edits that were not saved. They will be lost if you close this form.",
+      "discard": "Discard",
+      "keep": "Keep editing",
+      "title": "Discard changes?"
+    }
   },
   "navigation": {
     "overview": "Overview",
@@ -7787,7 +7793,15 @@
       "notFound": "Project not found",
       "notFoundHint": "It may have been deleted, or belong to another organization.",
       "openTasksBoard": "Open tasks board",
-      "board": "Board"
+      "board": "Board",
+      "archive": "Archive",
+      "archiveConfirm": "Archive this project?",
+      "archived": "Project archived",
+      "duplicate": "Duplicate",
+      "duplicated": "Project duplicated",
+      "moreActions": "More",
+      "unarchive": "Unarchive",
+      "unarchived": "Project unarchived"
     },
     "inlineEdit": {
       "nameRequired": "A project needs a name"
@@ -7879,7 +7893,10 @@
       "noAttendees": "No attendees",
       "editRecurrence": "Edit recurrence",
       "rrule": "Recurrence rule",
-      "rruleType": "Recurrence type"
+      "rruleType": "Recurrence type",
+      "duplicate": "Duplicate",
+      "duplicated": "Event duplicated",
+      "moreActions": "More"
     },
     "view": {
       "today": "Today",
@@ -12471,6 +12488,12 @@
       "label": "Notifications",
       "recent": "Latest notifications",
       "viewAll": "View all"
+    }
+  },
+  "commandPalette": {
+    "placeholder": "Search modules, actions and records...",
+    "records": {
+      "loading": "Searching records..."
     }
   }
 }

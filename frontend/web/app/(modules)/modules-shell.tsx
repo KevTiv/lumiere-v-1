@@ -50,6 +50,7 @@ import { useCompanies } from "@lumiere/query-hooks/hooks/organization-company"
 import { useOperatingCompanyId } from "@lumiere/query-hooks/hooks/use-operating-company"
 import { ErpAiRouteContextProvider, ErpAiChatControllerProvider, useErpAiRouteContext } from "@/lib/erp-ai-context"
 import { performSignOut } from "@/lib/auth-sign-out"
+import { recordPageHref } from "@/lib/record-page-href"
 import { useCurrentUserProfile } from "@lumiere/query-hooks/hooks/auth"
 import { useMailMessages } from "@lumiere/query-hooks/hooks/messages"
 
@@ -616,6 +617,7 @@ function ModulesContent({
 
         <ErpCommandPalette
           firstOrgProfile={firstOrgProfile}
+          recordHref={recordPageHref}
           onOpenAIChat={openAiChat}
           onOpenNotebook={() => setIsNotebookOpen(true)}
           onOpenJournal={() => setIsJournalOpen(true)}
