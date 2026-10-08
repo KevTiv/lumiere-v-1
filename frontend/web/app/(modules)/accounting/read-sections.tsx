@@ -174,6 +174,30 @@ export function taxDeadlinesTableConfig(t: (key: string, opts?: Record<string, u
   } as EntityViewConfig
 }
 
+/** Tax groups list config (rows carry the resolved company and account names). */
+export function taxGroupsTableConfig(t: (key: string, opts?: Record<string, unknown>) => string): EntityViewConfig {
+  return {
+    id: "tax-groups-table",
+    title: t("accounting.taxGroups.title", { defaultValue: "Tax groups" }),
+    view: {
+      mode: "table",
+      rowKey: "id",
+      searchable: true,
+      searchKeys: ["name", "companyName"],
+      columns: [
+        { key: "name", label: t("accounting.taxGroups.columns.name", { defaultValue: "Name" }), width: "min-w-48" },
+        { key: "sequence", label: t("accounting.taxGroups.columns.sequence", { defaultValue: "Sequence" }), align: "right" },
+        { key: "companyName", label: t("accounting.taxGroups.columns.company", { defaultValue: "Company" }) },
+        { key: "precedingSubtotalText", label: t("accounting.taxGroups.columns.precedingSubtotal", { defaultValue: "Preceding subtotal" }) },
+        { key: "payableAccountName", label: t("accounting.taxGroups.columns.payableAccount", { defaultValue: "Tax payable account" }) },
+        { key: "receivableAccountName", label: t("accounting.taxGroups.columns.receivableAccount", { defaultValue: "Tax receivable account" }) },
+        { key: "advanceAccountName", label: t("accounting.taxGroups.columns.advanceAccount", { defaultValue: "Advance tax payment account" }) },
+      ],
+      emptyMessage: t("accounting.taxGroups.empty", { defaultValue: "No tax groups." }),
+    },
+  } as EntityViewConfig
+}
+
 export interface CompanyRateLabels {
   readonly company: ReadonlyMap<string, string>
   readonly currency: ReadonlyMap<string, string>

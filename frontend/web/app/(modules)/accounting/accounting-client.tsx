@@ -85,7 +85,7 @@ import {
 } from "@lumiere/ui"
 import { Input } from "@lumiere/ui/components/input"
 import { Label } from "@lumiere/ui/components/label"
-import type { BadgeVariant, EntityAction, EntityRecordSheetConfig, EntityRow, EntityTableConfig, EntityViewConfig, FormConfig, ModuleConfig } from "@lumiere/ui"
+import type { BadgeVariant, EntityAction, EntityRecordSheetConfig, FormField, EntityRow, EntityTableConfig, EntityViewConfig, FormConfig, ModuleConfig } from "@lumiere/ui"
 import {
   accountingParamsToJson,
   analyticParamsToJson,
@@ -288,6 +288,9 @@ import {
   useRefreshTaxDeadlineStatuses,
   useScheduleTaxDeadlineUpdates,
   useTaxDeadlines,
+  useAccountTaxGroups,
+  useCreateAccountTaxGroup,
+  useUpdateAccountTaxGroup,
   useCompleteTaxDeadline,
   useWaiveTaxDeadline,
   useDeleteTaxDeadline,
@@ -351,6 +354,14 @@ import {
   toTaxDeadlineCreateBody,
   toTaxDeadlineUpdateBody,
 } from "./tax-deadline-actions"
+import {
+  canEditTaxGroup,
+  taxGroupAccountOptions,
+  taxGroupEditDefaults,
+  toTaxGroupCreateParams,
+  toTaxGroupUpdateParams,
+} from "./tax-group-actions"
+import { cellId, cellText, withNone } from "./tax-setup-wire"
 import { accountIsDeprecated, deprecateAccountParams } from "./account-deprecation"
 import { ACCOUNT_INTERNAL_TYPES, accountEditDefaults, toAccountUpdateParams } from "./account-edit"
 import {
@@ -391,6 +402,7 @@ import {
   ConsolidationCompanyRatesSection,
   TaxDeadlineRemindersSection,
   taxDeadlinesTableConfig,
+  taxGroupsTableConfig,
 } from "./read-sections"
 import { fetchQueryList } from "@lumiere/query-hooks/http"
 import {
@@ -743,6 +755,7 @@ function AccountingClientReady({
   const { data: budgetLines = [] } = useBudgetLines(orgId, { enabled: organizationId > 0 })
   const { data: budgetPosts = [] } = useBudgetPosts(orgId, { enabled: organizationId > 0 })
   const { data: taxDeadlines = [] } = useTaxDeadlines(orgId, { enabled: organizationId > 0 })
+  const { data: taxGroups = [] } = useAccountTaxGroups(orgId, { enabled: organizationId > 0 })
   const { data: analytic = [] } = useAccountAnalyticAccounts(orgId, { enabled: organizationId > 0 })
   const { data: analyticLines = [] } = useAccountAnalyticLines(orgId, { enabled: organizationId > 0 })
   const { data: analyticDistribution = [] } = useAccountAnalyticDistributionModels(orgId, {
@@ -1641,6 +1654,8 @@ function AccountingClientReady({
   const deleteTaxDeadline = useDeleteTaxDeadline(organizationId)
   const createTaxDeadline = useCreateTaxDeadline(organizationId)
   const updateTaxDeadline = useUpdateTaxDeadline(organizationId)
+  const createTaxGroup = useCreateAccountTaxGroup(organizationId, operatingCompanyId)
+  const updateTaxGroup = useUpdateAccountTaxGroup(organizationId, operatingCompanyId)
   const createBudget = useCreateCrossoveredBudget(organizationId)
   const updateBudget = useUpdateCrossoveredBudget(organizationId)
   const createBudgetLine = useCreateBudgetLine(organizationId)
@@ -2301,6 +2316,91 @@ function AccountingClientReady({
     waiveTaxDeadline.mutateAsync,
     deleteTaxDeadline.mutateAsync,
   ])
+
+  const taxGroupRows = useMemo(() => {
+    const accountLabel = new Map<string, string>()
+    for (const a of accounts as unknown as Record<string, unknown>[]) {
+      const id = cellId(a.id)
+      if (id != null) accountLabel.set(id.toString(), `${cellText(a.code)} ${cellText(a.name)}`.trim())
+    }
+    const companyLabel = new Map(companySelectOptions.map((o) => [String(o.value), o.label] as const))
+    const labelOf = (map: Map<string, string>, v: unknown) => {
+      const id = cellId(v)
+      return id == null ? "" : (map.get(id.toString()) ?? id.toString())
+    }
+    return (taxGroups as unknown as Record<string, unknown>[]).map((g) => ({
+      ...g,
+      sequence: Number(cellText(g.sequence)) || 0,
+      companyName: labelOf(companyLabel, g.companyId),
+      precedingSubtotalText: cellText(g.precedingSubtotal),
+      payableAccountName: labelOf(accountLabel, g.taxPayableAccountId),
+      receivableAccountName: labelOf(accountLabel, g.taxReceivableAccountId),
+      advanceAccountName: labelOf(accountLabel, g.advanceTaxPaymentAccountId),
+    }))
+  }, [taxGroups, accounts, companySelectOptions])
+
+  /** Tax groups table: "New tax group" and "Edit tax group" (the reducers re-validate accounts and company). */
+  const taxGroupsEntityConfig = useMemo((): EntityViewConfig => {
+    const base = taxGroupsTableConfig(t)
+    const view = base.view as EntityTableConfig
+    const newLabel = t("accounting.taxGroups.actions.new", { defaultValue: "New tax group" })
+    const editLabel = t("accounting.taxGroups.actions.edit", { defaultValue: "Edit tax group" })
+    const noneLabel = t("accounting.taxGroups.form.none", { defaultValue: "None" })
+    const accountRows = accounts as unknown as Record<string, unknown>[]
+    const fields = (current: ReturnType<typeof taxGroupEditDefaults> | null): FormField[] => [
+      { id: "name", name: "name", label: t("accounting.taxGroups.columns.name", { defaultValue: "Name" }), type: "text", required: true, defaultValue: current?.name ?? "", width: "2/3" },
+      { id: "sequence", name: "sequence", label: t("accounting.taxGroups.columns.sequence", { defaultValue: "Sequence" }), type: "number", required: true, min: 0, step: 1, defaultValue: current?.sequence ?? 10, width: "1/3" },
+      { id: "precedingSubtotal", name: "precedingSubtotal", label: t("accounting.taxGroups.columns.precedingSubtotal", { defaultValue: "Preceding subtotal" }), type: "text", defaultValue: current?.precedingSubtotal ?? "" },
+      { id: "taxPayableAccountId", name: "taxPayableAccountId", label: t("accounting.taxGroups.columns.payableAccount", { defaultValue: "Tax payable account" }), type: "select", defaultValue: current?.taxPayableAccountId ?? "", options: withNone(taxGroupAccountOptions(accountRows, "payable", operatingCompanyId), noneLabel) },
+      { id: "taxReceivableAccountId", name: "taxReceivableAccountId", label: t("accounting.taxGroups.columns.receivableAccount", { defaultValue: "Tax receivable account" }), type: "select", defaultValue: current?.taxReceivableAccountId ?? "", options: withNone(taxGroupAccountOptions(accountRows, "receivable", operatingCompanyId), noneLabel) },
+      { id: "advanceTaxPaymentAccountId", name: "advanceTaxPaymentAccountId", label: t("accounting.taxGroups.columns.advanceAccount", { defaultValue: "Advance tax payment account" }), type: "select", defaultValue: current?.advanceTaxPaymentAccountId ?? "", options: withNone(taxGroupAccountOptions(accountRows, "advance", operatingCompanyId), noneLabel) },
+    ]
+    const invalid = (title: string) =>
+      showWorkflowToast({
+        kind: "error",
+        title: t("accounting.taxDeadlines.actions.failed", { defaultValue: "{{action}} failed", action: title }),
+        description: t("accounting.taxGroups.actions.invalid", { defaultValue: "Enter a name and a whole-number sequence." }),
+      })
+
+    const promptNew = async () => {
+      const values = await askForm({ title: newLabel, fields: fields(null) })
+      if (values == null) return
+      const params = toTaxGroupCreateParams(values)
+      if (params == null) return invalid(newLabel)
+      await runTaxCommand(newLabel, () => createTaxGroup.mutateAsync(params))
+    }
+    const promptEdit = async (row: Record<string, unknown>) => {
+      const values = await askForm({ title: editLabel, fields: fields(taxGroupEditDefaults(row)) })
+      if (values == null) return
+      const result = toTaxGroupUpdateParams(values, row)
+      if (!result.ok) {
+        if (result.reason === "invalid") return invalid(editLabel)
+        showWorkflowToast({ kind: "info", title: t("accounting.accounts.edit.unchanged", { defaultValue: "Nothing to change." }) })
+        return
+      }
+      await runTaxCommand(editLabel, () =>
+        updateTaxGroup.mutateAsync({ groupId: BigInt(String(row.id)), params: result.params }),
+      )
+    }
+
+    const actions: EntityAction[] = [
+      {
+        id: "tax-group-new",
+        label: newLabel,
+        permission: { resource: "account_tax_group", action: "create" },
+        onClick: () => promptNew(),
+      },
+      {
+        id: "tax-group-edit",
+        label: editLabel,
+        requiresSelection: true,
+        permission: { resource: "account_tax_group", action: "write" },
+        isApplicable: (rows) => rows.every((r) => canEditTaxGroup(r, operatingCompanyId)),
+        onClick: (rows) => promptEdit(rows[0]!),
+      },
+    ]
+    return { ...base, view: { ...view, actions: [...(view.actions ?? []), ...actions] } } as EntityViewConfig
+  }, [t, askForm, accounts, operatingCompanyId, runTaxCommand, createTaxGroup.mutateAsync, updateTaxGroup.mutateAsync])
 
   const editTaxAction = useMemo((): EntityAction => {
     const label = t("accounting.taxes.actions.edit", { defaultValue: "Edit tax" })
@@ -4186,6 +4286,9 @@ function AccountingClientReady({
                 ),
               }
             }
+            if (tab.id === "tax-groups") {
+              return { ...tab, entityConfig: taxGroupsEntityConfig }
+            }
             if (tab.id === "tax-deadlines") {
               return {
                 ...tab,
@@ -4475,6 +4578,7 @@ function AccountingClientReady({
       scheduleTaxDeadlineUpdates.mutateAsync,
       editTaxAction,
       taxDeadlinesEntityConfig,
+      taxGroupsEntityConfig,
       toggleAccountDeprecated,
       checkPermission,
       canImportCsv,
@@ -4553,6 +4657,7 @@ function AccountingClientReady({
       payments: accountPayments,
       "bank-statements": bankStatements,
       "tax-deadlines": taxDeadlineRows,
+      "tax-groups": taxGroupRows,
       "payment-terms": paymentTerms,
       "payment-term-lines": paymentTermLinesDisplay,
       "account-journals": journals,
@@ -4569,6 +4674,7 @@ function AccountingClientReady({
       accountPayments,
       bankStatements,
       taxDeadlineRows,
+      taxGroupRows,
       paymentTerms,
       paymentTermLinesDisplay,
       journals,

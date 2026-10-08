@@ -991,14 +991,25 @@
         "precedingSubtotal": "Preceding Subtotal",
         "taxPayableAccountId": "Payable Account",
         "taxReceivableAccountId": "Receivable Account",
-        "advanceTaxPaymentAccountId": "Advance Payment Account"
+        "advanceTaxPaymentAccountId": "Advance Payment Account",
+        "advanceAccount": "Advance tax payment account",
+        "company": "Company",
+        "payableAccount": "Tax payable account",
+        "receivableAccount": "Tax receivable account"
       },
       "filters": {
         "name": "Name"
       },
       "actions": {
         "newTaxGroup": "New Tax Group",
-        "editTaxGroup": "Edit Tax Group"
+        "editTaxGroup": "Edit Tax Group",
+        "edit": "Edit tax group",
+        "invalid": "Enter a name and a whole-number sequence.",
+        "new": "New tax group"
+      },
+      "empty": "No tax groups.",
+      "form": {
+        "none": "None"
       }
     },
     "taxJurisdictions": {
