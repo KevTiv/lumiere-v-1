@@ -86,6 +86,90 @@ export const CSV_IMPORT_CONTRACTS = {
     ],
     optional: ["bom_id", "origin", "date_deadline", "metadata"],
   },
+  account: {
+    resource: "account_account",
+    required: ["code", "name"],
+    optional: [
+      "user_type_id", "currency_id", "is_off_balance", "group_id", "is_bank_account", "reconcile", "tax_ids", "note",
+      "opening_debit", "opening_credit", "opening_balance", "metadata",
+    ],
+  },
+  taxRate: {
+    resource: "account_tax",
+    required: ["name"],
+    optional: [
+      "type_tax_use", "amount_type", "description", "amount", "price_include", "include_base_amount", "sequence",
+      "tax_group_id", "country_id", "country_code", "metadata",
+    ],
+  },
+  accountMove: {
+    resource: "account_move",
+    required: ["journal_id"],
+    optional: [
+      "currency_id", "move_type", "date", "name", "ref_", "invoice_date", "invoice_date_due", "invoice_payment_term_id",
+      "invoice_origin", "payment_reference", "partner_id", "amount_untaxed", "amount_tax", "amount_total", "metadata",
+    ],
+  },
+  accountMoveLine: {
+    resource: "account_move_line",
+    required: ["move_id", "account_id"],
+    optional: [
+      "currency_id", "debit", "credit", "date", "ref_", "sequence", "name", "quantity", "price_unit", "tax_ids",
+      "partner_id", "analytic_account_id", "product_id", "product_uom_id", "cogs_amount", "metadata",
+    ],
+  },
+  budget: {
+    resource: "crossovered_budget",
+    required: ["name"],
+    optional: ["date_from", "date_to", "description", "metadata"],
+  },
+  budgetLine: {
+    resource: "crossovered_budget_lines",
+    required: ["general_budget_id"],
+    optional: ["date_from", "date_to", "planned_amount", "analytic_account_id", "project_id", "metadata"],
+  },
+  analyticAccount: {
+    resource: "account_analytic_account",
+    required: ["name"],
+    optional: ["currency_id", "code", "partner_id", "group_id", "root_plan_id", "plan_id", "parent_id", "metadata"],
+  },
+  country: {
+    resource: "country",
+    required: ["code", "name"],
+    optional: ["currency_code", "official_name", "iso3", "numcode", "phone_code", "language_codes", "metadata"],
+  },
+  currency: {
+    resource: "currency",
+    required: ["code", "name"],
+    optional: ["symbol", "position", "decimal_places", "rounding_factor", "active", "metadata"],
+  },
+  currencyRate: {
+    resource: "currency_rate",
+    required: ["from_currency", "to_currency", "rate"],
+    optional: ["company_id", "date", "metadata"],
+  },
+  company: {
+    resource: "company",
+    required: ["name"],
+    optional: [
+      "code", "is_parent", "parent_id", "currency_id", "fiscal_year_end_month", "fiscal_year_end_day", "tax_id",
+      "company_registry", "address_street", "address_city", "address_zip", "address_country_code", "metadata",
+    ],
+  },
+  role: {
+    resource: "role",
+    required: ["name"],
+    optional: ["description", "parent_id", "permissions", "is_system", "metadata"],
+  },
+  aiAgent: {
+    resource: "ai_agent",
+    required: ["name", "model"],
+    optional: [
+      "provider", "temperature", "description", "api_key_reference", "max_tokens", "top_p", "frequency_penalty",
+      "presence_penalty", "system_prompt", "context_window", "is_default", "allowed_models", "allowed_actions",
+      "rate_limit_per_minute", "cost_per_1k_tokens", "monthly_budget", "company_id", "metadata",
+    ],
+  },
 } as const satisfies Record<string, CsvImportContract>
 
 export type CsvImportContractKey = keyof typeof CSV_IMPORT_CONTRACTS
