@@ -293,6 +293,7 @@ import {
   useCreateTaxDeadline,
   useUpdateTaxDeadline,
   useUpdateAccountTax,
+  useDeprecateAccountAccount,
   useAccountingCsvImportMutations,
   useAccountPayments,
   useAccountPaymentTerms,
@@ -346,6 +347,7 @@ import {
   toTaxDeadlineCreateBody,
   toTaxDeadlineUpdateBody,
 } from "./tax-deadline-actions"
+import { accountIsDeprecated, deprecateAccountParams } from "./account-deprecation"
 import { formText, useFormDialog, workflowActionsToEntityActions } from "@lumiere/ui"
 import type {
   AccountAnalyticAccount,
@@ -627,7 +629,7 @@ function AccountingClientReady({
   const { confirm: confirmDialog, dialog: confirmDialogNode } = useConfirmDialog()
   const { toast } = useToast()
   const { askForm, formDialog } = useFormDialog()
-  const { currentUser } = useRBAC()
+  const { currentUser, checkPermission } = useRBAC()
   const runtimeRoleId = currentUser?.roles[0]
   const moduleConfigBase = useMemo(() => accountingModuleConfig(t), [t])
   const accountingTabIds = useMemo(
@@ -1618,6 +1620,7 @@ function AccountingClientReady({
   const createMove = useCreateAccountMove(organizationId)
   const createTax = useCreateAccountTax(organizationId)
   const updateTax = useUpdateAccountTax(organizationId)
+  const deprecateAccount = useDeprecateAccountAccount(organizationId)
   const completeTaxDeadline = useCompleteTaxDeadline(organizationId)
   const waiveTaxDeadline = useWaiveTaxDeadline(organizationId)
   const deleteTaxDeadline = useDeleteTaxDeadline(organizationId)
@@ -2338,6 +2341,48 @@ function AccountingClientReady({
       },
     }
   }, [t, askForm, runTaxCommand, updateTax.mutateAsync, operatingCompanyId])
+
+  /** Deprecate (after a confirmation) or reactivate a chart-of-accounts row; the reducer re-validates. */
+  const toggleAccountDeprecated = useCallback(
+    async (account: AccountAccount): Promise<void> => {
+      const row = account as unknown as Record<string, unknown>
+      const params = deprecateAccountParams(row, operatingCompanyId)
+      const label = params?.deprecated === false
+        ? t("accounting.accounts.rowActions.reactivate", { defaultValue: "Reactivate account" })
+        : t("accounting.accounts.rowActions.deprecate", { defaultValue: "Deprecate account" })
+      const fail = (description: string) =>
+        showWorkflowToast({
+          kind: "error",
+          title: t("accounting.taxDeadlines.actions.failed", { defaultValue: "{{action}} failed", action: label }),
+          description,
+        })
+      if (params == null) {
+        fail(t("accounting.accounts.rowActions.noCompany", { defaultValue: "No company is available for this account." }))
+        return
+      }
+      if (
+        !accountIsDeprecated(row) &&
+        !(await confirmDialog({
+          title: label,
+          description: t("accounting.accounts.rowActions.deprecateConfirm", {
+            defaultValue: "Deprecated accounts are marked as retired. You can reactivate the account later.",
+          }),
+        }))
+      ) {
+        return
+      }
+      try {
+        await deprecateAccount.mutateAsync({ accountId: BigInt(String(account.id)), params })
+        showWorkflowToast({
+          kind: "success",
+          title: t("accounting.taxDeadlines.actions.done", { defaultValue: "{{action}} completed", action: label }),
+        })
+      } catch (error) {
+        fail(error instanceof Error ? error.message : String(error))
+      }
+    },
+    [t, operatingCompanyId, confirmDialog, deprecateAccount.mutateAsync],
+  )
 
   const fiscalSetupFormConfig = useMemo((): FormConfig => {
     const year = new Date().getFullYear()
@@ -3627,6 +3672,9 @@ function AccountingClientReady({
                     chartStructureContent={chartStructurePanel}
                     onImportAccountsCsv={() => setCsvKind("account")}
                     onAccountClick={(account) => setGlDrilldownAccount(account)}
+                    onToggleDeprecated={
+                      checkPermission("account_account", "write").allowed ? toggleAccountDeprecated : undefined
+                    }
                     onCreate={accountTypes.length > 0 ? async (data) => {
                       const p = toCreateAccountAccountParams(data as Record<string, unknown>, {
                         companyId: operatingCompanyId,
@@ -4191,6 +4239,8 @@ function AccountingClientReady({
       scheduleTaxDeadlineUpdates.mutateAsync,
       editTaxAction,
       taxDeadlinesEntityConfig,
+      toggleAccountDeprecated,
+      checkPermission,
       postDraft,
       analyticLineFormConfig,
       newAnalyticAccountFormConfig,

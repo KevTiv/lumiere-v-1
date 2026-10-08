@@ -746,7 +746,13 @@
         "deprecated": "Deprecated",
         "active": "Active"
       },
-      "coasTab": "Accounts"
+      "coasTab": "Accounts",
+      "rowActions": {
+        "deprecate": "Deprecate account",
+        "deprecateConfirm": "Deprecated accounts are marked as retired. You can reactivate the account later.",
+        "noCompany": "No company is available for this account.",
+        "reactivate": "Reactivate account"
+      }
     },
     "glDrilldown": {
       "title": "{{code}} — {{name}}",
