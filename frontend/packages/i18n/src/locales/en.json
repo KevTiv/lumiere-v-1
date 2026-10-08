@@ -12668,6 +12668,19 @@
     },
     "reorderLineItems": {
       "failed": "Reorder line items failed"
+    },
+    "saveAsTemplate": {
+      "button": "Save as template",
+      "category": "Category",
+      "countryPackKey": "Country pack key (optional)",
+      "description": "Saves this proposal's sections (titles and content) to the template library.",
+      "done": "Template saved",
+      "failed": "Save as template failed",
+      "invalid": "Template name, category and locale are required.",
+      "locale": "Locale",
+      "name": "Template name",
+      "noSections": "Add at least one section first.",
+      "title": "Save as template"
     }
   },
   "forensics": {

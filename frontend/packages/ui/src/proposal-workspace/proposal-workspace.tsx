@@ -27,6 +27,11 @@ import { ComplianceChecklist } from "./compliance-checklist"
 import { parseBidDecisionInput } from "./bid-decision"
 import { parseProcurementScoreInput, procurementScoresForProposal, type ProcurementScoreView } from "./procurement-score"
 import { moveLineItemOrder, proposalLineItemsInOrder, type LineItemMoveDirection } from "./line-item-order"
+import {
+  DEFAULT_TEMPLATE_CATEGORY,
+  DEFAULT_TEMPLATE_LOCALE,
+  parseSectionTemplateInput,
+} from "./section-template"
 import { ProcurementScoresPanel } from "./procurement-scores-panel"
 import { PROJECT_BILL_TYPES, PROJECT_PRICING_TYPES, parseProjectConversionInput } from "./project-conversion"
 import { useFormDialog } from "../forms/use-form-dialog"
@@ -248,6 +253,15 @@ export interface ProposalWorkspaceHooks {
     billType: string
     pricingType: string
   }>
+  useCreateProposalTemplate: () => AsyncMutationResult<{
+    name: string
+    category: string
+    locale: string
+    countryPackKey?: string | null
+    sectionsJson: string
+    isActive: boolean
+    metadata?: string | null
+  }>
   useReorderProposalLineItems: () => AsyncMutationResult<{
     proposalId: bigint | number | string
     orderedIds: Array<bigint | number | string>
@@ -283,6 +297,8 @@ interface ProposalWorkspaceProps {
   canManageProcurementScores?: boolean
   /** Shows the line item move up / down controls; the caller passes the user's `proposal:write` permission. */
   canReorderLineItems?: boolean
+  /** Shows "Save as template"; the caller passes the user's `proposal:write` permission. */
+  canSaveAsTemplate?: boolean
   hooks: ProposalWorkspaceHooks
 }
 
@@ -302,6 +318,7 @@ export function ProposalWorkspace({
   convertToProjectReady = false,
   canManageProcurementScores = false,
   canReorderLineItems = false,
+  canSaveAsTemplate = false,
   hooks,
 }: ProposalWorkspaceProps) {
   const { t } = useTranslation()
@@ -362,6 +379,7 @@ export function ProposalWorkspace({
     useProposalProcurementScores,
     useUpsertProposalProcurementScore,
     useReorderProposalLineItems,
+    useCreateProposalTemplate,
   } = hooks
 
   // ── Data queries ──────────────────────────────────────────────────────────────
@@ -505,6 +523,7 @@ export function ProposalWorkspace({
   const convertToProject = useConvertProposalToProject()
   const upsertProcurementScore = useUpsertProposalProcurementScore()
   const reorderLineItems = useReorderProposalLineItems()
+  const createTemplate = useCreateProposalTemplate()
   const { askForm, formDialog } = useFormDialog()
 
   const libraryTemplates = useMemo(
@@ -912,6 +931,78 @@ export function ProposalWorkspace({
     [askForm, proposalIdBig, upsertProcurementScore, t],
   )
 
+  const handleSaveAsTemplate = useCallback(async () => {
+    const values = await askForm({
+      title: t("proposalWorkspace.saveAsTemplate.title", { defaultValue: "Save as template" }),
+      description: t("proposalWorkspace.saveAsTemplate.description", {
+        defaultValue: "Saves this proposal's sections (titles and content) to the template library.",
+      }),
+      fields: [
+        {
+          id: "name",
+          name: "name",
+          label: t("proposalWorkspace.saveAsTemplate.name", { defaultValue: "Template name" }),
+          type: "text",
+          required: true,
+          defaultValue: proposalTitle,
+        },
+        {
+          id: "category",
+          name: "category",
+          label: t("proposalWorkspace.saveAsTemplate.category", { defaultValue: "Category" }),
+          type: "text",
+          required: true,
+          defaultValue: DEFAULT_TEMPLATE_CATEGORY,
+          width: "1/2",
+        },
+        {
+          id: "locale",
+          name: "locale",
+          label: t("proposalWorkspace.saveAsTemplate.locale", { defaultValue: "Locale" }),
+          type: "text",
+          required: true,
+          defaultValue: DEFAULT_TEMPLATE_LOCALE,
+          width: "1/2",
+        },
+        {
+          id: "countryPackKey",
+          name: "countryPackKey",
+          label: t("proposalWorkspace.saveAsTemplate.countryPackKey", { defaultValue: "Country pack key (optional)" }),
+          type: "text",
+        },
+      ],
+    })
+    if (values == null) return
+    const failed = t("proposalWorkspace.saveAsTemplate.failed", { defaultValue: "Save as template failed" })
+    const parsed = parseSectionTemplateInput(values, proposalSections as Record<string, unknown>[])
+    if (!parsed.ok) {
+      showWorkflowToast({
+        kind: "error",
+        title: failed,
+        description:
+          parsed.reason === "sections"
+            ? t("proposalWorkspace.saveAsTemplate.noSections", { defaultValue: "Add at least one section first." })
+            : t("proposalWorkspace.saveAsTemplate.invalid", {
+                defaultValue: "Template name, category and locale are required.",
+              }),
+      })
+      return
+    }
+    try {
+      await createTemplate.mutateAsync(parsed.value)
+      showWorkflowToast({
+        kind: "success",
+        title: t("proposalWorkspace.saveAsTemplate.done", { defaultValue: "Template saved" }),
+      })
+    } catch (error) {
+      showWorkflowToast({
+        kind: "error",
+        title: failed,
+        description: error instanceof Error ? error.message : String(error),
+      })
+    }
+  }, [askForm, createTemplate, proposalSections, proposalTitle, t])
+
   const handleMoveLineItem = useCallback(
     async (id: bigint, direction: LineItemMoveDirection) => {
       const orderedIds = moveLineItemOrder(
@@ -1114,6 +1205,18 @@ export function ProposalWorkspace({
                 onClick={() => void handleConvertToProject()}
               >
                 {t("proposalWorkspace.convertToProject.button", { defaultValue: "Convert to project" })}
+              </Button>
+            ) : null}
+
+            {canSaveAsTemplate ? (
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={createTemplate.isPending || proposalSections.length === 0}
+                data-testid="proposal-save-as-template"
+                onClick={() => void handleSaveAsTemplate()}
+              >
+                {t("proposalWorkspace.saveAsTemplate.button", { defaultValue: "Save as template" })}
               </Button>
             ) : null}
 
