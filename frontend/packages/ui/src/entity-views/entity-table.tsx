@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useMemo, useEffect, type MouseEvent } from "react"
+import { useTranslation } from "@lumiere/i18n"
 import { cn } from "../lib/utils"
 import type { EntityAction, EntityRow, EntityTableConfig } from "../lib/entity-view-types"
 import { filterEntitySurface } from "../lib/entity-view-types"
@@ -61,10 +62,9 @@ import {
 } from "../forms/utils/radix-select-empty-value"
 import {
   formatEntityFieldValue,
-  formatTimestampLike,
   getRowField,
 } from "../lib/entity-row-utils"
-import { rowsToCsv, downloadCsv } from "../lib/export-csv"
+import { useEntityTableExport } from "./use-entity-table-export"
 import { rowFilterValue } from "../lib/entity-table-engine"
 import { useEntityTable } from "./use-entity-table"
 import { InlineEditCell } from "./inline-edit-cell"
@@ -100,6 +100,8 @@ interface EntityTableProps {
   initialFilters?: Record<string, string>
   /** Clears a parent-owned filter at its source rather than persisting a local override. */
   onInitialFilterClear?: (key: string) => void
+  /** Set false on sensitive lists to hide the Export action. Defaults to the config's `allowExport`, then true. */
+  allowExport?: boolean
 }
 
 /** "Status" → "All statuses", "Priority" → "All priorities". */
@@ -110,20 +112,6 @@ export function allFilterLabel(label: string): string {
   else if (/(s|x|z|ch|sh)$/.test(lower)) plural = `${lower}es`
   else plural = `${lower}s`
   return `All ${plural}`
-}
-
-function csvCellValue(value: unknown): string | number {
-  if (value == null) return ""
-  if (typeof value === "string" || typeof value === "number") return value
-  if (typeof value === "boolean") return value ? "Yes" : "No"
-  if (typeof value === "object" && !Array.isArray(value)) {
-    const obj = value as EntityRow
-    if ("tag" in obj && typeof obj.tag === "string") return obj.tag
-    if ("some" in obj) return csvCellValue(obj.some)
-    const d = formatTimestampLike(value)
-    if (d) return d.toISOString()
-  }
-  return String(value)
 }
 
 function readPersistedFilters(
@@ -149,7 +137,9 @@ export function EntityTable({
   isLoading = false,
   initialFilters,
   onInitialFilterClear,
+  allowExport,
 }: EntityTableProps) {
+  const { t } = useTranslation()
   const { checkPermission } = useRBAC()
   const [search, setSearch] = useState("")
   const [persistedFilters, setPersistedFilters] = useState<Record<string, string>>({})
@@ -467,13 +457,16 @@ export function EntityTable({
     }
   }
 
-  const handleCsvExport = () => {
-    const csv = rowsToCsv(
-      columns.map((col) => col.label),
-      sorted.map((row) => columns.map((col) => csvCellValue(getRowField(row, col.key)))),
-    )
-    downloadCsv(config.listViewKey ?? "export", csv)
-  }
+  // Selected rows go out in the order shown; with no selection, every row matching the search and filters.
+  const selectedSet = new Set(selectedRows)
+  const { exportCsv } = useEntityTableExport({
+    columns,
+    selectedRows: selectedSet.size > 0 ? sorted.filter((row) => selectedSet.has(row)) : [],
+    filteredRows: sorted,
+    listViewKey: config.listViewKey,
+  })
+  const exportLabel = t("common.entityView.export", { defaultValue: "Export" })
+  const canExport = (allowExport ?? config.allowExport ?? true) && columns.some((col) => !col.sensitive)
 
   return (
     <TooltipProvider>
@@ -685,16 +678,16 @@ export function EntityTable({
                   </DropdownMenuContent>
                 </DropdownMenu>
               )}
-              {sorted.length > 0 && (
+              {canExport && sorted.length > 0 && (
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={handleCsvExport}
-                  aria-label="Export CSV"
-                  data-testid="entity-export-csv"
+                  onClick={exportCsv}
+                  aria-label={exportLabel}
+                  data-testid="entity-table-export"
                 >
                   <FileDown className="mr-2 h-4 w-4" />
-                  Export CSV
+                  {exportLabel}
                 </Button>
               )}
               {actions.filter((action) => !action.requiresSelection).map(renderActionButton)}

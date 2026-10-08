@@ -293,6 +293,7 @@ export * from "./components/editable-number";
 export * from "./lib/sale-order-line-totals";
 export * from "./entity-views/sale-order-line-grid";
 export * from "./lib/entity-table-engine";
+export * from "./lib/entity-table-export";
 export * from "./lib/workflow-actions";
 export * from "./lib/workflow-toast";
 export * from "./lib/module-url-filters";
