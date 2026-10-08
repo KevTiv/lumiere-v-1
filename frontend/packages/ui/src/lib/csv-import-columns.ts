@@ -170,6 +170,29 @@ export const CSV_IMPORT_CONTRACTS = {
       "rate_limit_per_minute", "cost_per_1k_tokens", "monthly_budget", "company_id", "metadata",
     ],
   },
+  helpdeskTicket: {
+    resource: "helpdesk_ticket",
+    required: ["name", "team_id", "stage_id"],
+    optional: [
+      "sla_id", "partner_id", "priority", "state", "description", "partner_name", "partner_email", "sla_deadline",
+      "closed_at",
+    ],
+  },
+  helpdeskTeam: {
+    resource: "helpdesk_team",
+    required: ["name"],
+    optional: ["description", "is_active"],
+  },
+  helpdeskStage: {
+    resource: "helpdesk_stage",
+    required: ["name"],
+    optional: ["team_id", "description", "sequence", "is_closed", "template"],
+  },
+  helpdeskSla: {
+    resource: "helpdesk_sla",
+    required: ["name", "team_id", "stage_id"],
+    optional: ["priority", "time_days", "time_hours", "is_active"],
+  },
 } as const satisfies Record<string, CsvImportContract>
 
 export type CsvImportContractKey = keyof typeof CSV_IMPORT_CONTRACTS

@@ -8651,7 +8651,10 @@
   "helpdesk": {
     "actions": {
       "importTicketsCsv": "Import tickets (CSV)",
-      "editTicket": "Edit ticket"
+      "editTicket": "Edit ticket",
+      "importSlasCsv": "Import SLAs (CSV)",
+      "importStagesCsv": "Import stages (CSV)",
+      "importTeamsCsv": "Import teams (CSV)"
     },
     "tabs": {
       "teams": "Teams",
