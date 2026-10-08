@@ -8617,7 +8617,18 @@
       "signatureRequested": "Requested",
       "signatures": "Signatures",
       "signatureStatus": "Status",
-      "signerCount": "Signers"
+      "signerCount": "Signers",
+      "requestSignature": "Request signature",
+      "requestSignatureDone": "Signature requested",
+      "requestSignatureHint": "Record the e-signature envelope created with your provider for this document.",
+      "requestSignatureTitle": "Request signature",
+      "signatureEnvelope": "Envelope ID",
+      "signatureEnvelopeRequired": "An envelope ID is required",
+      "signatureProvider": "Provider",
+      "signatureProviderRequired": "A provider is required",
+      "signatureSigners": "Signers (optional)",
+      "signatureSignersHint": "One e-mail address per line.",
+      "signatureSignersInvalid": "Enter valid e-mail addresses, one per line"
     },
     "knowledgeActions": {
       "categoryInvalid": "Enter a name, a colour from 0 to 11 and a whole-number sequence.",

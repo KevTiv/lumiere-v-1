@@ -21,6 +21,7 @@ import {
   RecordPage,
   SmartButtons,
   buildModuleTabHref,
+  useRBAC,
   documentsTableConfig,
   setDocumentRetentionForm,
   uploadDocumentVersionForm,
@@ -47,6 +48,7 @@ import {
   useAddDocumentVersion,
   useDeleteDocument,
   useApplyDocumentLegalHold,
+  useCreateDocumentSignatureRequest,
   useDeletedDocuments,
   useDocumentExternalRefs,
   useDocumentLegalHolds,
@@ -78,6 +80,7 @@ import {
   rowsForDocument,
   signatureRequestRows,
 } from '../document-record';
+import { canRequestSignature, toSignatureRequestParams } from '../signature-request';
 
 interface DocumentPageClientProps {
   documentId: string;
@@ -88,7 +91,7 @@ interface DocumentPageClientProps {
 }
 
 type Row = Record<string, unknown>;
-type FormAction = 'edit' | 'uploadVersion' | 'setRetention' | 'move' | 'legalHold';
+type FormAction = 'edit' | 'uploadVersion' | 'setRetention' | 'move' | 'legalHold' | 'requestSignature';
 
 const TAB_IDS = ['overview', 'versions', 'signatures', 'externalRefs', 'discussion', 'audit'] as const;
 type TabId = (typeof TAB_IDS)[number];
@@ -157,6 +160,52 @@ function legalHoldForm(): FormConfig {
   };
 }
 
+function requestSignatureForm(t: ReturnType<typeof useTranslation>['t']): FormConfig {
+  return {
+    id: 'document-request-signature',
+    title: t('documents.page.requestSignatureTitle', { defaultValue: 'Request signature' }),
+    description: t('documents.page.requestSignatureHint', {
+      defaultValue: 'Record the e-signature envelope created with your provider for this document.',
+    }),
+    submitLabel: t('documents.page.requestSignature', { defaultValue: 'Request signature' }),
+    sections: [
+      {
+        id: 'signature',
+        fields: [
+          {
+            id: 'sig-provider',
+            name: 'provider',
+            type: 'text',
+            label: t('documents.page.signatureProvider', { defaultValue: 'Provider' }),
+            placeholder: 'DocuSign',
+            required: true,
+            width: '1/2',
+          },
+          {
+            id: 'sig-envelope',
+            name: 'externalEnvelopeId',
+            type: 'text',
+            label: t('documents.page.signatureEnvelope', { defaultValue: 'Envelope ID' }),
+            required: true,
+            width: '1/2',
+          },
+          {
+            id: 'sig-signers',
+            name: 'signers',
+            type: 'textarea',
+            label: t('documents.page.signatureSigners', { defaultValue: 'Signers (optional)' }),
+            description: t('documents.page.signatureSignersHint', {
+              defaultValue: 'One e-mail address per line.',
+            }),
+            rows: 3,
+            width: 'full',
+          },
+        ],
+      },
+    ],
+  };
+}
+
 function DocumentPageLoaded({
   documentId,
   initialDocuments,
@@ -190,6 +239,8 @@ function DocumentPageLoaded({
   const setRetention = useSetDocumentRetention(orgId);
   const applyLegalHold = useApplyDocumentLegalHold(orgId);
   const releaseLegalHold = useReleaseDocumentLegalHold(orgId);
+  const createSignatureRequest = useCreateDocumentSignatureRequest(orgId);
+  const { checkPermission } = useRBAC();
   const { confirm, dialog: confirmDialog } = useConfirmDialog();
   const releaseNoteRef = useRef<HTMLTextAreaElement | null>(null);
 
@@ -352,7 +403,9 @@ function DocumentPageLoaded({
             ? moveDocumentForm(document, documentFolderRowsToSelectOptions(folders as unknown as Row[]))
             : formAction === 'legalHold'
               ? legalHoldForm()
-              : null;
+              : formAction === 'requestSignature'
+                ? requestSignatureForm(t)
+                : null;
 
   const submitForm = async (formData: Record<string, unknown>) => {
     setFormError(null);
@@ -400,6 +453,27 @@ function DocumentPageLoaded({
         if (!reason) throw new Error('A reason is required');
         await applyLegalHold.mutateAsync({ documentId: id, reason });
         showWorkflowToast({ kind: 'success', title: 'Legal hold', description: label });
+      } else if (formAction === 'requestSignature') {
+        const result = toSignatureRequestParams(formData);
+        if (!result.ok) {
+          throw new Error(
+            result.reason === 'provider'
+              ? t('documents.page.signatureProviderRequired', { defaultValue: 'A provider is required' })
+              : result.reason === 'envelope'
+                ? t('documents.page.signatureEnvelopeRequired', { defaultValue: 'An envelope ID is required' })
+                : t('documents.page.signatureSignersInvalid', { defaultValue: 'Enter valid e-mail addresses, one per line' }),
+          );
+        }
+        // The hook types the options as plain strings; the params struct needs explicit SATS options.
+        await createSignatureRequest.mutateAsync({
+          documentId: id,
+          params: result.params as unknown as Parameters<typeof createSignatureRequest.mutateAsync>[0]['params'],
+        });
+        showWorkflowToast({
+          kind: 'success',
+          title: t('documents.page.requestSignatureDone', { defaultValue: 'Signature requested' }),
+          description: label,
+        });
       }
       setFormAction(null);
     } catch (error) {
@@ -540,6 +614,16 @@ function DocumentPageLoaded({
                     {t('documents.page.legalHold', { defaultValue: 'Legal hold' })}
                   </Button>
                 )}
+                {canRequestSignature(document) && checkPermission('document', 'write').allowed ? (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    data-testid="document-action-request-signature"
+                    onClick={() => setFormAction('requestSignature')}
+                  >
+                    {t('documents.page.requestSignature', { defaultValue: 'Request signature' })}
+                  </Button>
+                ) : null}
                 <Button
                   variant="outline"
                   size="sm"
@@ -670,7 +754,7 @@ function DocumentPageLoaded({
             }
           }}
           config={formConfig}
-          isPending={addVersion.isPending || updateDocument.isPending || setRetention.isPending || applyLegalHold.isPending}
+          isPending={addVersion.isPending || updateDocument.isPending || setRetention.isPending || applyLegalHold.isPending || createSignatureRequest.isPending}
           closeOnSubmit={false}
           submitError={formError}
           onSubmit={submitForm}
