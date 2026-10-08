@@ -957,7 +957,13 @@
       "taxUse": "Type",
       "priceInclude": "Price Inc.",
       "refreshDeadlineStatuses": "Refresh tax deadline statuses",
-      "scheduleDeadlineUpdates": "Schedule daily deadline updates"
+      "scheduleDeadlineUpdates": "Schedule daily deadline updates",
+      "actions": {
+        "active": "Active",
+        "edit": "Edit tax",
+        "invalid": "Enter a name and a rate.",
+        "withholding": "Withholding"
+      }
     },
     "taxGroups": {
       "title": "Tax Groups",
@@ -1071,7 +1077,17 @@
         "waiveSelected": "Waive Selected",
         "deleteSelected": "Delete Selected",
         "refreshStatuses": "Refresh Statuses",
-        "scheduleUpdates": "Schedule Updates"
+        "scheduleUpdates": "Schedule Updates",
+        "complete": "Mark complete",
+        "delete": "Delete deadline",
+        "deleteConfirm": "Delete this tax deadline? It disappears from the list.",
+        "done": "{{action}} completed",
+        "edit": "Edit deadline",
+        "failed": "{{action}} failed",
+        "invalid": "Enter a title and a due date.",
+        "new": "New deadline",
+        "waive": "Waive",
+        "waiveConfirm": "Mark this deadline as not applicable. It stops counting as open."
       },
       "empty": "No tax deadlines.",
       "reminders": {
@@ -1083,6 +1099,17 @@
         "sentAt": "Sent",
         "status": "Status",
         "tab": "Reminders"
+      },
+      "form": {
+        "company": "Company (optional)",
+        "type": "Type",
+        "types": {
+          "Filing": "Filing",
+          "Payment": "Payment",
+          "Registration": "Registration",
+          "Report": "Report",
+          "Renewal": "Renewal"
+        }
       }
     },
     "budgets": {
