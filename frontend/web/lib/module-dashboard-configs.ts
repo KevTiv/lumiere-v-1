@@ -200,6 +200,7 @@ import {
   subscriptionPriceTiersTableConfig,
   subscriptionPastDueTableConfig,
   subscriptionDueToBillTableConfig,
+  subscriptionBundlesTableConfig,
   subscriptionEntitlementsTableConfig,
   subscriptionPaymentIntentsTableConfig,
   createSubscriptionPriceTierForm,
@@ -2667,7 +2668,7 @@ export const subscriptionsModuleConfig = (t: TFunction): ModuleConfig => ({
   description: "Recurring revenue, plans, and subscription management",
   defaultTab: "dashboard",
   tabGroups: [
-    { label: t("modules.tabGroups.subscriptions", { defaultValue: "Subscriptions" }), tabIds: ["subscriptions", "plans", "lines", "amendments", "entitlements"] },
+    { label: t("modules.tabGroups.subscriptions", { defaultValue: "Subscriptions" }), tabIds: ["subscriptions", "plans", "lines", "amendments", "bundles", "entitlements"] },
     { label: t("modules.tabGroups.billing", { defaultValue: "Billing" }), tabIds: ["usage-events", "usage-charges", "rating-backlog", "price-tiers", "due-to-bill", "past-due", "payment-intents"] },
     { label: t("modules.tabGroups.revenue", { defaultValue: "Revenue" }), tabIds: ["deferred-schedules", "deferred-lines", "recognition-rules"] },
   ],
@@ -2796,6 +2797,12 @@ export const subscriptionsModuleConfig = (t: TFunction): ModuleConfig => ({
       label: t("subscriptions.dueToBill.tabLabel", { defaultValue: "Due to bill" }),
       type: "entity",
       entityConfig: subscriptionDueToBillTableConfig(t),
+    },
+    {
+      id: "bundles",
+      label: t("subscriptions.bundles.tabLabel", { defaultValue: "Bundles" }),
+      type: "entity",
+      entityConfig: subscriptionBundlesTableConfig(t),
     },
     {
       id: "entitlements",

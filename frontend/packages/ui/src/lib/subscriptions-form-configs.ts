@@ -1,4 +1,5 @@
 import type { TFunction } from "i18next"
+import { PLAN_BILLING_PERIODS } from "@lumiere/erp-shared/subscription-billing-periods"
 import type { FormConfig } from "./form-types"
 
 const emptySelect: Array<{ value: string; label: string; disabled?: boolean }> = []
@@ -201,11 +202,12 @@ export const newSubscriptionPlanForm = (t: TFunction): FormConfig => ({
           type: "select",
           label: t("subscriptions.forms.newPlan.fields.billingPeriod"),
           width: "1/2",
-          options: [
-            { value: "monthly", label: t("subscriptions.forms.newPlan.fields.options.monthly") },
-            { value: "quarterly", label: t("subscriptions.forms.newPlan.fields.options.quarterly") },
-            { value: "yearly", label: t("subscriptions.forms.newPlan.fields.options.yearly") },
-          ],
+          options: PLAN_BILLING_PERIODS.map((value) => ({
+            value,
+            label: t(`subscriptions.forms.newPlan.fields.options.${value}`, {
+              defaultValue: value.charAt(0).toUpperCase() + value.slice(1),
+            }),
+          })),
         },
         {
           id: "billingPeriodUnit",
