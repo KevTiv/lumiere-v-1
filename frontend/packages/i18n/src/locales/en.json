@@ -9158,8 +9158,11 @@
           "recurrenceId": "Billing Cycle",
           "recurrencePlaceholder": "Recurrence ID",
           "options": {
+            "day": "Day",
+            "week": "Week",
+            "month": "Month",
+            "year": "Year",
             "monthly": "Monthly",
-            "quarterly": "Quarterly",
             "yearly": "Yearly"
           }
         }
@@ -9476,6 +9479,18 @@
       "intentType": "Intent type",
       "invalid": "Choose an intent type and a currency, and enter an amount above zero (and a valid invoice move ID, if any).",
       "invoiceMoveId": "Invoice move ID (optional)"
+    },
+    "bundles": {
+      "columns": {
+        "active": "Active",
+        "code": "Code",
+        "name": "Name",
+        "plan": "Plan"
+      },
+      "description": "Bundles group extra items on top of a subscription plan",
+      "emptyMessage": "No bundles yet. Use New bundle on the Plans tab.",
+      "tabLabel": "Bundles",
+      "title": "Bundles"
     }
   },
   "expenses": {
