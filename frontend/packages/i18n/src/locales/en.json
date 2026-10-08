@@ -751,7 +751,16 @@
         "deprecate": "Deprecate account",
         "deprecateConfirm": "Deprecated accounts are marked as retired. You can reactivate the account later.",
         "noCompany": "No company is available for this account.",
-        "reactivate": "Reactivate account"
+        "reactivate": "Reactivate account",
+        "edit": "Edit account"
+      },
+      "edit": {
+        "deprecated": "Deprecated",
+        "internalType": "Account type",
+        "invalid": "Enter a code and a name.",
+        "note": "Note",
+        "reconcile": "Allow reconciliation",
+        "unchanged": "Nothing to change."
       }
     },
     "glDrilldown": {
@@ -1451,7 +1460,10 @@
         "period": "Period",
         "rate": "Rate",
         "title": "Company exchange rates",
-        "type": "Type"
+        "type": "Type",
+        "invalid": "Choose a company, period and currency, and enter a rate above zero and an effective date.",
+        "set": "Add / update rate",
+        "setHint": "A company and period that already has a rate gets its rate, type and effective date updated."
       }
     },
     "states": {
@@ -2752,6 +2764,19 @@
       "row": "Row",
       "tab": "Imported lines",
       "validationError": "Validation"
+    },
+    "bankStatements": {
+      "actions": {
+        "currency": "Currency",
+        "edit": "Edit statement",
+        "editTab": "Edit",
+        "invalidEdit": "Enter valid balances and date.",
+        "invalidNew": "Choose a bank journal and a currency, and enter a valid opening balance.",
+        "new": "New statement",
+        "noBankJournal": "Create a bank journal first; statements are opened on bank journals.",
+        "postedLocked": "A posted statement can no longer be edited.",
+        "reference": "Reference"
+      }
     }
   },
   "crm": {

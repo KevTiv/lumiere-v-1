@@ -294,6 +294,9 @@ import {
   useUpdateTaxDeadline,
   useUpdateAccountTax,
   useDeprecateAccountAccount,
+  useUpdateAccountAccount,
+  useCreateAccountBankStatement,
+  useUpdateAccountBankStatement,
   useAccountingCsvImportMutations,
   useAccountPayments,
   useAccountPaymentTerms,
@@ -348,6 +351,14 @@ import {
   toTaxDeadlineUpdateBody,
 } from "./tax-deadline-actions"
 import { accountIsDeprecated, deprecateAccountParams } from "./account-deprecation"
+import { ACCOUNT_INTERNAL_TYPES, accountEditDefaults, toAccountUpdateParams } from "./account-edit"
+import {
+  bankJournals,
+  canEditBankStatement,
+  statementDateInput,
+  toBankStatementCreateInput,
+  toBankStatementUpdateParams,
+} from "./bank-statement-actions"
 import { formText, useFormDialog, workflowActionsToEntityActions } from "@lumiere/ui"
 import type {
   AccountAnalyticAccount,
@@ -1621,6 +1632,9 @@ function AccountingClientReady({
   const createTax = useCreateAccountTax(organizationId)
   const updateTax = useUpdateAccountTax(organizationId)
   const deprecateAccount = useDeprecateAccountAccount(organizationId)
+  const updateAccount = useUpdateAccountAccount(organizationId)
+  const createBankStatement = useCreateAccountBankStatement(organizationId)
+  const updateBankStatement = useUpdateAccountBankStatement(organizationId)
   const completeTaxDeadline = useCompleteTaxDeadline(organizationId)
   const waiveTaxDeadline = useWaiveTaxDeadline(organizationId)
   const deleteTaxDeadline = useDeleteTaxDeadline(organizationId)
@@ -2382,6 +2396,212 @@ function AccountingClientReady({
       }
     },
     [t, operatingCompanyId, confirmDialog, deprecateAccount.mutateAsync],
+  )
+
+  /** Edit a chart-of-accounts row; only the fields the user changed are sent. */
+  const editAccount = useCallback(
+    async (account: AccountAccount): Promise<void> => {
+      const row = account as unknown as Record<string, unknown>
+      const label = t("accounting.accounts.rowActions.edit", { defaultValue: "Edit account" })
+      const current = accountEditDefaults(row)
+      const values = await askForm({
+        title: label,
+        fields: [
+          { id: "code", name: "code", label: t("accounting.accounts.code"), type: "text", required: true, defaultValue: current.code, width: "1/3" },
+          { id: "name", name: "name", label: t("accounting.accounts.name"), type: "text", required: true, defaultValue: current.name, width: "2/3" },
+          {
+            id: "internalType",
+            name: "internalType",
+            label: t("accounting.accounts.edit.internalType", { defaultValue: "Account type" }),
+            type: "select",
+            defaultValue: current.internalType,
+            options: ACCOUNT_INTERNAL_TYPES.map((value) => ({
+              value,
+              label: t(`accounting.accounts.edit.internalTypes.${value}`, { defaultValue: value }),
+            })),
+          },
+          { id: "reconcile", name: "reconcile", label: t("accounting.accounts.edit.reconcile", { defaultValue: "Allow reconciliation" }), type: "switch", defaultValue: current.reconcile, width: "1/2" },
+          { id: "deprecated", name: "deprecated", label: t("accounting.accounts.edit.deprecated", { defaultValue: "Deprecated" }), type: "switch", defaultValue: current.deprecated, width: "1/2" },
+          { id: "note", name: "note", label: t("accounting.accounts.edit.note", { defaultValue: "Note" }), type: "textarea", defaultValue: current.note },
+        ],
+      })
+      if (values == null) return
+      const result = toAccountUpdateParams(values, row, operatingCompanyId)
+      if (!result.ok) {
+        showWorkflowToast({
+          kind: result.reason === "unchanged" ? "info" : "error",
+          title:
+            result.reason === "unchanged"
+              ? t("accounting.accounts.edit.unchanged", { defaultValue: "Nothing to change." })
+              : t("accounting.taxDeadlines.actions.failed", { defaultValue: "{{action}} failed", action: label }),
+          description:
+            result.reason === "noCompany"
+              ? t("accounting.accounts.rowActions.noCompany", { defaultValue: "No company is available for this account." })
+              : result.reason === "invalid"
+                ? t("accounting.accounts.edit.invalid", { defaultValue: "Enter a code and a name." })
+                : undefined,
+        })
+        return
+      }
+      await runTaxCommand(label, () =>
+        updateAccount.mutateAsync({ accountId: BigInt(String(account.id)), params: result.params }),
+      )
+    },
+    [t, askForm, runTaxCommand, updateAccount.mutateAsync, operatingCompanyId],
+  )
+
+  const promptNewBankStatement = useCallback(async (): Promise<void> => {
+    const label = t("accounting.bankStatements.actions.new", { defaultValue: "New statement" })
+    const bank = bankJournals(journals as unknown as Record<string, unknown>[])
+    if (bank.length === 0) {
+      showWorkflowToast({
+        kind: "error",
+        title: t("accounting.taxDeadlines.actions.failed", { defaultValue: "{{action}} failed", action: label }),
+        description: t("accounting.bankStatements.actions.noBankJournal", {
+          defaultValue: "Create a bank journal first; statements are opened on bank journals.",
+        }),
+      })
+      return
+    }
+    const values = await askForm({
+      title: label,
+      fields: [
+        {
+          id: "journalId",
+          name: "journalId",
+          label: t("accounting.entities.bankStatements.columns.journalId"),
+          type: "select",
+          required: true,
+          searchable: true,
+          options: accountJournalRowsToSelectOptions(bank),
+        },
+        { id: "name", name: "name", label: t("accounting.entities.bankStatements.columns.name"), type: "text", width: "1/2" },
+        { id: "reference", name: "reference", label: t("accounting.bankStatements.actions.reference", { defaultValue: "Reference" }), type: "text", width: "1/2" },
+        { id: "date", name: "date", label: t("accounting.entities.bankStatements.columns.date"), type: "date", width: "1/2" },
+        { id: "balanceStart", name: "balanceStart", label: t("accounting.entities.bankStatements.columns.balanceStart"), type: "number", step: 0.01, defaultValue: 0, width: "1/2" },
+        {
+          id: "currencyId",
+          name: "currencyId",
+          label: t("accounting.bankStatements.actions.currency", { defaultValue: "Currency" }),
+          type: "select",
+          required: true,
+          defaultValue: defaultCurrencyId > 0n ? String(defaultCurrencyId) : "",
+          options: currencySelectOptions,
+        },
+      ],
+    })
+    if (values == null) return
+    const input = toBankStatementCreateInput(values, journals as unknown as Record<string, unknown>[])
+    if (input == null) {
+      showWorkflowToast({
+        kind: "error",
+        title: t("accounting.taxDeadlines.actions.failed", { defaultValue: "{{action}} failed", action: label }),
+        description: t("accounting.bankStatements.actions.invalidNew", {
+          defaultValue: "Choose a bank journal and a currency, and enter a valid opening balance.",
+        }),
+      })
+      return
+    }
+    await runTaxCommand(label, () => createBankStatement.mutateAsync(input))
+  }, [t, askForm, journals, currencySelectOptions, defaultCurrencyId, runTaxCommand, createBankStatement.mutateAsync])
+
+  const promptEditBankStatement = useCallback(
+    async (statement: Record<string, unknown>): Promise<void> => {
+      const label = t("accounting.bankStatements.actions.edit", { defaultValue: "Edit statement" })
+      const values = await askForm({
+        title: label,
+        fields: [
+          { id: "name", name: "name", label: t("accounting.entities.bankStatements.columns.name"), type: "text", defaultValue: String(statement.name ?? ""), width: "1/2" },
+          { id: "reference", name: "reference", label: t("accounting.bankStatements.actions.reference", { defaultValue: "Reference" }), type: "text", defaultValue: String(statement.reference ?? ""), width: "1/2" },
+          { id: "date", name: "date", label: t("accounting.entities.bankStatements.columns.date"), type: "date", defaultValue: statementDateInput(statement.date), width: "1/3" },
+          { id: "balanceStart", name: "balanceStart", label: t("accounting.entities.bankStatements.columns.balanceStart"), type: "number", step: 0.01, defaultValue: Number(statement.balanceStart ?? 0), width: "1/3" },
+          { id: "balanceEndReal", name: "balanceEndReal", label: t("accounting.entities.bankStatements.columns.balanceEndReal"), type: "number", step: 0.01, defaultValue: Number(statement.balanceEndReal ?? 0), width: "1/3" },
+        ],
+      })
+      if (values == null) return
+      const result = toBankStatementUpdateParams(values, statement)
+      if (!result.ok) {
+        showWorkflowToast({
+          kind: result.reason === "unchanged" ? "info" : "error",
+          title:
+            result.reason === "unchanged"
+              ? t("accounting.accounts.edit.unchanged", { defaultValue: "Nothing to change." })
+              : t("accounting.taxDeadlines.actions.failed", { defaultValue: "{{action}} failed", action: label }),
+          description:
+            result.reason === "invalid"
+              ? t("accounting.bankStatements.actions.invalidEdit", { defaultValue: "Enter valid balances and date." })
+              : undefined,
+        })
+        return
+      }
+      const companyId = optionalBigIntU64(statement.companyId ?? statement.company_id) ?? operatingCompanyId
+      await runTaxCommand(label, () =>
+        updateBankStatement.mutateAsync({
+          companyId,
+          statementId: BigInt(String(statement.id)),
+          params: result.params,
+        }),
+      )
+    },
+    [t, askForm, runTaxCommand, updateBankStatement.mutateAsync, operatingCompanyId],
+  )
+
+  /** The bank-statements table with its New / Edit actions, each shown only to users who may run it. */
+  const bankStatementsActionsConfig = useMemo((): EntityViewConfig => {
+    const view = bankStatementsEntityConfig.view as EntityTableConfig
+    const actions: EntityAction[] = [
+      {
+        id: "bank-statement-new",
+        label: t("accounting.bankStatements.actions.new", { defaultValue: "New statement" }),
+        permission: { resource: "account_bank_statement", action: "create" },
+        onClick: () => promptNewBankStatement(),
+      },
+      {
+        id: "bank-statement-edit",
+        label: t("accounting.bankStatements.actions.edit", { defaultValue: "Edit statement" }),
+        requiresSelection: true,
+        permission: { resource: "account_bank_statement", action: "write" },
+        isApplicable: (rows) => rows.every((r) => canEditBankStatement(r)),
+        onClick: (rows) => promptEditBankStatement(rows[0]!),
+      },
+    ]
+    return { ...bankStatementsEntityConfig, view: { ...view, actions: [...(view.actions ?? []), ...actions] } } as EntityViewConfig
+  }, [t, bankStatementsEntityConfig, promptNewBankStatement, promptEditBankStatement])
+
+  /** The statement sheet plus an Edit tab (a posted statement is final, so it only explains that). */
+  const bankStatementRecordSheetWithEdit = useMemo(
+    (): EntityRecordSheetConfig => ({
+      ...bankStatementRecordSheet,
+      customTabs: [
+        ...(bankStatementRecordSheet.customTabs ?? []),
+        ...(checkPermission("account_bank_statement", "write").allowed
+          ? [
+              {
+                id: "edit",
+                label: t("accounting.bankStatements.actions.editTab", { defaultValue: "Edit" }),
+                content: (record: Record<string, unknown>) =>
+                  canEditBankStatement(record) ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      data-testid="bank-statement-edit"
+                      onClick={() => void promptEditBankStatement(record)}
+                    >
+                      {t("accounting.bankStatements.actions.edit", { defaultValue: "Edit statement" })}
+                    </Button>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">
+                      {t("accounting.bankStatements.actions.postedLocked", {
+                        defaultValue: "A posted statement can no longer be edited.",
+                      })}
+                    </p>
+                  ),
+              },
+            ]
+          : []),
+      ],
+    }),
+    [t, bankStatementRecordSheet, checkPermission, promptEditBankStatement],
   )
 
   const fiscalSetupFormConfig = useMemo((): FormConfig => {
@@ -3675,6 +3895,7 @@ function AccountingClientReady({
                     onToggleDeprecated={
                       checkPermission("account_account", "write").allowed ? toggleAccountDeprecated : undefined
                     }
+                    onEdit={checkPermission("account_account", "write").allowed ? editAccount : undefined}
                     onCreate={accountTypes.length > 0 ? async (data) => {
                       const p = toCreateAccountAccountParams(data as Record<string, unknown>, {
                         companyId: operatingCompanyId,
@@ -3962,8 +4183,8 @@ function AccountingClientReady({
             if (tab.id === "bank-statements") {
               return {
                 ...tab,
-                entityConfig: bankStatementsEntityConfig,
-                recordSheet: bankStatementRecordSheet,
+                entityConfig: bankStatementsActionsConfig,
+                recordSheet: bankStatementRecordSheetWithEdit,
               }
             }
             if (tab.id === "reconciliation-widgets") {
@@ -4180,7 +4401,9 @@ function AccountingClientReady({
       accounts,
       allMoves,
       bankStatements,
-      bankStatementsEntityConfig,
+      bankStatementsActionsConfig,
+      bankStatementRecordSheetWithEdit,
+      editAccount,
       createAccount.mutate,
       organizationId,
       budgets,

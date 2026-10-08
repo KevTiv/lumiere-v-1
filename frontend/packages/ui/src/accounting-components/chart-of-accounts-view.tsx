@@ -135,9 +135,10 @@ interface AccountsTableProps {
   t: TFunction
   onAccountClick?: (account: AccountAccount) => void
   onToggleDeprecated?: (account: AccountAccount) => void | Promise<void>
+  onEdit?: (account: AccountAccount) => void | Promise<void>
 }
 
-function AccountsTable({ accounts, t, onAccountClick, onToggleDeprecated }: AccountsTableProps) {
+function AccountsTable({ accounts, t, onAccountClick, onToggleDeprecated, onEdit }: AccountsTableProps) {
   const accountsPager = usePagedRows(accounts)
   const [togglingId, setTogglingId] = useState<string | null>(null)
   return (
@@ -188,7 +189,18 @@ function AccountsTable({ accounts, t, onAccountClick, onToggleDeprecated }: Acco
               </TableCell>
               <TableCell>
                 <div className="flex items-center gap-1">
-                  <Button variant="ghost" size="icon" className="h-8 w-8">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8"
+                    title={onEdit ? t("accounting.accounts.rowActions.edit", { defaultValue: "Edit account" }) : undefined}
+                    aria-label={onEdit ? t("accounting.accounts.rowActions.edit", { defaultValue: "Edit account" }) : undefined}
+                    data-testid={`account-edit-${String(account.id)}`}
+                    onClick={onEdit ? (event) => {
+                      event.stopPropagation()
+                      void onEdit(account)
+                    } : undefined}
+                  >
                     <Edit className="h-4 w-4" />
                   </Button>
                   {onToggleDeprecated ? (
@@ -240,6 +252,11 @@ interface ChartOfAccountsViewProps {
    * the mutation and its toasts, and only passes this when the user may write accounts.
    */
   onToggleDeprecated?: (account: AccountAccount) => void | Promise<void>
+  /**
+   * When set, the row's edit button opens it for editing. The caller owns the form, the mutation
+   * and its toasts, and only passes this when the user may write accounts.
+   */
+  onEdit?: (account: AccountAccount) => void | Promise<void>
   /** When set, shows a second top-level tab (e.g. account types & groups). */
   chartStructureContent?: ReactNode
 }
@@ -250,6 +267,7 @@ export function ChartOfAccountsView({
   onImportAccountsCsv,
   onAccountClick,
   onToggleDeprecated,
+  onEdit,
   chartStructureContent,
 }: ChartOfAccountsViewProps) {
   const { t } = useTranslation()
@@ -340,7 +358,7 @@ export function ChartOfAccountsView({
             </TabsList>
             {tabGroups.map(({ value, accounts: tabAccounts }) => (
               <TabsContent key={value} value={value}>
-                <AccountsTable accounts={tabAccounts} t={t} onAccountClick={onAccountClick} onToggleDeprecated={onToggleDeprecated} />
+                <AccountsTable accounts={tabAccounts} t={t} onAccountClick={onAccountClick} onToggleDeprecated={onToggleDeprecated} onEdit={onEdit} />
               </TabsContent>
             ))}
           </Tabs>
