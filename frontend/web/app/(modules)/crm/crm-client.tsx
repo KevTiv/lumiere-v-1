@@ -1,6 +1,9 @@
 "use client"
 import { mapDashboardWidgets, withDashboardSections } from "@lumiere/ui/lib/dashboard-sections"
 import { withInlineEdits } from "@lumiere/ui/lib/with-inline-edits"
+import { useCurrencies } from "@lumiere/query-hooks/hooks/settings"
+import { currencyCodeMap, type KpiTileDef } from "@lumiere/ui/lib/kpi-tiles"
+import { opportunityKpis } from "./opportunity-kpis"
 import { requiredInlineEmail, requiredInlineText } from "@/lib/inline-edit-params"
 
 import { CrmDuplicateContacts } from "@/lib/crm-duplicate-contacts-panel"
@@ -2087,6 +2090,20 @@ function CrmClientLoaded({
     [leads, enrichedOpportunities, opportunityLines, contacts, activities, contactTags, contactCategories, contactSegments],
   )
 
+  const { data: kpiCurrencies = [] } = useCurrencies()
+  const kpiStrips = useMemo<Record<string, { tiles: KpiTileDef[]; loading?: boolean }>>(
+    () => ({
+      opportunities: {
+        tiles: opportunityKpis(enrichedOpportunities, {
+          t,
+          now: new Date(),
+          currencyCodeById: currencyCodeMap(kpiCurrencies as Record<string, unknown>[]),
+        }),
+      },
+    }),
+    [enrichedOpportunities, kpiCurrencies, t],
+  )
+
   const handleFormSubmit = async (
     _tabId: string,
     action: string,
@@ -2437,6 +2454,7 @@ function CrmClientLoaded({
         config={config}
         data={data}
         dataLoading={dataLoading}
+        kpiStrips={kpiStrips}
         entityBoardContext={entityBoardContext}
         onFormSubmit={handleFormSubmit}
         isPending={isFormMutationPending}

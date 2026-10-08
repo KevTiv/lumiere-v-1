@@ -1,6 +1,8 @@
 "use client"
 import { mapDashboardWidgets, withDashboardSections } from "@lumiere/ui/lib/dashboard-sections"
 import { withInlineEdits } from "@lumiere/ui/lib/with-inline-edits"
+import type { KpiTileDef } from "@lumiere/ui/lib/kpi-tiles"
+import { ticketKpis } from "./ticket-kpis"
 import { requiredInlineText, ticketPriorityPatch } from "@/lib/inline-edit-params"
 
 import { useMemo, useState } from "react"
@@ -400,6 +402,15 @@ function HelpdeskClientLoaded({
     [tickets, teams, stages, slas],
   )
 
+  const kpiStrips = useMemo<Record<string, { tiles: KpiTileDef[]; loading?: boolean }>>(
+    () => ({
+      tickets: {
+        tiles: ticketKpis(tickets as Record<string, unknown>[], { t, now: new Date(), currencyCodeById: new Map() }),
+      },
+    }),
+    [tickets, t],
+  )
+
   const handleFormSubmit = async (tabId: string, action: string, formData: Record<string, unknown>) => {
     if (action === "createTicket") {
       const params = toCreateTicketParams(formData)
@@ -491,6 +502,7 @@ function HelpdeskClientLoaded({
       <ModuleView
         config={config}
         data={data}
+        kpiStrips={kpiStrips}
         onFormSubmit={handleFormSubmit}
         onRowClick={onRowClick}
         isPending={isFormMutationPending}

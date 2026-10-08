@@ -122,6 +122,8 @@ export * from "./pages/notification-bell";
 export * from "./lib/notification-bell-model";
 export * from "./lib/dashboard-time-range";
 export * from "./components/trend-badge";
+export * from "./components/kpi-strip";
+export * from "./lib/kpi-tiles";
 export * from "./pages/dashboard-sidebar";
 export * from "./pages/dashboard-widget-renderer";
 export * from "./pages/stored-dashboard-view";

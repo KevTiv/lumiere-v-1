@@ -172,6 +172,8 @@ import {
 import { fetchQueryList } from "@lumiere/query-hooks/http"
 import { useDefaultOperatingCompanyBigInt } from "@lumiere/query-hooks/hooks/use-operating-company"
 import { useCurrencies } from "@lumiere/query-hooks/hooks/settings"
+import type { KpiTileDef } from "@lumiere/ui/lib/kpi-tiles"
+import { purchaseOrderKpis } from "./purchase-order-kpis"
 import {
   contactRowsToVendorSelectOptions,
   pricelistRowsToSelectOptions,
@@ -2420,6 +2422,16 @@ function PurchasingClientLoaded({
     [enrichedOrders, enrichedLines, requisitions, vendors, rfqs, rfqBids, purchaseReturns, landedCosts, supplierIntakes, partnerBanks],
   )
 
+  const kpiStrips = useMemo<Record<string, { tiles: KpiTileDef[]; loading?: boolean }>>(
+    () => ({
+      orders: {
+        tiles: purchaseOrderKpis(enrichedOrders as Record<string, unknown>[], { t, now: new Date(), currencyCodeById: new Map() }),
+        loading: ordersLoading,
+      },
+    }),
+    [enrichedOrders, ordersLoading, t],
+  )
+
   const handleFormSubmit = async (
     _tabId: string,
     action: string,
@@ -2718,6 +2730,7 @@ function PurchasingClientLoaded({
         config={configWithOperations}
         data={data}
         dataLoading={{ orders: ordersLoading }}
+        kpiStrips={kpiStrips}
         onFormSubmit={handleFormSubmit}
         activeTab={activeTab}
         onActiveTabChange={setActiveTab}

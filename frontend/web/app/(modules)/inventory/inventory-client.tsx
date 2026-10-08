@@ -93,6 +93,8 @@ import { useSerialUseWorkflow } from '@lumiere/query-hooks/hooks/serial-use-work
 import { useSerialBlockWorkflow } from '@lumiere/query-hooks/hooks/serial-block-workflow';
 import { planPartialDelivery, variantTag } from '@lumiere/erp-workflows';
 import { showWorkflowToast } from '@lumiere/ui/lib/workflow-toast';
+import type { KpiTileDef } from '@lumiere/ui/lib/kpi-tiles';
+import { transferKpis } from './transfer-kpis';
 import { groupBy } from '@/lib/utils';
 import { transferRecordHref } from './transfer-record';
 import { InventoryOpsPanel } from './inventory-ops-panel';
@@ -4996,6 +4998,16 @@ function InventoryClientLoaded({
     ],
   );
 
+  const kpiStrips = useMemo<Record<string, { tiles: KpiTileDef[]; loading?: boolean }>>(
+    () => ({
+      transfers: {
+        tiles: transferKpis(data.transfers, { t, now: new Date(), currencyCodeById: new Map() }),
+        loading: transfersLoading,
+      },
+    }),
+    [data.transfers, transfersLoading, t],
+  );
+
   const handleFormSubmit = async (
     _tabId: string,
     action: string,
@@ -5337,6 +5349,7 @@ function InventoryClientLoaded({
           stock: stockQuantsLoading,
           transfers: transfersLoading,
         }}
+        kpiStrips={kpiStrips}
         onFormSubmit={handleFormSubmit}
         isPending={isFormMutationPending}
         activeTab={activeTab}

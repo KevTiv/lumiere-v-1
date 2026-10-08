@@ -191,6 +191,8 @@ import {
 } from '@/lib/persist-record-custom-fields';
 import { useDefaultOperatingCompanyBigInt } from '@lumiere/query-hooks/hooks/use-operating-company';
 import { useCurrencies } from '@lumiere/query-hooks/hooks/settings';
+import { currencyCodeMap, type KpiTileDef } from '@lumiere/ui/lib/kpi-tiles';
+import { saleOrderKpis } from './sale-order-kpis';
 import { useModuleTab } from '@/hooks/use-module-tab';
 import { recordOptions as linkedRecordOptions, withLinkedPickers } from '@/lib/linked-options';
 import { CommissionPlansTab } from './commission-plans-tab';
@@ -2322,6 +2324,20 @@ function SalesClientLoaded({
     ],
   );
 
+  const kpiStrips = useMemo<Record<string, { tiles: KpiTileDef[]; loading?: boolean }>>(
+    () => ({
+      orders: {
+        tiles: saleOrderKpis(data.orders, {
+          t,
+          now: new Date(),
+          currencyCodeById: currencyCodeMap(currencies as Record<string, unknown>[]),
+        }),
+        loading: ordersLoading,
+      },
+    }),
+    [data.orders, currencies, ordersLoading, t],
+  );
+
   const handleFormSubmit = async (
     _tabId: string,
     action: string,
@@ -2441,6 +2457,7 @@ function SalesClientLoaded({
         config={config}
         data={data}
         dataLoading={{ orders: ordersLoading }}
+        kpiStrips={kpiStrips}
         onFormSubmit={handleFormSubmit}
         isPending={isFormMutationPending}
         activeTab={activeTab}
