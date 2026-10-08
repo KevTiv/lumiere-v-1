@@ -265,6 +265,8 @@ import {
   useCloseAccountPeriod,
   useDepreciationLines,
   useDeleteAccountAsset,
+  useCreateAccountAsset,
+  useUpdateAccountAsset,
   useConfirmAccountAsset,
   useCloseAccountAsset,
   useCreateDepreciationLine,
@@ -382,6 +384,18 @@ import {
 } from "./tax-schedule-actions"
 import { taxPickerField } from "./tax-picker-field"
 import { cellId, cellText, withNone } from "./tax-setup-wire"
+import {
+  ASSET_TYPES,
+  DEPRECIATION_METHODS,
+  assetAccountOptions,
+  assetCompanyId,
+  assetEditDefaults,
+  assetJournalOptions,
+  canEditAsset,
+  toAssetCreateParams,
+  toAssetUpdateParams,
+  type AssetFailure,
+} from "./asset-actions"
 import { accountIsDeprecated, deprecateAccountParams } from "./account-deprecation"
 import { ACCOUNT_INTERNAL_TYPES, accountEditDefaults, toAccountUpdateParams } from "./account-edit"
 import {
@@ -1744,6 +1758,8 @@ function AccountingClientReady({
   const matchEliminationEntries = useMatchEliminationEntries(organizationId)
   const unmatchEliminationEntry = useUnmatchEliminationEntry(organizationId)
 
+  const createAccountAsset = useCreateAccountAsset(organizationId)
+  const updateAccountAsset = useUpdateAccountAsset(organizationId)
   const deleteAccountAsset = useDeleteAccountAsset(organizationId, operatingCompanyId)
   const confirmAccountAsset = useConfirmAccountAsset(organizationId, operatingCompanyId)
   const closeAccountAsset = useCloseAccountAsset(organizationId, operatingCompanyId)
@@ -3023,11 +3039,198 @@ function AccountingClientReady({
   const fixedAssetsEntityConfig = useMemo((): EntityViewConfig => {
     const base = fixedAssetsTableConfig(t)
     const view = base.view as EntityTableConfig
+    const newAssetLabel = t("accounting.entities.fixedAssets.actions.new", { defaultValue: "New asset" })
+    const editAssetLabel = t("accounting.entities.fixedAssets.actions.edit", { defaultValue: "Edit asset" })
+    const staleSuffix = t("accounting.entities.fixedAssets.form.unavailable", { defaultValue: "(unavailable)" })
+    const noneLabel = t("accounting.entities.fixedAssets.form.none", { defaultValue: "None" })
+    const accountRows = accounts as unknown as Record<string, unknown>[]
+    const journalRows = journals as unknown as Record<string, unknown>[]
+    const assetFailureMessage = (reason: AssetFailure): string => {
+      switch (reason) {
+        case "code":
+        case "name":
+        case "assetType":
+        case "currency":
+          return t("accounting.entities.fixedAssets.form.invalidIdentity", { defaultValue: "Enter a code, a name, an asset type and a currency." })
+        case "originalValue":
+        case "salvageValue":
+          return t("accounting.entities.fixedAssets.form.invalidAmounts", { defaultValue: "The original value must be above zero and the salvage value from zero up to below the original value." })
+        case "method":
+        case "methodNumber":
+        case "methodPeriod":
+        case "progressFactor":
+          return t("accounting.entities.fixedAssets.form.invalidMethod", { defaultValue: "Choose a method, at least one depreciation of at least one month, and a degressive factor above 0 up to 100 for degressive methods." })
+        case "acquisitionDate":
+        case "firstDepreciationDate":
+          return t("accounting.entities.fixedAssets.form.invalidDates", { defaultValue: "Enter a valid acquisition date (and a valid first depreciation date, if any)." })
+        case "journal":
+        case "assetAccount":
+        case "depreciationAccount":
+        case "expenseAccount":
+          return t("accounting.entities.fixedAssets.form.invalidAccounts", { defaultValue: "Choose a general journal, asset and depreciation accounts from the Asset group and an expense account from the Expense group." })
+        default:
+          return t("accounting.entities.fixedAssets.form.invalidDisposal", { defaultValue: "Disposal accounts must be an income account for gains, an expense account for losses and an asset account for disposals." })
+      }
+    }
+    const assetFields = (
+      companyId: bigint,
+      current: ReturnType<typeof assetEditDefaults> | null,
+    ): FormField[] => {
+      const accountSelect = (
+        id: string,
+        label: string,
+        role: Parameters<typeof assetAccountOptions>[2],
+        value: string,
+        optional: boolean,
+      ): FormField => {
+        const options = assetAccountOptions(accountRows, companyId, role, value, staleSuffix)
+        return {
+          id,
+          name: id,
+          label,
+          type: "select",
+          required: !optional,
+          searchable: true,
+          defaultValue: value,
+          options: optional ? withNone(options, noneLabel) : options,
+          width: "1/2",
+        }
+      }
+      const f = (key: string, fallback: string) => t(`accounting.entities.fixedAssets.form.${key}`, { defaultValue: fallback })
+      const typeLabels: Record<string, string> = {
+        Purchase: f("typePurchase", "Purchase"),
+        Sale: f("typeSale", "Sale"),
+      }
+      const methodLabels: Record<string, string> = {
+        Linear: f("methodLinear", "Linear"),
+        Degressive: f("methodDegressive", "Degressive"),
+        DegressiveThenLinear: f("methodDegressiveThenLinear", "Degressive then linear"),
+      }
+      return [
+        ...(current == null
+          ? ([
+              { id: "code", name: "code", label: f("code", "Code"), type: "text", required: true, width: "1/2" },
+              { id: "name", name: "name", label: f("name", "Name"), type: "text", required: true, width: "1/2" },
+              {
+                id: "assetType",
+                name: "assetType",
+                label: f("assetType", "Asset type"),
+                type: "select",
+                required: true,
+                defaultValue: "Purchase",
+                options: ASSET_TYPES.map((value) => ({ value, label: typeLabels[value]! })),
+                width: "1/3",
+              },
+              {
+                id: "currencyId",
+                name: "currencyId",
+                label: f("currency", "Currency"),
+                type: "select",
+                required: true,
+                searchable: true,
+                defaultValue: defaultCurrencyId > 0n ? String(defaultCurrencyId) : "",
+                options: currencySelectOptions,
+                width: "1/3",
+              },
+              { id: "acquisitionDate", name: "acquisitionDate", label: f("acquisitionDate", "Acquisition date"), type: "date", required: true, width: "1/3" },
+            ] as FormField[])
+          : ([{ id: "name", name: "name", label: f("name", "Name"), type: "text", required: true, defaultValue: current.name }] as FormField[])),
+        { id: "originalValue", name: "originalValue", label: f("originalValue", "Original value"), type: "number", required: true, min: 0.01, step: 0.01, defaultValue: current?.originalValue, width: "1/2" },
+        { id: "salvageValue", name: "salvageValue", label: f("salvageValue", "Salvage value"), type: "number", min: 0, step: 0.01, defaultValue: current?.salvageValue ?? 0, width: "1/2" },
+        {
+          id: "method",
+          name: "method",
+          label: f("method", "Depreciation method"),
+          type: "select",
+          required: true,
+          defaultValue: current?.method ?? "Linear",
+          options: DEPRECIATION_METHODS.map((value) => ({ value, label: methodLabels[value]! })),
+          width: "1/2",
+        },
+        { id: "methodProgressFactor", name: "methodProgressFactor", label: f("progressFactor", "Degressive factor (%)"), type: "number", min: 0, max: 100, step: 0.01, defaultValue: current?.methodProgressFactor || 30, width: "1/2" },
+        { id: "methodNumber", name: "methodNumber", label: f("methodNumber", "Number of depreciations"), type: "number", required: true, min: 1, step: 1, defaultValue: current?.methodNumber ?? 5, width: "1/2" },
+        { id: "methodPeriod", name: "methodPeriod", label: f("methodPeriod", "Months between depreciations"), type: "number", required: true, min: 1, step: 1, defaultValue: current?.methodPeriod ?? 12, width: "1/2" },
+        { id: "firstDepreciationDate", name: "firstDepreciationDate", label: f("firstDepreciationDate", "First depreciation date"), type: "date", defaultValue: current?.firstDepreciationDate ?? "", width: "1/2" },
+        { id: "prorata", name: "prorata", label: f("prorata", "Prorata temporis"), type: "switch", defaultValue: current?.prorata ?? false, width: "1/2" },
+        {
+          id: "journalId",
+          name: "journalId",
+          label: f("journal", "Depreciation journal (general)"),
+          type: "select",
+          required: true,
+          searchable: true,
+          defaultValue: current?.journalId ?? "",
+          options: assetJournalOptions(journalRows, companyId, current?.journalId ?? "", staleSuffix),
+        },
+        accountSelect("accountAssetId", f("assetAccount", "Asset account"), "asset", current?.accountAssetId ?? "", false),
+        accountSelect("accountDepreciationId", f("depreciationAccount", "Accumulated depreciation account"), "depreciation", current?.accountDepreciationId ?? "", false),
+        accountSelect("accountDepreciationExpenseId", f("expenseAccount", "Depreciation expense account"), "expense", current?.accountDepreciationExpenseId ?? "", false),
+        accountSelect("gainAccountId", f("gainAccount", "Disposal gain account (optional)"), "gain", current?.gainAccountId ?? "", true),
+        accountSelect("lossAccountId", f("lossAccount", "Disposal loss account (optional)"), "loss", current?.lossAccountId ?? "", true),
+        accountSelect("accountDisposalId", f("disposalAccount", "Disposal account (optional)"), "disposal", current?.accountDisposalId ?? "", true),
+      ]
+    }
+    const promptNewAsset = async () => {
+      if (operatingCompanyId <= 0n) return
+      // One idempotency key per dialog: resubmitting this dialog replays instead of duplicating.
+      const idempotencyKey = `create-account-asset:${globalThis.crypto.randomUUID()}`
+      const values = await askForm({ title: newAssetLabel, fields: assetFields(operatingCompanyId, null) })
+      if (values == null) return
+      const result = toAssetCreateParams(values, { companyId: operatingCompanyId, accounts: accountRows, journals: journalRows }, idempotencyKey)
+      if (!result.ok) {
+        showWorkflowToast({
+          kind: "error",
+          title: t("accounting.taxDeadlines.actions.failed", { defaultValue: "{{action}} failed", action: newAssetLabel }),
+          description: assetFailureMessage(result.reason),
+        })
+        return
+      }
+      await runTaxCommand(newAssetLabel, () =>
+        createAccountAsset.mutateAsync({ companyId: operatingCompanyId, params: result.params }),
+      )
+    }
+    const promptEditAsset = async (row: Record<string, unknown>) => {
+      const companyId = assetCompanyId(row, operatingCompanyId)
+      if (companyId == null || !canEditAsset(row)) return
+      const values = await askForm({ title: editAssetLabel, fields: assetFields(companyId, assetEditDefaults(row)) })
+      if (values == null) return
+      const result = toAssetUpdateParams(values, row, { companyId, accounts: accountRows, journals: journalRows })
+      if (!result.ok) {
+        showWorkflowToast(
+          result.reason === "unchanged"
+            ? { kind: "info", title: t("accounting.accounts.edit.unchanged", { defaultValue: "Nothing to change." }) }
+            : {
+                kind: "error",
+                title: t("accounting.taxDeadlines.actions.failed", { defaultValue: "{{action}} failed", action: editAssetLabel }),
+                description: assetFailureMessage(result.reason),
+              },
+        )
+        return
+      }
+      await runTaxCommand(editAssetLabel, () =>
+        updateAccountAsset.mutateAsync({ companyId, assetId: BigInt(String(row.id)), params: result.params }),
+      )
+    }
     return {
       ...base,
       view: {
         ...view,
         actions: [
+          {
+            id: "asset-new",
+            label: newAssetLabel,
+            permission: { resource: "account_asset", action: "create" },
+            onClick: () => promptNewAsset(),
+          },
+          {
+            id: "asset-edit",
+            label: editAssetLabel,
+            requiresSelection: true,
+            selection: "single",
+            permission: { resource: "account_asset", action: "write" },
+            isApplicable: (rows) => rows.length === 1 && canEditAsset(rows[0] as Record<string, unknown>),
+            onClick: (rows) => promptEditAsset(rows[0] as Record<string, unknown>),
+          },
           {
             id: "asset-activate",
             label: t("accounting.entities.fixedAssets.actions.activateSelected"),
@@ -3162,6 +3365,15 @@ function AccountingClientReady({
     }
   }, [
     t,
+    askForm,
+    accounts,
+    journals,
+    operatingCompanyId,
+    defaultCurrencyId,
+    currencySelectOptions,
+    runTaxCommand,
+    createAccountAsset.mutateAsync,
+    updateAccountAsset.mutateAsync,
     setAccountAssetActive,
     confirmAccountAsset,
     closeAccountAsset,
