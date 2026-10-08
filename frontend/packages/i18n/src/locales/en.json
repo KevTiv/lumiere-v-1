@@ -991,14 +991,25 @@
         "precedingSubtotal": "Preceding Subtotal",
         "taxPayableAccountId": "Payable Account",
         "taxReceivableAccountId": "Receivable Account",
-        "advanceTaxPaymentAccountId": "Advance Payment Account"
+        "advanceTaxPaymentAccountId": "Advance Payment Account",
+        "advanceAccount": "Advance tax payment account",
+        "company": "Company",
+        "payableAccount": "Tax payable account",
+        "receivableAccount": "Tax receivable account"
       },
       "filters": {
         "name": "Name"
       },
       "actions": {
         "newTaxGroup": "New Tax Group",
-        "editTaxGroup": "Edit Tax Group"
+        "editTaxGroup": "Edit Tax Group",
+        "edit": "Edit tax group",
+        "invalid": "Enter a name and a whole-number sequence.",
+        "new": "New tax group"
+      },
+      "empty": "No tax groups.",
+      "form": {
+        "none": "None"
       }
     },
     "taxJurisdictions": {
@@ -1015,7 +1026,8 @@
         "city": "City",
         "zipFrom": "ZIP From",
         "zipTo": "ZIP To",
-        "isActive": "Active"
+        "isActive": "Active",
+        "status": "Status"
       },
       "filters": {
         "countryCode": "Country",
@@ -1024,8 +1036,17 @@
       },
       "actions": {
         "newJurisdiction": "New Jurisdiction",
-        "editJurisdiction": "Edit Jurisdiction"
-      }
+        "editJurisdiction": "Edit Jurisdiction",
+        "edit": "Edit jurisdiction",
+        "invalid": "Enter a name, a code and a country code.",
+        "new": "New jurisdiction"
+      },
+      "active": "Active",
+      "empty": "No tax jurisdictions.",
+      "form": {
+        "countryHint": "ISO country code, for example US."
+      },
+      "inactive": "Inactive"
     },
     "taxSchedules": {
       "title": "Tax Schedules",
@@ -1039,7 +1060,11 @@
         "taxIds": "Taxes",
         "isActive": "Active",
         "effectiveFrom": "Effective From",
-        "effectiveTo": "Effective To"
+        "effectiveTo": "Effective To",
+        "company": "Company",
+        "jurisdiction": "Jurisdiction",
+        "status": "Status",
+        "taxes": "Taxes"
       },
       "filters": {
         "jurisdictionId": "Jurisdiction",
@@ -1047,8 +1072,19 @@
       },
       "actions": {
         "newSchedule": "New Schedule",
-        "editSchedule": "Edit Schedule"
-      }
+        "editSchedule": "Edit Schedule",
+        "edit": "Edit schedule",
+        "invalid": "Enter a name and valid effective dates.",
+        "new": "New schedule"
+      },
+      "active": "Active",
+      "empty": "No tax schedules.",
+      "form": {
+        "inactive": "(inactive)",
+        "noActiveTaxes": "There are no active taxes to choose from.",
+        "none": "None"
+      },
+      "inactive": "Inactive"
     },
     "taxDeadlines": {
       "title": "Tax Deadlines",
