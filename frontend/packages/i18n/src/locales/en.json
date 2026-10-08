@@ -1026,7 +1026,8 @@
         "city": "City",
         "zipFrom": "ZIP From",
         "zipTo": "ZIP To",
-        "isActive": "Active"
+        "isActive": "Active",
+        "status": "Status"
       },
       "filters": {
         "countryCode": "Country",
@@ -1035,8 +1036,17 @@
       },
       "actions": {
         "newJurisdiction": "New Jurisdiction",
-        "editJurisdiction": "Edit Jurisdiction"
-      }
+        "editJurisdiction": "Edit Jurisdiction",
+        "edit": "Edit jurisdiction",
+        "invalid": "Enter a name, a code and a country code.",
+        "new": "New jurisdiction"
+      },
+      "active": "Active",
+      "empty": "No tax jurisdictions.",
+      "form": {
+        "countryHint": "ISO country code, for example US."
+      },
+      "inactive": "Inactive"
     },
     "taxSchedules": {
       "title": "Tax Schedules",

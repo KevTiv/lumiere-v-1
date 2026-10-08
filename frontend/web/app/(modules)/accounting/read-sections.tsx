@@ -198,6 +198,32 @@ export function taxGroupsTableConfig(t: (key: string, opts?: Record<string, unkn
   } as EntityViewConfig
 }
 
+/** Tax jurisdictions list config (organization-level; rows carry the resolved active label). */
+export function taxJurisdictionsTableConfig(t: (key: string, opts?: Record<string, unknown>) => string): EntityViewConfig {
+  return {
+    id: "tax-jurisdictions-table",
+    title: t("accounting.taxJurisdictions.title", { defaultValue: "Tax jurisdictions" }),
+    view: {
+      mode: "table",
+      rowKey: "id",
+      searchable: true,
+      searchKeys: ["name", "code", "countryCode", "stateCode", "city"],
+      columns: [
+        { key: "name", label: t("accounting.taxJurisdictions.columns.name", { defaultValue: "Name" }), width: "min-w-48" },
+        { key: "code", label: t("accounting.taxJurisdictions.columns.code", { defaultValue: "Code" }) },
+        { key: "countryCode", label: t("accounting.taxJurisdictions.columns.countryCode", { defaultValue: "Country code" }) },
+        { key: "stateCode", label: t("accounting.taxJurisdictions.columns.stateCode", { defaultValue: "State" }) },
+        { key: "countyCode", label: t("accounting.taxJurisdictions.columns.countyCode", { defaultValue: "County" }) },
+        { key: "city", label: t("accounting.taxJurisdictions.columns.city", { defaultValue: "City" }) },
+        { key: "zipFrom", label: t("accounting.taxJurisdictions.columns.zipFrom", { defaultValue: "Postal code from" }) },
+        { key: "zipTo", label: t("accounting.taxJurisdictions.columns.zipTo", { defaultValue: "Postal code to" }) },
+        { key: "activeLabel", label: t("accounting.taxJurisdictions.columns.status", { defaultValue: "Status" }) },
+      ],
+      emptyMessage: t("accounting.taxJurisdictions.empty", { defaultValue: "No tax jurisdictions." }),
+    },
+  } as EntityViewConfig
+}
+
 export interface CompanyRateLabels {
   readonly company: ReadonlyMap<string, string>
   readonly currency: ReadonlyMap<string, string>
