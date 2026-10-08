@@ -4,6 +4,7 @@ import { mapDashboardWidgets, withDashboardSections } from "@lumiere/ui/lib/dash
 import { useMemo, useState } from "react"
 import { useTranslation } from "@lumiere/i18n"
 import { showWorkflowToast } from "@lumiere/ui/lib/workflow-toast"
+import { canActivatePlan, canDeactivatePlan } from "./subscription-plan-actions"
 import {
   ModuleView,
   FormModal,
@@ -18,6 +19,7 @@ import {
   MissingOrganization,
   mergeSelectOptionsForFields,
   subscriptionsTableConfig,
+  subscriptionPlansTableConfig,
   subscriptionsWithBoard,
   subscriptionLinesTableConfig,
   subscriptionAmendmentsTableConfig,
@@ -32,7 +34,7 @@ import {
   deferredRevenueLinesTableConfig,
   revenueRecognitionRulesTableConfig,
 } from "@lumiere/ui"
-import type { EntityAction, FormConfig, ModuleConfig } from "@lumiere/ui"
+import type { EntityAction, EntityTableConfig, EntityViewConfig, FormConfig, ModuleConfig } from "@lumiere/ui"
 import {
   PlayCircle,
   PauseCircle,
@@ -67,6 +69,8 @@ import {
   useSubscriptionPaymentIntents,
   useCreateSubscription,
   useCreateSubscriptionPlan,
+  useActivateSubscriptionPlan,
+  useDeactivateSubscriptionPlan,
   useDeferredRevenueSchedules,
   useDeferredRevenueLines,
   useRevenueRecognitionRules,
@@ -228,6 +232,8 @@ function SubscriptionsClientLoaded({
   const activateRule = useActivateRevenueRecognitionRule(orgId, operatingCompanyId)
   const deactivateRule = useDeactivateRevenueRecognitionRule(orgId, operatingCompanyId)
   const importPlanCsv = useImportSubscriptionPlanCsv(orgId, operatingCompanyId)
+  const activatePlan = useActivateSubscriptionPlan(orgId, operatingCompanyId)
+  const deactivatePlan = useDeactivateSubscriptionPlan(orgId, operatingCompanyId)
   const importSubscriptionCsv = useImportSubscriptionCsv(orgId, operatingCompanyId)
 
   const isFormMutationPending =
@@ -239,6 +245,8 @@ function SubscriptionsClientLoaded({
     recognizeDeferred.isPending ||
     createRecognitionRule.isPending ||
     activateRule.isPending ||
+    activatePlan.isPending ||
+    deactivatePlan.isPending ||
     deactivateRule.isPending ||
     importPlanCsv.isPending ||
     importSubscriptionCsv.isPending
@@ -463,6 +471,54 @@ function SubscriptionsClientLoaded({
     ]
   }, [t, activateRule, deactivateRule])
 
+  const planEntityConfig = useMemo((): EntityViewConfig => {
+    const base = subscriptionPlansTableConfig(t)
+    const view = base.view as EntityTableConfig
+    const activateLabel = t("subscriptions.plans.actions.activate", { defaultValue: "Activate plan" })
+    const deactivateLabel = t("subscriptions.plans.actions.deactivate", { defaultValue: "Deactivate plan" })
+    const actions: EntityAction[] = [
+      {
+        id: "activate-plan",
+        label: activateLabel,
+        icon: CheckCircle2,
+        variant: "outline",
+        requiresSelection: true,
+        permission: { resource: "subscription_plan", action: "write" },
+        isApplicable: (rows) => rows.every((r) => canActivatePlan(r)),
+        successMessage: t("common.actionCompleted", { action: activateLabel }),
+        onClick: async (rows) => {
+          const r = rows[0]
+          if (!r) return
+          await activatePlan.mutateAsync({ planId: BigInt(String(r.id)) })
+        },
+      },
+      {
+        id: "deactivate-plan",
+        label: deactivateLabel,
+        icon: CircleSlash,
+        variant: "outline",
+        requiresSelection: true,
+        permission: { resource: "subscription_plan", action: "write" },
+        isApplicable: (rows) => rows.every((r) => canDeactivatePlan(r)),
+        confirm: {
+          title: deactivateLabel,
+          description: t("subscriptions.plans.actions.deactivateConfirm", {
+            defaultValue: "Deactivating a plan also unpublishes it, so it can no longer be chosen for new subscriptions.",
+          }),
+          confirmLabel: deactivateLabel,
+          cancelLabel: t("common.cancel", { defaultValue: "Cancel" }),
+        },
+        successMessage: t("common.actionCompleted", { action: deactivateLabel }),
+        onClick: async (rows) => {
+          const r = rows[0]
+          if (!r) return
+          await deactivatePlan.mutateAsync({ planId: BigInt(String(r.id)) })
+        },
+      },
+    ]
+    return { ...base, view: { ...view, actions: [...(view.actions ?? []), ...actions] } } as EntityViewConfig
+  }, [t, activatePlan, deactivatePlan])
+
   const liveSections = useMemo(() => {
     const rows = subscriptions as Record<string, unknown>[]
     const activeRows = rows.filter(isSubscriptionActiveForMetrics)
@@ -577,7 +633,7 @@ function SubscriptionsClientLoaded({
                 }],
               },
             }
-          if (tab.id === "plans") return { ...tab, createForm: planFormConfig }
+          if (tab.id === "plans") return { ...tab, createForm: planFormConfig, entityConfig: planEntityConfig }
           if (tab.id === "lines")
             return { ...tab, entityConfig: subscriptionLinesTableConfig(t) }
           if (tab.id === "amendments")
@@ -632,6 +688,7 @@ function SubscriptionsClientLoaded({
       subscriptionRowActions,
       deferredLineActions,
       recognitionRuleActions,
+      planEntityConfig,
       plans,
       orgId,
       operatingCompanyId,

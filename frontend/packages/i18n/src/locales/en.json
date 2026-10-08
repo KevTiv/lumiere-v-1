@@ -8895,6 +8895,11 @@
         "productId": "Product",
         "recurrenceId": "Billing Cycle",
         "active": "Active"
+      },
+      "actions": {
+        "activate": "Activate plan",
+        "deactivate": "Deactivate plan",
+        "deactivateConfirm": "Deactivating a plan also unpublishes it, so it can no longer be chosen for new subscriptions."
       }
     },
     "deferredSchedules": {
@@ -12443,7 +12448,19 @@
       "empty": "No compliance requirements yet — run Analyze to materialize.",
       "title": "Compliance"
     },
-    "requestPdf": "Queue PDF render"
+    "requestPdf": "Queue PDF render",
+    "bidDecision": {
+      "bid": "Bid",
+      "button": "Bid / no bid",
+      "decision": "Decision",
+      "description": "A bid decision is required before this proposal can be submitted.",
+      "done": "Bid decision recorded",
+      "failed": "Record bid decision failed",
+      "invalid": "Choose bid or no bid and give a rationale.",
+      "noBid": "No bid",
+      "rationale": "Rationale",
+      "title": "Record bid decision"
+    }
   },
   "forensics": {
     "page": {
