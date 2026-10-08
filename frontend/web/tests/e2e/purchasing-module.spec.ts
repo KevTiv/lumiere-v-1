@@ -105,6 +105,21 @@ test.describe("Purchasing module e2e", { tag: "@dev-fixture" }, () => {
     await expectNoAppError(page)
   })
 
+  test("RFQ award action opens a typed selection dialog", async ({ page }) => {
+    await gotoModule(page, "/purchasing", "purchasing")
+    await openPurchasingTab(page, "dashboard")
+
+    await page.getByTestId("purchasing-ops-award-rfq-bid").click()
+    const dialog = page.getByRole("dialog", { name: "Award RFQ bid" })
+    await expect(dialog).toBeVisible()
+    await expect(dialog.getByLabel("RFQ")).toBeVisible()
+    await expect(dialog.getByLabel("Submitted bid")).toBeVisible()
+
+    await dialog.getByRole("button", { name: /^cancel$/i }).click()
+    await expect(dialog).toBeHidden()
+    await expectNoAppError(page)
+  })
+
   test("seeded purchase order appears on Purchase Orders tab", { tag: "@dev-fixture" }, async ({ page }) => {
     await gotoModule(page, "/purchasing", "purchasing")
     await openPurchasingTab(page, "orders")

@@ -683,17 +683,8 @@ function PurchasingClientLoaded({
     setOperationDialogRequest({ kind: "add-rfq-bid" })
   }
 
-  const promptAwardRfqBid = async () => {
-    const rfqId = window
-      .prompt(t("purchasing.ops.prompt.rfqId", { defaultValue: "RFQ id" }))
-      ?.trim()
-    const bidId = window
-      .prompt(
-        t("purchasing.ops.prompt.bidId", { defaultValue: "Bid id to award" }),
-      )
-      ?.trim()
-    if (!rfqId || !bidId) return
-    await purchasingWorkflow.awardBid.execute({ rfqId, bidId }, { navigateToNext: true })
+  const openAwardRfqBid = async () => {
+    setOperationDialogRequest({ kind: "award-rfq-bid" })
   }
 
   const openCreatePurchaseReturn = async () => {
@@ -1305,15 +1296,29 @@ function PurchasingClientLoaded({
     [currencies],
   )
   const defaultCurrencyId = currencyFieldOptions[0]?.value ?? ""
-  const operationDialogOptions = useMemo(
-    () => ({
+  const operationDialogOptions = useMemo(() => {
+    const submittedBids = (rfqBids as EntityRow[]).filter(
+      (row) => String(row.state ?? "").toLowerCase() === "submitted",
+    )
+    const awardableRfqIds = new Set(
+      submittedBids.map((row) => String(row.rfqId ?? row.rfq_id ?? "")),
+    )
+
+    return {
       requisitions: (requisitions as EntityRow[]).map((row) => ({
         value: String(row.id ?? ""),
         label: String(row.name ?? row.origin ?? `Requisition ${String(row.id ?? "")}`),
       })),
-      rfqs: (rfqs as EntityRow[]).map((row) => ({
+      rfqs: (rfqs as EntityRow[])
+        .filter((row) => awardableRfqIds.has(String(row.id ?? "")))
+        .map((row) => ({
+          value: String(row.id ?? ""),
+          label: String(row.name ?? `RFQ ${String(row.id ?? "")}`),
+        })),
+      rfqBids: submittedBids.map((row) => ({
         value: String(row.id ?? ""),
-        label: String(row.name ?? `RFQ ${String(row.id ?? "")}`),
+        rfqId: String(row.rfqId ?? row.rfq_id ?? ""),
+        label: `Bid ${String(row.id ?? "")} · Vendor ${String(row.partnerId ?? row.partner_id ?? "")} · ${String(row.priceUnit ?? row.price_unit ?? "")}`,
       })),
       vendors: vendorFieldOptions.filter((option) => option.value !== ""),
       products: productFieldOptions.filter((option) => option.value !== ""),
@@ -1329,10 +1334,11 @@ function PurchasingClientLoaded({
       journals: purchaseJournalFieldOptions.filter((option) => option.value !== ""),
       expenseAccounts: expenseAccountFieldOptions.filter((option) => option.value !== ""),
       payableAccounts: payableAccountFieldOptions.filter((option) => option.value !== ""),
-    }),
-    [
+    }
+  }, [
       requisitions,
       rfqs,
+      rfqBids,
       vendorFieldOptions,
       productFieldOptions,
       uomFieldOptions,
@@ -1341,8 +1347,7 @@ function PurchasingClientLoaded({
       purchaseJournalFieldOptions,
       expenseAccountFieldOptions,
       payableAccountFieldOptions,
-    ],
-  )
+    ])
 
   const partnerBankFormConfig = useMemo(
     () =>
@@ -2700,7 +2705,7 @@ function PurchasingClientLoaded({
           }
           onCreatePurchaseRfq={() => openCreateRfqFromRequisition()}
           onAddPurchaseRfqBid={openAddRfqBid}
-          onAwardPurchaseRfqBid={promptAwardRfqBid}
+          onAwardPurchaseRfqBid={openAwardRfqBid}
           onCreatePurchaseReturn={openCreatePurchaseReturn}
           onConfirmPurchaseReturn={openPurchaseReturns}
           onCreateVendorCreditFromReturn={openVendorCreditFromReturn}
@@ -2775,6 +2780,9 @@ function PurchasingClientLoaded({
         onDismiss={() => setOperationDialogRequest(null)}
         onCreateRfq={(params) => createPurchaseRfq.mutateAsync(params)}
         onAddRfqBid={(params) => addPurchaseRfqBid.mutateAsync(params)}
+        onAwardRfqBid={(input) =>
+          purchasingWorkflow.awardBid.execute(input, { navigateToNext: true })
+        }
         onCreatePurchaseReturn={(params) => createPurchaseReturn.mutateAsync(params)}
         onCreateVendorCredit={(input) =>
           purchasingWorkflow.createVendorCredit.execute(input, { navigateToNext: true })
