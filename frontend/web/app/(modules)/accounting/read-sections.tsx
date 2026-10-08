@@ -224,6 +224,30 @@ export function taxJurisdictionsTableConfig(t: (key: string, opts?: Record<strin
   } as EntityViewConfig
 }
 
+/** Tax schedules list config (rows carry the resolved company, jurisdiction and tax names). */
+export function taxSchedulesTableConfig(t: (key: string, opts?: Record<string, unknown>) => string): EntityViewConfig {
+  return {
+    id: "tax-schedules-table",
+    title: t("accounting.taxSchedules.title", { defaultValue: "Tax schedules" }),
+    view: {
+      mode: "table",
+      rowKey: "id",
+      searchable: true,
+      searchKeys: ["name", "jurisdictionName", "taxNames"],
+      columns: [
+        { key: "name", label: t("accounting.taxSchedules.columns.name", { defaultValue: "Name" }), width: "min-w-48" },
+        { key: "companyName", label: t("accounting.taxSchedules.columns.company", { defaultValue: "Company" }) },
+        { key: "jurisdictionName", label: t("accounting.taxSchedules.columns.jurisdiction", { defaultValue: "Jurisdiction" }) },
+        { key: "taxNames", label: t("accounting.taxSchedules.columns.taxes", { defaultValue: "Taxes" }), width: "min-w-48" },
+        { key: "effectiveFromDate", label: t("accounting.taxSchedules.columns.effectiveFrom", { defaultValue: "Effective from" }), type: "date" },
+        { key: "effectiveToDate", label: t("accounting.taxSchedules.columns.effectiveTo", { defaultValue: "Effective to" }), type: "date" },
+        { key: "activeLabel", label: t("accounting.taxSchedules.columns.status", { defaultValue: "Status" }) },
+      ],
+      emptyMessage: t("accounting.taxSchedules.empty", { defaultValue: "No tax schedules." }),
+    },
+  } as EntityViewConfig
+}
+
 export interface CompanyRateLabels {
   readonly company: ReadonlyMap<string, string>
   readonly currency: ReadonlyMap<string, string>

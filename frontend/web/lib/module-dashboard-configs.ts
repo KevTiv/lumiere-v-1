@@ -366,7 +366,7 @@ export const accountingModuleConfig = (t: TFunction): ModuleConfig => ({
     { label: t("modules.tabGroups.banking", { defaultValue: "Banking" }), tabIds: ["bank-statements", "reconciliation-widgets", "fx-revaluation"] },
     { label: t("modules.tabGroups.planning", { defaultValue: "Planning" }), tabIds: ["budgets", "analytic", "analytic-lines", "analytic-distribution", "fixed-assets", "amortization"] },
     { label: t("modules.tabGroups.close", { defaultValue: "Close" }), tabIds: ["period-close", "fiscal-years", "account-periods", "consolidation", "intercompany-rules", "intercompany-transactions"] },
-    { label: t("modules.tabGroups.setup", { defaultValue: "Setup" }), tabIds: ["taxes", "tax-groups", "tax-jurisdictions", "tax-deadlines", "payment-terms", "payment-term-lines"] },
+    { label: t("modules.tabGroups.setup", { defaultValue: "Setup" }), tabIds: ["taxes", "tax-groups", "tax-jurisdictions", "tax-schedules", "tax-deadlines", "payment-terms", "payment-term-lines"] },
   ],
   tabs: [
     {
@@ -447,6 +447,12 @@ export const accountingModuleConfig = (t: TFunction): ModuleConfig => ({
       label: t("accounting.tabs.taxJurisdictions", { defaultValue: "Tax Jurisdictions" }),
       type: "entity",
       entityConfig: { id: "tax-jurisdictions-table", title: "", view: { mode: "table", rowKey: "id", columns: [] } },
+    },
+    {
+      id: "tax-schedules",
+      label: t("accounting.tabs.taxSchedules", { defaultValue: "Tax Schedules" }),
+      type: "entity",
+      entityConfig: { id: "tax-schedules-table", title: "", view: { mode: "table", rowKey: "id", columns: [] } },
     },
     {
       id: "tax-deadlines",

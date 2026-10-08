@@ -294,6 +294,9 @@ import {
   useTaxJurisdictions,
   useCreateTaxJurisdiction,
   useUpdateTaxJurisdiction,
+  useTaxSchedules,
+  useCreateTaxSchedule,
+  useUpdateTaxSchedule,
   useCompleteTaxDeadline,
   useWaiveTaxDeadline,
   useDeleteTaxDeadline,
@@ -369,6 +372,15 @@ import {
   toTaxJurisdictionCreateParams,
   toTaxJurisdictionUpdateParams,
 } from "./tax-jurisdiction-actions"
+import {
+  canEditTaxSchedule,
+  scheduleJurisdictionOptions,
+  scheduleTaxOptions,
+  taxScheduleEditDefaults,
+  toTaxScheduleCreateParams,
+  toTaxScheduleUpdateParams,
+} from "./tax-schedule-actions"
+import { taxPickerField } from "./tax-picker-field"
 import { cellId, cellText, withNone } from "./tax-setup-wire"
 import { accountIsDeprecated, deprecateAccountParams } from "./account-deprecation"
 import { ACCOUNT_INTERNAL_TYPES, accountEditDefaults, toAccountUpdateParams } from "./account-edit"
@@ -412,6 +424,7 @@ import {
   taxDeadlinesTableConfig,
   taxGroupsTableConfig,
   taxJurisdictionsTableConfig,
+  taxSchedulesTableConfig,
 } from "./read-sections"
 import { fetchQueryList } from "@lumiere/query-hooks/http"
 import {
@@ -766,6 +779,7 @@ function AccountingClientReady({
   const { data: taxDeadlines = [] } = useTaxDeadlines(orgId, { enabled: organizationId > 0 })
   const { data: taxGroups = [] } = useAccountTaxGroups(orgId, { enabled: organizationId > 0 })
   const { data: taxJurisdictions = [] } = useTaxJurisdictions(orgId, { enabled: organizationId > 0 })
+  const { data: taxSchedules = [] } = useTaxSchedules(orgId, { enabled: organizationId > 0 })
   const { data: analytic = [] } = useAccountAnalyticAccounts(orgId, { enabled: organizationId > 0 })
   const { data: analyticLines = [] } = useAccountAnalyticLines(orgId, { enabled: organizationId > 0 })
   const { data: analyticDistribution = [] } = useAccountAnalyticDistributionModels(orgId, {
@@ -1668,6 +1682,8 @@ function AccountingClientReady({
   const updateTaxGroup = useUpdateAccountTaxGroup(organizationId, operatingCompanyId)
   const createTaxJurisdiction = useCreateTaxJurisdiction(organizationId)
   const updateTaxJurisdiction = useUpdateTaxJurisdiction(organizationId)
+  const createTaxSchedule = useCreateTaxSchedule(organizationId, operatingCompanyId)
+  const updateTaxSchedule = useUpdateTaxSchedule(organizationId, operatingCompanyId)
   const createBudget = useCreateCrossoveredBudget(organizationId)
   const updateBudget = useUpdateCrossoveredBudget(organizationId)
   const createBudgetLine = useCreateBudgetLine(organizationId)
@@ -2494,6 +2510,105 @@ function AccountingClientReady({
     ]
     return { ...base, view: { ...view, actions: [...(view.actions ?? []), ...actions] } } as EntityViewConfig
   }, [t, askForm, runTaxCommand, createTaxJurisdiction.mutateAsync, updateTaxJurisdiction.mutateAsync])
+
+  const taxScheduleRows = useMemo(() => {
+    const companyLabel = new Map(companySelectOptions.map((o) => [String(o.value), o.label] as const))
+    const jurisdictionLabel = new Map(
+      (taxJurisdictions as unknown as Record<string, unknown>[]).map((j) => [cellId(j.id)?.toString() ?? "", cellText(j.name)] as const),
+    )
+    const taxLabel = new Map(
+      (taxes as unknown as Record<string, unknown>[]).map((x) => [cellId(x.id)?.toString() ?? "", cellText(x.name)] as const),
+    )
+    return (taxSchedules as unknown as Record<string, unknown>[]).map((s) => {
+      const current = taxScheduleEditDefaults(s)
+      const companyKey = cellId(s.companyId)?.toString() ?? ""
+      return {
+        ...s,
+        description: current.description,
+        companyName: companyLabel.get(companyKey) ?? companyKey,
+        jurisdictionName: jurisdictionLabel.get(current.jurisdictionId) ?? "",
+        taxNames: current.taxIds.map((id) => taxLabel.get(id) ?? id).join(", "),
+        effectiveFromDate: current.effectiveFrom,
+        effectiveToDate: current.effectiveTo,
+        activeLabel: current.isActive
+          ? t("accounting.taxSchedules.active", { defaultValue: "Active" })
+          : t("accounting.taxSchedules.inactive", { defaultValue: "Inactive" }),
+      }
+    })
+  }, [taxSchedules, taxJurisdictions, taxes, companySelectOptions, t])
+
+  /** Tax schedules table: "New schedule" and "Edit schedule" (taxes are picked from the company's active taxes). */
+  const taxSchedulesEntityConfig = useMemo((): EntityViewConfig => {
+    const base = taxSchedulesTableConfig(t)
+    const view = base.view as EntityTableConfig
+    const newLabel = t("accounting.taxSchedules.actions.new", { defaultValue: "New schedule" })
+    const editLabel = t("accounting.taxSchedules.actions.edit", { defaultValue: "Edit schedule" })
+    const noneLabel = t("accounting.taxSchedules.form.none", { defaultValue: "None" })
+    const inactiveSuffix = t("accounting.taxSchedules.form.inactive", { defaultValue: "(inactive)" })
+    const taxRows = taxes as unknown as Record<string, unknown>[]
+    const jurisdictionRows = taxJurisdictions as unknown as Record<string, unknown>[]
+    const fields = (current: ReturnType<typeof taxScheduleEditDefaults> | null): FormField[] => [
+      { id: "name", name: "name", label: t("accounting.taxSchedules.columns.name", { defaultValue: "Name" }), type: "text", required: true, defaultValue: current?.name ?? "" },
+      { id: "description", name: "description", label: t("accounting.taxSchedules.columns.description", { defaultValue: "Description" }), type: "textarea", defaultValue: current?.description ?? "" },
+      { id: "jurisdictionId", name: "jurisdictionId", label: t("accounting.taxSchedules.columns.jurisdiction", { defaultValue: "Jurisdiction" }), type: "select", defaultValue: current?.jurisdictionId ?? "", options: withNone(scheduleJurisdictionOptions(jurisdictionRows, current?.jurisdictionId ?? "", inactiveSuffix), noneLabel) },
+      taxPickerField({
+        id: "taxIds",
+        name: "taxIds",
+        label: t("accounting.taxSchedules.columns.taxes", { defaultValue: "Taxes" }),
+        options: scheduleTaxOptions(taxRows, operatingCompanyId, current?.taxIds ?? [], inactiveSuffix),
+        defaultValue: current?.taxIds ?? [],
+        emptyHint: t("accounting.taxSchedules.form.noActiveTaxes", { defaultValue: "There are no active taxes to choose from." }),
+      }),
+      { id: "effectiveFrom", name: "effectiveFrom", label: t("accounting.taxSchedules.columns.effectiveFrom", { defaultValue: "Effective from" }), type: "date", defaultValue: current?.effectiveFrom ?? "", width: "1/2" },
+      { id: "effectiveTo", name: "effectiveTo", label: t("accounting.taxSchedules.columns.effectiveTo", { defaultValue: "Effective to" }), type: "date", defaultValue: current?.effectiveTo ?? "", width: "1/2" },
+      { id: "isActive", name: "isActive", label: t("accounting.taxSchedules.active", { defaultValue: "Active" }), type: "switch", defaultValue: current?.isActive ?? true },
+    ]
+    const invalid = (title: string) =>
+      showWorkflowToast({
+        kind: "error",
+        title: t("accounting.taxDeadlines.actions.failed", { defaultValue: "{{action}} failed", action: title }),
+        description: t("accounting.taxSchedules.actions.invalid", { defaultValue: "Enter a name and valid effective dates." }),
+      })
+
+    const promptNew = async () => {
+      const values = await askForm({ title: newLabel, fields: fields(null) })
+      if (values == null) return
+      const params = toTaxScheduleCreateParams(values)
+      if (params == null) return invalid(newLabel)
+      await runTaxCommand(newLabel, () => createTaxSchedule.mutateAsync(params))
+    }
+    const promptEdit = async (row: Record<string, unknown>) => {
+      const values = await askForm({ title: editLabel, fields: fields(taxScheduleEditDefaults(row)) })
+      if (values == null) return
+      const result = toTaxScheduleUpdateParams(values, row)
+      if (!result.ok) {
+        if (result.reason === "invalid") return invalid(editLabel)
+        showWorkflowToast({ kind: "info", title: t("accounting.accounts.edit.unchanged", { defaultValue: "Nothing to change." }) })
+        return
+      }
+      await runTaxCommand(editLabel, () =>
+        updateTaxSchedule.mutateAsync({ scheduleId: BigInt(String(row.id)), params: result.params }),
+      )
+    }
+
+    const actions: EntityAction[] = [
+      {
+        id: "tax-schedule-new",
+        label: newLabel,
+        permission: { resource: "tax_schedule", action: "create" },
+        onClick: () => promptNew(),
+      },
+      {
+        id: "tax-schedule-edit",
+        label: editLabel,
+        requiresSelection: true,
+        permission: { resource: "tax_schedule", action: "write" },
+        isApplicable: (rows) => rows.every((r) => canEditTaxSchedule(r, operatingCompanyId)),
+        onClick: (rows) => promptEdit(rows[0]!),
+      },
+    ]
+    return { ...base, view: { ...view, actions: [...(view.actions ?? []), ...actions] } } as EntityViewConfig
+  }, [t, askForm, taxes, taxJurisdictions, operatingCompanyId, runTaxCommand, createTaxSchedule.mutateAsync, updateTaxSchedule.mutateAsync])
 
   const editTaxAction = useMemo((): EntityAction => {
     const label = t("accounting.taxes.actions.edit", { defaultValue: "Edit tax" })
@@ -4379,6 +4494,9 @@ function AccountingClientReady({
                 ),
               }
             }
+            if (tab.id === "tax-schedules") {
+              return { ...tab, entityConfig: taxSchedulesEntityConfig }
+            }
             if (tab.id === "tax-jurisdictions") {
               return { ...tab, entityConfig: taxJurisdictionsEntityConfig }
             }
@@ -4676,6 +4794,7 @@ function AccountingClientReady({
       taxDeadlinesEntityConfig,
       taxGroupsEntityConfig,
       taxJurisdictionsEntityConfig,
+      taxSchedulesEntityConfig,
       toggleAccountDeprecated,
       checkPermission,
       canImportCsv,
@@ -4756,6 +4875,7 @@ function AccountingClientReady({
       "tax-deadlines": taxDeadlineRows,
       "tax-groups": taxGroupRows,
       "tax-jurisdictions": taxJurisdictionRows,
+      "tax-schedules": taxScheduleRows,
       "payment-terms": paymentTerms,
       "payment-term-lines": paymentTermLinesDisplay,
       "account-journals": journals,
@@ -4774,6 +4894,7 @@ function AccountingClientReady({
       taxDeadlineRows,
       taxGroupRows,
       taxJurisdictionRows,
+      taxScheduleRows,
       paymentTerms,
       paymentTermLinesDisplay,
       journals,

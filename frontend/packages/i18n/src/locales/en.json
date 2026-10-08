@@ -1060,7 +1060,11 @@
         "taxIds": "Taxes",
         "isActive": "Active",
         "effectiveFrom": "Effective From",
-        "effectiveTo": "Effective To"
+        "effectiveTo": "Effective To",
+        "company": "Company",
+        "jurisdiction": "Jurisdiction",
+        "status": "Status",
+        "taxes": "Taxes"
       },
       "filters": {
         "jurisdictionId": "Jurisdiction",
@@ -1068,8 +1072,19 @@
       },
       "actions": {
         "newSchedule": "New Schedule",
-        "editSchedule": "Edit Schedule"
-      }
+        "editSchedule": "Edit Schedule",
+        "edit": "Edit schedule",
+        "invalid": "Enter a name and valid effective dates.",
+        "new": "New schedule"
+      },
+      "active": "Active",
+      "empty": "No tax schedules.",
+      "form": {
+        "inactive": "(inactive)",
+        "noActiveTaxes": "There are no active taxes to choose from.",
+        "none": "None"
+      },
+      "inactive": "Inactive"
     },
     "taxDeadlines": {
       "title": "Tax Deadlines",
