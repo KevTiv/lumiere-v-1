@@ -115,7 +115,7 @@ function HelpdeskClientLoaded({
   const [quickActionForm, setQuickActionForm] = useState<{ form: FormConfig; action: string } | null>(null)
   const [csvImportKind, setCsvImportKind] = useState<"ticket" | "team" | "stage" | "sla" | null>(null)
 
-  const { data: ticketsRaw = [] } = useHelpdeskTickets(orgId, initialTickets)
+  const { data: ticketsRaw = [], isLoading: ticketsLoading } = useHelpdeskTickets(orgId, initialTickets)
   const { data: teams = [] } = useHelpdeskTeams(orgId, initialTeams)
   const { data: stages = [] } = useHelpdeskStages(orgId, initialStages)
   const { data: slas = [] } = useHelpdeskSlas(orgId, initialSlas)
@@ -406,9 +406,10 @@ function HelpdeskClientLoaded({
     () => ({
       tickets: {
         tiles: ticketKpis(tickets as Record<string, unknown>[], { t, now: new Date(), currencyCodeById: new Map() }),
+        loading: ticketsLoading,
       },
     }),
-    [tickets, t],
+    [tickets, ticketsLoading, t],
   )
 
   const handleFormSubmit = async (tabId: string, action: string, formData: Record<string, unknown>) => {

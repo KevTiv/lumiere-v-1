@@ -5744,6 +5744,23 @@
       "late": "Late",
       "ready": "Ready to ship",
       "waiting": "Waiting"
+    },
+    "stockPackageActions": {
+      "confirm": "Confirm package",
+      "done": "Mark package done"
+    },
+    "stockPackages": {
+      "columns": {
+        "createDate": "Created",
+        "name": "Package",
+        "pickingId": "Transfer",
+        "state": "Status",
+        "volume": "Volume",
+        "weight": "Weight"
+      },
+      "description": "Packed shipments awaiting confirmation or dispatch",
+      "emptyMessage": "No packages found.",
+      "title": "Packages"
     }
   },
   "purchasing": {

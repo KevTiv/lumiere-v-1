@@ -756,6 +756,28 @@ export const pickingWavesTableConfig = (t: TFunction): EntityViewConfig => ({
   },
 })
 
+// ── Stock packages ───────────────────────────────────────────────────────────
+export const stockPackagesTableConfig = (t: TFunction): EntityViewConfig => ({
+  id: "stock-packages-table",
+  title: t("inventory.stockPackages.title", { defaultValue: "Packages" }),
+  description: t("inventory.stockPackages.description", { defaultValue: "Packed shipments awaiting confirmation or dispatch" }),
+  view: {
+    mode: "table",
+    rowKey: "id",
+    searchable: true,
+    searchKeys: ["name", "state"],
+    columns: [
+      { key: "name", label: t("inventory.stockPackages.columns.name", { defaultValue: "Package" }), width: "min-w-40" },
+      { key: "state", label: t("inventory.stockPackages.columns.state", { defaultValue: "Status" }), type: "badge" },
+      { key: "pickingId", label: t("inventory.stockPackages.columns.pickingId", { defaultValue: "Transfer" }), width: "min-w-24" },
+      { key: "weight", label: t("inventory.stockPackages.columns.weight", { defaultValue: "Weight" }), type: "number" },
+      { key: "volume", label: t("inventory.stockPackages.columns.volume", { defaultValue: "Volume" }), type: "number" },
+      { key: "createDate", label: t("inventory.stockPackages.columns.createDate", { defaultValue: "Created" }), type: "datetime" },
+    ],
+    emptyMessage: t("inventory.stockPackages.emptyMessage", { defaultValue: "No packages found." }),
+  },
+})
+
 // ── Warehouse tasks ───────────────────────────────────────────────────────────
 export const warehouseTasksTableConfig = (t: TFunction): EntityViewConfig => ({
   id: "warehouse-tasks-table",
@@ -1053,6 +1075,7 @@ export const inventoryEntityConfigs = (t: TFunction): Record<string, EntityViewC
   "quality-alerts-table": qualityAlertsTableConfig(t),
   "cycle-counts-table": cycleCountsTableConfig(t),
   "picking-waves-table": pickingWavesTableConfig(t),
+  "stock-packages-table": stockPackagesTableConfig(t),
   "warehouse-tasks-table": warehouseTasksTableConfig(t),
   "stock-routes-table": stockRoutesTableConfig(t),
   "stock-rules-table": stockRulesTableConfig(t),
