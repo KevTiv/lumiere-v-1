@@ -12645,6 +12645,24 @@
       "pricingType": "Pricing",
       "title": "Convert to project",
       "unavailable": "Only an awarded proposal without a project can be converted."
+    },
+    "procurementScores": {
+      "add": "Add score",
+      "addTitle": "Add procurement score",
+      "countryPackKey": "Country pack key",
+      "description": "A score is identified by its country pack and score kind; saving an existing pair updates it.",
+      "done": "Procurement score saved",
+      "edit": "Edit",
+      "editTitle": "Edit procurement score",
+      "empty": "No procurement scores yet.",
+      "failed": "Save procurement score failed",
+      "invalidKeys": "Country pack key and score kind are required.",
+      "invalidNumbers": "Score and maximum must be numbers.",
+      "maxValue": "Maximum",
+      "notes": "Notes",
+      "scoreKind": "Score kind",
+      "scoreValue": "Score",
+      "title": "Procurement scores"
     }
   },
   "forensics": {

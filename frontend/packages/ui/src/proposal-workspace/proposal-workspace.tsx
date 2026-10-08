@@ -25,6 +25,8 @@ import { PresenceBar } from "./presence-bar"
 import { DocumentInputPanel } from "./document-input-panel"
 import { ComplianceChecklist } from "./compliance-checklist"
 import { parseBidDecisionInput } from "./bid-decision"
+import { parseProcurementScoreInput, procurementScoresForProposal, type ProcurementScoreView } from "./procurement-score"
+import { ProcurementScoresPanel } from "./procurement-scores-panel"
 import { PROJECT_BILL_TYPES, PROJECT_PRICING_TYPES, parseProjectConversionInput } from "./project-conversion"
 import { useFormDialog } from "../forms/use-form-dialog"
 import { showWorkflowToast } from "../lib/workflow-toast"
@@ -209,6 +211,7 @@ export interface ProposalWorkspaceHooks {
   useResolveProposalComment: () => MutationResult<bigint | number | string>
   useProposalTemplates: UseQueryHook<unknown>
   useProposalComplianceRequirements: UseQueryHook<unknown>
+  useProposalProcurementScores: UseQueryHook<unknown>
   useApplyProposalTemplate: () => MutationResult<{
     proposalId: bigint | number | string
     templateId: bigint | number | string
@@ -244,6 +247,14 @@ export interface ProposalWorkspaceHooks {
     billType: string
     pricingType: string
   }>
+  useUpsertProposalProcurementScore: () => AsyncMutationResult<{
+    proposalId: bigint | number | string
+    countryPackKey: string
+    scoreKind: string
+    scoreValue: number
+    maxValue: number
+    notes?: string | null
+  }>
 }
 
 // ─── Props ────────────────────────────────────────────────────────────────────
@@ -263,6 +274,8 @@ interface ProposalWorkspaceProps {
   canConvertToProject?: boolean
   /** Enables it: the proposal is Awarded and has no project yet (see `canConvertProposalToProject`). */
   convertToProjectReady?: boolean
+  /** Shows the procurement score add / edit actions; the caller passes the user's `proposal:write` permission. */
+  canManageProcurementScores?: boolean
   hooks: ProposalWorkspaceHooks
 }
 
@@ -280,6 +293,7 @@ export function ProposalWorkspace({
   canRecordBidDecision = false,
   canConvertToProject = false,
   convertToProjectReady = false,
+  canManageProcurementScores = false,
   hooks,
 }: ProposalWorkspaceProps) {
   const { t } = useTranslation()
@@ -337,6 +351,8 @@ export function ProposalWorkspace({
     useCreateProposalIntegrationIntent,
     useRecordProposalBidDecision,
     useConvertProposalToProject,
+    useProposalProcurementScores,
+    useUpsertProposalProcurementScore,
   } = hooks
 
   // ── Data queries ──────────────────────────────────────────────────────────────
@@ -349,6 +365,7 @@ export function ProposalWorkspace({
   const { data: products } = useProducts(organizationId)
   const { data: templates } = useProposalTemplates(organizationId)
   const { data: complianceRows } = useProposalComplianceRequirements(organizationId)
+  const { data: procurementScoreRows } = useProposalProcurementScores(organizationId)
   const sectionsList = sections ?? EMPTY_QUERY_ROWS
   const sourceDocsList = sourceDocs ?? EMPTY_QUERY_ROWS
   const versionsList = versions ?? EMPTY_QUERY_ROWS
@@ -358,6 +375,7 @@ export function ProposalWorkspace({
   const lineItemsList = lineItems ?? EMPTY_QUERY_ROWS
   const templatesList = templates ?? EMPTY_QUERY_ROWS
   const complianceList = complianceRows ?? EMPTY_QUERY_ROWS
+  const procurementScoreList = procurementScoreRows ?? EMPTY_QUERY_ROWS
 
   // Filter to this proposal (memoized so effect/callback deps stay referentially
   // stable across renders — otherwise fresh arrays each render trigger setState
@@ -397,6 +415,11 @@ export function ProposalWorkspace({
           ) === proposalId,
       ),
     [complianceList, proposalId],
+  )
+
+  const procurementScores = useMemo(
+    () => procurementScoresForProposal(procurementScoreList as Record<string, unknown>[], proposalId),
+    [procurementScoreList, proposalId],
   )
 
   const [draftSources, setDraftSources] = useState<SourceDocument[]>([])
@@ -465,6 +488,7 @@ export function ProposalWorkspace({
   const createIntent = useCreateProposalIntegrationIntent()
   const recordBidDecision = useRecordProposalBidDecision()
   const convertToProject = useConvertProposalToProject()
+  const upsertProcurementScore = useUpsertProposalProcurementScore()
   const { askForm, formDialog } = useFormDialog()
 
   const libraryTemplates = useMemo(
@@ -782,6 +806,96 @@ export function ProposalWorkspace({
     }
   }, [askForm, convertToProject, proposalIdBig, t])
 
+  const handleEditProcurementScore = useCallback(
+    async (existing?: ProcurementScoreView) => {
+      const values = await askForm({
+        title: existing
+          ? t("proposalWorkspace.procurementScores.editTitle", { defaultValue: "Edit procurement score" })
+          : t("proposalWorkspace.procurementScores.addTitle", { defaultValue: "Add procurement score" }),
+        description: t("proposalWorkspace.procurementScores.description", {
+          defaultValue: "A score is identified by its country pack and score kind; saving an existing pair updates it.",
+        }),
+        fields: [
+          {
+            id: "countryPackKey",
+            name: "countryPackKey",
+            label: t("proposalWorkspace.procurementScores.countryPackKey", { defaultValue: "Country pack key" }),
+            type: "text",
+            required: true,
+            defaultValue: existing?.countryPackKey,
+            width: "1/2",
+          },
+          {
+            id: "scoreKind",
+            name: "scoreKind",
+            label: t("proposalWorkspace.procurementScores.scoreKind", { defaultValue: "Score kind" }),
+            type: "text",
+            required: true,
+            defaultValue: existing?.scoreKind,
+            width: "1/2",
+          },
+          {
+            id: "scoreValue",
+            name: "scoreValue",
+            label: t("proposalWorkspace.procurementScores.scoreValue", { defaultValue: "Score" }),
+            type: "number",
+            required: true,
+            defaultValue: existing?.scoreValue,
+            width: "1/2",
+          },
+          {
+            id: "maxValue",
+            name: "maxValue",
+            label: t("proposalWorkspace.procurementScores.maxValue", { defaultValue: "Maximum" }),
+            type: "number",
+            required: true,
+            defaultValue: existing?.maxValue,
+            width: "1/2",
+          },
+          {
+            id: "notes",
+            name: "notes",
+            label: t("proposalWorkspace.procurementScores.notes", { defaultValue: "Notes" }),
+            type: "textarea",
+            defaultValue: existing?.notes,
+          },
+        ],
+      })
+      if (values == null) return
+      const failed = t("proposalWorkspace.procurementScores.failed", { defaultValue: "Save procurement score failed" })
+      const parsed = parseProcurementScoreInput(values)
+      if (!parsed.ok) {
+        showWorkflowToast({
+          kind: "error",
+          title: failed,
+          description:
+            parsed.reason === "required"
+              ? t("proposalWorkspace.procurementScores.invalidKeys", {
+                  defaultValue: "Country pack key and score kind are required.",
+                })
+              : t("proposalWorkspace.procurementScores.invalidNumbers", {
+                  defaultValue: "Score and maximum must be numbers.",
+                }),
+        })
+        return
+      }
+      try {
+        await upsertProcurementScore.mutateAsync({ proposalId: proposalIdBig, ...parsed.value })
+        showWorkflowToast({
+          kind: "success",
+          title: t("proposalWorkspace.procurementScores.done", { defaultValue: "Procurement score saved" }),
+        })
+      } catch (error) {
+        showWorkflowToast({
+          kind: "error",
+          title: failed,
+          description: error instanceof Error ? error.message : String(error),
+        })
+      }
+    },
+    [askForm, proposalIdBig, upsertProcurementScore, t],
+  )
+
   const handleSaveVersion = useCallback((message: string) => {
     saveVersion.mutate({ proposalId: proposalIdBig, message })
   }, [proposalIdBig, saveVersion])
@@ -1010,11 +1124,20 @@ export function ProposalWorkspace({
             onAddSourceDoc={() => setShowDocInput(true)}
             onDeleteSourceDoc={(id) => deleteSourceDoc.mutate({ docId: id })}
             complianceSlot={
-              <ComplianceChecklist
-                rows={proposalCompliance as Record<string, unknown>[]}
-                proposalId={proposalIdBig}
-                onToggleComplete={handleToggleCompliance}
-              />
+              <>
+                <ComplianceChecklist
+                  rows={proposalCompliance as Record<string, unknown>[]}
+                  proposalId={proposalIdBig}
+                  onToggleComplete={handleToggleCompliance}
+                />
+                <ProcurementScoresPanel
+                  scores={procurementScores}
+                  canEdit={canManageProcurementScores}
+                  disabled={upsertProcurementScore.isPending || proposalIdBig === 0n}
+                  onAdd={() => void handleEditProcurementScore()}
+                  onEdit={(score) => void handleEditProcurementScore(score)}
+                />
+              </>
             }
           />
 
