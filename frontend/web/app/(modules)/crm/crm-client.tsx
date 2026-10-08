@@ -2099,9 +2099,10 @@ function CrmClientLoaded({
           now: new Date(),
           currencyCodeById: currencyCodeMap(kpiCurrencies as Record<string, unknown>[]),
         }),
+        loading: opportunitiesLoading,
       },
     }),
-    [enrichedOpportunities, kpiCurrencies, t],
+    [enrichedOpportunities, kpiCurrencies, opportunitiesLoading, t],
   )
 
   const handleFormSubmit = async (

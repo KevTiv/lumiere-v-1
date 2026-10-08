@@ -101,6 +101,7 @@ import {
   qualityChecksTableConfig,
   cycleCountsTableConfig,
   pickingWavesTableConfig,
+  stockPackagesTableConfig,
   warehouseTasksTableConfig,
   stockRoutesTableConfig,
   stockRulesTableConfig,
@@ -1167,7 +1168,7 @@ export const inventoryModuleConfig = (t: TFunction): ModuleConfig => ({
   defaultTab: "dashboard",
   tabGroups: [
     { label: t("modules.tabGroups.stock", { defaultValue: "Stock" }), tabIds: ["products", "product-categories", "stock", "valuations", "lots", "serials"] },
-    { label: t("modules.tabGroups.movements", { defaultValue: "Movements" }), tabIds: ["transfers", "stock-moves", "adjustments", "picking-waves", "warehouse-tasks", "replenishment"] },
+    { label: t("modules.tabGroups.movements", { defaultValue: "Movements" }), tabIds: ["transfers", "stock-moves", "adjustments", "picking-waves", "stock-packages", "warehouse-tasks", "replenishment"] },
     { label: t("modules.tabGroups.warehouse", { defaultValue: "Warehouse" }), tabIds: ["warehouses", "locations", "location-tree", "3d-view", "routes", "rules"] },
     { label: t("modules.tabGroups.quality", { defaultValue: "Quality" }), tabIds: ["quality", "quality-alerts", "cycle-counts", "cycle-wizard", "traceability-records", "traceability-reports"] },
     { label: t("modules.tabGroups.setup", { defaultValue: "Setup" }), tabIds: ["barcode-rules", "barcode-nomenclatures", "adjustment-reasons"] },
@@ -1284,6 +1285,12 @@ export const inventoryModuleConfig = (t: TFunction): ModuleConfig => ({
       label: t("inventory.pickingWaves.title"),
       type: "entity",
       entityConfig: pickingWavesTableConfig(t),
+    },
+    {
+      id: "stock-packages",
+      label: t("inventory.stockPackages.title", { defaultValue: "Packages" }),
+      type: "entity",
+      entityConfig: stockPackagesTableConfig(t),
     },
     {
       id: "warehouse-tasks",

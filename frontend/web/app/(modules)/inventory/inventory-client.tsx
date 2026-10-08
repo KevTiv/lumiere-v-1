@@ -82,6 +82,7 @@ import {
 } from './product-record-read-tabs';
 import { packagingOptionLabel, vendorPriceOptionLabel } from './product-record-tabs';
 import { canReleaseWave } from './picking-wave-actions';
+import { canConfirmPackage, canDonePackage } from './stock-package-actions';
 import { useInventoryModuleSubscription } from '@/lib/module-subscription-hooks';
 import { useWorkflowSurface } from '@/hooks/use-workflow-surface';
 import { usePickingWorkflow } from '@lumiere/query-hooks/hooks/picking-workflow';
@@ -112,6 +113,9 @@ import {
   useQualityTeams,
   useStockCycleCounts,
   usePickingWaves,
+  useStockPackages,
+  useConfirmStockPackage,
+  useDoneStockPackage,
   useWarehouseTasks,
   useStockRoutes,
   useStockRules,
@@ -582,6 +586,7 @@ function InventoryClientLoaded({
     initialStockCycleCounts,
   );
   const { data: pickingWaves = [] } = usePickingWaves(orgId);
+  const { data: stockPackages = [] } = useStockPackages(orgId);
   const { data: warehouseTasks = [] } = useWarehouseTasks(orgId);
   const { data: stockRoutes = [] } = useStockRoutes(orgId);
   const { data: stockRules = [] } = useStockRules(orgId);
@@ -1159,6 +1164,8 @@ function InventoryClientLoaded({
   const createPickingWave = useCreatePickingWave(orgId, operatingCompanyId);
   const confirmPickingWave = useConfirmPickingWave(orgId, operatingCompanyId);
   const completePickingWave = useCompletePickingWave(orgId, operatingCompanyId);
+  const confirmStockPackage = useConfirmStockPackage(orgId, operatingCompanyId);
+  const doneStockPackage = useDoneStockPackage(orgId, operatingCompanyId);
 
   // Product category hooks
   const createProductCategory = useCreateProductCategory(
@@ -4224,6 +4231,50 @@ function InventoryClientLoaded({
           },
         };
       }
+      // Stock package actions
+      if (tab.id === 'stock-packages') {
+        return {
+          ...tab,
+          entityConfig: {
+            ...tab.entityConfig,
+            view: {
+              ...v,
+              actions: [
+                {
+                  id: 'confirm-package',
+                  label: t('inventory.stockPackageActions.confirm', { defaultValue: 'Confirm package' }),
+                  icon: CheckCircle,
+                  requiresSelection: true,
+                  permission: { resource: 'stock_picking', action: 'update' },
+                  isApplicable: (rows) => rows.length === 1 && canConfirmPackage(rows[0]),
+                  successMessage: t('common.actionCompleted', {
+                    action: t('inventory.stockPackageActions.confirm', { defaultValue: 'Confirm package' }),
+                  }),
+                  onClick: async (rows) => {
+                    const id = rows[0]?.id as ScalarId | undefined;
+                    if (id != null) await confirmStockPackage.mutateAsync(id);
+                  },
+                },
+                {
+                  id: 'done-package',
+                  label: t('inventory.stockPackageActions.done', { defaultValue: 'Mark package done' }),
+                  icon: ListChecks,
+                  requiresSelection: true,
+                  permission: { resource: 'stock_picking', action: 'update' },
+                  isApplicable: (rows) => rows.length === 1 && canDonePackage(rows[0]),
+                  successMessage: t('common.actionCompleted', {
+                    action: t('inventory.stockPackageActions.done', { defaultValue: 'Mark package done' }),
+                  }),
+                  onClick: async (rows) => {
+                    const id = rows[0]?.id as ScalarId | undefined;
+                    if (id != null) await doneStockPackage.mutateAsync(id);
+                  },
+                },
+              ],
+            },
+          },
+        };
+      }
       // Product categories actions
       if (tab.id === 'product-categories') {
         return {
@@ -4745,6 +4796,7 @@ function InventoryClientLoaded({
           if (tab.id === 'quality') return withTransferActions(tab);
           if (tab.id === 'replenishment') return withTransferActions(tab);
           if (tab.id === 'picking-waves') return withTransferActions(tab);
+          if (tab.id === 'stock-packages') return withTransferActions(tab);
           if (tab.id === 'product-categories') return withTransferActions(tab);
           if (tab.id === 'routes') return withTransferActions(tab);
           if (tab.id === 'rules') return withTransferActions(tab);
@@ -4817,6 +4869,8 @@ function InventoryClientLoaded({
     // Picking waves
     confirmPickingWave,
     completePickingWave,
+    confirmStockPackage,
+    doneStockPackage,
     // Product categories
     deleteProductCategory,
     // Stock routes and rules
@@ -4936,6 +4990,7 @@ function InventoryClientLoaded({
       quality: qualityChecks as unknown as Record<string, unknown>[],
       'cycle-counts': cycleCounts as unknown as Record<string, unknown>[],
       'picking-waves': pickingWaves as unknown as Record<string, unknown>[],
+      'stock-packages': stockPackages as unknown as Record<string, unknown>[],
       'warehouse-tasks': warehouseTasks as unknown as Record<string, unknown>[],
       routes: stockRoutes as unknown as Record<string, unknown>[],
       rules: stockRules as unknown as Record<string, unknown>[],
@@ -4983,6 +5038,7 @@ function InventoryClientLoaded({
       qualityChecks,
       cycleCounts,
       pickingWaves,
+      stockPackages,
       warehouseTasks,
       stockRoutes,
       stockRules,

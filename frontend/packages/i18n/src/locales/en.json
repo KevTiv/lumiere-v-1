@@ -178,7 +178,12 @@
       "pivotNoData": "No records to summarise",
       "pivotNone": "None",
       "pivotTotal": "Total",
-      "pivotExportCsv": "Export CSV"
+      "pivotExportCsv": "Export CSV",
+      "export": "Export",
+      "exportTruncated": "Export limited to the first {{max}} rows",
+      "exportDone": "Exported {{count}} rows",
+      "exportDone_one": "Exported {{count}} row",
+      "exportDone_other": "Exported {{count}} rows"
     },
     "retry": "Retry",
     "discardChanges": {
@@ -5744,6 +5749,23 @@
       "late": "Late",
       "ready": "Ready to ship",
       "waiting": "Waiting"
+    },
+    "stockPackageActions": {
+      "confirm": "Confirm package",
+      "done": "Mark package done"
+    },
+    "stockPackages": {
+      "columns": {
+        "createDate": "Created",
+        "name": "Package",
+        "pickingId": "Transfer",
+        "state": "Status",
+        "volume": "Volume",
+        "weight": "Weight"
+      },
+      "description": "Packed shipments awaiting confirmation or dispatch",
+      "emptyMessage": "No packages found.",
+      "title": "Packages"
     }
   },
   "purchasing": {

@@ -416,6 +416,15 @@ function ManufacturingClientLoaded({
                 ...tab.entityConfig,
                 view: {
                   ...view,
+                  rowSelectionToggleOnClick: false,
+                  actions: [
+                    {
+                      id: "csv-mo",
+                      label: t("manufacturing.toolbar.importMoCsv"),
+                      permission: { resource: CSV_IMPORT_CONTRACTS.manufacturingOrder.resource, action: "create" },
+                      onClick: () => setCsvKind("mo"),
+                    },
+                  ],
                   columns: view.columns.map((column) =>
                     column.key === "name"
                       ? {
