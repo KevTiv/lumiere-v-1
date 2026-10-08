@@ -8593,6 +8593,23 @@
       "signatures": "Signatures",
       "signatureStatus": "Status",
       "signerCount": "Signers"
+    },
+    "knowledgeActions": {
+      "categoryInvalid": "Enter a name, a colour from 0 to 11 and a whole-number sequence.",
+      "delayInvalid": "Enter a whole number of seconds, 1 or more.",
+      "delaySeconds": "Delay (seconds)",
+      "deleteCategory": "Delete category",
+      "deleteCategoryConfirm": "Delete this category? Only categories without articles can be deleted, so move or delete their articles first.",
+      "done": "{{action}} completed",
+      "editCategory": "Edit category",
+      "failed": "{{action}} failed",
+      "memberIdentity": "Member identity (hex)",
+      "memberRequired": "Member identity is required.",
+      "removeMember": "Remove member",
+      "retentionPurge": "Run retention purge",
+      "retentionPurgeConfirm": "Schedule the purge to run in {{seconds}} seconds? Purged documents cannot be restored.",
+      "retentionPurgeHint": "Permanently deletes recycle-bin documents whose retention period has ended, after the delay.",
+      "retentionPurgeScheduled": "Retention purge scheduled in {{seconds}} seconds"
     }
   },
   "helpdesk": {
