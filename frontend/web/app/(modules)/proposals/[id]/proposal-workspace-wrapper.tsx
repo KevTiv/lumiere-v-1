@@ -1,7 +1,7 @@
 "use client"
 
 import { useMemo } from "react"
-import { ProposalWorkspace, useRBAC, type ProposalWorkspaceHooks } from "@lumiere/ui"
+import { ProposalWorkspace, canConvertProposalToProject, useRBAC, type ProposalWorkspaceHooks } from "@lumiere/ui"
 import type { AIAnalysis } from "@lumiere/ui"
 import {
   useProposalSections,
@@ -31,6 +31,8 @@ import {
   useUpsertProposalComplianceRequirement,
   useCreateProposalIntegrationIntent,
   useRecordProposalBidDecision,
+  useConvertProposalToProject,
+  useProposals,
 } from "@lumiere/query-hooks/hooks/proposals"
 import { useProducts } from "@lumiere/query-hooks/hooks/inventory"
 import type { ProposalStatus } from "@lumiere/ui"
@@ -208,6 +210,13 @@ function createHttpHooks(
         isPending: mutation.isPending,
       }
     },
+    useConvertProposalToProject: () => {
+      const mutation = useConvertProposalToProject(organizationId, companyId)
+      return {
+        mutateAsync: (params) => mutation.mutateAsync(params),
+        isPending: mutation.isPending,
+      }
+    },
   }
 }
 
@@ -222,6 +231,10 @@ export function ProposalWorkspaceWrapper({
   onAnalyze,
 }: ProposalWorkspaceWrapperProps) {
   const { checkPermission } = useRBAC()
+  const { data: proposals = [] } = useProposals(organizationId)
+  const proposalRow = (proposals as unknown as Record<string, unknown>[]).find(
+    (row) => String(row.id) === proposalId,
+  )
   const httpHooks = useMemo(
     () => createHttpHooks(organizationId, companyId),
     [organizationId, companyId],
@@ -237,6 +250,11 @@ export function ProposalWorkspaceWrapper({
       currentUserName={currentUserName}
       onAnalyze={onAnalyze}
       canRecordBidDecision={checkPermission("proposal", "write").allowed}
+      // The reducer also creates the project, so it needs project_project:create as well.
+      canConvertToProject={
+        checkPermission("proposal", "write").allowed && checkPermission("project_project", "create").allowed
+      }
+      convertToProjectReady={canConvertProposalToProject(proposalRow)}
       hooks={httpHooks}
     />
   )
