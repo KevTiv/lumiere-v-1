@@ -12522,7 +12522,9 @@
       "discountPercent": "Discount %",
       "saved": "saved {{amount}}",
       "notes": "Notes",
-      "additionalNotes": "Additional notes..."
+      "additionalNotes": "Additional notes...",
+      "moveDown": "Move down",
+      "moveUp": "Move up"
     },
     "presenceBar": {
       "activeCollaborators": "Active collaborators",
@@ -12645,6 +12647,40 @@
       "pricingType": "Pricing",
       "title": "Convert to project",
       "unavailable": "Only an awarded proposal without a project can be converted."
+    },
+    "procurementScores": {
+      "add": "Add score",
+      "addTitle": "Add procurement score",
+      "countryPackKey": "Country pack key",
+      "description": "A score is identified by its country pack and score kind; saving an existing pair updates it.",
+      "done": "Procurement score saved",
+      "edit": "Edit",
+      "editTitle": "Edit procurement score",
+      "empty": "No procurement scores yet.",
+      "failed": "Save procurement score failed",
+      "invalidKeys": "Country pack key and score kind are required.",
+      "invalidNumbers": "Score and maximum must be numbers.",
+      "maxValue": "Maximum",
+      "notes": "Notes",
+      "scoreKind": "Score kind",
+      "scoreValue": "Score",
+      "title": "Procurement scores"
+    },
+    "reorderLineItems": {
+      "failed": "Reorder line items failed"
+    },
+    "saveAsTemplate": {
+      "button": "Save as template",
+      "category": "Category",
+      "countryPackKey": "Country pack key (optional)",
+      "description": "Saves this proposal's sections (titles and content) to the template library.",
+      "done": "Template saved",
+      "failed": "Save as template failed",
+      "invalid": "Template name, category and locale are required.",
+      "locale": "Locale",
+      "name": "Template name",
+      "noSections": "Add at least one section first.",
+      "title": "Save as template"
     }
   },
   "forensics": {
