@@ -9,6 +9,7 @@ import {
   ModuleView,
   FormModal,
   CsvImportModal,
+  CSV_IMPORT_CONTRACTS,
   RuntimeFormModal,
   EntityView,
   ListPivotSwitch,
@@ -3776,6 +3777,12 @@ function AccountingClientReady({
     }
   }
 
+  const canImportCsv = useCallback(
+    (kind: "account" | "accountMove" | "accountMoveLine" | "budget" | "budgetLine") =>
+      checkPermission(CSV_IMPORT_CONTRACTS[kind].resource, "create").allowed,
+    [checkPermission],
+  )
+
   const addCsvToolbar = useCallback(
     (ec: EntityViewConfig, actions: EntityAction[]): EntityViewConfig => {
       if (ec.view.mode !== "table") return ec
@@ -3890,7 +3897,7 @@ function AccountingClientReady({
                   <ChartOfAccountsView
                     accounts={accounts}
                     chartStructureContent={chartStructurePanel}
-                    onImportAccountsCsv={() => setCsvKind("account")}
+                    onImportAccountsCsv={canImportCsv("account") ? () => setCsvKind("account") : undefined}
                     onAccountClick={(account) => setGlDrilldownAccount(account)}
                     onToggleDeprecated={
                       checkPermission("account_account", "write").allowed ? toggleAccountDeprecated : undefined
@@ -3917,8 +3924,8 @@ function AccountingClientReady({
                 customContent: (
                   <GeneralLedgerView
                     moves={allMoves}
-                    onImportMovesCsv={() => setCsvKind("accountMove")}
-                    onImportMoveLinesCsv={() => setCsvKind("accountMoveLine")}
+                    onImportMovesCsv={canImportCsv("accountMove") ? () => setCsvKind("accountMove") : undefined}
+                    onImportMoveLinesCsv={canImportCsv("accountMoveLine") ? () => setCsvKind("accountMoveLine") : undefined}
                     onCreate={() => setQuickActionForm({ form: journalEntryFormConfig, action: "createMove" })}
                     onPostMove={(move) => postDraft(move)}
                     onCancelMove={(move) =>
@@ -3941,12 +3948,16 @@ function AccountingClientReady({
                 customContent: (
                   <div className="space-y-3">
                     <div className="flex justify-end gap-2">
-                      <Button type="button" variant="outline" onClick={() => setCsvKind("budget")}>
-                        {t("accounting.csvImport.toolbarBudgets")}
-                      </Button>
-                      <Button type="button" variant="outline" onClick={() => setCsvKind("budgetLine")}>
-                        {t("accounting.csvImport.toolbarBudgetLines")}
-                      </Button>
+                      {canImportCsv("budget") ? (
+                        <Button type="button" variant="outline" onClick={() => setCsvKind("budget")}>
+                          {t("accounting.csvImport.toolbarBudgets")}
+                        </Button>
+                      ) : null}
+                      {canImportCsv("budgetLine") ? (
+                        <Button type="button" variant="outline" onClick={() => setCsvKind("budgetLine")}>
+                          {t("accounting.csvImport.toolbarBudgetLines")}
+                        </Button>
+                      ) : null}
                     </div>
                     <BudgetsWorkspace
                       budgets={budgets}
@@ -4021,6 +4032,7 @@ function AccountingClientReady({
                   {
                     id: "csv-tax",
                     label: t("accounting.csvImport.toolbarTaxRates"),
+                    permission: { resource: CSV_IMPORT_CONTRACTS.taxRate.resource, action: "create" },
                     onClick: () => setCsvKind("tax"),
                   },
                   {
@@ -4044,6 +4056,7 @@ function AccountingClientReady({
                   {
                     id: "csv-analytic",
                     label: t("accounting.csvImport.toolbarAnalytic"),
+                    permission: { resource: CSV_IMPORT_CONTRACTS.analyticAccount.resource, action: "create" },
                     onClick: () => setCsvKind("analytic"),
                   },
                 ]),
@@ -4464,6 +4477,7 @@ function AccountingClientReady({
       taxDeadlinesEntityConfig,
       toggleAccountDeprecated,
       checkPermission,
+      canImportCsv,
       postDraft,
       analyticLineFormConfig,
       newAnalyticAccountFormConfig,
@@ -4761,6 +4775,8 @@ function AccountingClientReady({
           key={csvKind}
           onClose={() => setCsvKind(null)}
           config={csvFormConfig}
+          columns={CSV_IMPORT_CONTRACTS[csvKind === "tax" ? "taxRate" : csvKind === "analytic" ? "analyticAccount" : csvKind]}
+          templateFileName={`accounting-${csvKind}-import-template.csv`}
           onImport={async (text) => {
             if (csvKind === "account") await csvImports.importAccount.mutateAsync(text)
             else if (csvKind === "accountMove") await csvImports.importAccountMove.mutateAsync(text)

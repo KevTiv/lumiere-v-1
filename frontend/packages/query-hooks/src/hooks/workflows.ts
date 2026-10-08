@@ -427,43 +427,6 @@ export function useCancelWorkflowInstance(organizationId: bigint) {
   return useCancelWorkflow(organizationId)
 }
 
-/** @deprecated Removed — use publish_workflow_version */
-export function useSetWorkflowActive(organizationId: bigint) {
-  return useMutation({
-    mutationFn: async () => {
-      throw new Error("set_workflow_active was removed; publish or retire a workflow version")
-    },
-    onSuccess: () => undefined,
-  })
-}
-
-/** @deprecated */
-export function useAddWorkflowActivity(organizationId: bigint) {
-  return useMutation({
-    mutationFn: async () => {
-      throw new Error("add_workflow_activity was removed; use upsert_workflow_node")
-    },
-  })
-}
-
-/** @deprecated */
-export function useAddWorkflowTransition(organizationId: bigint) {
-  return useMutation({
-    mutationFn: async () => {
-      throw new Error("add_workflow_transition was removed; use upsert_workflow_edge")
-    },
-  })
-}
-
-/** @deprecated */
-export function useSetWorkitemException(organizationId: bigint) {
-  return useMutation({
-    mutationFn: async () => {
-      throw new Error("set_workitem_exception was removed with the workitem model")
-    },
-  })
-}
-
 export type {
   CreateWorkflowParams,
   StartWorkflowParams,
