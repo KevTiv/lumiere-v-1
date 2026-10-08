@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { ExternalLink, Layers, Link2, PenLine } from 'lucide-react';
@@ -38,6 +38,8 @@ import {
 } from '@lumiere/ui/components/alert-dialog';
 import { Badge } from '@lumiere/ui/components/badge';
 import { formatTimestampLike } from '@lumiere/ui/lib/entity-row-values';
+import { Textarea } from '@lumiere/ui/components/textarea';
+import { useConfirmDialog } from '@lumiere/ui/hooks/use-confirm-dialog';
 import { Skeleton } from '@lumiere/ui/components/skeleton';
 import { showWorkflowToast } from '@lumiere/ui/lib/workflow-toast';
 import { optionalBigIntU64 } from '@lumiere/erp-shared/form-coercion';
@@ -49,6 +51,7 @@ import {
   useDocumentExternalRefs,
   useDocumentLegalHolds,
   useDocumentSignatureRequests,
+  useReleaseDocumentLegalHold,
   useDocumentFolders,
   useDocumentVersions,
   useDocuments,
@@ -186,6 +189,9 @@ function DocumentPageLoaded({
   const ingestEvidence = useIngestDocumentEvidence(orgId);
   const setRetention = useSetDocumentRetention(orgId);
   const applyLegalHold = useApplyDocumentLegalHold(orgId);
+  const releaseLegalHold = useReleaseDocumentLegalHold(orgId);
+  const { confirm, dialog: confirmDialog } = useConfirmDialog();
+  const releaseNoteRef = useRef<HTMLTextAreaElement | null>(null);
 
   const [formAction, setFormAction] = useState<FormAction | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
@@ -304,6 +310,36 @@ function DocumentPageLoaded({
   const heldTitle = t('documents.page.heldHint', {
     defaultValue: 'Not allowed while a legal hold is active. Release the hold first.',
   });
+
+  const releaseHold = async () => {
+    if (!activeHold) return;
+    const ok = await confirm({
+      title: t('documents.page.releaseHoldTitle', { defaultValue: 'Release legal hold?' }),
+      description: (
+        <span className="block space-y-2">
+          <span className="block">
+            {t('documents.page.releaseHoldHint', {
+              defaultValue: 'The document can be changed, deleted or purged again once the hold is released.',
+            })}
+          </span>
+          <Textarea
+            ref={releaseNoteRef}
+            rows={2}
+            defaultValue=""
+            placeholder={t('documents.page.releaseNote', { defaultValue: 'Note (optional)' })}
+            data-testid="document-release-hold-note"
+          />
+        </span>
+      ),
+      confirmLabel: t('documents.page.releaseHold', { defaultValue: 'Release hold' }),
+    });
+    const note = releaseNoteRef.current?.value.trim();
+    if (!ok) return;
+    await run('Release legal hold', async () => {
+      await releaseLegalHold.mutateAsync({ holdId: activeHold.id as bigint | number | string, metadata: note || undefined });
+      showWorkflowToast({ kind: 'success', title: 'Legal hold released', description: label });
+    });
+  };
 
   const formConfig: FormConfig | null =
     formAction === 'edit'
@@ -489,7 +525,17 @@ function DocumentPageLoaded({
                 <Button variant="outline" size="sm" data-testid="document-action-move" onClick={() => setFormAction('move')}>
                   {t('documents.page.move', { defaultValue: 'Move to folder' })}
                 </Button>
-                {!isHeld && (
+                {isHeld ? (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={releaseLegalHold.isPending}
+                    data-testid="document-action-release-hold"
+                    onClick={() => void releaseHold()}
+                  >
+                    {t('documents.page.releaseHold', { defaultValue: 'Release hold' })}
+                  </Button>
+                ) : (
                   <Button variant="outline" size="sm" data-testid="document-action-legal-hold" onClick={() => setFormAction('legalHold')}>
                     {t('documents.page.legalHold', { defaultValue: 'Legal hold' })}
                   </Button>
@@ -631,6 +677,7 @@ function DocumentPageLoaded({
         />
       ) : null}
 
+      {confirmDialog}
 
       <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
         <AlertDialogContent data-testid="document-delete-confirm">

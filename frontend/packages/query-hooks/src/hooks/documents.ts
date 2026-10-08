@@ -453,6 +453,28 @@ export function useApplyDocumentLegalHold(organizationId: bigint) {
   })
 }
 
+export function useReleaseDocumentLegalHold(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({
+      holdId,
+      metadata,
+    }: {
+      holdId: bigint | number | string
+      metadata?: string
+    }) => {
+      const { urlPath, init } = stdbBffCommandPost("release_document_legal_hold", { holdId: toScalarU64(holdId), params: stdbParamsToJson({ metadata } as object, "ReleaseDocumentLegalHoldParams") })
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error(await parseCallErrorDocuments(r))
+    },
+    onSuccess: () => {
+      const k = rqBigIntKey(organizationId)
+      void qc.invalidateQueries({ queryKey: ['documents', k] })
+      void qc.invalidateQueries({ queryKey: ['document-legal-holds', k] })
+    },
+  })
+}
+
 export function useUpdateDocumentPresence(organizationId: bigint) {
   return useMutation({
     mutationFn: async ({
