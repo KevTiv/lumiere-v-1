@@ -34,6 +34,7 @@ import {
   useConvertProposalToProject,
   useProposalProcurementScores,
   useUpsertProposalProcurementScore,
+  useReorderProposalLineItems,
   useProposals,
 } from "@lumiere/query-hooks/hooks/proposals"
 import { useProducts } from "@lumiere/query-hooks/hooks/inventory"
@@ -214,6 +215,13 @@ function createHttpHooks(
     },
     useProposalProcurementScores:
       useProposalProcurementScores as unknown as ProposalWorkspaceHooks['useProposalProcurementScores'],
+    useReorderProposalLineItems: () => {
+      const mutation = useReorderProposalLineItems(organizationId, companyId)
+      return {
+        mutateAsync: (params) => mutation.mutateAsync(params),
+        isPending: mutation.isPending,
+      }
+    },
     useUpsertProposalProcurementScore: () => {
       const mutation = useUpsertProposalProcurementScore(organizationId, companyId)
       return {
@@ -266,6 +274,7 @@ export function ProposalWorkspaceWrapper({
         checkPermission("proposal", "write").allowed && checkPermission("project_project", "create").allowed
       }
       canManageProcurementScores={checkPermission("proposal", "write").allowed}
+      canReorderLineItems={checkPermission("proposal", "write").allowed}
       convertToProjectReady={canConvertProposalToProject(proposalRow)}
       hooks={httpHooks}
     />

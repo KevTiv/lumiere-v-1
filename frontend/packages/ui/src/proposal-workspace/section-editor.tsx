@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils"
 import type { SectionStatus } from "@/lib/proposal-workspace-types"
 import type { ProposalLineItem, ProposalComment } from "@lumiere/stdb/proposal-row-types"
 import { ProductLineItems } from "./product-line-items"
+import type { LineItemMoveDirection } from "./line-item-order"
 import { CommentThread } from "./comment-thread"
 
  
@@ -46,6 +47,9 @@ interface SectionEditorProps {
   onAddLineItem: (productId: bigint, productName: string, priceUnit: number) => void
   onUpdateLineItem: (id: bigint, quantity: number, priceUnit: number, discount: number, notes?: string) => void
   onDeleteLineItem: (id: bigint) => void
+  /** Reorders a line item within this section; omitted when the user cannot reorder. */
+  onMoveLineItem?: (id: bigint, direction: LineItemMoveDirection) => void
+  isReorderingLineItems?: boolean
   onAddComment: (content: string, parentId?: bigint) => void
   onResolveComment: (id: bigint) => void
   onFocus: () => void
@@ -63,6 +67,8 @@ export function SectionEditor({
   onAddLineItem,
   onUpdateLineItem,
   onDeleteLineItem,
+  onMoveLineItem,
+  isReorderingLineItems,
   onAddComment,
   onResolveComment,
   onFocus,
@@ -277,6 +283,8 @@ export function SectionEditor({
         products={products}
         onUpdate={onUpdateLineItem}
         onDelete={onDeleteLineItem}
+        onMove={onMoveLineItem}
+        isReordering={isReorderingLineItems}
       />
 
       {/* Comments */}

@@ -26,6 +26,7 @@ import { DocumentInputPanel } from "./document-input-panel"
 import { ComplianceChecklist } from "./compliance-checklist"
 import { parseBidDecisionInput } from "./bid-decision"
 import { parseProcurementScoreInput, procurementScoresForProposal, type ProcurementScoreView } from "./procurement-score"
+import { moveLineItemOrder, proposalLineItemsInOrder, type LineItemMoveDirection } from "./line-item-order"
 import { ProcurementScoresPanel } from "./procurement-scores-panel"
 import { PROJECT_BILL_TYPES, PROJECT_PRICING_TYPES, parseProjectConversionInput } from "./project-conversion"
 import { useFormDialog } from "../forms/use-form-dialog"
@@ -247,6 +248,10 @@ export interface ProposalWorkspaceHooks {
     billType: string
     pricingType: string
   }>
+  useReorderProposalLineItems: () => AsyncMutationResult<{
+    proposalId: bigint | number | string
+    orderedIds: Array<bigint | number | string>
+  }>
   useUpsertProposalProcurementScore: () => AsyncMutationResult<{
     proposalId: bigint | number | string
     countryPackKey: string
@@ -276,6 +281,8 @@ interface ProposalWorkspaceProps {
   convertToProjectReady?: boolean
   /** Shows the procurement score add / edit actions; the caller passes the user's `proposal:write` permission. */
   canManageProcurementScores?: boolean
+  /** Shows the line item move up / down controls; the caller passes the user's `proposal:write` permission. */
+  canReorderLineItems?: boolean
   hooks: ProposalWorkspaceHooks
 }
 
@@ -294,6 +301,7 @@ export function ProposalWorkspace({
   canConvertToProject = false,
   convertToProjectReady = false,
   canManageProcurementScores = false,
+  canReorderLineItems = false,
   hooks,
 }: ProposalWorkspaceProps) {
   const { t } = useTranslation()
@@ -353,6 +361,7 @@ export function ProposalWorkspace({
     useConvertProposalToProject,
     useProposalProcurementScores,
     useUpsertProposalProcurementScore,
+    useReorderProposalLineItems,
   } = hooks
 
   // ── Data queries ──────────────────────────────────────────────────────────────
@@ -435,7 +444,13 @@ export function ProposalWorkspace({
 
   const effectiveActiveSectionId = (activeSection as { id?: bigint } | null)?.id ?? null
 
-  const activeSectionLineItems = lineItemsList.filter(
+  // The line items query is org-wide; reorder needs this proposal's complete, ordered set.
+  const proposalLineItems = useMemo(
+    () => proposalLineItemsInOrder(lineItemsList as Record<string, unknown>[], proposalId),
+    [lineItemsList, proposalId],
+  )
+
+  const activeSectionLineItems = proposalLineItems.filter(
     (item) => effectiveActiveSectionId && String((item as { sectionId?: unknown }).sectionId) === String(effectiveActiveSectionId)
   )
 
@@ -489,6 +504,7 @@ export function ProposalWorkspace({
   const recordBidDecision = useRecordProposalBidDecision()
   const convertToProject = useConvertProposalToProject()
   const upsertProcurementScore = useUpsertProposalProcurementScore()
+  const reorderLineItems = useReorderProposalLineItems()
   const { askForm, formDialog } = useFormDialog()
 
   const libraryTemplates = useMemo(
@@ -896,6 +912,28 @@ export function ProposalWorkspace({
     [askForm, proposalIdBig, upsertProcurementScore, t],
   )
 
+  const handleMoveLineItem = useCallback(
+    async (id: bigint, direction: LineItemMoveDirection) => {
+      const orderedIds = moveLineItemOrder(
+        proposalLineItems,
+        activeSectionLineItems.map((item) => String((item as { id?: unknown }).id)),
+        String(id),
+        direction,
+      )
+      if (orderedIds == null) return
+      try {
+        await reorderLineItems.mutateAsync({ proposalId: proposalIdBig, orderedIds })
+      } catch (error) {
+        showWorkflowToast({
+          kind: "error",
+          title: t("proposalWorkspace.reorderLineItems.failed", { defaultValue: "Reorder line items failed" }),
+          description: error instanceof Error ? error.message : String(error),
+        })
+      }
+    },
+    [activeSectionLineItems, proposalIdBig, proposalLineItems, reorderLineItems, t],
+  )
+
   const handleSaveVersion = useCallback((message: string) => {
     saveVersion.mutate({ proposalId: proposalIdBig, message })
   }, [proposalIdBig, saveVersion])
@@ -1173,6 +1211,8 @@ export function ProposalWorkspace({
                 })
               }
               onDeleteLineItem={(id) => deleteLineItem.mutate({ lineItemId: id })}
+              onMoveLineItem={canReorderLineItems ? (id, direction) => void handleMoveLineItem(id, direction) : undefined}
+              isReorderingLineItems={reorderLineItems.isPending || proposalIdBig === 0n}
               onAddComment={(content) => {
                 if (!effectiveActiveSectionId) return
                 addComment.mutate({

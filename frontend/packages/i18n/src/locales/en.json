@@ -12522,7 +12522,9 @@
       "discountPercent": "Discount %",
       "saved": "saved {{amount}}",
       "notes": "Notes",
-      "additionalNotes": "Additional notes..."
+      "additionalNotes": "Additional notes...",
+      "moveDown": "Move down",
+      "moveUp": "Move up"
     },
     "presenceBar": {
       "activeCollaborators": "Active collaborators",
@@ -12663,6 +12665,9 @@
       "scoreKind": "Score kind",
       "scoreValue": "Score",
       "title": "Procurement scores"
+    },
+    "reorderLineItems": {
+      "failed": "Reorder line items failed"
     }
   },
   "forensics": {
