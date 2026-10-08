@@ -746,7 +746,22 @@
         "deprecated": "Deprecated",
         "active": "Active"
       },
-      "coasTab": "Accounts"
+      "coasTab": "Accounts",
+      "rowActions": {
+        "deprecate": "Deprecate account",
+        "deprecateConfirm": "Deprecated accounts are marked as retired. You can reactivate the account later.",
+        "noCompany": "No company is available for this account.",
+        "reactivate": "Reactivate account",
+        "edit": "Edit account"
+      },
+      "edit": {
+        "deprecated": "Deprecated",
+        "internalType": "Account type",
+        "invalid": "Enter a code and a name.",
+        "note": "Note",
+        "reconcile": "Allow reconciliation",
+        "unchanged": "Nothing to change."
+      }
     },
     "glDrilldown": {
       "title": "{{code}} — {{name}}",
@@ -957,7 +972,13 @@
       "taxUse": "Type",
       "priceInclude": "Price Inc.",
       "refreshDeadlineStatuses": "Refresh tax deadline statuses",
-      "scheduleDeadlineUpdates": "Schedule daily deadline updates"
+      "scheduleDeadlineUpdates": "Schedule daily deadline updates",
+      "actions": {
+        "active": "Active",
+        "edit": "Edit tax",
+        "invalid": "Enter a name and a rate.",
+        "withholding": "Withholding"
+      }
     },
     "taxGroups": {
       "title": "Tax Groups",
@@ -970,14 +991,25 @@
         "precedingSubtotal": "Preceding Subtotal",
         "taxPayableAccountId": "Payable Account",
         "taxReceivableAccountId": "Receivable Account",
-        "advanceTaxPaymentAccountId": "Advance Payment Account"
+        "advanceTaxPaymentAccountId": "Advance Payment Account",
+        "advanceAccount": "Advance tax payment account",
+        "company": "Company",
+        "payableAccount": "Tax payable account",
+        "receivableAccount": "Tax receivable account"
       },
       "filters": {
         "name": "Name"
       },
       "actions": {
         "newTaxGroup": "New Tax Group",
-        "editTaxGroup": "Edit Tax Group"
+        "editTaxGroup": "Edit Tax Group",
+        "edit": "Edit tax group",
+        "invalid": "Enter a name and a whole-number sequence.",
+        "new": "New tax group"
+      },
+      "empty": "No tax groups.",
+      "form": {
+        "none": "None"
       }
     },
     "taxJurisdictions": {
@@ -994,7 +1026,8 @@
         "city": "City",
         "zipFrom": "ZIP From",
         "zipTo": "ZIP To",
-        "isActive": "Active"
+        "isActive": "Active",
+        "status": "Status"
       },
       "filters": {
         "countryCode": "Country",
@@ -1003,8 +1036,17 @@
       },
       "actions": {
         "newJurisdiction": "New Jurisdiction",
-        "editJurisdiction": "Edit Jurisdiction"
-      }
+        "editJurisdiction": "Edit Jurisdiction",
+        "edit": "Edit jurisdiction",
+        "invalid": "Enter a name, a code and a country code.",
+        "new": "New jurisdiction"
+      },
+      "active": "Active",
+      "empty": "No tax jurisdictions.",
+      "form": {
+        "countryHint": "ISO country code, for example US."
+      },
+      "inactive": "Inactive"
     },
     "taxSchedules": {
       "title": "Tax Schedules",
@@ -1018,7 +1060,11 @@
         "taxIds": "Taxes",
         "isActive": "Active",
         "effectiveFrom": "Effective From",
-        "effectiveTo": "Effective To"
+        "effectiveTo": "Effective To",
+        "company": "Company",
+        "jurisdiction": "Jurisdiction",
+        "status": "Status",
+        "taxes": "Taxes"
       },
       "filters": {
         "jurisdictionId": "Jurisdiction",
@@ -1026,8 +1072,19 @@
       },
       "actions": {
         "newSchedule": "New Schedule",
-        "editSchedule": "Edit Schedule"
-      }
+        "editSchedule": "Edit Schedule",
+        "edit": "Edit schedule",
+        "invalid": "Enter a name and valid effective dates.",
+        "new": "New schedule"
+      },
+      "active": "Active",
+      "empty": "No tax schedules.",
+      "form": {
+        "inactive": "(inactive)",
+        "noActiveTaxes": "There are no active taxes to choose from.",
+        "none": "None"
+      },
+      "inactive": "Inactive"
     },
     "taxDeadlines": {
       "title": "Tax Deadlines",
@@ -1071,7 +1128,17 @@
         "waiveSelected": "Waive Selected",
         "deleteSelected": "Delete Selected",
         "refreshStatuses": "Refresh Statuses",
-        "scheduleUpdates": "Schedule Updates"
+        "scheduleUpdates": "Schedule Updates",
+        "complete": "Mark complete",
+        "delete": "Delete deadline",
+        "deleteConfirm": "Delete this tax deadline? It disappears from the list.",
+        "done": "{{action}} completed",
+        "edit": "Edit deadline",
+        "failed": "{{action}} failed",
+        "invalid": "Enter a title and a due date.",
+        "new": "New deadline",
+        "waive": "Waive",
+        "waiveConfirm": "Mark this deadline as not applicable. It stops counting as open."
       },
       "empty": "No tax deadlines.",
       "reminders": {
@@ -1083,6 +1150,17 @@
         "sentAt": "Sent",
         "status": "Status",
         "tab": "Reminders"
+      },
+      "form": {
+        "company": "Company (optional)",
+        "type": "Type",
+        "types": {
+          "Filing": "Filing",
+          "Payment": "Payment",
+          "Registration": "Registration",
+          "Report": "Report",
+          "Renewal": "Renewal"
+        }
       }
     },
     "budgets": {
@@ -1418,7 +1496,10 @@
         "period": "Period",
         "rate": "Rate",
         "title": "Company exchange rates",
-        "type": "Type"
+        "type": "Type",
+        "invalid": "Choose a company, period and currency, and enter a rate above zero and an effective date.",
+        "set": "Add / update rate",
+        "setHint": "A company and period that already has a rate gets its rate, type and effective date updated."
       }
     },
     "states": {
@@ -1595,7 +1676,44 @@
           "addDepreciationLine": "Add depreciation line",
           "deleteSelected": "Delete Selected",
           "activateSelected": "Set active",
-          "deactivateSelected": "Set inactive"
+          "deactivateSelected": "Set inactive",
+          "edit": "Edit asset",
+          "new": "New asset"
+        },
+        "form": {
+          "acquisitionDate": "Acquisition date",
+          "assetAccount": "Asset account",
+          "assetType": "Asset type",
+          "code": "Code",
+          "currency": "Currency",
+          "depreciationAccount": "Accumulated depreciation account",
+          "disposalAccount": "Disposal account (optional)",
+          "expenseAccount": "Depreciation expense account",
+          "firstDepreciationDate": "First depreciation date",
+          "gainAccount": "Disposal gain account (optional)",
+          "invalidAccounts": "Choose a general journal, asset and depreciation accounts from the Asset group and an expense account from the Expense group.",
+          "invalidAmounts": "The original value must be above zero and the salvage value from zero up to below the original value.",
+          "invalidDates": "Enter a valid acquisition date (and a valid first depreciation date, if any).",
+          "invalidDisposal": "Disposal accounts must be an income account for gains, an expense account for losses and an asset account for disposals.",
+          "invalidIdentity": "Enter a code, a name, an asset type and a currency.",
+          "invalidMethod": "Choose a method, at least one depreciation of at least one month, and a degressive factor above 0 up to 100 for degressive methods.",
+          "journal": "Depreciation journal (general)",
+          "lossAccount": "Disposal loss account (optional)",
+          "method": "Depreciation method",
+          "methodDegressive": "Degressive",
+          "methodDegressiveThenLinear": "Degressive then linear",
+          "methodLinear": "Linear",
+          "methodNumber": "Number of depreciations",
+          "methodPeriod": "Months between depreciations",
+          "name": "Name",
+          "none": "None",
+          "originalValue": "Original value",
+          "progressFactor": "Degressive factor (%)",
+          "prorata": "Prorata temporis",
+          "salvageValue": "Salvage value",
+          "typePurchase": "Purchase",
+          "typeSale": "Sale",
+          "unavailable": "(unavailable)"
         }
       },
       "depreciationSchedule": {
@@ -2719,6 +2837,19 @@
       "row": "Row",
       "tab": "Imported lines",
       "validationError": "Validation"
+    },
+    "bankStatements": {
+      "actions": {
+        "currency": "Currency",
+        "edit": "Edit statement",
+        "editTab": "Edit",
+        "invalidEdit": "Enter valid balances and date.",
+        "invalidNew": "Choose a bank journal and a currency, and enter a valid opening balance.",
+        "new": "New statement",
+        "noBankJournal": "Create a bank journal first; statements are opened on bank journals.",
+        "postedLocked": "A posted statement can no longer be edited.",
+        "reference": "Reference"
+      }
     }
   },
   "crm": {
@@ -8559,13 +8690,44 @@
       "signatureRequested": "Requested",
       "signatures": "Signatures",
       "signatureStatus": "Status",
-      "signerCount": "Signers"
+      "signerCount": "Signers",
+      "requestSignature": "Request signature",
+      "requestSignatureDone": "Signature requested",
+      "requestSignatureHint": "Record the e-signature envelope created with your provider for this document.",
+      "requestSignatureTitle": "Request signature",
+      "signatureEnvelope": "Envelope ID",
+      "signatureEnvelopeRequired": "An envelope ID is required",
+      "signatureProvider": "Provider",
+      "signatureProviderRequired": "A provider is required",
+      "signatureSigners": "Signers (optional)",
+      "signatureSignersHint": "One e-mail address per line.",
+      "signatureSignersInvalid": "Enter valid e-mail addresses, one per line"
+    },
+    "knowledgeActions": {
+      "categoryInvalid": "Enter a name, a colour from 0 to 11 and a whole-number sequence.",
+      "delayInvalid": "Enter a whole number of seconds, 1 or more.",
+      "delaySeconds": "Delay (seconds)",
+      "deleteCategory": "Delete category",
+      "deleteCategoryConfirm": "Delete this category? Only categories without articles can be deleted, so move or delete their articles first.",
+      "done": "{{action}} completed",
+      "editCategory": "Edit category",
+      "failed": "{{action}} failed",
+      "memberIdentity": "Member identity (hex)",
+      "memberRequired": "Member identity is required.",
+      "removeMember": "Remove member",
+      "retentionPurge": "Run retention purge",
+      "retentionPurgeConfirm": "Schedule the purge to run in {{seconds}} seconds? Purged documents cannot be restored.",
+      "retentionPurgeHint": "Permanently deletes recycle-bin documents whose retention period has ended, after the delay.",
+      "retentionPurgeScheduled": "Retention purge scheduled in {{seconds}} seconds"
     }
   },
   "helpdesk": {
     "actions": {
       "importTicketsCsv": "Import tickets (CSV)",
-      "editTicket": "Edit ticket"
+      "editTicket": "Edit ticket",
+      "importSlasCsv": "Import SLAs (CSV)",
+      "importStagesCsv": "Import stages (CSV)",
+      "importTeamsCsv": "Import teams (CSV)"
     },
     "tabs": {
       "teams": "Teams",
@@ -8862,6 +9024,32 @@
         "productId": "Product",
         "recurrenceId": "Billing Cycle",
         "active": "Active"
+      },
+      "actions": {
+        "activate": "Activate plan",
+        "deactivate": "Deactivate plan",
+        "deactivateConfirm": "Deactivating a plan also unpublishes it, so it can no longer be chosen for new subscriptions.",
+        "edit": "Edit plan",
+        "failed": "{{action}} failed",
+        "newBundle": "New bundle"
+      },
+      "bundle": {
+        "invalid": "Choose a plan and enter a name and a code.",
+        "plan": "Plan"
+      },
+      "edit": {
+        "description": "Description",
+        "invalidBillingPeriod": "Choose a billing period: day, week, month or year.",
+        "invalidBillingPeriodUnit": "The billing interval must be a whole number of at least 1.",
+        "invalidCode": "A plan code cannot be blank.",
+        "invalidInvoiceDay": "The invoice day must be a whole number from 1 to 28.",
+        "invalidName": "Enter a plan name.",
+        "invalidPaymentMode": "Choose a payment mode: draft invoice or automated payment.",
+        "invalidTrialDuration": "The trial duration must be a whole number of 0 or more.",
+        "isPublished": "Published",
+        "paymentMode": "Payment mode",
+        "recurringInvoiceDay": "Invoice day (1-28)",
+        "unchanged": "Nothing to change."
       }
     },
     "deferredSchedules": {
@@ -9007,8 +9195,11 @@
           "recurrenceId": "Billing Cycle",
           "recurrencePlaceholder": "Recurrence ID",
           "options": {
+            "day": "Day",
+            "week": "Week",
+            "month": "Month",
+            "year": "Year",
             "monthly": "Monthly",
-            "quarterly": "Quarterly",
             "yearly": "Yearly"
           }
         }
@@ -9316,6 +9507,27 @@
       "moreInList": "More actions",
       "moreInListHint": "Close, invoice, amend, renew and the other actions that ask for details are in the list.",
       "moreActions": "More"
+    },
+    "paymentIntent": {
+      "amount": "Amount",
+      "create": "Create payment intent",
+      "currency": "Currency",
+      "failed": "Create payment intent failed",
+      "intentType": "Intent type",
+      "invalid": "Choose an intent type and a currency, and enter an amount above zero (and a valid invoice move ID, if any).",
+      "invoiceMoveId": "Invoice move ID (optional)"
+    },
+    "bundles": {
+      "columns": {
+        "active": "Active",
+        "code": "Code",
+        "name": "Name",
+        "plan": "Plan"
+      },
+      "description": "Bundles group extra items on top of a subscription plan",
+      "emptyMessage": "No bundles yet. Use New bundle on the Plans tab.",
+      "tabLabel": "Bundles",
+      "title": "Bundles"
     }
   },
   "expenses": {
@@ -12410,7 +12622,30 @@
       "empty": "No compliance requirements yet — run Analyze to materialize.",
       "title": "Compliance"
     },
-    "requestPdf": "Queue PDF render"
+    "requestPdf": "Queue PDF render",
+    "bidDecision": {
+      "bid": "Bid",
+      "button": "Bid / no bid",
+      "decision": "Decision",
+      "description": "A bid decision is required before this proposal can be submitted.",
+      "done": "Bid decision recorded",
+      "failed": "Record bid decision failed",
+      "invalid": "Choose bid or no bid and give a rationale.",
+      "noBid": "No bid",
+      "rationale": "Rationale",
+      "title": "Record bid decision"
+    },
+    "convertToProject": {
+      "billType": "Billing",
+      "button": "Convert to project",
+      "description": "Creates a project from this awarded proposal. A proposal can only be converted once.",
+      "done": "Project created from proposal",
+      "failed": "Convert to project failed",
+      "invalid": "Choose a billing type and a pricing type.",
+      "pricingType": "Pricing",
+      "title": "Convert to project",
+      "unavailable": "Only an awarded proposal without a project can be converted."
+    }
   },
   "forensics": {
     "page": {

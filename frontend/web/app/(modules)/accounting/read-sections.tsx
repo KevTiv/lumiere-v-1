@@ -2,7 +2,7 @@
 
 import { useMemo } from "react"
 import { useTranslation } from "@lumiere/i18n"
-import { useBankStatementImports } from "@lumiere/query-hooks/hooks/accounting"
+import { useBankStatementImports, useSetConsolidationCompanyRate } from "@lumiere/query-hooks/hooks/accounting"
 import {
   useBankStatementImportLines,
   useConsolidationCompanyRates,
@@ -12,8 +12,11 @@ import {
   importIdsApprovedIntoStatement,
   remindersForDeadline,
 } from "@lumiere/query-hooks/hooks/read-ui-rows"
-import { EntityView } from "@lumiere/ui"
+import { EntityView, useFormDialog, useRBAC } from "@lumiere/ui"
 import type { EntityViewConfig } from "@lumiere/ui"
+import { Button } from "@lumiere/ui/components/button"
+import { showWorkflowToast } from "@lumiere/ui/lib/workflow-toast"
+import { CONSOLIDATION_RATE_TYPES, toConsolidationRateParams } from "./consolidation-rate-actions"
 
 type QueryLike = { isLoading: boolean; isError: boolean; error: unknown }
 
@@ -171,6 +174,80 @@ export function taxDeadlinesTableConfig(t: (key: string, opts?: Record<string, u
   } as EntityViewConfig
 }
 
+/** Tax groups list config (rows carry the resolved company and account names). */
+export function taxGroupsTableConfig(t: (key: string, opts?: Record<string, unknown>) => string): EntityViewConfig {
+  return {
+    id: "tax-groups-table",
+    title: t("accounting.taxGroups.title", { defaultValue: "Tax groups" }),
+    view: {
+      mode: "table",
+      rowKey: "id",
+      searchable: true,
+      searchKeys: ["name", "companyName"],
+      columns: [
+        { key: "name", label: t("accounting.taxGroups.columns.name", { defaultValue: "Name" }), width: "min-w-48" },
+        { key: "sequence", label: t("accounting.taxGroups.columns.sequence", { defaultValue: "Sequence" }), align: "right" },
+        { key: "companyName", label: t("accounting.taxGroups.columns.company", { defaultValue: "Company" }) },
+        { key: "precedingSubtotalText", label: t("accounting.taxGroups.columns.precedingSubtotal", { defaultValue: "Preceding subtotal" }) },
+        { key: "payableAccountName", label: t("accounting.taxGroups.columns.payableAccount", { defaultValue: "Tax payable account" }) },
+        { key: "receivableAccountName", label: t("accounting.taxGroups.columns.receivableAccount", { defaultValue: "Tax receivable account" }) },
+        { key: "advanceAccountName", label: t("accounting.taxGroups.columns.advanceAccount", { defaultValue: "Advance tax payment account" }) },
+      ],
+      emptyMessage: t("accounting.taxGroups.empty", { defaultValue: "No tax groups." }),
+    },
+  } as EntityViewConfig
+}
+
+/** Tax jurisdictions list config (organization-level; rows carry the resolved active label). */
+export function taxJurisdictionsTableConfig(t: (key: string, opts?: Record<string, unknown>) => string): EntityViewConfig {
+  return {
+    id: "tax-jurisdictions-table",
+    title: t("accounting.taxJurisdictions.title", { defaultValue: "Tax jurisdictions" }),
+    view: {
+      mode: "table",
+      rowKey: "id",
+      searchable: true,
+      searchKeys: ["name", "code", "countryCode", "stateCode", "city"],
+      columns: [
+        { key: "name", label: t("accounting.taxJurisdictions.columns.name", { defaultValue: "Name" }), width: "min-w-48" },
+        { key: "code", label: t("accounting.taxJurisdictions.columns.code", { defaultValue: "Code" }) },
+        { key: "countryCode", label: t("accounting.taxJurisdictions.columns.countryCode", { defaultValue: "Country code" }) },
+        { key: "stateCode", label: t("accounting.taxJurisdictions.columns.stateCode", { defaultValue: "State" }) },
+        { key: "countyCode", label: t("accounting.taxJurisdictions.columns.countyCode", { defaultValue: "County" }) },
+        { key: "city", label: t("accounting.taxJurisdictions.columns.city", { defaultValue: "City" }) },
+        { key: "zipFrom", label: t("accounting.taxJurisdictions.columns.zipFrom", { defaultValue: "Postal code from" }) },
+        { key: "zipTo", label: t("accounting.taxJurisdictions.columns.zipTo", { defaultValue: "Postal code to" }) },
+        { key: "activeLabel", label: t("accounting.taxJurisdictions.columns.status", { defaultValue: "Status" }) },
+      ],
+      emptyMessage: t("accounting.taxJurisdictions.empty", { defaultValue: "No tax jurisdictions." }),
+    },
+  } as EntityViewConfig
+}
+
+/** Tax schedules list config (rows carry the resolved company, jurisdiction and tax names). */
+export function taxSchedulesTableConfig(t: (key: string, opts?: Record<string, unknown>) => string): EntityViewConfig {
+  return {
+    id: "tax-schedules-table",
+    title: t("accounting.taxSchedules.title", { defaultValue: "Tax schedules" }),
+    view: {
+      mode: "table",
+      rowKey: "id",
+      searchable: true,
+      searchKeys: ["name", "jurisdictionName", "taxNames"],
+      columns: [
+        { key: "name", label: t("accounting.taxSchedules.columns.name", { defaultValue: "Name" }), width: "min-w-48" },
+        { key: "companyName", label: t("accounting.taxSchedules.columns.company", { defaultValue: "Company" }) },
+        { key: "jurisdictionName", label: t("accounting.taxSchedules.columns.jurisdiction", { defaultValue: "Jurisdiction" }) },
+        { key: "taxNames", label: t("accounting.taxSchedules.columns.taxes", { defaultValue: "Taxes" }), width: "min-w-48" },
+        { key: "effectiveFromDate", label: t("accounting.taxSchedules.columns.effectiveFrom", { defaultValue: "Effective from" }), type: "date" },
+        { key: "effectiveToDate", label: t("accounting.taxSchedules.columns.effectiveTo", { defaultValue: "Effective to" }), type: "date" },
+        { key: "activeLabel", label: t("accounting.taxSchedules.columns.status", { defaultValue: "Status" }) },
+      ],
+      emptyMessage: t("accounting.taxSchedules.empty", { defaultValue: "No tax schedules." }),
+    },
+  } as EntityViewConfig
+}
+
 export interface CompanyRateLabels {
   readonly company: ReadonlyMap<string, string>
   readonly currency: ReadonlyMap<string, string>
@@ -187,6 +264,70 @@ export function ConsolidationCompanyRatesSection({
 }) {
   const { t } = useTranslation()
   const query = useConsolidationCompanyRates(organizationId)
+  const setRate = useSetConsolidationCompanyRate(Number(organizationId))
+  const { checkPermission } = useRBAC()
+  const { askForm, formDialog } = useFormDialog()
+  const canSetRate = checkPermission("consolidation_company_rate", "create").allowed
+  const toOptions = (labelMap: ReadonlyMap<string, string>) =>
+    Array.from(labelMap, ([value, label]) => ({ value, label }))
+
+  /** Add a rate, or update the one already recorded for the same company and period (the reducer upserts). */
+  const promptSetRate = async () => {
+    const label = t("accounting.consolidation.rates.set", { defaultValue: "Add / update rate" })
+    const values = await askForm({
+      title: label,
+      description: t("accounting.consolidation.rates.setHint", {
+        defaultValue: "A company and period that already has a rate gets its rate, type and effective date updated.",
+      }),
+      fields: [
+        { id: "companyId", name: "companyId", label: t("accounting.consolidation.rates.company", { defaultValue: "Company" }), type: "select", required: true, options: toOptions(labels.company), width: "1/2" },
+        { id: "periodId", name: "periodId", label: t("accounting.consolidation.rates.period", { defaultValue: "Period" }), type: "select", required: true, options: toOptions(labels.period), width: "1/2" },
+        { id: "currencyId", name: "currencyId", label: t("accounting.consolidation.rates.currency", { defaultValue: "Currency" }), type: "select", required: true, options: toOptions(labels.currency), width: "1/2" },
+        { id: "exchangeRate", name: "exchangeRate", label: t("accounting.consolidation.rates.rate", { defaultValue: "Rate" }), type: "number", required: true, step: 0.000001, min: 0, width: "1/2" },
+        {
+          id: "rateType",
+          name: "rateType",
+          label: t("accounting.consolidation.rates.type", { defaultValue: "Type" }),
+          type: "select",
+          required: true,
+          defaultValue: "average",
+          width: "1/2",
+          options: CONSOLIDATION_RATE_TYPES.map((value) => ({
+            value,
+            label: t(`accounting.consolidation.rates.types.${value}`, { defaultValue: value.charAt(0).toUpperCase() + value.slice(1) }),
+          })),
+        },
+        { id: "effectiveDate", name: "effectiveDate", label: t("accounting.consolidation.rates.effectiveDate", { defaultValue: "Effective" }), type: "date", required: true, width: "1/2" },
+      ],
+    })
+    if (values == null) return
+    const failed = (description: string) =>
+      showWorkflowToast({
+        kind: "error",
+        title: t("accounting.taxDeadlines.actions.failed", { defaultValue: "{{action}} failed", action: label }),
+        description,
+      })
+    const params = toConsolidationRateParams(values)
+    if (params == null) {
+      failed(
+        t("accounting.consolidation.rates.invalid", {
+          defaultValue: "Choose a company, period and currency, and enter a rate above zero and an effective date.",
+        }),
+      )
+      return
+    }
+    try {
+      await setRate.mutateAsync(params)
+      showWorkflowToast({
+        kind: "success",
+        title: t("accounting.taxDeadlines.actions.done", { defaultValue: "{{action}} completed", action: label }),
+      })
+      void query.refetch()
+    } catch (error) {
+      failed(error instanceof Error ? error.message : String(error))
+    }
+  }
+
   const rows = useMemo(
     () =>
       (query.data ?? []).map((r) => ({
@@ -222,9 +363,24 @@ export function ConsolidationCompanyRatesSection({
   )
   return (
     <div className="space-y-2">
-      <h3 className="text-base font-semibold">
-        {t("accounting.consolidation.rates.title", { defaultValue: "Company exchange rates" })}
-      </h3>
+      <div className="flex items-center justify-between gap-2">
+        <h3 className="text-base font-semibold">
+          {t("accounting.consolidation.rates.title", { defaultValue: "Company exchange rates" })}
+        </h3>
+        {canSetRate ? (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={setRate.isPending}
+            data-testid="consolidation-rate-set"
+            onClick={() => void promptSetRate()}
+          >
+            {t("accounting.consolidation.rates.set", { defaultValue: "Add / update rate" })}
+          </Button>
+        ) : null}
+      </div>
+      {formDialog}
       <SectionState
         query={query}
         isEmpty={rows.length === 0}

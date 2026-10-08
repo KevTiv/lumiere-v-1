@@ -1,7 +1,7 @@
 "use client"
 
 import { useMemo } from "react"
-import { ProposalWorkspace, type ProposalWorkspaceHooks } from "@lumiere/ui"
+import { ProposalWorkspace, canConvertProposalToProject, useRBAC, type ProposalWorkspaceHooks } from "@lumiere/ui"
 import type { AIAnalysis } from "@lumiere/ui"
 import {
   useProposalSections,
@@ -30,6 +30,9 @@ import {
   useApplyProposalTemplate,
   useUpsertProposalComplianceRequirement,
   useCreateProposalIntegrationIntent,
+  useRecordProposalBidDecision,
+  useConvertProposalToProject,
+  useProposals,
 } from "@lumiere/query-hooks/hooks/proposals"
 import { useProducts } from "@lumiere/query-hooks/hooks/inventory"
 import type { ProposalStatus } from "@lumiere/ui"
@@ -200,6 +203,20 @@ function createHttpHooks(
       organizationId,
       companyId,
     ),
+    useRecordProposalBidDecision: () => {
+      const mutation = useRecordProposalBidDecision(organizationId, companyId)
+      return {
+        mutateAsync: (params) => mutation.mutateAsync(params),
+        isPending: mutation.isPending,
+      }
+    },
+    useConvertProposalToProject: () => {
+      const mutation = useConvertProposalToProject(organizationId, companyId)
+      return {
+        mutateAsync: (params) => mutation.mutateAsync(params),
+        isPending: mutation.isPending,
+      }
+    },
   }
 }
 
@@ -213,6 +230,11 @@ export function ProposalWorkspaceWrapper({
   currentUserName,
   onAnalyze,
 }: ProposalWorkspaceWrapperProps) {
+  const { checkPermission } = useRBAC()
+  const { data: proposals = [] } = useProposals(organizationId)
+  const proposalRow = (proposals as unknown as Record<string, unknown>[]).find(
+    (row) => String(row.id) === proposalId,
+  )
   const httpHooks = useMemo(
     () => createHttpHooks(organizationId, companyId),
     [organizationId, companyId],
@@ -227,6 +249,12 @@ export function ProposalWorkspaceWrapper({
       currentUserId={currentUserId}
       currentUserName={currentUserName}
       onAnalyze={onAnalyze}
+      canRecordBidDecision={checkPermission("proposal", "write").allowed}
+      // The reducer also creates the project, so it needs project_project:create as well.
+      canConvertToProject={
+        checkPermission("proposal", "write").allowed && checkPermission("project_project", "create").allowed
+      }
+      convertToProjectReady={canConvertProposalToProject(proposalRow)}
       hooks={httpHooks}
     />
   )

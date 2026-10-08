@@ -4,9 +4,19 @@ import { mapDashboardWidgets, withDashboardSections } from "@lumiere/ui/lib/dash
 import { useMemo, useState } from "react"
 import { useTranslation } from "@lumiere/i18n"
 import { showWorkflowToast } from "@lumiere/ui/lib/workflow-toast"
+import { canActivatePlan, canDeactivatePlan } from "./subscription-plan-actions"
+import {
+  PLAN_BILLING_PERIODS,
+  PLAN_PAYMENT_MODES,
+  planEditDefaults,
+  toBundleCreateParams,
+  toPlanUpdateParams,
+  type PlanEditFailure,
+} from "./subscription-plan-edit"
 import {
   ModuleView,
   FormModal,
+  useFormDialog,
   newSubscriptionForm,
   newSubscriptionPlanForm,
   newDeferredRevenueScheduleForm,
@@ -18,6 +28,7 @@ import {
   MissingOrganization,
   mergeSelectOptionsForFields,
   subscriptionsTableConfig,
+  subscriptionPlansTableConfig,
   subscriptionsWithBoard,
   subscriptionLinesTableConfig,
   subscriptionAmendmentsTableConfig,
@@ -27,12 +38,13 @@ import {
   subscriptionPriceTiersTableConfig,
   subscriptionPastDueTableConfig,
   subscriptionDueToBillTableConfig,
+  subscriptionBundlesTableConfig,
   subscriptionEntitlementsTableConfig,
   subscriptionPaymentIntentsTableConfig,
   deferredRevenueLinesTableConfig,
   revenueRecognitionRulesTableConfig,
 } from "@lumiere/ui"
-import type { EntityAction, FormConfig, ModuleConfig } from "@lumiere/ui"
+import type { EntityAction, EntityTableConfig, EntityViewConfig, FormConfig, ModuleConfig } from "@lumiere/ui"
 import {
   PlayCircle,
   PauseCircle,
@@ -63,10 +75,15 @@ import {
   useCreateSubscriptionPriceTier,
   useSubscriptionPastDue,
   useSubscriptionDueToBill,
+  useSubscriptionBundles,
   useSubscriptionEntitlements,
   useSubscriptionPaymentIntents,
   useCreateSubscription,
   useCreateSubscriptionPlan,
+  useActivateSubscriptionPlan,
+  useDeactivateSubscriptionPlan,
+  useUpdateSubscriptionPlan,
+  useCreateSubscriptionBundle,
   useDeferredRevenueSchedules,
   useDeferredRevenueLines,
   useRevenueRecognitionRules,
@@ -204,6 +221,15 @@ function SubscriptionsClientLoaded({
   const { data: pastDue = [] } = useSubscriptionPastDue(orgId)
   const { data: dueToBill = [] } = useSubscriptionDueToBill(orgId)
   const { data: entitlements = [] } = useSubscriptionEntitlements(orgId)
+  const { data: bundles = [] } = useSubscriptionBundles(orgId)
+  const bundleRows = useMemo(
+    () =>
+      (bundles as unknown as Record<string, unknown>[]).map((bundle) => {
+        const plan = (plans as unknown as Record<string, unknown>[]).find((p) => String(p.id) === String(bundle.planId))
+        return { ...bundle, planName: plan?.name ?? (bundle.planId != null ? `#${String(bundle.planId)}` : "") }
+      }),
+    [bundles, plans],
+  )
   const { data: paymentIntents = [] } = useSubscriptionPaymentIntents(orgId)
   const { data: deferredSchedules = [] } = useDeferredRevenueSchedules(orgId, initialDeferredSchedules)
   const { data: deferredLines = [] } = useDeferredRevenueLines(orgId, initialDeferredLines)
@@ -228,6 +254,11 @@ function SubscriptionsClientLoaded({
   const activateRule = useActivateRevenueRecognitionRule(orgId, operatingCompanyId)
   const deactivateRule = useDeactivateRevenueRecognitionRule(orgId, operatingCompanyId)
   const importPlanCsv = useImportSubscriptionPlanCsv(orgId, operatingCompanyId)
+  const activatePlan = useActivateSubscriptionPlan(orgId, operatingCompanyId)
+  const deactivatePlan = useDeactivateSubscriptionPlan(orgId, operatingCompanyId)
+  const updatePlan = useUpdateSubscriptionPlan(orgId, operatingCompanyId)
+  const createBundle = useCreateSubscriptionBundle(orgId, operatingCompanyId)
+  const { askForm, formDialog } = useFormDialog()
   const importSubscriptionCsv = useImportSubscriptionCsv(orgId, operatingCompanyId)
 
   const isFormMutationPending =
@@ -239,6 +270,10 @@ function SubscriptionsClientLoaded({
     recognizeDeferred.isPending ||
     createRecognitionRule.isPending ||
     activateRule.isPending ||
+    activatePlan.isPending ||
+    deactivatePlan.isPending ||
+    updatePlan.isPending ||
+    createBundle.isPending ||
     deactivateRule.isPending ||
     importPlanCsv.isPending ||
     importSubscriptionCsv.isPending
@@ -463,6 +498,189 @@ function SubscriptionsClientLoaded({
     ]
   }, [t, activateRule, deactivateRule])
 
+  const planEntityConfig = useMemo((): EntityViewConfig => {
+    const base = subscriptionPlansTableConfig(t)
+    const view = base.view as EntityTableConfig
+    const activateLabel = t("subscriptions.plans.actions.activate", { defaultValue: "Activate plan" })
+    const deactivateLabel = t("subscriptions.plans.actions.deactivate", { defaultValue: "Deactivate plan" })
+    const editLabel = t("subscriptions.plans.actions.edit", { defaultValue: "Edit plan" })
+    const bundleLabel = t("subscriptions.plans.actions.newBundle", { defaultValue: "New bundle" })
+    const failedTitle = (action: string) => t("subscriptions.plans.actions.failed", { defaultValue: "{{action}} failed", action })
+    /** Runs a command and reports success or failure itself, so a cancelled dialog is not a success. */
+    const runCommand = async (action: string, work: () => Promise<unknown>) => {
+      try {
+        await work()
+        showWorkflowToast({ kind: "success", title: t("common.actionCompleted", { action }) })
+      } catch (error) {
+        showWorkflowToast({
+          kind: "error",
+          title: failedTitle(action),
+          description: error instanceof Error ? error.message : String(error),
+        })
+      }
+    }
+    const planEditProblem = (reason: PlanEditFailure): string => {
+      switch (reason) {
+        case "name":
+          return t("subscriptions.plans.edit.invalidName", { defaultValue: "Enter a plan name." })
+        case "code":
+          return t("subscriptions.plans.edit.invalidCode", { defaultValue: "A plan code cannot be blank." })
+        case "billingPeriod":
+          return t("subscriptions.plans.edit.invalidBillingPeriod", { defaultValue: "Choose a billing period: day, week, month or year." })
+        case "billingPeriodUnit":
+          return t("subscriptions.plans.edit.invalidBillingPeriodUnit", { defaultValue: "The billing interval must be a whole number of at least 1." })
+        case "recurringInvoiceDay":
+          return t("subscriptions.plans.edit.invalidInvoiceDay", { defaultValue: "The invoice day must be a whole number from 1 to 28." })
+        case "paymentMode":
+          return t("subscriptions.plans.edit.invalidPaymentMode", { defaultValue: "Choose a payment mode: draft invoice or automated payment." })
+        case "trialDuration":
+          return t("subscriptions.plans.edit.invalidTrialDuration", { defaultValue: "The trial duration must be a whole number of 0 or more." })
+        case "unchanged":
+          return t("subscriptions.plans.edit.unchanged", { defaultValue: "Nothing to change." })
+      }
+    }
+    const promptEdit = async (plan: Record<string, unknown>) => {
+      const current = planEditDefaults(plan)
+      const values = await askForm({
+        title: editLabel,
+        fields: [
+          { id: "name", name: "name", label: t("subscriptions.plans.columns.name"), type: "text", required: true, defaultValue: current.name, width: "1/2" },
+          { id: "code", name: "code", label: t("subscriptions.plans.columns.code"), type: "text", defaultValue: current.code, width: "1/2" },
+          { id: "description", name: "description", label: t("subscriptions.plans.edit.description", { defaultValue: "Description" }), type: "textarea", defaultValue: current.description },
+          {
+            id: "billingPeriod",
+            name: "billingPeriod",
+            label: t("subscriptions.plans.columns.billingPeriod"),
+            type: "select",
+            required: true,
+            defaultValue: current.billingPeriod,
+            width: "1/2",
+            options: PLAN_BILLING_PERIODS.map((value) => ({
+              value,
+              label: t(`subscriptions.plans.edit.billingPeriods.${value}`, { defaultValue: value.charAt(0).toUpperCase() + value.slice(1) }),
+            })),
+          },
+          { id: "billingPeriodUnit", name: "billingPeriodUnit", label: t("subscriptions.plans.columns.billingPeriodUnit"), type: "number", required: true, min: 1, step: 1, defaultValue: current.billingPeriodUnit, width: "1/2" },
+          { id: "recurringInvoiceDay", name: "recurringInvoiceDay", label: t("subscriptions.plans.edit.recurringInvoiceDay", { defaultValue: "Invoice day (1-28)" }), type: "number", required: true, min: 1, max: 28, step: 1, defaultValue: current.recurringInvoiceDay, width: "1/2" },
+          {
+            id: "paymentMode",
+            name: "paymentMode",
+            label: t("subscriptions.plans.edit.paymentMode", { defaultValue: "Payment mode" }),
+            type: "select",
+            required: true,
+            defaultValue: current.paymentMode,
+            width: "1/2",
+            options: PLAN_PAYMENT_MODES.map((value) => ({
+              value,
+              label: t(`subscriptions.plans.edit.paymentModes.${value}`, {
+                defaultValue: value === "draft_invoice" ? "Draft invoice" : "Automated payment",
+              }),
+            })),
+          },
+          { id: "trialPeriod", name: "trialPeriod", label: t("subscriptions.plans.columns.trialPeriod"), type: "switch", defaultValue: current.trialPeriod, width: "1/2" },
+          { id: "trialDuration", name: "trialDuration", label: t("subscriptions.plans.columns.trialDuration"), type: "number", min: 0, step: 1, defaultValue: current.trialDuration, width: "1/2" },
+          { id: "isPublished", name: "isPublished", label: t("subscriptions.plans.edit.isPublished", { defaultValue: "Published" }), type: "switch", defaultValue: current.isPublished, width: "1/2" },
+          { id: "isDefault", name: "isDefault", label: t("subscriptions.plans.columns.isDefault"), type: "switch", defaultValue: current.isDefault, width: "1/2" },
+        ],
+      })
+      if (values == null) return
+      const result = toPlanUpdateParams(values, plan)
+      if (!result.ok) {
+        showWorkflowToast({
+          kind: result.reason === "unchanged" ? "info" : "error",
+          title: result.reason === "unchanged" ? planEditProblem(result.reason) : failedTitle(editLabel),
+          description: result.reason === "unchanged" ? undefined : planEditProblem(result.reason),
+        })
+        return
+      }
+      await runCommand(editLabel, () => updatePlan.mutateAsync({ planId: BigInt(String(plan.id)), params: result.params }))
+    }
+    const promptNewBundle = async (selected: Record<string, unknown> | undefined) => {
+      const planOptions = subscriptionPlanRowsToSelectOptions(plans as unknown as Record<string, unknown>[])
+      const values = await askForm({
+        title: bundleLabel,
+        fields: [
+          { id: "planId", name: "planId", label: t("subscriptions.plans.bundle.plan", { defaultValue: "Plan" }), type: "select", required: true, searchable: true, defaultValue: selected?.id != null ? String(selected.id) : "", options: planOptions },
+          { id: "name", name: "name", label: t("subscriptions.plans.columns.name"), type: "text", required: true, width: "1/2" },
+          { id: "code", name: "code", label: t("subscriptions.plans.columns.code"), type: "text", required: true, width: "1/2" },
+          { id: "active", name: "active", label: t("subscriptions.plans.columns.active"), type: "switch", defaultValue: true },
+        ],
+      })
+      if (values == null) return
+      const params = toBundleCreateParams(values, plans as unknown as Record<string, unknown>[])
+      if (params == null) {
+        showWorkflowToast({
+          kind: "error",
+          title: failedTitle(bundleLabel),
+          description: t("subscriptions.plans.bundle.invalid", { defaultValue: "Choose a plan and enter a name and a code." }),
+        })
+        return
+      }
+      await runCommand(bundleLabel, () => createBundle.mutateAsync(params))
+    }
+    const actions: EntityAction[] = [
+      {
+        id: "edit-plan",
+        label: editLabel,
+        variant: "outline",
+        requiresSelection: true,
+        permission: { resource: "subscription_plan", action: "write" },
+        onClick: (rows) => {
+          const r = rows[0]
+          if (!r) return
+          return promptEdit(r)
+        },
+      },
+      {
+        id: "new-bundle",
+        label: bundleLabel,
+        variant: "outline",
+        // The reducer checks subscription:write, not the plan resource.
+        permission: { resource: "subscription", action: "write" },
+        onClick: (rows) => promptNewBundle(rows[0]),
+      },
+      {
+        id: "activate-plan",
+        label: activateLabel,
+        icon: CheckCircle2,
+        variant: "outline",
+        requiresSelection: true,
+        permission: { resource: "subscription_plan", action: "write" },
+        isApplicable: (rows) => rows.every((r) => canActivatePlan(r)),
+        successMessage: t("common.actionCompleted", { action: activateLabel }),
+        onClick: async (rows) => {
+          const r = rows[0]
+          if (!r) return
+          await activatePlan.mutateAsync({ planId: BigInt(String(r.id)) })
+        },
+      },
+      {
+        id: "deactivate-plan",
+        label: deactivateLabel,
+        icon: CircleSlash,
+        variant: "outline",
+        requiresSelection: true,
+        permission: { resource: "subscription_plan", action: "write" },
+        isApplicable: (rows) => rows.every((r) => canDeactivatePlan(r)),
+        confirm: {
+          title: deactivateLabel,
+          description: t("subscriptions.plans.actions.deactivateConfirm", {
+            defaultValue: "Deactivating a plan also unpublishes it, so it can no longer be chosen for new subscriptions.",
+          }),
+          confirmLabel: deactivateLabel,
+          cancelLabel: t("common.cancel", { defaultValue: "Cancel" }),
+        },
+        successMessage: t("common.actionCompleted", { action: deactivateLabel }),
+        onClick: async (rows) => {
+          const r = rows[0]
+          if (!r) return
+          await deactivatePlan.mutateAsync({ planId: BigInt(String(r.id)) })
+        },
+      },
+    ]
+    return { ...base, view: { ...view, actions: [...(view.actions ?? []), ...actions] } } as EntityViewConfig
+  }, [t, activatePlan, deactivatePlan, updatePlan, createBundle, askForm, plans])
+
   const liveSections = useMemo(() => {
     const rows = subscriptions as Record<string, unknown>[]
     const activeRows = rows.filter(isSubscriptionActiveForMetrics)
@@ -577,7 +795,7 @@ function SubscriptionsClientLoaded({
                 }],
               },
             }
-          if (tab.id === "plans") return { ...tab, createForm: planFormConfig }
+          if (tab.id === "plans") return { ...tab, createForm: planFormConfig, entityConfig: planEntityConfig }
           if (tab.id === "lines")
             return { ...tab, entityConfig: subscriptionLinesTableConfig(t) }
           if (tab.id === "amendments")
@@ -602,6 +820,7 @@ function SubscriptionsClientLoaded({
             return { ...tab, entityConfig: subscriptionPastDueTableConfig(t) }
           if (tab.id === "due-to-bill")
             return { ...tab, entityConfig: subscriptionDueToBillTableConfig(t) }
+          if (tab.id === "bundles") return { ...tab, entityConfig: subscriptionBundlesTableConfig(t) }
           if (tab.id === "entitlements")
             return { ...tab, entityConfig: subscriptionEntitlementsTableConfig(t) }
           if (tab.id === "payment-intents")
@@ -632,6 +851,7 @@ function SubscriptionsClientLoaded({
       subscriptionRowActions,
       deferredLineActions,
       recognitionRuleActions,
+      planEntityConfig,
       plans,
       orgId,
       operatingCompanyId,
@@ -659,6 +879,7 @@ function SubscriptionsClientLoaded({
       "price-tiers": priceTiers as unknown as Record<string, unknown>[],
       "past-due": pastDue as unknown as Record<string, unknown>[],
       "due-to-bill": dueToBill as unknown as Record<string, unknown>[],
+      bundles: bundleRows,
       entitlements: entitlements as unknown as Record<string, unknown>[],
       "payment-intents": paymentIntents as unknown as Record<string, unknown>[],
       "deferred-schedules": deferredSchedules as unknown as Record<string, unknown>[],
@@ -676,6 +897,7 @@ function SubscriptionsClientLoaded({
       priceTiers,
       pastDue,
       dueToBill,
+      bundleRows,
       entitlements,
       paymentIntents,
       deferredSchedules,
@@ -747,6 +969,7 @@ function SubscriptionsClientLoaded({
         }}
       />
       {subscriptionActions.dialogs}
+      {formDialog}
       <FormModal
         key={recognizeLineId != null ? `recognize-${recognizeMoveId || "new"}` : "recognize-closed"}
         open={recognizeLineId !== null}

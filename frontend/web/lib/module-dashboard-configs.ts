@@ -200,6 +200,7 @@ import {
   subscriptionPriceTiersTableConfig,
   subscriptionPastDueTableConfig,
   subscriptionDueToBillTableConfig,
+  subscriptionBundlesTableConfig,
   subscriptionEntitlementsTableConfig,
   subscriptionPaymentIntentsTableConfig,
   createSubscriptionPriceTierForm,
@@ -366,7 +367,7 @@ export const accountingModuleConfig = (t: TFunction): ModuleConfig => ({
     { label: t("modules.tabGroups.banking", { defaultValue: "Banking" }), tabIds: ["bank-statements", "reconciliation-widgets", "fx-revaluation"] },
     { label: t("modules.tabGroups.planning", { defaultValue: "Planning" }), tabIds: ["budgets", "analytic", "analytic-lines", "analytic-distribution", "fixed-assets", "amortization"] },
     { label: t("modules.tabGroups.close", { defaultValue: "Close" }), tabIds: ["period-close", "fiscal-years", "account-periods", "consolidation", "intercompany-rules", "intercompany-transactions"] },
-    { label: t("modules.tabGroups.setup", { defaultValue: "Setup" }), tabIds: ["taxes", "tax-deadlines", "payment-terms", "payment-term-lines"] },
+    { label: t("modules.tabGroups.setup", { defaultValue: "Setup" }), tabIds: ["taxes", "tax-groups", "tax-jurisdictions", "tax-schedules", "tax-deadlines", "payment-terms", "payment-term-lines"] },
   ],
   tabs: [
     {
@@ -435,6 +436,24 @@ export const accountingModuleConfig = (t: TFunction): ModuleConfig => ({
       id: "payment-operations",
       label: t("accounting.tabs.operationalPayments"),
       type: "custom",
+    },
+    {
+      id: "tax-groups",
+      label: t("accounting.tabs.taxGroups", { defaultValue: "Tax Groups" }),
+      type: "entity",
+      entityConfig: { id: "tax-groups-table", title: "", view: { mode: "table", rowKey: "id", columns: [] } },
+    },
+    {
+      id: "tax-jurisdictions",
+      label: t("accounting.tabs.taxJurisdictions", { defaultValue: "Tax Jurisdictions" }),
+      type: "entity",
+      entityConfig: { id: "tax-jurisdictions-table", title: "", view: { mode: "table", rowKey: "id", columns: [] } },
+    },
+    {
+      id: "tax-schedules",
+      label: t("accounting.tabs.taxSchedules", { defaultValue: "Tax Schedules" }),
+      type: "entity",
+      entityConfig: { id: "tax-schedules-table", title: "", view: { mode: "table", rowKey: "id", columns: [] } },
     },
     {
       id: "tax-deadlines",
@@ -2649,7 +2668,7 @@ export const subscriptionsModuleConfig = (t: TFunction): ModuleConfig => ({
   description: "Recurring revenue, plans, and subscription management",
   defaultTab: "dashboard",
   tabGroups: [
-    { label: t("modules.tabGroups.subscriptions", { defaultValue: "Subscriptions" }), tabIds: ["subscriptions", "plans", "lines", "amendments", "entitlements"] },
+    { label: t("modules.tabGroups.subscriptions", { defaultValue: "Subscriptions" }), tabIds: ["subscriptions", "plans", "lines", "amendments", "bundles", "entitlements"] },
     { label: t("modules.tabGroups.billing", { defaultValue: "Billing" }), tabIds: ["usage-events", "usage-charges", "rating-backlog", "price-tiers", "due-to-bill", "past-due", "payment-intents"] },
     { label: t("modules.tabGroups.revenue", { defaultValue: "Revenue" }), tabIds: ["deferred-schedules", "deferred-lines", "recognition-rules"] },
   ],
@@ -2778,6 +2797,12 @@ export const subscriptionsModuleConfig = (t: TFunction): ModuleConfig => ({
       label: t("subscriptions.dueToBill.tabLabel", { defaultValue: "Due to bill" }),
       type: "entity",
       entityConfig: subscriptionDueToBillTableConfig(t),
+    },
+    {
+      id: "bundles",
+      label: t("subscriptions.bundles.tabLabel", { defaultValue: "Bundles" }),
+      type: "entity",
+      entityConfig: subscriptionBundlesTableConfig(t),
     },
     {
       id: "entitlements",
