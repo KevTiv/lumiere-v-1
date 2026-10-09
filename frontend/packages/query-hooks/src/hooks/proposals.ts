@@ -13,6 +13,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 
 import { apiFetch, fetchQueryList, rqBigIntKey } from "../http"
 import { responseErrorMessage } from "@lumiere/api-client/response-error"
+import { isProposalSectionConflictError, proposalSectionUpsertError } from "./proposal-section-conflict"
 import { resolveProposalConversionEffect, resolveProposalStatusEffect } from "./proposal-award"
 import type {
   Proposal,
@@ -419,9 +420,15 @@ export function useUpsertProposalSection(organizationId: bigint, companyId?: big
           "UpsertProposalSectionParams",
         ) })
       const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error("Failed to upsert proposal section")
+      if (!r.ok) throw proposalSectionUpsertError(await r.text().catch(() => ""))
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["proposal-sections"] }),
+    // On a revision conflict, refetch so the UI holds the server's current section.
+    onError: (error) => {
+      if (isProposalSectionConflictError(error)) {
+        void qc.invalidateQueries({ queryKey: ["proposal-sections"] })
+      }
+    },
   })
 }
 

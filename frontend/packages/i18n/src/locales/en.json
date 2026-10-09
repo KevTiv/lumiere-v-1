@@ -12732,6 +12732,24 @@
       "name": "Template name",
       "noSections": "Add at least one section first.",
       "title": "Save as template"
+    },
+    "sectionConflict": {
+      "description": "Your save was not applied. Keep your version to overwrite theirs, or keep theirs to discard your edits.",
+      "discarded": "Your edits were discarded; showing the server version",
+      "fieldAiSuggestion": "AI suggestion",
+      "fieldContent": "Content",
+      "fieldSequence": "Order",
+      "fieldStatus": "Status",
+      "fieldTitle": "Title",
+      "identical": "The server version already matches your edits.",
+      "keepMine": "Keep mine",
+      "keepTheirs": "Keep theirs",
+      "mine": "Your version",
+      "resolved": "Your version was saved",
+      "resolveFailed": "Could not save your version",
+      "revision": "Revision",
+      "theirs": "Server version",
+      "title": "This section was changed by someone else"
     }
   },
   "forensics": {
