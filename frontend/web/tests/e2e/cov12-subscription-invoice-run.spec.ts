@@ -134,6 +134,10 @@ async function invoiceSnapshot(page: Page, moveId: number) {
 
 async function openSubscriptionHandoffs(page: Page, subscriptionId: number) {
   await gotoModule(page, `/subscriptions?tab=subscriptions&filter=${encodeURIComponent(`id:${subscriptionId}`)}`, "subscriptions")
+  return openMountedSubscriptionHandoffs(page, subscriptionId)
+}
+
+async function openMountedSubscriptionHandoffs(page: Page, subscriptionId: number) {
   const row = activeTabEntityTable(page).getByTestId(`entity-row-${subscriptionId}`)
   await expect(row).toBeVisible({ timeout: 30_000 })
   await row.click()
@@ -332,6 +336,29 @@ test.describe(
         })
 
       const paidEffect = await invoiceSnapshot(page, invoiceMoveId)
+
+      // Prove cache convergence before any navigation, reload or reader-context
+      // switch can hide a stale account-payments query on the mounted page.
+      const payments = (await rows(page, "account-payments")).filter((row) => {
+        const invoiceIds = row.reconciledInvoiceIds ?? row.reconciled_invoice_ids
+        return scalarQueryId(row.organizationId ?? row.organization_id) === organizationId
+          && scalarQueryId(row.companyId ?? row.company_id) === companyId
+          && tagged(row.state) === "Paid"
+          && Array.isArray(invoiceIds)
+          && invoiceIds.some((id) => scalarQueryId(id) === invoiceMoveId)
+      })
+      expect(payments).toHaveLength(1)
+      const paymentId = scalarQueryId(payments[0]!.id)
+      if (paymentId == null) throw new Error("Reconciled payment has no ID")
+
+      await expect(page.getByTestId("form-modal-pay-subscription-invoice")).toBeHidden()
+      const sheet = await openMountedSubscriptionHandoffs(page, subscriptionId)
+      const invoiceLink = sheet.getByTestId(`subscription-handoff-invoice-${invoiceMoveId}`)
+      await expect(invoiceLink).toHaveCount(1)
+      await expect(invoiceLink).toHaveAttribute("href", accountMoveHref(invoiceMoveId))
+      await expect(sheet.getByTestId(`subscription-handoff-payment-${paymentId}`))
+        .toHaveAttribute("href", accountPaymentHref(paymentId))
+
       const stalePayment = await replay(page, paid.request())
       expect(stalePayment.status()).toBe(422)
       expect(await invoiceSnapshot(page, invoiceMoveId)).toEqual(
@@ -361,25 +388,6 @@ test.describe(
         await readerContext.close()
       }
 
-      // Follow only durable billing-run and reconciled-invoice relations.
-      const payments = (await rows(page, "account-payments")).filter((row) => {
-        const invoiceIds = row.reconciledInvoiceIds ?? row.reconciled_invoice_ids
-        return scalarQueryId(row.organizationId ?? row.organization_id) === organizationId
-          && scalarQueryId(row.companyId ?? row.company_id) === companyId
-          && tagged(row.state) === "Paid"
-          && Array.isArray(invoiceIds)
-          && invoiceIds.some((id) => scalarQueryId(id) === invoiceMoveId)
-      })
-      expect(payments).toHaveLength(1)
-      const paymentId = scalarQueryId(payments[0]!.id)
-      if (paymentId == null) throw new Error("Reconciled payment has no ID")
-
-      const sheet = await openSubscriptionHandoffs(page, subscriptionId)
-      const invoiceLink = sheet.getByTestId(`subscription-handoff-invoice-${invoiceMoveId}`)
-      await expect(invoiceLink).toHaveCount(1)
-      await expect(invoiceLink).toHaveAttribute("href", accountMoveHref(invoiceMoveId))
-      await expect(sheet.getByTestId(`subscription-handoff-payment-${paymentId}`))
-        .toHaveAttribute("href", accountPaymentHref(paymentId))
       await invoiceLink.click()
       await expectAccountingFocus(page, "journal-entries", invoiceMoveId)
       await page.reload()

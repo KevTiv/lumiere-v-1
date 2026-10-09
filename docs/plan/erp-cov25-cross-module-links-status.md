@@ -136,7 +136,7 @@ Validation:
   and payment actions: exact invoice/payment hrefs, filtered target focus and
   focus preserved after refresh. Existing stale (422) and reader (403) replay
   assertions remain.
-- On 2026-10-09, frozen dependency installation, full web typecheck, all 271
+- On 2026-10-09, frozen dependency installation, full web typecheck, all 273
   query-hook tests (including the five handoff tests), static i18n checks and
   focused Playwright discovery passed locally.
 
@@ -154,6 +154,15 @@ invoice/payment links, refresh, same-key billing replay, stale-payment rejection
 and reader denial. No permissions, billing rules, reducer, projection or generated
 contract changed. Fresh local runtime validation and same-head CI remain required;
 test discovery and typecheck are not operator-path proof.
+
+Independent review also found that payment completion invalidated only the legacy
+payment cache, while the handoff consumes the company-scoped typed payment cache.
+Payment resources now use the existing typed invalidation helper and are included
+in the subscription workspace resource set. The first payment-link assertion runs
+on the already-mounted subscription page, before navigation, reload or switching
+to the reader context can mask stale cache data. Unit regressions check the three
+handoff resources remain subscribed and typed payment invalidation reaches the
+company cache without invalidating another organization's payments.
 
 Status remains **IMPLEMENTED — runtime acceptance pending** until same-head CI
 and browser proof pass. This does not promote the whole cross-module track.

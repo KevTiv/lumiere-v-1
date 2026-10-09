@@ -1,7 +1,8 @@
 import assert from "node:assert/strict"
 import { test } from "node:test"
-import type { QueryClient, QueryKey } from "@tanstack/react-query"
+import { QueryClient, type QueryKey } from "@tanstack/react-query"
 import { resolveAllowedActiveCompanyId } from "@lumiere/erp-session"
+import { SUBSCRIPTIONS_WORKSPACE_RESOURCE_KEYS } from "@lumiere/stdb/subscriptions"
 
 import {
   invalidateStdbQueryResources,
@@ -41,4 +42,24 @@ test("resource invalidation always includes the typed HTTP namespace", () => {
   invalidateStdbQueryResources(queryClient, 7n, ["account-taxes"])
 
   assert.deepEqual(invalidated[0], ["typed-stdb", "account-taxes", "7"])
+})
+
+test("subscription handoffs subscribe to all canonical relation resources", () => {
+  for (const resource of ["subscription-billing-runs", "account-moves", "account-payments"] as const) {
+    assert.ok(SUBSCRIPTIONS_WORKSPACE_RESOURCE_KEYS.includes(resource))
+  }
+})
+
+test("payment invalidation reaches typed company caches without crossing organizations", () => {
+  const queryClient = new QueryClient()
+  const companyPaymentKey = typedStdbQueryKey("account-payments", 7n, 42)
+  const otherOrgPaymentKey = typedStdbQueryKey("account-payments", 8n, 42)
+  queryClient.setQueryData(companyPaymentKey, [])
+  queryClient.setQueryData(otherOrgPaymentKey, [])
+
+  invalidateStdbQueryResources(queryClient, 7n, ["account-payments"])
+
+  assert.equal(queryClient.getQueryState(companyPaymentKey)?.isInvalidated, true)
+  assert.equal(queryClient.getQueryState(otherOrgPaymentKey)?.isInvalidated, false)
+  queryClient.clear()
 })
