@@ -1,6 +1,7 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 
+import { stdbBffCommandPost } from "@lumiere/stdb/commands"
 import { stdbParamsToJson } from "@lumiere/stdb/stdb-params-json"
 
 test("procurement score wire JSON keeps zero scores and spells notes as Option", () => {
@@ -44,4 +45,40 @@ test("template wire JSON spells country pack and metadata as Option", () => {
   )
   assert.deepEqual(some.country_pack_key, { some: "us" })
   assert.equal(some.is_active, false)
+})
+
+test("section conflict resolve wire JSON spells aiSuggestion as Option and keeps sequence 0", () => {
+  const none = stdbParamsToJson(
+    { title: "Scope", content: "mine", status: "draft", sequence: 0, aiSuggestion: null },
+    "UpsertProposalSectionParams",
+  )
+  assert.deepEqual(none, {
+    title: "Scope",
+    content: "mine",
+    status: "draft",
+    sequence: 0,
+    ai_suggestion: { none: [] },
+  })
+  const some = stdbParamsToJson(
+    { title: "Scope", content: "mine", status: "draft", sequence: 30, aiSuggestion: "hint" },
+    "UpsertProposalSectionParams",
+  )
+  assert.deepEqual(some.ai_suggestion, { some: "hint" })
+  assert.equal(some.sequence, 30)
+})
+
+test("section conflict resolve command body carries ids, no expected revision, and the Option-spelled params", () => {
+  const { init } = stdbBffCommandPost("resolve_proposal_section_conflict", {
+    companyId: 3n,
+    proposalId: 1n,
+    sectionId: 7n,
+    params: stdbParamsToJson(
+      { title: "Scope", content: "mine", status: "draft", sequence: 10, aiSuggestion: null },
+      "UpsertProposalSectionParams",
+    ),
+  })
+  const body = JSON.parse(String(init?.body)) as Record<string, unknown>
+  const text = JSON.stringify(body)
+  assert.ok(text.includes('"ai_suggestion":{"none":[]}'), text)
+  assert.ok(!text.includes("expected_revision") && !text.includes("expectedRevision"), text)
 })
