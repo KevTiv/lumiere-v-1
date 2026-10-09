@@ -232,9 +232,9 @@ pub async fn resolve_purchasing_company_id(
 /// Resolve the only Accounting company visible to the authenticated membership.
 ///
 /// Company-bound memberships are restricted to that company. Organization-level
-/// memberships fall back to the default company. Mirrors `resolve_purchasing_company_id`;
-/// every accounting table this covers carries a required (non-nullable)
-/// `company_id`, so there is no org-shared row concept here to fall back to.
+/// memberships fall back to the default company. Child resources use this same
+/// resolved company to validate their parent; they never expand to all companies
+/// in the organization.
 pub async fn resolve_accounting_company_id(
     client: &StdbClient,
     organization_id: u64,
@@ -375,8 +375,11 @@ pub(crate) fn purchasing_resource(resource: &str) -> bool {
     )
 }
 
-/// Accounting resources backed by a table with a required (non-nullable)
-/// `company_id`.
+/// Direct accounting resources requiring selected-company scope.
+///
+/// New entries must have a real required `company_id`; parent-derived resources
+/// belong in `accounting_child_resource`. Existing nullable tables (for example
+/// `tax-deadlines`) keep their registered SQL and fail-closed row filtering.
 pub(crate) fn accounting_resource(resource: &str) -> bool {
     matches!(
         resource,
@@ -396,9 +399,12 @@ pub(crate) fn accounting_resource(resource: &str) -> bool {
             | "analytic-distribution-models"
             | "analytic-lines"
             | "bank-statements"
+            | "balance-sheet-lines"
             | "budgets"
             | "budget-lines"
             | "budget-posts"
+            | "cash-flow-lines"
+            | "consolidation-company-rates"
             | "consolidation-elimination-entries"
             | "depreciation-lines"
             | "fiscal-years"
@@ -412,10 +418,40 @@ pub(crate) fn accounting_resource(resource: &str) -> bool {
             | "payment-reconciliations"
             | "payment-reversals"
             | "payment-transactions"
+            | "profit-loss-lines"
             | "tax-deadlines"
             | "tax-groups"
             | "tax-schedules"
     )
+}
+
+/// Narrow parent-derived reads: neither child table has a `company_id` column.
+/// Include these when resolving Accounting membership scope, but dispatch them
+/// to `accounting::read_accounting_child_rows`, not the direct-company SQL path.
+pub(crate) fn accounting_child_resource(resource: &str) -> bool {
+    matches!(
+        resource,
+        "bank-statement-import-lines" | "tax-deadline-reminders"
+    )
+}
+
+/// Canonical read grant for the six Pass12 Accounting reads.
+///
+/// The central gate may accept an independent child read grant first; otherwise
+/// it must check this parent grant with `has_resource_read_permission`. Field
+/// projection still uses the requested resource, not this permission resource.
+pub(crate) fn accounting_read_permission_resource(resource: &str) -> Option<&str> {
+    match resource {
+        "profit-loss-lines" | "balance-sheet-lines" | "cash-flow-lines" => {
+            Some("financial-reports")
+        }
+        // Imports are staged before an approved statement exists and use the
+        // account_bank_statement permission in their reducers.
+        "bank-statement-import-lines" => Some("bank-statements"),
+        "tax-deadline-reminders" => Some("tax-deadlines"),
+        "consolidation-company-rates" => Some(resource),
+        _ => None,
+    }
 }
 
 /// Accounting resources whose rows are either owned by the selected company
@@ -435,4 +471,85 @@ pub(crate) fn iot_resource(resource: &str) -> bool {
             | "iot-telemetry"
             | "iot-thresholds"
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn pass12_resources_use_only_schema_backed_company_classification() {
+        for resource in [
+            "profit-loss-lines",
+            "balance-sheet-lines",
+            "cash-flow-lines",
+            "consolidation-company-rates",
+        ] {
+            assert!(accounting_resource(resource), "{resource}");
+            assert!(!accounting_child_resource(resource), "{resource}");
+        }
+        for resource in ["bank-statement-import-lines", "tax-deadline-reminders"] {
+            assert!(accounting_child_resource(resource), "{resource}");
+            assert!(
+                !accounting_resource(resource),
+                "no company_id on {resource}"
+            );
+            assert!(!optional_company_accounting_resource(resource));
+        }
+        for resource in [
+            "bank_statement_import_line",
+            "tax_deadline_reminder",
+            "tax-deadline-reminders-extra",
+            "financial-reports",
+            "consolidation-reports",
+            "contacts",
+        ] {
+            assert!(!accounting_child_resource(resource), "{resource}");
+        }
+    }
+
+    #[test]
+    fn pass12_permission_mapping_is_canonical_and_narrow() {
+        for resource in [
+            "profit-loss-lines",
+            "balance-sheet-lines",
+            "cash-flow-lines",
+        ] {
+            assert_eq!(
+                accounting_read_permission_resource(resource),
+                Some("financial-reports")
+            );
+        }
+        assert_eq!(
+            accounting_read_permission_resource("bank-statement-import-lines"),
+            Some("bank-statements")
+        );
+        assert_eq!(
+            accounting_read_permission_resource("tax-deadline-reminders"),
+            Some("tax-deadlines")
+        );
+        assert_eq!(
+            accounting_read_permission_resource("consolidation-company-rates"),
+            Some("consolidation-company-rates")
+        );
+        assert_eq!(accounting_read_permission_resource("contacts"), None);
+        assert_eq!(
+            accounting_read_permission_resource("bank_statement_import_line"),
+            None
+        );
+    }
+
+    #[test]
+    fn accounting_browser_intent_cannot_change_membership_company() {
+        assert_eq!(enforce_requested_company(198, None, "denied").unwrap(), 198);
+        assert_eq!(
+            enforce_requested_company(198, Some(198), "denied").unwrap(),
+            198
+        );
+        assert!(matches!(
+            enforce_requested_company(198, Some(199), "denied"),
+            Err(ApiError::Forbidden(_))
+        ));
+        assert!(enforce_requested_company(198, Some(0), "denied").is_err());
+    }
 }
