@@ -565,6 +565,7 @@ async function invalidateSubscriptionInvoiceLifecycle(
   invalidateStdbQueryResources(qc, organizationId, [
     'account-moves',
     'account-move-lines',
+    'account-payments',
   ]);
   await Promise.all([
     qc.invalidateQueries({
@@ -578,9 +579,6 @@ async function invalidateSubscriptionInvoiceLifecycle(
     }),
     qc.invalidateQueries({
       queryKey: ['deferred-revenue-lines', rqBigIntKey(organizationId)],
-    }),
-    qc.invalidateQueries({
-      queryKey: ['stdb', 'account-payments', rqBigIntKey(organizationId)],
     }),
   ]);
 }

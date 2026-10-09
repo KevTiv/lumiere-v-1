@@ -127,6 +127,13 @@ static HTTP_SQL_INCLUDED_COLUMNS: Lazy<HashMap<String, HashSet<String>>> = Lazy:
         ["metadata"].into_iter().map(String::from).collect(),
     );
     m.insert(
+        "account-payments".to_string(),
+        ["reconciled_invoice_ids", "reconciled_bill_ids"]
+            .into_iter()
+            .map(String::from)
+            .collect(),
+    );
+    m.insert(
         "mail-messages".to_string(),
         ["metadata"].into_iter().map(String::from).collect(),
     );
@@ -1007,6 +1014,60 @@ mod tests {
             cols.iter().any(|column| column == "backorder_id"),
             "expected backorder_id in stock-pickings projection, got: {cols:?}"
         );
+    }
+
+    #[test]
+    fn payment_http_projection_keeps_canonical_reconciliation_relations() {
+        let cols =
+            resolve_http_sql_columns("account-payments", None).expect("account-payments columns");
+        for field in ["reconciled_invoice_ids", "reconciled_bill_ids"] {
+            assert!(
+                cols.iter().any(|column| column == field),
+                "expected {field} in account-payments projection, got: {cols:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn payment_http_relations_do_not_bypass_selective_field_permissions() {
+        let mut access = field_access(&["account-payments:read"]);
+        access.field_permissions.push(FieldPermissionLike {
+            id: Some(1),
+            organization_id: Some(7),
+            role_id: Some(9),
+            resource: "account-payments".to_string(),
+            action: "read".to_string(),
+            allowed_fields: vec!["name".to_string()],
+            subject_user_hex: None,
+            subject_role_id: Some(9),
+        });
+
+        let cols = resolve_http_sql_columns("account-payments", Some(&access))
+            .expect("selective payment columns");
+        assert!(cols.iter().any(|column| column == "company_id"));
+        for field in ["reconciled_invoice_ids", "reconciled_bill_ids"] {
+            assert!(
+                !cols.iter().any(|column| column == field),
+                "{field} must stay absent when the field grant omits it: {cols:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn payment_http_inclusion_does_not_widen_other_id_lists() {
+        let cols = [
+            "reconciled_invoice_ids",
+            "reconciled_bill_ids",
+            "message_ids",
+            "activity_ids",
+            "tag_ids",
+        ]
+        .map(String::from);
+        assert_eq!(
+            filter_http_sql_unsafe_columns(&cols, Some("account-payments")),
+            vec!["reconciled_invoice_ids", "reconciled_bill_ids"]
+        );
+        assert!(filter_http_sql_unsafe_columns(&cols, Some("subscriptions")).is_empty());
     }
 
     #[test]

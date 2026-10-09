@@ -1,6 +1,6 @@
 # COV-25 — Close one missing downstream record link per PR
 
-**Status:** IMPLEMENTED for sale order → delivery/invoice and purchase order → receipt/vendor bill (runtime acceptance pending); further links are one per PR  
+**Status:** IMPLEMENTED for sale order → delivery/invoice and purchase order → receipt/vendor bill, and subscription → invoice/payment (runtime acceptance pending); further links are one per PR  
 **Module/surface:** Cross-module  
 **Plan target:** direct navigation for primary handoffs  
 **Scaffold source:** [`erp-cov08-27-scaffold.md`](./erp-cov08-27-scaffold.md)
@@ -41,8 +41,7 @@ delivery and customer invoice with its state and open balance, linking to the ca
 `orderHandoffs` builder and `OrderHandoffLinks` component as the COV-24 workspace, so there is one definition of
 "this order's downstream records". No contract delta (the relation fields are already projected).
 
-**Next links (one per PR, not done):** subscription → invoice and payment, proposal →
-sale order, ticket → record.
+**Next links (one per PR, not done):** proposal → sale order, ticket → record.
 
 ## Prerequisites / decisions
 
@@ -110,3 +109,101 @@ Validation:
 
 This link remains **IMPLEMENTED — runtime acceptance pending** until same-head
 CI and the focused browser proof pass; it does not promote the whole COV-25 track.
+
+## Implementation — link 3: subscription → invoices and reconciled payments
+
+#149 is merged; #150 now targets `main`. The subscription record sheet adds
+**Invoices & payments**. Invoices resolve from the exact scoped billing run's
+`invoice_move_id`; payments require an exact `reconciled_invoice_ids` intersection
+with those resolved invoices and state Paid. Parent, runs, moves and payments
+must all match organization and company. Duplicate billing runs deduplicate the
+same invoice; ambiguous target rows are withheld with an unavailable-record alert.
+Refunds, cancelled invoices, pending approval payments and reversed payments are
+excluded. Names, references and timestamps never select records. A shared payment
+may appear for several subscriptions; no payment total is presented as allocation.
+
+The tab distinguishes loading, failed/denied reads, successful empty results and
+unresolved billing relations. It uses existing authorized projections and canonical
+`accountMoveHref` / `accountPaymentHref` links. There is no mutation, domain state,
+generated contract delta or new native-domain test requirement.
+
+Validation:
+- `subscription-handoffs.test.ts`: five passing focused tests for exact relations,
+  independent scope checks, multiple/shared payments, deduplication, ambiguity,
+  missing targets, excluded states, snake-case fields and large option IDs.
+  Executed with Node TypeScript support using temporary import-path substitutions.
+- Existing COV-12 browser proof gains COV-25 assertions after its visible billing
+  and payment actions: exact invoice/payment hrefs, filtered target focus and
+  focus preserved after refresh. Existing stale (422) and reader (403) replay
+  assertions remain.
+- On 2026-10-09, frozen dependency installation, full web typecheck, all 273
+  query-hook tests (including the five handoff tests), static i18n checks and
+  focused Playwright discovery passed locally.
+
+### PR #150 record-sheet repair
+
+The original targeted CI failure was a client-side crash, not a disabled billing
+action. Selecting a subscription opened the newly added record sheet without its
+required `detailConfig`; `EntityDetail` then threw while reading `config.sections`.
+The Actions trace and error snapshot in run `37222403725` confirm this cause.
+
+The sheet now has an explicit Overview layout using already-projected subscription
+fields and existing translations. The browser regression checks Overview rendering
+and client errors while retaining the visible generation/payment actions, exact
+invoice/payment links, refresh, same-key billing replay, stale-payment rejection
+and reader denial. No permissions, billing rules, reducer, projection or generated
+contract changed. Fresh local runtime validation and same-head CI remain required;
+test discovery and typecheck are not operator-path proof.
+
+Independent review also found that payment completion invalidated only the legacy
+payment cache, while the handoff consumes the company-scoped typed payment cache.
+Payment resources now use the existing typed invalidation helper and are included
+in the subscription workspace resource set. The first payment-link assertion runs
+on the already-mounted subscription page, before navigation, reload or switching
+to the reader context can mask stale cache data. Unit regressions check the three
+handoff resources remain subscribed and typed payment invalidation reaches the
+company cache without invalidating another organization's payments.
+
+Same-head E2E run `37949858708` then reached invoice generation and payment but
+found no linked payment. Its HTTP trace showed the new Paid payment with both
+reconciliation fields absent. The Rust HTTP projection filter discarded all
+`_ids` columns unless the resource explicitly opted in; `account-payments` had no
+inclusion despite both fields already being declared by the registry and pinned
+contracts. The resource now includes only `reconciled_invoice_ids` and
+`reconciled_bill_ids`, matching the existing purchase/sale relation pattern.
+Explicit field grants still determine the selected columns; the inclusion does
+not add fields omitted by a restricted grant or broaden unrelated ID lists.
+Rust regressions cover default relation selection, restricted-field preservation
+and resource-specific filtering. No schema, operation or generated contract
+changes are required. The failed run is not acceptance evidence.
+
+`cargo test --locked -p stdb-auth payment_http` passes all three new regressions.
+The full `stdb-auth` suite reports 42 passes and one unrelated existing helpdesk
+projection test failure (`user_id` is selected while that test expects it excluded).
+The payment fix does not change helpdesk selection or weaken that test.
+
+### Subscription deep-link tab selection
+
+Run `37952671041` progressed through generation, payment, same-page payment links
+and invoice navigation/refresh. Returning to
+`/subscriptions?tab=subscriptions&filter=id:1` then failed because the module still
+displayed Dashboard. Both attempts retained company 275; the HTTP response and
+server-rendered page still contained subscription 1. Subscriptions did not use
+`useModuleTab` or pass controlled tab props to `ModuleView`, unlike Accounting and
+Purchasing, so `defaultTab: "dashboard"` won over the URL.
+
+Subscriptions now reuses the shared URL-tab hook and passes its controlled state
+to `ModuleView`. The focused browser proof requires the Subscriptions tab, exact
+record filter and single target row both before and after refreshing that return
+deep link. It does not click the tab to bypass the route defect. The first
+same-page payment-link assertion and existing replay/stale/reader-denial checks
+remain unchanged. No filter engine, billing, authorization or contract changes
+are part of this navigation repair.
+
+Local validation of the navigation repair passed: full web typecheck, all 273
+query-hook tests, all four shared table URL-filter regressions and focused
+Playwright test discovery. Actual browser execution and same-head CI are still
+required; the earlier failure is retained as diagnostic evidence.
+
+Status remains **IMPLEMENTED — runtime acceptance pending** until same-head CI
+and browser proof pass. This does not promote the whole cross-module track.
