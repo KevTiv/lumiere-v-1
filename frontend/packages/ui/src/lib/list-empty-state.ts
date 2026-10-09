@@ -131,3 +131,20 @@ export function withTabCreateCta(view: ViewWithEmptyState, cta: TabCreateCta): V
   }
   return view
 }
+
+export type CreateGate = "allowed" | "denied" | "loading"
+
+/**
+ * Whether a create control may be offered. While permissions are still loading the answer is
+ * "loading" (callers keep the control visible: hiding it would flash for users who are allowed),
+ * and the server's own check stays authoritative.
+ */
+export function decideCreateGate(
+  permission: EntitySurfacePermission | undefined,
+  checkPermission: (permission: EntitySurfacePermission) => boolean,
+  permissionsReady = true,
+): CreateGate {
+  if (!permission) return "allowed"
+  if (!permissionsReady) return "loading"
+  return checkPermission(permission) ? "allowed" : "denied"
+}

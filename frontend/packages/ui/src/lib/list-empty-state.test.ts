@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest"
 import type { EntityAction, EntityViewConfig } from "./entity-view-types"
 import {
   countActiveFilters,
+  decideCreateGate,
   decideListEmptyState,
   resolveEmptyCtas,
   withTabCreateCta,
@@ -93,5 +94,24 @@ describe("withTabCreateCta", () => {
     const view = { mode: "table-or-board", table: { mode: "table", columns: [], emptyState: { title: "t" } } } as unknown as EntityViewConfig["view"]
     const out = withTabCreateCta(view, cta) as unknown as { table: { emptyState: { onAction: unknown } } }
     expect(out.table.emptyState.onAction).toBe(cta.onClick)
+  })
+})
+
+describe("decideCreateGate", () => {
+  const permission = { resource: "sale_order", action: "create" as const }
+
+  it("allows when the control has no permission", () => {
+    expect(decideCreateGate(undefined, () => false, false)).toBe("allowed")
+  })
+  it("allows when the permission check passes", () => {
+    expect(decideCreateGate(permission, () => true)).toBe("allowed")
+  })
+  it("denies when the permission check fails once permissions are ready", () => {
+    expect(decideCreateGate(permission, () => false, true)).toBe("denied")
+  })
+  it("reports loading instead of denying while permissions load", () => {
+    const check = vi.fn(() => false)
+    expect(decideCreateGate(permission, check, false)).toBe("loading")
+    expect(check).not.toHaveBeenCalled()
   })
 })

@@ -404,6 +404,7 @@ export const accountingModuleConfig = (t: TFunction): ModuleConfig => ({
       createForm: newInvoiceForm(t),
       createLabel: "New Invoice",
       createAction: "createInvoice",
+      createPermission: { resource: "account_move", action: "create" },
     },
     {
       id: "bills",
@@ -413,6 +414,7 @@ export const accountingModuleConfig = (t: TFunction): ModuleConfig => ({
       createForm: newBillForm(t),
       createLabel: "New Bill",
       createAction: "createBill",
+      createPermission: { resource: "account_move", action: "create" },
     },
     {
       id: "taxes",
@@ -761,6 +763,7 @@ export const salesModuleConfig = (t: TFunction): ModuleConfig => ({
       createForm: newSaleOrderForm(t),
       createLabel: "New Order",
       createAction: "createSaleOrder",
+      createPermission: { resource: "sale_order", action: "create" },
     },
     {
       id: "order-lines",
@@ -995,6 +998,7 @@ export const crmModuleConfig = (t: TFunction): ModuleConfig => ({
       createForm: newLeadForm(t),
       createLabel: "New Lead",
       createAction: "createLead",
+      createPermission: { resource: "lead", action: "create" },
     },
     {
       id: "opportunities",
@@ -1004,6 +1008,7 @@ export const crmModuleConfig = (t: TFunction): ModuleConfig => ({
       createForm: newOpportunityForm(t),
       createLabel: "New Opportunity",
       createAction: "createOpportunity",
+      createPermission: { resource: "opportunity", action: "create" },
     },
     {
       id: "opportunity-lines",
@@ -1021,6 +1026,7 @@ export const crmModuleConfig = (t: TFunction): ModuleConfig => ({
       createForm: newContactForm(t),
       createLabel: "New Contact",
       createAction: "createContact",
+      createPermission: { resource: "contact", action: "create" },
     },
     {
       id: "activities",
@@ -1214,6 +1220,7 @@ export const inventoryModuleConfig = (t: TFunction): ModuleConfig => ({
       createForm: newProductForm(t),
       createLabel: "New Product",
       createAction: "createProduct",
+      createPermission: { resource: "product", action: "create" },
     },
     {
       id: "product-categories",
@@ -1241,6 +1248,7 @@ export const inventoryModuleConfig = (t: TFunction): ModuleConfig => ({
       createForm: newTransferForm(t),
       createLabel: "New Transfer",
       createAction: "createStockPicking",
+      createPermission: { resource: "stock_picking", action: "create" },
     },
     {
       id: "stock-moves",
@@ -1519,6 +1527,7 @@ export const purchasingModuleConfig = (t: TFunction): ModuleConfig => ({
       createForm: newPurchaseOrderForm(t),
       createLabel: "New Order",
       createAction: "createPurchaseOrder",
+      createPermission: { resource: "purchase_order", action: "create" },
     },
     {
       id: "lines",
@@ -1684,6 +1693,7 @@ export const hrModuleConfig = (t: TFunction): ModuleConfig => ({
       createForm: newEmployeeForm(t),
       createLabel: "New Employee",
       createAction: "createEmployee",
+      createPermission: { resource: "hr_employee", action: "create" },
     },
     {
       id: "departments",
@@ -1908,6 +1918,7 @@ export const manufacturingModuleConfig = (t: TFunction): ModuleConfig => ({
       createForm: newManufacturingOrderForm(t),
       createLabel: "New Order",
       createAction: "createManufacturingOrder",
+      createPermission: { resource: "mrp_production", action: "create" },
     },
     {
       id: "boms",
@@ -2072,6 +2083,7 @@ export const projectsModuleConfig = (t: TFunction): ModuleConfig => ({
       createForm: newProjectForm(t),
       createLabel: "New Project",
       createAction: "createProject",
+      createPermission: { resource: "project_project", action: "create" },
     },
     {
       id: "tasks",
@@ -2737,6 +2749,7 @@ export const subscriptionsModuleConfig = (t: TFunction): ModuleConfig => ({
       createForm: newSubscriptionForm(t),
       createLabel: "New Subscription",
       createAction: "createSubscription",
+      createPermission: { resource: "subscription", action: "create" },
     },
     {
       id: "plans",
@@ -2903,6 +2916,7 @@ export const expensesModuleConfig = (t: TFunction): ModuleConfig => ({
       createForm: newExpenseForm(t),
       createLabel: "New Expense",
       createAction: "createExpense",
+      createPermission: { resource: "hr_expense", action: "create" },
     },
     {
       id: "expense-sheets",
@@ -2981,6 +2995,7 @@ export const helpdeskModuleConfig = (t: TFunction): ModuleConfig => ({
       createForm: newHelpdeskTicketForm(t),
       createLabel: "New Ticket",
       createAction: "createTicket",
+      createPermission: { resource: "helpdesk_ticket", action: "create" },
     },
     {
       id: "teams",
