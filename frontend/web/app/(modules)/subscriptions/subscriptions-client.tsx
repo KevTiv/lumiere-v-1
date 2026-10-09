@@ -755,6 +755,19 @@ function SubscriptionsClientLoaded({
   const subscriptionRecordSheet = useMemo((): EntityRecordSheetConfig => ({
     titleKey: "code",
     auditTableName: "subscription",
+    detailConfig: {
+      mode: "detail",
+      sections: [{
+        id: "subscription",
+        fields: [
+          { key: "code", label: t("subscriptions.subscriptions.columns.code") },
+          { key: "description", label: t("subscriptions.subscriptions.columns.description") },
+          { key: "isTrial", label: t("subscriptions.subscriptions.columns.isTrial"), type: "boolean" },
+          { key: "dateStart", label: t("subscriptions.subscriptions.columns.dateStart"), type: "date" },
+          { key: "recurringNextDate", label: t("subscriptions.subscriptions.columns.recurringNextDate"), type: "date" },
+        ],
+      }],
+    },
     customTabs: [{
       id: "handoffs",
       label: t("subscriptions.handoffs.title"),

@@ -112,7 +112,7 @@ CI and the focused browser proof pass; it does not promote the whole COV-25 trac
 
 ## Implementation — link 3: subscription → invoices and reconciled payments
 
-Stacked on the purchase-order slice (#149). The subscription record sheet adds
+#149 is merged; #150 now targets `main`. The subscription record sheet adds
 **Invoices & payments**. Invoices resolve from the exact scoped billing run's
 `invoice_move_id`; payments require an exact `reconciled_invoice_ids` intersection
 with those resolved invoices and state Paid. Parent, runs, moves and payments
@@ -136,8 +136,24 @@ Validation:
   and payment actions: exact invoice/payment hrefs, filtered target focus and
   focus preserved after refresh. Existing stale (422) and reader (403) replay
   assertions remain.
-- Full workspace typecheck and browser execution require GitHub CI; dependencies
-  and network access are unavailable locally.
+- On 2026-10-09, frozen dependency installation, full web typecheck, all 271
+  query-hook tests (including the five handoff tests), static i18n checks and
+  focused Playwright discovery passed locally.
+
+### PR #150 record-sheet repair
+
+The original targeted CI failure was a client-side crash, not a disabled billing
+action. Selecting a subscription opened the newly added record sheet without its
+required `detailConfig`; `EntityDetail` then threw while reading `config.sections`.
+The Actions trace and error snapshot in run `37222403725` confirm this cause.
+
+The sheet now has an explicit Overview layout using already-projected subscription
+fields and existing translations. The browser regression checks Overview rendering
+and client errors while retaining the visible generation/payment actions, exact
+invoice/payment links, refresh, same-key billing replay, stale-payment rejection
+and reader denial. No permissions, billing rules, reducer, projection or generated
+contract changed. Fresh local runtime validation and same-head CI remain required;
+test discovery and typecheck are not operator-path proof.
 
 Status remains **IMPLEMENTED — runtime acceptance pending** until same-head CI
 and browser proof pass. This does not promote the whole cross-module track.

@@ -139,6 +139,9 @@ async function openSubscriptionHandoffs(page: Page, subscriptionId: number) {
   await row.click()
   const sheet = page.locator('[data-slot="sheet-content"]:visible')
   await expect(sheet).toBeVisible()
+  await expect(sheet.getByRole("tab", { name: "Overview", exact: true }))
+    .toHaveAttribute("aria-selected", "true")
+  await expect(sheet.locator("dd").filter({ hasText: "SUB-ACME-001" })).toHaveCount(1)
   await sheet.getByTestId("entity-record-sheet-tab-handoffs").click()
   await expect(sheet.getByTestId("subscription-handoffs")).toBeVisible()
   return sheet
@@ -164,6 +167,8 @@ test.describe(
       page,
     }) => {
       test.setTimeout(300_000)
+      const pageErrors: string[] = []
+      page.on("pageerror", (error) => pageErrors.push(error.message))
       await gotoModule(page, "/subscriptions", "subscriptions")
 
       const subscription = (await rows(page, "subscriptions")).find(
@@ -189,6 +194,7 @@ test.describe(
 
       await selectModuleTab(page, "subscriptions", "subscriptions")
       await selectEntityRowById(page, subscriptionId)
+      expect(pageErrors, "Selecting the subscription must not crash its record sheet").toEqual([])
       const generateAction = page.getByTestId("entity-action-gen-inv")
       await expect(generateAction).toBeEnabled()
       await generateAction.click()
@@ -384,6 +390,7 @@ test.describe(
       await expectAccountingFocus(page, "payments", paymentId)
       await page.reload()
       await expectAccountingFocus(page, "payments", paymentId)
+      expect(pageErrors, "The billing and handoff workflow must not raise client errors").toEqual([])
     })
   },
 )
