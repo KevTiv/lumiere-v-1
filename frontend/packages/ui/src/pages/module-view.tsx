@@ -22,6 +22,7 @@ import { buildModuleTabRow, type ModuleConfig } from "../lib/module-types"
 import type { EntityBoardRuntimeContext } from "../lib/module-types"
 import { isEntitySurfaceVisible } from "../lib/entity-view-types"
 import { getEntityRowKey } from "../lib/entity-row-utils"
+import { withTabCreateCta } from "../lib/list-empty-state"
 import { useRBAC } from "../lib/rbac-context"
 import { exportDashboardToPng } from "../lib/export-dashboard-png"
 import { KpiStrip } from "../components/kpi-strip"
@@ -261,7 +262,26 @@ export function ModuleView({
                       </Button>
                     ) : undefined
                   }
-                  config={tab.entityConfig}
+                  config={
+                    tab.createForm
+                      ? {
+                          ...tab.entityConfig,
+                          view: withTabCreateCta(tab.entityConfig.view, {
+                            label: tab.createLabel ?? "New",
+                            onClick: () => setOpenForm(tab.id),
+                            permission: tab.createPermission,
+                          }),
+                        }
+                      : tab.entityConfig
+                  }
+                  externalFilter={
+                    kpiStrips?.[tab.id]
+                      ? {
+                          active: activeKpiTile(kpiStrips[tab.id]!.tiles, kpiSelection[tab.id] ?? null) != null,
+                          onClear: () => setKpiSelection((prev) => ({ ...prev, [tab.id]: null })),
+                        }
+                      : undefined
+                  }
                   data={
                     kpiStrips?.[tab.id]
                       ? filterRowsByKpi(data[tab.id] ?? [], kpiStrips[tab.id]!.tiles, kpiSelection[tab.id] ?? null)

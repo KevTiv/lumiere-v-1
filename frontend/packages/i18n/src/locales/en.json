@@ -183,7 +183,16 @@
       "exportTruncated": "Export limited to the first {{max}} rows",
       "exportDone": "Exported {{count}} rows",
       "exportDone_one": "Exported {{count}} row",
-      "exportDone_other": "Exported {{count}} rows"
+      "exportDone_other": "Exported {{count}} rows",
+      "firstTime": {
+        "readOnly": "You have read-only access. Ask an administrator to add the first record.",
+        "title": "No records yet"
+      },
+      "noResults": {
+        "clear": "Clear filters",
+        "description": "Try a different search or clear the filters.",
+        "title": "No matching records"
+      }
     },
     "retry": "Retry",
     "discardChanges": {
