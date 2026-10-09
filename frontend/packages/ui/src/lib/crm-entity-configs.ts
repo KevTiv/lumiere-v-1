@@ -23,18 +23,26 @@ const leadEmptyState = (t: TFunction) => ({
   title: t("crm.leads.emptyMessage"),
   description: t("crm.leads.description"),
   actionLabel: t("crm.forms.newLead.title"),
+  permission: { resource: "lead", action: "create" as const },
+  secondaryActionId: "csv-leads",
+  learnHint: t("crm.leads.emptyState.hint", { defaultValue: "Leads are unqualified enquiries; qualify the good ones into opportunities." }),
 })
 
 const opportunityEmptyState = (t: TFunction) => ({
   title: t("crm.opportunities.emptyMessage"),
   description: t("crm.opportunities.description"),
   actionLabel: t("crm.forms.newOpportunity.title"),
+  permission: { resource: "opportunity", action: "create" as const },
+  learnHint: t("crm.opportunities.emptyState.hint", { defaultValue: "Opportunities move through your pipeline stages and feed the sales forecast." }),
 })
 
 const contactEmptyState = (t: TFunction) => ({
   title: t("crm.contacts.emptyMessage"),
   description: t("crm.contacts.description"),
   actionLabel: t("crm.forms.newContact.title"),
+  permission: { resource: "contact", action: "create" as const },
+  secondaryActionId: "csv-contacts",
+  learnHint: t("crm.contacts.emptyState.hint", { defaultValue: "Contacts are the people and companies you sell to; leads, orders and invoices link back to them." }),
 })
 
 // ── Badge maps ────────────────────────────────────────────────────────────────

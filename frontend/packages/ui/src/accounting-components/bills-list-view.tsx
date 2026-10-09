@@ -51,6 +51,9 @@ import {
   stbEnumTag,
 } from "../lib/accounting-move-utils"
 import { useTranslation } from "@lumiere/i18n"
+import { EmptyStateCard } from "../components/empty-state-card"
+import { decideListEmptyState } from "../lib/list-empty-state"
+import { useRBAC } from "../lib/rbac-context"
 
 type BillStatus = "draft" | "pending" | "approved" | "partial" | "paid" | "overdue" | "cancelled"
 
@@ -110,6 +113,8 @@ export function BillsListView({
   const [statusFilter, setStatusFilter] = useState<BillStatus | "all">("all")
   // Set by the stat tiles above the list; "pending" groups pending, approved and partly paid bills.
   const [tileFilter, setTileFilter] = useState<"paid" | "pending" | "overdue" | null>(null)
+  const { checkPermission } = useRBAC()
+  const canCreate = checkPermission("account_move", "create").allowed
 
   const filtered = bills
     .filter((bill) => {
@@ -126,6 +131,12 @@ export function BillsListView({
     // Newest first, matching EntityTable's default (auto-inc ids only increase).
     .sort((a, b) => Number(b.id) - Number(a.id))
   const pager = usePagedRows(filtered, `${searchQuery}|${statusFilter}|${tileFilter}`)
+  const emptyKind = decideListEmptyState({
+    totalRows: bills.length,
+    visibleRows: filtered.length,
+    search: searchQuery,
+    filters: { status: statusFilter === "all" ? undefined : statusFilter, tile: tileFilter ?? undefined },
+  })
 
   const stats = {
     total: bills.length,
@@ -206,7 +217,41 @@ export function BillsListView({
             </TableHeader>
             <TableBody>
               {filtered.length === 0 ? (
-                <TableRow><TableCell colSpan={8} className="text-center py-8 text-muted-foreground">{t("accounting.bills.noResults")}</TableCell></TableRow>
+                <TableRow>
+                  <TableCell colSpan={8} className="p-0">
+                    {emptyKind === "first-time" ? (
+                      <EmptyStateCard
+                        compact
+                        data-testid="entity-empty-first-time"
+                        title={t("accounting.bills.emptyState.title", { defaultValue: "No vendor bills yet" })}
+                        description={t("accounting.bills.emptyState.description", { defaultValue: "Vendor bills record what you owe suppliers so payables and expenses stay accurate. Add the first one to start tracking it." })}
+                        primaryAction={
+                          canCreate && onCreateBill
+                            ? { label: t("accounting.actions.newBill"), onClick: onCreateBill }
+                            : undefined
+                        }
+                        readOnlyMessage={t("common.entityView.firstTime.readOnly", {
+                          defaultValue: "You have read-only access. Ask an administrator to add the first record.",
+                        })}
+                      />
+                    ) : (
+                      <EmptyStateCard
+                        compact
+                        data-testid="entity-empty-no-results"
+                        title={t("accounting.bills.noResults")}
+                        primaryAction={{
+                          label: t("common.entityView.noResults.clear", { defaultValue: "Clear filters" }),
+                          testId: "entity-empty-clear-filters",
+                          onClick: () => {
+                            setSearchQuery("")
+                            setStatusFilter("all")
+                            setTileFilter(null)
+                          },
+                        }}
+                      />
+                    )}
+                  </TableCell>
+                </TableRow>
               ) : pager.pageRows.map((bill) => {
                 const status = getBillStatus(bill)
                 const conf = statusConfig[status]

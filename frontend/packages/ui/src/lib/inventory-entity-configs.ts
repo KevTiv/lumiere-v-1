@@ -322,6 +322,9 @@ export const productsTableConfig = (
         description: t("inventory.products.emptyState.description"),
         actionLabel: t("inventory.products.emptyState.actionLabel"),
         onAction: options?.onEmptyAction,
+        permission: { resource: "product", action: "create" },
+        secondaryActionId: "csv-product",
+        learnHint: t("inventory.products.emptyState.hint", { defaultValue: "Products are what you buy, stock and sell: every order, transfer and invoice line points to one." }),
       },
     },
   }
@@ -507,6 +510,8 @@ export const transfersTableConfig = (
       description: t("inventory.transfers.emptyState.description"),
       actionLabel: t("inventory.transfers.emptyState.actionLabel"),
       onAction: options?.onEmptyAction,
+      permission: { resource: "stock_picking", action: "create" },
+      learnHint: t("inventory.transfers.emptyState.hint", { defaultValue: "Transfers (receipts, deliveries, internal moves) are how stock levels change." }),
     },
   },
 })

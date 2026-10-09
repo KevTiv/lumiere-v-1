@@ -74,6 +74,13 @@ export const expensesTableConfig = (t: TFunction): EntityViewConfig => ({
       { key: "state", label: t("expenses.expenses.columns.state"), type: "badge", ...expenseStateBadges(t) },
     ],
     emptyMessage: t("expenses.expenses.emptyMessage"),
+    emptyState: {
+      title: t("expenses.expenses.emptyMessage"),
+      description: t("expenses.expenses.emptyState.description", { defaultValue: "Expenses record what employees spend so it can be approved, reimbursed and booked to the right accounts." }),
+      permission: { resource: "hr_expense", action: "create" },
+      secondaryActionId: "csv-expenses",
+      learnHint: t("expenses.expenses.emptyState.hint", { defaultValue: "Group expenses into a report to submit them for approval." }),
+    },
   },
 })
 

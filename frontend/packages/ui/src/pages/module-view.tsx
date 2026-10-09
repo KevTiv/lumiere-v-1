@@ -20,8 +20,9 @@ import { FormModal } from "../forms/form-modal"
 import { RuntimeFormModal } from "../forms/runtime-form-modal"
 import { buildModuleTabRow, type ModuleConfig } from "../lib/module-types"
 import type { EntityBoardRuntimeContext } from "../lib/module-types"
-import { isEntitySurfaceVisible } from "../lib/entity-view-types"
+import type { EntitySurfacePermission } from "../lib/entity-view-types"
 import { getEntityRowKey } from "../lib/entity-row-utils"
+import { decideCreateGate, withTabCreateCta } from "../lib/list-empty-state"
 import { useRBAC } from "../lib/rbac-context"
 import { exportDashboardToPng } from "../lib/export-dashboard-png"
 import { KpiStrip } from "../components/kpi-strip"
@@ -94,7 +95,9 @@ export function ModuleView({
   const routeFilters = useModuleUrlFilters()
   const clearRouteFilter = useClearModuleUrlFilter()
   const urlFilters = urlFiltersProp ?? routeFilters
-  const { checkPermission } = useRBAC()
+  const { checkPermission, permissionsReady } = useRBAC()
+  const createGate = (permission: EntitySurfacePermission | undefined) =>
+    decideCreateGate(permission, (p) => checkPermission(p.resource, p.action).allowed, permissionsReady !== false)
   const { companyIds } = useErpSession()
   const aiReporter = useErpAiSelectionReporter()
   const aiSelection = useErpAiSelectionState()
@@ -250,8 +253,7 @@ export function ModuleView({
                 <EntityView
                   useCard={false}
                   headerAction={
-                    tab.createForm &&
-                    isEntitySurfaceVisible({ permission: tab.createPermission }, checkPermission) ? (
+                    tab.createForm && createGate(tab.createPermission) !== "denied" ? (
                       <Button
                         onClick={() => setOpenForm(tab.id)}
                         data-testid={`module-create-${config.id}-${tab.id}`}
@@ -261,7 +263,27 @@ export function ModuleView({
                       </Button>
                     ) : undefined
                   }
-                  config={tab.entityConfig}
+                  config={
+                    tab.createForm
+                      ? {
+                          ...tab.entityConfig,
+                          view: withTabCreateCta(tab.entityConfig.view, {
+                            label: tab.createLabel ?? "New",
+                            onClick: () => setOpenForm(tab.id),
+                            // Not gated until permissions load, so the empty state never flashes read-only.
+                            permission: createGate(tab.createPermission) === "loading" ? undefined : tab.createPermission,
+                          }),
+                        }
+                      : tab.entityConfig
+                  }
+                  externalFilter={
+                    kpiStrips?.[tab.id]
+                      ? {
+                          active: activeKpiTile(kpiStrips[tab.id]!.tiles, kpiSelection[tab.id] ?? null) != null,
+                          onClear: () => setKpiSelection((prev) => ({ ...prev, [tab.id]: null })),
+                        }
+                      : undefined
+                  }
                   data={
                     kpiStrips?.[tab.id]
                       ? filterRowsByKpi(data[tab.id] ?? [], kpiStrips[tab.id]!.tiles, kpiSelection[tab.id] ?? null)

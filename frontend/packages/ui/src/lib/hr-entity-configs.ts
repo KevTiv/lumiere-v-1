@@ -83,6 +83,8 @@ const employeeEmptyState = (t: TFunction) => ({
   title: t("hr.employees.emptyState.title"),
   description: t("hr.employees.emptyState.description"),
   actionLabel: t("hr.employees.emptyState.actionLabel"),
+  permission: { resource: "hr_employee", action: "create" as const },
+  learnHint: t("hr.employees.emptyState.hint", { defaultValue: "Employees anchor leave, contracts, payslips and expenses." }),
 })
 
 const leaveRequestEmptyState = (t: TFunction) => ({

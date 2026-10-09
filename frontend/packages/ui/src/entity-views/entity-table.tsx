@@ -34,14 +34,8 @@ import {
   SelectValue,
 } from "../components/select"
 import { TABLE_PAGE_SIZE, TablePager } from "../components/table-pager"
-import {
-  Empty,
-  EmptyContent,
-  EmptyDescription,
-  EmptyHeader,
-  EmptyMedia,
-  EmptyTitle,
-} from "../components/empty"
+import { EmptyStateCard } from "../components/empty-state-card"
+import { decideListEmptyState, resolveEmptyCtas, type ResolvedEmptyCta } from "../lib/list-empty-state"
 import { Skeleton } from "../components/skeleton"
 import { Checkbox } from "../components/checkbox"
 import { showWorkflowToast } from "../lib/workflow-toast"
@@ -102,6 +96,8 @@ interface EntityTableProps {
   onInitialFilterClear?: (key: string) => void
   /** Set false on sensitive lists to hide the Export action. Defaults to the config's `allowExport`, then true. */
   allowExport?: boolean
+  /** Narrowing applied above the table (a KPI tile): counts as an active filter for the empty state. */
+  externalFilter?: { active: boolean; onClear?: () => void }
 }
 
 /** "Status" → "All statuses", "Priority" → "All priorities". */
@@ -138,6 +134,7 @@ export function EntityTable({
   initialFilters,
   onInitialFilterClear,
   allowExport,
+  externalFilter,
 }: EntityTableProps) {
   const { t } = useTranslation()
   const { checkPermission } = useRBAC()
@@ -430,19 +427,37 @@ export function EntityTable({
     )
   }
 
-  // Rows exist but the search/filters hide them all: say so instead of "empty".
-  const filteredOut = data.length > 0 && sorted.length === 0
-  const emptyTitle = filteredOut
-    ? "No matching records"
-    : (config.emptyState?.title ?? config.emptyMessage ?? "No records yet")
-  const emptyDescription = filteredOut
-    ? "Try a different search or clear the filters."
-    : config.emptyState?.description
-  const emptyIcon = filteredOut ? (
-    <SearchX />
-  ) : (
-    config.emptyState?.icon ?? <Inbox />
+  // First-time (nothing exists yet) and no-results (search, filters or a KPI tile hide everything)
+  // are different situations: the first onboards, the second offers to clear.
+  const emptyKind = decideListEmptyState({
+    isLoading,
+    totalRows: data.length,
+    visibleRows: sorted.length,
+    search,
+    filters,
+    externalFilterActive: externalFilter?.active,
+  })
+  const emptyCtas = resolveEmptyCtas(
+    config.emptyState,
+    actions,
+    (permission) => checkPermission(permission.resource, permission.action).allowed,
   )
+  const clearAllFilters = () => {
+    setSearch("")
+    setPersistedFilters({})
+    for (const key of Object.keys(initialFilters ?? {})) onInitialFilterClear?.(key)
+    externalFilter?.onClear?.()
+  }
+  const ctaFromAction = (cta: ResolvedEmptyCta | null, testId?: string) => {
+    if (!cta) return undefined
+    const action = cta.actionId ? actions.find((a) => a.id === cta.actionId) : undefined
+    return {
+      label: cta.label,
+      testId,
+      disabled: action ? pendingActionIds.has(action.id) : false,
+      onClick: () => (action ? runAction(action) : cta.onClick?.()),
+    }
+  }
 
   // Opening a record from this list (a name link, or a row whose sheet has an Open button) files
   // the keys now shown, in order, so the record page's previous / next follow this list.
@@ -788,24 +803,39 @@ export function EntityTable({
               ) : sorted.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={Math.max(columns.length + selectColumnCount, 1)} className="p-0">
-                    <Empty className="border-0 py-12">
-                      <EmptyHeader>
-                        <EmptyMedia variant="icon">{emptyIcon}</EmptyMedia>
-                        <EmptyTitle>{emptyTitle}</EmptyTitle>
-                        {emptyDescription ? <EmptyDescription>{emptyDescription}</EmptyDescription> : null}
-                      </EmptyHeader>
-                      {config.emptyState?.actionLabel && config.emptyState.onAction ? (
-                        <EmptyContent>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={config.emptyState.onAction}
-                          >
-                            {config.emptyState.actionLabel}
-                          </Button>
-                        </EmptyContent>
-                      ) : null}
-                    </Empty>
+                    {emptyKind === "no-results" ? (
+                      <EmptyStateCard
+                        data-testid="entity-empty-no-results"
+                        icon={<SearchX />}
+                        title={t("common.entityView.noResults.title", { defaultValue: "No matching records" })}
+                        description={t("common.entityView.noResults.description", {
+                          defaultValue: "Try a different search or clear the filters.",
+                        })}
+                        primaryAction={{
+                          label: t("common.entityView.noResults.clear", { defaultValue: "Clear filters" }),
+                          onClick: clearAllFilters,
+                          testId: "entity-empty-clear-filters",
+                        }}
+                      />
+                    ) : (
+                      <EmptyStateCard
+                        data-testid="entity-empty-first-time"
+                        icon={config.emptyState?.icon ?? <Inbox />}
+                        title={config.emptyState?.title ?? config.emptyMessage ?? t("common.entityView.firstTime.title", { defaultValue: "No records yet" })}
+                        description={config.emptyState?.description}
+                        primaryAction={ctaFromAction(emptyCtas.primary, "entity-empty-cta")}
+                        secondaryAction={ctaFromAction(emptyCtas.secondary, "entity-empty-secondary-cta")}
+                        hint={config.emptyState?.learnHint}
+                        readOnlyMessage={
+                          emptyCtas.readOnly
+                            ? (config.emptyState?.readOnlyMessage ??
+                              t("common.entityView.firstTime.readOnly", {
+                                defaultValue: "You have read-only access. Ask an administrator to add the first record.",
+                              }))
+                            : undefined
+                        }
+                      />
+                    )}
                   </TableCell>
                 </TableRow>
               ) : (
