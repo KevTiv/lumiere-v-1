@@ -182,5 +182,28 @@ The full `stdb-auth` suite reports 42 passes and one unrelated existing helpdesk
 projection test failure (`user_id` is selected while that test expects it excluded).
 The payment fix does not change helpdesk selection or weaken that test.
 
+### Subscription deep-link tab selection
+
+Run `37952671041` progressed through generation, payment, same-page payment links
+and invoice navigation/refresh. Returning to
+`/subscriptions?tab=subscriptions&filter=id:1` then failed because the module still
+displayed Dashboard. Both attempts retained company 275; the HTTP response and
+server-rendered page still contained subscription 1. Subscriptions did not use
+`useModuleTab` or pass controlled tab props to `ModuleView`, unlike Accounting and
+Purchasing, so `defaultTab: "dashboard"` won over the URL.
+
+Subscriptions now reuses the shared URL-tab hook and passes its controlled state
+to `ModuleView`. The focused browser proof requires the Subscriptions tab, exact
+record filter and single target row both before and after refreshing that return
+deep link. It does not click the tab to bypass the route defect. The first
+same-page payment-link assertion and existing replay/stale/reader-denial checks
+remain unchanged. No filter engine, billing, authorization or contract changes
+are part of this navigation repair.
+
+Local validation of the navigation repair passed: full web typecheck, all 273
+query-hook tests, all four shared table URL-filter regressions and focused
+Playwright test discovery. Actual browser execution and same-head CI are still
+required; the earlier failure is retained as diagnostic evidence.
+
 Status remains **IMPLEMENTED — runtime acceptance pending** until same-head CI
 and browser proof pass. This does not promote the whole cross-module track.

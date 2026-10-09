@@ -134,10 +134,27 @@ async function invoiceSnapshot(page: Page, moveId: number) {
 
 async function openSubscriptionHandoffs(page: Page, subscriptionId: number) {
   await gotoModule(page, `/subscriptions?tab=subscriptions&filter=${encodeURIComponent(`id:${subscriptionId}`)}`, "subscriptions")
+  await expectSubscriptionFocus(page, subscriptionId)
+  await page.reload()
+  await expectSubscriptionFocus(page, subscriptionId)
   return openMountedSubscriptionHandoffs(page, subscriptionId)
 }
 
+async function expectSubscriptionFocus(page: Page, subscriptionId: number) {
+  await expect(page).toHaveURL((url) => url.pathname === "/subscriptions"
+    && url.searchParams.get("tab") === "subscriptions"
+    && url.searchParams.getAll("filter").length === 1
+    && url.searchParams.get("filter") === `id:${subscriptionId}`)
+  await expect(page.getByTestId("module-tab-subscriptions-subscriptions"))
+    .toHaveAttribute("aria-selected", "true")
+  const table = activeTabEntityTable(page)
+  await expect(table.getByTestId(`entity-row-${subscriptionId}`)).toBeVisible()
+  await expect(table.locator('[data-testid^="entity-row-"]')).toHaveCount(1)
+}
+
 async function openMountedSubscriptionHandoffs(page: Page, subscriptionId: number) {
+  await expect(page.getByTestId("module-tab-subscriptions-subscriptions"))
+    .toHaveAttribute("aria-selected", "true")
   const row = activeTabEntityTable(page).getByTestId(`entity-row-${subscriptionId}`)
   await expect(row).toBeVisible({ timeout: 30_000 })
   await row.click()

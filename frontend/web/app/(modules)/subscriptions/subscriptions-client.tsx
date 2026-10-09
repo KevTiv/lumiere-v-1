@@ -56,6 +56,7 @@ import {
 } from "lucide-react"
 import { subscriptionHandoffs } from "@lumiere/query-hooks/hooks/subscription-handoffs"
 import { SubscriptionHandoffLinks } from "../../../components/subscription-handoff-links"
+import { useModuleTab } from "@/hooks/use-module-tab"
 import { subscriptionsModuleConfig } from "@/lib/module-dashboard-configs"
 import { useSubscriptionsModuleSubscription } from "@/lib/module-subscription-hooks"
 import {
@@ -202,6 +203,14 @@ function SubscriptionsClientLoaded({
   useSubscriptionsModuleSubscription()
   const { t } = useTranslation()
   const moduleConfig = useMemo(() => subscriptionsModuleConfig(t), [t])
+  const subscriptionTabIds = useMemo(
+    () => moduleConfig.tabs.map((tab) => tab.id),
+    [moduleConfig],
+  )
+  const { activeTab, setActiveTab } = useModuleTab(
+    moduleConfig.defaultTab ?? "dashboard",
+    subscriptionTabIds,
+  )
   const { orgId } = orgBigInts(organizationId)
   const operatingCompanyId = useDefaultOperatingCompanyBigInt(organizationId) ?? 0n
   const [quickActionForm, setQuickActionForm] = useState<{ form: FormConfig; action: string } | null>(
@@ -1036,7 +1045,14 @@ function SubscriptionsClientLoaded({
 
   return (
     <>
-      <ModuleView config={config} data={data} onFormSubmit={handleFormSubmit} isPending={isFormMutationPending} />
+      <ModuleView
+        config={config}
+        data={data}
+        activeTab={activeTab}
+        onActiveTabChange={setActiveTab}
+        onFormSubmit={handleFormSubmit}
+        isPending={isFormMutationPending}
+      />
       <FormModal
         open={quickActionForm !== null}
         onOpenChange={(open) => !open && setQuickActionForm(null)}
