@@ -37,6 +37,12 @@ import { PROJECT_BILL_TYPES, PROJECT_PRICING_TYPES, parseProjectConversionInput 
 import { useFormDialog } from "../forms/use-form-dialog"
 import { showWorkflowToast } from "../lib/workflow-toast"
 import { rowBool, rowNumber, rowString } from "./row-field-utils"
+import {
+  readSectionConflictError,
+  updateConflictDraft,
+  type SectionConflict,
+  type SectionDraft,
+} from "./section-conflict"
 
 /** Stable fallback when query hooks return undefined — inline `= []` creates a new ref each render. */
 const EMPTY_QUERY_ROWS: Record<string, unknown>[] = []
@@ -123,7 +129,7 @@ export type UseQueryHookWithId<T = unknown> = (
 ) => QueryResult<T>
 
 export type MutationResult<T> = {
-  mutate: (params: T, options?: { onSettled?: () => void }) => void
+  mutate: (params: T, options?: { onSettled?: () => void; onError?: (error: unknown) => void }) => void
   isPending?: boolean
 }
 
@@ -526,6 +532,9 @@ export function ProposalWorkspace({
   const createTemplate = useCreateProposalTemplate()
   const { askForm, formDialog } = useFormDialog()
 
+  // Revision conflict on the active section: the rejected draft is kept ("mine"); the live row is "theirs".
+  const [sectionConflict, setSectionConflict] = useState<SectionConflict | null>(null)
+
   const libraryTemplates = useMemo(
     () =>
       templatesList
@@ -644,38 +653,79 @@ export function ProposalWorkspace({
     })
   }, [proposalIdBig, proposalSections, upsertSection])
 
+  /** Sends a section save; on a revision conflict keeps the rejected draft instead of dropping it. */
+  const saveSectionWithConflictCapture = useCallback(
+    (
+      sectionId: bigint,
+      expectedRevision: number,
+      draft: SectionDraft,
+      options?: { onSettled?: () => void },
+    ) => {
+      upsertSection.mutate(
+        {
+          proposalId: proposalIdBig,
+          sectionId,
+          expectedRevision,
+          title: draft.title,
+          content: draft.content,
+          status: draft.status,
+          sequence: draft.sequence,
+          aiSuggestion: draft.aiSuggestion ?? undefined,
+        },
+        {
+          ...options,
+          onError: (error) => {
+            const revisions = readSectionConflictError(error)
+            if (revisions) setSectionConflict({ sectionId: String(sectionId), draft, ...revisions })
+          },
+        },
+      )
+    },
+    [proposalIdBig, upsertSection],
+  )
+
   const handleSaveContent = useCallback((content: string, sectionStatus: SectionStatus) => {
     if (!effectiveActiveSectionId) return
+    if (sectionConflict && String(effectiveActiveSectionId) === sectionConflict.sectionId) {
+      // Unresolved conflict: keep the latest edit in the draft rather than sending another stale save.
+      setSectionConflict(updateConflictDraft(sectionConflict, { content, status: sectionStatus }))
+      return
+    }
     setIsSaving(true)
     const wordCount = countWords(content)
-    upsertSection.mutate(
+    saveSectionWithConflictCapture(
+      effectiveActiveSectionId,
+      (activeSection as { revision?: number })?.revision ?? 0,
       {
-        proposalId: proposalIdBig,
-        sectionId: effectiveActiveSectionId,
-        expectedRevision: (activeSection as { revision?: number })?.revision ?? 0,
         title: (activeSection as { title?: string })?.title ?? "",
         content,
         status: sectionStatus,
         sequence: (activeSection as { sequence?: number })?.sequence ?? 0,
-        aiSuggestion: (activeSection as { aiSuggestion?: string })?.aiSuggestion ?? undefined,
+        aiSuggestion: (activeSection as { aiSuggestion?: string })?.aiSuggestion ?? null,
       },
-      { onSettled: () => setIsSaving(false) }
+      { onSettled: () => setIsSaving(false) },
     )
     void wordCount // used server-side
-  }, [proposalIdBig, effectiveActiveSectionId, activeSection, upsertSection])
+  }, [effectiveActiveSectionId, activeSection, sectionConflict, saveSectionWithConflictCapture])
 
   const handleSaveTitle = useCallback((title: string) => {
     if (!effectiveActiveSectionId) return
-    upsertSection.mutate({
-      proposalId: proposalIdBig,
-      sectionId: effectiveActiveSectionId,
-      expectedRevision: (activeSection as { revision?: number })?.revision ?? 0,
-      title,
-      content: (activeSection as { content?: string })?.content ?? "",
-      status: ((activeSection as { status?: string })?.status as string)?.toLowerCase() ?? "draft",
-      sequence: (activeSection as { sequence?: number })?.sequence ?? 0,
-    })
-  }, [proposalIdBig, effectiveActiveSectionId, activeSection, upsertSection])
+    if (sectionConflict && String(effectiveActiveSectionId) === sectionConflict.sectionId) {
+      setSectionConflict(updateConflictDraft(sectionConflict, { title }))
+      return
+    }
+    saveSectionWithConflictCapture(
+      effectiveActiveSectionId,
+      (activeSection as { revision?: number })?.revision ?? 0,
+      {
+        title,
+        content: (activeSection as { content?: string })?.content ?? "",
+        status: ((activeSection as { status?: string })?.status as string)?.toLowerCase() ?? "draft",
+        sequence: (activeSection as { sequence?: number })?.sequence ?? 0,
+        aiSuggestion: null,
+      },
+    )
+  }, [effectiveActiveSectionId, activeSection, sectionConflict, saveSectionWithConflictCapture])
 
   const handleApplyStructure = useCallback(() => {
     if (!analysis) return

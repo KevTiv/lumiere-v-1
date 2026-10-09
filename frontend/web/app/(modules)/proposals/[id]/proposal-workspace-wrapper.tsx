@@ -85,7 +85,8 @@ function createHttpHooks(
     useUpsertProposalSection: () => {
       const mutation = useUpsertProposalSection(organizationId, companyId)
       return {
-        mutate: (params) => mutation.mutate(params),
+        // Forward options so the workspace sees onSettled / onError (revision conflicts).
+        mutate: (params, options) => mutation.mutate(params, options),
         isPending: mutation.isPending,
       }
     },
