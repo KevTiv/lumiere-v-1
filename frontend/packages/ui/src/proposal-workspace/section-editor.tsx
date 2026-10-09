@@ -10,6 +10,8 @@ import type { ProposalLineItem, ProposalComment } from "@lumiere/stdb/proposal-r
 import { ProductLineItems } from "./product-line-items"
 import type { LineItemMoveDirection } from "./line-item-order"
 import { CommentThread } from "./comment-thread"
+import { SectionConflictBanner } from "./section-conflict-banner"
+import type { SectionConflictView } from "./section-conflict"
 
  
 type Section = Record<string, any>
@@ -53,6 +55,14 @@ interface SectionEditorProps {
   onAddComment: (content: string, parentId?: bigint) => void
   onResolveComment: (id: bigint) => void
   onFocus: () => void
+  /** Revision conflict on this section; the banner shows both versions and lets the user pick one. */
+  conflict?: {
+    view: SectionConflictView
+    canKeepMine: boolean
+    isResolving?: boolean
+    onKeepMine: () => void
+    onKeepTheirs: () => void
+  } | null
 }
 
 export function SectionEditor({
@@ -72,6 +82,7 @@ export function SectionEditor({
   onAddComment,
   onResolveComment,
   onFocus,
+  conflict,
 }: SectionEditorProps) {
   const { t } = useTranslation()
   const [localContent, setLocalContent] = useState<string | null>(null)
@@ -136,6 +147,16 @@ export function SectionEditor({
     }
   }
 
+  // Keep theirs: drop the local draft and show the server's section again.
+  const handleKeepTheirs = () => {
+    if (!conflict) return
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    setLocalContent(null)
+    setLocalTitle(null)
+    setStatus(((section?.status as string)?.toLowerCase() as SectionStatus) ?? "empty")
+    conflict.onKeepTheirs()
+  }
+
   const handleSelectProduct = (product: Product) => {
     if (!mention || !textareaRef.current) {
       setMention(null)
@@ -172,6 +193,16 @@ export function SectionEditor({
 
   return (
     <div className="flex-1 flex flex-col overflow-y-auto px-6 py-4" onFocus={onFocus}>
+      {conflict ? (
+        <SectionConflictBanner
+          view={conflict.view}
+          canKeepMine={conflict.canKeepMine}
+          isResolving={conflict.isResolving}
+          onKeepMine={conflict.onKeepMine}
+          onKeepTheirs={handleKeepTheirs}
+        />
+      ) : null}
+
       {/* Title + status row */}
       <div className="flex items-start gap-3 mb-4">
         <input

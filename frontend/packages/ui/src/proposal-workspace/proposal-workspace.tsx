@@ -38,7 +38,9 @@ import { useFormDialog } from "../forms/use-form-dialog"
 import { showWorkflowToast } from "../lib/workflow-toast"
 import { rowBool, rowNumber, rowString } from "./row-field-utils"
 import {
+  buildSectionConflictView,
   readSectionConflictError,
+  sectionResolveParams,
   updateConflictDraft,
   type SectionConflict,
   type SectionDraft,
@@ -272,6 +274,15 @@ export interface ProposalWorkspaceHooks {
     proposalId: bigint | number | string
     orderedIds: Array<bigint | number | string>
   }>
+  useResolveProposalSectionConflict: () => AsyncMutationResult<{
+    proposalId: bigint | number | string
+    sectionId: bigint | number | string
+    title: string
+    content: string
+    status: string
+    sequence?: number
+    aiSuggestion?: string | null
+  }>
   useUpsertProposalProcurementScore: () => AsyncMutationResult<{
     proposalId: bigint | number | string
     countryPackKey: string
@@ -305,6 +316,8 @@ interface ProposalWorkspaceProps {
   canReorderLineItems?: boolean
   /** Shows "Save as template"; the caller passes the user's `proposal:write` permission. */
   canSaveAsTemplate?: boolean
+  /** Enables "Keep mine" on a section revision conflict; the caller passes the user's `proposal:write` permission. */
+  canResolveSectionConflict?: boolean
   hooks: ProposalWorkspaceHooks
 }
 
@@ -325,6 +338,7 @@ export function ProposalWorkspace({
   canManageProcurementScores = false,
   canReorderLineItems = false,
   canSaveAsTemplate = false,
+  canResolveSectionConflict = false,
   hooks,
 }: ProposalWorkspaceProps) {
   const { t } = useTranslation()
@@ -384,6 +398,7 @@ export function ProposalWorkspace({
     useConvertProposalToProject,
     useProposalProcurementScores,
     useUpsertProposalProcurementScore,
+    useResolveProposalSectionConflict,
     useReorderProposalLineItems,
     useCreateProposalTemplate,
   } = hooks
@@ -528,6 +543,7 @@ export function ProposalWorkspace({
   const recordBidDecision = useRecordProposalBidDecision()
   const convertToProject = useConvertProposalToProject()
   const upsertProcurementScore = useUpsertProposalProcurementScore()
+  const resolveSectionConflict = useResolveProposalSectionConflict()
   const reorderLineItems = useReorderProposalLineItems()
   const createTemplate = useCreateProposalTemplate()
   const { askForm, formDialog } = useFormDialog()
@@ -726,6 +742,47 @@ export function ProposalWorkspace({
       },
     )
   }, [effectiveActiveSectionId, activeSection, sectionConflict, saveSectionWithConflictCapture])
+
+  const [isResolvingConflict, setIsResolvingConflict] = useState(false)
+
+  const handleKeepMine = useCallback(async () => {
+    if (!sectionConflict) return
+    setIsResolvingConflict(true)
+    try {
+      await resolveSectionConflict.mutateAsync(
+        sectionResolveParams(proposalIdBig, sectionConflict.sectionId, sectionConflict.draft),
+      )
+      setSectionConflict(null)
+      showWorkflowToast({
+        kind: "success",
+        title: t("proposalWorkspace.sectionConflict.resolved", { defaultValue: "Your version was saved" }),
+      })
+    } catch (error) {
+      showWorkflowToast({
+        kind: "error",
+        title: t("proposalWorkspace.sectionConflict.resolveFailed", { defaultValue: "Could not save your version" }),
+        description: error instanceof Error ? error.message : String(error),
+      })
+    } finally {
+      setIsResolvingConflict(false)
+    }
+  }, [proposalIdBig, resolveSectionConflict, sectionConflict, t])
+
+  const handleKeepTheirs = useCallback(() => {
+    setSectionConflict(null)
+    showWorkflowToast({
+      kind: "success",
+      title: t("proposalWorkspace.sectionConflict.discarded", { defaultValue: "Your edits were discarded; showing the server version" }),
+    })
+  }, [t])
+
+  const sectionConflictView = useMemo(
+    () =>
+      sectionConflict && String(effectiveActiveSectionId) === sectionConflict.sectionId
+        ? buildSectionConflictView(sectionConflict, activeSection as Record<string, unknown> | null)
+        : null,
+    [sectionConflict, effectiveActiveSectionId, activeSection],
+  )
 
   const handleApplyStructure = useCallback(() => {
     if (!analysis) return
@@ -1342,6 +1399,17 @@ export function ProposalWorkspace({
               onSaveContent={handleSaveContent}
               onSaveTitle={handleSaveTitle}
               onFocus={handleEditorFocus}
+              conflict={
+                sectionConflictView
+                  ? {
+                      view: sectionConflictView,
+                      canKeepMine: canResolveSectionConflict,
+                      isResolving: isResolvingConflict || Boolean(resolveSectionConflict.isPending),
+                      onKeepMine: () => void handleKeepMine(),
+                      onKeepTheirs: handleKeepTheirs,
+                    }
+                  : null
+              }
               onAddLineItem={(productId, productName, priceUnit) =>
                 addLineItem.mutate({
                   proposalId: proposalIdBig,

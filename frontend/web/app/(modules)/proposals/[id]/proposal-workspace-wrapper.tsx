@@ -11,6 +11,7 @@ import {
   useProposalPresence,
   useProposalComments,
   useUpsertProposalSection,
+  useResolveProposalSectionConflict,
   useDeleteProposalSection,
   useAddProposalSourceDoc,
   useDeleteProposalSourceDoc,
@@ -231,6 +232,13 @@ function createHttpHooks(
         isPending: mutation.isPending,
       }
     },
+    useResolveProposalSectionConflict: () => {
+      const mutation = useResolveProposalSectionConflict(organizationId, companyId)
+      return {
+        mutateAsync: (params) => mutation.mutateAsync(params),
+        isPending: mutation.isPending,
+      }
+    },
     useUpsertProposalProcurementScore: () => {
       const mutation = useUpsertProposalProcurementScore(organizationId, companyId)
       return {
@@ -285,6 +293,7 @@ export function ProposalWorkspaceWrapper({
       canManageProcurementScores={checkPermission("proposal", "write").allowed}
       canReorderLineItems={checkPermission("proposal", "write").allowed}
       canSaveAsTemplate={checkPermission("proposal", "write").allowed}
+      canResolveSectionConflict={checkPermission("proposal", "write").allowed}
       convertToProjectReady={canConvertProposalToProject(proposalRow)}
       hooks={httpHooks}
     />
