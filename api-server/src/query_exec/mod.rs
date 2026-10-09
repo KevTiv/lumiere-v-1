@@ -7,8 +7,8 @@ use std::collections::HashSet;
 
 use crate::error::ApiError;
 use stdb_auth::{
-    identity_sql_literal, is_hr_pii_resource, registry_get, resolve_http_sql_columns,
-    FieldAccessContext,
+    has_resource_read_permission, identity_sql_literal, is_hr_pii_resource, registry_get,
+    resolve_http_sql_columns, FieldAccessContext,
 };
 use stdb_client::StdbClient;
 
@@ -41,9 +41,9 @@ use authoritative::{authoritative_record_sql, AuthoritativeResourceScope};
 #[cfg(test)]
 pub(crate) use company_scope::enforce_requested_company;
 pub(crate) use company_scope::{
-    accounting_resource, authorize_membership_company_ids, crm_resource, inventory_resource,
-    iot_resource, optional_company_accounting_resource, purchasing_resource,
-    resolve_membership_company_id,
+    accounting_child_resource, accounting_read_permission_resource, accounting_resource,
+    authorize_membership_company_ids, crm_resource, inventory_resource, iot_resource,
+    optional_company_accounting_resource, purchasing_resource, resolve_membership_company_id,
 };
 pub use company_scope::{
     default_company_id, resolve_accounting_company_id, resolve_crm_company_id,
@@ -81,6 +81,44 @@ fn filter_inventory_company_rows(resource: &str, company_id: u64, rows: &mut Vec
     rows.retain(|row| row_company_matches(row, company_id, allow_shared));
 }
 
+fn require_ui_child_read_permission(
+    resource: &str,
+    organization_id: u64,
+    identity_hex: &str,
+    field_access: Option<&FieldAccessContext>,
+) -> Result<(), ApiError> {
+    let allowed = match resource {
+        "hr-leave-allocations" | "hr-offboarding-checklists" | "hr-statutory-ids" => {
+            hr::has_hr_child_read_permission(field_access, resource)
+        }
+        "document-signature-requests" | "document-legal-holds" | "document-external-refs" => {
+            documents::has_document_read_permission(field_access)
+        }
+        _ => {
+            let Some(parent) = accounting_read_permission_resource(resource) else {
+                return Ok(());
+            };
+            has_resource_read_permission(field_access, resource)
+                || has_resource_read_permission(field_access, parent)
+        }
+    };
+    let context_matches = field_access.is_some_and(|access| {
+        organization_id > 0
+            && access.organization_id == organization_id
+            && identity_sql_literal(identity_hex)
+                .ok()
+                .is_some_and(|identity| {
+                    identity_sql_literal(&access.identity_hex).ok().as_ref() == Some(&identity)
+                })
+    });
+    if !allowed || !context_matches {
+        return Err(ApiError::Forbidden(format!(
+            "Read permission denied for resource '{resource}'"
+        )));
+    }
+    Ok(())
+}
+
 pub async fn execute_resource_query(
     client: &StdbClient,
     resource: &str,
@@ -108,6 +146,7 @@ pub async fn execute_resource_query_for_company(
     requested_company_id: Option<u64>,
 ) -> Result<Vec<Value>, ApiError> {
     let fa = field_access;
+    require_ui_child_read_permission(resource, organization_id, identity_hex, fa)?;
     if iot_resource(resource) && !has_iot_read_permission(fa, resource) {
         return Err(ApiError::Forbidden(format!(
             "Read permission denied for IoT resource '{resource}'"
@@ -147,20 +186,22 @@ pub async fn execute_resource_query_for_company(
     } else {
         None
     };
-    let accounting_company_id =
-        if accounting_resource(resource) || optional_company_accounting_resource(resource) {
-            Some(
-                resolve_accounting_company_id(
-                    client,
-                    organization_id,
-                    identity_hex,
-                    requested_company_id,
-                )
-                .await?,
+    let accounting_company_id = if accounting_resource(resource)
+        || accounting_child_resource(resource)
+        || optional_company_accounting_resource(resource)
+    {
+        Some(
+            resolve_accounting_company_id(
+                client,
+                organization_id,
+                identity_hex,
+                requested_company_id,
             )
-        } else {
-            None
-        };
+            .await?,
+        )
+    } else {
+        None
+    };
     let iot_company_id = if iot_resource(resource) {
         Some(
             resolve_iot_company_id(client, organization_id, identity_hex, requested_company_id)
@@ -169,6 +210,17 @@ pub async fn execute_resource_query_for_company(
     } else {
         None
     };
+
+    if accounting_child_resource(resource) {
+        return accounting::read_accounting_child_rows(
+            client,
+            resource,
+            organization_id,
+            fa,
+            accounting_company_id,
+        )
+        .await;
+    }
 
     if let Some(rows) = crate::workflow_reads::execute_private_workflow_query(
         client,
@@ -183,6 +235,27 @@ pub async fn execute_resource_query_for_company(
     }
 
     match resource {
+        "hr-leave-allocations" | "hr-offboarding-checklists" | "hr-statutory-ids" => {
+            return hr::read_hr_child_rows(
+                client,
+                resource,
+                organization_id,
+                identity_hex,
+                fa,
+                requested_company_id,
+            )
+            .await;
+        }
+        "document-signature-requests" | "document-legal-holds" | "document-external-refs" => {
+            return documents::read_document_child_rows(
+                client,
+                resource,
+                organization_id,
+                identity_hex,
+                fa,
+            )
+            .await;
+        }
         "roles" => {
             return read_roles(client, fa).await;
         }
@@ -588,6 +661,112 @@ mod tests {
             role_permissions: vec![permission.into()],
             identity_hex: "actor".into(),
             field_permissions: Vec::new(),
+        }
+    }
+
+    #[test]
+    fn ui_child_reads_reuse_domain_permissions_without_accepting_write_grants() {
+        let identity = "ab".repeat(32);
+        for (resource, grant) in [
+            ("profit-loss-lines", "financial_report:read"),
+            ("balance-sheet-lines", "financial_report:read"),
+            ("cash-flow-lines", "financial_report:read"),
+            (
+                "consolidation-company-rates",
+                "consolidation_company_rate:read",
+            ),
+            ("bank-statement-import-lines", "account_bank_statement:read"),
+            ("tax-deadline-reminders", "tax_deadline:read"),
+            ("hr-leave-allocations", "hr_leave:read"),
+            ("hr-offboarding-checklists", "hr_employee:read"),
+            ("hr-statutory-ids", "hr_employee:read"),
+            ("document-signature-requests", "document:read"),
+            ("document-legal-holds", "document:read"),
+            ("document-external-refs", "document:read"),
+        ] {
+            let mut access = authoritative_access(grant);
+            access.identity_hex = identity.clone();
+            assert!(
+                require_ui_child_read_permission(resource, 42, &identity, Some(&access)).is_ok(),
+                "{resource}"
+            );
+            access.role_permissions = vec![grant.replace(":read", ":write")];
+            assert!(
+                matches!(
+                    require_ui_child_read_permission(resource, 42, &identity, Some(&access)),
+                    Err(ApiError::Forbidden(_))
+                ),
+                "{resource}"
+            );
+            assert!(require_ui_child_read_permission(resource, 42, &identity, None).is_err());
+        }
+    }
+
+    #[test]
+    fn ui_child_reads_reject_mismatched_actor_or_organization_even_for_superusers() {
+        let identity = "ab".repeat(32);
+        let mut access = authoritative_access("*:*");
+        access.identity_hex = identity.clone();
+        access.is_superuser = true;
+        for resource in [
+            "profit-loss-lines",
+            "hr-statutory-ids",
+            "document-legal-holds",
+        ] {
+            assert!(
+                require_ui_child_read_permission(resource, 42, &identity, Some(&access)).is_ok()
+            );
+            for organization_id in [0, 43] {
+                assert!(require_ui_child_read_permission(
+                    resource,
+                    organization_id,
+                    &identity,
+                    Some(&access)
+                )
+                .is_err());
+            }
+            for actor in ["invalid".to_owned(), "cd".repeat(32)] {
+                assert!(
+                    require_ui_child_read_permission(resource, 42, &actor, Some(&access)).is_err()
+                );
+            }
+        }
+        assert!(require_ui_child_read_permission("products", 42, &identity, None).is_ok());
+    }
+
+    #[tokio::test]
+    async fn ui_child_dispatcher_denies_unscoped_reads_before_database_access() {
+        let client = StdbClient::new("http://127.0.0.1:9".into(), "test".into(), "test".into());
+        let identity = "ab".repeat(32);
+        for resource in [
+            "profit-loss-lines",
+            "balance-sheet-lines",
+            "cash-flow-lines",
+            "bank-statement-import-lines",
+            "tax-deadline-reminders",
+            "consolidation-company-rates",
+            "hr-leave-allocations",
+            "hr-offboarding-checklists",
+            "hr-statutory-ids",
+            "document-signature-requests",
+            "document-legal-holds",
+            "document-external-refs",
+        ] {
+            assert!(
+                matches!(
+                    execute_resource_query_for_company(
+                        &client,
+                        resource,
+                        42,
+                        &identity,
+                        None,
+                        Some(7)
+                    )
+                    .await,
+                    Err(ApiError::Forbidden(_))
+                ),
+                "{resource}"
+            );
         }
     }
 

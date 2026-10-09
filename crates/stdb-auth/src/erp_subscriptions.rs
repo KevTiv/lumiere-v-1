@@ -374,17 +374,26 @@ pub fn subscription_queries_for_resource(
         return Ok(Some(vec![sql.clone()]));
     }
 
-    // These resources require BFF-side company filtering that subscription SQL
-    // cannot express: partner banks have optional company ownership and landed
-    // cost lines, bank statement import lines, tax deadline reminders and
-    // consolidation company rates inherit ownership from their parent.
+    // These resources require BFF-side parent/company or ACL filtering, HR
+    // authorization, or sensitive-read auditing that subscription SQL cannot
+    // enforce. Keep them on authorized HTTP even for superusers: auditing only
+    // happens on the HTTP path.
     if matches!(
         r,
         "partner-banks"
             | "landed-cost-lines"
+            | "profit-loss-lines"
+            | "balance-sheet-lines"
+            | "cash-flow-lines"
             | "bank-statement-import-lines"
             | "tax-deadline-reminders"
             | "consolidation-company-rates"
+            | "hr-leave-allocations"
+            | "hr-offboarding-checklists"
+            | "hr-statutory-ids"
+            | "document-signature-requests"
+            | "document-legal-holds"
+            | "document-external-refs"
     ) {
         return Ok(None);
     }
@@ -698,6 +707,95 @@ mod tests {
                     .expect("subscription SQL generation should not fail"),
                 None,
                 "{resource} must remain behind BFF company filtering"
+            );
+        }
+    }
+
+    #[test]
+    fn pass12_sensitive_feeds_remain_http_only_for_all_contexts() {
+        let resources = [
+            "profit-loss-lines",
+            "balance-sheet-lines",
+            "cash-flow-lines",
+            "bank-statement-import-lines",
+            "tax-deadline-reminders",
+            "consolidation-company-rates",
+            "hr-leave-allocations",
+            "hr-offboarding-checklists",
+            "hr-statutory-ids",
+            "document-signature-requests",
+            "document-legal-holds",
+            "document-external-refs",
+        ];
+        let company_ids = [7];
+        let identity_hex = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+        let normal_access = FieldAccessContext {
+            organization_id: 42,
+            role_id: 9,
+            role_name: "manager".into(),
+            is_superuser: false,
+            role_permissions: vec!["module:hr:read".into()],
+            identity_hex: identity_hex.into(),
+            field_permissions: vec![],
+        };
+        let privileged_access = FieldAccessContext {
+            role_name: "superuser".into(),
+            is_superuser: true,
+            ..normal_access.clone()
+        };
+        let organization_context = SubscriptionQueryContext {
+            organization_id: Some(42),
+            company_ids: Some(&company_ids),
+            identity_hex: Some(identity_hex),
+            manager_employee_id: Some(7),
+            ..SubscriptionQueryContext::default()
+        };
+        let mut mixed_resources = resources.to_vec();
+        mixed_resources.push("account-payment-term-lines");
+
+        for (label, context) in [
+            ("no context", SubscriptionQueryContext::default()),
+            ("organization", organization_context.clone()),
+            (
+                "normal",
+                SubscriptionQueryContext {
+                    field_access: Some(&normal_access),
+                    ..organization_context.clone()
+                },
+            ),
+            (
+                "superuser",
+                SubscriptionQueryContext {
+                    field_access: Some(&privileged_access),
+                    ..organization_context.clone()
+                },
+            ),
+        ] {
+            for resource in resources {
+                assert_eq!(
+                    subscription_queries_for_resource(resource, &context)
+                        .expect("subscription SQL generation should not fail"),
+                    None,
+                    "{resource} must use authorized HTTP with {label} context"
+                );
+            }
+            assert!(
+                create_client_subscriptions(&resources, &context)
+                    .expect("subscription SQL generation should not fail")
+                    .is_empty(),
+                "HTTP-only feeds must not emit aggregate SQL with {label} context"
+            );
+            let control = subscription_queries_for_resource("account-payment-term-lines", &context)
+                .expect("unrelated resource should compile")
+                .unwrap_or_default();
+            if context.organization_id.is_some() {
+                assert!(!control.is_empty(), "unrelated feed must remain subscribed");
+            }
+            assert_eq!(
+                create_client_subscriptions(&mixed_resources, &context)
+                    .expect("mixed subscription SQL generation should not fail"),
+                control,
+                "mixed requests must only retain the unrelated feed with {label} context"
             );
         }
     }

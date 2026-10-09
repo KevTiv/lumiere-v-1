@@ -342,11 +342,26 @@ export function subscriptionQueriesForResource(
 
   if (PRIVATE_CRM_RESOURCES.has(r)) return null;
 
-  // These Purchasing resources cannot be scoped safely in subscription SQL:
-  // partner-bank company ownership is optional, while landed-cost lines inherit
-  // company ownership from their parent. Keep realtime fail-closed and read them
-  // through the BFF, which applies the required row/parent filtering.
-  if (r === "partner-banks" || r === "landed-cost-lines") return null;
+  // These resources require BFF-side parent/company or ACL filtering, HR
+  // authorization, or sensitive-read auditing that subscription SQL cannot
+  // enforce. Keep them on authorized HTTP even for superusers: auditing only
+  // happens on the HTTP path.
+  if ([
+    "partner-banks",
+    "landed-cost-lines",
+    "profit-loss-lines",
+    "balance-sheet-lines",
+    "cash-flow-lines",
+    "bank-statement-import-lines",
+    "tax-deadline-reminders",
+    "consolidation-company-rates",
+    "hr-leave-allocations",
+    "hr-offboarding-checklists",
+    "hr-statutory-ids",
+    "document-signature-requests",
+    "document-legal-holds",
+    "document-external-refs",
+  ].includes(r)) return null;
 
   if (r === "roles") {
     return [selectRolesActiveSql(ctx.fieldAccess)];
