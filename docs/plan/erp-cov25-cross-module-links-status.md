@@ -164,5 +164,23 @@ to the reader context can mask stale cache data. Unit regressions check the thre
 handoff resources remain subscribed and typed payment invalidation reaches the
 company cache without invalidating another organization's payments.
 
+Same-head E2E run `37949858708` then reached invoice generation and payment but
+found no linked payment. Its HTTP trace showed the new Paid payment with both
+reconciliation fields absent. The Rust HTTP projection filter discarded all
+`_ids` columns unless the resource explicitly opted in; `account-payments` had no
+inclusion despite both fields already being declared by the registry and pinned
+contracts. The resource now includes only `reconciled_invoice_ids` and
+`reconciled_bill_ids`, matching the existing purchase/sale relation pattern.
+Explicit field grants still determine the selected columns; the inclusion does
+not add fields omitted by a restricted grant or broaden unrelated ID lists.
+Rust regressions cover default relation selection, restricted-field preservation
+and resource-specific filtering. No schema, operation or generated contract
+changes are required. The failed run is not acceptance evidence.
+
+`cargo test --locked -p stdb-auth payment_http` passes all three new regressions.
+The full `stdb-auth` suite reports 42 passes and one unrelated existing helpdesk
+projection test failure (`user_id` is selected while that test expects it excluded).
+The payment fix does not change helpdesk selection or weaken that test.
+
 Status remains **IMPLEMENTED — runtime acceptance pending** until same-head CI
 and browser proof pass. This does not promote the whole cross-module track.
