@@ -22,6 +22,8 @@ import {
   usePublishWorkflowVersion,
   useCloneWorkflowVersionToDraft,
   useRetireWorkflowVersion,
+  useStartWorkflow,
+  useSignalWorkflow,
   useImportWorkflowCsv,
   useCancelWorkflow,
   useSimulateWorkflow,
@@ -206,6 +208,8 @@ function WorkflowsClientLoaded({
   const publishVersion = usePublishWorkflowVersion(orgId, operatingCompanyId)
   const cloneVersion = useCloneWorkflowVersionToDraft(orgId, operatingCompanyId)
   const retireVersion = useRetireWorkflowVersion(orgId, operatingCompanyId)
+  const startWorkflow = useStartWorkflow(orgId)
+  const signalWorkflow = useSignalWorkflow(orgId)
   const importWorkflowCsv = useImportWorkflowCsv(orgId)
   const cancelWorkflow = useCancelWorkflow(orgId)
   const simulateWorkflow = useSimulateWorkflow(orgId)
@@ -468,6 +472,7 @@ function WorkflowsClientLoaded({
         }}
       />
       <WorkflowsRowDialog
+        key={rowDialog ? `${rowDialog.tabId}-${String(rowDialog.row.id)}` : "closed"}
         open={rowDialog !== null}
         onOpenChange={(open) => !open && setRowDialog(null)}
         tabId={rowDialog?.tabId ?? null}
@@ -475,10 +480,14 @@ function WorkflowsClientLoaded({
         t={t}
         decisionEvents={eventsRaw as Record<string, unknown>[]}
         activePlans={activePlans}
+        workflowEdges={edgesRaw as Record<string, unknown>[]}
+        operatingCompanyId={operatingCompanyId}
         mutations={{
           publishVersion,
           cloneVersion,
           retireVersion,
+          startWorkflow,
+          signalWorkflow,
           cancelWorkflow,
           simulateWorkflow,
           setPlanActive,

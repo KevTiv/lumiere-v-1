@@ -25,7 +25,8 @@ services:
 
   web:
     command: >
-      sh -c "pnpm install --frozen-lockfile &&
+      sh -c "cd /workspace/frontend &&
+      pnpm install --frozen-lockfile &&
       pnpm --filter ./web exec next build &&
       pnpm --filter ./web exec next start --hostname 0.0.0.0 --port 3000"
     environment:

@@ -7,9 +7,25 @@ import { stdbBffCommandPost } from "@lumiere/stdb/commands"
  */
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
+import { responseErrorMessage } from "@lumiere/api-client/response-error"
 
-import { apiFetch, fetchQueryList, rqBigIntKey, type QueryRows } from "../http"
+import {
+  apiFetch,
+  fetchQueryList,
+  parseQueryListResponse,
+  rqBigIntKey,
+  type QueryRows,
+} from "../http"
 import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
+import {
+  buildSignalWorkflowWireParams,
+  buildStartWorkflowWireParams,
+  buildWorkflowSubjectSnapshotRequest,
+  selectWorkflowSubjectSnapshot,
+  type SignalWorkflowInput,
+  type StartWorkflowInput,
+  type WorkflowConditionSnapshotWire,
+} from "./workflow-runtime"
 import type {
   CancelWorkflowParams,
   CancelWorkflowOutboxParams,
@@ -19,9 +35,7 @@ import type {
   FireWorkflowTimerParams,
   MigrateWorkflowInstanceParams,
   PreflightWorkflowMigrationParams,
-  SignalWorkflowParams,
   SimulateWorkflowParams,
-  StartWorkflowParams,
   Workflow,
   WorkflowInstance,
 } from "@lumiere/stdb/types"
@@ -273,13 +287,48 @@ export function useImportWorkflowCsv(organizationId: bigint) {
   })
 }
 
+async function requestWorkflowSubjectSnapshot(input: {
+  companyId: bigint | number | string
+  workflowVersionId: bigint | number | string
+  subjectModel: string
+  subjectId: bigint | number | string
+}): Promise<WorkflowConditionSnapshotWire> {
+  const normalized = buildWorkflowSubjectSnapshotRequest(input)
+  const { urlPath, init } = stdbBffCommandPost("request_workflow_subject_snapshot", {
+    companyId: normalized.companyId,
+    params: stdbParamsToJson(
+      normalized.params,
+      "RequestWorkflowSubjectSnapshotParams",
+    ),
+  })
+  const request = await apiFetch(urlPath, init)
+  if (!request.ok) {
+    throw new Error(
+      await responseErrorMessage(request, "Failed to request workflow subject snapshot"),
+    )
+  }
+
+  const query = await apiFetch("/api/query/workflow-subject-snapshots")
+  if (!query.ok) {
+    throw new Error(
+      await responseErrorMessage(query, "Failed to read workflow subject snapshot"),
+    )
+  }
+
+  return selectWorkflowSubjectSnapshot(parseQueryListResponse(await query.json()), input)
+}
+
 export function useStartWorkflow(organizationId: bigint) {
   const qc = useQueryClient()
-  return useMutation({
-    mutationFn: async (params: StartWorkflowParams) => {
-      const { urlPath, init } = stdbBffCommandPost("start_workflow", { params: stdbParamsToJson(params as object, "StartWorkflowParams") })
+  return useMutation<void, Error, StartWorkflowInput>({
+    mutationFn: async (input) => {
+      const snapshot = await requestWorkflowSubjectSnapshot(input)
+      const params = buildStartWorkflowWireParams(input, snapshot)
+      const { urlPath, init } = stdbBffCommandPost("start_workflow", { params })
       const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error("Failed to start workflow")
+      if (!r.ok) {
+        throw new Error(await responseErrorMessage(r, "Failed to start workflow"))
+      }
     },
     onSuccess: async () => {
       invalidateAllWorkflowQueries(qc, organizationId)
@@ -289,11 +338,15 @@ export function useStartWorkflow(organizationId: bigint) {
 
 export function useSignalWorkflow(organizationId: bigint) {
   const qc = useQueryClient()
-  return useMutation({
-    mutationFn: async (params: SignalWorkflowParams) => {
-      const { urlPath, init } = stdbBffCommandPost("signal_workflow", { params: stdbParamsToJson(params as object, "SignalWorkflowParams") })
+  return useMutation<void, Error, SignalWorkflowInput>({
+    mutationFn: async (input) => {
+      const snapshot = await requestWorkflowSubjectSnapshot(input)
+      const params = buildSignalWorkflowWireParams(input, snapshot)
+      const { urlPath, init } = stdbBffCommandPost("signal_workflow", { params })
       const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error("Failed to signal workflow")
+      if (!r.ok) {
+        throw new Error(await responseErrorMessage(r, "Failed to signal workflow"))
+      }
     },
     onSuccess: async () => {
       invalidateAllWorkflowQueries(qc, organizationId)
@@ -442,3 +495,4 @@ export type {
   Workflow,
   WorkflowInstance,
 } from "@lumiere/stdb/types"
+export type { SignalWorkflowInput, StartWorkflowInput } from "./workflow-runtime"

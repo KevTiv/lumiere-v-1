@@ -14,6 +14,7 @@ export const WORKFLOWS_BFF_REDUCERS = [
   "publish_workflow_version",
   "clone_workflow_version_to_draft",
   "retire_workflow_version",
+  "request_workflow_subject_snapshot",
   "start_workflow",
   "signal_workflow",
   "cancel_workflow",
@@ -44,6 +45,7 @@ const WORKFLOW_RESOURCE_KEYS = [
   "workflow-migration-plans",
   "workflow-migration-preflights",
   "workflow-migration-results",
+  "workflow-subject-snapshots",
 ] as const;
 
 const WORKFLOWS_HINT_OVERRIDES: Partial<
@@ -58,6 +60,7 @@ const WORKFLOWS_HINT_OVERRIDES: Partial<
   publish_workflow_version: WORKFLOW_RESOURCE_KEYS,
   clone_workflow_version_to_draft: WORKFLOW_RESOURCE_KEYS,
   retire_workflow_version: WORKFLOW_RESOURCE_KEYS,
+  request_workflow_subject_snapshot: ["workflow-subject-snapshots"],
   start_workflow: WORKFLOW_RESOURCE_KEYS,
   signal_workflow: WORKFLOW_RESOURCE_KEYS,
   cancel_workflow: WORKFLOW_RESOURCE_KEYS,
