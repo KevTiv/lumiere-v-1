@@ -1,6 +1,7 @@
 # Workflow subject snapshot read (Option A) - Phase 1 design and blocker
 
-Status: design only. Implementation is intentionally NOT started; see "Blocker".
+Status: implemented locally with Docker runtime and contract-generation
+validation. The remote contracts release and pin are still pending.
 
 ## Problem
 
@@ -30,7 +31,7 @@ signal workflows.
 - There is no generic table-to-row accessor. `generated_reconstruction_apply.rs`
   only deserializes canonical row JSON into inserts; it does not read rows.
 
-## Chosen design (when unblocked)
+## Implemented design
 
 Reducer `request_workflow_subject_snapshot(organization_id, company_id,
 params{subject_model, subject_id, workflow_version_id})` writes one upserted row
@@ -50,13 +51,14 @@ Hash via `canonical_condition_snapshot_hash` only. Permission: same as the
 start/signal use plus read access to the subject; company/org scope guard on the
 subject row.
 
-## Blocker (why Phase 2 was not started)
+## Resolved implementation prerequisite
 
-Every variant needs a NEW table (a view/procedure cannot take the arguments, and
+Every variant needed a NEW table (a view/procedure cannot take the arguments, and
 a column on an existing table is rejected by the PG ledger rules). A new table
 is part of the durable PostgreSQL projection even with a `derived_rebuildable`
 storage class, so it requires generated and cross-stack artifacts that cannot be
-hand-written or verified without cargo and codegen:
+hand-written or verified without cargo and codegen. The implementation now
+includes:
 
 - storage-policy entry, reconstruction manifest and `generated_reconstruction_apply.rs`;
 - a pending durable PG follow-up migration promoted into

@@ -234,6 +234,7 @@ pub async fn execute_resource_query_for_company(
         | "workflow-migration-plans"
         | "workflow-migration-preflights"
         | "workflow-migration-results"
+        | "workflow-subject-snapshots"
         | "workflow-activities"
         | "workflow-transitions"
         | "workflow-workitems" => {

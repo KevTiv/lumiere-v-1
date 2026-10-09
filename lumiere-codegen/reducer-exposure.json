@@ -3435,6 +3435,11 @@
       "reason": "invoked by an enumerated frontend BFF call site"
     },
     {
+      "name": "request_workflow_subject_snapshot",
+      "exposure": "session",
+      "reason": "reviewed requester-scoped workflow snapshot read guarded by workflow command permission, subject read permission, and organization/company ownership checks"
+    },
+    {
       "name": "reserve_serial",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"

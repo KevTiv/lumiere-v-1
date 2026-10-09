@@ -26,6 +26,7 @@
   "workflow-migration-plans",
   "workflow-migration-preflights",
   "workflow-migration-results",
+  "workflow-subject-snapshots",
   "workflow-transitions",
   "workflow-workitems"
 ]

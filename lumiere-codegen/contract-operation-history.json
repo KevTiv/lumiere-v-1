@@ -3446,6 +3446,10 @@
       "name": "request_expense_policy_exception",
       "shape_fingerprint": "sha256:628ed92461861363397072a9b82bf7c700c0f838eadfb520131d65802cefd917"
     },
+    "erp.request_workflow_subject_snapshot": {
+      "name": "request_workflow_subject_snapshot",
+      "shape_fingerprint": "sha256:5495da63ae66197c23b96b11d0ce55bdc10d9c936aef805d4077b423c69e84c1"
+    },
     "erp.reserve_ai_spend": {
       "name": "reserve_ai_spend",
       "shape_fingerprint": "sha256:7356e80c83ec5d1fbed3b1f4f883d3d8e321dbd5ebe1c56b2cf68a0608682c19"
@@ -4485,6 +4489,10 @@
     "erp.run_workflow_runtime_tests": {
       "name": "run_workflow_runtime_tests",
       "shape_fingerprint": "sha256:1e1735d61a21517c67effd1e78e16a73a38333b57398f2e3556e24281bf9bfd5"
+    },
+    "erp.run_workflow_subject_snapshot_tests": {
+      "name": "run_workflow_subject_snapshot_tests",
+      "shape_fingerprint": "sha256:018a23d399143380aa9cc6006c880bcaaa66e570c099d18b3891b775fef88cff"
     },
     "erp.save_import_mapping_template": {
       "name": "save_import_mapping_template",
@@ -5892,6 +5900,14 @@
       "current_operations_fingerprint": "sha256:810d98bb268eccb3275d4fe82e4a605d7674933a03b2ed32554423552d4936fe",
       "operation_count": 1427,
       "reason": "release on top of v0.3.86: add none; change the shape of release_document_legal_hold"
+    },
+    {
+      "previous_release": "v0.3.87",
+      "previous_ir_sha256": "sha256:5d9346b1e777e9ab3f63af269f3169ca4f0561230dcdb008d5bfeef5ec04e225",
+      "previous_operations_fingerprint": "sha256:810d98bb268eccb3275d4fe82e4a605d7674933a03b2ed32554423552d4936fe",
+      "current_operations_fingerprint": "sha256:3324bce97daa1f9f32abfc999e54abbf31971b50b0a43ec18a0ef042e98ad87c",
+      "operation_count": 1429,
+      "reason": "add the tenant-scoped workflow subject snapshot reducer and its in-database test reducer on top of released v0.3.87; preserve every existing operation shape"
     }
   ]
 }

@@ -6,7 +6,7 @@
 
 use crate::error::ApiError;
 use serde_json::Value;
-use stdb_auth::FieldAccessContext;
+use stdb_auth::{identity_sql_literal, FieldAccessContext};
 use stdb_client::StdbClient;
 
 mod candidate_scope;
@@ -89,6 +89,9 @@ source_workflow_version_id, target_workflow_version_id, outcome, reason, mapping
 idempotency_key, prior_instance_revision, next_instance_revision, error_summary, recorded_by, \
 recorded_at";
 
+const SUBJECT_SNAPSHOT_COLS: &str = "id, organization_id, company_id, subject_model, subject_id, \
+workflow_version_id, subject_revision_hash, fields, requested_at";
+
 pub fn is_private_workflow_resource(resource: &str) -> bool {
     matches!(
         resource,
@@ -106,6 +109,7 @@ pub fn is_private_workflow_resource(resource: &str) -> bool {
             | "workflow-migration-plans"
             | "workflow-migration-preflights"
             | "workflow-migration-results"
+            | "workflow-subject-snapshots"
             // Legacy keys: fail closed with empty/not-found via early arms below.
             | "approval-requests-inbox"
             | "approval-requests"
@@ -325,6 +329,20 @@ pub async fn execute_private_workflow_query(
             sort_rows_by_id_desc(&mut rows);
             Ok(Some(rows))
         }
+        "workflow-subject-snapshots" => {
+            let requested_by = identity_sql_literal(identity_hex).map_err(ApiError::Internal)?;
+            let sql = format!(
+                "SELECT {SUBJECT_SNAPSHOT_COLS} FROM workflow_subject_snapshot \
+                 WHERE organization_id = {organization_id} AND requested_by = {requested_by}"
+            );
+            let rows = owner.query_sql(&sql).await.map_err(ApiError::internal)?;
+            let company_ids = allowed_company_ids(owner, organization_id, field_access).await?;
+            let rows = rows
+                .into_iter()
+                .filter(|row| row_company_allowed(row, &company_ids))
+                .collect();
+            Ok(Some(rows))
+        }
         _ => Ok(None),
     }
 }
@@ -443,6 +461,7 @@ mod tests {
     fn private_resource_detection() {
         assert!(is_private_workflow_resource("workflow-human-tasks-inbox"));
         assert!(is_private_workflow_resource("workflows"));
+        assert!(is_private_workflow_resource("workflow-subject-snapshots"));
         assert!(!is_private_workflow_resource("contacts"));
     }
 

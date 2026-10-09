@@ -5,6 +5,16 @@ repo's codegen tooling (the Claude cloud sandbox has none of these).
 Branch with the design: `claude/workflow-snapshot-backend` (design note only,
 no code): `docs/plan/workflow-subject-snapshot-read-design.md`.
 
+## Implementation status
+
+Task 1 is implemented on top of the design branch. Local acceptance includes a
+release WebAssembly build, an isolated SpacetimeDB 2.8.2 Docker publish, the
+focused in-database workflow snapshot test, API reader tests, code-generator
+tests, and the full `check-codegen` gate. Migration 12 is promoted and frozen.
+
+The remote contracts release, pin commit, and `frontend-contracts` check remain
+pending. Task 2 remains intentionally unstarted until that pin lands.
+
 ## Goal
 
 Let the web UI start and signal workflows. `start_workflow` and `signal_workflow`

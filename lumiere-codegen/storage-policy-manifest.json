@@ -171,6 +171,12 @@
       "reviewed": true
     },
     {
+      "table": "workflow_subject_snapshot",
+      "module": "workflow",
+      "storage_class": "projection_only",
+      "reviewed": true
+    },
+    {
       "table": "presentation_module",
       "module": "presentation",
       "storage_class": "always_hot",
@@ -16507,6 +16513,37 @@
       "hydration_policy": "not_applicable",
       "delete_behavior": "tombstone",
       "postgres_access_path": "organization_index"
+    },
+    {
+      "table": "workflow_subject_snapshot",
+      "module": "workflow",
+      "rationale": "Requester-scoped derived snapshot rebuilt from an authoritative organization/company-owned workflow subject row.",
+      "authoritative_resources": [],
+      "durability_class": "derived_rebuildable",
+      "organization_ownership": "direct",
+      "organization_column": "organization_id",
+      "company_ownership": "direct",
+      "company_column_path": [
+        "company_id"
+      ],
+      "company_column_nullable": false,
+      "aggregate": {
+        "kind": "root",
+        "parent": null
+      },
+      "primary_key": {
+        "strategy": "natural",
+        "column": "id",
+        "version_strategy": "none"
+      },
+      "projection_mode": "snapshot",
+      "hot_retention": "always",
+      "cooling_eligibility": "never",
+      "cooling_eligibility_source": "reviewed:c5/people-platform/always-hot/requester-scoped-workflow-command-input",
+      "dependency_behavior": "independent",
+      "hydration_policy": "not_applicable",
+      "delete_behavior": "rebuild",
+      "postgres_access_path": "snapshot_key"
     },
     {
       "table": "workflow_timer",

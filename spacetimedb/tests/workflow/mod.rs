@@ -10,6 +10,7 @@ mod evaluator_simulation_test;
 mod human_tasks_test;
 mod migration_test;
 mod runtime_test;
+mod subject_snapshot_test;
 
 use spacetimedb::ReducerContext;
 
@@ -70,12 +71,18 @@ pub fn run_workflow_migration_tests(ctx: &ReducerContext) -> Result<(), String> 
 }
 
 #[spacetimedb::reducer]
+pub fn run_workflow_subject_snapshot_tests(ctx: &ReducerContext) -> Result<(), String> {
+    subject_snapshot_test::test_workflow_subject_snapshots(ctx)
+}
+
+#[spacetimedb::reducer]
 pub fn run_all_workflow_deterministic_core_tests(ctx: &ReducerContext) -> Result<(), String> {
     evaluator_simulation_test::test_workflow_evaluator_and_simulation(ctx)?;
     runtime_test::test_workflow_runtime(ctx)?;
     authorization_test::test_workflow_authorization(ctx)?;
     branches_test::test_workflow_branches(ctx)?;
     migration_test::test_workflow_migration(ctx)?;
+    subject_snapshot_test::test_workflow_subject_snapshots(ctx)?;
     log::info!("workflow deterministic core tests complete");
     Ok(())
 }

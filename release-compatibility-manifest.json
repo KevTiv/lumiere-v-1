@@ -19,7 +19,7 @@
   },
   "operation_history": {
     "path": "lumiere-codegen/contract-operation-history.json",
-    "checksum": "sha256:9215f6342e40a3ab6d53b86601853a259d52c9f051e850ad76f9d9ba3e9eb24e"
+    "checksum": "sha256:fba2939c12bcc8f62828eab571255a013124a09b7f4b833f3924196077fecf07"
   },
   "stdb_module": {
     "name": "lumiere_v1",
@@ -35,8 +35,8 @@
     "manifest_path": "manifests/durable-pg-schema-manifest.json",
     "checksum": "sha256:5598834cc650011744abb9b9ad090e6ba09bfc824bc6d853f89f34930ef8d9ab",
     "application_catalog_path": "api-server/src/cold_tier/migrate.rs",
-    "application_catalog_version": 11,
-    "application_catalog_checksum": "sha256:a45f4ea1ae3e5b7f7093960dec0eb1ea475741b7f0e5d6380c5aea21bcf65ab5"
+    "application_catalog_version": 12,
+    "application_catalog_checksum": "sha256:f8e01e3fd27f33ad863bd5749674867eca9551b79b9d8ad092fd7a7248e5939d"
   },
   "services": {
     "api_server": {
