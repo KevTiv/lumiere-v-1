@@ -957,7 +957,11 @@
         "unpaid": "Unpaid"
       },
       "noReconcilablePayments": "No posted payments available",
-      "reconcilePaymentHint": "Match a posted payment entry to this document. The lesser of the two open balances is applied."
+      "reconcilePaymentHint": "Match a posted payment entry to this document. The lesser of the two open balances is applied.",
+      "emptyState": {
+        "description": "Invoices bill your customers and feed receivables and revenue reporting. Create the first one to start getting paid.",
+        "title": "No invoices yet"
+      }
     },
     "bills": {
       "title": "Bills (Accounts Payable)",
@@ -973,6 +977,10 @@
         "payBill": "Pay Bill",
         "download": "Download",
         "recalculateTotals": "Recalculate totals"
+      },
+      "emptyState": {
+        "description": "Vendor bills record what you owe suppliers so payables and expenses stay accurate. Add the first one to start tracking it.",
+        "title": "No vendor bills yet"
       }
     },
     "taxes": {
@@ -2967,6 +2975,9 @@
         "Won": "Won",
         "Lost": "Lost",
         "Converted": "Converted"
+      },
+      "emptyState": {
+        "hint": "Leads are unqualified enquiries; qualify the good ones into opportunities."
       }
     },
     "opportunities": {
@@ -2994,6 +3005,9 @@
         "Low": "Low",
         "Medium": "Medium",
         "High": "High"
+      },
+      "emptyState": {
+        "hint": "Opportunities move through your pipeline stages and feed the sales forecast."
       }
     },
     "opportunityLines": {
@@ -3024,6 +3038,9 @@
         "isCompany": "Type",
         "city": "City",
         "countryId": "Country"
+      },
+      "emptyState": {
+        "hint": "Contacts are the people and companies you sell to; leads, orders and invoices link back to them."
       }
     },
     "activities": {
@@ -3967,7 +3984,8 @@
       "emptyState": {
         "title": "No employees yet",
         "description": "Add your first employee to start managing your workforce.",
-        "actionLabel": "New Employee"
+        "actionLabel": "New Employee",
+        "hint": "Employees anchor leave, contracts, payslips and expenses."
       },
       "columns": {
         "employeeNumber": "#",
@@ -4581,7 +4599,8 @@
       "emptyState": {
         "title": "No products yet",
         "description": "Add your first product to start tracking stock and sales.",
-        "actionLabel": "New product"
+        "actionLabel": "New product",
+        "hint": "Products are what you buy, stock and sell: every order, transfer and invoice line points to one."
       },
       "detail": {
         "barcode": "Barcode",
@@ -4650,7 +4669,8 @@
       "emptyState": {
         "title": "No transfers yet",
         "description": "Create a transfer to move stock between locations.",
-        "actionLabel": "New transfer"
+        "actionLabel": "New transfer",
+        "hint": "Transfers (receipts, deliveries, internal moves) are how stock levels change."
       },
       "detail": {
         "locationFrom": "From location",
@@ -5935,7 +5955,8 @@
       "emptyState": {
         "title": "No purchase orders yet",
         "description": "Create your first purchase order to track vendor spending.",
-        "actionLabel": "New purchase order"
+        "actionLabel": "New purchase order",
+        "hint": "Confirmed purchase orders drive receipts and vendor bills, so spend stays traceable."
       },
       "columns": {
         "name": "Reference",
@@ -6807,7 +6828,8 @@
       "emptyState": {
         "title": "No sales orders yet",
         "description": "Create your first sales order to start tracking revenue.",
-        "actionLabel": "New sales order"
+        "actionLabel": "New sales order",
+        "hint": "Start with a quotation: confirming it turns it into a sales order, deliveries and an invoice."
       },
       "columns": {
         "reference": "Order #",
@@ -7559,6 +7581,10 @@
         "ToClose": "To Close",
         "Done": "Done",
         "Cancelled": "Cancelled"
+      },
+      "emptyState": {
+        "description": "Manufacturing orders consume components and produce finished goods, keeping stock and costs in step with the shop floor.",
+        "hint": "Define a bill of materials first so orders know what to consume."
       }
     },
     "billsOfMaterials": {
@@ -7924,6 +7950,10 @@
         "Paused": "Paused",
         "Done": "Done",
         "Cancelled": "Cancelled"
+      },
+      "emptyState": {
+        "description": "Projects group tasks, timesheets and billing for a piece of work, so progress and profitability are visible.",
+        "hint": "Add tasks to a project, then log time against them."
       }
     },
     "tasks": {
@@ -8841,6 +8871,10 @@
         "normal": "Normal",
         "high": "High",
         "urgent": "Urgent"
+      },
+      "emptyState": {
+        "description": "Tickets track every customer request from first contact to resolution, so nothing gets lost.",
+        "hint": "Assign tickets to a team and SLAs will time them for you."
       }
     },
     "forms": {
@@ -9015,6 +9049,10 @@
       "health": {
         "good": "Good",
         "bad": "At risk"
+      },
+      "emptyState": {
+        "description": "Subscriptions bill customers on a schedule and drive recurring revenue reporting.",
+        "hint": "Create a plan first, then attach it to a customer's subscription."
       }
     },
     "plans": {
@@ -9588,6 +9626,10 @@
         "Posted": "Posted",
         "Done": "Done",
         "Refused": "Refused"
+      },
+      "emptyState": {
+        "description": "Expenses record what employees spend so it can be approved, reimbursed and booked to the right accounts.",
+        "hint": "Group expenses into a report to submit them for approval."
       }
     },
     "expenseReports": {

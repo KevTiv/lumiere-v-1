@@ -77,6 +77,12 @@ export const helpdeskTicketsTableConfig = (t: TFunction): EntityViewConfig => ({
       { key: "createdAt", label: t("helpdesk.tickets.columns.createdAt"), type: "date" },
     ],
     emptyMessage: t("helpdesk.tickets.emptyMessage"),
+    emptyState: {
+      title: t("helpdesk.tickets.emptyMessage"),
+      description: t("helpdesk.tickets.emptyState.description", { defaultValue: "Tickets track every customer request from first contact to resolution, so nothing gets lost." }),
+      permission: { resource: "helpdesk_ticket", action: "create" },
+      learnHint: t("helpdesk.tickets.emptyState.hint", { defaultValue: "Assign tickets to a team and SLAs will time them for you." }),
+    },
   },
 })
 

@@ -225,6 +225,9 @@ export const purchaseOrdersTableConfig = (
       description: t("purchasing.purchaseOrders.emptyState.description"),
       actionLabel: t("purchasing.purchaseOrders.emptyState.actionLabel"),
       onAction: options?.onEmptyAction,
+      permission: { resource: "purchase_order", action: "create" },
+      secondaryActionId: "csv-purchase-orders",
+      learnHint: t("purchasing.purchaseOrders.emptyState.hint", { defaultValue: "Confirmed purchase orders drive receipts and vendor bills, so spend stays traceable." }),
     },
   },
 })

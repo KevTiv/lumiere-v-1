@@ -50,6 +50,9 @@ import {
   moveTypeIsInvoiceOrRefund,
 } from "../lib/accounting-move-utils"
 import { useTranslation } from "@lumiere/i18n"
+import { EmptyStateCard } from "../components/empty-state-card"
+import { decideListEmptyState } from "../lib/list-empty-state"
+import { useRBAC } from "../lib/rbac-context"
 
 // State display mapping
 type DisplayStatus = "draft" | "sent" | "partial" | "paid" | "overdue" | "cancelled"
@@ -111,6 +114,8 @@ export function InvoiceListView({
   const [statusFilter, setStatusFilter] = useState<DisplayStatus | "all">("all")
   // Set by the stat tiles above the list; "pending" groups sent and partly paid invoices.
   const [tileFilter, setTileFilter] = useState<"paid" | "pending" | "overdue" | null>(null)
+  const { checkPermission } = useRBAC()
+  const canCreate = checkPermission("account_move", "create").allowed
 
   const filtered = invoices
     .filter((inv) => {
@@ -126,6 +131,12 @@ export function InvoiceListView({
     // Newest first, matching EntityTable's default (auto-inc ids only increase).
     .sort((a, b) => Number(b.id) - Number(a.id))
   const pager = usePagedRows(filtered, `${searchQuery}|${statusFilter}|${tileFilter}`)
+  const emptyKind = decideListEmptyState({
+    totalRows: invoices.length,
+    visibleRows: filtered.length,
+    search: searchQuery,
+    filters: { status: statusFilter === "all" ? undefined : statusFilter, tile: tileFilter ?? undefined },
+  })
 
   const stats = {
     total: invoices.length,
@@ -205,7 +216,41 @@ export function InvoiceListView({
             </TableHeader>
             <TableBody>
               {filtered.length === 0 ? (
-                <TableRow><TableCell colSpan={8} className="text-center py-8 text-muted-foreground">{t("accounting.invoices.noResults")}</TableCell></TableRow>
+                <TableRow>
+                  <TableCell colSpan={8} className="p-0">
+                    {emptyKind === "first-time" ? (
+                      <EmptyStateCard
+                        compact
+                        data-testid="entity-empty-first-time"
+                        title={t("accounting.invoices.emptyState.title", { defaultValue: "No invoices yet" })}
+                        description={t("accounting.invoices.emptyState.description", { defaultValue: "Invoices bill your customers and feed receivables and revenue reporting. Create the first one to start getting paid." })}
+                        primaryAction={
+                          canCreate && onCreateInvoice
+                            ? { label: t("accounting.actions.newInvoice"), onClick: onCreateInvoice }
+                            : undefined
+                        }
+                        readOnlyMessage={t("common.entityView.firstTime.readOnly", {
+                          defaultValue: "You have read-only access. Ask an administrator to add the first record.",
+                        })}
+                      />
+                    ) : (
+                      <EmptyStateCard
+                        compact
+                        data-testid="entity-empty-no-results"
+                        title={t("accounting.invoices.noResults")}
+                        primaryAction={{
+                          label: t("common.entityView.noResults.clear", { defaultValue: "Clear filters" }),
+                          testId: "entity-empty-clear-filters",
+                          onClick: () => {
+                            setSearchQuery("")
+                            setStatusFilter("all")
+                            setTileFilter(null)
+                          },
+                        }}
+                      />
+                    )}
+                  </TableCell>
+                </TableRow>
               ) : pager.pageRows.map((inv) => {
                 const status = getMoveStatus(inv)
                 const conf = statusConfig[status]
