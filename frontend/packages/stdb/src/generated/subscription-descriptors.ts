@@ -2164,6 +2164,75 @@ export const SUBSCRIPTION_DESCRIPTORS = {
       "exception": "SQ-0 records the resource shape; SQ-2 must map interactive reads to a shared STDB access path."
     }
   },
+  "hr-leave-allocations": {
+    "resource": "hr-leave-allocations",
+    "source": {
+      "table": "hr_leave_allocation",
+      "readModel": "bff-authorized:hr_leave_allocation"
+    },
+    "scope": "organization+company",
+    "deliveryMode": "invalidation-only",
+    "realtime": true,
+    "directRowExposure": false,
+    "fieldSensitivity": "field-policy",
+    "predicateClass": "none",
+    "expectedCardinality": "broad",
+    "latencyClass": "interactive",
+    "updateFanout": "medium",
+    "sourceClass": "canonical-table",
+    "reconnectClass": "on-demand",
+    "accessPath": {
+      "status": "pending",
+      "key": null,
+      "exception": "SQ-0 records the resource shape; SQ-2 must map interactive reads to a shared STDB access path."
+    }
+  },
+  "hr-offboarding-checklists": {
+    "resource": "hr-offboarding-checklists",
+    "source": {
+      "table": "hr_offboarding_checklist",
+      "readModel": "bff-authorized:hr_offboarding_checklist"
+    },
+    "scope": "organization+company",
+    "deliveryMode": "invalidation-only",
+    "realtime": true,
+    "directRowExposure": false,
+    "fieldSensitivity": "field-policy",
+    "predicateClass": "none",
+    "expectedCardinality": "broad",
+    "latencyClass": "interactive",
+    "updateFanout": "medium",
+    "sourceClass": "canonical-table",
+    "reconnectClass": "on-demand",
+    "accessPath": {
+      "status": "pending",
+      "key": null,
+      "exception": "SQ-0 records the resource shape; SQ-2 must map interactive reads to a shared STDB access path."
+    }
+  },
+  "hr-statutory-ids": {
+    "resource": "hr-statutory-ids",
+    "source": {
+      "table": "hr_statutory_id",
+      "readModel": "bff-authorized:hr_statutory_id"
+    },
+    "scope": "organization+company",
+    "deliveryMode": "invalidation-only",
+    "realtime": true,
+    "directRowExposure": false,
+    "fieldSensitivity": "field-policy",
+    "predicateClass": "none",
+    "expectedCardinality": "broad",
+    "latencyClass": "interactive",
+    "updateFanout": "medium",
+    "sourceClass": "canonical-table",
+    "reconnectClass": "on-demand",
+    "accessPath": {
+      "status": "pending",
+      "key": null,
+      "exception": "SQ-0 records the resource shape; SQ-2 must map interactive reads to a shared STDB access path."
+    }
+  },
   "hr-employee-skills": {
     "resource": "hr-employee-skills",
     "source": {
@@ -4418,6 +4487,75 @@ export const SUBSCRIPTION_DESCRIPTORS = {
       "exception": "SQ-0 records the resource shape; SQ-2 must map interactive reads to a shared STDB access path."
     }
   },
+  "document-external-refs": {
+    "resource": "document-external-refs",
+    "source": {
+      "table": "document_external_ref",
+      "readModel": "bff-authorized:document_external_ref"
+    },
+    "scope": "organization",
+    "deliveryMode": "invalidation-only",
+    "realtime": true,
+    "directRowExposure": false,
+    "fieldSensitivity": "field-policy",
+    "predicateClass": "none",
+    "expectedCardinality": "broad",
+    "latencyClass": "interactive",
+    "updateFanout": "medium",
+    "sourceClass": "canonical-table",
+    "reconnectClass": "on-demand",
+    "accessPath": {
+      "status": "pending",
+      "key": null,
+      "exception": "SQ-0 records the resource shape; SQ-2 must map interactive reads to a shared STDB access path."
+    }
+  },
+  "document-legal-holds": {
+    "resource": "document-legal-holds",
+    "source": {
+      "table": "document_legal_hold",
+      "readModel": "bff-authorized:document_legal_hold"
+    },
+    "scope": "organization",
+    "deliveryMode": "invalidation-only",
+    "realtime": true,
+    "directRowExposure": false,
+    "fieldSensitivity": "field-policy",
+    "predicateClass": "none",
+    "expectedCardinality": "broad",
+    "latencyClass": "interactive",
+    "updateFanout": "medium",
+    "sourceClass": "canonical-table",
+    "reconnectClass": "on-demand",
+    "accessPath": {
+      "status": "pending",
+      "key": null,
+      "exception": "SQ-0 records the resource shape; SQ-2 must map interactive reads to a shared STDB access path."
+    }
+  },
+  "document-signature-requests": {
+    "resource": "document-signature-requests",
+    "source": {
+      "table": "document_signature_request",
+      "readModel": "bff-authorized:document_signature_request"
+    },
+    "scope": "organization+company",
+    "deliveryMode": "invalidation-only",
+    "realtime": true,
+    "directRowExposure": false,
+    "fieldSensitivity": "field-policy",
+    "predicateClass": "none",
+    "expectedCardinality": "broad",
+    "latencyClass": "interactive",
+    "updateFanout": "medium",
+    "sourceClass": "canonical-table",
+    "reconnectClass": "on-demand",
+    "accessPath": {
+      "status": "pending",
+      "key": null,
+      "exception": "SQ-0 records the resource shape; SQ-2 must map interactive reads to a shared STDB access path."
+    }
+  },
   "document-templates": {
     "resource": "document-templates",
     "source": {
@@ -6378,6 +6516,9 @@ export const SUBSCRIPTION_RESOURCE_KEYS = [
   "project-integration-intents",
   "hr-resources",
   "hr-skills",
+  "hr-leave-allocations",
+  "hr-offboarding-checklists",
+  "hr-statutory-ids",
   "hr-employee-skills",
   "onboarding-templates",
   "onboarding-template-items",
@@ -6476,6 +6617,9 @@ export const SUBSCRIPTION_RESOURCE_KEYS = [
   "documents-deleted",
   "document-folders",
   "document-versions",
+  "document-external-refs",
+  "document-legal-holds",
+  "document-signature-requests",
   "document-templates",
   "mail-templates",
   "knowledge-articles",
