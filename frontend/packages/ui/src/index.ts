@@ -291,6 +291,7 @@ export * from "./entity-views/sale-order-line-grid";
 export * from "./lib/entity-table-engine";
 export * from "./lib/workflow-actions";
 export * from "./lib/workflow-toast";
+export * from "./lib/semantic-operation-outcome";
 export * from "./lib/module-url-filters";
 
 export * from "./pages/erp-command-palette";

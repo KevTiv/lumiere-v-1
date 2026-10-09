@@ -17,8 +17,10 @@ and on the Docker stack
 ([`cov-runtime-docker-acceptance-2026-10-04.md`](../evidence/cov-runtime-docker-acceptance-2026-10-04.md)).
 The projection defect (`mrp_bom` `type`/`type_`) is fixed and the Docker run
 converged all organizations with the projection worker attached. Runtime
-acceptance stays at `REVIEW`: the contracts `v0.3.81` change to released
-migration 1 is open for existing databases.
+acceptance stays at `REVIEW` for the remaining coverage limits. The contracts
+`v0.3.81` released-migration regression is closed on `v0.3.86`: migration 1 is
+restored and Docker PostgreSQL upgrade proof applies the index through authored
+migration 11 without changing the recorded migration 1 checksum.
 
 ## Required PR completion card
 

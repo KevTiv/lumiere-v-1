@@ -177,22 +177,36 @@ export function observeConvertedRequisition(
   return { outcome: "applied", createdRecords: [order], next: order }
 }
 
-/** The RFQ an awarded PO came from: `award_purchase_rfq_bid` stamps `metadata.rfq_id`. */
+/**
+ * The RFQ an awarded PO came from. `award_purchase_rfq_bid` stamps both the projected
+ * `origin` relation and `metadata.rfq_id`; conflicting stamps are unresolved.
+ */
 export function poSourceRfqId(order: RowValueMap): string | undefined {
+  const origin = firstNonNullKey(order, "origin")
+  const originMatch = typeof origin === "string" ? /^rfq:([0-9]+)$/.exec(origin) : null
+  const originRfqId = originMatch?.[1]
+
   const metadata = firstNonNullKey(order, "metadata")
-  if (typeof metadata !== "string") return undefined
-  try {
-    const id = (JSON.parse(metadata) as { rfq_id?: unknown }).rfq_id
-    return id == null ? undefined : String(id)
-  } catch {
-    return undefined
+  let metadataRfqId: string | undefined
+  if (typeof metadata === "string") {
+    try {
+      const id = (JSON.parse(metadata) as { rfq_id?: unknown }).rfq_id
+      if (typeof id === "string" || typeof id === "number" || typeof id === "bigint") {
+        metadataRfqId = String(id)
+      }
+    } catch {
+      // The projected origin remains authoritative when metadata is not readable.
+    }
   }
+
+  if (originRfqId && metadataRfqId && originRfqId !== metadataRfqId) return undefined
+  return originRfqId ?? metadataRfqId
 }
 
 /**
  * An RFQ is awarded once: `award_purchase_rfq_bid` records the PO it created on the RFQ's own
  * `purchase_order_id`. The award is confirmed only when that exact RFQ reads back awarded and the
- * PO it names exists and carries the same `rfq_id` stamp.
+ * PO it names exists and carries the same strict RFQ source stamp.
  */
 export function observeAwardedRfq(
   rfqId: string,
@@ -380,7 +394,7 @@ export interface AwardRfqBidInput {
   bidId: string
 }
 
-/** Presented against an RFQ bid row; the current prompt-driven flow dispatches the collected ids through `execute`. */
+/** Presented against an RFQ bid row or typed award form; both dispatch the selected ids through `execute`. */
 export function awardRfqBidAction(options: {
   label: string
   execute: ExecuteAction<AwardRfqBidInput>
