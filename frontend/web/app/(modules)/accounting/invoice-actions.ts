@@ -8,10 +8,9 @@ export function canResetMove(move: Row): boolean {
   return variantTag(move.state) === 'Cancelled' && (move.postedBefore ?? move.posted_before) === false;
 }
 
-/** `cancel_account_move` accepts only draft or posted moves. */
+/** Direct cancellation is draft-only. Posted moves require a credit note or reversal. */
 export function canCancelMove(move: Row): boolean {
-  const state = variantTag(move.state);
-  return state === 'Draft' || state === 'Posted';
+  return variantTag(move.state) === 'Draft';
 }
 
 /** `add_`, `update_` and `delete_account_move_line` accept only lines of a draft move. */

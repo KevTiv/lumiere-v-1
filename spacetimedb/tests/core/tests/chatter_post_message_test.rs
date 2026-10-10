@@ -258,6 +258,8 @@ fn read_at_of(row: &MailMessage) -> Option<i64> {
 /// Notification read state: `mark_notification_read` / `mark_all_notifications_read`.
 pub fn test_notification_read_state(ctx: &ReducerContext) -> Result<(), String> {
     use crate::core::messaging::{mark_all_notifications_read, mark_notification_read};
+    use crate::core::permissions::{role, Role};
+    use crate::core::users::{user_organization, user_profile, UserProfile};
     use crate::types::MailMessageType;
 
     ensure_test_superuser(ctx)?;
@@ -275,6 +277,38 @@ pub fn test_notification_read_state(ctx: &ReducerContext) -> Result<(), String> 
             Some(serde_json::json!({ "recipient": recipient, "event": "comment" }).to_string()),
         )
     };
+
+    // Narrow the fixture owner to read-only authority. This proves that
+    // acknowledging a caller-owned notification does not require message
+    // content write permission.
+    let profile = ctx
+        .db
+        .user_profile()
+        .user_profile_by_identity_organization()
+        .filter((ctx.sender(), org))
+        .next()
+        .ok_or("test user profile missing")?;
+    let membership = ctx
+        .db
+        .user_organization()
+        .user_org_by_user()
+        .filter(&ctx.sender())
+        .find(|row| row.organization_id == org)
+        .ok_or("test organization membership missing")?;
+    let owner_role = ctx
+        .db
+        .role()
+        .id()
+        .find(&membership.role_id)
+        .ok_or("test owner role missing")?;
+    ctx.db.user_profile().id().update(UserProfile {
+        is_superuser: false,
+        ..profile
+    });
+    ctx.db.role().id().update(Role {
+        permissions: vec!["mail_message:read".to_string()],
+        ..owner_role.clone()
+    });
 
     // The recipient marks their own notification read; other keys survive.
     let mine = notification(&me);
@@ -359,5 +393,17 @@ pub fn test_notification_read_state(ctx: &ReducerContext) -> Result<(), String> 
     {
         return Err("second mark_all_notifications_read changed rows".to_string());
     }
+    ctx.db.role().id().update(owner_role);
+    let narrowed_profile = ctx
+        .db
+        .user_profile()
+        .user_profile_by_identity_organization()
+        .filter((ctx.sender(), org))
+        .next()
+        .ok_or("test user profile missing after notification checks")?;
+    ctx.db.user_profile().id().update(UserProfile {
+        is_superuser: true,
+        ..narrowed_profile
+    });
     Ok(())
 }

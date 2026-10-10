@@ -125,6 +125,34 @@ export function usePostMessage(organizationId: bigint) {
   })
 }
 
+export function useMarkNotificationRead(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation<void, Error, bigint | number | string>({
+    mutationFn: async (messageId) => {
+      const { urlPath, init } = stdbBffCommandPost("mark_notification_read", {
+        messageId: toScalarU64(messageId),
+      })
+      const response = await apiFetch(urlPath, init)
+      if (!response.ok) throw new Error(await response.text() || "Unable to mark notification read")
+    },
+    onSuccess: () =>
+      qc.invalidateQueries({ queryKey: ['mail-messages', rqBigIntKey(organizationId)] }),
+  })
+}
+
+export function useMarkAllNotificationsRead(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation<void, Error, void>({
+    mutationFn: async () => {
+      const { urlPath, init } = stdbBffCommandPost("mark_all_notifications_read", {})
+      const response = await apiFetch(urlPath, init)
+      if (!response.ok) throw new Error(await response.text() || "Unable to mark notifications read")
+    },
+    onSuccess: () =>
+      qc.invalidateQueries({ queryKey: ['mail-messages', rqBigIntKey(organizationId)] }),
+  })
+}
+
 export function useMailFollowers(
   organizationId: bigint,
   initialData?: MailFollower[],

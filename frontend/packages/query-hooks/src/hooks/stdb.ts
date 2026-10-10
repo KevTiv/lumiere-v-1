@@ -69,13 +69,18 @@ export function realtimeQueryKeysForResource(
   organizationId: bigint | number,
 ): QueryKey[] {
   const orgString = organizationId.toString()
-  const keys: QueryKey[] = [
-    stdbQueryKey(resource, organizationId),
-    [resource, orgString],
-  ]
+  const keys: QueryKey[] = []
+  const appendResourceKeys = (resourceKey: string) => {
+    keys.push(stdbQueryKey(resourceKey, organizationId), [resourceKey, orgString])
+    if (typeof organizationId === 'number') {
+      keys.push(['stdb', resourceKey, organizationId])
+    }
+  }
 
-  if (typeof organizationId === 'number') {
-    keys.push(['stdb', resource, organizationId])
+  appendResourceKeys(resource)
+
+  for (const resourceAlias of BUNDLE_RESOURCE_ALIASES[resource] ?? []) {
+    appendResourceKeys(resourceAlias)
   }
 
   // HR hooks (`hooks/hr.ts`) deviate from the `[resource, org]` convention and
@@ -88,9 +93,39 @@ export function realtimeQueryKeysForResource(
     keys.push([hrAlias, orgString])
   }
 
-  // TODO(BFF Form Cleanup): add explicit aliases for bundle resources like
-  // "auth" and "form-configuration" once their concrete query keys are settled.
+  if (resource === 'auth') {
+    keys.push(
+      ['settings-roles', orgString],
+      ['settings-users', orgString],
+      ['user-role-assignments', orgString],
+      ['user-organizations', orgString],
+      ['current-user-profile'],
+    )
+  }
+
   return keys
+}
+
+/** Concrete BFF resource caches covered by invalidation-only subscription bundles. */
+const BUNDLE_RESOURCE_ALIASES: Record<string, readonly string[]> = {
+  auth: [
+    'user-profile',
+    'user-role-assignment',
+    'user-organization',
+    'roles',
+    'field-permissions',
+  ],
+  'form-configuration': [
+    'form-configs',
+    'form-config-fields',
+    'form-role-configs',
+    'user-custom-fields',
+    'form-field-labels',
+  ],
+}
+
+export function isInvalidationOnlyResource(resource: string): boolean {
+  return Object.prototype.hasOwnProperty.call(BUNDLE_RESOURCE_ALIASES, resource)
 }
 
 /** Maps `HR_WORKSPACE_RESOURCE_KEYS` resource names to the custom query key prefix used in `hooks/hr.ts`. */
@@ -128,13 +163,15 @@ export function invalidateStdbQueryResources(
   organizationId: bigint | number,
   resources: readonly string[],
 ) {
+  const invalidateHttpCaches =
+    !isSubscriptionReady() || resources.some(isInvalidationOnlyResource)
   for (const resource of resources) {
     // Typed HTTP rows use a separate namespace so the opt-in legacy direct-row
     // cache can never populate them with unprojected SDK entities.
     void qc.invalidateQueries({
       queryKey: typedStdbQueryKey(resource, organizationId),
     })
-    if (isSubscriptionReady()) continue
+    if (!invalidateHttpCaches) continue
     for (const queryKey of realtimeQueryKeysForResource(resource, organizationId)) {
       void qc.invalidateQueries({ queryKey })
     }

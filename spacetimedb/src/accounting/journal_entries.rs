@@ -1585,9 +1585,15 @@ pub fn cancel_account_move(
 
     let move_record = load_account_move_in_scope(ctx, organization_id, move_id)?;
 
-    if move_record.state != AccountMoveState::Draft && move_record.state != AccountMoveState::Posted
-    {
-        return Err("Only draft or posted moves can be cancelled".to_string());
+    match move_record.state {
+        AccountMoveState::Draft => {}
+        AccountMoveState::Posted => {
+            return Err(
+                "Posted moves cannot be cancelled; create a credit note or reversal instead"
+                    .to_string(),
+            )
+        }
+        AccountMoveState::Cancelled => return Err("Only draft moves can be cancelled".to_string()),
     }
 
     let old_state = format!("{:?}", move_record.state);
@@ -1629,11 +1635,11 @@ pub fn cancel_account_move(
 
 /// Return a cancelled move to draft so its lines can be edited again.
 ///
-/// Only `Cancelled -> Draft` is supported. `Posted -> Draft` is refused because posting is
+/// Only `Cancelled -> Draft` is supported. Only draft moves can be cancelled; `Posted -> Draft`
+/// is refused because posting is
 /// not exactly invertible from the code: `post_invoice` inserts COGS lines, may accrue sale
 /// commissions and re-derives totals, and `post_account_move` pushes budget actuals and may
-/// issue a document number. Previously posted moves must be reversed with a credit note;
-/// cancelling does not undo those posting effects and must not make them repostable.
+/// issue a document number. Posted moves must be reversed with a credit note or reversal.
 /// The document number (`name` / `move_name`) is kept, so no number is ever re-issued; the
 /// payment/residual fields are untouched because cancel does not modify them.
 #[spacetimedb::reducer]
@@ -1651,14 +1657,16 @@ pub fn reset_account_move_to_draft(
         AccountMoveState::Draft => return Err("Move is already in draft state".to_string()),
         AccountMoveState::Posted => {
             return Err(
-                "Posted moves cannot be reset to draft; cancel the move first or issue a credit note"
+                "Posted moves cannot be reset to draft; issue a credit note or reversal"
                     .to_string(),
             )
         }
     }
 
     if move_record.posted_before {
-        return Err("Previously posted moves cannot be reset to draft; issue a credit note".to_string());
+        return Err(
+            "Previously posted moves cannot be reset to draft; issue a credit note".to_string(),
+        );
     }
 
     let company_id = move_record.company_id;

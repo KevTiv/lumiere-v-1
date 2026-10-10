@@ -5,15 +5,14 @@
 import { useEffect, useMemo, useReducer, useState } from "react"
 import { useTranslation } from "@lumiere/i18n"
 import { useErpSession } from "@lumiere/erp-session"
-import { stdbBrowserQuery } from "@lumiere/stdb/browser-http"
+import {
+  stdbBrowserQuery,
+  stdbBrowserQueryOrganizationUsers,
+} from "@lumiere/stdb/browser-http"
 import {
   addUserCustomField,
   deleteUserCustomField,
 } from "@lumiere/stdb/client-ui-bridge"
-import type {
-  FieldType as StdbFieldType,
-  FieldWidth as StdbFieldWidth,
-} from "@lumiere/stdb/types"
 import type {
   FormConfig,
   FormConfigField,
@@ -25,6 +24,7 @@ import type {
   CreateFormFieldParams,
   FieldType,
   FieldWidth,
+  FieldOption,
 } from "../config/types"
 import {
   parseFormField,
@@ -34,8 +34,8 @@ import {
   isCustomField,
 } from "../config/types"
 import { getDefaultFormConfig } from "../config/registry"
-import { formOptionsToStdb, formValidationToStdb } from "../utils/stdb-field-params"
 import { toCreateUserCustomFieldParams } from "@lumiere/erp-shared/forms-create-params"
+import { identityToHex } from "../../lib/identity-label"
 
 // ═════════════════════════════════════════════════════════════════════════════
 // STATE REDUCERS
@@ -50,6 +50,7 @@ interface FormConfigState {
   fields: FormConfigField[]
   roleConfigs: FormRoleConfig[]
   customFields: UserCustomField[]
+  userOptions: FieldOption[]
   isLoading: boolean
   error: string | null
 }
@@ -59,6 +60,7 @@ const initialState: FormConfigState = {
   fields: [],
   roleConfigs: [],
   customFields: [],
+  userOptions: [],
   isLoading: true,
   error: null,
 }
@@ -173,6 +175,44 @@ function buildLocalizedLabelMap(
     }
   }
   return byFieldRowId
+}
+
+/** Convert server-authorized organization profiles into stable UserSelect options. */
+export function organizationUsersToFieldOptions(
+  rows: readonly Record<string, unknown>[],
+): FieldOption[] {
+  const byIdentity = new Map<string, FieldOption>()
+  for (const row of rows) {
+    const identity = [
+      row.identity,
+      row.identityHex,
+      row.userIdentity,
+      row.user_identity,
+      row.id,
+    ]
+      .map(value => identityToHex(value).replace(/^0x/, ""))
+      .find(Boolean) ?? ""
+    if (!identity || byIdentity.has(identity)) continue
+    const name = String(row.name ?? "").trim()
+    const email = String(row.email ?? "").trim()
+    const label = name || email
+    byIdentity.set(identity, {
+      value: identity,
+      label: label || (identity.length > 10 ? `${identity.slice(0, 8)}…` : identity),
+    })
+  }
+  return [...byIdentity.values()].sort(
+    (left, right) => left.label.localeCompare(right.label) || left.value.localeCompare(right.value),
+  )
+}
+
+function hydrateUserSelectOptions(
+  fields: readonly ParsedFormField[],
+  options: readonly FieldOption[],
+): ParsedFormField[] {
+  return fields.map(field =>
+    field.type === "UserSelect" ? { ...field, options: [...options] } : field,
+  )
 }
 
 function parseUserCustomFieldRow(cf: UserCustomField): ParsedFormField {
@@ -388,7 +428,7 @@ export function useFormConfiguration(options: UseFormConfigurationOptions): {
      * default then resolves to no runtime overlay (callers keep their static
      * config) instead of a dependency failure.
      */
-    function loadDefaultConfig(absentIsError = true) {
+    function loadDefaultConfig(absentIsError = true, userOptions: FieldOption[] = []) {
       const defaultConfig = getDefaultFormConfig(moduleId, formId)
       if (defaultConfig) {
         const mockConfig: FormConfig = {
@@ -457,6 +497,7 @@ export function useFormConfiguration(options: UseFormConfigurationOptions): {
             fields: mockFields,
             roleConfigs: mockRoleConfigs,
             customFields: [],
+            userOptions,
           },
         })
       } else if (absentIsError) {
@@ -464,7 +505,7 @@ export function useFormConfiguration(options: UseFormConfigurationOptions): {
       } else {
         dispatch({
           type: "SET_DATA",
-          payload: { config: null, fields: [], roleConfigs: [], customFields: [] },
+          payload: { config: null, fields: [], roleConfigs: [], customFields: [], userOptions },
         })
       }
     }
@@ -478,12 +519,13 @@ export function useFormConfiguration(options: UseFormConfigurationOptions): {
     let cancelled = false
     ;(async () => {
       try {
-        const [configRows, fieldRows, roleRows, allCustomRows, labelRows] = await Promise.all([
+        const [configRows, fieldRows, roleRows, allCustomRows, labelRows, userRows] = await Promise.all([
           stdbBrowserQuery("form-configs"),
           stdbBrowserQuery("form-config-fields"),
           stdbBrowserQuery("form-role-configs"),
           stdbBrowserQuery("user-custom-fields"),
           stdbBrowserQuery("form-field-labels").catch(() => [] as Record<string, unknown>[]),
+          stdbBrowserQueryOrganizationUsers().catch(() => [] as Record<string, unknown>[]),
         ])
         if (cancelled) return
 
@@ -496,7 +538,7 @@ export function useFormConfiguration(options: UseFormConfigurationOptions): {
         )
 
         if (configs.length === 0) {
-          if (useDefaultIfMissing) loadDefaultConfig(false)
+          if (useDefaultIfMissing) loadDefaultConfig(false, organizationUsersToFieldOptions(userRows))
           else dispatch({ type: "SET_ERROR", payload: `No form configuration found for ${moduleId}:${formId}` })
           return
         }
@@ -599,6 +641,7 @@ export function useFormConfiguration(options: UseFormConfigurationOptions): {
             fields,
             roleConfigs,
             customFields,
+            userOptions: organizationUsersToFieldOptions(userRows),
           },
         })
 
@@ -641,7 +684,10 @@ export function useFormConfiguration(options: UseFormConfigurationOptions): {
       )
     }
 
-    const allFields = mergeWithCustomFields(roleFields, parsedCustomFields).sort((a, b) => a.order - b.order)
+    const allFields = hydrateUserSelectOptions(
+      mergeWithCustomFields(roleFields, parsedCustomFields),
+      state.userOptions,
+    ).sort((a, b) => a.order - b.order)
 
     return {
       config: state.config,
@@ -650,7 +696,7 @@ export function useFormConfiguration(options: UseFormConfigurationOptions): {
       roleConfig: parsedRoleConfig ? parseRoleConfig(parsedRoleConfig) : undefined,
       customFields: parsedCustomFields,
     }
-  }, [state.config, state.fields, state.roleConfigs, state.customFields, roleId, forAdminSettings])
+  }, [state.config, state.fields, state.roleConfigs, state.customFields, state.userOptions, roleId, forAdminSettings])
 
   const refetch = () => setRefreshKey(k => k + 1)
 
