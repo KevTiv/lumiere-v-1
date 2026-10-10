@@ -4,6 +4,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import type { EntityTableConfig } from "../lib/entity-view-types"
 import { RBACProvider } from "../lib/rbac-context"
 import { EntityTable } from "./entity-table"
+import type { TFunction } from "i18next"
+import { documentsTableConfig } from "../lib/documents-entity-configs"
+import { employeesTableConfig, payslipsTableConfig } from "../lib/hr-entity-configs"
+import { entityTableConfigFromView } from "../lib/entity-view-types"
 
 vi.mock("../components/tooltip", () => ({
   TooltipProvider: ({ children }: { children: ReactNode }) => <>{children}</>,
@@ -74,4 +78,35 @@ describe("EntityTable export", () => {
     renderTable({ allowExport: false })
     expect(screen.queryByTestId("entity-table-export")).toBeNull()
   })
+
+  it.each([payslipsTableConfig, documentsTableConfig])("hides export for confidential list configs", (factory) => {
+    const t = ((key: string) => key) as TFunction
+    render(
+      <RBACProvider>
+        <EntityTable config={entityTableConfigFromView(factory(t).view)} data={[{ id: 1, name: "Private record" }]} />
+      </RBACProvider>,
+    )
+    expect(screen.queryByTestId("entity-table-export")).toBeNull()
+    expect(blobs).toHaveLength(0)
+  })
+
+  it("exports employee operational data without personal identity or contact fields", async () => {
+    const t = ((key: string) => key) as TFunction
+    render(
+      <RBACProvider>
+        <EntityTable
+          config={entityTableConfigFromView(employeesTableConfig(t).view)}
+          data={[{ id: 1, name: "Private Person", employeeNumber: "EMP-SECRET", workEmail: "private@example.test", jobTitle: "Engineer" }]}
+        />
+      </RBACProvider>,
+    )
+    fireEvent.click(screen.getByTestId("entity-table-export"))
+    expect(blobs).toHaveLength(1)
+    const text = await readBlob(blobs[0]!)
+    expect(text).toContain("Engineer")
+    expect(text).not.toContain("Private Person")
+    expect(text).not.toContain("EMP-SECRET")
+    expect(text).not.toContain("private@example.test")
+  })
 })
+

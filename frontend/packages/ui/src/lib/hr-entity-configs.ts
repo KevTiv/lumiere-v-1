@@ -126,11 +126,12 @@ export const employeesTableConfig = (t: TFunction): EntityViewConfig => ({
     columns: [
       {
         key: "employeeNumber",
+        sensitive: true,
         label: t("hr.employees.columns.employeeNumber"),
         width: "min-w-20",
         sortable: true,
       },
-      { key: "name", label: t("hr.employees.columns.name"), width: "min-w-40", sortable: true },
+      { key: "name", label: t("hr.employees.columns.name"), width: "min-w-40", sortable: true, sensitive: true },
       { key: "jobTitle", label: t("hr.employees.columns.jobTitle"), width: "min-w-36" },
       { key: "departmentId", label: t("hr.employees.columns.departmentId"), width: "min-w-32" },
       {
@@ -140,7 +141,7 @@ export const employeesTableConfig = (t: TFunction): EntityViewConfig => ({
         sortable: true,
         ...employmentTypeBadges(t),
       },
-      { key: "workEmail", label: t("hr.employees.columns.workEmail"), width: "min-w-40" },
+      { key: "workEmail", label: t("hr.employees.columns.workEmail"), width: "min-w-40", sensitive: true },
       {
         key: "dateHired",
         label: t("hr.employees.columns.dateHired"),
@@ -222,6 +223,9 @@ export const leaveRequestsTableConfig = (t: TFunction): EntityViewConfig => ({
   description: t("hr.leaveRequests.description"),
   view: {
     mode: "table",
+    // Leave dates and types disclose individual absence information.
+    // Generic CSV has no dedicated export authorization; keep this list in the app.
+    allowExport: false,
     rowKey: "id",
     searchable: true,
     searchPlaceholder: t("hr.leaveRequests.searchPlaceholder"),
@@ -317,6 +321,9 @@ export const contractsTableConfig = (t: TFunction): EntityViewConfig => ({
   description: t("hr.contracts.description"),
   view: {
     mode: "table",
+    // Individual contracts include compensation information.
+    // Generic CSV has no dedicated export authorization; keep this list in the app.
+    allowExport: false,
     rowKey: "id",
     searchable: true,
     searchPlaceholder: t("hr.contracts.searchPlaceholder"),
@@ -353,6 +360,7 @@ export const contractsTableConfig = (t: TFunction): EntityViewConfig => ({
       { key: "dateEnd", label: t("hr.contracts.columns.dateEnd"), type: "relative-date" },
       {
         key: "wage",
+        sensitive: true,
         label: t("hr.contracts.columns.wage"),
         type: "currency",
         align: "right",
@@ -411,6 +419,9 @@ export const attendanceTableConfig = (t: TFunction): EntityViewConfig => ({
   description: t("hr.attendance.description"),
   view: {
     mode: "table",
+    // Attendance exposes individual work schedules.
+    // Generic CSV has no dedicated export authorization; keep this list in the app.
+    allowExport: false,
     rowKey: "id",
     searchable: true,
     searchPlaceholder: t("hr.attendance.searchPlaceholder"),
@@ -443,6 +454,9 @@ export const payslipsTableConfig = (t: TFunction): EntityViewConfig => ({
   description: t("hr.payslips.description"),
   view: {
     mode: "table",
+    // Payroll uses the explicit payroll export-intent workflow.
+    // Generic CSV has no dedicated export authorization; keep this list in the app.
+    allowExport: false,
     rowKey: "id",
     searchable: true,
     searchPlaceholder: t("hr.payslips.searchPlaceholder"),
@@ -466,9 +480,9 @@ export const payslipsTableConfig = (t: TFunction): EntityViewConfig => ({
       { key: "state", label: t("hr.payslips.columns.state"), type: "badge", ...payslipStateBadges(t) },
       { key: "dateFrom", label: t("hr.payslips.columns.dateFrom"), type: "date" },
       { key: "dateTo", label: t("hr.payslips.columns.dateTo"), type: "date" },
-      { key: "basicWage", label: t("hr.payslips.columns.basicWage"), type: "currency", align: "right" },
-      { key: "grossWage", label: t("hr.payslips.columns.grossWage"), type: "currency", align: "right" },
-      { key: "netWage", label: t("hr.payslips.columns.netWage"), type: "currency", align: "right" },
+      { key: "basicWage", sensitive: true, label: t("hr.payslips.columns.basicWage"), type: "currency", align: "right" },
+      { key: "grossWage", sensitive: true, label: t("hr.payslips.columns.grossWage"), type: "currency", align: "right" },
+      { key: "netWage", sensitive: true, label: t("hr.payslips.columns.netWage"), type: "currency", align: "right" },
     ],
     emptyMessage: t("hr.payslips.emptyMessage"),
   },
@@ -553,6 +567,9 @@ export const leaveAllocationsTableConfig = (
   }),
   view: {
     mode: "table",
+    // Individual leave balances are personnel records.
+    // Generic CSV has no dedicated export authorization; keep this list in the app.
+    allowExport: false,
     rowKey: "id",
     searchable: true,
     searchPlaceholder: t("hr.leaveAllocations.searchPlaceholder", { defaultValue: "Search by employee or leave type" }),
@@ -691,8 +708,8 @@ export const performanceGoalsTableConfig = (t: TFunction): EntityViewConfig => (
     searchPlaceholder: "Search goals…",
     searchKeys: ["title", "employeeId", "cycleId"],
     columns: [
-      { key: "title", label: "Goal", width: "min-w-40" },
-      { key: "employeeId", label: "Employee", width: "min-w-28" },
+      { key: "title", sensitive: true, label: "Goal", width: "min-w-40" },
+      { key: "employeeId", sensitive: true, label: "Employee", width: "min-w-28" },
       { key: "cycleId", label: "Cycle", width: "min-w-24" },
       { key: "state", label: "State", type: "badge", width: "min-w-24" },
       { key: "weight", label: "Weight", type: "number", align: "right", width: "min-w-20" },
@@ -707,6 +724,9 @@ export const performanceReviewsTableConfig = (t: TFunction): EntityViewConfig =>
   description: "Self and manager review workflow per employee and cycle",
   view: {
     mode: "table",
+    // Individual ratings are personnel records.
+    // Generic CSV has no dedicated export authorization; keep this list in the app.
+    allowExport: false,
     rowKey: "id",
     searchable: true,
     searchPlaceholder: "Search reviews…",
@@ -760,6 +780,9 @@ export const benefitEnrollmentsTableConfig = (t: TFunction): EntityViewConfig =>
   description: "Active and terminated employee benefit assignments",
   view: {
     mode: "table",
+    // Benefit participation is individual personnel information.
+    // Generic CSV has no dedicated export authorization; keep this list in the app.
+    allowExport: false,
     rowKey: "id",
     searchable: true,
     searchPlaceholder: "Search enrollments…",
@@ -805,3 +828,4 @@ export const hrEntityConfigs = (t: TFunction): Record<string, EntityViewConfig> 
   "benefit-plans-table": benefitPlansTableConfig(t),
   "benefit-enrollments-table": benefitEnrollmentsTableConfig(t),
 })
+
