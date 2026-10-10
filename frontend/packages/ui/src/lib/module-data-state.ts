@@ -21,3 +21,8 @@ export function moduleQueryState(query: {
   }
   return { status: query.isLoading ? "loading" : "ready" }
 }
+
+/** Failed or denied collections cannot supply cached records to joins or dialogs. */
+export function canUseModuleData(state: ModuleDataState): boolean {
+  return state.status !== "error" && state.status !== "denied"
+}

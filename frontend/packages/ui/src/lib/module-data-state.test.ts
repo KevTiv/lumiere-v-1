@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 import { describe, it } from "node:test"
-import { moduleQueryState } from "./module-data-state"
+import { canUseModuleData, moduleQueryState } from "./module-data-state"
 
 describe("module query status", () => {
   it("distinguishes a failed empty read from successful empty results", () => {
@@ -24,4 +24,11 @@ describe("module query status", () => {
   it("keeps loading separate from empty results", () => {
     assert.equal(moduleQueryState({ isLoading: true, isError: false, refetch() {} }).status, "loading")
   })
+})
+
+it("blocks unavailable cached rows from dialog and join consumers while retaining partial rows", () => {
+  assert.equal(canUseModuleData({ status: "denied" }), false)
+  assert.equal(canUseModuleData({ status: "error" }), false)
+  assert.equal(canUseModuleData({ status: "partial" }), true)
+  assert.equal(canUseModuleData({ status: "ready" }), true)
 })

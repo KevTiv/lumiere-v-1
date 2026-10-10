@@ -1,8 +1,8 @@
 "use client"
 import { mapDashboardWidgets, withDashboardSections } from "@lumiere/ui/lib/dashboard-sections"
 
-import { moduleQueryState } from "@lumiere/ui/lib/module-data-state"
-import { useMemo, useState } from "react"
+import { canUseModuleData, moduleQueryState } from "@lumiere/ui/lib/module-data-state"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { useTranslation } from "@lumiere/i18n"
 import { showWorkflowToast } from "@lumiere/ui/lib/workflow-toast"
 import { canActivatePlan, canDeactivatePlan } from "./subscription-plan-actions"
@@ -211,30 +211,30 @@ function SubscriptionsClientLoaded({
   const [recognizeMoveId, setRecognizeMoveId] = useState("")
 
   const subscriptionsQuery = useSubscriptions(orgId, initialSubscriptions)
-  const { data: subscriptions = [] } = subscriptionsQuery
+  const subscriptions = canUseModuleData(moduleQueryState(subscriptionsQuery)) ? subscriptionsQuery.data ?? [] : []
   const { data: billingRuns = [], isLoading: billingRunsLoading, isError: billingRunsError } = useSubscriptionBillingRuns(orgId)
   const plansQuery = useSubscriptionPlans(orgId, initialPlans)
-  const { data: plans = [] } = plansQuery
+  const plans = canUseModuleData(moduleQueryState(plansQuery)) ? plansQuery.data ?? [] : []
   const subscriptionLinesQuery = useSubscriptionLines(orgId)
-  const { data: subscriptionLines = [] } = subscriptionLinesQuery
+  const subscriptionLines = canUseModuleData(moduleQueryState(subscriptionLinesQuery)) ? subscriptionLinesQuery.data ?? [] : []
   const subscriptionAmendmentsQuery = useSubscriptionAmendments(orgId)
-  const { data: subscriptionAmendments = [] } = subscriptionAmendmentsQuery
+  const subscriptionAmendments = canUseModuleData(moduleQueryState(subscriptionAmendmentsQuery)) ? subscriptionAmendmentsQuery.data ?? [] : []
   const usageEventsQuery = useSubscriptionUsageEvents(orgId)
-  const { data: usageEvents = [] } = usageEventsQuery
+  const usageEvents = canUseModuleData(moduleQueryState(usageEventsQuery)) ? usageEventsQuery.data ?? [] : []
   const usageChargesQuery = useSubscriptionUsageCharges(orgId)
-  const { data: usageCharges = [] } = usageChargesQuery
+  const usageCharges = canUseModuleData(moduleQueryState(usageChargesQuery)) ? usageChargesQuery.data ?? [] : []
   const ratingBacklogQuery = useSubscriptionRatingBacklog(orgId)
-  const { data: ratingBacklog = [] } = ratingBacklogQuery
+  const ratingBacklog = canUseModuleData(moduleQueryState(ratingBacklogQuery)) ? ratingBacklogQuery.data ?? [] : []
   const priceTiersQuery = useSubscriptionPriceTiers(orgId)
-  const { data: priceTiers = [] } = priceTiersQuery
+  const priceTiers = canUseModuleData(moduleQueryState(priceTiersQuery)) ? priceTiersQuery.data ?? [] : []
   const pastDueQuery = useSubscriptionPastDue(orgId)
-  const { data: pastDue = [] } = pastDueQuery
+  const pastDue = canUseModuleData(moduleQueryState(pastDueQuery)) ? pastDueQuery.data ?? [] : []
   const dueToBillQuery = useSubscriptionDueToBill(orgId)
-  const { data: dueToBill = [] } = dueToBillQuery
+  const dueToBill = canUseModuleData(moduleQueryState(dueToBillQuery)) ? dueToBillQuery.data ?? [] : []
   const entitlementsQuery = useSubscriptionEntitlements(orgId)
-  const { data: entitlements = [] } = entitlementsQuery
+  const entitlements = canUseModuleData(moduleQueryState(entitlementsQuery)) ? entitlementsQuery.data ?? [] : []
   const bundlesQuery = useSubscriptionBundles(orgId)
-  const { data: bundles = [] } = bundlesQuery
+  const bundles = canUseModuleData(moduleQueryState(bundlesQuery)) ? bundlesQuery.data ?? [] : []
   const bundleRows = useMemo(
     () =>
       (bundles as unknown as Record<string, unknown>[]).map((bundle) => {
@@ -244,13 +244,13 @@ function SubscriptionsClientLoaded({
     [bundles, plans],
   )
   const paymentIntentsQuery = useSubscriptionPaymentIntents(orgId)
-  const { data: paymentIntents = [] } = paymentIntentsQuery
+  const paymentIntents = canUseModuleData(moduleQueryState(paymentIntentsQuery)) ? paymentIntentsQuery.data ?? [] : []
   const deferredSchedulesQuery = useDeferredRevenueSchedules(orgId, initialDeferredSchedules)
-  const { data: deferredSchedules = [] } = deferredSchedulesQuery
+  const deferredSchedules = canUseModuleData(moduleQueryState(deferredSchedulesQuery)) ? deferredSchedulesQuery.data ?? [] : []
   const deferredLinesQuery = useDeferredRevenueLines(orgId, initialDeferredLines)
-  const { data: deferredLines = [] } = deferredLinesQuery
+  const deferredLines = canUseModuleData(moduleQueryState(deferredLinesQuery)) ? deferredLinesQuery.data ?? [] : []
   const recognitionRulesQuery = useRevenueRecognitionRules(orgId, initialRecognitionRules)
-  const { data: recognitionRules = [] } = recognitionRulesQuery
+  const recognitionRules = canUseModuleData(moduleQueryState(recognitionRulesQuery)) ? recognitionRulesQuery.data ?? [] : []
   const { data: saleOrders = [] } = useSaleOrders(orgId, initialSaleOrders)
   const { data: pricelists = [] } = usePricelists(orgId, initialPricelists)
   const { data: products = [] } = useProducts(orgId, initialProducts)
@@ -263,7 +263,7 @@ function SubscriptionsClientLoaded({
 
   const createSubscription = useCreateSubscription(orgId, operatingCompanyId)
   const createPlan = useCreateSubscriptionPlan(orgId, operatingCompanyId)
-  const subscriptionActions = useSubscriptionActions(orgId, operatingCompanyId)
+  const subscriptionActions = useSubscriptionActions(orgId, operatingCompanyId, canUseModuleData(moduleQueryState(subscriptionsQuery)))
   const createPriceTier = useCreateSubscriptionPriceTier(orgId, operatingCompanyId)
   const createDeferredSchedule = useCreateDeferredRevenueSchedule(orgId, operatingCompanyId)
   const recognizeDeferred = useRecognizeDeferredRevenue(orgId, operatingCompanyId)
@@ -275,7 +275,9 @@ function SubscriptionsClientLoaded({
   const deactivatePlan = useDeactivateSubscriptionPlan(orgId, operatingCompanyId)
   const updatePlan = useUpdateSubscriptionPlan(orgId, operatingCompanyId)
   const createBundle = useCreateSubscriptionBundle(orgId, operatingCompanyId)
-  const { askForm, formDialog } = useFormDialog()
+  const { askForm, cancelForm, formDialog } = useFormDialog()
+  const plansUsableRef = useRef(true)
+  plansUsableRef.current = canUseModuleData(moduleQueryState(plansQuery))
   const importSubscriptionCsv = useImportSubscriptionCsv(orgId, operatingCompanyId)
 
   const isFormMutationPending =
@@ -600,7 +602,7 @@ function SubscriptionsClientLoaded({
           { id: "isDefault", name: "isDefault", label: t("subscriptions.plans.columns.isDefault"), type: "switch", defaultValue: current.isDefault, width: "1/2" },
         ],
       })
-      if (values == null) return
+      if (values == null || !plansUsableRef.current) return
       const result = toPlanUpdateParams(values, plan)
       if (!result.ok) {
         showWorkflowToast({
@@ -623,7 +625,7 @@ function SubscriptionsClientLoaded({
           { id: "active", name: "active", label: t("subscriptions.plans.columns.active"), type: "switch", defaultValue: true },
         ],
       })
-      if (values == null) return
+      if (values == null || !plansUsableRef.current) return
       const params = toBundleCreateParams(values, plans as unknown as Record<string, unknown>[])
       if (params == null) {
         showWorkflowToast({
@@ -953,11 +955,33 @@ function SubscriptionsClientLoaded({
     "recognition-rules": moduleQueryState(recognitionRulesQuery),
   }
 
+  const actionTabs: Record<string, keyof typeof dataState> = {
+    createSubscription: "subscriptions", importSubscriptionCsv: "subscriptions",
+    createPlan: "plans", importPlanCsv: "plans", createPriceTier: "price-tiers",
+    createDeferredSchedule: "deferred-schedules", createRecognitionRule: "recognition-rules",
+  }
+  const actionUsable = (action: string) => {
+    const tab = actionTabs[action]
+    return tab != null && canUseModuleData(dataState[tab])
+  }
+  const quickActionUsable = quickActionForm == null || actionUsable(quickActionForm.action)
+  const plansUsable = canUseModuleData(dataState.plans)
+  const recognizeUsable = canUseModuleData(dataState["deferred-lines"])
+  useEffect(() => {
+    if (!plansUsable) cancelForm()
+    if (quickActionForm && !quickActionUsable) setQuickActionForm(null)
+    if (!recognizeUsable) {
+      setRecognizeLineId(null)
+      setRecognizeMoveId("")
+    }
+  }, [plansUsable, recognizeUsable, quickActionForm, quickActionUsable, cancelForm])
+
   const handleFormSubmit = (
     _tabId: string,
     action: string,
     formData: Record<string, unknown>,
   ) => {
+    if (!actionUsable(action)) return
     if (action === "createSubscription") {
       const params = toCreateSubscriptionFromSaleOrderParams(formData, saleOrders, orgId)
       if (!params) return
@@ -1005,7 +1029,7 @@ function SubscriptionsClientLoaded({
     <>
       <ModuleView config={config} data={data} dataState={dataState} activeTab={activeTab} onActiveTabChange={setActiveTab} onFormSubmit={handleFormSubmit} isPending={isFormMutationPending} />
       <FormModal
-        open={quickActionForm !== null}
+        open={quickActionForm !== null && actionUsable(quickActionForm.action)}
         onOpenChange={(open) => !open && setQuickActionForm(null)}
         config={quickActionForm?.form ?? subscriptionFormConfig}
         onSubmit={(formData) => {
@@ -1015,11 +1039,11 @@ function SubscriptionsClientLoaded({
           }
         }}
       />
-      {subscriptionActions.dialogs}
-      {formDialog}
+      {canUseModuleData(dataState.subscriptions) && subscriptionActions.dialogs}
+      {plansUsable && formDialog}
       <FormModal
         key={recognizeLineId != null ? `recognize-${recognizeMoveId || "new"}` : "recognize-closed"}
-        open={recognizeLineId !== null}
+        open={recognizeLineId !== null && recognizeUsable}
         onOpenChange={(open) => {
           if (!open) {
             setRecognizeLineId(null)
@@ -1032,7 +1056,7 @@ function SubscriptionsClientLoaded({
           if (moveId !== recognizeMoveId) setRecognizeMoveId(moveId)
         }}
         onSubmit={(formData) => {
-          if (recognizeLineId == null) return
+          if (recognizeLineId == null || !recognizeUsable) return
           const moveId = formData.moveId
           const moveLineId = formData.moveLineId
           const params = buildRecognizeDeferredRevenueParams({ moveId, moveLineId })
