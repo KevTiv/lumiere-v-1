@@ -11,10 +11,15 @@
       "version": 11,
       "name": "0011_durable_projection_delta",
       "file": "0011_durable_projection_delta.sql"
+    },
+    {
+      "version": 12,
+      "name": "0012_durable_projection_delta",
+      "file": "0012_durable_projection_delta.sql"
     }
   ],
   "pending": {
-    "version": 12,
-    "name": "0012_durable_projection_delta"
+    "version": 13,
+    "name": "0013_durable_projection_delta"
   }
 }
