@@ -6044,6 +6044,10 @@
           "header": "Header"
         },
         "title": "Edit purchase order"
+      },
+      "rfqAward": {
+        "description": "Select an open RFQ and one of its submitted bids.",
+        "title": "Award RFQ bid"
       }
     },
     "ops": {
