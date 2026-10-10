@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react"
 
 import { cn } from "../lib/utils"
 import { Input } from "./input"
+import { useUnsavedChangesGuard } from "../forms/use-unsaved-changes-guard"
 
 export interface EditableNumberProps {
   /** The saved value. */
@@ -47,6 +48,7 @@ export function EditableNumber({
   const settled = useRef(value)
   // Escape reverts and then blurs; that blur must not save what was just thrown away.
   const cancelled = useRef(false)
+  const navigationDialog = useUnsavedChangesGuard(text !== format(settled.current), saving)
 
   // A change from outside (a refresh, another edit) replaces what is shown unless the user is typing.
   useEffect(() => {
@@ -80,6 +82,7 @@ export function EditableNumber({
   }
 
   return (
+    <>
     <Input
       type="number"
       inputMode="decimal"
@@ -120,5 +123,7 @@ export function EditableNumber({
         }
       }}
     />
+    {navigationDialog}
+    </>
   )
 }

@@ -5,6 +5,7 @@
     "edit": "Edit",
     "delete": "Delete",
     "confirm": "Confirm",
+    "confirmAction": "Confirm action",
     "loading": "Loading...",
     "search": "Search",
     "export": "Export",
@@ -181,6 +182,7 @@
     },
     "retry": "Retry",
     "discardChanges": {
+      "navigate": "You have edits that were not saved. They will be lost if you leave this page.",
       "description": "You have edits that were not saved. They will be lost if you close this form.",
       "discard": "Discard",
       "keep": "Keep editing",
@@ -12505,7 +12507,29 @@
   "commandPalette": {
     "placeholder": "Search modules, actions and records...",
     "records": {
-      "loading": "Searching records..."
+      "loading": "Searching records...",
+      "failed": "Some records could not be searched. Try again."
     }
+  },
+  "recordHeader": {
+    "edit": {
+      "transfer": "Edit transfer",
+      "manufacturing": "Edit manufacturing order",
+      "vehicle": "Edit vehicle"
+    },
+    "origin": "Source reference",
+    "note": "Note",
+    "quantity": "Quantity to produce",
+    "positiveQuantity": "Enter a quantity greater than zero.",
+    "name": "Name",
+    "vehicleType": "Vehicle type",
+    "licensePlate": "License plate",
+    "driverName": "Driver name",
+    "odometerKm": "Odometer (km)",
+    "fuelLevel": "Fuel level (0–1)",
+    "unreserve": "Release reservation",
+    "unreserveDescription": "Release the stock reserved for this transfer? You can check availability again afterwards.",
+    "reset": "Reset to draft",
+    "resetDescription": "Return this cancelled document to draft for editing? Only documents that have never been posted can be reset."
   }
 }

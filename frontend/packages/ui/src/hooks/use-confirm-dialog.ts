@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import { useTranslation } from "@lumiere/i18n"
 
 import {
   AlertDialog,
@@ -30,28 +31,37 @@ type Pending = { options: ConfirmDialogOptions; resolve: (ok: boolean) => void }
  */
 export function useConfirmDialog(): {
   confirm: (options: ConfirmDialogOptions) => Promise<boolean>
+  dismiss: () => void
   dialog: React.ReactNode
 } {
+  const { t } = useTranslation()
   const [pending, setPending] = React.useState<Pending | null>(null)
   const pendingRef = React.useRef<Pending | null>(null)
-  pendingRef.current = pending
+
+  React.useEffect(() => () => {
+    pendingRef.current?.resolve(false)
+    pendingRef.current = null
+  }, [])
 
   const confirm = React.useCallback(
     (options: ConfirmDialogOptions) =>
       new Promise<boolean>((resolve) => {
         pendingRef.current?.resolve(false)
-        setPending({ options, resolve })
+        const next = { options, resolve }
+        pendingRef.current = next
+        setPending(next)
       }),
     [],
   )
 
-  const settle = (ok: boolean) => {
+  const settle = React.useCallback((ok: boolean) => {
     const current = pendingRef.current
     if (!current) return
     pendingRef.current = null
     setPending(null)
     current.resolve(ok)
-  }
+  }, [])
+  const dismiss = React.useCallback(() => settle(false), [settle])
 
   const options = pending?.options
   const dialog = React.createElement(
@@ -63,7 +73,7 @@ export function useConfirmDialog(): {
       React.createElement(
         AlertDialogHeader,
         null,
-        options?.title != null ? React.createElement(AlertDialogTitle, null, options.title) : null,
+        React.createElement(AlertDialogTitle, null, options?.title ?? t("common.confirmAction", { defaultValue: "Confirm action" })),
         React.createElement(AlertDialogDescription, null, options?.description),
       ),
       React.createElement(
@@ -72,16 +82,16 @@ export function useConfirmDialog(): {
         React.createElement(
           AlertDialogCancel,
           { ...testId("confirm-dialog-cancel"), onClick: () => settle(false) },
-          options?.cancelLabel ?? "Cancel",
+          options?.cancelLabel ?? t("common.cancel", { defaultValue: "Cancel" }),
         ),
         React.createElement(
           AlertDialogAction,
           { ...testId("confirm-dialog-confirm"), onClick: () => settle(true) },
-          options?.confirmLabel ?? "Confirm",
+          options?.confirmLabel ?? t("common.confirm", { defaultValue: "Confirm" }),
         ),
       ),
     ),
   )
 
-  return { confirm, dialog }
+  return { confirm, dismiss, dialog }
 }

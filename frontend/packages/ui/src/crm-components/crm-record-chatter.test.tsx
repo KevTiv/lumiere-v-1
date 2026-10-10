@@ -44,11 +44,15 @@ afterEach(cleanup)
 
 describe("CrmRecordChatter", () => {
   it("offers notes on any record but scheduled activities only where the backend can attach them", () => {
-    const { rerender } = render(<CrmRecordChatter organizationId={1} resModel="sale_order" resId={5n} />)
+    const { rerender } = render(<CrmRecordChatter organizationId={1} resModel="unsupported" resId={5n} />)
     expect(screen.getByTestId("record-chatter-post")).toBeTruthy()
     expect(screen.queryByTestId("record-chatter-log-activity")).toBeNull()
 
     rerender(<CrmRecordChatter organizationId={1} resModel="lead" resId={5n} />)
     expect(screen.getByTestId("record-chatter-log-activity")).toBeTruthy()
+    for (const resModel of ["sale_order", "purchase_order", "account_move", "hr_employee", "stock_picking"]) {
+      rerender(<CrmRecordChatter organizationId={1} resModel={resModel} resId={5n} />)
+      expect(screen.getByTestId("record-chatter-log-activity")).toBeTruthy()
+    }
   })
 })

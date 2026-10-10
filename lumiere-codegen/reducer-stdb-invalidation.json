@@ -74,6 +74,10 @@
     "account-moves",
     "account-move-lines"
   ],
+  "reset_account_move_to_draft": [
+    "account-moves",
+    "account-move-lines"
+  ],
   "post_invoice": [
     "account-moves",
     "account-move-lines"
@@ -296,5 +300,14 @@
   "rebase_deferred_schedules_for_subscription": [
     "deferred-revenue-schedules",
     "deferred-revenue-lines"
+  ],
+  "unreserve_stock_picking": [
+    "stock-pickings",
+    "stock-moves",
+    "stock-quants",
+    "stock-production-serials"
+  ],
+  "update_stock_picking": [
+    "stock-pickings"
   ]
 }
