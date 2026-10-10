@@ -143,6 +143,7 @@ import {
   useReverseSaleCommissionSettlement,
   useAccrueSaleCommission,
   useCreateSaleCommissionPlan,
+  useSaleCommissionPlans,
   useCreateSaleCommissionPlanSplit,
   useCreateSaleContract,
   useCreateSaleCpqConstraint,
@@ -190,7 +191,11 @@ import {
 } from '@/lib/persist-record-custom-fields';
 import { useDefaultOperatingCompanyBigInt } from '@lumiere/query-hooks/hooks/use-operating-company';
 import { useCurrencies } from '@lumiere/query-hooks/hooks/settings';
+import { currencyCodeMap, type KpiTileDef } from '@lumiere/ui/lib/kpi-tiles';
+import { saleOrderKpis } from './sale-order-kpis';
 import { useModuleTab } from '@/hooks/use-module-tab';
+import { recordOptions as linkedRecordOptions, withLinkedPickers } from '@/lib/linked-options';
+import { CommissionPlansTab } from './commission-plans-tab';
 import { useWorkflowSurface } from '@/hooks/use-workflow-surface';
 import { useSaleOrderWorkflow } from '@lumiere/query-hooks/hooks/sales-order-workflow';
 import { useReturnOrderWorkflow } from '@lumiere/query-hooks/hooks/return-order-workflow';
@@ -450,6 +455,7 @@ function SalesClientLoaded({
   const { data: returnOrders = [] } = useReturnOrders(orgId, initialReturnOrders);
   const { data: returnOrderLines = [] } = useReturnOrderLines(orgId, initialReturnOrderLines);
   const { data: saleCommissions = [] } = useSaleCommissions(orgId);
+  const { data: saleCommissionPlans = [] } = useSaleCommissionPlans(orgId);
   const { data: saleOrdersToApprove = [] } = useSaleOrdersToApprove(orgId);
   const { data: saleCommissionsPending = [] } = useSaleCommissionsPending(orgId);
   const settleSaleCommissions = useSettleSaleCommissions(orgId, operatingCompanyId);
@@ -517,12 +523,16 @@ function SalesClientLoaded({
     });
   };
 
-  // Commission plans have no list query yet, so a plan is still identified by its id.
+  // The plan is chosen from the readable commission plans (number field -> searchable picker).
   const promptCreateCommissionPlanSplit = async () => {
     const values = await askForm({
       title: t('sales.ops.createCommissionSplit', { defaultValue: 'New commission split' }),
-      fields: [
-        { id: 'planId', name: 'planId', label: label('planId', 'Commission plan id'), type: 'number', required: true, min: 1 },
+      fields: withLinkedPickers(
+        {
+          id: 'commission-split-fields',
+          title: '',
+          sections: [{ id: 'main', fields: [
+        { id: 'planId', name: 'planId', label: label('planId', 'Commission plan'), type: 'number', required: true, min: 1 },
         { id: 'partnerId', name: 'partnerId', label: label('partnerId', 'Partner'), type: 'select', required: true, searchable: true, options: partnerFieldOptions },
         {
           id: 'share',
@@ -535,7 +545,12 @@ function SalesClientLoaded({
           step: 0.01,
           defaultValue: 50,
         },
-      ],
+          ] }],
+        } as FormConfig,
+        {
+          planId: linkedRecordOptions(saleCommissionPlans as Record<string, unknown>[], (row) => row.name ?? row.Name),
+        },
+      ).sections[0].fields,
     });
     const planId = formText(values?.planId);
     const partnerId = formText(values?.partnerId);
@@ -1053,6 +1068,16 @@ function SalesClientLoaded({
     for (const contact of contacts) {
       const row = contact as Record<string, unknown>;
       map.set(String(row.id), String(row.name ?? row.displayName ?? row.id));
+    }
+    return map;
+  }, [contacts]);
+
+  const partnerNameById = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const contact of contacts) {
+      const row = contact as Record<string, unknown>;
+      const name = String(row.name ?? row.displayName ?? '').trim();
+      if (row.id != null && name) map.set(String(row.id), name);
     }
     return map;
   }, [contacts]);
@@ -2049,6 +2074,13 @@ function SalesClientLoaded({
               ),
             };
           }
+          if (tab.id === 'commission-plans') {
+            return {
+              ...tab,
+              type: 'custom' as const,
+              customContent: <CommissionPlansTab orgId={orgId} partnerNameById={partnerNameById} />,
+            };
+          }
           if (tab.id === 'invoices') {
             return {
               ...tab,
@@ -2221,6 +2253,8 @@ function SalesClientLoaded({
       saleCommissions,
       saleOrdersToApprove,
       saleCommissionsPending,
+      partnerNameById,
+      orgId,
       accountMoves,
       accountJournals,
       accountAccounts,
@@ -2288,6 +2322,20 @@ function SalesClientLoaded({
       loyaltyPrograms,
       loyaltyCards,
     ],
+  );
+
+  const kpiStrips = useMemo<Record<string, { tiles: KpiTileDef[]; loading?: boolean }>>(
+    () => ({
+      orders: {
+        tiles: saleOrderKpis(data.orders, {
+          t,
+          now: new Date(),
+          currencyCodeById: currencyCodeMap(currencies as Record<string, unknown>[]),
+        }),
+        loading: ordersLoading,
+      },
+    }),
+    [data.orders, currencies, ordersLoading, t],
   );
 
   const handleFormSubmit = async (
@@ -2409,6 +2457,7 @@ function SalesClientLoaded({
         config={config}
         data={data}
         dataLoading={{ orders: ordersLoading }}
+        kpiStrips={kpiStrips}
         onFormSubmit={handleFormSubmit}
         isPending={isFormMutationPending}
         activeTab={activeTab}

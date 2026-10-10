@@ -130,6 +130,7 @@ import { buildEntitySelection } from "@lumiere/query-hooks/ai-ui-context"
 import { useOpenErpAiChat } from "@/lib/erp-ai-context"
 import { PivotExplorer } from "./pivot-explorer"
 import { VatReportPanel } from "./vat-report-panel"
+import { StatementsPanel } from "./statements-panel"
 import { QueryBuilder } from "./query-builder"
 import { OwnerReportsPanel } from "./owner-reports-panel"
 
@@ -904,6 +905,18 @@ function ReportsClientLoaded({
                 companyId={operatingCompanyId}
                 financialReports={reports as Record<string, unknown>[]}
                 trialBalances={trialBalances as Record<string, unknown>[]}
+              />
+            ),
+          }
+        }
+        if (tab.id === "statements") {
+          return {
+            ...tab,
+            type: "custom" as const,
+            customContent: (
+              <StatementsPanel
+                organizationId={orgId}
+                financialReports={reports as Record<string, unknown>[]}
               />
             ),
           }

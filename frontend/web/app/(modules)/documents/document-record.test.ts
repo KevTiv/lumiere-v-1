@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { activeLegalHold, documentRecordHref, formatFileSize, linkedRecordHref } from './document-record';
+import { activeLegalHold, externalRefRows, rowsForDocument, signatureRequestRows, signerCount, documentRecordHref, formatFileSize, linkedRecordHref } from './document-record';
 
 test('a document links to its own page by id', () => {
   assert.equal(documentRecordHref({ id: 7 }), '/documents/7');
@@ -50,4 +50,20 @@ test('the active legal hold is the active row of that document only', () => {
   assert.equal(activeLegalHold(holds, '5')?.id, 3);
   assert.equal(activeLegalHold(holds.slice(0, 1), 5), undefined);
   assert.equal(activeLegalHold([], 5), undefined);
+});
+
+test('signer count never exposes signer details', () => {
+  assert.equal(signerCount('[{"email":"a@x.com"},{"email":"b@x.com"}]'), 2);
+  assert.equal(signerCount(null), 0);
+  assert.equal(signerCount('not json'), 0);
+  const [row] = signatureRequestRows([{ id: 1, status: 'pending', signers_json: '[{"email":"a@x.com"}]', requested_at: 5 }]);
+  assert.deepEqual(Object.keys(row).sort(), ['completedAt', 'id', 'provider', 'requestedAt', 'signerCount', 'status']);
+  assert.equal(row.signerCount, 1);
+  assert.equal(row.requestedAt, 5);
+});
+
+test('rows are scoped to one document, newest first, with tolerant keys', () => {
+  const rows = [{ id: 1, document_id: 5 }, { id: 2, documentId: 6 }, { id: 3, documentId: 5 }];
+  assert.deepEqual(rowsForDocument(rows, '5').map((r) => r.id), [3, 1]);
+  assert.equal(externalRefRows([{ id: 1, external_id: 'abc' }])[0].externalId, 'abc');
 });

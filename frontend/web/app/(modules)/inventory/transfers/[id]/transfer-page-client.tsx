@@ -4,7 +4,7 @@ import { useCallback, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { RecordHeaderActions } from '../../../../../components/record-header-actions';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { ArrowLeftRight, ListOrdered, ShoppingCart } from 'lucide-react';
+import { ArrowLeftRight, ListChecks, ListOrdered, ShoppingCart } from 'lucide-react';
 import { useTranslation } from '@lumiere/i18n';
 import {
   Button,
@@ -42,7 +42,15 @@ import { Badge } from '@lumiere/ui/components/badge';
 import { Skeleton } from '@lumiere/ui/components/skeleton';
 import { variantTag, type AnyWorkflowAction, type RowValueMap } from '@lumiere/erp-workflows';
 import type { StockLocation, StockMove, StockPicking } from '@lumiere/stdb/types';
-import { useStockLocations, useStockMoves, useStockPickings } from '@lumiere/query-hooks/hooks/inventory';
+import {
+  useProducts,
+  useProductionLots,
+  useStockLocations,
+  useStockMoveLines,
+  useStockMoves,
+  useStockPickings,
+} from '@lumiere/query-hooks/hooks/inventory';
+import { inventoryProductPrimaryLabel } from '@lumiere/stdb/read-models';
 import { usePickingWorkflow } from '@lumiere/query-hooks/hooks/picking-workflow';
 import { useDefaultOperatingCompanyBigInt } from '@lumiere/query-hooks/hooks/use-operating-company';
 import { useWorkflowSurface } from '@/hooks/use-workflow-surface';
@@ -50,7 +58,9 @@ import { useRecordNavigation } from '@/hooks/use-record-navigation';
 import { useInventoryModuleSubscription } from '@/lib/module-subscription-hooks';
 import { hasValidOrganizationId, orgBigInts } from '@/lib/org-scoped';
 import { RecordDocumentAttachments } from '../../../../../components/record-document-attachments';
+import { ReadOnlyRows } from '../../../../../components/read-only-rows';
 import { transferBackorders } from '../../transfer-record';
+import { detailedOperationRows, moveLinesForTransfer } from '../../transfer-move-lines';
 import { transferStatusBar } from '../../transfer-status';
 
 interface TransferPageClientProps {
@@ -70,7 +80,7 @@ const PRIMARY_ACTION_IDS: ReadonlySet<string> = new Set([
   'inventory.picking.confirm',
 ]);
 
-const TAB_IDS = ['overview', 'moves', 'backorders', 'discussion', 'audit'] as const;
+const TAB_IDS = ['overview', 'moves', 'operations', 'backorders', 'discussion', 'audit'] as const;
 type TabId = (typeof TAB_IDS)[number];
 
 export function TransferPageClient(props: TransferPageClientProps) {
@@ -98,6 +108,9 @@ function TransferPageLoaded({
   const { data: pickings = [], isLoading: pickingsLoading } = useStockPickings(orgId, initialPickings);
   const { data: moves = [] } = useStockMoves(orgId, initialMoves);
   const { data: locations = [] } = useStockLocations(orgId, initialLocations);
+  const moveLinesQuery = useStockMoveLines(orgId);
+  const { data: products = [] } = useProducts(orgId);
+  const { data: lots = [] } = useProductionLots(orgId);
 
   const workflowSurface = useWorkflowSurface({ organizationId });
   const workflow = usePickingWorkflow(
@@ -125,6 +138,26 @@ function TransferPageLoaded({
     () => (moves as unknown as Row[]).filter((move) => String(move.pickingId ?? move.picking_id) === transferId),
     [moves, transferId],
   );
+  const operationRows = useMemo(() => {
+    const productNameById = new Map<string, string>();
+    for (const product of products as unknown as Row[]) {
+      const name = inventoryProductPrimaryLabel(product) || String(product.name ?? '').trim();
+      if (product.id != null && name) productNameById.set(String(product.id), name);
+    }
+    const locationNameById = new Map<string, string>();
+    for (const location of locations as unknown as Row[]) {
+      const name = String(location.completeName ?? location.name ?? '').trim();
+      if (location.id != null && name) locationNameById.set(String(location.id), name);
+    }
+    const lotNameById = new Map<string, string>();
+    for (const lot of lots as unknown as Row[]) {
+      const name = String(lot.name ?? '').trim();
+      if (lot.id != null && name) lotNameById.set(String(lot.id), name);
+    }
+    const moveIds = new Set(transferMoves.map((move) => String(move.id)));
+    const lines = moveLinesForTransfer(transferId, (moveLinesQuery.data ?? []) as Row[], moveIds);
+    return detailedOperationRows(lines, { productNameById, locationNameById, lotNameById });
+  }, [products, locations, lots, transferMoves, transferId, moveLinesQuery.data]);
   const backorders = useMemo(
     () => transferBackorders(transfer ?? {}, pickings as unknown as Row[]),
     [transfer, pickings],
@@ -267,6 +300,13 @@ function TransferPageLoaded({
                 icon: <ListOrdered className="h-4 w-4" />,
                 onClick: () => setActiveTab('moves'),
               },
+              {
+                id: 'operations',
+                label: t('inventory.transfers.detailedOperations', { defaultValue: 'Detailed operations' }),
+                count: operationRows.length,
+                icon: <ListChecks className="h-4 w-4" />,
+                onClick: () => setActiveTab('operations'),
+              },
               ...(saleId != null
                 ? [
                     {
@@ -339,6 +379,30 @@ function TransferPageLoaded({
             label: t('inventory.stockMoves.title'),
             content: (
               <EntityView config={{ ...movesConfig, title: '', description: undefined }} data={transferMoves} useCard={false} />
+            ),
+          },
+          {
+            id: 'operations',
+            label: t('inventory.transfers.detailedOperations', { defaultValue: 'Detailed operations' }),
+            content: (
+              <ReadOnlyRows
+                id="transfer-detailed-operations"
+                testId="transfer-detailed-operations"
+                isLoading={moveLinesQuery.isLoading}
+                error={moveLinesQuery.error}
+                rows={operationRows}
+                emptyMessage={t('inventory.transfers.detailedOperationsEmpty', {
+                  defaultValue: 'No detailed operations yet. They appear once the transfer is reserved or processed.',
+                })}
+                columns={[
+                  { key: 'product', label: t('inventory.transfers.ops.product', { defaultValue: 'Product' }), width: 'min-w-40' },
+                  { key: 'lot', label: t('inventory.transfers.ops.lot', { defaultValue: 'Lot / Serial' }) },
+                  { key: 'fromLocation', label: t('inventory.transfers.ops.from', { defaultValue: 'From' }), width: 'min-w-32' },
+                  { key: 'toLocation', label: t('inventory.transfers.ops.to', { defaultValue: 'To' }), width: 'min-w-32' },
+                  { key: 'quantityReserved', label: t('inventory.transfers.ops.reserved', { defaultValue: 'Reserved' }), type: 'number', align: 'right' },
+                  { key: 'quantityDone', label: t('inventory.transfers.ops.done', { defaultValue: 'Done' }), type: 'number', align: 'right' },
+                ]}
+              />
             ),
           },
           {

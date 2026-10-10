@@ -35,16 +35,12 @@ import {
   Send,
   Download,
   Trash2,
-  FileText,
-  DollarSign,
-  Clock,
-  AlertTriangle,
-  CheckCircle2,
   Filter,
   Calculator,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { StatCard, StatCardGrid } from "../components/stat-card"
+import { KpiStrip } from "../components/kpi-strip"
+import { toggleKpiKey } from "../lib/kpi-tiles"
 import { TablePager, usePagedRows } from "../components/table-pager"
 import { accountingListStatusBadgeClass } from "../lib/theme-colors"
 import type { AccountMove } from "../lib/accounting-types"
@@ -113,6 +109,8 @@ export function InvoiceListView({
   const { t } = useTranslation()
   const [searchQuery, setSearchQuery] = useState("")
   const [statusFilter, setStatusFilter] = useState<DisplayStatus | "all">("all")
+  // Set by the stat tiles above the list; "pending" groups sent and partly paid invoices.
+  const [tileFilter, setTileFilter] = useState<"paid" | "pending" | "overdue" | null>(null)
 
   const filtered = invoices
     .filter((inv) => {
@@ -121,11 +119,13 @@ export function InvoiceListView({
       const matchesSearch = name.includes(searchQuery.toLowerCase()) || partner.includes(searchQuery.toLowerCase())
       const status = getMoveStatus(inv)
       const matchesStatus = statusFilter === "all" || status === statusFilter
-      return matchesSearch && matchesStatus
+      const matchesTile =
+        tileFilter == null || (tileFilter === "pending" ? ["sent", "partial"].includes(status) : status === tileFilter)
+      return matchesSearch && matchesStatus && matchesTile
     })
     // Newest first, matching EntityTable's default (auto-inc ids only increase).
     .sort((a, b) => Number(b.id) - Number(a.id))
-  const pager = usePagedRows(filtered, `${searchQuery}|${statusFilter}`)
+  const pager = usePagedRows(filtered, `${searchQuery}|${statusFilter}|${tileFilter}`)
 
   const stats = {
     total: invoices.length,
@@ -139,14 +139,24 @@ export function InvoiceListView({
   return (
     <div className="space-y-6">
       {/* Stats */}
-      <StatCardGrid className="lg:grid-cols-6">
-        <StatCard label={t("accounting.invoices.totalInvoices")} value={stats.total} icon={FileText} tone="info" />
-        <StatCard label={t("accounting.states.paid")} value={stats.paid} icon={CheckCircle2} tone="success" />
-        <StatCard label={t("accounting.states.pending")} value={stats.pending} icon={Clock} tone="warning" />
-        <StatCard label={t("accounting.states.overdue")} value={stats.overdue} icon={AlertTriangle} tone="destructive" />
-        <StatCard label={t("accounting.invoices.totalInvoiced")} value={formatCurrency(stats.totalAmount)} icon={DollarSign} />
-        <StatCard label={t("accounting.invoices.outstandingBalance")} value={formatCurrency(stats.totalDue)} icon={DollarSign} />
-      </StatCardGrid>
+      <KpiStrip
+        tiles={[
+          { key: "total", label: t("accounting.invoices.totalInvoices"), value: stats.total, tone: "info", active: false },
+          ...(["paid", "pending", "overdue"] as const).map((key) => ({
+            key,
+            label: { paid: t("accounting.states.paid"), pending: t("accounting.states.pending"), overdue: t("accounting.states.overdue") }[key],
+            value: stats[key],
+            tone: ({ paid: "success", pending: "warning", overdue: "destructive" } as const)[key],
+            active: tileFilter === key,
+            onSelect: () => {
+              setTileFilter(toggleKpiKey(tileFilter, key) as typeof tileFilter)
+              setStatusFilter("all")
+            },
+          })),
+          { key: "invoiced", label: t("accounting.invoices.totalInvoiced"), value: formatCurrency(stats.totalAmount), active: false },
+          { key: "outstanding", label: t("accounting.invoices.outstandingBalance"), value: formatCurrency(stats.totalDue), active: false },
+        ]}
+      />
 
       {/* Table */}
       <Card>
@@ -160,7 +170,10 @@ export function InvoiceListView({
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input placeholder={t("accounting.invoices.searchPlaceholder")} value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-10" />
             </div>
-            <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as DisplayStatus | "all")}>
+            <Select value={statusFilter} onValueChange={(v) => {
+              setStatusFilter(v as DisplayStatus | "all")
+              setTileFilter(null)
+            }}>
               <SelectTrigger className="w-[150px]">
                 <Filter className="h-4 w-4 mr-2" /><SelectValue placeholder={t("accounting.journalEntries.state")} />
               </SelectTrigger>

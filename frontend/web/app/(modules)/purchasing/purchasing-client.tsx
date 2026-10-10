@@ -10,6 +10,7 @@ import {
   ModuleView,
   FormModal,
   CsvImportModal,
+  CSV_IMPORT_CONTRACTS,
   RuntimeFormModal,
   useRBAC,
   workflowActionsToEntityActions,
@@ -59,6 +60,8 @@ import { purchasingModuleConfig } from "@/lib/module-dashboard-configs"
 import { usePurchasingModuleSubscription } from "@/lib/module-subscription-hooks"
 import { PurchasingOpsSod } from "./purchasing-ops-sod"
 import { purchaseOrderLineCanBeRemoved, requisitionCanCreateRfq } from "./purchasing-action-gates"
+import { requisitionCanAddLine, toRequisitionLineInput } from "./purchase-requisition-line"
+import { showWorkflowToast } from "@lumiere/ui/lib/workflow-toast"
 import { PurchasingBlanketWorkspace } from "./purchasing-blanket-workspace"
 import {
   PurchasingOperationDialogs,
@@ -103,6 +106,7 @@ import {
   type ResPartnerBank,
   useCreatePurchaseOrder,
   useCreatePurchaseRequisition,
+  useAddPurchaseRequisitionLine,
   useAddPurchaseOrderLine,
   useRemovePurchaseOrderLine,
   useInvoicePurchaseOrderLine,
@@ -165,6 +169,8 @@ import {
 import { fetchQueryList } from "@lumiere/query-hooks/http"
 import { useDefaultOperatingCompanyBigInt } from "@lumiere/query-hooks/hooks/use-operating-company"
 import { useCurrencies } from "@lumiere/query-hooks/hooks/settings"
+import type { KpiTileDef } from "@lumiere/ui/lib/kpi-tiles"
+import { purchaseOrderKpis } from "./purchase-order-kpis"
 import {
   contactRowsToVendorSelectOptions,
   pricelistRowsToSelectOptions,
@@ -555,6 +561,7 @@ function PurchasingClientLoaded({
 
   const createPurchaseOrder = useCreatePurchaseOrder(orgId, { companyId: operatingCompanyId ?? undefined })
   const createPurchaseRequisition = useCreatePurchaseRequisition(orgId, { companyId: operatingCompanyId ?? undefined })
+  const addRequisitionLine = useAddPurchaseRequisitionLine(orgId, operatingCompanyId)
   const workflowSurface = useWorkflowSurface({ organizationId })
   const purchasingWorkflow = usePurchasingWorkflow(
     orgId,
@@ -668,6 +675,39 @@ function PurchasingClientLoaded({
     orgId,
     operatingCompanyId,
   )
+
+  const promptAddRequisitionLine = async (requisitionId: string) => {
+    const title = t("purchasing.requisition.addLine.title", { defaultValue: "Add requisition line" })
+    const values = await askForm({
+      title,
+      fields: [
+        { id: "productId", name: "productId", label: t("purchasing.ops.prompt.productId", { defaultValue: "Product" }), type: "select", required: true, searchable: true, options: productFieldOptions },
+        { id: "uomId", name: "uomId", label: t("purchasing.requisition.addLine.uom", { defaultValue: "Unit of measure" }), type: "select", required: true, searchable: true, options: uomFieldOptions },
+        { id: "quantity", name: "quantity", label: t("purchasing.requisition.addLine.quantity", { defaultValue: "Quantity" }), type: "number", required: true, min: 0, defaultValue: 1, width: "1/2" },
+        { id: "name", name: "name", label: t("purchasing.requisition.addLine.description", { defaultValue: "Description (optional)" }), type: "text" },
+      ],
+    })
+    if (values == null) return
+    const input = toRequisitionLineInput(values)
+    if (input == null) {
+      showWorkflowToast({
+        kind: "error",
+        title: t("purchasing.requisition.addLine.failed", { defaultValue: "Add requisition line failed" }),
+        description: t("purchasing.requisition.addLine.invalid", { defaultValue: "Choose a product, a unit and a quantity above zero." }),
+      })
+      return
+    }
+    try {
+      await addRequisitionLine.mutateAsync({ requisitionId, ...input })
+      showWorkflowToast({ kind: "success", title: t("purchasing.requisition.addLine.done", { defaultValue: "Requisition line added" }) })
+    } catch (error) {
+      showWorkflowToast({
+        kind: "error",
+        title: t("purchasing.requisition.addLine.failed", { defaultValue: "Add requisition line failed" }),
+        description: error instanceof Error ? error.message : String(error),
+      })
+    }
+  }
 
   const openCreateRfqFromRequisition = async (requisitionId?: string) => {
     setOperationDialogRequest({ kind: "create-rfq", requisitionId })
@@ -1375,6 +1415,7 @@ function PurchasingClientLoaded({
           {
             id: "csv-purchase-orders",
             label: t("purchasing.csvImport.toolbarOrders"),
+            permission: { resource: CSV_IMPORT_CONTRACTS.purchaseOrder.resource, action: "create" },
             onClick: () => setCsvKind("order"),
           },
           {
@@ -1610,6 +1651,7 @@ function PurchasingClientLoaded({
           {
             id: "csv-purchase-order-lines",
             label: t("purchasing.csvImport.toolbarOrderLines"),
+            permission: { resource: CSV_IMPORT_CONTRACTS.purchaseOrderLine.resource, action: "create" },
             onClick: () => setCsvKind("orderLine"),
           },
           {
@@ -1696,6 +1738,17 @@ function PurchasingClientLoaded({
             confirmation: WORKFLOW_CONFIRMATION(t),
           }),
           {
+            id: "req-add-line",
+            label: t("purchasing.requisition.addLine.title", { defaultValue: "Add requisition line" }),
+            requiresSelection: true,
+            isApplicable: (rows) => rows.length === 1 && rows.every((r) => requisitionCanAddLine(r)),
+            onClick: async (rows) => {
+              const first = rows[0]
+              if (!first) return
+              await promptAddRequisitionLine(String(first.id))
+            },
+          },
+          {
             id: "req-create-rfq",
             label: t("purchasing.actions.createRfq", {
               defaultValue: "Create RFQ",
@@ -1715,7 +1768,7 @@ function PurchasingClientLoaded({
         ],
       },
     }
-  }, [t, purchasingWorkflow.requisitionActions, openCreateRfqFromRequisition])
+  }, [t, purchasingWorkflow.requisitionActions, openCreateRfqFromRequisition, promptAddRequisitionLine])
 
   const landedCostsEntityConfig = useMemo((): EntityViewConfig => {
     const view: EntityTableConfig = {
@@ -2164,6 +2217,7 @@ function PurchasingClientLoaded({
                       {
                         id: "csv-supplier-info",
                         label: t("purchasing.csvImport.toolbarSupplierInfo"),
+                        permission: { resource: CSV_IMPORT_CONTRACTS.supplierInfo.resource, action: "create" },
                         onClick: () => setCsvKind("supplierInfo"),
                       },
                       ...(view.actions ?? []),
@@ -2362,6 +2416,16 @@ function PurchasingClientLoaded({
       "partner-banks": partnerBanks as unknown as Record<string, unknown>[],
     }),
     [enrichedOrders, enrichedLines, requisitions, vendors, rfqs, rfqBids, purchaseReturns, landedCosts, supplierIntakes, partnerBanks],
+  )
+
+  const kpiStrips = useMemo<Record<string, { tiles: KpiTileDef[]; loading?: boolean }>>(
+    () => ({
+      orders: {
+        tiles: purchaseOrderKpis(enrichedOrders as Record<string, unknown>[], { t, now: new Date(), currencyCodeById: new Map() }),
+        loading: ordersLoading,
+      },
+    }),
+    [enrichedOrders, ordersLoading, t],
   )
 
   const handleFormSubmit = async (
@@ -2662,6 +2726,7 @@ function PurchasingClientLoaded({
         config={configWithOperations}
         data={data}
         dataLoading={{ orders: ordersLoading }}
+        kpiStrips={kpiStrips}
         onFormSubmit={handleFormSubmit}
         activeTab={activeTab}
         onActiveTabChange={setActiveTab}
@@ -2772,6 +2837,8 @@ function PurchasingClientLoaded({
           key={csvKind}
           onClose={() => setCsvKind(null)}
           config={csvFormConfig}
+          columns={CSV_IMPORT_CONTRACTS[csvKind === "order" ? "purchaseOrder" : csvKind === "orderLine" ? "purchaseOrderLine" : "supplierInfo"]}
+          templateFileName={`purchasing-${csvKind}-import-template.csv`}
           isPending={isFormMutationPending}
           onImport={async (text) => {
             if (csvKind === "order") await csvImports.importPurchaseOrder.mutateAsync(text)

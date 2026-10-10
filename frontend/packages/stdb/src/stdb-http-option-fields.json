@@ -1,6 +1,11 @@
 {
+  "AcceptSaleOrderQuotationParams": [
+    "signature"
+  ],
   "AccountAccount": [
     "currency_id",
+    "internal_type",
+    "internal_group",
     "last_time_entries_checked",
     "group_id",
     "root_id",
@@ -69,12 +74,6 @@
     "write_date",
     "metadata"
   ],
-  "ApplySubscriptionInvoicePaymentParams": [
-    "amount",
-    "payment_date",
-    "ref",
-    "memo"
-  ],
   "AccountAsset": [
     "parent_id",
     "account_analytic_id",
@@ -95,6 +94,7 @@
     "metadata"
   ],
   "AccountAssetDepreciationLine": [
+    "company_id",
     "name",
     "move_id",
     "create_uid",
@@ -128,6 +128,18 @@
     "write_date",
     "metadata"
   ],
+  "AccountFiscalPosition": [
+    "company_id",
+    "create_uid",
+    "create_date",
+    "write_uid",
+    "write_date",
+    "metadata"
+  ],
+  "AccountFiscalPositionTax": [
+    "tax_dest_id",
+    "metadata"
+  ],
   "AccountFiscalYear": [
     "closing_move_id",
     "opening_move_id",
@@ -142,6 +154,13 @@
     "code_prefix_start",
     "code_prefix_end",
     "parent_id",
+    "create_uid",
+    "create_date",
+    "write_uid",
+    "write_date",
+    "metadata"
+  ],
+  "AccountIncoterm": [
     "create_uid",
     "create_date",
     "write_uid",
@@ -282,7 +301,10 @@
     "write_date",
     "metadata"
   ],
-  "AccrueSaleCommissionParams": [],
+  "AccountingOwnershipBackfillIssue": [
+    "company_id",
+    "parent_id"
+  ],
   "Activity": [
     "note",
     "date_deadline",
@@ -341,6 +363,17 @@
     "employee_id",
     "metadata"
   ],
+  "AddPerformanceGoalParams": [
+    "description",
+    "target_value",
+    "reviewer_employee_id"
+  ],
+  "AddProposalLineItemParams": [
+    "section_id",
+    "product_variant_id",
+    "description",
+    "notes"
+  ],
   "AddPurchaseOrderLineParams": [
     "name",
     "sequence",
@@ -352,9 +385,16 @@
     "lot_id",
     "metadata"
   ],
+  "AddPurchaseRequisitionLineParams": [
+    "name",
+    "sequence"
+  ],
   "AddPurchaseRfqLineParams": [
     "name",
     "sequence"
+  ],
+  "AddSubscriptionBundleItemParams": [
+    "metadata"
   ],
   "AddUserToOrganizationParams": [
     "company_id",
@@ -363,10 +403,13 @@
     "employee_id",
     "metadata"
   ],
-  "AddWorkflowHumanTaskCommentParams": [],
   "AdjustmentReason": [
     "description",
     "metadata"
+  ],
+  "AdvanceSubscriptionDunningParams": [
+    "past_due_days",
+    "suspend_after_days"
   ],
   "AiActionDraft": [
     "warnings_json",
@@ -399,10 +442,24 @@
     "completed_at",
     "metadata"
   ],
+  "AiAgentRunPolicySnapshot": [
+    "skill_config_id",
+    "custom_instructions"
+  ],
   "AiAgentRunStep": [
     "output_row_count",
     "citations_json",
     "error_message"
+  ],
+  "AiArtifactComponent": [
+    "parent_component_id",
+    "forked_from_artifact_ref"
+  ],
+  "AiCapabilityExecution": [
+    "output_json",
+    "output_hash",
+    "failure_reason",
+    "finished_at"
   ],
   "AiChatMessage": [
     "sources_json",
@@ -418,6 +475,18 @@
     "active_tab",
     "metadata"
   ],
+  "AiDecisionCase": [
+    "confidence",
+    "provider_attempt_id",
+    "verification_status",
+    "verification_reason",
+    "outcome_json",
+    "correction_of"
+  ],
+  "AiDecisionPattern": [
+    "reviewed_by",
+    "reviewed_note"
+  ],
   "AiDocumentProcessingJob": [
     "ai_agent_id",
     "model_used",
@@ -431,8 +500,57 @@
     "cost",
     "reviewed_by",
     "reviewed_at",
+    "document_id",
+    "document_version_id",
     "company_id",
     "metadata"
+  ],
+  "AiEvidenceClaim": [
+    "calculation_ref",
+    "contribution_id",
+    "verification_note",
+    "supersedes_claim_id",
+    "reviewer_uid",
+    "reviewed_at"
+  ],
+  "AiEvidenceContribution": [
+    "agent_run_id",
+    "turn_ref",
+    "event_ref",
+    "source_version_id",
+    "note"
+  ],
+  "AiEvidenceDecision": [
+    "contribution_id",
+    "supersedes_decision_id",
+    "reviewer_uid",
+    "reviewed_at"
+  ],
+  "AiEvidenceDependency": [
+    "acknowledged_by",
+    "acknowledged_at",
+    "last_change_id"
+  ],
+  "AiEvidencePassage": [
+    "effective_from_micros",
+    "effective_to_micros",
+    "source_version_id",
+    "processor_ref"
+  ],
+  "AiEvidenceSource": [
+    "author_organization"
+  ],
+  "AiEvidenceSourceChange": [
+    "replacement_version_id"
+  ],
+  "AiEvidenceSourceVersion": [
+    "edition",
+    "publication_date_micros",
+    "uri",
+    "retrieved_at_micros",
+    "content_hash",
+    "snapshot_ref",
+    "supersedes_version_id"
   ],
   "AiInsight": [
     "related_id",
@@ -447,6 +565,82 @@
     "company_id",
     "metadata"
   ],
+  "AiIntelligenceEvent": [
+    "decision_type_name",
+    "decision_type_version",
+    "confidence",
+    "provider_attempt_id",
+    "verification_status",
+    "verification_reason",
+    "escalation_reason",
+    "acceptance_reason",
+    "shadow_profile_ref",
+    "shadow_error"
+  ],
+  "AiKnowledgeEntry": [
+    "team_ref"
+  ],
+  "AiKnowledgeEntryVersion": [
+    "nomination_signal",
+    "supersedes_version_id"
+  ],
+  "AiKnowledgeReview": [
+    "note"
+  ],
+  "AiKnowledgeSkillPromotion": [
+    "requested_skill_id",
+    "skill_id",
+    "skill_version_id",
+    "reviewed_by",
+    "reviewed_at",
+    "review_note",
+    "invalidated_at"
+  ],
+  "AiKnowledgeVersionContent": [
+    "nomination_signal"
+  ],
+  "AiModelProfile": [
+    "temperature",
+    "top_p",
+    "input_cost_per1_k_microunits",
+    "output_cost_per1_k_microunits",
+    "per_request_cost_ceiling_microunits"
+  ],
+  "AiProviderAttempt": [
+    "failure_reason",
+    "resolution",
+    "dispatched_at",
+    "finished_at"
+  ],
+  "AiProviderAttemptRead": [
+    "failure_reason"
+  ],
+  "AiReducerAllowlist": [
+    "metadata"
+  ],
+  "AiRunEffect": [
+    "provider_reference",
+    "detail"
+  ],
+  "AiRunLifecycleEvent": [
+    "payload_json"
+  ],
+  "AiRunLifecycleState": [
+    "parent_run_id",
+    "parent_checkpoint_hash",
+    "fork_key",
+    "interrupted_reason",
+    "authority_snapshot_hash"
+  ],
+  "AiRunQuestion": [
+    "response_schema_json",
+    "answer_json",
+    "answered_at_version",
+    "answered_by"
+  ],
+  "AiRunReview": [
+    "rationale"
+  ],
   "AiSkill": [
     "description",
     "output_schema",
@@ -454,10 +648,51 @@
     "dataset_specs",
     "metadata"
   ],
+  "AiSkillCertificationEnvironment": [
+    "metadata"
+  ],
+  "AiSkillCertificationEvidence": [
+    "failure_kind",
+    "failure_reason",
+    "metadata"
+  ],
+  "AiSkillCertificationRequest": [
+    "certification_environment_id",
+    "runtime_profile_id",
+    "claimed_by",
+    "claimed_at",
+    "terminal_at",
+    "error_code"
+  ],
+  "AiSkillCertificationRuntimeProfile": [
+    "retired_at",
+    "metadata"
+  ],
   "AiSkillConfig": [
     "company_id",
     "custom_instructions",
     "metadata"
+  ],
+  "AiSkillFixture": [
+    "description",
+    "metadata"
+  ],
+  "AiSkillRelease": [
+    "previous_release_id",
+    "rollback_target_release_id",
+    "reason"
+  ],
+  "AiSkillTestRun": [
+    "failure_reason",
+    "metadata"
+  ],
+  "AiSkillVersion": [
+    "review_notes",
+    "metadata"
+  ],
+  "AiSpendReservation": [
+    "settled_by",
+    "settled_at"
   ],
   "AiTeamMember": [
     "avatar_url",
@@ -468,6 +703,36 @@
   ],
   "AiTeamMemberSkill": [
     "module_hint"
+  ],
+  "AiWorkflowGeneration": [
+    "parent_workflow_version_id"
+  ],
+  "AllocatePaymentParams": [
+    "write_off_account_id",
+    "metadata"
+  ],
+  "AmendSubscriptionParams": [
+    "effective_date",
+    "new_product_id",
+    "new_quantity",
+    "new_price_unit",
+    "new_discount",
+    "journal_id",
+    "income_account_id",
+    "receivable_account_id",
+    "notes",
+    "parent_line_id"
+  ],
+  "AmortizationLine": [
+    "move_id",
+    "create_uid",
+    "create_date",
+    "metadata"
+  ],
+  "AmortizationSchedule": [
+    "create_uid",
+    "create_date",
+    "metadata"
   ],
   "AnalyticsMetric": [
     "domain",
@@ -495,8 +760,40 @@
     "duration_ms",
     "metadata"
   ],
+  "AppendCrmConversationMessageParams": [
+    "provider_message_id",
+    "operational_message_id",
+    "metadata"
+  ],
+  "ApplyDocumentLegalHoldParams": [
+    "metadata"
+  ],
   "ApplyExpenseAdvanceParams": [
     "metadata"
+  ],
+  "ApplyOmnichannelAllocationParams": [
+    "preferred_route_id",
+    "channel",
+    "metadata"
+  ],
+  "ApplyProjectChangeOrderParams": [
+    "metadata"
+  ],
+  "ApplyProposalAnalysisParams": [
+    "score_json"
+  ],
+  "ApplySubscriptionInvoicePaymentParams": [
+    "amount",
+    "payment_date",
+    "ref",
+    "memo"
+  ],
+  "ArchiveEmployeeParams": [
+    "termination_date",
+    "override_reason"
+  ],
+  "AskAiRunQuestionParams": [
+    "response_schema_json"
   ],
   "AssignContactRoleParams": [
     "company_id",
@@ -544,6 +841,20 @@
   "BankMatchCandidate": [
     "rule_id"
   ],
+  "BankStatementImport": [
+    "file_name",
+    "approved_statement_id",
+    "approved_at",
+    "approved_by"
+  ],
+  "BankStatementImportLine": [
+    "date",
+    "amount",
+    "reference",
+    "description",
+    "validation_error",
+    "created_statement_line_id"
+  ],
   "BarcodeNomenclature": [
     "description",
     "metadata"
@@ -568,10 +879,21 @@
     "context_id",
     "metadata"
   ],
+  "BillProjectMilestoneParams": [
+    "amount",
+    "percent_complete",
+    "partner_id",
+    "invoice_date",
+    "fiscal_position_id"
+  ],
   "BillTimesheetsParams": [
     "company_id",
     "invoice_date",
     "fiscal_position_id"
+  ],
+  "BillingAccount": [
+    "trial_ends_at",
+    "metadata"
   ],
   "BomExplosionResult": [
     "line_id",
@@ -581,6 +903,9 @@
     "operation_id",
     "child_bom_id",
     "metadata"
+  ],
+  "BootstrapNewTenantParams": [
+    "default_company_currency_code"
   ],
   "BudgetPost": [
     "code",
@@ -604,8 +929,20 @@
     "rrule_type",
     "metadata"
   ],
+  "CancelSubscriptionParams": [
+    "close_reason_id",
+    "notes",
+    "invoice_move_id",
+    "journal_id",
+    "income_account_id",
+    "receivable_account_id"
+  ],
   "CancelWorkflowParams": [
     "causation_id"
+  ],
+  "CapacityForecastSnapshot": [
+    "employee_id",
+    "metadata"
   ],
   "CartonizationResult": [
     "metadata"
@@ -625,6 +962,12 @@
     "close_reason_id",
     "notes"
   ],
+  "ColdTierServiceIdentity": [
+    "retired_at"
+  ],
+  "CommodityPriceIndex": [
+    "metadata"
+  ],
   "Company": [
     "parent_id",
     "tax_id",
@@ -636,14 +979,23 @@
     "deleted_at",
     "metadata"
   ],
+  "CompanyCountryPack": [
+    "configuration"
+  ],
   "CompanyScopeParams": [
     "company_id"
+  ],
+  "CompanyVerticalPack": [
+    "configuration"
   ],
   "CompleteAiAgentRunParams": [
     "summary",
     "artifacts_json",
     "citations_json",
     "error_message"
+  ],
+  "CompleteAiSkillCertificationParams": [
+    "metadata"
   ],
   "CompleteDocumentProcessingJobParams": [
     "extracted_data",
@@ -653,8 +1005,32 @@
     "cost",
     "error_message"
   ],
+  "CompleteDocumentSignatureRequestParams": [
+    "changes_description",
+    "metadata"
+  ],
+  "CompleteOffboardingItemParams": [
+    "notes"
+  ],
+  "CompleteOnboardingItemParams": [
+    "notes"
+  ],
+  "CompletePerformanceReviewParams": [
+    "summary"
+  ],
+  "CompleteProposalIntegrationIntentParams": [
+    "result_document_id",
+    "metadata"
+  ],
+  "CompleteQueueJobParams": [
+    "error_summary",
+    "response_fingerprint"
+  ],
   "ConfirmPayslipParams": [
     "company_id"
+  ],
+  "ConsignmentAgreement": [
+    "metadata"
   ],
   "ConsolidationAccount": [
     "elimination_account_id",
@@ -702,7 +1078,7 @@
     "fax",
     "website",
     "street",
-    "street_2",
+    "street2",
     "city",
     "state_code",
     "zip",
@@ -719,6 +1095,7 @@
     "user_id",
     "color",
     "deleted_at",
+    "merge_target_id",
     "metadata"
   ],
   "ContactCategory": [
@@ -729,10 +1106,36 @@
   "ContactCategoryAssignment": [
     "metadata"
   ],
+  "ContactCommunicationPreference": [
+    "company_id",
+    "quiet_hours_start",
+    "quiet_hours_end",
+    "metadata"
+  ],
+  "ContactIdentityVerificationProof": [
+    "company_id"
+  ],
+  "ContactPhoneIdentity": [
+    "company_id",
+    "verified_at",
+    "archived_at",
+    "metadata"
+  ],
   "ContactRelationship": [
     "start_date",
     "end_date",
     "notes",
+    "metadata"
+  ],
+  "ContactRelationshipInsight": [
+    "metadata",
+    "stale_since"
+  ],
+  "ContactRoleAssignment": [
+    "company_id",
+    "active_until",
+    "ended_at",
+    "ended_by",
     "metadata"
   ],
   "ContactSegment": [
@@ -740,6 +1143,11 @@
     "domain",
     "color",
     "parent_id",
+    "metadata"
+  ],
+  "ContactSegmentRule": [
+    "value_text",
+    "value_id",
     "metadata"
   ],
   "ContactTag": [
@@ -762,9 +1170,18 @@
     "opportunity_stage_id",
     "metadata"
   ],
+  "CorrectAiDecisionCaseParams": [
+    "confidence"
+  ],
   "Country": [
     "official_name",
-    "currency_code",
+    "currency_id",
+    "metadata"
+  ],
+  "CountryPackDefinition": [
+    "metadata"
+  ],
+  "CountryPackTaxRule": [
     "metadata"
   ],
   "CreateAccountAccountParams": [
@@ -789,7 +1206,6 @@
     "account_disposal_id",
     "first_depreciation_date",
     "first_depreciation_date_manual",
-    "salvage_move_id",
     "depreciation_schedule",
     "metadata"
   ],
@@ -807,7 +1223,6 @@
     "name",
     "reference",
     "date",
-    "date_done",
     "metadata"
   ],
   "CreateAccountGroupParams": [
@@ -891,8 +1306,7 @@
     "date_deadline",
     "date_done",
     "assigned_to",
-    "res_model",
-    "res_id",
+    "target",
     "duration",
     "location",
     "video_url",
@@ -935,6 +1349,19 @@
     "priority",
     "metadata"
   ],
+  "CreateAiKnowledgeEntryParams": [
+    "team_ref"
+  ],
+  "CreateAiReducerAllowlistParams": [
+    "metadata"
+  ],
+  "CreateAiSkillCertificationEnvironmentParams": [
+    "metadata"
+  ],
+  "CreateAiSkillFixtureParams": [
+    "description",
+    "metadata"
+  ],
   "CreateAiSkillParams": [
     "description",
     "output_schema",
@@ -942,10 +1369,17 @@
     "dataset_specs",
     "metadata"
   ],
+  "CreateAiSkillVersionParams": [
+    "review_notes",
+    "metadata"
+  ],
   "CreateAiTeamMemberParams": [
     "avatar_url",
     "greeting_message",
     "personality",
+    "metadata"
+  ],
+  "CreateAmortizationScheduleParams": [
     "metadata"
   ],
   "CreateAnalyticAccountParams": [
@@ -992,7 +1426,19 @@
     "target_period",
     "metadata"
   ],
+  "CreateAssignmentRuleParams": [
+    "domain",
+    "team_id",
+    "metadata"
+  ],
+  "CreateAttendancePunchParams": [
+    "check_out"
+  ],
   "CreateAuditRuleParams": [
+    "metadata"
+  ],
+  "CreateBadDebtWriteOffParams": [
+    "reference",
     "metadata"
   ],
   "CreateBarcodeNomenclatureParams": [
@@ -1004,7 +1450,17 @@
     "alias",
     "metadata"
   ],
+  "CreateBenefitPlanParams": [
+    "description"
+  ],
   "CreateBillFromPurchaseOrderParams": [
+    "metadata"
+  ],
+  "CreateBillingAccountParams": [
+    "trial_ends_at",
+    "metadata"
+  ],
+  "CreateBomByproductParams": [
     "metadata"
   ],
   "CreateBomParams": [
@@ -1044,6 +1500,9 @@
     "address_country_code",
     "metadata"
   ],
+  "CreateConsignmentAgreementParams": [
+    "metadata"
+  ],
   "CreateConsolidationAccountParams": [
     "elimination_account_id",
     "elimination_method",
@@ -1053,6 +1512,16 @@
   "CreateConsolidationJournalParams": [
     "exchange_rate_date",
     "notes",
+    "metadata"
+  ],
+  "CreateContactCategoryParams": [
+    "color",
+    "parent_id",
+    "metadata"
+  ],
+  "CreateContactIdentityParams": [
+    "company_id",
+    "verification_state",
     "metadata"
   ],
   "CreateContactParams": [
@@ -1068,7 +1537,7 @@
     "fax",
     "website",
     "street",
-    "street_2",
+    "street2",
     "city",
     "state_code",
     "zip",
@@ -1086,9 +1555,9 @@
     "color",
     "metadata"
   ],
-  "CreateContactIdentityParams": [
-    "company_id",
-    "verification_state",
+  "CreateContactRelationshipParams": [
+    "start_date",
+    "notes",
     "metadata"
   ],
   "CreateContactSegmentParams": [
@@ -1112,7 +1581,7 @@
   ],
   "CreateCountryParams": [
     "official_name",
-    "currency_code",
+    "currency_id",
     "metadata"
   ],
   "CreateCreditNoteFromReturnOrderParams": [
@@ -1121,8 +1590,13 @@
   "CreateCreditNoteParams": [
     "reason"
   ],
+  "CreateCrmForecastSnapshotParams": [
+    "owner_id",
+    "metadata"
+  ],
   "CreateCrossoveredBudgetLineParams": [
     "analytic_account_id",
+    "project_id",
     "paid_date",
     "metadata"
   ],
@@ -1198,6 +1672,7 @@
     "description",
     "parent_id",
     "storage_id",
+    "residency_region",
     "metadata"
   ],
   "CreateDocumentParams": [
@@ -1206,11 +1681,27 @@
     "res_model",
     "res_id",
     "partner_id",
+    "classification_id",
+    "retention_days",
+    "fiscal_kind",
+    "residency_region",
     "metadata"
   ],
   "CreateDocumentProcessingJobParams": [
     "ai_agent_id",
     "input_data",
+    "document_id",
+    "document_version_id",
+    "metadata"
+  ],
+  "CreateDocumentSignatureRequestParams": [
+    "signers_json",
+    "metadata"
+  ],
+  "CreateDocumentTemplateParams": [
+    "header_html",
+    "footer_html",
+    "variable_bindings_json",
     "metadata"
   ],
   "CreateEliminationEntryParams": [
@@ -1231,6 +1722,7 @@
     "work_phone",
     "mobile_phone",
     "work_location",
+    "work_contact_partner_id",
     "date_hired",
     "gender",
     "birthday",
@@ -1300,9 +1792,27 @@
     "exported_file_url",
     "metadata"
   ],
+  "CreateFiscalPositionParams": [
+    "company_id",
+    "metadata"
+  ],
+  "CreateFiscalPositionTaxParams": [
+    "tax_dest_id",
+    "metadata"
+  ],
   "CreateFiscalYearParams": [
     "notes",
     "metadata"
+  ],
+  "CreateFleetVehicleParams": [
+    "license_plate",
+    "driver_name",
+    "driver_id",
+    "service_type_id",
+    "metadata"
+  ],
+  "CreateFleetVehicleServiceTypeParams": [
+    "company_id"
   ],
   "CreateFormConfigParams": [
     "description"
@@ -1323,10 +1833,44 @@
   "CreateHelpdeskTeamParams": [
     "description"
   ],
+  "CreateHrApplicantParams": [
+    "company_id",
+    "email",
+    "notes"
+  ],
+  "CreateHrEmployeeDocumentParams": [
+    "title",
+    "notes"
+  ],
+  "CreateHrEmployeeSkillParams": [
+    "notes",
+    "metadata"
+  ],
+  "CreateHrGlobalAssignmentParams": [
+    "date_to",
+    "notes"
+  ],
   "CreateHrIntegrationIntentParams": [
     "company_id",
     "payslip_id",
     "export_intent_id",
+    "metadata"
+  ],
+  "CreateHrLaborCostSnapshotParams": [
+    "employee_id",
+    "metadata"
+  ],
+  "CreateHrShiftOptJobParams": [
+    "metadata",
+    "result_summary"
+  ],
+  "CreateHrSkillParams": [
+    "code",
+    "category",
+    "description",
+    "metadata"
+  ],
+  "CreateIncotermParams": [
     "metadata"
   ],
   "CreateIntercompanyRuleParams": [
@@ -1363,6 +1907,10 @@
   "CreateInvoiceFromSaleOrderParams": [
     "metadata"
   ],
+  "CreateInvoiceReminderBatchParams": [
+    "company_id",
+    "metadata"
+  ],
   "CreateJobPositionParams": [
     "company_id",
     "department_id",
@@ -1396,6 +1944,10 @@
     "description",
     "metadata"
   ],
+  "CreateLeadLostReasonParams": [
+    "description",
+    "metadata"
+  ],
   "CreateLeadParams": [
     "email",
     "phone",
@@ -1421,6 +1973,10 @@
     "date_deadline",
     "metadata"
   ],
+  "CreateLeadSourceParams": [
+    "description",
+    "metadata"
+  ],
   "CreateLeaveRequestParams": [
     "notes",
     "name",
@@ -1432,10 +1988,28 @@
     "validity_start",
     "validity_stop"
   ],
+  "CreateLossCategoryParams": [
+    "company_id",
+    "metadata"
+  ],
   "CreateLoyaltyProgramParams": [
     "validity_duration",
     "validity_duration_type",
     "date_to"
+  ],
+  "CreateMailTemplateParams": [
+    "document_template_id",
+    "metadata"
+  ],
+  "CreateMessageBatchParams": [
+    "company_id",
+    "subject_query",
+    "metadata"
+  ],
+  "CreateMessageTemplateParams": [
+    "company_id",
+    "subject",
+    "metadata"
   ],
   "CreateMrpProductionParams": [
     "company_id",
@@ -1447,6 +2021,17 @@
     "date_deadline",
     "origin",
     "responsible_user_id",
+    "metadata"
+  ],
+  "CreateOnboardingTemplateItemParams": [
+    "description"
+  ],
+  "CreateOnboardingTemplateParams": [
+    "description"
+  ],
+  "CreateOperationalMessageParams": [
+    "company_id",
+    "rendered_subject",
     "metadata"
   ],
   "CreateOpportunityLineParams": [
@@ -1475,6 +2060,11 @@
     "description",
     "metadata"
   ],
+  "CreateOpportunityStageParams": [
+    "requirements",
+    "team_id",
+    "metadata"
+  ],
   "CreateOrganizationParams": [
     "description",
     "logo_url",
@@ -1497,26 +2087,11 @@
     "journal_id",
     "metadata"
   ],
-  "CreatePaymentMethodParams": [
-    "receivable_account_id",
-    "outstanding_account_id",
-    "journal_id",
-    "cash_journal_id",
-    "use_payment_terminal",
-    "image"
-  ],
   "CreatePaymentAccountParams": [
     "provider_label",
     "reference_raw",
     "fee_account_id",
     "clearing_account_id",
-    "metadata"
-  ],
-  "CreatePaymentTransactionParams": [
-    "external_reference",
-    "occurred_at",
-    "source_entity",
-    "source_entity_id",
     "metadata"
   ],
   "CreatePaymentFeeParams": [
@@ -1525,13 +2100,13 @@
     "provider_reference",
     "metadata"
   ],
-  "AllocatePaymentParams": [
-    "write_off_account_id",
-    "metadata"
-  ],
-  "ReversePaymentTransactionParams": [
-    "reason",
-    "metadata"
+  "CreatePaymentMethodParams": [
+    "receivable_account_id",
+    "outstanding_account_id",
+    "journal_id",
+    "cash_journal_id",
+    "use_payment_terminal",
+    "image"
   ],
   "CreatePaymentParams": [
     "date",
@@ -1541,10 +2116,24 @@
   "CreatePaymentTermParams": [
     "note"
   ],
+  "CreatePaymentTransactionParams": [
+    "external_reference",
+    "occurred_at",
+    "source_entity",
+    "source_entity_id",
+    "metadata"
+  ],
+  "CreatePayrollExportIntentParams": [
+    "pack_key",
+    "metadata"
+  ],
   "CreatePayslipParams": [
     "company_id",
     "contract_id",
     "notes"
+  ],
+  "CreatePerformanceCycleParams": [
+    "description"
   ],
   "CreatePickingBatchParams": [
     "company_id",
@@ -1597,6 +2186,9 @@
     "date_start",
     "date_end"
   ],
+  "CreatePricelistParams": [
+    "company_id"
+  ],
   "CreateProductCategoryParams": [
     "parent_id",
     "company_id",
@@ -1626,8 +2218,8 @@
     "description_sale",
     "service_type",
     "service_tracking",
-    "image_1920_url",
-    "image_128_url",
+    "image1920_url",
+    "image128_url",
     "color",
     "responsible_id",
     "pricelist_id",
@@ -1660,6 +2252,21 @@
     "default_code",
     "barcode"
   ],
+  "CreateProjectChangeOrderParams": [
+    "description",
+    "scope_delta",
+    "metadata"
+  ],
+  "CreateProjectIntegrationIntentParams": [
+    "company_id",
+    "project_id",
+    "metadata"
+  ],
+  "CreateProjectMilestoneParams": [
+    "description",
+    "deadline",
+    "metadata"
+  ],
   "CreateProjectParams": [
     "company_id",
     "description",
@@ -1684,6 +2291,67 @@
     "activity_summary",
     "metadata"
   ],
+  "CreateProjectRateCardLineParams": [
+    "employee_id",
+    "task_id",
+    "effective_from",
+    "effective_to",
+    "metadata"
+  ],
+  "CreateProjectRateCardParams": [
+    "project_id",
+    "effective_from",
+    "effective_to",
+    "metadata"
+  ],
+  "CreateProjectRevenueLineParams": [
+    "milestone_id",
+    "metadata"
+  ],
+  "CreateProjectRevenueScheduleParams": [
+    "milestone_id",
+    "metadata"
+  ],
+  "CreateProposalClarificationParams": [
+    "author_email"
+  ],
+  "CreateProposalClauseParams": [
+    "country_pack_key",
+    "metadata"
+  ],
+  "CreateProposalIntegrationIntentParams": [
+    "proposal_version_id",
+    "metadata"
+  ],
+  "CreateProposalParams": [
+    "deadline",
+    "description",
+    "template_id",
+    "partner_id",
+    "document_folder_id",
+    "metadata"
+  ],
+  "CreateProposalTemplateParams": [
+    "country_pack_key",
+    "metadata"
+  ],
+  "CreatePublicHolidayParams": [
+    "calendar_id",
+    "metadata"
+  ],
+  "CreatePurchaseBlanketOrderLineParams": [
+    "metadata"
+  ],
+  "CreatePurchaseBlanketOrderParams": [
+    "date_start",
+    "date_end",
+    "metadata"
+  ],
+  "CreatePurchaseContractParams": [
+    "date_start",
+    "date_end",
+    "metadata"
+  ],
   "CreatePurchaseOrderParams": [
     "company_id",
     "origin",
@@ -1697,6 +2365,10 @@
     "user_id",
     "is_quantity_copy",
     "metadata"
+  ],
+  "CreatePurchaseRequisitionLineParams": [
+    "name",
+    "sequence"
   ],
   "CreatePurchaseRequisitionParams": [
     "company_id",
@@ -1727,6 +2399,11 @@
   "CreatePurchaseRfqParams": [
     "requisition_id",
     "notes",
+    "metadata"
+  ],
+  "CreatePurchasingIntegrationIntentParams": [
+    "purchase_order_id",
+    "request_payload",
     "metadata"
   ],
   "CreateQualityAlertParams": [
@@ -1788,6 +2465,14 @@
     "attachment",
     "metadata"
   ],
+  "CreateResourceAllocationParams": [
+    "employee_id",
+    "resource_id",
+    "task_id",
+    "name",
+    "notes",
+    "metadata"
+  ],
   "CreateReturnOrderLineParams": [
     "sale_order_line_id",
     "lot_id"
@@ -1812,6 +2497,24 @@
     "worksheet_url",
     "metadata"
   ],
+  "CreateSaleCommissionPlanParams": [
+    "company_id",
+    "metadata"
+  ],
+  "CreateSaleCommissionPlanSplitParams": [
+    "metadata"
+  ],
+  "CreateSaleContractParams": [
+    "company_id",
+    "date_start",
+    "date_end",
+    "pricelist_id",
+    "metadata"
+  ],
+  "CreateSaleCpqConstraintParams": [
+    "company_id",
+    "metadata"
+  ],
   "CreateSaleOrderLineParams": [
     "price_unit",
     "name",
@@ -1820,6 +2523,9 @@
     "packaging_id",
     "route_id",
     "customer_lead",
+    "metadata"
+  ],
+  "CreateSaleOrderOptionParams": [
     "metadata"
   ],
   "CreateSaleOrderParams": [
@@ -1836,7 +2542,6 @@
     "validity_days",
     "shipping_policy",
     "picking_policy",
-    "invoice_policy",
     "campaign_id",
     "medium_id",
     "source_id",
@@ -1852,10 +2557,23 @@
     "is_printed",
     "is_locked",
     "is_dropship",
+    "invoice_policy",
     "message_follower_ids",
     "message_partner_ids",
     "message_channel_ids",
     "activity_ids",
+    "metadata"
+  ],
+  "CreateSalePromotionParams": [
+    "company_id",
+    "date_start",
+    "date_end",
+    "metadata"
+  ],
+  "CreateSalesIntegrationIntentParams": [
+    "company_id",
+    "sale_order_id",
+    "request_payload",
     "metadata"
   ],
   "CreateSavedReportParams": [
@@ -1864,6 +2582,9 @@
     "metadata"
   ],
   "CreateScheduledReportParams": [
+    "report_template_id",
+    "owner_report_key",
+    "timezone",
     "description",
     "domain",
     "day_of_week",
@@ -1873,6 +2594,13 @@
     "metadata"
   ],
   "CreateShippingMethodParams": [
+    "metadata"
+  ],
+  "CreateSodConflictRuleParams": [
+    "description",
+    "metadata"
+  ],
+  "CreateStatutoryIdParams": [
     "metadata"
   ],
   "CreateStockInventoryLineParams": [
@@ -1934,6 +2662,7 @@
     "inventory_id",
     "sale_line_id",
     "lot_id",
+    "serial_id",
     "package_id",
     "result_package_id",
     "owner_id",
@@ -2040,6 +2769,9 @@
   "CreateStockTraceabilityReportParams": [
     "metadata"
   ],
+  "CreateSubscriptionBundleParams": [
+    "metadata"
+  ],
   "CreateSubscriptionFromSaleOrderParams": [
     "company_id",
     "code",
@@ -2050,13 +2782,27 @@
     "stage_id",
     "metadata"
   ],
+  "CreateSubscriptionPaymentIntentParams": [
+    "invoice_move_id",
+    "payment_token_id",
+    "metadata"
+  ],
   "CreateSubscriptionPlanParams": [
     "company_id",
     "description",
     "template_id",
     "invoice_mail_template_id",
     "website_url",
-    "image_1920_url",
+    "image1920_url",
+    "metadata"
+  ],
+  "CreateSubscriptionPriceTierParams": [
+    "product_id",
+    "max_qty",
+    "metadata"
+  ],
+  "CreateSubscriptionTaxSettleIntentParams": [
+    "payment_id",
     "metadata"
   ],
   "CreateTaskParams": [
@@ -2164,7 +2910,7 @@
     "metadata"
   ],
   "CreateWarehouseSyncIntentParams": [
-    "deviceId",
+    "device_id",
     "metadata"
   ],
   "CreateWarehouseTaskParams": [
@@ -2214,6 +2960,9 @@
     "description",
     "metadata"
   ],
+  "CreateWorkingCalendarParams": [
+    "metadata"
+  ],
   "CreateWorkorderParams": [
     "capacity",
     "worksheet",
@@ -2221,6 +2970,30 @@
     "operation_note",
     "operation_id",
     "blocked_by_workorder_id",
+    "metadata"
+  ],
+  "CrmConversation": [
+    "provider_account_id",
+    "phone_identity_id",
+    "assigned_user_id",
+    "last_message_at",
+    "last_preview",
+    "external_thread_id",
+    "metadata"
+  ],
+  "CrmConversationMessage": [
+    "provider_message_id",
+    "operational_message_id",
+    "metadata"
+  ],
+  "CrmForecastSnapshot": [
+    "owner_id",
+    "metadata"
+  ],
+  "CrmProviderPrincipal": [
+    "retired_at"
+  ],
+  "CrmTeam": [
     "metadata"
   ],
   "CrossoveredBudget": [
@@ -2233,6 +3006,7 @@
   ],
   "CrossoveredBudgetLines": [
     "analytic_account_id",
+    "project_id",
     "paid_date",
     "create_uid",
     "create_date",
@@ -2286,8 +3060,14 @@
     "origin_move_id",
     "origin_move_line_id"
   ],
+  "DelegatedAdminScope": [
+    "metadata"
+  ],
   "DeleteAccountMoveLineParams": [
     "company_id"
+  ],
+  "DeleteHrEmployeeDocumentParams": [
+    "reason"
   ],
   "DeliveryCarrier": [
     "metadata"
@@ -2306,6 +3086,7 @@
     "description",
     "checksum",
     "index_content",
+    "index_language",
     "access_token",
     "url",
     "res_model",
@@ -2316,13 +3097,24 @@
     "folder_id",
     "locked_by",
     "locked_at",
+    "locked_until",
     "share_link",
     "share_expires",
     "deleted_at",
     "deleted_by",
+    "classification_id",
+    "retention_days",
+    "purge_after",
+    "fiscal_kind",
+    "residency_region",
     "current_version_id",
     "last_viewed_at",
     "last_viewed_by",
+    "metadata"
+  ],
+  "DocumentExternalRef": [
+    "connection_id",
+    "etag",
     "metadata"
   ],
   "DocumentFolder": [
@@ -2332,6 +3124,26 @@
     "storage_id",
     "share_link",
     "share_expires",
+    "residency_region",
+    "metadata"
+  ],
+  "DocumentLegalHold": [
+    "released_at",
+    "released_by",
+    "metadata"
+  ],
+  "DocumentSignatureRequest": [
+    "company_id",
+    "signers_json",
+    "completed_version_id",
+    "completed_at",
+    "metadata"
+  ],
+  "DocumentTemplate": [
+    "company_id",
+    "header_html",
+    "footer_html",
+    "variable_bindings_json",
     "metadata"
   ],
   "DocumentVersion": [
@@ -2346,7 +3158,9 @@
     "reason"
   ],
   "EnqueueJobParams": [
-    "scheduled_at_micros",
+    "company_id",
+    "available_at_micros",
+    "causation_id",
     "metadata"
   ],
   "ExecuteCrossDockParams": [
@@ -2357,7 +3171,34 @@
     "dest_location_id",
     "metadata"
   ],
+  "ExpenseAllocationLineParams": [
+    "analytic_account_id",
+    "project_id",
+    "metadata"
+  ],
+  "ExpenseCardStatementLine": [
+    "merchant_key",
+    "matched_expense_id",
+    "metadata"
+  ],
+  "ExpenseIntegrationIntent": [
+    "device_id",
+    "result_expense_id",
+    "result_sheet_id",
+    "last_error",
+    "applied_at",
+    "metadata"
+  ],
+  "FailAiSkillCertificationParams": [
+    "metadata"
+  ],
   "FailExpenseIntegrationIntentParams": [
+    "metadata"
+  ],
+  "FailProjectIntegrationIntentParams": [
+    "metadata"
+  ],
+  "FailProposalIntegrationIntentParams": [
     "metadata"
   ],
   "FailWarehouseSyncIntentParams": [
@@ -2366,6 +3207,9 @@
   "FieldOption": [
     "color",
     "icon"
+  ],
+  "FieldPermission": [
+    "role_id"
   ],
   "FieldValidation": [
     "min_length",
@@ -2390,10 +3234,29 @@
     "write_date",
     "metadata"
   ],
+  "FireWorkflowTimerParams": [
+    "causation_id"
+  ],
+  "FleetInspection": [
+    "inspector_id",
+    "odometer_km",
+    "notes",
+    "client_request_id"
+  ],
+  "FleetServiceRecord": [
+    "odometer_km",
+    "provider",
+    "notes",
+    "cost_amount",
+    "currency_id",
+    "account_move_id",
+    "client_request_id"
+  ],
   "FleetVehicle": [
     "license_plate",
     "driver_name",
     "driver_id",
+    "service_type_id",
     "latitude",
     "longitude",
     "speed_kmh",
@@ -2401,10 +3264,27 @@
     "last_position_at",
     "fuel_level",
     "odometer_km",
-    "company_id",
+    "metadata"
+  ],
+  "FleetVehicleServiceType": [
+    "company_id"
+  ],
+  "FxRevaluationRun": [
+    "reference",
+    "create_uid",
+    "create_date",
+    "metadata"
+  ],
+  "GenerateSubscriptionInvoiceParams": [
+    "billing_run_key",
+    "journal_id",
+    "tax_account_id"
+  ],
+  "GeneratedOwnerReport": [
     "metadata"
   ],
   "GoogleDriveConnection": [
+    "company_id",
     "root_folder_id",
     "shared_drive_id",
     "webhook_url",
@@ -2414,6 +3294,13 @@
     "last_error",
     "deleted_at",
     "created_by",
+    "metadata"
+  ],
+  "GrantDelegatedAdminScopeParams": [
+    "metadata"
+  ],
+  "GrantSubscriptionEntitlementParams": [
+    "product_id",
     "metadata"
   ],
   "HelpdeskStage": [
@@ -2435,11 +3322,33 @@
     "closed_at",
     "deleted_at"
   ],
+  "HrApplicant": [
+    "email",
+    "notes"
+  ],
+  "HrAttendance": [
+    "check_out"
+  ],
+  "HrBenefitEnrollment": [
+    "effective_to"
+  ],
+  "HrBenefitPlan": [
+    "description"
+  ],
+  "HrCapacityForecast": [
+    "metadata"
+  ],
+  "HrCompensationEvent": [
+    "reason"
+  ],
   "HrContract": [
     "job_id",
     "department_id",
     "date_end",
     "notes"
+  ],
+  "HrCountryPackLeaveDefault": [
+    "metadata"
   ],
   "HrDepartment": [
     "complete_name",
@@ -2461,6 +3370,7 @@
     "work_phone",
     "mobile_phone",
     "work_location",
+    "work_contact_partner_id",
     "date_hired",
     "date_terminated",
     "gender",
@@ -2475,23 +3385,98 @@
     "deleted_at",
     "metadata"
   ],
+  "HrEmployeeDocument": [
+    "title",
+    "notes"
+  ],
+  "HrEmployeeSkill": [
+    "notes",
+    "metadata"
+  ],
   "HrExpense": [
     "product_id",
     "account_id",
     "analytic_account_id",
+    "project_id",
+    "mileage_distance",
+    "mileage_rate_id",
+    "per_diem_days",
+    "per_diem_rate_id",
     "sheet_id",
-    "description"
+    "description",
+    "client_request_id",
+    "merchant_key",
+    "fraud_reason",
+    "duplicate_of_id"
+  ],
+  "HrExpenseAdvance": [
+    "account_move_id",
+    "client_request_id",
+    "metadata"
+  ],
+  "HrExpenseAllocation": [
+    "analytic_account_id",
+    "project_id",
+    "metadata"
+  ],
+  "HrExpenseMileageRate": [
+    "effective_from",
+    "effective_to",
+    "metadata"
+  ],
+  "HrExpensePerDiemRate": [
+    "effective_from",
+    "effective_to",
+    "metadata"
+  ],
+  "HrExpensePolicy": [
+    "max_line_amount",
+    "max_sheet_amount",
+    "metadata"
+  ],
+  "HrExpensePolicyException": [
+    "approved_by",
+    "resolved_at",
+    "metadata"
+  ],
+  "HrExpenseReceipt": [
+    "file_name",
+    "mime_type",
+    "content_hash",
+    "client_request_id"
   ],
   "HrExpenseSheet": [
     "accounting_date",
     "account_move_id",
+    "reimbursement_move_id",
+    "rebill_move_id",
+    "submitted_by",
     "approver_id",
+    "notes",
+    "metadata"
+  ],
+  "HrGlobalAssignment": [
+    "date_to",
     "notes"
+  ],
+  "HrIntegrationIntent": [
+    "payslip_id",
+    "export_intent_id",
+    "result_ref",
+    "external_ref",
+    "payload_hash",
+    "last_error",
+    "applied_at",
+    "metadata"
   ],
   "HrJobPosition": [
     "department_id",
     "description",
     "requirements"
+  ],
+  "HrLaborCostSnapshot": [
+    "employee_id",
+    "metadata"
   ],
   "HrLeave": [
     "name",
@@ -2507,13 +3492,70 @@
     "validity_start",
     "validity_stop"
   ],
+  "HrOffboardingChecklist": [
+    "assets_notes",
+    "access_notes",
+    "docs_notes"
+  ],
+  "HrOnboardingProgress": [
+    "completed_at",
+    "notes"
+  ],
+  "HrOnboardingTemplate": [
+    "description"
+  ],
+  "HrOnboardingTemplateItem": [
+    "description"
+  ],
+  "HrPayrollExportIntent": [
+    "payload_hash",
+    "external_ref",
+    "last_error",
+    "applied_at",
+    "metadata"
+  ],
   "HrPayslip": [
     "number",
     "contract_id",
+    "calculation_source",
+    "calculation_metadata",
+    "account_move_id",
+    "export_intent_id",
     "notes"
+  ],
+  "HrPerformanceCycle": [
+    "description"
+  ],
+  "HrPerformanceGoal": [
+    "description",
+    "target_value"
+  ],
+  "HrPerformanceReview": [
+    "reviewer_employee_id",
+    "self_rating",
+    "manager_rating",
+    "summary",
+    "submitted_at",
+    "completed_at"
+  ],
+  "HrPiiAccessLog": [
+    "company_id"
   ],
   "HrResource": [
     "user_id"
+  ],
+  "HrShiftOptJob": [
+    "metadata",
+    "result_summary"
+  ],
+  "HrSkill": [
+    "code",
+    "category",
+    "description",
+    "metadata"
+  ],
+  "HrStatutoryId": [
+    "metadata"
   ],
   "ImportJob": [
     "file_name",
@@ -2527,6 +3569,14 @@
   "ImportMappingTemplate": [
     "write_uid",
     "write_date"
+  ],
+  "IngestSubscriptionUsageEventParams": [
+    "product_id",
+    "occurred_at",
+    "metadata"
+  ],
+  "InspectAiEvidenceSourceVersionParams": [
+    "snapshot_ref"
   ],
   "IntercompanyRule": [
     "journal_id",
@@ -2550,7 +3600,6 @@
     "approved_at",
     "metadata"
   ],
-  "InvalidateWorkflowHumanTaskParams": [],
   "InventoryAdjustment": [
     "inventory_id",
     "lot_id",
@@ -2563,6 +3612,42 @@
     "accounting_entry_id",
     "approved_at",
     "posted_at",
+    "metadata"
+  ],
+  "InventoryAuditRun": [
+    "company_id",
+    "completed_at"
+  ],
+  "InventoryAuditViolation": [
+    "field_name"
+  ],
+  "InventoryClose": [
+    "journal_id",
+    "inventory_account_id",
+    "valuation_account_id",
+    "account_move_id",
+    "closed_at",
+    "metadata"
+  ],
+  "InventoryCloseLine": [
+    "lot_id",
+    "metadata"
+  ],
+  "InventoryException": [
+    "product_id",
+    "location_id",
+    "quant_id",
+    "lot_id",
+    "quality_check_id",
+    "resolved_at",
+    "metadata"
+  ],
+  "InventoryIntegrationIntent": [
+    "warehouse_id",
+    "picking_id",
+    "request_payload",
+    "last_error",
+    "external_reference",
     "metadata"
   ],
   "InventoryValuation": [
@@ -2597,6 +3682,7 @@
     "metadata"
   ],
   "IoTHub": [
+    "credential_hash",
     "ip_address",
     "firmware_version",
     "last_heartbeat",
@@ -2660,6 +3746,7 @@
     "date_conversion",
     "date_last_stage_update",
     "user_id",
+    "stage_id",
     "team_id",
     "partner_id",
     "day_open",
@@ -2672,8 +3759,28 @@
     "description",
     "metadata"
   ],
+  "LeadScore": [
+    "metadata",
+    "stale_since"
+  ],
+  "LeadScoreFactor": [
+    "evidence"
+  ],
   "LeadSource": [
     "description",
+    "metadata"
+  ],
+  "LinkProposalVersionEsignParams": [
+    "signers_json",
+    "metadata"
+  ],
+  "LinkSubcontractorCostParams": [
+    "purchase_order_id",
+    "purchase_order_line_id",
+    "vendor_bill_move_id",
+    "vendor_bill_line_id",
+    "partner_id",
+    "name",
     "metadata"
   ],
   "LogAuditEventParams": [
@@ -2685,9 +3792,14 @@
     "user_agent",
     "metadata"
   ],
+  "LogHrPiiReadParams": [
+    "company_id"
+  ],
   "LogTimesheetParams": [
     "company_id",
     "task_id",
+    "employee_cost",
+    "sell_rate",
     "timesheet_invoice_type",
     "product_id",
     "product_uom_id",
@@ -2699,10 +3811,34 @@
   ],
   "MailMessage": [
     "subtype",
-    "parent_id"
+    "parent_id",
+    "metadata"
+  ],
+  "MailTemplate": [
+    "company_id",
+    "document_template_id",
+    "metadata"
   ],
   "MatchExpenseCardStatementLineParams": [
     "metadata"
+  ],
+  "MessageBatch": [
+    "company_id",
+    "subject_query",
+    "approved_by",
+    "approved_at",
+    "rejected_by",
+    "rejected_at",
+    "rejection_reason",
+    "metadata"
+  ],
+  "MessageTemplate": [
+    "company_id",
+    "subject",
+    "metadata"
+  ],
+  "MigrateWorkflowInstanceParams": [
+    "causation_id"
   ],
   "MoveStockQuantParams": [
     "company_id"
@@ -2715,10 +3851,16 @@
     "routing_id",
     "metadata"
   ],
+  "MrpBomByproduct": [
+    "metadata"
+  ],
   "MrpBomLine": [
     "operation_id",
     "parent_product_tmpl_id",
     "child_bom_id",
+    "metadata"
+  ],
+  "MrpLossCategory": [
     "metadata"
   ],
   "MrpProduction": [
@@ -2754,6 +3896,7 @@
   ],
   "MrpWorkcenterProductivity": [
     "description",
+    "loss_id",
     "date_end",
     "metadata"
   ],
@@ -2767,6 +3910,22 @@
     "operation_note",
     "quality_state",
     "last_working_user_id",
+    "metadata"
+  ],
+  "OpenCrmConversationParams": [
+    "phone_identity_id",
+    "external_thread_id",
+    "assigned_user_id",
+    "metadata"
+  ],
+  "OperationalMessage": [
+    "company_id",
+    "rendered_subject",
+    "copied_at",
+    "queued_at",
+    "sent_at",
+    "failed_at",
+    "failure_reason",
     "metadata"
   ],
   "Opportunity": [
@@ -2814,6 +3973,14 @@
     "currency_id",
     "metadata"
   ],
+  "OrganizationReconstructionFence": [
+    "completed_at",
+    "failure",
+    "current_restore_order"
+  ],
+  "OrganizationRowChange": [
+    "row_json"
+  ],
   "OrganizationSettings": [
     "module_config",
     "integration_keys",
@@ -2831,8 +3998,52 @@
     "barcode",
     "metadata"
   ],
+  "PartnerCreditControl": [
+    "notes",
+    "create_uid",
+    "create_date",
+    "write_uid",
+    "write_date",
+    "metadata"
+  ],
   "PasswordResetToken": [
     "used_at"
+  ],
+  "PauseSubscriptionParams": [
+    "notes"
+  ],
+  "PaymentAccount": [
+    "provider_label",
+    "reference_normalized",
+    "reference_masked",
+    "fee_account_id",
+    "clearing_account_id",
+    "archived_at",
+    "metadata"
+  ],
+  "PaymentFee": [
+    "fee_account_id",
+    "tax_account_id",
+    "provider_reference",
+    "metadata"
+  ],
+  "PaymentReconciliation": [
+    "write_off_account_id",
+    "write_off_move_id",
+    "reversed_reconciliation_id",
+    "metadata"
+  ],
+  "PaymentReversal": [
+    "reason",
+    "metadata"
+  ],
+  "PaymentTransaction": [
+    "external_reference",
+    "account_payment_id",
+    "source_entity",
+    "source_entity_id",
+    "voided_at",
+    "metadata"
   ],
   "PickingWave": [
     "user_id",
@@ -2886,7 +4097,8 @@
     "procurement_group_id",
     "shipping_date",
     "last_order_preparation_change",
-    "metadata"
+    "metadata",
+    "cold_eligible_at"
   ],
   "PosOrderLine": [
     "reward_id",
@@ -2943,6 +4155,13 @@
     "fx_fee_amount",
     "client_request_id"
   ],
+  "PostPayslipParams": [
+    "tax_withholding_account_id"
+  ],
+  "PostRealizedFxParams": [
+    "reference",
+    "metadata"
+  ],
   "PrivacyConsent": [
     "granted_at",
     "revoked_at",
@@ -2960,8 +4179,8 @@
     "description_sale",
     "service_type",
     "service_tracking",
-    "image_1920_url",
-    "image_128_url",
+    "image1920_url",
+    "image128_url",
     "color",
     "responsible_id",
     "pricelist_id",
@@ -2997,6 +4216,9 @@
     "company_id",
     "metadata"
   ],
+  "ProductPricelist": [
+    "company_id"
+  ],
   "ProductPricelistItem": [
     "product_tmpl_id",
     "product_id",
@@ -3031,6 +4253,35 @@
     "write_date",
     "metadata"
   ],
+  "ProjectBaseline": [
+    "current_change_order_id",
+    "metadata"
+  ],
+  "ProjectChangeOrder": [
+    "description",
+    "scope_delta",
+    "applied_at",
+    "metadata"
+  ],
+  "ProjectEarnedValueSnapshot": [
+    "metadata"
+  ],
+  "ProjectIntegrationIntent": [
+    "project_id",
+    "result_ref",
+    "last_error",
+    "applied_at",
+    "metadata"
+  ],
+  "ProjectMarginSnapshot": [
+    "metadata"
+  ],
+  "ProjectMilestone": [
+    "description",
+    "deadline",
+    "invoice_move_id",
+    "metadata"
+  ],
   "ProjectProject": [
     "description",
     "partner_id",
@@ -3052,6 +4303,38 @@
     "activity_type_id",
     "activity_user_id",
     "activity_summary",
+    "metadata"
+  ],
+  "ProjectRateCard": [
+    "project_id",
+    "effective_from",
+    "effective_to",
+    "metadata"
+  ],
+  "ProjectRateCardLine": [
+    "employee_id",
+    "task_id",
+    "effective_from",
+    "effective_to",
+    "metadata"
+  ],
+  "ProjectRevenueLine": [
+    "milestone_id",
+    "move_id",
+    "move_line_id",
+    "metadata"
+  ],
+  "ProjectRevenueSchedule": [
+    "milestone_id",
+    "metadata"
+  ],
+  "ProjectSubcontractorCost": [
+    "purchase_order_id",
+    "purchase_order_line_id",
+    "vendor_bill_move_id",
+    "vendor_bill_line_id",
+    "partner_id",
+    "name",
     "metadata"
   ],
   "ProjectTask": [
@@ -3091,17 +4374,52 @@
     "manager_id",
     "metadata"
   ],
+  "ProjectTimesheetApproval": [
+    "reason"
+  ],
+  "PromoteAiDecisionPatternParams": [
+    "note"
+  ],
   "Proposal": [
     "deadline",
     "description",
     "template_id",
     "partner_id",
     "document_folder_id",
+    "award_approved_at",
+    "award_approved_by",
+    "sale_order_id",
+    "project_id",
+    "metadata"
+  ],
+  "ProposalAnalysis": [
+    "score_json"
+  ],
+  "ProposalClarification": [
+    "author_email",
+    "answer",
+    "answered_by",
+    "answered_at"
+  ],
+  "ProposalClause": [
+    "country_pack_key",
     "metadata"
   ],
   "ProposalComment": [
     "parent_id",
     "resolved_by"
+  ],
+  "ProposalComplianceRequirement": [
+    "description",
+    "waiver_rationale",
+    "evidence_document_id"
+  ],
+  "ProposalIntegrationIntent": [
+    "proposal_version_id",
+    "result_document_id",
+    "last_error",
+    "applied_at",
+    "metadata"
   ],
   "ProposalLineItem": [
     "section_id",
@@ -3113,12 +4431,46 @@
     "section_id",
     "cursor_position"
   ],
+  "ProposalProcurementScore": [
+    "notes"
+  ],
   "ProposalSection": [
     "ai_suggestion"
+  ],
+  "ProposalSourceDoc": [
+    "document_id"
+  ],
+  "ProposalTemplate": [
+    "country_pack_key",
+    "metadata"
+  ],
+  "ProposeAiKnowledgeSkillPromotionParams": [
+    "skill_id"
+  ],
+  "PublicHoliday": [
+    "calendar_id",
+    "metadata"
   ],
   "PublishFormConfigurationParams": [
     "description",
     "expected_updated_at_micros"
+  ],
+  "PurchaseApprovalDelegate": [
+    "metadata"
+  ],
+  "PurchaseBlanketOrder": [
+    "date_start",
+    "date_end",
+    "last_release_po_id",
+    "metadata"
+  ],
+  "PurchaseBlanketOrderLine": [
+    "metadata"
+  ],
+  "PurchaseContract": [
+    "date_start",
+    "date_end",
+    "metadata"
   ],
   "PurchaseOrder": [
     "name",
@@ -3132,6 +4484,8 @@
     "date_calendar_start",
     "date_calendar_done",
     "effective_date",
+    "match_qty_tolerance",
+    "match_price_tolerance",
     "notes",
     "message_main_attachment_id",
     "activity_state",
@@ -3157,6 +4511,7 @@
     "display_type",
     "sale_line_id",
     "sale_order_id",
+    "lot_id",
     "metadata"
   ],
   "PurchaseRequisition": [
@@ -3169,6 +4524,38 @@
     "account_analytic_id",
     "picking_type_id",
     "vendor_id",
+    "metadata"
+  ],
+  "PurchaseRequisitionLine": [
+    "name"
+  ],
+  "PurchaseReturn": [
+    "purchase_order_id",
+    "return_reason",
+    "picking_id",
+    "credit_move_id"
+  ],
+  "PurchaseReturnLine": [
+    "purchase_order_line_id"
+  ],
+  "PurchaseRfq": [
+    "requisition_id",
+    "notes",
+    "awarded_bid_id",
+    "purchase_order_id",
+    "metadata"
+  ],
+  "PurchaseRfqBid": [
+    "notes"
+  ],
+  "PurchaseRfqLine": [
+    "name"
+  ],
+  "PurchasingIntegrationIntent": [
+    "purchase_order_id",
+    "request_payload",
+    "last_error",
+    "external_reference",
     "metadata"
   ],
   "QualityAlert": [
@@ -3236,19 +4623,134 @@
     "phone",
     "metadata"
   ],
+  "QueueAttempt": [
+    "company_id",
+    "lease_expires_at",
+    "available_at",
+    "error_summary"
+  ],
+  "QueueEffectReceipt": [
+    "company_id",
+    "causation_id"
+  ],
   "QueueJob": [
-    "scheduled_at",
-    "started_at",
+    "company_id",
+    "lease_worker_id",
+    "lease_token",
+    "lease_expires_at",
+    "causation_id",
     "completed_at",
-    "error_message",
+    "last_error_summary",
+    "dead_lettered_at",
+    "dead_lettered_by",
+    "dead_letter_reason",
+    "last_retried_at",
+    "last_retried_by",
+    "last_retry_reason",
+    "cancelled_at",
+    "cancelled_by",
+    "cancellation_reason",
     "metadata"
   ],
+  "QueueMailFromTemplateParams": [
+    "context_json"
+  ],
   "QueueWorker": [
+    "company_id",
     "metadata"
+  ],
+  "RateSubscriptionUsageEventsParams": [
+    "fallback_unit_price"
+  ],
+  "RebaseDeferredSchedulesParams": [
+    "notes"
   ],
   "ReceiveConsignmentStockParams": [
     "location_id",
+    "lot_id",
     "metadata"
+  ],
+  "RecognizeAmortizationLineParams": [
+    "reference",
+    "metadata"
+  ],
+  "RecognizeDeferredRevenueParams": [
+    "reference",
+    "metadata"
+  ],
+  "RecognizeProjectRevenueParams": [
+    "reference",
+    "metadata"
+  ],
+  "ReconcileAiRunEffectParams": [
+    "provider_reference",
+    "detail"
+  ],
+  "RecordAiCapabilityExecutionResultParams": [
+    "output_json",
+    "output_hash",
+    "failure_reason"
+  ],
+  "RecordAiDecisionCaseParams": [
+    "confidence",
+    "provider_attempt_id"
+  ],
+  "RecordAiDecisionEventParams": [
+    "confidence",
+    "provider_attempt_id"
+  ],
+  "RecordAiDecisionShadowEventParams": [
+    "outcome_kind",
+    "output_json",
+    "confidence",
+    "shadow_error"
+  ],
+  "RecordAiEvidenceClaimParams": [
+    "calculation_ref",
+    "contribution_id",
+    "verification_note",
+    "supersedes_claim_id"
+  ],
+  "RecordAiEvidenceContributionParams": [
+    "agent_run_id",
+    "turn_ref",
+    "event_ref",
+    "source_version_id",
+    "note"
+  ],
+  "RecordAiEvidenceDecisionParams": [
+    "contribution_id",
+    "supersedes_decision_id"
+  ],
+  "RecordAiEvidencePassageParams": [
+    "effective_from_micros",
+    "effective_to_micros",
+    "source_version_id",
+    "processor_ref"
+  ],
+  "RecordAiEvidenceSourceChangeParams": [
+    "replacement_version_id"
+  ],
+  "RecordAiEvidenceSourceParams": [
+    "author_organization"
+  ],
+  "RecordAiEvidenceSourceVersionParams": [
+    "edition",
+    "publication_date_micros",
+    "uri",
+    "retrieved_at_micros",
+    "content_hash",
+    "snapshot_ref",
+    "supersedes_version_id"
+  ],
+  "RecordAiProviderAttemptResultParams": [
+    "failure_reason"
+  ],
+  "RecordAiReasoningEventParams": [
+    "provider_attempt_id"
+  ],
+  "RecordAiRunReviewParams": [
+    "rationale"
   ],
   "RecordBarcodeScanParams": [
     "context_type",
@@ -3259,9 +4761,42 @@
     "device_id",
     "metadata"
   ],
+  "RecordContactIdentityVerificationProofParams": [
+    "company_id"
+  ],
+  "RecordCrmProviderDeliveryParams": [
+    "failure_reason"
+  ],
+  "RecordCustomFieldValue": [
+    "create_uid",
+    "write_uid",
+    "create_date",
+    "write_date"
+  ],
   "RecordCycleCountLineParams": [
     "lot_id",
     "notes",
+    "metadata"
+  ],
+  "RecordFleetInspectionParams": [
+    "inspector_id",
+    "inspected_at",
+    "odometer_km",
+    "notes",
+    "client_request_id"
+  ],
+  "RecordFleetServiceParams": [
+    "serviced_at",
+    "odometer_km",
+    "provider",
+    "notes",
+    "cost_amount",
+    "journal_id",
+    "expense_account_id",
+    "offset_account_id",
+    "client_request_id"
+  ],
+  "RecordGeneratedOwnerReportParams": [
     "metadata"
   ],
   "RecordHrIntegrationResultParams": [
@@ -3283,19 +4818,72 @@
     "cost",
     "metadata"
   ],
+  "RecordPayrollExportResultParams": [
+    "external_ref",
+    "payload_hash",
+    "last_error",
+    "metadata"
+  ],
   "RecordPrivacyConsentParams": [
     "ip_address",
     "user_agent",
     "metadata"
   ],
+  "RecordPurchasingIntegrationResultParams": [
+    "external_reference",
+    "last_error",
+    "metadata"
+  ],
+  "RecordSalesIntegrationResultParams": [
+    "external_reference",
+    "last_error",
+    "metadata"
+  ],
+  "RecordSubscriptionPaymentFailureParams": [
+    "invoice_move_id",
+    "reason",
+    "past_due_days"
+  ],
   "RecordTelemetryParams": [
     "raw_value"
+  ],
+  "RecordWorkflowOutboxResultParams": [
+    "response_fingerprint",
+    "error_summary",
+    "causation_id"
+  ],
+  "RefreshCapacityForecastParams": [
+    "employee_id",
+    "period_start",
+    "period_end",
+    "metadata"
+  ],
+  "RefreshHrCapacityForecastParams": [
+    "employee_id"
   ],
   "RefreshInventoryExceptionsParams": [
     "metadata"
   ],
+  "RefreshProjectEarnedValueParams": [
+    "metadata"
+  ],
+  "RefreshResourceUtilisationParams": [
+    "employee_id",
+    "period_start",
+    "period_end"
+  ],
   "RefuseExpenseSheetParams": [
     "reason"
+  ],
+  "RegisterAiModelProfileParams": [
+    "temperature",
+    "top_p",
+    "input_cost_per1_k_microunits",
+    "output_cost_per1_k_microunits",
+    "per_request_cost_ceiling_microunits"
+  ],
+  "RegisterAiSkillCertificationRuntimeProfileParams": [
+    "metadata"
   ],
   "RegisterDeviceParams": [
     "metadata"
@@ -3306,6 +4894,7 @@
     "metadata"
   ],
   "RegisterQueueWorkerParams": [
+    "company_id",
     "metadata"
   ],
   "RejectExpensePolicyExceptionParams": [
@@ -3313,6 +4902,17 @@
   ],
   "RejectTimesheetsParams": [
     "company_id"
+  ],
+  "ReleaseBlanketToPoParams": [
+    "notes",
+    "date_planned",
+    "metadata"
+  ],
+  "ReleaseDocumentLegalHoldParams": [
+    "metadata"
+  ],
+  "RenewSubscriptionParams": [
+    "notes"
   ],
   "ReopenTimesheetsParams": [
     "company_id",
@@ -3347,8 +4947,71 @@
     "journal_id",
     "metadata"
   ],
+  "ResourceAllocation": [
+    "employee_id",
+    "resource_id",
+    "task_id",
+    "name",
+    "notes",
+    "metadata"
+  ],
+  "ResourceCapacitySnapshot": [
+    "employee_id",
+    "resource_id",
+    "calendar_id",
+    "metadata"
+  ],
+  "ResourceUtilisationSnapshot": [
+    "metadata"
+  ],
+  "ResumeSubscriptionParams": [
+    "notes",
+    "recurring_next_date"
+  ],
+  "RetryDeadLetterJobParams": [
+    "available_at_micros"
+  ],
+  "ReturnOrder": [
+    "sale_order_id",
+    "return_reason",
+    "picking_id",
+    "credit_move_id"
+  ],
+  "ReturnOrderLine": [
+    "sale_order_line_id",
+    "lot_id"
+  ],
   "RevenueRecognitionRule": [
     "expense_account_id"
+  ],
+  "ReversePaymentTransactionParams": [
+    "reason",
+    "metadata"
+  ],
+  "ReviewAiArtifactComponentLinksParams": [
+    "note",
+    "expected_content_hash"
+  ],
+  "ReviewAiEvidenceClaimParams": [
+    "verification_note"
+  ],
+  "ReviewAiEvidenceDecisionParams": [
+    "note"
+  ],
+  "ReviewAiKnowledgeEntryVersionParams": [
+    "note"
+  ],
+  "ReviewAiKnowledgeSkillPromotionParams": [
+    "note"
+  ],
+  "ReviewMessageBatchParams": [
+    "reason"
+  ],
+  "ReviseAiArtifactComponentParams": [
+    "fork_artifact_ref",
+    "fork_component_key",
+    "decision_ids",
+    "claim_ids"
   ],
   "Role": [
     "description",
@@ -3359,10 +5022,43 @@
     "packaging_material_id",
     "metadata"
   ],
+  "RunFxRevaluationBatchParams": [
+    "reference",
+    "metadata"
+  ],
+  "RunFxRevaluationParams": [
+    "reference",
+    "metadata"
+  ],
   "RunInventoryCloseParams": [
     "journal_id",
     "inventory_account_id",
     "valuation_account_id",
+    "metadata"
+  ],
+  "SaleCommission": [
+    "settle_move_id",
+    "settled_at",
+    "settle_batch_id",
+    "create_uid",
+    "create_date",
+    "write_uid",
+    "write_date",
+    "metadata"
+  ],
+  "SaleCommissionPlan": [
+    "metadata"
+  ],
+  "SaleCommissionPlanSplit": [
+    "metadata"
+  ],
+  "SaleContract": [
+    "date_start",
+    "date_end",
+    "pricelist_id",
+    "metadata"
+  ],
+  "SaleCpqConstraint": [
     "metadata"
   ],
   "SaleOrder": [
@@ -3376,6 +5072,7 @@
     "team_id",
     "origin_so_id",
     "opportunity_id",
+    "proposal_id",
     "campaign_id",
     "medium_id",
     "source_id",
@@ -3390,6 +5087,7 @@
     "procurement_group_id",
     "last_website_so_id",
     "analytic_account_id",
+    "incoterm_id",
     "incoterm",
     "incoterm_location",
     "carrier_id",
@@ -3423,8 +5121,36 @@
     "line_id",
     "metadata"
   ],
+  "SalePromotion": [
+    "company_id",
+    "date_start",
+    "date_end",
+    "create_uid",
+    "create_date",
+    "write_uid",
+    "write_date",
+    "metadata"
+  ],
+  "SalesIntegrationIntent": [
+    "sale_order_id",
+    "request_payload",
+    "last_error",
+    "external_reference",
+    "metadata"
+  ],
+  "SavedReport": [
+    "column_dimension",
+    "filter_json",
+    "metadata"
+  ],
+  "ScheduleDocumentRetentionPurgeParams": [
+    "delay_seconds"
+  ],
   "ScheduledReport": [
     "description",
+    "report_template_id",
+    "owner_report_key",
+    "timezone",
     "domain",
     "day_of_week",
     "day_of_month",
@@ -3433,6 +5159,14 @@
     "last_run",
     "company_id",
     "metadata"
+  ],
+  "ScheduledReportRun": [
+    "queue_job_id",
+    "error_message",
+    "generated_owner_report_id",
+    "document_id",
+    "notification_outcome",
+    "completed_at"
   ],
   "SearchEmbedding": [
     "embedding_hash",
@@ -3444,8 +5178,18 @@
     "company_id",
     "metadata"
   ],
+  "SeedPackHolidaysParams": [
+    "calendar_id"
+  ],
+  "SeedStatutoryExpenseMileageRatesParams": [
+    "company_id"
+  ],
   "SegmentMember": [
     "metadata"
+  ],
+  "SegmentRuleClause": [
+    "value_text",
+    "value_id"
   ],
   "SerialLotTraceability": [
     "serial_id",
@@ -3461,11 +5205,38 @@
     "company_id",
     "website_url"
   ],
+  "SetCommodityPriceIndexParams": [
+    "metadata"
+  ],
+  "SetCompanyCountryPackParams": [
+    "configuration"
+  ],
+  "SetCompanyVerticalPackParams": [
+    "configuration"
+  ],
   "SetConsolidationCompanyRateParams": [
     "metadata"
   ],
+  "SetContactSegmentRulesParams": [
+    "metadata"
+  ],
+  "SetDocumentRetentionParams": [
+    "classification_id",
+    "retention_days"
+  ],
   "SetExpenseFraudHoldParams": [
     "fraud_reason",
+    "metadata"
+  ],
+  "SetPurchaseApprovalDelegateParams": [
+    "metadata"
+  ],
+  "SetSubscriptionCommitmentParams": [
+    "product_id",
+    "metadata"
+  ],
+  "SetVendorRiskFlagParams": [
+    "reason",
     "metadata"
   ],
   "SettleSaleCommissionsParams": [
@@ -3478,9 +5249,27 @@
   "SignalWorkflowParams": [
     "causation_id"
   ],
+  "SimulateWorkflowParams": [
+    "signal_key"
+  ],
+  "SodConflictRule": [
+    "description",
+    "metadata"
+  ],
+  "StageBankStatementImportLineParams": [
+    "date",
+    "amount",
+    "reference",
+    "description"
+  ],
+  "StageBankStatementImportParams": [
+    "file_name"
+  ],
   "StartTimesheetTimerParams": [
     "company_id",
     "task_id",
+    "employee_cost",
+    "sell_rate",
     "timesheet_invoice_type",
     "product_id",
     "product_uom_id",
@@ -3585,6 +5374,7 @@
     "inventory_id",
     "sale_line_id",
     "lot_id",
+    "serial_id",
     "package_id",
     "result_package_id",
     "owner_id",
@@ -3623,6 +5413,12 @@
     "product_barcode",
     "location_process_id",
     "location_process_dest_id",
+    "metadata"
+  ],
+  "StockPackage": [
+    "packaging_material_id",
+    "location_id",
+    "location_dest_id",
     "metadata"
   ],
   "StockPicking": [
@@ -3732,6 +5528,9 @@
   "StockTraceabilityReport": [
     "metadata"
   ],
+  "SubmitPerformanceReviewParams": [
+    "summary"
+  ],
   "SubmitSupplierIntakeParams": [
     "phone",
     "website",
@@ -3761,18 +5560,59 @@
     "stage_id",
     "vendor_id"
   ],
+  "SubscriptionAmendment": [
+    "line_id",
+    "proration_move_id",
+    "credit_note_move_id"
+  ],
+  "SubscriptionCollection": [
+    "last_failure_at"
+  ],
+  "SubscriptionCommitment": [
+    "product_id"
+  ],
+  "SubscriptionEntitlement": [
+    "product_id",
+    "revoked_at"
+  ],
   "SubscriptionLine": [
     "analytic_account_id",
     "recurring_last_date",
-    "line_parent_id"
+    "line_parent_id",
+    "sale_order_line_id"
+  ],
+  "SubscriptionPaymentIntent": [
+    "invoice_move_id",
+    "payment_token_id",
+    "last_error",
+    "applied_at"
   ],
   "SubscriptionPlan": [
     "template_id",
     "invoice_mail_template_id",
     "user_id",
     "website_url",
-    "image_1920_url",
+    "image1920_url",
     "close_reason_id"
+  ],
+  "SubscriptionPriceTier": [
+    "product_id",
+    "max_qty"
+  ],
+  "SubscriptionTaxSettleIntent": [
+    "payment_id",
+    "last_error",
+    "applied_at"
+  ],
+  "SubscriptionUsageCharge": [
+    "usage_event_id",
+    "product_id",
+    "invoice_move_id",
+    "billing_run_key"
+  ],
+  "SubscriptionUsageEvent": [
+    "product_id",
+    "rated_charge_id"
   ],
   "SupplierIntakeRequest": [
     "phone",
@@ -3801,6 +5641,13 @@
     "partner_id",
     "metadata"
   ],
+  "SyncExternalFileToDocumentParams": [
+    "connection_id",
+    "etag",
+    "folder_id",
+    "company_id",
+    "metadata"
+  ],
   "TaxDeadline": [
     "company_id",
     "tax_obligation_id",
@@ -3819,9 +5666,6 @@
     "notification_type",
     "sent_at",
     "acknowledged_at"
-  ],
-  "TaxDeadlineStatusJob": [
-    "organization_id"
   ],
   "TaxJurisdiction": [
     "state_code",
@@ -3874,6 +5718,8 @@
     "code",
     "deprecated",
     "currency_id",
+    "internal_type",
+    "internal_group",
     "group_id",
     "reconcile",
     "tax_ids",
@@ -3886,6 +5732,7 @@
     "company_id",
     "name",
     "type",
+    "internal_group",
     "include_initial_balance",
     "is_deprecated",
     "metadata"
@@ -3894,6 +5741,7 @@
     "name",
     "original_value",
     "salvage_value",
+    "method",
     "method_number",
     "method_period",
     "method_progress_factor",
@@ -3938,6 +5786,7 @@
     "balance_end_real",
     "balance_end",
     "currency_id",
+    "state",
     "line_ids",
     "move_line_ids",
     "total_entry_encoding",
@@ -4013,6 +5862,7 @@
   "UpdateAccountTaxParams": [
     "name",
     "description",
+    "type_tax_use",
     "amount",
     "active",
     "price_include",
@@ -4037,6 +5887,13 @@
   ],
   "UpdateAiChatSessionTitleParams": [
     "title"
+  ],
+  "UpdateAiReducerAllowlistParams": [
+    "reducer_name",
+    "permission_resource",
+    "permission_action",
+    "enabled",
+    "metadata"
   ],
   "UpdateAnalyticAccountParams": [
     "company_id",
@@ -4071,6 +5928,17 @@
     "tag_ids",
     "metadata"
   ],
+  "UpdateAssignmentRuleParams": [
+    "name",
+    "model",
+    "domain",
+    "assign_type",
+    "user_ids",
+    "team_id",
+    "priority",
+    "is_active",
+    "metadata"
+  ],
   "UpdateAuditRuleParams": [
     "log_reads",
     "log_writes",
@@ -4095,6 +5963,13 @@
     "type",
     "alias",
     "is_active",
+    "metadata"
+  ],
+  "UpdateBillingAccountParams": [
+    "plan_tier",
+    "seat_count",
+    "status",
+    "trial_ends_at",
     "metadata"
   ],
   "UpdateBomParams": [
@@ -4176,7 +6051,7 @@
   ],
   "UpdateContactAddressParams": [
     "street",
-    "street_2",
+    "street2",
     "city",
     "state_code",
     "zip",
@@ -4188,6 +6063,13 @@
     "industry",
     "employees_count",
     "annual_revenue"
+  ],
+  "UpdateContactCategoryParams": [
+    "name",
+    "color",
+    "parent_id",
+    "is_active",
+    "metadata"
   ],
   "UpdateContactCoreParams": [
     "name",
@@ -4210,6 +6092,13 @@
     "description",
     "color"
   ],
+  "UpdateContactIdentityParams": [
+    "company_id",
+    "raw_value",
+    "is_preferred",
+    "verification_state",
+    "metadata"
+  ],
   "UpdateContractParams": [
     "company_id",
     "name",
@@ -4217,11 +6106,20 @@
     "date_end",
     "job_id",
     "department_id",
-    "notes"
+    "notes",
+    "wage_change_reason",
+    "wage_effective_from"
+  ],
+  "UpdateCrmConversationParams": [
+    "status",
+    "assigned_user_id",
+    "external_thread_id",
+    "metadata"
   ],
   "UpdateCrossoveredBudgetLineParams": [
     "planned_amount",
     "analytic_account_id",
+    "project_id",
     "date_from",
     "date_to",
     "metadata"
@@ -4242,6 +6140,19 @@
     "note",
     "is_active"
   ],
+  "UpdateDocumentFolderParams": [
+    "name",
+    "description",
+    "parent_id",
+    "sequence",
+    "is_access_restricted",
+    "is_hidden",
+    "is_readonly",
+    "is_favorite",
+    "storage_id",
+    "residency_region",
+    "metadata"
+  ],
   "UpdateDocumentParams": [
     "name",
     "description",
@@ -4251,6 +6162,17 @@
     "res_model",
     "res_id",
     "partner_id",
+    "metadata"
+  ],
+  "UpdateDocumentTemplateParams": [
+    "name",
+    "report_type",
+    "body_html",
+    "header_html",
+    "footer_html",
+    "variable_bindings_json",
+    "is_default",
+    "is_active",
     "metadata"
   ],
   "UpdateEmployeeParams": [
@@ -4263,6 +6185,8 @@
     "work_phone",
     "mobile_phone",
     "work_location",
+    "work_contact_partner_id",
+    "employment_type",
     "user_id"
   ],
   "UpdateExpenseParams": [
@@ -4274,6 +6198,7 @@
     "account_id",
     "product_id",
     "tax_ids",
+    "payment_mode",
     "merchant_key",
     "attachment_ids",
     "mileage_distance",
@@ -4310,16 +6235,60 @@
     "notes",
     "metadata"
   ],
+  "UpdateFleetVehicleDetailsParams": [
+    "name",
+    "vehicle_type",
+    "license_plate",
+    "driver_name",
+    "odometer_km",
+    "fuel_level",
+    "metadata"
+  ],
+  "UpdateFleetVehicleParams": [
+    "driver_id",
+    "service_type_id"
+  ],
   "UpdateFormFieldParams": [
     "label",
     "description",
     "placeholder",
     "default_value",
     "options",
+    "validation",
     "ai_suggestions",
     "order",
     "is_enabled",
-    "show_in_list"
+    "show_in_list",
+    "width",
+    "visibility_json",
+    "expected_updated_at_micros"
+  ],
+  "UpdateHrApplicantParams": [
+    "stage",
+    "email",
+    "notes"
+  ],
+  "UpdateHrEmployeeSkillParams": [
+    "level",
+    "notes",
+    "active",
+    "metadata"
+  ],
+  "UpdateHrGlobalAssignmentParams": [
+    "home_company_id",
+    "host_company_id",
+    "date_from",
+    "date_to",
+    "status",
+    "notes"
+  ],
+  "UpdateHrSkillParams": [
+    "name",
+    "code",
+    "category",
+    "description",
+    "active",
+    "metadata"
   ],
   "UpdateIntercompanyRuleParams": [
     "name",
@@ -4388,10 +6357,67 @@
     "referred_by",
     "description"
   ],
+  "UpdateLeadLostReasonParams": [
+    "name",
+    "description",
+    "is_active",
+    "metadata"
+  ],
+  "UpdateLeadParams": [
+    "contact_name",
+    "title",
+    "website",
+    "industry",
+    "referred_by",
+    "description",
+    "street",
+    "city",
+    "zip",
+    "country_code",
+    "expected_revenue",
+    "probability",
+    "stage_id",
+    "team_id"
+  ],
+  "UpdateLeadSourceParams": [
+    "name",
+    "description",
+    "sequence",
+    "is_active",
+    "metadata"
+  ],
   "UpdateLeaveTypeParams": [
     "name",
     "max_leaves",
     "is_active"
+  ],
+  "UpdateMailTemplateParams": [
+    "name",
+    "subject",
+    "body_html",
+    "document_template_id",
+    "attach_document",
+    "is_default",
+    "is_active",
+    "metadata"
+  ],
+  "UpdateManufacturingOrderParams": [
+    "product_qty",
+    "date_planned_start",
+    "date_planned_finished",
+    "date_deadline",
+    "origin",
+    "metadata"
+  ],
+  "UpdateMessageTemplateParams": [
+    "name",
+    "subject",
+    "body_template",
+    "allowed_variables",
+    "applicable_channels",
+    "active",
+    "review_state",
+    "metadata"
   ],
   "UpdateMetricValuesParams": [
     "previous_value"
@@ -4411,6 +6437,17 @@
     "description",
     "tag_ids"
   ],
+  "UpdateOpportunityStageParams": [
+    "name",
+    "sequence",
+    "probability",
+    "requirements",
+    "fold",
+    "is_won",
+    "team_id",
+    "is_active",
+    "metadata"
+  ],
   "UpdateOrgMemberDetailsParams": [
     "department_id",
     "job_title",
@@ -4428,11 +6465,40 @@
     "date_format",
     "language"
   ],
+  "UpdateOwnerReportScheduleParams": [
+    "name",
+    "frequency",
+    "hour",
+    "minute",
+    "timezone",
+    "recipient_identities",
+    "is_active",
+    "next_run"
+  ],
   "UpdatePartnerBankParams": [
     "acc_number",
     "acc_holder_name",
     "allow_out_payment",
     "active"
+  ],
+  "UpdatePaymentAccountParams": [
+    "name",
+    "provider_label",
+    "reference_raw",
+    "fee_account_id",
+    "clearing_account_id",
+    "active",
+    "is_primary",
+    "metadata"
+  ],
+  "UpdatePaymentTransactionParams": [
+    "external_reference",
+    "gross_external_amount",
+    "settlement_amount",
+    "net_account_amount",
+    "occurred_at",
+    "evidence_document_ids",
+    "metadata"
   ],
   "UpdateProductCategoryParams": [
     "name",
@@ -4471,7 +6537,7 @@
     "standard_price",
     "list_price",
     "currency_id",
-    "costMethod"
+    "cost_method"
   ],
   "UpdateProductSupplierInfoParams": [
     "min_qty",
@@ -4488,6 +6554,17 @@
     "default_code",
     "barcode",
     "is_active"
+  ],
+  "UpdateProjectMilestoneParams": [
+    "name",
+    "description",
+    "deadline",
+    "sequence",
+    "is_reached",
+    "bill_amount",
+    "percent_complete",
+    "active",
+    "metadata"
   ],
   "UpdateProjectParams": [
     "company_id",
@@ -4511,6 +6588,7 @@
     "allow_material",
     "allow_worksheets",
     "allow_forecast",
+    "allow_wip_je",
     "bill_type",
     "pricing_type",
     "rating_status",
@@ -4535,16 +6613,33 @@
     "message_ids",
     "metadata"
   ],
-  "CreateProposalParams": [
-    "deadline",
-    "description",
-    "template_id",
-    "partner_id",
-    "document_folder_id",
+  "UpdateProjectRateCardLineParams": [
+    "scope",
+    "employee_id",
+    "task_id",
+    "currency_id",
+    "cost_rate",
+    "sell_rate",
+    "active",
+    "effective_from",
+    "effective_to",
     "metadata"
   ],
-  "CreatePricelistParams": [
-    "company_id"
+  "UpdateProjectRateCardParams": [
+    "name",
+    "currency_id",
+    "project_id",
+    "active",
+    "effective_from",
+    "effective_to",
+    "metadata"
+  ],
+  "UpdateProposalLineItemParams": [
+    "quantity",
+    "price_unit",
+    "discount",
+    "notes",
+    "description"
   ],
   "UpdateProposalParams": [
     "title",
@@ -4558,25 +6653,6 @@
     "document_folder_id",
     "metadata"
   ],
-  "UpsertProposalSectionParams": [
-    "ai_suggestion"
-  ],
-  "AddProposalLineItemParams": [
-    "section_id",
-    "product_variant_id",
-    "description",
-    "notes"
-  ],
-  "UpdateProposalLineItemParams": [
-    "quantity",
-    "price_unit",
-    "discount",
-    "notes",
-    "description"
-  ],
-  "RecordProposalBidDecisionParams": [],
-  "ConvertProposalToSaleOrderParams": [],
-  "ConvertProposalToProjectParams": [],
   "UpdateProposalSourceDocParams": [
     "name",
     "content",
@@ -4584,42 +6660,12 @@
     "word_count",
     "document_id"
   ],
-  "CreateProposalTemplateParams": [
-    "country_pack_key",
-    "metadata"
-  ],
-  "CreateProposalClauseParams": [
-    "country_pack_key",
-    "metadata"
-  ],
-  "UpsertProposalComplianceRequirementParams": [
-    "description",
-    "waiver_rationale",
-    "evidence_document_id"
-  ],
-  "ApplyProposalAnalysisParams": [
-    "score_json"
-  ],
-  "UpsertProposalProcurementScoreParams": [
-    "notes"
-  ],
-  "CreateProposalIntegrationIntentParams": [
-    "proposal_version_id",
-    "metadata"
-  ],
-  "CompleteProposalIntegrationIntentParams": [
-    "result_document_id",
-    "metadata"
-  ],
-  "FailProposalIntegrationIntentParams": [
-    "metadata"
-  ],
-  "CreateProposalClarificationParams": [
-    "author_email"
-  ],
-  "AnswerProposalClarificationParams": [],
-  "LinkProposalVersionEsignParams": [
-    "signers_json",
+  "UpdatePublicHolidayParams": [
+    "calendar_id",
+    "pack_key",
+    "name",
+    "holiday_date",
+    "is_recurring",
     "metadata"
   ],
   "UpdatePurchaseOrderLineParams": [
@@ -4633,6 +6679,7 @@
     "account_analytic_id",
     "display_type",
     "propagate_cancel",
+    "lot_id",
     "metadata"
   ],
   "UpdatePurchaseOrderParams": [
@@ -4646,6 +6693,8 @@
     "incoterm_location",
     "partner_id",
     "currency_id",
+    "match_qty_tolerance",
+    "match_price_tolerance",
     "metadata"
   ],
   "UpdateQualityAlertReasonParams": [
@@ -4676,11 +6725,51 @@
     "template_content",
     "paper_format"
   ],
+  "UpdateResourceAllocationParams": [
+    "employee_id",
+    "resource_id",
+    "project_id",
+    "task_id",
+    "date_from",
+    "date_to",
+    "allocated_hours",
+    "allocation_percent",
+    "name",
+    "notes",
+    "enforce_capacity",
+    "active",
+    "metadata"
+  ],
   "UpdateRoleParams": [
     "name",
     "description",
     "permissions",
     "is_active"
+  ],
+  "UpdateSaleOrderLineParams": [
+    "product_id",
+    "quantity",
+    "uom_id",
+    "price_unit",
+    "discount",
+    "tax_ids",
+    "name",
+    "sequence",
+    "product_variant_id",
+    "packaging_id",
+    "route_id",
+    "analytic_tag_ids",
+    "customer_lead",
+    "display_type",
+    "metadata"
+  ],
+  "UpdateSaleOrderOptionParams": [
+    "name",
+    "quantity",
+    "price_unit",
+    "discount",
+    "is_present",
+    "metadata"
   ],
   "UpdateSaleOrderParams": [
     "client_order_ref",
@@ -4705,6 +6794,28 @@
     "is_dropship",
     "metadata"
   ],
+  "UpdateSavedReportParams": [
+    "name",
+    "row_dimension",
+    "column_dimension",
+    "measure_field",
+    "measure_op",
+    "filter_json",
+    "is_active",
+    "metadata"
+  ],
+  "UpdateSodConflictRuleParams": [
+    "permission_a",
+    "permission_b",
+    "description",
+    "is_active",
+    "metadata"
+  ],
+  "UpdateStatutoryIdParams": [
+    "id_kind",
+    "value",
+    "metadata"
+  ],
   "UpdateStockLocationParams": [
     "name",
     "usage",
@@ -4719,6 +6830,13 @@
     "cyclic_inventory_frequency",
     "location_category",
     "metadata"
+  ],
+  "UpdateStockPickingParams": [
+    "company_id",
+    "partner_id",
+    "scheduled_date",
+    "origin",
+    "note"
   ],
   "UpdateStockProductionLotParams": [
     "company_id",
@@ -4775,6 +6893,30 @@
     "notify_stock",
     "metadata"
   ],
+  "UpdateSubscriptionPlanParams": [
+    "name",
+    "description",
+    "code",
+    "currency_id",
+    "journal_id",
+    "product_id",
+    "billing_period",
+    "billing_period_unit",
+    "recurring_invoice_day",
+    "trial_period",
+    "trial_duration",
+    "trial_unit",
+    "auto_close_limit",
+    "payment_mode",
+    "template_id",
+    "invoice_mail_template_id",
+    "website_url",
+    "is_published",
+    "is_default",
+    "color",
+    "image1920_url",
+    "metadata"
+  ],
   "UpdateSupplierIntakeParams": [
     "company_name",
     "contact_name",
@@ -4807,6 +6949,7 @@
     "priority",
     "sequence",
     "stage_id",
+    "state",
     "kanban_state",
     "date_assign",
     "date_deadline",
@@ -4816,6 +6959,8 @@
     "project_id",
     "user_ids",
     "milestone_id",
+    "wbs_code",
+    "wbs_level",
     "planned_hours",
     "total_hours_spent",
     "effective_hours",
@@ -4905,6 +7050,7 @@
     "is_active"
   ],
   "UpdateWarehouse3DZoneParams": [
+    "display_type",
     "color",
     "width",
     "height",
@@ -4925,10 +7071,10 @@
     "crossdock",
     "sequence",
     "partner_id",
-    "metadata",
+    "resupply_wh_ids",
     "wh_qc_stock_loc_id",
     "clear_wh_qc_stock_loc_id",
-    "resupply_wh_ids"
+    "metadata"
   ],
   "UpdateWhatsAppBusinessAccountParams": [
     "name",
@@ -4963,6 +7109,24 @@
     "default_time_efficiency",
     "default_oee_target",
     "sequence",
+    "metadata"
+  ],
+  "UpdateWorkflowDraftParams": [
+    "description",
+    "metadata"
+  ],
+  "UpdateWorkingCalendarParams": [
+    "name",
+    "pack_key",
+    "hours_per_day",
+    "work_monday",
+    "work_tuesday",
+    "work_wednesday",
+    "work_thursday",
+    "work_friday",
+    "work_saturday",
+    "work_sunday",
+    "active",
     "metadata"
   ],
   "UpsertAiSkillConfigParams": [
@@ -5000,12 +7164,43 @@
     "integration_keys",
     "metadata"
   ],
+  "UpsertPartnerCreditControlParams": [
+    "notes",
+    "metadata"
+  ],
+  "UpsertProposalComplianceRequirementParams": [
+    "description",
+    "waiver_rationale",
+    "evidence_document_id"
+  ],
+  "UpsertProposalProcurementScoreParams": [
+    "notes"
+  ],
+  "UpsertProposalSectionParams": [
+    "ai_suggestion"
+  ],
   "UpsertSearchEmbeddingParams": [
     "embedding_hash",
     "metadata"
   ],
-  "UserCredential": [
-    "workos_user_id"
+  "UpsertSubscriptionPriceIndexParams": [
+    "metadata"
+  ],
+  "UpsertVendorScorecardParams": [
+    "metadata"
+  ],
+  "UpsertWorkflowEdgeParams": [
+    "signal_key",
+    "condition",
+    "metadata"
+  ],
+  "UpsertWorkflowNodeParams": [
+    "action",
+    "task_policy",
+    "timer_policy",
+    "retry_policy",
+    "subflow",
+    "metadata"
   ],
   "UserInvite": [
     "accepted_at"
@@ -5045,6 +7240,13 @@
     "wip_account_id",
     "wip_labor_account_id"
   ],
+  "VendorRiskFlag": [
+    "reason",
+    "metadata"
+  ],
+  "VendorScorecard": [
+    "metadata"
+  ],
   "Warehouse": [
     "partner_id",
     "wh_input_stock_loc_id",
@@ -5064,6 +7266,12 @@
     "city",
     "country_code",
     "manager_name"
+  ],
+  "WarehouseSyncIntent": [
+    "device_id",
+    "last_error",
+    "applied_at",
+    "metadata"
   ],
   "WarehouseTask": [
     "user_id",
@@ -5085,6 +7293,7 @@
     "metadata"
   ],
   "WhatsAppBusinessAccount": [
+    "company_id",
     "template_namespace",
     "media_provider",
     "webhook_url",
@@ -5100,12 +7309,155 @@
   "Workflow": [
     "company_id"
   ],
+  "WorkflowCalendar": [
+    "company_id"
+  ],
+  "WorkflowCalendarException": [
+    "subdivision",
+    "locality",
+    "workday_start_minute",
+    "cutoff_minute",
+    "source_published_on"
+  ],
+  "WorkflowCalendarVersion": [
+    "subdivision",
+    "locality",
+    "source_published_on"
+  ],
+  "WorkflowCandidateGroupMember": [
+    "revoked_by",
+    "revoked_at"
+  ],
+  "WorkflowCommandReceipt": [
+    "causation_id"
+  ],
+  "WorkflowDecisionEvent": [
+    "token_id",
+    "result_token_id",
+    "prior_node_key",
+    "next_node_key",
+    "prior_instance_state",
+    "prior_token_state",
+    "next_token_state",
+    "acting_for",
+    "matched_role_id",
+    "delegation_id",
+    "condition_result",
+    "action_key",
+    "domain_receipt",
+    "reason",
+    "causation_id"
+  ],
+  "WorkflowDelegation": [
+    "role_id",
+    "revoked_by",
+    "revoked_at",
+    "reason"
+  ],
+  "WorkflowDeliveryAttempt": [
+    "queue_job_id",
+    "worker_id",
+    "lease_token",
+    "response_fingerprint",
+    "error_summary",
+    "runtime_revision"
+  ],
+  "WorkflowDeliveryReceipt": [
+    "runtime_revision",
+    "queue_job_id",
+    "queue_effect_receipt_key"
+  ],
+  "WorkflowEdge": [
+    "company_id",
+    "signal_key",
+    "condition",
+    "metadata"
+  ],
+  "WorkflowFork": [
+    "join_node_key",
+    "closed_at"
+  ],
+  "WorkflowHumanTask": [
+    "guarded_action",
+    "claimed_by",
+    "claimed_at",
+    "decided_by",
+    "acting_for",
+    "decided_at",
+    "decision",
+    "decision_comment",
+    "invalidated_by",
+    "invalidated_at",
+    "invalidation_reason"
+  ],
+  "WorkflowHumanTaskCandidate": [
+    "decision",
+    "decided_at",
+    "decided_by"
+  ],
+  "WorkflowHumanTaskEvent": [
+    "prior_status",
+    "decision",
+    "acting_for",
+    "matched_role_id",
+    "delegation_id",
+    "comment",
+    "domain_receipt"
+  ],
+  "WorkflowHumanTaskReceipt": [
+    "domain_receipt"
+  ],
   "WorkflowInstance": [
     "singleton_scope_key",
     "completed_at",
     "cancelled_by",
     "cancelled_at",
     "causation_id"
+  ],
+  "WorkflowMigrationInstanceResult": [
+    "next_instance_revision",
+    "error_summary"
+  ],
+  "WorkflowNode": [
+    "company_id",
+    "action",
+    "task_policy",
+    "timer_policy",
+    "retry_policy",
+    "subflow",
+    "metadata"
+  ],
+  "WorkflowOutbox": [
+    "response_fingerprint",
+    "error_summary",
+    "completed_at",
+    "causation_id"
+  ],
+  "WorkflowSimulationResult": [
+    "company_id"
+  ],
+  "WorkflowSimulationStep": [
+    "company_id",
+    "node_key",
+    "edge_key",
+    "outcome"
+  ],
+  "WorkflowTimer": [
+    "fired_by",
+    "fired_at",
+    "cancelled_by",
+    "cancelled_at",
+    "cancellation_reason",
+    "causation_id"
+  ],
+  "WorkflowTimerPolicy": [
+    "calendar_key"
+  ],
+  "WorkflowToken": [
+    "parent_token_id",
+    "fork_id",
+    "branch_key",
+    "consumed_at"
   ],
   "WorkflowVersion": [
     "company_id",
@@ -5117,31 +7469,7 @@
     "retired_date",
     "metadata"
   ],
-  "SimulateWorkflowParams": [
-    "signal_key"
-  ],
-  "UpsertWorkflowNodeParams": [
-    "action",
-    "task_policy",
-    "timer_policy",
-    "retry_policy",
-    "subflow",
+  "WorkingCalendar": [
     "metadata"
-  ],
-  "UpsertWorkflowEdgeParams": [
-    "signal_key",
-    "condition",
-    "metadata"
-  ],
-  "CreateFleetVehicleParams": [
-    "license_plate",
-    "driver_name",
-    "metadata"
-  ],
-  "GenerateSubscriptionInvoiceParams": [
-    "billing_run_key",
-    "journal_id",
-    "tax_account_id"
-  ],
-  "UpdateVehiclePositionParams": []
+  ]
 }
