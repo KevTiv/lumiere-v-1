@@ -1,6 +1,7 @@
 "use client"
 import { mapDashboardWidgets, withDashboardSections } from "@lumiere/ui/lib/dashboard-sections"
 
+import { moduleQueryState } from "@lumiere/ui/lib/module-data-state"
 import { useMemo, useState } from "react"
 import { useTranslation } from "@lumiere/i18n"
 import { showWorkflowToast } from "@lumiere/ui/lib/workflow-toast"
@@ -209,19 +210,31 @@ function SubscriptionsClientLoaded({
   const [recognizeLineId, setRecognizeLineId] = useState<number | null>(null)
   const [recognizeMoveId, setRecognizeMoveId] = useState("")
 
-  const { data: subscriptions = [] } = useSubscriptions(orgId, initialSubscriptions)
+  const subscriptionsQuery = useSubscriptions(orgId, initialSubscriptions)
+  const { data: subscriptions = [] } = subscriptionsQuery
   const { data: billingRuns = [], isLoading: billingRunsLoading, isError: billingRunsError } = useSubscriptionBillingRuns(orgId)
-  const { data: plans = [] } = useSubscriptionPlans(orgId, initialPlans)
-  const { data: subscriptionLines = [] } = useSubscriptionLines(orgId)
-  const { data: subscriptionAmendments = [] } = useSubscriptionAmendments(orgId)
-  const { data: usageEvents = [] } = useSubscriptionUsageEvents(orgId)
-  const { data: usageCharges = [] } = useSubscriptionUsageCharges(orgId)
-  const { data: ratingBacklog = [] } = useSubscriptionRatingBacklog(orgId)
-  const { data: priceTiers = [] } = useSubscriptionPriceTiers(orgId)
-  const { data: pastDue = [] } = useSubscriptionPastDue(orgId)
-  const { data: dueToBill = [] } = useSubscriptionDueToBill(orgId)
-  const { data: entitlements = [] } = useSubscriptionEntitlements(orgId)
-  const { data: bundles = [] } = useSubscriptionBundles(orgId)
+  const plansQuery = useSubscriptionPlans(orgId, initialPlans)
+  const { data: plans = [] } = plansQuery
+  const subscriptionLinesQuery = useSubscriptionLines(orgId)
+  const { data: subscriptionLines = [] } = subscriptionLinesQuery
+  const subscriptionAmendmentsQuery = useSubscriptionAmendments(orgId)
+  const { data: subscriptionAmendments = [] } = subscriptionAmendmentsQuery
+  const usageEventsQuery = useSubscriptionUsageEvents(orgId)
+  const { data: usageEvents = [] } = usageEventsQuery
+  const usageChargesQuery = useSubscriptionUsageCharges(orgId)
+  const { data: usageCharges = [] } = usageChargesQuery
+  const ratingBacklogQuery = useSubscriptionRatingBacklog(orgId)
+  const { data: ratingBacklog = [] } = ratingBacklogQuery
+  const priceTiersQuery = useSubscriptionPriceTiers(orgId)
+  const { data: priceTiers = [] } = priceTiersQuery
+  const pastDueQuery = useSubscriptionPastDue(orgId)
+  const { data: pastDue = [] } = pastDueQuery
+  const dueToBillQuery = useSubscriptionDueToBill(orgId)
+  const { data: dueToBill = [] } = dueToBillQuery
+  const entitlementsQuery = useSubscriptionEntitlements(orgId)
+  const { data: entitlements = [] } = entitlementsQuery
+  const bundlesQuery = useSubscriptionBundles(orgId)
+  const { data: bundles = [] } = bundlesQuery
   const bundleRows = useMemo(
     () =>
       (bundles as unknown as Record<string, unknown>[]).map((bundle) => {
@@ -230,16 +243,20 @@ function SubscriptionsClientLoaded({
       }),
     [bundles, plans],
   )
-  const { data: paymentIntents = [] } = useSubscriptionPaymentIntents(orgId)
-  const { data: deferredSchedules = [] } = useDeferredRevenueSchedules(orgId, initialDeferredSchedules)
-  const { data: deferredLines = [] } = useDeferredRevenueLines(orgId, initialDeferredLines)
-  const { data: recognitionRules = [] } = useRevenueRecognitionRules(orgId, initialRecognitionRules)
+  const paymentIntentsQuery = useSubscriptionPaymentIntents(orgId)
+  const { data: paymentIntents = [] } = paymentIntentsQuery
+  const deferredSchedulesQuery = useDeferredRevenueSchedules(orgId, initialDeferredSchedules)
+  const { data: deferredSchedules = [] } = deferredSchedulesQuery
+  const deferredLinesQuery = useDeferredRevenueLines(orgId, initialDeferredLines)
+  const { data: deferredLines = [] } = deferredLinesQuery
+  const recognitionRulesQuery = useRevenueRecognitionRules(orgId, initialRecognitionRules)
+  const { data: recognitionRules = [] } = recognitionRulesQuery
   const { data: saleOrders = [] } = useSaleOrders(orgId, initialSaleOrders)
   const { data: pricelists = [] } = usePricelists(orgId, initialPricelists)
   const { data: products = [] } = useProducts(orgId, initialProducts)
   const { data: journals = [] } = useAccountJournals(orgId)
   const { data: accounts = [] } = useAccountAccounts(orgId)
-  const { data: accountMoves = [], isLoading: accountMovesLoading, isError: accountMovesError } = useAccountMoves(orgId)
+  const { data: accountMoves = [], isLoading: accountMovesLoading, isError: accountMovesError, error: accountMovesFailure, refetch: refetchAccountMoves } = useAccountMoves(orgId)
   const { data: accountPayments = [], isLoading: accountPaymentsLoading, isError: accountPaymentsError } = useAccountPayments(orgId)
   const { data: accountMoveLines = [] } = useAccountMoveLines(orgId)
   const { data: currencies = [] } = useCurrencies()
@@ -906,6 +923,36 @@ function SubscriptionsClientLoaded({
     ],
   )
 
+  const dashboardQueries = [subscriptionsQuery, deferredSchedulesQuery]
+  const dashboardStatuses = [moduleQueryState(subscriptionsQuery), moduleQueryState(deferredSchedulesQuery),
+    moduleQueryState({ isLoading: accountMovesLoading, isError: accountMovesError, error: accountMovesFailure, data: accountMoves, refetch: refetchAccountMoves })]
+  const dataState = {
+    dashboard: dashboardStatuses.find((state) => state.status === "denied") ??
+      (dashboardStatuses.some((state) => state.status === "error" || state.status === "partial")
+        ? { status: "error" as const, onRetry: () => {
+            void subscriptionsQuery.refetch()
+            void deferredSchedulesQuery.refetch()
+            void refetchAccountMoves()
+          } }
+        : { status: dashboardQueries.some((query) => query.isLoading) || accountMovesLoading ? "loading" as const : "ready" as const }),
+    "subscriptions": moduleQueryState(subscriptionsQuery),
+    "plans": moduleQueryState(plansQuery),
+    "lines": moduleQueryState(subscriptionLinesQuery),
+    "amendments": moduleQueryState(subscriptionAmendmentsQuery),
+    "usage-events": moduleQueryState(usageEventsQuery),
+    "usage-charges": moduleQueryState(usageChargesQuery),
+    "rating-backlog": moduleQueryState(ratingBacklogQuery),
+    "price-tiers": moduleQueryState(priceTiersQuery),
+    "past-due": moduleQueryState(pastDueQuery),
+    "due-to-bill": moduleQueryState(dueToBillQuery),
+    "entitlements": moduleQueryState(entitlementsQuery),
+    "bundles": moduleQueryState(bundlesQuery),
+    "payment-intents": moduleQueryState(paymentIntentsQuery),
+    "deferred-schedules": moduleQueryState(deferredSchedulesQuery),
+    "deferred-lines": moduleQueryState(deferredLinesQuery),
+    "recognition-rules": moduleQueryState(recognitionRulesQuery),
+  }
+
   const handleFormSubmit = (
     _tabId: string,
     action: string,
@@ -956,7 +1003,7 @@ function SubscriptionsClientLoaded({
 
   return (
     <>
-      <ModuleView config={config} data={data} activeTab={activeTab} onActiveTabChange={setActiveTab} onFormSubmit={handleFormSubmit} isPending={isFormMutationPending} />
+      <ModuleView config={config} data={data} dataState={dataState} activeTab={activeTab} onActiveTabChange={setActiveTab} onFormSubmit={handleFormSubmit} isPending={isFormMutationPending} />
       <FormModal
         open={quickActionForm !== null}
         onOpenChange={(open) => !open && setQuickActionForm(null)}
