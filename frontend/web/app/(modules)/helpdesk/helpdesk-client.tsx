@@ -574,6 +574,8 @@ function HelpdeskClientLoaded({
       />
       {csvImportKind ? (
         <CsvImportModal
+          organizationId={orgId}
+          tableName={`helpdesk_${csvImportKind}`}
           key={csvImportKind}
           onClose={() => setCsvImportKind(null)}
           config={csvImportForm(

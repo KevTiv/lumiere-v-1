@@ -110,6 +110,21 @@ export function ImportJobStatusPanel({
       </div>
 
       {jobErrors.length > 0 ? (
+        <ul className="max-h-56 space-y-2 overflow-auto text-sm" aria-label={t("common.importAssistant.jobErrors")}>
+          {jobErrors.map((row, index) => (
+            <li key={String(row.id ?? index)} className="rounded border p-2">
+              {t("common.csvImportDialog.rowError", {
+                defaultValue: "Row {{row}}: {{message}}",
+                row: row.rowNumber ?? row.row_number ?? "?",
+                message: row.errorMessage ?? row.error_message ?? "",
+              })}
+              {row.fieldName ?? row.field_name ? <span className="ml-2 text-muted-foreground">({row.fieldName ?? row.field_name})</span> : null}
+            </li>
+          ))}
+        </ul>
+      ) : null}
+
+      {jobErrors.length > 0 ? (
         <div className="flex flex-wrap gap-2">
           <Button
             type="button"

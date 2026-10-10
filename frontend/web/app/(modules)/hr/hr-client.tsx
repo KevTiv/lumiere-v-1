@@ -1814,6 +1814,8 @@ function HrClientLoaded({
       ) : null}
       {csvKind && csvFormConfig ? (
         <CsvImportModal
+          organizationId={orgId}
+          tableName={{ resource: "hr_resource", department: "hr_department", job_position: "hr_job_position", employee: "hr_employee", contract: "hr_contract", leave_type: "hr_leave_type", leave: "hr_leave", payroll_structure: "hr_payroll_structure", salary_rule: "hr_salary_rule", payslip: "hr_payslip" }[csvKind]}
           key={csvKind}
           onClose={() => setCsvKind(null)}
           config={csvFormConfig}

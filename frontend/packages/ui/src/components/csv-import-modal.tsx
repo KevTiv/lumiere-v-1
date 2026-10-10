@@ -11,6 +11,7 @@ import {
   type CsvImportColumns,
 } from "../lib/csv-import-preview"
 import { showWorkflowToast } from "../lib/workflow-toast"
+import { CsvImportHistory } from "../import-assistant/csv-import-history"
 import { Button } from "./button"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "./dialog"
 import { Input } from "./input"
@@ -30,6 +31,9 @@ export interface CsvImportModalProps {
   columns?: CsvImportColumns
   /** File name for the downloaded template; defaults to `import-template.csv`. */
   templateFileName?: string
+  /** Scope the explicitly uncorrelated import history to this organization and entity. */
+  organizationId?: bigint
+  tableName?: string
 }
 
 function downloadTemplate(columns: CsvImportColumns, fileName: string) {
@@ -45,7 +49,8 @@ function downloadTemplate(columns: CsvImportColumns, fileName: string) {
 /**
  * File-backed CSV import: pick a .csv, preview its first rows and header check, confirm, then submit
  * the raw text through `onImport`. The reducers skip bad rows and record them in the import job
- * history instead of failing the call, so a success toast means the file was accepted.
+ * history instead of failing the call. Submission opens entity-scoped history without claiming
+ * that the newest job belongs to this file.
  */
 export function CsvImportModal({
   onClose,
@@ -54,6 +59,8 @@ export function CsvImportModal({
   onImport,
   columns,
   templateFileName = "import-template.csv",
+  organizationId,
+  tableName,
 }: CsvImportModalProps) {
   const { t } = useTranslation()
   const [fileName, setFileName] = useState("")
@@ -61,6 +68,7 @@ export function CsvImportModal({
   const [analysis, setAnalysis] = useState<CsvImportAnalysis | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [submitted, setSubmitted] = useState(false)
 
   const handleFile = async (file: File | undefined) => {
     setError(null)
@@ -84,7 +92,7 @@ export function CsvImportModal({
     try {
       await onImport(csvText)
       showWorkflowToast({
-        kind: "success",
+        kind: "info",
         title: t("common.csvImportDialog.success", { defaultValue: "Import submitted" }),
         description: t("common.csvImportDialog.successDescription", {
           defaultValue: "{{count}} rows from {{file}} were sent. Rows the server rejects are listed in the import job history.",
@@ -92,7 +100,8 @@ export function CsvImportModal({
           file: fileName,
         }),
       })
-      onClose()
+      if (organizationId && organizationId > 0n) setSubmitted(true)
+      else onClose()
     } catch (cause) {
       const message = cause instanceof Error ? cause.message : String(cause)
       setError(message)
@@ -117,6 +126,10 @@ export function CsvImportModal({
         </DialogHeader>
 
         <div className="space-y-4">
+          {submitted && organizationId ? (
+            <CsvImportHistory organizationId={organizationId} tableName={tableName} />
+          ) : null}
+          {!submitted ? <>
           <div className="space-y-2">
             <Label htmlFor="csv-import-file">
               {t("common.csvImportDialog.fileLabel", { defaultValue: "CSV file" })}
@@ -193,6 +206,7 @@ export function CsvImportModal({
             </div>
           ) : null}
 
+          </> : null}
           {error ? (
             <p role="alert" className="text-sm text-destructive">
               {error}
@@ -202,11 +216,11 @@ export function CsvImportModal({
 
         <DialogFooter>
           <Button type="button" variant="outline" disabled={busy} onClick={onClose}>
-            {config.cancelLabel ?? t("common.cancel")}
+            {submitted ? t("common.close", { defaultValue: "Close" }) : config.cancelLabel ?? t("common.cancel")}
           </Button>
-          <Button type="button" disabled={busy || !canSubmitCsvImport(analysis)} onClick={() => void handleSubmit()}>
+          {!submitted ? <Button type="button" disabled={busy || !canSubmitCsvImport(analysis)} onClick={() => void handleSubmit()}>
             {config.submitLabel ?? t("common.csvImportDialog.submit", { defaultValue: "Import" })}
-          </Button>
+          </Button> : null}
         </DialogFooter>
       </DialogContent>
     </Dialog>
