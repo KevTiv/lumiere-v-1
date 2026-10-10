@@ -16,11 +16,13 @@ import {
   gotoModule,
   openEntityCreate,
   openWorkflowVersionRow,
+  scalarQueryId,
   seedPublishableWorkflowDraft,
   smokeName,
   submitForm,
   waitForWorkflowVersionStatus,
 } from "./helpers"
+import { createDraftSaleOrder } from "./sales-order-fixtures"
 
 const WORKFLOW_TAB_IDS = [
   "dashboard",
@@ -103,6 +105,90 @@ test.describe("Gate UI — workflows and approvals", { tag: ["@gate-ui", "@p0"] 
     await page.getByTestId("workflow-version-simulate").click()
     const simulateRes = await simulateWait
     expect(simulateRes.ok(), await simulateRes.text()).toBe(true)
+    await expectNoAppError(page)
+  })
+
+  test("starts and signals a published workflow with canonical subject snapshots", async ({
+    page,
+  }) => {
+    test.setTimeout(240_000)
+
+    const orderId = await createDraftSaleOrder(page, smokeName("workflow-subject"))
+    const seeded = await seedPublishableWorkflowDraft(page, {
+      workflowKey: smokeName("workflow-runtime").toLowerCase().replace(/-/g, "_"),
+      name: "Workflow runtime snapshot gate",
+      model: "sale_order",
+      signalKey: "complete",
+    })
+
+    await openWorkflowVersionRow(page, seeded.versionId)
+    const publishWait = page.waitForResponse(
+      (res) => matchesOperationResponse(res, "publish_workflow_version"),
+      { timeout: 30_000 },
+    )
+    await page.getByTestId("workflow-version-publish").click()
+    const publishRes = await publishWait
+    expect(publishRes.ok(), await publishRes.text()).toBe(true)
+    await waitForWorkflowVersionStatus(page, seeded.versionId, "Published")
+
+    await openWorkflowVersionRow(page, seeded.versionId)
+    await page.getByTestId("workflow-version-start-subject-id").fill(String(orderId))
+    const snapshotWait = page.waitForResponse(
+      (res) => matchesOperationResponse(res, "request_workflow_subject_snapshot"),
+      { timeout: 30_000 },
+    )
+    const startWait = page.waitForResponse(
+      (res) => matchesOperationResponse(res, "start_workflow"),
+      { timeout: 30_000 },
+    )
+    await page.getByTestId("workflow-version-start").click()
+    const [snapshotRes, startRes] = await Promise.all([snapshotWait, startWait])
+    expect(snapshotRes.ok(), await snapshotRes.text()).toBe(true)
+    expect(startRes.ok(), await startRes.text()).toBe(true)
+
+    let instanceId = 0
+    await expect
+      .poll(
+        async () => {
+          const res = await page.request.get("/api/query/workflow-instances")
+          if (!res.ok()) return 0
+          const json = (await res.json()) as { data?: Record<string, unknown>[] }
+          const row = (json.data ?? []).find(
+            (candidate) =>
+              scalarQueryId(candidate.workflowVersionId ?? candidate.workflow_version_id) ===
+                seeded.versionId &&
+              scalarQueryId(candidate.subjectId ?? candidate.subject_id) === orderId,
+          )
+          instanceId = scalarQueryId(row?.id) ?? 0
+          return instanceId
+        },
+        { timeout: 30_000 },
+      )
+      .toBeGreaterThan(0)
+
+    await gotoModule(page, "/workflows", "workflows")
+    await page.getByTestId("module-tab-workflows-instances").click()
+    const instanceRow = activeTabEntityTable(page).getByTestId(`entity-row-${instanceId}`)
+    await expect(instanceRow).toBeVisible({ timeout: 30_000 })
+    await instanceRow.click()
+    await expect(page.getByTestId("workflow-row-dialog-instances")).toBeVisible()
+    await page.getByTestId("workflow-instance-signal-key").selectOption("complete")
+
+    const signalSnapshotWait = page.waitForResponse(
+      (res) => matchesOperationResponse(res, "request_workflow_subject_snapshot"),
+      { timeout: 30_000 },
+    )
+    const signalWait = page.waitForResponse(
+      (res) => matchesOperationResponse(res, "signal_workflow"),
+      { timeout: 30_000 },
+    )
+    await page.getByTestId("workflow-instance-signal").click()
+    const [signalSnapshotRes, signalRes] = await Promise.all([
+      signalSnapshotWait,
+      signalWait,
+    ])
+    expect(signalSnapshotRes.ok(), await signalSnapshotRes.text()).toBe(true)
+    expect(signalRes.ok(), await signalRes.text()).toBe(true)
     await expectNoAppError(page)
   })
 
