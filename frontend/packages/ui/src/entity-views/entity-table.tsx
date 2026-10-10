@@ -100,7 +100,7 @@ interface EntityTableProps {
   initialFilters?: Record<string, string>
   /** Clears a parent-owned filter at its source rather than persisting a local override. */
   onInitialFilterClear?: (key: string) => void
-  /** Set false on sensitive lists to hide the Export action. Defaults to the config's `allowExport`, then true. */
+  /** Explicitly enable export for a reviewed list. Export is fail-closed by default. */
   allowExport?: boolean
 }
 
@@ -466,7 +466,7 @@ export function EntityTable({
     listViewKey: config.listViewKey,
   })
   const exportLabel = t("common.entityView.export", { defaultValue: "Export" })
-  const canExport = (allowExport ?? config.allowExport ?? true) && columns.some((col) => !col.sensitive)
+  const canExport = (allowExport ?? config.allowExport ?? false) && columns.some((col) => !col.sensitive)
 
   return (
     <TooltipProvider>

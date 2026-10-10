@@ -1,6 +1,6 @@
 # COV browser acceptance on the Docker stack — 2026-10-04
 
-**Browser lane: PASS twice (46 passed, 0 failed, 0 skipped). Durable projection: CONVERGED on the second run. Overall runtime acceptance: REVIEW (released-migration compatibility open).**
+**Browser lane: PASS twice (46 passed, 0 failed, 0 skipped). Durable projection: CONVERGED on the second run. Released-migration compatibility: CLOSED on contracts v0.3.86. Overall runtime acceptance: REVIEW (remaining coverage limits open).**
 
 This is a second, independent browser pass of the same repair. It complements
 [`cov-runtime-browser-acceptance-2026-10-04.md`](./cov-runtime-browser-acceptance-2026-10-04.md),
@@ -120,11 +120,11 @@ registering the service identities on that module.
 - **Projection (first run).** In the first run the Docker `projection-worker`
   was attached to the developer module, so nothing projected from the e2e
   module. The second run above closes that for the tables the specs write.
-- **Migration 1.** Contracts `v0.3.81` adds one index to the already released
-  migration 1 (`cold_tier_service_identity_identity`), so databases initialized
-  before `v0.3.81` refuse to start (`migration 1 checksum mismatch`). This run
-  used a freshly created database and so did not hit it. It needs an authored
-  follow-up migration and a contracts release.
+- **Migration 1 at the time of this run.** Contracts `v0.3.81` added one index
+  to the already released migration 1 (`cold_tier_service_identity_identity`),
+  so databases initialized before `v0.3.81` refused to start (`migration 1
+  checksum mismatch`). This run used a freshly created database and so did not
+  hit it. The 2026-10-07 follow-up below closes this blocker.
 - **Coverage limits.** COV-25 proves the first order-to-delivery/invoice link
   only; the companion document records the remaining coverage limits.
 - **Scope.** COV-11 and COV-12 (already accepted) and the non-COV Playwright
@@ -133,7 +133,30 @@ registering the service identities on that module.
 ## Disposition
 
 No status page changes disposition on this evidence. The browser lane passed
-twice on an identical tree and the projection converged, but runtime acceptance
-stays at `REVIEW` until the released-migration issue is resolved for existing
-databases (contracts `v0.3.81` changes migration 1 in place) and the remaining
-coverage limits recorded in the companion document are accepted or closed.
+twice on an identical tree and the projection converged. The 2026-10-07
+follow-up closes the released-migration blocker. Runtime acceptance stays at
+`REVIEW` until the remaining coverage limits recorded in the companion
+document are accepted or closed.
+
+## 2026-10-07 follow-up: released-migration compatibility closed
+
+- The COV branch now pins contracts `v0.3.86` at revision
+  `97c4c73203301eb6b32ac6d403bdbb2a9137bf53`.
+- The released migration 1 in `v0.3.86` is byte-identical to `v0.3.80`. The
+  index `cold_tier_service_identity_identity` is instead owned by authored
+  migration 11, `durable_projection_delta`.
+- A Docker PostgreSQL upgrade test created a database at migrations 1 through
+  10, retained the recorded migration 1 checksum, ran `ensure_schema`, and
+  proved exactly 11 migration records plus the new index.
+
+```sh
+docker compose --env-file .env.docker -f docker-compose.dev.yml \
+  run --rm --no-deps -e C4_TEST_PG=1 api-server \
+  python3 scripts/run-required-cargo-tests.py --locked -p api-server --lib \
+  cold_tier::migrate::postgres_compatibility_tests:: -- --nocapture
+```
+
+Result: **PASS** (`2 passed, 0 failed`; both PostgreSQL compatibility tests ran,
+including mutation and readback). CI now runs this complete test group. This
+closes the migration checksum blocker for databases created before `v0.3.81`.
+It does not expand the browser coverage stated above.

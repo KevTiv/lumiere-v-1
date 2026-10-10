@@ -289,6 +289,8 @@ export function buildRbacUserFromServer(
 export function actionsMatch(ruleAction: Action | "*", requested: Action): boolean {
   if (ruleAction === "*") return true
   if (ruleAction === requested) return true
+  // `admin` is a server-enforced capability. A broad UI `manage` policy must
+  // not silently grant it; only an exact or wildcard rule can do that.
   if (ruleAction === "manage" && requested !== "admin") return true
   if (ruleAction === "write" && (requested === "update" || requested === "create")) {
     return true

@@ -4,8 +4,8 @@ import { actionsMatch, parsePermissionString } from "./rbac-defaults"
 
 describe("RBAC action vocabulary", () => {
   it("parses the server admin action without replacing it with manage", () => {
-    expect(parsePermissionString("tax_deadline:admin")).toEqual({
-      resource: "tax_deadline",
+    expect(parsePermissionString("tax:deadlines:admin")).toEqual({
+      resource: "tax:deadlines",
       action: "admin",
     })
   })
@@ -14,5 +14,10 @@ describe("RBAC action vocabulary", () => {
     expect(actionsMatch("manage", "admin")).toBe(false)
     expect(actionsMatch("admin", "admin")).toBe(true)
     expect(actionsMatch("*", "admin")).toBe(true)
+  })
+
+  it("preserves manage coverage for non-admin UI actions", () => {
+    expect(actionsMatch("manage", "read")).toBe(true)
+    expect(actionsMatch("manage", "update")).toBe(true)
   })
 })

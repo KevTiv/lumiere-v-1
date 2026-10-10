@@ -1,10 +1,10 @@
 //! `/v1/import/{entity}` — CSV import via dedicated `import_*_csv` reducers (bypasses `/call` allowlist).
 
-use std::sync::Arc;
+use std::{collections::HashSet, sync::Arc};
 
 use axum::{
     extract::{Path, State},
-    http::HeaderMap,
+    http::{HeaderMap, StatusCode},
     routing::post,
     Json, Router,
 };
@@ -371,8 +371,26 @@ fn resolve_import_entity(entity: &str) -> Option<&'static ImportEntity> {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct ImportParams {
-    company_id: Option<u64>,
-    currency_id: Option<u64>,
+    company_id: Option<JsonU64>,
+    currency_id: Option<JsonU64>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(untagged)]
+enum JsonU64 {
+    Number(u64),
+    String(String),
+}
+
+impl JsonU64 {
+    fn parse(self, field: &str) -> Result<u64, ApiError> {
+        match self {
+            Self::Number(value) => Ok(value),
+            Self::String(value) => value
+                .parse()
+                .map_err(|_| ApiError::BadRequest(format!("params.{field} must be a u64"))),
+        }
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -397,34 +415,55 @@ fn validate_csv(csv: &str) -> Result<(), ApiError> {
     Ok(())
 }
 
-struct LatestImportJob {
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct ImportJobSnapshot {
     job_id: u64,
     imported_rows: u32,
 }
 
-async fn latest_import_job(
+async fn import_jobs(
     client: &stdb_client::StdbClient,
     org_id: u64,
     table_name: &str,
-) -> Option<LatestImportJob> {
+) -> Result<Vec<ImportJobSnapshot>, ApiError> {
     let sql = format!(
-        "SELECT id, imported_rows FROM import_job WHERE organization_id = {org_id} AND table_name = '{table_name}' ORDER BY id DESC LIMIT 1"
+        "SELECT id, imported_rows FROM import_job WHERE organization_id = {org_id} AND table_name = '{table_name}'"
     );
-    let rows = client.query_sql(&sql).await.ok()?;
-    let row = rows.first()?;
-    let job_id = row
-        .get("id")
-        .and_then(|v| v.as_u64())
-        .or_else(|| row.get("id").and_then(|v| v.as_str()?.parse().ok()))?;
-    let imported_rows = row
-        .get("importedRows")
-        .or_else(|| row.get("imported_rows"))
-        .and_then(|v| v.as_u64())
-        .map(|n| n as u32)?;
-    Some(LatestImportJob {
-        job_id,
-        imported_rows,
-    })
+    let rows = client
+        .query_sql(&sql)
+        .await
+        .map_err(ApiError::unavailable)?;
+    rows.into_iter()
+        .map(|row| {
+            let job_id = row
+                .get("id")
+                .and_then(|value| value.as_u64())
+                .or_else(|| row.get("id").and_then(|value| value.as_str()?.parse().ok()))
+                .ok_or_else(|| ApiError::Internal("import job has no valid id".into()))?;
+            let imported_rows = row
+                .get("importedRows")
+                .or_else(|| row.get("imported_rows"))
+                .and_then(|value| value.as_u64())
+                .and_then(|value| u32::try_from(value).ok())
+                .ok_or_else(|| {
+                    ApiError::Internal("import job has no valid imported row count".into())
+                })?;
+            Ok(ImportJobSnapshot {
+                job_id,
+                imported_rows,
+            })
+        })
+        .collect()
+}
+
+fn resolve_created_import_job<'a>(
+    before: &[ImportJobSnapshot],
+    after: &'a [ImportJobSnapshot],
+) -> Option<&'a ImportJobSnapshot> {
+    let prior_ids = before.iter().map(|job| job.job_id).collect::<HashSet<_>>();
+    let mut created = after.iter().filter(|job| !prior_ids.contains(&job.job_id));
+    let job = created.next()?;
+    created.next().is_none().then_some(job)
 }
 
 async fn import_entity_post(
@@ -433,7 +472,7 @@ async fn import_entity_post(
     cookies: Cookies,
     Path(entity): Path<String>,
     Json(body): Json<ImportBody>,
-) -> Result<Json<Value>, ApiError> {
+) -> Result<(StatusCode, Json<Value>), ApiError> {
     let auth = headers
         .get(axum::http::header::AUTHORIZATION)
         .and_then(|v| v.to_str().ok());
@@ -482,7 +521,7 @@ async fn import_entity_post(
         ImportArgShape::OrgOnly => json!([org_id, body.csv]),
         ImportArgShape::OrgCompany => {
             let company_id = if let Some(cid) = params.company_id {
-                cid
+                cid.parse("companyId")?
             } else {
                 default_company_id(&client, org_id).await?.ok_or_else(|| {
                     ApiError::Unprocessable("No company found for organization".into())
@@ -491,27 +530,62 @@ async fn import_entity_post(
             json!([org_id, company_id, body.csv])
         }
         ImportArgShape::OrgCurrency => {
-            let currency_id = params.currency_id.ok_or_else(|| {
-                ApiError::BadRequest("params.currencyId is required for product import".into())
-            })?;
+            let currency_id = params
+                .currency_id
+                .ok_or_else(|| {
+                    ApiError::BadRequest("params.currencyId is required for product import".into())
+                })?
+                .parse("currencyId")?;
             json!([org_id, currency_id, body.csv])
         }
     };
 
+    // Snapshot the producer-owned identity set before dispatch. A "latest job"
+    // query can select another actor's concurrent import and is not canonical.
+    let before = import_jobs(client, org_id, spec.table_name).await?;
     let context = dispatch_session_reducer(&state, &session, spec.reducer, args).await?;
+    let after = match import_jobs(context.client(), org_id, spec.table_name).await {
+        Ok(jobs) => jobs,
+        Err(_) => {
+            return Ok((
+                StatusCode::ACCEPTED,
+                Json(json!({
+                    "ok": false,
+                    "outcome": "unknown",
+                    "reason": "readback-failed",
+                    "entity": spec.table_name,
+                })),
+            ));
+        }
+    };
 
-    let latest_job = latest_import_job(context.client(), org_id, spec.table_name).await;
+    let Some(job) = resolve_created_import_job(&before, &after) else {
+        return Ok((
+            StatusCode::ACCEPTED,
+            Json(json!({
+                "ok": false,
+                "outcome": "unknown",
+                "reason": "readback-ambiguous",
+                "entity": spec.table_name,
+            })),
+        ));
+    };
 
-    let mut resp = json!({
-        "ok": true,
-        "entity": spec.table_name,
-    });
-    if let Some(job) = latest_job {
-        resp["jobId"] = json!(job.job_id);
-        resp["rowsImported"] = json!(job.imported_rows);
-    }
-
-    Ok(Json(resp))
+    Ok((
+        StatusCode::OK,
+        Json(json!({
+            "ok": true,
+            "outcome": "converged",
+            "entity": spec.table_name,
+            "jobId": job.job_id,
+            "rowsImported": job.imported_rows,
+            "record": {
+                "resource": "import-jobs",
+                "id": job.job_id.to_string(),
+                "href": format!("/settings/import-jobs/{}", job.job_id),
+            },
+        })),
+    ))
 }
 
 pub fn router() -> Router<Arc<AppState>> {
@@ -532,5 +606,52 @@ mod tests {
     #[test]
     fn unknown_entity_returns_none() {
         assert!(resolve_import_entity("not_a_table").is_none());
+    }
+
+    #[test]
+    fn import_ids_accept_exact_decimal_strings() {
+        assert_eq!(
+            JsonU64::String(u64::MAX.to_string())
+                .parse("companyId")
+                .unwrap(),
+            u64::MAX,
+        );
+        assert!(JsonU64::String("not-an-id".into())
+            .parse("companyId")
+            .is_err());
+    }
+
+    #[test]
+    fn resolves_the_only_job_created_by_this_dispatch() {
+        let before = vec![ImportJobSnapshot {
+            job_id: 10,
+            imported_rows: 2,
+        }];
+        let after = vec![
+            before[0].clone(),
+            ImportJobSnapshot {
+                job_id: 11,
+                imported_rows: 4,
+            },
+        ];
+
+        assert_eq!(resolve_created_import_job(&before, &after), after.get(1));
+    }
+
+    #[test]
+    fn refuses_to_guess_when_multiple_jobs_appear() {
+        let before = vec![];
+        let after = vec![
+            ImportJobSnapshot {
+                job_id: 11,
+                imported_rows: 4,
+            },
+            ImportJobSnapshot {
+                job_id: 12,
+                imported_rows: 1,
+            },
+        ];
+
+        assert_eq!(resolve_created_import_job(&before, &after), None);
     }
 }

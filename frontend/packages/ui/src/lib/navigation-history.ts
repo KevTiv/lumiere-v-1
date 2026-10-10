@@ -2,6 +2,13 @@ const KEY = "__lumiere_navigation_guard"
 
 interface Position { token: string; index: number }
 
+function navigationToken(): string {
+  if (typeof crypto.randomUUID === "function") return crypto.randomUUID()
+  return Array.from(crypto.getRandomValues(new Uint32Array(4)), (value) =>
+    value.toString(16).padStart(8, "0"),
+  ).join("")
+}
+
 function position(state: unknown): Position | undefined {
   if (typeof state !== "object" || state === null || !(KEY in state)) return
   const value = (state as { [KEY]: unknown })[KEY]
@@ -18,7 +25,7 @@ export function installNavigationHistoryGuard(
   shouldGuard: () => boolean,
   confirm: () => Promise<boolean>,
 ): () => void {
-  const token = crypto.randomUUID()
+  const token = navigationToken()
   const originalPush = history.pushState
   const originalReplace = history.replaceState
   let current = 0
