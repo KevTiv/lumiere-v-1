@@ -56,7 +56,6 @@ import {
 } from "@lumiere/ui"
 import type { EntityRow, EntityViewConfig, EntityTableConfig, EntityRecordSheetConfig, FormConfig, ModuleConfig } from "@lumiere/ui"
 import type { Product, Uom } from "@lumiere/stdb/types"
-import { awardBidOptions } from "@/lib/linked-options"
 import { purchasingModuleConfig } from "@/lib/module-dashboard-configs"
 import { usePurchasingModuleSubscription } from "@/lib/module-subscription-hooks"
 import { PurchasingOpsSod } from "./purchasing-ops-sod"
@@ -158,8 +157,6 @@ import {
 import { usePricelists, type ProductPricelist } from "@lumiere/query-hooks/hooks/sales"
 import type { Contact } from "@lumiere/query-hooks/hooks/crm"
 import { useAccountAccounts, useAccountJournals, useAccountPaymentTerms, useAccountMoves } from "@lumiere/query-hooks/hooks/accounting"
-import { purchaseOrderLinks } from "@lumiere/query-hooks/hooks/cross-record-links"
-import { CrossRecordLinks } from "../../../components/order-handoff-links"
 import { useProducts, useUoms, useStockPickings, useWarehouses } from "@lumiere/query-hooks/hooks/inventory"
 import { useDepartments, type HrDepartment } from "@lumiere/query-hooks/hooks/hr"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
@@ -200,6 +197,8 @@ import {
   toUpdateLandedCostParams,
   toUpdatePurchaseOrderLineParams,
 } from "@/lib/purchasing-create-params"
+import { purchaseOrderHandoffs } from "@lumiere/query-hooks/hooks/purchase-order-handoffs"
+import { OrderHandoffLinks } from "../../../components/order-handoff-links"
 import { stbTimestampFromDate } from "@/lib/stb-timestamp"
 import {
   toCreatePartnerBankParams,
@@ -539,7 +538,10 @@ function PurchasingClientLoaded({
   const { data: pricelists = [] } = usePricelists(orgId, initialPricelists)
   const { data: products = [] } = useProducts(orgId, initialProducts)
   const { data: uoms = [] } = useUoms(orgId, initialUoms)
-  const { data: stockPickings = [], isLoading: stockPickingsLoading, isError: stockPickingsError } = useStockPickings(orgId)
+  const receiptQuery = useStockPickings(orgId)
+  const { data: stockPickings = [] } = receiptQuery
+  const billQuery = useAccountMoves(orgId)
+  const { data: accountMoves = [] } = billQuery
   const { data: landedCosts = [] } = useLandedCosts(orgId)
   const { data: landedCostLines = [] } = useLandedCostLines(orgId)
   const { data: supplierIntakes = [] } = useSupplierIntakes(orgId)
@@ -551,7 +553,6 @@ function PurchasingClientLoaded({
   const { data: accountJournals = [] } = useAccountJournals(orgId)
   const { data: accountAccounts = [] } = useAccountAccounts(orgId)
   const { data: paymentTerms = [] } = useAccountPaymentTerms(orgId)
-  const { data: accountMoves = [], isLoading: accountMovesLoading, isError: accountMovesError } = useAccountMoves(orgId)
   const { data: currencies = [] } = useCurrencies()
   const { data: blanketOrders = [] } = usePurchaseBlanketOrders(orgId)
   const { data: blanketOrderLines = [] } = usePurchaseBlanketOrderLines(orgId)
@@ -716,40 +717,8 @@ function PurchasingClientLoaded({
     setOperationDialogRequest({ kind: "add-rfq-bid" })
   }
 
-  const promptAwardRfqBid = async () => {
-    const vendorNames = new Map(vendorFieldOptions.map((option) => [option.value, option.label]))
-    const pickers = awardBidOptions(
-      rfqs as unknown as Record<string, unknown>[],
-      rfqBids as unknown as Record<string, unknown>[],
-      vendorNames,
-    )
-    const values = await askForm({
-      title: t("purchasing.ops.awardRfqBid", { defaultValue: "Award RFQ bid" }),
-      fields: [
-        {
-          id: "rfqId",
-          name: "rfqId",
-          label: t("purchasing.ops.prompt.rfqId", { defaultValue: "RFQ id" }),
-          type: "select",
-          searchable: true,
-          required: true,
-          options: pickers.rfqId.length > 0 ? pickers.rfqId : [{ value: "", label: "No records", disabled: true }],
-        },
-        {
-          id: "bidId",
-          name: "bidId",
-          label: t("purchasing.ops.prompt.bidId", { defaultValue: "Bid id to award" }),
-          type: "select",
-          searchable: true,
-          required: true,
-          options: pickers.bidId.length > 0 ? pickers.bidId : [{ value: "", label: "No records", disabled: true }],
-        },
-      ],
-    })
-    const rfqId = formText(values?.rfqId)
-    const bidId = formText(values?.bidId)
-    if (rfqId == null || bidId == null) return
-    await purchasingWorkflow.awardBid.execute({ rfqId, bidId }, { navigateToNext: true })
+  const openAwardRfqBid = async () => {
+    setOperationDialogRequest({ kind: "award-rfq-bid" })
   }
 
   const openCreatePurchaseReturn = async () => {
@@ -1176,20 +1145,33 @@ function PurchasingClientLoaded({
         },
         {
           id: "handoffs",
-          label: "Receipts & vendor bills",
-          content: (record) => accountMovesLoading || stockPickingsLoading ? <p>Loading linked records…</p> : (
-            <CrossRecordLinks
-              testIdPrefix="purchase-order-handoff"
-              result={accountMovesError || stockPickingsError
-                ? { status: "unavailable", links: [], reason: "Linked records are unavailable" }
-                : purchaseOrderLinks(record, { organizationId: orgId, companyId: operatingCompanyId },
-                    stockPickings, accountMoves)}
-            />
+          label: t("purchasing.handoffs.title"),
+          content: (record) => (
+            <div className="p-4" data-testid="purchase-order-handoffs">
+              {receiptQuery.isError || billQuery.isError ? (
+                <p role="alert">{t("purchasing.handoffs.error")}</p>
+              ) : receiptQuery.isPending || billQuery.isPending ? (
+                <p role="status">{t("purchasing.handoffs.loading")}</p>
+              ) : (
+                <OrderHandoffLinks
+                  testIdPrefix="purchase-order-handoff"
+                  emptyLabel={t("purchasing.handoffs.empty")}
+                  pickingLabel={t("purchasing.handoffs.receipt")}
+                  invoiceLabel={t("purchasing.handoffs.bill")}
+                  handoffs={purchaseOrderHandoffs(
+                    record,
+                    { organizationId: orgId, companyId: operatingCompanyId },
+                    stockPickings,
+                    accountMoves,
+                  )}
+                />
+              )}
+            </div>
           ),
         },
       ],
     }
-  }, [t, lines, vendorLabelById, orgId, operatingCompanyId, stockPickings, stockPickingsLoading, stockPickingsError, accountMoves, accountMovesLoading, accountMovesError])
+  }, [t, lines, vendorLabelById, orgId, operatingCompanyId, stockPickings, accountMoves, receiptQuery.isError, receiptQuery.isPending, billQuery.isError, billQuery.isPending])
 
   const purchaseRequisitionFormConfig = useMemo(
     () =>
@@ -1253,15 +1235,29 @@ function PurchasingClientLoaded({
     [currencies],
   )
   const defaultCurrencyId = currencyFieldOptions[0]?.value ?? ""
-  const operationDialogOptions = useMemo(
-    () => ({
+  const operationDialogOptions = useMemo(() => {
+    const submittedBids = (rfqBids as EntityRow[]).filter(
+      (row) => String(row.state ?? "").toLowerCase() === "submitted",
+    )
+    const awardableRfqIds = new Set(
+      submittedBids.map((row) => String(row.rfqId ?? row.rfq_id ?? "")),
+    )
+
+    return {
       requisitions: (requisitions as EntityRow[]).map((row) => ({
         value: String(row.id ?? ""),
         label: String(row.name ?? row.origin ?? `Requisition ${String(row.id ?? "")}`),
       })),
-      rfqs: (rfqs as EntityRow[]).map((row) => ({
+      rfqs: (rfqs as EntityRow[])
+        .filter((row) => awardableRfqIds.has(String(row.id ?? "")))
+        .map((row) => ({
+          value: String(row.id ?? ""),
+          label: String(row.name ?? `RFQ ${String(row.id ?? "")}`),
+        })),
+      rfqBids: submittedBids.map((row) => ({
         value: String(row.id ?? ""),
-        label: String(row.name ?? `RFQ ${String(row.id ?? "")}`),
+        rfqId: String(row.rfqId ?? row.rfq_id ?? ""),
+        label: `Bid ${String(row.id ?? "")} · Vendor ${String(row.partnerId ?? row.partner_id ?? "")} · ${String(row.priceUnit ?? row.price_unit ?? "")}`,
       })),
       vendors: vendorFieldOptions.filter((option) => option.value !== ""),
       products: productFieldOptions.filter((option) => option.value !== ""),
@@ -1277,10 +1273,11 @@ function PurchasingClientLoaded({
       journals: purchaseJournalFieldOptions.filter((option) => option.value !== ""),
       expenseAccounts: expenseAccountFieldOptions.filter((option) => option.value !== ""),
       payableAccounts: payableAccountFieldOptions.filter((option) => option.value !== ""),
-    }),
-    [
+    }
+  }, [
       requisitions,
       rfqs,
+      rfqBids,
       vendorFieldOptions,
       productFieldOptions,
       uomFieldOptions,
@@ -1289,8 +1286,7 @@ function PurchasingClientLoaded({
       purchaseJournalFieldOptions,
       expenseAccountFieldOptions,
       payableAccountFieldOptions,
-    ],
-  )
+    ])
 
   const partnerBankFormConfig = useMemo(
     () =>
@@ -2666,7 +2662,7 @@ function PurchasingClientLoaded({
             }
             onCreatePurchaseRfq={() => openCreateRfqFromRequisition()}
             onAddPurchaseRfqBid={openAddRfqBid}
-            onAwardPurchaseRfqBid={promptAwardRfqBid}
+            onAwardPurchaseRfqBid={openAwardRfqBid}
             onCreatePurchaseReturn={openCreatePurchaseReturn}
             onConfirmPurchaseReturn={openPurchaseReturns}
             onCreateVendorCreditFromReturn={openVendorCreditFromReturn}
@@ -2754,6 +2750,9 @@ function PurchasingClientLoaded({
         onDismiss={() => setOperationDialogRequest(null)}
         onCreateRfq={(params) => createPurchaseRfq.mutateAsync(params)}
         onAddRfqBid={(params) => addPurchaseRfqBid.mutateAsync(params)}
+        onAwardRfqBid={(input) =>
+          purchasingWorkflow.awardBid.execute(input, { navigateToNext: true })
+        }
         onCreatePurchaseReturn={(params) => createPurchaseReturn.mutateAsync(params)}
         onCreateVendorCredit={(input) =>
           purchasingWorkflow.createVendorCredit.execute(input, { navigateToNext: true })

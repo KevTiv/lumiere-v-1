@@ -93,6 +93,20 @@ mod tests {
     }
 
     #[test]
+    fn rfq_child_projections_expose_company_scope() {
+        for resource in ["purchase-rfq-bids", "purchase-rfq-lines"] {
+            let entry = registry_get(resource).expect("RFQ child resource must be registered");
+            assert!(
+                entry
+                    .default_restricted
+                    .iter()
+                    .any(|field| field == "company_id"),
+                "{resource} must expose company_id for purchasing scope enforcement"
+            );
+        }
+    }
+
+    #[test]
     fn workflow_readback_projections_expose_exact_effect_fields() {
         for (resource, fields) in [
             (

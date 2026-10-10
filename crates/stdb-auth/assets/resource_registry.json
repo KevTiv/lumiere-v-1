@@ -5158,6 +5158,7 @@
       "purchase_rfq_bid"
     ],
     "default_restricted": [
+      "company_id",
       "rfq_id",
       "partner_id",
       "price_unit",
@@ -5176,6 +5177,7 @@
       "purchase_rfq_line"
     ],
     "default_restricted": [
+      "company_id",
       "rfq_id",
       "product_id",
       "product_uom_qty"

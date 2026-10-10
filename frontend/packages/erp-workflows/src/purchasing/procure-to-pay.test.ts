@@ -94,11 +94,15 @@ test("a converted requisition opens the one PO added since the snapshot, never t
 })
 
 test("an RFQ award is confirmed by the RFQ's own purchase_order_id, not the newest stamped PO", () => {
+  assert.equal(poSourceRfqId({ origin: "rfq:4" }), "4")
   assert.equal(poSourceRfqId({ metadata: '{"rfq_id":4,"awarded_bid_id":2}' }), "4")
+  assert.equal(poSourceRfqId({ origin: "rfq:4", metadata: '{"rfq_id":4}' }), "4")
+  assert.equal(poSourceRfqId({ origin: "rfq:4", metadata: '{"rfq_id":5}' }), undefined)
+  assert.equal(poSourceRfqId({ origin: "rfq:4:latest" }), undefined)
   assert.equal(poSourceRfqId({ metadata: "not json" }), undefined)
   assert.equal(poSourceRfqId({}), undefined)
   const orders = [
-    { id: 10, metadata: '{"rfq_id":4}' },
+    { id: 10, origin: "rfq:4" },
     { id: 12, metadata: '{"rfq_id":4}' },
     { id: 13, metadata: '{"rfq_id":5}' },
   ]
