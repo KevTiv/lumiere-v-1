@@ -4,6 +4,7 @@ import { stdbBffCommandPost } from "@lumiere/stdb/commands"
 
 import { matchesOperationResponse } from "./operation-response"
 import {
+  activeTabEntityTable,
   chooseFirstEnabledOption,
   chooseSelectOptionByLabel,
   expectFormModalVisible,
@@ -102,8 +103,39 @@ test.describe("COV-01d/COV-03 opportunity → sale-order effect certification", 
     await submitForm(page, "convert-opportunity-order")
     await firstDispatch
 
+    await expect(
+      page.getByText("Sales order ready.", { exact: true }),
+    ).toBeVisible({ timeout: 15_000 })
+    await page.getByRole("button", { name: "Open sales order", exact: true }).click()
+
     const orderId = await fetchSaleOrderIdByOpportunityId(page, opportunityId, companyId)
     expect(orderId).toBeGreaterThan(0)
+    await expect(page).toHaveURL((url) => {
+      return (
+        url.pathname === "/sales" &&
+        url.searchParams.get("tab") === "orders" &&
+        url.searchParams.getAll("filter").length === 1 &&
+        url.searchParams.get("filter") === `id:${orderId}`
+      )
+    })
+    await expect(page.getByTestId("module-tab-sales-orders")).toHaveAttribute(
+      "aria-selected",
+      "true",
+    )
+    await expect(
+      activeTabEntityTable(page).getByTestId(`entity-row-${orderId}`),
+    ).toBeVisible({ timeout: 30_000 })
+    await page.reload({ waitUntil: "domcontentloaded" })
+    await expect(page).toHaveURL((url) => {
+      return (
+        url.pathname === "/sales" &&
+        url.searchParams.get("tab") === "orders" &&
+        url.searchParams.get("filter") === `id:${orderId}`
+      )
+    })
+    await expect(
+      activeTabEntityTable(page).getByTestId(`entity-row-${orderId}`),
+    ).toBeVisible({ timeout: 30_000 })
     await expect
       .poll(
         async () => fetchSaleOrderIdsByOpportunityId(page, opportunityId, companyId),
