@@ -84,10 +84,7 @@ export function useCreateAccountAsset(organizationId: number) {
     mutationFn: async (args: { companyId: bigint; params: CreateAccountAssetParams }) => {
       const { urlPath, init } = stdbBffCommandPost("create_account_asset", {
         companyId: args.companyId,
-        // No struct name: the option-field table lists a stale `salvage_move_id` that is not a field of
-        // CreateAccountAssetParams, so the encoder would send an unknown field. Callers spell every
-        // Option field as SATS `{some}` / `{none: []}` (see accounting/asset-actions.ts).
-        params: stdbParamsToJson(args.params as object),
+        params: stdbParamsToJson(args.params as object, "CreateAccountAssetParams"),
       })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
