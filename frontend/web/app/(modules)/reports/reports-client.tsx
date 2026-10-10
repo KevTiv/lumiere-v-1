@@ -1142,6 +1142,7 @@ function ReportsClientLoaded({
       />
       {csvKind && csvFormConfig ? (
         <CsvImportModal
+          trackedImport={{ companyId: operatingCompanyId }}
           organizationId={orgId}
           tableName={csvKind === "report_template" ? "report_template" : "analytics_metric"}
           key={csvKind}
