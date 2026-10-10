@@ -11,6 +11,7 @@ export type FieldType =
   | "url"
   | "textarea"
   | "select"
+  | "multiselect"
   | "checkbox"
   | "switch"
   | "radio"
@@ -77,6 +78,12 @@ export interface SelectField extends BaseField {
   }>
 }
 
+export interface MultiSelectField extends BaseField {
+  type: "multiselect"
+  defaultValue?: string[]
+  options: SelectField["options"]
+}
+
 export interface CheckboxField extends BaseField {
   type: "checkbox"
   defaultValue?: boolean
@@ -129,6 +136,7 @@ export type FormField =
   | NumberField
   | TextareaField
   | SelectField
+  | MultiSelectField
   | CheckboxField
   | SwitchField
   | RadioField

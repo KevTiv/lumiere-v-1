@@ -73,6 +73,9 @@ export function ModularForm({
         } else {
           // Set default empty values based on type
           switch (field.type) {
+            case "multiselect":
+              values[field.name] = []
+              break
             case "checkbox":
             case "switch":
               values[field.name] = false
@@ -216,8 +219,14 @@ export function ModularForm({
   }
 
   const validateField = (field: FormField, value: unknown): string | null => {
+    if (field.type === "multiselect" &&
+        (!Array.isArray(value) || !value.every((item) => typeof item === "string"))) {
+      return t("common.validation.invalidFormat")
+    }
     if (field.required) {
-      if (field.type === "file") {
+      if (field.type === "multiselect") {
+        if (!Array.isArray(value) || value.length === 0) return t("common.validation.required")
+      } else if (field.type === "file") {
         const fl = value as FileList | null | undefined
         if (!fl || fl.length === 0) return t("common.validation.required")
       } else if (value === "" || value === null || value === undefined) {
@@ -274,6 +283,8 @@ export function ModularForm({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+
+    if (submissionDisabled) return
 
     if (busy) {
       toast.warning(t("common.formSubmit.busy"))
