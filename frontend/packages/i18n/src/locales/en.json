@@ -201,11 +201,14 @@
       "fileLabel": "CSV file",
       "missingColumns": "Missing required columns: {{columns}}",
       "noRows": "The file has a header but no data rows.",
+      "outcomeUnknown": "Import outcome not verified",
+      "outcomeUnknownDescription": "The server accepted {{file}}, but no exact import job was returned. Review import history before you retry.",
       "rowCount": "{{count}} rows found",
       "submit": "Import",
       "success": "Import submitted",
       "successDescription": "{{count}} rows from {{file}} were sent. Rows the server rejects are listed in the import job history.",
-      "unknownColumns": "These columns are not used and will be ignored: {{columns}}"
+      "unknownColumns": "These columns are not used and will be ignored: {{columns}}",
+      "viewJob": "View import job"
     }
   },
   "navigation": {
@@ -12849,7 +12852,9 @@
     "bell": {
       "empty": "No notifications.",
       "label": "Notifications",
+      "markAllRead": "Mark all read",
       "recent": "Latest notifications",
+      "unread": "Unread notifications",
       "viewAll": "View all"
     }
   },

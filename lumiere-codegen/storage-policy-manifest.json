@@ -5281,7 +5281,9 @@
       "table": "document_retention_purge_job",
       "module": "documents",
       "rationale": "Independent organization-owned aggregate root; related rows do not determine storage routing.",
-      "authoritative_resources": [],
+      "authoritative_resources": [
+        "document-retention-purge-jobs"
+      ],
       "durability_class": "durable_operational_state",
       "organization_ownership": "direct",
       "organization_column": "organization_id",
