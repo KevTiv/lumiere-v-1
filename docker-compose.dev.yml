@@ -124,6 +124,7 @@ services:
       context: .
       dockerfile: Dockerfile.dev
     command: cargo watch -w ai-gateway -w crates -w Cargo.toml -x 'run -p ai-gateway'
+    restart: unless-stopped
     environment:
       CARGO_BUILD_JOBS: ${CARGO_BUILD_JOBS:-1}
       CARGO_INCREMENTAL: ${CARGO_INCREMENTAL:-0}
@@ -180,6 +181,7 @@ services:
       context: .
       dockerfile: Dockerfile.dev
     command: cargo watch -w api-server -w crates -w Cargo.toml -x 'run -p api-server'
+    restart: unless-stopped
     environment:
       CARGO_BUILD_JOBS: ${CARGO_BUILD_JOBS:-1}
       CARGO_INCREMENTAL: ${CARGO_INCREMENTAL:-0}
@@ -233,6 +235,7 @@ services:
       context: .
       dockerfile: Dockerfile.dev
     command: cargo watch -w api-server -w crates -w Cargo.toml -x 'run -p api-server --bin owner-report-worker'
+    restart: unless-stopped
     environment:
       CARGO_BUILD_JOBS: ${CARGO_BUILD_JOBS:-1}
       CARGO_INCREMENTAL: ${CARGO_INCREMENTAL:-0}
@@ -272,6 +275,7 @@ services:
       context: .
       dockerfile: Dockerfile.dev
     command: cargo watch -w api-server -w crates -w Cargo.toml -x 'run -p api-server --bin workflow-worker'
+    restart: unless-stopped
     environment:
       CARGO_BUILD_JOBS: ${CARGO_BUILD_JOBS:-1}
       CARGO_INCREMENTAL: ${CARGO_INCREMENTAL:-0}
@@ -311,6 +315,7 @@ services:
       context: .
       dockerfile: Dockerfile.dev
     command: cargo watch -w api-server -w crates -w Cargo.toml -x 'run -p api-server --bin projection-worker'
+    restart: unless-stopped
     environment:
       CARGO_BUILD_JOBS: ${CARGO_BUILD_JOBS:-1}
       CARGO_INCREMENTAL: ${CARGO_INCREMENTAL:-0}
@@ -416,6 +421,7 @@ services:
       context: .
       dockerfile: Dockerfile.dev
     command: cargo watch -w iot-gateway -w crates -w Cargo.toml -x 'run -p iot-gateway'
+    restart: unless-stopped
     environment:
       CARGO_BUILD_JOBS: ${CARGO_BUILD_JOBS:-1}
       CARGO_INCREMENTAL: ${CARGO_INCREMENTAL:-0}
