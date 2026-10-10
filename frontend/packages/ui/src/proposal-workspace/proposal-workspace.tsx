@@ -25,6 +25,7 @@ import { PresenceBar } from "./presence-bar"
 import { DocumentInputPanel } from "./document-input-panel"
 import { ComplianceChecklist } from "./compliance-checklist"
 import { parseBidDecisionInput } from "./bid-decision"
+import { PROJECT_BILL_TYPES, PROJECT_PRICING_TYPES, parseProjectConversionInput } from "./project-conversion"
 import { useFormDialog } from "../forms/use-form-dialog"
 import { showWorkflowToast } from "../lib/workflow-toast"
 import { rowBool, rowNumber, rowString } from "./row-field-utils"
@@ -238,6 +239,11 @@ export interface ProposalWorkspaceHooks {
     decision: string
     rationale: string
   }>
+  useConvertProposalToProject: () => AsyncMutationResult<{
+    proposalId: bigint | number | string
+    billType: string
+    pricingType: string
+  }>
 }
 
 // ─── Props ────────────────────────────────────────────────────────────────────
@@ -253,6 +259,10 @@ interface ProposalWorkspaceProps {
   onAnalyze: (text: string) => Promise<AIAnalysis>
   /** Shows the bid / no-bid action; the caller passes the user's `proposal:write` permission. */
   canRecordBidDecision?: boolean
+  /** Shows the "Convert to project" action; the caller passes the user's `proposal:write` and `project_project:create` permissions. */
+  canConvertToProject?: boolean
+  /** Enables it: the proposal is Awarded and has no project yet (see `canConvertProposalToProject`). */
+  convertToProjectReady?: boolean
   hooks: ProposalWorkspaceHooks
 }
 
@@ -268,6 +278,8 @@ export function ProposalWorkspace({
   currentUserName,
   onAnalyze,
   canRecordBidDecision = false,
+  canConvertToProject = false,
+  convertToProjectReady = false,
   hooks,
 }: ProposalWorkspaceProps) {
   const { t } = useTranslation()
@@ -324,6 +336,7 @@ export function ProposalWorkspace({
     useUpsertProposalComplianceRequirement,
     useCreateProposalIntegrationIntent,
     useRecordProposalBidDecision,
+    useConvertProposalToProject,
   } = hooks
 
   // ── Data queries ──────────────────────────────────────────────────────────────
@@ -451,6 +464,7 @@ export function ProposalWorkspace({
   const upsertCompliance = useUpsertProposalComplianceRequirement()
   const createIntent = useCreateProposalIntegrationIntent()
   const recordBidDecision = useRecordProposalBidDecision()
+  const convertToProject = useConvertProposalToProject()
   const { askForm, formDialog } = useFormDialog()
 
   const libraryTemplates = useMemo(
@@ -700,6 +714,74 @@ export function ProposalWorkspace({
     }
   }, [askForm, proposalIdBig, recordBidDecision, t])
 
+  const handleConvertToProject = useCallback(async () => {
+    const title = t("proposalWorkspace.convertToProject.title", { defaultValue: "Convert to project" })
+    const values = await askForm({
+      title,
+      description: t("proposalWorkspace.convertToProject.description", {
+        defaultValue: "Creates a project from this awarded proposal. A proposal can only be converted once.",
+      }),
+      fields: [
+        {
+          id: "billType",
+          name: "billType",
+          label: t("proposalWorkspace.convertToProject.billType", { defaultValue: "Billing" }),
+          type: "select",
+          required: true,
+          defaultValue: "customer_task",
+          width: "1/2",
+          options: PROJECT_BILL_TYPES.map((value) => ({
+            value,
+            label: t(`proposalWorkspace.convertToProject.billTypes.${value}`, {
+              defaultValue: { customer_task: "Billed by task", customer_project: "Billed by project", no: "Not billable" }[value],
+            }),
+          })),
+        },
+        {
+          id: "pricingType",
+          name: "pricingType",
+          label: t("proposalWorkspace.convertToProject.pricingType", { defaultValue: "Pricing" }),
+          type: "select",
+          required: true,
+          defaultValue: "task_rate",
+          width: "1/2",
+          options: PROJECT_PRICING_TYPES.map((value) => ({
+            value,
+            label: t(`proposalWorkspace.convertToProject.pricingTypes.${value}`, {
+              defaultValue: { task_rate: "Task rate", fixed_rate: "Fixed rate", employee_rate: "Employee rate" }[value],
+            }),
+          })),
+        },
+      ],
+    })
+    if (values == null) return
+    const failed = t("proposalWorkspace.convertToProject.failed", { defaultValue: "Convert to project failed" })
+    const input = parseProjectConversionInput(values)
+    if (input == null) {
+      showWorkflowToast({
+        kind: "error",
+        title: failed,
+        description: t("proposalWorkspace.convertToProject.invalid", {
+          defaultValue: "Choose a billing type and a pricing type.",
+        }),
+      })
+      return
+    }
+    try {
+      await convertToProject.mutateAsync({ proposalId: proposalIdBig, ...input })
+      showWorkflowToast({
+        kind: "success",
+        title: t("proposalWorkspace.convertToProject.done", { defaultValue: "Project created from proposal" }),
+      })
+    } catch (error) {
+      showWorkflowToast({
+        kind: "error",
+        title: failed,
+        description: error instanceof Error ? error.message : String(error),
+      })
+    }
+  }, [askForm, convertToProject, proposalIdBig, t])
+
   const handleSaveVersion = useCallback((message: string) => {
     saveVersion.mutate({ proposalId: proposalIdBig, message })
   }, [proposalIdBig, saveVersion])
@@ -861,6 +943,25 @@ export function ProposalWorkspace({
                 onClick={() => void handleRecordBidDecision()}
               >
                 {t("proposalWorkspace.bidDecision.button", { defaultValue: "Bid / no bid" })}
+              </Button>
+            ) : null}
+
+            {canConvertToProject ? (
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={!convertToProjectReady || convertToProject.isPending || proposalIdBig === 0n}
+                title={
+                  convertToProjectReady
+                    ? undefined
+                    : t("proposalWorkspace.convertToProject.unavailable", {
+                        defaultValue: "Only an awarded proposal without a project can be converted.",
+                      })
+                }
+                data-testid="proposal-convert-to-project"
+                onClick={() => void handleConvertToProject()}
+              >
+                {t("proposalWorkspace.convertToProject.button", { defaultValue: "Convert to project" })}
               </Button>
             ) : null}
 

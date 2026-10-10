@@ -751,7 +751,16 @@
         "deprecate": "Deprecate account",
         "deprecateConfirm": "Deprecated accounts are marked as retired. You can reactivate the account later.",
         "noCompany": "No company is available for this account.",
-        "reactivate": "Reactivate account"
+        "reactivate": "Reactivate account",
+        "edit": "Edit account"
+      },
+      "edit": {
+        "deprecated": "Deprecated",
+        "internalType": "Account type",
+        "invalid": "Enter a code and a name.",
+        "note": "Note",
+        "reconcile": "Allow reconciliation",
+        "unchanged": "Nothing to change."
       }
     },
     "glDrilldown": {
@@ -1451,7 +1460,10 @@
         "period": "Period",
         "rate": "Rate",
         "title": "Company exchange rates",
-        "type": "Type"
+        "type": "Type",
+        "invalid": "Choose a company, period and currency, and enter a rate above zero and an effective date.",
+        "set": "Add / update rate",
+        "setHint": "A company and period that already has a rate gets its rate, type and effective date updated."
       }
     },
     "states": {
@@ -2752,6 +2764,19 @@
       "row": "Row",
       "tab": "Imported lines",
       "validationError": "Validation"
+    },
+    "bankStatements": {
+      "actions": {
+        "currency": "Currency",
+        "edit": "Edit statement",
+        "editTab": "Edit",
+        "invalidEdit": "Enter valid balances and date.",
+        "invalidNew": "Choose a bank journal and a currency, and enter a valid opening balance.",
+        "new": "New statement",
+        "noBankJournal": "Create a bank journal first; statements are opened on bank journals.",
+        "postedLocked": "A posted statement can no longer be edited.",
+        "reference": "Reference"
+      }
     }
   },
   "crm": {
@@ -8592,7 +8617,18 @@
       "signatureRequested": "Requested",
       "signatures": "Signatures",
       "signatureStatus": "Status",
-      "signerCount": "Signers"
+      "signerCount": "Signers",
+      "requestSignature": "Request signature",
+      "requestSignatureDone": "Signature requested",
+      "requestSignatureHint": "Record the e-signature envelope created with your provider for this document.",
+      "requestSignatureTitle": "Request signature",
+      "signatureEnvelope": "Envelope ID",
+      "signatureEnvelopeRequired": "An envelope ID is required",
+      "signatureProvider": "Provider",
+      "signatureProviderRequired": "A provider is required",
+      "signatureSigners": "Signers (optional)",
+      "signatureSignersHint": "One e-mail address per line.",
+      "signatureSignersInvalid": "Enter valid e-mail addresses, one per line"
     },
     "knowledgeActions": {
       "categoryInvalid": "Enter a name, a colour from 0 to 11 and a whole-number sequence.",
@@ -8916,7 +8952,28 @@
       "actions": {
         "activate": "Activate plan",
         "deactivate": "Deactivate plan",
-        "deactivateConfirm": "Deactivating a plan also unpublishes it, so it can no longer be chosen for new subscriptions."
+        "deactivateConfirm": "Deactivating a plan also unpublishes it, so it can no longer be chosen for new subscriptions.",
+        "edit": "Edit plan",
+        "failed": "{{action}} failed",
+        "newBundle": "New bundle"
+      },
+      "bundle": {
+        "invalid": "Choose a plan and enter a name and a code.",
+        "plan": "Plan"
+      },
+      "edit": {
+        "description": "Description",
+        "invalidBillingPeriod": "Choose a billing period: day, week, month or year.",
+        "invalidBillingPeriodUnit": "The billing interval must be a whole number of at least 1.",
+        "invalidCode": "A plan code cannot be blank.",
+        "invalidInvoiceDay": "The invoice day must be a whole number from 1 to 28.",
+        "invalidName": "Enter a plan name.",
+        "invalidPaymentMode": "Choose a payment mode: draft invoice or automated payment.",
+        "invalidTrialDuration": "The trial duration must be a whole number of 0 or more.",
+        "isPublished": "Published",
+        "paymentMode": "Payment mode",
+        "recurringInvoiceDay": "Invoice day (1-28)",
+        "unchanged": "Nothing to change."
       }
     },
     "deferredSchedules": {
@@ -9371,6 +9428,15 @@
       "moreInList": "More actions",
       "moreInListHint": "Close, invoice, amend, renew and the other actions that ask for details are in the list.",
       "moreActions": "More"
+    },
+    "paymentIntent": {
+      "amount": "Amount",
+      "create": "Create payment intent",
+      "currency": "Currency",
+      "failed": "Create payment intent failed",
+      "intentType": "Intent type",
+      "invalid": "Choose an intent type and a currency, and enter an amount above zero (and a valid invoice move ID, if any).",
+      "invoiceMoveId": "Invoice move ID (optional)"
     }
   },
   "expenses": {
@@ -12477,6 +12543,17 @@
       "noBid": "No bid",
       "rationale": "Rationale",
       "title": "Record bid decision"
+    },
+    "convertToProject": {
+      "billType": "Billing",
+      "button": "Convert to project",
+      "description": "Creates a project from this awarded proposal. A proposal can only be converted once.",
+      "done": "Project created from proposal",
+      "failed": "Convert to project failed",
+      "invalid": "Choose a billing type and a pricing type.",
+      "pricingType": "Pricing",
+      "title": "Convert to project",
+      "unavailable": "Only an awarded proposal without a project can be converted."
     }
   },
   "forensics": {
