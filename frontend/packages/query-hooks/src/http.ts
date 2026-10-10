@@ -3,7 +3,7 @@
  */
 "use client"
 
-import type { QueryRows } from "@lumiere/api-client"
+import type { QueryResourceState, QueryRows } from "@lumiere/api-client"
 import { getLumiereApiClientOrThrow } from "@lumiere/api-client"
 import type { QueryResourceKey } from "@lumiere/stdb/generated/query-registry"
 import type { QueryRowFor } from "@lumiere/stdb/query-row-map"
@@ -38,6 +38,18 @@ export async function fetchQueryListAllowEmpty<K extends QueryResourceKey>(
 export async function fetchQueryListAllowEmpty(path: string): Promise<QueryRows>
 export async function fetchQueryListAllowEmpty(path: string): Promise<QueryRows> {
   return getLumiereApiClientOrThrow().fetchQueryListAllowEmpty(path)
+}
+
+export async function fetchQueryListState<K extends QueryResourceKey>(
+  path: `/api/query/${K}`,
+): Promise<QueryResourceState<QueryRowFor<K>>>
+export async function fetchQueryListState(
+  path: string,
+): Promise<QueryResourceState<Record<string, unknown>>>
+export async function fetchQueryListState(
+  path: string,
+): Promise<QueryResourceState<Record<string, unknown>>> {
+  return getLumiereApiClientOrThrow().fetchQueryListState(path)
 }
 
 /** React Query hashes keys with JSON.stringify — BigInt is not JSON-serializable. */

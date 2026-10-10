@@ -248,15 +248,22 @@ pub async fn resolve_api_session(
     cookie_token: Option<&str>,
     x_std_identity: Option<&str>,
 ) -> Result<Option<ApiSession>, ApiError> {
-    // Dev mock: DEV_MOCK_ORG_ID + STDB_SERVER_TOKEN (local dev only — never in production).
-    if !runtime_is_production() {
+    // A supplied credential always identifies the interactive actor, even in
+    // local mock mode. Never replace an invalid or denied browser credential
+    // with the server's privileged token.
+    let supplied_credentials = authorization.is_some() || cookie_token.is_some();
+    // Dev mock is an anonymous local-development fallback only.
+    if !supplied_credentials && !runtime_is_production() {
         if let (Some(org), Some(tok)) = (
             state.config.dev_mock_org_id,
             state.config.stdb_server_token.as_deref(),
         ) {
             if !tok.is_empty() {
                 let client = state.client_with_token(tok);
-                let identity_hex = "dev-mock-identity".to_string();
+                let identity_hex = client
+                    .authenticated_identity()
+                    .await
+                    .map_err(|_| ApiError::Unauthorized)?;
                 let fa = load_field_access_context(&client, &identity_hex, org)
                     .await
                     .ok()
@@ -273,9 +280,11 @@ pub async fn resolve_api_session(
 
     let mut token: Option<String> = None;
     if let Some(a) = authorization {
-        if let Some(rest) = a.strip_prefix("Bearer ") {
-            token = Some(rest.trim().to_string());
+        let rest = a.strip_prefix("Bearer ").ok_or(ApiError::Unauthorized)?;
+        if rest.trim().is_empty() {
+            return Err(ApiError::Unauthorized);
         }
+        token = Some(rest.trim().to_string());
     }
     if token.is_none() {
         if let Some(c) = cookie_token {
@@ -374,5 +383,70 @@ mod tests {
             .await
             .expect("resolve should not error");
         assert!(session.is_none());
+    }
+
+    #[tokio::test]
+    async fn explicit_invalid_credentials_never_use_mock_authority() {
+        let mut config = test_config(Some("owner-token"));
+        config.dev_mock_org_id = Some(1);
+        let state = AppState::new(config);
+        for header in ["Basic credential", "Bearer ", ""] {
+            let result =
+                resolve_api_session(&state, Some(header), Some("cookie-token"), None).await;
+            assert!(matches!(result, Err(ApiError::Unauthorized)));
+        }
+        assert!(resolve_api_session(&state, None, Some(""), None)
+            .await
+            .expect("empty cookie is anonymous, not mock")
+            .is_none());
+    }
+
+    #[tokio::test]
+    async fn supplied_actor_token_wins_over_mock_and_identity_hint() {
+        use axum::{extract::State, http::HeaderMap, routing::post, Router};
+        use std::sync::{Arc, Mutex};
+        let observed = Arc::new(Mutex::new(Vec::<String>::new()));
+        async fn reject_probe(
+            State(observed): State<Arc<Mutex<Vec<String>>>>,
+            headers: HeaderMap,
+        ) -> axum::http::StatusCode {
+            observed.lock().unwrap().push(
+                headers
+                    .get("authorization")
+                    .unwrap()
+                    .to_str()
+                    .unwrap()
+                    .to_string(),
+            );
+            axum::http::StatusCode::UNAUTHORIZED
+        }
+        let listener = tokio::net::TcpListener::bind(("127.0.0.1", 0))
+            .await
+            .unwrap();
+        let address = listener.local_addr().unwrap();
+        let app = Router::new()
+            .route("/v1/database/test-module/sql", post(reject_probe))
+            .with_state(observed.clone());
+        let server = tokio::spawn(async move {
+            axum::serve(listener, app).await.unwrap();
+        });
+        let mut config = test_config(Some("owner-token"));
+        config.stdb_host = format!("http://{address}");
+        config.dev_mock_org_id = Some(1);
+        let state = AppState::new(config);
+        for (header, cookie) in [
+            (Some("Bearer reader-token"), Some("different-cookie-token")),
+            (None, Some("reader-token")),
+        ] {
+            assert!(matches!(
+                resolve_api_session(&state, header, cookie, Some(&"aa".repeat(32))).await,
+                Err(ApiError::Unauthorized)
+            ));
+        }
+        server.abort();
+        assert_eq!(
+            *observed.lock().unwrap(),
+            ["Bearer reader-token", "Bearer reader-token"]
+        );
     }
 }

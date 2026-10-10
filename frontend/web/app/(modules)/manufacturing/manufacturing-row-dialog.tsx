@@ -23,13 +23,9 @@ export interface ManufacturingRowDialogProps {
   row: Record<string, unknown> | null;
   workcenters: QueryRows;
   iotDevices: QueryRows;
+  iotReferenceStatus?: string;
   qualityChecks: QualityCheck[];
   productOptions: Array<{ value: string; label: string; disabled?: boolean }>;
-  scrapLocationOptions: Array<{
-    value: string;
-    label: string;
-    disabled?: boolean;
-  }>;
   mutations: ManufacturingMutations;
   t: TFunction;
 }
@@ -60,9 +56,9 @@ export function ManufacturingRowDialog({
   row,
   workcenters,
   iotDevices,
+  iotReferenceStatus,
   qualityChecks,
   productOptions,
-  scrapLocationOptions,
   mutations,
   t,
 }: ManufacturingRowDialogProps) {
@@ -87,6 +83,9 @@ export function ManufacturingRowDialog({
   )
 
   const iotDeviceOptions = useMemo(() => {
+    if (iotReferenceStatus) {
+      return [{ value: "", label: `IoT devices: ${iotReferenceStatus}`, disabled: true as const }]
+    }
     const sorted = [...iotDevices].sort((a, b) =>
       String(a.name ?? "").localeCompare(String(b.name ?? "")),
     )
@@ -100,7 +99,7 @@ export function ManufacturingRowDialog({
       .filter((o) => o.value !== "")
     if (opts.length > 0) return opts
     return [{ value: "", label: t("manufacturing.rowActions.noIotDevices"), disabled: true as const }]
-  }, [iotDevices, t])
+  }, [iotDevices, iotReferenceStatus, t])
 
   const linkedDeviceIdForWc = useMemo(() => {
     if (!row || entity !== "workcenters") return ""
@@ -124,7 +123,6 @@ export function ManufacturingRowDialog({
         state,
         defaultProduceQty,
         workcenterOptions,
-        scrapLocationOptions,
       });
     }
     if (entity === "boms") {
@@ -170,7 +168,6 @@ export function ManufacturingRowDialog({
     linkedDeviceIdForWc,
     qualityChecks,
     productOptions,
-    scrapLocationOptions,
   ]);
 
   if (!formConfig || !tabId) return null

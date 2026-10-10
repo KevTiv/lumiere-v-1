@@ -1,13 +1,12 @@
 import { Suspense } from "react"
 import { getStdbSession } from "@/lib/api-session"
-import { serverFetchQueryListsAllowEmpty } from "@/lib/server-query"
+import { serverFetchQueryListState, serverFetchQueryListsRequired } from "@/lib/server-query"
 import { PurchasingClient } from "./purchasing-client"
 
 const SSR_RESOURCES = [
   "purchase-orders",
   "purchase-order-lines",
   "purchase-requisitions",
-  "contacts",
   "pricelists",
   "products",
   "uoms",
@@ -21,17 +20,20 @@ export default async function PurchasingPage() {
     return <PurchasingClient />
   }
 
+  const [records, contactsState] = await Promise.all([
+    serverFetchQueryListsRequired(session, SSR_RESOURCES),
+    serverFetchQueryListState(session, "contacts"),
+  ])
   const [
     orders,
     lines,
     requisitions,
-    contacts,
     pricelists,
     products,
     uoms,
     partnerBanks,
     departments,
-  ] = await serverFetchQueryListsAllowEmpty(session, SSR_RESOURCES)
+  ] = records
 
   return (
     <Suspense>
@@ -39,7 +41,7 @@ export default async function PurchasingPage() {
         initialOrders={orders}
         initialLines={lines}
         initialRequisitions={requisitions}
-        initialContacts={contacts}
+        initialContactsState={contactsState}
         initialPricelists={pricelists}
         initialProducts={products}
         initialUoms={uoms}

@@ -15,6 +15,7 @@ use crate::core::persistence::{
 use crate::core::reference::currency;
 use crate::core::users::{user_organization, user_profile};
 use crate::crm::activities::activity_type;
+use crate::forms::migrations::seed_organization_form_configs;
 use crate::forms::{form_config, form_config_field, form_field_label, form_role_config};
 use crate::hr::country_pack_hr::hr_country_pack_leave_default;
 
@@ -109,6 +110,83 @@ pub fn test_bootstrap_new_tenant_records_complete_commit(
         .iter()
         .find(|row| row.code == code)
         .ok_or("bootstrap organization missing")?;
+    for (module_id, form_id, expected_fields) in [
+        ("sales", "add-sale-order-line", 9),
+        ("purchasing", "add-purchase-order-line", 5),
+        ("sales", "create-invoice-from-sale-order", 9),
+        ("purchasing", "create-bill-from-purchase-order", 10),
+    ] {
+        let configs: Vec<_> = ctx
+            .db
+            .form_config()
+            .iter()
+            .filter(|row| {
+                row.organization_id == org.id
+                    && row.module_id == module_id
+                    && row.form_id == form_id
+            })
+            .collect();
+        if configs.len() != 1 || !configs[0].is_active || configs[0].config_version != 1 {
+            return Err(format!(
+                "bootstrap must publish one active {module_id}/{form_id}"
+            ));
+        }
+        let config = &configs[0];
+        let fields: Vec<_> = ctx
+            .db
+            .form_config_field()
+            .iter()
+            .filter(|row| row.configuration_id == config.id)
+            .collect();
+        if fields.len() != expected_fields
+            || fields
+                .iter()
+                .any(|row| row.organization_id != org.id || !row.is_enabled || !row.is_system)
+        {
+            return Err(format!(
+                "bootstrap field graph invalid for {module_id}/{form_id}"
+            ));
+        }
+        let publications: Vec<_> = ctx
+            .db
+            .organization_commit()
+            .iter()
+            .filter(|row| {
+                row.organization_id == org.id
+                    && row.operation_id == "erp.publish_form_configuration"
+                    && row.correlation_id
+                        == format!("form:{module_id}/{form_id}:config:{}", config.id)
+            })
+            .collect();
+        if publications.len() != 1 {
+            return Err(format!(
+                "missing canonical publication for {module_id}/{form_id}"
+            ));
+        }
+    }
+    let form_count = ctx
+        .db
+        .form_config()
+        .iter()
+        .filter(|row| row.organization_id == org.id)
+        .count();
+    let field_count = ctx
+        .db
+        .form_config_field()
+        .iter()
+        .filter(|row| row.organization_id == org.id)
+        .count();
+    let role_count = ctx
+        .db
+        .form_role_config()
+        .iter()
+        .filter(|row| row.organization_id == org.id)
+        .count();
+    if (form_count, field_count, role_count) != (5, 41, 5) {
+        return Err(format!(
+            "bootstrap form graph mismatch: {form_count} configs/{field_count} fields/{role_count} roles"
+        ));
+    }
     let expected_correlation = format!("bootstrap:organization:{}", org.id);
     let commits: Vec<_> = ctx
         .db
@@ -170,11 +248,13 @@ pub fn test_bootstrap_new_tenant_records_complete_commit(
         "user_organization",
         "user_role_assignment",
     ]);
-    expected_tables.push("form_config");
-    for _ in 0..8 {
+    for _ in 0..form_count {
+        expected_tables.push("form_config");
+    }
+    for _ in 0..field_count {
         expected_tables.push("form_config_field");
     }
-    for _ in 0..5 {
+    for _ in 0..role_count {
         expected_tables.push("form_role_config");
     }
     let actual_tables: Vec<_> = changes
@@ -440,6 +520,116 @@ pub fn test_bootstrap_new_tenant_records_complete_commit(
                 , expected.row_json
             ));
         }
+    }
+
+    // Existing-organization provisioning must be a no-op, including after a
+    // deliberate operator edit/deactivation. Never republish defaults over policy.
+    let invoice = ctx
+        .db
+        .form_config()
+        .iter()
+        .find(|row| {
+            row.organization_id == org.id
+                && row.module_id == "sales"
+                && row.form_id == "create-invoice-from-sale-order"
+        })
+        .ok_or("invoice form missing")?;
+    let invoice_id = invoice.id;
+    ctx.db.form_config().id().update(crate::forms::FormConfig {
+        name: "Operator governed invoice form".to_string(),
+        is_active: false,
+        config_version: 7,
+        ..invoice
+    });
+    let commit_count = ctx
+        .db
+        .organization_commit()
+        .iter()
+        .filter(|row| row.organization_id == org.id)
+        .count();
+    seed_organization_form_configs(ctx, org.id)?;
+    seed_organization_form_configs(ctx, org.id)?;
+    let preserved = ctx
+        .db
+        .form_config()
+        .id()
+        .find(&invoice_id)
+        .ok_or("seed replaced form")?;
+    if preserved.name != "Operator governed invoice form"
+        || preserved.is_active
+        || preserved.config_version != 7
+        || ctx
+            .db
+            .organization_commit()
+            .iter()
+            .filter(|row| row.organization_id == org.id)
+            .count()
+            != commit_count
+        || ctx
+            .db
+            .form_config()
+            .iter()
+            .filter(|row| row.organization_id == org.id)
+            .count()
+            != 5
+    {
+        return Err("form seed replay overwrote governance or emitted another effect".to_string());
+    }
+    let duplicate = ctx
+        .db
+        .form_config()
+        .insert(crate::forms::FormConfig { id: 0, ..preserved });
+    let rejected = seed_organization_form_configs(ctx, org.id);
+    ctx.db.form_config().id().delete(&duplicate.id);
+    if rejected.is_ok() {
+        return Err("duplicate governed form identity must fail provisioning".to_string());
+    }
+    let bill = ctx
+        .db
+        .form_config()
+        .iter()
+        .find(|row| {
+            row.organization_id == org.id
+                && row.module_id == "purchasing"
+                && row.form_id == "create-bill-from-purchase-order"
+        })
+        .ok_or("bill form missing")?;
+    let bill_id = bill.id;
+    ctx.db.form_config().id().update(crate::forms::FormConfig {
+        name: "Operator governed bill form".to_string(),
+        is_active: false,
+        config_version: 7,
+        ..bill
+    });
+    seed_organization_form_configs(ctx, org.id)?;
+    seed_organization_form_configs(ctx, org.id)?;
+    let preserved_bill = ctx
+        .db
+        .form_config()
+        .id()
+        .find(&bill_id)
+        .ok_or("seed replaced bill form")?;
+    if preserved_bill.name != "Operator governed bill form"
+        || preserved_bill.is_active
+        || preserved_bill.config_version != 7
+        || ctx
+            .db
+            .organization_commit()
+            .iter()
+            .filter(|row| row.organization_id == org.id)
+            .count()
+            != commit_count
+    {
+        return Err("bill seed replay overwrote governance or emitted another effect".to_string());
+    }
+    let duplicate_bill = ctx.db.form_config().insert(crate::forms::FormConfig {
+        id: 0,
+        ..preserved_bill
+    });
+    let rejected_bill = seed_organization_form_configs(ctx, org.id);
+    ctx.db.form_config().id().delete(&duplicate_bill.id);
+    if rejected_bill.is_ok() {
+        return Err("duplicate governed bill identity must fail provisioning".to_string());
     }
     Ok(())
 }

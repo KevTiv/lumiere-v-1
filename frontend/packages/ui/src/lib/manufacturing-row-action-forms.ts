@@ -47,11 +47,6 @@ export interface ManufacturingOrderRowFormParams {
     label: string;
     disabled?: boolean;
   }>;
-  scrapLocationOptions: Array<{
-    value: string;
-    label: string;
-    disabled?: boolean;
-  }>;
 }
 
 export function manufacturingOrderRowActionForm(
@@ -123,11 +118,14 @@ export function manufacturingOrderRowActionForm(
             visibleWhen: { field: 'moAction', equals: 'produce' },
           },
           {
-            type: 'select',
+            // The accepted default location read omits the scrap designation.
+            // Explicit identity is validated by the canonical scrap reducer.
+            type: 'number',
             id: 'scrapLocationId',
             name: 'scrapLocationId',
             label: t('manufacturing.rowActions.form.scrapLocation'),
-            options: p.scrapLocationOptions,
+            min: 1,
+            step: 1,
             width: '1/2',
             visibleWhen: { field: 'moAction', equals: 'scrap_output' },
           },

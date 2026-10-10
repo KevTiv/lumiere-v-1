@@ -259,7 +259,7 @@ function ErpAiChatPanel(props: Omit<ComponentProps<typeof AIChatPanel>, "onSendM
         const draftResponse = await actionDraft.mutateAsync({
           companyId: operatingCompanyId,
           query: userText,
-          ui_context: uiContext as Parameters<typeof actionDraft.mutateAsync>[0]["ui_context"],
+          uiContext: uiContext as Parameters<typeof actionDraft.mutateAsync>[0]["uiContext"],
         })
         const gatewayDrafts = draftResponse.drafts ?? []
         if (gatewayDrafts.length === 0) return []

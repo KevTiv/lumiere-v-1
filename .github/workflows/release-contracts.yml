@@ -24,6 +24,7 @@ on:
       - crates/presentation-core/**
       - lumiere-codegen/**
       - crates/stdb-auth/assets/resource_registry.json
+      - .github/workflows/build-contracts-module.yml
       - .github/workflows/release-contracts.yml
   workflow_dispatch:
     inputs:
@@ -56,7 +57,11 @@ env:
   CONTRACTS_REMOTE: git@github.com:KevTiv/lumiere-contracts.git
 
 jobs:
+  contracts-module:
+    uses: ./.github/workflows/build-contracts-module.yml
+
   release:
+    needs: contracts-module
     runs-on: ubuntu-latest
     steps:
       # The branch head, not the triggering commit: a queued run releases the
@@ -67,8 +72,6 @@ jobs:
           fetch-depth: 0
 
       - uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: wasm32-unknown-unknown
 
       # A dedicated write key is preferred; the shared deploy key is used when
       # no publish key is configured.
@@ -138,25 +141,20 @@ jobs:
           print(f"pinned v{previous}, highest published v{highest}; next v{version}")
           PY
 
-      # Same key as the CI contracts job, so a module CI already compiled for
-      # these sources is reused instead of rebuilt.
-      - name: Restore compiled contracts module
-        id: contracts-module
-        uses: actions/cache@v4
-        with:
-          path: .ci/contracts-module.wasm
-          key: contracts-module-v1-${{ runner.os }}-${{ hashFiles('spacetimedb/src/**', 'spacetimedb/assets/**', 'spacetimedb/Cargo.toml', 'spacetimedb/Cargo.lock', 'crates/presentation-core/src/**', 'crates/presentation-core/Cargo.toml') }}
-
       - uses: Swatinem/rust-cache@v2
         with:
-          workspaces: |
-            spacetimedb
-            .
+          workspaces: .
           cache-on-failure: true
 
       - uses: ./.github/actions/setup-spacetime-cli
         with:
           version: ${{ env.SPACETIME_CLI_VERSION }}
+
+      - name: Download compiled contracts module
+        uses: actions/download-artifact@v4
+        with:
+          name: contracts-module
+          path: .ci
 
       - name: Start standalone SpacetimeDB
         run: |
@@ -169,13 +167,6 @@ jobs:
           done
           cat /tmp/lumiere-release-stdb.log
           exit 1
-
-      - name: Build contracts module (ci-contracts profile)
-        if: steps.contracts-module.outputs.cache-hit != 'true'
-        run: |
-          cargo build --manifest-path spacetimedb/Cargo.toml --target wasm32-unknown-unknown --profile ci-contracts
-          mkdir -p .ci
-          cp spacetimedb/target/wasm32-unknown-unknown/ci-contracts/lumiere_v1.wasm .ci/contracts-module.wasm
 
       - name: Publish module
         run: |
@@ -192,8 +183,17 @@ jobs:
           CHECKOUT="$(bash scripts/resolve-pinned-contracts.sh)"
           if python3 scripts/verify-contract-ir.py .contracts-staging/ir/lumiere-contract-ir-v2.json \
               --expect-schema-hash-from "$CHECKOUT/ir/lumiere-contract-ir-v2.json" >/dev/null 2>&1; then
-            echo "Generated contracts match v$PREVIOUS_VERSION; nothing to release."
-            echo "release=false" >> "$GITHUB_OUTPUT"
+            # The IR hash does not cover the durable PostgreSQL migrations, which
+            # are generated from the same sources (and the migration ledger), so a
+            # change there is a release on its own.
+            if diff -rq "$CHECKOUT/manifests/pg_ddl/migrations" .contracts-staging/manifests/pg_ddl/migrations >/dev/null 2>&1 \
+                && cmp -s "$CHECKOUT/manifests/durable-pg-schema-manifest.json" .contracts-staging/manifests/durable-pg-schema-manifest.json; then
+              echo "Generated contracts match v$PREVIOUS_VERSION; nothing to release."
+              echo "release=false" >> "$GITHUB_OUTPUT"
+            else
+              echo "IR matches v$PREVIOUS_VERSION but the durable PostgreSQL migrations differ; releasing."
+              echo "release=true" >> "$GITHUB_OUTPUT"
+            fi
           else
             echo "release=true" >> "$GITHUB_OUTPUT"
           fi
@@ -268,8 +268,6 @@ jobs:
       - name: Commit regenerated sources
         if: steps.changes.outputs.release == 'true'
         run: |
-          # The compiled module in .ci/ is a build output, never source.
-          echo '/.ci/' >> .git/info/exclude
           git add -A
           git status --short
           if ! git diff --cached --quiet; then
@@ -298,6 +296,25 @@ jobs:
           python3 scripts/verify-operation-history.py
           python3 scripts/verify-contract-ir.py .contracts-staging/ir/lumiere-contract-ir-v2.json --require-clean
 
+      # api-server consumes durable follow-up migrations from the migration
+      # ledger. A pending one has no catalog entry, so publishing it would fail
+      # every database's startup verification; stop before anything is published.
+      - name: Require promoted durable migrations
+        if: steps.changes.outputs.release == 'true'
+        run: |
+          python3 - <<'PY'
+          import json
+          import sys
+
+          manifest = json.load(open(".contracts-staging/manifests/durable-pg-schema-manifest.json", encoding="utf-8"))
+          pending = [entry["name"] for entry in manifest.get("migrations", []) if entry.get("state") != "released"]
+          if pending:
+              sys.exit(
+                  "Durable PostgreSQL migrations must be promoted into lumiere-codegen/pg-migration-ledger "
+                  "and added to the api-server catalog before release: " + ", ".join(pending)
+              )
+          PY
+
       # The presentation contract generator imports frontend dev dependencies
       # (json-schema-to-typescript).
       - uses: ./.github/actions/setup-frontend
@@ -308,12 +325,30 @@ jobs:
         working-directory: frontend
         run: pnpm install --frozen-lockfile
 
+      - name: Restore contract release npm cache
+        if: steps.changes.outputs.release == 'true'
+        uses: actions/cache@v4
+        with:
+          path: target/contracts-release/npm-cache
+          key: contracts-release-npm-v1-${{ runner.os }}-${{ hashFiles('release-compatibility-manifest.json') }}
+          restore-keys: |
+            contracts-release-npm-v1-${{ runner.os }}-
+
+      # The generation passes emit only the presentation schemas, but the
+      # publisher also requires the TypeScript contracts. They need only node and
+      # the frontend dependencies installed above.
+      - name: Generate presentation contracts
+        if: steps.changes.outputs.release == 'true'
+        run: make generate-presentation-contracts
+
       # Build and check the full candidate first; nothing remote changes if it fails.
       - name: Prepare contracts release
         if: steps.changes.outputs.release == 'true'
         env:
           LUMIERE_CONTRACTS_PREPARE_DIR: ${{ runner.temp }}/contracts-release
-        run: make publish-contracts VERSION="$VERSION"
+        # Pass 2 already rebuilt and verified the staging tree from the clean
+        # commit. Do not run the generation prerequisites for a third time.
+        run: make publish-contracts-prepared VERSION="$VERSION"
 
       - name: Publish contracts release
         if: steps.changes.outputs.release == 'true'

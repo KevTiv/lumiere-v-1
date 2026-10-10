@@ -53,6 +53,9 @@ struct QueueRow {
     company_id: Option<u64>,
     revision: u64,
     payload: String,
+    status: String,
+    #[serde(alias = "availableAt")]
+    available_at: Value,
     #[serde(default)]
     #[serde(alias = "leaseExpiresAt")]
     lease_expires_at: Option<Value>,
@@ -217,25 +220,27 @@ async fn process_batch(state: &AppState) -> anyhow::Result<usize> {
 
     let pending_rows = state
         .stdb
-        .query_sql(&format!(
-            "SELECT id, organization_id, company_id, revision, payload, lease_expires_at FROM queue_job \
-             WHERE queue_name = 'owner_report' AND job_type = 'owner_report.generate' \
-             AND status = 'Pending' ORDER BY available_at ASC, id ASC LIMIT {BATCH_SIZE}"
-        ))
+        .query_sql(
+            "SELECT id, organization_id, company_id, revision, payload, status, available_at, lease_expires_at FROM queue_job \
+             WHERE queue_name = 'owner_report' AND job_type = 'owner_report.generate'"
+        )
         .await?;
     let leased_rows = state
         .stdb
-        .query_sql(&format!(
-            "SELECT id, organization_id, company_id, revision, payload, lease_expires_at FROM queue_job \
-             WHERE queue_name = 'owner_report' AND job_type = 'owner_report.generate' \
-             AND status = 'Leased' AND lease_expires_at IS NOT NULL \
-             ORDER BY lease_expires_at ASC, id ASC LIMIT {RECOVERY_BATCH_SIZE}"
-        ))
+        .query_sql(
+            "SELECT id, organization_id, company_id, revision, payload, status, available_at, lease_expires_at FROM queue_job \
+             WHERE queue_name = 'owner_report' AND job_type = 'owner_report.generate'"
+        )
         .await?;
-    let pending_jobs = pending_rows
+    let mut pending_jobs = pending_rows
         .into_iter()
         .map(serde_json::from_value::<QueueRow>)
-        .collect::<Result<Vec<_>, _>>()?;
+        .collect::<Result<Vec<_>, _>>()?
+        .into_iter()
+        .filter(|job| job.status == "Pending")
+        .collect::<Vec<_>>();
+    pending_jobs.sort_by_key(|job| (timestamp_micros(&job.available_at), job.id));
+    pending_jobs.truncate(BATCH_SIZE);
     let recovery_jobs = leased_rows
         .into_iter()
         .map(serde_json::from_value::<QueueRow>)
@@ -757,11 +762,20 @@ fn validate_generated_artifact(
 
 fn select_expired_leased(mut rows: Vec<QueueRow>, now_micros: u64) -> Vec<QueueRow> {
     rows.retain(|row| {
-        row.lease_expires_at
-            .as_ref()
-            .and_then(timestamp_micros)
-            .is_some_and(|expires_at| expires_at <= now_micros)
+        row.status == "Leased"
+            && row
+                .lease_expires_at
+                .as_ref()
+                .and_then(timestamp_micros)
+                .is_some_and(|expires_at| expires_at <= now_micros)
     });
+    rows.sort_by_key(|row| {
+        (
+            row.lease_expires_at.as_ref().and_then(timestamp_micros),
+            row.id,
+        )
+    });
+    rows.truncate(RECOVERY_BATCH_SIZE);
     rows
 }
 
@@ -894,6 +908,8 @@ mod tests {
             company_id,
             revision: 4,
             payload: String::new(),
+            status: "Pending".into(),
+            available_at: json!({"microsSinceUnixEpoch": 0}),
             lease_expires_at: None,
         }
     }
@@ -972,21 +988,53 @@ mod tests {
 
     #[test]
     fn expired_leased_selection_excludes_future_and_missing_expiry() {
-        let expired = QueueRow {
+        let expired_later = QueueRow {
+            id: 102,
+            status: "Leased".into(),
             lease_expires_at: Some(json!({
                 "__timestamp_micros_since_unix_epoch__": 9_999
             })),
             ..queue_job(Some(11))
         };
+        let expired_earlier = QueueRow {
+            id: 100,
+            status: "Leased".into(),
+            lease_expires_at: Some(json!({
+                "__timestamp_micros_since_unix_epoch__": 9_000
+            })),
+            ..queue_job(Some(11))
+        };
         let future = QueueRow {
+            status: "Leased".into(),
             lease_expires_at: Some(json!({
                 "__timestamp_micros_since_unix_epoch__": 10_001
             })),
             ..queue_job(Some(11))
         };
-        let selected = select_expired_leased(vec![expired, future, queue_job(Some(11))], 10_000);
-        assert_eq!(selected.len(), 1);
-        assert_eq!(selected[0].id, 101);
+        let pending_with_expired_lease = QueueRow {
+            lease_expires_at: Some(json!({
+                "__timestamp_micros_since_unix_epoch__": 8_000
+            })),
+            ..queue_job(Some(11))
+        };
+        let missing_expiry = QueueRow {
+            status: "Leased".into(),
+            ..queue_job(Some(11))
+        };
+        let selected = select_expired_leased(
+            vec![
+                expired_later,
+                future,
+                pending_with_expired_lease,
+                missing_expiry,
+                expired_earlier,
+            ],
+            10_000,
+        );
+        assert_eq!(
+            selected.iter().map(|row| row.id).collect::<Vec<_>>(),
+            vec![100, 102]
+        );
     }
 
     #[test]

@@ -245,8 +245,15 @@ pub fn run(paths: &Paths) -> Result<()> {
         .keys()
         .map(String::as_str)
         .collect::<BTreeSet<_>>();
-    if identity_names != schema_names {
-        bail!("contract operation identities must exactly cover module reducers");
+    let missing_reducers = schema_names
+        .difference(&identity_names)
+        .copied()
+        .collect::<Vec<_>>();
+    if !missing_reducers.is_empty() {
+        bail!(
+            "contract operation identities are missing module reducers: {}",
+            missing_reducers.join(", ")
+        );
     }
     let mut identity_values = BTreeSet::new();
     for (name, id) in &identity_manifest.operations {
@@ -256,7 +263,7 @@ pub fn run(paths: &Paths) -> Result<()> {
                     .bytes()
                     .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'_')
         }) {
-            bail!("reducer {name} has invalid contract operation id {id}");
+            bail!("operation {name} has invalid contract operation id {id}");
         }
         if !identity_values.insert(id) {
             bail!("duplicate contract operation id {id}");

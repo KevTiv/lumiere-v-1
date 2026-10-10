@@ -159,6 +159,7 @@ test.describe("HR wave lifecycle e2e @hr", () => {
     const employeeId = await fetchFirstEmployeeId(page)
     const structId = await fetchPayrollStructureId(page)
 
+    const payslipTag = smokeName("hr-payslip-export")
     await callReducerBff(page, "create_payslip", [
       organizationId,
       {
@@ -169,18 +170,32 @@ test.describe("HR wave lifecycle e2e @hr", () => {
         date_to: { __timestamp_micros_since_unix_epoch__: (Date.now() + 30 * 86400) * 1000 },
         basic_wage: 4200,
         contract_id: none,
-        notes: none,
+        notes: some(payslipTag),
       },
     ])
 
     const payslipsRes = await page.request.get("/api/query/payslips")
-    const payslipId = Number(
-      ((await payslipsRes.json()) as { data?: Array<{ id?: number; employeeId?: number; employee_id?: number }> })
-        .data?.filter(
-          (p) => Number(p.employeeId ?? p.employee_id) === employeeId,
-        )
-        .sort((a, b) => Number(b.id) - Number(a.id))[0]?.id,
+    const payslipRows = (
+      (await payslipsRes.json()) as {
+        data?: Array<{
+          id?: unknown
+          employeeId?: unknown
+          employee_id?: unknown
+          notes?: unknown
+        }>
+      }
+    ).data ?? []
+    const matchingPayslips = payslipRows.filter(
+      (p) =>
+        scalarQueryId(p.employeeId ?? p.employee_id) === employeeId &&
+        String(p.notes ?? "") === payslipTag,
     )
+    if (matchingPayslips.length !== 1) {
+      throw new Error(
+        `expected one payslip for employee ${employeeId} and tag ${payslipTag}, found ${matchingPayslips.length}`,
+      )
+    }
+    const payslipId = scalarQueryId(matchingPayslips[0]?.id) ?? 0
     expect(payslipId).toBeGreaterThan(0)
 
     await callReducerBff(page, "confirm_payslip", [
@@ -389,14 +404,18 @@ test.describe("HR-008 employee → contract → payslip lifecycle @hr @p0", () =
             notes?: string
           }>
         }
-        const row = (json.data ?? [])
-          .filter(
+        const matches = (json.data ?? []).filter(
             (p) =>
               scalarQueryId(p.employeeId ?? p.employee_id) === employeeId &&
-              scalarQueryId(p.contractId ?? p.contract_id) === contractId,
+              scalarQueryId(p.contractId ?? p.contract_id) === contractId &&
+              String(p.notes ?? "") === payslipTag,
           )
-          .sort((a, b) => (scalarQueryId(b.id) ?? 0) - (scalarQueryId(a.id) ?? 0))[0]
-        payslipId = scalarQueryId(row?.id) ?? 0
+        if (matches.length > 1) {
+          throw new Error(
+            `expected one payslip for contract ${contractId} and tag ${payslipTag}, found ${matches.length}`,
+          )
+        }
+        payslipId = scalarQueryId(matches[0]?.id) ?? 0
         return payslipId
       }, { timeout: 45_000 })
       .toBeGreaterThan(0)

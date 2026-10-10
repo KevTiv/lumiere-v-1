@@ -17,6 +17,8 @@ export async function companyIdBelongsToOrganization(
     }
     return false
   } catch {
+    // Degraded-safe classification: uncertainty denies the scoped operation.
+    // This helper never uses read failure as permission to continue.
     return false
   }
 }

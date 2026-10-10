@@ -30,10 +30,12 @@ import { useAiActionDraftInboxCount } from "@lumiere/query-hooks/hooks/ai-action
 import { useOperatingCompanyId } from "@lumiere/query-hooks/hooks/use-operating-company"
 import { useMessageBatches } from "@lumiere/query-hooks/hooks/messages"
 import { OwnerControlLoop } from "./owner-control-loop"
+import { overviewResourceStatus, resourceStatusLabel, combinedResourceStatus, type OverviewInitialStates } from "./resource-state"
 import type { StockQuant, Product } from "@lumiere/stdb/types"
 
 interface OverviewClientProps {
   organizationId?: number
+  initialResourceStates?: OverviewInitialStates
   initialOrders?: SaleOrder[]
   initialStockQuants?: StockQuant[]
   initialProducts?: Product[]
@@ -123,6 +125,7 @@ export function OverviewClient(props: OverviewClientProps) {
 
 function OverviewClientLoaded({
   organizationId,
+  initialResourceStates,
   initialOrders,
   initialStockQuants,
   initialProducts,
@@ -136,21 +139,54 @@ function OverviewClientLoaded({
   const { orgId } = orgBigInts(organizationId)
   const operatingCompanyId = useOperatingCompanyId(organizationId)
 
-  const { data: orders = [], isLoading: ordersLoading } = useSaleOrders(orgId, initialOrders)
-  const { data: moves = [], isLoading: movesLoading } = useAccountMoves(orgId)
-  const { data: stockQuants = [], isLoading: stockQuantsLoading } = useStockQuants(orgId, initialStockQuants)
-  const { data: products = [], isLoading: productsLoading } = useProducts(orgId, initialProducts)
-  const { data: tasks = [], isLoading: tasksLoading } = useTasks(orgId, initialTasks)
-  const { isLoading: projectsLoading } = useProjects(orgId, initialProjects)
-  const { isLoading: purchaseOrdersLoading } = usePurchaseOrders(orgId, initialPurchaseOrders)
-  const { data: contacts = [], isLoading: contactsLoading } = useContacts(orgId, initialContacts)
-  const { data: paymentTransactions = [], isLoading: paymentTransactionsLoading } = usePaymentTransactions(orgId)
-  const { data: paymentReconciliations = [], isLoading: paymentReconciliationsLoading } = usePaymentReconciliations(orgId)
-  const { data: messageBatches = [], isLoading: messageBatchesLoading } = useMessageBatches(orgId)
-  const { count: pendingAiDrafts = 0, isLoading: aiDraftsLoading } = useAiActionDraftInboxCount(
+  const ordersQuery = useSaleOrders(orgId, initialOrders)
+  const movesQuery = useAccountMoves(orgId)
+  const stockQuantsQuery = useStockQuants(orgId, initialStockQuants)
+  const productsQuery = useProducts(orgId, initialProducts)
+  const tasksQuery = useTasks(orgId, initialTasks)
+  const projectsQuery = useProjects(orgId, initialProjects)
+  const purchaseOrdersQuery = usePurchaseOrders(orgId, initialPurchaseOrders)
+  const contactsQuery = useContacts(orgId, initialContacts)
+  const paymentTransactionsQuery = usePaymentTransactions(orgId)
+  const paymentReconciliationsQuery = usePaymentReconciliations(orgId)
+  const messageBatchesQuery = useMessageBatches(orgId)
+  const aiDraftsQuery = useAiActionDraftInboxCount(
     organizationId,
     operatingCompanyId != null && operatingCompanyId > 0,
   )
+  // Arrays are calculation inputs only; canonical statuses gate every displayed value.
+  const orders = ordersQuery.data ?? []
+  const moves = movesQuery.data ?? []
+  const stockQuants = stockQuantsQuery.data ?? []
+  const products = productsQuery.data ?? []
+  const tasks = tasksQuery.data ?? []
+  const contacts = contactsQuery.data ?? []
+  const paymentTransactions = paymentTransactionsQuery.data ?? []
+  const paymentReconciliations = paymentReconciliationsQuery.data ?? []
+  const messageBatches = messageBatchesQuery.data ?? []
+  const pendingAiDrafts = aiDraftsQuery.count
+  const resourceStates = {
+    "sale-orders": overviewResourceStatus(ordersQuery, initialResourceStates?.["sale-orders"]),
+    "account-moves": overviewResourceStatus(movesQuery),
+    "stock-quants": overviewResourceStatus(stockQuantsQuery, initialResourceStates?.["stock-quants"]),
+    products: overviewResourceStatus(productsQuery, initialResourceStates?.products),
+    tasks: overviewResourceStatus(tasksQuery, initialResourceStates?.tasks),
+    projects: overviewResourceStatus(projectsQuery, initialResourceStates?.projects),
+    "purchase-orders": overviewResourceStatus(purchaseOrdersQuery, initialResourceStates?.["purchase-orders"]),
+    contacts: overviewResourceStatus(contactsQuery, initialResourceStates?.contacts),
+    "payment-transactions": overviewResourceStatus(paymentTransactionsQuery),
+    "payment-reconciliations": overviewResourceStatus(paymentReconciliationsQuery),
+    "message-batches": overviewResourceStatus(messageBatchesQuery),
+    "ai-action-drafts": overviewResourceStatus(aiDraftsQuery),
+  }
+  const salesState = resourceStatusLabel(resourceStates["sale-orders"])
+  const tasksState = resourceStatusLabel(resourceStates.tasks)
+  const contactsState = resourceStatusLabel(resourceStates.contacts)
+  const movesState = resourceStatusLabel(resourceStates["account-moves"])
+  const aiState = resourceStatusLabel(resourceStates["ai-action-drafts"])
+  const paymentsState = resourceStatusLabel(combinedResourceStatus(resourceStates["payment-transactions"], resourceStates["payment-reconciliations"]))
+  const stockState = resourceStatusLabel(combinedResourceStatus(resourceStates["stock-quants"], resourceStates.products))
+  const messagesState = resourceStatusLabel(resourceStates["message-batches"])
   const [timeRange, setTimeRange] = useState<TimeRangeValue>("30d")
   const [isHydrated, setIsHydrated] = useState(false)
 
@@ -160,21 +196,6 @@ function OverviewClientLoaded({
 
   const { startMs, endMs } = useMemo(() => timeRangeToMs(timeRange), [timeRange])
   const previousRange = useMemo(() => previousPeriodMs(timeRange), [timeRange])
-
-  const isDataReady = !(
-    ordersLoading ||
-    movesLoading ||
-    stockQuantsLoading ||
-    productsLoading ||
-    tasksLoading ||
-    projectsLoading ||
-    purchaseOrdersLoading ||
-    contactsLoading ||
-    paymentTransactionsLoading ||
-    paymentReconciliationsLoading ||
-    messageBatchesLoading ||
-    aiDraftsLoading
-  )
 
   const scopedOrders = useMemo(
     () => orders.filter((row) => matchesCompany(row as Record<string, unknown>, operatingCompanyId)),
@@ -277,17 +298,17 @@ function OverviewClientLoaded({
     const needsAttentionRows = [
       {
         reference: `${t("overview.dashboard.overdue")} Invoices`,
-        amount: String(overdueInvoices.length),
-        status: `$${Math.round(overdueInvoiceTotal).toLocaleString()}`,
+        amount: movesState ?? String(overdueInvoices.length),
+        status: movesState ?? `$${Math.round(overdueInvoiceTotal).toLocaleString()}`,
       },
       {
         reference: t("overview.dashboard.stats.pendingAiDrafts"),
-        amount: String(pendingAiDrafts),
+        amount: aiState ?? String(pendingAiDrafts),
         status: t("overview.dashboard.actions.aiDrafts"),
       },
       {
         reference: t("projects.dashboard.overdueTasks"),
-        amount: String(overdueTaskCount),
+        amount: tasksState ?? String(overdueTaskCount),
         status: t("overview.dashboard.actions.projects"),
       },
     ]
@@ -295,20 +316,24 @@ function OverviewClientLoaded({
     const data: OverviewDashboardData = {
       metrics: {
         revenue: {
-          value: `$${Math.round(currentRevenue).toLocaleString()}`,
-          change: revenueChange,
+          value: salesState ?? `$${Math.round(currentRevenue).toLocaleString()}`,
+          change: salesState ? undefined : revenueChange,
         },
-        "open-sales-orders": { value: String(currentOpenOrders), change: openOrdersChange },
-        "open-tasks": { value: String(openTasks) },
-        contacts: { value: String(scopedContacts.length) },
+        "open-sales-orders": { value: salesState ?? String(currentOpenOrders), change: salesState ? undefined : openOrdersChange },
+        "open-tasks": { value: tasksState ?? String(openTasks) },
+        contacts: { value: contactsState ?? String(scopedContacts.length) },
       },
       series: {
         revenue: salesTrendValues.map(({ month, revenue }) => ({ label: month, value: revenue })),
       },
       tables: { "needs-attention": needsAttentionRows },
     }
-    return toDashboardSections(overviewDashboardDefinition, data, t, overviewDashboardWebOptions)
-  }, [scopedMoves, scopedTasks, scopedContacts, pendingAiDrafts, salesTrendValues, periodMetrics, t])
+    // A denied revenue read is not an empty (or zero-valued) chart.
+    const definition = salesState
+      ? { ...overviewDashboardDefinition, sections: overviewDashboardDefinition.sections.filter((section) => section.id !== "overview-revenue") }
+      : overviewDashboardDefinition
+    return toDashboardSections(definition, data, t, overviewDashboardWebOptions)
+  }, [scopedMoves, scopedTasks, scopedContacts, pendingAiDrafts, salesTrendValues, periodMetrics, salesState, tasksState, contactsState, movesState, aiState, t])
 
   const ownerControlLoop = useMemo(() => {
     const reconciledTransactionIds = new Set(paymentReconciliations.map((row) => String((row as Record<string, unknown>).paymentTransactionId ?? "")))
@@ -347,9 +372,21 @@ function OverviewClientLoaded({
         onTimeRangeChange={setTimeRange}
         onExport={() => void handleDashboardExport()}
       />
-      {isHydrated && isDataReady ? (
+      {isHydrated ? (
         <div className="flex flex-col gap-6">
-          <OwnerControlLoop {...ownerControlLoop} />
+          <section aria-label="Dashboard resource status" data-testid="overview-resource-status" className="space-y-1 text-sm">
+            {Object.entries(resourceStates).flatMap(([resource, state]) => {
+              const label = resourceStatusLabel(state)
+              return label ? [<p key={resource} data-resource={resource} data-state={state}>{resource}: {label}</p>] : []
+            })}
+          </section>
+          <OwnerControlLoop
+            overdueInvoices={movesState ?? ownerControlLoop.overdueInvoices}
+            unreconciledPayments={paymentsState ?? ownerControlLoop.unreconciledPayments}
+            lowStockProducts={stockState ?? ownerControlLoop.lowStockProducts}
+            pendingMessageApprovals={messagesState ?? ownerControlLoop.pendingMessageApprovals}
+          />
+          {salesState ? <p data-testid="overview-sales-trend-state">Sales trend: {salesState}</p> : null}
           <DashboardGrid
             ref={dashboardGridRef}
             sections={liveSections}

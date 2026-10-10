@@ -9,14 +9,15 @@ import { expect, test, type Page } from "@playwright/test"
 /** @dev-fixture — excluded from E2E_SUITE=p0; requires seed_dev_data fixture rows. */
 
 import {
+  activeTabEntityTable,
   callReducerBff,
   expectNoAppError,
   expectSeededText,
   fetchCurrencyIdByCode,
   fetchDefaultCompanyId,
   fetchFirstUomId,
-  fetchLatestPurchaseOrderLineIdByOrder,
-  fetchLatestPurchaseOrderIdByPartner,
+  fetchOnlyPurchaseOrderLineId,
+  fetchPurchaseOrderIdByExactOrigin,
   fetchProductIdByName,
   fetchSessionOrganizationId,
   fetchVendorPartnerIdByName,
@@ -54,29 +55,29 @@ async function assertPurchasingTabRenders(page: Page, tabId: string) {
       break
     case "orders":
       await expect(page.getByTestId("module-create-purchasing-orders")).toBeVisible()
-      await expect(page.getByTestId("entity-table")).toBeVisible()
+      await expect(activeTabEntityTable(page)).toBeVisible()
       break
     case "lines":
-      await expect(page.getByTestId("entity-table")).toBeVisible({ timeout: 30_000 })
+      await expect(activeTabEntityTable(page)).toBeVisible({ timeout: 30_000 })
       break
     case "requisitions":
       await expect(page.getByTestId("module-create-purchasing-requisitions")).toBeVisible()
-      await expect(page.getByTestId("entity-table")).toBeVisible()
+      await expect(activeTabEntityTable(page)).toBeVisible()
       break
     case "vendors":
-      await expect(page.getByTestId("entity-table")).toBeVisible()
+      await expect(activeTabEntityTable(page)).toBeVisible()
       break
     case "partner-banks":
       await expect(page.getByTestId("module-create-purchasing-partner-banks")).toBeVisible()
-      await expect(page.getByTestId("entity-table")).toBeVisible()
+      await expect(activeTabEntityTable(page)).toBeVisible()
       break
     case "landed-costs":
       await expect(page.getByTestId("module-create-purchasing-landed-costs")).toBeVisible()
-      await expect(page.getByTestId("entity-table")).toBeVisible()
+      await expect(activeTabEntityTable(page)).toBeVisible()
       break
     case "supplier-intakes":
       await expect(page.getByTestId("module-create-purchasing-supplier-intakes")).toBeVisible()
-      await expect(page.getByTestId("entity-table")).toBeVisible()
+      await expect(activeTabEntityTable(page)).toBeVisible()
       break
     default:
       break
@@ -101,6 +102,21 @@ test.describe("Purchasing module e2e", { tag: "@dev-fixture" }, () => {
 
     await page.getByTestId("form-modal-new-purchase-order").getByRole("button", { name: /^cancel$/i }).click()
     await expect(page.getByTestId("form-modal-new-purchase-order")).toBeHidden()
+    await expectNoAppError(page)
+  })
+
+  test("RFQ award action opens a typed selection dialog", async ({ page }) => {
+    await gotoModule(page, "/purchasing", "purchasing")
+    await openPurchasingTab(page, "dashboard")
+
+    await page.getByTestId("purchasing-ops-award-rfq-bid").click()
+    const dialog = page.getByRole("dialog", { name: "Award RFQ bid" })
+    await expect(dialog).toBeVisible()
+    await expect(dialog.getByLabel("RFQ")).toBeVisible()
+    await expect(dialog.getByLabel("Submitted bid")).toBeVisible()
+
+    await dialog.getByRole("button", { name: /^cancel$/i }).click()
+    await expect(dialog).toBeHidden()
     await expectNoAppError(page)
   })
 
@@ -168,7 +184,10 @@ async function fetchPurchaseOrderPickingIds(page: Page, orderId: number): Promis
   throw new Error(`purchase order ${orderId} has no pickings`)
 }
 
-async function fetchLatestLandedCostId(page: Page, description: string): Promise<number> {
+async function fetchLandedCostIdByExactDescription(
+  page: Page,
+  description: string,
+): Promise<number> {
   const deadline = Date.now() + 30_000
   let lastStatus = 0
   let lastDescriptions: string[] = []
@@ -183,10 +202,12 @@ async function fetchLatestLandedCostId(page: Page, description: string): Promise
       const matches = (json.data ?? []).filter(
         (r) => scalarQueryString(r.description) === description,
       )
-      const newest = [...matches].sort(
-        (a, b) => (scalarQueryId(b.id) ?? 0) - (scalarQueryId(a.id) ?? 0),
-      )[0]
-      const id = scalarQueryId(newest?.id)
+      if (matches.length > 1) {
+        throw new Error(
+          `expected one landed cost for description ${description}, found ${matches.length}`,
+        )
+      }
+      const id = scalarQueryId(matches[0]?.id)
       if (id != null) return id
     }
     await page.waitForTimeout(250)
@@ -249,7 +270,7 @@ test.describe("PUR-007: PO → Receipt → Landed Cost flow", { tag: "@p0" }, ()
       },
     ])
 
-    const orderId = await fetchLatestPurchaseOrderIdByPartner(page, vendorPartnerId, origin)
+    const orderId = await fetchPurchaseOrderIdByExactOrigin(page, vendorPartnerId, origin)
 
     await callReducerBff(page, "add_purchase_order_line", [
       organizationId,
@@ -273,7 +294,7 @@ test.describe("PUR-007: PO → Receipt → Landed Cost flow", { tag: "@p0" }, ()
       },
     ])
 
-    const lineId = await fetchLatestPurchaseOrderLineIdByOrder(page, orderId)
+    const lineId = await fetchOnlyPurchaseOrderLineId(page, orderId)
 
     await callReducerBff(page, "confirm_purchase_order", [organizationId, orderId])
     await waitForPurchaseOrderState(page, orderId, "Purchase")
@@ -325,7 +346,7 @@ test.describe("PUR-007: PO → Receipt → Landed Cost flow", { tag: "@p0" }, ()
       },
     ])
 
-    const landedCostId = await fetchLatestLandedCostId(page, lcDescription)
+    const landedCostId = await fetchLandedCostIdByExactDescription(page, lcDescription)
 
     await callReducerBff(page, "add_landed_cost_line", [
       organizationId,

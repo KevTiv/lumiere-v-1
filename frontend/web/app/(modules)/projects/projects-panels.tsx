@@ -3,6 +3,7 @@
 import { useMemo } from "react"
 import { useTranslation } from "@lumiere/i18n"
 import type { QueryRows } from "@lumiere/query-hooks/http"
+import { TablePager, usePagedRows } from "@lumiere/ui/components/table-pager"
 
 function microsToDateLabel(raw: unknown): string {
   const ms = Number(raw ?? 0) / 1000
@@ -48,6 +49,7 @@ export function ProjectGanttPanel({
         progress: taskProgress(tk),
       }))
   }, [projects, tasks])
+  const rowsPager = usePagedRows(rows)
 
   return (
     <div className="space-y-4 p-1">
@@ -71,7 +73,7 @@ export function ProjectGanttPanel({
               </tr>
             </thead>
             <tbody>
-              {rows.map((row) => (
+              {rowsPager.pageRows.map((row) => (
                 <tr key={row.id} className="border-b border-border last:border-0">
                   <td className="px-3 py-2 text-muted-foreground">{row.wbs || "—"}</td>
                   <td className="px-3 py-2 font-medium">{row.task}</td>
@@ -93,6 +95,7 @@ export function ProjectGanttPanel({
               ))}
             </tbody>
           </table>
+          <TablePager {...rowsPager} />
         </div>
       )}
     </div>
@@ -190,6 +193,8 @@ export function ResourceAllocationPanel({
       }))
       .slice(0, 40)
   }, [allocations, employees])
+  const bookingPager = usePagedRows(bookingRows)
+  const capacityPager = usePagedRows(capacityRows)
 
   return (
     <div className="space-y-6 p-1">
@@ -230,7 +235,7 @@ export function ResourceAllocationPanel({
               </tr>
             </thead>
             <tbody>
-              {capacityRows.map((row) => (
+              {capacityPager.pageRows.map((row) => (
                 <tr key={row.id} className="border-b border-border last:border-0">
                   <td className="px-3 py-2 font-medium">{row.label}</td>
                   <td className="px-3 py-2 text-right">{row.available.toFixed(1)}h</td>
@@ -249,6 +254,7 @@ export function ResourceAllocationPanel({
               ))}
             </tbody>
           </table>
+          <TablePager {...capacityPager} />
         </div>
       )}
 
@@ -269,7 +275,7 @@ export function ResourceAllocationPanel({
                 </tr>
               </thead>
               <tbody>
-                {bookingRows.map((row) => (
+                {bookingPager.pageRows.map((row) => (
                   <tr key={row.id} className="border-b border-border last:border-0">
                     <td className="px-3 py-2 font-medium">{row.employee}</td>
                     <td className="px-3 py-2">{row.projectId}</td>
@@ -282,6 +288,7 @@ export function ResourceAllocationPanel({
                 ))}
               </tbody>
             </table>
+            <TablePager {...bookingPager} />
           </div>
         )}
       </div>
@@ -317,6 +324,7 @@ export function ResourceUtilisationPanel({
       })
       .sort((a, b) => b.utilisation - a.utilisation)
   }, [employees, utilisation])
+  const rowsPager = usePagedRows(rows)
 
   return (
     <div className="space-y-4 p-1" data-testid="proj-utilisation-panel">
@@ -345,7 +353,7 @@ export function ResourceUtilisationPanel({
               </tr>
             </thead>
             <tbody>
-              {rows.map((row) => (
+              {rowsPager.pageRows.map((row) => (
                 <tr key={row.id} className="border-b border-border last:border-0">
                   <td className="px-3 py-2 font-medium">{row.employee}</td>
                   <td className="px-3 py-2 text-right">{row.available.toFixed(1)}h</td>
@@ -357,6 +365,7 @@ export function ResourceUtilisationPanel({
               ))}
             </tbody>
           </table>
+          <TablePager {...rowsPager} />
         </div>
       )}
     </div>

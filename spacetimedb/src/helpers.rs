@@ -80,9 +80,6 @@ pub fn check_permission(
     resource: &str,
     action: &str,
 ) -> Result<(), String> {
-    if action != "read" {
-        crate::core::reconstruction::require_writes_unfenced(ctx, organization_id)?;
-    }
     let user = find_user_profile_for_organization(ctx, ctx.sender(), organization_id)
         .ok_or("User not found")?;
 
@@ -116,7 +113,12 @@ pub fn check_permission(
         resource,
         action,
     ) {
-        PermissionResolution::Allow => Ok(()),
+        PermissionResolution::Allow => {
+            if action != "read" {
+                crate::core::reconstruction::require_writes_unfenced(ctx, organization_id)?;
+            }
+            Ok(())
+        }
         PermissionResolution::Deny | PermissionResolution::NotGranted => {
             Err(format!("Permission denied: {} on {}", action, resource))
         }

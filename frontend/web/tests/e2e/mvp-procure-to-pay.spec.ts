@@ -16,11 +16,11 @@ import {
   expectNoAppError,
   expectPostDraftBillRejected,
   fetchAccountSelectLabelByInternalType,
-  fetchDraftVendorBillMoveIdByPartner,
+  fetchDraftVendorBillMoveIdForPurchaseOrder,
   fetchInvoiceMoveDetails,
-  fetchLatestPaymentIdByPartner,
-  fetchLatestPurchaseOrderIdByPartner,
-  fetchLatestPurchaseOrderLineIdByOrder,
+  fetchPaymentIdByExactReference,
+  fetchPurchaseOrderIdByExactOrigin,
+  fetchOnlyPurchaseOrderLineId,
   fetchPurchaseOrderLineReceiveLabel,
   fetchPurchaseOrderSelectLabel,
   fetchSessionOrganizationId,
@@ -87,7 +87,7 @@ async function createConfirmedPoWithLine(
   ])
   expect(createPoRes.ok()).toBe(true)
 
-  const orderId = await fetchLatestPurchaseOrderIdByPartner(page, vendorPartnerId, origin)
+  const orderId = await fetchPurchaseOrderIdByExactOrigin(page, vendorPartnerId, origin)
   const orderLabel = await fetchPurchaseOrderSelectLabel(page, orderId)
 
   await selectModuleTab(page, "purchasing", "lines")
@@ -183,20 +183,20 @@ test.describe("MVP procure-to-pay workflow", { tag: "@p0" }, () => {
 
     const { orderId } = await createConfirmedPoWithLine(page, origin, vendorPartnerId, "2")
 
-    const lineId = await fetchLatestPurchaseOrderLineIdByOrder(page, orderId)
+    const lineId = await fetchOnlyPurchaseOrderLineId(page, orderId)
     await receivePoLineQty(page, orderId, lineId, "2")
 
     const billResponse = await createBillFromPo(page, orderId)
 
-    const moveId = await fetchDraftVendorBillMoveIdByPartner(page, VENDOR_NAME)
+    const moveId = await fetchDraftVendorBillMoveIdForPurchaseOrder(page, orderId)
     await assertMoveLinesBalanced(page, moveId)
 
     // Replaying the exact command must fail without creating another bill.
     const duplicateBillResponse = await page.request.fetch(billResponse.request())
     expect(duplicateBillResponse.ok()).toBe(false)
-    expect(await fetchDraftVendorBillMoveIdByPartner(page, VENDOR_NAME)).toBe(moveId)
+    expect(await fetchDraftVendorBillMoveIdForPurchaseOrder(page, orderId)).toBe(moveId)
 
-    await postDraftBillViaUi(page, VENDOR_NAME)
+    await postDraftBillViaUi(page, moveId)
 
     const { amountTotal, currencyId } = await fetchInvoiceMoveDetails(page, moveId)
     await gotoModule(page, "/accounting", "accounting")
@@ -210,6 +210,8 @@ test.describe("MVP procure-to-pay workflow", { tag: "@p0" }, () => {
     await chooseSelectOptionByValue(page, "currencyId", currencyId)
     await chooseFirstEnabledOption(page, "journalId")
     await fillField(page, "date", new Date().toISOString().slice(0, 10))
+    const paymentReference = smokeName("mvp-p2p-payment")
+    await fillField(page, "ref", paymentReference)
     const [createPaymentResponse] = await Promise.all([
       page.waitForResponse(
         (res) => matchesOperationResponse(res, "create_payment") && res.ok(),
@@ -219,7 +221,7 @@ test.describe("MVP procure-to-pay workflow", { tag: "@p0" }, () => {
     ])
     expect(createPaymentResponse.ok()).toBe(true)
 
-    const paymentId = await fetchLatestPaymentIdByPartner(page, vendorPartnerId, {
+    const paymentId = await fetchPaymentIdByExactReference(page, vendorPartnerId, paymentReference, {
       state: "NotPaid",
     })
     await selectEntityRowById(page, paymentId)
@@ -254,9 +256,11 @@ test.describe("MVP procure-to-pay workflow", { tag: "@p0" }, () => {
     await page.getByTestId("module-tab-accounting-payments").click()
     await expect(page.getByTestId(`entity-row-${paymentId}`)).toContainText(VENDOR_NAME)
     await waitForSettledBill(page, moveId)
-    expect(await fetchLatestPaymentIdByPartner(page, vendorPartnerId, { state: "Paid" })).toBe(
-      paymentId,
-    )
+    expect(
+      await fetchPaymentIdByExactReference(page, vendorPartnerId, paymentReference, {
+        state: "Paid",
+      }),
+    ).toBe(paymentId)
 
     await expectNoAppError(page)
   })
@@ -269,12 +273,12 @@ test.describe("MVP procure-to-pay workflow", { tag: "@p0" }, () => {
 
     const { orderId } = await createConfirmedPoWithLine(page, origin, vendorPartnerId, "10")
 
-    const lineId = await fetchLatestPurchaseOrderLineIdByOrder(page, orderId)
+    const lineId = await fetchOnlyPurchaseOrderLineId(page, orderId)
     await receivePoLineQty(page, orderId, lineId, "5")
 
     await createBillFromPo(page, orderId)
 
-    const moveId = await fetchDraftVendorBillMoveIdByPartner(page, VENDOR_NAME)
+    const moveId = await fetchDraftVendorBillMoveIdForPurchaseOrder(page, orderId)
     await assertMoveLinesBalanced(page, moveId)
 
     await waitForPoLineMatchStatus(page, lineId, "matched")
@@ -286,7 +290,7 @@ test.describe("MVP procure-to-pay workflow", { tag: "@p0" }, () => {
       timeout: 30_000,
     })
 
-    await postDraftBillViaUi(page, VENDOR_NAME)
+    await postDraftBillViaUi(page, moveId)
 
     await expectNoAppError(page)
   })
@@ -299,7 +303,7 @@ test.describe("MVP procure-to-pay workflow", { tag: "@p0" }, () => {
 
     const { orderId } = await createConfirmedPoWithLine(page, origin, vendorPartnerId, "10")
 
-    const lineId = await fetchLatestPurchaseOrderLineIdByOrder(page, orderId)
+    const lineId = await fetchOnlyPurchaseOrderLineId(page, orderId)
     await receivePoLineQty(page, orderId, lineId, "5")
 
     const invoiceIdsBefore = await fetchPurchaseOrderInvoiceIds(page, orderId)
@@ -326,7 +330,7 @@ test.describe("MVP procure-to-pay workflow", { tag: "@p0" }, () => {
       timeout: 30_000,
     })
 
-    await expectPostDraftBillRejected(page, VENDOR_NAME, /three-way match failed/i)
+    await expectPostDraftBillRejected(page, billId, /three-way match failed/i)
     expect(await fetchVendorBillById(page, billId)).toMatchObject({ state: "Draft" })
 
     // The rejected post is non-destructive: purchasing can resolve the exact exception by
@@ -342,7 +346,7 @@ test.describe("MVP procure-to-pay workflow", { tag: "@p0" }, () => {
       timeout: 30_000,
     })
 
-    expect(await postDraftBillViaUi(page, VENDOR_NAME)).toBe(billId)
+    expect(await postDraftBillViaUi(page, billId)).toBe(billId)
     expect(await fetchVendorBillById(page, billId)).toMatchObject({ state: "Posted" })
     await expectNoAppError(page)
   })

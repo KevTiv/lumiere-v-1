@@ -65,6 +65,8 @@ export interface ManufacturingFinishedMoveProjection {
   readonly is_done?: unknown
   readonly quantityDone?: unknown
   readonly quantity_done?: unknown
+  readonly reference?: unknown
+  readonly scrapped?: unknown
 }
 
 export interface ManufacturingFinishedQuantProjection {
@@ -239,18 +241,68 @@ export function resolveManufacturingFinishedEffect(
     plannedQty == null ||
     !sameQty(producedQty, plannedQty) ||
     finishedIds == null ||
-    finishedIds.length !== 1 ||
-    finishedCount !== 1
+    finishedIds.length === 0 ||
+    finishedCount !== finishedIds.length
   ) {
     return null
   }
 
-  const finishedMoveId = finishedIds[0]!
-  const moveMatches = stockMoves.filter(
-    (row) => parseStrictU64(row.id) === finishedMoveId,
+  if (new Set(finishedIds).size !== finishedIds.length) {
+    throw new AmbiguousOperationEffectError("Manufacturing finished relation repeats a move ID")
+  }
+
+  // The MO owns the whole output set: one primary product plus its byproducts.
+  // Resolve every declared ID, never infer an output from product/quantity/latest.
+  const outputMoves: ManufacturingFinishedMoveProjection[] = []
+  const outputProducts = new Set<bigint>()
+  const byproductDefinitions = new Set<bigint>()
+  for (const outputId of finishedIds) {
+    const matches = stockMoves.filter(row => parseStrictU64(row.id) === outputId)
+    if (matches.length > 1) {
+      throw new AmbiguousOperationEffectError("Manufacturing finished move identity is duplicated")
+    }
+    if (matches.length === 0) return null
+    const output = matches[0]!
+    const outputProductId = parseStrictU64(output.productId ?? output.product_id)
+    const outputUomId = parseStrictU64(output.productUom ?? output.product_uom)
+    const outputQty = numeric(output.productUomQty ?? output.product_uom_qty)
+    const outputDone = numeric(output.quantityDone ?? output.quantity_done)
+    if (
+      outputProductId == null || outputProductId === 0n ||
+      outputUomId == null || outputUomId === 0n ||
+      parseStrictU64(output.companyId ?? output.company_id) !== companyId ||
+      parseStrictU64(output.productionId ?? output.production_id) !== manufacturingOrderId ||
+      parseStrictU64(output.locationId ?? output.location_id) !== sourceLocationId ||
+      parseStrictU64(output.locationDestId ?? output.location_dest_id) !== destinationLocationId ||
+      outputQty == null || outputQty <= 0 || outputDone == null ||
+      !sameQty(outputQty, outputDone) ||
+      stateTag(output.state) !== "done" ||
+      (output.isDone ?? output.is_done) === false ||
+      output.scrapped === true
+    ) return null
+    if (outputProducts.has(outputProductId)) {
+      throw new AmbiguousOperationEffectError("Manufacturing finished relation repeats an output product")
+    }
+    outputProducts.add(outputProductId)
+    if (outputProductId !== productId) {
+      const prefix = `MO/${manufacturingOrderId}/BYPRODUCT/`
+      if (typeof output.reference !== "string" || !output.reference.startsWith(prefix)) return null
+      const definitionId = parseStrictU64(output.reference.slice(prefix.length))
+      if (definitionId == null || definitionId === 0n) return null
+      if (byproductDefinitions.has(definitionId)) {
+        throw new AmbiguousOperationEffectError("Manufacturing finished relation repeats a byproduct definition")
+      }
+      byproductDefinitions.add(definitionId)
+    }
+    outputMoves.push(output)
+  }
+
+  const primaryMoves = outputMoves.filter(
+    row => parseStrictU64(row.productId ?? row.product_id) === productId,
   )
-  if (moveMatches.length !== 1) return null
-  const move = moveMatches[0]!
+  if (primaryMoves.length !== 1) return null
+  const move = primaryMoves[0]!
+  const finishedMoveId = parseStrictU64(move.id)!
   const moveQty = numeric(move.productUomQty ?? move.product_uom_qty)
   const quantityDone = numeric(move.quantityDone ?? move.quantity_done)
   if (

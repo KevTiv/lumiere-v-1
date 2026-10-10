@@ -11,6 +11,7 @@ use anyhow::{anyhow, bail, Context, Result};
 use deadpool_postgres::Pool;
 use serde_json::{json, Value};
 use std::collections::BTreeSet;
+use std::time::{SystemTime, UNIX_EPOCH};
 use stdb_client::StdbClient;
 
 use super::super::{commit_projection, ledger, pg_codec};
@@ -79,7 +80,7 @@ pub async fn drain_batch(
         .query_sql(&sql)
         .await
         .context("query pos_order finalization batch")?;
-    let raw_rows = select_candidates(raw_rows, batch_size)?;
+    let raw_rows = select_candidates(raw_rows, batch_size, unix_time_micros()?)?;
 
     stats.read = raw_rows.len();
     for raw in &raw_rows {
@@ -276,13 +277,20 @@ pub(super) async fn drain_one_for_test(
     drain_one(pool, finalizer_stdb, columns, &source_row).await
 }
 
-fn select_candidates(rows: Vec<Value>, batch_size: u32) -> Result<Vec<Value>> {
+fn select_candidates(rows: Vec<Value>, batch_size: u32, now_micros: i64) -> Result<Vec<Value>> {
     let mut candidates = Vec::with_capacity(rows.len());
     for row in rows {
         let eligible = row
             .get("coldEligibleAt")
             .ok_or_else(|| anyhow!("pos_order candidate is missing coldEligibleAt"))?;
         if eligible.is_null() {
+            continue;
+        }
+        let eligible_at_micros = eligible
+            .get("microsSinceUnixEpoch")
+            .and_then(Value::as_i64)
+            .ok_or_else(|| anyhow!("pos_order candidate has invalid coldEligibleAt"))?;
+        if eligible_at_micros > now_micros {
             continue;
         }
         let id = require_u64(&row, "id")?;
@@ -302,6 +310,16 @@ fn select_candidates(rows: Vec<Value>, batch_size: u32) -> Result<Vec<Value>> {
         .take(batch_size as usize)
         .map(|(_, row)| row)
         .collect())
+}
+
+fn unix_time_micros() -> Result<i64> {
+    let micros = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .context("system clock is before the Unix epoch")?
+        .as_micros();
+    micros
+        .try_into()
+        .context("system time is outside the supported timestamp range")
 }
 
 fn select_exact_pos_order_row(
@@ -498,6 +516,7 @@ mod tests {
                 candidate(1, json!({"microsSinceUnixEpoch": 1})),
             ],
             2,
+            8,
         )
         .unwrap();
         assert_eq!(
@@ -517,14 +536,36 @@ mod tests {
                 candidate(4, json!({"microsSinceUnixEpoch": 5})),
             ],
             10,
+            10,
         );
         assert!(duplicate.unwrap_err().to_string().contains("duplicate id"));
 
-        let missing = select_candidates(vec![json!({"id": 4})], 10);
+        let missing = select_candidates(vec![json!({"id": 4})], 10, 10);
         assert!(missing
             .unwrap_err()
             .to_string()
             .contains("missing coldEligibleAt"));
+    }
+
+    #[test]
+    fn candidate_selection_excludes_future_and_rejects_invalid_eligibility() {
+        let selected = select_candidates(
+            vec![
+                candidate(1, json!({"microsSinceUnixEpoch": 10})),
+                candidate(2, json!({"microsSinceUnixEpoch": 11})),
+            ],
+            10,
+            10,
+        )
+        .unwrap();
+        assert_eq!(selected.len(), 1);
+        assert_eq!(selected[0]["id"], 1);
+
+        let invalid = select_candidates(vec![candidate(3, json!({"unexpected": 1}))], 10, 10);
+        assert!(invalid
+            .unwrap_err()
+            .to_string()
+            .contains("invalid coldEligibleAt"));
     }
 
     #[test]

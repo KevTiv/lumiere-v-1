@@ -44,6 +44,18 @@ def operation(name="create_order", operation_id="erp.create_order", **changes):
     return value
 
 
+def view_operation(name="orders_read", operation_id="erp.orders_read"):
+    return operation(
+        name,
+        operation_id,
+        application=None,
+        source_kind="view",
+        target={"kind": "spacetimedb_view", "name": name},
+        input={"kind": "unresolved", "parameter_positions": []},
+        output={"kind": "unresolved"},
+    )
+
+
 def history_for(ir):
     return MODULE.build_history_from_value(ir)
 
@@ -71,6 +83,13 @@ class OperationHistoryTests(unittest.TestCase):
         changed["source_commit"] = "not-contract-shape"
         changed["source_dirty"] = True
         self.assertEqual(MODULE.shape_fingerprint(original), MODULE.shape_fingerprint(changed))
+
+    def test_view_shape_fingerprint_accepts_null_application(self):
+        view = view_operation()
+
+        history = MODULE.build_history_from_value(ir_with(view))
+
+        self.assertEqual(history["operations"]["erp.orders_read"]["name"], "orders_read")
 
     def test_shape_fingerprint_uses_type_name_not_typespace_index(self):
         previous = operation()

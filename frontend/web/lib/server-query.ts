@@ -7,7 +7,12 @@
  */
 import "server-only"
 
-import { parseQueryListResponse } from "@lumiere/api-client"
+import {
+  parseQueryListResponse,
+  queryResourceFailure,
+  queryResourceRows,
+  type QueryResourceState,
+} from "@lumiere/api-client"
 import type { QueryResourceKey } from "@lumiere/stdb/generated/query-registry"
 import type { QueryRowFor } from "@lumiere/stdb/query-row-map"
 import {
@@ -56,6 +61,16 @@ function requireApiServerBase(): string {
   return base
 }
 
+class ServerQueryRequestError extends Error {
+  constructor(
+    readonly status: number,
+    message: string,
+  ) {
+    super(message)
+    this.name = "ServerQueryRequestError"
+  }
+}
+
 async function fetchFromApiServer<K extends QueryResourceKey>(
   creds: ServerQueryCredentials,
   resource: K,
@@ -75,7 +90,7 @@ async function fetchFromApiServer<K extends QueryResourceKey>(
   if (!res.ok) {
     const json = (await res.json().catch(() => ({}))) as Record<string, unknown>
     const detail = typeof json.error === "string" ? json.error : res.statusText
-    throw new Error(detail || `Query ${resource} failed`)
+    throw new ServerQueryRequestError(res.status, detail || `Query ${resource} failed`)
   }
   const payload: unknown = await res.json()
   if (resource === "companies") {
@@ -126,7 +141,36 @@ export async function serverFetchQueryList<K extends QueryResourceKey>(
   }
 }
 
-/** Like {@link serverFetchQueryList} but returns `[]` on failure (SSR seed pattern). */
+/** Fetch a critical SSR resource without collapsing empty, denied, and unavailable states. */
+export async function serverFetchQueryListState<K extends QueryResourceKey>(
+  session: ApiSession,
+  resource: K,
+): Promise<QueryResourceState<ServerQueryRowFor<K>>> {
+  try {
+    return queryResourceRows(await fetchFromApiServer(sessionCredentials(session), resource))
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    const status = error instanceof ServerQueryRequestError ? error.status : undefined
+    return queryResourceFailure(status, message)
+  }
+}
+
+/** Require a successful critical read while preserving a legitimate empty result. */
+export function requireServerQueryRows<Row>(
+  state: QueryResourceState<Row>,
+  resource: string,
+): Row[] {
+  if (state.status === "ready" || state.status === "empty") return state.rows
+  throw new Error(`${resource} query ${state.status}: ${state.message}`)
+}
+
+/**
+ * Optional SSR-prefetch compatibility path.
+ *
+ * Use only when `[]` means "no seed" and the client performs an authoritative
+ * query. Never use this helper for authorization, company scope, or a final
+ * resource state.
+ */
 export async function serverFetchQueryListAllowEmpty<K extends QueryResourceKey>(
   session: ApiSession,
   resource: K,
@@ -138,7 +182,7 @@ export async function serverFetchQueryListAllowEmpty<K extends QueryResourceKey>
   }
 }
 
-/** Parallel batch of {@link serverFetchQueryListAllowEmpty} — order matches `resources`. */
+/** Optional SSR seeds only; order matches `resources`. See {@link serverFetchQueryListAllowEmpty}. */
 export async function serverFetchQueryListsAllowEmpty<const T extends readonly QueryResourceKey[]>(
   session: ApiSession,
   resources: T,
@@ -149,6 +193,23 @@ export async function serverFetchQueryListsAllowEmpty<const T extends readonly Q
     resources.map((resource) => serverFetchQueryListAllowEmpty(session, resource)),
   )
   return rows as {
+    [K in keyof T]: T[K] extends QueryResourceKey ? ServerQueryRowFor<T[K]>[] : never
+  }
+}
+
+/** Critical SSR batch: preserve legitimate emptiness and fail on denied/unavailable resources. */
+export async function serverFetchQueryListsRequired<const T extends readonly QueryResourceKey[]>(
+  session: ApiSession,
+  resources: T,
+): Promise<{
+  [K in keyof T]: T[K] extends QueryResourceKey ? ServerQueryRowFor<T[K]>[] : never
+}> {
+  const states = await Promise.all(
+    resources.map((resource) => serverFetchQueryListState(session, resource)),
+  )
+  return states.map((state, index) =>
+    requireServerQueryRows(state, resources[index] ?? "unknown"),
+  ) as {
     [K in keyof T]: T[K] extends QueryResourceKey ? ServerQueryRowFor<T[K]>[] : never
   }
 }

@@ -158,8 +158,18 @@ export const ORG_SUBSCRIPTION_QUERY_DESCRIPTORS = {
     "predicates": [],
     "order_by": []
   },
+  "balance-sheet-lines": {
+    "table": "balance_sheet_line",
+    "predicates": [],
+    "order_by": []
+  },
   "bank-match-candidates": {
     "table": "bank_match_candidate",
+    "predicates": [],
+    "order_by": []
+  },
+  "bank-statement-import-lines": {
+    "table": "bank_statement_import_line",
     "predicates": [],
     "order_by": []
   },
@@ -253,6 +263,11 @@ export const ORG_SUBSCRIPTION_QUERY_DESCRIPTORS = {
     "predicates": [],
     "order_by": []
   },
+  "cash-flow-lines": {
+    "table": "cash_flow_line",
+    "predicates": [],
+    "order_by": []
+  },
   "commodity-price-indexes": {
     "table": "commodity_price_index",
     "predicates": [],
@@ -270,6 +285,11 @@ export const ORG_SUBSCRIPTION_QUERY_DESCRIPTORS = {
   },
   "consignment-agreements": {
     "table": "consignment_agreement",
+    "predicates": [],
+    "order_by": []
+  },
+  "consolidation-company-rates": {
+    "table": "consolidation_company_rate",
     "predicates": [],
     "order_by": []
   },
@@ -438,8 +458,23 @@ export const ORG_SUBSCRIPTION_QUERY_DESCRIPTORS = {
     ],
     "order_by": []
   },
+  "document-external-refs": {
+    "table": "document_external_ref",
+    "predicates": [],
+    "order_by": []
+  },
   "document-folders": {
     "table": "doc_folder",
+    "predicates": [],
+    "order_by": []
+  },
+  "document-legal-holds": {
+    "table": "document_legal_hold",
+    "predicates": [],
+    "order_by": []
+  },
+  "document-signature-requests": {
+    "table": "document_signature_request",
     "predicates": [],
     "order_by": []
   },
@@ -696,6 +731,16 @@ export const ORG_SUBSCRIPTION_QUERY_DESCRIPTORS = {
     ],
     "order_by": []
   },
+  "hr-leave-allocations": {
+    "table": "hr_leave_allocation",
+    "predicates": [],
+    "order_by": []
+  },
+  "hr-offboarding-checklists": {
+    "table": "hr_offboarding_checklist",
+    "predicates": [],
+    "order_by": []
+  },
   "hr-resources": {
     "table": "hr_resource",
     "predicates": [],
@@ -703,6 +748,11 @@ export const ORG_SUBSCRIPTION_QUERY_DESCRIPTORS = {
   },
   "hr-skills": {
     "table": "hr_skill",
+    "predicates": [],
+    "order_by": []
+  },
+  "hr-statutory-ids": {
+    "table": "hr_statutory_id",
     "predicates": [],
     "order_by": []
   },
@@ -1197,6 +1247,11 @@ export const ORG_SUBSCRIPTION_QUERY_DESCRIPTORS = {
   },
   "products": {
     "table": "product",
+    "predicates": [],
+    "order_by": []
+  },
+  "profit-loss-lines": {
+    "table": "profit_loss_line",
     "predicates": [],
     "order_by": []
   },
@@ -1988,6 +2043,11 @@ export const ORG_SUBSCRIPTION_QUERY_DESCRIPTORS = {
   },
   "tasks": {
     "table": "project_task",
+    "predicates": [],
+    "order_by": []
+  },
+  "tax-deadline-reminders": {
+    "table": "tax_deadline_reminder",
     "predicates": [],
     "order_by": []
   },

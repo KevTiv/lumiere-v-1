@@ -59,9 +59,9 @@ export async function POST(request: NextRequest) {
       method: 'POST',
       body: JSON.stringify({
         execution: scopedExecution,
-        candidate_output: candidateOutput ?? null,
-        stdb_token: session.stdbToken,
-        identity_hex: session.identityHex,
+        candidateOutput: candidateOutput ?? null,
+        stdbToken: session.stdbToken,
+        identityHex: session.identityHex,
       }),
     })
 

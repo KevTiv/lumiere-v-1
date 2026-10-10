@@ -1645,13 +1645,6 @@ pub fn publish_form_configuration(
     organization_id: u64,
     params: PublishFormConfigurationParams,
 ) -> Result<(), String> {
-    if params.module_id.trim().is_empty() || params.form_id.trim().is_empty() {
-        return Err("module_id and form_id are required".to_string());
-    }
-    if params.name.trim().is_empty() {
-        return Err("name is required".to_string());
-    }
-
     let existing = ctx.db.form_config().iter().find(|c| {
         c.organization_id == organization_id
             && c.module_id == params.module_id
@@ -1669,6 +1662,13 @@ pub fn publish_form_configuration(
         "form_configuration",
         permission_action,
     )?;
+
+    if params.module_id.trim().is_empty() || params.form_id.trim().is_empty() {
+        return Err("module_id and form_id are required".to_string());
+    }
+    if params.name.trim().is_empty() {
+        return Err("name is required".to_string());
+    }
 
     let configuration_id = match existing {
         Some(config) => {

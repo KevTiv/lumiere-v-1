@@ -2,6 +2,7 @@
 import { mapDashboardWidgets, withDashboardSections } from "@lumiere/ui/lib/dashboard-sections"
 
 import { useEffect, useMemo, useState } from "react"
+import type { QueryResourceState } from "@lumiere/api-client"
 import { useModuleTab } from "@/hooks/use-module-tab"
 import { useTranslation } from "@lumiere/i18n"
 import {
@@ -51,7 +52,6 @@ import {
   useProducts,
   useStockQuants,
   useStockPickings,
-  useStockLocations,
   useWarehouses,
 } from "@lumiere/query-hooks/hooks/inventory"
 import { useIotDevices } from "@lumiere/query-hooks/hooks/iot"
@@ -71,7 +71,7 @@ interface ManufacturingClientProps {
   initialWorkorders?: MrpWorkorder[]
   initialWorkcenters?: MrpWorkcenter[]
   initialRoutingOperations?: MrpRoutingWorkcenter[]
-  initialIotDevices?: IoTDevice[]
+  initialIotDevicesState?: QueryResourceState<IoTDevice>
   initialProducts?: Product[]
   initialWarehouses?: Warehouse[]
   initialStockPickings?: StockPicking[]
@@ -97,7 +97,7 @@ function ManufacturingClientLoaded({
   initialWorkorders,
   initialWorkcenters,
   initialRoutingOperations,
-  initialIotDevices,
+  initialIotDevicesState,
   initialProducts,
   initialWarehouses,
   initialStockPickings,
@@ -129,7 +129,20 @@ function ManufacturingClientLoaded({
     orgId,
     initialRoutingOperations,
   );
-  const { data: iotDevices = [] } = useIotDevices(orgId, initialIotDevices);
+  const iotDevicesQuery = useIotDevices(
+    orgId,
+    initialIotDevicesState?.status === "ready" || initialIotDevicesState?.status === "empty"
+      ? initialIotDevicesState.rows
+      : undefined,
+  )
+  const { data: iotDevices = [] } = iotDevicesQuery
+  const iotReferenceStatus = iotDevicesQuery.status === "success"
+    ? undefined
+    : initialIotDevicesState?.status === "denied"
+      ? "Access denied"
+      : iotDevicesQuery.status === "error" || initialIotDevicesState?.status === "unavailable"
+        ? "Unavailable"
+        : "Loading"
   const { data: qualityChecks = [] } = useQualityChecks(orgId);
   const { data: products = [] } = useProducts(orgId, initialProducts);
   const { data: warehouses = [] } = useWarehouses(orgId, initialWarehouses);
@@ -138,7 +151,6 @@ function ManufacturingClientLoaded({
     initialStockPickings,
   );
   const { data: stockQuants = [] } = useStockQuants(orgId, initialStockQuants);
-  const { data: stockLocations = [] } = useStockLocations(orgId);
 
   const m = useManufacturingMutations(orgId, operatingCompanyId)
 
@@ -197,17 +209,6 @@ function ManufacturingClientLoaded({
       locs.length > 0 ? locs : [{ value: "", label: t("common.lookup.noStockMoves"), disabled: true }]
     return { picking: emptyPicking, locs: emptyLocs }
   }, [transfers, stockQuants, t])
-
-  const scrapLocationOptions = useMemo(
-    () =>
-      stockLocations
-        .filter((location) => location.scrapLocation)
-        .map((location) => ({
-          value: String(location.id),
-          label: String(location.completeName ?? location.name ?? location.id),
-        })),
-    [stockLocations],
-  );
 
   const moFormConfig = useMemo(
     () =>
@@ -512,6 +513,11 @@ function ManufacturingClientLoaded({
 
   return (
     <>
+      {iotReferenceStatus && (
+        <p role="status" className="text-sm text-muted-foreground">
+          IoT device reference data: {iotReferenceStatus}. Device linking requires IoT device read access; manufacturing order and BOM workflows remain available.
+        </p>
+      )}
       <ModuleView
         config={config}
         data={data}
@@ -534,9 +540,9 @@ function ManufacturingClientLoaded({
         row={rowPick?.row ?? null}
         workcenters={workcenters}
         iotDevices={iotDevices}
+        iotReferenceStatus={iotReferenceStatus}
         qualityChecks={qualityChecks}
         productOptions={productFieldOptions}
-        scrapLocationOptions={scrapLocationOptions}
         mutations={m}
         t={t}
       />

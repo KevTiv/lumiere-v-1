@@ -1,5 +1,5 @@
 import { getStdbSession } from "@/lib/api-session"
-import { serverFetchQueryListAllowEmpty } from "@/lib/server-query"
+import { serverFetchQueryListState } from "@/lib/server-query"
 import { ProposalsClient } from "./proposals-client"
 
 export default async function ProposalsPage() {
@@ -8,11 +8,18 @@ export default async function ProposalsPage() {
     return <ProposalsClient />
   }
 
-  const initialProposals = await serverFetchQueryListAllowEmpty(session, "proposals")
+  const proposals = await serverFetchQueryListState(session, "proposals")
+  if (proposals.status === "denied" || proposals.status === "unavailable") {
+    return (
+      <main className="p-6" role="alert">
+        Proposal data {proposals.status}: {proposals.message}
+      </main>
+    )
+  }
 
   return (
     <ProposalsClient
-      initialProposals={initialProposals}
+      initialProposals={proposals.rows}
       organizationId={session.organizationId}
     />
   )

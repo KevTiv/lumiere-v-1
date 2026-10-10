@@ -3038,6 +3038,7 @@ pub fn confirm_stock_picking(
     picking_id: u64,
     params: CompanyScopeParams,
 ) -> Result<(), String> {
+    check_permission(ctx, organization_id, "stock_picking", "write")?;
     let company_id = company_id_from_scope(ctx, organization_id, params.company_id)?;
 
     let picking = ctx
@@ -3046,8 +3047,6 @@ pub fn confirm_stock_picking(
         .id()
         .find(&picking_id)
         .ok_or("Picking not found")?;
-
-    check_permission(ctx, organization_id, "stock_picking", "write")?;
 
     if picking.company_id != company_id {
         return Err("Picking does not belong to this company".to_string());
@@ -3108,6 +3107,7 @@ pub fn assign_stock_picking(
     picking_id: u64,
     params: CompanyScopeParams,
 ) -> Result<(), String> {
+    check_permission(ctx, organization_id, "stock_picking", "write")?;
     let company_id = company_id_from_scope(ctx, organization_id, params.company_id)?;
 
     let picking = ctx
@@ -3116,8 +3116,6 @@ pub fn assign_stock_picking(
         .id()
         .find(&picking_id)
         .ok_or("Picking not found")?;
-
-    check_permission(ctx, organization_id, "stock_picking", "write")?;
 
     if picking.company_id != company_id {
         return Err("Picking does not belong to this company".to_string());
@@ -3227,6 +3225,7 @@ fn validate_stock_picking_impl(
     params: CompanyScopeParams,
     create_backorder: bool,
 ) -> Result<(), String> {
+    check_permission(ctx, organization_id, "stock_picking", "write")?;
     let company_id = company_id_from_scope(ctx, organization_id, params.company_id)?;
 
     let picking = ctx
@@ -3235,8 +3234,6 @@ fn validate_stock_picking_impl(
         .id()
         .find(&picking_id)
         .ok_or("Picking not found")?;
-
-    check_permission(ctx, organization_id, "stock_picking", "write")?;
 
     if picking.company_id != company_id {
         return Err("Picking does not belong to this company".to_string());

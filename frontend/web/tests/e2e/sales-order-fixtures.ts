@@ -1,6 +1,7 @@
 import { expect } from "@playwright/test"
 import type { Page } from "@playwright/test"
 import type { QueryRowFor } from "@lumiere/stdb/query-row-map"
+import { saleOrderHref } from "@lumiere/erp-shared/record-links"
 
 import { matchesOperationResponse } from "./operation-response"
 import {
@@ -176,8 +177,9 @@ export async function fetchOrderDeliveredQty(page: Page, orderId: number): Promi
 
 /** Confirm an order through the Orders tab and wait until the query API shows it confirmed. */
 export async function confirmOrderViaUi(page: Page, orderId: number) {
-  await gotoModule(page, "/sales", "sales")
-  await page.getByTestId("module-tab-sales-orders").click()
+  // Exact focus also keeps later fixtures operable after the first table page fills.
+  await gotoModule(page, saleOrderHref(orderId), "sales")
+  await expect(page.getByTestId("module-tab-sales-orders")).toHaveAttribute("aria-selected", "true")
   await selectEntityRowById(page, orderId)
   await clickEntityActionAndWaitForReducer(page, "entity-action-confirm-orders", "confirm_sales_order")
   await waitForSaleOrderConfirmed(page, orderId)

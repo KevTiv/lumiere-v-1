@@ -5435,6 +5435,41 @@
       "idempotency": "not_applicable",
       "codec": { "id": "spacetimedb-sats-json", "version": 1 },
       "evidence": "spacetimedb/tests/ai/mod.rs: test reducer executes the workflow provenance scenarios; retry classification is not applicable"
+    },
+    "ai_action_draft_request_read": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": { "id": "spacetimedb-sats-json", "version": 1 },
+      "evidence": "spacetimedb/src/ai/spend_reads.rs: sender-scoped read-only view for the active ai_spend_reader service identity"
+    },
+    "ai_provider_attempt_read": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": { "id": "spacetimedb-sats-json", "version": 1 },
+      "evidence": "spacetimedb/src/ai/spend_reads.rs: sender-scoped read-only view for the active ai_spend_reader service identity"
+    },
+    "ai_spend_budget_read": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": { "id": "spacetimedb-sats-json", "version": 1 },
+      "evidence": "spacetimedb/src/ai/spend_reads.rs: sender-scoped read-only view for the active ai_spend_reader service identity"
+    },
+    "ai_spend_price_snapshot_read": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": { "id": "spacetimedb-sats-json", "version": 1 },
+      "evidence": "spacetimedb/src/ai/spend_reads.rs: sender-scoped read-only view for the active ai_spend_reader service identity"
+    },
+    "ai_spend_reservation_read": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": { "id": "spacetimedb-sats-json", "version": 1 },
+      "evidence": "spacetimedb/src/ai/spend_reads.rs: sender-scoped read-only view for the active ai_spend_reader service identity"
     }
   }
 }

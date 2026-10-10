@@ -26,6 +26,7 @@ import {
   toCreateConsolidationJournalParams,
   toCreateEliminationEntryParams,
 } from "@lumiere/erp-shared/accounting-create-params"
+import { TablePager, usePagedRows } from "../components/table-pager"
 
 function consolidationStateTag(row: Record<string, unknown>): string {
   const v = row.state
@@ -188,6 +189,9 @@ export function ConsolidationWorkspace({
     currencySelectOptions,
   ])
 
+  const entriesPager = usePagedRows(journalEntriesForSelected, selectedJournal?.id)
+  const journalsPager = usePagedRows(consolidationJournals)
+  const accountsPager = usePagedRows(consolidationAccounts)
   return (
     <div className="space-y-6">
       {/* ── Consolidation accounts ────────────────────────────────────────── */}
@@ -227,7 +231,7 @@ export function ConsolidationWorkspace({
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {consolidationAccounts.map((acct) => (
+                  {accountsPager.pageRows.map((acct) => (
                     <TableRow key={String(acct.id)}>
                       <TableCell className="font-mono text-sm">{String(acct.code ?? "")}</TableCell>
                       <TableCell>{String(acct.name ?? "")}</TableCell>
@@ -259,6 +263,7 @@ export function ConsolidationWorkspace({
                   ))}
                 </TableBody>
               </Table>
+              <TablePager {...accountsPager} />
             </div>
           )}
         </CardContent>
@@ -302,7 +307,7 @@ export function ConsolidationWorkspace({
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {consolidationJournals.map((j) => {
+                  {journalsPager.pageRows.map((j) => {
                     const state = consolidationStateTag(j)
                     const isSelected = selectedJournal?.id != null && String(selectedJournal.id) === String(j.id)
                     return (
@@ -371,6 +376,7 @@ export function ConsolidationWorkspace({
                   })}
                 </TableBody>
               </Table>
+              <TablePager {...journalsPager} />
             </div>
           )}
 
@@ -414,7 +420,7 @@ export function ConsolidationWorkspace({
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {journalEntriesForSelected.map((entry) => (
+                      {entriesPager.pageRows.map((entry) => (
                         <TableRow key={String(entry.id)}>
                           <TableCell>{String(entry.name ?? "")}</TableCell>
                           <TableCell className="font-mono text-xs">
@@ -480,6 +486,7 @@ export function ConsolidationWorkspace({
                       ))}
                     </TableBody>
                   </Table>
+                  <TablePager {...entriesPager} />
                 </div>
               )}
             </div>

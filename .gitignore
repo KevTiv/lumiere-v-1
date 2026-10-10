@@ -23,6 +23,7 @@ frontend/web/reports/
 */**/**/.turbo
 */**/.turbo
 /.tmp/
+/.ci/
 /.vscode/
 /3. Fix AI certification integrity
 /.claude/worktrees/

@@ -56,7 +56,7 @@ jobs:
     runs-on: ubuntu-latest
     services:
       postgres:
-        image: postgres:16
+        image: postgres:18
         env:
           POSTGRES_DB: lumiere
           POSTGRES_USER: lumiere
@@ -112,7 +112,7 @@ jobs:
           PG_TLS_MODE: disable
         run: python3 scripts/run-required-cargo-tests.py --locked -p api-server --lib cold_tier::commit_projection::tests::postgres_manifest_matrix -- --nocapture
 
-      - name: C4 PostgreSQL release compatibility
+      - name: C4 PostgreSQL migration compatibility
         env:
           C4_TEST_PG: "1"
           PG_HOST: 127.0.0.1
@@ -121,7 +121,7 @@ jobs:
           PG_USER: lumiere
           PG_PASSWORD: lumiere
           PG_TLS_MODE: disable
-        run: python3 scripts/run-required-cargo-tests.py --locked -p api-server --lib cold_tier::migrate::postgres_compatibility_tests::postgres_current_next_application_rollback -- --nocapture
+        run: python3 scripts/run-required-cargo-tests.py --locked -p api-server --lib cold_tier::migrate::postgres_compatibility_tests:: -- --nocapture
 
       - name: C5 manifest-driven finalization
         env:
@@ -163,9 +163,15 @@ jobs:
       - name: ai-gateway unit tests
         run: cargo test --locked -p ai-gateway --bin gateway
 
+  contracts-module:
+    name: Contracts module
+    needs: scope
+    if: needs.scope.outputs.run_contracts == 'true'
+    uses: ./.github/workflows/build-contracts-module.yml
+
   contracts-drift:
     name: Contracts drift
-    needs: scope
+    needs: [scope, contracts-module]
     if: needs.scope.outputs.run_contracts == 'true'
     runs-on: ubuntu-latest
     env:
@@ -176,28 +182,21 @@ jobs:
       - uses: actions/checkout@v4
 
       - uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: wasm32-unknown-unknown
 
       - uses: ./.github/actions/setup-contracts-ssh
         with:
           deploy-key: ${{ secrets.LUMIERE_CONTRACTS_DEPLOY_KEY }}
 
-      # The published schema depends only on module sources, so reuse the
-      # compiled module whenever they are unchanged.
-      - name: Restore compiled contracts module
-        id: contracts-module
-        uses: actions/cache@v4
-        with:
-          path: .ci/contracts-module.wasm
-          key: contracts-module-v1-${{ runner.os }}-${{ hashFiles('spacetimedb/src/**', 'spacetimedb/assets/**', 'spacetimedb/Cargo.toml', 'spacetimedb/Cargo.lock', 'crates/presentation-core/src/**', 'crates/presentation-core/Cargo.toml') }}
-
       - uses: Swatinem/rust-cache@v2
         with:
-          workspaces: |
-            spacetimedb
-            .
+          workspaces: .
           cache-on-failure: true
+
+      - name: Download compiled contracts module
+        uses: actions/download-artifact@v4
+        with:
+          name: contracts-module
+          path: .ci
 
       - uses: ./.github/actions/setup-spacetime-cli
         with:
@@ -214,15 +213,6 @@ jobs:
           done
           cat /tmp/lumiere-ci-stdb.log
           exit 1
-
-      # Schema extraction is optimisation-independent: build with the fast
-      # ci-contracts profile (the size-optimised release build is ~4x slower).
-      - name: Build contracts module (ci-contracts profile)
-        if: steps.contracts-module.outputs.cache-hit != 'true'
-        run: |
-          cargo build --manifest-path spacetimedb/Cargo.toml --target wasm32-unknown-unknown --profile ci-contracts
-          mkdir -p .ci
-          cp spacetimedb/target/wasm32-unknown-unknown/ci-contracts/lumiere_v1.wasm .ci/contracts-module.wasm
 
       - name: Publish production module to standalone SpacetimeDB
         run: spacetime publish lumiere-ci-contracts --bin-path .ci/contracts-module.wasm --server local --delete-data=always -y --no-config

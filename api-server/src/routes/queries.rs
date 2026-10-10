@@ -19,6 +19,8 @@ use serde_json::{json, Value};
 use std::sync::Arc;
 use stdb_auth::{has_resource_read_permission, registry_get};
 
+mod replenishment;
+
 #[derive(Debug, Deserialize)]
 pub(crate) struct OrgQuery {
     #[serde(rename = "organizationId")]
@@ -36,7 +38,9 @@ pub(crate) struct AuthoritativeQuery {
 }
 
 fn owner_read_permission_resource(resource: &str) -> Option<&str> {
-    if crate::query_exec::crm_resource(resource) {
+    if resource == "replenishment-run-jobs" {
+        Some("replenishment-rules")
+    } else if crate::query_exec::crm_resource(resource) {
         Some(resource)
     } else if crate::workflow_reads::is_private_workflow_resource(resource) {
         // Most private workflow tables are intentionally absent from the
@@ -124,6 +128,15 @@ pub(crate) async fn get_query(
     let owner_read = owner_read_permission_resource(&resource).is_some();
     if owner_read {
         require_owner_read_permission(&resource, &context)?;
+    }
+    // Only this exact registered private inventory resource uses the bounded
+    // adapter. Membership scope is resolved with the actor client, not owner authority.
+    if resource == "replenishment-run-jobs" {
+        let mut data = replenishment::read(&state.stdb, context, q.company_id).await?;
+        if let Some(limit) = q.limit {
+            data.truncate(limit as usize);
+        }
+        return Ok(Json(json!({ "data": data })));
     }
     let client = if owner_read {
         state.stdb.clone()
@@ -254,5 +267,14 @@ mod tests {
             Some("workflows")
         );
         assert_eq!(owner_read_permission_resource("products"), None);
+        assert_eq!(
+            owner_read_permission_resource("replenishment-run-jobs"),
+            Some("replenishment-rules")
+        );
+        assert_eq!(owner_read_permission_resource("replenishment_run_job"), None);
+        assert_eq!(
+            owner_read_permission_resource("replenishment-run-jobs-extra"),
+            None
+        );
     }
 }

@@ -114,9 +114,12 @@ function MapClientLoaded({ organizationId }: { organizationId: number }) {
     () => new Set(defaultMapLayers.filter((l) => l.defaultVisible !== false).map((l) => l.id))
   )
   const { t } = useTranslation()
-  const { data: vehicles = [] } = useFleetVehicles(orgId)
-  const { data: posTerminals = [] } = usePosTerminals(orgId)
-  const { data: warehouseGeos = [] } = useWarehouseGeo(orgId)
+  const vehiclesQuery = useFleetVehicles(orgId)
+  const posTerminalsQuery = usePosTerminals(orgId)
+  const warehouseGeosQuery = useWarehouseGeo(orgId)
+  const vehicles = vehiclesQuery.data?.rows ?? []
+  const posTerminals = posTerminalsQuery.data?.rows ?? []
+  const warehouseGeos = warehouseGeosQuery.data?.rows ?? []
   const createFleetVehicle = useCreateFleetVehicle(orgId, operatingCompanyId)
   const updateVehiclePosition = useUpdateVehiclePosition(orgId, operatingCompanyId)
   const [fleetAction, setFleetAction] = useState<FleetMapAction | null>(null)
@@ -283,6 +286,43 @@ function MapClientLoaded({ organizationId }: { organizationId: number }) {
   const handleFleetSubmit = async (data: Record<string, unknown>) => {
     if (fleetAction === "createVehicle") await handleCreateFleetVehicle(data)
     else if (fleetAction === "updatePosition") await handleUpdateVehiclePosition(data)
+  }
+
+  const resourceStates = [
+    vehiclesQuery.data,
+    posTerminalsQuery.data,
+    warehouseGeosQuery.data,
+  ]
+  const deniedResource = resourceStates.find((state) => state?.status === "denied")
+  const unavailableResource = resourceStates.find((state) => state?.status === "unavailable")
+  const isResourceLoading =
+    vehiclesQuery.isLoading || posTerminalsQuery.isLoading || warehouseGeosQuery.isLoading
+
+  if (isResourceLoading) {
+    return (
+      <div className="flex h-full items-center justify-center text-sm text-muted-foreground" role="status">
+        Loading map resources…
+      </div>
+    )
+  }
+
+  if (deniedResource || unavailableResource) {
+    const denied = deniedResource?.status === "denied"
+    const state = deniedResource ?? unavailableResource
+    return (
+      <div className="flex h-full items-center justify-center p-6">
+        <div
+          className="max-w-lg rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive"
+          data-testid="map-resource-state"
+          role="alert"
+        >
+          <p className="font-semibold">
+            {denied ? "Map data access denied" : "Map data unavailable"}
+          </p>
+          <p className="mt-1">{state?.message}</p>
+        </div>
+      </div>
+    )
   }
 
   return (

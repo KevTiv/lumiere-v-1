@@ -35,13 +35,13 @@ The audit uses current source and existing accepted evidence rather than histori
 ## Correctness/effect evidence sampled
 
 - `api-server/src/routes/operations.rs` and `api-server/src/commands.rs` — authenticated generated-operation/trusted-context authority is strong, but generic successful dispatch currently yields transport acceptance rather than authoritative business-effect disposition.
-- `frontend/packages/query-hooks/src/hooks/ai-action-drafts.ts` — production newest/highest-id correlation after draft creation; must be replaced by stable request/effect identity.
-- `frontend/web/tests/e2e/helpers-exact-sale-order.ts` — current opportunity→sale-order helper enforces exact 0..1 identity; other latest/highest helpers remain classified under COV-D09.
+- `ai-gateway/src/routes/actions.rs`, `ai-gateway/src/routes/action_draft_bridge.rs`, and `frontend/packages/query-hooks/src/hooks/ai-action-drafts.ts` — action drafts use durable run/request identity and exact 0..1 readback.
+- `frontend/web/tests/e2e/helpers-exact-sale-order.ts` and `frontend/web/tests/e2e/helpers-legacy.ts` — certification effects use exact producer-owned relations or unique request fields and reject duplicate matches.
 - `frontend/packages/ui/src/forms/form-modal.tsx` — missing-submit false success is repaired and guarded.
-- `frontend/packages/ui/src/forms/runtime-form-modal.tsx` — runtime-config failure can fall back to static form and still submit.
-- `frontend/packages/api-client/src/create-client.ts`, `frontend/packages/query-hooks/src/http.ts`, and `frontend/web/lib/server-query.ts` — `AllowEmpty` paths can collapse non-OK/failure into `[]`; COV-00C must classify critical usages.
-- `frontend/packages/ui/src/lib/stored-dashboard-resolver.ts` — malformed domains can broaden to all rows; unknown operators can pass; missing timestamps/measures weaken period/aggregate semantics.
-- `frontend/web/hooks/use-stored-dashboard-data-sources.ts` — renderer currently receives loading but not a shared source-error/partial-state contract.
+- `frontend/packages/ui/src/forms/runtime-form-modal.tsx` — runtime-config failure is visible and blocks submission unless an explicitly classified static fallback is selected.
+- `frontend/packages/api-client/src/query-resource-state.ts` and `frontend/web/lib/server-query.ts` — critical reads preserve ready, empty, denied, and unavailable states.
+- `frontend/packages/ui/src/lib/stored-dashboard-resolver.ts` — invalid definitions fail closed; missing timestamps/measures are reported as partial and block export.
+- `frontend/web/hooks/use-stored-dashboard-data-sources.ts` — per-source loading, ready, empty, denied, unavailable, and partial state reaches reports and exports.
 
 ## Representative browser evidence inspected
 
