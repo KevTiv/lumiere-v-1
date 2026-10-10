@@ -11,6 +11,7 @@ import {
   gotoModule,
   scalarQueryId,
   scalarQueryString,
+  selectModuleTab,
   signIn,
   smokeName,
 } from "./helpers"
@@ -171,6 +172,7 @@ test.describe(
           PERSONA_PASSWORD,
         )
         await gotoModule(purchasingPage, "/purchasing", "purchasing")
+        await selectModuleTab(purchasingPage, "purchasing", "operations")
         await purchasingPage.getByTestId("purchasing-ops-award-rfq-bid").click()
 
         const dialog = purchasingPage.getByRole("dialog", { name: "Award RFQ bid" })
