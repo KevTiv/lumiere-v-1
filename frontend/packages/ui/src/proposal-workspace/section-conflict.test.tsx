@@ -37,6 +37,7 @@ const theirRow = { ...baseRow, content: "their text", revision: 4 }
 
 const EMPTY_QUERY = { data: [] as Record<string, unknown>[] }
 let sections: Record<string, unknown>[]
+let lineItems: Record<string, unknown>[]
 let upsertMutate: ReturnType<typeof vi.fn>
 let resolveAsync: ReturnType<typeof vi.fn>
 
@@ -46,6 +47,7 @@ function makeHooks(): ProposalWorkspaceHooks {
     {
       get: (_target, name: string) => {
         if (name === "useProposalSections") return () => ({ data: sections })
+        if (name === "useProposalLineItems") return () => ({ data: lineItems })
         if (QUERY_HOOKS.has(name)) return () => EMPTY_QUERY
         if (name === "useUpsertProposalSection") return () => ({ mutate: upsertMutate, isPending: false })
         if (name === "useResolveProposalSectionConflict") return () => ({ mutateAsync: resolveAsync, isPending: false })
@@ -55,10 +57,10 @@ function makeHooks(): ProposalWorkspaceHooks {
   ) as unknown as ProposalWorkspaceHooks
 }
 
-function renderWorkspace(canResolve = true) {
+function renderWorkspace(canResolve = true, proposalId = "1") {
   return render(
     <ProposalWorkspace
-      proposalId="1"
+      proposalId={proposalId}
       proposalTitle="Bid"
       organizationId={1n}
       companyId={1n}
@@ -77,6 +79,7 @@ beforeEach(() => {
   vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] })
   toasts.show.mockClear()
   sections = [baseRow]
+  lineItems = []
   upsertMutate = vi.fn((_params, options?: { onError?: (e: unknown) => void; onSettled?: () => void }) => {
     sections = [theirRow] // the invalidated sections query now holds the server's version
     options?.onError?.(conflictError)
@@ -196,3 +199,53 @@ describe("section revision conflict banner", () => {
   })
 })
 
+describe("proposal totals", () => {
+  beforeEach(() => {
+    sections = [
+      baseRow,
+      { ...baseRow, id: 8n, title: "Delivery", sequence: 20 },
+      { ...baseRow, id: 9n, proposalId: "2", title: "Other proposal" },
+    ]
+    // The line-item query returns organization-wide data, even when passed a proposal ID.
+    lineItems = [
+      { id: 11n, proposalId: 1n, sectionId: 7n, quantity: 2, priceUnit: 100, discount: 25, sequence: 10 },
+      { id: 12n, proposalId: "1", sectionId: 8n, quantity: 3, priceUnit: 50, discount: 0, sequence: 20 },
+      { id: 13n, proposalId: 1n, sectionId: null, quantity: 1, priceUnit: 40, discount: 50, sequence: 30 },
+      { id: 21n, proposalId: 2n, sectionId: 9n, quantity: 5, priceUnit: 1000, discount: 10, sequence: 10 },
+    ]
+  })
+
+  function displayedValue(): string | null {
+    const label = screen.queryByText("proposalWorkspace.sectionSidebar.proposalValue")
+    return label?.nextElementSibling?.textContent ?? null
+  }
+
+  it("totals only this proposal across all sections and unassigned items, including discounts", () => {
+    renderWorkspace()
+    // 2 × 100 × 75% + 3 × 50 + 1 × 40 × 50% = 320.
+    expect(displayedValue()).toBe("$320")
+  })
+
+  it("does not show another proposal's value when this proposal has no line items", () => {
+    renderWorkspace(true, "3")
+    expect(displayedValue()).toBeNull()
+  })
+
+  it("recalculates the value when the selected proposal changes", () => {
+    const view = renderWorkspace()
+    expect(displayedValue()).toBe("$320")
+
+    view.rerender(
+      <ProposalWorkspace
+        proposalId="2"
+        proposalTitle="Other bid"
+        organizationId={1n}
+        companyId={1n}
+        onAnalyze={vi.fn()}
+        hooks={makeHooks()}
+      />,
+    )
+
+    expect(displayedValue()).toBe("$4,500")
+  })
+})
