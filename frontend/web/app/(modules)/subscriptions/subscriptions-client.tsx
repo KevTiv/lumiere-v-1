@@ -559,6 +559,7 @@ function SubscriptionsClientLoaded({
       }
     }
     const promptEdit = async (plan: Record<string, unknown>) => {
+      if (!plansUsableRef.current) return
       const current = planEditDefaults(plan)
       const values = await askForm({
         title: editLabel,
@@ -615,6 +616,7 @@ function SubscriptionsClientLoaded({
       await runCommand(editLabel, () => updatePlan.mutateAsync({ planId: BigInt(String(plan.id)), params: result.params }))
     }
     const promptNewBundle = async (selected: Record<string, unknown> | undefined) => {
+      if (!plansUsableRef.current) return
       const planOptions = subscriptionPlanRowsToSelectOptions(plans as unknown as Record<string, unknown>[])
       const values = await askForm({
         title: bundleLabel,
