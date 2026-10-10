@@ -64,7 +64,11 @@ test("sha256Hex matches the standard test vector", async () => {
 
 test("import commit resolves the exact job stamped with the file hash", () => {
   const jobs = [job(7n, 1n, "hr_payslip", "success", "aa"), job(8n, 1n, "hr_payslip", "success", "bb")]
-  assert.deepEqual(resolveImportCommitEffect(jobs, 1n, "hr_payslip", "bb"), { resource: "import-jobs", id: "8" })
+  assert.deepEqual(resolveImportCommitEffect(jobs, 1n, "hr_payslip", "bb"), {
+    resource: "import-jobs",
+    id: "8",
+    href: "/settings/import-jobs/8",
+  })
 })
 
 test("failed, pending, foreign-org, wrong-entity and unstamped jobs do not prove a commit", () => {

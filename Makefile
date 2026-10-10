@@ -1223,6 +1223,8 @@ check-reducer-contracts-drift: schema-snapshot codegen
 # CI source check that does not depend on a separately deployed module. The
 # live deployment compatibility check remains available as check-contracts-drift.
 check-contracts-source-drift: clean-contracts-live-staging generate-stdb-rust-sdk generate-stdb-ts-sdk
+	@git diff --exit-code -- frontend/packages/stdb/src/stdb-http-option-fields.json || \
+		(echo "Generated HTTP option-field registry is out of date. Run: make generate-stdb-ts-sdk" && exit 1)
 	@CHECKOUT="$$(bash scripts/resolve-pinned-contracts.sh)"; \
 	if [ -z "$$CHECKOUT" ] || [ ! -d "$$CHECKOUT/crates/lumiere-contracts/src/bindings" ]; then \
 		echo "check-contracts-source-drift: could not resolve pinned contracts" >&2; \

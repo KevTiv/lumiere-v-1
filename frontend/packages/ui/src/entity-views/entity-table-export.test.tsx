@@ -59,8 +59,8 @@ function renderTable(props: { allowExport?: boolean } = {}) {
 }
 
 describe("EntityTable export", () => {
-  it("downloads all rows without sensitive columns", async () => {
-    renderTable()
+  it("downloads all rows without sensitive columns when explicitly enabled", async () => {
+    renderTable({ allowExport: true })
     fireEvent.click(screen.getByTestId("entity-table-export"))
     expect(blobs).toHaveLength(1)
     const text = await readBlob(blobs[0]!)
@@ -70,7 +70,11 @@ describe("EntityTable export", () => {
     expect(text).not.toContain("s1")
   })
 
-  it("hides the action when export is disabled", () => {
+  it("hides the action unless export is explicitly enabled", () => {
+    renderTable()
+    expect(screen.queryByTestId("entity-table-export")).toBeNull()
+
+    cleanup()
     renderTable({ allowExport: false })
     expect(screen.queryByTestId("entity-table-export")).toBeNull()
   })

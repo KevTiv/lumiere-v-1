@@ -154,7 +154,7 @@ export interface EntityTableConfig {
   rowKey?: string
   /** When set, filter UI state is persisted in localStorage under this key. */
   listViewKey?: string
-  /** Set false on sensitive lists to hide the Export action. Defaults to true. */
+  /** Explicitly enable export for a reviewed list. Defaults to false. */
   allowExport?: boolean
   searchable?: boolean
   searchPlaceholder?: string
