@@ -451,8 +451,7 @@ function DocumentsClientLoaded({
     id: "run-retention-purge",
     label: t("documents.knowledgeActions.retentionPurge", { defaultValue: "Run retention purge" }),
     requiresSelection: false,
-    // The reducer needs document:admin; the client permission model's top level is "manage".
-    permission: { resource: "document", action: "manage" },
+    permission: { resource: "document", action: "admin" },
     onClick: async () => {
       const title = t("documents.knowledgeActions.retentionPurge", { defaultValue: "Run retention purge" })
       const values = await askForm({

@@ -51,6 +51,7 @@ import {
   type CanonicalRecordRef,
   type ResolvedOperationEffectOutcome,
 } from './operation-effect';
+import { resolveExactRecordState } from './exact-record-state';
 
 function requireSelectedCompany(companyId: bigint | undefined): bigint {
   if (companyId == null || companyId <= 0n) {
@@ -895,19 +896,38 @@ export function useDeactivateSubscriptionPlan(
   companyId?: bigint,
 ) {
   const qc = useQueryClient();
-  return useMutation<void, Error, { planId: bigint }>({
-    mutationFn: async ({ planId }) => {
-      const { urlPath, init } = stdbBffCommandPost(
-        'deactivate_subscription_plan',
-        { companyId: requireSelectedCompany(companyId), planId: planId },
-      );
-      const r = await apiFetch(urlPath, init);
-      if (!r.ok) throw new Error('Failed to deactivate subscription plan');
+  return useMutation({
+    mutationFn: async ({ planId }: { planId: bigint }) => {
+      const selectedCompany = requireSelectedCompany(companyId);
+      const outcome = await executeOperationWithCanonicalReadback({
+        resolveEffect: async () =>
+          resolveExactRecordState(
+            await fetchQueryList('/api/query/subscription-plans', 'Failed to read subscription plan'),
+            organizationId,
+            planId,
+            'subscription-plans',
+            (row) => Boolean(row.isActive ?? row.is_active) === false,
+            `/subscriptions?tab=plans&recordId=${planId}`,
+          ),
+        dispatch: async () => {
+          const { urlPath, init } = stdbBffCommandPost(
+            'deactivate_subscription_plan',
+            { companyId: selectedCompany, planId },
+          );
+          return decodeOperationDispatch(
+            await apiFetch(urlPath, init),
+            'Failed to deactivate subscription plan',
+          );
+        },
+        afterDispatch: () =>
+          qc.invalidateQueries({
+            queryKey: ['subscription-plans', rqBigIntKey(organizationId)],
+          }),
+        readbackAttempts: 6,
+        readbackDelayMs: 150,
+      });
+      return requireResolvedOperationEffect(outcome);
     },
-    onSuccess: () =>
-      qc.invalidateQueries({
-        queryKey: ['subscription-plans', rqBigIntKey(organizationId)],
-      }),
   });
 }
 
@@ -916,19 +936,38 @@ export function useActivateSubscriptionPlan(
   companyId?: bigint,
 ) {
   const qc = useQueryClient();
-  return useMutation<void, Error, { planId: bigint }>({
-    mutationFn: async ({ planId }) => {
-      const { urlPath, init } = stdbBffCommandPost(
-        'activate_subscription_plan',
-        { companyId: requireSelectedCompany(companyId), planId: planId },
-      );
-      const r = await apiFetch(urlPath, init);
-      if (!r.ok) throw new Error('Failed to activate subscription plan');
+  return useMutation({
+    mutationFn: async ({ planId }: { planId: bigint }) => {
+      const selectedCompany = requireSelectedCompany(companyId);
+      const outcome = await executeOperationWithCanonicalReadback({
+        resolveEffect: async () =>
+          resolveExactRecordState(
+            await fetchQueryList('/api/query/subscription-plans', 'Failed to read subscription plan'),
+            organizationId,
+            planId,
+            'subscription-plans',
+            (row) => Boolean(row.isActive ?? row.is_active) === true,
+            `/subscriptions?tab=plans&recordId=${planId}`,
+          ),
+        dispatch: async () => {
+          const { urlPath, init } = stdbBffCommandPost(
+            'activate_subscription_plan',
+            { companyId: selectedCompany, planId },
+          );
+          return decodeOperationDispatch(
+            await apiFetch(urlPath, init),
+            'Failed to activate subscription plan',
+          );
+        },
+        afterDispatch: () =>
+          qc.invalidateQueries({
+            queryKey: ['subscription-plans', rqBigIntKey(organizationId)],
+          }),
+        readbackAttempts: 6,
+        readbackDelayMs: 150,
+      });
+      return requireResolvedOperationEffect(outcome);
     },
-    onSuccess: () =>
-      qc.invalidateQueries({
-        queryKey: ['subscription-plans', rqBigIntKey(organizationId)],
-      }),
   });
 }
 

@@ -1705,6 +1705,20 @@
     ],
     "table": "document_legal_hold"
   },
+  "document-retention-purge-jobs": {
+    "aliases": [
+      "document-retention-purge-jobs",
+      "document_retention_purge_job"
+    ],
+    "default_restricted": [
+      "scheduled_at"
+    ],
+    "mandatory": [
+      "scheduled_id",
+      "organization_id"
+    ],
+    "table": "document_retention_purge_job"
+  },
   "document-signature-requests": {
     "aliases": [
       "document-signature-requests",
@@ -2922,7 +2936,9 @@
     ],
     "default_restricted": [
       "name",
-      "is_published"
+      "is_published",
+      "member_ids",
+      "article_member_count"
     ],
     "mandatory": [
       "id",
@@ -2937,6 +2953,8 @@
     ],
     "default_restricted": [
       "name",
+      "description",
+      "color",
       "article_count",
       "parent_id",
       "sequence"

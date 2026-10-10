@@ -2241,8 +2241,7 @@ function AccountingClientReady({
         id: "tax-deadline-waive",
         label: waiveLabel,
         requiresSelection: true,
-        // The reducer needs tax_deadline:admin; the client permission model's top level is "manage".
-        permission: { resource: "tax_deadline", action: "manage" },
+        permission: { resource: "tax_deadline", action: "admin" },
         isApplicable: (rows) => rows.every((r) => canWaiveTaxDeadline(r)),
         confirm: {
           title: waiveLabel,

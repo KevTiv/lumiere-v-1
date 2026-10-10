@@ -11,7 +11,8 @@ import type {
   AccountTaxQueryRow,
 } from "@lumiere/stdb/resource-reads"
 import { createStdbSdk } from "@lumiere/stdb/sdk"
-import { apiFetch } from "../../http"
+import { decodeOperationDispatch } from "@lumiere/api-client"
+import { apiFetch, fetchQueryList } from "../../http"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import {
   paymentParamsToJson,
@@ -64,6 +65,11 @@ import {
 import { stdbInvalidationFor } from "@lumiere/contracts/stdb-reducer-invalidation"
 
 import { responseErrorMessage as parseCallError } from "@lumiere/api-client/response-error"
+import {
+  executeOperationWithCanonicalReadback,
+  requireResolvedOperationEffect,
+} from "../operation-effect"
+import { enumState, resolveExactRecordState } from "../exact-record-state"
 export function useImportTaxRateCsv(organizationId: number, companyId: bigint) {
   const qc = useQueryClient()
   return useMutation({
@@ -248,12 +254,25 @@ export function useDeleteTaxDeadline(organizationId: number) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (deadlineId: bigint) => {
-      const { urlPath, init } = stdbBffCommandPost("delete_tax_deadline", { deadlineId: deadlineId })
-      const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error(await parseCallError(r))
-    },
-    onSuccess: () => {
-      invalidateStdbQueryResources(qc, organizationId, ["tax-deadlines"])
+      const outcome = await executeOperationWithCanonicalReadback({
+        resolveBeforeDispatch: false,
+        resolveEffect: async () =>
+          resolveExactRecordState(
+            await fetchQueryList("/api/query/tax-deadlines", "Failed to read tax deadline"),
+            BigInt(organizationId),
+            deadlineId,
+            "tax-deadlines",
+            (row) => (row.deletedAt ?? row.deleted_at) != null,
+          ),
+        dispatch: async () => {
+          const { urlPath, init } = stdbBffCommandPost("delete_tax_deadline", { deadlineId })
+          return decodeOperationDispatch(await apiFetch(urlPath, init), "Failed to delete tax deadline")
+        },
+        afterDispatch: () => invalidateStdbQueryResources(qc, organizationId, ["tax-deadlines"]),
+        readbackAttempts: 6,
+        readbackDelayMs: 150,
+      })
+      return requireResolvedOperationEffect(outcome)
     },
   })
 }
@@ -262,12 +281,25 @@ export function useCompleteTaxDeadline(organizationId: number) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (deadlineId: bigint) => {
-      const { urlPath, init } = stdbBffCommandPost("complete_tax_deadline", { deadlineId: deadlineId })
-      const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error(await parseCallError(r))
-    },
-    onSuccess: () => {
-      invalidateStdbQueryResources(qc, organizationId, ["tax-deadlines"])
+      const outcome = await executeOperationWithCanonicalReadback({
+        resolveEffect: async () =>
+          resolveExactRecordState(
+            await fetchQueryList("/api/query/tax-deadlines", "Failed to read tax deadline"),
+            BigInt(organizationId),
+            deadlineId,
+            "tax-deadlines",
+            (row) => enumState(row.status) === "completed",
+            `/accounting?tab=tax-deadlines&recordId=${deadlineId}`,
+          ),
+        dispatch: async () => {
+          const { urlPath, init } = stdbBffCommandPost("complete_tax_deadline", { deadlineId })
+          return decodeOperationDispatch(await apiFetch(urlPath, init), "Failed to complete tax deadline")
+        },
+        afterDispatch: () => invalidateStdbQueryResources(qc, organizationId, ["tax-deadlines"]),
+        readbackAttempts: 6,
+        readbackDelayMs: 150,
+      })
+      return requireResolvedOperationEffect(outcome)
     },
   })
 }
@@ -276,12 +308,25 @@ export function useWaiveTaxDeadline(organizationId: number) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (deadlineId: bigint) => {
-      const { urlPath, init } = stdbBffCommandPost("waive_tax_deadline", { deadlineId: deadlineId })
-      const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error(await parseCallError(r))
-    },
-    onSuccess: () => {
-      invalidateStdbQueryResources(qc, organizationId, ["tax-deadlines"])
+      const outcome = await executeOperationWithCanonicalReadback({
+        resolveEffect: async () =>
+          resolveExactRecordState(
+            await fetchQueryList("/api/query/tax-deadlines", "Failed to read tax deadline"),
+            BigInt(organizationId),
+            deadlineId,
+            "tax-deadlines",
+            (row) => enumState(row.status) === "waived",
+            `/accounting?tab=tax-deadlines&recordId=${deadlineId}`,
+          ),
+        dispatch: async () => {
+          const { urlPath, init } = stdbBffCommandPost("waive_tax_deadline", { deadlineId })
+          return decodeOperationDispatch(await apiFetch(urlPath, init), "Failed to waive tax deadline")
+        },
+        afterDispatch: () => invalidateStdbQueryResources(qc, organizationId, ["tax-deadlines"]),
+        readbackAttempts: 6,
+        readbackDelayMs: 150,
+      })
+      return requireResolvedOperationEffect(outcome)
     },
   })
 }

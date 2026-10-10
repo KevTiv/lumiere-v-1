@@ -24,6 +24,7 @@ const KNOWN_ACTIONS = new Set<Action>([
   "delete",
   "manage",
   "write",
+  "admin",
 ])
 
 function readBool(row: BackendRoleRow, camel: "isSystem" | "isActive"): boolean {
@@ -288,7 +289,7 @@ export function buildRbacUserFromServer(
 export function actionsMatch(ruleAction: Action | "*", requested: Action): boolean {
   if (ruleAction === "*") return true
   if (ruleAction === requested) return true
-  if (ruleAction === "manage") return true
+  if (ruleAction === "manage" && requested !== "admin") return true
   if (ruleAction === "write" && (requested === "update" || requested === "create")) {
     return true
   }
