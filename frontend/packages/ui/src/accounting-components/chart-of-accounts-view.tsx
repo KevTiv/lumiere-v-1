@@ -40,6 +40,8 @@ import {
   PiggyBank,
   Receipt,
   Upload,
+  Archive,
+  ArchiveRestore,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import {
@@ -132,10 +134,12 @@ interface AccountsTableProps {
   accounts: AccountAccount[]
   t: TFunction
   onAccountClick?: (account: AccountAccount) => void
+  onToggleDeprecated?: (account: AccountAccount) => void | Promise<void>
 }
 
-function AccountsTable({ accounts, t, onAccountClick }: AccountsTableProps) {
+function AccountsTable({ accounts, t, onAccountClick, onToggleDeprecated }: AccountsTableProps) {
   const accountsPager = usePagedRows(accounts)
+  const [togglingId, setTogglingId] = useState<string | null>(null)
   return (
     <>
       <Table>
@@ -183,9 +187,37 @@ function AccountsTable({ accounts, t, onAccountClick }: AccountsTableProps) {
                 </Badge>
               </TableCell>
               <TableCell>
-                <Button variant="ghost" size="icon" className="h-8 w-8">
-                  <Edit className="h-4 w-4" />
-                </Button>
+                <div className="flex items-center gap-1">
+                  <Button variant="ghost" size="icon" className="h-8 w-8">
+                    <Edit className="h-4 w-4" />
+                  </Button>
+                  {onToggleDeprecated ? (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8"
+                      disabled={togglingId === String(account.id)}
+                      title={account.deprecated === true
+                        ? t("accounting.accounts.rowActions.reactivate", { defaultValue: "Reactivate account" })
+                        : t("accounting.accounts.rowActions.deprecate", { defaultValue: "Deprecate account" })}
+                      aria-label={account.deprecated === true
+                        ? t("accounting.accounts.rowActions.reactivate", { defaultValue: "Reactivate account" })
+                        : t("accounting.accounts.rowActions.deprecate", { defaultValue: "Deprecate account" })}
+                      data-testid={`account-toggle-deprecated-${String(account.id)}`}
+                      onClick={async (event) => {
+                        event.stopPropagation()
+                        setTogglingId(String(account.id))
+                        try {
+                          await onToggleDeprecated(account)
+                        } finally {
+                          setTogglingId(null)
+                        }
+                      }}
+                    >
+                      {account.deprecated === true ? <ArchiveRestore className="h-4 w-4" /> : <Archive className="h-4 w-4" />}
+                    </Button>
+                  ) : null}
+                </div>
               </TableCell>
             </TableRow>
           )
@@ -203,6 +235,11 @@ interface ChartOfAccountsViewProps {
   onImportAccountsCsv?: () => void
   /** Click account row to open GL move-line drilldown. */
   onAccountClick?: (account: AccountAccount) => void
+  /**
+   * When set, each row gets a deprecate / reactivate button. The caller owns confirmation,
+   * the mutation and its toasts, and only passes this when the user may write accounts.
+   */
+  onToggleDeprecated?: (account: AccountAccount) => void | Promise<void>
   /** When set, shows a second top-level tab (e.g. account types & groups). */
   chartStructureContent?: ReactNode
 }
@@ -212,6 +249,7 @@ export function ChartOfAccountsView({
   onCreate,
   onImportAccountsCsv,
   onAccountClick,
+  onToggleDeprecated,
   chartStructureContent,
 }: ChartOfAccountsViewProps) {
   const { t } = useTranslation()
@@ -302,7 +340,7 @@ export function ChartOfAccountsView({
             </TabsList>
             {tabGroups.map(({ value, accounts: tabAccounts }) => (
               <TabsContent key={value} value={value}>
-                <AccountsTable accounts={tabAccounts} t={t} onAccountClick={onAccountClick} />
+                <AccountsTable accounts={tabAccounts} t={t} onAccountClick={onAccountClick} onToggleDeprecated={onToggleDeprecated} />
               </TabsContent>
             ))}
           </Tabs>

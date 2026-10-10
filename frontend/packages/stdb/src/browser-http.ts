@@ -37,6 +37,36 @@ export async function stdbBrowserQuery(resource: string): Promise<Record<string,
   return queryStdbList(resolveApiFetch(), resource)
 }
 
+/** Read every active user in the caller's organization through the server-owned private profile join. */
+export async function stdbBrowserQueryOrganizationUsers(): Promise<Record<string, unknown>[]> {
+  const apiFetch = resolveApiFetch()
+  const pageSize = 100
+  const rows: Record<string, unknown>[] = []
+
+  for (let offset = 0; ; offset += pageSize) {
+    const response = await apiFetch(`/api/settings/users?limit=${pageSize}&offset=${offset}`)
+    if (!response.ok) {
+      throw new Error("Failed to fetch organization users")
+    }
+    const body = (await response.json()) as {
+      data?: unknown
+      meta?: { total?: unknown }
+    }
+    const page = Array.isArray(body.data)
+      ? body.data.filter(
+          (row): row is Record<string, unknown> =>
+            row !== null && typeof row === "object" && !Array.isArray(row),
+        )
+      : []
+    rows.push(...page)
+
+    const total = Number(body.meta?.total)
+    if (page.length < pageSize || (Number.isFinite(total) && rows.length >= total)) {
+      return rows
+    }
+  }
+}
+
 /** Invoke a session-exposed operation through its generated immutable contract ID. */
 export async function stdbBrowserCommand<K extends StdbBffNamedReducerKey>(
   operation: K,

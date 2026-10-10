@@ -1,6 +1,7 @@
 "use client"
 
 
+import { decodeOperationDispatch } from "@lumiere/api-client"
 import { stdbBffCommandPost } from "@lumiere/stdb/commands"
 /**
  * Proposals hooks — SpacetimeDB API (org + company scoped mutators).
@@ -14,6 +15,15 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiFetch, fetchQueryList, rqBigIntKey } from "../http"
 import { responseErrorMessage } from "@lumiere/api-client/response-error"
 import { resolveProposalConversionEffect, resolveProposalStatusEffect } from "./proposal-award"
+import {
+  executeOperationWithCanonicalReadback,
+  requireResolvedOperationEffect,
+} from "./operation-effect"
+import {
+  proposalBidDecisionIds,
+  resolveProposalBidDecisionEffect,
+  type ProposalBidDecisionProjection,
+} from "./proposal-bid-decision-effect"
 import type {
   Proposal,
   ProposalBidDecision,
@@ -569,17 +579,48 @@ export function useRecordProposalBidDecision(
       rationale: string
     }) => {
       const company = requireCompany(companyId)
-      const { urlPath, init } = stdbBffCommandPost("record_proposal_bid_decision", { companyId: company, proposalId: toScalarU64(params.proposalId), params: stdbParamsToJson(
-          {
-            decision: params.decision,
-            rationale: params.rationale,
-          },
-          "RecordProposalBidDecisionParams",
-        ) })
-      const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error("Failed to record proposal bid decision")
+      const proposalId = toScalarU64(params.proposalId)
+      const readDecisions = async () =>
+        (await fetchQueryList(
+          "/api/query/proposal-bid-decisions",
+          "Failed to read proposal bid decisions",
+        )) as ProposalBidDecisionProjection[]
+      const beforeIds = proposalBidDecisionIds(await readDecisions())
+      const outcome = await executeOperationWithCanonicalReadback({
+        resolveBeforeDispatch: false,
+        resolveEffect: async () =>
+          resolveProposalBidDecisionEffect(
+            await readDecisions(),
+            beforeIds,
+            organizationId,
+            company,
+            proposalId,
+            params.decision,
+            params.rationale,
+          ),
+        dispatch: async () => {
+          const { urlPath, init } = stdbBffCommandPost("record_proposal_bid_decision", {
+            companyId: company,
+            proposalId,
+            params: stdbParamsToJson(
+              {
+                decision: params.decision,
+                rationale: params.rationale,
+              },
+              "RecordProposalBidDecisionParams",
+            ),
+          })
+          return decodeOperationDispatch(
+            await apiFetch(urlPath, init),
+            "Failed to record proposal bid decision",
+          )
+        },
+        afterDispatch: () => invalidateProposalQueries(qc),
+        readbackAttempts: 6,
+        readbackDelayMs: 150,
+      })
+      return requireResolvedOperationEffect(outcome)
     },
-    onSuccess: () => invalidateProposalQueries(qc),
   })
 }
 

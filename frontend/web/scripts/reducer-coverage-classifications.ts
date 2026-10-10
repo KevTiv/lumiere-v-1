@@ -15,6 +15,8 @@ export const EXPLICIT_REDUCER_CLASSIFICATIONS: Record<
   dev_promote_caller_superuser: "dev-only",
   ensure_dev_admin: "dev-only",
   mark_embedding_synced: "internal/background",
+  mark_all_notifications_read: "user-facing",
+  mark_notification_read: "user-facing",
   record_google_drive_sync: "internal/background",
   record_google_drive_sync_error: "internal/background",
   record_whatsapp_health_check: "internal/background",

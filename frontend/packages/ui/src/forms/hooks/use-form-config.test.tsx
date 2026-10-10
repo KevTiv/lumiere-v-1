@@ -1,6 +1,6 @@
 import { renderHook, act, waitFor } from "@testing-library/react"
 import { describe, it, expect, vi } from "vitest"
-import { useFormConfiguration } from "./use-form-config"
+import { organizationUsersToFieldOptions, useFormConfiguration } from "./use-form-config"
 
 vi.mock("@lumiere/erp-session", () => ({
   useErpSession: () => ({ identity: null, connected: false, organizationId: undefined }),
@@ -8,6 +8,7 @@ vi.mock("@lumiere/erp-session", () => ({
 
 vi.mock("@lumiere/stdb/browser-http", () => ({
   stdbBrowserQuery: vi.fn().mockResolvedValue([]),
+  stdbBrowserQueryOrganizationUsers: vi.fn().mockResolvedValue([]),
 }))
 
 vi.mock("@lumiere/stdb/client-ui-bridge", () => ({
@@ -204,5 +205,23 @@ describe("useFormConfiguration", () => {
       expect(result.current.isLoading).toBe(false)
     })
     expect(result.current.config).not.toBeNull()
+  })
+})
+
+describe("organizationUsersToFieldOptions", () => {
+  it("uses canonical identities, server labels, deduplication, and deterministic ordering", () => {
+    expect(
+      organizationUsersToFieldOptions([
+        { identity: "0xBBBB", name: "Zoe" },
+        { identity: "", identityHex: "aaaa", name: "", email: "amy@example.com" },
+        { user_identity: "0xBBBB", name: "Duplicate" },
+        { identity: "cccccccccccc", name: "" },
+        { name: "Missing identity" },
+      ]),
+    ).toEqual([
+      { value: "aaaa", label: "amy@example.com" },
+      { value: "cccccccccccc", label: "cccccccc…" },
+      { value: "bbbb", label: "Zoe" },
+    ])
   })
 })

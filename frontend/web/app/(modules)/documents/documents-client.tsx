@@ -26,8 +26,11 @@ import {
   completeDocumentProcessingJobForm,
   acknowledgeDocumentInsightForm,
   formatStdbTaggedValue,
+  useFormDialog,
 } from "@lumiere/ui"
 import type { EntityAction, EntityViewConfig, FormConfig } from "@lumiere/ui"
+import { useConfirmDialog } from "@lumiere/ui/hooks/use-confirm-dialog"
+import { showWorkflowToast } from "@lumiere/ui/lib/workflow-toast"
 import { withInlineEdits } from "@lumiere/ui/lib/with-inline-edits"
 import { documentsModuleConfig } from "@/lib/module-dashboard-configs"
 import { useDocumentsModuleSubscription } from "@/lib/module-subscription-hooks"
@@ -57,6 +60,10 @@ import {
   useUnlockKnowledgeArticle,
   useSetArticlePublished,
   useAddArticleMember,
+  useRemoveArticleMember,
+  useUpdateKnowledgeCategory,
+  useDeleteKnowledgeCategory,
+  useScheduleDocumentRetentionPurge,
   useCreateKnowledgeCategory,
   useCreateDocumentFolder,
   useUpdateDocumentFolder,
@@ -102,6 +109,13 @@ import {
 } from "@/lib/documents-create-params"
 import { documentRecordHref, formatFileSize } from "./document-record"
 import { documentFolderCanBeDeleted } from "./document-folder-gates"
+import {
+  canDeleteKnowledgeCategory,
+  canRemoveArticleMember,
+  parseMemberIdentity,
+  parseRetentionDelaySeconds,
+  toKnowledgeCategoryUpdateBody,
+} from "./knowledge-actions"
 import { optionalBigIntU64 } from "@lumiere/erp-shared/form-coercion"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
 import { useDefaultOperatingCompanyBigInt } from "@lumiere/query-hooks/hooks/use-operating-company"
@@ -293,6 +307,12 @@ function DocumentsClientLoaded({
   const unlockKnowledgeArticle = useUnlockKnowledgeArticle(orgId)
   const setArticlePublished = useSetArticlePublished(orgId, operatingCompanyId)
   const addArticleMember = useAddArticleMember(orgId)
+  const removeArticleMember = useRemoveArticleMember(orgId)
+  const updateKnowledgeCategory = useUpdateKnowledgeCategory(orgId)
+  const deleteKnowledgeCategory = useDeleteKnowledgeCategory(orgId)
+  const scheduleRetentionPurge = useScheduleDocumentRetentionPurge(orgId)
+  const { askForm, formDialog } = useFormDialog()
+  const { confirm: confirmDialog, dialog: confirmDialogNode } = useConfirmDialog()
   const createKnowledgeCategory = useCreateKnowledgeCategory(orgId, operatingCompanyId)
   const createDocumentFolder = useCreateDocumentFolder(orgId)
   const updateDocumentFolder = useUpdateDocumentFolder(orgId)
@@ -309,23 +329,174 @@ function DocumentsClientLoaded({
   const mailTemplateFormConfig = useMemo(() => newMailTemplateForm(t), [t])
   const articleMemberFormConfig = useMemo(() => addArticleMemberForm(t), [t])
 
-  const addCsvToolbar = (
-    ec: EntityViewConfig,
-    actions: Array<{
-      id: string
-      label: string
-      onClick: (selectedRows: Record<string, unknown>[]) => void
-    }>,
-  ): EntityViewConfig => {
-    if (ec.view.mode !== "table") return ec
-    return {
-      ...ec,
-      view: {
-        ...ec.view,
-        rowSelectionToggleOnClick: false,
-        actions,
-      },
+  /** Run one command from a dialog; the reducer re-validates, so failures surface as an error toast. */
+  const runKnowledgeCommand = async (title: string, work: () => Promise<unknown>, doneTitle?: string) => {
+    try {
+      await work()
+      showWorkflowToast({
+        kind: "success",
+        title: doneTitle ?? t("documents.knowledgeActions.done", { defaultValue: "{{action}} completed", action: title }),
+      })
+    } catch (error) {
+      showWorkflowToast({
+        kind: "error",
+        title: t("documents.knowledgeActions.failed", { defaultValue: "{{action}} failed", action: title }),
+        description: error instanceof Error ? error.message : String(error),
+      })
     }
+  }
+  const knowledgeInputError = (title: string, description: string) =>
+    showWorkflowToast({
+      kind: "error",
+      title: t("documents.knowledgeActions.failed", { defaultValue: "{{action}} failed", action: title }),
+      description,
+    })
+
+  const editCategoryAction: EntityAction = {
+    id: "edit-kb-category",
+    label: t("documents.knowledgeActions.editCategory", { defaultValue: "Edit category" }),
+    requiresSelection: true,
+    permission: { resource: "knowledge_article_category", action: "write" },
+    onClick: async (rows) => {
+      const row = rows[0]
+      if (!row) return
+      const title = t("documents.knowledgeActions.editCategory", { defaultValue: "Edit category" })
+      const values = await askForm({
+        title,
+        fields: [
+          { id: "name", name: "name", label: t("documents.forms.newCategory.fields.name"), type: "text", required: true, defaultValue: String(row.name ?? "") },
+          { id: "description", name: "description", label: t("documents.forms.newCategory.fields.description"), type: "textarea", defaultValue: String(row.description ?? "") },
+          { id: "sequence", name: "sequence", label: t("documents.forms.newCategory.fields.sequence"), type: "number", min: 0, defaultValue: row.sequence != null ? Number(row.sequence) : 10, width: "1/2" },
+          { id: "color", name: "color", label: t("documents.forms.newCategory.fields.color"), type: "number", min: 0, max: 11, defaultValue: row.color != null ? Number(row.color) : undefined, width: "1/2" },
+        ],
+      })
+      if (values == null) return
+      const params = toKnowledgeCategoryUpdateBody(values)
+      if (params == null) {
+        knowledgeInputError(
+          title,
+          t("documents.knowledgeActions.categoryInvalid", {
+            defaultValue: "Enter a name, a colour from 0 to 11 and a whole-number sequence.",
+          }),
+        )
+        return
+      }
+      await runKnowledgeCommand(title, () =>
+        updateKnowledgeCategory.mutateAsync({ categoryId: row.id as string | number, params }),
+      )
+    },
+  }
+
+  const deleteCategoryAction: EntityAction = {
+    id: "delete-kb-category",
+    label: t("documents.knowledgeActions.deleteCategory", { defaultValue: "Delete category" }),
+    variant: "destructive",
+    requiresSelection: true,
+    permission: { resource: "knowledge_article_category", action: "delete" },
+    // The reducer refuses a category that still has articles, so the action stays disabled for one.
+    isApplicable: (rows) => rows.every((row) => canDeleteKnowledgeCategory(row)),
+    confirm: {
+      title: t("documents.knowledgeActions.deleteCategory", { defaultValue: "Delete category" }),
+      description: t("documents.knowledgeActions.deleteCategoryConfirm", {
+        defaultValue: "Delete this category? Only categories without articles can be deleted, so move or delete their articles first.",
+      }),
+      confirmLabel: t("common.delete", { defaultValue: "Delete" }),
+      cancelLabel: t("common.cancel", { defaultValue: "Cancel" }),
+    },
+    successMessage: t("common.actionCompleted", {
+      action: t("documents.knowledgeActions.deleteCategory", { defaultValue: "Delete category" }),
+    }),
+    onClick: async (rows) => {
+      const row = rows[0]
+      if (!row) return
+      await deleteKnowledgeCategory.mutateAsync(row.id as string | number)
+    },
+  }
+
+  const removeMemberAction: EntityAction = {
+    id: "remove-article-member",
+    label: t("documents.knowledgeActions.removeMember", { defaultValue: "Remove member" }),
+    requiresSelection: true,
+    permission: { resource: "knowledge_article", action: "write" },
+    isApplicable: (rows) => rows.every((row) => canRemoveArticleMember(row)),
+    onClick: async (rows) => {
+      const row = rows[0]
+      if (!row) return
+      const title = t("documents.knowledgeActions.removeMember", { defaultValue: "Remove member" })
+      const values = await askForm({
+        title,
+        fields: [
+          {
+            id: "member",
+            name: "member",
+            label: t("documents.knowledgeActions.memberIdentity", { defaultValue: "Member identity (hex)" }),
+            type: "text",
+            required: true,
+          },
+        ],
+      })
+      if (values == null) return
+      const member = parseMemberIdentity(values)
+      if (member == null) {
+        knowledgeInputError(title, t("documents.knowledgeActions.memberRequired", { defaultValue: "Member identity is required." }))
+        return
+      }
+      await runKnowledgeCommand(title, () =>
+        removeArticleMember.mutateAsync({ articleId: row.id as string | number, member }),
+      )
+    },
+  }
+
+  const retentionPurgeAction: EntityAction = {
+    id: "run-retention-purge",
+    label: t("documents.knowledgeActions.retentionPurge", { defaultValue: "Run retention purge" }),
+    requiresSelection: false,
+    permission: { resource: "document", action: "admin" },
+    onClick: async () => {
+      const title = t("documents.knowledgeActions.retentionPurge", { defaultValue: "Run retention purge" })
+      const values = await askForm({
+        title,
+        description: t("documents.knowledgeActions.retentionPurgeHint", {
+          defaultValue: "Permanently deletes recycle-bin documents whose retention period has ended, after the delay.",
+        }),
+        fields: [
+          {
+            id: "delaySeconds",
+            name: "delaySeconds",
+            label: t("documents.knowledgeActions.delaySeconds", { defaultValue: "Delay (seconds)" }),
+            type: "number",
+            required: true,
+            min: 1,
+            defaultValue: 60,
+          },
+        ],
+      })
+      if (values == null) return
+      const delaySeconds = parseRetentionDelaySeconds(values.delaySeconds)
+      if (delaySeconds == null) {
+        knowledgeInputError(title, t("documents.knowledgeActions.delayInvalid", { defaultValue: "Enter a whole number of seconds, 1 or more." }))
+        return
+      }
+      if (
+        !(await confirmDialog({
+          title,
+          description: t("documents.knowledgeActions.retentionPurgeConfirm", {
+            defaultValue: "Schedule the purge to run in {{seconds}} seconds? Purged documents cannot be restored.",
+            seconds: delaySeconds,
+          }),
+        }))
+      ) {
+        return
+      }
+      await runKnowledgeCommand(
+        title,
+        () => scheduleRetentionPurge.mutateAsync({ delaySeconds }),
+        t("documents.knowledgeActions.retentionPurgeScheduled", {
+          defaultValue: "Retention purge scheduled in {{seconds}} seconds",
+          seconds: delaySeconds,
+        }),
+      )
+    },
   }
 
   const csvFormConfig = useMemo(() => {
@@ -681,6 +852,7 @@ function DocumentsClientLoaded({
                     })
                   },
                 },
+                removeMemberAction,
                 {
                   id: "delete-article",
                   label: "Delete",
@@ -709,13 +881,19 @@ function DocumentsClientLoaded({
           return {
             ...tab,
             createForm: knowledgeCategoryFormConfig,
-            entityConfig: addCsvToolbar(tab.entityConfig, [
-              {
-                id: "csv-kb-category-tab",
-                label: t("documents.toolbar.importCategoryCsv"),
-                onClick: (_rows) => setCsvKind("knowledge_category"),
-              },
-            ]),
+            entityConfig: withTableActions(
+              tab.entityConfig,
+              [
+                {
+                  id: "csv-kb-category-tab",
+                  label: t("documents.toolbar.importCategoryCsv"),
+                  onClick: (_rows) => setCsvKind("knowledge_category"),
+                },
+                editCategoryAction,
+                deleteCategoryAction,
+              ],
+              false,
+            ),
           }
         }
         if (tab.id === "document-folders" && tab.entityConfig) {
@@ -804,6 +982,7 @@ function DocumentsClientLoaded({
                     }
                   },
                 },
+                retentionPurgeAction,
               ],
               true,
             ),
@@ -1064,6 +1243,10 @@ function DocumentsClientLoaded({
     unlockKnowledgeArticle.isPending ||
     setArticlePublished.isPending ||
     addArticleMember.isPending ||
+    removeArticleMember.isPending ||
+    updateKnowledgeCategory.isPending ||
+    deleteKnowledgeCategory.isPending ||
+    scheduleRetentionPurge.isPending ||
     createKnowledgeCategory.isPending ||
     createDocumentFolder.isPending ||
     updateDocumentFolder.isPending ||
@@ -1089,6 +1272,8 @@ function DocumentsClientLoaded({
           {documentToolbarError}
         </p>
       ) : null}
+      {formDialog}
+      {confirmDialogNode}
       <ModuleView
         config={config}
         data={data}
