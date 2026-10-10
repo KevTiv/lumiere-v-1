@@ -15,6 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../components/select"
+import { RecordPicker } from "../components/record-picker"
 import {
   radixSelectControlledValue,
   radixSelectItemValue,
@@ -138,6 +139,20 @@ export function FormFieldRenderer({
         )
 
       case "select":
+        if (field.searchable) {
+          return (
+            <RecordPicker
+              value={String(value ?? "")}
+              onChange={onChange}
+              options={field.options}
+              placeholder={field.placeholder}
+              disabled={field.disabled}
+              invalid={!!error}
+              data-testid={`form-field-${field.name}`}
+              aria-describedby={describedBy}
+            />
+          )
+        }
         return (
           <Select
             value={radixSelectControlledValue(value as string | undefined, field.options)}

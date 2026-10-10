@@ -1,4 +1,5 @@
 "use client"
+import { recordOptions, withLinkedPickers } from "@/lib/linked-options"
 import { mapDashboardWidgets, withDashboardSections } from "@lumiere/ui/lib/dashboard-sections"
 
 import { useMemo, useState } from "react"
@@ -26,7 +27,8 @@ import {
   acknowledgeDocumentInsightForm,
   formatStdbTaggedValue,
 } from "@lumiere/ui"
-import type { EntityViewConfig, FormConfig } from "@lumiere/ui"
+import type { EntityAction, EntityViewConfig, FormConfig } from "@lumiere/ui"
+import { withInlineEdits } from "@lumiere/ui/lib/with-inline-edits"
 import { documentsModuleConfig } from "@/lib/module-dashboard-configs"
 import { useDocumentsModuleSubscription } from "@/lib/module-subscription-hooks"
 import {
@@ -98,6 +100,8 @@ import {
   toUpdateDocumentFolderParams,
   toSetDocumentRetentionParams,
 } from "@/lib/documents-create-params"
+import { documentRecordHref, formatFileSize } from "./document-record"
+import { documentFolderCanBeDeleted } from "./document-folder-gates"
 import { optionalBigIntU64 } from "@lumiere/erp-shared/form-coercion"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
 import { useDefaultOperatingCompanyBigInt } from "@lumiere/query-hooks/hooks/use-operating-company"
@@ -208,12 +212,7 @@ function truthyRowBool(v: unknown): boolean {
 
 function withTableActions(
   ec: EntityViewConfig,
-  actions: Array<{
-    id: string
-    label: string
-    requiresSelection?: boolean
-    onClick: (selectedRows: Record<string, unknown>[]) => void
-  }>,
+  actions: EntityAction[],
   rowSelectionToggleOnClick?: boolean,
 ): EntityViewConfig {
   if (ec.view.mode !== "table") return ec
@@ -395,10 +394,13 @@ function DocumentsClientLoaded({
 
   const processingJobFormConfig = useMemo(
     () =>
-      mergeSelectOptionsForFields(newDocumentProcessingJobForm(t), {
-        aiAgentId: aiAgentSelectOptions,
-      }),
-    [t, aiAgentSelectOptions],
+      withLinkedPickers(
+        mergeSelectOptionsForFields(newDocumentProcessingJobForm(t), {
+          aiAgentId: aiAgentSelectOptions,
+        }),
+        { documentId: recordOptions(documents as unknown as Record<string, unknown>[], (row) => row.name) },
+      ),
+    [t, aiAgentSelectOptions, documents],
   )
 
   const liveSections = useMemo(() => {
@@ -448,13 +450,38 @@ function DocumentsClientLoaded({
           // never set `data-state="selected"` for the lock actions below.
           return {
             ...tab,
-            entityConfig: withTableActions(
+            recordSheet: {
+              titleKey: "name",
+              auditTableName: "document",
+              discussion: {},
+              openHref: documentRecordHref,
+              detailConfig: {
+                mode: "detail" as const,
+                sections: [
+                  {
+                    id: "document",
+                    fields: [
+                      { key: "fileName", label: t("documents.documents.columns.fileName") },
+                      { key: "mimetype", label: t("documents.documents.columns.mimetype") },
+                      { key: "fileSize", label: t("documents.documents.columns.fileSize"), render: (value: unknown) => formatFileSize(value) },
+                      { key: "resName", label: "Attached to" },
+                      { key: "description", label: "Description" },
+                    ],
+                  },
+                ],
+              },
+            },
+            entityConfig: withInlineEdits(
+              withTableActions(
               tab.entityConfig,
               [
                 {
                   id: "lock-document",
                   label: "Lock",
                   requiresSelection: true,
+                  selection: "multiple",
+                  isApplicable: (rows) => rows.every((row) => !(row.isLocked === true)),
+                  successMessage: t("common.actionCompleted", { action: "Lock" }),
                   onClick: async (rows) => {
                     setDocumentToolbarError(null)
                     try {
@@ -463,6 +490,7 @@ function DocumentsClientLoaded({
                       }
                     } catch (e) {
                       setDocumentToolbarError(e instanceof Error ? e.message : String(e))
+                      throw e
                     }
                   },
                 },
@@ -470,6 +498,9 @@ function DocumentsClientLoaded({
                   id: "unlock-document",
                   label: "Unlock",
                   requiresSelection: true,
+                  selection: "multiple",
+                  isApplicable: (rows) => rows.every((row) => row.isLocked === true),
+                  successMessage: t("common.actionCompleted", { action: "Unlock" }),
                   onClick: async (rows) => {
                     setDocumentToolbarError(null)
                     try {
@@ -478,6 +509,7 @@ function DocumentsClientLoaded({
                       }
                     } catch (e) {
                       setDocumentToolbarError(e instanceof Error ? e.message : String(e))
+                      throw e
                     }
                   },
                 },
@@ -509,6 +541,21 @@ function DocumentsClientLoaded({
                 },
               ],
               true,
+            ),
+              {
+                name: {
+                  kind: "text",
+                  canEdit: (row) => !truthyRowBool(row.isDeleted) && !truthyRowBool(row.isLocked),
+                  save: async (row, value) => {
+                    const name = String(value)
+                    if (!name) throw new Error("A document needs a name")
+                    await updateDocument.mutateAsync({
+                      documentId: row.id as string | number,
+                      params: { name },
+                    })
+                  },
+                },
+              },
             ),
           }
         }
@@ -546,6 +593,8 @@ function DocumentsClientLoaded({
                   id: "publish-article",
                   label: "Publish",
                   requiresSelection: true,
+                  selection: "multiple",
+                  successMessage: t("common.actionCompleted", { action: "Publish" }),
                   onClick: async (rows) => {
                     setDocumentToolbarError(null)
                     try {
@@ -557,6 +606,7 @@ function DocumentsClientLoaded({
                       }
                     } catch (e) {
                       setDocumentToolbarError(e instanceof Error ? e.message : String(e))
+                      throw e
                     }
                   },
                 },
@@ -564,6 +614,8 @@ function DocumentsClientLoaded({
                   id: "unpublish-article",
                   label: "Unpublish",
                   requiresSelection: true,
+                  selection: "multiple",
+                  successMessage: t("common.actionCompleted", { action: "Unpublish" }),
                   onClick: async (rows) => {
                     setDocumentToolbarError(null)
                     try {
@@ -575,6 +627,7 @@ function DocumentsClientLoaded({
                       }
                     } catch (e) {
                       setDocumentToolbarError(e instanceof Error ? e.message : String(e))
+                      throw e
                     }
                   },
                 },
@@ -582,6 +635,9 @@ function DocumentsClientLoaded({
                   id: "lock-article",
                   label: "Lock",
                   requiresSelection: true,
+                  selection: "multiple",
+                  isApplicable: (rows) => rows.every((row) => !(row.isLocked === true)),
+                  successMessage: t("common.actionCompleted", { action: "Lock" }),
                   onClick: async (rows) => {
                     setDocumentToolbarError(null)
                     try {
@@ -590,6 +646,7 @@ function DocumentsClientLoaded({
                       }
                     } catch (e) {
                       setDocumentToolbarError(e instanceof Error ? e.message : String(e))
+                      throw e
                     }
                   },
                 },
@@ -597,6 +654,8 @@ function DocumentsClientLoaded({
                   id: "unlock-article",
                   label: "Unlock",
                   requiresSelection: true,
+                  selection: "multiple",
+                  successMessage: t("common.actionCompleted", { action: "Unlock" }),
                   onClick: async (rows) => {
                     setDocumentToolbarError(null)
                     try {
@@ -605,6 +664,7 @@ function DocumentsClientLoaded({
                       }
                     } catch (e) {
                       setDocumentToolbarError(e instanceof Error ? e.message : String(e))
+                      throw e
                     }
                   },
                 },
@@ -625,6 +685,9 @@ function DocumentsClientLoaded({
                   id: "delete-article",
                   label: "Delete",
                   requiresSelection: true,
+                  selection: "multiple",
+                  isApplicable: (rows) => rows.every((row) => !truthyRowBool(row.isLocked)),
+                  successMessage: t("common.actionCompleted", { action: "Delete" }),
                   onClick: async (rows) => {
                     setDocumentToolbarError(null)
                     try {
@@ -633,6 +696,7 @@ function DocumentsClientLoaded({
                       }
                     } catch (e) {
                       setDocumentToolbarError(e instanceof Error ? e.message : String(e))
+                      throw e
                     }
                   },
                 },
@@ -680,6 +744,10 @@ function DocumentsClientLoaded({
                   id: "delete-folder",
                   label: "Delete folder",
                   requiresSelection: true,
+                  selection: "multiple",
+                  isApplicable: (rows) =>
+                    rows.every((row) => documentFolderCanBeDeleted(row, folders as Record<string, unknown>[])),
+                  successMessage: t("common.actionCompleted", { action: "Delete folder" }),
                   onClick: async (rows) => {
                     setDocumentToolbarError(null)
                     try {
@@ -688,6 +756,7 @@ function DocumentsClientLoaded({
                       }
                     } catch (e) {
                       setDocumentToolbarError(e instanceof Error ? e.message : String(e))
+                      throw e
                     }
                   },
                 },
@@ -706,6 +775,8 @@ function DocumentsClientLoaded({
                   id: "restore-document",
                   label: "Restore",
                   requiresSelection: true,
+                  selection: "multiple",
+                  successMessage: t("common.actionCompleted", { action: "Restore" }),
                   onClick: async (rows) => {
                     setDocumentToolbarError(null)
                     try {
@@ -714,6 +785,7 @@ function DocumentsClientLoaded({
                       }
                     } catch (e) {
                       setDocumentToolbarError(e instanceof Error ? e.message : String(e))
+                      throw e
                     }
                   },
                 },
@@ -721,12 +793,14 @@ function DocumentsClientLoaded({
                   id: "purge-expired",
                   label: "Purge expired",
                   requiresSelection: false,
+                  successMessage: t("common.actionCompleted", { action: "Purge expired" }),
                   onClick: async () => {
                     setDocumentToolbarError(null)
                     try {
                       await purgeExpiredDocuments.mutateAsync()
                     } catch (e) {
                       setDocumentToolbarError(e instanceof Error ? e.message : String(e))
+                      throw e
                     }
                   },
                 },
@@ -772,6 +846,11 @@ function DocumentsClientLoaded({
                   id: "approve-job",
                   label: t("documents.processing.actions.approve"),
                   requiresSelection: true,
+                  selection: "multiple",
+                  isApplicable: (rows) =>
+                    rows.some(
+                      (r) => formatStdbTaggedValue(r.status) === "Completed" && !truthyRowBool(r.isApproved),
+                    ),
                   onClick: async (rows) => {
                     setProcessingToolbarError(null)
                     const eligible = rows.filter(
@@ -807,6 +886,7 @@ function DocumentsClientLoaded({
                   id: "ack-insight",
                   label: t("documents.insights.actions.acknowledge"),
                   requiresSelection: true,
+                  selection: "multiple",
                   onClick: (rows) => {
                     setProcessingToolbarError(null)
                     const eligible = rows.filter(
@@ -867,6 +947,7 @@ function DocumentsClientLoaded({
       knowledgeCategoryFormConfig,
       documentFolderFormConfig,
       processingJobFormConfig,
+      folders,
     ],
   )
 

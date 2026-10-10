@@ -1,5 +1,6 @@
 import type { TFunction } from "i18next"
 import type { EntityViewConfig } from "./entity-view-types"
+import { withReadOnlyStateBoard } from "./entity-state-board"
 
 // ── Badge maps ────────────────────────────────────────────────────────────────
 const moStateBadges = (t: TFunction) => ({
@@ -262,3 +263,19 @@ export const manufacturingEntityConfigs = (t: TFunction): Record<string, EntityV
   "workcenters-table": workcentersTableConfig(t),
   "routing-operations-table": routingOperationsTableConfig(t),
 })
+
+/** Read-only board of manufacturing orders by state; state changes stay workflow actions. */
+export const manufacturingOrdersWithBoard = (t: TFunction, config: EntityViewConfig): EntityViewConfig =>
+  withReadOnlyStateBoard(t, config, {
+    groupKey: "state",
+    card: {
+      titleKey: "name",
+      fields: [
+        { key: "productName", label: t("manufacturing.manufacturingOrders.columns.productId") },
+        { key: "productQty", label: t("manufacturing.manufacturingOrders.columns.productQty"), type: "number" },
+      ],
+      footerFields: [
+        { key: "datePlannedStart", label: t("manufacturing.manufacturingOrders.columns.datePlannedStart"), type: "date" },
+      ],
+    },
+  })

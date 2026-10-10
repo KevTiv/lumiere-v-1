@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test"
 
 import {
+  expectRowActionsOffered,
   chooseFirstOption,
   activeTabEntityTable,
   expectNoAppError,
@@ -89,9 +90,7 @@ test.describe("Workforce modules e2e @phase-5", () => {
       await openExpensesTab(page, "expense-sheets")
       await expect(page.getByTestId("entity-action-csv-sheets")).toBeVisible()
       await expect(page.getByText("Import reports (CSV)")).toBeVisible()
-      await expect(page.getByTestId("entity-action-submit-sheets")).toBeVisible()
-      await expect(page.getByTestId("entity-action-post-sheets")).toBeVisible()
-      await expect(page.getByTestId("entity-action-reimburse-sheets")).toBeVisible()
+      await expectRowActionsOffered(page, ["submit-sheets", "post-sheets", "reimburse-sheets"])
       await expectNoAppError(page)
     })
 

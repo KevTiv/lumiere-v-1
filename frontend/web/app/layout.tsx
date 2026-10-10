@@ -11,9 +11,8 @@ const _geist = Geist({ subsets: ["latin"] });
 const _geistMono = Geist_Mono({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: 'Modular ERP Dashboard',
-  description: 'Enterprise dashboard with configurable layouts and real-time analytics',
-  generator: 'v0.app',
+  title: 'Lumiere ERP',
+  description: 'Lumiere ERP',
   icons: {
     icon: [
       {

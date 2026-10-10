@@ -1,6 +1,7 @@
 "use client"
 import { projectTimesheetsHref } from "@lumiere/erp-shared/record-links"
 import { mapDashboardWidgets, withDashboardSections } from "@lumiere/ui/lib/dashboard-sections"
+import { withInlineEdits } from "@lumiere/ui/lib/with-inline-edits"
 
 import { useMemo, useState, useCallback, useEffect } from "react"
 import type { QueryResourceState } from "@lumiere/api-client"
@@ -27,7 +28,7 @@ import {
   projectsCsvImportForm,
   ImportAssistantWizard,
 } from "@lumiere/ui"
-import type { EntityRow, EntityViewConfig, FormConfig, ModuleConfig, ProjectsCsvImportKind } from "@lumiere/ui"
+import type { EntityAction, EntityRow, EntityViewConfig, FormConfig, ModuleConfig, ProjectsCsvImportKind } from "@lumiere/ui"
 import {
   projectsParamsToJson,
   toCreateProjectParams,
@@ -38,6 +39,9 @@ import {
   toStartTimesheetTimerParams,
 } from "@/lib/projects-create-params"
 import { projectsModuleConfig } from "@/lib/module-dashboard-configs"
+import Link from "next/link"
+import { showWorkflowToast } from "@lumiere/ui/lib/workflow-toast"
+import { getProjectFieldValue, projectHref } from "./project-record"
 import { useProjectsModuleSubscription } from "@/lib/module-subscription-hooks"
 import {
   useProjects,
@@ -164,14 +168,6 @@ type LifecycleModalState =
   | { type: "subcontractorCost"; rows: Record<string, unknown>[]; form: FormConfig }
   | { type: "integrationIntent"; rows: Record<string, unknown>[]; form: FormConfig }
 
-type ProjectToolbarAction = {
-  id: string
-  label: string
-  requiresSelection?: boolean
-  variant?: "default" | "destructive"
-  onClick: (rows: Record<string, unknown>[]) => void
-}
-
 const taskStateForm: FormConfig = {
   id: "projects-update-task-state",
   title: "Update Task State",
@@ -284,6 +280,10 @@ function idLines(value: unknown): Array<string | number | bigint> {
     .filter(Boolean)
 }
 
+function timesheetStatus(row: Record<string, unknown>): string {
+  return String(row.validationStatus ?? row.validation_status ?? "")
+}
+
 export function ProjectsClient(props: ProjectsClientProps) {
   if (!hasValidOrganizationId(props.organizationId)) {
     return <MissingOrganization />
@@ -381,7 +381,7 @@ function ProjectsClientLoaded({
 
   const addCsvToolbar = (
     ec: EntityViewConfig,
-    actions: ProjectToolbarAction[],
+    actions: EntityAction[],
     // Tabs whose row click opens an editor keep selection off the row click;
     // tabs without one (timesheets) need it, or selection actions stay disabled.
     options: { selectOnRowClick?: boolean } = {},
@@ -628,20 +628,36 @@ function ProjectsClientLoaded({
                 form: integrationIntentFormConfig,
               })
             }
-            onRefreshForecast={() =>
-              void refreshForecast.mutateAsync({
-                employeeId: null,
-                periodStart: null,
-                periodEnd: null,
-                metadata: null,
-              })
-            }
-            onRefreshEvm={() =>
-              void refreshEvm.mutateAsync({
-                projectIds: [],
-                metadata: null,
-              })
-            }
+            onRefreshForecast={async () => {
+              try {
+                await refreshForecast.mutateAsync({
+                  employeeId: null,
+                  periodStart: null,
+                  periodEnd: null,
+                  metadata: null,
+                })
+              } catch (error) {
+                showWorkflowToast({
+                  kind: "error",
+                  title: "Capacity forecast refresh failed",
+                  description: error instanceof Error ? error.message : String(error),
+                })
+              }
+            }}
+            onRefreshEvm={async () => {
+              try {
+                await refreshEvm.mutateAsync({
+                  projectIds: [],
+                  metadata: null,
+                })
+              } catch (error) {
+                showWorkflowToast({
+                  kind: "error",
+                  title: "Earned value refresh failed",
+                  description: error instanceof Error ? error.message : String(error),
+                })
+              }
+            }}
           />
           <TimesheetCapturePanel organizationId={organizationId} />
         </div>
@@ -997,6 +1013,50 @@ function ProjectsClientLoaded({
         ...moduleConfig,
         tabs: [
           ...withDashboardSections(moduleConfig, liveSections).tabs.map((tab) => {
+          if (tab.id === "projects" && tab.entityConfig && tab.entityConfig.view.mode === "table") {
+            // The row opens the edit form; the project's name opens its page.
+            const view = tab.entityConfig.view
+            return {
+              ...tab,
+              entityConfig: withInlineEdits({
+                ...tab.entityConfig,
+                view: {
+                  ...view,
+                  columns: view.columns.map((column) =>
+                    column.key === "name"
+                      ? {
+                          ...column,
+                          render: (_value: unknown, row: Record<string, unknown>) => {
+                            const href = projectHref(row)
+                            const shown = String(row.name ?? "").trim()
+                            if (!href || !shown) return shown || "—"
+                            return (
+                              <Link
+                                href={href}
+                                className="font-medium text-primary hover:underline"
+                                data-testid={`project-link-${String(row.id)}`}
+                                onClick={(event) => event.stopPropagation()}
+                              >
+                                {shown}
+                              </Link>
+                            )
+                          },
+                        }
+                      : column,
+                  ),
+                },
+              }, {
+                name: {
+                  kind: "text",
+                  save: async (row, value) => {
+                    const name = String(value).trim()
+                    if (!name) throw new Error(t("projects.inlineEdit.nameRequired", { defaultValue: "A project needs a name" }))
+                    await updateProject.mutateAsync({ projectId: row.id as string | number, params: { name } })
+                  },
+                },
+              }),
+            }
+          }
           if (tab.id === "rate-cards" && tab.entityConfig) {
             return {
               ...tab,
@@ -1031,6 +1091,7 @@ function ProjectsClientLoaded({
                   id: "task-state",
                   label: "Update state",
                   requiresSelection: true,
+                  selection: "multiple",
                   onClick: (rows) => {
                     setLifecycleError(null)
                     setLifecycleModal({ type: "taskState", rows, form: taskStateForm })
@@ -1040,6 +1101,7 @@ function ProjectsClientLoaded({
                   id: "task-parent",
                   label: "Set parent",
                   requiresSelection: true,
+                  selection: "multiple",
                   onClick: (rows) => {
                     setLifecycleError(null)
                     setLifecycleModal({ type: "taskParent", rows, form: taskParentFormConfig })
@@ -1049,6 +1111,7 @@ function ProjectsClientLoaded({
                   id: "assign-users",
                   label: "Assign users",
                   requiresSelection: true,
+                  selection: "multiple",
                   onClick: (rows) => {
                     setLifecycleError(null)
                     setLifecycleModal({ type: "assignUsers", rows, form: assignUsersFormConfig })
@@ -1071,14 +1134,21 @@ function ProjectsClientLoaded({
                   id: "stop-timer",
                   label: "Stop timer",
                   requiresSelection: true,
-                  onClick: (rows) => void runForSelectedIds(rows, (id) => stopTimer.mutateAsync(id)),
+                  selection: "multiple",
+                  isApplicable: (rows) =>
+                    rows.every((row) => (row.isTimerRunning ?? row.is_timer_running) === true),
+                  successMessage: t("common.actionCompleted", { action: "Stop timer" }),
+                  onClick: (rows) => runForSelectedIds(rows, (id) => stopTimer.mutateAsync(id)),
                 },
                 {
                   id: "validate-timesheets",
                   label: "Validate",
                   requiresSelection: true,
+                  selection: "multiple",
+                  isApplicable: (rows) => rows.every((row) => timesheetStatus(row) === "draft"),
+                  successMessage: t("common.actionCompleted", { action: "Validate" }),
                   onClick: (rows) =>
-                    void validateTimesheets.mutateAsync({
+                    validateTimesheets.mutateAsync({
                       companyId: operatingCompanyId,
                       timesheetIds: selectedIds(rows),
                     }),
@@ -1087,9 +1157,16 @@ function ProjectsClientLoaded({
                   id: "reject-timesheets",
                   label: "Reject",
                   requiresSelection: true,
+                  selection: "multiple",
+                  isApplicable: (rows) =>
+                    rows.every((row) => {
+                      const status = timesheetStatus(row)
+                      return status === "draft" || status === "submitted"
+                    }),
+                  successMessage: t("common.actionCompleted", { action: "Reject" }),
                   variant: "destructive" as const,
                   onClick: (rows) =>
-                    void rejectTimesheets.mutateAsync({
+                    rejectTimesheets.mutateAsync({
                       companyId: operatingCompanyId,
                       timesheetIds: selectedIds(rows),
                       reason: "Rejected by manager",
@@ -1099,6 +1176,13 @@ function ProjectsClientLoaded({
                   id: "bill-timesheets",
                   label: "Bill",
                   requiresSelection: true,
+                  selection: "multiple",
+                  isApplicable: (rows) =>
+                    rows.every(
+                      (row) =>
+                        timesheetStatus(row) === "validated" &&
+                        (row.timesheetInvoiceId ?? row.timesheet_invoice_id) == null,
+                    ),
                   onClick: (rows) => {
                     setLifecycleError(null)
                     setLifecycleModal({ type: "billTimesheets", rows, form: billTimesheetsFormConfig })
@@ -1139,6 +1223,7 @@ function ProjectsClientLoaded({
       billTimesheetsFormConfig,
       stopTimer,
       validateTimesheets,
+      updateProject,
       operatingCompanyId,
     ],
   )
@@ -1569,33 +1654,6 @@ function ProjectsClientLoaded({
 }
 
 // Helper functions to extract field values from entities
-function getProjectFieldValue(project: Record<string, unknown>, fieldName: string): unknown {
-  switch (fieldName) {
-    case 'name':
-      return project.name ?? ''
-    case 'pricelistId':
-      return String(project.pricelistId ?? '')
-    case 'partnerId':
-      return String(project.partnerId ?? '')
-    case 'billType':
-      return String(project.billType ?? 'customer_task')
-    case 'pricingType':
-      return String(project.pricingType ?? 'task_rate')
-    case 'allocatedHours':
-      return project.allocatedHours ?? ''
-    case 'dateStart':
-      return project.dateStart ? new Date(Number(project.dateStart) / 1000).toISOString().split('T')[0] : ''
-    case 'dateEnd':
-      return project.dateEnd ? new Date(Number(project.dateEnd) / 1000).toISOString().split('T')[0] : ''
-    case 'description':
-      return project.description ?? ''
-    case 'active':
-      return project.active ?? true
-    default:
-      return ''
-  }
-}
-
 function getTaskFieldValue(task: Record<string, unknown>, fieldName: string): unknown {
   switch (fieldName) {
     case 'name':

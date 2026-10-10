@@ -1,6 +1,13 @@
 "use client"
 import { accountMoveHref } from "@lumiere/erp-shared/record-links"
 import { mapDashboardWidgets, withDashboardSections } from "@lumiere/ui/lib/dashboard-sections"
+import { withInlineEdits } from "@lumiere/ui/lib/with-inline-edits"
+import {
+  inlineNumberAbove,
+  isDraftExpense,
+  isDraftStandardExpense,
+  requiredInlineText,
+} from "@/lib/inline-edit-params"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { useTranslation } from "@lumiere/i18n"
@@ -12,10 +19,7 @@ import {
   newExpenseSheetForm,
   editExpenseForm,
   addExpenseToReportForm,
-  postExpenseReportForm,
-  reimburseExpenseReportForm,
   setExpenseAllocationsForm,
-  projectRebillExpenseReportForm,
   MissingOrganization,
   mergeSelectOptionsForFields,
   mergeFieldDefaultValues,
@@ -28,8 +32,11 @@ import {
   DialogTitle,
   csvImportForm,
 } from "@lumiere/ui"
-import type { EntityViewConfig, FormConfig, ModuleConfig } from "@lumiere/ui"
+import type { EntityAction, EntityViewConfig, FormConfig, ModuleConfig } from "@lumiere/ui"
 import { expensesModuleConfig } from "@/lib/module-dashboard-configs"
+import Link from "next/link"
+import { expenseReportHref } from "./expense-report"
+import { useExpenseReportFinance } from "./expense-report-finance-dialogs"
 import { useExpensesModuleSubscription } from "@/lib/module-subscription-hooks"
 import {
   useExpenses,
@@ -45,9 +52,6 @@ import {
   useSubmitExpenseSheet,
   useApproveExpenseSheet,
   useRefuseExpenseSheet,
-  usePostExpenseSheet,
-  useCreateExpenseReimbursementPayment,
-  useCreateExpenseProjectRebill,
   useSetExpenseAllocations,
   useExpensesCsvImportMutations,
   useExpenseMileageRates,
@@ -61,7 +65,6 @@ import { ExpensesInboxPanel } from "./expenses-inbox-panel"
 import { ExpensesOpsPanel } from "./expenses-ops-panel"
 import { ExpensesAdminPanel } from "./expenses-admin-panel"
 import { useExpenseSheetApprovalTimeline } from "@lumiere/query-hooks/hooks/approvals"
-import { useAccountAccounts, useAccountJournals } from "@lumiere/query-hooks/hooks/accounting"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
 import { useDefaultOperatingCompanyBigInt } from "@lumiere/query-hooks/hooks/use-operating-company"
 import { usePricelists, type ProductPricelist } from "@lumiere/query-hooks/hooks/sales"
@@ -76,15 +79,12 @@ import {
   pricelistRowsToSelectOptions,
   employeeRowsToSelectOptions,
   expenseSheetRowsToDraftSelectOptions,
-  accountJournalRowsToSelectOptions,
-  accountAccountRowsToSelectOptions,
   expenseRateRowsToSelectOptions,
 } from "@/lib/form-lookup"
 import {
   mapExpenseRow,
   mapExpenseSheetRow,
 } from "@/lib/expense-state"
-import { stbTimestampFromDate } from "@/lib/stb-timestamp"
 
 interface ExpensesClientProps {
   initialExpenses?: HrExpense[]
@@ -101,10 +101,7 @@ type ExpensesClientLoadedProps = Omit<ExpensesClientProps, "organizationId"> & {
 type WorkflowForm =
   | { kind: "editExpense"; row: Record<string, unknown> }
   | { kind: "addToReport"; row: Record<string, unknown> }
-  | { kind: "postReport"; row: Record<string, unknown> }
-  | { kind: "reimburseReport"; row: Record<string, unknown> }
   | { kind: "setAllocations"; row: Record<string, unknown> }
-  | { kind: "projectRebill"; row: Record<string, unknown> }
 
 type ExpensesCsvImportKind = "expense" | "sheet"
 
@@ -125,6 +122,39 @@ function numField(row: Record<string, unknown>, ...keys: string[]): number {
     if (v != null && v !== "") return Number(v)
   }
   return 0
+}
+
+/** The report's name opens its page; the row itself still opens the actions dialog. */
+function withReportLink(ec: EntityViewConfig): EntityViewConfig {
+  if (ec.view.mode !== "table") return ec
+  return {
+    ...ec,
+    view: {
+      ...ec.view,
+      columns: ec.view.columns.map((column) =>
+        column.key === "name"
+          ? {
+              ...column,
+              render: (_value: unknown, row: Record<string, unknown>) => {
+                const href = expenseReportHref(row)
+                const shown = String(row.name ?? "").trim()
+                if (!href || !shown) return shown || "—"
+                return (
+                  <Link
+                    href={href}
+                    className="font-medium text-primary hover:underline"
+                    data-testid={`expense-report-link-${String(row.id)}`}
+                    onClick={(event) => event.stopPropagation()}
+                  >
+                    {shown}
+                  </Link>
+                )
+              },
+            }
+          : column,
+      ),
+    },
+  }
 }
 
 function ExpensesClientLoaded({
@@ -164,8 +194,6 @@ function ExpensesClientLoaded({
   )
   const { data: pricelists = [] } = usePricelists(orgId, initialPricelists)
   const { data: employees = [] } = useEmployees(orgId, initialEmployees)
-  const { data: accountJournals = [] } = useAccountJournals(orgId)
-  const { data: accountAccounts = [] } = useAccountAccounts(orgId)
   const { data: mileageRates = [] } = useExpenseMileageRates(orgId)
   const { data: perDiemRates = [] } = useExpensePerDiemRates(orgId)
 
@@ -219,24 +247,13 @@ function ExpensesClientLoaded({
   const submitExpenseSheet = useSubmitExpenseSheet(orgId, operatingCompanyId)
   const approveExpenseSheet = useApproveExpenseSheet(orgId, operatingCompanyId)
   const refuseExpenseSheet = useRefuseExpenseSheet(orgId)
-  const postExpenseSheet = usePostExpenseSheet(orgId, operatingCompanyId)
-  const reimburseExpenseSheet = useCreateExpenseReimbursementPayment(
-    orgId,
-    operatingCompanyId,
-  )
+  const finance = useExpenseReportFinance(orgId, operatingCompanyId)
   const setExpenseAllocations = useSetExpenseAllocations(orgId)
-  const projectRebill = useCreateExpenseProjectRebill(orgId)
   const csvImports = useExpensesCsvImportMutations(orgId)
 
   const addCsvToolbar = (
     ec: EntityViewConfig,
-    actions: Array<{
-      id: string
-      label: string
-      requiresSelection?: boolean
-      variant?: "default" | "destructive"
-      onClick: (selectedRows: Record<string, unknown>[]) => void
-    }>,
+    actions: EntityAction[],
   ): EntityViewConfig => {
     if (ec.view.mode !== "table") return ec
     return {
@@ -330,49 +347,7 @@ function ExpensesClientLoaded({
     [t, mileageRateFieldOptions, perDiemRateFieldOptions],
   )
   const addToReportFormBase = useMemo(() => addExpenseToReportForm(t), [t])
-  const journalFieldOptions = useMemo(() => {
-    const fromApi = accountJournalRowsToSelectOptions(accountJournals)
-    if (fromApi.length > 0) return fromApi
-    return [{ value: "", label: t("common.lookup.noJournals"), disabled: true }]
-  }, [accountJournals, t])
-  const accountFieldOptions = useMemo(() => {
-    const fromApi = accountAccountRowsToSelectOptions(accountAccounts)
-    if (fromApi.length > 0) return fromApi
-    return [{ value: "", label: t("common.lookup.noAccounts"), disabled: true }]
-  }, [accountAccounts, t])
-  const postReportFormBase = useMemo(
-    () =>
-      mergeSelectOptionsForFields(postExpenseReportForm(t), {
-        journalId: journalFieldOptions,
-        defaultExpenseAccountId: accountFieldOptions,
-        payableAccountId: accountFieldOptions,
-        defaultTaxAccountId: accountFieldOptions,
-        cardLiabilityAccountId: accountFieldOptions,
-        advanceAccountId: accountFieldOptions,
-        fxFeeAccountId: accountFieldOptions,
-      }),
-    [t, journalFieldOptions, accountFieldOptions],
-  )
-  const reimburseReportFormBase = useMemo(
-    () =>
-      mergeSelectOptionsForFields(reimburseExpenseReportForm(t), {
-        journalId: journalFieldOptions,
-        payableAccountId: accountFieldOptions,
-        liquidityAccountId: accountFieldOptions,
-      }),
-    [t, journalFieldOptions, accountFieldOptions],
-  )
   const allocationsFormConfig = useMemo(() => setExpenseAllocationsForm(t), [t])
-  const projectRebillFormBase = useMemo(
-    () =>
-      mergeSelectOptionsForFields(projectRebillExpenseReportForm(t), {
-        journalId: journalFieldOptions,
-        receivableAccountId: accountFieldOptions,
-        incomeAccountId: accountFieldOptions,
-      }),
-    [t, journalFieldOptions, accountFieldOptions],
-  )
-
   const liveSections = useMemo(() => {
     const pendingApproval = sheetsToApprove.length
     const missingReceiptCount = missingReceipts.length
@@ -439,20 +414,49 @@ function ExpensesClientLoaded({
             return {
               ...tab,
               createForm: expenseFormConfig,
-              entityConfig: addCsvToolbar(tab.entityConfig, [
+              entityConfig: withInlineEdits(
+                addCsvToolbar(tab.entityConfig, [
+                  {
+                    id: "csv-expenses",
+                    label: t("expenses.csvImport.toolbarExpenses"),
+                    onClick: () => setCsvKind("expense"),
+                  },
+                ]),
                 {
-                  id: "csv-expenses",
-                  label: t("expenses.csvImport.toolbarExpenses"),
-                  onClick: () => setCsvKind("expense"),
+                  // The backend only edits Draft expenses.
+                  name: {
+                    kind: "text",
+                    canEdit: isDraftExpense,
+                    save: async (row, value) => {
+                      const name = requiredInlineText(
+                        value,
+                        t("expenses.inlineEdit.nameRequired", { defaultValue: "An expense needs a description" }),
+                      )
+                      await updateExpense.mutateAsync({ expenseId: row.id as string | number, params: { name } })
+                    },
+                  },
+                  // Mileage and per diem lines derive their quantity, so only standard lines take it.
+                  quantity: {
+                    kind: "number",
+                    canEdit: isDraftStandardExpense,
+                    save: async (row, value) => {
+                      const quantity = inlineNumberAbove(
+                        value,
+                        0,
+                        t("expenses.inlineEdit.quantityInvalid", { defaultValue: "Quantity must be above 0" }),
+                      )
+                      await updateExpense.mutateAsync({ expenseId: row.id as string | number, params: { quantity } })
+                    },
+                  },
                 },
-              ]),
+              ),
             }
           }
           if (tab.id === "expense-sheets" && tab.entityConfig) {
             return {
               ...tab,
               createForm: expenseSheetFormConfig,
-              entityConfig: addCsvToolbar(tab.entityConfig, [
+              entityConfig: addCsvToolbar(withReportLink(tab.entityConfig), [
                 {
                   id: "csv-sheets",
                   label: t("expenses.csvImport.toolbarSheets"),
@@ -462,13 +466,15 @@ function ExpensesClientLoaded({
                   id: "submit-sheets",
                   label: t("expenses.workflow.submitReport"),
                   requiresSelection: true,
-                  onClick: (rows) => {
+                  selection: "multiple",
+                  isApplicable: (rows) => rows.some((r) => rowState(r) === "Draft"),
+                  onClick: async (rows) => {
                     const draft = rows.filter((r) => rowState(r) === "Draft")
                     if (draft.length === 0) {
                       setToolbarError(t("expenses.workflow.noDraftSheets"))
                       return
                     }
-                    void runSheetAction(draft, "report", (row) =>
+                    await runSheetAction(draft, "report", (row) =>
                       submitExpenseSheet.mutateAsync(rowId(row)),
                     )
                   },
@@ -477,13 +483,15 @@ function ExpensesClientLoaded({
                   id: "approve-sheets",
                   label: t("expenses.workflow.approveReport"),
                   requiresSelection: true,
-                  onClick: (rows) => {
+                  selection: "multiple",
+                  isApplicable: (rows) => rows.some((r) => rowState(r) === "Submitted"),
+                  onClick: async (rows) => {
                     const submitted = rows.filter((r) => rowState(r) === "Submitted")
                     if (submitted.length === 0) {
                       setToolbarError(t("expenses.workflow.noSubmittedSheets"))
                       return
                     }
-                    void runSheetAction(submitted, "report", (row) =>
+                    await runSheetAction(submitted, "report", (row) =>
                       approveExpenseSheet.mutateAsync(rowId(row)),
                     )
                   },
@@ -492,6 +500,8 @@ function ExpensesClientLoaded({
                   id: "refuse-sheets",
                   label: t("expenses.workflow.refuseReport"),
                   requiresSelection: true,
+                  selection: "multiple",
+                  isApplicable: (rows) => rows.some((r) => rowState(r) === "Submitted"),
                   variant: "destructive",
                   onClick: (rows) => {
                     const submitted = rows.filter((r) => rowState(r) === "Submitted")
@@ -511,6 +521,8 @@ function ExpensesClientLoaded({
                   id: "post-sheets",
                   label: t("expenses.workflow.postReport"),
                   requiresSelection: true,
+                  selection: "multiple",
+                  isApplicable: (rows) => rows.some((r) => rowState(r) === "Approved"),
                   onClick: (rows) => {
                     const approved = rows.filter((r) => rowState(r) === "Approved")
                     if (approved.length === 0) {
@@ -518,7 +530,7 @@ function ExpensesClientLoaded({
                       return
                     }
                     if (approved.length === 1) {
-                      setWorkflowForm({ kind: "postReport", row: approved[0]! })
+                      finance.open("postReport", approved[0]!)
                       return
                     }
                     setToolbarError("Select one approved report to post (accounts required).")
@@ -528,6 +540,8 @@ function ExpensesClientLoaded({
                   id: "reimburse-sheets",
                   label: t("expenses.workflow.reimburseReport"),
                   requiresSelection: true,
+                  selection: "multiple",
+                  isApplicable: (rows) => rows.some((r) => rowState(r) === "Posted"),
                   onClick: (rows) => {
                     const posted = rows.filter((r) => rowState(r) === "Posted")
                     if (posted.length === 0) {
@@ -535,7 +549,7 @@ function ExpensesClientLoaded({
                       return
                     }
                     if (posted.length === 1) {
-                      setWorkflowForm({ kind: "reimburseReport", row: posted[0]! })
+                      finance.open("reimburseReport", posted[0]!)
                       return
                     }
                     setToolbarError("Select one posted report to reimburse.")
@@ -545,6 +559,22 @@ function ExpensesClientLoaded({
             }
           }
           return tab
+        }).concat({
+          // Capture queue, statement/FX operations and admin settings live in
+          // their own tab rather than above the module header.
+          id: "operations",
+          label: t("expenses.operationsTab", { defaultValue: "Operations" }),
+          type: "custom" as const,
+          description: t("expenses.operationsTabDescription", {
+            defaultValue: "Receipt capture queue, card statements and expense settings",
+          }),
+          customContent: (
+            <div className="space-y-6">
+              <ExpensesCapturePanel organizationId={organizationId} />
+              <ExpensesOpsPanel organizationId={organizationId} />
+              <ExpensesAdminPanel organizationId={organizationId} />
+            </div>
+          ),
         }),
       }) as ModuleConfig,
     [
@@ -557,16 +587,25 @@ function ExpensesClientLoaded({
       approveExpenseSheet,
       refuseExpenseSheet,
       organizationId,
+      updateExpense,
     ],
   )
 
-  const data = useMemo(
-    () => ({
-      expenses: expenses as unknown as Record<string, unknown>[],
-      "expense-sheets": sheets as unknown as Record<string, unknown>[],
-    }),
-    [expenses, sheets],
-  )
+  const data = useMemo(() => {
+    // Show the employee's name in the Employee column instead of their id.
+    const employeeNames = new Map(
+      (employees as Record<string, unknown>[]).map((e) => [String(e.id), String(e.name ?? "")]),
+    )
+    const withEmployeeName = (rows: Record<string, unknown>[]) =>
+      rows.map((row) => {
+        const name = employeeNames.get(String(row.employeeId ?? ""))
+        return { ...row, employeeName: name || String(row.employeeId ?? "") }
+      })
+    return {
+      expenses: withEmployeeName(expenses as unknown as Record<string, unknown>[]),
+      "expense-sheets": withEmployeeName(sheets as unknown as Record<string, unknown>[]),
+    }
+  }, [expenses, sheets, employees])
 
   const handleFormSubmit = async (
     _tabId: string,
@@ -614,10 +653,8 @@ function ExpensesClientLoaded({
     submitExpenseSheet.isPending ||
     approveExpenseSheet.isPending ||
     refuseExpenseSheet.isPending ||
-    postExpenseSheet.isPending ||
-    reimburseExpenseSheet.isPending ||
+    finance.isPending ||
     setExpenseAllocations.isPending ||
-    projectRebill.isPending ||
     csvImports.importExpense.isPending ||
     csvImports.importExpenseSheet.isPending
 
@@ -674,36 +711,15 @@ function ExpensesClientLoaded({
     if (workflowForm.kind === "addToReport") {
       return addToReportFormForRow(workflowForm.row)
     }
-    if (workflowForm.kind === "postReport") {
-      const today = new Date().toISOString().slice(0, 10)
-      return mergeFieldDefaultValues(postReportFormBase, {
-        accountingDate: today,
-      })
-    }
-    if (workflowForm.kind === "reimburseReport") {
-      const today = new Date().toISOString().slice(0, 10)
-      return mergeFieldDefaultValues(reimburseReportFormBase, {
-        paymentDate: today,
-      })
-    }
     if (workflowForm.kind === "setAllocations") {
       return allocationsFormConfig
-    }
-    if (workflowForm.kind === "projectRebill") {
-      const today = new Date().toISOString().slice(0, 10)
-      return mergeFieldDefaultValues(projectRebillFormBase, {
-        invoiceDate: today,
-      })
     }
     return null
   }, [
     workflowForm,
     editExpenseFormConfig,
     addToReportFormForRow,
-    postReportFormBase,
-    reimburseReportFormBase,
     allocationsFormConfig,
-    projectRebillFormBase,
   ])
 
   const handleWorkflowSubmit = async (formData: Record<string, unknown>) => {
@@ -774,71 +790,6 @@ function ExpensesClientLoaded({
         expenseId: rowId(workflowForm.row),
         sheetId: String(sheetRaw),
       })
-    } else if (workflowForm.kind === "postReport") {
-      const d = formData.accountingDate
-      const journalId = formData.journalId
-      const payableAccountId = formData.payableAccountId
-      const defaultExpenseAccountId = formData.defaultExpenseAccountId
-      const defaultTaxAccountId = formData.defaultTaxAccountId
-      const cardLiabilityAccountId = formData.cardLiabilityAccountId
-      const advanceAccountId = formData.advanceAccountId
-      const fxFeeAccountId = formData.fxFeeAccountId
-      const fxFeeAmountRaw = formData.fxFeeAmount
-      if (d == null || d === "" || !journalId || !payableAccountId || !defaultExpenseAccountId) return
-      await postExpenseSheet.mutateAsync({
-        sheetId: rowId(workflowForm.row),
-        params: {
-          accountingDate: stbTimestampFromDate(new Date(String(d))),
-          journalId: BigInt(String(journalId)),
-          payableAccountId: BigInt(String(payableAccountId)),
-          defaultExpenseAccountId: BigInt(String(defaultExpenseAccountId)),
-          clientRequestId:
-            // A6: stable per sheet so retries are idempotent (not a new UUID each click).
-            `exp-post-${rowId(workflowForm.row)}`,
-          defaultTaxAccountId:
-            defaultTaxAccountId != null && String(defaultTaxAccountId).trim() !== ""
-              ? BigInt(String(defaultTaxAccountId))
-              : undefined,
-          cardLiabilityAccountId:
-            cardLiabilityAccountId != null && String(cardLiabilityAccountId).trim() !== ""
-              ? BigInt(String(cardLiabilityAccountId))
-              : undefined,
-          advanceAccountId:
-            advanceAccountId != null && String(advanceAccountId).trim() !== ""
-              ? BigInt(String(advanceAccountId))
-              : undefined,
-          fxFeeAccountId:
-            fxFeeAccountId != null && String(fxFeeAccountId).trim() !== ""
-              ? BigInt(String(fxFeeAccountId))
-              : undefined,
-          fxFeeAmount:
-            fxFeeAmountRaw != null && String(fxFeeAmountRaw).trim() !== ""
-              ? Number(fxFeeAmountRaw)
-              : undefined,
-        },
-      })
-    } else if (workflowForm.kind === "reimburseReport") {
-      const d = formData.paymentDate
-      const journalId = formData.journalId
-      const payableAccountId = formData.payableAccountId
-      const liquidityAccountId = formData.liquidityAccountId
-      if (d == null || d === "" || !journalId || !payableAccountId || !liquidityAccountId) return
-      const amountRaw = formData.amount
-      const amount =
-        amountRaw != null && String(amountRaw).trim() !== ""
-          ? Number(amountRaw)
-          : undefined
-      await reimburseExpenseSheet.mutateAsync({
-        sheetId: rowId(workflowForm.row),
-        params: {
-          paymentDate: stbTimestampFromDate(new Date(String(d))),
-          journalId: BigInt(String(journalId)),
-          payableAccountId: BigInt(String(payableAccountId)),
-          liquidityAccountId: BigInt(String(liquidityAccountId)),
-          ...(amount != null && Number.isFinite(amount) ? { amount } : {}),
-          clientRequestId: `exp-reimburse-${rowId(workflowForm.row)}`,
-        },
-      })
     } else if (workflowForm.kind === "setAllocations") {
       const lines = []
       for (const n of [1, 2, 3, 4] as const) {
@@ -864,21 +815,6 @@ function ExpensesClientLoaded({
         expenseId: rowId(workflowForm.row),
         params: { lines },
       })
-    } else if (workflowForm.kind === "projectRebill") {
-      const d = formData.invoiceDate
-      const journalId = formData.journalId
-      const receivableAccountId = formData.receivableAccountId
-      const incomeAccountId = formData.incomeAccountId
-      if (d == null || d === "" || !journalId || !receivableAccountId || !incomeAccountId) return
-      await projectRebill.mutateAsync({
-        sheetId: rowId(workflowForm.row),
-        params: {
-          invoiceDate: stbTimestampFromDate(new Date(String(d))),
-          journalId: BigInt(String(journalId)),
-          receivableAccountId: BigInt(String(receivableAccountId)),
-          incomeAccountId: BigInt(String(incomeAccountId)),
-        },
-      })
     }
     setWorkflowForm(null)
   }
@@ -898,9 +834,6 @@ function ExpensesClientLoaded({
           {toolbarError}
         </p>
       ) : null}
-      <ExpensesCapturePanel organizationId={organizationId} />
-      <ExpensesOpsPanel organizationId={organizationId} />
-      <ExpensesAdminPanel organizationId={organizationId} />
       <ModuleView
         config={config}
         data={data}
@@ -1080,7 +1013,7 @@ function ExpensesClientLoaded({
                 onClick={() => {
                   const row = rowAction.row
                   setRowAction(null)
-                  setWorkflowForm({ kind: "postReport", row })
+                  finance.open("postReport", row)
                 }}
               >
                 {t("expenses.workflow.postReport")}
@@ -1094,7 +1027,7 @@ function ExpensesClientLoaded({
                   onClick={() => {
                     const row = rowAction.row
                     setRowAction(null)
-                    setWorkflowForm({ kind: "reimburseReport", row })
+                    finance.open("reimburseReport", row)
                   }}
                 >
                   {t("expenses.workflow.reimburseReport")}
@@ -1105,7 +1038,7 @@ function ExpensesClientLoaded({
                   onClick={() => {
                     const row = rowAction.row
                     setRowAction(null)
-                    setWorkflowForm({ kind: "projectRebill", row })
+                    finance.open("projectRebill", row)
                   }}
                 >
                   {t("expenses.workflow.projectRebill")}
@@ -1119,7 +1052,7 @@ function ExpensesClientLoaded({
                 onClick={() => {
                   const row = rowAction.row
                   setRowAction(null)
-                  setWorkflowForm({ kind: "projectRebill", row })
+                  finance.open("projectRebill", row)
                 }}
               >
                 {t("expenses.workflow.projectRebill")}
@@ -1288,6 +1221,7 @@ function ExpensesClientLoaded({
         </DialogContent>
       </Dialog>
 
+      {finance.modal}
       {workflowFormConfig && workflowForm && (
         <FormModal
           key={`${workflowForm.kind}-${rowId(workflowForm.row)}`}

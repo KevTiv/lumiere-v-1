@@ -4,6 +4,7 @@ import { useRef } from "react"
 import { Download, FileDown } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "../components/card"
 import { Button } from "../components/button"
+import { Skeleton } from "../components/skeleton"
 import type { DashboardWidget, WidgetType } from "../lib/dashboard-types"
 import { exportChartToPng } from "../lib/export-dashboard-png"
 import { downloadCsv, widgetDataToCsv } from "../lib/export-csv"
@@ -30,6 +31,26 @@ interface WidgetRendererProps {
   widget: DashboardWidget
   widthClass: string
   testId?: string
+  /** While the module's data loads, show a placeholder instead of zeros. */
+  isLoading?: boolean
+}
+
+/** A chart with no points, or only zero values, renders as an empty frame. */
+function chartIsEmpty(widget: DashboardWidget): boolean {
+  switch (widget.type) {
+    case "area-chart":
+    case "line-chart":
+    case "bar-chart": {
+      const names = widget.data.series.map((series) => series.name)
+      return !widget.data.values.some((point) =>
+        names.some((name) => Number(point[name] ?? 0) !== 0),
+      )
+    }
+    case "funnel-chart":
+      return !widget.data.stages.some((stage) => stage.value !== 0)
+    default:
+      return false
+  }
 }
 
 const CHART_WIDGET_TYPES = new Set<WidgetType>([
@@ -40,13 +61,28 @@ const CHART_WIDGET_TYPES = new Set<WidgetType>([
   "funnel-chart",
 ])
 
-export function DashboardWidgetRenderer({ widget, widthClass, testId }: WidgetRendererProps) {
+export function DashboardWidgetRenderer({ widget, widthClass, testId, isLoading = false }: WidgetRendererProps) {
   const chartRef = useRef<HTMLDivElement>(null)
   const useCard = widget.useCard !== false
   const isChart = CHART_WIDGET_TYPES.has(widget.type)
   const canExportCsv = isChart || widget.type === "table"
 
   const renderContent = () => {
+    if (isLoading && widget.type !== "quick-actions" && widget.type !== "custom") {
+      return (
+        <Skeleton
+          className={isChart ? "h-56 w-full" : "h-16 w-full"}
+          data-testid={testId ? `${testId}-loading` : undefined}
+        />
+      )
+    }
+    if (isChart && chartIsEmpty(widget)) {
+      return (
+        <div className="flex h-56 items-center justify-center rounded-lg border border-dashed border-border text-sm text-muted-foreground">
+          No data for this period yet.
+        </div>
+      )
+    }
     switch (widget.type) {
       case "kpi":
         return <KPIWidget data={widget.data} />

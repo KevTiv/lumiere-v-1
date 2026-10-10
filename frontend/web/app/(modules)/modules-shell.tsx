@@ -7,7 +7,12 @@ import {
   AIChatPanel,
   NotebookPanel,
   JournalPanel,
+  ChatterUploaderProvider,
+  HeaderTrailingProvider,
+  NotificationBell,
+  recentNotifications,
 } from "@lumiere/ui"
+import { useWebChatterUploader } from "@/lib/chatter-attachment-uploader"
 import { useErpSession } from "@lumiere/erp-session"
 import type { ChatContext, ChatMessage, ChatMessageSourceRef, ChatAction } from "@lumiere/ui"
 import {
@@ -45,6 +50,9 @@ import { useCompanies } from "@lumiere/query-hooks/hooks/organization-company"
 import { useOperatingCompanyId } from "@lumiere/query-hooks/hooks/use-operating-company"
 import { ErpAiRouteContextProvider, ErpAiChatControllerProvider, useErpAiRouteContext } from "@/lib/erp-ai-context"
 import { performSignOut } from "@/lib/auth-sign-out"
+import { recordPageHref } from "@/lib/record-page-href"
+import { useCurrentUserProfile } from "@lumiere/query-hooks/hooks/auth"
+import { useMailMessages } from "@lumiere/query-hooks/hooks/messages"
 
 const AI_CHAT_SESSION_KEY_STORAGE = "lumiere:erp-ai-chat-session-key"
 
@@ -517,6 +525,23 @@ function ErpAiChatPanel(props: Omit<ComponentProps<typeof AIChatPanel>, "onSendM
   )
 }
 
+/** Header bell: the latest notifications addressed to the signed-in user (the model has no read state). */
+function HeaderNotificationBell({ organizationId }: { organizationId: number }) {
+  const { identity } = useErpSession()
+  const { data: messages = [] } = useMailMessages(BigInt(organizationId))
+  const notifications = useMemo(
+    () => recentNotifications(messages as unknown as Record<string, unknown>[], identity),
+    [messages, identity],
+  )
+  return (
+    <NotificationBell
+      notifications={notifications}
+      viewAllHref="/messages"
+      itemHref={(n) => `/messages/${n.id}`}
+    />
+  )
+}
+
 function ModulesContent({
   children,
   firstOrgProfile,
@@ -536,6 +561,8 @@ function ModulesContent({
     orgId,
     orgReady && operatingCompanyId != null && operatingCompanyId > 0,
   )
+  const currentUserProfile = useCurrentUserProfile()
+
   const navBadges = useMemo(() => {
     const badges: Record<string, number> = {}
     if (approvalInboxCountQuery.count > 0) badges["/approvals"] = approvalInboxCountQuery.count
@@ -548,6 +575,7 @@ function ModulesContent({
 
   return (
     <ErpAiChatControllerProvider open={openAiChat}>
+      <HeaderTrailingProvider value={orgReady ? <HeaderNotificationBell organizationId={orgId} /> : null}>
       <div className="flex h-screen overflow-hidden bg-muted/30 text-foreground">
         <DashboardSidebar
           firstOrgProfile={firstOrgProfile}
@@ -557,6 +585,7 @@ function ModulesContent({
           onOpenNotebook={() => setIsNotebookOpen(true)}
           onOpenAIChat={openAiChat}
           onSignOut={() => void performSignOut()}
+          userProfile={currentUserProfile.data}
         />
         <main className="flex-1 overflow-auto scroll-smooth">
           <div className="mx-auto w-full max-w-[1600px] px-4 py-5 sm:px-6 lg:px-8 lg:py-7">{children}</div>
@@ -588,11 +617,13 @@ function ModulesContent({
 
         <ErpCommandPalette
           firstOrgProfile={firstOrgProfile}
+          recordHref={recordPageHref}
           onOpenAIChat={openAiChat}
           onOpenNotebook={() => setIsNotebookOpen(true)}
           onOpenJournal={() => setIsJournalOpen(true)}
         />
       </div>
+      </HeaderTrailingProvider>
     </ErpAiChatControllerProvider>
   )
 }
@@ -607,7 +638,9 @@ export default function ModulesShell({
   return (
     <Suspense fallback={null}>
       <ErpAiRouteContextProvider>
-        <ModulesContent firstOrgProfile={firstOrgProfile}>{children}</ModulesContent>
+        <ChatterUploaderProvider value={useWebChatterUploader}>
+          <ModulesContent firstOrgProfile={firstOrgProfile}>{children}</ModulesContent>
+        </ChatterUploaderProvider>
       </ErpAiRouteContextProvider>
     </Suspense>
   )

@@ -1,7 +1,7 @@
 "use client"
 
 import type { ReactNode } from "react"
-import { Fragment } from "react"
+import { Fragment, createContext, useContext } from "react"
 import Link from "next/link"
 import { Button } from "../components/button"
 import {
@@ -54,6 +54,10 @@ const timeRanges = [
   { label: "Year to Date", value: "ytd" },
 ]
 
+/** Content the app shell shows at the end of every DashboardHeader's actions (e.g. the notifications bell). */
+const HeaderTrailingContext = createContext<ReactNode>(null)
+export const HeaderTrailingProvider = HeaderTrailingContext.Provider
+
 export function DashboardHeader({
   title,
   description,
@@ -65,6 +69,7 @@ export function DashboardHeader({
   timeRange = "30d",
   onTimeRangeChange,
 }: DashboardHeaderProps) {
+  const trailing = useContext(HeaderTrailingContext)
   const selectedTimeRange = timeRanges.find((range) => range.value === timeRange) ?? timeRanges[2]
 
   return (
@@ -141,6 +146,7 @@ export function DashboardHeader({
             <Download className="h-4 w-4" />
           </Button>
         ) : null}
+        {trailing}
       </div>
     </header>
   )

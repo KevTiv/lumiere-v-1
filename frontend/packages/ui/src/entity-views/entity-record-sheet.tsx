@@ -1,6 +1,9 @@
 "use client"
 
+import Link from "next/link"
+import { ExternalLink } from "lucide-react"
 import { Badge } from "../components/badge"
+import { Button } from "../components/button"
 import {
   Sheet,
   SheetContent,
@@ -8,10 +11,14 @@ import {
   SheetTitle,
 } from "../components/sheet"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/tabs"
+import { useErpSession } from "@lumiere/erp-session"
+import { RecordChatter } from "../crm-components/crm-record-chatter"
 import { EntityDetail } from "./entity-detail"
 import { RecordAuditTab } from "./record-audit-tab"
 import type { EntityRecordSheetConfig } from "../lib/module-types"
 import type { BadgeVariant } from "../lib/entity-view-types"
+import { commitRecordListFor } from "../lib/record-list-context"
+import { humanizeEnumValue, statusTone } from "../lib/entity-row-values"
 
 interface EntityRecordSheetProps {
   open: boolean
@@ -38,8 +45,15 @@ export function EntityRecordSheet({
   const statusRaw =
     record && config.statusKey ? resolveStatusValue(record, config.statusKey) : ""
   const statusVariant: BadgeVariant =
-    (config.statusBadgeVariants?.[statusRaw] as BadgeVariant | undefined) ?? "secondary"
-  const statusLabel = config.statusBadgeLabels?.[statusRaw] ?? statusRaw
+    statusTone(statusRaw) ??
+    (config.statusBadgeVariants?.[statusRaw] as BadgeVariant | undefined) ??
+    "secondary"
+  const statusLabel = config.statusBadgeLabels?.[statusRaw] ?? humanizeEnumValue(statusRaw)
+  const { organizationId } = useErpSession()
+  const discussionModel = config.discussion ? (config.discussion.resModel ?? config.auditTableName) : undefined
+  const recordId = record ? String(record.id ?? record.Id ?? "") : ""
+  const showDiscussion = Boolean(discussionModel && organizationId && /^\d+$/.test(recordId))
+  const openHref = record ? config.openHref?.(record) : undefined
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -50,14 +64,27 @@ export function EntityRecordSheet({
               <SheetTitle>{title}</SheetTitle>
             </SheetHeader>
 
-            <div className="mt-4 space-y-4">
-              {(config.statusKey || config.actions) && (
+            <div className="mt-2 space-y-4 px-4 pb-6">
+              {(config.statusKey || config.actions || openHref) && (
                 <div className="flex flex-wrap items-center gap-2">
                   {config.statusKey && statusRaw && (
                     <Badge variant={statusVariant}>{statusLabel}</Badge>
                   )}
                   {config.actions && (
                     <div className="flex flex-wrap gap-2">{config.actions}</div>
+                  )}
+                  {openHref && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="ml-auto"
+                      nativeButton={false}
+                      render={<Link href={openHref} onClick={() => commitRecordListFor(openHref)} />}
+                      data-testid="entity-record-sheet-open"
+                    >
+                      <ExternalLink className="mr-1 h-3.5 w-3.5" />
+                      Open
+                    </Button>
                   )}
                 </div>
               )}
@@ -74,6 +101,11 @@ export function EntityRecordSheet({
                       {tab.label}
                     </TabsTrigger>
                   ))}
+                  {showDiscussion && (
+                    <TabsTrigger value="discussion" data-testid="entity-record-sheet-tab-discussion">
+                      Discussion
+                    </TabsTrigger>
+                  )}
                   <TabsTrigger value="audit">Audit</TabsTrigger>
                 </TabsList>
 
@@ -86,6 +118,18 @@ export function EntityRecordSheet({
                     {tab.content(record)}
                   </TabsContent>
                 ))}
+
+                {showDiscussion && discussionModel && organizationId ? (
+                  <TabsContent value="discussion" className="mt-4 space-y-6">
+                    <RecordChatter
+                      organizationId={organizationId}
+                      resModel={discussionModel}
+                      resId={BigInt(recordId)}
+                      recordTitle={title}
+                    />
+                    {config.discussion?.attachments?.(record)}
+                  </TabsContent>
+                ) : null}
 
                 <TabsContent value="audit" className="mt-4">
                   {config.auditTableName ? (

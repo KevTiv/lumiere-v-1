@@ -2,6 +2,8 @@
 
 import { useMemo, type ReactNode } from "react"
 import Link from "next/link"
+import { showWorkflowToast } from "@lumiere/ui/lib/workflow-toast"
+import { DashboardHeader } from "@lumiere/ui"
 import { BoxesIcon, CircleDollarSignIcon, PackageIcon, ReceiptTextIcon, StoreIcon } from "lucide-react"
 
 import { useErpSession } from "@lumiere/erp-session"
@@ -97,7 +99,17 @@ export function DistributorClient() {
   )
 
   if (!organizationId) return <MissingOrganization />
-  const toggle = () => void setPack.mutate({ companyId, organizationId, packKey: "distributor_wholesaler", enabled: !enabled })
+  const toggle = async () => {
+    try {
+      await setPack.mutateAsync({ companyId, organizationId, packKey: "distributor_wholesaler", enabled: !enabled })
+    } catch (error) {
+      showWorkflowToast({
+        kind: "error",
+        title: enabled ? "Disable pack failed" : "Enable pack failed",
+        description: error instanceof Error ? error.message : String(error),
+      })
+    }
+  }
 
   return (
     <main
@@ -105,6 +117,10 @@ export function DistributorClient() {
       data-testid="module-view-distributor"
       data-hydrated={packs.isSuccess ? "true" : "false"}
     >
+      <DashboardHeader
+        title="Distributor"
+        description="Cash, credit, order-to-cash and stock control for distribution companies"
+      />
       <Card>
         <CardHeader>
           <div>

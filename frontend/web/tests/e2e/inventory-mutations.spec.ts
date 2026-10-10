@@ -16,6 +16,7 @@ import {
   submitForm,
   waitForBffQueryMinRows,
   waitForEntityActionEnabled,
+  acceptEntityActionConfirm,
 } from "./helpers"
 
 test.describe("Inventory update/delete mutations", { tag: ["@p0", "@phase-2"] }, () => {
@@ -106,18 +107,13 @@ test.describe("Inventory update/delete mutations", { tag: ["@p0", "@phase-2"] },
     await selectEntityRowById(page, categoryId)
     await waitForEntityActionEnabled(page, "entity-action-delete-category")
 
-    page.once("dialog", (dialog) => {
-      expect(dialog.type()).toBe("confirm")
-      void dialog.accept()
-    })
-
-    const [deleteCategoryRes] = await Promise.all([
-      page.waitForResponse(
-        (res) => matchesOperationResponse(res, "delete_product_category") && res.ok(),
-        { timeout: 30_000 },
-      ),
-      page.getByTestId("entity-action-delete-category").click(),
-    ])
+    const deleteCategoryResponse = page.waitForResponse(
+      (res) => matchesOperationResponse(res, "delete_product_category") && res.ok(),
+      { timeout: 30_000 },
+    )
+    await page.getByTestId("entity-action-delete-category").click()
+    await acceptEntityActionConfirm(page)
+    const deleteCategoryRes = await deleteCategoryResponse
     expect(deleteCategoryRes.ok()).toBe(true)
 
     await expectRecordAbsentFromQuery(page, "/api/query/product-categories", (row) =>

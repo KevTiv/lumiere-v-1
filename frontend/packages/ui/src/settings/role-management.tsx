@@ -47,6 +47,7 @@ import {
 import type { Role, Resource, Action } from "@/lib/rbac-types"
 import { cn } from "@/lib/utils"
 import { useTranslation } from "@lumiere/i18n"
+import { useConfirmDialog } from "@lumiere/ui/hooks/use-confirm-dialog"
 import { rolePillClassForColor, roleSwatchClass } from "@/lib/theme-colors"
 import { FieldPermissionsEditor } from "./field-permissions-editor"
 
@@ -61,6 +62,7 @@ const roleColors = [
 
 export function RoleManagement() {
   const { t } = useTranslation()
+  const { confirm: confirmDialog, dialog: confirmDialogNode } = useConfirmDialog()
   const { organizationId } = useErpSession()
   const orgReady = hasValidOrganizationId(organizationId)
   const orgBigInt = orgReady ? BigInt(organizationId) : 0n
@@ -219,13 +221,13 @@ export function RoleManagement() {
     }
   }
 
-  const handleDeleteRole = (roleId: string) => {
+  const handleDeleteRole = async (roleId: string) => {
     const role = roles.find(r => r.id === roleId)
     if (role?.isSystem) {
       alert(t("settings.roles.systemCannotDelete"))
       return
     }
-    if (confirm(t("settings.roles.deleteConfirm"))) {
+    if (await confirmDialog({ description: t("settings.roles.deleteConfirm") })) {
       alert(t("settings.formConfig.fieldDeleteError"))
     }
   }
@@ -604,6 +606,7 @@ export function RoleManagement() {
           </DialogContent>
         </Dialog>
       ) : null}
+      {confirmDialogNode}
     </div>
   )
 }

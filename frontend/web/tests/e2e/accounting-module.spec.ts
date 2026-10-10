@@ -311,18 +311,18 @@ test.describe("Accounting module e2e", () => {
     await expectNoAppError(page)
   })
 
-  test("fiscal year bulk actions disable until a row is selected", async ({ page }) => {
+  test("fiscal year bulk actions appear once a row is selected", async ({ page }) => {
     await gotoModule(page, "/accounting", "accounting")
     await openAccountingTab(page, "fiscal-years")
 
     const openBtn = page.getByTestId("entity-action-fy-open")
-    await expect(openBtn).toBeVisible()
-    await expect(openBtn).toBeDisabled()
+    await expect(activeTabEntityTable(page)).toBeVisible()
+    await expect(openBtn).toHaveCount(0)
 
-    const rowLocator = page.locator('[data-testid^="entity-row-"]').first()
+    const rowLocator = activeTabEntityTable(page).locator('[data-testid^="entity-row-"]').first()
     if ((await rowLocator.count()) > 0) {
       await rowLocator.click()
-      await expect(openBtn).toBeEnabled()
+      await expect(openBtn).toBeVisible()
     }
 
     await expectNoAppError(page)

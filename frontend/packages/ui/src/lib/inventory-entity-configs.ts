@@ -402,20 +402,22 @@ export type TransfersTableConfigOptions = {
 // ── Transfers (pickings) ──────────────────────────────────────────────────────
 
 export type PickingActionHandlers = Partial<
-  Record<PickingActionId, (rows: EntityRow[]) => void>
+  Record<PickingActionId, (rows: EntityRow[]) => void | Promise<unknown>>
 >
 
 const PICKING_ACTION_ORDER: Array<{
   id: PickingActionId
   labelKey: string
   destructive?: boolean
+  /** Runs once per selected transfer; the rest act on a single one. */
+  multiple?: boolean
 }> = [
-  { id: "confirm", labelKey: "inventory.transferActions.confirm" },
-  { id: "assign", labelKey: "inventory.transferActions.assign" },
+  { id: "confirm", labelKey: "inventory.transferActions.confirm", multiple: true },
+  { id: "assign", labelKey: "inventory.transferActions.assign", multiple: true },
   { id: "assign-user", labelKey: "inventory.transferActions.assignUser" },
   { id: "partial-validate", labelKey: "sales.fulfillment.actions.partialValidate" },
-  { id: "pack", labelKey: "sales.fulfillment.actions.pack" },
-  { id: "validate", labelKey: "inventory.transferActions.validate" },
+  { id: "pack", labelKey: "sales.fulfillment.actions.pack", multiple: true },
+  { id: "validate", labelKey: "inventory.transferActions.validate", multiple: true },
   { id: "cancel", labelKey: "inventory.transferActions.cancel", destructive: true },
 ]
 
@@ -428,7 +430,7 @@ export const pickingRowActions = (
   handlers: PickingActionHandlers,
   icons: Partial<Record<PickingActionId, EntityAction["icon"]>> = {},
 ): EntityAction[] =>
-  PICKING_ACTION_ORDER.flatMap(({ id, labelKey, destructive }) => {
+  PICKING_ACTION_ORDER.flatMap(({ id, labelKey, destructive, multiple }) => {
     const handler = handlers[id]
     if (!handler) return []
     return [
@@ -438,6 +440,7 @@ export const pickingRowActions = (
         icon: icons[id],
         variant: destructive ? ("destructive" as const) : undefined,
         requiresSelection: true,
+        selection: multiple ? ("multiple" as const) : ("single" as const),
         isApplicable: (rows: EntityRow[]) => isPickingActionApplicableToAll(id, rows),
         onClick: handler,
       },
