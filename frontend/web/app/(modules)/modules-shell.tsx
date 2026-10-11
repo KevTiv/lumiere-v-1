@@ -52,7 +52,11 @@ import { ErpAiRouteContextProvider, ErpAiChatControllerProvider, useErpAiRouteCo
 import { performSignOut } from "@/lib/auth-sign-out"
 import { recordPageHref } from "@/lib/record-page-href"
 import { useCurrentUserProfile } from "@lumiere/query-hooks/hooks/auth"
-import { useMailMessages } from "@lumiere/query-hooks/hooks/messages"
+import {
+  useMailMessages,
+  useMarkAllNotificationsRead,
+  useMarkNotificationRead,
+} from "@lumiere/query-hooks/hooks/messages"
 
 const AI_CHAT_SESSION_KEY_STORAGE = "lumiere:erp-ai-chat-session-key"
 
@@ -525,10 +529,13 @@ function ErpAiChatPanel(props: Omit<ComponentProps<typeof AIChatPanel>, "onSendM
   )
 }
 
-/** Header bell: the latest notifications addressed to the signed-in user (the model has no read state). */
+/** Header bell: unread notifications addressed to the signed-in user. */
 function HeaderNotificationBell({ organizationId }: { organizationId: number }) {
   const { identity } = useErpSession()
-  const { data: messages = [] } = useMailMessages(BigInt(organizationId))
+  const orgId = BigInt(organizationId)
+  const { data: messages = [] } = useMailMessages(orgId)
+  const markNotificationRead = useMarkNotificationRead(orgId)
+  const markAllNotificationsRead = useMarkAllNotificationsRead(orgId)
   const notifications = useMemo(
     () => recentNotifications(messages as unknown as Record<string, unknown>[], identity),
     [messages, identity],
@@ -538,6 +545,9 @@ function HeaderNotificationBell({ organizationId }: { organizationId: number }) 
       notifications={notifications}
       viewAllHref="/messages"
       itemHref={(n) => `/messages/${n.id}`}
+      onNotificationOpen={(notification) => markNotificationRead.mutateAsync(notification.id)}
+      onMarkAllRead={() => markAllNotificationsRead.mutateAsync()}
+      isMarkingRead={markNotificationRead.isPending || markAllNotificationsRead.isPending}
     />
   )
 }
