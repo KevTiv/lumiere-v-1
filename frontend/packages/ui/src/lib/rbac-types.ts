@@ -47,7 +47,7 @@ export type KnownResource =
 export type Resource = KnownResource | (string & {})
 
 // Actions that can be performed
-export type Action = "read" | "create" | "update" | "delete" | "manage" | "write"
+export type Action = "read" | "create" | "update" | "delete" | "manage" | "write" | "admin"
 
 // Effect of a policy rule
 export type Effect = "allow" | "deny"
