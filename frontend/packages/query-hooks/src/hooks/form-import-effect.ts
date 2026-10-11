@@ -26,6 +26,12 @@ export type ImportJobEffectProjection = {
   readonly metadata?: unknown
 }
 
+export interface ImportJobRecordRef {
+  resource: "import-jobs"
+  id: string
+  href: string
+}
+
 /** Exact form configuration identity: (organization, module, form). */
 function exactFormConfig(
   rows: readonly FormConfigEffectProjection[],
@@ -104,7 +110,7 @@ export function resolveImportCommitEffect(
   organizationId: bigint,
   tableName: string,
   sha256: string,
-): CanonicalRecordRef | null {
+): ImportJobRecordRef | null {
   const matches = jobs.filter(
     (job) =>
       parseStrictU64(job.organizationId ?? job.organization_id) === organizationId &&
@@ -116,5 +122,7 @@ export function resolveImportCommitEffect(
     throw new AmbiguousOperationEffectError(`Expected one import job, found ${matches.length}`)
   }
   const id = parseStrictU64(matches[0]?.id)
-  return id === undefined ? null : { resource: "import-jobs", id: id.toString() }
+  return id === undefined
+    ? null
+    : { resource: "import-jobs", id: id.toString(), href: `/settings/import-jobs/${id}` }
 }
