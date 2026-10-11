@@ -1,7 +1,7 @@
-import type { OperationInputMap } from "@lumiere/contracts/generated/operation-inputs"
+import type { StdbBffCommandInput } from "@lumiere/stdb/commands"
 import { parseStrictU64 } from "@lumiere/erp-shared/u64"
 
-export function toManufacturingValuationParams(values: Record<string, unknown>): OperationInputMap["configure_manufacturing_valuation"]["params"] {
+export function toManufacturingValuationParams(values: Record<string, unknown>): StdbBffCommandInput<"configure_manufacturing_valuation">["params"] {
   const required = (field: string) => {
     const id = parseStrictU64(values[field])
     if (id == null || id <= 0n) throw new Error("Select a journal and each valuation account")
