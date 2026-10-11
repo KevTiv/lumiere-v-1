@@ -5,21 +5,21 @@
     "ir_version": 2,
     "ir_path": "ir/lumiere-contract-ir-v2.json",
     "pin_path": "ir/PIN.json",
-    "artifact_sha256": "813f74098de2220871149ebfd389404f82e4f59a1d65d1b22c877a2e3b39bf4b",
-    "schema_hash": "sha256:b03e0bc8a63ffb6426d1a9942bb6dce3aeec5654de262efb0e658354c2ca3562",
-    "source_commit": "904606f49e670c4306713b04f7d35aad07e62f0a",
+    "artifact_sha256": "d6c06231aaa3458d8a7fc8b9b8e10d6dea7f17d5519989454464d8441911da3a",
+    "schema_hash": "sha256:1e97b9448f49e120640632ea468c7acd0917ab8cea09ba0acc4747b037e51c56",
+    "source_commit": "2d6192ce83fb1aa56b83e6a753196c86377c8e19",
     "source_repository": "https://github.com/KevTiv/lumiere-v-1"
   },
   "lumiere_contracts": {
     "package": "lumiere-contracts",
-    "version": "0.3.99",
-    "tag": "v0.3.99",
-    "revision": "8d43e11e6a7683e774c65920b97bdcf450b52fc0",
+    "version": "0.3.100",
+    "tag": "v0.3.100",
+    "revision": "c7efc900130fcf6a43d23cbadb2581e3de52aa67",
     "repository": "ssh://git@github.com/KevTiv/lumiere-contracts.git"
   },
   "operation_history": {
     "path": "lumiere-codegen/contract-operation-history.json",
-    "checksum": "sha256:3624f9688f2ff453daab3a1fd91325a0da87c144fae4f4152562f6d33e3abd6b"
+    "checksum": "sha256:206b35f371bf44247a70143473b95a16735f76e9fa20bc0eff0c0180367e4144"
   },
   "stdb_module": {
     "name": "lumiere_v1",
@@ -36,7 +36,7 @@
     "checksum": "sha256:5598834cc650011744abb9b9ad090e6ba09bfc824bc6d853f89f34930ef8d9ab",
     "application_catalog_path": "api-server/src/cold_tier/migrate.rs",
     "application_catalog_version": 14,
-    "application_catalog_checksum": "sha256:30efae3cefac489704cdc7c6af855dc3c154c58852a225f973685012a60ba2e5"
+    "application_catalog_checksum": "sha256:4f2a5f0eccb50e0f48a9aa5c2eeb07b3604ec49c67d157c7db49154ed6766861"
   },
   "services": {
     "api_server": {
@@ -51,7 +51,7 @@
   "minimum_client_contract": {
     "version": "ir-v2",
     "ir_version": 2,
-    "generated_contract_release": "0.3.99"
+    "generated_contract_release": "0.3.100"
   },
   "deployment": {
     "config_generation": 2,
