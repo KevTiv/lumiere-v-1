@@ -156,14 +156,26 @@ export function parsedFieldToModularField(field: ParsedFormField): FormField {
 }
 
 function applyStdbOverrides(staticField: FormField, stdbField: ParsedFormField): FormField {
-  const merged: FormField = {
-    ...staticField,
+  const overrides = {
     label: stdbField.label || staticField.label,
     placeholder: stdbField.placeholder || staticField.placeholder,
     description: stdbField.description || staticField.description,
     required: stdbField.validation.required || staticField.required,
     width: stdbWidthToModular(stdbField.width) ?? staticField.width,
     visibleWhen: stdbField.visibleWhen ?? staticField.visibleWhen,
+  }
+  let merged: FormField = { ...staticField, ...overrides }
+  if (stdbField.type === "UserSelect" && staticField.type === "select") {
+    merged = {
+      ...staticField,
+      ...overrides,
+      type: "select",
+      options: stdbField.options.map(option => ({
+        value: option.value,
+        label: option.label,
+        disabled: option.disabled,
+      })),
+    }
   }
   if (stdbField.defaultValue !== undefined && staticField.defaultValue === undefined) {
     return { ...merged, defaultValue: stdbField.defaultValue } as FormField

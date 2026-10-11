@@ -44,6 +44,9 @@ if [[ "${FAKE_MANY_FILES:-}" == "1" ]]; then
     printf 'pub struct Extra%s;\n' "$index" >"$out_dir/extra_$index.rs"
   done
 fi
+if [[ "${FAKE_INVOKE_INTERNAL_RUSTFMT:-}" == "1" ]]; then
+  rustfmt --edition 2021 "$out_dir/row.rs"
+fi
 if [[ "${FAKE_COLOR:-}" == "1" ]]; then
   printf '\033[1m\033[31merror\033[0m: expected identifier, found keyword `type`\n' >&2
   printf '\033[1m\033[31merror\033[0m: expected identifier, found keyword `ref`\n' >&2
@@ -110,6 +113,16 @@ FAKE_RUSTFMT_LOG="$TMP_ROOT/rustfmt.log" FAKE_MANY_FILES=1 \
 
 test "$(wc -l <"$TMP_ROOT/rustfmt.log" | tr -d ' ')" -ge 2
 grep -q 'pub r#type:' "$TMP_ROOT/out-many/row.rs"
+
+# The invalid source proves the CLI's internal rustfmt is shimmed. The wrapper
+# must still repair it and run the configured real formatter afterwards.
+FAKE_RUSTFMT_LOG="$TMP_ROOT/rustfmt-shimmed.log" FAKE_INVOKE_INTERNAL_RUSTFMT=1 \
+  RUSTFMT_BIN="$FAKE_RUSTFMT" STDB_GENERATE_WASM="$FAKE_WASM" \
+  SPACETIME_BIN="$FAKE_SPACETIME" \
+  bash "$ROOT/scripts/generate-spacetimedb-rust-sdk.sh" "$TMP_ROOT/out-shimmed" "$TMP_ROOT/module"
+
+test "$(wc -l <"$TMP_ROOT/rustfmt-shimmed.log" | tr -d ' ')" -eq 1
+grep -q 'pub r#type:' "$TMP_ROOT/out-shimmed/row.rs"
 
 if FAKE_UNEXPECTED=1 FAKE_EXIT_STATUS=0 STDB_GENERATE_WASM="$FAKE_WASM" SPACETIME_BIN="$FAKE_SPACETIME" \
   bash "$ROOT/scripts/generate-spacetimedb-rust-sdk.sh" "$TMP_ROOT/rejected" "$TMP_ROOT/module" \
