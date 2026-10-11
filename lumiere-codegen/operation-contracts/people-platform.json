@@ -1811,6 +1811,16 @@
       },
       "evidence": "spacetimedb/src/data_ops/core_imports.rs: body inserts or appends a new effect without a replay guard"
     },
+    "import_csv_tracked": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "request_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/data_ops/import_tracker.rs: request_id and payload digest reuse the exact ImportJob receipt and reject changed-payload replay"
+    },
     "import_currency_csv": {
       "semantic_kind": "command",
       "client_facing": true,
@@ -5520,6 +5530,13 @@
       "idempotency": "not_applicable",
       "codec": { "id": "spacetimedb-sats-json", "version": 1 },
       "evidence": "spacetimedb/src/ai/spend_reads.rs: sender-scoped read-only view for the active ai_spend_reader service identity"
+    },
+    "helpdesk_related_record_read": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": { "id": "spacetimedb-sats-json", "version": 1 },
+      "evidence": "spacetimedb/src/helpdesk/related_records.rs: sender-scoped read-only view enforces ticket permission and organization, company, and target scope"
     }
   }
 }

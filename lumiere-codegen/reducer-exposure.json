@@ -2555,6 +2555,11 @@
       "reason": "invoked by an enumerated frontend BFF call site"
     },
     {
+      "name": "import_csv_tracked",
+      "exposure": "session",
+      "reason": "required by the authenticated tracked CSV import endpoint"
+    },
+    {
       "name": "import_currency_csv",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"

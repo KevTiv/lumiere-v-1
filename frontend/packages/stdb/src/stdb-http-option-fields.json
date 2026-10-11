@@ -3557,6 +3557,10 @@
   "HrStatutoryId": [
     "metadata"
   ],
+  "ImportCsvTrackedParams": [
+    "file_name",
+    "currency_id"
+  ],
   "ImportJob": [
     "file_name",
     "completed_at",
@@ -5227,6 +5231,9 @@
   "SetExpenseFraudHoldParams": [
     "fraud_reason",
     "metadata"
+  ],
+  "SetHelpdeskRelatedRecordParams": [
+    "target"
   ],
   "SetPurchaseApprovalDelegateParams": [
     "metadata"
