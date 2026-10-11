@@ -14,6 +14,7 @@ export const MANUFACTURING_UI_REDUCERS = [
   'cancel_manufacturing_order',
   'check_mo_availability',
   'compute_bom_cost',
+  'configure_workcenter_cost_rate',
   'confirm_manufacturing_order',
   'consume_mo_materials',
   'create_bom',
@@ -252,6 +253,12 @@ export async function submitManufacturingRowAction(
           params: { name: String(values.wcName ?? "") },
         })
         return
+      case "configure_cost_rate": {
+        const workcenterId = optionalBigIntU64(wcId)
+        const hourlyRate = num(values.wcHourlyRate, Number.NaN)
+        if (!workcenterId || !Number.isFinite(hourlyRate) || hourlyRate < 0) throw new Error("Enter a valid workcenter and nonnegative hourly rate")
+        return m.configureWorkcenterCostRate.mutateAsync({ workcenterId, hourlyRate })
+      }
       case "block":
         await m.blockWc.mutateAsync({
           workcenterId: wcId,

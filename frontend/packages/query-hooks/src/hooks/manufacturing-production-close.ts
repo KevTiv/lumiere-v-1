@@ -17,7 +17,7 @@ import {
 } from "./operation-effect"
 
 const PRODUCE_AFFECTS = ["mrp-productions"] as const
-const FINISH_AFFECTS = ["mrp-productions", "stock-moves", "stock-quants"] as const
+const FINISH_AFFECTS = ["mrp-productions", "stock-moves", "stock-quants", "mrp-production-costs", "mrp-productivity-costs", "account-moves", "account-move-lines"] as const
 
 export interface ManufacturingCloseOrderProjection {
   readonly id?: unknown

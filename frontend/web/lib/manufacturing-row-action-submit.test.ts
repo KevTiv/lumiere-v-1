@@ -23,3 +23,12 @@ test("denied or unresolved mutation errors propagate without success results", a
   const mutations = { finishMo: { mutateAsync: async () => { throw denied } } } as unknown as ManufacturingMutations
   await assert.rejects(submitManufacturingRowAction("orders", { moAction: "finish", moRecordId: "3" }, mutations), error => error === denied)
 })
+
+test("workcenter rates accept an explicitly configured zero but reject missing, negative or invalid rates", async () => {
+  let calls = 0
+  const mutations = { configureWorkcenterCostRate: { mutateAsync: async (input: { workcenterId: bigint; hourlyRate: number }) => { calls++; assert.equal(input.workcenterId, 18446744073709551615n); assert.equal(input.hourlyRate, 0) } } } as unknown as ManufacturingMutations
+  const values = { wcRecordId: "18446744073709551615", wcAction: "configure_cost_rate", wcHourlyRate: 0 }
+  await submitManufacturingRowAction("workcenters", values, mutations)
+  for (const rate of [undefined, "", -1, Infinity, "NaN"]) await assert.rejects(submitManufacturingRowAction("workcenters", { ...values, wcHourlyRate: rate }, mutations))
+  assert.equal(calls, 1)
+})

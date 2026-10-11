@@ -1969,6 +1969,11 @@ export const manufacturingModuleConfig = (t: TFunction): ModuleConfig => ({
       type: "entity",
       entityConfig: qualityChecksTableConfig(t),
     },
+    {
+      id: "cost-settings",
+      label: "Costing & Valuation",
+      type: "custom",
+    },
   ],
 })
 

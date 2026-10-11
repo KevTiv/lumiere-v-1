@@ -58,6 +58,7 @@ import { useManufacturingModuleSubscription } from '@/lib/module-subscription-ho
 import { hasValidOrganizationId, orgBigInts } from '@/lib/org-scoped';
 import { ManufacturingRowDialog } from '../../manufacturing-row-dialog';
 import { ManufacturingActionResult } from '../../manufacturing-action-result';
+import { ManufacturingCostReadback } from '../../manufacturing-cost-readback';
 import { resolvedManufacturingResultLinks, type ManufacturingResultLink } from '@/lib/manufacturing-result-links';
 import {
   canCancelOrder,
@@ -412,7 +413,7 @@ function ManufacturingOrderPageLoaded({
           {
             id: 'overview',
             label: t('common.overview', { defaultValue: 'Overview' }),
-            content: <EntityDetail config={detailConfig} data={order} />,
+            content: <div className="space-y-6"><EntityDetail config={detailConfig} data={order} /><ManufacturingCostReadback organizationId={orgId} companyId={operatingCompanyId} productionId={id} /></div>,
           },
           {
             id: 'workorders',

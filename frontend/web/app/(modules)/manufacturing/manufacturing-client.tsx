@@ -49,6 +49,8 @@ import { manufacturingOrderHref } from "./manufacturing-order"
 import { ManufacturingRowDialog } from "./manufacturing-row-dialog"
 import { createBomComponentsField } from "./bom-components-field"
 import { ManufacturingActionResult } from "./manufacturing-action-result"
+import { ManufacturingCostSettings } from "./manufacturing-cost-settings"
+import { useMrpWorkcenterCostRates } from "@lumiere/query-hooks/hooks/manufacturing-costs"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
 import {
   toCreateBomParams,
@@ -134,6 +136,9 @@ function ManufacturingClientLoaded({
   const byproductsQuery = useMrpBomByproducts(orgId)
   const byproductsState = moduleQueryState(byproductsQuery)
   const byproducts = canUseModuleData(byproductsState) ? byproductsQuery.data ?? [] : []
+  const costRatesQuery = useMrpWorkcenterCostRates(orgId)
+  const costRatesState = moduleQueryState(costRatesQuery)
+  const costRates = canUseModuleData(costRatesState) ? costRatesQuery.data ?? [] : []
   const { data: workorders = [] } = useMrpWorkorders(orgId, initialWorkorders);
   const { data: workcenters = [] } = useMrpWorkcenters(
     orgId,
@@ -427,6 +432,7 @@ function ManufacturingClientLoaded({
       ({
         ...moduleConfig,
         tabs: withDashboardSections(moduleConfig, liveSections).tabs.map((tab) => {
+          if (tab.id === "cost-settings") return { ...tab, customContent: <ManufacturingCostSettings organizationId={orgId} companyId={operatingCompanyId} /> }
           if (tab.id === "orders" && tab.entityConfig && tab.entityConfig.view.mode === "table") {
             // The row opens the action form; the order's name opens its page.
             const view = tab.entityConfig.view
@@ -508,7 +514,7 @@ function ManufacturingClientLoaded({
           return tab
         }),
       }) as ModuleConfig,
-    [moduleConfig, liveSections, moFormConfig, bomFormConfig, workcenterFormConfig, t],
+    [moduleConfig, liveSections, moFormConfig, bomFormConfig, workcenterFormConfig, t, orgId, operatingCompanyId],
   )
 
   const data = useMemo(
@@ -627,6 +633,7 @@ function ManufacturingClientLoaded({
         tabId={rowPick?.tabId ?? null}
         row={rowPick?.row ?? null}
         workcenters={workcenters}
+        workcenterCostRates={costRates}
         iotDevices={iotDevices}
         iotReferenceStatus={iotReferenceStatus}
         qualityChecks={qualityChecks}
