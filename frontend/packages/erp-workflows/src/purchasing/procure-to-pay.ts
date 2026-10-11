@@ -9,6 +9,7 @@
 import { firstNonNullKey, type RowValueMap } from "@lumiere/erp-shared/row-values"
 import { recordAction, type ExecuteAction, type WorkflowAction } from "../core/action"
 import { singleAddedId } from "../core/effect-delta"
+import { WorkflowError } from "../core/errors"
 import { recordRef } from "../core/record-ref"
 import { rowId, variantTag } from "../core/row"
 import type { ObservedTransition } from "../core/transition"
@@ -248,11 +249,20 @@ export interface ReceiptTarget {
   pickingId: string
 }
 
+/** Both canonical projections must agree; truthy values are never boolean proof. */
+function receiptDone(move: RowValueMap): boolean | undefined {
+  const done = firstNonNullKey(move, "isDone", "is_done")
+  const state = firstNonNullKey(move, "state")
+  if (typeof done !== "boolean" || typeof state !== "string") return undefined
+  if (done !== (state === "done")) return undefined
+  return done
+}
+
 /**
  * Resolve the exact open stock move that a receive command is about to advance.
  *
- * Zero matches is valid for service/legacy lines and lets the reducer decide. Multiple matches
- * are deliberately unresolved: neither the client nor the reducer may choose an arbitrary row.
+ * Zero matches leaves receipt proof unresolved; it does not establish a service line or success.
+ * Multiple matches or malformed identities fail closed with a typed conflict.
  */
 export function resolveOpenReceiptTarget(
   lineId: string,
@@ -261,35 +271,46 @@ export function resolveOpenReceiptTarget(
   const matches = moves.flatMap((move) => {
     const line = firstNonNullKey(move, "purchaseLineId", "purchase_line_id")
     const pickingId = firstNonNullKey(move, "pickingId", "picking_id")
-    const done =
-      Boolean(firstNonNullKey(move, "isDone", "is_done")) ||
-      String(firstNonNullKey(move, "state") ?? "") === "done"
+    if (line == null || String(line) !== lineId) return []
+    const done = receiptDone(move)
+    if (done === undefined) {
+      throw new WorkflowError("conflict", `Receipt move for purchase line ${lineId} has invalid or contradictory done evidence`)
+    }
     const cancelled = String(firstNonNullKey(move, "state") ?? "") === "cancel"
-    if (line == null || String(line) !== lineId || pickingId == null || done || cancelled) return []
+    if (done || cancelled) return []
+    const moveId = firstNonNullKey(move, "id")
+    const isValidId = (id: unknown) =>
+      (typeof id === "string" && /^[1-9]\d*$/.test(id)) ||
+      (typeof id === "number" && Number.isSafeInteger(id) && id > 0) ||
+      (typeof id === "bigint" && id > 0n)
+    if (!isValidId(moveId) || !isValidId(pickingId)) {
+      throw new WorkflowError("conflict", `Open receipt move for purchase line ${lineId} has an invalid identity`)
+    }
     return [{ moveId: rowId(move), pickingId: String(pickingId) }]
   })
-  return matches.length === 1 ? matches[0] : undefined
+  if (matches.length > 1) {
+    throw new WorkflowError("conflict", `Multiple open receipt moves match purchase line ${lineId}`)
+  }
+  return matches[0]
 }
 
 /**
  * Observe only the move/picking identity captured before dispatch. A later/higher-id move can
- * never replace it in the semantic result. Non-stock (service) lines have no target and stay put.
+ * never replace it in the semantic result. An absent target provides no receipt proof.
  */
 export function observeReceivedLine(
   lineId: string,
   target: ReceiptTarget | undefined,
   moves: readonly RowValueMap[],
 ): ObservedTransition {
-  if (!target) return { outcome: "applied" }
+  if (!target) return {}
 
   const move = moves.find((candidate) => rowId(candidate) === target.moveId)
   if (!move) return {}
 
   const line = firstNonNullKey(move, "purchaseLineId", "purchase_line_id")
   const pickingId = firstNonNullKey(move, "pickingId", "picking_id")
-  const done =
-    Boolean(firstNonNullKey(move, "isDone", "is_done")) ||
-    String(firstNonNullKey(move, "state") ?? "") === "done"
+  const done = receiptDone(move)
 
   if (
     line == null ||

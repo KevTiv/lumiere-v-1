@@ -47,13 +47,11 @@ import {
   recordRef,
   supplierIntakeWorkflow,
   requisitionPurchaseIds,
-  observeReceivedLine,
   observeReturnVendorCredit,
   observeSameRecord,
   observeSentPurchaseOrder,
   postLandedCostAction,
   receivePurchaseLineAction,
-  resolveOpenReceiptTarget,
   rejectSupplierIntakeAction,
   releaseBlanketAction,
   reviewSupplierIntakeAction,
@@ -66,7 +64,6 @@ import {
   type CreateBillFromPurchaseOrderInput,
   type CreateVendorCreditInput,
   type ObservedTransition,
-  type ReceiptTarget,
   type ReceivePurchaseLineInput,
   type ReleaseBlanketInput,
   type ReviewSupplierIntakeInput,
@@ -76,7 +73,7 @@ import {
 } from "@lumiere/erp-workflows"
 
 import { fetchQueryList } from "../http"
-import { stockMovesQueryOptions } from "./inventory/stock-operations"
+import { captureReceiptSnapshot, observeReceiptQuantity, type ReceiptSnapshot, type ReceiptReads } from "./purchasing-receipt-effect"
 import {
   applyLandedCostsCommand,
   approvePurchaseRequisitionCommand,
@@ -140,7 +137,7 @@ export interface PurchasingWorkflowLabels {
 type BillInput = CreateBillFromPurchaseOrderInput<CreateBillFromPurchaseOrderParams>
 type BillRunInput = BillInput & { invoiceIdsBefore: string[] }
 type ConvertRunInput = { requisitionId: string; purchaseIdsBefore: string[] }
-type ReceiveRunInput = ReceivePurchaseLineInput & { receiptTarget?: ReceiptTarget }
+type ReceiveRunInput = ReceivePurchaseLineInput & { receiptSnapshot?: ReceiptSnapshot }
 type VendorCreditInput = CreateVendorCreditInput<VendorCreditFromReturnParams>
 type ReleaseInput = ReleaseBlanketInput<ReleaseBlanketToPoParams>
 
@@ -197,6 +194,13 @@ export function usePurchasingWorkflow(
     const landedCosts = () => fetchQueryList("/api/query/landed-costs", "Failed to read landed costs")
     const landedCostIn = (state: string) => sameRecordIn(landedCostWorkflow, landedCosts, state)
 
+    // Correctness reads bypass subscription/cache state; each record is also scope-checked.
+    const receiptReads: ReceiptReads = {
+      lines: () => fetchQueryList("/api/query/purchase-order-lines", "Failed to read purchase receipt quantities"),
+      products: () => fetchQueryList("/api/query/products", "Failed to read purchase receipt products"),
+      moves: () => fetchQueryList("/api/query/stock-moves", "Failed to read purchase receipt moves"),
+    }
+
     return {
       submitRequisition: idSpec("purchasing.requisition.submit", submitPurchaseRequisitionCommand, REQUISITION_TRANSITION_AFFECTS, {
         observe: requisitionIn("InProgress"),
@@ -245,19 +249,21 @@ export function usePurchasingWorkflow(
 
       receiveLine: typed<ReceiveRunInput>({
         id: "purchasing.line.receive",
-        command: (input) =>
-          receivePurchaseOrderLineCommand({
+        command: async (input) => {
+          // The runner has acquired the per-line flight before this fresh pre-read.
+          input.receiptSnapshot = await captureReceiptSnapshot(
+            input.lineId, input.qty,
+            { organizationId, companyId: requireCompany("receive a purchase line") },
+            receiptReads,
+          )
+          await receivePurchaseOrderLineCommand({
             lineId: input.lineId,
             qty: input.qty,
             lotId: input.lotId,
-          }),
+          })
+        },
         affects: RECEIVE_PO_LINE_AFFECTS,
-        observe: async ({ lineId, receiptTarget }) =>
-          observeReceivedLine(
-            lineId,
-            receiptTarget,
-            await fresh<RowValueMap[]>(stockMovesQueryOptions(organizationId)),
-          ),
+        observe: ({ receiptSnapshot }) => observeReceiptQuantity(receiptSnapshot, receiptReads),
       }),
 
       awardBid: typed<AwardRfqBidInput>({
@@ -441,16 +447,11 @@ export function usePurchasingWorkflow(
           )
         },
       }),
-      /** Row dispatch receives the full open quantity; capture exact receipt identity before dispatch. */
+      /** Snapshot/readback run inside the existing per-line single-flight. */
       receiveLine: receivePurchaseLineAction({
         label: labels.receiveLine,
         execute: async (input, context) => {
-          const moves = (await qc.fetchQuery({
-            ...stockMovesQueryOptions(organizationId),
-            staleTime: 0,
-          })) as RowValueMap[]
-          const receiptTarget = resolveOpenReceiptTarget(input.lineId, moves)
-          const runInput: ReceiveRunInput = { ...input, receiptTarget }
+          const runInput: ReceiveRunInput = { ...input }
           return runner.run(
             `${specs.receiveLine.id}:${input.lineId}`,
             specs.receiveLine,
