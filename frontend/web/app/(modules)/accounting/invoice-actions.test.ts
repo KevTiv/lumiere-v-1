@@ -14,9 +14,9 @@ test('only never-posted cancelled moves can reset to draft', () => {
   assert.equal(canResetMove({ state: tag('Cancelled') }), false);
 });
 
-test('only draft and posted moves can be cancelled', () => {
+test('only draft moves can be cancelled directly', () => {
   assert.equal(canCancelMove({ state: tag('Draft') }), true);
-  assert.equal(canCancelMove({ state: tag('Posted') }), true);
+  assert.equal(canCancelMove({ state: tag('Posted') }), false);
   assert.equal(canCancelMove({ state: tag('Cancelled') }), false);
 });
 

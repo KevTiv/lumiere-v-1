@@ -9,9 +9,11 @@ MODULE_DIR="${2:-$ROOT/spacetimedb}"
 SPACETIME_BIN="${SPACETIME_BIN:-spacetime}"
 RUSTFMT_BIN="${RUSTFMT_BIN:-rustfmt}"
 GENERATE_WASM="${STDB_GENERATE_WASM:-}"
-LOG_FILE="$(mktemp "${TMPDIR:-/tmp}/lumiere-stdb-rust-generate.XXXXXX.log")"
-CLEAN_LOG_FILE="$(mktemp "${TMPDIR:-/tmp}/lumiere-stdb-rust-generate-clean.XXXXXX.log")"
-trap 'rm -f "$LOG_FILE" "$CLEAN_LOG_FILE"' EXIT
+TMP_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/lumiere-stdb-rust-generate.XXXXXX")"
+LOG_FILE="$TMP_ROOT/generate.log"
+CLEAN_LOG_FILE="$TMP_ROOT/generate-clean.log"
+RUSTFMT_SHIM_DIR="$TMP_ROOT/rustfmt-shim"
+trap 'rm -rf "$TMP_ROOT"' EXIT
 
 if [[ -z "$GENERATE_WASM" ]]; then
   "$SPACETIME_BIN" build --module-path "$MODULE_DIR"
@@ -28,8 +30,20 @@ fi
 rm -rf "$OUT_DIR"
 mkdir -p "$OUT_DIR"
 
+# SpacetimeDB invokes rustfmt once with every generated file. The current
+# schema produces thousands of files, which can exhaust a constrained runner
+# before this wrapper can repair Rust-keyword field names. Suppress only that
+# internal formatter. The bounded pass below remains the formatting and parse
+# validation authority for the repaired output.
+mkdir -p "$RUSTFMT_SHIM_DIR"
+cat >"$RUSTFMT_SHIM_DIR/rustfmt" <<'SHIM'
+#!/usr/bin/env bash
+exit 0
+SHIM
+chmod +x "$RUSTFMT_SHIM_DIR/rustfmt"
+
 set +e
-"$SPACETIME_BIN" generate \
+PATH="$RUSTFMT_SHIM_DIR:$PATH" "$SPACETIME_BIN" generate \
   --include-private \
   --lang rust \
   --out-dir "$OUT_DIR" \
@@ -70,10 +84,10 @@ fi
 
 bash "$ROOT/scripts/fix-spacetimedb-rust-sdk-bindings.sh" "$OUT_DIR"
 
-# The CLI's formatter ran before the keyword repair. Run it again to both
-# normalize and parse-check every repaired output file. Keep each rustfmt
-# invocation bounded: a full module currently contains more than a thousand
-# files, which can exhaust a constrained CI runner when passed in one batch.
+# The CLI's formatter was intentionally suppressed before the keyword repair.
+# Run the real formatter to both normalize and parse-check every repaired file.
+# Keep each rustfmt invocation bounded: a full module currently contains more
+# than a thousand files, which can exhaust a constrained CI runner in one batch.
 find "$OUT_DIR" -name '*.rs' -print0 | xargs -0 -n 64 "$RUSTFMT_BIN" --edition 2021
 
 if [[ ! -s "$OUT_DIR/mod.rs" ]]; then

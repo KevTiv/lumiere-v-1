@@ -227,6 +227,8 @@
       "manualResultNotice": "This import uses manual history selection. Its results cannot yet be linked automatically to this file.",
       "missingColumns": "Missing required columns: {{columns}}",
       "noRows": "The file has a header but no data rows.",
+      "outcomeUnknown": "Import outcome not verified",
+      "outcomeUnknownDescription": "The server accepted {{file}}, but no exact import job was returned. Review import history before you retry.",
       "recoveryNotice": "The server may already have imported this file. Retry keeps the same submission reference and cannot create a second import. Avoid starting a new submission until this result is known.",
       "refreshHistory": "Refresh history",
       "requestReference": "Submission reference: {{requestId}}",
@@ -239,7 +241,8 @@
       "submit": "Import",
       "success": "Import submitted",
       "successDescription": "{{count}} rows from {{file}} were sent. Rows the server rejects are listed in the import job history.",
-      "unknownColumns": "These columns are not used and will be ignored: {{columns}}"
+      "unknownColumns": "These columns are not used and will be ignored: {{columns}}",
+      "viewJob": "View import job"
     }
   },
   "navigation": {
