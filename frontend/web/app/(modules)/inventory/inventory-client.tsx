@@ -5926,7 +5926,7 @@ function InventoryClientLoaded({
       ) : null}
       {csvKind && csvKind !== 'product' && csvFormConfig ? (
         <CsvImportModal
-          trackedImport={{ companyId: operatingCompanyId, currencyId: csvKind === "product" ? pricelists.find((p) => p.currencyId != null && String(p.currencyId).trim() !== "")?.currencyId as string | number | bigint | undefined : undefined }}
+          trackedImport={{ companyId: operatingCompanyId }}
           organizationId={orgId}
           tableName={{ uomCategory: "uom_category", uom: "uom", productCategory: "product_category", product: "product", productVariant: "product_variant", warehouse: "warehouse", stockLocation: "stock_location", stockQuant: "stock_quant", lot: "stock_production_lot" }[csvKind]}
           key={csvKind}
@@ -5950,19 +5950,6 @@ function InventoryClientLoaded({
               await csvImports.importStockQuant.mutateAsync(text);
             else if (csvKind === 'lot')
               await csvImports.importLot.mutateAsync(text);
-            else if (csvKind === 'product') {
-              const pl = pricelists.find(
-                (p) =>
-                  p.currencyId != null && String(p.currencyId).trim() !== '',
-              );
-              if (pl == null || pl.currencyId == null) {
-                throw new Error(t('inventory.csvImport.noPricelistCurrency'));
-              }
-              await csvImports.importProduct.mutateAsync({
-                csvData: text,
-                currencyId: Number(pl.currencyId),
-              });
-            }
           }}
         />
       ) : null}
