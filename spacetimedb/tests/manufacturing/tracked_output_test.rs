@@ -40,13 +40,23 @@ pub fn run_manufacturing_tracked_output_test(ctx: &ReducerContext) -> Result<(),
         .ok_or("fixture product missing")?;
     ctx.db.product().id().update(Product {
         tracking: "lot".to_string(),
-        ..primary.clone()
+        ..ctx
+            .db
+            .product()
+            .id()
+            .find(&primary.id)
+            .ok_or("primary fixture missing")?
     });
     let byproduct = ctx.db.product().insert(Product {
         id: 0,
         name: "COV-07L serial byproduct fixture".to_string(),
         tracking: "serial".to_string(),
-        ..primary.clone()
+        ..ctx
+            .db
+            .product()
+            .id()
+            .find(&primary.id)
+            .ok_or("primary fixture missing")?
     });
     let lot_id = create_lot(ctx, &fixture, primary.id, "COV-07L primary")?;
     create_stock_production_serial(
@@ -382,13 +392,23 @@ fn test_serial_primary_lot_byproduct(ctx: &ReducerContext) -> Result<(), String>
         .ok_or("serial primary fixture missing")?;
     ctx.db.product().id().update(Product {
         tracking: "serial".to_string(),
-        ..primary.clone()
+        ..ctx
+            .db
+            .product()
+            .id()
+            .find(&primary.id)
+            .ok_or("serial primary fixture missing")?
     });
     let byproduct = ctx.db.product().insert(Product {
         id: 0,
         name: "COV-07L lot byproduct fixture".to_string(),
         tracking: "lot".to_string(),
-        ..primary.clone()
+        ..ctx
+            .db
+            .product()
+            .id()
+            .find(&primary.id)
+            .ok_or("serial primary fixture missing")?
     });
     let lot_id = create_lot(ctx, &fixture, byproduct.id, "COV-07L byproduct lot")?;
     create_stock_production_serial(
@@ -746,7 +766,12 @@ fn test_material_wastage(ctx: &ReducerContext) -> Result<(), String> {
     let component = ctx.db.product().insert(Product {
         id: 0,
         name: "COV-07L material fixture".to_string(),
-        ..primary.clone()
+        ..ctx
+            .db
+            .product()
+            .id()
+            .find(&primary.id)
+            .ok_or("material fixture missing")?
     });
     let bom_id = create_test_bom(
         ctx,
