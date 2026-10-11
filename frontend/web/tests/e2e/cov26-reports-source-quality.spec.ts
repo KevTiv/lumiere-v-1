@@ -346,7 +346,7 @@ test.describe("COV-26 Reports source quality", { tag: "@dev-fixture" }, () => {
     await openSaleOrderQueryBuilder(page)
 
     await expect(page.getByTestId("qb-source-denied")).toHaveAttribute("role", "alert")
-    await expect(page.getByTestId("qb-preview-unavailable")).toBeVisible()
+    await expect(page.getByTestId("qb-preview-denied")).toHaveAttribute("role", "alert")
     await expect(page.getByTestId("qb-source-row-count")).toHaveCount(0)
 
     const retry = page.getByTestId("qb-source-retry")
