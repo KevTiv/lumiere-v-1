@@ -93,6 +93,13 @@
       "change_constructors": ["upsert_stdb_row"]
     },
     {
+      "source": "spacetimedb/src/helpdesk/related_records.rs",
+      "function": "set_helpdesk_related_record",
+      "operation": "set_helpdesk_related_record",
+      "operation_id": "erp.set_helpdesk_related_record",
+      "change_constructors": ["upsert_stdb_row", "delete"]
+    },
+    {
       "source": "spacetimedb/src/hr/payroll.rs",
       "function": "create_payroll_export_intent",
       "operation": "create_payroll_export_intent",
@@ -139,6 +146,27 @@
       "function": "create_bom",
       "operation": "create_bom",
       "operation_id": "erp.create_bom",
+      "change_constructors": ["upsert_stdb_row"]
+    },
+    {
+      "source": "spacetimedb/src/manufacturing/bill_of_materials.rs",
+      "function": "set_bom_operations",
+      "operation": "set_bom_operations",
+      "operation_id": "erp.set_bom_operations",
+      "change_constructors": ["upsert_stdb_row"]
+    },
+    {
+      "source": "spacetimedb/src/manufacturing/costing.rs",
+      "function": "configure_workcenter_cost_rate",
+      "operation": "configure_workcenter_cost_rate",
+      "operation_id": "erp.configure_workcenter_cost_rate",
+      "change_constructors": ["upsert_stdb_row"]
+    },
+    {
+      "source": "spacetimedb/src/manufacturing/costing.rs",
+      "function": "configure_manufacturing_valuation",
+      "operation": "configure_manufacturing_valuation",
+      "operation_id": "erp.configure_manufacturing_valuation",
       "change_constructors": ["upsert_stdb_row"]
     },
     {
