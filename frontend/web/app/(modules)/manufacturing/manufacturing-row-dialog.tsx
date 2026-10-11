@@ -10,6 +10,7 @@ import {
   manufacturingWorkcenterRowActionForm,
 } from "@lumiere/ui"
 import type { ManufacturingMutations } from "@lumiere/query-hooks/hooks/manufacturing"
+import type { ResolvedOperationEffectOutcome } from "@lumiere/query-hooks/hooks/operation-effect"
 import type { QualityCheck } from "@lumiere/stdb/types"
 import type { QueryRows } from "@/lib/query-fetch"
 import { submitManufacturingRowAction } from "@/lib/manufacturing-row-action-submit"
@@ -19,6 +20,7 @@ type TabEntity = "orders" | "boms" | "workorders" | "workcenters"
 export interface ManufacturingRowDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onActionResult?: (outcome: ResolvedOperationEffectOutcome) => void;
   tabId: string | null;
   row: Record<string, unknown> | null;
   workcenters: QueryRows;
@@ -52,6 +54,7 @@ function workcenterIdOnDevice(d: Record<string, unknown>): string {
 export function ManufacturingRowDialog({
   open,
   onOpenChange,
+  onActionResult,
   tabId,
   row,
   workcenters,
@@ -184,7 +187,8 @@ export function ManufacturingRowDialog({
         onSubmit={async (data) => {
           setSubmitError(null)
           try {
-            await submitManufacturingRowAction(tabId, data, mutations)
+            const outcome = await submitManufacturingRowAction(tabId, data, mutations)
+            if (outcome) onActionResult?.(outcome)
             onOpenChange(false)
           } catch (e) {
             setSubmitError(e instanceof Error ? e.message : String(e))

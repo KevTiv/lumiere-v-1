@@ -1,4 +1,5 @@
 import type { ManufacturingMutations } from "@lumiere/query-hooks/hooks/manufacturing"
+import type { ResolvedOperationEffectOutcome } from "@lumiere/query-hooks/hooks/operation-effect"
 import { i18n } from "@lumiere/i18n"
 import {
   toCreateBomByproductParams,
@@ -76,7 +77,7 @@ export async function submitManufacturingRowAction(
   tabId: string,
   values: Record<string, unknown>,
   m: ManufacturingMutations,
-): Promise<void> {
+): Promise<ResolvedOperationEffectOutcome | void> {
   if (tabId === "orders") {
     const moId = idFrom(values, ["moRecordId"])
     const action = String(values.moAction ?? "")
@@ -91,17 +92,15 @@ export async function submitManufacturingRowAction(
         await m.startMo.mutateAsync(moId);
         return;
       case 'produce':
-        await m.produceMo.mutateAsync({
+        return m.produceMo.mutateAsync({
           moId,
           qty: num(values.produceQty, 0) || 0.0001,
         });
-        return;
       case 'consume':
         await m.consumeMoMaterials.mutateAsync(moId);
         return;
       case 'finish':
-        await m.finishMo.mutateAsync(moId);
-        return;
+        return m.finishMo.mutateAsync(moId);
       case 'cancel':
         await m.cancelMo.mutateAsync(moId);
         return;
@@ -119,13 +118,12 @@ export async function submitManufacturingRowAction(
         ) {
           throw new Error('A secure scrap request id could not be created');
         }
-        await m.scrapFinishedOutput.mutateAsync({
+        return m.scrapFinishedOutput.mutateAsync({
           moId,
           scrapLocationId,
           quantity,
           requestId: globalThis.crypto.randomUUID(),
         });
-        return;
       }
       case 'create_workorder': {
         const wcRaw = optionalBigIntU64(values.woWorkcenterId);
@@ -172,8 +170,7 @@ export async function submitManufacturingRowAction(
         });
         if (!params)
           throw new Error('Select a byproduct, UOM and positive quantity');
-        await m.createBomByproduct.mutateAsync({ bomId, params });
-        return;
+        return m.createBomByproduct.mutateAsync({ bomId, params });
       }
       case 'delete':
         if (values.bomDeleteConfirmed !== true) {

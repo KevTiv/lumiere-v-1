@@ -163,6 +163,25 @@ export const bomLinesTableConfig = (t: TFunction): EntityViewConfig => ({
 })
 
 // ── Work Orders ───────────────────────────────────────────────────────────────
+export const bomByproductsTableConfig = (t: TFunction): EntityViewConfig => ({
+  id: "bom-byproducts-table",
+  title: "BOM Byproducts",
+  view: {
+    mode: "table",
+    rowKey: "id",
+    searchable: true,
+    searchKeys: ["bomId", "productId"],
+    columns: [
+      { key: "id", label: "ID" },
+      { key: "bomId", label: t("manufacturing.bomLines.columns.bomId") },
+      { key: "productId", label: t("manufacturing.bomLines.columns.productId") },
+      { key: "productQty", label: t("manufacturing.bomLines.columns.productQty"), type: "number", align: "right" },
+      { key: "productUomId", label: t("manufacturing.bomLines.columns.productUomId") },
+      { key: "costShare", label: t("manufacturing.rowActions.form.byproductCostShare"), type: "number", align: "right" },
+    ],
+  },
+})
+
 export const workordersTableConfig = (t: TFunction): EntityViewConfig => ({
   id: "workorders-table",
   title: t("manufacturing.workOrders.title"),
@@ -266,6 +285,7 @@ export const manufacturingEntityConfigs = (t: TFunction): Record<string, EntityV
   "manufacturing-orders-table": manufacturingOrdersTableConfig(t),
   "boms-table": bomsTableConfig(t),
   "bom-lines-table": bomLinesTableConfig(t),
+  "bom-byproducts-table": bomByproductsTableConfig(t),
   "workorders-table": workordersTableConfig(t),
   "workcenters-table": workcentersTableConfig(t),
   "routing-operations-table": routingOperationsTableConfig(t),

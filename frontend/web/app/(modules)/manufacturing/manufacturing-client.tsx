@@ -1,5 +1,7 @@
 "use client"
 import { mapDashboardWidgets, withDashboardSections } from "@lumiere/ui/lib/dashboard-sections"
+import { canUseModuleData, moduleQueryState } from "@lumiere/ui/lib/module-data-state"
+import { manufacturingResultLinks, type ManufacturingResultLink } from "@/lib/manufacturing-result-links"
 
 import { useEffect, useMemo, useState } from "react"
 import type { QueryResourceState } from "@lumiere/api-client"
@@ -27,6 +29,7 @@ import {
   useMrpProductions,
   useMrpBoms,
   useMrpBomLines,
+  useMrpBomByproducts,
   useMrpWorkorders,
   useMrpWorkcenters,
   useMrpRoutingWorkcenters,
@@ -45,6 +48,7 @@ import Link from "next/link"
 import { manufacturingOrderHref } from "./manufacturing-order"
 import { ManufacturingRowDialog } from "./manufacturing-row-dialog"
 import { createBomComponentsField } from "./bom-components-field"
+import { ManufacturingActionResult } from "./manufacturing-action-result"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
 import {
   toCreateBomParams,
@@ -116,7 +120,9 @@ function ManufacturingClientLoaded({
   const hasActiveCompany = operatingCompanyId > 0n
   const [quickActionForm, setQuickActionForm] = useState<{ form: FormConfig; action: string } | null>(null)
   const [rowPick, setRowPick] = useState<{ tabId: string; row: Record<string, unknown> } | null>(null)
+  const [resultLinks, setResultLinks] = useState<ManufacturingResultLink[]>([])
   const [csvKind, setCsvKind] = useState<ManufacturingCsvImportKind | null>(null)
+  useEffect(() => setResultLinks([]), [orgId, operatingCompanyId])
   // activeTab is now URL-synced via useModuleTab below (after moduleConfig is defined)
 
   const { data: productions = [] } = useMrpProductions(
@@ -125,6 +131,9 @@ function ManufacturingClientLoaded({
   );
   const { data: boms = [] } = useMrpBoms(orgId, initialBoms);
   const { data: bomLines = [] } = useMrpBomLines(orgId, initialBomLines);
+  const byproductsQuery = useMrpBomByproducts(orgId)
+  const byproductsState = moduleQueryState(byproductsQuery)
+  const byproducts = canUseModuleData(byproductsState) ? byproductsQuery.data ?? [] : []
   const { data: workorders = [] } = useMrpWorkorders(orgId, initialWorkorders);
   const { data: workcenters = [] } = useMrpWorkcenters(
     orgId,
@@ -507,12 +516,13 @@ function ManufacturingClientLoaded({
       orders: enrichedProductions as unknown as Record<string, unknown>[],
       boms: enrichedBoms as unknown as Record<string, unknown>[],
       "bom-lines": bomLines as unknown as Record<string, unknown>[],
+      "bom-byproducts": byproducts as unknown as Record<string, unknown>[],
       workorders: enrichedWorkorders as unknown as Record<string, unknown>[],
       workcenters: workcenters as unknown as Record<string, unknown>[],
       "routing-operations": enrichedRoutingOperations as unknown as Record<string, unknown>[],
       quality: qualityChecks as unknown as Record<string, unknown>[],
     }),
-    [enrichedProductions, enrichedBoms, bomLines, enrichedWorkorders, workcenters, enrichedRoutingOperations, qualityChecks],
+    [enrichedProductions, enrichedBoms, bomLines, byproducts, enrichedWorkorders, workcenters, enrichedRoutingOperations, qualityChecks],
   )
 
   const handleFormSubmit = async (
@@ -587,6 +597,7 @@ function ManufacturingClientLoaded({
 
   return (
     <>
+      <ManufacturingActionResult links={resultLinks} onDismiss={() => setResultLinks([])} />
       {iotReferenceStatus && (
         <p role="status" className="text-sm text-muted-foreground">
           IoT device reference data: {iotReferenceStatus}. Device linking requires IoT device read access; manufacturing order and BOM workflows remain available.
@@ -595,6 +606,7 @@ function ManufacturingClientLoaded({
       <ModuleView
         config={config}
         data={data}
+        dataState={{ "bom-byproducts": byproductsState }}
         onFormSubmit={handleFormSubmit}
         activeTab={activeTab}
         onActiveTabChange={setActiveTab}
@@ -602,10 +614,12 @@ function ManufacturingClientLoaded({
         onRowClick={(tabId, row) => {
           if (["orders", "boms", "workorders", "workcenters"].includes(tabId)) {
             setRowPick({ tabId, row })
+            setResultLinks([])
           }
         }}
       />
       <ManufacturingRowDialog
+        onActionResult={(outcome) => setResultLinks(manufacturingResultLinks(outcome.ref))}
         open={rowPick !== null}
         onOpenChange={(o) => {
           if (!o) setRowPick(null)

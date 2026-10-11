@@ -97,6 +97,7 @@ export interface ManufacturingFinishedEffectRef extends CanonicalRecordRef {
   readonly resource: "mrp-productions"
   readonly companyId: string
   readonly finishedMoveId: string
+  readonly finishedMoveIds: readonly string[]
   readonly destinationQuantId: string
 }
 
@@ -340,6 +341,7 @@ export function resolveManufacturingFinishedEffect(
     id: manufacturingOrderId.toString(),
     companyId: companyId.toString(),
     finishedMoveId: finishedMoveId.toString(),
+    finishedMoveIds: finishedIds.map(String),
     destinationQuantId: quantId.toString(),
   }
 }
