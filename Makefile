@@ -333,7 +333,15 @@ e2e-smoke-setup:
 		fi; \
 		SPACETIME_STARTED=0; \
 		API_PID=""; \
+		if [ "$${E2E_DOCKER:-0}" = "1" ]; then \
+			echo "[e2e] Ensuring Docker SpacetimeDB is running..."; \
+			docker compose --env-file .env.docker -f docker-compose.dev.yml up -d --wait spacetimedb; \
+		fi; \
 		if ! curl -fsS "$$E2E_STDB_HOST/v1/identity" -X POST >/dev/null 2>&1; then \
+			if [ "$${E2E_DOCKER:-0}" = "1" ]; then \
+				echo "[e2e] Docker SpacetimeDB did not become reachable at $$E2E_STDB_HOST."; \
+				exit 1; \
+			fi; \
 			echo "[e2e] Starting local SpacetimeDB..."; \
 			nohup spacetime start --listen-addr 127.0.0.1:3000 >"$$LOG_DIR/spacetime.log" 2>&1 & \
 			disown $$! 2>/dev/null || true; \
@@ -810,10 +818,9 @@ e2e-playwright-only:
 		echo "[e2e] Smoke tests passed."; \
 	'
 
-# Acceptance proof entirely on the Docker dev stack: SpacetimeDB, api-server, web
-# and PostgreSQL are the OrbStack containers (docker-compose.e2e.yml retargets
-# api-server/web to the e2e module with dev bypasses off). Only the Playwright
-# browser runs on the host. Needs `make docker-dev` (or compose up) done once.
+# Acceptance proof entirely on the Docker dev stack: SpacetimeDB, api-server, web,
+# PostgreSQL, and the Playwright browser run in Compose containers. The host only
+# runs the orchestration CLI. Needs `make docker-dev` (or compose up) done once.
 #   make e2e-docker E2E_SPEC_FILES="cov05-purchase-order-confirmation.spec.ts cov09-hr-leave-approval.spec.ts"
 # Set E2E_CLEAR_DB=1 for a pristine module (clears lumiere-v1-local-e2e only).
 e2e-docker:
@@ -822,23 +829,13 @@ e2e-docker:
 		ROOT="$$(pwd)"; LOG_DIR="$$ROOT/.tmp/e2e"; \
 		set -a; . "$$LOG_DIR/env.sh"; set +a; \
 		E2E_STDB_MODULE="$(E2E_DB)" "$$ROOT/scripts/e2e-docker-projection.sh" start; \
-		cd "$$ROOT/frontend/web"; \
+		COMPOSE=(docker compose --env-file .env.docker -f docker-compose.dev.yml -f docker-compose.e2e.yml --profile e2e); \
 		PW_ARGS=(--workers "$$E2E_WORKERS"); \
 		for f in $$E2E_SPEC_FILES; do PW_ARGS+=("tests/e2e/$$f"); done; \
 		if [ -n "$$E2E_GREP" ]; then PW_ARGS+=(--grep "$$E2E_GREP"); fi; \
-		echo "[e2e-docker] Playwright against Docker web :3001 / api-server :8082 ($${E2E_SPEC_FILES:-full suite})"; \
-		pnpm exec playwright install chromium; \
-		PORT="" \
-		PLAYWRIGHT_PORT=3001 \
-		PLAYWRIGHT_BASE_URL="http://127.0.0.1:3001" \
-		LUMIERE_API_SERVER_URL="http://127.0.0.1:$(E2E_API_PORT)" \
-		STDB_SERVER_TOKEN="$$E2E_STDB_TOKEN" \
-		STDB_CREDENTIAL_ENCRYPTION_KEY="$$STDB_CREDENTIAL_ENCRYPTION_KEY" \
-		STDB_MODULE="$(E2E_DB)" NEXT_PUBLIC_STDB_MODULE="$(E2E_DB)" \
-		STDB_HOST="$$E2E_STDB_HOST" NEXT_PUBLIC_STDB_HOST="$$E2E_STDB_HOST" \
-		NEXT_PUBLIC_API_GATEWAY_URL="" \
-		pnpm exec playwright test "$${PW_ARGS[@]}"; \
-		cd "$$ROOT"; \
+		echo "[e2e-docker] Playwright in Docker against web:3000 / api-server:8082 ($${E2E_SPEC_FILES:-full suite})"; \
+		"$${COMPOSE[@]}" build e2e-runner; \
+		"$${COMPOSE[@]}" run --rm --no-deps e2e-runner "$${PW_ARGS[@]}"; \
 		E2E_STDB_MODULE="$(E2E_DB)" "$$ROOT/scripts/e2e-docker-projection.sh" settle; \
 	'
 
@@ -1226,6 +1223,8 @@ check-reducer-contracts-drift: schema-snapshot codegen
 # CI source check that does not depend on a separately deployed module. The
 # live deployment compatibility check remains available as check-contracts-drift.
 check-contracts-source-drift: clean-contracts-live-staging generate-stdb-rust-sdk generate-stdb-ts-sdk
+	@git diff --exit-code -- frontend/packages/stdb/src/stdb-http-option-fields.json || \
+		(echo "Generated HTTP option-field registry is out of date. Run: make generate-stdb-ts-sdk" && exit 1)
 	@CHECKOUT="$$(bash scripts/resolve-pinned-contracts.sh)"; \
 	if [ -z "$$CHECKOUT" ] || [ ! -d "$$CHECKOUT/crates/lumiere-contracts/src/bindings" ]; then \
 		echo "check-contracts-source-drift: could not resolve pinned contracts" >&2; \

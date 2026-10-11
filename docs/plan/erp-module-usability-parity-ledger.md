@@ -31,6 +31,8 @@ Status values follow the coordination program: `TODO`, `ACTIVE`, `REVIEW`, `BLOC
 
 > **COV-00 status: ACCEPTED.** Coordinator acceptance is recorded in [`erp-cov00-coordinator-acceptance.md`](./erp-cov00-coordinator-acceptance.md) against evidence revision `4f797db650ae82318ab0f477670d14aee9d5d0cd`. This accepts the current census and ownership denominators only; downstream runtime defects, U4/U5 promotion, and first-org admission remain governed by their named packages and gates.
 
+> **COV-01 status: ACCEPTED.** The representative CRM opportunity-to-sales-order spine is recorded in [`erp-cov01-reference-spine-status.md`](./erp-cov01-reference-spine-status.md). It proves generated operation dispatch, exact canonical readback, typed semantic outcomes, shared result presentation, direct record navigation, refresh persistence, replay without redispatch, and representative denial. This accepts the shared reference spine only; module adoption and U4/U5 promotion remain package-owned.
+
 > **COV-02A/B/C status: ACCEPTED.** The authorities and COV-03..24 fixture gaps are inventoried in [`erp-cov02a-seed-persona-inventory-status.md`](./erp-cov02a-seed-persona-inventory-status.md); the versioned manifest and deterministic provisioner are recorded in [`erp-cov02b-first-org-fixture-status.md`](./erp-cov02b-first-org-fixture-status.md); and disposable-stack execution, seven login paths, representative authorization denial, required IoT baseline, and independent clear/reseed proof are recorded in [`erp-cov02c-first-org-fixture-runtime-status.md`](./erp-cov02c-first-org-fixture-runtime-status.md). This accepts the shared fixture foundation, not any module lifecycle or U4/U5 row.
 
 ## 3. Core commercial and supply-chain modules
