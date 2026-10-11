@@ -1848,8 +1848,7 @@ function HrClientLoaded({
                   await csvImports.importSalaryRule.mutateAsync(text)
                   break
                 case "payslip":
-                  await csvImports.importPayslip.mutateAsync(text)
-                  break
+                  return await csvImports.importPayslip.mutateAsync(text)
               default:
                 break
             }

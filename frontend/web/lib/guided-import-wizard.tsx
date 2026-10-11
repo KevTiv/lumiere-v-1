@@ -297,10 +297,21 @@ export function GuidedImportWizard({ organizationId }: GuidedImportWizardProps) 
       })
       const importJson = (await importRes.json()) as {
         ok?: boolean
+        outcome?: "converged" | "unknown"
         rowsImported?: number
+        record?: { resource?: string; id?: string; href?: string }
+        reason?: string
         error?: string
       }
       if (!importRes.ok) throw new Error(importJson.error ?? "Import failed")
+      if (!importJson.ok || importJson.outcome !== "converged" || !importJson.record?.id) {
+        throw new Error(
+          t(
+            "settings.import.outcomeUnknown",
+            "The import was accepted, but its job could not be identified. Review import history before you retry.",
+          ),
+        )
+      }
 
       phCapture("ai_import_completed", {
         entity: targetEntity,

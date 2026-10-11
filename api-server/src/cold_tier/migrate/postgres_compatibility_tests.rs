@@ -1,4 +1,6 @@
-use super::{ensure_schema, migration_checksum, MIGRATIONS, MIGRATION_TABLE};
+use super::{
+    ensure_schema, migration_checksum, MIGRATIONS, MIGRATION_TABLE, MIGRATION_TABLE_DDL,
+};
 use crate::cold_tier::{conventions, pg_codec, pg_pool, projection_worker};
 use anyhow::{ensure, Context, Result};
 use deadpool_postgres::Pool;
@@ -39,6 +41,107 @@ async fn postgres_current_next_application_rollback() -> Result<()> {
     test_result?;
     cleanup_result?;
     Ok(())
+}
+
+#[tokio::test]
+async fn postgres_existing_durable_projection_adds_migration_11() -> Result<()> {
+    if std::env::var("C4_TEST_PG").as_deref() != Ok("1") {
+        eprintln!(
+            "skipping postgres_existing_durable_projection_adds_migration_11 (set C4_TEST_PG=1 to run)"
+        );
+        return Ok(());
+    }
+
+    let base_config = pg_pool::PgConfig::from_env()?;
+    let database = unique_database_name()?;
+    let admin_pool = admin_pool(&base_config)?;
+    create_database(&admin_pool, &database, &base_config.user).await?;
+
+    let mut test_config = base_config.clone();
+    test_config.database.clone_from(&database);
+    let test_pool = pg_pool::build_pool(&test_config)?;
+    let test_result = exercise_durable_projection_upgrade(&test_pool).await;
+    drop(test_pool);
+    let cleanup_result = drop_database(&admin_pool, &database).await;
+
+    test_result?;
+    cleanup_result?;
+    Ok(())
+}
+
+async fn exercise_durable_projection_upgrade(pool: &Pool) -> Result<()> {
+    let migration_11_index = "cold_tier_service_identity_identity";
+    let frozen_migration_1 = include_str!(
+        "../../../../lumiere-codegen/pg-migration-ledger/0001_durable_projection.sql"
+    );
+    let prefix_length = MIGRATIONS
+        .len()
+        .checked_sub(1)
+        .context("migration 11 is missing from the catalog")?;
+    ensure!(MIGRATIONS[0].sql == frozen_migration_1);
+    ensure!(MIGRATIONS[prefix_length].version == 11);
+    ensure!(MIGRATIONS[prefix_length].name == "durable_projection_delta");
+
+    apply_migration_prefix(pool, prefix_length).await?;
+    ensure!(migration_count(pool).await? == prefix_length as i64);
+    ensure!(!relation_exists(pool, migration_11_index).await?);
+    let migration_1_checksum = applied_checksum(pool, 1).await?;
+
+    ensure_schema(pool).await?;
+
+    ensure!(migration_count(pool).await? == MIGRATIONS.len() as i64);
+    ensure!(relation_exists(pool, migration_11_index).await?);
+    ensure!(applied_checksum(pool, 1).await? == migration_1_checksum);
+    ensure!(
+        applied_checksum(pool, 11).await?
+            == migration_checksum(MIGRATIONS[prefix_length].sql)
+    );
+    Ok(())
+}
+
+async fn apply_migration_prefix(pool: &Pool, prefix_length: usize) -> Result<()> {
+    let mut client = pool.get().await?;
+    let transaction = client.transaction().await?;
+    transaction.batch_execute(MIGRATION_TABLE_DDL).await?;
+    for migration in &MIGRATIONS[..prefix_length] {
+        transaction.batch_execute(migration.sql).await?;
+        let checksum = migration_checksum(migration.sql);
+        transaction
+            .execute(
+                &format!(
+                    "insert into {MIGRATION_TABLE} (version, name, change_set, phase, checksum) values ($1, $2, $3, $4, $5)"
+                ),
+                &[
+                    &migration.version,
+                    &migration.name,
+                    &migration.change_set,
+                    &migration.phase.as_str(),
+                    &checksum,
+                ],
+            )
+            .await?;
+    }
+    transaction.commit().await?;
+    Ok(())
+}
+
+async fn relation_exists(pool: &Pool, relation: &str) -> Result<bool> {
+    let client = pool.get().await?;
+    Ok(client
+        .query_one("select to_regclass($1) is not null", &[&relation])
+        .await?
+        .get(0))
+}
+
+async fn applied_checksum(pool: &Pool, version: i64) -> Result<String> {
+    let client = pool.get().await?;
+    Ok(client
+        .query_one(
+            &format!("select checksum from {MIGRATION_TABLE} where version = $1"),
+            &[&version],
+        )
+        .await?
+        .get(0))
 }
 
 async fn exercise_release_compatibility(pool: &Pool) -> Result<()> {

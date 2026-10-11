@@ -55,3 +55,10 @@ fi
 # Keep the committed contract artifact byte-stable across CLI versions that
 # disagree only about extra blank lines at end of file.
 perl -0pi -e 's/\n+\z/\n/' "$INDEX"
+
+# The HTTP reducer encoder needs the exact Option<T> field set from the same
+# generated bindings. Regenerate it here so schema changes cannot leave stale
+# fields in the committed frontend registry.
+node "$ROOT/scripts/generate-stdb-http-option-fields.mjs" \
+  "$OUT_DIR/types.ts" \
+  "$ROOT/frontend/packages/stdb/src/stdb-http-option-fields.json"
