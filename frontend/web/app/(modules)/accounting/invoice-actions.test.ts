@@ -1,9 +1,18 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { canCancelMove, canEditMoveLines, canRecomputeInvoiceTotals, canRegisterPayment, paymentOptionLabel, registrablePayments } from './invoice-actions';
+import { canResetMove, canCancelMove, canEditMoveLines, canRecomputeInvoiceTotals, canRegisterPayment, paymentOptionLabel, registrablePayments } from './invoice-actions';
 
 const tag = (value: string) => ({ tag: value });
+
+test('only never-posted cancelled moves can reset to draft', () => {
+  assert.equal(canResetMove({ state: tag('Cancelled'), postedBefore: false }), true);
+  assert.equal(canResetMove({ state: tag('Cancelled'), posted_before: false }), true);
+  assert.equal(canResetMove({ state: tag('Cancelled'), postedBefore: true }), false);
+  assert.equal(canResetMove({ state: tag('Posted'), postedBefore: true }), false);
+  assert.equal(canResetMove({ state: tag('Draft'), postedBefore: false }), false);
+  assert.equal(canResetMove({ state: tag('Cancelled') }), false);
+});
 
 test('only draft and posted moves can be cancelled', () => {
   assert.equal(canCancelMove({ state: tag('Draft') }), true);

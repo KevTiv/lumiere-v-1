@@ -2,6 +2,10 @@
 
 import { useCallback, useMemo, useState } from 'react';
 import Link from 'next/link';
+import { useResetAccountMoveToDraft } from '@lumiere/query-hooks/hooks/pass9-record-actions';
+import { useRBAC } from '@/lib/rbac-context';
+import { useUnsavedChangesGuard } from '@lumiere/ui';
+import { useConfirmDialog } from '@lumiere/ui/hooks/use-confirm-dialog';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { ListOrdered, MoreHorizontal, ShoppingCart } from 'lucide-react';
 import { useTranslation } from '@lumiere/i18n';
@@ -89,6 +93,7 @@ import { RecordDocumentAttachments } from '../../../../../components/record-docu
 import { toAddAccountMoveLineParamsFromForm } from '../../account-move-line-forms';
 import {
   canCancelMove,
+  canResetMove,
   canEditMoveLines,
   canRecomputeInvoiceTotals,
   canRegisterPayment,
@@ -147,6 +152,10 @@ function InvoicePageLoaded({
   const searchParams = useSearchParams();
   const { askForm, formDialog } = useFormDialog();
   const { orgId } = orgBigInts(organizationId);
+  const { checkPermission } = useRBAC();
+  const resetMove = useResetAccountMoveToDraft(orgId);
+  const resetPendingGuard = useUnsavedChangesGuard(false, resetMove.isPending);
+  const { confirm: confirmReset, dialog: resetDialog } = useConfirmDialog();
 
   const { data: moves = [], isLoading: movesLoading } = useAccountMoves(orgId, { enabled: true });
   const { data: moveLines = [] } = useAccountMoveLines(orgId, { enabled: true });
@@ -333,6 +342,17 @@ function InvoicePageLoaded({
   };
 
   const moreActions: Array<{ id: string; label: string; show: boolean; run: () => Promise<void> | void }> = [
+    {
+      id: 'reset-to-draft',
+      label: t('recordHeader.reset'),
+      show: canResetMove(move) && checkPermission('account_move', 'write').allowed,
+      run: async () => {
+        if (resetMove.isPending) return;
+        if (!await confirmReset({ title: t('recordHeader.reset'), description: t('recordHeader.resetDescription') })) return;
+        await resetMove.mutateAsync(BigInt(moveId));
+        showWorkflowToast({ kind: 'success', title: t('recordHeader.reset') });
+      },
+    },
     {
       id: 'recalculate',
       label: t('accounting.invoices.invoiceActions.recalculate', { defaultValue: 'Recalculate totals' }),
@@ -692,6 +712,8 @@ function InvoicePageLoaded({
         </AlertDialogContent>
       </AlertDialog>
       {formDialog}
+      {resetDialog}
+      {resetPendingGuard}
     </>
   );
 }

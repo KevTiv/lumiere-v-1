@@ -219,3 +219,145 @@ pub fn test_post_message_idempotency(ctx: &ReducerContext) -> Result<(), String>
     }
     Ok(())
 }
+
+fn insert_message(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    message_type: crate::types::MailMessageType,
+    metadata: Option<String>,
+) -> MailMessage {
+    ctx.db.mail_message().insert(MailMessage {
+        id: 0,
+        organization_id,
+        model: "cov19_notification".to_string(),
+        res_id: 1,
+        author_id: ctx.sender(),
+        body: "New comment: hello".to_string(),
+        message_type,
+        subtype: Some("mail.mt_comment".to_string()),
+        date: ctx.timestamp,
+        parent_id: None,
+        attachment_ids: vec![],
+        metadata,
+    })
+}
+
+fn stored_row(ctx: &ReducerContext, id: u64) -> Result<MailMessage, String> {
+    ctx.db
+        .mail_message()
+        .id()
+        .find(&id)
+        .ok_or_else(|| format!("message {id} missing"))
+}
+
+fn read_at_of(row: &MailMessage) -> Option<i64> {
+    let value: serde_json::Value = serde_json::from_str(row.metadata.as_deref()?).ok()?;
+    value.get("read_at")?.as_i64()
+}
+
+/// Notification read state: `mark_notification_read` / `mark_all_notifications_read`.
+pub fn test_notification_read_state(ctx: &ReducerContext) -> Result<(), String> {
+    use crate::core::messaging::{mark_all_notifications_read, mark_notification_read};
+    use crate::types::MailMessageType;
+
+    ensure_test_superuser(ctx)?;
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let org = fixture.organization_id;
+    let me = ctx.sender().to_hex().to_string();
+    let other = spacetimedb::Identity::from_byte_array([0x5a; 32])
+        .to_hex()
+        .to_string();
+    let notification = |recipient: &str| {
+        insert_message(
+            ctx,
+            org,
+            MailMessageType::Notification,
+            Some(serde_json::json!({ "recipient": recipient, "event": "comment" }).to_string()),
+        )
+    };
+
+    // The recipient marks their own notification read; other keys survive.
+    let mine = notification(&me);
+    mark_notification_read(ctx, org, mine.id)?;
+    let marked = stored_row(ctx, mine.id)?;
+    let read_at = read_at_of(&marked).ok_or("read_at was not recorded")?;
+    if read_at != ctx.timestamp.to_micros_since_unix_epoch() {
+        return Err("read_at is not the call timestamp".to_string());
+    }
+    let stored: serde_json::Value =
+        serde_json::from_str(marked.metadata.as_deref().ok_or("metadata empty")?)
+            .map_err(|e| e.to_string())?;
+    if stored.get("recipient").and_then(|v| v.as_str()) != Some(me.as_str())
+        || stored.get("event").and_then(|v| v.as_str()) != Some("comment")
+    {
+        return Err("marking read dropped existing metadata keys".to_string());
+    }
+
+    // A second call is a no-op: Ok and the row is unchanged.
+    mark_notification_read(ctx, org, mine.id)?;
+    if stored_row(ctx, mine.id)? != marked {
+        return Err("second mark_notification_read changed the row".to_string());
+    }
+
+    // Another user's notification cannot be marked, and stays unread.
+    let theirs = notification(&other);
+    match mark_notification_read(ctx, org, theirs.id) {
+        Err(message) if message.contains("not addressed to the caller") => {}
+        outcome => {
+            return Err(format!(
+                "foreign notification must be rejected: {outcome:?}"
+            ))
+        }
+    }
+    if stored_row(ctx, theirs.id)? != theirs {
+        return Err("rejected mark changed a foreign notification".to_string());
+    }
+
+    // A non-notification message is rejected even if its metadata names the caller.
+    let comment = insert_message(
+        ctx,
+        org,
+        MailMessageType::Comment,
+        Some(serde_json::json!({ "recipient": me }).to_string()),
+    );
+    match mark_notification_read(ctx, org, comment.id) {
+        Err(message) if message.contains("not a notification") => {}
+        outcome => return Err(format!("non-notification must be rejected: {outcome:?}")),
+    }
+    if stored_row(ctx, comment.id)? != comment {
+        return Err("rejected mark changed a non-notification".to_string());
+    }
+    if mark_notification_read(ctx, org, u64::MAX).is_ok() {
+        return Err("unknown message id must be rejected".to_string());
+    }
+
+    // mark-all only touches the caller's unread notifications.
+    let unread_a = notification(&me);
+    let unread_b = notification(&me);
+    let foreign = notification(&other);
+    mark_all_notifications_read(ctx, org)?;
+    for row in [&unread_a, &unread_b] {
+        if read_at_of(&stored_row(ctx, row.id)?).is_none() {
+            return Err("mark_all left an own notification unread".to_string());
+        }
+    }
+    if stored_row(ctx, foreign.id)? != foreign || stored_row(ctx, theirs.id)? != theirs {
+        return Err("mark_all touched another user's notification".to_string());
+    }
+    if stored_row(ctx, comment.id)? != comment {
+        return Err("mark_all touched a non-notification".to_string());
+    }
+    if stored_row(ctx, mine.id)? != marked {
+        return Err("mark_all rewrote an already-read notification".to_string());
+    }
+
+    // Idempotent: a second mark-all changes nothing.
+    let after_first = [stored_row(ctx, unread_a.id)?, stored_row(ctx, unread_b.id)?];
+    mark_all_notifications_read(ctx, org)?;
+    if stored_row(ctx, unread_a.id)? != after_first[0]
+        || stored_row(ctx, unread_b.id)? != after_first[1]
+    {
+        return Err("second mark_all_notifications_read changed rows".to_string());
+    }
+    Ok(())
+}

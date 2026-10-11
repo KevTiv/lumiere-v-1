@@ -2,6 +2,11 @@ import { isPaymentRegistrable, variantTag } from '@lumiere/erp-workflows';
 
 type Row = Record<string, unknown>;
 
+/** Cancellation does not undo posting effects, so an ever-posted move cannot reset. */
+export function canResetMove(move: Row): boolean {
+  return variantTag(move.state) === 'Cancelled' && (move.postedBefore ?? move.posted_before) === false;
+}
+
 /** `cancel_account_move` accepts only draft or posted moves. */
 export function canCancelMove(move: Row): boolean {
   const state = variantTag(move.state);

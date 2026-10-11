@@ -406,3 +406,128 @@ pub fn mark_mail_message_delivered(
 
     Ok(())
 }
+
+// ── Notification read state ───────────────────────────────────────────────────
+//
+// Notifications are `MailMessageType::Notification` rows written by
+// `notify_record_followers`, one per follower, with the recipient stored in the
+// `metadata` JSON object as `recipient` (the follower identity as hex). Read
+// state lives in the same object as `read_at` (timestamp micros since the Unix
+// epoch); every other key is preserved. No schema change is involved.
+//
+// Read receipts are per-user, high-volume and carry no business data, so (like
+// `subscribe_to_record` / `unsubscribe_from_record`) they do not write audit rows.
+
+/// Upper bound on rows updated by one `mark_all_notifications_read` call (newest
+/// first). A caller with more unread notifications simply calls again.
+const MAX_NOTIFICATIONS_MARKED_PER_CALL: usize = 500;
+
+/// The `metadata` of a message as a JSON object, if it is one.
+fn metadata_object(metadata: Option<&str>) -> Option<serde_json::Map<String, serde_json::Value>> {
+    match serde_json::from_str::<serde_json::Value>(metadata?).ok()? {
+        serde_json::Value::Object(object) => Some(object),
+        _ => None,
+    }
+}
+
+/// The recipient identity (hex) a notification was addressed to.
+fn notification_recipient(metadata: Option<&str>) -> Option<String> {
+    metadata_object(metadata)?
+        .get("recipient")?
+        .as_str()
+        .map(str::to_owned)
+}
+
+/// Whether a notification already carries a `read_at` marker.
+fn notification_is_read(metadata: Option<&str>) -> bool {
+    metadata_object(metadata)
+        .and_then(|object| object.get("read_at").map(|value| !value.is_null()))
+        .unwrap_or(false)
+}
+
+/// `metadata` with `read_at` merged in, preserving every other key. A missing or
+/// non-object `metadata` starts a new object.
+fn metadata_with_read_at(metadata: Option<&str>, read_at_micros: i64) -> String {
+    let mut object = metadata_object(metadata).unwrap_or_default();
+    object.insert("read_at".to_string(), serde_json::json!(read_at_micros));
+    serde_json::Value::Object(object).to_string()
+}
+
+/// Mark one of the calling identity's own notifications as read.
+/// Idempotent: an already-read notification is left untouched.
+#[reducer]
+pub fn mark_notification_read(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    message_id: u64,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "mail_message", "write")?;
+
+    let message = ctx
+        .db
+        .mail_message()
+        .id()
+        .find(&message_id)
+        .ok_or("mail message not found")?;
+
+    if message.organization_id != organization_id {
+        return Err("mail message does not belong to this organization".to_string());
+    }
+    if message.message_type != MailMessageType::Notification {
+        return Err("mail message is not a notification".to_string());
+    }
+    let sender_hex = ctx.sender().to_hex().to_string();
+    if notification_recipient(message.metadata.as_deref()).as_deref() != Some(sender_hex.as_str()) {
+        return Err("notification is not addressed to the caller".to_string());
+    }
+    if notification_is_read(message.metadata.as_deref()) {
+        return Ok(());
+    }
+
+    let metadata = metadata_with_read_at(
+        message.metadata.as_deref(),
+        ctx.timestamp.to_micros_since_unix_epoch(),
+    );
+    ctx.db.mail_message().id().update(MailMessage {
+        metadata: Some(metadata),
+        ..message
+    });
+    Ok(())
+}
+
+/// Mark the calling identity's unread notifications in the organization as read.
+/// Idempotent. At most `MAX_NOTIFICATIONS_MARKED_PER_CALL` rows (newest first) are
+/// updated per call; call again to clear a larger backlog.
+#[reducer]
+pub fn mark_all_notifications_read(
+    ctx: &ReducerContext,
+    organization_id: u64,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "mail_message", "write")?;
+
+    let sender_hex = ctx.sender().to_hex().to_string();
+    let mut unread: Vec<MailMessage> = ctx
+        .db
+        .mail_message()
+        .mail_message_by_org()
+        .filter(&organization_id)
+        .filter(|message| {
+            message.message_type == MailMessageType::Notification
+                && notification_recipient(message.metadata.as_deref()).as_deref()
+                    == Some(sender_hex.as_str())
+                && !notification_is_read(message.metadata.as_deref())
+        })
+        .collect();
+    unread.sort_by(|a, b| b.date.cmp(&a.date).then(b.id.cmp(&a.id)));
+    unread.truncate(MAX_NOTIFICATIONS_MARKED_PER_CALL);
+
+    let read_at = ctx.timestamp.to_micros_since_unix_epoch();
+    for message in unread {
+        let metadata = metadata_with_read_at(message.metadata.as_deref(), read_at);
+        ctx.db.mail_message().id().update(MailMessage {
+            metadata: Some(metadata),
+            ..message
+        });
+    }
+    Ok(())
+}

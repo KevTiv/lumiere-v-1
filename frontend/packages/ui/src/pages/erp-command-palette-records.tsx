@@ -34,7 +34,7 @@ import { CommandGroup, CommandItem } from "../components/command"
 import { readRowField, searchRecords } from "../lib/record-search"
 
 type Row = Record<string, unknown>
-type RowsQuery = { data?: unknown; isLoading?: boolean }
+type RowsQuery = { data?: unknown; isLoading?: boolean; isError?: boolean }
 
 const RECORDS_PER_MODEL = 5
 
@@ -88,6 +88,7 @@ function asRows(data: unknown): Row[] {
 export interface RecordSearchSummary {
   loading: boolean
   count: number
+  failed: boolean
 }
 
 interface RecordSearchResultsProps {
@@ -125,15 +126,15 @@ function PartnerLabelsLoaded({
   organizationId: bigint
   children: (labels: ReadonlyMap<string, string>) => ReactNode
 }) {
-  const { data } = useContacts(organizationId)
+  const { data, isError } = useContacts(organizationId)
   const labels = useMemo(() => {
     const map = new Map<string, string>()
-    for (const row of asRows(data)) {
+    for (const row of isError ? [] : asRows(data)) {
       const label = firstText(row, ["displayName", "name"])
       if (label) map.set(String(row.id), label)
     }
     return map
-  }, [data])
+  }, [data, isError])
   return <>{children(labels)}</>
 }
 
@@ -155,7 +156,7 @@ function RecordModelResults({
   onStatus: (model: string, status: RecordSearchSummary) => void
 }) {
   const { t } = useTranslation()
-  const { data, isLoading } = spec.useRows(organizationId)
+  const { data, isLoading, isError } = spec.useRows(organizationId)
   const partnerOf = (row: Row): string =>
     spec.partnerField
       ? (partnerLabels.get(String(readRowField(row, spec.partnerField) ?? "")) ?? "")
@@ -163,21 +164,22 @@ function RecordModelResults({
   const hits = useMemo(
     () =>
       searchRecords(
-        asRows(data),
+        isError ? [] : asRows(data),
         query,
         (row) => [...spec.fields.map((key) => readRowField(row, key)), partnerOf(row)],
         RECORDS_PER_MODEL,
       ),
     // partnerOf closes over spec + partnerLabels only
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [data, query, spec, partnerLabels],
+    [data, isError, query, spec, partnerLabels],
   )
   const loading = Boolean(isLoading)
   const count = hits.length
+  const failed = Boolean(isError)
   useEffect(() => {
-    onStatus(spec.model, { loading, count })
-  }, [onStatus, spec.model, loading, count])
-  useEffect(() => () => onStatus(spec.model, { loading: false, count: 0 }), [onStatus, spec.model])
+    onStatus(spec.model, { loading, count, failed })
+  }, [onStatus, spec.model, loading, count, failed])
+  useEffect(() => () => onStatus(spec.model, { loading: false, count: 0, failed: false }), [onStatus, spec.model])
 
   if (count === 0) return null
   const Icon = spec.icon
@@ -233,7 +235,7 @@ export function RecordSearchResults({
     () => (model: string, status: RecordSearchSummary) =>
       setStatuses((prev) => {
         const current = prev[model]
-        if (current && current.loading === status.loading && current.count === status.count) return prev
+        if (current && current.loading === status.loading && current.count === status.count && current.failed === status.failed) return prev
         return { ...prev, [model]: status }
       }),
   )
@@ -243,12 +245,13 @@ export function RecordSearchResults({
       // A model that has not reported yet is still loading.
       loading: values.some((status) => !status || status.loading),
       count: values.reduce((sum, status) => sum + (status?.count ?? 0), 0),
+      failed: values.some((status) => status?.failed),
     }
   }, [specs, statuses])
-  const { loading: summaryLoading, count: summaryCount } = summary
+  const { loading: summaryLoading, count: summaryCount, failed: summaryFailed } = summary
   useEffect(() => {
-    onSummary({ loading: summaryLoading, count: summaryCount })
-  }, [onSummary, summaryLoading, summaryCount])
+    onSummary({ loading: summaryLoading, count: summaryCount, failed: summaryFailed })
+  }, [onSummary, summaryLoading, summaryCount, summaryFailed])
 
   const canReadContacts = allowedResources.has("module:crm")
   return (
@@ -274,6 +277,11 @@ export function RecordSearchResults({
               data-testid="erp-command-palette-records-loading"
             >
               {t("commandPalette.records.loading", { defaultValue: "Searching records..." })}
+            </div>
+          ) : null}
+          {summary.failed ? (
+            <div role="alert" className="px-2 py-2 text-xs text-destructive" data-testid="erp-command-palette-records-error">
+              {t("commandPalette.records.failed", { defaultValue: "Some records could not be searched. Try again." })}
             </div>
           ) : null}
         </>

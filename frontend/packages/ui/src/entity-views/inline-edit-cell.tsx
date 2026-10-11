@@ -7,6 +7,7 @@ import type { EntityInlineEdit, EntityRow } from "../lib/entity-view-types"
 import { isUnchangedInline, parseInlineValue } from "../lib/inline-edit"
 import { showWorkflowToast } from "../lib/workflow-toast"
 import { Input } from "../components/input"
+import { useUnsavedChangesGuard } from "../forms/use-unsaved-changes-guard"
 
 interface InlineEditCellProps {
   edit: EntityInlineEdit
@@ -26,6 +27,7 @@ export function InlineEditCell({ edit, row, columnKey, label, value, children }:
   const [draft, setDraft] = useState("")
   const [pending, setPending] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const navigationDialog = useUnsavedChangesGuard(editing && draft !== String(value ?? ""), pending)
 
   if (edit.canEdit && !edit.canEdit(row)) return <>{children}</>
 
@@ -103,6 +105,7 @@ export function InlineEditCell({ edit, row, columnKey, label, value, children }:
   }
 
   return (
+    <>
     <span className="flex flex-col gap-1" data-testid={`entity-inline-editor-${columnKey}`}>
       <span className="flex items-center gap-1">
         {edit.kind === "select" ? (
@@ -135,5 +138,7 @@ export function InlineEditCell({ edit, row, columnKey, label, value, children }:
         </span>
       ) : null}
     </span>
+    {navigationDialog}
+    </>
   )
 }

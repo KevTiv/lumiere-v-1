@@ -2351,6 +2351,16 @@
       },
       "evidence": "spacetimedb/src/ai/spend.rs: body loads current state and enforces a uniqueness, revision, or lifecycle guard"
     },
+    "mark_all_notifications_read": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/core/messaging.rs: body loads current state and enforces a uniqueness, revision, or lifecycle guard"
+    },
     "mark_embedding_synced": {
       "semantic_kind": "internal",
       "client_facing": false,
@@ -2380,6 +2390,16 @@
         "version": 1
       },
       "evidence": "spacetimedb/src/core/messaging.rs: reducer persists a stable payload key and rejects a duplicate before message or follower-notification insertion"
+    },
+    "mark_notification_read": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/core/messaging.rs: body loads current state and enforces a uniqueness, revision, or lifecycle guard"
     },
     "mark_onboarding_done": {
       "semantic_kind": "command",

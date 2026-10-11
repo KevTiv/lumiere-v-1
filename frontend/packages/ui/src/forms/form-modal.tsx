@@ -89,6 +89,7 @@ export function FormModal({
   const [dirty, setDirty] = React.useState(false)
   const [confirmingDiscard, setConfirmingDiscard] = React.useState(false)
   const submittingRef = React.useRef(false)
+  const [submitting, setSubmitting] = React.useState(false)
 
   // Nothing survives a closed dialog, so nothing is left to protect.
   React.useEffect(() => {
@@ -98,11 +99,13 @@ export function FormModal({
     }
   }, [open])
 
-  useUnsavedChangesGuard(open && dirty)
+  const navigationDialog = useUnsavedChangesGuard(open && dirty, open && (submitting || !!isPending))
 
   /** Dismissals (Cancel, Escape, overlay, X) ask first when fields were edited. */
   const requestOpenChange = (next: boolean) => {
-    if (!next && dirty && !submittingRef.current && !isPending) {
+    // Closing during a save loses the form and its eventual failure feedback.
+    if (!next && (submittingRef.current || isPending)) return
+    if (!next && dirty) {
       setConfirmingDiscard(true)
       return
     }
@@ -112,7 +115,7 @@ export function FormModal({
   const handleSubmit = async (data: Record<string, unknown>) => {
     // A form without an admitted submit binding must never report a successful
     // save. Leave it open so the missing binding is visible during integration.
-    if (!onSubmit) return
+    if (!onSubmit) throw new Error(t("common.formSubmit.noHandler"))
 
     let semanticOutcome: SemanticOperationOutcomeDetail | undefined
     const captureSemanticOutcome = (event: Event) => {
@@ -125,10 +128,12 @@ export function FormModal({
     }
 
     submittingRef.current = true
+    setSubmitting(true)
     try {
       await onSubmit(data)
     } finally {
       submittingRef.current = false
+      setSubmitting(false)
       if (typeof window !== "undefined") {
         window.removeEventListener(SEMANTIC_OPERATION_OUTCOME_EVENT, captureSemanticOutcome)
       }
@@ -240,6 +245,7 @@ export function FormModal({
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+        {navigationDialog}
       </DialogContent>
     </Dialog>
   )

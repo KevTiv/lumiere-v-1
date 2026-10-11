@@ -2,6 +2,7 @@
 
 import { useCallback, useMemo, useState } from 'react';
 import Link from 'next/link';
+import { RecordHeaderActions } from '../../../../../components/record-header-actions';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { ClipboardCheck, Wrench } from 'lucide-react';
 import { useTranslation } from '@lumiere/i18n';
@@ -229,6 +230,7 @@ function VehiclePageLoaded({
         }
         actions={
           <>
+            <RecordHeaderActions model="vehicle" record={vehicle} organizationId={orgId} companyId={company ?? undefined} />
             <Button size="sm" data-testid="vehicle-action-service" onClick={() => setForm('service')}>
               {t('fleet.lifecycle.service.action')}
             </Button>
