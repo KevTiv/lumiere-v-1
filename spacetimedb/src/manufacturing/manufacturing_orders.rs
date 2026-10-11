@@ -353,6 +353,27 @@ fn complete_output_move(
     let unit_cost = if method == "standard" { product.standard_price } else { params.price_unit * quantity / stock_quantity };
     validate_cost(unit_cost, "output inventory unit cost")?;
     validate_cost(stock_quantity * unit_cost, "output inventory value")?;
+    let destination_quants: Vec<_> = ctx.db.stock_quant().quant_by_product().filter(&product_id)
+        .filter(|quant| quant.organization_id == organization_id && quant.company_id == company_id
+            && quant.location_id == destination_id && quant.owner_id.is_none() && quant.lot_id == lot_id)
+        .collect();
+    if destination_quants.iter().any(|quant| quant.package_id.is_some())
+        || ((method == "standard" || method == "average") && destination_quants.len() > 1) {
+        return Err("manufacturing output quant identity is ambiguous or packaged".to_string());
+    }
+    for quant in &destination_quants {
+        validate_cost(quant.quantity, "existing output stock quantity")?;
+        validate_cost(quant.cost, "existing output quant unit cost")?;
+        validate_cost(quant.value, "existing output quant value")?;
+        validate_cost(quant.quantity + stock_quantity, "resulting output quant quantity")?;
+        validate_cost(quant.value + stock_quantity * unit_cost, "resulting output quant value")?;
+        if (quant.value - quant.quantity * quant.cost).abs() > 1e-9 * quant.value.max(1.0) {
+            return Err("existing output quant value is inconsistent".to_string());
+        }
+        if method == "standard" && !crate::inventory::costing::costs_match(quant.cost, unit_cost) {
+            return Err("output standard cost changed; revalue existing stock before manufacturing close".to_string());
+        }
+    }
     let created = create_stock_move_internal(ctx, organization_id, params)?;
     let move_id = created.id;
     ctx.db.stock_move().id().update(StockMove {
@@ -1486,6 +1507,9 @@ fn finish_manufacturing_order_internal(
         }
         for row in rows {
             let product = require_product_for_manufacturing(ctx, organization_id, row.product_id, "BOM byproduct")?;
+            if product.currency_id != cost_inputs.currency_id {
+                return Err("byproduct valuation currency must match company".to_string());
+            }
             let normalized_mo_qty = convert_uom_quantity(ctx, organization_id, mo.product_uom_id,
                 bom.product_uom_id, mo.product_qty, Some(mo.product_id))?;
             validate_positive_qty(bom.product_qty, "BOM base quantity")?;
@@ -1514,6 +1538,9 @@ fn finish_manufacturing_order_internal(
     let shares: Vec<_> = byproduct_outputs.iter().map(|(row, _, _, _, _)| row.cost_share).collect();
     let (primary_value, byproduct_values) = allocate_output_cost(cost_inputs.total_value, &shares)?;
     let primary_product = require_product_for_manufacturing(ctx, organization_id, mo.product_id, "manufactured output")?;
+    if primary_product.currency_id != cost_inputs.currency_id {
+        return Err("primary output valuation currency must match company".to_string());
+    }
     let primary_unit_cost = primary_value / finished_qty;
     validate_cost(primary_unit_cost, "primary output allocated unit cost")?;
     let primary_stock_quantity = convert_uom_quantity(ctx, organization_id, mo.product_uom_id,

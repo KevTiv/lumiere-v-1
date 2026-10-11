@@ -437,6 +437,11 @@ pub(crate) fn production_cost_inputs(
         .map_err(|_| "raw move cost snapshot is malformed")?;
         let snapshot = &metadata["manufacturing_material_cost"];
         if snapshot["currency_id"].as_u64() != Some(currency_id)
+            || snapshot["product_id"].as_u64() != Some(movement.product_id)
+            || snapshot["stock_uom_id"].as_u64() != Some(movement.product_uom)
+            || snapshot["production_id"].as_u64() != Some(mo.id)
+            || snapshot["source_location_id"].as_u64() != Some(movement.location_id)
+            || snapshot["source_quant_id"].as_u64().is_none()
             || snapshot["consumed_quantity"].as_f64() != Some(movement.quantity_done)
             || snapshot["unit_cost"].as_f64() != Some(movement.price_unit)
         {
@@ -448,6 +453,7 @@ pub(crate) fn production_cost_inputs(
             .as_f64()
             .ok_or("raw material cost value missing")?;
         validate_cost(value, "material cost")?;
+        validate_cost(movement.price_unit, "material move unit cost")?;
         if (value - movement.quantity_done * movement.price_unit).abs() > 1e-9 * value.max(1.0) {
             return Err("raw material cost value does not match consumed quantity".to_string());
         }
@@ -513,6 +519,14 @@ pub(crate) fn production_cost_inputs(
                 );
             }
             validate_cost(snapshot.value, "workcenter cost snapshot")?;
+            let expected_value =
+                math::operation_cost(snapshot.duration_minutes, snapshot.hourly_rate)?;
+            if (snapshot.value - expected_value).abs() > 1e-9 * expected_value.max(1.0) {
+                return Err(
+                    "workcenter cost snapshot does not match its applied rate and duration"
+                        .to_string(),
+                );
+            }
             workcenter_value += snapshot.value;
             productivity_ids.push(time.id);
         }
@@ -588,6 +602,8 @@ pub(crate) fn material_cost_snapshot(
         source.cost,
         serde_json::json!({"manufacturing_material_cost": {
             "source_quant_id": source.id, "currency_id": currency_id,
+            "product_id": product_id, "stock_uom_id": component.uom_id,
+            "production_id": mo.id, "source_location_id": location_id,
             "unit_cost": source.cost, "consumed_quantity": quantity, "value": value,
         }})
         .to_string(),
