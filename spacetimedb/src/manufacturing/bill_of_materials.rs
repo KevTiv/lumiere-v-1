@@ -751,6 +751,16 @@ pub fn create_bom_byproduct(
         changed_fields: vec!["bom_id".to_string(), "product_id".to_string()],
         metadata: None,
     });
+    let updated_bom = ctx.db.mrp_bom().id().find(&bom_id).ok_or("BOM not found after byproduct creation")?;
+    record_organization_commit(ctx, OrganizationCommitInput {
+        organization_id,
+        operation_id: "erp.create_bom_byproduct".to_string(),
+        correlation_id: format!("bom:{bom_id}:byproduct:{}", row.id),
+        changes: vec![
+            RowChange::upsert_stdb_row("mrp_bom", serde_json::json!({"id": bom_id}), &updated_bom)?,
+            RowChange::upsert_stdb_row("mrp_bom_byproduct", serde_json::json!({"id": row.id}), &row)?,
+        ],
+    })?;
     Ok(())
 }
 
