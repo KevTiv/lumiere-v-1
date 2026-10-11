@@ -30,12 +30,11 @@ use crate::projects::timesheets::{
 };
 use crate::purchasing::purchase_orders::{
     purchase_order, purchase_order_line, validate_three_way_match_po_lines,
-    DEFAULT_QTY_MATCH_TOLERANCE,
 };
 use crate::sales::sales_core::{sale_order, sale_order_line, SaleOrderLine};
 use crate::types::{
-    AccountMoveState, BudgetState, InvoiceStatus, LineInvoiceStatus, MoveType, PaymentState,
-    PoInvoiceStatus, TaxTypeUse,
+    AccountMoveState, AccountTypeInternal, BudgetState, InvoiceStatus, LineInvoiceStatus, MoveType,
+    PaymentState, TaxTypeUse,
 };
 use crate::workflow::action_registry::{
     GuardedActionInput, GuardedActionKey, GUARDED_ACTION_SCHEMA_VERSION,
@@ -920,21 +919,105 @@ fn mark_move_lines_posted(ctx: &ReducerContext, move_id: u64, name: &str) -> Res
     Ok(())
 }
 
-/// Enforce PO three-way match before posting a vendor bill linked via `invoice_origin` (e.g. `PO123`).
+/// PO-owned relations are authority; origin is only a consistency label.
+/// Legacy bills without exact line provenance must be repaired from evidence, not guessed.
 fn validate_in_invoice_three_way_match(
     ctx: &ReducerContext,
     move_record: &AccountMove,
     move_id: u64,
 ) -> Result<(), String> {
-    let Some(origin) = move_record.invoice_origin.as_ref() else {
-        return Ok(());
+    // Scan all owners, including other tenants: a foreign or duplicate owner
+    // must not disappear merely because the current-company read is scoped.
+    let bill_lines: Vec<_> = ctx
+        .db
+        .account_move_line()
+        .move_line_by_move()
+        .filter(&move_id)
+        .collect();
+    for ml in &bill_lines {
+        if ml.organization_id != move_record.organization_id
+            || ml.company_id != move_record.company_id
+        {
+            return Err(
+                "strict PO provenance failed: bill line has inconsistent scope or parent".into(),
+            );
+        }
+        if !ml.quantity.is_finite() || !ml.price_unit.is_finite() {
+            return Err(format!(
+                "strict PO provenance failed: bill line {} has nonfinite quantity or price",
+                ml.id
+            ));
+        }
+    }
+    let mut source_po = None;
+    for po in ctx.db.purchase_order().iter() {
+        let occurrences = po.invoice_ids.iter().filter(|&&id| id == move_id).count();
+        if occurrences == 0 {
+            continue;
+        }
+        if occurrences != 1 || source_po.is_some() {
+            return Err(format!(
+                "strict PO provenance failed: bill {move_id} has multiple or duplicate PO owners"
+            ));
+        }
+        if po.organization_id != move_record.organization_id
+            || po.company_id != move_record.company_id
+        {
+            return Err(format!(
+                "strict PO provenance failed: bill {move_id} PO owner is outside bill scope"
+            ));
+        }
+        source_po = Some(po);
+    }
+
+    let Some(po) = source_po else {
+        if ctx.db.purchase_order_line().iter().any(|source| {
+            source
+                .invoice_lines
+                .iter()
+                .any(|id| bill_lines.iter().any(|line| line.id == *id))
+        }) {
+            return Err(format!("strict PO provenance failed: bill {move_id} has source membership without canonical PO ownership"));
+        }
+        if move_record.invoice_origin.as_deref().is_some_and(|origin| {
+            origin
+                .strip_prefix("PO")
+                .and_then(|id| id.parse::<u64>().ok())
+                .is_some_and(|id| origin == format!("PO{id}"))
+        }) {
+            return Err(format!("strict PO provenance failed: bill {move_id} asserts PO origin without canonical PO ownership"));
+        }
+        return Ok(()); // Legitimate manual, non-PO vendor invoice.
     };
-    let Some(po_id_str) = origin.strip_prefix("PO") else {
-        return Ok(());
-    };
-    let Ok(po_id) = po_id_str.parse::<u64>() else {
-        return Ok(());
-    };
+    let po_id = po.id;
+    if move_record.partner_id != Some(po.partner_id) {
+        return Err(format!(
+            "strict PO provenance failed: bill {move_id} partner disagrees with PO {po_id}"
+        ));
+    }
+    for ml in &bill_lines {
+        if (ml.product_id.is_some()
+            || ctx
+                .db
+                .account_account()
+                .id()
+                .find(&ml.account_id)
+                .is_some_and(|account| account.internal_type == Some(AccountTypeInternal::Payable)))
+            && ml.partner_id != Some(po.partner_id)
+        {
+            return Err(format!(
+                "strict PO provenance failed: bill line {} partner disagrees with PO {po_id}",
+                ml.id
+            ));
+        }
+    }
+    if let Some(origin) = move_record.invoice_origin.as_deref() {
+        if origin != format!("PO{po_id}") {
+            return Err(format!(
+                "strict PO provenance failed: bill {move_id} origin disagrees with PO {po_id}"
+            ));
+        }
+    }
 
     let po_lines: Vec<_> = ctx
         .db
@@ -944,34 +1027,134 @@ fn validate_in_invoice_three_way_match(
         .collect();
 
     if po_lines.is_empty() {
-        return Ok(());
+        return Err(format!(
+            "strict PO provenance failed: PO {po_id} has no source lines"
+        ));
+    }
+    for line in &po_lines {
+        if line.organization_id != po.organization_id
+            || line.company_id != po.company_id
+            || line.order_id != po_id
+            || line.partner_id != po.partner_id
+            || line.currency_id != po.currency_id
+        {
+            return Err(
+                "strict PO provenance failed: PO line has inconsistent scope or parent".into(),
+            );
+        }
+        if !line.qty_received.is_finite()
+            || !line.qty_invoiced.is_finite()
+            || !line.price_unit.is_finite()
+        {
+            return Err(format!(
+                "strict PO provenance failed: PO line {} has nonfinite quantity or price",
+                line.id
+            ));
+        }
     }
 
-    let po = ctx.db.purchase_order().id().find(&po_id);
-    let tolerance = po
-        .as_ref()
-        .map(|o| crate::purchasing::purchase_orders::qty_match_tolerance_for_order(o))
-        .unwrap_or(DEFAULT_QTY_MATCH_TOLERANCE);
-    let price_tol = po
-        .as_ref()
-        .map(|o| crate::purchasing::purchase_orders::price_match_tolerance_for_order(o))
-        .unwrap_or(crate::purchasing::purchase_orders::DEFAULT_PRICE_MATCH_TOLERANCE);
+    // Reverse edges must survive deletion/rebalancing, not just forward lookup.
+    let mut current_memberships = std::collections::BTreeSet::new();
+    for source in &po_lines {
+        for &id in &source.invoice_lines {
+            let occurrences = ctx
+                .db
+                .purchase_order_line()
+                .iter()
+                .map(|line| {
+                    line.invoice_lines
+                        .iter()
+                        .filter(|&&member| member == id)
+                        .count()
+                })
+                .sum::<usize>();
+            if occurrences != 1 {
+                return Err(
+                    "strict PO provenance failed: multiple or duplicate source memberships".into(),
+                );
+            }
+            let referenced = ctx
+                .db
+                .account_move_line()
+                .id()
+                .find(&id)
+                .ok_or("strict PO provenance failed: dangling source invoice membership")?;
+            if referenced.organization_id != po.organization_id
+                || referenced.company_id != po.company_id
+                || po
+                    .invoice_ids
+                    .iter()
+                    .filter(|&&bill| bill == referenced.move_id)
+                    .count()
+                    != 1
+            {
+                return Err("strict PO provenance failed: source invoice membership has inconsistent scope or parent".into());
+            }
+            let parent =
+                ctx.db.account_move().id().find(&referenced.move_id).ok_or(
+                    "strict PO provenance failed: source invoice membership parent missing",
+                )?;
+            if parent.organization_id != po.organization_id || parent.company_id != po.company_id {
+                return Err("strict PO provenance failed: source invoice membership has inconsistent scope or parent".into());
+            }
+            if referenced.product_id != Some(source.product_id) {
+                return Err(format!(
+                    "strict PO provenance failed: product disagrees with source PO line {}",
+                    source.id
+                ));
+            }
+            if !referenced.quantity.is_finite() || !referenced.price_unit.is_finite() {
+                return Err("strict PO provenance failed: source invoice membership has nonfinite quantity or price".into());
+            }
+            if referenced.move_id == move_id {
+                current_memberships.insert(id);
+            }
+        }
+    }
+
+    let tolerance = crate::purchasing::purchase_orders::qty_match_tolerance_for_order(&po);
+    let price_tol = crate::purchasing::purchase_orders::price_match_tolerance_for_order(&po);
     validate_three_way_match_po_lines(&po_lines, tolerance)?;
 
-    for ml in ctx
-        .db
-        .account_move_line()
-        .move_line_by_move()
-        .filter(&move_id)
-    {
-        if ml.debit <= 0.0 {
-            continue;
+    for ml in &bill_lines {
+        if ml.organization_id != move_record.organization_id
+            || ml.company_id != move_record.company_id
+            || ml.move_id != move_id
+        {
+            return Err(
+                "strict PO provenance failed: bill line has inconsistent scope or parent".into(),
+            );
         }
         let Some(product_id) = ml.product_id else {
-            continue;
+            continue; // Payable and tax lines retain their Accounting owners.
         };
-        let Some(po_line) = po_lines.iter().find(|l| l.product_id == product_id) else {
-            continue;
+        let mut source_line = None;
+        for line in ctx.db.purchase_order_line().iter() {
+            let occurrences = line.invoice_lines.iter().filter(|&&id| id == ml.id).count();
+            if occurrences == 0 {
+                continue;
+            }
+            if occurrences != 1 || source_line.is_some() {
+                return Err(format!("strict PO provenance failed: bill line {} has multiple or duplicate source memberships", ml.id));
+            }
+            if line.order_id != po_id
+                || line.organization_id != po.organization_id
+                || line.company_id != po.company_id
+                || line.partner_id != po.partner_id
+                || line.currency_id != po.currency_id
+            {
+                return Err(format!("strict PO provenance failed: bill line {} source has inconsistent scope or parent", ml.id));
+            }
+            source_line = Some(line);
+        }
+        let po_line = source_line.ok_or_else(|| {
+            format!(
+                "strict PO provenance failed: bill line {} has no exact source PO line membership",
+                ml.id
+            )
+        })?;
+        if po_line.product_id != product_id {
+            return Err(format!("strict PO provenance failed: bill line {} product disagrees with source PO line {}", ml.id, po_line.id));
         };
         if ml.quantity > po_line.qty_received + tolerance {
             return Err(format!(
@@ -987,6 +1170,14 @@ fn validate_in_invoice_three_way_match(
         }
     }
 
+    let actual_products: std::collections::BTreeSet<_> = bill_lines
+        .iter()
+        .filter(|line| line.product_id.is_some())
+        .map(|line| line.id)
+        .collect();
+    if current_memberships != actual_products {
+        return Err("strict PO provenance failed: bill product lines do not exactly match source memberships".into());
+    }
     Ok(())
 }
 
@@ -1398,6 +1589,11 @@ pub fn post_account_move_impl(
 
     if move_record.state != AccountMoveState::Draft {
         return Err("Only draft moves can be posted".to_string());
+    }
+
+    // Approval re-entry skips only the gate, never persisted provenance.
+    if move_record.move_type == MoveType::InInvoice {
+        validate_in_invoice_three_way_match(ctx, &move_record, move_id)?;
     }
 
     let is_vendor_bill = matches!(
@@ -2314,9 +2510,7 @@ pub fn create_bill_from_purchase_order(
         line_params.sequence = seq as u32;
         line_params.quantity = qty;
         line_params.price_unit = price_unit;
-        if line_params.partner_id.is_none() {
-            line_params.partner_id = Some(po.partner_id);
-        }
+        line_params.partner_id = Some(po.partner_id);
         line_params.product_id = Some(product_id);
         line_params.product_uom_id = Some(product_uom);
         if line_params.analytic_account_id.is_none() {
@@ -2325,10 +2519,16 @@ pub fn create_bill_from_purchase_order(
         // Always take tags from the PO line — do not treat template `[]` as preserve.
         line_params.analytic_tag_ids = analytic_tag_ids;
 
-        insert_draft_account_move_line(ctx, &move_record, line_params)?;
+        let created_line = insert_draft_account_move_line(ctx, &move_record, line_params)?;
+        let mut invoice_lines = line.invoice_lines.clone();
+        // Capture provenance while the exact source and inserted row are both known.
+        if !invoice_lines.contains(&created_line.id) {
+            invoice_lines.push(created_line.id);
+        }
 
         ctx.db.purchase_order_line().id().update(
             crate::purchasing::purchase_orders::PurchaseOrderLine {
+                invoice_lines,
                 qty_invoiced: qty_invoiced_prev + qty,
                 qty_to_invoice: (product_qty - (qty_invoiced_prev + qty)).max(0.0),
                 write_uid: ctx.sender(),
@@ -2354,9 +2554,7 @@ pub fn create_bill_from_purchase_order(
             .clone()
             .unwrap_or_else(|| "Accounts Payable".to_string());
     }
-    if payable_params.partner_id.is_none() {
-        payable_params.partner_id = Some(po.partner_id);
-    }
+    payable_params.partner_id = Some(po.partner_id);
     insert_draft_account_move_line(ctx, &move_record, payable_params)?;
 
     // Update AccountMove totals
@@ -2375,20 +2573,7 @@ pub fn create_bill_from_purchase_order(
         ..move_record.clone()
     });
 
-    // Update PO invoice tracking
-    let all_invoiced = ctx
-        .db
-        .purchase_order_line()
-        .purchase_order_line_by_order()
-        .filter(&purchase_order_id)
-        .all(|l| l.qty_received <= l.qty_invoiced);
-
-    let new_invoice_status = if all_invoiced {
-        PoInvoiceStatus::Invoiced
-    } else {
-        PoInvoiceStatus::Partial
-    };
-
+    // Preserve exact bill relations; Purchasing owns derived invoice coverage.
     let mut updated_invoice_ids = po.invoice_ids.clone();
     updated_invoice_ids.push(move_record.id);
     let new_invoice_count = po.invoice_count + 1;
@@ -2400,11 +2585,15 @@ pub fn create_bill_from_purchase_order(
         .update(crate::purchasing::purchase_orders::PurchaseOrder {
             invoice_ids: updated_invoice_ids,
             invoice_count: new_invoice_count,
-            invoice_status: new_invoice_status,
             write_uid: ctx.sender(),
             write_date: ctx.timestamp,
             ..po
         });
+    crate::purchasing::purchase_orders::refresh_po_invoice_status(
+        ctx,
+        organization_id,
+        purchase_order_id,
+    )?;
 
     write_audit_log_v2(
         ctx,
