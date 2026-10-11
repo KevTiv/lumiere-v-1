@@ -15,6 +15,9 @@ use crate::manufacturing::bill_of_materials::{
     mrp_bom_line, mrp_routing_workcenter, BomLineInput, CreateBomByproductParams,
     CreateBomParams, CreateRoutingWorkcenterParams,
 };
+use crate::manufacturing::costing::{
+    configure_workcenter_cost_rate, mrp_productivity_cost, mrp_production_cost,
+};
 use crate::manufacturing::manufacturing_orders::{
     confirm_manufacturing_order, consume_mo_materials, create_manufacturing_order, create_workorder,
     finish_manufacturing_order, finish_workorder, mrp_production, mrp_workorder,
@@ -77,6 +80,17 @@ fn snapshot(ctx: &ReducerContext, organization_id: u64) -> Vec<String> {
         rows.push(serde_json::json!(["center", row.id, row.order_ids, row.workorder_count,
             row.workorder_pending_count, row.workorder_progress_count,
             row.productivity_ids, row.productive_time]).to_string());
+    }
+    for row in ctx.db.mrp_productivity_cost().mrp_productivity_cost_by_org().filter(&organization_id) {
+        rows.push(serde_json::json!(["productivity_cost", row.productivity_id, row.company_id,
+            row.production_id, row.workorder_id, row.workcenter_id, row.currency_id,
+            row.duration_minutes, row.hourly_rate, row.configured, row.value]).to_string());
+    }
+    for row in ctx.db.mrp_production_cost().mrp_production_cost_by_org().filter(&organization_id) {
+        rows.push(serde_json::json!(["production_cost", row.production_id, row.company_id,
+            row.currency_id, row.material_value, row.workcenter_value, row.total_value,
+            row.inventory_value, row.variance_value, row.raw_move_ids, row.output_move_ids,
+            row.productivity_cost_ids, row.account_move_id, row.account_move_line_ids]).to_string());
     }
     rows.sort_unstable();
     rows
@@ -159,6 +173,7 @@ pub fn test_bom_to_close_domain_lifecycle(ctx: &ReducerContext) -> Result<(), St
     })?;
     let center = ctx.db.mrp_workcenter().mrp_workcenter_by_org().filter(&org)
         .find(|row| row.name == "COV-07H Center").ok_or("center missing")?;
+    configure_workcenter_cost_rate(ctx, org, company, center.id, 60.0)?;
     let mut operations = Vec::new();
     for name in ["COV-07H Assemble", "COV-07H Inspect"] {
         let blockers = operations.clone();
@@ -270,6 +285,16 @@ pub fn test_bom_to_close_domain_lifecycle(ctx: &ReducerContext) -> Result<(), St
             return Err("raw move exact scope/terminal state mismatch".to_string());
         }
         exact(row.quantity_done, row.product_uom_qty, "consumed raw move quantity")?;
+        exact(row.price_unit, 10.0, "raw source cost snapshot")?;
+        let metadata: serde_json::Value = serde_json::from_str(row.metadata.as_deref().ok_or("raw cost metadata missing")?)
+            .map_err(|error| format!("raw cost metadata: {error}"))?;
+        let cost = &metadata["manufacturing_material_cost"];
+        if cost["source_quant_id"].as_u64() != Some(opening.id)
+            || cost["currency_id"].as_u64() != Some(fixture.currency_id) {
+            return Err("raw cost snapshot lost exact quant/currency identity".to_string());
+        }
+        exact(cost["consumed_quantity"].as_f64().ok_or("raw cost quantity missing")?, row.quantity_done, "raw snapshot quantity")?;
+        exact(cost["value"].as_f64().ok_or("raw cost value missing")?, row.quantity_done * 10.0, "raw snapshot value")?;
         quantities.push(row.quantity_done);
     }
     quantities.sort_by(f64::total_cmp);
@@ -307,6 +332,17 @@ pub fn test_bom_to_close_domain_lifecycle(ctx: &ReducerContext) -> Result<(), St
             return Err("exact productivity owner graph mismatch".to_string());
         }
         log_ids.push(logs[0].id);
+        let time_cost = ctx.db.mrp_productivity_cost().productivity_id().find(&logs[0].id)
+            .ok_or("productivity cost missing")?;
+        if time_cost.organization_id != org || time_cost.company_id != company
+            || time_cost.production_id != mo.id || time_cost.workorder_id != *workorder_id
+            || time_cost.workcenter_id != center.id || time_cost.currency_id != fixture.currency_id
+            || !time_cost.configured {
+            return Err("productivity cost exact owner/configuration mismatch".to_string());
+        }
+        exact(time_cost.duration_minutes, duration, "costed workorder duration")?;
+        exact(time_cost.hourly_rate, 60.0, "configured hourly cost rate")?;
+        exact(time_cost.value, duration, "workorder labor cost")?;
         create_workorder_quality_check(ctx, org, company, *workorder_id, format!("COV-07H Inspection {index}"))?;
         let checks: Vec<_> = ctx.db.quality_check().iter().filter(|row| row.workorder_id == Some(*workorder_id)).collect();
         if checks.len() != 1 || checks[0].organization_id != org || checks[0].company_id != company
@@ -356,6 +392,7 @@ pub fn test_bom_to_close_domain_lifecycle(ctx: &ReducerContext) -> Result<(), St
         }
         output_products.insert(row.product_id);
         exact(row.quantity_done, row.product_uom_qty, "output done/planned quantity")?;
+        exact(row.price_unit, 24.0, "allocated actual output unit cost")?;
         if row.product_id == primary_id {
             exact(row.quantity_done, 0.5, "primary output quantity")?;
             exact(row.cost_share, 0.0, "primary move existing cost share")?;
@@ -392,6 +429,22 @@ pub fn test_bom_to_close_domain_lifecycle(ctx: &ReducerContext) -> Result<(), St
         return Err("completed workcenter ownership/count mismatch".to_string());
     }
     exact(final_center.productive_time, 10.0, "total productive time")?;
+    let cost = ctx.db.mrp_production_cost().production_id().find(&mo.id).ok_or("production cost result missing")?;
+    let cost_raw_ids: HashSet<_> = cost.raw_move_ids.iter().copied().collect();
+    let cost_output_ids: HashSet<_> = cost.output_move_ids.iter().copied().collect();
+    let cost_productivity_ids: HashSet<_> = cost.productivity_cost_ids.iter().copied().collect();
+    if cost.organization_id != org || cost.company_id != company || cost.currency_id != fixture.currency_id
+        || cost_raw_ids != raw_ids || cost.raw_move_ids.len() != 2
+        || cost_output_ids != finished_ids || cost.output_move_ids.len() != 2
+        || cost_productivity_ids != log_ids.iter().copied().collect() || cost.productivity_cost_ids.len() != 2
+        || cost.account_move_id.is_some() || !cost.account_move_line_ids.is_empty() {
+        return Err("production cost result exact effect/currency ownership mismatch".to_string());
+    }
+    exact(cost.material_value, 5.0, "production material value")?;
+    exact(cost.workcenter_value, 10.0, "production labor value")?;
+    exact(cost.total_value, 15.0, "production total actual value")?;
+    exact(cost.inventory_value, 8.875, "production standard inventory value")?;
+    exact(cost.variance_value, 6.125, "actual/standard production variance")?;
     rejected_without_effect(ctx, org, "MO finish replay", || finish_manufacturing_order(ctx, org, company, mo.id))?;
     rejected_without_effect(ctx, org, "terminal consumption", || consume_mo_materials(ctx, org, company, mo.id))?;
     rejected_without_effect(ctx, org, "terminal output replay", || produce_manufacturing_order(ctx, org, company, mo.id, 0.5))?;

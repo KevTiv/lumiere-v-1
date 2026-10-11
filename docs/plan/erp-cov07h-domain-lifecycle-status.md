@@ -18,6 +18,15 @@ An MO for 0.5 units must own exactly two raw moves (0.375 and 0.125), finish wit
 standard cost 17/value 8.5 and 0.125 byproduct units at standard cost 3/value
 0.375. The BOM's existing cached component estimate must equal 20.
 
+The workcenter's explicit hourly rate is 60. Four and six productive minutes
+cost 4 and 6, so the MO must own exact productivity-cost rows totaling 10.
+Its exact production-cost result must reference the raw/output move sets and
+productivity-cost sets, with material value 5, labor value 10, total actual
+value 15, standard inventory value 8.875 and variance 6.125. Output moves carry
+allocated actual unit cost 24 (primary value 12 and byproduct value 3), while
+the standard-cost quants preserve their configured costs. Raw move cost
+metadata must reference the exact opening quant and company currency.
+
 The proof checks exact organization/company/product/location identities,
 parent/child ID sets, terminal move flags, workcenter capacity, operation
 dependencies, closed productivity rows and passing quality ownership. Scoped
@@ -25,9 +34,11 @@ effect snapshots must remain unchanged on material replay and rejected draft,
 state replay, routing blocker, overproduction, pending-quality, and terminal
 commands.
 
-These are assertions of the existing standard-cost and cost-share fields.
-They do not certify accounting journal identities, actual manufacturing cost
-allocation, labor/overhead absorption, tracked output, or reservations/ATP.
+This scenario configures labor rates but intentionally has no accounting
+valuation configuration. Its cost result must therefore contain no account
+move or journal line references. It does not certify accounting journal
+identities, overhead absorption, tracked output, or reservations/ATP; the
+concurrent costing slice supplies the configured journal scenario.
 The fractional MO and non-unit BOM base require the concurrent costing slice's
 material-scaling correction: `line.product_qty * mo.product_qty / bom.product_qty`.
 
