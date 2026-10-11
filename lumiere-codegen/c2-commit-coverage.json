@@ -235,6 +235,164 @@
       "change_constructors": [
         "upsert_stdb_row"
       ]
+    },
+    {
+      "source": "spacetimedb/src/manufacturing/bill_of_materials.rs",
+      "function": "create_bom_byproduct",
+      "operation": "create_bom_byproduct",
+      "operation_id": "erp.create_bom_byproduct",
+      "change_constructors": [
+        "upsert_stdb_row"
+      ]
+    },
+    {
+      "source": "spacetimedb/src/manufacturing/effects.rs",
+      "function": "record_created_order",
+      "operation": "create_manufacturing_order",
+      "operation_id": "erp.create_manufacturing_order",
+      "change_constructors": [
+        "upsert_stdb_row"
+      ]
+    }
+  ],
+  "dynamic_commit_helpers": [
+    {
+      "source": "spacetimedb/src/manufacturing/effects.rs",
+      "function": "record",
+      "operation_id_parameter": "operation_id",
+      "snapshot_type": "ManufacturingEffectSnapshot",
+      "method": "record",
+      "change_constructors": [
+        "upsert_stdb_row",
+        "delete"
+      ],
+      "change_helpers": [
+        "add_row",
+        "changed_rows"
+      ],
+      "callers": [
+        {
+          "source": "spacetimedb/src/manufacturing/manufacturing_orders.rs",
+          "function": "confirm_manufacturing_order",
+          "argument": "\"erp.confirm_manufacturing_order\"",
+          "operations": {
+            "confirm_manufacturing_order": "erp.confirm_manufacturing_order"
+          }
+        },
+        {
+          "source": "spacetimedb/src/manufacturing/manufacturing_orders.rs",
+          "function": "start_manufacturing_order",
+          "argument": "\"erp.start_manufacturing_order\"",
+          "operations": {
+            "start_manufacturing_order": "erp.start_manufacturing_order"
+          }
+        },
+        {
+          "source": "spacetimedb/src/manufacturing/manufacturing_orders.rs",
+          "function": "produce_manufacturing_order",
+          "argument": "\"erp.produce_manufacturing_order\"",
+          "operations": {
+            "produce_manufacturing_order": "erp.produce_manufacturing_order"
+          }
+        },
+        {
+          "source": "spacetimedb/src/manufacturing/manufacturing_orders.rs",
+          "function": "consume_mo_materials",
+          "argument": "\"erp.consume_mo_materials\"",
+          "operations": {
+            "consume_mo_materials": "erp.consume_mo_materials"
+          }
+        },
+        {
+          "source": "spacetimedb/src/manufacturing/manufacturing_orders.rs",
+          "function": "finish_manufacturing_order_internal",
+          "argument": "close_operation",
+          "operations": {
+            "finish_manufacturing_order": "erp.finish_manufacturing_order",
+            "finish_manufacturing_order_with_tracking": "erp.finish_manufacturing_order_with_tracking"
+          }
+        },
+        {
+          "source": "spacetimedb/src/manufacturing/manufacturing_orders.rs",
+          "function": "scrap_finished_manufacturing_output",
+          "argument": "\"erp.scrap_finished_manufacturing_output\"",
+          "operations": {
+            "scrap_finished_manufacturing_output": "erp.scrap_finished_manufacturing_output"
+          }
+        },
+        {
+          "source": "spacetimedb/src/manufacturing/manufacturing_orders.rs",
+          "function": "scrap_tracked_manufacturing_output",
+          "argument": "\"erp.scrap_tracked_manufacturing_output\"",
+          "operations": {
+            "scrap_tracked_manufacturing_output": "erp.scrap_tracked_manufacturing_output"
+          }
+        },
+        {
+          "source": "spacetimedb/src/manufacturing/manufacturing_orders.rs",
+          "function": "scrap_manufacturing_material",
+          "argument": "\"erp.scrap_manufacturing_material\"",
+          "operations": {
+            "scrap_manufacturing_material": "erp.scrap_manufacturing_material"
+          }
+        },
+        {
+          "source": "spacetimedb/src/manufacturing/manufacturing_orders.rs",
+          "function": "create_workorder_internal",
+          "argument": "\"erp.create_workorder\"",
+          "operations": {
+            "create_workorder": "erp.create_workorder"
+          }
+        },
+        {
+          "source": "spacetimedb/src/manufacturing/manufacturing_orders.rs",
+          "function": "start_workorder",
+          "argument": "\"erp.start_workorder\"",
+          "operations": {
+            "start_workorder": "erp.start_workorder"
+          }
+        },
+        {
+          "source": "spacetimedb/src/manufacturing/manufacturing_orders.rs",
+          "function": "finish_workorder",
+          "argument": "\"erp.finish_workorder\"",
+          "operations": {
+            "finish_workorder": "erp.finish_workorder"
+          }
+        },
+        {
+          "source": "spacetimedb/src/manufacturing/work_centers.rs",
+          "function": "log_workcenter_productivity",
+          "argument": "\"erp.log_workcenter_productivity\"",
+          "operations": {
+            "log_workcenter_productivity": "erp.log_workcenter_productivity"
+          }
+        },
+        {
+          "source": "spacetimedb/src/inventory/quality.rs",
+          "function": "create_workorder_quality_check",
+          "argument": "\"erp.create_workorder_quality_check\"",
+          "operations": {
+            "create_workorder_quality_check": "erp.create_workorder_quality_check"
+          }
+        },
+        {
+          "source": "spacetimedb/src/inventory/quality.rs",
+          "function": "fail_workorder_quality_check",
+          "argument": "\"erp.fail_workorder_quality_check\"",
+          "operations": {
+            "fail_workorder_quality_check": "erp.fail_workorder_quality_check"
+          }
+        },
+        {
+          "source": "spacetimedb/src/inventory/quality.rs",
+          "function": "pass_quality_check",
+          "argument": "\"erp.pass_quality_check\"",
+          "operations": {
+            "pass_quality_check": "erp.pass_quality_check"
+          }
+        }
+      ]
     }
   ]
 }

@@ -3670,6 +3670,26 @@
       "reason": "isolated persisted domain proof; never exposed through the session BFF"
     },
     {
+      "name": "run_manufacturing_bom_to_close_domain_lifecycle_test",
+      "exposure": "denied",
+      "reason": "isolated persisted manufacturing lifecycle proof; never exposed through the session BFF"
+    },
+    {
+      "name": "run_manufacturing_bom_routing_lifecycle_test",
+      "exposure": "denied",
+      "reason": "isolated persisted routing ownership proof; never exposed through the session BFF"
+    },
+    {
+      "name": "run_manufacturing_actual_cost_valuation_test",
+      "exposure": "denied",
+      "reason": "isolated persisted cost and accounting valuation proof; never exposed through the session BFF"
+    },
+    {
+      "name": "run_manufacturing_cost_configuration_scope_test",
+      "exposure": "denied",
+      "reason": "isolated persisted cost configuration authorization proof; never exposed through the session BFF"
+    },
+    {
       "name": "finish_manufacturing_order_with_tracking",
       "exposure": "session",
       "reason": "explicit tracked manufacturing close intent with exact lot and serial attribution"

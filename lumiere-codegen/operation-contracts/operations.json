@@ -2368,6 +2368,34 @@
       "idempotency": "non_idempotent",
       "semantic_kind": "operator"
     },
+    "run_manufacturing_bom_to_close_domain_lifecycle_test": {
+      "client_facing": false,
+      "codec": {"id": "spacetimedb-sats-json", "version": 1},
+      "evidence": "spacetimedb/tests/manufacturing/mod.rs invokes the persisted full manufacturing lifecycle proof with isolated fixture writes; test-only reducer denied to session callers.",
+      "idempotency": "non_idempotent",
+      "semantic_kind": "operator"
+    },
+    "run_manufacturing_bom_routing_lifecycle_test": {
+      "client_facing": false,
+      "codec": {"id": "spacetimedb-sats-json", "version": 1},
+      "evidence": "spacetimedb/tests/manufacturing/mod.rs invokes the persisted routing ownership and predecessor proof with isolated fixture writes; test-only reducer denied to session callers.",
+      "idempotency": "non_idempotent",
+      "semantic_kind": "operator"
+    },
+    "run_manufacturing_actual_cost_valuation_test": {
+      "client_facing": false,
+      "codec": {"id": "spacetimedb-sats-json", "version": 1},
+      "evidence": "spacetimedb/tests/manufacturing/mod.rs invokes the persisted manufacturing cost and posted accounting valuation proof with isolated fixture writes; test-only reducer denied to session callers.",
+      "idempotency": "non_idempotent",
+      "semantic_kind": "operator"
+    },
+    "run_manufacturing_cost_configuration_scope_test": {
+      "client_facing": false,
+      "codec": {"id": "spacetimedb-sats-json", "version": 1},
+      "evidence": "spacetimedb/tests/manufacturing/mod.rs invokes the persisted cost configuration scope and closed-period rejection proof with isolated fixture writes; test-only reducer denied to session callers.",
+      "idempotency": "non_idempotent",
+      "semantic_kind": "operator"
+    },
     "scrap_finished_manufacturing_output": {
       "client_facing": true,
       "codec": {
