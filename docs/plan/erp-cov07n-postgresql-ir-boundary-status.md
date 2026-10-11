@@ -33,5 +33,9 @@ The explicit staging parity test checks the current 510-table handoff against
 the prior renderer, every released migration (including frozen migration 14),
 and every archive/protocol SQL artifact byte-for-byte. Focused rejection tests
 cover invalid versions, types, nullable flags, keys, index positions, identifiers,
-and unsupported commit-stream bootstrap metadata. PostgreSQL execution remains
-a separate integration proof; byte parity is not an execution claim.
+and unsupported commit-stream bootstrap metadata. The coordinator also replayed
+the IR-only emitter and executed all five generated migration files plus the
+archive/bootstrap artifacts in isolated PostgreSQL 16.15. Migration 14 added
+exactly the four cost tables; replay preserved the table count. See the
+[bounded runtime evidence](../evidence/cov07-completion-runtime-2026-10-11.md).
+This is generated-DDL execution, not the full API migration/projector proof.

@@ -2,7 +2,8 @@
 
 Disposition: ACTIVE implementation; Manufacturing remains U2/review.
 Integration base: PR #175, `9eb67a11744c159cac5f7cd2b4d363e0d452019a`.
-No new completion-stack runtime acceptance is claimed by this plan.
+The bounded persisted domain acceptance passed; full operator/runtime acceptance
+remains open. See the [executed evidence](../evidence/cov07-completion-runtime-2026-10-11.md).
 
 ## Requirements and existing progress
 
@@ -58,6 +59,7 @@ required checks when publishing the completion PR.
 | COV-07k costing/valuation | Scale raw requirements by `mo.product_qty / bom.product_qty`; snapshot consumed quant/currency/unit cost, configured workcenter rate at productivity time, actual material/labor totals and output allocations. Preserve standard-cost inventory policy and record its variance. Optional configured journal posting uses canonical Accounting owners. | `mrp_workcenter_cost_rate`, `mrp_productivity_cost`, `mrp_valuation_config`, `mrp_production_cost` and exact move/journal-line references; tests of source-stock bounds, edited rates/prices, cost-share/quantity arithmetic, company/currency/account/period compatibility, atomic failure and replay. New generated resources/operations and durable migration require release/pin before frontend acceptance. |
 | COV-07l tracking/scrap | Explicit lot/serial identities support tracked output/byproduct attribution and bounded scrap during production or after close; untracked compatibility stays explicit. Resolve source/destination quant by complete company/product/location/lot/package/owner identity. | Persisted tests and generated-operation/browser evidence for lot/serial compatibility, serial uniqueness, quantity bounds, lot locks, exact traceability, replay/request conflicts and scope denial. Report any unsupported tracking/material-consumption combination as a restriction, not completed coverage. |
 | COV-07m routing/workcenters | Enforce operation/workcenter and blocker compatibility, finite positive capacities/cycles, dependency graph integrity and started-execution edit policy. Keep workcenter counts/time/relations derived from authoritative rows. | Persisted positive/negative tests of scoped operations, cross-center injection, duplicate/self/cyclic blockers, blocked/inactive center behavior, started-routing policy and repeated finish. Unit/browser checks cover the visible selectors/actions affected by these rules. Explicitly classify any versioning/race scenario not exercised. |
+| COV-07n PostgreSQL IR boundary | Generate durable migrations, archive DDL and projection bootstrap only after canonical IR v2. Business layouts derive from `persistence.postgresql` and `persistence.storage`, validated against canonical tables/types; keep SpacetimeDB the business authority. | IR-only replay, fail-closed malformed-contract tests, exact frozen migration parity and PostgreSQL execution. Existing projection-only protocol templates remain compatibility implementation, not a second business schema. [Boundary status](./erp-cov07n-postgresql-ir-boundary-status.md). |
 
 ## Integration and contract gates
 
@@ -74,6 +76,19 @@ inputs. Generate artifacts through the established producer, review the clean
 codegen diff, promote/freeze additive migrations, publish the immutable contracts
 release and pin it consistently in Cargo/frontend before running contract gates.
 Never hand-edit generated bindings or rewrite released migration checksums.
+
+The [contracts extraction plan](../plans/contracts-extraction-execution-plan.md#21-refined-generator-boundary)
+requires PostgreSQL DDL to derive from the v2 persistence handoff. The completion
+stack now moves every generated PG DDL target write behind that boundary;
+`--postgresql-ir-only` consumes the handoff without inspecting domain source or
+SDK bindings. The early schema stage only plans prerequisite manifests.
+
+The current contracts-owned typed-read emitter still has an Accounting-only
+allowlist. A prepared new-contract candidate omits the four Manufacturing cost
+row codecs even though canonical IR exposes the resources. Full web typecheck
+therefore fails. A companion emitter change, generated codec tests, immutable
+release and final application pin are required; casts or handwritten decoders
+are not an acceptable substitute.
 
 ## Definition of done
 

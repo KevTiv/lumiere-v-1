@@ -2,6 +2,13 @@
 
 Status: UI implementation staged; generated contracts release and integrated runtime acceptance pending.
 
+Executed candidate check: the full web typecheck fails because the
+contracts-owned typed-read generator's Accounting-only allowlist omits the four
+Manufacturing cost resources from `ResourceQueryRowMap`. The new operation
+inputs and general query registry are generated correctly. This needs a
+companion emitter change and release/pin; no decoder or generated binding has
+been hand-edited to conceal the gap.
+
 The manufacturing order overview reads immutable `mrp-production-costs` and `mrp-productivity-costs` through generated row decoders. It displays material cost, workcenter cost, total actual cost, output inventory value, variance and configured/unconfigured productivity rates. Missing or withheld amounts show unavailable; an absent close snapshot is explicit. Read denial and failures retain their distinct collection states. Exact MO/organization/company identity owns the snapshot, and duplicate snapshots fail visibly.
 
 Output links use the snapshot's exact output move IDs. A posted valuation links its exact `account_move_id` to Accounting / journal entries. Closed-order refresh invalidates cost and accounting collections together with finished stock.
