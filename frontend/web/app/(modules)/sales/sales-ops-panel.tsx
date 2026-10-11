@@ -16,7 +16,7 @@ import {
   useOperatingCompanyBigInt,
   useOperatingCompanyId,
 } from '@lumiere/query-hooks/hooks/use-operating-company'
-import { Button, FormModal } from '@lumiere/ui'
+import { Button, FormModal, formText, recordOptions, useFormDialog } from '@lumiere/ui'
 import type { FormConfig } from '@lumiere/ui'
 
 export type SalesOpsQueueId =
@@ -438,8 +438,11 @@ export function SalesOpsPanel({
       defaultValue: id.replace(/_/g, ' '),
     })
 
+  const { askForm, formDialog } = useFormDialog()
+
   return (
     <div className="flex flex-col gap-4 p-4" data-testid="sales-ops-panel">
+      {formDialog}
       <div className="flex flex-wrap gap-2">
         {QUEUE_IDS.map((id) => (
           <Button
@@ -475,11 +478,28 @@ export function SalesOpsPanel({
           disabled={!operatingCompanyId || refreshPromise.isPending}
           data-testid="sales-ops-refresh-promise"
           onClick={async () => {
-            const raw = window.prompt('Sale order id to refresh promise dates')
-            if (!raw?.trim()) return
+            const values = await askForm({
+              title: 'Refresh promise dates',
+              fields: [
+                {
+                  id: 'orderId',
+                  name: 'orderId',
+                  label: 'Sale order',
+                  type: 'select',
+                  required: true,
+                  searchable: true,
+                  options: recordOptions(orders, (order) =>
+                    String(order.reference ?? order.name ?? `#${rowId(order)}`),
+                    rowId,
+                  ),
+                },
+              ],
+            })
+            const orderId = formText(values?.orderId)
+            if (orderId == null) return
             try {
               setActionError(null)
-              await refreshPromise.mutateAsync(raw.trim())
+              await refreshPromise.mutateAsync(orderId)
             } catch (e) {
               setActionError(e instanceof Error ? e.message : String(e))
             }
@@ -770,17 +790,24 @@ export function SalesOpsPanel({
                         )
                         return
                       }
-                      const reason =
-                        typeof window !== 'undefined'
-                          ? (window
-                              .prompt(
-                                t('sales.ops.rejectReasonPrompt', {
-                                  defaultValue: 'Reason for rejection',
-                                }),
-                              )
-                              ?.trim() ?? '')
-                          : ''
-                      if (!reason) return
+                      const values = await askForm({
+                        title: t('sales.ops.reject', { defaultValue: 'Reject' }),
+                        submitLabel: t('sales.ops.reject', { defaultValue: 'Reject' }),
+                        fields: [
+                          {
+                            id: 'reason',
+                            name: 'reason',
+                            label: t('sales.ops.rejectReasonPrompt', {
+                              defaultValue: 'Reason for rejection',
+                            }),
+                            type: 'textarea',
+                            rows: 3,
+                            required: true,
+                          },
+                        ],
+                      })
+                      const reason = formText(values?.reason)
+                      if (reason == null) return
                       await rejectRequest.mutateAsync({
                         requestId: Number(pendingApprovalForSelected.id),
                         reason,

@@ -119,6 +119,37 @@ export function activeTabEntityTable(page: Page) {
   return page.locator('[role="tabpanel"]:visible [data-testid="entity-table"]').first()
 }
 
+/**
+ * Row actions only render once a row is selected. Select the first row of the
+ * active table when there is one and expect the actions; with an empty table
+ * expect none to be offered.
+ */
+export async function expectRowActionsOffered(page: Page, actionIds: readonly string[]) {
+  const table = activeTabEntityTable(page)
+  await expect(table).toBeVisible()
+  const firstRow = table.locator('[data-testid^="entity-row-"]').first()
+  const hasRow = await firstRow
+    .waitFor({ state: "visible", timeout: 5_000 })
+    .then(() => true)
+    .catch(() => false)
+  for (const actionId of actionIds) {
+    if (!hasRow) {
+      await expect(page.getByTestId(`entity-action-${actionId}`)).toHaveCount(0)
+    }
+  }
+  if (!hasRow) return
+  await firstRow.click()
+  for (const actionId of actionIds) {
+    await expect(page.getByTestId(`entity-action-${actionId}`)).toBeVisible()
+  }
+  // A row click may also open the record sheet; close it so the page stays usable.
+  const dialog = page.getByRole("dialog")
+  if (await dialog.isVisible().catch(() => false)) {
+    await page.keyboard.press("Escape")
+    await expect(dialog).toBeHidden()
+  }
+}
+
 /** Rows in a custom tab panel table (e.g. accounting InvoiceListView). */
 export function activeTabCustomTableRows(page: Page) {
   return page.locator('[role="tabpanel"]:visible table tbody tr')
@@ -273,6 +304,9 @@ export async function dismissBlockingDialogs(page: Page) {
       async () => {
         if ((await overlay.count()) === 0) return true
         await page.keyboard.press("Escape")
+        // An edited form asks before closing; this helper's job is to clear the screen.
+        const discard = page.getByTestId("discard-changes-confirm")
+        if (await discard.isVisible().catch(() => false)) await discard.click()
         return (await overlay.count()) === 0
       },
       { timeout: 15_000 },
@@ -337,9 +371,13 @@ export async function openTabAndCancelCreate(
   tabId: string,
   formId: string,
 ) {
-  await page.getByTestId(`module-tab-${moduleId}-${tabId}`).click()
+  const tab = page.getByTestId(`module-tab-${moduleId}-${tabId}`)
+  await tab.click()
+  await expect(tab).toHaveAttribute("aria-selected", "true")
+  // The tab switch also updates ?tab=, which can re-render the panel; click
+  // (unlike scrollIntoViewIfNeeded) re-resolves a replaced element.
   const createBtn = page.getByTestId(`module-create-${moduleId}-${tabId}`)
-  await createBtn.scrollIntoViewIfNeeded()
+  await expect(createBtn).toBeVisible()
   await createBtn.click()
   await expect(page.getByTestId(`form-modal-${formId}`)).toBeVisible()
   await page.getByTestId(`form-modal-${formId}`).getByRole("button", { name: /^cancel$/i }).click()
@@ -786,6 +824,28 @@ export async function selectEntityRowById(page: Page, id: number | string) {
 /** Wait until a selection-gated entity action is enabled (proves row context is applied). */
 export async function waitForEntityActionEnabled(page: Page, actionTestId: string) {
   await expect(page.getByTestId(actionTestId)).toBeEnabled({ timeout: 30_000 })
+}
+
+/** Open a sale order's own page and wait for its header. */
+export async function openSaleOrderPage(page: Page, orderId: number | string) {
+  await page.goto(`/sales/orders/${orderId}`)
+  await expect(page.getByTestId("sale-order-title")).toBeVisible({ timeout: 30_000 })
+}
+
+/** Start "Create invoice" from a sale order's page and wait for its form. */
+export async function openCreateInvoiceFromOrder(page: Page, orderId: number | string) {
+  await openSaleOrderPage(page, orderId)
+  const action = page.getByTestId("record-workflow-action-sales.order.create-invoice")
+  await expect(action).toBeEnabled({ timeout: 30_000 })
+  await action.click()
+  await expect(page.getByTestId("form-modal-create-invoice-from-sale-order")).toBeVisible({ timeout: 15_000 })
+}
+
+/** Confirm the table's confirmation dialog, shown after clicking a confirm-gated row action. */
+export async function acceptEntityActionConfirm(page: Page) {
+  const dialog = page.getByTestId("entity-action-confirm")
+  await expect(dialog).toBeVisible({ timeout: 15_000 })
+  await dialog.getByRole("button", { name: "Confirm", exact: true }).click()
 }
 
 /** Click a toolbar action and wait for the matching reducer HTTP call. */
@@ -2265,9 +2325,6 @@ export async function waitForOrgPermissionAbsent(
 
 export async function revokePermissionViaSettings(page: Page, permissionId: number) {
   await gotoModule(page, "/settings")
-  page.once("dialog", (dialog) => {
-    void dialog.accept()
-  })
   await page.getByTestId("settings-admin-action-revokePermission").click()
   await expect(page.getByTestId("form-modal-settings-revoke-permission")).toBeVisible()
   await fillField(page, "permissionId", String(permissionId))
@@ -2276,7 +2333,14 @@ export async function revokePermissionViaSettings(page: Page, permissionId: numb
       (r) => matchesOperationResponse(r, "revoke_permission") && r.ok(),
       { timeout: 30_000 },
     ),
-    submitForm(page, "settings-revoke-permission"),
+    (async () => {
+      // The form stays open while the in-app confirmation is showing, so click through it
+      // before waiting for the form to close (submitForm would time out first).
+      await page.getByTestId("form-submit-settings-revoke-permission").click()
+      await page.getByTestId("confirm-dialog-confirm").click()
+      await expect(page.getByTestId("form-modal-settings-revoke-permission")).toBeHidden({ timeout: 15_000 })
+      await expectNoAppError(page)
+    })(),
   ])
   expect(res.ok()).toBe(true)
 }

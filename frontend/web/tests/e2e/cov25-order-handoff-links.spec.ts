@@ -1,7 +1,9 @@
 import { expect, test } from "@playwright/test"
 import { saleOrderHref } from "@lumiere/erp-shared/record-links"
 
-import { chooseSelectOptionByLabel, fetchSalesInvoiceJournalLabel, fetchAccountSelectLabelByInternalType, gotoModule, scalarQueryId, selectEntityRowById, signIn, smokeName, submitForm } from "./helpers"
+import { chooseSelectOptionByLabel, fetchSalesInvoiceJournalLabel, fetchAccountSelectLabelByInternalType, gotoModule, scalarQueryId, selectEntityRowById, signIn, smokeName, submitForm,
+  openCreateInvoiceFromOrder,
+} from "./helpers"
 import { expectCanonicalPickingFocus } from "./inventory-picking-fixtures"
 import { clickCanonicalHandoff, openCanonicalHandoffs } from "./cov25-link-navigation"
 import { matchesOperationResponse } from "./operation-response"
@@ -56,10 +58,7 @@ test.describe("COV-25 sale order → delivery link", { tag: ["@p0", "@cov25", "@
     const receivable = await fetchAccountSelectLabelByInternalType(page, "receivable")
     await gotoModule(page, saleOrderHref(orderId), "sales")
     await expect(page.getByTestId("module-tab-sales-orders")).toHaveAttribute("aria-selected", "true")
-    await selectEntityRowById(page, orderId)
-    await expect(page.getByTestId("entity-action-create-invoice")).toBeEnabled()
-    await page.getByTestId("entity-action-create-invoice").click()
-    await expect(page.getByTestId("form-modal-create-invoice-from-sale-order")).toBeVisible()
+    await openCreateInvoiceFromOrder(page, orderId)
     await chooseSelectOptionByLabel(page, "journalId", journal)
     await chooseSelectOptionByLabel(page, "defaultIncomeAccountId", income)
     await chooseSelectOptionByLabel(page, "receivableAccountId", receivable)

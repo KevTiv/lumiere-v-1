@@ -23,6 +23,7 @@ import {
   waitForEntityActionEnabled,
   waitForSaleOrderBillableLines,
   waitForSaleOrderConfirmed,
+  openCreateInvoiceFromOrder,
 } from "./helpers"
 import { saleOrderHref } from "@lumiere/erp-shared/record-links"
 
@@ -363,14 +364,7 @@ test.describe("SAL-004: Full SO → Invoice creation flow", { tag: "@p0" }, () =
         .getByRole("textbox", { name: "Search records" })
         .fill(customerName)
 
-      await selectEntityRowById(page, orderId)
-
-      // ── Step 8: Click "Create Invoice" action ─────────────────────────────────
-      await waitForEntityActionEnabled(page, "entity-action-create-invoice")
-      await page.getByTestId("entity-action-create-invoice").click()
-      await expect(page.getByTestId("form-modal-create-invoice-from-sale-order")).toBeVisible({
-        timeout: 15_000,
-      })
+      await openCreateInvoiceFromOrder(page, orderId)
 
       // ── Step 9: Fill and submit the invoice creation form ─────────────────────
       await chooseSelectOptionByLabel(page, "journalId", journalLabel)

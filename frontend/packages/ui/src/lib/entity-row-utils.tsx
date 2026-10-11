@@ -5,8 +5,15 @@ import { Progress } from "../components/progress"
 import { Tooltip, TooltipContent, TooltipTrigger } from "../components/tooltip"
 import { cn } from "./utils"
 import { entryTableStatusDotClass } from "./theme-colors"
-import type { EntityViewConfig } from "./entity-view-types"
-import { getRowField, formatTimestampLike } from "./entity-row-values"
+import type { BadgeVariant, EntityViewConfig } from "./entity-view-types"
+import {
+  getRowField,
+  formatTimestampLike,
+  unwrapEntityValue,
+  humanizeEnumValue,
+  displayEntityValue,
+  statusTone,
+} from "./entity-row-values"
 export { getRowField, formatTimestampLike } from "./entity-row-values"
 
 export function getEntityRowKey(config: EntityViewConfig): string | undefined {
@@ -64,21 +71,45 @@ function isLikelyImageSrc(value: string): boolean {
   )
 }
 
+/**
+ * The ISO 4217 code in a row's currency field, upper-cased; undefined for anything else (missing,
+ * numeric ids, unknown codes) so callers fall back to the default currency.
+ */
+export function resolveCurrencyCode(raw: unknown): string | undefined {
+  const value = unwrapEntityValue(raw)
+  if (typeof value !== "string" || !/^[A-Za-z]{3}$/.test(value.trim())) return undefined
+  const code = value.trim().toUpperCase()
+  try {
+    new Intl.NumberFormat("en-US", { style: "currency", currency: code })
+    return code
+  } catch {
+    return undefined
+  }
+}
+
+export function formatCurrencyAmount(value: number, currencyCode?: string): string {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: resolveCurrencyCode(currencyCode) ?? "USD",
+  }).format(value)
+}
+
 export function formatEntityFieldValue(
-  value: unknown,
+  rawValue: unknown,
   type: string | undefined,
   badgeVariants?: Record<string, string>,
   badgeLabels?: Record<string, string>,
+  /** ISO code for `type: "currency"`; USD when absent or not a valid code. */
+  currencyCode?: string,
 ): ReactNode {
+  const value = unwrapEntityValue(rawValue)
   if (value === null || value === undefined || value === "") {
     return <span className="text-muted-foreground">—</span>
   }
 
   switch (type) {
     case "currency":
-      return typeof value === "number"
-        ? new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value)
-        : String(value)
+      return typeof value === "number" ? formatCurrencyAmount(value, currencyCode) : String(value)
 
     case "number":
       return typeof value === "number"
@@ -122,19 +153,15 @@ export function formatEntityFieldValue(
 
     case "badge": {
       const raw = String(value)
-      const variant = (badgeVariants?.[raw] ?? "secondary") as
-        | "default"
-        | "secondary"
-        | "destructive"
-        | "outline"
-      const label = badgeLabels?.[raw] ?? raw
+      const variant = (statusTone(raw) ?? badgeVariants?.[raw] ?? "secondary") as BadgeVariant
+      const label = badgeLabels?.[raw] ?? humanizeEnumValue(raw)
       return <Badge variant={variant}>{label}</Badge>
     }
 
     case "status": {
       const raw = String(value)
-      const variantKey = badgeVariants?.[raw] ?? "secondary"
-      const label = badgeLabels?.[raw] ?? raw
+      const variantKey = statusTone(raw) ?? badgeVariants?.[raw] ?? "secondary"
+      const label = badgeLabels?.[raw] ?? humanizeEnumValue(raw)
       return (
         <div className="flex items-center gap-2">
           <span className={cn("h-2 w-2 shrink-0 rounded-full", statusDotClass(variantKey))} />
@@ -172,6 +199,6 @@ export function formatEntityFieldValue(
     }
 
     default:
-      return String(value)
+      return displayEntityValue(value)
   }
 }

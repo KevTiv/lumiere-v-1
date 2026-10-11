@@ -1,6 +1,7 @@
 "use client"
 
-import { useState } from "react"
+import { useMemo, useState } from "react"
+import { useConfirmDialog } from "@lumiere/ui/hooks/use-confirm-dialog"
 import { useTranslation, i18n } from "@lumiere/i18n"
 import { DashboardHeader, FormModal, MissingOrganization, SettingsModule, type FormConfig } from "@lumiere/ui"
 import {
@@ -54,6 +55,10 @@ import type {
 import { GuidedImportWizard } from "@/lib/guided-import-wizard"
 import { useSettingsModuleSubscription } from "@/lib/module-subscription-hooks"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
+import { currencyOptionsFromRows } from "@/lib/form-lookup"
+import { recordOptions, withLinkedPickers } from "@/lib/linked-options"
+import { useCompanies } from "@lumiere/query-hooks/hooks/organization-company"
+import { useCurrencies } from "@lumiere/query-hooks/hooks/settings"
 
 type SettingsAction =
   | "createAuditRule"
@@ -636,11 +641,26 @@ function SettingsLoaded({
   title: string
   description: string
 }) {
+  const { confirm: confirmDialog, dialog: confirmDialogNode } = useConfirmDialog()
   useSettingsModuleSubscription()
   const { orgId } = orgBigInts(organizationId)
   const [activeAction, setActiveAction] = useState<SettingsAction | null>(null)
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
+
+  const { data: companyRows = [] } = useCompanies(organizationId, true)
+  const { data: currencyRows = [] } = useCurrencies()
+  const linkedOptions = useMemo(() => {
+    const companyOptions = recordOptions(companyRows as unknown as Record<string, unknown>[], (row) => row.name)
+    return {
+      companyId: companyOptions,
+      // Company hierarchy: the parent is another company.
+      parentId: companyOptions,
+      currencyId: currencyOptionsFromRows(currencyRows),
+    }
+  },
+    [companyRows, currencyRows],
+  )
 
   const createAuditRule = useCreateAuditRule(orgId)
   const updateAuditRule = useUpdateAuditRule(orgId)
@@ -759,7 +779,7 @@ function SettingsLoaded({
             formData.syncFrequencyMinutes === undefined || formData.syncFrequencyMinutes === "" ? undefined : Number(formData.syncFrequencyMinutes),
         })
       } else if (activeAction === "deleteIntegration") {
-        if (!confirm("Delete this integration?")) return
+        if (!(await confirmDialog({ description: "Delete this integration?" }))) return
         await deleteIntegration(
           orgId,
           toBigIntId(formData.integrationId, "Integration ID"),
@@ -788,7 +808,7 @@ function SettingsLoaded({
           mediaProvider: optionalText(formData.mediaProvider),
         })
       } else if (activeAction === "deleteWhatsappBusinessAccount") {
-        if (!confirm("Delete this WhatsApp Business account?")) return
+        if (!(await confirmDialog({ description: "Delete this WhatsApp Business account?" }))) return
         await deleteWhatsAppBusinessAccount(orgId, toBigIntId(formData.accountId, "Account ID"))
       } else if (activeAction === "setWhatsappPrimaryAccount") {
         await setWhatsAppPrimaryAccount(orgId, toBigIntId(formData.accountId, "Account ID"))
@@ -802,7 +822,7 @@ function SettingsLoaded({
           effect: String(formData.effect ?? "Allow") as "Allow" | "Deny",
         })
       } else if (activeAction === "revokePermission") {
-        if (!confirm("Revoke this permission?")) return
+        if (!(await confirmDialog({ description: "Revoke this permission?" }))) return
         await revokePermission(orgId, toBigIntId(formData.permissionId, "Permission ID"))
       } else if (activeAction === "archiveAiChatSession") {
         await archiveAiChatSession(
@@ -849,7 +869,7 @@ function SettingsLoaded({
           },
         })
       } else if (activeAction === "deleteCompany") {
-        if (!confirm("Delete this company?")) return
+        if (!(await confirmDialog({ description: "Delete this company?" }))) return
         await deleteCompany.mutateAsync({
           companyId: toBigIntId(formData.companyId, "Company ID"),
           organizationId,
@@ -997,9 +1017,9 @@ function SettingsLoaded({
       <section className="rounded-xl border border-dashed border-border bg-card">
         <div className="border-b border-border px-4 py-4">
           <p className="text-xs font-medium uppercase tracking-[0.08em] text-muted-foreground">Advanced</p>
-          <h2 className="mt-1 text-base font-semibold tracking-[-0.01em]">Admin action coverage</h2>
+          <h2 className="mt-1 text-base font-semibold tracking-[-0.01em]">More administrative actions</h2>
           <p className="mt-1 max-w-2xl text-sm leading-6 text-muted-foreground">
-            Direct form-builder surfaces for settings reducers that are not yet embedded in the polished settings sections.
+            Less common administration tasks that are not part of the sections above.
           </p>
         </div>
         <div className="grid gap-2 p-4 md:grid-cols-2 xl:grid-cols-3">
@@ -1027,13 +1047,14 @@ function SettingsLoaded({
               setSubmitError(null)
             }
           }}
-          config={settingsActionForms[activeAction]}
+          config={withLinkedPickers(settingsActionForms[activeAction], linkedOptions)}
           isPending={isPending}
           closeOnSubmit={false}
           submitError={submitError}
           onSubmit={handleSubmit}
         />
       ) : null}
+      {confirmDialogNode}
     </div>
   )
 }

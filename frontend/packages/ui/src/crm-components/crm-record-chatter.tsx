@@ -35,6 +35,12 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { cn } from "@/lib/utils"
+import { showWorkflowToast } from "../lib/workflow-toast"
+import {
+  ChatterAttachmentPicker,
+  useChatterAttachments,
+  useChatterUploader,
+} from "./chatter-attachments"
 import {
   formatTimelineDate,
   mergeRecordTimeline,
@@ -60,6 +66,14 @@ function messageTypeLabel(v: unknown): string {
   if (s === "email") return "email"
   if (s === "notification" || s === "user_notification") return "notification"
   return s || "message"
+}
+
+function reportError(error: unknown, title: string) {
+  showWorkflowToast({
+    kind: "error",
+    title,
+    description: error instanceof Error ? error.message : String(error),
+  })
 }
 
 function parseAttachmentIds(raw: string): bigint[] {
@@ -138,6 +152,8 @@ export function CrmRecordChatter({
     }>
   >([])
   const [following, setFollowing] = useState(false)
+  const upload = useChatterUploader(organizationId)
+  const attachments = useChatterAttachments(upload, { resModel, resId })
 
   const reloadMessages = useCallback(() => {
     if (!organizationId || !resModel) {
@@ -297,11 +313,23 @@ export function CrmRecordChatter({
     const body = noteBody.trim()
     if (!body || !identity) return
     let attachmentIds: bigint[] = []
-    if (attachmentIdsRaw.trim()) {
+    if (upload) {
+      try {
+        setBusy(true)
+        const uploaded = await attachments.uploadAll()
+        if (!uploaded) {
+          reportError(new Error(t("crm.chatter.attachmentsFailed", { defaultValue: "Some files failed to upload. Remove them or retry." })), t("crm.chatter.postNote"))
+          return
+        }
+        attachmentIds = uploaded
+      } finally {
+        setBusy(false)
+      }
+    } else if (attachmentIdsRaw.trim()) {
       try {
         attachmentIds = parseAttachmentIds(attachmentIdsRaw)
       } catch {
-        window.alert(t("crm.chatter.attachmentIdsInvalid"))
+        reportError(new Error(t("crm.chatter.attachmentIdsInvalid")), t("crm.chatter.postNote"))
         return
       }
     }
@@ -317,9 +345,10 @@ export function CrmRecordChatter({
       })
       setNoteBody("")
       setAttachmentIdsRaw("")
+      attachments.reset()
       reloadMessages()
     } catch (e) {
-      window.alert(e instanceof Error ? e.message : String(e))
+      reportError(e, t("crm.chatter.postNote"))
     } finally {
       setBusy(false)
     }
@@ -349,7 +378,7 @@ export function CrmRecordChatter({
       setActivityDeadline("")
       reloadActivities()
     } catch (e) {
-      window.alert(e instanceof Error ? e.message : String(e))
+      reportError(e, t("crm.chatter.scheduleActivity"))
     } finally {
       setBusy(false)
     }
@@ -361,7 +390,7 @@ export function CrmRecordChatter({
       await completeActivity.mutateAsync(activityId)
       reloadActivities()
     } catch (e) {
-      window.alert(e instanceof Error ? e.message : String(e))
+      reportError(e, t("crm.chatter.markDone"))
     } finally {
       setBusy(false)
     }
@@ -377,12 +406,16 @@ export function CrmRecordChatter({
         await subscribeToRecord(org, resModel, resId, [...FOLLOW_SUBTYPES])
       }
     } catch (e) {
-      window.alert(e instanceof Error ? e.message : String(e))
+      reportError(e, t("crm.chatter.follow"))
     } finally {
       setBusy(false)
       reloadFollower()
     }
   }
+
+  // The backend attaches activities only to contacts, leads and opportunities. On any other
+  // record a scheduled activity would be saved unattached and never show here, so don't offer it.
+  const canScheduleActivities = crmActivityTargetFor(resModel, resId) !== undefined
 
   const heading = useMemo(() => {
     if (recordTitle?.trim()) return recordTitle.trim()
@@ -422,12 +455,21 @@ export function CrmRecordChatter({
           className="resize-y min-h-[4.5rem]"
           data-testid="record-chatter-note"
         />
-        <input
-          className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm"
-          placeholder={t("crm.chatter.attachmentIdsPlaceholder")}
-          value={attachmentIdsRaw}
-          onChange={(e) => setAttachmentIdsRaw(e.target.value)}
-        />
+        {upload ? (
+          <ChatterAttachmentPicker
+            items={attachments.items}
+            onAdd={attachments.add}
+            onRemove={attachments.remove}
+            disabled={busy}
+          />
+        ) : (
+          <input
+            className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm"
+            placeholder={t("crm.chatter.attachmentIdsPlaceholder")}
+            value={attachmentIdsRaw}
+            onChange={(e) => setAttachmentIdsRaw(e.target.value)}
+          />
+        )}
         <Button
           type="button"
           size="sm"
@@ -439,6 +481,7 @@ export function CrmRecordChatter({
         </Button>
       </div>
 
+      {canScheduleActivities ? (
       <div className="space-y-3 rounded-md border p-3 bg-muted/20">
         <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
           {t("crm.chatter.logActivity")}
@@ -501,6 +544,7 @@ export function CrmRecordChatter({
           {t("crm.chatter.scheduleActivity")}
         </Button>
       </div>
+      ) : null}
 
       <div className="border-t pt-3 space-y-2 max-h-72 overflow-y-auto">
         <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">

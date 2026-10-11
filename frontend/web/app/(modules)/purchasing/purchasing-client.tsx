@@ -15,14 +15,9 @@ import {
   workflowActionsToEntityActions,
   EntityView,
   newPurchaseOrderForm,
-  editPurchaseOrderForm,
   newPurchaseRequisitionForm,
   newPartnerBankForm,
   editPartnerBankForm,
-  addPurchaseOrderLineForm,
-  editPurchaseOrderLineForm,
-  receivePurchaseOrderLineForm,
-  invoicePurchaseOrderLineForm,
   newLandedCostForm,
   editLandedCostForm,
   addLandedCostLineForm,
@@ -30,7 +25,6 @@ import {
   newSupplierIntakeForm,
   reviewSupplierIntakeForm,
   editSupplierIntakeForm,
-  createBillFromPurchaseOrderForm,
   MissingOrganization,
   mergeSelectOptionsForFields,
   mergeFieldDefaultValues,
@@ -55,12 +49,16 @@ import {
   percentChange,
   previousPeriodMs,
   timeRangeToMs,
+  formNumber,
+  formText,
+  useFormDialog,
 } from "@lumiere/ui"
 import type { EntityRow, EntityViewConfig, EntityTableConfig, EntityRecordSheetConfig, FormConfig, ModuleConfig } from "@lumiere/ui"
 import type { Product, Uom } from "@lumiere/stdb/types"
 import { purchasingModuleConfig } from "@/lib/module-dashboard-configs"
 import { usePurchasingModuleSubscription } from "@/lib/module-subscription-hooks"
 import { PurchasingOpsSod } from "./purchasing-ops-sod"
+import { purchaseOrderLineCanBeRemoved, requisitionCanCreateRfq } from "./purchasing-action-gates"
 import { PurchasingBlanketWorkspace } from "./purchasing-blanket-workspace"
 import {
   PurchasingOperationDialogs,
@@ -76,6 +74,17 @@ import { RecordDocumentAttachments } from "../../../components/record-document-a
 import { chatterTargetFromRow, type ChatterTarget } from "@/lib/record-chatter"
 import { groupBy } from "@/lib/utils"
 import { useWorkflowSurface } from "@/hooks/use-workflow-surface"
+import { purchaseOrderRecordHref } from "./purchase-order-record"
+import {
+  CreateBillFromPurchaseOrderDialog,
+  billLookupOptions,
+  purchaseOrderFormConfigs,
+} from "./purchase-order-dialogs"
+import {
+  purchaseOrderHeaderDefaults,
+  toReceiveLineInput,
+  toUpdatePurchaseOrderHeaderArgs,
+} from "./purchase-order-forms"
 import { usePurchasingWorkflow } from "@lumiere/query-hooks/hooks/purchasing-workflow"
 import { recordRef, type TransitionNotice } from "@lumiere/erp-workflows"
 import {
@@ -160,6 +169,7 @@ import {
   contactRowsToVendorSelectOptions,
   pricelistRowsToSelectOptions,
   productRowsToSelectOptions,
+  warehouseRowsToSelectOptions,
   uomRowsToSelectOptions,
   purchaseOrderRowsToSelectOptions,
   purchaseOrderLineRowsToEditOptions,
@@ -167,15 +177,12 @@ import {
   purchaseOrderLineRowsToInvoiceOptions,
   partnerBankRowsToSelectOptions,
   departmentRowsToSelectOptions,
-  accountJournalRowsToSelectOptions,
-  accountAccountRowsToSelectOptions,
   paymentTermRowsToSelectOptions,
   currencyOptionsFromRows,
 } from "@/lib/form-lookup"
 import {
   toAddLandedCostLineParams,
   toAddPurchaseOrderLineParams,
-  toCreateBillFromPurchaseOrderParams,
   toCreateLandedCostParams,
   toCreatePurchaseOrderParams,
   toCreatePurchaseRequisitionParams,
@@ -214,28 +221,6 @@ function recordTimestampMs(row: Record<string, unknown>): number {
   const n = Number(raw)
   if (!Number.isFinite(n) || n <= 0) return 0
   return n > 1e15 ? n / 1000 : n
-}
-
-function journalTypeTag(row: { type?: unknown; type_?: unknown }): string {
-  const v = row.type_ ?? row.type
-  if (v != null && typeof v === "object" && "tag" in v) return String((v as { tag: string }).tag)
-  return String(v ?? "")
-}
-
-function accountInternalTypeTag(row: Record<string, unknown>): string {
-  const v = row.internalType ?? row.internal_type
-  if (v != null && typeof v === "object" && "tag" in v) {
-    return String((v as { tag: string }).tag).toLowerCase()
-  }
-  return String(v ?? "").toLowerCase()
-}
-
-function accountInternalGroupTag(row: EntityRow): string {
-  const v = row.internalGroup ?? row.internal_group
-  if (v != null && typeof v === "object" && "tag" in v) {
-    return String((v as { tag: string }).tag).toLowerCase()
-  }
-  return String(v ?? "").toLowerCase()
 }
 
 function landedCostState(row: Record<string, unknown>): string {
@@ -465,6 +450,7 @@ function PurchasingClientLoaded({
   const { currentUser } = useRBAC()
   const runtimeRoleId = currentUser?.roles[0]
   const { orgId } = orgBigInts(organizationId)
+  const { askForm, formDialog } = useFormDialog()
 
   const purchaseOrdersTableRuntime = useRuntimeListConfig({
     base: purchaseOrdersTableConfig(t).view as EntityTableConfig,
@@ -476,7 +462,7 @@ function PurchasingClientLoaded({
   })
   const moduleConfig = useMemo(() => purchasingModuleConfig(t), [t])
   const purchasingTabIds = useMemo(
-    () => [...moduleConfig.tabs.map((tab) => tab.id), "rfqs", "rfq-bids", "purchase-returns", "landed-costs", "supplier-intakes", "blanket-orders"],
+    () => [...moduleConfig.tabs.map((tab) => tab.id), "rfqs", "rfq-bids", "purchase-returns", "landed-costs", "supplier-intakes", "blanket-orders", "operations"],
     [moduleConfig],
   )
   const { activeTab, setActiveTab } = useModuleTab(
@@ -492,7 +478,6 @@ function PurchasingClientLoaded({
   const [formModalKey, setFormModalKey] = useState(0)
   const [csvKind, setCsvKind] = useState<PurchasingCsvImportKind | null>(null)
   const [billOrderId, setBillOrderId] = useState<bigint | null>(null)
-  const [billOrderError, setBillOrderError] = useState<string | null>(null)
   const [chatterTarget, setChatterTarget] = useState<ChatterTarget | null>(null)
   const [dashboardTimeRange, setDashboardTimeRange] = useState<TimeRangeValue>("30d")
   const [blanketActionRequest, setBlanketActionRequest] = useState<{
@@ -518,6 +503,13 @@ function PurchasingClientLoaded({
   }, [quickActionForm])
 
   const { data: orders = [], isLoading: ordersLoading } = usePurchaseOrders(orgId, initialOrders)
+  const billOrder = useMemo(
+    () =>
+      billOrderId == null
+        ? undefined
+        : (orders as Record<string, unknown>[]).find((order) => String(order.id) === String(billOrderId)),
+    [orders, billOrderId],
+  )
   const { data: ordersToApprove = [] } = usePurchaseOrdersToApprove(orgId)
   const { data: ordersPartialReceipt = [] } = usePurchaseOrdersPartialReceipt(orgId)
   const { data: linesOverBilled = [] } = usePurchaseOrderLinesOverBilled(orgId)
@@ -730,21 +722,16 @@ function PurchasingClientLoaded({
   }
 
   const promptCreatePurchaseContract = async () => {
-    const name =
-      window
-        .prompt(
-          t("purchasing.ops.prompt.contractName", {
-            defaultValue: "Purchase contract name",
-          }),
-        )
-        ?.trim() ?? ""
-    const partnerId =
-      window
-        .prompt(
-          t("purchasing.ops.prompt.partnerId", { defaultValue: "Vendor partner id" }),
-        )
-        ?.trim() ?? ""
-    if (!name || !partnerId) return
+    const values = await askForm({
+      title: t("purchasing.ops.createContract", { defaultValue: "New purchase contract" }),
+      fields: [
+        { id: "name", name: "name", label: t("purchasing.ops.prompt.contractName", { defaultValue: "Purchase contract name" }), type: "text", required: true },
+        { id: "partnerId", name: "partnerId", label: t("purchasing.ops.prompt.partnerId", { defaultValue: "Vendor" }), type: "select", required: true, searchable: true, options: vendorFieldOptions },
+      ],
+    })
+    const name = formText(values?.name)
+    const partnerId = formText(values?.partnerId)
+    if (name == null || partnerId == null) return
     await createPurchaseContract.mutateAsync({
       name,
       partnerId: BigInt(partnerId),
@@ -755,32 +742,18 @@ function PurchasingClientLoaded({
   }
 
   const promptUpsertVendorScorecard = async () => {
-    const partnerId =
-      window
-        .prompt(
-          t("purchasing.ops.prompt.partnerId", { defaultValue: "Vendor partner id" }),
-        )
-        ?.trim() ?? ""
-    const otifRaw =
-      window.prompt(
-        t("purchasing.ops.prompt.otifScore", {
-          defaultValue: "OTIF score (0–100)",
-        }),
-        "95",
-      ) ?? ""
-    const qualityRaw =
-      window.prompt(
-        t("purchasing.ops.prompt.qualityScore", {
-          defaultValue: "Quality score (0–100)",
-        }),
-        "90",
-      ) ?? ""
-    if (!partnerId) return
-    const otifScore = Number(otifRaw)
-    const qualityScore = Number(qualityRaw)
-    if (!Number.isFinite(otifScore) || !Number.isFinite(qualityScore)) {
-      throw new Error("Invalid score")
-    }
+    const values = await askForm({
+      title: t("purchasing.ops.vendorScorecard", { defaultValue: "Vendor scorecard" }),
+      fields: [
+        { id: "partnerId", name: "partnerId", label: t("purchasing.ops.prompt.partnerId", { defaultValue: "Vendor" }), type: "select", required: true, searchable: true, options: vendorFieldOptions },
+        { id: "otif", name: "otif", label: t("purchasing.ops.prompt.otifScore", { defaultValue: "OTIF score (0–100)" }), type: "number", required: true, min: 0, max: 100, defaultValue: 95, width: "1/2" },
+        { id: "quality", name: "quality", label: t("purchasing.ops.prompt.qualityScore", { defaultValue: "Quality score (0–100)" }), type: "number", required: true, min: 0, max: 100, defaultValue: 90, width: "1/2" },
+      ],
+    })
+    const partnerId = formText(values?.partnerId)
+    const otifScore = formNumber(values?.otif)
+    const qualityScore = formNumber(values?.quality)
+    if (partnerId == null || otifScore == null || qualityScore == null) return
     await upsertVendorScorecard.mutateAsync({
       partnerId: BigInt(partnerId),
       otifScore,
@@ -790,22 +763,28 @@ function PurchasingClientLoaded({
   }
 
   const promptSetVendorRiskFlag = async () => {
-    const partnerId =
-      window
-        .prompt(
-          t("purchasing.ops.prompt.partnerId", { defaultValue: "Vendor partner id" }),
-        )
-        ?.trim() ?? ""
-    const riskLevel =
-      window
-        .prompt(
-          t("purchasing.ops.prompt.riskLevel", {
-            defaultValue: "Risk level (e.g. low, medium, high)",
-          }),
-          "medium",
-        )
-        ?.trim() ?? ""
-    if (!partnerId || !riskLevel) return
+    const values = await askForm({
+      title: t("purchasing.ops.vendorRiskFlag", { defaultValue: "Flag vendor risk" }),
+      fields: [
+        { id: "partnerId", name: "partnerId", label: t("purchasing.ops.prompt.partnerId", { defaultValue: "Vendor" }), type: "select", required: true, searchable: true, options: vendorFieldOptions },
+        {
+          id: "riskLevel",
+          name: "riskLevel",
+          label: t("purchasing.ops.prompt.riskLevel", { defaultValue: "Risk level" }),
+          type: "select",
+          required: true,
+          defaultValue: "medium",
+          options: [
+            { value: "low", label: "Low" },
+            { value: "medium", label: "Medium" },
+            { value: "high", label: "High" },
+          ],
+        },
+      ],
+    })
+    const partnerId = formText(values?.partnerId)
+    const riskLevel = formText(values?.riskLevel)
+    if (partnerId == null || riskLevel == null) return
     await setVendorRiskFlag.mutateAsync({
       partnerId: BigInt(partnerId),
       isFlagged: true,
@@ -816,33 +795,20 @@ function PurchasingClientLoaded({
   }
 
   const promptCreateConsignmentAgreement = async () => {
-    const name =
-      window
-        .prompt(
-          t("purchasing.ops.prompt.consignmentName", {
-            defaultValue: "Consignment agreement name",
-          }),
-        )
-        ?.trim() ?? ""
-    const partnerId =
-      window
-        .prompt(
-          t("purchasing.ops.prompt.partnerId", { defaultValue: "Vendor partner id" }),
-        )
-        ?.trim() ?? ""
-    const productId =
-      window
-        .prompt(
-          t("purchasing.ops.prompt.productId", { defaultValue: "Product id" }),
-        )
-        ?.trim() ?? ""
-    const warehouseId =
-      window
-        .prompt(
-          t("purchasing.ops.prompt.warehouseId", { defaultValue: "Warehouse id" }),
-        )
-        ?.trim() ?? ""
-    if (!name || !partnerId || !productId || !warehouseId) return
+    const values = await askForm({
+      title: t("purchasing.ops.createConsignment", { defaultValue: "New consignment agreement" }),
+      fields: [
+        { id: "name", name: "name", label: t("purchasing.ops.prompt.consignmentName", { defaultValue: "Consignment agreement name" }), type: "text", required: true },
+        { id: "partnerId", name: "partnerId", label: t("purchasing.ops.prompt.partnerId", { defaultValue: "Vendor" }), type: "select", required: true, searchable: true, options: vendorFieldOptions },
+        { id: "productId", name: "productId", label: t("purchasing.ops.prompt.productId", { defaultValue: "Product" }), type: "select", required: true, searchable: true, options: productFieldOptions },
+        { id: "warehouseId", name: "warehouseId", label: t("purchasing.ops.prompt.warehouseId", { defaultValue: "Warehouse" }), type: "select", required: true, options: warehouseSelectOptions },
+      ],
+    })
+    const name = formText(values?.name)
+    const partnerId = formText(values?.partnerId)
+    const productId = formText(values?.productId)
+    const warehouseId = formText(values?.warehouseId)
+    if (name == null || partnerId == null || productId == null || warehouseId == null) return
     await createConsignmentAgreement.mutateAsync({
       name,
       partnerId: BigInt(partnerId),
@@ -852,24 +818,22 @@ function PurchasingClientLoaded({
     })
   }
 
+  // Users are identified by their 64-character identity hex, which no list here carries yet.
   const promptSetApprovalDelegate = async () => {
-    const principalIdentity =
-      window
-        .prompt(
-          t("purchasing.ops.prompt.principalIdentity", {
-            defaultValue: "Principal identity hex (64 chars)",
-          }),
-        )
-        ?.trim() ?? ""
-    const delegateIdentity =
-      window
-        .prompt(
-          t("purchasing.ops.prompt.delegateIdentity", {
-            defaultValue: "Delegate identity hex (64 chars)",
-          }),
-        )
-        ?.trim() ?? ""
-    if (!principalIdentity || !delegateIdentity) return
+    const hex64 = (value: unknown) =>
+      /^[0-9a-fA-F]{64}$/.test(String(value ?? "").trim())
+        ? null
+        : t("purchasing.ops.identityHexInvalid", { defaultValue: "Enter the 64-character identity hex" })
+    const values = await askForm({
+      title: t("purchasing.ops.approvalDelegate", { defaultValue: "Set approval delegate" }),
+      fields: [
+        { id: "principal", name: "principal", label: t("purchasing.ops.prompt.principalIdentity", { defaultValue: "Principal identity hex (64 chars)" }), type: "text", required: true, validation: { custom: hex64 } },
+        { id: "delegate", name: "delegate", label: t("purchasing.ops.prompt.delegateIdentity", { defaultValue: "Delegate identity hex (64 chars)" }), type: "text", required: true, validation: { custom: hex64 } },
+      ],
+    })
+    const principalIdentity = formText(values?.principal)
+    const delegateIdentity = formText(values?.delegate)
+    if (principalIdentity == null || delegateIdentity == null) return
     await setPurchaseApprovalDelegate.mutateAsync({
       principalIdentity,
       delegateIdentity,
@@ -879,24 +843,16 @@ function PurchasingClientLoaded({
   }
 
   const promptSetCommodityPriceIndex = async () => {
-    const code =
-      window
-        .prompt(
-          t("purchasing.ops.prompt.commodityCode", {
-            defaultValue: "Commodity code (e.g. WTI, CU)",
-          }),
-        )
-        ?.trim() ?? ""
-    const rateRaw =
-      window.prompt(
-        t("purchasing.ops.prompt.commodityRate", {
-          defaultValue: "Rate",
-        }),
-        "1",
-      ) ?? ""
-    if (!code) return
-    const rate = Number(rateRaw)
-    if (!Number.isFinite(rate)) throw new Error("Invalid rate")
+    const values = await askForm({
+      title: t("purchasing.ops.commodityPriceIndex", { defaultValue: "Commodity price index" }),
+      fields: [
+        { id: "code", name: "code", label: t("purchasing.ops.prompt.commodityCode", { defaultValue: "Commodity code (e.g. WTI, CU)" }), type: "text", required: true },
+        { id: "rate", name: "rate", label: t("purchasing.ops.prompt.commodityRate", { defaultValue: "Rate" }), type: "number", required: true, step: 0.0001, defaultValue: 1 },
+      ],
+    })
+    const code = formText(values?.code)
+    const rate = formNumber(values?.rate)
+    if (code == null || rate == null) return
     await setCommodityPriceIndex.mutateAsync({
       code,
       rate,
@@ -906,42 +862,24 @@ function PurchasingClientLoaded({
   }
 
   const promptCreateIntegrationIntent = async () => {
-    const provider =
-      window
-        .prompt(
-          t("purchasing.ops.prompt.intentProvider", {
-            defaultValue: "Provider (e.g. customs, e-invoice)",
-          }),
-          "customs",
-        )
-        ?.trim() ?? ""
-    const intentType =
-      window
-        .prompt(
-          t("purchasing.ops.prompt.intentType", {
-            defaultValue: "Intent type (e.g. submit, declare)",
-          }),
-          "submit",
-        )
-        ?.trim() ?? ""
-    const orderRaw =
-      window
-        .prompt(
-          t("purchasing.ops.prompt.intentPoId", {
-            defaultValue: "Purchase order id (optional)",
-          }),
-        )
-        ?.trim() ?? ""
-    const idempotencyKey =
-      window
-        .prompt(
-          t("purchasing.ops.prompt.idempotencyKey", {
-            defaultValue: "Idempotency key",
-          }),
-          `pur-intent-${Date.now()}`,
-        )
-        ?.trim() ?? ""
-    if (!provider || !intentType || !idempotencyKey) return
+    const orderOptions = [
+      { value: "", label: t("purchasing.ops.noOrder", { defaultValue: "No purchase order" }) },
+      ...purchaseOrderRowsToSelectOptions(orders as Record<string, unknown>[]),
+    ]
+    const values = await askForm({
+      title: t("purchasing.ops.createIntegrationIntent", { defaultValue: "New integration intent" }),
+      fields: [
+        { id: "provider", name: "provider", label: t("purchasing.ops.prompt.intentProvider", { defaultValue: "Provider (e.g. customs, e-invoice)" }), type: "text", required: true, defaultValue: "customs" },
+        { id: "intentType", name: "intentType", label: t("purchasing.ops.prompt.intentType", { defaultValue: "Intent type (e.g. submit, declare)" }), type: "text", required: true, defaultValue: "submit" },
+        { id: "orderId", name: "orderId", label: t("purchasing.ops.prompt.intentPoId", { defaultValue: "Purchase order (optional)" }), type: "select", searchable: true, options: orderOptions },
+        { id: "idempotencyKey", name: "idempotencyKey", label: t("purchasing.ops.prompt.idempotencyKey", { defaultValue: "Idempotency key" }), type: "text", required: true, defaultValue: `pur-intent-${Date.now()}` },
+      ],
+    })
+    const provider = formText(values?.provider)
+    const intentType = formText(values?.intentType)
+    const idempotencyKey = formText(values?.idempotencyKey)
+    if (provider == null || intentType == null || idempotencyKey == null) return
+    const orderRaw = formText(values?.orderId)
     await createPurchasingIntegrationIntent.mutateAsync({
       provider,
       intentType,
@@ -952,38 +890,24 @@ function PurchasingClientLoaded({
     })
   }
 
+  // Integration intents have no list query yet, so an intent is still identified by its id.
   const promptRecordIntegrationResult = async () => {
-    const intentId =
-      window
-        .prompt(
-          t("purchasing.ops.prompt.intentId", {
-            defaultValue: "Integration intent id",
-          }),
-        )
-        ?.trim() ?? ""
-    const status =
-      window
-        .prompt(
-          t("purchasing.ops.prompt.intentStatus", {
-            defaultValue: "Status (e.g. succeeded, failed)",
-          }),
-          "succeeded",
-        )
-        ?.trim() ?? ""
-    if (!intentId || !status) return
-    const externalReference =
-      window
-        .prompt(
-          t("purchasing.ops.prompt.externalRef", {
-            defaultValue: "External reference (optional)",
-          }),
-        )
-        ?.trim() || null
+    const values = await askForm({
+      title: t("purchasing.ops.recordIntegrationResult", { defaultValue: "Record integration result" }),
+      fields: [
+        { id: "intentId", name: "intentId", label: t("purchasing.ops.prompt.intentId", { defaultValue: "Integration intent id" }), type: "number", required: true, min: 1 },
+        { id: "status", name: "status", label: t("purchasing.ops.prompt.intentStatus", { defaultValue: "Status (e.g. succeeded, failed)" }), type: "text", required: true, defaultValue: "succeeded" },
+        { id: "externalReference", name: "externalReference", label: t("purchasing.ops.prompt.externalRef", { defaultValue: "External reference (optional)" }), type: "text" },
+      ],
+    })
+    const intentId = formText(values?.intentId)
+    const status = formText(values?.status)
+    if (intentId == null || status == null) return
     await recordPurchasingIntegrationResult.mutateAsync({
       intentId,
       params: {
         status,
-        externalReference,
+        externalReference: formText(values?.externalReference) ?? null,
         lastError: status === "failed" ? "recorded via Ops" : null,
         metadata: null,
       },
@@ -1037,67 +961,25 @@ function PurchasingClientLoaded({
     return [{ value: "", label: t("common.lookup.noPricelists"), disabled: true }]
   }, [pricelists, t])
 
+  const warehouseSelectOptions = useMemo(() => {
+    const fromApi = warehouseRowsToSelectOptions(warehouses as Record<string, unknown>[])
+    if (fromApi.length > 0) return fromApi
+    return [{ value: "", label: t("common.lookup.noWarehouses", { defaultValue: "No warehouses" }), disabled: true }]
+  }, [warehouses, t])
+
   const productFieldOptions = useMemo(() => {
     const fromApi = productRowsToSelectOptions(products)
     if (fromApi.length > 0) return fromApi
     return [{ value: "", label: t("common.lookup.noProducts"), disabled: true }]
   }, [products, t])
 
-  const purchaseJournalFieldOptions = useMemo(() => {
-    const purchaseRows = accountJournals.filter(
-      (row) => journalTypeTag(row) === "Purchase" && row.active !== false,
-    )
-    const fromApi = accountJournalRowsToSelectOptions(purchaseRows)
-    if (fromApi.length > 0) return fromApi
-    return [
-      {
-        value: "",
-        label: t("purchasing.forms.createBillFromOrder.noJournals"),
-        disabled: true,
-      },
-    ]
-  }, [accountJournals, t])
-
-  const expenseAccountFieldOptions = useMemo(() => {
-    const expenseRows = (accountAccounts as EntityRow[]).filter(
-      (row) => accountInternalGroupTag(row) === "expense",
-    )
-    const fromApi = accountAccountRowsToSelectOptions(
-      expenseRows,
-    )
-    if (fromApi.length > 0) return fromApi
-    return [
-      {
-        value: "",
-        label: t("purchasing.forms.createBillFromOrder.noAccounts"),
-        disabled: true,
-      },
-    ]
-  }, [accountAccounts, t])
-
-  const payableAccountFieldOptions = useMemo(() => {
-    const payableRows = (accountAccounts as Record<string, unknown>[]).filter(
-      (row) => accountInternalTypeTag(row) === "payable",
-    )
-    const fromApi = accountAccountRowsToSelectOptions(payableRows)
-    if (fromApi.length > 0) return fromApi
-    return [
-      {
-        value: "",
-        label: t("purchasing.forms.createBillFromOrder.noPayableAccounts"),
-        disabled: true,
-      },
-    ]
-  }, [accountAccounts, t])
-
-  const createBillFormConfig = useMemo(
-    () =>
-      mergeSelectOptionsForFields(createBillFromPurchaseOrderForm(t), {
-        journalId: purchaseJournalFieldOptions,
-        defaultExpenseAccountId: expenseAccountFieldOptions,
-        payableAccountId: payableAccountFieldOptions,
-      }),
-    [t, purchaseJournalFieldOptions, expenseAccountFieldOptions, payableAccountFieldOptions],
+  const {
+    journalOptions: purchaseJournalFieldOptions,
+    expenseOptions: expenseAccountFieldOptions,
+    payableOptions: payableAccountFieldOptions,
+  } = useMemo(
+    () => billLookupOptions(t, accountJournals as Record<string, unknown>[], accountAccounts as Record<string, unknown>[]),
+    [t, accountJournals, accountAccounts],
   )
 
   const uomFieldOptions = useMemo(() => {
@@ -1144,12 +1026,14 @@ function PurchasingClientLoaded({
   )
 
   const vendorLabelById = useMemo(() => {
+    // Any contact can be a PO partner, not only those flagged as vendors.
     const map = new Map<string, string>()
-    for (const vendor of vendors) {
-      map.set(String(vendor.id), String(vendor.name ?? vendor.displayName ?? vendor.id))
+    for (const contact of [...(allContacts as Record<string, unknown>[]), ...(vendors as Record<string, unknown>[])]) {
+      const label = contact.name ?? contact.displayName
+      if (contact.id != null && label != null) map.set(String(contact.id), String(label))
     }
     return map
-  }, [vendors])
+  }, [allContacts, vendors])
 
   const purchaseOrderRecordSheet = useMemo((): EntityRecordSheetConfig => {
     const status = purchaseOrderStatusBadges(t)
@@ -1186,6 +1070,17 @@ function PurchasingClientLoaded({
       statusBadgeLabels: status.badgeLabels,
       detailConfig,
       auditTableName: "purchase_order",
+      openHref: purchaseOrderRecordHref,
+      discussion: {
+        attachments: (record) => (
+          <RecordDocumentAttachments
+            organizationId={orgId}
+            resModel="purchase_order"
+            resId={BigInt(String(record.id))}
+            title="Attachments"
+          />
+        ),
+      },
       customTabs: [
         {
           id: "lines",
@@ -1251,43 +1146,32 @@ function PurchasingClientLoaded({
 
   const editPurchaseOrderFormConfig = useMemo(
     () =>
-      mergeSelectOptionsForFields(editPurchaseOrderForm(t), {
-        orderId: draftPoOptions,
-        partnerId: vendorFieldOptions,
-        paymentTermId: [
-          { value: "", label: "—" },
-          ...paymentTerms.map((pt) => ({
-            value: String(pt.id),
-            label: String(pt.name ?? pt.id),
-          })),
-        ],
+      purchaseOrderFormConfigs.editHeader(t, {
+        orderOptions: draftPoOptions,
+        vendorOptions: vendorFieldOptions,
+        paymentTerms: paymentTerms as Record<string, unknown>[],
       }),
     [t, draftPoOptions, vendorFieldOptions, paymentTerms],
   )
 
   const addLineFormConfig = useMemo(
     () =>
-      mergeSelectOptionsForFields(addPurchaseOrderLineForm(t), {
-        orderId: draftPoOptions,
-        productId: productFieldOptions,
-        uomId: uomFieldOptions,
+      purchaseOrderFormConfigs.addLine(t, {
+        orderOptions: draftPoOptions,
+        productOptions: productFieldOptions,
+        uomOptions: uomFieldOptions,
       }),
     [t, draftPoOptions, productFieldOptions, uomFieldOptions],
   )
 
   const receiveLineFormConfig = useMemo(
-    () =>
-      mergeSelectOptionsForFields(receivePurchaseOrderLineForm(t), {
-        lineId: receiveLineOptions,
-      }),
+    () => purchaseOrderFormConfigs.receive(t, { lineOptions: receiveLineOptions }),
     [t, receiveLineOptions],
   )
 
   const invoiceLineFormConfig = useMemo(
     () =>
-      mergeSelectOptionsForFields(invoicePurchaseOrderLineForm(t), {
-        lineId: invoiceLineOptions,
-      }),
+      purchaseOrderFormConfigs.invoiceLine(t, { lineOptions: invoiceLineOptions }),
     [t, invoiceLineOptions],
   )
 
@@ -1298,10 +1182,10 @@ function PurchasingClientLoaded({
 
   const editLineFormConfig = useMemo(
     () =>
-      mergeSelectOptionsForFields(editPurchaseOrderLineForm(t), {
-        lineId: editLineOptions,
-        productId: productFieldOptions,
-        uomId: uomFieldOptions,
+      purchaseOrderFormConfigs.editLine(t, {
+        lineOptions: editLineOptions,
+        productOptions: productFieldOptions,
+        uomOptions: uomFieldOptions,
       }),
     [t, editLineOptions, productFieldOptions, uomFieldOptions],
   )
@@ -1477,7 +1361,7 @@ function PurchasingClientLoaded({
   )
 
   const ordersEntityConfig = useMemo((): EntityViewConfig => {
-    const base = purchaseOrdersTableConfig(t, { onEmptyAction: openCreatePurchaseOrder })
+    const base = purchaseOrdersTableConfig(t, { onEmptyAction: openCreatePurchaseOrder, recordHref: purchaseOrderRecordHref })
     const runtimeView = purchaseOrdersTableRuntime
     return {
       ...base,
@@ -1499,20 +1383,12 @@ function PurchasingClientLoaded({
               defaultValue: "Edit header",
             }),
             requiresSelection: true,
+            isApplicable: (rows) => rows.every((r) => poState(r) === "Draft"),
             onClick: (rows) => {
               const first = rows[0]
               if (!first || poState(first) !== "Draft") return
               setQuickActionForm({
-                form: mergeFieldDefaultValues(editPurchaseOrderFormConfig, {
-                  orderId: String(first.id),
-                  partnerId: String(first.partnerId ?? first.partner_id ?? ""),
-                  origin: String(first.origin ?? ""),
-                  partnerRef: String(first.partnerRef ?? first.partner_ref ?? ""),
-                  notes: String(first.notes ?? ""),
-                  paymentTermId: String(
-                    first.paymentTermId ?? first.payment_term_id ?? "",
-                  ),
-                }),
+                form: mergeFieldDefaultValues(editPurchaseOrderFormConfig, purchaseOrderHeaderDefaults(first)),
                 action: "updatePurchaseOrder",
               })
             },
@@ -1530,9 +1406,11 @@ function PurchasingClientLoaded({
             id: "po-recalc",
             label: t("purchasing.actions.recalculateTotals"),
             requiresSelection: true,
-            onClick: (rows) => {
+            selection: "multiple",
+            successMessage: t("common.actionCompleted", { action: t("purchasing.actions.recalculateTotals") }),
+            onClick: async (rows) => {
               for (const r of rows) {
-                void computePoTotals.mutateAsync(r.id as string | number | bigint)
+                await computePoTotals.mutateAsync(r.id as string | number | bigint)
               }
             },
           },
@@ -1540,9 +1418,11 @@ function PurchasingClientLoaded({
             id: "po-recalc-lines",
             label: t("purchasing.actions.recalculateLineTotals"),
             requiresSelection: true,
-            onClick: (rows) => {
+            selection: "multiple",
+            successMessage: t("common.actionCompleted", { action: t("purchasing.actions.recalculateLineTotals") }),
+            onClick: async (rows) => {
               for (const r of rows) {
-                void computePoLineTotals.mutateAsync(r.id as string | number | bigint)
+                await computePoLineTotals.mutateAsync(r.id as string | number | bigint)
               }
             },
           },
@@ -1550,9 +1430,11 @@ function PurchasingClientLoaded({
             id: "po-refresh-receipt-status",
             label: t("purchasing.actions.refreshReceiptStatus"),
             requiresSelection: true,
-            onClick: (rows) => {
+            selection: "multiple",
+            successMessage: t("common.actionCompleted", { action: t("purchasing.actions.refreshReceiptStatus") }),
+            onClick: async (rows) => {
               for (const r of rows) {
-                void updatePoReceiptStatus.mutateAsync(r.id as string | number | bigint)
+                await updatePoReceiptStatus.mutateAsync(r.id as string | number | bigint)
               }
             },
           },
@@ -1560,9 +1442,11 @@ function PurchasingClientLoaded({
             id: "po-refresh-invoice-status",
             label: t("purchasing.actions.refreshInvoiceStatus"),
             requiresSelection: true,
-            onClick: (rows) => {
+            selection: "multiple",
+            successMessage: t("common.actionCompleted", { action: t("purchasing.actions.refreshInvoiceStatus") }),
+            onClick: async (rows) => {
               for (const r of rows) {
-                void updatePoInvoiceStatus.mutateAsync(r.id as string | number | bigint)
+                await updatePoInvoiceStatus.mutateAsync(r.id as string | number | bigint)
               }
             },
           },
@@ -1570,9 +1454,12 @@ function PurchasingClientLoaded({
             id: "po-lock",
             label: t("purchasing.actions.lockSelected"),
             requiresSelection: true,
-            onClick: (rows) => {
+            selection: "multiple",
+            isApplicable: (rows) => rows.every((r) => poState(r) !== "Done" && poState(r) !== "Cancelled"),
+            successMessage: t("common.actionCompleted", { action: t("purchasing.actions.lockSelected") }),
+            onClick: async (rows) => {
               for (const r of rows) {
-                void lockPurchaseOrder.mutateAsync(r.id as string | number | bigint)
+                await lockPurchaseOrder.mutateAsync(r.id as string | number | bigint)
               }
             },
           },
@@ -1580,9 +1467,11 @@ function PurchasingClientLoaded({
             id: "po-unlock",
             label: t("purchasing.actions.unlockSelected"),
             requiresSelection: true,
-            onClick: (rows) => {
+            selection: "multiple",
+            successMessage: t("common.actionCompleted", { action: t("purchasing.actions.unlockSelected") }),
+            onClick: async (rows) => {
               for (const r of rows) {
-                void unlockPurchaseOrder.mutateAsync(r.id as string | number | bigint)
+                await unlockPurchaseOrder.mutateAsync(r.id as string | number | bigint)
               }
             },
           },
@@ -1597,7 +1486,6 @@ function PurchasingClientLoaded({
               if (!purchasingWorkflow.createBill.canPresent(rows[0] as EntityRow)) return
               const id = rows[0]?.id
               if (id == null) return
-              setBillOrderError(null)
               setBillOrderId(BigInt(String(id)))
             },
           },
@@ -1752,10 +1640,13 @@ function PurchasingClientLoaded({
             id: "pol-remove",
             label: t("common.delete"),
             requiresSelection: true,
+            selection: "multiple",
             variant: "destructive",
-            onClick: (rows) => {
+            isApplicable: (rows) => rows.every((r) => purchaseOrderLineCanBeRemoved(r, orders as Record<string, unknown>[])),
+            successMessage: t("common.actionCompleted", { action: t("common.delete") }),
+            onClick: async (rows) => {
               for (const r of rows) {
-                void removePurchaseOrderLine.mutateAsync(r.id as string | number | bigint)
+                await removePurchaseOrderLine.mutateAsync(r.id as string | number | bigint)
               }
             },
           },
@@ -1764,11 +1655,11 @@ function PurchasingClientLoaded({
             label: t("purchasing.actions.receiveFullOpenQty"),
             requiresSelection: true,
             isApplicable: (rows) => rows.length === 1 && purchasingWorkflow.receiveLine.canPresent(rows[0] as EntityRow),
-            onClick: (rows) => {
+            onClick: async (rows) => {
               const first = rows[0] as EntityRow | undefined
               const receiveLine = purchasingWorkflow.receiveLine
               if (!first || !receiveLine.canPresent(first) || !receiveLine.prepare) return
-              void receiveLine.execute(receiveLine.prepare(first), { navigateToNext: true }).catch(() => undefined)
+              await receiveLine.execute(receiveLine.prepare(first), { navigateToNext: true }).catch(() => undefined)
             },
           },
         ],
@@ -1781,6 +1672,7 @@ function PurchasingClientLoaded({
     receiveLineFormConfig,
     invoiceLineFormConfig,
     removePurchaseOrderLine,
+    orders,
     purchasingWorkflow.receiveLine,
   ])
 
@@ -1809,10 +1701,11 @@ function PurchasingClientLoaded({
               defaultValue: "Create RFQ",
             }),
             requiresSelection: true,
-            onClick: (rows) => {
+            isApplicable: (rows) => rows.every((r) => requisitionCanCreateRfq(r)),
+            onClick: async (rows) => {
               const first = rows[0]
               if (!first) return
-              void openCreateRfqFromRequisition(String(first.id)).catch(
+              await openCreateRfqFromRequisition(String(first.id)).catch(
                 (e: unknown) => {
                   window.alert(e instanceof Error ? e.message : String(e))
                 },
@@ -1881,11 +1774,14 @@ function PurchasingClientLoaded({
           id: "lc-delete",
           label: t("common.delete"),
           requiresSelection: true,
+          selection: "multiple",
           variant: "destructive",
-          onClick: (rows) => {
+          isApplicable: (rows) => rows.some((r) => landedCostState(r) === "Draft"),
+          successMessage: t("common.actionCompleted", { action: t("common.delete") }),
+          onClick: async (rows) => {
             for (const r of rows) {
               if (landedCostState(r) === "Draft") {
-                void deleteLandedCost.mutateAsync(r.id as string | number | bigint)
+                await deleteLandedCost.mutateAsync(r.id as string | number | bigint)
               }
             }
           },
@@ -2019,10 +1915,14 @@ function PurchasingClientLoaded({
           id: "si-delete",
           label: t("common.delete"),
           requiresSelection: true,
+          selection: "multiple",
           variant: "destructive",
-          onClick: (rows) => {
+          isApplicable: (rows) =>
+            rows.every((r) => !["Approved", "Rejected", "Onboarded"].includes(supplierIntakeState(r))),
+          successMessage: t("common.actionCompleted", { action: t("common.delete") }),
+          onClick: async (rows) => {
             for (const r of rows) {
-              void deleteSupplierIntake.mutateAsync(r.id as string | number | bigint)
+              await deleteSupplierIntake.mutateAsync(r.id as string | number | bigint)
             }
           },
         },
@@ -2141,7 +2041,7 @@ function PurchasingClientLoaded({
                 },
                 {
                   label: t("purchasing.dashboard.onTimePct", {
-                    defaultValue: "On-time (MVP)",
+                    defaultValue: "On-time %",
                   }),
                   value: onTimePct == null ? "—" : `${onTimePct}%`,
                   icon: "Gauge",
@@ -2296,18 +2196,18 @@ function PurchasingClientLoaded({
                         id: "pb-delete",
                         label: t("common.delete"),
                         requiresSelection: true,
+                        selection: "multiple",
                         variant: "destructive",
-                        onClick: (rows: Record<string, unknown>[]) => {
-                          if (
-                            typeof window !== "undefined" &&
-                            !window.confirm(
-                              t("purchasing.partnerBanks.deleteConfirm", { count: rows.length }),
-                            )
-                          ) {
-                            return
-                          }
+                        successMessage: t("common.actionCompleted", { action: t("common.delete") }),
+                        confirm: {
+                          title: t("common.delete"),
+                          description: (rows: Record<string, unknown>[]) => t("purchasing.partnerBanks.deleteConfirm", { count: rows.length }),
+                          confirmLabel: t("common.confirm"),
+                          cancelLabel: t("common.cancel"),
+                        },
+                        onClick: async (rows: Record<string, unknown>[]) => {
                           for (const r of rows) {
-                            void deletePartnerBank.mutateAsync(r.id as string | number | bigint)
+                            await deletePartnerBank.mutateAsync(r.id as string | number | bigint)
                           }
                         },
                       },
@@ -2470,31 +2370,9 @@ function PurchasingClientLoaded({
     formData: Record<string, unknown>,
   ) => {
     if (action === "updatePurchaseOrder") {
-      const orderId = formData.orderId
-      if (orderId === "" || orderId == null) return
-      const params: Record<string, unknown> = {}
-      if (formData.origin != null && String(formData.origin).trim() !== "") {
-        params.origin = String(formData.origin).trim()
-      }
-      if (formData.partnerRef != null && String(formData.partnerRef).trim() !== "") {
-        params.partnerRef = String(formData.partnerRef).trim()
-      }
-      if (formData.notes != null && String(formData.notes).trim() !== "") {
-        params.notes = String(formData.notes).trim()
-      }
-      if (formData.partnerId != null && String(formData.partnerId).trim() !== "") {
-        params.partnerId = BigInt(String(formData.partnerId))
-      }
-      if (formData.paymentTermId != null && String(formData.paymentTermId).trim() !== "") {
-        params.paymentTermId = BigInt(String(formData.paymentTermId))
-      }
-      if (formData.datePlanned != null && String(formData.datePlanned).trim() !== "") {
-        params.datePlanned = formData.datePlanned
-      }
-      await updatePurchaseOrder.mutateAsync({
-        orderId: orderId as string | number | bigint,
-        params,
-      })
+      const args = toUpdatePurchaseOrderHeaderArgs(formData)
+      if (args == null) return
+      await updatePurchaseOrder.mutateAsync(args)
     } else if (action === "createPurchaseOrder") {
       const params = toCreatePurchaseOrderParams(
         formData,
@@ -2540,16 +2418,9 @@ function PurchasingClientLoaded({
         params,
       })
     } else if (action === "receivePurchaseOrderLine") {
-      const args = toReceivePoLineArgs(formData)
-      if (args == null) return
-      await purchasingWorkflow.receiveLine.execute(
-        {
-          lineId: String(args.lineId),
-          qty: args.qty,
-          lotId: args.lotId == null ? undefined : String(args.lotId),
-        },
-        { navigateToNext: true },
-      )
+      const input = toReceiveLineInput(toReceivePoLineArgs(formData))
+      if (input == null) return
+      await purchasingWorkflow.receiveLine.execute(input, { navigateToNext: true })
     } else if (action === "invoicePurchaseOrderLine") {
       const args = toInvoicePoLineArgs(formData)
       if (args == null) return
@@ -2703,73 +2574,92 @@ function PurchasingClientLoaded({
     return landedCostLines.filter((line) => String(line.landedCostId ?? "") === costId)
   }, [landedCostDetailRow, landedCostLines])
 
+  // RFQs, returns, blanket orders and supplier configuration get their own
+  // tab instead of a toolbar above the module header.
+  // Built each render: the action handlers below are not memoized.
+  const configWithOperations = {
+        ...config,
+        tabs: [
+          ...config.tabs,
+          {
+            id: "operations",
+            label: t("purchasing.operationsTab", { defaultValue: "Operations" }),
+            type: "custom" as const,
+            description: t("purchasing.operationsTabDescription", {
+              defaultValue: "RFQs, returns, blanket orders and supplier configuration",
+            }),
+            customContent: (
+          <PurchasingOpsSod
+            orders={enrichedOrders}
+            ordersToApprove={
+              ordersToApprove.length > 0
+                ? (ordersToApprove as Record<string, unknown>[])
+                : undefined
+            }
+            onCreatePurchaseRfq={() => openCreateRfqFromRequisition()}
+            onAddPurchaseRfqBid={openAddRfqBid}
+            onAwardPurchaseRfqBid={openAwardRfqBid}
+            onCreatePurchaseReturn={openCreatePurchaseReturn}
+            onConfirmPurchaseReturn={openPurchaseReturns}
+            onCreateVendorCreditFromReturn={openVendorCreditFromReturn}
+            onCreateBlanketOrder={openBlanketOrderCreate}
+            onReleaseBlanketToPo={openBlanketRelease}
+            onCreatePurchaseContract={() => openPurchasingConfiguration("contract")}
+            onUpsertVendorScorecard={() => openPurchasingConfiguration("scorecard")}
+            onSetVendorRiskFlag={() => openPurchasingConfiguration("riskFlag")}
+            onCreateConsignmentAgreement={() => openPurchasingConfiguration("consignment")}
+            onSetApprovalDelegate={() => openPurchasingConfiguration("approvalDelegate")}
+            onSetCommodityPriceIndex={() => openPurchasingConfiguration("commodityIndex")}
+            onCreateIntegrationIntent={() => openPurchasingConfiguration("integrationIntent")}
+            onRecordIntegrationResult={promptRecordIntegrationResult}
+          >
+            <>
+              <PurchasingBlanketWorkspace
+                embedded
+                actionRequest={blanketActionRequest}
+                blanketOrders={blanketOrders as EntityRow[]}
+                blanketLines={blanketOrderLines as EntityRow[]}
+                blanketReleases={blanketReleases as EntityRow[]}
+                vendors={vendors as EntityRow[]}
+                products={products as EntityRow[]}
+                uoms={uoms as EntityRow[]}
+                currencies={currencies as EntityRow[]}
+                createBlanket={(params) => createPurchaseBlanketOrder.mutateAsync(params)}
+                releaseBlanket={releaseBlanket}
+                onOpenPurchaseOrder={openPurchaseOrder}
+              />
+              <PurchasingConfigurationWorkspace
+                embedded
+                actionRequest={configurationActionRequest}
+                vendors={vendors as EntityRow[]}
+                products={products as EntityRow[]}
+                warehouses={warehouses as EntityRow[]}
+                purchaseOrders={orders as EntityRow[]}
+                onCreateContract={(params) => createPurchaseContract.mutateAsync(params)}
+                onUpsertScorecard={(params) => upsertVendorScorecard.mutateAsync(params)}
+                onSetRiskFlag={(params) => setVendorRiskFlag.mutateAsync(params)}
+                onSetApprovalDelegate={(params) => setPurchaseApprovalDelegate.mutateAsync(params)}
+                onSetCommodityIndex={(params) => setCommodityPriceIndex.mutateAsync(params)}
+                onCreateConsignment={(params) => createConsignmentAgreement.mutateAsync(params)}
+                onCreateIntegrationIntent={(params) => createPurchasingIntegrationIntent.mutateAsync(params)}
+              />
+            </>
+          </PurchasingOpsSod>
+            ),
+          },
+        ],
+  } as ModuleConfig
+
   return (
     <>
+      {formDialog}
       {contactsReferenceStatus && (
         <p role="status" className="text-sm text-muted-foreground">
           Contacts reference data: {contactsReferenceStatus}. Supplier selection requires CRM contact read access; existing purchasing records remain available.
         </p>
       )}
-      {(activeTab === "dashboard" || activeTab === "orders") && (
-        <PurchasingOpsSod
-          orders={enrichedOrders}
-          ordersToApprove={
-            ordersToApprove.length > 0
-              ? (ordersToApprove as Record<string, unknown>[])
-              : undefined
-          }
-          onCreatePurchaseRfq={() => openCreateRfqFromRequisition()}
-          onAddPurchaseRfqBid={openAddRfqBid}
-          onAwardPurchaseRfqBid={openAwardRfqBid}
-          onCreatePurchaseReturn={openCreatePurchaseReturn}
-          onConfirmPurchaseReturn={openPurchaseReturns}
-          onCreateVendorCreditFromReturn={openVendorCreditFromReturn}
-          onCreateBlanketOrder={openBlanketOrderCreate}
-          onReleaseBlanketToPo={openBlanketRelease}
-          onCreatePurchaseContract={() => openPurchasingConfiguration("contract")}
-          onUpsertVendorScorecard={() => openPurchasingConfiguration("scorecard")}
-          onSetVendorRiskFlag={() => openPurchasingConfiguration("riskFlag")}
-          onCreateConsignmentAgreement={() => openPurchasingConfiguration("consignment")}
-          onSetApprovalDelegate={() => openPurchasingConfiguration("approvalDelegate")}
-          onSetCommodityPriceIndex={() => openPurchasingConfiguration("commodityIndex")}
-          onCreateIntegrationIntent={() => openPurchasingConfiguration("integrationIntent")}
-          onRecordIntegrationResult={promptRecordIntegrationResult}
-        >
-          <>
-            <PurchasingBlanketWorkspace
-              embedded
-              actionRequest={blanketActionRequest}
-              blanketOrders={blanketOrders as EntityRow[]}
-              blanketLines={blanketOrderLines as EntityRow[]}
-              blanketReleases={blanketReleases as EntityRow[]}
-              vendors={vendors as EntityRow[]}
-              products={products as EntityRow[]}
-              uoms={uoms as EntityRow[]}
-              currencies={currencies as EntityRow[]}
-              createBlanket={(params) => createPurchaseBlanketOrder.mutateAsync(params)}
-              releaseBlanket={releaseBlanket}
-              onOpenPurchaseOrder={openPurchaseOrder}
-            />
-            <PurchasingConfigurationWorkspace
-              embedded
-              actionRequest={configurationActionRequest}
-              vendors={vendors as EntityRow[]}
-              products={products as EntityRow[]}
-              warehouses={warehouses as EntityRow[]}
-              purchaseOrders={orders as EntityRow[]}
-              onCreateContract={(params) => createPurchaseContract.mutateAsync(params)}
-              onUpsertScorecard={(params) => upsertVendorScorecard.mutateAsync(params)}
-              onSetRiskFlag={(params) => setVendorRiskFlag.mutateAsync(params)}
-              onSetApprovalDelegate={(params) => setPurchaseApprovalDelegate.mutateAsync(params)}
-              onSetCommodityIndex={(params) => setCommodityPriceIndex.mutateAsync(params)}
-              onCreateConsignment={(params) => createConsignmentAgreement.mutateAsync(params)}
-              onCreateIntegrationIntent={(params) => createPurchasingIntegrationIntent.mutateAsync(params)}
-            />
-          </>
-        </PurchasingOpsSod>
-      )}
       <ModuleView
-        config={config}
+        config={configWithOperations}
         data={data}
         dataLoading={{ orders: ordersLoading }}
         onFormSubmit={handleFormSubmit}
@@ -2890,48 +2780,12 @@ function PurchasingClientLoaded({
           }}
         />
       ) : null}
-      {billOrderId != null ? (
-        <RuntimeFormModal
-          key={`bill-order-${billOrderId.toString()}`}
-          open
-          onOpenChange={(o) => {
-            if (!o) {
-              setBillOrderId(null)
-              setBillOrderError(null)
-            }
-          }}
-          staticConfig={createBillFormConfig}
-          moduleId="purchasing"
-          formId="create-bill-from-purchase-order"
+      {billOrder ? (
+        <CreateBillFromPurchaseOrderDialog
+          order={billOrder}
           organizationId={organizationId}
-          roleId={runtimeRoleId}
-          preferStdbVisibility
-          foldCustomFieldsIntoMetadata={false}
-          closeOnSubmit={false}
-          submitError={billOrderError}
-          isPending={purchasingWorkflow.isPending}
-          onSubmit={async (formData) => {
-            setBillOrderError(null)
-            const orderRow = (orders as Record<string, unknown>[]).find(
-              (o) => String(o.id) === String(billOrderId),
-            )
-            const partnerId =
-              orderRow?.partnerId != null ? BigInt(String(orderRow.partnerId)) : undefined
-            const params = toCreateBillFromPurchaseOrderParams(formData, { partnerId })
-            if (!params) {
-              setBillOrderError(t("common.validation.required"))
-              return
-            }
-            try {
-              await purchasingWorkflow.createBill.execute(
-                { orderId: String(billOrderId), params },
-                { navigateToNext: true },
-              )
-              setBillOrderId(null)
-            } catch (e) {
-              setBillOrderError(e instanceof Error ? e.message : String(e))
-            }
-          }}
+          workflow={purchasingWorkflow}
+          onClose={() => setBillOrderId(null)}
         />
       ) : null}
       <Dialog open={landedCostDetailRow != null} onOpenChange={(open) => !open && setLandedCostDetailRow(null)}>

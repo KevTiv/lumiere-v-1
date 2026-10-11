@@ -8,6 +8,16 @@ import React from "react"
 import { toast } from "sonner"
 
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "../components/alert-dialog"
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -18,6 +28,7 @@ import type { AiFormAssistConfig, FormConfig } from "../lib/form-types"
 import { showSemanticOperationOutcome } from "../lib/semantic-operation-outcome"
 import { cn } from "../lib/utils"
 import { ModularForm } from "./modular-form"
+import { useUnsavedChangesGuard } from "./use-unsaved-changes-guard"
 
 const sizeClasses: Record<string, string> = {
   md: "sm:max-w-[600px]",
@@ -75,6 +86,28 @@ export function FormModal({
   onValuesChange,
 }: FormModalProps) {
   const { t } = useTranslation()
+  const [dirty, setDirty] = React.useState(false)
+  const [confirmingDiscard, setConfirmingDiscard] = React.useState(false)
+  const submittingRef = React.useRef(false)
+
+  // Nothing survives a closed dialog, so nothing is left to protect.
+  React.useEffect(() => {
+    if (!open) {
+      setDirty(false)
+      setConfirmingDiscard(false)
+    }
+  }, [open])
+
+  useUnsavedChangesGuard(open && dirty)
+
+  /** Dismissals (Cancel, Escape, overlay, X) ask first when fields were edited. */
+  const requestOpenChange = (next: boolean) => {
+    if (!next && dirty && !submittingRef.current && !isPending) {
+      setConfirmingDiscard(true)
+      return
+    }
+    onOpenChange(next)
+  }
 
   const handleSubmit = async (data: Record<string, unknown>) => {
     // A form without an admitted submit binding must never report a successful
@@ -91,9 +124,11 @@ export function FormModal({
       window.addEventListener(SEMANTIC_OPERATION_OUTCOME_EVENT, captureSemanticOutcome)
     }
 
+    submittingRef.current = true
     try {
       await onSubmit(data)
     } finally {
+      submittingRef.current = false
       if (typeof window !== "undefined") {
         window.removeEventListener(SEMANTIC_OPERATION_OUTCOME_EVENT, captureSemanticOutcome)
       }
@@ -116,7 +151,7 @@ export function FormModal({
   }
 
   const handleCancel = () => {
-    onOpenChange(false)
+    requestOpenChange(false)
   }
 
   const size = config.size ?? "md"
@@ -128,7 +163,7 @@ export function FormModal({
     : undefined
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={requestOpenChange}>
       <DialogContent
         data-testid={`form-modal-${config.id}`}
         className={cn(
@@ -175,8 +210,36 @@ export function FormModal({
             submissionDisabled={submissionDisabled}
             aiAssist={aiAssist}
             onValuesChange={onValuesChange}
+            onDirtyChange={setDirty}
           />
         </div>
+        <AlertDialog open={confirmingDiscard} onOpenChange={setConfirmingDiscard}>
+          <AlertDialogContent data-testid="discard-changes-dialog">
+            <AlertDialogHeader>
+              <AlertDialogTitle>{t("common.discardChanges.title", { defaultValue: "Discard changes?" })}</AlertDialogTitle>
+              <AlertDialogDescription>
+                {t("common.discardChanges.description", {
+                  defaultValue: "You have edits that were not saved. They will be lost if you close this form.",
+                })}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel data-testid="discard-changes-keep">
+                {t("common.discardChanges.keep", { defaultValue: "Keep editing" })}
+              </AlertDialogCancel>
+              <AlertDialogAction
+                data-testid="discard-changes-confirm"
+                onClick={() => {
+                  setConfirmingDiscard(false)
+                  setDirty(false)
+                  onOpenChange(false)
+                }}
+              >
+                {t("common.discardChanges.discard", { defaultValue: "Discard" })}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </DialogContent>
     </Dialog>
   )

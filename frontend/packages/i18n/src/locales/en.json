@@ -12,6 +12,7 @@
     "settings": "Settings",
     "back": "Back",
     "next": "Next",
+    "actionCompleted": "{{action}} completed",
     "active": "Active",
     "inactive": "Inactive",
     "none": "None",
@@ -154,6 +155,36 @@
       "rollbackImport": "Rollback import",
       "rollbackComplete": "This import was rolled back.",
       "rollbackFailed": "Rollback failed"
+    },
+    "audit": "Audit",
+    "overview": "Overview",
+    "remove": "Remove",
+    "entityView": {
+      "board": "Board",
+      "emptyColumn": "No records",
+      "table": "Table",
+      "toggleLabel": "Switch view",
+      "boardSearch": "Search cards",
+      "list": "List",
+      "otherColumn": "Other",
+      "pivot": "Summary",
+      "pivotChartTitle": "{{measure}} by group",
+      "pivotColumnsBy": "Columns",
+      "pivotCount": "Count",
+      "pivotEmpty": "Not set",
+      "pivotGroupBy": "Group by",
+      "pivotMixedCurrencies": "These records use more than one currency ({{currencies}}). Totals add the amounts as they are, without converting.",
+      "pivotNoData": "No records to summarise",
+      "pivotNone": "None",
+      "pivotTotal": "Total",
+      "pivotExportCsv": "Export CSV"
+    },
+    "retry": "Retry",
+    "discardChanges": {
+      "description": "You have edits that were not saved. They will be lost if you close this form.",
+      "discard": "Discard",
+      "keep": "Keep editing",
+      "title": "Discard changes?"
     }
   },
   "navigation": {
@@ -197,7 +228,8 @@
     "aiAssistant": "AI Assistant",
     "noRole": "No Role",
     "signOut": "Sign out",
-    "erpSystem": "ERP System",
+    "signedIn": "Signed in",
+    "erpSystem": "Lumiere ERP",
     "companySwitcher": {
       "switchCompany": "Switch company",
       "current": "Active",
@@ -216,7 +248,7 @@
   },
   "dashboard": {
     "title": "Dashboard",
-    "erpSystem": "ERP System",
+    "erpSystem": "Lumiere ERP",
     "vsLastMonth": "vs last month",
     "timeRange": {
       "today": "Today",
@@ -790,7 +822,19 @@
       "payment": "Payment",
       "postEntry": "Post",
       "cancelEntry": "Cancel",
-      "recalculateInvoiceTotals": "Recalculate totals"
+      "recalculateInvoiceTotals": "Recalculate totals",
+      "states": {
+        "cancelled": "Cancelled",
+        "draft": "Draft",
+        "posted": "Posted"
+      },
+      "types": {
+        "entry": "Journal Entry",
+        "inInvoice": "Vendor Bill",
+        "inRefund": "Vendor Credit",
+        "outInvoice": "Customer Invoice",
+        "outRefund": "Credit Note"
+      }
     },
     "invoices": {
       "title": "Invoices",
@@ -804,7 +848,7 @@
       "totalInvoices": "Total Invoices",
       "totalInvoiced": "Total Invoiced",
       "outstandingBalance": "Outstanding Balance",
-      "allStatus": "All Status",
+      "allStatus": "All statuses",
       "issueDate": "Issue Date",
       "amount": "Amount",
       "customer": "Customer",
@@ -833,13 +877,39 @@
         "postDraft": "Post",
         "recalculateTotals": "Recalculate totals",
         "createCreditNote": "Create credit note",
-        "createExchange": "Create exchange order"
+        "createExchange": "Create exchange order",
+        "archive": "Archive PDF to Documents",
+        "recalculate": "Recalculate totals",
+        "registerPayment": "Register payment",
+        "cancel": "Cancel document"
       },
       "recordSheet": {
         "actionsTab": "Actions",
         "openActions": "Open document actions"
       },
-      "postMissingCogsAccounts": "Cannot post: chart of accounts is missing COGS and inventory GL accounts. Add expense (COGS) and asset (inventory) accounts first."
+      "postMissingCogsAccounts": "Cannot post: chart of accounts is missing COGS and inventory GL accounts. Add expense (COGS) and asset (inventory) accounts first.",
+      "attachments": "Attachments",
+      "backToInvoices": "Back to invoices",
+      "discussion": "Discussion",
+      "draftName": "Draft",
+      "moreActions": "More",
+      "notFound": "Document not found",
+      "notFoundHint": "It may have been deleted, or belong to another company.",
+      "purchaseOrder": "Purchase order",
+      "saleOrder": "Sales order",
+      "cancelConfirm": "This cancels the document and its lines. This cannot be undone.",
+      "noRegistrablePayments": "No posted payments available",
+      "payment": "Payment",
+      "registerPaymentHint": "Apply a posted payment to this document.",
+      "removeLinesDescription": "The lines are deleted from this draft and its totals are recomputed.",
+      "removeLinesTitle": "Delete the selected lines?",
+      "paymentStates": {
+        "notPaid": "Not paid",
+        "paid": "Paid",
+        "partial": "Partial",
+        "reversed": "Reversed",
+        "unpaid": "Unpaid"
+      }
     },
     "bills": {
       "title": "Bills (Accounts Payable)",
@@ -2648,7 +2718,10 @@
         "email": "Email",
         "meeting": "Meeting",
         "todo": "To-do"
-      }
+      },
+      "attachFiles": "Attach files",
+      "attachmentsFailed": "Some files failed to upload. Remove them or retry.",
+      "removeAttachment": "Remove"
     },
     "csvImport": {
       "contactsTitle": "Import contacts (CSV)",
@@ -3471,6 +3544,17 @@
       "noRules": "No rules yet.",
       "applySample": "Apply AU customer rules",
       "evaluate": "Evaluate"
+    },
+    "inlineEdit": {
+      "emailInvalid": "Enter a valid email address",
+      "nameRequired": "A contact needs a name",
+      "phoneRequired": "Enter a phone number"
+    },
+    "myActivities": {
+      "empty": "You have no open activities.",
+      "noDeadline": "No deadline",
+      "overdue": "Overdue",
+      "tabLabel": "My activities"
     }
   },
   "iot": {
@@ -3910,7 +3994,10 @@
       "description": "Department hierarchy and reporting lines",
       "emptyMessage": "No departments found. Add departments to build the org chart.",
       "employees": "employees",
-      "manager": "Manager"
+      "employeeCount_one": "{{count}} employee",
+      "employeeCount_other": "{{count}} employees",
+      "manager": "Manager",
+      "employeeCount": "{{count}} employees"
     },
     "recruitment": {
       "title": "Recruitment Pipeline",
@@ -4190,6 +4277,12 @@
     },
     "workflow": {
       "approvalTimeline": "Approval timeline"
+    },
+    "operationsTab": "Operations",
+    "operationsTabDescription": "Approval and export queues, workforce planning",
+    "inlineEdit": {
+      "jobTitleRequired": "Enter a job title",
+      "nameRequired": "An employee needs a name"
     }
   },
   "inventory": {
@@ -4343,7 +4436,16 @@
         "assigned": "Ready",
         "done": "Done",
         "cancel": "Cancelled"
-      }
+      },
+      "attachments": "Attachments",
+      "backorderOf": "Backorder of",
+      "backToTransfers": "Back to transfers",
+      "discussion": "Discussion",
+      "notFound": "Transfer not found",
+      "notFoundHint": "It may have been deleted, or belong to another organization.",
+      "purchaseOrder": "Purchase order",
+      "saleOrder": "Sales order",
+      "backorders": "Backorders"
     },
     "warehouses": {
       "title": "Warehouses",
@@ -4464,9 +4566,9 @@
     },
     "z3dActions": {
       "addZone": "Add 3D zone",
-      "editZone": "Edit zone (by ID)…",
+      "editZone": "Edit zone…",
       "zoneIdPrompt": "Zone ID",
-      "deleteZone": "Deactivate zone (by ID)…"
+      "deleteZone": "Deactivate zone…"
     },
     "productionLots": {
       "title": "Lots & Serials",
@@ -4793,9 +4895,9 @@
       "addVariant": "Add variant",
       "addSupplierLine": "Add supplier line",
       "addPackaging": "Add packaging",
-      "updateSupplierLineById": "Update supplier line (by ID)…",
+      "updateSupplierLineById": "Update supplier line…",
       "supplierLineIdPrompt": "Supplier info row ID",
-      "updatePackagingById": "Update packaging (by ID)…",
+      "updatePackagingById": "Update packaging…",
       "packagingIdPrompt": "Packaging row ID",
       "updatePricing": "Update pricing…",
       "standardPricePrompt": "Standard cost",
@@ -4803,7 +4905,7 @@
       "updateInventoryData": "Update inventory quantities…",
       "qtyAvailablePrompt": "Quantity on hand",
       "virtualAvailablePrompt": "Forecast quantity",
-      "updateVariantById": "Update variant (by ID)…",
+      "updateVariantById": "Update variant…",
       "variantIdPrompt": "Variant ID",
       "variantNamePrompt": "Variant name"
     },
@@ -4854,26 +4956,26 @@
       "linkDevice": "Link IoT device…",
       "deviceIdPrompt": "IoT device ID",
       "checkIdForDevicePrompt": "Quality check ID to link",
-      "openAlertById": "Open alert (by ID)…",
-      "solveAlertById": "Solve alert (by ID)…",
+      "openAlertById": "Open alert…",
+      "solveAlertById": "Solve alert…",
       "alertIdPrompt": "Quality alert ID",
       "solveDescriptionPrompt": "Resolution notes (optional)",
       "addAlertReason": "New alert reason…",
       "alertReasonNamePrompt": "Reason name",
       "alertReasonDescPrompt": "Description (optional)",
-      "updateAlertReason": "Update alert reason (by ID)…",
+      "updateAlertReason": "Update alert reason…",
       "reasonIdPrompt": "Reason ID",
       "newReasonNamePrompt": "New name (leave empty to skip)",
-      "deleteAlertReason": "Delete alert reason (by ID)…",
-      "addTeamMember": "Add member to team (by IDs)…",
-      "removeTeamMember": "Remove member from team (by IDs)…",
+      "deleteAlertReason": "Delete alert reason…",
+      "addTeamMember": "Add member to team…",
+      "removeTeamMember": "Remove member from team…",
       "teamIdPrompt": "Quality team ID",
       "memberIdentityPrompt": "Member identity (hex)",
-      "updatePoint": "Update quality point (by ID)…",
+      "updatePoint": "Update quality point…",
       "pointIdPrompt": "Quality point ID",
       "pointNamePrompt": "Point name",
       "testTypePrompt": "Test type",
-      "updateTeam": "Update quality team (by ID)…",
+      "updateTeam": "Update quality team…",
       "teamNamePrompt": "Team name",
       "teamEmailPrompt": "Team email"
     },
@@ -4893,7 +4995,7 @@
     },
     "categoryActions": {
       "confirmDelete": "Delete this product category?",
-      "restoreById": "Restore category (by ID)…",
+      "restoreById": "Restore category…",
       "categoryIdPrompt": "Category ID"
     },
     "routeActions": {
@@ -5448,6 +5550,50 @@
           "maxWeight": "Max weight"
         }
       }
+    },
+    "byRecord": {
+      "barcodeRule": "Barcode rule",
+      "category": "Archived category",
+      "color": "Color (hex)",
+      "deactivate": "Deactivate",
+      "destLocation": "Destination location",
+      "device": "IoT device",
+      "email": "Email",
+      "failReason": "Reason for failure",
+      "fromUom": "From unit",
+      "inventoryCount": "Inventory count",
+      "location": "Location",
+      "member": "Member identity",
+      "minQty": "Minimum quantity",
+      "name": "Name",
+      "packagingId": "Packaging ID",
+      "pointId": "Quality point ID",
+      "price": "Price",
+      "product": "Product",
+      "qualityRating": "Quality rating",
+      "quarantineLocation": "Quarantine location",
+      "reasonId": "Alert reason ID",
+      "sourceLocation": "Source location",
+      "standardPrice": "Standard price",
+      "status": "Status",
+      "supplierLineId": "Supplier line ID",
+      "taskCancelled": "Cancelled",
+      "taskDone": "Done",
+      "taskInProgress": "In progress",
+      "taskPending": "Pending",
+      "team": "Quality team",
+      "testType": "Test type",
+      "toUom": "To unit",
+      "uom": "Unit of measure",
+      "uomCategory": "Category",
+      "uomConversionHint": "Both units must be in the same category.",
+      "variantId": "Variant ID",
+      "whatsappAccountId": "WhatsApp account ID",
+      "zone": "Zone"
+    },
+    "inlineEdit": {
+      "nameRequired": "A product needs a name",
+      "priceInvalid": "Enter a price of 0 or more"
     }
   },
   "purchasing": {
@@ -5473,7 +5619,7 @@
       "pendingReceipt": "Pending Receipt",
       "awaitingApproval": "Awaiting Approval",
       "vendorLabel": "Vendor {{id}}",
-      "onTimePct": "On-time (MVP)",
+      "onTimePct": "On-time %",
       "overBilled": "Over-billed lines",
       "partialReceipt": "Partial receipt"
     },
@@ -5523,7 +5669,8 @@
         "ToApprove": "To Approve",
         "Approved": "Purchase Order",
         "Done": "Done",
-        "Cancelled": "Cancelled"
+        "Cancelled": "Cancelled",
+        "Purchase": "Purchase order"
       },
       "fulfillment": {
         "dropship": "Dropship",
@@ -6119,7 +6266,15 @@
       "toApproveHelp": "Approve or reject workflow requests for ToApprove POs (SoD).",
       "toApproveTitle": "Purchase orders awaiting approval",
       "upsertScorecard": "Upsert vendor scorecard",
-      "vendorCreditFromReturn": "Vendor credit from return"
+      "vendorCreditFromReturn": "Vendor credit from return",
+      "approvalDelegate": "Set approval delegate",
+      "commodityPriceIndex": "Commodity price index",
+      "createIntegrationIntent": "New integration intent",
+      "identityHexInvalid": "Enter the 64-character identity hex",
+      "noOrder": "No purchase order",
+      "recordIntegrationResult": "Record integration result",
+      "vendorRiskFlag": "Flag vendor risk",
+      "vendorScorecard": "Vendor scorecard"
     },
     "purchaseReturns": {
       "title": "Purchase returns",
@@ -6146,6 +6301,30 @@
         "creditMoveId": "Vendor credit",
         "createDate": "Created"
       }
+    },
+    "operationsTab": "Operations",
+    "operationsTabDescription": "RFQs, returns, blanket orders and supplier configuration",
+    "order": {
+      "attachments": "Attachments",
+      "backToOrders": "Back to purchase orders",
+      "bills": "Vendor bills",
+      "createBill": "Create bill",
+      "discussion": "Discussion",
+      "handoffs": "Receipts & vendor bills",
+      "notFound": "Purchase order not found",
+      "notFoundHint": "It may have been deleted, or belong to another organization.",
+      "receipts": "Receipts",
+      "status": {
+        "cancelled": "Cancelled",
+        "done": "Done",
+        "purchase": "Purchase order",
+        "rfq": "RFQ",
+        "sent": "RFQ sent",
+        "toApprove": "To approve"
+      },
+      "moreActions": "More",
+      "removeLinesDescription": "The lines are deleted from this order and its totals are recomputed.",
+      "removeLinesTitle": "Remove the selected lines?"
     }
   },
   "erpWorkflow": {
@@ -6180,7 +6359,23 @@
   },
   "sales": {
     "order": {
-      "handoffs": "Deliveries & invoices"
+      "handoffs": "Deliveries & invoices",
+      "attachments": "Attachments",
+      "backToOrders": "Back to orders",
+      "deliveries": "Deliveries",
+      "discussion": "Discussion",
+      "invoices": "Invoices",
+      "moreActions": "More",
+      "notFound": "Order not found",
+      "notFoundHint": "It may have been deleted, or belong to another organization.",
+      "status": {
+        "cancelled": "Cancelled",
+        "locked": "Locked",
+        "quotation": "Quotation",
+        "sale": "Sales order",
+        "sent": "Quotation sent",
+        "toApprove": "To approve"
+      }
     },
     "dashboard": {
       "ordersByState": "Orders by State",
@@ -6260,7 +6455,10 @@
       "recordIntegrationResult": "Record integration result",
       "reject": "Reject",
       "rejectReasonPrompt": "Reason for rejection",
-      "scheduleSla": "Schedule SLA escalation"
+      "scheduleSla": "Schedule SLA escalation",
+      "invalidJson": "Not valid JSON",
+      "noOrder": "No sale order",
+      "scheduleSlaEscalation": "Schedule SLA escalation"
     },
     "csvImport": {
       "ordersTitle": "Import sale orders (CSV)",
@@ -6290,7 +6488,8 @@
         "deliverySummary": "Delivery",
         "invoiceSummary": "Invoicing",
         "paymentSummary": "Payment",
-        "outstandingAmount": "Balance due"
+        "outstandingAmount": "Balance due",
+        "partnerName": "Customer"
       },
       "cashSummary": {
         "delivery": {
@@ -6355,7 +6554,10 @@
         "priceUnit": "Unit Price",
         "priceSubtotal": "Subtotal",
         "discount": "Disc %"
-      }
+      },
+      "add": "Add line",
+      "delete": "Remove line",
+      "update": "Update line"
     },
     "pricelistItems": {
       "title": "Pricelist rules",
@@ -6954,7 +7156,9 @@
       "deleteOrderLines": "Delete lines",
       "exportCommercialPacket": "Export commercial packet",
       "omnichannelChannelPrompt": "Channel (optional, e.g. web, store)",
-      "omnichannelRoutePrompt": "Preferred route id (optional)"
+      "omnichannelRoutePrompt": "Preferred route id (optional)",
+      "archivePdfToDocuments": "Archive PDF to Documents",
+      "downloadPdf": "Download PDF"
     }
   },
   "manufacturing": {
@@ -7289,6 +7493,13 @@
           "oeeTargetPlaceholder": "85"
         }
       }
+    },
+    "page": {
+      "backToOrders": "Back to manufacturing orders",
+      "discussion": "Discussion",
+      "notFound": "Manufacturing order not found",
+      "notFoundHint": "It may have been deleted, or belong to another organization.",
+      "produced": "produced"
     }
   },
   "projects": {
@@ -7379,7 +7590,8 @@
         "Changes": "Changes Requested",
         "Approved": "Approved",
         "Done": "Done",
-        "Cancelled": "Cancelled"
+        "Cancelled": "Cancelled",
+        "ChangesRequested": "Changes requested"
       },
       "priority": {
         "0": "Normal",
@@ -7585,6 +7797,26 @@
           "descriptionPlaceholder": "What did you work on?"
         }
       }
+    },
+    "page": {
+      "backToProjects": "Back to projects",
+      "discussion": "Discussion",
+      "edit": "Edit",
+      "notFound": "Project not found",
+      "notFoundHint": "It may have been deleted, or belong to another organization.",
+      "openTasksBoard": "Open tasks board",
+      "board": "Board",
+      "archive": "Archive",
+      "archiveConfirm": "Archive this project?",
+      "archived": "Project archived",
+      "duplicate": "Duplicate",
+      "duplicated": "Project duplicated",
+      "moreActions": "More",
+      "unarchive": "Unarchive",
+      "unarchived": "Project unarchived"
+    },
+    "inlineEdit": {
+      "nameRequired": "A project needs a name"
     }
   },
   "calendar": {
@@ -7664,7 +7896,19 @@
       "edit": "Edit",
       "delete": "Delete",
       "closeAria": "Close",
-      "relatedTo": "Related {{type}}"
+      "relatedTo": "Related {{type}}",
+      "open": "Open",
+      "attendees": "Attendees",
+      "cancel": "Cancel event",
+      "cancelConfirm": "Cancel this event?",
+      "confirm": "Confirm event",
+      "noAttendees": "No attendees",
+      "editRecurrence": "Edit recurrence",
+      "rrule": "Recurrence rule",
+      "rruleType": "Recurrence type",
+      "duplicate": "Duplicate",
+      "duplicated": "Event duplicated",
+      "moreActions": "More"
     },
     "view": {
       "today": "Today",
@@ -7681,6 +7925,15 @@
         "fri": "Fri",
         "sat": "Sat"
       }
+    },
+    "page": {
+      "backToCalendar": "Back to calendar",
+      "discussion": "Discussion",
+      "notFound": "Event not found",
+      "notFoundHint": "It may have been deleted, or belong to another organization."
+    },
+    "inlineEdit": {
+      "nameRequired": "An event needs a title"
     }
   },
   "documents": {
@@ -7700,7 +7953,9 @@
         "createDate": "Created",
         "fiscalKind": "Fiscal kind",
         "residencyRegion": "Residency",
-        "retentionDays": "Retention"
+        "retentionDays": "Retention",
+        "description": "Description",
+        "resName": "Attached to"
       },
       "filters": {
         "isDeleted": {
@@ -8027,6 +8282,31 @@
           "classificationIdHint": "Optional data_classification row id"
         }
       }
+    },
+    "backToDocuments": "Back to documents",
+    "notFound": "Document not found",
+    "notFoundHint": "It may have been purged, or belong to another organization.",
+    "page": {
+      "delete": "Delete",
+      "deleted": "In recycle bin",
+      "deleteHint": "You can restore it from the recycle bin.",
+      "deleteTitle": "Move to recycle bin?",
+      "discussion": "Discussion",
+      "edit": "Edit",
+      "favorite": "Favorite",
+      "linkedRecord": "Attached record",
+      "lock": "Lock",
+      "locked": "Locked",
+      "noVersions": "No versions yet",
+      "openFile": "Open file",
+      "restore": "Restore",
+      "setRetention": "Set retention",
+      "shared": "Shared",
+      "unlock": "Unlock",
+      "uploadVersion": "Upload version",
+      "versions": "Versions",
+      "legalHold": "Legal hold",
+      "move": "Move to folder"
     }
   },
   "helpdesk": {
@@ -8250,6 +8530,10 @@
           "description": "Headers must match the server import template for SLAs."
         }
       }
+    },
+    "discussion": "Discussion",
+    "inlineEdit": {
+      "nameRequired": "A ticket needs a subject"
     }
   },
   "subscriptions": {
@@ -8764,6 +9048,17 @@
       "emptyMessage": "No usage events yet.",
       "tabLabel": "Usage events",
       "title": "Usage events"
+    },
+    "backToSubscriptions": "Back to subscriptions",
+    "notFound": "Subscription not found",
+    "notFoundHint": "It may have been deleted, or belong to another organization.",
+    "page": {
+      "attachments": "Attachments",
+      "billing": "Invoices & payments",
+      "discussion": "Discussion",
+      "moreInList": "More actions",
+      "moreInListHint": "Close, invoice, amend, renew and the other actions that ask for details are in the list.",
+      "moreActions": "More"
     }
   },
   "expenses": {
@@ -8881,7 +9176,8 @@
       "noApprovalRequests": "No workflow approval requests for this report yet.",
       "setAllocations": "Split allocations",
       "projectRebill": "Project rebill invoice",
-      "accountingMoves": "Accounting moves"
+      "accountingMoves": "Accounting moves",
+      "financeFailed": "Expense report action failed"
     },
     "capture": {
       "title": "Mobile capture (delayed sync)",
@@ -9194,6 +9490,21 @@
           "incomeAccountId": "Income account"
         }
       }
+    },
+    "operationsTab": "Operations",
+    "operationsTabDescription": "Receipt capture queue, card statements and expense settings",
+    "page": {
+      "backToReports": "Back to expense reports",
+      "discussion": "Discussion",
+      "moreInList": "Post or reimburse in the list",
+      "moreInListHint": "Posting, reimbursing and rebilling ask for details and are done from the list.",
+      "notFound": "Expense report not found",
+      "notFoundHint": "It may have been deleted, or belong to another organization.",
+      "refuseReason": "Reason (optional)"
+    },
+    "inlineEdit": {
+      "nameRequired": "An expense needs a description",
+      "quantityInvalid": "Quantity must be above 0"
     }
   },
   "workflows": {
@@ -9543,7 +9854,8 @@
         "resId": "Record ID",
         "messageType": "Type",
         "subtype": "Subtype",
-        "date": "Date"
+        "date": "Date",
+        "author": "Author"
       },
       "states": {
         "email": "Email",
@@ -9638,6 +9950,18 @@
       "description": "Chatter notifications for records you follow",
       "searchPlaceholder": "Search notifications…",
       "emptyMessage": "No notifications for you yet. Follow a record and post a note to receive updates."
+    },
+    "page": {
+      "backToMessages": "Back to messages",
+      "filedOn": "Filed on",
+      "inReplyTo": "In reply to",
+      "noReplies": "No replies yet.",
+      "notFound": "Message not found",
+      "notFoundHint": "It may have been deleted, or belong to another organization.",
+      "openReply": "Open",
+      "replies": "Replies",
+      "reply": "Reply",
+      "thread": "Replies"
     }
   },
   "pos": {
@@ -9783,6 +10107,42 @@
         }
       },
       "operations": "Operations"
+    },
+    "session": {
+      "backToSessions": "Back to sessions",
+      "cashDifference": "Difference",
+      "cashEnd": "Counted cash",
+      "cashStart": "Opening cash",
+      "discussion": "Discussion",
+      "notFound": "Session not found",
+      "notFoundHint": "It may have been deleted, or belong to another organization.",
+      "startAt": "Opened",
+      "states": {
+        "closed": "Closed",
+        "closingControl": "Closing control",
+        "new": "New",
+        "opened": "Open",
+        "openingControl": "Opening control"
+      },
+      "stopAt": "Closed",
+      "openNew": "Open a new session",
+      "orders": "Orders"
+    },
+    "orders": {
+      "columns": {
+        "date": "Date",
+        "partner": "Customer",
+        "reference": "Reference",
+        "state": "State",
+        "total": "Total"
+      },
+      "emptyMessage": "No orders in this session",
+      "error": "Orders could not be loaded",
+      "linesUnavailable": "Order lines and payments are not available here.",
+      "loadMore": "Load more",
+      "loadMoreHint": "No orders for this session in the pages loaded so far.",
+      "searchPlaceholder": "Search orders",
+      "title": "Orders"
     }
   },
   "aiChat": {
@@ -9825,6 +10185,8 @@
     }
   },
   "aiHarness": {
+    "title": "AI Workbench",
+    "description": "Compose AI reports, scan stock and review AI-proposed actions with their evidence",
     "tabs": {
       "reportComposer": "Report composer",
       "lowStock": "Low stock",
@@ -9915,6 +10277,7 @@
     "emptyDataHint": "No live map pins yet — create fleet vehicles (with position), POS terminals, or warehouse geo to populate coordinates.",
     "fleet": {
       "title": "Fleet",
+      "description": "Vehicles, drivers, fuel and maintenance",
       "subtitle": "Vehicles",
       "empty": "No vehicles yet.",
       "create": "Add vehicle",
@@ -10060,6 +10423,13 @@
         "failed": "Failed",
         "attentionRequired": "Attention required"
       }
+    },
+    "description": "Vehicles, drivers, fuel and maintenance",
+    "page": {
+      "backToVehicles": "Back to vehicles",
+      "discussion": "Discussion",
+      "notFound": "Vehicle not found",
+      "notFoundHint": "It may have been deleted, or belong to another company."
     }
   },
   "tasks": {
@@ -11625,7 +11995,11 @@
       "untitled": "Untitled",
       "sourceDocs": "Source Docs ({{count}})",
       "addDocument": "Add document",
-      "proposalValue": "Proposal value"
+      "proposalValue": "Proposal value",
+      "customSectionAdd": "Add section",
+      "customSectionDescription": "Name the new proposal section.",
+      "customSectionPlaceholder": "Section title",
+      "customSectionTitle": "Section title"
     },
     "sectionEditor": {
       "statusEmpty": "Empty",
@@ -11787,7 +12161,7 @@
       "tabAnalytics": "Analytics",
       "searchPlaceholder": "Search reports...",
       "filterStatus": "Status",
-      "filterStatusAll": "All Status",
+      "filterStatusAll": "All statuses",
       "filterStatusOpen": "Open",
       "filterStatusInvestigating": "Investigating",
       "filterStatusResolved": "Resolved",
@@ -12095,6 +12469,43 @@
     "nav": {
       "backToSignIn": "Back to sign in",
       "requestNewLink": "Request a new link"
+    }
+  },
+  "modules": {
+    "tabGroups": {
+      "banking": "Banking",
+      "billing": "Billing",
+      "close": "Close",
+      "fulfillment": "Fulfillment",
+      "invoicing": "Invoicing",
+      "ledger": "Ledger",
+      "movements": "Movements",
+      "orders": "Orders",
+      "pay": "Pay",
+      "people": "People",
+      "planning": "Planning",
+      "pricing": "Pricing",
+      "quality": "Quality",
+      "revenue": "Revenue",
+      "setup": "Setup",
+      "stock": "Stock",
+      "subscriptions": "Subscriptions",
+      "timeoff": "Time off",
+      "warehouse": "Warehouse"
+    }
+  },
+  "notifications": {
+    "bell": {
+      "empty": "No notifications.",
+      "label": "Notifications",
+      "recent": "Latest notifications",
+      "viewAll": "View all"
+    }
+  },
+  "commandPalette": {
+    "placeholder": "Search modules, actions and records...",
+    "records": {
+      "loading": "Searching records..."
     }
   }
 }

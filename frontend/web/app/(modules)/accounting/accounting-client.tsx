@@ -4,12 +4,14 @@ import { useModuleTab } from "@/hooks/use-module-tab"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { useTranslation } from "@lumiere/i18n"
+import { useConfirmDialog } from "@lumiere/ui/hooks/use-confirm-dialog"
 import {
   ModuleView,
   FormModal,
   CsvImportModal,
   RuntimeFormModal,
   EntityView,
+  ListPivotSwitch,
   useRBAC,
   newJournalEntryForm,
   newTaxForm,
@@ -145,6 +147,8 @@ import {
 } from "@/lib/accounting-create-params"
 import type { ClearablePatch } from "@/lib/accounting-create-params"
 import { optionalBigIntU64 } from "@lumiere/erp-shared/form-coercion"
+import { toAddAccountMoveLineParamsFromForm } from "./account-move-line-forms"
+import { accountMoveLineCanBeDeleted } from "./account-move-line-gates"
 import { stdbParamsToJson } from "@/lib/stdb-params-json"
 import {
   buildAccountLabelMap,
@@ -156,12 +160,13 @@ import {
   buildSourceDocumentLabelMap,
 } from "@lumiere/stdb/read-models"
 import type {
-  AddAccountMoveLineParams,
   UpdateAccountJournalParams,
   UpdateCrossoveredBudgetLineParams,
   UpdateCrossoveredBudgetParams,
 } from "@lumiere/stdb/types"
 import { accountingModuleConfig } from "@/lib/module-dashboard-configs"
+import { invoiceRecordHref } from "./invoice-record"
+import { accountMovePivotSetup } from "@lumiere/ui/lib/accounting-pivot-configs"
 import { PaymentOperationsPanel } from "./payment-operations-panel"
 import { useAccountingModuleSubscription } from "@/lib/module-subscription-hooks"
 import { chatterTargetFromRow, type ChatterTarget } from "@/lib/record-chatter"
@@ -320,10 +325,11 @@ import {
 } from "@/lib/form-lookup"
 import { useCurrencies } from "@lumiere/query-hooks/hooks/settings"
 import { useToast } from "@/hooks/use-toast"
+import { showWorkflowToast } from "@lumiere/ui/lib/workflow-toast"
 import { useWorkflowSurface } from "@/hooks/use-workflow-surface"
 import { useInvoiceToPaymentWorkflow } from "@lumiere/query-hooks/hooks/accounting/invoice-workflow"
 import { isPaymentRegistrable } from "@lumiere/erp-workflows"
-import { workflowActionsToEntityActions } from "@lumiere/ui"
+import { formText, useFormDialog, workflowActionsToEntityActions } from "@lumiere/ui"
 import type {
   AccountAnalyticAccount,
   AccountFiscalYear,
@@ -388,56 +394,6 @@ function paymentTermValueTag(
   if (s === "Percent") return { tag: "Percent" }
   if (s === "Fixed") return { tag: "Fixed" }
   return { tag: "Balance" }
-}
-
-function toAddAccountMoveLineParamsFromForm(
-  formData: Record<string, unknown>,
-): { moveId: bigint; params: AddAccountMoveLineParams } | null {
-  const moveId = optionalBigIntU64(formData.moveId)
-  const accountId = optionalBigIntU64(formData.accountId)
-  const name = String(formData.name ?? "").trim()
-  if (!moveId || !accountId || !name) return null
-  const debit = Number(formData.debit ?? 0)
-  const credit = Number(formData.credit ?? 0)
-  return {
-    moveId,
-    params: {
-      accountId,
-      name,
-      debit: Number.isFinite(debit) ? debit : 0,
-      credit: Number.isFinite(credit) ? credit : 0,
-      sequence: 10,
-      quantity: 0,
-      priceUnit: 0,
-      discount: 0,
-      taxIds: [],
-      partnerId: undefined,
-      productId: undefined,
-      productUomId: undefined,
-      productCategoryId: undefined,
-      analyticAccountId: undefined,
-      analyticTagIds: [],
-      displayType: undefined,
-      isDownpayment: false,
-      excludeFromInvoiceTab: false,
-      blocked: false,
-      groupTaxId: undefined,
-      taxLineId: undefined,
-      taxGroupId: undefined,
-      taxRepartitionLineId: undefined,
-      taxAudit: undefined,
-      reconcileModelId: undefined,
-      paymentId: undefined,
-      statementLineId: undefined,
-      matchingNumber: undefined,
-      matchingLabel: undefined,
-      expectedPayDate: undefined,
-      expectedPayDateCurrencyId: undefined,
-      expectedPayDateAmount: 0,
-      expectedPayDateResidual: 0,
-      metadata: undefined,
-    },
-  }
 }
 
 function moveStateStr(row: Record<string, unknown>): string {
@@ -645,7 +601,9 @@ function AccountingClientReady({
 }: AccountingClientReadyProps) {
   useAccountingModuleSubscription()
   const { t } = useTranslation()
+  const { confirm: confirmDialog, dialog: confirmDialogNode } = useConfirmDialog()
   const { toast } = useToast()
+  const { askForm, formDialog } = useFormDialog()
   const { currentUser } = useRBAC()
   const runtimeRoleId = currentUser?.roles[0]
   const moduleConfigBase = useMemo(() => accountingModuleConfig(t), [t])
@@ -1079,6 +1037,7 @@ function AccountingClientReady({
         currencyLabelMap,
       }),
       auditTableName: "account_payment",
+      discussion: {},
     }
   }, [t, partnerLabelMap, journalLabelMap, currencyLabelMap])
 
@@ -1091,6 +1050,7 @@ function AccountingClientReady({
       statusBadgeLabels: status.badgeLabels,
       detailConfig: bankStatementDetailConfig(t),
       auditTableName: "account_bank_statement",
+      discussion: {},
       customTabs: [
         {
           id: "lines",
@@ -1177,6 +1137,8 @@ function AccountingClientReady({
       statusBadgeLabels: moveStatus.badgeLabels,
       detailConfig: accountMoveDetailConfig(t),
       auditTableName: "account_move",
+      discussion: {},
+      openHref: invoiceRecordHref,
       customTabs: [
         {
           id: "lines",
@@ -2014,10 +1976,13 @@ function AccountingClientReady({
             id: "fy-open",
             label: t("accounting.entities.fiscalYears.actions.openSelected"),
             requiresSelection: true,
-            onClick: (rows) => {
+            selection: "multiple",
+            isApplicable: (rows) => rows.some((row) => fiscalYearStateTag(row as Record<string, unknown>) === "Draft"),
+            successMessage: t("common.actionCompleted", { action: t("accounting.entities.fiscalYears.actions.openSelected") }),
+            onClick: async (rows) => {
               for (const r of rows) {
                 if (fiscalYearStateTag(r as Record<string, unknown>) === "Draft") {
-                  void openFiscalYear.mutateAsync(BigInt(String(r.id)))
+                  await openFiscalYear.mutateAsync(BigInt(String(r.id)))
                 }
               }
             },
@@ -2026,10 +1991,13 @@ function AccountingClientReady({
             id: "fy-close",
             label: t("accounting.entities.fiscalYears.actions.closeSelected"),
             requiresSelection: true,
-            onClick: (rows) => {
+            selection: "multiple",
+            isApplicable: (rows) => rows.some((row) => fiscalYearStateTag(row as Record<string, unknown>) === "Running"),
+            successMessage: t("common.actionCompleted", { action: t("accounting.entities.fiscalYears.actions.closeSelected") }),
+            onClick: async (rows) => {
               for (const r of rows) {
                 if (fiscalYearStateTag(r as Record<string, unknown>) === "Running") {
-                  void closeFiscalYear.mutateAsync(BigInt(String(r.id)))
+                  await closeFiscalYear.mutateAsync(BigInt(String(r.id)))
                 }
               }
             },
@@ -2038,11 +2006,14 @@ function AccountingClientReady({
             id: "fy-delete",
             label: t("accounting.entities.fiscalYears.actions.deleteSelected"),
             requiresSelection: true,
+            selection: "multiple",
             variant: "destructive",
-            onClick: (rows) => {
+            isApplicable: (rows) => rows.some((row) => fiscalYearStateTag(row as Record<string, unknown>) === "Draft"),
+            successMessage: t("common.actionCompleted", { action: t("accounting.entities.fiscalYears.actions.deleteSelected") }),
+            onClick: async (rows) => {
               for (const r of rows) {
                 if (fiscalYearStateTag(r as Record<string, unknown>) === "Draft") {
-                  void deleteFiscalYear.mutateAsync(BigInt(String(r.id)))
+                  await deleteFiscalYear.mutateAsync(BigInt(String(r.id)))
                 }
               }
             },
@@ -2112,10 +2083,13 @@ function AccountingClientReady({
             id: "ap-open",
             label: t("accounting.entities.accountPeriods.actions.openSelected"),
             requiresSelection: true,
-            onClick: (rows) => {
+            selection: "multiple",
+            isApplicable: (rows) => rows.some((row) => accountPeriodStateTag(row as Record<string, unknown>) === "Draft"),
+            successMessage: t("common.actionCompleted", { action: t("accounting.entities.accountPeriods.actions.openSelected") }),
+            onClick: async (rows) => {
               for (const r of rows) {
                 if (accountPeriodStateTag(r as Record<string, unknown>) === "Draft") {
-                  void openAccountPeriod.mutateAsync(BigInt(String(r.id)))
+                  await openAccountPeriod.mutateAsync(BigInt(String(r.id)))
                 }
               }
             },
@@ -2124,10 +2098,13 @@ function AccountingClientReady({
             id: "ap-close",
             label: t("accounting.entities.accountPeriods.actions.closeSelected"),
             requiresSelection: true,
-            onClick: (rows) => {
+            selection: "multiple",
+            isApplicable: (rows) => rows.some((row) => accountPeriodStateTag(row as Record<string, unknown>) === "Open"),
+            successMessage: t("common.actionCompleted", { action: t("accounting.entities.accountPeriods.actions.closeSelected") }),
+            onClick: async (rows) => {
               for (const r of rows) {
                 if (accountPeriodStateTag(r as Record<string, unknown>) === "Open") {
-                  void closeAccountPeriod.mutateAsync(BigInt(String(r.id)))
+                  await closeAccountPeriod.mutateAsync(BigInt(String(r.id)))
                 }
               }
             },
@@ -2136,11 +2113,14 @@ function AccountingClientReady({
             id: "ap-delete",
             label: t("accounting.entities.accountPeriods.actions.deleteSelected"),
             requiresSelection: true,
+            selection: "multiple",
             variant: "destructive",
-            onClick: (rows) => {
+            isApplicable: (rows) => rows.some((row) => accountPeriodStateTag(row as Record<string, unknown>) !== "Closed"),
+            successMessage: t("common.actionCompleted", { action: t("accounting.entities.accountPeriods.actions.deleteSelected") }),
+            onClick: async (rows) => {
               for (const r of rows) {
                 if (accountPeriodStateTag(r as Record<string, unknown>) !== "Closed") {
-                  void deleteAccountPeriod.mutateAsync(BigInt(String(r.id)))
+                  await deleteAccountPeriod.mutateAsync(BigInt(String(r.id)))
                 }
               }
             },
@@ -2162,11 +2142,14 @@ function AccountingClientReady({
             id: "asset-activate",
             label: t("accounting.entities.fixedAssets.actions.activateSelected"),
             requiresSelection: true,
-            onClick: (rows) => {
+            selection: "multiple",
+            isApplicable: (rows) => rows.some((row) => (row as Record<string, unknown>).active === false),
+            successMessage: t("common.actionCompleted", { action: t("accounting.entities.fixedAssets.actions.activateSelected") }),
+            onClick: async (rows) => {
               for (const r of rows) {
                 const row = r as Record<string, unknown>
                 if (row.active === false) {
-                  void setAccountAssetActive.mutateAsync({
+                  await setAccountAssetActive.mutateAsync({
                     assetId: BigInt(String(row.id)),
                     active: true,
                   })
@@ -2178,11 +2161,14 @@ function AccountingClientReady({
             id: "asset-deactivate",
             label: t("accounting.entities.fixedAssets.actions.deactivateSelected"),
             requiresSelection: true,
-            onClick: (rows) => {
+            selection: "multiple",
+            isApplicable: (rows) => rows.some((row) => (row as Record<string, unknown>).active === true),
+            successMessage: t("common.actionCompleted", { action: t("accounting.entities.fixedAssets.actions.deactivateSelected") }),
+            onClick: async (rows) => {
               for (const r of rows) {
                 const row = r as Record<string, unknown>
                 if (row.active === true) {
-                  void setAccountAssetActive.mutateAsync({
+                  await setAccountAssetActive.mutateAsync({
                     assetId: BigInt(String(row.id)),
                     active: false,
                   })
@@ -2194,10 +2180,13 @@ function AccountingClientReady({
             id: "asset-confirm",
             label: t("accounting.entities.fixedAssets.actions.confirmSelected"),
             requiresSelection: true,
-            onClick: (rows) => {
+            selection: "multiple",
+            isApplicable: (rows) => rows.some((row) => assetStateTag(row as Record<string, unknown>) === "Draft"),
+            successMessage: t("common.actionCompleted", { action: t("accounting.entities.fixedAssets.actions.confirmSelected") }),
+            onClick: async (rows) => {
               for (const r of rows) {
                 if (assetStateTag(r as Record<string, unknown>) === "Draft") {
-                  void confirmAccountAsset.mutateAsync(BigInt(String(r.id)))
+                  await confirmAccountAsset.mutateAsync(BigInt(String(r.id)))
                 }
               }
             },
@@ -2206,10 +2195,13 @@ function AccountingClientReady({
             id: "asset-close",
             label: t("accounting.entities.fixedAssets.actions.closeSelected"),
             requiresSelection: true,
-            onClick: (rows) => {
+            selection: "multiple",
+            isApplicable: (rows) => rows.some((row) => assetStateTag(row as Record<string, unknown>) === "Running"),
+            successMessage: t("common.actionCompleted", { action: t("accounting.entities.fixedAssets.actions.closeSelected") }),
+            onClick: async (rows) => {
               for (const r of rows) {
                 if (assetStateTag(r as Record<string, unknown>) === "Running") {
-                  void closeAccountAsset.mutateAsync(BigInt(String(r.id)))
+                  await closeAccountAsset.mutateAsync(BigInt(String(r.id)))
                 }
               }
             },
@@ -2218,16 +2210,18 @@ function AccountingClientReady({
             id: "asset-compute-depreciation",
             label: t("accounting.entities.fixedAssets.actions.computeDepreciation"),
             requiresSelection: true,
+            selection: "multiple",
             isApplicable: (rows) =>
               rows.length > 0 &&
               rows.every(
                 (row) =>
                   assetStateTag(row as EntityRow) === "Running",
               ),
-            onClick: (rows) => {
+            successMessage: t("common.actionCompleted", { action: t("accounting.entities.fixedAssets.actions.computeDepreciation") }),
+            onClick: async (rows) => {
               for (const r of rows) {
                 if (assetStateTag(r as EntityRow) === "Running") {
-                  void computeDepreciationBoard.mutateAsync(BigInt(String(r.id)))
+                  await computeDepreciationBoard.mutateAsync(BigInt(String(r.id)))
                 }
               }
             },
@@ -2236,6 +2230,7 @@ function AccountingClientReady({
             id: "asset-dispose",
             label: t("accounting.entities.fixedAssets.actions.disposeSelected"),
             requiresSelection: true,
+            selection: "multiple",
             variant: "destructive",
             isApplicable: (rows) =>
               rows.length > 0 &&
@@ -2243,11 +2238,12 @@ function AccountingClientReady({
                 const state = assetStateTag(row as EntityRow)
                 return state === "Running" || state === "Close"
               }),
-            onClick: (rows) => {
+            successMessage: t("common.actionCompleted", { action: t("accounting.entities.fixedAssets.actions.disposeSelected") }),
+            onClick: async (rows) => {
               for (const r of rows) {
                 const state = assetStateTag(r as EntityRow)
                 if (state === "Running" || state === "Close") {
-                  void disposeAccountAsset.mutateAsync({
+                  await disposeAccountAsset.mutateAsync({
                     assetId: BigInt(String(r.id)),
                     disposalDate: new Date(),
                   })
@@ -2259,11 +2255,14 @@ function AccountingClientReady({
             id: "asset-delete",
             label: t("accounting.entities.fixedAssets.actions.deleteSelected"),
             requiresSelection: true,
+            selection: "multiple",
             variant: "destructive",
-            onClick: (rows) => {
+            isApplicable: (rows) => rows.some((row) => assetStateTag(row as Record<string, unknown>) === "Draft"),
+            successMessage: t("common.actionCompleted", { action: t("accounting.entities.fixedAssets.actions.deleteSelected") }),
+            onClick: async (rows) => {
               for (const r of rows) {
                 if (assetStateTag(r as Record<string, unknown>) === "Draft") {
-                  void deleteAccountAsset.mutateAsync(BigInt(String(r.id)))
+                  await deleteAccountAsset.mutateAsync(BigInt(String(r.id)))
                 }
               }
             },
@@ -2301,12 +2300,18 @@ function AccountingClientReady({
             id: "pay-cancel",
             label: t("accounting.entities.payments.actions.cancelSelected"),
             requiresSelection: true,
+            selection: "multiple",
             variant: "destructive",
-            onClick: (rows) => {
+            isApplicable: (rows) => rows.some((row) => {
+              const st = paymentStateTag(row as Record<string, unknown>)
+              return st === "NotPaid" || st === "Paid"
+            }),
+            successMessage: t("common.actionCompleted", { action: t("accounting.entities.payments.actions.cancelSelected") }),
+            onClick: async (rows) => {
               for (const r of rows) {
                 const st = paymentStateTag(r as Record<string, unknown>)
                 if (st === "NotPaid" || st === "Paid") {
-                  void cancelAccountPayment.mutateAsync(BigInt(String((r as Record<string, unknown>).id)))
+                  await cancelAccountPayment.mutateAsync(BigInt(String((r as Record<string, unknown>).id)))
                 }
               }
             },
@@ -2358,10 +2363,13 @@ function AccountingClientReady({
             id: "pt-activate",
             label: t("accounting.entities.paymentTerms.actions.activateSelected"),
             requiresSelection: true,
-            onClick: (rows) => {
+            selection: "multiple",
+            isApplicable: (rows) => rows.some((row) => !paymentTermIsActive(row as Record<string, unknown>)),
+            successMessage: t("common.actionCompleted", { action: t("accounting.entities.paymentTerms.actions.activateSelected") }),
+            onClick: async (rows) => {
               for (const r of rows) {
                 if (!paymentTermIsActive(r as Record<string, unknown>)) {
-                  void updatePaymentTerm.mutateAsync({
+                  await updatePaymentTerm.mutateAsync({
                     termId: BigInt(String((r as Record<string, unknown>).id)),
                     name: null,
                     note: null,
@@ -2375,10 +2383,13 @@ function AccountingClientReady({
             id: "pt-deactivate",
             label: t("accounting.entities.paymentTerms.actions.deactivateSelected"),
             requiresSelection: true,
-            onClick: (rows) => {
+            selection: "multiple",
+            isApplicable: (rows) => rows.some((row) => paymentTermIsActive(row as Record<string, unknown>)),
+            successMessage: t("common.actionCompleted", { action: t("accounting.entities.paymentTerms.actions.deactivateSelected") }),
+            onClick: async (rows) => {
               for (const r of rows) {
                 if (paymentTermIsActive(r as Record<string, unknown>)) {
-                  void updatePaymentTerm.mutateAsync({
+                  await updatePaymentTerm.mutateAsync({
                     termId: BigInt(String((r as Record<string, unknown>).id)),
                     name: null,
                     note: null,
@@ -2392,10 +2403,12 @@ function AccountingClientReady({
             id: "pt-delete",
             label: t("accounting.entities.paymentTerms.actions.deleteSelected"),
             requiresSelection: true,
+            selection: "multiple",
             variant: "destructive",
-            onClick: (rows) => {
+            successMessage: t("common.actionCompleted", { action: t("accounting.entities.paymentTerms.actions.deleteSelected") }),
+            onClick: async (rows) => {
               for (const r of rows) {
-                void deletePaymentTerm.mutateAsync(BigInt(String((r as Record<string, unknown>).id)))
+                await deletePaymentTerm.mutateAsync(BigInt(String((r as Record<string, unknown>).id)))
               }
             },
           },
@@ -2425,10 +2438,12 @@ function AccountingClientReady({
             id: "ptl-delete",
             label: t("accounting.entities.paymentTerms.actions.deleteLinesSelected"),
             requiresSelection: true,
+            selection: "multiple",
             variant: "destructive",
-            onClick: (rows) => {
+            successMessage: t("common.actionCompleted", { action: t("accounting.entities.paymentTerms.actions.deleteLinesSelected") }),
+            onClick: async (rows) => {
               for (const r of rows) {
-                void deletePaymentTermLine.mutateAsync(BigInt(String((r as Record<string, unknown>).id)))
+                await deletePaymentTermLine.mutateAsync(BigInt(String((r as Record<string, unknown>).id)))
               }
             },
           },
@@ -2474,10 +2489,14 @@ function AccountingClientReady({
             id: "move-line-delete",
             label: t("accounting.entities.moveLines.actions.deleteSelected"),
             requiresSelection: true,
+            selection: "multiple",
             variant: "destructive",
-            onClick: (rows) => {
+            isApplicable: (rows) =>
+              rows.every((r) => accountMoveLineCanBeDeleted(r as Record<string, unknown>, allMoves as Record<string, unknown>[])),
+            successMessage: t("common.actionCompleted", { action: t("accounting.entities.moveLines.actions.deleteSelected") }),
+            onClick: async (rows) => {
               for (const r of rows) {
-                void deleteAccountMoveLine.mutateAsync({
+                await deleteAccountMoveLine.mutateAsync({
                   lineId: BigInt(String((r as Record<string, unknown>).id)),
                   params: { companyId: operatingCompanyId },
                 })
@@ -2487,7 +2506,7 @@ function AccountingClientReady({
         ],
       },
     }
-  }, [t, deleteAccountMoveLine, organizationId, operatingCompanyId, accountLabelMap, sourceDocumentLabelMap])
+  }, [t, deleteAccountMoveLine, organizationId, operatingCompanyId, accountLabelMap, sourceDocumentLabelMap, allMoves])
 
   // Helper to get intercompany rule active state
   const intercompanyRuleIsActive = useCallback((row: Record<string, unknown>): boolean => {
@@ -2506,10 +2525,13 @@ function AccountingClientReady({
             id: "ic-rule-activate",
             label: t("accounting.entities.intercompanyRules.actions.activateSelected"),
             requiresSelection: true,
-            onClick: (rows) => {
+            selection: "multiple",
+            isApplicable: (rows) => rows.some((row) => !intercompanyRuleIsActive(row as Record<string, unknown>)),
+            successMessage: t("common.actionCompleted", { action: t("accounting.entities.intercompanyRules.actions.activateSelected") }),
+            onClick: async (rows) => {
               for (const r of rows) {
                 if (!intercompanyRuleIsActive(r as Record<string, unknown>)) {
-                  void setIntercompanyRuleActive.mutateAsync({
+                  await setIntercompanyRuleActive.mutateAsync({
                     ruleId: BigInt(String(r.id)),
                     isActive: true,
                   })
@@ -2521,10 +2543,13 @@ function AccountingClientReady({
             id: "ic-rule-deactivate",
             label: t("accounting.entities.intercompanyRules.actions.deactivateSelected"),
             requiresSelection: true,
-            onClick: (rows) => {
+            selection: "multiple",
+            isApplicable: (rows) => rows.some((row) => intercompanyRuleIsActive(row as Record<string, unknown>)),
+            successMessage: t("common.actionCompleted", { action: t("accounting.entities.intercompanyRules.actions.deactivateSelected") }),
+            onClick: async (rows) => {
               for (const r of rows) {
                 if (intercompanyRuleIsActive(r as Record<string, unknown>)) {
-                  void setIntercompanyRuleActive.mutateAsync({
+                  await setIntercompanyRuleActive.mutateAsync({
                     ruleId: BigInt(String(r.id)),
                     isActive: false,
                   })
@@ -2536,10 +2561,12 @@ function AccountingClientReady({
             id: "ic-rule-delete",
             label: t("accounting.entities.intercompanyRules.actions.deleteSelected"),
             requiresSelection: true,
+            selection: "multiple",
             variant: "destructive",
-            onClick: (rows) => {
+            successMessage: t("common.actionCompleted", { action: t("accounting.entities.intercompanyRules.actions.deleteSelected") }),
+            onClick: async (rows) => {
               for (const r of rows) {
-                void deleteIntercompanyRule.mutateAsync(BigInt(String(r.id)))
+                await deleteIntercompanyRule.mutateAsync(BigInt(String(r.id)))
               }
             },
           },
@@ -2571,11 +2598,17 @@ function AccountingClientReady({
             id: "ic-tx-approve",
             label: t("accounting.entities.intercompanyTransactions.actions.approveSelected"),
             requiresSelection: true,
-            onClick: (rows) => {
+            selection: "multiple",
+            isApplicable: (rows) => rows.some((row) => {
+              const state = intercompanyTransactionState(row as Record<string, unknown>)
+              return state === "Pending" || state === "Draft"
+            }),
+            successMessage: t("common.actionCompleted", { action: t("accounting.entities.intercompanyTransactions.actions.approveSelected") }),
+            onClick: async (rows) => {
               for (const r of rows) {
                 const state = intercompanyTransactionState(r as Record<string, unknown>)
                 if (state === "Pending" || state === "Draft") {
-                  void approveIntercompanyTransaction.mutateAsync(BigInt(String(r.id)))
+                  await approveIntercompanyTransaction.mutateAsync(BigInt(String(r.id)))
                 }
               }
             },
@@ -2584,11 +2617,14 @@ function AccountingClientReady({
             id: "ic-tx-process",
             label: t("accounting.entities.intercompanyTransactions.actions.processSelected"),
             requiresSelection: true,
-            onClick: (rows) => {
+            selection: "multiple",
+            isApplicable: (rows) => rows.some((row) => intercompanyTransactionState(row as Record<string, unknown>) === "Approved"),
+            successMessage: t("common.actionCompleted", { action: t("accounting.entities.intercompanyTransactions.actions.processSelected") }),
+            onClick: async (rows) => {
               for (const r of rows) {
                 const state = intercompanyTransactionState(r as Record<string, unknown>)
                 if (state === "Approved") {
-                  void processIntercompanyTransaction.mutateAsync({
+                  await processIntercompanyTransaction.mutateAsync({
                     transactionId: BigInt(String(r.id)),
                     params: {}, // Process params would come from a modal in a full implementation
                   })
@@ -2600,11 +2636,14 @@ function AccountingClientReady({
             id: "ic-tx-complete",
             label: t("accounting.entities.intercompanyTransactions.actions.completeSelected"),
             requiresSelection: true,
-            onClick: (rows) => {
+            selection: "multiple",
+            isApplicable: (rows) => rows.some((row) => intercompanyTransactionState(row as Record<string, unknown>) === "Processing"),
+            successMessage: t("common.actionCompleted", { action: t("accounting.entities.intercompanyTransactions.actions.completeSelected") }),
+            onClick: async (rows) => {
               for (const r of rows) {
                 const state = intercompanyTransactionState(r as Record<string, unknown>)
                 if (state === "Processing") {
-                  void completeIntercompanyTransaction.mutateAsync(BigInt(String(r.id)))
+                  await completeIntercompanyTransaction.mutateAsync(BigInt(String(r.id)))
                 }
               }
             },
@@ -2613,11 +2652,14 @@ function AccountingClientReady({
             id: "ic-tx-retry",
             label: t("accounting.entities.intercompanyTransactions.actions.retrySelected"),
             requiresSelection: true,
-            onClick: (rows) => {
+            selection: "multiple",
+            isApplicable: (rows) => rows.some((row) => intercompanyTransactionState(row as Record<string, unknown>) === "Error"),
+            successMessage: t("common.actionCompleted", { action: t("accounting.entities.intercompanyTransactions.actions.retrySelected") }),
+            onClick: async (rows) => {
               for (const r of rows) {
                 const state = intercompanyTransactionState(r as Record<string, unknown>)
                 if (state === "Error") {
-                  void retryIntercompanyTransaction.mutateAsync(BigInt(String(r.id)))
+                  await retryIntercompanyTransaction.mutateAsync(BigInt(String(r.id)))
                 }
               }
             },
@@ -2626,12 +2668,18 @@ function AccountingClientReady({
             id: "ic-tx-cancel",
             label: t("accounting.entities.intercompanyTransactions.actions.cancelSelected"),
             requiresSelection: true,
+            selection: "multiple",
             variant: "destructive",
-            onClick: (rows) => {
+            isApplicable: (rows) => rows.some((row) => {
+              const state = intercompanyTransactionState(row as Record<string, unknown>)
+              return state !== "Completed" && state !== "Cancelled"
+            }),
+            successMessage: t("common.actionCompleted", { action: t("accounting.entities.intercompanyTransactions.actions.cancelSelected") }),
+            onClick: async (rows) => {
               for (const r of rows) {
                 const state = intercompanyTransactionState(r as Record<string, unknown>)
                 if (state !== "Completed" && state !== "Cancelled") {
-                  void cancelIntercompanyTransaction.mutateAsync({
+                  await cancelIntercompanyTransaction.mutateAsync({
                     transactionId: BigInt(String(r.id)),
                     reason: "Cancelled by user",
                   })
@@ -2664,6 +2712,23 @@ function AccountingClientReady({
     currencyLabelMap,
   ])
 
+  const runMutation = useCallback(
+    async (op: () => Promise<unknown>): Promise<boolean> => {
+      try {
+        await op()
+        return true
+      } catch (e) {
+        showWorkflowToast({
+          kind: "error",
+          title: t("common.error.title"),
+          description: e instanceof Error ? e.message : t("common.error.generic"),
+        })
+        return false
+      }
+    },
+    [t],
+  )
+
   const postDraft = useCallback(
     (move: unknown) => {
       const row = move as Record<string, unknown>
@@ -2674,10 +2739,10 @@ function AccountingClientReady({
         // The workflow surface already reports the failure.
         void invoiceToPayment.postInvoice.execute(String(id)).catch(() => undefined)
       } else {
-        postMove.mutate(id)
+        void runMutation(() => postMove.mutateAsync(id))
       }
     },
-    [postMove, invoiceToPayment.postInvoice],
+    [postMove, invoiceToPayment.postInvoice, runMutation],
   )
 
   const handleInvoiceDownloadPdf = useCallback(async () => {
@@ -2724,8 +2789,20 @@ function AccountingClientReady({
 
   const handleInvoiceSendEmail = useCallback(async () => {
     if (!selectedInvoice?.id) return
-    const recipient = window.prompt("Recipient email address")
-    if (!recipient?.trim()) return
+    const values = await askForm({
+      title: t("accounting.invoices.invoiceActions.send"),
+      fields: [
+        {
+          id: "recipient",
+          name: "recipient",
+          label: "Recipient email address",
+          type: "email",
+          required: true,
+        },
+      ],
+    })
+    const recipient = formText(values?.recipient)
+    if (recipient == null) return
     const template = (mailTemplatesQuery.data ?? []).find(
       (row) =>
         (row.model ?? "") === "account_move" &&
@@ -2745,7 +2822,7 @@ function AccountingClientReady({
         templateId: Number(template.id),
         model: "account_move",
         resId: Number(selectedInvoice.id),
-        recipientEmail: recipient.trim(),
+        recipientEmail: recipient,
       })
       const dispatchResult = await dispatchQueuedMail.mutateAsync()
       toast({
@@ -2766,6 +2843,7 @@ function AccountingClientReady({
     mailTemplatesQuery.data,
     queueMailFromTemplate,
     dispatchQueuedMail,
+    askForm,
     toast,
     t,
   ])
@@ -3174,6 +3252,12 @@ function AccountingClientReady({
                 ...tabRest,
                 type: "custom" as const,
                 customContent: (
+                  <ListPivotSwitch
+                    storageId="accounting-invoices-list"
+                    t={t}
+                    rows={invoices as unknown as Record<string, unknown>[]}
+                    {...accountMovePivotSetup(t)}
+                  >
                   <InvoiceListView
                     invoices={invoices}
                     onSelectInvoice={(invoice) =>
@@ -3182,9 +3266,10 @@ function AccountingClientReady({
                     }
                     onCreateInvoice={() => setShowCreateInvoice(true)}
                     onRecalculateTotals={(inv) =>
-                      void computeInvoiceTotals.mutateAsync(inv.id as string | number | bigint)
+                      void runMutation(() => computeInvoiceTotals.mutateAsync(inv.id as string | number | bigint))
                     }
                   />
+                  </ListPivotSwitch>
                 ),
               }
             }
@@ -3194,6 +3279,12 @@ function AccountingClientReady({
                 ...tabRest,
                 type: "custom" as const,
                 customContent: (
+                  <ListPivotSwitch
+                    storageId="accounting-bills-list"
+                    t={t}
+                    rows={bills as unknown as Record<string, unknown>[]}
+                    {...accountMovePivotSetup(t)}
+                  >
                   <BillsListView
                     bills={bills}
                     onCreateBill={() => setShowCreateBill(true)}
@@ -3202,9 +3293,10 @@ function AccountingClientReady({
                       setInvoiceSheetRecord(bill as unknown as Record<string, unknown>)
                     }
                     onRecalculateTotals={(bill) =>
-                      void computeInvoiceTotals.mutateAsync(bill.id as string | number | bigint)
+                      void runMutation(() => computeInvoiceTotals.mutateAsync(bill.id as string | number | bigint))
                     }
                   />
+                  </ListPivotSwitch>
                 ),
               }
             }
@@ -3245,10 +3337,10 @@ function AccountingClientReady({
                     onCreate={() => setQuickActionForm({ form: journalEntryFormConfig, action: "createMove" })}
                     onPostMove={(move) => postDraft(move)}
                     onCancelMove={(move) =>
-                      cancelMove.mutate(move.id as string | number | bigint)
+                      void runMutation(() => cancelMove.mutateAsync(move.id as string | number | bigint))
                     }
                     onComputeInvoiceTotals={(move) =>
-                      void computeInvoiceTotals.mutateAsync(move.id as string | number | bigint)
+                      void runMutation(() => computeInvoiceTotals.mutateAsync(move.id as string | number | bigint))
                     }
                     postMovePending={postMove.isPending || invoiceToPayment.isPending}
                     cancelMovePending={cancelMove.isPending}
@@ -3349,12 +3441,12 @@ function AccountingClientReady({
                   {
                     id: "tax-refresh-deadline-statuses",
                     label: t("accounting.taxes.refreshDeadlineStatuses"),
-                    onClick: () => void refreshTaxDeadlineStatuses.mutateAsync(),
+                    onClick: () => refreshTaxDeadlineStatuses.mutateAsync(),
                   },
                   {
                     id: "tax-schedule-deadline-updates",
                     label: t("accounting.taxes.scheduleDeadlineUpdates"),
-                    onClick: () => void scheduleTaxDeadlineUpdates.mutateAsync(),
+                    onClick: () => scheduleTaxDeadlineUpdates.mutateAsync(),
                   },
                 ]),
               }
@@ -3905,6 +3997,7 @@ function AccountingClientReady({
 
   return (
     <>
+      {formDialog}
       <ModuleView
         config={config}
         data={data}
@@ -4095,8 +4188,8 @@ function AccountingClientReady({
         onRecalculateTotals={
           selectedInvoice
             ? () =>
-              void computeInvoiceTotals.mutateAsync(
-                selectedInvoice.id as string | number | bigint,
+              void runMutation(() =>
+                computeInvoiceTotals.mutateAsync(selectedInvoice.id as string | number | bigint),
               )
             : undefined
         }
@@ -4424,7 +4517,7 @@ function AccountingClientReady({
             disabled={!analyticLineEdit?.id || deleteAnalyticLine.isPending}
             onClick={async () => {
               if (!analyticLineEdit?.id) return
-              if (!window.confirm(`${t("common.delete")}?`)) return
+              if (!(await confirmDialog({ description: `${t("common.delete")}?` }))) return
               await deleteAnalyticLine.mutateAsync(BigInt(String(analyticLineEdit.id)))
               setAnalyticLineEdit(null)
             }}
@@ -4460,7 +4553,7 @@ function AccountingClientReady({
             disabled={!reconciliationWidgetEdit?.id || deleteReconciliationWidget.isPending}
             onClick={async () => {
               if (!reconciliationWidgetEdit?.id) return
-              if (!window.confirm(`${t("common.delete")}?`)) return
+              if (!(await confirmDialog({ description: `${t("common.delete")}?` }))) return
               await deleteReconciliationWidget.mutateAsync(BigInt(String(reconciliationWidgetEdit.id)))
               setReconciliationWidgetEdit(null)
             }}
@@ -4545,12 +4638,14 @@ function AccountingClientReady({
                   size="sm"
                   variant="secondary"
                   disabled={bankStatementStateStr(bankStatementDetail) === "Posted" || deleteBankStatement.isPending}
-                  onClick={() => {
+                  onClick={async () => {
                     if (!bankStatementDetail.id) return
-                    if (!window.confirm(t("accounting.bankStatementDetail.deleteStatementConfirm"))) return
-                    void deleteBankStatement.mutateAsync(BigInt(String(bankStatementDetail.id))).then(() => {
-                      setBankStatementDetail(null)
-                    })
+                    if (!(await confirmDialog({ description: t("accounting.bankStatementDetail.deleteStatementConfirm") }))) return
+                    void runMutation(() => deleteBankStatement.mutateAsync(BigInt(String(bankStatementDetail.id)))).then(
+                      (ok) => {
+                        if (ok) setBankStatementDetail(null)
+                      },
+                    )
                   }}
                 >
                   {t("common.delete")}
@@ -4627,16 +4722,18 @@ function AccountingClientReady({
                                       variant="ghost"
                                       className="h-7 px-2"
                                       disabled={unreconcileBankLine.isPending}
-                                      onClick={() => {
+                                      onClick={async () => {
                                         if (!line.id) return
-                                        if (!window.confirm(t("accounting.bankStatementDetail.unreconcileConfirm")))
+                                        if (!(await confirmDialog({ description: t("accounting.bankStatementDetail.unreconcileConfirm") })))
                                           return
                                         const lid = BigInt(String(line.id))
                                         const amt = Number(line.amount ?? 0)
-                                        void unreconcileBankLine.mutateAsync({
-                                          lineId: lid,
-                                          params: bankReconcileParamsToJson([], amt),
-                                        })
+                                        void runMutation(() =>
+                                          unreconcileBankLine.mutateAsync({
+                                            lineId: lid,
+                                            params: bankReconcileParamsToJson([], amt),
+                                          }),
+                                        )
                                       }}
                                     >
                                       {t("accounting.bankStatementDetail.unreconcileLine")}
@@ -4665,11 +4762,11 @@ function AccountingClientReady({
                                       bankStatementStateStr(bankStatementDetail) === "Posted" ||
                                       deleteBankStatementLine.isPending
                                     }
-                                    onClick={() => {
+                                    onClick={async () => {
                                       if (!line.id) return
-                                      if (!window.confirm(t("accounting.bankStatementDetail.deleteLineConfirm")))
+                                      if (!(await confirmDialog({ description: t("accounting.bankStatementDetail.deleteLineConfirm") })))
                                         return
-                                      void deleteBankStatementLine.mutateAsync(BigInt(String(line.id)))
+                                      void runMutation(() => deleteBankStatementLine.mutateAsync(BigInt(String(line.id))))
                                     }}
                                   >
                                     {t("common.delete")}
@@ -4710,10 +4807,12 @@ function AccountingClientReady({
                         variant="secondary"
                         disabled={matchBankLine.isPending}
                         onClick={() => {
-                          void matchBankLine.mutateAsync({
-                            lineId: BigInt(String(bankLineMatchFocus.id)),
-                            ruleId: parseOptionalRuleId(reconciliationRuleIdInput),
-                          })
+                          void runMutation(() =>
+                            matchBankLine.mutateAsync({
+                              lineId: BigInt(String(bankLineMatchFocus.id)),
+                              ruleId: parseOptionalRuleId(reconciliationRuleIdInput),
+                            }),
+                          )
                         }}
                       >
                         {t("accounting.bankStatementDetail.matchBankLine")}
@@ -4724,10 +4823,12 @@ function AccountingClientReady({
                         variant="secondary"
                         disabled={applyReconciliationRules.isPending}
                         onClick={() => {
-                          void applyReconciliationRules.mutateAsync({
-                            lineId: BigInt(String(bankLineMatchFocus.id)),
-                            ruleId: parseOptionalRuleId(reconciliationRuleIdInput),
-                          })
+                          void runMutation(() =>
+                            applyReconciliationRules.mutateAsync({
+                              lineId: BigInt(String(bankLineMatchFocus.id)),
+                              ruleId: parseOptionalRuleId(reconciliationRuleIdInput),
+                            }),
+                          )
                         }}
                       >
                         {t("accounting.bankStatementDetail.applyRules")}
@@ -4768,13 +4869,15 @@ function AccountingClientReady({
                                       disabled={reconcileBankLine.isPending || Boolean(bankLineMatchFocus.isReconciled)}
                                       onClick={() => {
                                         if (!bankLineMatchFocus.id || c.entityId == null) return
-                                        void reconcileBankLine.mutateAsync({
-                                          lineId: BigInt(String(bankLineMatchFocus.id)),
-                                          params: bankReconcileParamsToJson(
-                                            [BigInt(String(c.entityId))],
-                                            0,
-                                          ),
-                                        })
+                                        void runMutation(() =>
+                                          reconcileBankLine.mutateAsync({
+                                            lineId: BigInt(String(bankLineMatchFocus.id)),
+                                            params: bankReconcileParamsToJson(
+                                              [BigInt(String(c.entityId))],
+                                              0,
+                                            ),
+                                          }),
+                                        )
                                       }}
                                     >
                                       {t("accounting.bankStatementDetail.reconcileWithCandidate")}
@@ -4831,13 +4934,15 @@ function AccountingClientReady({
                             .filter(Boolean)
                           const ids = parts.map((p) => BigInt(p))
                           const res = Number(manualReconcileResidual)
-                          void reconcileBankLine.mutateAsync({
-                            lineId: BigInt(String(bankLineMatchFocus.id)),
-                            params: bankReconcileParamsToJson(
-                              ids,
-                              Number.isFinite(res) ? res : 0,
-                            ),
-                          })
+                          void runMutation(() =>
+                            reconcileBankLine.mutateAsync({
+                              lineId: BigInt(String(bankLineMatchFocus.id)),
+                              params: bankReconcileParamsToJson(
+                                ids,
+                                Number.isFinite(res) ? res : 0,
+                              ),
+                            }),
+                          )
                         }}
                       >
                         {t("accounting.bankStatementDetail.reconcileManual")}
@@ -4878,6 +4983,7 @@ function AccountingClientReady({
         config={editBankStatementLineFormConfig}
         onSubmit={onSubmitEditBankStatementLine}
       />
+      {confirmDialogNode}
     </>
   )
 }

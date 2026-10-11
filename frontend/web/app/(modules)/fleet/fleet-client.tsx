@@ -2,22 +2,19 @@
 
 import { useMemo } from "react"
 import { useTranslation } from "@lumiere/i18n"
-import { ModuleView, MissingOrganization, type EntityRow } from "@lumiere/ui"
+import { ModuleView, MissingOrganization, type EntityRow, type ModuleConfig } from "@lumiere/ui"
 import { fleetModuleConfig } from "@/lib/module-dashboard-configs"
 import { useFleetModuleSubscription } from "@/lib/module-subscription-hooks"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
 import { useOperatingCompanyBigInt } from "@lumiere/query-hooks/hooks/use-operating-company"
 import {
   useFleetVehicles,
-  useCreateFleetVehicle,
   useFleetServiceTypes,
   useFleetServiceRecords,
   useFleetInspections,
-  useUpdateFleetVehicleDriver,
-  useRecordFleetService,
-  useRecordFleetInspection,
-  type FleetInspectionOutcome,
 } from "@lumiere/query-hooks/hooks/fleet"
+import { fleetVehicleRecordHref, showVehicleNameColumn, withVehicleNames } from "./fleet-record"
+import { useFleetActions } from "./fleet-actions"
 import { useEmployees } from "@lumiere/query-hooks/hooks/hr/employees"
 import {
   useAccountAccounts,
@@ -38,6 +35,18 @@ type FleetClientLoadedProps = Omit<FleetClientProps, "organizationId"> & {
   organizationId: number
 }
 
+const withVehicleNameColumn = <Tab extends ModuleConfig["tabs"][number]>(tab: Tab): Tab => {
+  const entityConfig = tab.entityConfig
+  if (!entityConfig || entityConfig.view.mode !== "table") return tab
+  return {
+    ...tab,
+    entityConfig: {
+      ...entityConfig,
+      view: { ...entityConfig.view, columns: showVehicleNameColumn(entityConfig.view.columns) },
+    },
+  }
+}
+
 function FleetClientLoaded({ initialVehicles, organizationId }: FleetClientLoadedProps) {
   const { t } = useTranslation()
   const { orgId } = orgBigInts(organizationId)
@@ -52,10 +61,7 @@ function FleetClientLoaded({ initialVehicles, organizationId }: FleetClientLoade
   const { data: inspections = [] } = useFleetInspections(orgId)
   const { data: accountJournals = [] } = useAccountJournals(orgId)
   const { data: accountAccounts = [] } = useAccountAccounts(orgId)
-  const createVehicle = useCreateFleetVehicle(orgId, company ?? undefined)
-  const updateDriver = useUpdateFleetVehicleDriver(orgId, company ?? undefined)
-  const recordService = useRecordFleetService(orgId, company ?? undefined)
-  const recordInspection = useRecordFleetInspection(orgId, company ?? undefined)
+  const fleetActions = useFleetActions(orgId, company ?? undefined)
 
   const belongsToCompany = (row: EntityRow, allowOrganizationWide = false) => {
     if (company == null) return true
@@ -92,89 +98,55 @@ function FleetClientLoaded({ initialVehicles, organizationId }: FleetClientLoade
     })
   }, [accountRows, employeeRows, journalRows, serviceTypeRows, t, vehicleRows])
 
-  const optionalDate = (value: unknown) => {
-    if (value == null || String(value).trim() === "") return undefined
-    const parsed = new Date(String(value))
-    return Number.isNaN(parsed.getTime()) ? undefined : parsed
-  }
-
-  const optionalNumber = (value: unknown) => {
-    if (value == null || String(value).trim() === "") return undefined
-    const parsed = Number(value)
-    return Number.isFinite(parsed) ? parsed : undefined
-  }
-
-  const requestId = () => crypto.randomUUID()
+  const config = useMemo(
+    () => ({
+      ...moduleConfig,
+      tabs: moduleConfig.tabs.map((tab) =>
+        tab.id === "fleet-service-records" || tab.id === "fleet-inspections"
+          ? withVehicleNameColumn(tab)
+          : tab.id === "fleet-vehicles"
+          ? {
+              ...tab,
+              recordSheet: {
+                titleKey: "name",
+                auditTableName: "fleet_vehicle",
+                discussion: {},
+                openHref: fleetVehicleRecordHref,
+                detailConfig: {
+                  mode: "detail" as const,
+                  sections: [
+                    {
+                      id: "vehicle",
+                      fields: [
+                        { key: "license_plate", label: t("fleet.table.licensePlate") },
+                        { key: "vehicle_type", label: t("fleet.table.vehicleType") },
+                        { key: "driver_name", label: t("fleet.table.driverName") },
+                        { key: "status", label: t("fleet.table.status") },
+                        { key: "odometer_km", label: t("fleet.table.odometer") },
+                      ],
+                    },
+                  ],
+                },
+              },
+            }
+          : tab,
+      ),
+    }),
+    [moduleConfig, t],
+  )
 
   return (
     <ModuleView
-      config={moduleConfig}
+      config={config}
       data={{
         "fleet-vehicles": vehicleRows,
         "fleet-driver-assignment": vehicleRows,
-        "fleet-service-records": serviceRecordRows,
-        "fleet-inspections": inspectionRows,
+        "fleet-service-records": withVehicleNames(serviceRecordRows as unknown as EntityRow[], vehicleRows),
+        "fleet-inspections": withVehicleNames(inspectionRows as unknown as EntityRow[], vehicleRows),
       }}
-      isPending={
-        createVehicle.isPending ||
-        updateDriver.isPending ||
-        recordService.isPending ||
-        recordInspection.isPending
-      }
+      isPending={fleetActions.isPending}
       onFormSubmit={async (_tabId, action, formData) => {
-        if (action === "createFleetVehicle") {
-          await createVehicle.mutateAsync({
-            name: String(formData.name ?? ""),
-            vehicleType: String(formData.vehicle_type ?? "truck"),
-            licensePlate:
-              formData.license_plate != null &&
-              String(formData.license_plate).trim() !== ""
-                ? String(formData.license_plate).trim()
-                : null,
-            driverName:
-              formData.driver_name != null &&
-              String(formData.driver_name).trim() !== ""
-                ? String(formData.driver_name).trim()
-                : null,
-          })
-          return
-        }
-        if (action === "assignFleetDriver") {
-          const driverId = String(formData.driver_id ?? "")
-          await updateDriver.mutateAsync({
-            vehicleId: BigInt(String(formData.vehicle_id)),
-            driverId: driverId === "unassigned" ? null : BigInt(driverId),
-          })
-          return
-        }
-        if (action === "recordFleetService") {
-          await recordService.mutateAsync({
-            vehicleId: BigInt(String(formData.vehicle_id)),
-            serviceTypeId: BigInt(String(formData.service_type_id)),
-            servicedAt: optionalDate(formData.serviced_at),
-            odometerKm: optionalNumber(formData.odometer_km),
-            provider: String(formData.provider ?? ""),
-            notes: String(formData.notes ?? ""),
-            costAmount: Number(formData.cost_amount),
-            journalId: BigInt(String(formData.journal_id)),
-            expenseAccountId: BigInt(String(formData.expense_account_id)),
-            offsetAccountId: BigInt(String(formData.offset_account_id)),
-            clientRequestId: requestId(),
-          })
-          return
-        }
-        if (action === "recordFleetInspection") {
-          const inspectorId = String(formData.inspector_id ?? "").trim()
-          await recordInspection.mutateAsync({
-            vehicleId: BigInt(String(formData.vehicle_id)),
-            inspectorId: inspectorId ? BigInt(inspectorId) : undefined,
-            inspectedAt: optionalDate(formData.inspected_at),
-            outcome: String(formData.outcome ?? "passed") as FleetInspectionOutcome,
-            odometerKm: optionalNumber(formData.odometer_km),
-            notes: String(formData.notes ?? ""),
-            clientRequestId: requestId(),
-          })
-        }
+        await fleetActions.submit(action, formData)
       }}
     />
   )

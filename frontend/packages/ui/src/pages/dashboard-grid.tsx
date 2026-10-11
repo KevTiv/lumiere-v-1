@@ -9,10 +9,11 @@ interface DashboardGridProps {
   sections: DashboardSection[]
   testId?: string
   widgetTestIdPrefix?: string
+  isLoading?: boolean
 }
 
 export const DashboardGrid = forwardRef<HTMLDivElement, DashboardGridProps>(
-  function DashboardGrid({ sections, testId, widgetTestIdPrefix }, ref) {
+  function DashboardGrid({ sections, testId, widgetTestIdPrefix, isLoading }, ref) {
     return (
       <div ref={ref} className="space-y-10" data-testid={testId}>
         {sections.map((section) => (
@@ -28,6 +29,7 @@ export const DashboardGrid = forwardRef<HTMLDivElement, DashboardGridProps>(
                   key={widget.id}
                   widget={widget}
                   widthClass={gridWidthClasses[widget.width]}
+                  isLoading={isLoading}
                   testId={widgetTestIdPrefix ? `${widgetTestIdPrefix}-${widget.id}` : undefined}
                 />
               ))}
