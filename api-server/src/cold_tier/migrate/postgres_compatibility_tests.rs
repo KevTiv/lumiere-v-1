@@ -1,6 +1,4 @@
-use super::{
-    ensure_schema, migration_checksum, MIGRATIONS, MIGRATION_TABLE, MIGRATION_TABLE_DDL,
-};
+use super::{ensure_schema, migration_checksum, MIGRATIONS, MIGRATION_TABLE, MIGRATION_TABLE_DDL};
 use crate::cold_tier::{conventions, pg_codec, pg_pool, projection_worker};
 use anyhow::{ensure, Context, Result};
 use deadpool_postgres::Pool;
@@ -69,14 +67,39 @@ async fn postgres_existing_durable_projection_adds_migration_11() -> Result<()> 
     Ok(())
 }
 
+#[tokio::test]
+async fn postgres_migration_13_adds_manufacturing_cost_projection_14() -> Result<()> {
+    if std::env::var("C4_TEST_PG").as_deref() != Ok("1") {
+        eprintln!(
+            "skipping postgres_migration_13_adds_manufacturing_cost_projection_14 (set C4_TEST_PG=1 to run)"
+        );
+        return Ok(());
+    }
+
+    let base_config = pg_pool::PgConfig::from_env()?;
+    let database = unique_database_name()?;
+    let admin_pool = admin_pool(&base_config)?;
+    create_database(&admin_pool, &database, &base_config.user).await?;
+
+    let mut test_config = base_config.clone();
+    test_config.database.clone_from(&database);
+    let test_pool = pg_pool::build_pool(&test_config)?;
+    let test_result = exercise_manufacturing_cost_projection_upgrade(&test_pool).await;
+    drop(test_pool);
+    let cleanup_result = drop_database(&admin_pool, &database).await;
+
+    test_result?;
+    cleanup_result?;
+    Ok(())
+}
+
 async fn exercise_durable_projection_upgrade(pool: &Pool) -> Result<()> {
     let migration_11_index = "cold_tier_service_identity_identity";
-    let frozen_migration_1 = include_str!(
-        "../../../../lumiere-codegen/pg-migration-ledger/0001_durable_projection.sql"
-    );
+    let frozen_migration_1 =
+        include_str!("../../../../lumiere-codegen/pg-migration-ledger/0001_durable_projection.sql");
     let prefix_length = MIGRATIONS
-        .len()
-        .checked_sub(1)
+        .iter()
+        .position(|migration| migration.version == 11)
         .context("migration 11 is missing from the catalog")?;
     ensure!(MIGRATIONS[0].sql == frozen_migration_1);
     ensure!(MIGRATIONS[prefix_length].version == 11);
@@ -92,11 +115,91 @@ async fn exercise_durable_projection_upgrade(pool: &Pool) -> Result<()> {
     ensure!(migration_count(pool).await? == MIGRATIONS.len() as i64);
     ensure!(relation_exists(pool, migration_11_index).await?);
     ensure!(applied_checksum(pool, 1).await? == migration_1_checksum);
-    ensure!(
-        applied_checksum(pool, 11).await?
-            == migration_checksum(MIGRATIONS[prefix_length].sql)
-    );
+    ensure!(applied_checksum(pool, 11).await? == migration_checksum(MIGRATIONS[prefix_length].sql));
     Ok(())
+}
+
+async fn exercise_manufacturing_cost_projection_upgrade(pool: &Pool) -> Result<()> {
+    let migration_13_index = MIGRATIONS
+        .iter()
+        .position(|migration| migration.version == 13)
+        .context("migration 13 is missing from the catalog")?;
+    let migration_14_index = MIGRATIONS
+        .iter()
+        .position(|migration| migration.version == 14)
+        .context("migration 14 is missing from the catalog")?;
+    let frozen_migration_14 = include_str!(
+        "../../../../lumiere-codegen/pg-migration-ledger/0014_durable_projection_delta.sql"
+    );
+    ensure!(migration_14_index == migration_13_index + 1);
+    ensure!(MIGRATIONS[migration_14_index].name == "manufacturing_actual_cost_projection");
+    ensure!(MIGRATIONS[migration_14_index].sql == frozen_migration_14);
+    let prefix_length = migration_13_index + 1;
+    apply_migration_prefix(pool, prefix_length).await?;
+    ensure!(migration_count(pool).await? == prefix_length as i64);
+    let previous_history = applied_migration_history(pool).await?;
+    let previous_tables = public_table_names(pool).await?;
+    let expected_cost_tables = [
+        "mrp_production_cost",
+        "mrp_productivity_cost",
+        "mrp_valuation_config",
+        "mrp_workcenter_cost_rate",
+    ];
+    for table in expected_cost_tables {
+        ensure!(
+            !relation_exists(pool, table).await?,
+            "cost table {table} predates migration 14"
+        );
+    }
+
+    ensure_schema(pool).await?;
+
+    let current_history = applied_migration_history(pool).await?;
+    ensure!(current_history.len() == MIGRATIONS.len());
+    ensure!(
+        current_history[..prefix_length] == previous_history,
+        "manufacturing upgrade changed prior migration identity, checksum, or applied time"
+    );
+    ensure!(applied_checksum(pool, 14).await? == migration_checksum(frozen_migration_14));
+    let added_tables: Vec<_> = public_table_names(pool)
+        .await?
+        .into_iter()
+        .filter(|table| !previous_tables.contains(table))
+        .collect();
+    ensure!(
+        added_tables == expected_cost_tables,
+        "migration 13 upgrade produced unexpected new tables: {added_tables:?}"
+    );
+
+    // Startup replay must preserve both the released history and its application timestamps.
+    ensure_schema(pool).await?;
+    ensure!(applied_migration_history(pool).await? == current_history);
+    Ok(())
+}
+
+type AppliedMigrationHistory = (i64, String, i64, String, String, String);
+
+async fn applied_migration_history(pool: &Pool) -> Result<Vec<AppliedMigrationHistory>> {
+    let client = pool.get().await?;
+    Ok(client.query(
+        &format!("select version, name, change_set, phase, checksum, applied_at::text from {MIGRATION_TABLE} order by version"),
+        &[],
+    ).await?.into_iter().map(|row|
+        (row.get(0), row.get(1), row.get(2), row.get(3), row.get(4), row.get(5))
+    ).collect())
+}
+
+async fn public_table_names(pool: &Pool) -> Result<Vec<String>> {
+    let client = pool.get().await?;
+    Ok(client
+        .query(
+            "select tablename from pg_tables where schemaname = 'public' order by tablename",
+            &[],
+        )
+        .await?
+        .into_iter()
+        .map(|row| row.get(0))
+        .collect())
 }
 
 async fn apply_migration_prefix(pool: &Pool, prefix_length: usize) -> Result<()> {
