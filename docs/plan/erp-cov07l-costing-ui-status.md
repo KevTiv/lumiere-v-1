@@ -2,12 +2,17 @@
 
 Status: UI implementation staged; generated contracts release and integrated runtime acceptance pending.
 
-Executed candidate check: the full web typecheck fails because the
+Initial candidate check: the full web typecheck failed because the
 contracts-owned typed-read generator's Accounting-only allowlist omits the four
 Manufacturing cost resources from `ResourceQueryRowMap`. The new operation
 inputs and general query registry are generated correctly. This needs a
 companion emitter change and release/pin; no decoder or generated binding has
-been hand-edited to conceal the gap.
+been hand-edited to conceal the gap. The approved
+[contracts PR #18](https://github.com/KevTiv/lumiere-contracts/pull/18) now provides
+the IR-derived codec change, and the full web typecheck passes against its
+candidate. Package typecheck/build, 31 emitter tests and 19 runtime tests pass.
+The application v0.3.100 pin does not yet contain that unmerged companion fix;
+final release/pin and operator acceptance remain pending.
 
 The manufacturing order overview reads immutable `mrp-production-costs` and `mrp-productivity-costs` through generated row decoders. It displays material cost, workcenter cost, total actual cost, output inventory value, variance and configured/unconfigured productivity rates. Missing or withheld amounts show unavailable; an absent close snapshot is explicit. Read denial and failures retain their distinct collection states. Exact MO/organization/company identity owns the snapshot, and duplicate snapshots fail visibly.
 

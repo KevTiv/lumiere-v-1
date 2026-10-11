@@ -83,12 +83,16 @@ stack now moves every generated PG DDL target write behind that boundary;
 `--postgresql-ir-only` consumes the handoff without inspecting domain source or
 SDK bindings. The early schema stage only plans prerequisite manifests.
 
-The current contracts-owned typed-read emitter still has an Accounting-only
-allowlist. A prepared new-contract candidate omits the four Manufacturing cost
-row codecs even though canonical IR exposes the resources. Full web typecheck
-therefore fails. A companion emitter change, generated codec tests, immutable
-release and final application pin are required; casts or handwritten decoders
-are not an acceptable substitute.
+The released contracts-owned typed-read emitter still has an Accounting-only
+allowlist. The first prepared candidate omitted the four Manufacturing cost
+row codecs even though canonical IR exposes the resources, failing full web
+typecheck. The approved [companion contracts PR #18](https://github.com/KevTiv/lumiere-contracts/pull/18)
+adds those IR-derived codecs. Its 31 emitter tests, 19 runtime tests, package
+typecheck/build and full application web typecheck against the candidate passed.
+The application has since received the v0.3.100 pin, but that tag predates the
+companion fix. Review, a subsequent immutable release incorporating #18, and
+final-pin checks are still required. No handwritten decoder or cast workaround
+has been used; neither PR has been merged.
 
 ## Definition of done
 

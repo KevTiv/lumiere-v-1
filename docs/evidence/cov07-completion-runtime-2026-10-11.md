@@ -133,9 +133,59 @@ inputs and general query registry do include the additions. A companion
 contracts emitter change is required; no handwritten decoder/cast workaround
 or full frontend pass is claimed.
 
+## Approved companion-codec follow-up
+
+The user approved the companion change on 2026-10-11. Draft
+[lumiere-contracts PR #18](https://github.com/KevTiv/lumiere-contracts/pull/18)
+is linked to draft [application PR #177](https://github.com/KevTiv/lumiere-v-1/pull/177).
+Candidate source/runtime head is
+`a9f237423104361529dbe4cf16501aa38f8da24a`, based on released contracts v0.3.100
+`c7efc900130fcf6a43d23cbadb2581e3de52aa67`. It adds the four cost resources to
+the typed-read rollout and regenerates TypeScript source and distributed JS
+from existing canonical IR. The IR artifact, migration bytes and package version
+were not changed; its pinned artifact SHA-256 remains
+`d6c06231aaa3458d8a7fc8b9b8e10d6dea7f17d5519989454464d8441911da3a`.
+The codec preserves the IR's non-`id` mandatory keys and optional/withheld fields,
+not an invented requirement that every projected cost row expose company data.
+HTTP tenant/company enforcement remains in the application.
+
+Executed successfully:
+
+```sh
+PYTHONDONTWRITEBYTECODE=1 python3 scripts/generate-from-ir.py --check
+PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests -v
+npm run --prefix packages/contracts typecheck
+npm run --prefix packages/contracts build
+node --test packages/contracts/tests/resource-codecs.test.mjs \
+  packages/contracts/tests/agent-capability-registry.test.mjs
+```
+
+All 31 Python tests and 19 runtime tests passed. The full application web
+typecheck also exited 0 at application source
+`3ada525784f127bf4dab2f391227caf13c462ae5` using:
+
+```sh
+NODE_OPTIONS=--max-old-space-size=8192 \
+node /workspace/.corepack/v1/pnpm/10.31.0/bin/pnpm.cjs --dir frontend/web \
+  exec tsc --noEmit -p /tmp/cov07-web-candidate-tsconfig.json
+```
+
+That temporary config preserves application aliases but maps
+`@lumiere/contracts/*` to `/workspace/cov07-contracts-codecs/packages/contracts/src/*`.
+No tracked application config or installed dependency was altered to claim
+this candidate check as final-pin acceptance.
+
+The release workflow subsequently committed application pin
+`cb3ccd15819256f956db0672c2bb5ed3b08ab785` for v0.3.100, including catalog 14's
+compatibility checksum. This pin was imported without rewriting bot history.
+It predates the unmerged codec companion; a later release must include #18.
+`python3 scripts/verify-release-manifest.py --contracts-root /workspace/cov07-contracts-release100`
+passed against a detached worktree of the exact released v0.3.100 commit.
+Both PRs remain unmerged and no new tag was published for the companion.
+
 ## Remaining acceptance gates
 
-The new generated contract release and consistent application pin, complete
+Review and an immutable contract release/pin incorporating companion #18, complete
 authenticated operator BOM/MO-to-close browser path, exact scrap/byproduct and
 cost-result navigation with reload/recovery, and same-head PostgreSQL projection
 and full API migration gates remain open. No new browser, PostgreSQL projection, CI or
