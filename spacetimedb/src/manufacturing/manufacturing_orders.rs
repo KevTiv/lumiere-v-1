@@ -22,6 +22,7 @@ use crate::manufacturing::costing::{
     allocate_output_cost, material_cost_snapshot, production_cost_inputs, record_production_cost,
     validate_cost,
 };
+use crate::manufacturing::effects::{record_created_order, ManufacturingEffectSnapshot};
 use crate::manufacturing::relations::{
     require_active_workcenter_in_company, require_bom_in_company,
     require_location_for_manufacturing, require_product_for_manufacturing,
@@ -760,6 +761,7 @@ pub fn create_manufacturing_order(
         },
     );
 
+    record_created_order(ctx, &mo)?;
     log::info!("Manufacturing order created: id={}", mo.id);
     Ok(())
 }
@@ -873,6 +875,7 @@ pub fn confirm_manufacturing_order(
 
     match mo.state {
         MoState::Draft => {
+            let effects = ManufacturingEffectSnapshot::capture(ctx, &mo)?;
             // Materialize the immutable BOM routing before confirmation. Never
             // merge manual rows into a generated routing or silently duplicate it.
             if let Some(bom_id) = mo.bom_id {
@@ -1009,6 +1012,7 @@ pub fn confirm_manufacturing_order(
                     metadata: None,
                 });
 
+            effects.record(ctx, "erp.confirm_manufacturing_order")?;
             log::info!("Manufacturing order confirmed: id={}", mo_id);
             Ok(())
         }
@@ -1047,6 +1051,7 @@ pub fn start_manufacturing_order(
 
     match mo.state {
         MoState::Confirmed | MoState::Planned => {
+            let effects = ManufacturingEffectSnapshot::capture(ctx, &mo)?;
             ctx.db.mrp_production().id().update(MrpProduction {
                 state: MoState::Progress,
                 date_start: Some(ctx.timestamp),
@@ -1070,6 +1075,7 @@ pub fn start_manufacturing_order(
                 },
             );
 
+            effects.record(ctx, "erp.start_manufacturing_order")?;
             log::info!("Manufacturing order started: id={}", mo_id);
             Ok(())
         }
@@ -1108,6 +1114,7 @@ pub fn produce_manufacturing_order(
         ));
     }
 
+    let effects = ManufacturingEffectSnapshot::capture(ctx, &mo)?;
     let new_qty_produced = mo.qty_produced + qty_producing;
     let new_state = if (new_qty_produced - mo.product_qty).abs() <= 1e-9 {
         MoState::ToClose
@@ -1146,6 +1153,7 @@ pub fn produce_manufacturing_order(
         },
     );
 
+    effects.record(ctx, "erp.produce_manufacturing_order")?;
     log::info!(
         "Manufacturing order produced: id={}, qty={}",
         mo_id,
@@ -1179,6 +1187,7 @@ pub fn consume_mo_materials(
         return Ok(());
     }
 
+    let effects = ManufacturingEffectSnapshot::capture(ctx, &mo)?;
     let source_location_id = get_production_location(&mo);
 
     let mut created_move_ids = mo.move_raw_ids.clone();
@@ -1376,6 +1385,7 @@ pub fn consume_mo_materials(
         },
     );
 
+    effects.record(ctx, "erp.consume_mo_materials")?;
     Ok(())
 }
 
@@ -1472,6 +1482,12 @@ fn finish_manufacturing_order_internal(
         }
     }
 
+    let effects = ManufacturingEffectSnapshot::capture(ctx, &mo)?;
+    let close_operation = if tracking.is_some() {
+        "erp.finish_manufacturing_order_with_tracking"
+    } else {
+        "erp.finish_manufacturing_order"
+    };
     let cost_inputs = production_cost_inputs(ctx, &mo, &workorders)?;
 
     let finished_qty = mo.qty_produced;
@@ -1635,6 +1651,7 @@ fn finish_manufacturing_order_internal(
         },
     );
 
+    effects.record(ctx, close_operation)?;
     log::info!("Manufacturing order finished: id={}", mo_id);
     Ok(())
 }
@@ -2233,6 +2250,7 @@ fn create_workorder_internal(
     let resolved_capacity = params.capacity.unwrap_or(wc.capacity);
     validate_positive_qty(resolved_capacity, "workorder capacity")?;
 
+    let effects = ManufacturingEffectSnapshot::capture_with_workcenter(ctx, &mo, Some(params.workcenter_id))?;
     let wo = ctx.db.mrp_workorder().insert(MrpWorkorder {
         id: 0,
         organization_id,
@@ -2309,6 +2327,7 @@ fn create_workorder_internal(
         },
     );
 
+    effects.record(ctx, "erp.create_workorder")?;
     log::info!("Work order created: id={}", wo.id);
     Ok(())
 }
@@ -2331,6 +2350,7 @@ pub fn start_workorder(
         wo.workcenter_id,
         "workorder workcenter",
     )?;
+    let effects = ManufacturingEffectSnapshot::capture(ctx, &_mo)?;
 
     match wo.state {
         WorkorderState::Pending | WorkorderState::Ready => {
@@ -2415,6 +2435,7 @@ pub fn start_workorder(
                 },
             );
 
+            effects.record(ctx, "erp.start_workorder")?;
             log::info!("Work order started: id={}", workorder_id);
             Ok(())
         }
@@ -2433,6 +2454,7 @@ pub fn finish_workorder(
     check_permission(ctx, organization_id, "mrp_workorder", "write")?;
     let (wo, _mo) =
         require_workorder_execution_scope(ctx, organization_id, company_id, workorder_id)?;
+    let effects = ManufacturingEffectSnapshot::capture(ctx, &_mo)?;
 
     if wo.state != WorkorderState::Progress {
         return Err("Work order must be in Progress state to finish".to_string());
@@ -2544,6 +2566,7 @@ pub fn finish_workorder(
         },
     );
 
+    effects.record(ctx, "erp.finish_workorder")?;
     log::info!("Work order finished: id={}", workorder_id);
     Ok(())
 }
