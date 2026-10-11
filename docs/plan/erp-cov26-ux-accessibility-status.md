@@ -1,6 +1,8 @@
 # COV-26 — One module quality pass per PR
 
-**Status:** REVIEW — current-stack integration, contract release/pin, and hosted-Maincloud browser proof complete; same-head CI and public hosted-application U4/U5 certification pending
+**Status:** REVIEW — current-stack integration, contract release/pin, exact-head CI,
+and hosted-Maincloud browser proof complete; public hosted-application U4/U5
+certification deferred
 **Module/surface:** UX / Accessibility  
 **Plan target:** common UI-quality pass  
 **Scaffold source:** [`erp-cov08-27-scaffold.md`](./erp-cov08-27-scaffold.md)
@@ -37,9 +39,9 @@ contracts run `38155126649` published and pinned immutable
 
 ## Reports / Analytics bounded pass (2026-10-10)
 
-**State:** IMPLEMENTED locally — source read states, truthful definition handling,
-and focused runtime proof complete; stack/release/CI and hosted acceptance gates
-stay open.
+**State:** IMPLEMENTED — source read states, truthful definition handling,
+focused runtime proof, current-stack integration, contract release/pin, and
+exact-head CI complete; public hosted-application certification stays open.
 
 The self-serve query builder now renders an accessible loading status separately
 from a successfully loaded source with zero rows. The shared stored-dashboard
@@ -68,9 +70,10 @@ failure. COV-D05, COV-D06, and COV-D07 are resolved for this bounded Reports pat
 
 ## Reports widget create-and-attach mutation pass (2026-10-10)
 
-**State:** REVIEW — deterministic implementation, exact-head local runtime proof,
-contract release/pin, and hosted-Maincloud browser proof complete; same-head CI
-and public hosted-application U4/U5 certification pending.
+**State:** ACCEPTED for this bounded Reports pass — deterministic implementation,
+exact-head local runtime proof, contract release/pin, hosted-Maincloud browser
+proof, and same-head CI complete. Public hosted-application U4/U5 certification
+is deferred and does not follow from this bounded acceptance.
 
 The query builder no longer finds a created widget by display name or greatest id.
 Each save attempt now carries one versioned creation request id in the canonical
@@ -108,6 +111,13 @@ exactly one current credential, active membership, and active role assignment fo
 each of the seven accepted personas. The fixture health gate also found every
 required COV-03 through COV-24 module row.
 
+The final non-destructive republish used the exact production artifact with
+SHA-256 `2e529632b1d982a22d6df3279c2ccab52884e12efa94fd1c8917edfbfa1ee270`
+and `--delete-data=never`. The deployed schema hash remained
+`0ae887e84d49c70bac3e44b7c0c34319c8d56ff100f463f682014e284a5b7f8e`.
+The seven-persona fixture health check then returned `healthy: true` with no
+failures.
+
 An optimized Next.js 16.1.6 production build and the exact API source then ran the
 complete six-test COV-26 Reports browser file against that hosted database. All six
 tests passed with one worker. The canonical create-and-attach case retained the
@@ -118,13 +128,18 @@ higher-id same-name decoy.
 This is hosted-data runtime evidence. The web and API processes are still local
 loopback services, so it is not public hosted-application U4/U5 certification.
 
+The exact implementation head `35c3ee1696794563472c356a9ff038211bbd43d7` passed all eight
+reported GitHub checks, including the targeted Playwright smoke, E2E gate,
+frontend contracts, semantic index, i18n, and security checks. No unresolved
+review thread remained when this evidence was recorded.
+
 ## Remaining gates
 
-1. Push the final hosted-auth and Query Builder result-state changes, then run the
-   required CI suite on that exact head.
-2. Deploy that same head to a public hosted web/API environment and record its
-   application URL.
-3. Repeat the U4/U5 operator evidence through that public URL. The current
+1. If public hosted-application certification is required, deploy the accepted
+   head to the selected public web/API environment and record its application
+   URL. This deployment is deferred and is not part of the Maincloud module
+   publish.
+2. Repeat the U4/U5 operator evidence through that public URL. The current
    production-build browser proof uses hosted Maincloud data but loopback web/API
    processes.
 
@@ -143,5 +158,8 @@ COV-03..25 candidates.
 
 ## Acceptance
 
-Becomes IMPLEMENTED when the bounded path and proofs above exist, and ACCEPTED only
-with same-head green CI (plus the contract release, when required).
+This bounded Reports pass is accepted for implementation on exact head
+`35c3ee1696794563472c356a9ff038211bbd43d7`: the required contract release is
+pinned and same-head CI is green. COV-26 remains at `REVIEW` as a program-level
+track because a bounded Reports pass does not certify every T0 module or establish
+public hosted-application U4/U5 evidence.
