@@ -3650,6 +3650,26 @@
       "reason": "invoked by an enumerated frontend BFF call site"
     },
     {
+      "name": "run_manufacturing_tracked_output_test",
+      "exposure": "denied",
+      "reason": "isolated persisted domain proof; never exposed through the session BFF"
+    },
+    {
+      "name": "finish_manufacturing_order_with_tracking",
+      "exposure": "session",
+      "reason": "explicit tracked manufacturing close intent with exact lot and serial attribution"
+    },
+    {
+      "name": "scrap_manufacturing_material",
+      "exposure": "session",
+      "reason": "explicit in-progress BOM material wastage intent before consumption"
+    },
+    {
+      "name": "scrap_tracked_manufacturing_output",
+      "exposure": "session",
+      "reason": "explicit tracked output scrap intent from an exact MO-owned move"
+    },
+    {
       "name": "seed_statutory_expense_mileage_rates",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"

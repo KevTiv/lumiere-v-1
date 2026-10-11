@@ -13,13 +13,11 @@ use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 use crate::inventory::product::product;
 use crate::inventory::quality::quality_check;
 use crate::inventory::stock::{
-    create_stock_move, create_stock_move_internal, done_stock_move, move_stock_quant, stock_move,
-    stock_quant, CreateStockMoveParams, DoneStockMoveParams, MoveStockQuantParams, StockMove,
-    StockQuant,
+    create_stock_move, create_stock_move_internal, done_stock_move, move_stock_quant, stock_move, stock_quant,
+    ensure_lot_for_product, ensure_serial_usable, CreateStockMoveParams, DoneStockMoveParams, MoveStockQuantParams, StockMove, StockQuant,
 };
-use crate::manufacturing::bill_of_materials::{
-    mrp_bom, mrp_bom_byproduct, mrp_bom_line, ordered_bom_operations,
-};
+use crate::inventory::tracking::{stock_production_lot, stock_production_serial, StockProductionSerial};
+use crate::manufacturing::bill_of_materials::{mrp_bom, mrp_bom_byproduct, mrp_bom_line, ordered_bom_operations};
 use crate::manufacturing::costing::{
     allocate_output_cost, material_cost_snapshot, production_cost_inputs, record_production_cost,
     validate_cost,
@@ -226,6 +224,23 @@ pub struct UpdateManufacturingOrderParams {
     pub metadata: Option<Option<String>>,
 }
 
+/// Explicit tracking identity for one BOM-owned byproduct output.
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct ManufacturingByproductTracking {
+    pub bom_byproduct_id: u64,
+    pub lot_id: Option<u64>,
+    pub serial_id: Option<u64>,
+}
+
+/// Close attribution. Serial output is deliberately limited to one exact unit
+/// per output move; multiple serials require a future split-output contract.
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct FinishManufacturingTrackingParams {
+    pub lot_id: Option<u64>,
+    pub serial_id: Option<u64>,
+    pub byproducts: Vec<ManufacturingByproductTracking>,
+}
+
 /// Intent-shaped create params for work orders.
 ///
 /// Server-managed state fields are excluded — the server always derives:
@@ -405,6 +420,68 @@ fn require_lot_when_tracked(
         }
         _ => Ok(()),
     }
+}
+
+fn validate_output_tracking(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    product_id: u64,
+    quantity: f64,
+    lot_id: Option<u64>,
+    serial_id: Option<u64>,
+) -> Result<(), String> {
+    let product = require_product_for_manufacturing(ctx, organization_id, product_id, "Output")?;
+    match product.tracking.as_str() {
+        "none" if lot_id.is_none() && serial_id.is_none() => Ok(()),
+        "lot" if serial_id.is_none() => {
+            let lot_id = lot_id.ok_or("Lot-tracked output requires an explicit lot")?;
+            validate_manufacturing_output_lot(ctx, organization_id, company_id, product_id, lot_id)
+        }
+        "serial" => {
+            if (quantity - 1.0).abs() > 1e-9 {
+                return Err("Serial output requires exactly one unit per output move".to_string());
+            }
+            let serial_id = serial_id.ok_or("Serial output requires an explicit serial")?;
+            let serial = ctx.db.stock_production_serial().id().find(&serial_id)
+                .ok_or("Output serial not found")?;
+            ensure_serial_usable(ctx, organization_id, company_id, product_id, &serial)?;
+            if serial.lot_id != lot_id || serial.product_variant_id.is_some()
+                || serial.package_id.is_some() || serial.owner_id.is_some()
+                || serial.state != "free" || serial.is_scrap || serial.location_id.is_some() {
+                return Err("Output serial must be new, free and match the exact stock identity".to_string());
+            }
+            if let Some(lot_id) = lot_id {
+                validate_manufacturing_output_lot(ctx, organization_id, company_id, product_id, lot_id)?;
+            }
+            if ctx.db.stock_move().iter().any(|mv| mv.serial_id == Some(serial_id) && mv.is_done) {
+                return Err("Output serial already has a completed stock effect".to_string());
+            }
+            Ok(())
+        }
+        _ => Err("Output tracking attributes do not match product tracking".to_string()),
+    }
+}
+
+fn validate_manufacturing_output_lot(ctx: &ReducerContext, organization_id: u64,
+    company_id: u64, product_id: u64, lot_id: u64) -> Result<(), String> {
+    ensure_lot_for_product(ctx, organization_id, company_id, product_id, lot_id)?;
+    let lot = ctx.db.stock_production_lot().id().find(&lot_id).ok_or("Output lot disappeared")?;
+    if lot.product_variant_id.is_some() || lot.package_id.is_some() || lot.owner_id.is_some() || lot.is_scrap {
+        return Err("Output lot must match an unpackaged, unowned, unscrapped product identity".to_string());
+    }
+    Ok(())
+}
+
+fn place_output_serial(ctx: &ReducerContext, serial_id: Option<u64>, location_id: u64) -> Result<(), String> {
+    if let Some(serial_id) = serial_id {
+        let serial = ctx.db.stock_production_serial().id().find(&serial_id)
+            .ok_or("Output serial disappeared")?;
+        ctx.db.stock_production_serial().id().update(StockProductionSerial {
+            location_id: Some(location_id), product_qty: 1.0, write_date: ctx.timestamp, ..serial
+        });
+    }
+    Ok(())
 }
 
 fn upsert_stock_quant(
@@ -1289,6 +1366,28 @@ pub fn finish_manufacturing_order(
     company_id: u64,
     mo_id: u64,
 ) -> Result<(), String> {
+    finish_manufacturing_order_internal(ctx, organization_id, company_id, mo_id, None)
+}
+
+/// Finish with caller-selected, validated lot/serial identity for each output.
+#[reducer]
+pub fn finish_manufacturing_order_with_tracking(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    mo_id: u64,
+    params: FinishManufacturingTrackingParams,
+) -> Result<(), String> {
+    finish_manufacturing_order_internal(ctx, organization_id, company_id, mo_id, Some(params))
+}
+
+fn finish_manufacturing_order_internal(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    mo_id: u64,
+    tracking: Option<FinishManufacturingTrackingParams>,
+) -> Result<(), String> {
     check_permission(ctx, organization_id, "mrp_production", "write")?;
 
     let mo = require_mo_in_company(ctx, organization_id, company_id, mo_id)?;
@@ -1352,15 +1451,23 @@ pub fn finish_manufacturing_order(
         }
     }
 
-    require_lot_when_tracked(
-        &mo.product_tracking,
-        mo.lot_producing_id,
-        &format!("MO {} finish", mo.id),
-    )?;
-
     let cost_inputs = production_cost_inputs(ctx, &mo, &workorders)?;
 
     let finished_qty = mo.qty_produced;
+    let output_product = require_product_for_manufacturing(ctx, organization_id, mo.product_id, "Primary output")?;
+    if output_product.tracking != mo.product_tracking {
+        return Err("Product tracking changed after manufacturing order creation".to_string());
+    }
+    let primary_lot_id = tracking.as_ref().map_or(mo.lot_producing_id, |params| params.lot_id);
+    let primary_serial_id = tracking.as_ref().and_then(|params| params.serial_id);
+    validate_output_tracking(ctx, organization_id, company_id, mo.product_id, finished_qty,
+        primary_lot_id, primary_serial_id)?;
+    let mut byproduct_tracking = tracking.map_or_else(Vec::new, |params| params.byproducts);
+    let mut attribution_ids: Vec<_> = byproduct_tracking.iter().map(|entry| entry.bom_byproduct_id).collect();
+    attribution_ids.sort_unstable();
+    if attribution_ids.windows(2).any(|pair| pair[0] == pair[1]) {
+        return Err("Duplicate byproduct tracking attribution".to_string());
+    }
     let mut byproduct_outputs = Vec::new();
     if let Some(bom_id) = mo.bom_id {
         let bom = ctx.db.mrp_bom().id().find(&bom_id).ok_or("Manufacturing BOM not found")?;
@@ -1379,9 +1486,6 @@ pub fn finish_manufacturing_order(
         }
         for row in rows {
             let product = require_product_for_manufacturing(ctx, organization_id, row.product_id, "BOM byproduct")?;
-            if product.tracking != "none" {
-                return Err("Tracked byproduct output requires a separate lot/serial path".to_string());
-            }
             let normalized_mo_qty = convert_uom_quantity(ctx, organization_id, mo.product_uom_id,
                 bom.product_uom_id, mo.product_qty, Some(mo.product_id))?;
             validate_positive_qty(bom.product_qty, "BOM base quantity")?;
@@ -1389,11 +1493,25 @@ pub fn finish_manufacturing_order(
             let quantity = convert_uom_quantity(ctx, organization_id, row.product_uom_id,
                 product.uom_id, defined_quantity, Some(product.id))?;
             validate_positive_qty(quantity, "byproduct output quantity")?;
-            byproduct_outputs.push((row, product, quantity));
+            let attribution = byproduct_tracking.iter().position(|entry| entry.bom_byproduct_id == row.id)
+                .map(|index| byproduct_tracking.remove(index));
+            let lot_id = attribution.as_ref().and_then(|entry| entry.lot_id);
+            let serial_id = attribution.as_ref().and_then(|entry| entry.serial_id);
+            validate_output_tracking(ctx, organization_id, company_id, product.id, quantity, lot_id, serial_id)?;
+            byproduct_outputs.push((row, product, quantity, lot_id, serial_id));
         }
     }
+    if !byproduct_tracking.is_empty() {
+        return Err("Tracking attribution references a byproduct outside the manufacturing BOM".to_string());
+    }
+    let mut serial_ids: Vec<_> = byproduct_outputs.iter().filter_map(|(_, _, _, _, serial_id)| *serial_id).collect();
+    serial_ids.extend(primary_serial_id);
+    serial_ids.sort_unstable();
+    if serial_ids.windows(2).any(|pair| pair[0] == pair[1]) {
+        return Err("A serial cannot identify multiple manufacturing outputs".to_string());
+    }
 
-    let shares: Vec<_> = byproduct_outputs.iter().map(|(row, _, _)| row.cost_share).collect();
+    let shares: Vec<_> = byproduct_outputs.iter().map(|(row, _, _, _, _)| row.cost_share).collect();
     let (primary_value, byproduct_values) = allocate_output_cost(cost_inputs.total_value, &shares)?;
     let primary_product = require_product_for_manufacturing(ctx, organization_id, mo.product_id, "manufactured output")?;
     let primary_unit_cost = primary_value / finished_qty;
@@ -1414,12 +1532,16 @@ pub fn finish_manufacturing_order(
         company_id,
         CreateStockMoveParams {
             price_unit: primary_unit_cost, cost_share: 100.0 - shares.iter().sum::<f64>(),
-            metadata: Some(primary_metadata), ..finished_move_params(ctx, &mo, finished_qty)
+            metadata: Some(primary_metadata),
+            lot_id: primary_lot_id, serial_id: primary_serial_id,
+            has_tracking: mo.product_tracking != "none",
+            ..finished_move_params(ctx, &mo, finished_qty)
         },
         finished_qty,
     )?;
     let mut finished_ids = vec![finished_move_id];
-    for ((row, product, quantity), allocated_value) in byproduct_outputs.into_iter().zip(byproduct_values) {
+    place_output_serial(ctx, primary_serial_id, mo.location_dest_id)?;
+    for ((row, product, quantity, lot_id, serial_id), allocated_value) in byproduct_outputs.into_iter().zip(byproduct_values) {
         let allocated_unit_cost = allocated_value / quantity;
         validate_cost(allocated_unit_cost, "byproduct allocated unit cost")?;
         let inventory_unit_cost = if crate::inventory::costing::normalize_cost_method(&product.cost_method) == "standard" {
@@ -1439,8 +1561,9 @@ pub fn finish_manufacturing_order(
                 sequence: row.sequence as i32,
                 cost_share: row.cost_share,
                 price_unit: allocated_unit_cost,
-                has_tracking: false,
-                lot_id: None,
+                has_tracking: product.tracking != "none",
+                lot_id,
+                serial_id,
                 product_type: Some(product.type_.clone()),
                 metadata: Some(serde_json::json!({"bom_byproduct_id": row.id, "manufacturing_output_cost": {
                     "currency_id": cost_inputs.currency_id, "allocated_value": allocated_value,
@@ -1451,10 +1574,13 @@ pub fn finish_manufacturing_order(
             quantity,
         )?;
         finished_ids.push(move_id);
+        place_output_serial(ctx, serial_id, mo.location_dest_id)?;
     }
     record_production_cost(ctx, &mo, cost_inputs, &finished_ids)?;
     ctx.db.mrp_production().id().update(MrpProduction {
         state: MoState::Done,
+        lot_producing_id: primary_lot_id,
+        lot_producing_count: u32::from(primary_lot_id.is_some()),
         date_finished: Some(ctx.timestamp),
         move_finished_count: finished_ids.len() as u32,
         move_finished_ids: finished_ids,
@@ -1595,6 +1721,235 @@ pub fn scrap_finished_manufacturing_output(
         changed_fields: vec!["scrap_move".to_string()], metadata: None,
     });
     Ok(())
+}
+
+/// Scrap an exact MO-owned tracked output, including a BOM byproduct. The
+/// original output move bounds cumulative waste; lot and serial identity are
+/// inherited from that move, never selected from unrelated stock.
+#[reducer]
+pub fn scrap_tracked_manufacturing_output(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    mo_id: u64,
+    output_move_id: u64,
+    scrap_location_id: u64,
+    quantity: f64,
+    request_id: String,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "mrp_production", "write")?;
+    let mo = require_mo_in_company(ctx, organization_id, company_id, mo_id)?;
+    if mo.state != MoState::Done || !mo.move_finished_ids.contains(&output_move_id) {
+        return Err("Tracked scrap requires an exact output move owned by a completed MO".to_string());
+    }
+    validate_positive_qty(quantity, "scrap quantity")?;
+    let output = ctx.db.stock_move().id().find(&output_move_id).ok_or("Output move not found")?;
+    let product = require_product_for_manufacturing(ctx, organization_id, output.product_id, "Scrap output")?;
+    if output.organization_id != organization_id || output.company_id != company_id
+        || output.production_id != Some(mo_id) || output.scrapped || !output.is_done
+        || output.state != "done" || output.location_dest_id != mo.location_dest_id
+        || output.product_variant_id.is_some() || output.package_id.is_some() || output.owner_id.is_some()
+        || !output.quantity_done.is_finite() || output.quantity_done <= 0.0
+        || product.tracking == "none" {
+        return Err("Output move does not match tracked manufacturing stock".to_string());
+    }
+    match product.tracking.as_str() {
+        "lot" if output.serial_id.is_none() => {
+            validate_manufacturing_output_lot(ctx, organization_id, company_id, product.id,
+                output.lot_id.ok_or("Output move has no lot identity")?)?;
+        }
+        "serial" => {
+            let serial = ctx.db.stock_production_serial().id()
+                .find(&output.serial_id.ok_or("Output move has no serial identity")?)
+                .ok_or("Output serial not found")?;
+            ensure_serial_usable(ctx, organization_id, company_id, product.id, &serial)?;
+            if (quantity - 1.0).abs() > 1e-9 || (output.quantity_done - 1.0).abs() > 1e-9
+                || serial.lot_id != output.lot_id || serial.location_id != Some(mo.location_dest_id)
+                || serial.state != "free" || serial.is_scrap || serial.product_variant_id.is_some()
+                || serial.package_id.is_some() || serial.owner_id.is_some() {
+                return Err("Serial scrap requires one available exact output serial at the output location".to_string());
+            }
+            if let Some(lot_id) = output.lot_id {
+                validate_manufacturing_output_lot(ctx, organization_id, company_id, product.id, lot_id)?;
+            }
+        }
+        _ => return Err("Output tracking identity is inconsistent".to_string()),
+    }
+    let reference = scrap_reference(ctx, &mo, &request_id)?;
+    require_scrap_destination(ctx, &mo, scrap_location_id, mo.location_dest_id)?;
+    let effects: Vec<_> = ctx.db.stock_move().iter().filter(|mv| {
+        mv.organization_id == organization_id && mv.company_id == company_id
+            && mv.production_id == Some(mo_id) && mv.scrapped
+            && mv.product_id == output.product_id && mv.lot_id == output.lot_id
+            && mv.serial_id == output.serial_id && mv.raw_material_production_id.is_none()
+    }).collect();
+    let mut already_scrapped = 0.0;
+    for effect in effects {
+        let source_output = effect.metadata.as_deref().and_then(|data| serde_json::from_str::<serde_json::Value>(data).ok())
+            .and_then(|data| data.get("source_output_move_id").and_then(|value| value.as_u64()));
+        if source_output != Some(output_move_id) || !effect.is_done || effect.state != "done"
+            || effect.location_id != mo.location_dest_id || !effect.quantity_done.is_finite()
+            || effect.quantity_done <= 0.0 {
+            return Err("Tracked manufacturing scrap effects are inconsistent".to_string());
+        }
+        already_scrapped += effect.quantity_done;
+    }
+    if quantity > output.quantity_done - already_scrapped + 1e-9 {
+        return Err("Scrap quantity exceeds this output move's remaining stock".to_string());
+    }
+    let source = require_exact_scrap_quant(ctx, &mo, output.product_id, output.lot_id, mo.location_dest_id, quantity)?;
+    let move_id = post_manufacturing_scrap(ctx, &mo, &source, scrap_location_id, quantity,
+        CreateStockMoveParams {
+            name: format!("MO {mo_id} tracked output scrap"),
+            product_id: output.product_id, product_tmpl_id: output.product_tmpl_id,
+            product_uom: output.product_uom, product_uom_qty: quantity,
+            lot_id: output.lot_id, serial_id: output.serial_id, has_tracking: true,
+            price_unit: output.price_unit, reference: Some(reference),
+            location_id: mo.location_dest_id, location_dest_id: scrap_location_id, scrapped: true,
+            metadata: Some(serde_json::json!({"source_output_move_id": output_move_id, "source_quant_id": source.id}).to_string()),
+            ..finished_move_params(ctx, &mo, quantity)
+        })?;
+    if let Some(serial_id) = output.serial_id {
+        let serial = ctx.db.stock_production_serial().id().find(&serial_id).ok_or("Scrap serial disappeared")?;
+        ctx.db.stock_production_serial().id().update(StockProductionSerial {
+            location_id: Some(scrap_location_id), state: "scrapped".to_string(), is_scrap: true,
+            write_date: ctx.timestamp, ..serial
+        });
+    }
+    audit_manufacturing_scrap(ctx, &mo, move_id, quantity);
+    Ok(())
+}
+
+fn scrap_reference(ctx: &ReducerContext, mo: &MrpProduction, request_id: &str) -> Result<String, String> {
+    let request_id = request_id.trim();
+    if request_id.is_empty() {
+        return Err("Scrap request id is required".to_string());
+    }
+    let reference = format!("MO/{}/SCRAP/{request_id}", mo.id);
+    if ctx.db.stock_move().iter().any(|mv| mv.organization_id == mo.organization_id
+        && mv.company_id == mo.company_id && mv.production_id == Some(mo.id)
+        && mv.reference.as_deref() == Some(reference.as_str())) {
+        return Err("Scrap request has already been recorded".to_string());
+    }
+    Ok(reference)
+}
+
+/// Record additional material wastage while manufacturing is in progress.
+/// This relocates still-available, unconsumed BOM stock. It does not reduce the
+/// BOM consumption requirement, credit production, or invent unposted WIP.
+#[reducer]
+pub fn scrap_manufacturing_material(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    mo_id: u64,
+    source_quant_id: u64,
+    scrap_location_id: u64,
+    quantity: f64,
+    request_id: String,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "mrp_production", "write")?;
+    let mo = require_mo_in_company(ctx, organization_id, company_id, mo_id)?;
+    if mo.state != MoState::Progress || !mo.move_raw_ids.is_empty() {
+        return Err("Material scrap requires an in-progress MO before material consumption".to_string());
+    }
+    validate_positive_qty(quantity, "material scrap quantity")?;
+    let bom = require_bom_in_company(ctx, organization_id, company_id, mo.bom_id.ok_or("Material scrap requires a BOM")?, "Material scrap")?;
+    let lines: Vec<_> = ctx.db.mrp_bom_line().mrp_bom_line_by_bom().filter(&bom.id).collect();
+    let mut actual_ids: Vec<_> = lines.iter().map(|line| line.id).collect();
+    actual_ids.sort_unstable();
+    let mut owned_ids = bom.bom_line_ids.clone();
+    owned_ids.sort_unstable();
+    if actual_ids != owned_ids || lines.iter().any(|line| line.organization_id != organization_id || line.company_id != company_id) {
+        return Err("Manufacturing BOM material ownership is inconsistent".to_string());
+    }
+    let source = ctx.db.stock_quant().id().find(&source_quant_id).ok_or("Material scrap source quant not found")?;
+    if source.organization_id != organization_id || source.company_id != company_id
+        || source.location_id != mo.location_src_id || source.product_variant_id.is_some()
+        || source.package_id.is_some() || source.owner_id.is_some()
+        || !lines.iter().any(|line| line.product_id == source.product_id) {
+        return Err("Material scrap source must be exact available BOM stock at the MO source".to_string());
+    }
+    let product = require_product_for_manufacturing(ctx, organization_id, source.product_id, "Scrap material")?;
+    if product.tracking == "serial" {
+        return Err("Serial material scrap requires a separate explicit serial-consumption contract".to_string());
+    }
+    if product.tracking == "lot" || source.lot_id.is_some() {
+        ensure_lot_for_product(ctx, organization_id, company_id, product.id,
+            source.lot_id.ok_or("Material scrap requires the exact source lot")?)?;
+    }
+    let exact_source = require_exact_scrap_quant(ctx, &mo, product.id, source.lot_id, mo.location_src_id, quantity)?;
+    if exact_source.id != source_quant_id {
+        return Err("Material scrap quant does not match requested identity".to_string());
+    }
+    let reference = scrap_reference(ctx, &mo, &request_id)?;
+    require_scrap_destination(ctx, &mo, scrap_location_id, mo.location_src_id)?;
+    let move_id = post_manufacturing_scrap(ctx, &mo, &source, scrap_location_id, quantity,
+        CreateStockMoveParams {
+            name: format!("MO {mo_id} material wastage"), product_id: product.id,
+            product_tmpl_id: product.id, product_uom: product.uom_id,
+            product_uom_qty: quantity, location_id: mo.location_src_id,
+            location_dest_id: scrap_location_id, reference: Some(reference),
+            lot_id: source.lot_id, serial_id: None, has_tracking: product.tracking != "none",
+            scrapped: true, raw_material_production_id: Some(mo_id), price_unit: source.cost,
+            metadata: Some(serde_json::json!({"source_quant_id": source.id, "bom_id": bom.id, "wastage_kind": "additional_unconsumed_material"}).to_string()),
+            ..finished_move_params(ctx, &mo, quantity)
+        })?;
+    audit_manufacturing_scrap(ctx, &mo, move_id, quantity);
+    Ok(())
+}
+
+fn require_scrap_destination(ctx: &ReducerContext, mo: &MrpProduction, location_id: u64, source_location_id: u64) -> Result<(), String> {
+    let location = require_location_for_manufacturing(ctx, mo.organization_id, location_id, "Scrap")?;
+    if !location.scrap_location || location.company_id.is_some_and(|id| id != mo.company_id)
+        || location_id == source_location_id {
+        return Err("Destination must be a different, company-compatible scrap location".to_string());
+    }
+    Ok(())
+}
+
+fn require_exact_scrap_quant(ctx: &ReducerContext, mo: &MrpProduction, product_id: u64,
+    lot_id: Option<u64>, location_id: u64, quantity: f64) -> Result<StockQuant, String> {
+    let mut matches = ctx.db.stock_quant().quant_by_product().filter(&product_id).filter(|q| {
+        q.organization_id == mo.organization_id && q.company_id == mo.company_id
+            && q.location_id == location_id && q.lot_id == lot_id
+            && q.product_variant_id.is_none() && q.package_id.is_none() && q.owner_id.is_none()
+    });
+    let source = matches.next().ok_or("Scrap source quant not found")?;
+    if matches.next().is_some() || !source.available_quantity.is_finite() || source.available_quantity + 1e-9 < quantity {
+        return Err("Scrap stock identity is ambiguous or insufficient".to_string());
+    }
+    Ok(source)
+}
+
+fn post_manufacturing_scrap(ctx: &ReducerContext, mo: &MrpProduction, source: &StockQuant,
+    scrap_location_id: u64, quantity: f64, params: CreateStockMoveParams) -> Result<u64, String> {
+    let created = create_stock_move_internal(ctx, mo.organization_id, params)?;
+    ctx.db.stock_move().id().update(StockMove {
+        state: "assigned".to_string(), is_assigned: true,
+        write_uid: ctx.sender(), write_date: ctx.timestamp, ..created.clone()
+    });
+    done_stock_move(ctx, mo.organization_id, created.id, DoneStockMoveParams {
+        company_id: Some(mo.company_id), quantity_done: quantity,
+    })?;
+    move_stock_quant(ctx, mo.organization_id, source.id, MoveStockQuantParams {
+        company_id: Some(mo.company_id), dest_location_id: scrap_location_id, quantity,
+    })?;
+    let completed = ctx.db.stock_move().id().find(&created.id).ok_or("Scrap move disappeared")?;
+    ctx.db.stock_move().id().update(StockMove {
+        state: "done".to_string(), is_done: true, is_assigned: false,
+        write_uid: ctx.sender(), write_date: ctx.timestamp, ..completed
+    });
+    Ok(created.id)
+}
+
+fn audit_manufacturing_scrap(ctx: &ReducerContext, mo: &MrpProduction, move_id: u64, quantity: f64) {
+    write_audit_log_v2(ctx, mo.organization_id, AuditLogParams {
+        company_id: Some(mo.company_id), table_name: "mrp_production", record_id: mo.id,
+        action: "UPDATE", old_values: None,
+        new_values: Some(serde_json::json!({"scrap_move_id": move_id, "quantity": quantity}).to_string()),
+        changed_fields: vec!["scrap_move".to_string()], metadata: None,
+    });
 }
 
 #[reducer]

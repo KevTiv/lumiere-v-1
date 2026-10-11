@@ -1530,6 +1530,13 @@
       "idempotency": "state_guarded",
       "semantic_kind": "operator"
     },
+    "finish_manufacturing_order_with_tracking": {
+      "client_facing": true,
+      "codec": { "id": "spacetimedb-sats-json", "version": 1 },
+      "evidence": "spacetimedb/src/manufacturing/manufacturing_orders.rs: finish_manufacturing_order_with_tracking validates exact lot/serial attribution and shares the ToClose state guard with finish.",
+      "idempotency": "state_guarded",
+      "semantic_kind": "command"
+    },
     "finish_workorder": {
       "client_facing": true,
       "codec": {
@@ -2340,6 +2347,13 @@
       "idempotency": "state_guarded",
       "semantic_kind": "command"
     },
+    "run_manufacturing_tracked_output_test": {
+      "client_facing": false,
+      "codec": { "id": "spacetimedb-sats-json", "version": 1 },
+      "evidence": "spacetimedb/tests/manufacturing/tracked_output_test.rs: isolated persisted domain proof; test-only reducer denied to session callers.",
+      "idempotency": "non_idempotent",
+      "semantic_kind": "operator"
+    },
     "scrap_finished_manufacturing_output": {
       "client_facing": true,
       "codec": {
@@ -2347,6 +2361,20 @@
         "version": 1
       },
       "evidence": "spacetimedb/src/manufacturing/manufacturing_orders.rs:1200 reducer takes a caller idempotency key and rejects a reused key; exposed through the manufacturing-order scrap action.",
+      "idempotency": "request_guarded",
+      "semantic_kind": "command"
+    },
+    "scrap_manufacturing_material": {
+      "client_facing": true,
+      "codec": { "id": "spacetimedb-sats-json", "version": 1 },
+      "evidence": "spacetimedb/src/manufacturing/manufacturing_orders.rs: scrap_manufacturing_material requires exact available BOM material stock in Progress before consumption and rejects reused request references.",
+      "idempotency": "request_guarded",
+      "semantic_kind": "command"
+    },
+    "scrap_tracked_manufacturing_output": {
+      "client_facing": true,
+      "codec": { "id": "spacetimedb-sats-json", "version": 1 },
+      "evidence": "spacetimedb/src/manufacturing/manufacturing_orders.rs: scrap_tracked_manufacturing_output bounds scrap by the exact owned output move and rejects reused request references.",
       "idempotency": "request_guarded",
       "semantic_kind": "command"
     },
