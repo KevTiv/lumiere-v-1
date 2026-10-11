@@ -2294,7 +2294,69 @@ pub fn update_po_receipt_status(
     Ok(())
 }
 
-/// Update purchase order invoice status based on invoiced quantities.
+/// Coverage of currently received quantities, not ordered fulfillment (receipt_status).
+/// Per-line comparison prevents an overbilled line from hiding another unbilled line.
+/// This derived status does not replace three-way-match/overbilling validation.
+fn invoice_status_for_received_quantities(
+    quantities: impl IntoIterator<Item = (f64, f64)>,
+) -> PoInvoiceStatus {
+    let mut any_invoiced = false;
+    let mut all_received_covered = true;
+    for (received, invoiced) in quantities {
+        any_invoiced |= invoiced > 0.0;
+        all_received_covered &= received <= invoiced;
+    }
+    if !any_invoiced {
+        PoInvoiceStatus::No
+    } else if all_received_covered {
+        PoInvoiceStatus::Invoiced
+    } else {
+        PoInvoiceStatus::Partial
+    }
+}
+
+#[cfg(test)]
+mod invoice_status_tests {
+    use super::{invoice_status_for_received_quantities, PoInvoiceStatus};
+
+    #[test]
+    fn later_receipt_reopens_current_cycle_invoice_coverage() {
+        for (received, invoiced, expected) in [
+            (0.0, 0.0, PoInvoiceStatus::No),
+            (4.0, 0.0, PoInvoiceStatus::No),
+            (4.0, 4.0, PoInvoiceStatus::Invoiced),
+            (10.0, 4.0, PoInvoiceStatus::Partial),
+            (10.0, 10.0, PoInvoiceStatus::Invoiced),
+        ] {
+            assert_eq!(
+                invoice_status_for_received_quantities([(received, invoiced)]),
+                expected
+            );
+        }
+    }
+
+    #[test]
+    fn coverage_is_per_line_not_aggregate_netting() {
+        assert_eq!(
+            invoice_status_for_received_quantities([]),
+            PoInvoiceStatus::No
+        );
+        assert_eq!(
+            invoice_status_for_received_quantities([(4.0, 0.0), (6.0, 0.0)]),
+            PoInvoiceStatus::No
+        );
+        assert_eq!(
+            invoice_status_for_received_quantities([(4.0, 8.0), (4.0, 0.0)]),
+            PoInvoiceStatus::Partial
+        );
+        assert_eq!(
+            invoice_status_for_received_quantities([(4.0, 4.0), (0.0, 0.0)]),
+            PoInvoiceStatus::Invoiced
+        );
+    }
+}
+
+/// Update purchase order invoice status based on currently received quantities.
 #[reducer]
 pub fn update_po_invoice_status(
     ctx: &ReducerContext,
@@ -2303,25 +2365,24 @@ pub fn update_po_invoice_status(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "purchase_order", "write")?;
 
+    refresh_po_invoice_status(ctx, organization_id, order_id)
+}
+
+/// Internal derived-state refresh after an already-authorized domain mutation.
+pub(crate) fn refresh_po_invoice_status(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    order_id: u64,
+) -> Result<(), String> {
     let order = validate_order_in_organization(ctx, organization_id, order_id)?;
 
-    let lines: Vec<_> = ctx
-        .db
-        .purchase_order_line()
-        .purchase_order_line_by_order()
-        .filter(&order_id)
-        .collect();
-
-    let total_ordered: f64 = lines.iter().map(|l| l.product_qty).sum();
-    let total_invoiced: f64 = lines.iter().map(|l| l.qty_invoiced).sum();
-
-    let invoice_status = if lines.is_empty() || total_invoiced <= 0.0 {
-        PoInvoiceStatus::No
-    } else if total_invoiced >= total_ordered && total_ordered > 0.0 {
-        PoInvoiceStatus::Invoiced
-    } else {
-        PoInvoiceStatus::Partial
-    };
+    let invoice_status = invoice_status_for_received_quantities(
+        ctx.db
+            .purchase_order_line()
+            .purchase_order_line_by_order()
+            .filter(&order_id)
+            .map(|line| (line.qty_received, line.qty_invoiced)),
+    );
 
     let company_id = order.company_id;
     let old_invoice_status = format!("{:?}", order.invoice_status);
@@ -2435,8 +2496,8 @@ pub fn receive_po_line(
 
     check_permission(ctx, organization_id, "purchase_order_line", "write")?;
 
-    if qty <= 0.0 {
-        return Err("Received quantity must be greater than zero".to_string());
+    if !qty.is_finite() || qty <= 0.0 {
+        return Err("Received quantity must be finite and greater than zero".to_string());
     }
 
     let line = ctx
@@ -2569,6 +2630,7 @@ pub fn receive_po_line(
         let match_state =
             compute_line_match_state(&line_after, qty_match_tolerance_for_order(&order_after));
         persist_line_match_state(ctx, &order_after, line_after);
+        refresh_po_invoice_status(ctx, organization_id, order_id)?;
 
         write_audit_log_v2(
             ctx,
@@ -2620,6 +2682,7 @@ pub fn receive_po_line(
 
     update_po_receipt_status(ctx, organization_id, order_id)?;
     compute_purchase_order_totals(ctx, organization_id, order_id)?;
+    refresh_po_invoice_status(ctx, organization_id, order_id)?;
 
     write_audit_log_v2(
         ctx,
@@ -2661,8 +2724,8 @@ pub fn invoice_po_line(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "purchase_order_line", "write")?;
 
-    if qty <= 0.0 {
-        return Err("Invoiced quantity must be greater than zero".to_string());
+    if !qty.is_finite() || qty <= 0.0 {
+        return Err("Invoiced quantity must be finite and greater than zero".to_string());
     }
 
     let line = ctx
