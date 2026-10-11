@@ -4,14 +4,15 @@ use spacetimedb::{ReducerContext, Table};
 use crate::accounting::journal_entries::{
     account_move, account_move_line, add_account_move_line, cancel_account_move,
     compute_invoice_totals, create_credit_note_from_invoice, post_invoice,
-    reset_account_move_to_draft,
-    AddAccountMoveLineParams, CreateCreditNoteParams,
+    reset_account_move_to_draft, AddAccountMoveLineParams, CreateCreditNoteParams,
 };
 use crate::accounting::tax_management::{account_tax, create_account_tax, CreateAccountTaxParams};
 use crate::test_harness::{chart_keys, ensure_test_superuser, OrgFixture};
 use crate::types::{AccountMoveState, PaymentState, TaxAmountType, TaxTypeUse};
 
-use super::helpers::{create_balanced_customer_invoice, create_balanced_customer_invoice_on_account};
+use super::helpers::{
+    create_balanced_customer_invoice, create_balanced_customer_invoice_on_account,
+};
 
 pub fn test_post_customer_invoice_creates_move_lines(ctx: &ReducerContext) -> Result<(), String> {
     ensure_test_superuser(ctx)?;
@@ -442,7 +443,9 @@ pub fn test_add_account_move_line_rejects_invalid_and_cross_org_tax_id(
     Ok(())
 }
 
-pub fn test_reset_account_move_to_draft_only_from_cancelled(ctx: &ReducerContext) -> Result<(), String> {
+pub fn test_reset_account_move_to_draft_only_from_cancelled(
+    ctx: &ReducerContext,
+) -> Result<(), String> {
     ensure_test_superuser(ctx)?;
     let fixture = OrgFixture::seed_minimal(ctx)?;
     let org_id = fixture.organization_id;
@@ -471,7 +474,11 @@ pub fn test_reset_account_move_to_draft_only_from_cancelled(ctx: &ReducerContext
         .move_line_by_move()
         .filter(&move_id)
         .collect();
-    if lines.is_empty() || lines.iter().any(|l| l.parent_state != AccountMoveState::Draft) {
+    if lines.is_empty()
+        || lines
+            .iter()
+            .any(|l| l.parent_state != AccountMoveState::Draft)
+    {
         return Err("move lines were not returned to Draft".to_string());
     }
 
@@ -498,17 +505,31 @@ pub fn test_reset_account_move_to_draft_only_from_cancelled(ctx: &ReducerContext
         Ok(()) => return Err("reset of a posted move succeeded".to_string()),
     }
 
+    match cancel_account_move(ctx, org_id, posted_id) {
+        Err(error) if error.contains("credit note or reversal") => {}
+        Err(error) => return Err(format!("unexpected posted cancellation error: {error}")),
+        Ok(()) => return Err("cancellation of a posted move succeeded".to_string()),
+    }
+    let posted = ctx
+        .db
+        .account_move()
+        .id()
+        .find(&posted_id)
+        .ok_or("posted move missing")?;
+    if posted.state != AccountMoveState::Posted || !posted.posted_before {
+        return Err("rejected cancellation changed the posted move".to_string());
+    }
+    if ctx
+        .db
+        .account_move_line()
+        .move_line_by_move()
+        .filter(&posted_id)
+        .any(|line| line.parent_state != AccountMoveState::Posted)
+    {
+        return Err("rejected cancellation changed a posted move line".to_string());
+    }
+
     let other = OrgFixture::seed_minimal(ctx)?;
-    cancel_account_move(ctx, org_id, posted_id)?;
-    match reset_account_move_to_draft(ctx, org_id, posted_id) {
-        Err(error) if error.contains("Previously posted") => {}
-        Err(error) => return Err(format!("unexpected previously-posted reset error: {error}")),
-        Ok(()) => return Err("reset of a posted-then-cancelled move succeeded".to_string()),
-    }
-    let cancelled = ctx.db.account_move().id().find(&posted_id).ok_or("posted move missing")?;
-    if cancelled.state != AccountMoveState::Cancelled || !cancelled.posted_before {
-        return Err("rejected reset changed the previously-posted move".to_string());
-    }
     cancel_account_move(ctx, org_id, move_id)?;
     match reset_account_move_to_draft(ctx, other.organization_id, move_id) {
         Err(error) if error.contains("organization") => {}

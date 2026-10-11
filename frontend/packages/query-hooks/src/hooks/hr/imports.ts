@@ -3,11 +3,11 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { stdbBffCommandPost } from "@lumiere/stdb/commands"
 import { apiFetch, fetchQueryList, rqBigIntKey } from "../../http"
-import type { CanonicalRecordRef } from "../operation-effect"
 import {
   resolveImportCommitEffect,
   sha256Hex,
   type ImportJobEffectProjection,
+  type ImportJobRecordRef,
 } from "../form-import-effect"
 import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
 import { responseErrorMessage as parseCallError } from "@lumiere/api-client/response-error"
@@ -141,7 +141,7 @@ function useImportHrSalaryRuleCsv(organizationId: bigint) {
 
 function useImportHrPayslipCsv(organizationId: bigint) {
   const qc = useQueryClient()
-  return useMutation<CanonicalRecordRef, Error, string>({
+  return useMutation<ImportJobRecordRef, Error, string>({
     mutationFn: async (csvData) => {
       const sha256 = await sha256Hex(csvData)
       const { urlPath, init } = stdbBffCommandPost("import_hr_payslip_csv", { csvData: csvData })
