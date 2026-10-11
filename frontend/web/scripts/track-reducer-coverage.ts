@@ -261,6 +261,8 @@ const WEB_DETECTION_PATTERNS = {
   useStdbReducerWithInvalidation: /useStdbReducerWithInvalidation\s*\(\s*['"`]([a-z_][a-z0-9_]*)['"`]/g,
   // useStdbCallMutation('name', ...)
   useStdbCallMutation: /useStdbCallMutation\s*\(\s*['"`]([a-z_][a-z0-9_]*)['"`]/g,
+  // stdbBffCommandPost('name', ...) - generated named BFF command client
+  stdbBffCommandPost: /stdbBffCommandPost\s*\(\s*['"`]([a-z_][a-z0-9_]*)['"`]/g,
   // callReducer('name', ...) - server-side lib
   callReducerLiteral: /callReducer\s*\(\s*['"`]([a-z_][a-z0-9_]*)['"`]/g,
   // callReducersBatch entries
@@ -299,6 +301,7 @@ interface CoverageReport {
     useStdbReducer: number
     useStdbReducerWithInvalidation: number
     useStdbCallMutation: number
+    stdbBffCommandPost: number
     callReducerLiteral: number
     callReducersBatch: number
     stdbBrowserCommand: number
@@ -416,6 +419,7 @@ function extractWebReducers(): {
     useStdbReducer: new Set(),
     useStdbReducerWithInvalidation: new Set(),
     useStdbCallMutation: new Set(),
+    stdbBffCommandPost: new Set(),
     callReducerLiteral: new Set(),
     callReducersBatch: new Set(),
     stdbBrowserCommand: new Set(),
@@ -478,6 +482,13 @@ function extractWebReducers(): {
       while ((match = WEB_DETECTION_PATTERNS.useStdbCallMutation.exec(content)) !== null) {
         allReducers.add(match[1])
         sources.useStdbCallMutation.add(match[1])
+      }
+
+      // Generated named BFF command pattern
+      WEB_DETECTION_PATTERNS.stdbBffCommandPost.lastIndex = 0
+      while ((match = WEB_DETECTION_PATTERNS.stdbBffCommandPost.exec(content)) !== null) {
+        allReducers.add(match[1])
+        sources.stdbBffCommandPost.add(match[1])
       }
 
       // callReducer pattern
@@ -582,7 +593,7 @@ function extractHookWrappers(): Map<string, Set<string>> {
     ...globSync('**/*.ts', { cwd: STDB_MUTATIONS_SRC, absolute: true }),
   ]
   const patterns = [
-    /\b[a-zA-Z]+BffPost\s*\(\s*['"`]([a-z_][a-z0-9_]*)['"`]/g,
+    /\bstdbBffCommandPost\s*\(\s*['"`]([a-z_][a-z0-9_]*)['"`]/g,
     /['"]\/api\/call\/([a-z_][a-z0-9_]*)/g,
     /useAccountingCallMutation\s*\(\s*['"`]([a-z_][a-z0-9_]*)['"`]/g,
     /useStdb(?:Reducer|CallMutation|ReducerWithInvalidation)?\s*\(\s*['"`]([a-z_][a-z0-9_]*)['"`]/g,
@@ -1391,6 +1402,7 @@ function generateReport(
       useStdbReducer: webResult.sources.useStdbReducer.size,
       useStdbReducerWithInvalidation: webResult.sources.useStdbReducerWithInvalidation.size,
       useStdbCallMutation: webResult.sources.useStdbCallMutation.size,
+      stdbBffCommandPost: webResult.sources.stdbBffCommandPost.size,
       callReducerLiteral: webResult.sources.callReducerLiteral.size,
       callReducersBatch: webResult.sources.callReducersBatch.size,
       stdbBrowserCommand: webResult.sources.stdbBrowserCommand.size,
@@ -1652,6 +1664,7 @@ function printReport(report: CoverageReport): void {
   console.log(`  useStdbReducer('...'): ${report.detectionSources.useStdbReducer}`)
   console.log(`  useStdbReducerWithInvalidation('...'): ${report.detectionSources.useStdbReducerWithInvalidation}`)
   console.log(`  useStdbCallMutation('...'): ${report.detectionSources.useStdbCallMutation}`)
+  console.log(`  stdbBffCommandPost('...'): ${report.detectionSources.stdbBffCommandPost}`)
   console.log(`  callReducer('...'): ${report.detectionSources.callReducerLiteral}`)
   console.log(`  callReducersBatch entries: ${report.detectionSources.callReducersBatch}`)
   console.log(`  stdbBrowserCommand('...'): ${report.detectionSources.stdbBrowserCommand}`)
