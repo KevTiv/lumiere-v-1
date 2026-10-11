@@ -3234,6 +3234,10 @@
     "write_date": "timestamp",
     "metadata": "string"
   },
+  "FinishManufacturingTrackingParams": {
+    "lot_id": "u64",
+    "serial_id": "u64"
+  },
   "FireWorkflowTimerParams": {
     "causation_id": "string"
   },
@@ -3823,6 +3827,10 @@
     "document_template_id": "u64",
     "metadata": "string"
   },
+  "ManufacturingByproductTracking": {
+    "lot_id": "u64",
+    "serial_id": "u64"
+  },
   "MatchExpenseCardStatementLineParams": {
     "metadata": "string"
   },
@@ -3884,6 +3892,9 @@
     "activity_type_id": "u64",
     "activity_summary": "string",
     "metadata": "string"
+  },
+  "MrpProductionCost": {
+    "account_move_id": "u64"
   },
   "MrpRoutingWorkcenter": {
     "worksheet": "string",

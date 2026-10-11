@@ -1,5 +1,5 @@
 import { parseStrictU64 } from "@lumiere/erp-shared/u64"
-import type { StdbBffCommandInput } from "@lumiere/stdb/commands"
+import type { StdbNamedOperationInput } from "@lumiere/stdb/commands"
 
 export type TrackingRow = Readonly<Record<string, unknown>>
 export interface ManufacturingTrackingSnapshot {
@@ -107,7 +107,7 @@ export function outputIdentityOptions(requirement: OutputTrackingRequirement, sn
     && (requirement.tracking !== "serial" || (row.state === "free" && absent(field(row, "locationId", "location_id")))))
 }
 export function buildTrackedCloseIntent(order: TrackingRow, snapshot: ManufacturingTrackingSnapshot,
-  organizationId: bigint, companyId: bigint, selections: Readonly<Record<string, TrackingSelection>>): StdbBffCommandInput<"finish_manufacturing_order_with_tracking"> {
+  organizationId: bigint, companyId: bigint, selections: Readonly<Record<string, TrackingSelection>>): StdbNamedOperationInput<"finish_manufacturing_order_with_tracking"> {
   const requirements = outputTrackingRequirements(order, snapshot, organizationId, companyId)
   const resolve = (requirement: OutputTrackingRequirement) => {
     const selection = selections[requirement.key]
@@ -162,7 +162,7 @@ export function scrapLocationOptions(snapshot: ManufacturingTrackingSnapshot, or
 export function buildManufacturingScrapIntent(kind: "output" | "material", order: TrackingRow,
   snapshot: ManufacturingTrackingSnapshot, organizationId: bigint, companyId: bigint,
   selectedId: string, locationId: string, quantity: number, requestId: string):
-  StdbBffCommandInput<"scrap_tracked_manufacturing_output"> | StdbBffCommandInput<"scrap_manufacturing_material"> {
+  StdbNamedOperationInput<"scrap_tracked_manufacturing_output"> | StdbNamedOperationInput<"scrap_manufacturing_material"> {
   if (!Number.isFinite(quantity) || quantity <= 0 || !requestId.trim()) throw new Error("Positive quantity and request identity are required")
   const source = unique(kind === "output" ? trackedOutputOptions(order, snapshot, organizationId, companyId)
     : materialScrapOptions(order, snapshot, organizationId, companyId), id(selectedId))
@@ -192,7 +192,7 @@ export function buildManufacturingScrapIntent(kind: "output" | "material", order
 
 export function resolveTrackingCloseEffect(order: TrackingRow, snapshot: ManufacturingTrackingSnapshot,
   organizationId: bigint, companyId: bigint,
-  input: StdbBffCommandInput<"finish_manufacturing_order_with_tracking">,
+  input: StdbNamedOperationInput<"finish_manufacturing_order_with_tracking">,
   ordersAfter: readonly TrackingRow[], movesAfter: readonly TrackingRow[]) {
   const orders = ordersAfter.filter((row) => trackingId(row.id) === trackingId(order.id) && scoped(row, organizationId, companyId))
   if (orders.length > 1) throw new Error("Manufacturing order projection is ambiguous")
@@ -228,7 +228,7 @@ export function resolveTrackingCloseEffect(order: TrackingRow, snapshot: Manufac
 
 export function resolveTrackingScrapEffect(kind: "output" | "material", order: TrackingRow,
   organizationId: bigint, companyId: bigint,
-  input: StdbBffCommandInput<"scrap_tracked_manufacturing_output"> | StdbBffCommandInput<"scrap_manufacturing_material">,
+  input: StdbNamedOperationInput<"scrap_tracked_manufacturing_output"> | StdbNamedOperationInput<"scrap_manufacturing_material">,
   movesAfter: readonly TrackingRow[]) {
   const matches = movesAfter.filter((move) => scoped(move, organizationId, companyId)
     && trackingId(field(move, "productionId", "production_id")) === trackingId(order.id)

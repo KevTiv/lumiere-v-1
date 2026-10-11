@@ -169,6 +169,15 @@ pub const MIGRATIONS: &[Migration] = &[
             "../../../lumiere-codegen/pg-migration-ledger/0013_durable_projection_delta.sql"
         ),
     },
+    Migration {
+        version: 14,
+        name: "manufacturing_actual_cost_projection",
+        change_set: 6,
+        phase: MigrationPhase::Expand,
+        sql: include_str!(
+            "../../../lumiere-codegen/pg-migration-ledger/0014_durable_projection_delta.sql"
+        ),
+    },
 ];
 
 /// SQL used to bootstrap the migration history itself.

@@ -3234,6 +3234,10 @@
     "write_date",
     "metadata"
   ],
+  "FinishManufacturingTrackingParams": [
+    "lot_id",
+    "serial_id"
+  ],
   "FireWorkflowTimerParams": [
     "causation_id"
   ],
@@ -3823,6 +3827,10 @@
     "document_template_id",
     "metadata"
   ],
+  "ManufacturingByproductTracking": [
+    "lot_id",
+    "serial_id"
+  ],
   "MatchExpenseCardStatementLineParams": [
     "metadata"
   ],
@@ -3884,6 +3892,9 @@
     "activity_type_id",
     "activity_summary",
     "metadata"
+  ],
+  "MrpProductionCost": [
+    "account_move_id"
   ],
   "MrpRoutingWorkcenter": [
     "worksheet",

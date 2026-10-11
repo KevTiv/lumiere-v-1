@@ -217,6 +217,10 @@ const PARENT_OVERRIDES = {
   import_job_record: ["import_job", "job_id", "id"],
   mrp_bom_byproduct: ["mrp_bom", "bom_id", "id"],
   mrp_bom_line: ["mrp_bom", "bom_id", "id"],
+  mrp_production_cost: ["mrp_production", "production_id", "id"],
+  mrp_productivity_cost: ["mrp_workcenter_productivity", "productivity_id", "id"],
+  mrp_valuation_config: ["company", "company_id", "id"],
+  mrp_workcenter_cost_rate: ["mrp_workcenter", "workcenter_id", "id"],
   opportunity_line: ["opportunity", "opportunity_id", "id"],
   pos_order_line: ["pos_order", "order_id", "id"],
   pos_payment: ["pos_order", "order_id", "id"],
@@ -369,6 +373,7 @@ function primaryKeyStrategy(table) {
   const { column_name: column, ty } = table.primary_key;
   if (ty === "Identity") return "identity";
   if (table.sql_name === "organization_commit_cursor") return "natural";
+  if (["mrp_production_cost", "mrp_productivity_cost", "mrp_valuation_config", "mrp_workcenter_cost_rate"].includes(table.sql_name)) return "natural";
   if (ty === "U64") return "auto_increment";
   if (column.endsWith("_key") || column === "code" || column === "token" || column === "scope_key") {
     return "natural";
