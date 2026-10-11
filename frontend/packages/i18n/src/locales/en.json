@@ -5975,6 +5975,14 @@
       "overBilled": "Over-billed lines",
       "partialReceipt": "Partial receipt"
     },
+    "handoffs": {
+      "title": "Receipts and vendor bills",
+      "loading": "Loading receipts and vendor bills...",
+      "error": "Receipts and vendor bills could not be loaded.",
+      "empty": "No receipts or vendor bills found.",
+      "receipt": "Receipt",
+      "bill": "Vendor bill"
+    },
     "purchaseOrders": {
       "title": "Purchase Orders",
       "description": "All purchase orders",
@@ -6253,6 +6261,10 @@
       "rfqBid": {
         "title": "New RFQ bid",
         "description": "Record a vendor bid for a request for quotation."
+      },
+      "rfqAward": {
+        "title": "Award RFQ bid",
+        "description": "Select an open RFQ and one of its submitted bids."
       },
       "vendorCredit": {
         "title": "New vendor credit",
@@ -13153,7 +13165,9 @@
     "bell": {
       "empty": "No notifications.",
       "label": "Notifications",
+      "markAllRead": "Mark all read",
       "recent": "Latest notifications",
+      "unread": "Unread notifications",
       "viewAll": "View all"
     }
   },
