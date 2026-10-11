@@ -1,4 +1,5 @@
 //! Manufacturing domain test suite — invoke via `run_all_manufacturing_tests` reducer.
+pub mod domain_lifecycle_test;
 pub mod relational_integrity_test;
 pub mod workcenter_test;
 
@@ -21,10 +22,19 @@ pub fn run_all_manufacturing_tests(ctx: &ReducerContext) -> Result<(), String> {
     run_manufacturing_workorder_quality_gate_test(ctx)?;
     run_manufacturing_finished_output_scrap_exact_effect_test(ctx)?;
     run_manufacturing_bom_byproduct_output_exact_effect_test(ctx)?;
+    run_manufacturing_bom_to_close_domain_lifecycle_test(ctx)?;
     relational_integrity_test::test_update_manufacturing_order_draft_only(ctx)
         .map_err(|e| format!("update_manufacturing_order_draft_only: {e}"))?;
     log::info!("✅ run_all_manufacturing_tests complete");
     Ok(())
+}
+
+#[spacetimedb::reducer]
+pub fn run_manufacturing_bom_to_close_domain_lifecycle_test(
+    ctx: &ReducerContext,
+) -> Result<(), String> {
+    domain_lifecycle_test::test_bom_to_close_domain_lifecycle(ctx)
+        .map_err(|e| format!("bom_to_close_domain_lifecycle: {e}"))
 }
 
 #[spacetimedb::reducer]
