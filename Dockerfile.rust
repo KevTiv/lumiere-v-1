@@ -5,7 +5,11 @@ WORKDIR /app
 
 FROM chef AS builder
 ARG BIN
+ARG CARGO_BUILD_JOBS=1
 COPY Cargo.toml Cargo.lock ./
+COPY Makefile ./
+COPY release-compatibility-manifest.json ./
+COPY scripts ./scripts
 COPY api-server ./api-server
 COPY ai-gateway ./ai-gateway
 COPY iot-gateway ./iot-gateway
@@ -14,7 +18,11 @@ COPY crates ./crates
 RUN install -d -m 0700 /root/.ssh \
   && printf '%s\n' 'github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl' > /root/.ssh/known_hosts \
   && chmod 0600 /root/.ssh/known_hosts
-RUN --mount=type=ssh cargo build --locked --release --bin "${BIN}"
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends python3 \
+  && rm -rf /var/lib/apt/lists/*
+RUN --mount=type=ssh make contracts-staging-from-pinned
+RUN --mount=type=ssh cargo build --locked --release --jobs "${CARGO_BUILD_JOBS}" --bin "${BIN}"
 
 FROM debian:bookworm-slim AS runtime
 ARG BIN
