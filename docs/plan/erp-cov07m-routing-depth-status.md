@@ -2,7 +2,7 @@
 
 Status: implemented; integrated reducer runtime acceptance pending.
 
-Stack base: PR #175 (`codex/phase9-manufacturing-v0-3-99`, commit `9eb67a11`).
+Stack base: PR #175, commit `9eb67a11`.
 
 This slice closes the disconnected BOM operation relation. The new
 `set_bom_operations` reducer assigns existing operation identities to a scoped
