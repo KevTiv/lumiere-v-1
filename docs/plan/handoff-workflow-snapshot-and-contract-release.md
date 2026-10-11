@@ -18,6 +18,11 @@ The remote `Release contracts` run
 passed. It published `lumiere-contracts` `v0.3.90` and pinned it in commit
 `c0012a78f` (`chore(contracts): publish and pin v0.3.90`).
 
+The repaired current UI stack now carries this work through PR #175. Release run
+[`38155126649`](https://github.com/KevTiv/lumiere-v-1/actions/runs/38155126649)
+passed and pinned the current immutable aggregate contract as `v0.3.99` in commit
+`3f191c7f5`. PR #174 head `a8f9b8e0` is an ancestor of that PR #175 head.
+
 Task 2 is implemented on the dependent branch
 `codex/pass26-workflow-runtime`. The client requests and exact-reads the
 canonical snapshot before start or signal. It passes only the snapshot revision

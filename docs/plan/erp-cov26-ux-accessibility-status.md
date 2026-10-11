@@ -1,6 +1,6 @@
 # COV-26 — One module quality pass per PR
 
-**Status:** REVIEW — three bounded Reports quality passes implemented and locally verified; current-stack integration, contract release/pin, same-head CI, and hosted U4/U5 pending
+**Status:** REVIEW — current-stack integration, contract release/pin, and hosted-Maincloud browser proof complete; same-head CI and public hosted-application U4/U5 certification pending
 **Module/surface:** UX / Accessibility  
 **Plan target:** common UI-quality pass  
 **Scaffold source:** [`erp-cov08-27-scaffold.md`](./erp-cov08-27-scaffold.md)
@@ -30,11 +30,10 @@ COV-08d for the minimal form). Never correlate by newest row, name or timestamp.
 the complete governed `dashboard-widgets` definition projection for deterministic
 rendering, including `metadata` for exact canonical readback. It also adds the
 internal `run_analytics_dashboard_widget_idempotency_test` operation identity.
-Release and pin regenerated contract artifacts before acceptance. The fetched
-remote contains the newer `v0.3.94` application pin on PR #155, while the current
-top draft stack head regresses to `v0.3.91`; this branch's inherited `v0.3.80` pin
-is also not a valid release base. Repair the stack to a monotonic contract base
-first, then use the next available immutable tag after a live tag check.
+Release and pin regenerated contract artifacts before acceptance. The repaired
+PR #154 through PR #175 stack now has monotonic ancestry. The successful Release
+contracts run `38155126649` published and pinned immutable
+`lumiere-contracts@0.3.99` in commit `3f191c7f5`.
 
 ## Reports / Analytics bounded pass (2026-10-10)
 
@@ -69,8 +68,9 @@ failure. COV-D05, COV-D06, and COV-D07 are resolved for this bounded Reports pat
 
 ## Reports widget create-and-attach mutation pass (2026-10-10)
 
-**State:** REVIEW — deterministic implementation and exact-head local runtime proof
-complete; contract release/pin and same-head CI pending.
+**State:** REVIEW — deterministic implementation, exact-head local runtime proof,
+contract release/pin, and hosted-Maincloud browser proof complete; same-head CI
+and public hosted-application U4/U5 certification pending.
 
 The query builder no longer finds a created widget by display name or greatest id.
 Each save attempt now carries one versioned creation request id in the canonical
@@ -102,20 +102,31 @@ decoy was excluded. A conflicting replay returned 422, a named reader-persona
 replay returned 403, the canonical effect row remained singular after both, and a
 full reload reopened the saved dashboard with the exact widget visible.
 
-This is local runtime evidence. It does not certify hosted production behavior or
-U4/U5. Current-stack integration, same-head CI, and the contract release/pin remain
-acceptance gates.
+On 2026-10-11, the production module was also published without data deletion to
+Maincloud database `lumiere-v1-j1uo0`. Owner-restricted provisioning produced
+exactly one current credential, active membership, and active role assignment for
+each of the seven accepted personas. The fixture health gate also found every
+required COV-03 through COV-24 module row.
+
+An optimized Next.js 16.1.6 production build and the exact API source then ran the
+complete six-test COV-26 Reports browser file against that hosted database. All six
+tests passed with one worker. The canonical create-and-attach case retained the
+exact success link across report cache refreshes, rejected a conflicting replay,
+denied the reader persona, and proved the dashboard relation excluded the
+higher-id same-name decoy.
+
+This is hosted-data runtime evidence. The web and API processes are still local
+loopback services, so it is not public hosted-application U4/U5 certification.
 
 ## Remaining gates
 
-1. Integrate this divergent work onto the current UI stack and repair its contract
-   pin regression: PR #155 pins `v0.3.94`, but the current top draft head pins
-   `v0.3.91`.
-2. From the clean integrated source, regenerate contracts, publish the next free
-   immutable version after a live tag check, and repin the same source commit.
-3. Run the required CI suite on that exact pushed head.
-4. Collect hosted U4/U5 operator evidence on the same released head. Local Docker
-   and browser evidence do not satisfy this gate.
+1. Push the final hosted-auth and Query Builder result-state changes, then run the
+   required CI suite on that exact head.
+2. Deploy that same head to a public hosted web/API environment and record its
+   application URL.
+3. Repeat the U4/U5 operator evidence through that public URL. The current
+   production-build browser proof uses hosted Maincloud data but loopback web/API
+   processes.
 
 ## Prerequisites / decisions
 
@@ -127,8 +138,8 @@ COV-03..25 candidates.
 | --- | --- | --- |
 | D | Native domain test: transition, replay rejection leaving the row unchanged, invariant/denial cases | IMPLEMENTED locally — exact-head idempotency reducer test passed; conflicting replay returned 422 and preserved one canonical row |
 | A | Generated operation keeps permission + organization/company scope; reader persona denied (403) | IMPLEMENTED locally — named operations use server-derived organization scope; company ownership validation passed; named reader replay returned 403 |
-| O | Playwright drives the transition through the visible UI action (setup calls allowed only for fixtures) | IMPLEMENTED locally — production-build query-builder case passed against the exact-head local stack |
-| E | Exact-effect resolver unit test (state/scope/identity/ambiguity) and browser snapshot preserved after stale (422) and denied (403) replay | IMPLEMENTED locally — exact creation/attachment, higher-id decoy exclusion, stale/denied preservation, reload, and exact saved-widget readback passed |
+| O | Playwright drives the transition through the visible UI action (setup calls allowed only for fixtures) | IMPLEMENTED against hosted Maincloud — the production-build query-builder case passed through the visible save action; public hosted-application repeat remains open |
+| E | Exact-effect resolver unit test (state/scope/identity/ambiguity) and browser snapshot preserved after stale (422) and denied (403) replay | IMPLEMENTED against hosted Maincloud — exact creation/attachment, higher-id decoy exclusion, stale/denied preservation, reload, and exact saved-widget readback passed |
 
 ## Acceptance
 

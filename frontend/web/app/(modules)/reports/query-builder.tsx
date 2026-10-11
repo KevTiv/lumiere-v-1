@@ -37,10 +37,18 @@ import {
   type QueryBuilderFilterRow,
 } from "./query-builder-semantics"
 
+export type QueryBuilderStatus = {
+  kind: "ok" | "error"
+  message: string
+  href?: string
+}
+
 type QueryBuilderProps = {
   organizationId: bigint
   companyId?: bigint
   dashboards: Record<string, unknown>[]
+  status: QueryBuilderStatus | null
+  onStatusChange: (status: QueryBuilderStatus | null) => void
 }
 
 type WidgetKind = "kpi" | "chart" | "table"
@@ -66,7 +74,13 @@ function humanize(name: string): string {
     .replace(/\b\w/g, (character) => character.toUpperCase())
 }
 
-export function QueryBuilder({ organizationId, companyId, dashboards }: QueryBuilderProps) {
+export function QueryBuilder({
+  organizationId,
+  companyId,
+  dashboards,
+  status,
+  onStatusChange,
+}: QueryBuilderProps) {
   const { t } = useTranslation()
 
   const [model, setModel] = useState("")
@@ -83,11 +97,6 @@ export function QueryBuilder({ organizationId, companyId, dashboards }: QueryBui
   const [limit, setLimit] = useState("10")
   const [name, setName] = useState("")
   const [attachDashboardId, setAttachDashboardId] = useState("")
-  const [status, setStatus] = useState<{
-    kind: "ok" | "error"
-    message: string
-    href?: string
-  } | null>(null)
   const saveAttemptRef = useRef<{ fingerprint: string; requestId: string } | null>(null)
 
   const createWidget = useCreateDashboardWidget(organizationId)
@@ -203,7 +212,7 @@ export function QueryBuilder({ organizationId, companyId, dashboards }: QueryBui
     setFilters([])
     setTimeField("")
     setSortField("")
-    setStatus(null)
+    onStatusChange(null)
   }
 
   const toggleDisplayField = (field: string) => {
@@ -218,7 +227,7 @@ export function QueryBuilder({ organizationId, companyId, dashboards }: QueryBui
   }
 
   const handleSave = async () => {
-    setStatus(null)
+    onStatusChange(null)
     const widgetInput = {
       name: name.trim(),
       companyId: companyId?.toString() ?? "",
@@ -255,7 +264,7 @@ export function QueryBuilder({ organizationId, companyId, dashboards }: QueryBui
           widgetId: created.ref.id,
         })
         saveAttemptRef.current = null
-        setStatus({
+        onStatusChange({
           kind: "ok",
           message: t("reports.queryBuilder.savedAttached", { name: name.trim() }),
           href: attached.ref.href,
@@ -263,13 +272,13 @@ export function QueryBuilder({ organizationId, companyId, dashboards }: QueryBui
         return
       }
       saveAttemptRef.current = null
-      setStatus({
+      onStatusChange({
         kind: "ok",
         message: t("reports.queryBuilder.saved", { name: name.trim() }),
         href: created.ref.href,
       })
     } catch (e) {
-      setStatus({ kind: "error", message: e instanceof Error ? e.message : String(e) })
+      onStatusChange({ kind: "error", message: e instanceof Error ? e.message : String(e) })
     }
   }
 

@@ -131,7 +131,7 @@ import { useOpenErpAiChat } from "@/lib/erp-ai-context"
 import { PivotExplorer } from "./pivot-explorer"
 import { VatReportPanel } from "./vat-report-panel"
 import { StatementsPanel } from "./statements-panel"
-import { QueryBuilder } from "./query-builder"
+import { QueryBuilder, type QueryBuilderStatus } from "./query-builder"
 import { OwnerReportsPanel } from "./owner-reports-panel"
 
 export { REPORTS_UI_REDUCERS } from "@/lib/reports-ui-reducers"
@@ -199,6 +199,7 @@ function ReportsClientLoaded({
   const [updateLayoutWidgetId, setUpdateLayoutWidgetId] = useState<string | null>(null)
   const [viewDashboardId, setViewDashboardId] = useState<string | null>(null)
   const [viewDashboardRange, setViewDashboardRange] = useState<"all" | "7d" | "30d" | "90d" | "ytd">("all")
+  const [queryBuilderStatus, setQueryBuilderStatus] = useState<QueryBuilderStatus | null>(null)
   const openErpAiChat = useOpenErpAiChat()
 
   const { data: reportsRaw = [] } = useFinancialReports(orgId, initialReports)
@@ -946,6 +947,8 @@ function ReportsClientLoaded({
                 organizationId={orgId}
                 companyId={operatingCompanyId}
                 dashboards={dashboards as unknown as Record<string, unknown>[]}
+                status={queryBuilderStatus}
+                onStatusChange={setQueryBuilderStatus}
               />
             ),
           }
@@ -970,6 +973,7 @@ function ReportsClientLoaded({
       reports,
       trialBalances,
       dashboards,
+      queryBuilderStatus,
       companies,
       operatingCompanyId,
       orgId,

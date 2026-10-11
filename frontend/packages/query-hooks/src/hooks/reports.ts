@@ -760,7 +760,9 @@ export function useCreateDashboardWidget(organizationId: bigint) {
           )
         },
         afterDispatch: async () => {
-          await invalidateReportsModule(qc, organizationId)
+          await qc.invalidateQueries({
+            queryKey: ["dashboard-widgets", rqBigIntKey(organizationId)],
+          })
         },
         readbackAttempts: 6,
         readbackDelayMs: 150,
@@ -802,7 +804,9 @@ export function useAddWidgetToDashboard(organizationId: bigint) {
           )
         },
         afterDispatch: async () => {
-          await invalidateReportsModule(qc, organizationId)
+          await qc.invalidateQueries({
+            queryKey: ["dashboards", rqBigIntKey(organizationId)],
+          })
         },
         readbackAttempts: 6,
         readbackDelayMs: 150,
