@@ -332,10 +332,12 @@ fn complete_output_move(
     let lot_id = params.lot_id;
     let product = require_product_for_manufacturing(ctx, organization_id, product_id, "manufactured output")?;
     let method = crate::inventory::costing::normalize_cost_method(&product.cost_method);
+    let stock_quantity = convert_uom_quantity(ctx, organization_id, params.product_uom, product.uom_id, quantity, Some(product_id))?;
+    validate_positive_qty(stock_quantity, "output stock quantity")?;
     // A zero allocated cost is a real cost, not the inventory receipt fallback to standard.
-    let unit_cost = if method == "standard" { product.standard_price } else { params.price_unit };
+    let unit_cost = if method == "standard" { product.standard_price } else { params.price_unit * quantity / stock_quantity };
     validate_cost(unit_cost, "output inventory unit cost")?;
-    validate_cost(quantity * unit_cost, "output inventory value")?;
+    validate_cost(stock_quantity * unit_cost, "output inventory value")?;
     let created = create_stock_move_internal(ctx, organization_id, params)?;
     let move_id = created.id;
     ctx.db.stock_move().id().update(StockMove {
@@ -360,7 +362,7 @@ fn complete_output_move(
     });
     crate::inventory::stock::increase_quant_at_location_owned(
         ctx, organization_id, company_id, product_id, destination_id,
-        quantity, unit_cost, None, lot_id, &method,
+        stock_quantity, unit_cost, None, lot_id, &method,
     )?;
     Ok(move_id)
 }
@@ -1087,16 +1089,29 @@ pub fn consume_mo_materials(
         let bom = require_bom_in_company(ctx, organization_id, company_id, bom_id, "MO consumption BOM")?;
         validate_positive_qty(bom.product_qty, "BOM base quantity")?;
         validate_positive_qty(mo.product_qty, "manufacturing order quantity")?;
+        let normalized_mo_qty = convert_uom_quantity(ctx, organization_id, mo.product_uom_id,
+            bom.product_uom_id, mo.product_qty, Some(mo.product_id))?;
+        validate_positive_qty(normalized_mo_qty, "BOM normalized production quantity")?;
         let bom_lines: Vec<_> = ctx
             .db
             .mrp_bom_line()
             .mrp_bom_line_by_bom()
             .filter(&bom_id)
             .collect();
+        let mut authoritative_line_ids: Vec<_> = bom_lines.iter().map(|line| line.id).collect();
+        authoritative_line_ids.sort_unstable();
+        let mut owned_line_ids = bom.bom_line_ids.clone();
+        owned_line_ids.sort_unstable();
+        if authoritative_line_ids != owned_line_ids {
+            return Err("BOM material line ownership is inconsistent".to_string());
+        }
 
-        for (seq_idx, line) in bom_lines.into_iter().enumerate() {
-            let required_qty = line.product_qty * (mo.product_qty / bom.product_qty);
-            validate_positive_qty(required_qty, "required material quantity")?;
+        let mut consumption_plan = Vec::new();
+        let mut planned_quantities = std::collections::HashMap::<u64, f64>::new();
+
+        for line in bom_lines {
+            let line_required_qty = line.product_qty * (normalized_mo_qty / bom.product_qty);
+            validate_positive_qty(line_required_qty, "required material quantity")?;
             // MFG-010: Re-validate the BOM line's component product still exists,
             // belongs to this organization, and is active before exploding the
             // BOM into consumption moves (defense in depth against stale/edited
@@ -1107,6 +1122,12 @@ pub fn consume_mo_materials(
                 line.product_id,
                 "BOM component",
             )?;
+            if line.organization_id != organization_id || line.company_id != company_id {
+                return Err("BOM material line does not match manufacturing scope".to_string());
+            }
+            let required_qty = convert_uom_quantity(ctx, organization_id, line.product_uom_id,
+                component.uom_id, line_required_qty, Some(component.id))?;
+            validate_positive_qty(required_qty, "required material stock quantity")?;
             require_lot_when_tracked(
                 &component.tracking,
                 None,
@@ -1115,7 +1136,13 @@ pub fn consume_mo_materials(
             let (material_unit_cost, cost_metadata) = material_cost_snapshot(
                 ctx, &mo, line.product_id, source_location_id, required_qty,
             )?;
+            let total_quantity = planned_quantities.entry(line.product_id).or_default();
+            *total_quantity += required_qty;
+            material_cost_snapshot(ctx, &mo, line.product_id, source_location_id, *total_quantity)?;
+            consumption_plan.push((line, component, required_qty, material_unit_cost, cost_metadata));
+        }
 
+        for (seq_idx, (line, component, required_qty, material_unit_cost, cost_metadata)) in consumption_plan.into_iter().enumerate() {
             let created_move = create_stock_move_internal(
                 ctx,
                 organization_id,
@@ -1124,7 +1151,7 @@ pub fn consume_mo_materials(
                     name: format!("MO {} consume component {}", mo.id, line.product_id),
                     product_id: line.product_id,
                     product_tmpl_id: line.product_tmpl_id,
-                    product_uom: line.product_uom_id,
+                    product_uom: component.uom_id,
                     product_uom_qty: required_qty,
                     location_id: source_location_id,
                     location_dest_id: source_location_id,
@@ -1153,7 +1180,7 @@ pub fn consume_mo_materials(
                     product_packaging_qty: 0.0,
                     warehouse_id: Some(mo.warehouse_id),
                     production_id: Some(mo.id),
-                    raw_material_production_id: None,
+                    raw_material_production_id: Some(mo.id),
                     unbuild_id: None,
                     consume_unbuild_id: None,
                     cost_share: 0.0,
@@ -1355,7 +1382,12 @@ pub fn finish_manufacturing_order(
             if product.tracking != "none" {
                 return Err("Tracked byproduct output requires a separate lot/serial path".to_string());
             }
-            let quantity = row.product_qty * (mo.product_qty / bom.product_qty);
+            let normalized_mo_qty = convert_uom_quantity(ctx, organization_id, mo.product_uom_id,
+                bom.product_uom_id, mo.product_qty, Some(mo.product_id))?;
+            validate_positive_qty(bom.product_qty, "BOM base quantity")?;
+            let defined_quantity = row.product_qty * (normalized_mo_qty / bom.product_qty);
+            let quantity = convert_uom_quantity(ctx, organization_id, row.product_uom_id,
+                product.uom_id, defined_quantity, Some(product.id))?;
             validate_positive_qty(quantity, "byproduct output quantity")?;
             byproduct_outputs.push((row, product, quantity));
         }
@@ -1366,12 +1398,14 @@ pub fn finish_manufacturing_order(
     let primary_product = require_product_for_manufacturing(ctx, organization_id, mo.product_id, "manufactured output")?;
     let primary_unit_cost = primary_value / finished_qty;
     validate_cost(primary_unit_cost, "primary output allocated unit cost")?;
-    let primary_inventory_cost = if crate::inventory::costing::normalize_cost_method(&primary_product.cost_method) == "standard" {
-        primary_product.standard_price
-    } else { primary_unit_cost };
+    let primary_stock_quantity = convert_uom_quantity(ctx, organization_id, mo.product_uom_id,
+        primary_product.uom_id, finished_qty, Some(primary_product.id))?;
+    let primary_inventory_value = if crate::inventory::costing::normalize_cost_method(&primary_product.cost_method) == "standard" {
+        primary_product.standard_price * primary_stock_quantity
+    } else { primary_value };
     let primary_metadata = serde_json::json!({"manufacturing_output_cost": {
         "currency_id": cost_inputs.currency_id, "allocated_value": primary_value,
-        "inventory_value": primary_inventory_cost * finished_qty,
+        "inventory_value": primary_inventory_value,
         "material_value": cost_inputs.material_value, "workcenter_value": cost_inputs.workcenter_value,
     }}).to_string();
     let finished_move_id = complete_output_move(
@@ -1399,7 +1433,7 @@ pub fn finish_manufacturing_order(
                 name: format!("MO {} byproduct {}", mo.id, row.product_id),
                 product_id: row.product_id,
                 product_tmpl_id: row.product_tmpl_id,
-                product_uom: row.product_uom_id,
+                product_uom: product.uom_id,
                 product_uom_qty: quantity,
                 reference: Some(format!("MO/{}/BYPRODUCT/{}", mo.id, row.id)),
                 sequence: row.sequence as i32,

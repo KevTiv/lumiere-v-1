@@ -2,6 +2,8 @@
 
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
+use crate::accounting::fiscal_periods::ensure_accounting_period_open_for_date;
+use crate::accounting::idempotency::replayed_result;
 use crate::accounting::journal_entries::{
     account_move, account_move_line, add_account_move_line, create_account_move, post_account_move,
     CreateAccountMoveParams,
@@ -9,11 +11,13 @@ use crate::accounting::journal_entries::{
 use crate::accounting::line_params::journal_line_params;
 use crate::accounting::relations::{require_active_account, require_active_journal};
 use crate::core::organization::{company, require_company_in_organization};
+use crate::core::persistence::{record_organization_commit, OrganizationCommitInput, RowChange};
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
+use crate::inventory::product::product;
 use crate::inventory::stock::{stock_move, stock_quant};
 use crate::manufacturing::manufacturing_orders::{MrpProduction, MrpWorkorder};
 use crate::manufacturing::work_centers::{mrp_workcenter, mrp_workcenter_productivity};
-use crate::types::{AccountMoveState, MoveType};
+use crate::types::{AccountInternalGroup, AccountMoveState, JournalType, MoveType};
 
 #[path = "costing_math.rs"]
 mod math;
@@ -170,6 +174,25 @@ pub fn configure_workcenter_cost_rate(
         "mrp_workcenter_cost_rate",
         workcenter_id,
     );
+    let stored = ctx
+        .db
+        .mrp_workcenter_cost_rate()
+        .workcenter_id()
+        .find(&workcenter_id)
+        .ok_or("configured rate disappeared")?;
+    record_organization_commit(
+        ctx,
+        OrganizationCommitInput {
+            organization_id,
+            operation_id: "erp.configure_workcenter_cost_rate".to_string(),
+            correlation_id: format!("workcenter:{workcenter_id}:cost-rate"),
+            changes: vec![RowChange::upsert_stdb_row(
+                "mrp_workcenter_cost_rate",
+                serde_json::json!({"workcenter_id":workcenter_id}),
+                &stored,
+            )?],
+        },
+    )?;
     Ok(())
 }
 
@@ -213,6 +236,25 @@ pub fn configure_manufacturing_valuation(
         "mrp_valuation_config",
         company_id,
     );
+    let stored = ctx
+        .db
+        .mrp_valuation_config()
+        .company_id()
+        .find(&company_id)
+        .ok_or("valuation configuration disappeared")?;
+    record_organization_commit(
+        ctx,
+        OrganizationCommitInput {
+            organization_id,
+            operation_id: "erp.configure_manufacturing_valuation".to_string(),
+            correlation_id: format!("company:{company_id}:manufacturing-valuation"),
+            changes: vec![RowChange::upsert_stdb_row(
+                "mrp_valuation_config",
+                serde_json::json!({"company_id":company_id}),
+                &stored,
+            )?],
+        },
+    )?;
     Ok(())
 }
 
@@ -256,6 +298,15 @@ fn validate_valuation_configuration(
     if journal.currency_id.is_some_and(|id| id != row.currency_id) {
         return Err("manufacturing valuation journal must use company currency".to_string());
     }
+    if !matches!(
+        journal.type_,
+        JournalType::General | JournalType::Inventory | JournalType::Manufacturing
+    ) {
+        return Err(
+            "manufacturing valuation requires a general, inventory, or manufacturing journal"
+                .to_string(),
+        );
+    }
     for id in [
         row.material_account_id,
         row.output_account_id,
@@ -271,6 +322,15 @@ fn validate_valuation_configuration(
         )?;
         if account.currency_id.is_some_and(|id| id != row.currency_id) {
             return Err("manufacturing valuation accounts must use company currency".to_string());
+        }
+        let inventory = id == row.material_account_id || id == row.output_account_id;
+        let expected = if inventory {
+            AccountInternalGroup::Asset
+        } else {
+            AccountInternalGroup::Expense
+        };
+        if account.internal_group != Some(expected) || account.is_off_balance {
+            return Err("manufacturing valuation requires asset inventory and expense cost/variance accounts".to_string());
         }
     }
     Ok(())
@@ -349,6 +409,17 @@ pub(crate) fn production_cost_inputs(
     if raw_ids.windows(2).any(|ids| ids[0] == ids[1]) {
         return Err("manufacturing raw move identities contain duplicates".to_string());
     }
+    let mut authoritative_raw_ids: Vec<_> = ctx
+        .db
+        .stock_move()
+        .iter()
+        .filter(|movement| movement.raw_material_production_id == Some(mo.id))
+        .map(|movement| movement.id)
+        .collect();
+    authoritative_raw_ids.sort_unstable();
+    if authoritative_raw_ids != raw_ids {
+        return Err("manufacturing raw move ownership is inconsistent".to_string());
+    }
     let mut material_value = 0.0;
     for id in &raw_ids {
         let movement = ctx
@@ -383,12 +454,23 @@ pub(crate) fn production_cost_inputs(
         material_value += value;
     }
     validate_cost(material_value, "total material cost")?;
-    let configured_valuation = ctx
+    let valuation_config = ctx
         .db
         .mrp_valuation_config()
         .company_id()
-        .find(&mo.company_id)
-        .is_some();
+        .find(&mo.company_id);
+    if let Some(config) = &valuation_config {
+        if config.organization_id != mo.organization_id {
+            return Err("manufacturing valuation configuration scope mismatch".to_string());
+        }
+        validate_valuation_configuration(ctx, config)?;
+        // Preflight posting authority/period before any finished stock effects are applied.
+        check_permission(ctx, mo.organization_id, "account_move", "create")?;
+        check_permission(ctx, mo.organization_id, "account_move", "write")?;
+        check_permission(ctx, mo.organization_id, "account_move_line", "create")?;
+        ensure_accounting_period_open_for_date(ctx, mo.company_id, ctx.timestamp)?;
+    }
+    let configured_valuation = valuation_config.is_some();
     let mut productivity_ids = Vec::new();
     let mut workcenter_value = 0.0;
     for wo in workorders {
@@ -456,6 +538,15 @@ pub(crate) fn material_cost_snapshot(
     quantity: f64,
 ) -> Result<(f64, String), String> {
     let currency_id = company_currency(ctx, mo.organization_id, mo.company_id)?;
+    let component = ctx
+        .db
+        .product()
+        .id()
+        .find(&product_id)
+        .ok_or("material product not found for cost snapshot")?;
+    if component.organization_id != mo.organization_id || component.currency_id != currency_id {
+        return Err("material product cost currency/scope must match company".to_string());
+    }
     let quants: Vec<_> = ctx
         .db
         .stock_quant()
@@ -475,7 +566,9 @@ pub(crate) fn material_cost_snapshot(
     }
     let source = &quants[0];
     if source.quantity < quantity
+        || source.available_quantity < quantity
         || !source.quantity.is_finite()
+        || !source.available_quantity.is_finite()
         || !quantity.is_finite()
         || quantity <= 0.0
     {
@@ -485,6 +578,10 @@ pub(crate) fn material_cost_snapshot(
         return Err("material quant must use company currency".to_string());
     }
     validate_cost(source.cost, "material quant unit cost")?;
+    validate_cost(source.value, "material quant value")?;
+    if (source.value - source.quantity * source.cost).abs() > 1e-9 * source.value.max(1.0) {
+        return Err("material quant value does not match cost and quantity".to_string());
+    }
     let value = source.cost * quantity;
     validate_cost(value, "material consumption value")?;
     Ok((
@@ -544,59 +641,64 @@ pub(crate) fn record_production_cost(
         validate_valuation_configuration(ctx, &config)?;
         if inventory_value > 0.0 || input.total_value > 0.0 {
             let reference = format!("MO/{}/VALUATION", mo.id);
-            let before: std::collections::HashSet<_> =
-                ctx.db.account_move().iter().map(|row| row.id).collect();
-            create_account_move(
+            let params = CreateAccountMoveParams {
+                idempotency_key: format!("manufacturing-valuation:{}", mo.id),
+                company_id: Some(mo.company_id),
+                journal_id: config.journal_id,
+                move_type: MoveType::Entry,
+                date: ctx.timestamp,
+                name: String::new(),
+                ref_: Some(reference.clone()),
+                auto_post: false,
+                to_check: false,
+                is_storno: false,
+                partner_id: None,
+                partner_bank_id: None,
+                fiscal_position_id: None,
+                invoice_date: None,
+                invoice_date_due: None,
+                invoice_payment_term_id: None,
+                payment_reference: None,
+                invoice_origin: None,
+                invoice_partner_display_name: None,
+                invoice_cash_rounding_id: None,
+                partner_shipping_id: None,
+                sale_order_id: None,
+                invoice_incoterm_id: None,
+                incoterm_location: None,
+                campaign_id: None,
+                source_id: None,
+                medium_id: None,
+                secure_sequence_number: None,
+                metadata: Some(
+                    serde_json::json!({"manufacturing_production_id":mo.id}).to_string(),
+                ),
+            };
+            let payload_fingerprint = format!("{params:?}");
+            let key = params.idempotency_key.clone();
+            create_account_move(ctx, mo.organization_id, params)?;
+            let entry_id = replayed_result(
                 ctx,
                 mo.organization_id,
-                CreateAccountMoveParams {
-                    idempotency_key: format!("manufacturing-valuation:{}", mo.id),
-                    company_id: Some(mo.company_id),
-                    journal_id: config.journal_id,
-                    move_type: MoveType::Entry,
-                    date: ctx.timestamp,
-                    name: String::new(),
-                    ref_: Some(reference),
-                    auto_post: false,
-                    to_check: false,
-                    is_storno: false,
-                    partner_id: None,
-                    partner_bank_id: None,
-                    fiscal_position_id: None,
-                    invoice_date: None,
-                    invoice_date_due: None,
-                    invoice_payment_term_id: None,
-                    payment_reference: None,
-                    invoice_origin: None,
-                    invoice_partner_display_name: None,
-                    invoice_cash_rounding_id: None,
-                    partner_shipping_id: None,
-                    sale_order_id: None,
-                    invoice_incoterm_id: None,
-                    incoterm_location: None,
-                    campaign_id: None,
-                    source_id: None,
-                    medium_id: None,
-                    secure_sequence_number: None,
-                    metadata: Some(
-                        serde_json::json!({"manufacturing_production_id":mo.id}).to_string(),
-                    ),
-                },
-            )?;
+                mo.company_id,
+                "create_account_move",
+                &key,
+                &payload_fingerprint,
+            )?
+            .ok_or("manufacturing valuation owner did not return an exact receipt")?;
             let created: Vec<_> = ctx
                 .db
                 .account_move()
                 .iter()
                 .filter(|row| {
-                    !before.contains(&row.id)
+                    row.ref_.as_deref() == Some(reference.as_str())
                         && row.organization_id == mo.organization_id
                         && row.company_id == mo.company_id
                 })
                 .collect();
-            if created.len() != 1 {
+            if created.len() != 1 || created[0].id != entry_id {
                 return Err("manufacturing valuation journal identity is ambiguous".to_string());
             }
-            let entry_id = created[0].id;
             for (seq, (account, debit, credit, label)) in [
                 (
                     config.output_account_id,

@@ -325,7 +325,7 @@ pub fn test_workorder_quality_gate(ctx: &ReducerContext) -> Result<(), String> {
     Ok(())
 }
 
-fn create_test_workcenter(
+pub(crate) fn create_test_workcenter(
     ctx: &ReducerContext,
     fixture: &OrgFixture,
     name: &str,
@@ -372,7 +372,7 @@ fn create_test_production(
     create_test_production_with_bom(ctx, fixture, origin, None)
 }
 
-fn create_test_production_with_bom(
+pub(crate) fn create_test_production_with_bom(
     ctx: &ReducerContext,
     fixture: &OrgFixture,
     origin: &str,
@@ -430,7 +430,7 @@ fn create_test_production_with_bom(
     Ok(production)
 }
 
-fn create_test_workorder(
+pub(crate) fn create_test_workorder(
     ctx: &ReducerContext,
     fixture: &OrgFixture,
     production_id: u64,
