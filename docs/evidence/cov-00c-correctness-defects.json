@@ -101,7 +101,11 @@
       "evidence": [
         {
           "path": "frontend/packages/ui/src/lib/stored-dashboard-resolver.ts",
-          "markers": ["invalid-definition", "The filter operator ${operator} is not supported.", "storedDashboardExportGate"]
+          "markers": ["invalid-definition", "code: \"invalid-filter\"", "code: \"invalid-operator\"", "storedDashboardExportGate"]
+        },
+        {
+          "path": "frontend/packages/ui/src/pages/dashboard-widget-renderer.tsx",
+          "markers": ["dashboard-widget-diagnostic", "role=\"alert\""]
         }
       ]
     },
@@ -118,7 +122,11 @@
       "evidence": [
         {
           "path": "frontend/packages/ui/src/lib/stored-dashboard-resolver.ts",
-          "markers": ["kind: \"missing-timestamp\"", "kind: \"missing-measure\"", "rejectedRows"]
+          "markers": ["kind: \"missing-timestamp\"", "code: \"invalid-timestamp\"", "code: \"missing-measure\"", "rejectedRows"]
+        },
+        {
+          "path": "frontend/web/app/(modules)/reports/query-builder-semantics.ts",
+          "markers": ["missingTimestampPolicy: \"reject\"", "missingMeasurePolicy: \"reject\""]
         }
       ]
     },
@@ -135,7 +143,11 @@
       "evidence": [
         {
           "path": "frontend/web/hooks/use-stored-dashboard-data-sources.ts",
-          "markers": ["sourceStates: StoredDashboardSourceStates", "return { dataSources, sourceStates, isLoading }"]
+          "markers": ["sourceStates: StoredDashboardSourceStates", "issue: StoredDashboardSourceIssue | null", "queries.find((query) => query.error != null)?.error"]
+        },
+        {
+          "path": "frontend/web/app/(modules)/reports/reports-client.tsx",
+          "markers": ["storedDashboardIssue != null", "storedDashboardIssue ?"]
         }
       ]
     },

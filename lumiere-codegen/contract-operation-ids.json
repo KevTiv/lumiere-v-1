@@ -945,6 +945,7 @@
     "run_all_workflow_human_effect_tests": "erp.run_all_workflow_human_effect_tests",
     "run_analytics_cross_company_widget_add_test": "erp.run_analytics_cross_company_widget_add_test",
     "run_analytics_dashboard_company_scope_test": "erp.run_analytics_dashboard_company_scope_test",
+    "run_analytics_dashboard_widget_idempotency_test": "erp.run_analytics_dashboard_widget_idempotency_test",
     "run_c_0_organization_ownership_backfill": "erp.run_c0_organization_ownership_backfill",
     "run_cartonization": "erp.run_cartonization",
     "run_core_operational_messaging_test": "erp.run_core_operational_messaging_test",

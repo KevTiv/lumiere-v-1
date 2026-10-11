@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useMemo, useRef, useState } from "react"
 import { useTranslation } from "@lumiere/i18n"
 import { Button, Input, Label, DashboardWidgetRenderer, resolveStoredDashboard } from "@lumiere/ui"
 import { Checkbox } from "@lumiere/ui/components/checkbox"
@@ -26,26 +26,25 @@ import {
   useAddWidgetToDashboard,
   useCreateDashboardWidget,
 } from "@lumiere/query-hooks/hooks/reports"
-import { apiFetch } from "@lumiere/query-hooks/http"
 import { useStoredDashboardDataSources } from "@/hooks/use-stored-dashboard-data-sources"
 import { Plus, Save, Trash2 } from "lucide-react"
 import { queryBuilderSourceState } from "./query-builder-source-state"
+import {
+  buildQueryBuilderDomain,
+  discoverQueryBuilderFields,
+  storedDashboardBindingConfiguration,
+  type QueryBuilderFilterOp,
+  type QueryBuilderFilterRow,
+} from "./query-builder-semantics"
 
 type QueryBuilderProps = {
   organizationId: bigint
+  companyId?: bigint
   dashboards: Record<string, unknown>[]
 }
 
 type WidgetKind = "kpi" | "chart" | "table"
-type FilterOp = "eq" | "ne" | "gt" | "gte" | "lt" | "lte" | "in"
-
-interface FilterRow {
-  field: string
-  op: FilterOp
-  value: string
-}
-
-const FILTER_OPS: Array<{ value: FilterOp; label: string }> = [
+const FILTER_OPS: Array<{ value: QueryBuilderFilterOp; label: string }> = [
   { value: "eq", label: "=" },
   { value: "ne", label: "≠" },
   { value: "gt", label: ">" },
@@ -61,78 +60,13 @@ const CHART_TYPES = ["bar", "line", "area", "pie"] as const
 /** Tables that make no sense as self-serve widget sources. */
 const EXCLUDED_TABLES = new Set(["field_permission", "ai_reducer_allowlist"])
 
-function camelToSnake(key: string): string {
-  return key.replace(/[A-Z]/g, (m) => `_${m.toLowerCase()}`)
-}
-
 function humanize(name: string): string {
   return name
     .replace(/[_-]+/g, " ")
-    .replace(/\b\w/g, (c) => c.toUpperCase())
+    .replace(/\b\w/g, (character) => character.toUpperCase())
 }
 
-/** Scalar value extraction matching the stored-dashboard resolver conventions. */
-function scalarish(value: unknown): string | number | null {
-  if (value == null) return null
-  if (typeof value === "number" || typeof value === "string") return value
-  if (typeof value === "boolean" || typeof value === "bigint") return String(value)
-  if (typeof value === "object" && !Array.isArray(value)) {
-    const obj = value as Record<string, unknown>
-    if ("tag" in obj && typeof obj.tag === "string") return obj.tag
-    if ("some" in obj) return scalarish(obj.some)
-  }
-  return null
-}
-
-interface FieldInfo {
-  /** snake_case field name persisted on the widget row */
-  field: string
-  label: string
-  numeric: boolean
-}
-
-function discoverFields(rows: Record<string, unknown>[]): FieldInfo[] {
-  const sample = rows.slice(0, 50)
-  const numeric = new Map<string, boolean>()
-
-  for (const row of sample) {
-    for (const [key, raw] of Object.entries(row)) {
-      const value = scalarish(raw)
-      if (value == null) {
-        if (!numeric.has(key) && raw != null) continue
-        if (!numeric.has(key)) numeric.set(key, true)
-        continue
-      }
-      const isNum = typeof value === "number" || (value !== "" && Number.isFinite(Number(value)))
-      numeric.set(key, (numeric.get(key) ?? true) && isNum)
-    }
-  }
-
-  return [...numeric.entries()]
-    .map(([key, isNumeric]) => {
-      const snake = camelToSnake(key)
-      return { field: snake, label: humanize(snake), numeric: isNumeric }
-    })
-    .sort((a, b) => a.label.localeCompare(b.label))
-}
-
-function buildDomain(filters: FilterRow[]): string | undefined {
-  const domain: Record<string, unknown> = {}
-  for (const { field, op, value } of filters) {
-    if (!field || value.trim() === "") continue
-    if (op === "eq") {
-      domain[field] = value.trim()
-    } else if (op === "in") {
-      domain[field] = { $in: value.split(",").map((v) => v.trim()).filter(Boolean) }
-    } else {
-      const n = Number(value)
-      domain[field] = { [`$${op}`]: Number.isFinite(n) ? n : value.trim() }
-    }
-  }
-  return Object.keys(domain).length > 0 ? JSON.stringify(domain) : undefined
-}
-
-export function QueryBuilder({ organizationId, dashboards }: QueryBuilderProps) {
+export function QueryBuilder({ organizationId, companyId, dashboards }: QueryBuilderProps) {
   const { t } = useTranslation()
 
   const [model, setModel] = useState("")
@@ -142,36 +76,54 @@ export function QueryBuilder({ organizationId, dashboards }: QueryBuilderProps) 
   const [groupBy, setGroupBy] = useState("")
   const [chartType, setChartType] = useState<string>("bar")
   const [displayFields, setDisplayFields] = useState<string[]>([])
-  const [filters, setFilters] = useState<FilterRow[]>([])
+  const [filters, setFilters] = useState<QueryBuilderFilterRow[]>([])
+  const [timeField, setTimeField] = useState("")
   const [sortField, setSortField] = useState("")
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc")
   const [limit, setLimit] = useState("10")
   const [name, setName] = useState("")
   const [attachDashboardId, setAttachDashboardId] = useState("")
-  const [status, setStatus] = useState<{ kind: "ok" | "error"; message: string } | null>(null)
+  const [status, setStatus] = useState<{
+    kind: "ok" | "error"
+    message: string
+    href?: string
+  } | null>(null)
+  const saveAttemptRef = useRef<{ fingerprint: string; requestId: string } | null>(null)
 
   const createWidget = useCreateDashboardWidget(organizationId)
   const addWidgetToDashboard = useAddWidgetToDashboard(organizationId)
 
   const modelOptions = useMemo(
     () =>
-      QUERY_RESOURCE_KEYS.map((key) => RESOURCE_REGISTRY[key]?.table ?? "")
-        .filter((table) => table && !EXCLUDED_TABLES.has(table))
+      [...new Set(
+        QUERY_RESOURCE_KEYS.map((key) => RESOURCE_REGISTRY[key]?.table ?? "")
+          .filter((table) => table && !EXCLUDED_TABLES.has(table)),
+      )]
         .sort()
         .map((table) => ({ value: table, label: humanize(table) })),
     [],
   )
 
   const models = useMemo(() => (model ? [model] : []), [model])
-  const { dataSources, sourceStates } = useStoredDashboardDataSources(organizationId, models)
+  const modelTriggerRef = useRef<HTMLButtonElement>(null)
+  const { dataSources, sourceStates, isRefreshing, retry } =
+    useStoredDashboardDataSources(organizationId, models)
   const rows = useMemo(() => (model ? dataSources[model] ?? [] : []), [dataSources, model])
-  const sourceState = queryBuilderSourceState(model, sourceStates[model])
+  const sourceState = queryBuilderSourceState(
+    model,
+    sourceStates[model],
+    isRefreshing,
+  )
   const sourceMessage = model ? sourceStates[model]?.message : undefined
 
-  const fields = useMemo(() => discoverFields(rows), [rows])
-  const numericFields = useMemo(() => fields.filter((f) => f.numeric), [fields])
+  const fields = useMemo(() => discoverQueryBuilderFields(rows), [rows])
+  const numericFields = useMemo(() => fields.filter((field) => field.kind === "measure"), [fields])
+  const timestampFields = useMemo(
+    () => fields.filter((field) => field.kind === "timestamp"),
+    [fields],
+  )
 
-  const domain = useMemo(() => buildDomain(filters), [filters])
+  const domain = useMemo(() => buildQueryBuilderDomain(filters), [filters])
 
   const sortOrder = useMemo(() => {
     if (!sortField) return undefined
@@ -183,6 +135,11 @@ export function QueryBuilder({ organizationId, dashboards }: QueryBuilderProps) 
     if (aggregation !== "count" && aggField) return [aggField]
     return []
   }, [widgetKind, displayFields, aggregation, aggField])
+
+  const bindingConfiguration = useMemo(
+    () => storedDashboardBindingConfiguration(timeField, aggregation === "count" ? "" : aggField),
+    [timeField, aggregation, aggField],
+  )
 
   const previewResolution = useMemo(() => {
     if (!model) return null
@@ -198,6 +155,7 @@ export function QueryBuilder({ organizationId, dashboards }: QueryBuilderProps) 
       groupBy: groupBy || undefined,
       aggregation,
       chartType: widgetKind === "chart" ? chartType : undefined,
+      configuration: bindingConfiguration,
       domain,
       sortOrder,
       limit: Number(limit) > 0 ? Number(limit) : 10,
@@ -217,6 +175,7 @@ export function QueryBuilder({ organizationId, dashboards }: QueryBuilderProps) 
     widgetFields,
     aggregation,
     chartType,
+    bindingConfiguration,
     domain,
     sortOrder,
     limit,
@@ -230,6 +189,8 @@ export function QueryBuilder({ organizationId, dashboards }: QueryBuilderProps) 
   const canSave = Boolean(
     name.trim() &&
     previewWidget &&
+    (aggregation === "count" || Boolean(aggField)) &&
+    (sourceState === "ready" || sourceState === "empty") &&
     (previewResolution?.state === "ready" || previewResolution?.state === "empty") &&
     !createWidget.isPending,
   )
@@ -240,6 +201,7 @@ export function QueryBuilder({ organizationId, dashboards }: QueryBuilderProps) 
     setGroupBy("")
     setDisplayFields([])
     setFilters([])
+    setTimeField("")
     setSortField("")
     setStatus(null)
   }
@@ -250,45 +212,62 @@ export function QueryBuilder({ organizationId, dashboards }: QueryBuilderProps) 
     )
   }
 
+  const handleSourceRetry = async () => {
+    await retry()
+    modelTriggerRef.current?.focus()
+  }
+
   const handleSave = async () => {
     setStatus(null)
+    const widgetInput = {
+      name: name.trim(),
+      companyId: companyId?.toString() ?? "",
+      widgetType: widgetKind,
+      dataSource: model,
+      fields: widgetFields,
+      domain,
+      groupBy: groupBy || undefined,
+      aggregation,
+      config: bindingConfiguration,
+      chartType: widgetKind === "chart" ? chartType : undefined,
+      sortOrder,
+      limit,
+      width: 6,
+      height: 300,
+    }
+    const fingerprint = JSON.stringify(widgetInput)
+    const priorAttempt = saveAttemptRef.current
+    const requestId =
+      priorAttempt?.fingerprint === fingerprint
+        ? priorAttempt.requestId
+        : globalThis.crypto.randomUUID()
+    saveAttemptRef.current = { fingerprint, requestId }
+
     try {
-      await createWidget.mutateAsync({
-        name: name.trim(),
-        widgetType: widgetKind,
-        dataSource: model,
-        fields: widgetFields,
-        domain,
-        groupBy: groupBy || undefined,
-        aggregation,
-        chartType: widgetKind === "chart" ? chartType : undefined,
-        sortOrder,
-        limit,
-        width: 6,
-        height: 300,
+      const created = await createWidget.mutateAsync({
+        ...widgetInput,
+        creationRequestId: requestId,
       })
 
       if (attachDashboardId) {
-        const response = await apiFetch("/api/query/dashboard-widgets")
-        if (response.ok) {
-          const json = (await response.json()) as { data?: Record<string, unknown>[] }
-          const match = (json.data ?? [])
-            .filter((row) => String(row.name ?? "") === name.trim())
-            .sort((a, b) => Number(b.id ?? 0) - Number(a.id ?? 0))[0]
-          if (match?.id != null) {
-            await addWidgetToDashboard.mutateAsync({
-              dashboardId: attachDashboardId,
-              widgetId: String(match.id),
-            })
-            setStatus({
-              kind: "ok",
-              message: t("reports.queryBuilder.savedAttached", { name: name.trim() }),
-            })
-            return
-          }
-        }
+        const attached = await addWidgetToDashboard.mutateAsync({
+          dashboardId: attachDashboardId,
+          widgetId: created.ref.id,
+        })
+        saveAttemptRef.current = null
+        setStatus({
+          kind: "ok",
+          message: t("reports.queryBuilder.savedAttached", { name: name.trim() }),
+          href: attached.ref.href,
+        })
+        return
       }
-      setStatus({ kind: "ok", message: t("reports.queryBuilder.saved", { name: name.trim() }) })
+      saveAttemptRef.current = null
+      setStatus({
+        kind: "ok",
+        message: t("reports.queryBuilder.saved", { name: name.trim() }),
+        href: created.ref.href,
+      })
     } catch (e) {
       setStatus({ kind: "error", message: e instanceof Error ? e.message : String(e) })
     }
@@ -304,9 +283,9 @@ export function QueryBuilder({ organizationId, dashboards }: QueryBuilderProps) 
         <CardContent className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-1.5">
-              <Label>{t("reports.queryBuilder.model")}</Label>
+              <Label htmlFor="qb-model">{t("reports.queryBuilder.model")}</Label>
               <Select value={model} onValueChange={handleModelChange}>
-                <SelectTrigger data-testid="qb-model">
+                <SelectTrigger id="qb-model" ref={modelTriggerRef} data-testid="qb-model">
                   <SelectValue placeholder={t("reports.queryBuilder.modelPlaceholder")} />
                 </SelectTrigger>
                 <SelectContent className="max-h-72">
@@ -325,13 +304,50 @@ export function QueryBuilder({ organizationId, dashboards }: QueryBuilderProps) 
                 >
                   {t("common.loading", "Loading…")}
                 </p>
-              ) : sourceState === "empty" || sourceState === "ready" ? (
-                <p className="text-xs text-muted-foreground" data-testid="qb-source-row-count">
-                  {t("reports.queryBuilder.rowsLoaded", { count: rows.length })}
+              ) : sourceState === "refreshing" ? (
+                <p
+                  className="text-xs text-muted-foreground"
+                  role="status"
+                  data-testid="qb-source-refreshing"
+                >
+                  {t("reports.queryBuilder.sourceRefreshing")}
                 </p>
-              ) : sourceState === "denied" || sourceState === "unavailable" || sourceState === "partial" ? (
-                <p className="text-xs text-destructive" role="alert" data-testid={`qb-source-${sourceState}`}>
+              ) : sourceState === "denied" || sourceState === "error" || sourceState === "unavailable" ? (
+                <div
+                  className="space-y-2 rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm"
+                  role="alert"
+                  data-testid={sourceState === "denied" ? "qb-source-denied" : "qb-source-error"}
+                >
+                  <p>
+                    {sourceState === "denied"
+                      ? t("reports.queryBuilder.sourceDenied")
+                      : sourceMessage ?? t("reports.queryBuilder.sourceError")}
+                  </p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => void handleSourceRetry()}
+                    data-testid="qb-source-retry"
+                  >
+                    {t("reports.queryBuilder.retrySource")}
+                  </Button>
+                </div>
+              ) : sourceState === "partial" ? (
+                <p
+                  className="text-xs text-destructive"
+                  role="alert"
+                  data-testid={`qb-source-${sourceState}`}
+                >
                   {sourceMessage ?? t(`reports.queryBuilder.sourceStates.${sourceState}`)}
+                </p>
+              ) : sourceState === "empty" || sourceState === "ready" ? (
+                <p
+                  className="text-xs text-muted-foreground"
+                  role="status"
+                  data-testid="qb-source-row-count"
+                >
+                  {t("reports.queryBuilder.rowsLoaded", { count: rows.length })}
                 </p>
               ) : null}
             </div>
@@ -386,6 +402,29 @@ export function QueryBuilder({ organizationId, dashboards }: QueryBuilderProps) 
               ) : null}
             </div>
           ) : null}
+
+          <div className="space-y-1.5">
+            <Label>{t("reports.queryBuilder.timeField")}</Label>
+            <Select
+              value={timeField || "__none__"}
+              onValueChange={(value) => setTimeField(value === "__none__" ? "" : value)}
+            >
+              <SelectTrigger data-testid="qb-time-field">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent className="max-h-72">
+                <SelectItem value="__none__">{t("reports.queryBuilder.timeFieldNone")}</SelectItem>
+                {timestampFields.map((field) => (
+                  <SelectItem key={field.field} value={field.field}>
+                    {field.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              {t("reports.queryBuilder.timeFieldDescription")}
+            </p>
+          </div>
 
           {widgetKind === "chart" ? (
             <div className="grid gap-4 sm:grid-cols-2">
@@ -477,7 +516,9 @@ export function QueryBuilder({ organizationId, dashboards }: QueryBuilderProps) 
                   value={filter.op}
                   onValueChange={(v) =>
                     setFilters((prev) =>
-                      prev.map((f, i) => (i === index ? { ...f, op: v as FilterOp } : f)),
+                      prev.map((f, i) =>
+                        i === index ? { ...f, op: v as QueryBuilderFilterOp } : f,
+                      ),
                     )
                   }
                 >
@@ -505,6 +546,7 @@ export function QueryBuilder({ organizationId, dashboards }: QueryBuilderProps) 
                   type="button"
                   variant="ghost"
                   size="icon"
+                  aria-label={t("reports.queryBuilder.removeFilter")}
                   onClick={() => setFilters((prev) => prev.filter((_, i) => i !== index))}
                 >
                   <Trash2 className="h-4 w-4" />
@@ -550,8 +592,9 @@ export function QueryBuilder({ organizationId, dashboards }: QueryBuilderProps) 
                 </Select>
               </div>
               <div className="space-y-1.5">
-                <Label>{t("reports.queryBuilder.limit")}</Label>
+                <Label htmlFor="qb-limit">{t("reports.queryBuilder.limit")}</Label>
                 <Input
+                  id="qb-limit"
                   type="number"
                   min={1}
                   max={100}
@@ -565,8 +608,9 @@ export function QueryBuilder({ organizationId, dashboards }: QueryBuilderProps) 
           <div className="space-y-4 border-t pt-4">
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-1.5">
-                <Label>{t("reports.queryBuilder.widgetName")}</Label>
+                <Label htmlFor="qb-name">{t("reports.queryBuilder.widgetName")}</Label>
                 <Input
+                  id="qb-name"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder={t("reports.queryBuilder.widgetNamePlaceholder")}
@@ -605,11 +649,18 @@ export function QueryBuilder({ organizationId, dashboards }: QueryBuilderProps) 
             </Button>
             {status ? (
               <p
+                role={status.kind === "ok" ? "status" : "alert"}
                 className={
                   status.kind === "ok" ? "text-sm text-emerald-600" : "text-sm text-destructive"
                 }
               >
-                {status.message}
+                {status.href ? (
+                  <a className="underline" href={status.href} data-testid="qb-result-link">
+                    {status.message}
+                  </a>
+                ) : (
+                  status.message
+                )}
               </p>
             ) : null}
           </div>
@@ -628,6 +679,18 @@ export function QueryBuilder({ organizationId, dashboards }: QueryBuilderProps) 
               data-testid="qb-preview-loading"
             >
               {t("common.loading", "Loading…")}
+            </p>
+          ) : sourceState === "refreshing" ? (
+            <p
+              className="text-sm text-muted-foreground"
+              role="status"
+              data-testid="qb-preview-refreshing"
+            >
+              {t("reports.queryBuilder.sourceRefreshing")}
+            </p>
+          ) : sourceState === "error" ? (
+            <p className="text-sm text-muted-foreground" data-testid="qb-preview-unavailable">
+              {t("reports.queryBuilder.previewUnavailable")}
             </p>
           ) : sourceState === "empty" ? (
             <p

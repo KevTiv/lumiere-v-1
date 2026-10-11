@@ -151,6 +151,47 @@ pub struct Dashboard {
     pub metadata: Option<String>,
 }
 
+const DASHBOARD_WIDGET_CREATION_KEY_PREFIX: &str = "lumiere.dashboard-widget.create/v1:";
+
+fn dashboard_widget_creation_key(metadata: Option<&str>) -> Result<Option<&str>, String> {
+    let Some(metadata) = metadata else {
+        return Ok(None);
+    };
+    let Some(request_id) = metadata.strip_prefix(DASHBOARD_WIDGET_CREATION_KEY_PREFIX) else {
+        return Ok(None);
+    };
+    if request_id.is_empty() || request_id.len() > 128 || request_id.contains(':') {
+        return Err("Invalid dashboard widget creation request id".to_string());
+    }
+    Ok(Some(request_id))
+}
+
+fn dashboard_widget_matches_create(
+    widget: &DashboardWidget,
+    company_id: Option<u64>,
+    params: &CreateDashboardWidgetParams,
+) -> bool {
+    widget.company_id == company_id
+        && widget.name == params.name
+        && widget.widget_type == params.widget_type
+        && widget.model == params.model
+        && widget.domain == params.domain
+        && widget.fields == params.fields
+        && widget.group_by == params.group_by
+        && widget.aggregation == params.aggregation
+        && widget.chart_type == params.chart_type
+        && widget.sort_order == params.sort_order
+        && widget.limit == params.limit
+        && widget.refresh_interval == params.refresh_interval
+        && widget.configuration == params.configuration
+        && widget.position_x == params.position_x
+        && widget.position_y == params.position_y
+        && widget.width == params.width
+        && widget.height == params.height
+        && widget.is_active == params.is_active
+        && widget.metadata == params.metadata
+}
+
 // ============================================================================
 // REDUCERS
 // ============================================================================
@@ -164,6 +205,38 @@ pub fn create_dashboard_widget(
     params: CreateDashboardWidgetParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "dashboard_widget", "create")?;
+
+    if let Some(cid) = company_id {
+        require_company_in_organization(ctx, organization_id, cid)?;
+    }
+
+    if dashboard_widget_creation_key(params.metadata.as_deref())?.is_some() {
+        let matches: Vec<_> = ctx
+            .db
+            .dashboard_widget()
+            .widget_by_org()
+            .filter(&organization_id)
+            .filter(|widget| widget.metadata == params.metadata)
+            .take(2)
+            .collect();
+        match matches.as_slice() {
+            [] => {}
+            [widget] if dashboard_widget_matches_create(widget, company_id, &params) => {
+                return Ok(())
+            }
+            [_] => {
+                return Err(
+                    "Dashboard widget creation request id was reused with different input"
+                        .to_string(),
+                )
+            }
+            _ => {
+                return Err(
+                    "Dashboard widget creation request id has multiple canonical rows".to_string(),
+                )
+            }
+        }
+    }
 
     let widget = ctx.db.dashboard_widget().insert(DashboardWidget {
         id: 0,

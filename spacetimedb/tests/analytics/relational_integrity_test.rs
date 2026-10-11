@@ -215,6 +215,94 @@ pub fn test_cross_company_widget_add_rejected(ctx: &ReducerContext) -> Result<()
     Ok(())
 }
 
+/// COV-26: a producer-owned creation request key creates at most one widget.
+pub fn test_dashboard_widget_create_request_is_idempotent(
+    ctx: &ReducerContext,
+) -> Result<(), String> {
+    ensure_test_superuser(ctx)?;
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let metadata = Some(format!(
+        "lumiere.dashboard-widget.create/v1:analytics-test-{}",
+        fixture.organization_id
+    ));
+    let params = CreateDashboardWidgetParams {
+        name: "COV-26 Idempotent Widget".to_string(),
+        widget_type: WidgetType::Kpi,
+        model: "sale_order".to_string(),
+        fields: vec![],
+        position_x: 0,
+        position_y: 0,
+        width: 4,
+        height: 4,
+        is_active: true,
+        domain: None,
+        group_by: None,
+        aggregation: Some("Count".to_string()),
+        chart_type: None,
+        sort_order: None,
+        limit: Some(10),
+        refresh_interval: None,
+        configuration: None,
+        metadata: metadata.clone(),
+    };
+
+    create_dashboard_widget(
+        ctx,
+        fixture.organization_id,
+        Some(fixture.company_id),
+        params.clone(),
+    )?;
+    create_dashboard_widget(
+        ctx,
+        fixture.organization_id,
+        Some(fixture.company_id),
+        params.clone(),
+    )?;
+
+    let rows: Vec<_> = ctx
+        .db
+        .dashboard_widget()
+        .widget_by_org()
+        .filter(&fixture.organization_id)
+        .filter(|widget| widget.metadata == metadata)
+        .collect();
+    if rows.len() != 1 {
+        return Err(format!(
+            "creation request should resolve to one widget, found {}",
+            rows.len()
+        ));
+    }
+
+    let mut conflicting = params;
+    conflicting.name = "COV-26 Conflicting Widget".to_string();
+    let rejected = create_dashboard_widget(
+        ctx,
+        fixture.organization_id,
+        Some(fixture.company_id),
+        conflicting,
+    );
+    match rejected {
+        Err(ref error) if error.contains("reused with different input") => {}
+        other => {
+            return Err(format!(
+                "request-key conflict should be rejected, got {other:?}"
+            ))
+        }
+    }
+
+    let row = ctx
+        .db
+        .dashboard_widget()
+        .id()
+        .find(&rows[0].id)
+        .ok_or("idempotent dashboard widget disappeared")?;
+    if row.name != "COV-26 Idempotent Widget" {
+        return Err("rejected request-key conflict changed the widget".to_string());
+    }
+
+    Ok(())
+}
+
 pub fn test_generated_owner_report_records_ordered_commit(
     ctx: &ReducerContext,
 ) -> Result<(), String> {

@@ -8,13 +8,31 @@ test("keeps an unselected report source distinct from loading", () => {
   assert.equal(queryBuilderSourceState("sale_order"), "loading")
 })
 
-test("reports a successfully loaded empty source truthfully", () => {
-  assert.equal(queryBuilderSourceState("sale_order", { status: "empty", rowCount: 0 }), "empty")
-  assert.equal(queryBuilderSourceState("sale_order", { status: "ready", rowCount: 3 }), "ready")
+test("reports ready and empty source states truthfully", () => {
+  assert.equal(
+    queryBuilderSourceState("sale_order", { status: "empty", rowCount: 0 }),
+    "empty",
+  )
+  assert.equal(
+    queryBuilderSourceState("sale_order", { status: "ready", rowCount: 3 }),
+    "ready",
+  )
 })
 
-test("preserves denied, unavailable, and partial source states", () => {
-  assert.equal(queryBuilderSourceState("sale_order", { status: "denied", rowCount: 0 }), "denied")
-  assert.equal(queryBuilderSourceState("sale_order", { status: "unavailable", rowCount: 0 }), "unavailable")
-  assert.equal(queryBuilderSourceState("sale_order", { status: "partial", rowCount: 3 }), "partial")
+test("preserves unavailable and partial per-source states", () => {
+  assert.equal(
+    queryBuilderSourceState("sale_order", { status: "unavailable", rowCount: 0 }),
+    "unavailable",
+  )
+  assert.equal(
+    queryBuilderSourceState("sale_order", { status: "partial", rowCount: 3 }),
+    "partial",
+  )
+})
+
+test("reports background readback separately from cached rows", () => {
+  assert.equal(
+    queryBuilderSourceState("sale_order", { status: "ready", rowCount: 3 }, true),
+    "refreshing",
+  )
 })

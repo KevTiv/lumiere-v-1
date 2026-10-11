@@ -3471,6 +3471,16 @@
       },
       "evidence": "spacetimedb/tests/analytics/mod.rs: test reducer executes assertions; retry classification is not applicable"
     },
+    "run_analytics_dashboard_widget_idempotency_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/tests/analytics/mod.rs: test reducer executes assertions; retry classification is not applicable"
+    },
     "run_c_0_organization_ownership_backfill": {
       "semantic_kind": "test",
       "client_facing": false,

@@ -49,6 +49,12 @@ import {
   type CanonicalRecordRef,
   type ResolvedOperationEffectOutcome,
 } from "./operation-effect"
+import {
+  resolveDashboardWidgetAttachmentEffect,
+  resolveDashboardWidgetCreationEffect,
+  type DashboardEffectRef,
+  type DashboardWidgetEffectRef,
+} from "./dashboard-widget-effect"
 
 // ── Reads ────────────────────────────────────────────────────────────────────
 
@@ -719,19 +725,47 @@ export function useCreateDashboard(organizationId: bigint) {
 
 export function useCreateDashboardWidget(organizationId: bigint) {
   const qc = useQueryClient()
-  return useMutation<void, Error, Record<string, unknown>>({
+  return useMutation<
+    ResolvedOperationEffectOutcome<DashboardWidgetEffectRef>,
+    Error,
+    Record<string, unknown>
+  >({
     mutationFn: async (formData) => {
+      const creationRequestId = String(formData.creationRequestId ?? "").trim()
+      if (!creationRequestId) {
+        throw new Error("Dashboard widget creation request id is required")
+      }
       const params = toCreateDashboardWidgetParams(formData)
       if (!params.name.trim()) throw new Error('Widget name is required')
       if (!params.model.trim()) throw new Error('Data source / model is required')
       const companyId = companyIdFromDashboardWidgetForm(formData)
-      const { urlPath, init } = stdbBffCommandPost("create_dashboard_widget", { companyId: companyId, params: stdbParamsToJson(params) })
-
-      const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error('Failed to create dashboard widget')
-    },
-    onSuccess: async () => {
-      await invalidateReportsModule(qc, organizationId)
+      const outcome = await executeOperationWithCanonicalReadback({
+        resolveEffect: async () =>
+          resolveDashboardWidgetCreationEffect(
+            await fetchQueryList(
+              "/api/query/dashboard-widgets",
+              "Failed to read dashboard widgets",
+            ),
+            organizationId,
+            creationRequestId,
+          ),
+        dispatch: async () => {
+          const { urlPath, init } = stdbBffCommandPost("create_dashboard_widget", {
+            companyId,
+            params: stdbParamsToJson(params, "CreateDashboardWidgetParams"),
+          })
+          return decodeOperationDispatch(
+            await apiFetch(urlPath, init),
+            "Failed to create dashboard widget",
+          )
+        },
+        afterDispatch: async () => {
+          await invalidateReportsModule(qc, organizationId)
+        },
+        readbackAttempts: 6,
+        readbackDelayMs: 150,
+      })
+      return requireResolvedOperationEffect(outcome)
     },
   })
 }
@@ -739,18 +773,41 @@ export function useCreateDashboardWidget(organizationId: bigint) {
 export function useAddWidgetToDashboard(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<
-    void,
+    ResolvedOperationEffectOutcome<DashboardEffectRef>,
     Error,
     { dashboardId: string | number | bigint; widgetId: string | number | bigint; layout?: Record<string, unknown> }
   >({
     mutationFn: async ({ dashboardId, widgetId }) => {
-      const { urlPath, init } = stdbBffCommandPost("add_widget_to_dashboard", { dashboardId: dashboardId, widgetId: widgetId })
-
-      const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error('Failed to add widget to dashboard')
-    },
-    onSuccess: async () => {
-      await invalidateReportsModule(qc, organizationId)
+      const resolvedDashboardId = parseStrictU64(dashboardId)
+      const resolvedWidgetId = parseStrictU64(widgetId)
+      if (resolvedDashboardId == null || resolvedWidgetId == null) {
+        throw new Error("Invalid dashboard or widget id")
+      }
+      const outcome = await executeOperationWithCanonicalReadback({
+        resolveEffect: async () =>
+          resolveDashboardWidgetAttachmentEffect(
+            await fetchQueryList("/api/query/dashboards", "Failed to read dashboards"),
+            organizationId,
+            resolvedDashboardId,
+            resolvedWidgetId,
+          ),
+        dispatch: async () => {
+          const { urlPath, init } = stdbBffCommandPost("add_widget_to_dashboard", {
+            dashboardId: resolvedDashboardId,
+            widgetId: resolvedWidgetId,
+          })
+          return decodeOperationDispatch(
+            await apiFetch(urlPath, init),
+            "Failed to add widget to dashboard",
+          )
+        },
+        afterDispatch: async () => {
+          await invalidateReportsModule(qc, organizationId)
+        },
+        readbackAttempts: 6,
+        readbackDelayMs: 150,
+      })
+      return requireResolvedOperationEffect(outcome)
     },
   })
 }

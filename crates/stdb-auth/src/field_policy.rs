@@ -150,6 +150,10 @@ static HTTP_SQL_INCLUDED_COLUMNS: Lazy<HashMap<String, HashSet<String>>> = Lazy:
         ["value_ids"].into_iter().map(String::from).collect(),
     );
     m.insert(
+        "dashboard-widgets".to_string(),
+        ["metadata"].into_iter().map(String::from).collect(),
+    );
+    m.insert(
         "purchase-orders".to_string(),
         ["picking_ids", "invoice_ids"]
             .into_iter()
@@ -1230,6 +1234,31 @@ mod tests {
             cols.iter().any(|column| column == "metadata"),
             "expected metadata in mail-messages projection, got: {cols:?}"
         );
+    }
+
+    #[test]
+    fn resolve_http_sql_columns_includes_dashboard_widget_readback_contract() {
+        let cols =
+            resolve_http_sql_columns("dashboard-widgets", None).expect("dashboard-widgets columns");
+        for expected in [
+            "metadata",
+            "domain",
+            "fields",
+            "group_by",
+            "aggregation",
+            "chart_type",
+            "sort_order",
+            "limit",
+            "configuration",
+            "position_x",
+            "position_y",
+            "width",
+        ] {
+            assert!(
+                cols.iter().any(|column| column == expected),
+                "expected {expected} in dashboard-widgets projection, got: {cols:?}"
+            );
+        }
     }
 
     #[test]
