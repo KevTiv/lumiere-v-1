@@ -6,6 +6,10 @@ use std::time::Duration;
 
 use spacetimedb::{ReducerContext, Table};
 
+use crate::core::persistence::{
+    organization_commit, organization_commit_cursor, organization_row_change,
+};
+
 use crate::inventory::product::{create_product, product, CreateProductParams};
 use crate::inventory::quality::{
     create_workorder_quality_check, pass_quality_check, quality_check,
@@ -44,6 +48,50 @@ fn exact(actual: f64, expected: f64, label: &str) -> Result<(), String> {
 /// checked for side effects, rather than only checking their return values.
 fn snapshot(ctx: &ReducerContext, organization_id: u64) -> Vec<String> {
     let mut rows = Vec::new();
+    if let Some(cursor) = ctx
+        .db
+        .organization_commit_cursor()
+        .organization_id()
+        .find(&organization_id)
+    {
+        rows.push(serde_json::json!(["commit_cursor", cursor.next_sequence]).to_string());
+    }
+    for commit in ctx
+        .db
+        .organization_commit()
+        .organization_commit_by_organization()
+        .filter(&organization_id)
+    {
+        rows.push(
+            serde_json::json!([
+                "commit",
+                commit.id,
+                commit.operation_id,
+                commit.row_change_count,
+                commit.checksum
+            ])
+            .to_string(),
+        );
+    }
+    for change in ctx
+        .db
+        .organization_row_change()
+        .organization_row_change_by_organization()
+        .filter(&organization_id)
+    {
+        rows.push(
+            serde_json::json!([
+                "row_change",
+                change.id,
+                change.table_name,
+                change.row_identity_json,
+                change.change_kind,
+                change.row_json,
+                change.checksum
+            ])
+            .to_string(),
+        );
+    }
     for mo in ctx
         .db
         .mrp_production()
@@ -265,6 +313,67 @@ fn snapshot(ctx: &ReducerContext, organization_id: u64) -> Vec<String> {
     }
     rows.sort_unstable();
     rows
+}
+
+fn require_durable_row<T: spacetimedb_sats::Serialize + ?Sized>(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    production_id: u64,
+    operation_id: &str,
+    table: &str,
+    identity: serde_json::Value,
+    expected: &T,
+) -> Result<(), String> {
+    let correlation = format!("manufacturing-order:{production_id}:{operation_id}");
+    let commit = ctx
+        .db
+        .organization_commit()
+        .organization_commit_by_organization()
+        .filter(&organization_id)
+        .filter(|row| row.operation_id == operation_id && row.correlation_id == correlation)
+        .max_by_key(|row| row.sequence)
+        .ok_or_else(|| format!("missing durable commit for {operation_id}"))?;
+    let changes: Vec<_> = ctx
+        .db
+        .organization_row_change()
+        .organization_row_change_by_commit()
+        .filter((&organization_id, &commit.sequence))
+        .collect();
+    if changes.len() != commit.row_change_count as usize {
+        return Err(format!(
+            "{operation_id}: durable envelope row count mismatch"
+        ));
+    }
+    let matches: Vec<_> = changes
+        .iter()
+        .filter(|row| {
+            row.table_name == table
+                && serde_json::from_str::<serde_json::Value>(&row.row_identity_json)
+                    .ok()
+                    .as_ref()
+                    == Some(&identity)
+        })
+        .collect();
+    if matches.len() != 1 || matches[0].change_kind != "upsert" {
+        return Err(format!(
+            "{operation_id}: missing/duplicate full-row effect {table}/{identity}"
+        ));
+    }
+    let persisted: serde_json::Value = serde_json::from_str(
+        matches[0]
+            .row_json
+            .as_deref()
+            .ok_or("durable upsert missing row JSON")?,
+    )
+    .map_err(|error| format!("durable row JSON: {error}"))?;
+    let expected = serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(expected))
+        .map_err(|error| format!("expected durable row: {error}"))?;
+    if persisted != expected {
+        return Err(format!(
+            "{operation_id}: durable full row differs from authoritative {table}/{identity}"
+        ));
+    }
+    Ok(())
 }
 
 fn rejected_without_effect(
@@ -694,6 +803,15 @@ pub fn test_bom_to_close_domain_lifecycle(ctx: &ReducerContext) -> Result<(), St
         .find(&mo.id)
         .ok_or("MO missing after consumption")?;
     let raw_ids: HashSet<_> = consumed.move_raw_ids.iter().copied().collect();
+    require_durable_row(
+        ctx,
+        org,
+        mo.id,
+        "erp.consume_mo_materials",
+        "mrp_production",
+        serde_json::json!({"id": mo.id}),
+        &consumed,
+    )?;
     if raw_ids.len() != 2 || consumed.move_raw_ids.len() != 2 || consumed.move_raw_count != 2 {
         return Err("exact raw move ownership/count mismatch".to_string());
     }
@@ -724,6 +842,15 @@ pub fn test_bom_to_close_domain_lifecycle(ctx: &ReducerContext) -> Result<(), St
             "consumed raw move quantity",
         )?;
         exact(row.price_unit, 10.0, "raw source cost snapshot")?;
+        require_durable_row(
+            ctx,
+            org,
+            mo.id,
+            "erp.consume_mo_materials",
+            "stock_move",
+            serde_json::json!({"id": row.id}),
+            &row,
+        )?;
         let metadata: serde_json::Value =
             serde_json::from_str(row.metadata.as_deref().ok_or("raw cost metadata missing")?)
                 .map_err(|error| format!("raw cost metadata: {error}"))?;
@@ -763,6 +890,15 @@ pub fn test_bom_to_close_domain_lifecycle(ctx: &ReducerContext) -> Result<(), St
     )?;
     exact(remaining_raw.cost, 10.0, "preserved raw cost")?;
     exact(remaining_raw.value, 995.0, "raw remaining value")?;
+    require_durable_row(
+        ctx,
+        org,
+        mo.id,
+        "erp.consume_mo_materials",
+        "stock_quant",
+        serde_json::json!({"id": remaining_raw.id}),
+        &remaining_raw,
+    )?;
     let before_replay = snapshot(ctx, org);
     consume_mo_materials(ctx, org, company, mo.id)?;
     if snapshot(ctx, org) != before_replay {
@@ -843,6 +979,24 @@ pub fn test_bom_to_close_domain_lifecycle(ctx: &ReducerContext) -> Result<(), St
         )?;
         exact(time_cost.hourly_rate, 60.0, "configured hourly cost rate")?;
         exact(time_cost.value, duration, "workorder labor cost")?;
+        require_durable_row(
+            ctx,
+            org,
+            mo.id,
+            "erp.log_workcenter_productivity",
+            "mrp_workcenter_productivity",
+            serde_json::json!({"id": logs[0].id}),
+            &logs[0],
+        )?;
+        require_durable_row(
+            ctx,
+            org,
+            mo.id,
+            "erp.log_workcenter_productivity",
+            "mrp_productivity_cost",
+            serde_json::json!({"productivity_id": logs[0].id}),
+            &time_cost,
+        )?;
         create_workorder_quality_check(
             ctx,
             org,
@@ -930,6 +1084,15 @@ pub fn test_bom_to_close_domain_lifecycle(ctx: &ReducerContext) -> Result<(), St
         return Err("closed MO exact owner graph mismatch".to_string());
     }
     exact(closed.qty_produced, 0.5, "closed MO output")?;
+    require_durable_row(
+        ctx,
+        org,
+        mo.id,
+        "erp.finish_manufacturing_order",
+        "mrp_production",
+        serde_json::json!({"id": mo.id}),
+        &closed,
+    )?;
     let finished_ids: HashSet<_> = closed.move_finished_ids.iter().copied().collect();
     if finished_ids.len() != 2 || !finished_ids.is_disjoint(&raw_ids) {
         return Err("finished/raw move ownership overlaps or duplicates".to_string());
@@ -960,6 +1123,15 @@ pub fn test_bom_to_close_domain_lifecycle(ctx: &ReducerContext) -> Result<(), St
             "output done/planned quantity",
         )?;
         exact(row.price_unit, 24.0, "allocated actual output unit cost")?;
+        require_durable_row(
+            ctx,
+            org,
+            mo.id,
+            "erp.finish_manufacturing_order",
+            "stock_move",
+            serde_json::json!({"id": row.id}),
+            &row,
+        )?;
         if row.product_id == primary_id {
             exact(row.quantity_done, 0.5, "primary output quantity")?;
             exact(row.cost_share, 0.0, "primary move existing cost share")?;
@@ -1002,6 +1174,15 @@ pub fn test_bom_to_close_domain_lifecycle(ctx: &ReducerContext) -> Result<(), St
         exact(output.reserved_quantity, 0.0, "output reserved quantity")?;
         exact(output.cost, cost, "output standard cost")?;
         exact(output.value, value, "output standard-cost value")?;
+        require_durable_row(
+            ctx,
+            org,
+            mo.id,
+            "erp.finish_manufacturing_order",
+            "stock_quant",
+            serde_json::json!({"id": output.id}),
+            &output,
+        )?;
     }
     let final_raw = quant(ctx, &fixture, raw.id)?;
     exact(final_raw.quantity, 99.5, "close preserves raw quantity")?;
@@ -1029,6 +1210,15 @@ pub fn test_bom_to_close_domain_lifecycle(ctx: &ReducerContext) -> Result<(), St
         .find(&mo.id)
         .ok_or("production cost result missing")?;
     let cost_raw_ids: HashSet<_> = cost.raw_move_ids.iter().copied().collect();
+    require_durable_row(
+        ctx,
+        org,
+        mo.id,
+        "erp.finish_manufacturing_order",
+        "mrp_production_cost",
+        serde_json::json!({"production_id": mo.id}),
+        &cost,
+    )?;
     let cost_output_ids: HashSet<_> = cost.output_move_ids.iter().copied().collect();
     let cost_productivity_ids: HashSet<_> = cost.productivity_cost_ids.iter().copied().collect();
     if cost.organization_id != org
