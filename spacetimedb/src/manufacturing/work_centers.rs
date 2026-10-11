@@ -579,6 +579,8 @@ pub fn log_workcenter_productivity(
             metadata: params.metadata,
         });
 
+    crate::manufacturing::costing::snapshot_productivity_cost(ctx, productivity.id, workorder.production_id)?;
+
     let mut prod_ids = wc.productivity_ids.clone();
     prod_ids.push(productivity.id);
     let productive_time = wc.productive_time + params.duration;

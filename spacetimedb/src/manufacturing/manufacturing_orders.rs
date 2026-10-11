@@ -16,6 +16,10 @@ use crate::inventory::stock::{
     CreateStockMoveParams, DoneStockMoveParams, MoveStockQuantParams, StockMove, StockQuant,
 };
 use crate::manufacturing::bill_of_materials::{mrp_bom, mrp_bom_byproduct, mrp_bom_line};
+use crate::manufacturing::costing::{
+    allocate_output_cost, material_cost_snapshot, production_cost_inputs, record_production_cost,
+    validate_cost,
+};
 use crate::manufacturing::relations::{
     require_active_workcenter_in_company, require_bom_in_company,
     require_location_for_manufacturing, require_product_for_manufacturing,
@@ -321,6 +325,13 @@ fn complete_output_move(
 ) -> Result<u64, String> {
     let product_id = params.product_id;
     let destination_id = params.location_dest_id;
+    let lot_id = params.lot_id;
+    let product = require_product_for_manufacturing(ctx, organization_id, product_id, "manufactured output")?;
+    let method = crate::inventory::costing::normalize_cost_method(&product.cost_method);
+    // A zero allocated cost is a real cost, not the inventory receipt fallback to standard.
+    let unit_cost = if method == "standard" { product.standard_price } else { params.price_unit };
+    validate_cost(unit_cost, "output inventory unit cost")?;
+    validate_cost(quantity * unit_cost, "output inventory value")?;
     let created = create_stock_move_internal(ctx, organization_id, params)?;
     let move_id = created.id;
     ctx.db.stock_move().id().update(StockMove {
@@ -343,7 +354,10 @@ fn complete_output_move(
         write_date: ctx.timestamp,
         ..completed
     });
-    upsert_stock_quant(ctx, organization_id, company_id, product_id, destination_id, quantity)?;
+    crate::inventory::stock::increase_quant_at_location_owned(
+        ctx, organization_id, company_id, product_id, destination_id,
+        quantity, unit_cost, None, lot_id, &method,
+    )?;
     Ok(move_id)
 }
 
@@ -972,6 +986,9 @@ pub fn consume_mo_materials(
     let mut created_move_ids = mo.move_raw_ids.clone();
 
     if let Some(bom_id) = mo.bom_id {
+        let bom = require_bom_in_company(ctx, organization_id, company_id, bom_id, "MO consumption BOM")?;
+        validate_positive_qty(bom.product_qty, "BOM base quantity")?;
+        validate_positive_qty(mo.product_qty, "manufacturing order quantity")?;
         let bom_lines: Vec<_> = ctx
             .db
             .mrp_bom_line()
@@ -980,7 +997,8 @@ pub fn consume_mo_materials(
             .collect();
 
         for (seq_idx, line) in bom_lines.into_iter().enumerate() {
-            let required_qty = line.product_qty * mo.product_qty.max(1.0);
+            let required_qty = line.product_qty * (mo.product_qty / bom.product_qty);
+            validate_positive_qty(required_qty, "required material quantity")?;
             // MFG-010: Re-validate the BOM line's component product still exists,
             // belongs to this organization, and is active before exploding the
             // BOM into consumption moves (defense in depth against stale/edited
@@ -995,6 +1013,9 @@ pub fn consume_mo_materials(
                 &component.tracking,
                 None,
                 &format!("MO {} consume component {}", mo.id, line.product_id),
+            )?;
+            let (material_unit_cost, cost_metadata) = material_cost_snapshot(
+                ctx, &mo, line.product_id, source_location_id, required_qty,
             )?;
 
             let created_move = create_stock_move_internal(
@@ -1025,7 +1046,7 @@ pub fn consume_mo_materials(
                     group_id: None,
                     rule_id: None,
                     procure_method: "make_to_stock".to_string(),
-                    price_unit: 0.0,
+                    price_unit: material_unit_cost,
                     scrapped: false,
                     to_refund: false,
                     propagate_cancel: true,
@@ -1053,7 +1074,7 @@ pub fn consume_mo_materials(
                     owner_id: None,
                     package_level_id: None,
                     product_type: None,
-                    metadata: None,
+                    metadata: Some(cost_metadata),
                 },
             )?;
             let move_id = created_move.id;
@@ -1212,6 +1233,8 @@ pub fn finish_manufacturing_order(
         &format!("MO {} finish", mo.id),
     )?;
 
+    let cost_inputs = production_cost_inputs(ctx, &mo, &workorders)?;
+
     let finished_qty = mo.qty_produced;
     let mut byproduct_outputs = Vec::new();
     if let Some(bom_id) = mo.bom_id {
@@ -1240,15 +1263,36 @@ pub fn finish_manufacturing_order(
         }
     }
 
+    let shares: Vec<_> = byproduct_outputs.iter().map(|(row, _, _)| row.cost_share).collect();
+    let (primary_value, byproduct_values) = allocate_output_cost(cost_inputs.total_value, &shares)?;
+    let primary_product = require_product_for_manufacturing(ctx, organization_id, mo.product_id, "manufactured output")?;
+    let primary_unit_cost = primary_value / finished_qty;
+    validate_cost(primary_unit_cost, "primary output allocated unit cost")?;
+    let primary_inventory_cost = if crate::inventory::costing::normalize_cost_method(&primary_product.cost_method) == "standard" {
+        primary_product.standard_price
+    } else { primary_unit_cost };
+    let primary_metadata = serde_json::json!({"manufacturing_output_cost": {
+        "currency_id": cost_inputs.currency_id, "allocated_value": primary_value,
+        "inventory_value": primary_inventory_cost * finished_qty,
+        "material_value": cost_inputs.material_value, "workcenter_value": cost_inputs.workcenter_value,
+    }}).to_string();
     let finished_move_id = complete_output_move(
         ctx,
         organization_id,
         company_id,
-        finished_move_params(ctx, &mo, finished_qty),
+        CreateStockMoveParams {
+            price_unit: primary_unit_cost, cost_share: 100.0 - shares.iter().sum::<f64>(),
+            metadata: Some(primary_metadata), ..finished_move_params(ctx, &mo, finished_qty)
+        },
         finished_qty,
     )?;
     let mut finished_ids = vec![finished_move_id];
-    for (row, product, quantity) in byproduct_outputs {
+    for ((row, product, quantity), allocated_value) in byproduct_outputs.into_iter().zip(byproduct_values) {
+        let allocated_unit_cost = allocated_value / quantity;
+        validate_cost(allocated_unit_cost, "byproduct allocated unit cost")?;
+        let inventory_unit_cost = if crate::inventory::costing::normalize_cost_method(&product.cost_method) == "standard" {
+            product.standard_price
+        } else { allocated_unit_cost };
         let move_id = complete_output_move(
             ctx,
             organization_id,
@@ -1262,16 +1306,21 @@ pub fn finish_manufacturing_order(
                 reference: Some(format!("MO/{}/BYPRODUCT/{}", mo.id, row.id)),
                 sequence: row.sequence as i32,
                 cost_share: row.cost_share,
+                price_unit: allocated_unit_cost,
                 has_tracking: false,
                 lot_id: None,
                 product_type: Some(product.type_.clone()),
-                metadata: Some(serde_json::json!({"bom_byproduct_id": row.id}).to_string()),
+                metadata: Some(serde_json::json!({"bom_byproduct_id": row.id, "manufacturing_output_cost": {
+                    "currency_id": cost_inputs.currency_id, "allocated_value": allocated_value,
+                    "inventory_value": inventory_unit_cost * quantity,
+                }}).to_string()),
                 ..finished_move_params(ctx, &mo, quantity)
             },
             quantity,
         )?;
         finished_ids.push(move_id);
     }
+    record_production_cost(ctx, &mo, cost_inputs, &finished_ids)?;
     ctx.db.mrp_production().id().update(MrpProduction {
         state: MoState::Done,
         date_finished: Some(ctx.timestamp),
