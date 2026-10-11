@@ -54,6 +54,21 @@ function recipientOf(metadata: unknown): string {
   }
 }
 
+function isRead(metadata: unknown): boolean {
+  if (metadata == null || metadata === "") return false
+  try {
+    const parsed = typeof metadata === "string" ? JSON.parse(metadata) : metadata
+    return Boolean(
+      parsed &&
+        typeof parsed === "object" &&
+        "read_at" in parsed &&
+        (parsed as { read_at: unknown }).read_at != null,
+    )
+  } catch {
+    return false
+  }
+}
+
 function titleOf(body: unknown, max = 90): string {
   const text = String(body ?? "").replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim()
   return text.length > max ? `${text.slice(0, max - 1)}…` : text
@@ -62,7 +77,7 @@ function titleOf(body: unknown, max = 90): string {
 /**
  * The signed-in user's most recent notifications, newest first. A notification is a mail message
  * of type Notification whose `metadata.recipient` is the user (the backend writes one per follower).
- * There is no read/unread state on the model, so these are "recent", not "unread".
+ * The reducer records `metadata.read_at`; only unread notifications are returned.
  */
 export function recentNotifications(
   messages: ReadonlyArray<Row>,
@@ -74,7 +89,11 @@ export function recentNotifications(
   return messages
     .filter((m) => {
       const type = tagOf(m.messageType ?? m.message_type)
-      return (type === "notification" || type === "user_notification") && recipientOf(m.metadata) === me
+      return (
+        (type === "notification" || type === "user_notification") &&
+        recipientOf(m.metadata) === me &&
+        !isRead(m.metadata)
+      )
     })
     .map((m) => ({
       id: String(m.id),
