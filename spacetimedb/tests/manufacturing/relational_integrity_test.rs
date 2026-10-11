@@ -690,6 +690,15 @@ pub(crate) fn create_test_workorder(
     workcenter_id: u64,
     name: &str,
 ) -> Result<MrpWorkorder, String> {
+    // Setup-only insertion identity: two workorders may share their center,
+    // so selecting the first row at that center returns the wrong fixture.
+    let before_ids: HashSet<_> = ctx
+        .db
+        .mrp_workorder()
+        .mrp_workorder_by_production()
+        .filter(&production_id)
+        .map(|workorder| workorder.id)
+        .collect();
     create_workorder(
         ctx,
         fixture.organization_id,
@@ -709,12 +718,28 @@ pub(crate) fn create_test_workorder(
         },
     )?;
 
-    ctx.db
+    let mut created: Vec<_> = ctx
+        .db
         .mrp_workorder()
         .mrp_workorder_by_production()
         .filter(&production_id)
-        .find(|workorder| workorder.workcenter_id == workcenter_id)
-        .ok_or_else(|| format!("workorder {name} missing after create"))
+        .filter(|workorder| !before_ids.contains(&workorder.id))
+        .collect();
+    if created.len() != 1 {
+        return Err(format!(
+            "workorder {name}: expected exactly one inserted fixture, got {}",
+            created.len()
+        ));
+    }
+    let workorder = created.pop().ok_or("inserted workorder disappeared")?;
+    if workorder.organization_id != fixture.organization_id
+        || workorder.company_id != fixture.company_id
+        || workorder.production_id != production_id
+        || workorder.workcenter_id != workcenter_id
+    {
+        return Err(format!("workorder {name}: inserted fixture scope mismatch"));
+    }
+    Ok(workorder)
 }
 
 fn create_test_loss_category(
