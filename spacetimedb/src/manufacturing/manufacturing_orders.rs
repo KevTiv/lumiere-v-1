@@ -1482,7 +1482,7 @@ fn finish_manufacturing_order_internal(
         }
     }
 
-    let effects = ManufacturingEffectSnapshot::capture(ctx, &mo)?;
+    let effects = ManufacturingEffectSnapshot::capture_for_tracking(ctx, &mo, tracking.as_ref())?;
     let close_operation = if tracking.is_some() {
         "erp.finish_manufacturing_order_with_tracking"
     } else {
@@ -1734,6 +1734,9 @@ pub fn scrap_finished_manufacturing_output(
         return Err("Not enough available finished output to scrap".to_string());
     }
 
+    let effects = ManufacturingEffectSnapshot::capture_with_stock_scope(
+        ctx, &mo, &[mo.product_id], &[mo.location_dest_id, scrap_location_id],
+    )?;
     let created = create_stock_move_internal(ctx, organization_id, CreateStockMoveParams {
         name: format!("MO {mo_id} finished output scrap"),
         product_uom_qty: quantity,
@@ -1764,6 +1767,7 @@ pub fn scrap_finished_manufacturing_output(
         new_values: Some(serde_json::json!({"scrap_move_id": created.id, "quantity": quantity}).to_string()),
         changed_fields: vec!["scrap_move".to_string()], metadata: None,
     });
+    effects.record(ctx, "erp.scrap_manufacturing_output")?;
     Ok(())
 }
 
@@ -1842,6 +1846,9 @@ pub fn scrap_tracked_manufacturing_output(
         return Err("Scrap quantity exceeds this output move's remaining stock".to_string());
     }
     let source = require_exact_scrap_quant(ctx, &mo, output.product_id, output.lot_id, mo.location_dest_id, quantity)?;
+    let effects = ManufacturingEffectSnapshot::capture_with_stock_scope(
+        ctx, &mo, &[source.product_id], &[source.location_id, scrap_location_id],
+    )?;
     let move_id = post_manufacturing_scrap(ctx, &mo, &source, scrap_location_id, quantity,
         CreateStockMoveParams {
             name: format!("MO {mo_id} tracked output scrap"),
@@ -1861,6 +1868,7 @@ pub fn scrap_tracked_manufacturing_output(
         });
     }
     audit_manufacturing_scrap(ctx, &mo, move_id, quantity);
+    effects.record(ctx, "erp.scrap_tracked_manufacturing_output")?;
     Ok(())
 }
 
@@ -1928,6 +1936,9 @@ pub fn scrap_manufacturing_material(
     }
     let reference = scrap_reference(ctx, &mo, &request_id)?;
     require_scrap_destination(ctx, &mo, scrap_location_id, mo.location_src_id)?;
+    let effects = ManufacturingEffectSnapshot::capture_with_stock_scope(
+        ctx, &mo, &[source.product_id], &[source.location_id, scrap_location_id],
+    )?;
     let move_id = post_manufacturing_scrap(ctx, &mo, &source, scrap_location_id, quantity,
         CreateStockMoveParams {
             name: format!("MO {mo_id} material wastage"), product_id: product.id,
@@ -1940,6 +1951,7 @@ pub fn scrap_manufacturing_material(
             ..finished_move_params(ctx, &mo, quantity)
         })?;
     audit_manufacturing_scrap(ctx, &mo, move_id, quantity);
+    effects.record(ctx, "erp.scrap_manufacturing_material")?;
     Ok(())
 }
 
