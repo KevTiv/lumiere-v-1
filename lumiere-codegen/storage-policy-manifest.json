@@ -3155,7 +3155,9 @@
       "table": "balance_sheet_line",
       "module": "accounting",
       "rationale": "Reviewed child aggregate: report_id references financial_report.id.",
-      "authoritative_resources": [],
+      "authoritative_resources": [
+        "balance-sheet-lines"
+      ],
       "durability_class": "durable_business_record",
       "organization_ownership": "direct",
       "organization_column": "organization_id",
@@ -3252,7 +3254,9 @@
       "table": "bank_statement_import_line",
       "module": "accounting",
       "rationale": "Reviewed child aggregate: import_id references bank_statement_import.id.",
-      "authoritative_resources": [],
+      "authoritative_resources": [
+        "bank-statement-import-lines"
+      ],
       "durability_class": "durable_business_record",
       "organization_ownership": "direct",
       "organization_column": "organization_id",
@@ -3565,7 +3569,9 @@
       "table": "cash_flow_line",
       "module": "accounting",
       "rationale": "Reviewed child aggregate: report_id references financial_report.id.",
-      "authoritative_resources": [],
+      "authoritative_resources": [
+        "cash-flow-lines"
+      ],
       "durability_class": "durable_business_record",
       "organization_ownership": "direct",
       "organization_column": "organization_id",
@@ -3819,7 +3825,9 @@
       "table": "consolidation_company_rate",
       "module": "accounting",
       "rationale": "Independent organization-owned aggregate root; related rows do not determine storage routing.",
-      "authoritative_resources": [],
+      "authoritative_resources": [
+        "consolidation-company-rates"
+      ],
       "durability_class": "durable_business_record",
       "organization_ownership": "direct",
       "organization_column": "organization_id",
@@ -5182,7 +5190,9 @@
       "table": "document_external_ref",
       "module": "documents",
       "rationale": "Independent organization-owned aggregate root; related rows do not determine storage routing.",
-      "authoritative_resources": [],
+      "authoritative_resources": [
+        "document-external-refs"
+      ],
       "durability_class": "durable_business_record",
       "organization_ownership": "direct",
       "organization_column": "organization_id",
@@ -5211,7 +5221,9 @@
       "table": "document_legal_hold",
       "module": "documents",
       "rationale": "Independent organization-owned aggregate root; related rows do not determine storage routing.",
-      "authoritative_resources": [],
+      "authoritative_resources": [
+        "document-legal-holds"
+      ],
       "durability_class": "durable_business_record",
       "organization_ownership": "direct",
       "organization_column": "organization_id",
@@ -5327,7 +5339,9 @@
       "table": "document_signature_request",
       "module": "documents",
       "rationale": "Independent organization-owned aggregate root; related rows do not determine storage routing.",
-      "authoritative_resources": [],
+      "authoritative_resources": [
+        "document-signature-requests"
+      ],
       "durability_class": "durable_business_record",
       "organization_ownership": "direct",
       "organization_column": "organization_id",
@@ -7043,7 +7057,9 @@
       "table": "hr_leave_allocation",
       "module": "hr",
       "rationale": "Reviewed child aggregate: employee_id references hr_employee.id.",
-      "authoritative_resources": [],
+      "authoritative_resources": [
+        "hr-leave-allocations"
+      ],
       "durability_class": "durable_business_record",
       "organization_ownership": "direct",
       "organization_column": "organization_id",
@@ -7111,7 +7127,9 @@
       "table": "hr_offboarding_checklist",
       "module": "hr",
       "rationale": "Independent organization-owned aggregate root; related rows do not determine storage routing.",
-      "authoritative_resources": [],
+      "authoritative_resources": [
+        "hr-offboarding-checklists"
+      ],
       "durability_class": "durable_business_record",
       "organization_ownership": "direct",
       "organization_column": "organization_id",
@@ -10258,7 +10276,9 @@
       "table": "product_attribute",
       "module": "inventory",
       "rationale": "Independent organization-owned aggregate root; related rows do not determine storage routing.",
-      "authoritative_resources": [],
+      "authoritative_resources": [
+        "product-attributes"
+      ],
       "durability_class": "durable_business_record",
       "organization_ownership": "direct",
       "organization_column": "organization_id",
@@ -10287,7 +10307,9 @@
       "table": "product_attribute_line",
       "module": "inventory",
       "rationale": "Reviewed child aggregate: product_tmpl_id references product.id.",
-      "authoritative_resources": [],
+      "authoritative_resources": [
+        "product-attribute-lines"
+      ],
       "durability_class": "durable_business_record",
       "organization_ownership": "direct",
       "organization_column": "organization_id",
@@ -10320,7 +10342,9 @@
       "table": "product_attribute_value",
       "module": "inventory",
       "rationale": "Independent organization-owned aggregate root; related rows do not determine storage routing.",
-      "authoritative_resources": [],
+      "authoritative_resources": [
+        "product-attribute-values"
+      ],
       "durability_class": "durable_business_record",
       "organization_ownership": "direct",
       "organization_column": "organization_id",
@@ -10382,7 +10406,9 @@
       "table": "product_packaging",
       "module": "inventory",
       "rationale": "Independent organization-owned aggregate root; related rows do not determine storage routing.",
-      "authoritative_resources": [],
+      "authoritative_resources": [
+        "product-packagings"
+      ],
       "durability_class": "durable_business_record",
       "organization_ownership": "direct",
       "organization_column": "organization_id",
@@ -10484,7 +10510,9 @@
       "table": "product_supplier_info",
       "module": "inventory",
       "rationale": "Independent organization-owned aggregate root; related rows do not determine storage routing.",
-      "authoritative_resources": [],
+      "authoritative_resources": [
+        "product-supplier-infos"
+      ],
       "durability_class": "durable_business_record",
       "organization_ownership": "direct",
       "organization_column": "organization_id",
@@ -10544,7 +10572,9 @@
       "table": "profit_loss_line",
       "module": "accounting",
       "rationale": "Independent organization-owned aggregate root; related rows do not determine storage routing.",
-      "authoritative_resources": [],
+      "authoritative_resources": [
+        "profit-loss-lines"
+      ],
       "durability_class": "durable_business_record",
       "organization_ownership": "direct",
       "organization_column": "organization_id",
@@ -12924,7 +12954,9 @@
       "table": "sale_commission_plan",
       "module": "sales",
       "rationale": "Independent organization-owned aggregate root; related rows do not determine storage routing.",
-      "authoritative_resources": [],
+      "authoritative_resources": [
+        "sale-commission-plans"
+      ],
       "durability_class": "durable_business_record",
       "organization_ownership": "direct",
       "organization_column": "organization_id",
@@ -12955,7 +12987,9 @@
       "table": "sale_commission_plan_split",
       "module": "sales",
       "rationale": "Reviewed child aggregate: plan_id references sale_commission_plan.id.",
-      "authoritative_resources": [],
+      "authoritative_resources": [
+        "sale-commission-plan-splits"
+      ],
       "durability_class": "durable_business_record",
       "organization_ownership": "direct",
       "organization_column": "organization_id",
@@ -13124,7 +13158,9 @@
       "table": "sale_order_option",
       "module": "sales",
       "rationale": "Reviewed child aggregate: order_id references sale_order.id.",
-      "authoritative_resources": [],
+      "authoritative_resources": [
+        "sale-order-options"
+      ],
       "durability_class": "durable_business_record",
       "organization_ownership": "direct",
       "organization_column": "organization_id",
@@ -13872,7 +13908,9 @@
       "table": "stock_move_line",
       "module": "inventory",
       "rationale": "Reviewed child aggregate: move_id references stock_move.id.",
-      "authoritative_resources": [],
+      "authoritative_resources": [
+        "stock-move-lines"
+      ],
       "durability_class": "durable_business_record",
       "organization_ownership": "direct",
       "organization_column": "organization_id",
@@ -14845,7 +14883,9 @@
       "table": "tax_deadline_reminder",
       "module": "accounting",
       "rationale": "Reviewed child aggregate: tax_deadline_id references tax_deadline.id.",
-      "authoritative_resources": [],
+      "authoritative_resources": [
+        "tax-deadline-reminders"
+      ],
       "durability_class": "durable_business_record",
       "organization_ownership": "direct",
       "organization_column": "organization_id",

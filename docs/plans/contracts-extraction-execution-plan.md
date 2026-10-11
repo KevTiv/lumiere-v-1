@@ -218,12 +218,29 @@ Release rules:
 
 - [x] transitional `make publish-contracts` — validate canonical IR, copy IR
   plus current generated targets, write the v2 provenance pin, push, and tag;
+- [x] use one reusable exact-source WASM build for release and contract-drift
+  workflows; concurrent callers serialize only that build and exchange the
+  compiled module as a short-lived artifact;
+- [x] keep the two clean generation passes, then publish through
+  `make publish-contracts-prepared` so release preparation does not run a third
+  equivalent schema/SDK/codegen pass;
+- [x] reuse a stable Cargo target and content-addressed npm cache while checking
+  all generated Rust features and the TypeScript package;
 - [x] add a contracts-owned `generate-from-ir` entry point for the first four
   IR-derived targets;
 - [ ] replace the remaining transitional direct-copy portions after the SDK
   binding and manifest emitters reach IR parity;
 - [ ] CI in `lumiere-contracts` validates that every manifest parses and cross-references resolve;
 - [ ] CI in `lumiere-v-1` fails when the pinned tag's manifests differ from what local generation produces.
+
+The `v0.3.81` release run is the optimization baseline. It took 27 minutes:
+the standalone module build took 4 minutes 20 seconds, the two required
+generation passes took 2 minutes 37 seconds and 2 minutes 29 seconds, release
+preparation took 8 minutes 16 seconds, pinning took 4 minutes 30 seconds, and
+pin verification took 2 minutes 38 seconds. The reusable module artifact and
+prepared-publication path target the duplicated build and third generation
+pass. Retain these step timings in later runs so performance claims use measured
+data rather than cache-hit assumptions.
 
 ---
 

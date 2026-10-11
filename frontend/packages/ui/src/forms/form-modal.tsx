@@ -15,6 +15,7 @@ import {
   DialogTitle,
 } from "../components/dialog"
 import type { AiFormAssistConfig, FormConfig } from "../lib/form-types"
+import { showSemanticOperationOutcome } from "../lib/semantic-operation-outcome"
 import { cn } from "../lib/utils"
 import { ModularForm } from "./modular-form"
 
@@ -24,7 +25,7 @@ const sizeClasses: Record<string, string> = {
   xl: "sm:max-w-[920px]",
 }
 
-interface FormModalProps {
+export interface FormModalProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   config: FormConfig
@@ -49,22 +50,12 @@ interface FormModalProps {
   formLeadingActions?: React.ReactNode
   /** Forwarded to {@link ModularForm} — e.g. parent mutation `isPending`. */
   isPending?: boolean
+  /** Blocks submission while leaving cancel and inspection available. */
+  submissionDisabled?: boolean
   /** Forwarded to {@link ModularForm} to enable advisory AI form fill. */
   aiAssist?: AiFormAssistConfig
   /** Forwarded to {@link ModularForm} — e.g. swap dependent select options when a field changes. */
   onValuesChange?: (values: Record<string, unknown>) => void
-}
-
-function showSemanticOutcome(detail: SemanticOperationOutcomeDetail): void {
-  const action =
-    detail.href && detail.actionLabel
-      ? {
-          label: detail.actionLabel,
-          onClick: () => window.location.assign(detail.href!),
-        }
-      : undefined
-
-  toast.success(detail.message, action ? { action } : undefined)
 }
 
 export function FormModal({
@@ -79,6 +70,7 @@ export function FormModal({
   submitError,
   formLeadingActions,
   isPending,
+  submissionDisabled,
   aiAssist,
   onValuesChange,
 }: FormModalProps) {
@@ -112,7 +104,7 @@ export function FormModal({
     }
 
     if (semanticOutcome) {
-      showSemanticOutcome(semanticOutcome)
+      showSemanticOperationOutcome(semanticOutcome)
       return
     }
 
@@ -180,6 +172,7 @@ export function FormModal({
             onCancel={handleCancel}
             leadingActions={formLeadingActions}
             isPending={isPending}
+            submissionDisabled={submissionDisabled}
             aiAssist={aiAssist}
             onValuesChange={onValuesChange}
           />

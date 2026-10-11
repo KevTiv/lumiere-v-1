@@ -177,7 +177,7 @@ impl Config {
             ollama_url: std::env::var("OLLAMA_URL")
                 .unwrap_or_else(|_| "http://localhost:11434".to_string()),
             ollama_embed_model: std::env::var("OLLAMA_EMBED_MODEL")
-                .unwrap_or_else(|_| "nomic-embed-text".to_string()),
+                .unwrap_or_else(|_| "embeddinggemma:latest".to_string()),
             ollama_vision_model: std::env::var("OLLAMA_VISION_MODEL")
                 .unwrap_or_else(|_| "llava".to_string()),
             ollama_llm_model: std::env::var("OLLAMA_LLM_MODEL")

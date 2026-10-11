@@ -1,6 +1,6 @@
 # COV-25 — Close one missing downstream record link per PR
 
-**Status:** IMPLEMENTED for sale order → delivery/invoice and purchase order → receipt/vendor bill (runtime acceptance pending); further links are one per PR  
+**Status:** IMPLEMENTED for sale order → delivery/invoice and purchase order → receipt/vendor bill (runtime acceptance pending); further links are one per PR
 **Module/surface:** Cross-module  
 **Plan target:** direct navigation for primary handoffs  
 **Scaffold source:** [`erp-cov08-27-scaffold.md`](./erp-cov08-27-scaffold.md)
@@ -41,8 +41,15 @@ delivery and customer invoice with its state and open balance, linking to the ca
 `orderHandoffs` builder and `OrderHandoffLinks` component as the COV-24 workspace, so there is one definition of
 "this order's downstream records". No contract delta (the relation fields are already projected).
 
-**Next links (one per PR, not done):** subscription → invoice and payment, proposal →
-sale order, ticket → record.
+**Remaining-link implementation review:** purchase order → receipt/vendor bill, subscription billing run → invoice,
+and proposal → sale order now have read-only record-sheet navigation and focused COV-25 browser specs. Runtime acceptance is still
+pending. Subscription → payment is blocked by the operator query projection omitting `reconciled_invoice_ids`;
+known invoices remain clickable with an explicit payment-unavailable notice. Ticket → related business record is blocked:
+the canonical ticket has no related-record model/ID relation.
+
+See [`cov25-remaining-link-review.md`](../evidence/cov25-remaining-link-review.md) for the exact relation inventory,
+query-field availability, scope/cardinality rules, operator clicks, and unproven limits. Subscription navigation is explicitly bounded
+to billing-run invoices; it does not silently infer historical invoices or pending/unreconciled payments.
 
 ## Prerequisites / decisions
 

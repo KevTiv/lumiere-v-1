@@ -14,10 +14,10 @@ import {
   expectOverviewDashboardLive,
   expectSeededText,
   fetchAccountSelectLabelByInternalType,
-  fetchDraftInvoiceMoveIdByPartner,
+  fetchDraftInvoiceMoveIdForSaleOrder,
   fetchDefaultCompanyId,
   fetchInvoiceMoveDetails,
-  fetchLatestPaymentIdByPartner,
+  fetchPaymentIdByExactReference,
   fetchSalesInvoiceJournalLabel,
   fetchLeadIdByName,
   fetchSessionOrganizationId,
@@ -348,12 +348,12 @@ test.describe("MVP lead-to-cash workflow", { tag: "@p0" }, () => {
     ])
     expect(invoiceRes.ok()).toBe(true)
 
-    const moveId = await fetchDraftInvoiceMoveIdByPartner(page, leadName)
+    const moveId = await fetchDraftInvoiceMoveIdForSaleOrder(page, orderId)
     await assertMoveLinesBalanced(page, moveId)
     await expectOrderSummary(page, orderId, { present: [ORDER_SUMMARY.invoice.draft] })
 
     // Step 10 — post invoice (UI — invoices tab → detail modal → Post)
-    await postDraftInvoiceViaUi(page, leadName)
+    await postDraftInvoiceViaUi(page, moveId)
 
     // Posted but unpaid: the draft is gone and the customer owes the invoice.
     await expectOrderSummary(page, orderId, {
@@ -380,6 +380,8 @@ test.describe("MVP lead-to-cash workflow", { tag: "@p0" }, () => {
     await chooseSelectOptionByValue(page, "currencyId", currencyId)
     await chooseFirstEnabledOption(page, "journalId")
     await fillField(page, "date", isoDate(0))
+    const paymentReference = smokeName("mvp-l2c-payment")
+    await fillField(page, "ref", paymentReference)
     const [createPaymentRes] = await Promise.all([
       page.waitForResponse(
         (res) => matchesOperationResponse(res, "create_payment") && res.ok(),
@@ -389,7 +391,9 @@ test.describe("MVP lead-to-cash workflow", { tag: "@p0" }, () => {
     ])
     expect(createPaymentRes.ok()).toBe(true)
 
-    const paymentId = await fetchLatestPaymentIdByPartner(page, partnerId, { state: "NotPaid" })
+    const paymentId = await fetchPaymentIdByExactReference(page, partnerId, paymentReference, {
+      state: "NotPaid",
+    })
     await selectEntityRowById(page, paymentId)
     await waitForEntityActionEnabled(page, "entity-action-pay-post")
     const [postPaymentRes] = await Promise.all([
@@ -665,7 +669,7 @@ test.describe("MVP lead-to-cash workflow", { tag: "@p0" }, () => {
     ])
     expect(invoiceRes.ok()).toBe(true)
 
-    const moveId = await fetchDraftInvoiceMoveIdByPartner(page, SEEDED_CUSTOMER_NAME)
+    const moveId = await fetchDraftInvoiceMoveIdForSaleOrder(page, orderId)
     await assertMoveLinesBalanced(page, moveId)
     await expectNoAppError(page)
   })

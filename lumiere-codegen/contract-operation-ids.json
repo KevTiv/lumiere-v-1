@@ -1415,6 +1415,11 @@
     "steer_ai_run": "erp.steer_ai_run",
     "begin_ai_workflow_generation": "erp.begin_ai_workflow_generation",
     "run_workflow_provenance_tests": "erp.run_workflow_provenance_tests",
-    "stage_ai_workflow_node_provenance": "erp.stage_ai_workflow_node_provenance"
+    "stage_ai_workflow_node_provenance": "erp.stage_ai_workflow_node_provenance",
+    "ai_action_draft_request_read": "erp.ai_action_draft_request_read",
+    "ai_provider_attempt_read": "erp.ai_provider_attempt_read",
+    "ai_spend_budget_read": "erp.ai_spend_budget_read",
+    "ai_spend_price_snapshot_read": "erp.ai_spend_price_snapshot_read",
+    "ai_spend_reservation_read": "erp.ai_spend_reservation_read"
   }
 }

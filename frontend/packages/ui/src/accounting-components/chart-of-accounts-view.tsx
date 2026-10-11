@@ -50,6 +50,7 @@ import {
 import type { AccountAccount } from "../lib/accounting-types"
 import { useTranslation } from "@lumiere/i18n"
 import { toast } from "sonner"
+import { TablePager, usePagedRows } from "../components/table-pager"
 
 type DisplayGroup = AccountTypeGroup
 
@@ -123,8 +124,10 @@ interface AccountsTableProps {
 }
 
 function AccountsTable({ accounts, t, onAccountClick }: AccountsTableProps) {
+  const accountsPager = usePagedRows(accounts)
   return (
-    <Table>
+    <>
+      <Table>
       <TableHeader>
         <TableRow>
           <TableHead className="w-20">{t("accounting.accounts.code")}</TableHead>
@@ -138,7 +141,7 @@ function AccountsTable({ accounts, t, onAccountClick }: AccountsTableProps) {
       <TableBody>
         {accounts.length === 0 ? (
           <TableRow><TableCell colSpan={6} className="text-center py-8 text-muted-foreground">{t("accounting.accounts.noResults")}</TableCell></TableRow>
-        ) : accounts.map((account) => {
+        ) : accountsPager.pageRows.map((account) => {
           const group = getDisplayGroup(account)
           const conf = groupConfig[group]
           return (
@@ -177,7 +180,9 @@ function AccountsTable({ accounts, t, onAccountClick }: AccountsTableProps) {
           )
         })}
       </TableBody>
-    </Table>
+      </Table>
+      <TablePager {...accountsPager} />
+    </>
   )
 }
 

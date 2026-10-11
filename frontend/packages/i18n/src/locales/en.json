@@ -6044,6 +6044,10 @@
           "header": "Header"
         },
         "title": "Edit purchase order"
+      },
+      "rfqAward": {
+        "description": "Select an open RFQ and one of its submitted bids.",
+        "title": "Award RFQ bid"
       }
     },
     "ops": {
@@ -11049,7 +11053,12 @@
       "save": "Save widget",
       "saved": "Widget \"{{name}}\" saved.",
       "savedAttached": "Widget \"{{name}}\" saved and added to the dashboard.",
-      "rowsLoaded": "{{count}} rows loaded"
+      "rowsLoaded": "{{count}} rows loaded",
+      "sourceStates": {
+        "denied": "You do not have access to this dashboard source.",
+        "unavailable": "This dashboard source is unavailable.",
+        "partial": "Only partial dashboard source data is available."
+      }
     },
     "ownerReports": {
       "title": "Owner Reports",

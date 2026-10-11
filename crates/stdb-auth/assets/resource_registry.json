@@ -663,6 +663,28 @@
     ],
     "table": "audit_rule"
   },
+  "balance-sheet-lines": {
+    "aliases": [
+      "balance-sheet-lines",
+      "balance_sheet_line"
+    ],
+    "default_restricted": [
+      "name",
+      "account_id",
+      "account_codes",
+      "line_type",
+      "amount",
+      "comparison_amount",
+      "variance",
+      "variance_percentage"
+    ],
+    "mandatory": [
+      "id",
+      "organization_id",
+      "company_id"
+    ],
+    "table": "balance_sheet_line"
+  },
   "bank-match-candidates": {
     "aliases": [
       "bank-match-candidates",
@@ -681,6 +703,24 @@
       "organization_id"
     ],
     "table": "bank_match_candidate"
+  },
+  "bank-statement-import-lines": {
+    "aliases": [
+      "bank-statement-import-lines",
+      "bank_statement_import_line"
+    ],
+    "default_restricted": [
+      "date",
+      "amount",
+      "reference",
+      "description",
+      "validation_error"
+    ],
+    "mandatory": [
+      "id",
+      "organization_id"
+    ],
+    "table": "bank_statement_import_line"
   },
   "bank-statement-lines": {
     "aliases": [
@@ -912,6 +952,26 @@
     ],
     "table": "cartonization_result"
   },
+  "cash-flow-lines": {
+    "aliases": [
+      "cash-flow-lines",
+      "cash_flow_line"
+    ],
+    "default_restricted": [
+      "name",
+      "line_type",
+      "amount",
+      "comparison_amount",
+      "variance",
+      "variance_percentage"
+    ],
+    "mandatory": [
+      "id",
+      "organization_id",
+      "company_id"
+    ],
+    "table": "cash_flow_line"
+  },
   "companies": {
     "aliases": [
       "companies",
@@ -975,6 +1035,24 @@
       "id"
     ],
     "table": "consolidation_account"
+  },
+  "consolidation-company-rates": {
+    "aliases": [
+      "consolidation-company-rates",
+      "consolidation_company_rate"
+    ],
+    "default_restricted": [
+      "exchange_rate",
+      "rate_type",
+      "effective_date",
+      "currency_id",
+      "company_id"
+    ],
+    "mandatory": [
+      "id",
+      "organization_id"
+    ],
+    "table": "consolidation_company_rate"
   },
   "consolidation-elimination-entries": {
     "aliases": [
@@ -1573,6 +1651,25 @@
     ],
     "table": "hr_employee"
   },
+  "document-external-refs": {
+    "aliases": [
+      "document-external-refs",
+      "document_external_ref"
+    ],
+    "default_restricted": [
+      "document_id",
+      "provider",
+      "connection_id",
+      "external_id",
+      "last_sync_at",
+      "last_direction"
+    ],
+    "mandatory": [
+      "id",
+      "organization_id"
+    ],
+    "table": "document_external_ref"
+  },
   "document-folders": {
     "aliases": [
       "document-folders",
@@ -1589,6 +1686,45 @@
       "organization_id"
     ],
     "table": "doc_folder"
+  },
+  "document-legal-holds": {
+    "aliases": [
+      "document-legal-holds",
+      "document_legal_hold"
+    ],
+    "default_restricted": [
+      "document_id",
+      "reason",
+      "is_active",
+      "held_at",
+      "released_at"
+    ],
+    "mandatory": [
+      "id",
+      "organization_id"
+    ],
+    "table": "document_legal_hold"
+  },
+  "document-signature-requests": {
+    "aliases": [
+      "document-signature-requests",
+      "document_signature_request"
+    ],
+    "default_restricted": [
+      "document_id",
+      "company_id",
+      "provider",
+      "external_envelope_id",
+      "status",
+      "completed_version_id",
+      "requested_at",
+      "completed_at"
+    ],
+    "mandatory": [
+      "id",
+      "organization_id"
+    ],
+    "table": "document_signature_request"
   },
   "document-templates": {
     "aliases": [
@@ -2343,6 +2479,47 @@
       "organization_id"
     ],
     "table": "hr_integration_intent"
+  },
+  "hr-leave-allocations": {
+    "aliases": [
+      "hr-leave-allocations",
+      "hr_leave_allocation"
+    ],
+    "default_restricted": [
+      "employee_id",
+      "company_id",
+      "leave_type_id",
+      "period_year",
+      "allocated_days",
+      "used_days"
+    ],
+    "mandatory": [
+      "id",
+      "organization_id"
+    ],
+    "table": "hr_leave_allocation"
+  },
+  "hr-offboarding-checklists": {
+    "aliases": [
+      "hr-offboarding-checklists",
+      "hr_offboarding_checklist"
+    ],
+    "default_restricted": [
+      "employee_id",
+      "company_id",
+      "status",
+      "assets_returned",
+      "access_revoked",
+      "docs_collected",
+      "assets_notes",
+      "access_notes",
+      "docs_notes"
+    ],
+    "mandatory": [
+      "id",
+      "organization_id"
+    ],
+    "table": "hr_offboarding_checklist"
   },
   "hr-resources": {
     "aliases": [
@@ -3961,6 +4138,63 @@
     ],
     "table": "privacy_consent"
   },
+  "product-attribute-lines": {
+    "aliases": [
+      "product-attribute-lines",
+      "product_attribute_line"
+    ],
+    "default_restricted": [
+      "product_tmpl_id",
+      "attribute_id",
+      "active"
+    ],
+    "mandatory": [
+      "id",
+      "organization_id"
+    ],
+    "table": "product_attribute_line"
+  },
+  "product-attribute-values": {
+    "aliases": [
+      "product-attribute-values",
+      "product_attribute_value"
+    ],
+    "default_restricted": [
+      "name",
+      "sequence",
+      "attribute_id",
+      "color",
+      "html_color",
+      "is_custom",
+      "display_type",
+      "ptav_active",
+      "product_attribute_value_id",
+      "is_active"
+    ],
+    "mandatory": [
+      "id",
+      "organization_id"
+    ],
+    "table": "product_attribute_value"
+  },
+  "product-attributes": {
+    "aliases": [
+      "product-attributes",
+      "product_attribute"
+    ],
+    "default_restricted": [
+      "name",
+      "create_variant",
+      "display_type",
+      "sequence",
+      "is_active"
+    ],
+    "mandatory": [
+      "id",
+      "organization_id"
+    ],
+    "table": "product_attribute"
+  },
   "product-categories": {
     "aliases": [
       "product-categories",
@@ -3977,6 +4211,61 @@
       "organization_id"
     ],
     "table": "product_category"
+  },
+  "product-packagings": {
+    "aliases": [
+      "product-packagings",
+      "product_packaging"
+    ],
+    "default_restricted": [
+      "name",
+      "sequence",
+      "product_id",
+      "qty",
+      "uom_id",
+      "barcode",
+      "company_id",
+      "sales",
+      "purchase",
+      "length",
+      "width",
+      "height",
+      "weight",
+      "max_weight",
+      "volume"
+    ],
+    "mandatory": [
+      "id",
+      "organization_id"
+    ],
+    "table": "product_packaging"
+  },
+  "product-supplier-infos": {
+    "aliases": [
+      "product-supplier-infos",
+      "product_supplier_info"
+    ],
+    "default_restricted": [
+      "product_tmpl_id",
+      "product_id",
+      "partner_id",
+      "product_name",
+      "product_code",
+      "sequence",
+      "min_qty",
+      "price",
+      "currency_id",
+      "company_id",
+      "date_start",
+      "date_end",
+      "delay",
+      "is_active"
+    ],
+    "mandatory": [
+      "id",
+      "organization_id"
+    ],
+    "table": "product_supplier_info"
   },
   "products": {
     "aliases": [
@@ -4004,6 +4293,28 @@
       "uom_po_id"
     ],
     "table": "product"
+  },
+  "profit-loss-lines": {
+    "aliases": [
+      "profit-loss-lines",
+      "profit_loss_line"
+    ],
+    "default_restricted": [
+      "name",
+      "account_id",
+      "account_codes",
+      "line_type",
+      "amount",
+      "comparison_amount",
+      "variance",
+      "variance_percentage"
+    ],
+    "mandatory": [
+      "id",
+      "organization_id",
+      "company_id"
+    ],
+    "table": "profit_loss_line"
   },
   "project-baselines": {
     "aliases": [
@@ -4847,6 +5158,7 @@
       "purchase_rfq_bid"
     ],
     "default_restricted": [
+      "company_id",
       "rfq_id",
       "partner_id",
       "price_unit",
@@ -4865,6 +5177,7 @@
       "purchase_rfq_line"
     ],
     "default_restricted": [
+      "company_id",
       "rfq_id",
       "product_id",
       "product_uom_qty"
@@ -5181,6 +5494,39 @@
     ],
     "table": "hr_salary_rule"
   },
+  "sale-commission-plan-splits": {
+    "aliases": [
+      "sale-commission-plan-splits",
+      "sale_commission_plan_split"
+    ],
+    "default_restricted": [
+      "plan_id",
+      "partner_id",
+      "share_percent"
+    ],
+    "mandatory": [
+      "id",
+      "organization_id"
+    ],
+    "table": "sale_commission_plan_split"
+  },
+  "sale-commission-plans": {
+    "aliases": [
+      "sale-commission-plans",
+      "sale_commission_plan"
+    ],
+    "default_restricted": [
+      "company_id",
+      "name",
+      "is_active",
+      "default_rate_percent"
+    ],
+    "mandatory": [
+      "id",
+      "organization_id"
+    ],
+    "table": "sale_commission_plan"
+  },
   "sale-commissions": {
     "aliases": [
       "sale-commissions",
@@ -5250,6 +5596,28 @@
       "organization_id"
     ],
     "table": "sale_order_line"
+  },
+  "sale-order-options": {
+    "aliases": [
+      "sale-order-options",
+      "sale_order_option"
+    ],
+    "default_restricted": [
+      "order_id",
+      "line_id",
+      "product_id",
+      "name",
+      "quantity",
+      "uom_id",
+      "price_unit",
+      "discount",
+      "is_present"
+    ],
+    "mandatory": [
+      "id",
+      "organization_id"
+    ],
+    "table": "sale_order_option"
   },
   "sale-orders": {
     "aliases": [
@@ -5484,6 +5852,41 @@
       "organization_id"
     ],
     "table": "stock_location"
+  },
+  "stock-move-lines": {
+    "aliases": [
+      "stock-move-lines",
+      "stock_move_line"
+    ],
+    "default_restricted": [
+      "move_id",
+      "company_id",
+      "product_id",
+      "product_variant_id",
+      "product_uom_id",
+      "location_id",
+      "location_dest_id",
+      "lot_id",
+      "package_id",
+      "result_package_id",
+      "qty_done",
+      "product_uom_qty",
+      "reserved_uom_qty",
+      "reserved_qty",
+      "quantity_done",
+      "picking_id",
+      "production_id",
+      "workorder_id",
+      "date",
+      "state",
+      "is_done",
+      "reference"
+    ],
+    "mandatory": [
+      "id",
+      "organization_id"
+    ],
+    "table": "stock_move_line"
   },
   "stock-moves": {
     "aliases": [
@@ -6064,6 +6467,24 @@
       "organization_id"
     ],
     "table": "project_task"
+  },
+  "tax-deadline-reminders": {
+    "aliases": [
+      "tax-deadline-reminders",
+      "tax_deadline_reminder"
+    ],
+    "default_restricted": [
+      "user_id",
+      "reminder_date",
+      "days_before_deadline",
+      "notification_type",
+      "status"
+    ],
+    "mandatory": [
+      "id",
+      "organization_id"
+    ],
+    "table": "tax_deadline_reminder"
   },
   "tax-deadlines": {
     "aliases": [

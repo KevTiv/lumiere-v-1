@@ -375,6 +375,7 @@ import {
 } from "@/lib/accounting-post-draft"
 import { Button } from "@lumiere/ui/components/button"
 import { cn } from "@lumiere/ui/lib/utils"
+import { TablePager, usePagedRows } from "@lumiere/ui/components/table-pager"
 
 function moveTypeTag(row: Record<string, unknown>): string {
   return enumTag(row.moveType ?? row.move_type)
@@ -1754,6 +1755,7 @@ function AccountingClientReady({
     const sid = String(bankStatementDetail.id)
     return bankStatementLines.filter((l) => String(l.statementId) === sid)
   }, [bankStatementDetail, bankStatementLines])
+  const statementLinesPager = usePagedRows(detailStatementLines)
 
   const statementBalancesMatch = useMemo(() => {
     if (!bankStatementDetail) return false
@@ -4581,7 +4583,7 @@ function AccountingClientReady({
                         </tr>
                       </thead>
                       <tbody>
-                        {detailStatementLines.map((line) => {
+                        {statementLinesPager.pageRows.map((line) => {
                           const lineRow = line as Record<string, unknown>
                           const focused =
                             bankLineMatchFocus?.id != null &&
@@ -4679,6 +4681,7 @@ function AccountingClientReady({
                         })}
                       </tbody>
                     </table>
+                    <TablePager {...statementLinesPager} />
                   </div>
                 )}
               </div>

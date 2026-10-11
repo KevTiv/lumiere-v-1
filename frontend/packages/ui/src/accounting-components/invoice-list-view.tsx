@@ -44,6 +44,7 @@ import {
   Calculator,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { TablePager, usePagedRows } from "../components/table-pager"
 import { accountingListStatusBadgeClass } from "../lib/theme-colors"
 import type { AccountMove } from "../lib/accounting-types"
 import {
@@ -112,14 +113,18 @@ export function InvoiceListView({
   const [searchQuery, setSearchQuery] = useState("")
   const [statusFilter, setStatusFilter] = useState<DisplayStatus | "all">("all")
 
-  const filtered = invoices.filter((inv) => {
-    const name = inv.name?.toLowerCase() ?? ""
-    const partner = inv.invoicePartnerDisplayName?.toLowerCase() ?? ""
-    const matchesSearch = name.includes(searchQuery.toLowerCase()) || partner.includes(searchQuery.toLowerCase())
-    const status = getMoveStatus(inv)
-    const matchesStatus = statusFilter === "all" || status === statusFilter
-    return matchesSearch && matchesStatus
-  })
+  const filtered = invoices
+    .filter((inv) => {
+      const name = inv.name?.toLowerCase() ?? ""
+      const partner = inv.invoicePartnerDisplayName?.toLowerCase() ?? ""
+      const matchesSearch = name.includes(searchQuery.toLowerCase()) || partner.includes(searchQuery.toLowerCase())
+      const status = getMoveStatus(inv)
+      const matchesStatus = statusFilter === "all" || status === statusFilter
+      return matchesSearch && matchesStatus
+    })
+    // Newest first, matching EntityTable's default (auto-inc ids only increase).
+    .sort((a, b) => Number(b.id) - Number(a.id))
+  const pager = usePagedRows(filtered, `${searchQuery}|${statusFilter}`)
 
   const stats = {
     total: invoices.length,
@@ -221,11 +226,16 @@ export function InvoiceListView({
             <TableBody>
               {filtered.length === 0 ? (
                 <TableRow><TableCell colSpan={8} className="text-center py-8 text-muted-foreground">{t("accounting.invoices.noResults")}</TableCell></TableRow>
-              ) : filtered.map((inv) => {
+              ) : pager.pageRows.map((inv) => {
                 const status = getMoveStatus(inv)
                 const conf = statusConfig[status]
                 return (
-                  <TableRow key={String(inv.id)} className="cursor-pointer hover:bg-muted/50" onClick={() => onSelectInvoice?.(inv)}>
+                  <TableRow
+                    key={String(inv.id)}
+                    data-testid={`entity-row-${inv.id}`}
+                    className="cursor-pointer hover:bg-muted/50"
+                    onClick={() => onSelectInvoice?.(inv)}
+                  >
                     <TableCell className="font-medium">{inv.name}</TableCell>
                     <TableCell>
                       <p className="font-medium">{inv.invoicePartnerDisplayName ?? `Partner #${inv.partnerId}`}</p>
@@ -275,6 +285,7 @@ export function InvoiceListView({
               })}
             </TableBody>
           </Table>
+          <TablePager {...pager} />
         </CardContent>
       </Card>
     </div>

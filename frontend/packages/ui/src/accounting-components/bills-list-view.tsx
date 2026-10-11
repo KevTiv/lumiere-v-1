@@ -45,6 +45,7 @@ import {
   Calculator,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { TablePager, usePagedRows } from "../components/table-pager"
 import { accountingListStatusBadgeClass } from "../lib/theme-colors"
 import type { AccountMove } from "../lib/accounting-types"
 import {
@@ -112,14 +113,18 @@ export function BillsListView({
   const [searchQuery, setSearchQuery] = useState("")
   const [statusFilter, setStatusFilter] = useState<BillStatus | "all">("all")
 
-  const filtered = bills.filter((bill) => {
-    const name = bill.name?.toLowerCase() ?? ""
-    const partner = bill.invoicePartnerDisplayName?.toLowerCase() ?? ""
-    const matchesSearch = name.includes(searchQuery.toLowerCase()) || partner.includes(searchQuery.toLowerCase())
-    const status = getBillStatus(bill)
-    const matchesStatus = statusFilter === "all" || status === statusFilter
-    return matchesSearch && matchesStatus
-  })
+  const filtered = bills
+    .filter((bill) => {
+      const name = bill.name?.toLowerCase() ?? ""
+      const partner = bill.invoicePartnerDisplayName?.toLowerCase() ?? ""
+      const matchesSearch = name.includes(searchQuery.toLowerCase()) || partner.includes(searchQuery.toLowerCase())
+      const status = getBillStatus(bill)
+      const matchesStatus = statusFilter === "all" || status === statusFilter
+      return matchesSearch && matchesStatus
+    })
+    // Newest first, matching EntityTable's default (auto-inc ids only increase).
+    .sort((a, b) => Number(b.id) - Number(a.id))
+  const pager = usePagedRows(filtered, `${searchQuery}|${statusFilter}`)
 
   const stats = {
     total: bills.length,
@@ -222,11 +227,16 @@ export function BillsListView({
             <TableBody>
               {filtered.length === 0 ? (
                 <TableRow><TableCell colSpan={8} className="text-center py-8 text-muted-foreground">{t("accounting.bills.noResults")}</TableCell></TableRow>
-              ) : filtered.map((bill) => {
+              ) : pager.pageRows.map((bill) => {
                 const status = getBillStatus(bill)
                 const conf = statusConfig[status]
                 return (
-                  <TableRow key={String(bill.id)} className="cursor-pointer hover:bg-muted/50" onClick={() => onSelectBill?.(bill)}>
+                  <TableRow
+                    key={String(bill.id)}
+                    data-testid={`entity-row-${bill.id}`}
+                    className="cursor-pointer hover:bg-muted/50"
+                    onClick={() => onSelectBill?.(bill)}
+                  >
                     <TableCell className="font-medium">{bill.name}</TableCell>
                     <TableCell>
                       <p className="font-medium">{bill.invoicePartnerDisplayName ?? `Partner #${bill.partnerId}`}</p>
@@ -280,6 +290,7 @@ export function BillsListView({
               })}
             </TableBody>
           </Table>
+          <TablePager {...pager} />
         </CardContent>
       </Card>
     </div>

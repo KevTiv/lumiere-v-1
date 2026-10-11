@@ -95,5 +95,127 @@ pub fn test_post_message_idempotency(ctx: &ReducerContext) -> Result<(), String>
     if rows_for(ctx, org, 4).len() != 4 {
         return Err("distinct keys and unkeyed posts must each create a message".to_string());
     }
+
+    // Revoke current authority after the accepted operation. Neither replay,
+    // key conflict, malformed business input, nor a fresh valid post may bypass
+    // the current role check. Restore authority before returning to the suite.
+    use crate::core::audit::audit_log;
+    use crate::core::permissions::{role, Role};
+    use crate::core::users::{
+        find_user_profile_for_organization, user_organization, user_profile, UserProfile,
+    };
+    let profile = find_user_profile_for_organization(ctx, ctx.sender(), org)
+        .ok_or("fixture profile missing")?;
+    let membership = ctx
+        .db
+        .user_organization()
+        .user_org_by_user()
+        .filter(&ctx.sender())
+        .find(|row| row.organization_id == org && row.is_active)
+        .ok_or("fixture membership missing")?;
+    let current_role = ctx
+        .db
+        .role()
+        .id()
+        .find(&membership.role_id)
+        .ok_or("fixture role missing")?;
+    let messages_before: Vec<_> = ctx
+        .db
+        .mail_message()
+        .iter()
+        .filter(|row| row.organization_id == org)
+        .collect();
+    let audit_before: Vec<_> = ctx
+        .db
+        .audit_log()
+        .iter()
+        .filter(|row| row.organization_id == org)
+        .map(|row| row.id)
+        .collect();
+    let restricted_profile = ctx
+        .db
+        .user_profile()
+        .id()
+        .find(&profile.id)
+        .ok_or("fixture profile missing before restriction")?;
+    ctx.db.user_profile().id().update(UserProfile {
+        is_superuser: false,
+        ..restricted_profile
+    });
+    ctx.db.role().id().update(Role {
+        permissions: vec![],
+        ..current_role.clone()
+    });
+    let denied = [
+        post(1, "first", Some("cov19-key-a")),       // accepted replay
+        post(1, "conflicting", Some("cov19-key-a")), // stale key conflict
+        post(5, "", Some("")),                       // invalid business input
+        post(5, "fresh valid", Some("cov19-denied-fresh")), // valid new effect
+        crate::crm::activities::complete_activity(ctx, org, u64::MAX),
+        crate::inventory::tracking::reserve_serial(ctx, org, u64::MAX),
+        crate::inventory::tracking::use_serial(ctx, org, u64::MAX),
+        crate::sales::pos_transactions::close_pos_session(ctx, org, u64::MAX, 0.0),
+        crate::inventory::stock::confirm_stock_picking(
+            ctx,
+            org,
+            u64::MAX,
+            crate::core::organization::CompanyScopeParams {
+                company_id: Some(u64::MAX),
+            },
+        ),
+        crate::inventory::stock::assign_stock_picking(
+            ctx,
+            org,
+            u64::MAX,
+            crate::core::organization::CompanyScopeParams {
+                company_id: Some(u64::MAX),
+            },
+        ),
+        crate::inventory::stock::validate_stock_picking(
+            ctx,
+            org,
+            u64::MAX,
+            crate::core::organization::CompanyScopeParams {
+                company_id: Some(u64::MAX),
+            },
+        ),
+        crate::inventory::stock::validate_stock_picking_backorder(
+            ctx,
+            org,
+            u64::MAX,
+            crate::core::organization::CompanyScopeParams {
+                company_id: Some(u64::MAX),
+            },
+        ),
+    ];
+    ctx.db.user_profile().id().update(profile);
+    ctx.db.role().id().update(current_role);
+    for result in denied {
+        match result {
+            Err(error) if error.starts_with("Permission denied:") => {}
+            other => return Err(format!("expected current permission denial, got {other:?}")),
+        }
+    }
+    let messages_after: Vec<_> = ctx
+        .db
+        .mail_message()
+        .iter()
+        .filter(|row| row.organization_id == org)
+        .collect();
+    let audit_after: Vec<_> = ctx
+        .db
+        .audit_log()
+        .iter()
+        .filter(|row| row.organization_id == org)
+        .map(|row| row.id)
+        .collect();
+    if messages_before != messages_after || audit_before != audit_after {
+        return Err("denied calls changed canonical message or audit effects".to_string());
+    }
+    // Authorized replay behavior remains unchanged after the denial checks.
+    post(1, "first", Some("cov19-key-a"))?;
+    if rows_for(ctx, org, 1) != after_replay {
+        return Err("authorized replay changed after current authority restoration".to_string());
+    }
     Ok(())
 }

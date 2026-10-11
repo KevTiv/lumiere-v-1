@@ -32,15 +32,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../components/select"
-import {
-  Pagination,
-  PaginationContent,
-  PaginationEllipsis,
-  PaginationItem,
-  PaginationLink,
-  PaginationNext,
-  PaginationPrevious,
-} from "../components/pagination"
+import { TABLE_PAGE_SIZE, TablePager } from "../components/table-pager"
 import {
   Empty,
   EmptyContent,
@@ -64,7 +56,7 @@ import {
 } from "../lib/entity-row-utils"
 import { rowsToCsv, downloadCsv } from "../lib/export-csv"
 
-const PAGE_SIZE = 25
+const PAGE_SIZE = TABLE_PAGE_SIZE
 const LOADING_ROW_COUNT = 5
 
 type SortDirection = "asc" | "desc"
@@ -135,23 +127,6 @@ function readPersistedFilters(
         allowedKeys.has(entry[0]) && typeof entry[1] === "string",
     ),
   )
-}
-
-function paginationItems(currentPage: number, totalPages: number): Array<number | "ellipsis"> {
-  if (totalPages <= 7) {
-    return Array.from({ length: totalPages }, (_, index) => index + 1)
-  }
-
-  const items: Array<number | "ellipsis"> = [1]
-  if (currentPage > 3) items.push("ellipsis")
-
-  const start = Math.max(2, currentPage - 1)
-  const end = Math.min(totalPages - 1, currentPage + 1)
-  for (let page = start; page <= end; page += 1) items.push(page)
-
-  if (currentPage < totalPages - 2) items.push("ellipsis")
-  items.push(totalPages)
-  return items
 }
 
 export function EntityTable({
@@ -256,9 +231,13 @@ export function EntityTable({
   }, [data, search, filters, config.searchKeys])
 
   const sorted = useMemo(() => {
-    if (!sortKey) return filtered
+    // Without a user-chosen column, newest first. Read projections carry no
+    // creation timestamp, and SpacetimeDB auto-inc ids only ever increase
+    // (with gaps), so descending id is creation order.
+    const key = sortKey ?? "id"
+    const direction = sortKey ? sortDirection : "desc"
     return [...filtered].sort((a, b) =>
-      compareRowValues(getRowField(a, sortKey), getRowField(b, sortKey), sortDirection),
+      compareRowValues(getRowField(a, key), getRowField(b, key), direction),
     )
   }, [filtered, sortKey, sortDirection])
 
@@ -590,53 +569,15 @@ export function EntityTable({
           </Table>
         </div>
 
-        {!isLoading && sorted.length > PAGE_SIZE ? (
-          <Pagination className="justify-end">
-            <PaginationContent>
-              <PaginationItem>
-                <PaginationPrevious
-                  href="#"
-                  onClick={(event) => {
-                    event.preventDefault()
-                    if (currentPage > 1) setPage(currentPage - 1)
-                  }}
-                  className={currentPage === 1 ? "pointer-events-none opacity-50" : undefined}
-                />
-              </PaginationItem>
-              {paginationItems(currentPage, totalPages).map((item, index) =>
-                item === "ellipsis" ? (
-                  <PaginationItem key={`ellipsis-${index}`}>
-                    <PaginationEllipsis />
-                  </PaginationItem>
-                ) : (
-                  <PaginationItem key={item}>
-                    <PaginationLink
-                      href="#"
-                      isActive={item === currentPage}
-                      onClick={(event) => {
-                        event.preventDefault()
-                        setPage(item)
-                      }}
-                    >
-                      {item}
-                    </PaginationLink>
-                  </PaginationItem>
-                ),
-              )}
-              <PaginationItem>
-                <PaginationNext
-                  href="#"
-                  onClick={(event) => {
-                    event.preventDefault()
-                    if (currentPage < totalPages) setPage(currentPage + 1)
-                  }}
-                  className={
-                    currentPage === totalPages ? "pointer-events-none opacity-50" : undefined
-                  }
-                />
-              </PaginationItem>
-            </PaginationContent>
-          </Pagination>
+        {!isLoading ? (
+          <TablePager
+            currentPage={currentPage}
+            totalPages={totalPages}
+            setPage={setPage}
+            total={sorted.length}
+            pageSize={PAGE_SIZE}
+            showRange={false}
+          />
         ) : null}
 
         {!isLoading && sorted.length > 0 && (

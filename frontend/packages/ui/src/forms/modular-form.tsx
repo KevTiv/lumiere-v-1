@@ -40,6 +40,8 @@ interface ModularFormProps {
   onValuesChange?: (values: Record<string, unknown>) => void
   /** External mutation in-flight (e.g. React Query) — disables actions and shows loading on submit. */
   isPending?: boolean
+  /** Blocks submission without presenting a false in-progress state. */
+  submissionDisabled?: boolean
   /** Enables advisory AI suggestions that only update local form state when the user applies them. */
   aiAssist?: AiFormAssistConfig
 }
@@ -52,6 +54,7 @@ export function ModularForm({
   leadingActions,
   onValuesChange,
   isPending,
+  submissionDisabled = false,
   aiAssist,
 }: ModularFormProps) {
   const { t } = useTranslation()
@@ -445,7 +448,12 @@ export function ModularForm({
                 {config.cancelLabel || t("common.cancel")}
               </Button>
             )}
-            <Button type="submit" size="sm" disabled={busy} data-testid={`form-submit-${config.id}`}>
+            <Button
+              type="submit"
+              size="sm"
+              disabled={busy || submissionDisabled}
+              data-testid={`form-submit-${config.id}`}
+            >
               {busy
                 ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 : <Check className="mr-2 h-4 w-4" />

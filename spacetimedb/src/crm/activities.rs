@@ -378,6 +378,7 @@ pub fn complete_activity(
     organization_id: u64,
     activity_id: u64,
 ) -> Result<(), String> {
+    check_permission(ctx, organization_id, "activity", "write")?;
     let activity = ctx
         .db
         .activity()
@@ -388,7 +389,6 @@ pub fn complete_activity(
     if activity.organization_id != organization_id {
         return Err("Activity does not belong to this organization".to_string());
     }
-    check_permission(ctx, organization_id, "activity", "write")?;
     if activity.is_done || activity.state == "done" {
         return Err("Activity is already done".to_string());
     }

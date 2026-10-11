@@ -5,7 +5,7 @@ import { Providers } from './providers'
 import './globals.css'
 
 import { getBrowserStdbSession, hasAuthenticatedIdentity } from '@/lib/browser-session'
-import { serverFetchQueryListAllowEmpty } from '@/lib/server-query'
+import { requireServerQueryRows, serverFetchQueryListState } from '@/lib/server-query'
 
 const _geist = Geist({ subsets: ["latin"] });
 const _geistMono = Geist_Mono({ subsets: ["latin"] });
@@ -45,9 +45,13 @@ export default async function RootLayout({
 
   let serverRoleNames: string[] = []
   if (identityHex && session) {
-    try {
-      const assignments = await serverFetchQueryListAllowEmpty(session, "user-roles")
-      const allRoles = await serverFetchQueryListAllowEmpty(session, "roles")
+    {
+      const [assignmentsState, rolesState] = await Promise.all([
+        serverFetchQueryListState(session, "user-roles"),
+        serverFetchQueryListState(session, "roles"),
+      ])
+      const assignments = requireServerQueryRows(assignmentsState, "user-roles")
+      const allRoles = requireServerQueryRows(rolesState, "roles")
       const assignedIds = new Set(
         assignments
           .filter((a) => a["isActive"])
@@ -56,18 +60,18 @@ export default async function RootLayout({
       serverRoleNames = allRoles
         .filter((r) => assignedIds.has(String(r["id"])))
         .map((r) => String(r["name"]))
-    } catch {
-      // Session token present but role query failed — render with empty role list
     }
   }
 
   let companyIds: readonly number[] | undefined
   if (organizationId != null && session) {
-    try {
-      const [companies, memberships] = await Promise.all([
-        serverFetchQueryListAllowEmpty(session, "companies"),
-        serverFetchQueryListAllowEmpty(session, "user-organization"),
+    {
+      const [companiesState, membershipsState] = await Promise.all([
+        serverFetchQueryListState(session, "companies"),
+        serverFetchQueryListState(session, "user-organization"),
       ])
+      const companies = requireServerQueryRows(companiesState, "companies")
+      const memberships = requireServerQueryRows(membershipsState, "user-organization")
       const validCompanies = companies
         .map((row) => ({
           id: Number(row["id"]),
@@ -83,8 +87,6 @@ export default async function RootLayout({
       )[0]?.id
       const allowedCompanyId = membershipCompanyId ?? fallbackCompanyId
       companyIds = allowedCompanyId == null ? undefined : [allowedCompanyId]
-    } catch {
-      companyIds = undefined
     }
   }
 

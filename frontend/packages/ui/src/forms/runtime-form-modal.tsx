@@ -30,6 +30,11 @@ export interface RuntimeFormModalProps {
   isPending?: boolean
   /** When true, `custom:*` keys are folded into a `metadata` JSON string on submit. */
   foldCustomFieldsIntoMetadata?: boolean
+  /**
+   * `block` is the safe default. Use `use-static` only when the form owner has
+   * classified runtime fields, visibility, and relation policy as optional.
+   */
+  runtimeConfigFailureMode?: "block" | "use-static"
   aiAssist?: React.ComponentProps<typeof FormModal>["aiAssist"]
 }
 
@@ -46,6 +51,8 @@ export function RuntimeFormModal({
   transformConfig,
   onSubmit,
   foldCustomFieldsIntoMetadata = true,
+  runtimeConfigFailureMode = "block",
+  submitError,
   ...rest
 }: RuntimeFormModalProps) {
   const { config, isLoading, error, customFieldIds } = useRuntimeFormModalConfig({
@@ -90,14 +97,20 @@ export function RuntimeFormModal({
     )
   }
 
-  // On STDB query error, still render the merged/static scaffold so create is not blocked,
-  // but keep custom-field folding when ids were already known from a prior successful load.
+  const runtimeConfigFailed = error != null
+  const submissionBlocked = runtimeConfigFailed && runtimeConfigFailureMode === "block"
+  const runtimeConfigError = submissionBlocked
+    ? `Runtime form configuration is unavailable. Submission is disabled. ${error}`
+    : submitError
+
   return (
     <FormModal
       open={open}
       onOpenChange={onOpenChange}
-      config={error ? staticConfig : resolvedConfig}
-      onSubmit={error ? onSubmit : handleSubmit}
+      config={runtimeConfigFailed ? staticConfig : resolvedConfig}
+      onSubmit={submissionBlocked ? undefined : runtimeConfigFailed ? onSubmit : handleSubmit}
+      submissionDisabled={submissionBlocked}
+      submitError={runtimeConfigError}
       {...rest}
     />
   )

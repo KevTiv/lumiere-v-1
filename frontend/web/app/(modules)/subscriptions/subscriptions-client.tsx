@@ -127,7 +127,10 @@ import { useDefaultOperatingCompanyBigInt } from "@lumiere/query-hooks/hooks/use
 import { useSaleOrders, usePricelists, type SaleOrder, type ProductPricelist } from "@lumiere/query-hooks/hooks/sales"
 import { useProducts } from "@lumiere/query-hooks/hooks/inventory"
 import { useCurrencies } from "@lumiere/query-hooks/hooks/settings"
-import { useAccountJournals, useAccountAccounts, useAccountMoves, useAccountMoveLines } from "@lumiere/query-hooks/hooks/accounting"
+import { useAccountJournals, useAccountAccounts, useAccountMoves, useAccountMoveLines, useAccountPayments } from "@lumiere/query-hooks/hooks/accounting"
+import { subscriptionRecordLinks } from "@lumiere/query-hooks/hooks/cross-record-links"
+import { CrossRecordLinks } from "../../../components/order-handoff-links"
+import { useModuleTab } from "@/hooks/use-module-tab"
 import type { Product } from "@lumiere/stdb/types"
 import {
   saleOrderRowsToSelectOptions,
@@ -200,6 +203,10 @@ function SubscriptionsClientLoaded({
   useSubscriptionsModuleSubscription()
   const { t } = useTranslation()
   const moduleConfig = useMemo(() => subscriptionsModuleConfig(t), [t])
+  const { activeTab, setActiveTab } = useModuleTab(
+    moduleConfig.defaultTab ?? "dashboard",
+    moduleConfig.tabs.map((tab) => tab.id),
+  )
   const { orgId } = orgBigInts(organizationId)
   const operatingCompanyId = useDefaultOperatingCompanyBigInt(organizationId) ?? 0n
   const [quickActionForm, setQuickActionForm] = useState<{ form: FormConfig; action: string } | null>(
@@ -217,7 +224,7 @@ function SubscriptionsClientLoaded({
   const [recognizeMoveId, setRecognizeMoveId] = useState("")
 
   const { data: subscriptions = [] } = useSubscriptions(orgId, initialSubscriptions)
-  const { data: billingRuns = [] } = useSubscriptionBillingRuns(orgId)
+  const { data: billingRuns = [], isLoading: billingRunsLoading, isError: billingRunsError } = useSubscriptionBillingRuns(orgId)
   const { data: plans = [] } = useSubscriptionPlans(orgId, initialPlans)
   const { data: subscriptionLines = [] } = useSubscriptionLines(orgId)
   const { data: subscriptionAmendments = [] } = useSubscriptionAmendments(orgId)
@@ -237,7 +244,8 @@ function SubscriptionsClientLoaded({
   const { data: products = [] } = useProducts(orgId, initialProducts)
   const { data: journals = [] } = useAccountJournals(orgId)
   const { data: accounts = [] } = useAccountAccounts(orgId)
-  const { data: accountMoves = [] } = useAccountMoves(orgId)
+  const { data: accountMoves = [], isLoading: accountMovesLoading, isError: accountMovesError } = useAccountMoves(orgId)
+  const { data: accountPayments = [], isLoading: accountPaymentsLoading, isError: accountPaymentsError } = useAccountPayments(orgId)
   const { data: accountMoveLines = [] } = useAccountMoveLines(orgId)
   const { data: currencies = [] } = useCurrencies()
 
@@ -756,6 +764,28 @@ function SubscriptionsClientLoaded({
               ...tab,
               createForm: subscriptionFormConfig,
               entityConfig: subscriptionsTableConfig(t, subscriptionRowActions),
+              recordSheet: {
+                titleKey: "code",
+                statusKey: "state",
+                auditTableName: "subscription",
+                detailConfig: { mode: "detail", sections: [{ id: "subscription", fields: [
+                  { key: "code", label: t("subscriptions.subscriptions.columns.code") },
+                  { key: "description", label: t("subscriptions.subscriptions.columns.description") },
+                ] }] },
+                customTabs: [{
+                  id: "handoffs",
+                  label: "Billing run invoices & reconciled payments",
+                  content: (record) => billingRunsLoading || accountMovesLoading
+                    ? <p>Loading linked records…</p>
+                    : <CrossRecordLinks testIdPrefix="subscription-handoff"
+                        result={billingRunsError || accountMovesError
+                          ? { status: "unavailable", links: [], reason: "Linked billing records are unavailable" }
+                          : subscriptionRecordLinks(record, { organizationId: orgId, companyId: operatingCompanyId },
+                              billingRuns, accountMoves,
+                              accountPaymentsError || accountPaymentsLoading ? undefined : accountPayments)}
+                      />,
+                }],
+              },
             }
           if (tab.id === "plans") return { ...tab, createForm: planFormConfig }
           if (tab.id === "lines")
@@ -813,6 +843,17 @@ function SubscriptionsClientLoaded({
       deferredLineActions,
       recognitionRuleActions,
       plans,
+      orgId,
+      operatingCompanyId,
+      billingRuns,
+      billingRunsLoading,
+      billingRunsError,
+      accountMoves,
+      accountMovesLoading,
+      accountMovesError,
+      accountPayments,
+      accountPaymentsLoading,
+      accountPaymentsError,
     ],
   )
 
@@ -987,7 +1028,7 @@ function SubscriptionsClientLoaded({
 
   return (
     <>
-      <ModuleView config={config} data={data} onFormSubmit={handleFormSubmit} isPending={isFormMutationPending} />
+      <ModuleView config={config} data={data} activeTab={activeTab} onActiveTabChange={setActiveTab} onFormSubmit={handleFormSubmit} isPending={isFormMutationPending} />
       <FormModal
         open={quickActionForm !== null}
         onOpenChange={(open) => !open && setQuickActionForm(null)}

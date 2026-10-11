@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react"
 import { useTranslation } from "@lumiere/i18n"
-import { Button, Input, Label, DashboardWidgetRenderer, resolveStoredDashboardWidgets } from "@lumiere/ui"
+import { Button, Input, Label, DashboardWidgetRenderer, resolveStoredDashboard } from "@lumiere/ui"
 import { Checkbox } from "@lumiere/ui/components/checkbox"
 import {
   Card,
@@ -163,9 +163,10 @@ export function QueryBuilder({ organizationId, dashboards }: QueryBuilderProps) 
   )
 
   const models = useMemo(() => (model ? [model] : []), [model])
-  const { dataSources, isLoading } = useStoredDashboardDataSources(organizationId, models)
+  const { dataSources, sourceStates } = useStoredDashboardDataSources(organizationId, models)
   const rows = useMemo(() => (model ? dataSources[model] ?? [] : []), [dataSources, model])
-  const sourceState = queryBuilderSourceState(model, isLoading, rows.length)
+  const sourceState = queryBuilderSourceState(model, sourceStates[model])
+  const sourceMessage = model ? sourceStates[model]?.message : undefined
 
   const fields = useMemo(() => discoverFields(rows), [rows])
   const numericFields = useMemo(() => fields.filter((f) => f.numeric), [fields])
@@ -183,7 +184,7 @@ export function QueryBuilder({ organizationId, dashboards }: QueryBuilderProps) 
     return []
   }, [widgetKind, displayFields, aggregation, aggField])
 
-  const previewWidget = useMemo(() => {
+  const previewResolution = useMemo(() => {
     if (!model) return null
     if (widgetKind === "chart" && !groupBy) return null
     if (widgetKind === "table" && displayFields.length === 0) return null
@@ -206,8 +207,7 @@ export function QueryBuilder({ organizationId, dashboards }: QueryBuilderProps) 
       isActive: true,
     }
 
-    const resolved = resolveStoredDashboardWidgets([syntheticRow], [0], dataSources)
-    return resolved[0] ?? null
+    return resolveStoredDashboard([syntheticRow], [0], dataSources, { sourceStates })
   }, [
     model,
     widgetKind,
@@ -221,10 +221,18 @@ export function QueryBuilder({ organizationId, dashboards }: QueryBuilderProps) 
     sortOrder,
     limit,
     dataSources,
+    sourceStates,
     t,
   ])
 
-  const canSave = Boolean(name.trim() && previewWidget && !createWidget.isPending)
+  const previewWidget = previewResolution?.widgets[0] ?? null
+
+  const canSave = Boolean(
+    name.trim() &&
+    previewWidget &&
+    (previewResolution?.state === "ready" || previewResolution?.state === "empty") &&
+    !createWidget.isPending,
+  )
 
   const handleModelChange = (next: string) => {
     setModel(next)
@@ -320,6 +328,10 @@ export function QueryBuilder({ organizationId, dashboards }: QueryBuilderProps) 
               ) : sourceState === "empty" || sourceState === "ready" ? (
                 <p className="text-xs text-muted-foreground" data-testid="qb-source-row-count">
                   {t("reports.queryBuilder.rowsLoaded", { count: rows.length })}
+                </p>
+              ) : sourceState === "denied" || sourceState === "unavailable" || sourceState === "partial" ? (
+                <p className="text-xs text-destructive" role="alert" data-testid={`qb-source-${sourceState}`}>
+                  {sourceMessage ?? t(`reports.queryBuilder.sourceStates.${sourceState}`)}
                 </p>
               ) : null}
             </div>
@@ -623,6 +635,10 @@ export function QueryBuilder({ organizationId, dashboards }: QueryBuilderProps) 
               data-testid="qb-preview-empty"
             >
               {t("reports.queryBuilder.previewNoRows")}
+            </p>
+          ) : sourceState === "denied" || sourceState === "unavailable" || sourceState === "partial" ? (
+            <p className="text-sm text-destructive" role="alert" data-testid={`qb-preview-${sourceState}`}>
+              {sourceMessage ?? t(`reports.queryBuilder.sourceStates.${sourceState}`)}
             </p>
           ) : previewWidget ? (
             <div className="grid grid-cols-1 gap-4">

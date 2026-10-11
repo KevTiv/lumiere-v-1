@@ -228,6 +228,44 @@ def verify_pg(root: Path, contracts: Path, manifest: dict[str, Any]) -> None:
     ]
     require(versions == list(range(1, catalog_version + 1)), "application PostgreSQL migration catalog version does not match manifest")
 
+    # Releases that freeze migration 1 list every durable migration they ship.
+    # Releases before the migration ledger have no such list.
+    durable_migrations = schema.get("migrations")
+    if durable_migrations is not None:
+        require(
+            isinstance(durable_migrations, list) and durable_migrations,
+            "durable PG schema manifest migrations must be a non-empty list",
+        )
+        first = durable_migrations[0]
+        require(
+            isinstance(first, dict)
+            and first.get("version") == migration.get("version")
+            and first.get("checksum") == digest,
+            "durable PG schema manifest baseline migration does not match the release manifest",
+        )
+        previous_version = 0
+        for entry in durable_migrations:
+            require(isinstance(entry, dict), "durable PG migration entry must be an object")
+            version = entry.get("version")
+            require(
+                isinstance(version, int) and version > previous_version,
+                "durable PG migrations must have strictly increasing versions",
+            )
+            previous_version = version
+            require(
+                entry.get("state") == "released",
+                f"durable PG migration {version} is still pending; promote it into lumiere-codegen/pg-migration-ledger",
+            )
+            entry_path = relative_path(contracts, entry.get("sql_file"), f"durable PG migration {version} sql_file")
+            require(
+                entry.get("checksum") == f"sha256:{sha256(entry_path)}",
+                f"durable PG migration {version} checksum does not match its SQL",
+            )
+            require(
+                version in versions,
+                f"durable PG migration {version} is missing from the application migration catalog",
+            )
+
 
 def verify_services(root: Path, manifest: dict[str, Any]) -> None:
     services = object_field(manifest, "services", dict)
