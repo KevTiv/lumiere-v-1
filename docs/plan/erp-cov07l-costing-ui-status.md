@@ -10,7 +10,7 @@ companion emitter change and release/pin; no decoder or generated binding has
 been hand-edited to conceal the gap. The approved
 [contracts PR #18](https://github.com/KevTiv/lumiere-contracts/pull/18) now provides
 the IR-derived codec change, and the full web typecheck passes against its
-candidate. Package typecheck/build, 31 emitter tests and 19 runtime tests pass.
+candidate. Package typecheck/build, 32 emitter tests and 19 runtime tests pass.
 The application v0.3.100 pin does not yet contain that unmerged companion fix;
 final release/pin and operator acceptance remain pending.
 

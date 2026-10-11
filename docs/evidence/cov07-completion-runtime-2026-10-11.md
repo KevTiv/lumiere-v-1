@@ -160,7 +160,11 @@ node --test packages/contracts/tests/resource-codecs.test.mjs \
   packages/contracts/tests/agent-capability-registry.test.mjs
 ```
 
-All 31 Python tests and 19 runtime tests passed. The full application web
+All 32 Python tests and 19 runtime tests passed. A follow-up emitter-only
+compatibility regression ensures older pins without the additive resources
+still generate their existing reads, while malformed present resources and
+missing established typed reads fail closed. The generated source/runtime stayed
+byte-identical to the tested candidate after that follow-up. The full application web
 typecheck also exited 0 at application source
 `3ada525784f127bf4dab2f391227caf13c462ae5` using:
 

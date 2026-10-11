@@ -87,7 +87,7 @@ The released contracts-owned typed-read emitter still has an Accounting-only
 allowlist. The first prepared candidate omitted the four Manufacturing cost
 row codecs even though canonical IR exposes the resources, failing full web
 typecheck. The approved [companion contracts PR #18](https://github.com/KevTiv/lumiere-contracts/pull/18)
-adds those IR-derived codecs. Its 31 emitter tests, 19 runtime tests, package
+adds those IR-derived codecs. Its 32 emitter tests, 19 runtime tests, package
 typecheck/build and full application web typecheck against the candidate passed.
 The application has since received the v0.3.100 pin, but that tag predates the
 companion fix. Review, a subsequent immutable release incorporating #18, and
