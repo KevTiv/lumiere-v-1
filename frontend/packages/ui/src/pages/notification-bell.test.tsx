@@ -4,7 +4,20 @@ import { afterEach, describe, expect, it, vi } from "vitest"
 vi.mock("@lumiere/i18n", () => ({
   useTranslation: () => ({ t: (_k: string, o?: { defaultValue?: string }) => o?.defaultValue ?? _k, i18n: { language: "en" } }),
 }))
-vi.mock("next/link", () => ({ default: ({ href, children, ...p }: { href: string; children: React.ReactNode }) => <a href={href} {...p}>{children}</a> }))
+vi.mock("next/link", () => ({
+  default: ({ href, children, onClick, ...p }: { href: string; children: React.ReactNode; onClick?: React.MouseEventHandler<HTMLAnchorElement> }) => (
+    <a
+      href={href}
+      {...p}
+      onClick={(event) => {
+        event.preventDefault()
+        onClick?.(event)
+      }}
+    >
+      {children}
+    </a>
+  ),
+}))
 
 import { NotificationBell } from "./notification-bell"
 import { DashboardHeader, HeaderTrailingProvider } from "./dashboard-header"
@@ -28,6 +41,25 @@ describe("NotificationBell", () => {
   it("hides the badge when empty", () => {
     render(<NotificationBell notifications={[]} viewAllHref="/messages" itemHref={() => "/"} />)
     expect(screen.queryByTestId("notification-bell-count")).toBeNull()
+  })
+
+  it("acknowledges one notification or all notifications", () => {
+    const onOpen = vi.fn()
+    const onMarkAllRead = vi.fn()
+    render(
+      <NotificationBell
+        notifications={items}
+        viewAllHref="/messages"
+        itemHref={(n) => `/messages/${n.id}`}
+        onNotificationOpen={onOpen}
+        onMarkAllRead={onMarkAllRead}
+      />,
+    )
+    fireEvent.click(screen.getByTestId("notification-bell"))
+    fireEvent.click(screen.getByTestId("notification-bell-item-2"))
+    expect(onOpen).toHaveBeenCalledWith(items[0])
+    fireEvent.click(screen.getByTestId("notification-bell-mark-all"))
+    expect(onMarkAllRead).toHaveBeenCalledTimes(1)
   })
 })
 
