@@ -35,4 +35,8 @@ test("reports background readback separately from cached rows", () => {
     queryBuilderSourceState("sale_order", { status: "ready", rowCount: 3 }, true),
     "refreshing",
   )
+  assert.equal(
+    queryBuilderSourceState("sale_order", { status: "loading", rowCount: 0 }, true),
+    "refreshing",
+  )
 })

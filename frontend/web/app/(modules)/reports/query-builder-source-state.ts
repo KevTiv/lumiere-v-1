@@ -17,7 +17,7 @@ export function queryBuilderSourceState(
   isRefreshing = false,
 ): QueryBuilderSourceState {
   if (!model) return "unselected"
-  if (sourceState?.status === "loading") return "loading"
   if (isRefreshing) return "refreshing"
+  if (sourceState?.status === "loading") return "loading"
   return sourceState?.status ?? "loading"
 }
