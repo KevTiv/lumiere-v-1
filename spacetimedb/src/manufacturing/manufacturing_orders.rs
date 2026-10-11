@@ -1767,7 +1767,7 @@ pub fn scrap_finished_manufacturing_output(
         new_values: Some(serde_json::json!({"scrap_move_id": created.id, "quantity": quantity}).to_string()),
         changed_fields: vec!["scrap_move".to_string()], metadata: None,
     });
-    effects.record(ctx, "erp.scrap_manufacturing_output")?;
+    effects.record(ctx, "erp.scrap_finished_manufacturing_output")?;
     Ok(())
 }
 

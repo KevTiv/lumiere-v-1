@@ -59,6 +59,7 @@ import { hasValidOrganizationId, orgBigInts } from '@/lib/org-scoped';
 import { ManufacturingRowDialog } from '../../manufacturing-row-dialog';
 import { ManufacturingActionResult } from '../../manufacturing-action-result';
 import { ManufacturingCostReadback } from '../../manufacturing-cost-readback';
+import { ManufacturingTrackingPanel } from '../../manufacturing-tracking-panel';
 import { resolvedManufacturingResultLinks, type ManufacturingResultLink } from '@/lib/manufacturing-result-links';
 import {
   canCancelOrder,
@@ -313,6 +314,8 @@ function ManufacturingOrderPageLoaded({
   return (
     <>
       <ManufacturingActionResult links={resultLinks} onDismiss={() => setResultLinks([])} />
+      <ManufacturingTrackingPanel key={`${orgId}-${operatingCompanyId}-${orderId}`}
+        order={order} organizationId={orgId} companyId={operatingCompanyId} />
       <RecordPage
         testIdPrefix="manufacturing-order"
         breadcrumbs={[

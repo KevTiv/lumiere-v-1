@@ -61,3 +61,26 @@ acceptance and are not claimed here.
 - These producers require explicit UI attribution controls after contract
   publication; existing untracked UI remains available. Producer implementation
   alone is not evidence of browser acceptance or module promotion.
+
+## Bounded operator controls
+
+The MO record page now includes `ManufacturingTrackingPanel` for explicit
+attributed close, exact completed tracked-output scrap and available BOM-material
+wastage. Selectors derive from authoritative BOM ownership and scoped reference
+rows. They reject other organizations/companies/products, missing/ambiguous
+references, locked identities, previously placed serials, unsupported serial
+quantities, fractional serial scrap, excessive output/material quantities and
+inconsistent existing waste effects. Nothing is selected automatically.
+
+The panel calls generated named operations and uses cache-independent canonical
+readback before showing record links. Close readback checks every owned output
+against its exact reference/product/lot/serial; scrap readback checks request,
+source output or quant, quantity and destination. Unknown outcomes retain the
+request identity; an in-flight guard prevents multiple concurrent dispatches.
+Failed reference queries remain visible and block submission.
+
+Eight focused intent/readback tests pass using Node's TypeScript stripping with
+an alias-resolution loader; `git diff --check` passes. Integrated typecheck needs
+the canonical generated contract release containing these operations. Browser
+acceptance remains pending: these test results prove selector/intent/readback
+logic, not a browser run. Multiunit serial close remains excluded explicitly.
