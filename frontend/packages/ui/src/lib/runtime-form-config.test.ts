@@ -77,4 +77,40 @@ describe("runtime form cardinality", () => {
     const result = mergeRuntimeFormConfig(empty, runtime(field()))
     assert.deepEqual(serializeAiFormSchema(result.config), [])
   })
+
+  it("applies live organization users to a matched UserSelect field", () => {
+    const staticConfig: FormConfig = {
+      id: "assign-owner",
+      title: "Assign owner",
+      sections: [{
+        id: "main",
+        fields: [{
+          id: "owner_id",
+          name: "owner_id",
+          label: "Owner",
+          type: "select",
+          options: [],
+        }],
+      }],
+    }
+    const userField = field({
+      fieldId: "owner_id",
+      name: "owner_id",
+      label: "Owner",
+      type: "UserSelect",
+      options: [{ value: "abc123", label: "Ada Lovelace" }],
+      isSystem: true,
+    })
+
+    const merged = mergeRuntimeFormConfig(staticConfig, {
+      config: {},
+      fields: [userField],
+      sourceFields: [userField],
+      customFields: [],
+    } as MergedFormConfiguration)
+
+    assert.deepEqual(merged.config.sections[0]?.fields[0]?.options, [
+      { value: "abc123", label: "Ada Lovelace", disabled: undefined },
+    ])
+  })
 })
