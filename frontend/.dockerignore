@@ -2,6 +2,8 @@
 # list in addition to the repository-root .dockerignore.
 node_modules
 **/node_modules
+.pnpm-store
+**/.pnpm-store
 .next
 **/.next
 .turbo
@@ -11,6 +13,7 @@ dist
 coverage
 playwright-report
 test-results
+**/*.tsbuildinfo
 .env
 .env.*
 .DS_Store
