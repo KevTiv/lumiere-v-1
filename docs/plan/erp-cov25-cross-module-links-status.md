@@ -1,6 +1,6 @@
 # COV-25 — Close one missing downstream record link per PR
 
-**Status:** IMPLEMENTED for the first link — sale order → delivery and invoice (runtime acceptance pending); further links are one per PR  
+**Status:** IMPLEMENTED for sale order → delivery/invoice and purchase order → receipt/vendor bill (runtime acceptance pending); further links are one per PR
 **Module/surface:** Cross-module  
 **Plan target:** direct navigation for primary handoffs  
 **Scaffold source:** [`erp-cov08-27-scaffold.md`](./erp-cov08-27-scaffold.md)
@@ -87,3 +87,33 @@ default tab — were replaced:
 Unit test: `record-links.test.ts` (3 tests, passing). Not verified in a browser: that each target tab applies the
 filter. Entity tabs do (`EntityTable.initialFilters`); the Accounting "invoices" and "bills" tabs are custom lists
 that ignore it, which is why account moves link to "journal-entries".
+
+## Implementation — link 2: purchase order → receipts and vendor bills
+
+The Purchasing order record sheet adds **Receipts & vendor bills**, reusing
+`OrderHandoffLinks` and the canonical `stockPickingHref` / `accountMoveHref`
+builders. Receipts require exact `stock_picking.purchase_id`, incoming direction,
+and matching organization/company. Bills come only from the selected PO's
+durable `invoice_ids` relation and resolve to same-scope `InInvoice` moves.
+Returns, refunds and cancelled records are excluded. Names and invoice origins
+are display values, never identity selectors.
+
+Loading and failed/denied queries have distinct status/alert text; a failed
+query is not presented as a successful empty handoff list. Existing authorized
+queries remain the access boundary. This read-only slice adds no domain state,
+mutation or generated contract delta.
+
+Validation:
+- `purchase-order-handoffs.test.ts` covers exact relation selection, parent and
+  child scope, returns/cancellations/refunds, snake-case/option IDs, large IDs,
+  missing relations and rejection of name/origin-based discovery.
+- The focused pure tests passed using Node's TypeScript support in this
+  environment, with import paths adjusted only in temporary verification copies.
+- `cov25-purchase-handoff-links.spec.ts` creates a PO through the existing UI
+  fixtures, verifies an unrelated draft stays empty, follows the exact receipt
+  and vendor bill, and checks filtered record focus survives refresh.
+- Full workspace typecheck and browser execution remain pending GitHub CI:
+  local Git/network access is unavailable in this environment.
+
+This link remains **IMPLEMENTED — runtime acceptance pending** until same-head
+CI and the focused browser proof pass; it does not promote the whole COV-25 track.

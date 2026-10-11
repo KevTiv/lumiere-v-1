@@ -84,6 +84,7 @@ import type {
   DocumentExternalRef,
   DocumentFolder,
   DocumentLegalHold,
+  DocumentRetentionPurgeJob,
   DocumentSignatureRequest,
   DocumentTemplate,
   DocumentVersion,
@@ -434,6 +435,7 @@ export interface QueryRowMap {
   "document-external-refs": DocumentExternalRef
   "document-folders": DocumentFolder
   "document-legal-holds": DocumentLegalHold
+  "document-retention-purge-jobs": DocumentRetentionPurgeJob
   "document-signature-requests": DocumentSignatureRequest
   "document-templates": DocumentTemplate
   "document-versions": DocumentVersion
