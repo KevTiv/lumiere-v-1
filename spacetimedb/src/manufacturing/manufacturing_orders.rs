@@ -8,14 +8,18 @@
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::core::organization::{company_id_from_scope, require_company_in_organization};
+use crate::core::reference::convert_uom_quantity;
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 use crate::inventory::product::product;
 use crate::inventory::quality::quality_check;
 use crate::inventory::stock::{
-    create_stock_move, create_stock_move_internal, done_stock_move, move_stock_quant, stock_move, stock_quant,
-    CreateStockMoveParams, DoneStockMoveParams, MoveStockQuantParams, StockMove, StockQuant,
+    create_stock_move, create_stock_move_internal, done_stock_move, move_stock_quant, stock_move,
+    stock_quant, CreateStockMoveParams, DoneStockMoveParams, MoveStockQuantParams, StockMove,
+    StockQuant,
 };
-use crate::manufacturing::bill_of_materials::{mrp_bom, mrp_bom_byproduct, mrp_bom_line};
+use crate::manufacturing::bill_of_materials::{
+    mrp_bom, mrp_bom_byproduct, mrp_bom_line, ordered_bom_operations,
+};
 use crate::manufacturing::costing::{
     allocate_output_cost, material_cost_snapshot, production_cost_inputs, record_production_cost,
     validate_cost,
@@ -769,6 +773,101 @@ pub fn confirm_manufacturing_order(
 
     match mo.state {
         MoState::Draft => {
+            // Materialize the immutable BOM routing before confirmation. Never
+            // merge manual rows into a generated routing or silently duplicate it.
+            if let Some(bom_id) = mo.bom_id {
+                let bom =
+                    require_bom_in_company(ctx, organization_id, company_id, bom_id, "MO BOM")?;
+                let operations = ordered_bom_operations(ctx, &bom, &bom.operation_ids)?;
+                if !operations.is_empty() {
+                    check_permission(ctx, organization_id, "mrp_workorder", "create")?;
+                    if !mo.workorder_ids.is_empty()
+                        || ctx
+                            .db
+                            .mrp_workorder()
+                            .mrp_workorder_by_production()
+                            .filter(&mo_id)
+                            .next()
+                            .is_some()
+                    {
+                        return Err(
+                            "Routed MO must have no workorders before confirmation".to_string()
+                        );
+                    }
+                    // Validate all numeric inputs before the first insert.
+                    let mut planned = Vec::with_capacity(operations.len());
+                    let routing_qty = convert_uom_quantity(
+                        ctx,
+                        organization_id,
+                        mo.product_uom_id,
+                        bom.product_uom_id,
+                        mo.product_qty,
+                        Some(mo.product_id),
+                    )?;
+                    validate_positive_qty(bom.product_qty, "routing BOM quantity")?;
+                    validate_positive_qty(routing_qty, "routing product quantity")?;
+                    for operation in operations {
+                        let center = require_active_workcenter_in_company(
+                            ctx,
+                            organization_id,
+                            company_id,
+                            operation.workcenter_id,
+                            "routing workcenter",
+                        )?;
+                        validate_positive_qty(center.capacity, "routing capacity")?;
+                        validate_positive_qty(center.time_efficiency, "routing time efficiency")?;
+                        let cycle = if operation.time_mode == "manual" {
+                            operation.time_cycle_manual
+                        } else {
+                            operation.time_cycle
+                        };
+                        let duration = (routing_qty / bom.product_qty / center.capacity).ceil()
+                            * cycle
+                            * 100.0
+                            / center.time_efficiency;
+                        validate_positive_duration(duration, "routing expected duration")?;
+                        planned.push((operation, duration));
+                    }
+                    let mut operation_workorders = std::collections::HashMap::new();
+                    for (operation, duration) in planned {
+                        let blocker = operation
+                            .blocked_by_operation_ids
+                            .last()
+                            .and_then(|id| operation_workorders.get(id))
+                            .copied();
+                        create_workorder_internal(
+                            ctx,
+                            organization_id,
+                            CreateWorkorderParams {
+                                workcenter_id: operation.workcenter_id,
+                                production_id: mo_id,
+                                duration_expected: duration,
+                                name: operation.name.clone(),
+                                sequence: operation.sequence,
+                                capacity: None,
+                                worksheet: operation.worksheet.clone(),
+                                worksheet_url: operation.worksheet_url.clone(),
+                                operation_note: None,
+                                operation_id: Some(operation.id),
+                                blocked_by_workorder_id: blocker,
+                                metadata: None,
+                            },
+                            true,
+                        )?;
+                        let row = ctx
+                            .db
+                            .mrp_workorder()
+                            .mrp_workorder_by_production()
+                            .filter(&mo_id)
+                            .find(|row| row.operation_id == Some(operation.id))
+                            .ok_or("Generated workorder missing")?;
+                        operation_workorders.insert(operation.id, row.id);
+                    }
+                }
+            }
+            // Workorder insertion updated ownership: do not overwrite it with
+            // the original Draft row when transitioning the parent.
+            let mo = require_mo_in_company(ctx, organization_id, company_id, mo_id)?;
             // MFG-005: Validate all workorder blocker FKs before confirming
             let workorders: Vec<_> = ctx
                 .db
@@ -808,8 +907,7 @@ pub fn confirm_manufacturing_order(
                     new_values: Some(serde_json::json!({ "state": "confirmed" }).to_string()),
                     changed_fields: vec!["state".to_string()],
                     metadata: None,
-                },
-            );
+                });
 
             log::info!("Manufacturing order confirmed: id={}", mo_id);
             Ok(())
@@ -1618,7 +1716,15 @@ pub fn create_workorder(
     params: CreateWorkorderParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "mrp_workorder", "create")?;
+    create_workorder_internal(ctx, organization_id, params, false)
+}
 
+fn create_workorder_internal(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    params: CreateWorkorderParams,
+    materializing_routing: bool,
+) -> Result<(), String> {
     let mo = ctx
         .db
         .mrp_production()
@@ -1631,6 +1737,29 @@ pub fn create_workorder(
     }
 
     let company_id = mo.company_id;
+
+    if mo.state == MoState::Done || mo.state == MoState::Cancelled {
+        return Err("Cannot add workorders to a terminal manufacturing order".to_string());
+    }
+    if let Some(bom_id) = mo.bom_id {
+        let bom =
+            require_bom_in_company(ctx, organization_id, company_id, bom_id, "workorder BOM")?;
+        if !bom.operation_ids.is_empty() {
+            if mo.state != MoState::Draft || !materializing_routing {
+                return Err(
+                    "BOM routing workorders are generated only by MO confirmation".to_string(),
+                );
+            }
+            if !params
+                .operation_id
+                .is_some_and(|id| bom.operation_ids.contains(&id))
+            {
+                return Err(
+                    "Workorder operation must belong to the manufacturing order BOM".to_string(),
+                );
+            }
+        }
+    }
 
     validate_positive_duration(params.duration_expected, "duration_expected")?;
 
@@ -1645,13 +1774,25 @@ pub fn create_workorder(
 
     // Validate routing operation if supplied.
     if let Some(op_id) = params.operation_id {
-        require_routing_workcenter_in_company(
+        let operation = require_routing_workcenter_in_company(
             ctx,
             organization_id,
             company_id,
             op_id,
             "workorder operation",
         )?;
+        if operation.workcenter_id != params.workcenter_id {
+            return Err("Workorder workcenter must match its routing operation".to_string());
+        }
+        if ctx
+            .db
+            .mrp_workorder()
+            .mrp_workorder_by_production()
+            .filter(&mo.id)
+            .any(|row| row.operation_id == Some(op_id))
+        {
+            return Err("Manufacturing order already owns this routing operation".to_string());
+        }
     }
 
     // MFG-005: Validate blocker workorder FK — blocker must exist in the same MO
@@ -1674,6 +1815,7 @@ pub fn create_workorder(
 
     // Resolve capacity: use supplied value, fall back to validated workcenter capacity.
     let resolved_capacity = params.capacity.unwrap_or(wc.capacity);
+    validate_positive_qty(resolved_capacity, "workorder capacity")?;
 
     let wo = ctx.db.mrp_workorder().insert(MrpWorkorder {
         id: 0,
@@ -1766,9 +1908,51 @@ pub fn start_workorder(
     check_permission(ctx, organization_id, "mrp_workorder", "write")?;
     let (wo, _mo) =
         require_workorder_execution_scope(ctx, organization_id, company_id, workorder_id)?;
+    require_active_workcenter_in_company(
+        ctx,
+        organization_id,
+        company_id,
+        wo.workcenter_id,
+        "workorder workcenter",
+    )?;
 
     match wo.state {
         WorkorderState::Pending | WorkorderState::Ready => {
+            // The singular blocker field is a compatibility projection; routing
+            // definitions can declare several prerequisites, all of which must
+            // be owned by this MO and Done before the dependent operation starts.
+            if let Some(operation_id) = wo.operation_id {
+                let operation = require_routing_workcenter_in_company(
+                    ctx,
+                    organization_id,
+                    company_id,
+                    operation_id,
+                    "workorder operation",
+                )?;
+                if operation.workcenter_id != wo.workcenter_id {
+                    return Err("Workorder routing workcenter relation is inconsistent".to_string());
+                }
+                for blocker_operation in operation.blocked_by_operation_ids {
+                    let rows: Vec<_> = ctx
+                        .db
+                        .mrp_workorder()
+                        .mrp_workorder_by_production()
+                        .filter(&wo.production_id)
+                        .filter(|row| row.operation_id == Some(blocker_operation))
+                        .collect();
+                    if rows.len() != 1
+                        || rows[0].organization_id != organization_id
+                        || rows[0].company_id != company_id
+                        || rows[0].state != WorkorderState::Done
+                    {
+                        return Err(
+                            "All routing predecessor workorders must be Done before start"
+                                .to_string(),
+                        );
+                    }
+                    require_workorder_parent(ctx, organization_id, company_id, &rows[0])?;
+                }
+            }
             if let Some(blocker_id) = wo.blocked_by_workorder_id {
                 let blocker = ctx
                     .db
