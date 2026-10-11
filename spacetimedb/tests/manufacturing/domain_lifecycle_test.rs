@@ -1134,7 +1134,7 @@ pub fn test_bom_to_close_domain_lifecycle(ctx: &ReducerContext) -> Result<(), St
         )?;
         if row.product_id == primary_id {
             exact(row.quantity_done, 0.5, "primary output quantity")?;
-            exact(row.cost_share, 0.0, "primary move existing cost share")?;
+            exact(row.cost_share, 80.0, "primary residual actual cost share")?;
         } else if row.product_id == byproduct_id {
             exact(row.quantity_done, 0.125, "byproduct output quantity")?;
             exact(row.cost_share, 20.0, "byproduct allocated share metadata")?;
