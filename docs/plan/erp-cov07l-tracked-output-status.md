@@ -78,6 +78,9 @@ against its exact reference/product/lot/serial; scrap readback checks request,
 source output or quant, quantity and destination. Unknown outcomes retain the
 request identity; an in-flight guard prevents multiple concurrent dispatches.
 Failed reference queries remain visible and block submission.
+An unresolved operation also retains its original readback closure and blocks
+new submissions. "Check previous action" only reads canonical records; it never
+redispatches or rebuilds an intent from stock that may already have changed.
 
 Eight focused intent/readback tests pass using Node's TypeScript stripping with
 an alias-resolution loader; `git diff --check` passes. Integrated typecheck needs

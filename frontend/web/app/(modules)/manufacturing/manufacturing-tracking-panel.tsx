@@ -5,7 +5,8 @@ import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { decodeOperationDispatch, getLumiereApiClientOrThrow } from "@lumiere/api-client"
 import { stdbBffCommandPost } from "@lumiere/stdb/commands"
 import { Button } from "@lumiere/ui"
-import { executeOperationWithCanonicalReadback, requireResolvedOperationEffect } from "@lumiere/query-hooks/hooks/operation-effect"
+import { executeOperationWithCanonicalReadback, requireResolvedOperationEffect, UnresolvedOperationEffectError,
+  type CanonicalRecordRef } from "@lumiere/query-hooks/hooks/operation-effect"
 import { invalidateResourceQueries } from "@lumiere/query-hooks/subscription-query"
 import {
   buildManufacturingScrapIntent, buildTrackedCloseIntent, materialScrapOptions,
@@ -34,6 +35,8 @@ export function ManufacturingTrackingPanel({ order, organizationId, companyId }:
   const [requestId, setRequestId] = useState("")
   const [busy, setBusy] = useState(false)
   const inFlight = useRef(false)
+  const pendingReadback = useRef<(() => Promise<CanonicalRecordRef | null>) | null>(null)
+  const [pendingUnknown, setPendingUnknown] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [links, setLinks] = useState<ManufacturingResultLink[]>([])
   const state = trackingState(order)
@@ -71,7 +74,7 @@ export function ManufacturingTrackingPanel({ order, organizationId, companyId }:
     return [product ? labelOf(product) : "Product unavailable", serial ? labelOf(serial) : lot ? labelOf(lot) : "Untracked", `${qty} units`].join(" · ")
   }
   const submit = async () => {
-    if (inFlight.current || !references.data) return
+    if (inFlight.current || pendingUnknown || !references.data) return
     inFlight.current = true
     setBusy(true); setError(null); setLinks([])
     try {
@@ -87,15 +90,17 @@ export function ManufacturingTrackingPanel({ order, organizationId, companyId }:
       }
       if (mode === "close") {
         const input = buildTrackedCloseIntent(order, snapshot, organizationId, companyId, selections)
+        const resolveEffect = async () => {
+          const [orders, moves] = await readOrdersAndMoves()
+          return resolveTrackingCloseEffect(order, snapshot, organizationId, companyId, input, orders, moves)
+        }
+        pendingReadback.current = resolveEffect
         const result = requireResolvedOperationEffect(await executeOperationWithCanonicalReadback({
           dispatch: async () => {
             const request = stdbBffCommandPost("finish_manufacturing_order_with_tracking", input)
             return decodeOperationDispatch(await api.apiFetch(request.urlPath, request.init), "Unable to close attributed output")
           },
-          resolveEffect: async () => {
-            const [orders, moves] = await readOrdersAndMoves()
-            return resolveTrackingCloseEffect(order, snapshot, organizationId, companyId, input, orders, moves)
-          }, afterDispatch: refresh, readbackAttempts: 6,
+          resolveEffect, afterDispatch: refresh, readbackAttempts: 6,
         }))
         setLinks(manufacturingResultLinks(result.ref))
       } else {
@@ -105,18 +110,38 @@ export function ManufacturingTrackingPanel({ order, organizationId, companyId }:
         setRequestId(key)
         const input = buildManufacturingScrapIntent(mode, order, snapshot, organizationId, companyId,
           sourceId, locationId, Number(quantity), key)
+        const resolveEffect = async () => resolveTrackingScrapEffect(mode, order, organizationId, companyId, input,
+          await api.fetchQueryList("/api/query/stock-moves", "Unable to read completed scrap"))
+        pendingReadback.current = resolveEffect
         const result = requireResolvedOperationEffect(await executeOperationWithCanonicalReadback({
           dispatch: async () => {
             const request = "outputMoveId" in input
               ? stdbBffCommandPost("scrap_tracked_manufacturing_output", input)
               : stdbBffCommandPost("scrap_manufacturing_material", input)
             return decodeOperationDispatch(await api.apiFetch(request.urlPath, request.init), "Unable to record manufacturing waste")
-          }, resolveEffect: async () => resolveTrackingScrapEffect(mode, order, organizationId, companyId, input,
-            await api.fetchQueryList("/api/query/stock-moves", "Unable to read completed scrap")),
+          }, resolveEffect,
           afterDispatch: refresh, readbackAttempts: 6,
         }))
         setLinks(manufacturingResultLinks(result.ref)); setRequestId(""); setQuantity("")
       }
+      pendingReadback.current = null
+    } catch (error) {
+      setPendingUnknown(error instanceof UnresolvedOperationEffectError)
+      if (!(error instanceof UnresolvedOperationEffectError)) pendingReadback.current = null
+      setError(error instanceof Error ? error.message : String(error))
+    }
+    finally { inFlight.current = false; setBusy(false) }
+  }
+  const checkPreviousAction = async () => {
+    if (inFlight.current || !pendingReadback.current) return
+    inFlight.current = true; setBusy(true)
+    try {
+      const ref = await pendingReadback.current()
+      if (!ref) { setError("The previous action has not appeared in the canonical records yet. Check again after refresh."); return }
+      setLinks(manufacturingResultLinks(ref)); setPendingUnknown(false); setError(null)
+      setRequestId(""); setQuantity(""); pendingReadback.current = null
+      invalidateResourceQueries(qc, organizationId, ["mrp-productions", "stock-moves", "stock-quants", "stock-production-serials"])
+      await qc.invalidateQueries({ queryKey })
     } catch (error) { setError(error instanceof Error ? error.message : String(error)) }
     finally { inFlight.current = false; setBusy(false) }
   }
@@ -148,7 +173,8 @@ export function ManufacturingTrackingPanel({ order, organizationId, companyId }:
       </>}
       {mode === "close" && choices && !choices.error && choices.requirements.length === 0 ? <p className="text-sm">This order has no tracked outputs. Use the standard finish action.</p> : null}
       {error ? <p role="alert">{error}</p> : null}
-      <Button disabled={busy || !choices || !!choices.error || !!references.error
+      {pendingUnknown ? <Button variant="outline" disabled={busy} onClick={() => void checkPreviousAction()}>Check previous action</Button> : null}
+      <Button disabled={busy || pendingUnknown || !choices || !!choices.error || !!references.error
         || (mode === "close" ? choices.requirements.length === 0 : !sourceId || !locationId || !quantity)} onClick={() => void submit()}>
         {busy ? "Saving…" : title}
       </Button>
