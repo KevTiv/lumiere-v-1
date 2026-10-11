@@ -115,12 +115,13 @@ describe("sale order lifecycle commands", () => {
     )
   })
 
-  it("keeps a totals recalculation failure typed, and retryable when the gateway is down", async () => {
+  it("requires reconciliation when a totals recalculation gets an ambiguous gateway response", async () => {
     respondWith(503, "upstream unavailable")
     await assert.rejects(computeSaleOrderTotalsCommand(5n), (error: unknown) => {
       assert.ok(error instanceof WorkflowError)
-      assert.equal(error.kind, "retryable_transport")
-      assert.equal(error.retryable, true)
+      assert.equal(error.kind, "outcome_unknown")
+      assert.equal(error.retryable, false)
+      assert.equal(error.needsReadback, true)
       return true
     })
   })
