@@ -26,6 +26,20 @@ async function chooseFile() {
 }
 
 describe("CSV submission outcomes", () => {
+  it("closes with verified feedback when the server returns an exact job", async () => {
+    const onClose = vi.fn()
+    const onImport = vi.fn().mockResolvedValue({ resource: "import-jobs", id: "job-42" })
+    render(<CsvImportModal config={config} organizationId={1n} tableName="hr_employee" onImport={onImport} onClose={onClose} />)
+    await chooseFile()
+    fireEvent.click(screen.getByRole("button", { name: "Import" }))
+    await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1))
+    expect(screen.queryByText("Organization import history")).toBeNull()
+    expect(toast).toHaveBeenCalledWith(expect.objectContaining({
+      kind: "success",
+      title: "Import job created",
+    }))
+  })
+
   it("keeps the dialog open for history and prevents duplicate submission after acceptance", async () => {
     const onClose = vi.fn()
     const onImport = vi.fn().mockResolvedValue(undefined)

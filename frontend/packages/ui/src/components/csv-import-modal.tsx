@@ -23,7 +23,7 @@ export interface CsvImportModalProps {
   /** Supplies the dialog title, description and button labels. */
   config: FormConfig
   isPending?: boolean
-  onImport: (csvText: string) => void | Promise<void>
+  onImport: (csvText: string) => CsvImportRecordRef | void | Promise<CsvImportRecordRef | void>
   /**
    * The reducer's header contract. When set, the preview checks the file's header against it, blocks
    * the import while a required column is missing, and offers a header-only template download.
@@ -34,6 +34,12 @@ export interface CsvImportModalProps {
   /** Scope the explicitly uncorrelated import history to this organization and entity. */
   organizationId?: bigint
   tableName?: string
+}
+
+export interface CsvImportRecordRef {
+  resource: "import-jobs"
+  id: string
+  href?: string
 }
 
 function downloadTemplate(columns: CsvImportColumns, fileName: string) {
@@ -49,8 +55,8 @@ function downloadTemplate(columns: CsvImportColumns, fileName: string) {
 /**
  * File-backed CSV import: pick a .csv, preview its first rows and header check, confirm, then submit
  * the raw text through `onImport`. The reducers skip bad rows and record them in the import job
- * history instead of failing the call. Submission opens entity-scoped history without claiming
- * that the newest job belongs to this file.
+ * history instead of failing the call. An exact record reference gives verified job feedback;
+ * otherwise the dialog shows scoped history without assigning a job to this submission.
  */
 export function CsvImportModal({
   onClose,
@@ -90,17 +96,33 @@ export function CsvImportModal({
     setError(null)
     setIsSubmitting(true)
     try {
-      await onImport(csvText)
+      const record = await onImport(csvText)
       showWorkflowToast({
-        kind: "info",
-        title: t("common.csvImportDialog.success", { defaultValue: "Import submitted" }),
-        description: t("common.csvImportDialog.successDescription", {
-          defaultValue: "{{count}} rows from {{file}} were sent. Rows the server rejects are listed in the import job history.",
-          count: analysis?.rowCount ?? 0,
-          file: fileName,
-        }),
+        kind: record ? "success" : "info",
+        title: record
+          ? t("common.csvImportDialog.success", { defaultValue: "Import job created" })
+          : t("common.csvImportDialog.outcomeUnknown", { defaultValue: "Import outcome not verified" }),
+        description: record
+          ? t("common.csvImportDialog.successDescription", {
+              defaultValue: "{{count}} rows from {{file}} were sent to import job {{jobId}}. Rows the server rejects are listed on that job.",
+              count: analysis?.rowCount ?? 0,
+              file: fileName,
+              jobId: record.id,
+            })
+          : t("common.csvImportDialog.outcomeUnknownDescription", {
+              defaultValue: "The server accepted {{file}}, but no exact import job was returned. Review import history before you retry.",
+              file: fileName,
+            }),
+        ...(record?.href
+          ? {
+              action: {
+                label: t("common.csvImportDialog.viewJob", { defaultValue: "View import job" }),
+                onClick: () => window.location.assign(record.href!),
+              },
+            }
+          : {}),
       })
-      if (organizationId && organizationId > 0n) setSubmitted(true)
+      if (!record && organizationId && organizationId > 0n) setSubmitted(true)
       else onClose()
     } catch (cause) {
       const message = cause instanceof Error ? cause.message : String(cause)
