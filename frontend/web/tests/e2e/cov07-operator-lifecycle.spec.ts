@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test"
-import { stdbBffCommandPost } from "@lumiere/stdb/commands"
+import { stdbBffCommandPost, type StdbBffCommandInput } from "@lumiere/stdb/commands"
 import { resolveManufacturingMaterialEffect } from "@lumiere/query-hooks/hooks/manufacturing-material-consumption"
 import { resolveManufacturingFinishedEffect, type DestinationQuantSnapshot } from "@lumiere/query-hooks/hooks/manufacturing-production-close"
 import { locationOptionsFromQuantsAndTransfers, productRowsToSelectOptions, warehouseRowsToSelectOptions } from "../../lib/form-lookup"
@@ -70,7 +70,7 @@ async function woAction(page: Page, woId: number, action: string, operation: str
   await submit(page, `manufacturing-wo-row-${woId}`, operation)
 }
 
-async function command(page: Page, reducer: "consume_mo_materials" | "finish_manufacturing_order" | "finish_workorder" | "pass_quality_check", args: Row) {
+async function command<K extends "consume_mo_materials" | "finish_manufacturing_order" | "finish_workorder" | "pass_quality_check">(page: Page, reducer: K, args: StdbBffCommandInput<K>) {
   const prepared = stdbBffCommandPost(reducer, args)
   return page.request.post(prepared.urlPath, { headers: { "Content-Type": "application/json" }, data: JSON.parse(String(prepared.init.body)) })
 }
