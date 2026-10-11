@@ -44,6 +44,7 @@ import type {
 import Link from "next/link"
 import { manufacturingOrderHref } from "./manufacturing-order"
 import { ManufacturingRowDialog } from "./manufacturing-row-dialog"
+import { createBomComponentsField } from "./bom-components-field"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
 import {
   toCreateBomParams,
@@ -228,11 +229,21 @@ function ManufacturingClientLoaded({
   )
 
   const bomFormConfig = useMemo(
-    () =>
-      mergeSelectOptionsForFields(newBomForm(t), {
+    () => {
+      const config = mergeSelectOptionsForFields(newBomForm(t), {
         productTmplId: productFieldOptions,
-      }),
-    [t, productFieldOptions],
+      })
+      const component = createBomComponentsField(products.flatMap((product) => {
+        const uomId = optionalBigIntU64(product.uomId)
+        if (!uomId || products.filter((candidate) => String(candidate.id) === String(product.id)).length !== 1) return []
+        return [{ id: String(product.id), label: String(product.name), uomId: String(uomId) }]
+      }))
+      return { ...config, sections: [...config.sections, {
+        id: "bom-components", title: t("manufacturing.forms.newBom.components.title"),
+        fields: [{ type: "custom" as const, id: "bomLines", name: "bomLines", width: "full" as const, component }],
+      }] }
+    },
+    [t, productFieldOptions, products],
   )
 
   const workcenterFormConfig = useMemo(() => newWorkcenterForm(t), [t])
@@ -514,35 +525,47 @@ function ManufacturingClientLoaded({
     }
     if (action === "createManufacturingOrder") {
       const prodRaw = formData.productId
-      const productRow = products.find((p) => String(p.id) === String(prodRaw))
+      const matches = products.filter((p) => String(p.id) === String(prodRaw))
+      if (matches.length !== 1) throw new Error(t("manufacturing.forms.newBom.components.invalid"))
+      const productRow = matches[0]
       const uomFromProduct =
         productRow?.uomId != null
           ? optionalBigIntU64(productRow.uomId)
           : productRow?.uomPoId != null
             ? optionalBigIntU64(productRow.uomPoId)
             : undefined
-      if (uomFromProduct == null) return
+      if (uomFromProduct == null) throw new Error(t("manufacturing.forms.newBom.components.invalid"))
       const params = toCreateMrpProductionParams(formData, {
         productUomId: uomFromProduct,
         companyId: operatingCompanyId > 0n ? operatingCompanyId : undefined,
       })
-      if (!params) return
+      if (!params) throw new Error(t("manufacturing.forms.newBom.components.invalid"))
       await m.createManufacturingOrder.mutateAsync(params)
     } else if (action === "createBom") {
       const tmplRaw = formData.productTmplId
-      const productRow = products.find((p) => String(p.id) === String(tmplRaw))
+      const matches = products.filter((p) => String(p.id) === String(tmplRaw))
+      if (matches.length !== 1) throw new Error(t("manufacturing.forms.newBom.components.invalid"))
+      const productRow = matches[0]
       const uomFromProduct =
         productRow?.uomId != null
           ? optionalBigIntU64(productRow.uomId)
           : productRow?.uomPoId != null
             ? optionalBigIntU64(productRow.uomPoId)
             : undefined
-      if (uomFromProduct == null) return
+      if (uomFromProduct == null) throw new Error(t("manufacturing.forms.newBom.components.invalid"))
+      if (Array.isArray(formData.bomLines)) {
+        for (const line of formData.bomLines) {
+          const components = products.filter((product) => String(product.id) === String(line.productId))
+          if (components.length !== 1 || String(components[0]!.uomId) !== String(line.productUomId)) {
+            throw new Error(t("manufacturing.forms.newBom.components.invalid"))
+          }
+        }
+      }
       const params = toCreateBomParams(formData, {
         productUomId: uomFromProduct,
         companyId: operatingCompanyId > 0n ? operatingCompanyId : undefined,
       })
-      if (!params) return
+      if (!params) throw new Error(t("manufacturing.forms.newBom.components.invalid"))
       await m.createBom.mutateAsync(params)
     } else if (action === "createWorkcenter") {
       const params = toCreateWorkcenterParams(
