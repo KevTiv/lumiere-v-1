@@ -17,6 +17,27 @@
   },
   "reducers": [
     {
+      "name": "set_bom_operations",
+      "company_paths": [
+        {"path": ["company_id"], "required": true, "nullable": false,
+         "meaning": "legal entity owning the BOM and every assigned operation"}
+      ]
+    },
+    {
+      "name": "configure_workcenter_cost_rate",
+      "company_paths": [
+        {"path": ["company_id"], "required": true, "nullable": false,
+         "meaning": "legal entity owning the active workcenter and rate currency"}
+      ]
+    },
+    {
+      "name": "configure_manufacturing_valuation",
+      "company_paths": [
+        {"path": ["company_id"], "required": true, "nullable": false,
+         "meaning": "legal entity owning the journal, posting accounts and valuation currency"}
+      ]
+    },
+    {
       "name": "create_account_account",
       "company_paths": [
         {

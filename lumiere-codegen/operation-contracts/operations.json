@@ -366,7 +366,7 @@
         "id": "spacetimedb-sats-json",
         "version": 1
       },
-      "evidence": "spacetimedb/src/manufacturing/manufacturing_orders.rs:534 reducer body shows current-state or membership guard; session-exposed.",
+      "evidence": "spacetimedb/src/manufacturing/manufacturing_orders.rs confirm_manufacturing_order accepts Draft only; a routed BOM creates exactly one owned mrp_workorder per operation, updates mrp_workcenter counters, and confirms the same mrp_production. Replay rejects before new rows; session-exposed.",
       "idempotency": "state_guarded",
       "semantic_kind": "command"
     },
@@ -449,6 +449,20 @@
       "evidence": "spacetimedb/src/manufacturing/bill_of_materials.rs:443 reducer body shows append-only insert/event or accumulated side effect; session-exposed.",
       "idempotency": "non_idempotent",
       "semantic_kind": "command"
+    },
+    "configure_workcenter_cost_rate": {
+      "client_facing": true,
+      "codec": {"id": "spacetimedb-sats-json", "version": 1},
+      "evidence": "spacetimedb/src/manufacturing/costing.rs configure_workcenter_cost_rate validates a scoped active workcenter and overwrites its keyed rate; audit and organization commits remain append-only. Typed frontend BFF cost configuration caller; session-exposed.",
+      "idempotency": "non_idempotent",
+      "semantic_kind": "operator"
+    },
+    "configure_manufacturing_valuation": {
+      "client_facing": true,
+      "codec": {"id": "spacetimedb-sats-json", "version": 1},
+      "evidence": "spacetimedb/src/manufacturing/costing.rs configure_manufacturing_valuation validates same-company posting accounts and overwrites keyed valuation configuration; audit and organization commits remain append-only. Typed frontend BFF valuation configuration caller; session-exposed.",
+      "idempotency": "non_idempotent",
+      "semantic_kind": "operator"
     },
     "create_bom_byproduct": {
       "client_facing": true,
@@ -2397,6 +2411,13 @@
       "evidence": "spacetimedb/src/documents/knowledge.rs:633 reducer body shows current-state or membership guard; session-exposed.",
       "idempotency": "state_guarded",
       "semantic_kind": "command"
+    },
+    "set_bom_operations": {
+      "client_facing": false,
+      "codec": {"id": "spacetimedb-sats-json", "version": 1},
+      "evidence": "spacetimedb/src/manufacturing/bill_of_materials.rs set_bom_operations validates ordered scoped routing and rejects changes after any MO references the BOM; audit and organization commits remain append-only. No enumerated frontend BFF caller.",
+      "idempotency": "non_idempotent",
+      "semantic_kind": "operator"
     },
     "set_document_retention": {
       "client_facing": true,

@@ -1003,6 +1003,21 @@
       "reason": "invoked by an enumerated frontend BFF call site"
     },
     {
+      "name": "configure_workcenter_cost_rate",
+      "exposure": "session",
+      "reason": "invoked by the typed manufacturing workcenter cost configuration frontend BFF caller; domain reducer enforces company ownership and workcenter write authority"
+    },
+    {
+      "name": "configure_manufacturing_valuation",
+      "exposure": "session",
+      "reason": "invoked by the typed manufacturing valuation configuration frontend BFF caller; domain reducer enforces company ownership and accounting authority"
+    },
+    {
+      "name": "set_bom_operations",
+      "exposure": "denied",
+      "reason": "BOM routing assignment has no enumerated frontend BFF caller; reducer remains permission-gated in the domain runtime"
+    },
+    {
       "name": "create_bom_byproduct",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"

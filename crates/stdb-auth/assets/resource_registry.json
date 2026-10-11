@@ -3405,6 +3405,44 @@
     ],
     "table": "mrp_production"
   },
+  "mrp-production-costs": {
+    "aliases": ["mrp-production-costs", "mrp_production_cost"],
+    "default_restricted": [
+      "company_id", "currency_id", "material_value", "workcenter_value",
+      "total_value", "inventory_value", "variance_value", "raw_move_ids",
+      "output_move_ids", "productivity_cost_ids", "account_move_id",
+      "account_move_line_ids", "created_at"
+    ],
+    "mandatory": ["production_id", "organization_id"],
+    "table": "mrp_production_cost"
+  },
+  "mrp-productivity-costs": {
+    "aliases": ["mrp-productivity-costs", "mrp_productivity_cost"],
+    "default_restricted": [
+      "company_id", "production_id", "workorder_id", "workcenter_id",
+      "currency_id", "duration_minutes", "hourly_rate", "configured",
+      "value", "created_at"
+    ],
+    "mandatory": ["productivity_id", "organization_id"],
+    "table": "mrp_productivity_cost"
+  },
+  "mrp-valuation-configs": {
+    "aliases": ["mrp-valuation-configs", "mrp_valuation_config"],
+    "default_restricted": [
+      "currency_id", "journal_id", "material_account_id", "output_account_id",
+      "workcenter_account_id", "variance_account_id", "updated_at", "updated_by"
+    ],
+    "mandatory": ["company_id", "organization_id"],
+    "table": "mrp_valuation_config"
+  },
+  "mrp-workcenter-cost-rates": {
+    "aliases": ["mrp-workcenter-cost-rates", "mrp_workcenter_cost_rate"],
+    "default_restricted": [
+      "company_id", "currency_id", "hourly_rate", "updated_by", "updated_at"
+    ],
+    "mandatory": ["workcenter_id", "organization_id"],
+    "table": "mrp_workcenter_cost_rate"
+  },
   "mrp-routing-workcenters": {
     "aliases": [
       "mrp-routing-workcenters",
