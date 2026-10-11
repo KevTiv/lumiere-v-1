@@ -58,6 +58,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.rust
+      ssh:
+        - default
       args:
         BIN: api-server
     depends_on:
@@ -112,6 +114,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.rust
+      ssh:
+        - default
       args:
         BIN: owner-report-worker
     depends_on:
@@ -140,6 +144,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.rust
+      ssh:
+        - default
       args:
         BIN: workflow-worker
     environment:
@@ -166,6 +172,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.rust
+      ssh:
+        - default
       args:
         BIN: projection-worker
     environment:
@@ -200,6 +208,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.rust
+      ssh:
+        - default
       args:
         BIN: gateway
     depends_on:
