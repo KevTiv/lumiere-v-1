@@ -18,13 +18,16 @@ use crate::core::persistence::{
 use crate::core::reference::document_sequence;
 use crate::inventory::quality::quality_check;
 use crate::inventory::stock::{stock_move, stock_move_line, stock_quant};
+use crate::inventory::tracking::stock_production_serial;
 use crate::manufacturing::bill_of_materials::{
     mrp_bom, mrp_bom_byproduct, mrp_bom_line, mrp_routing_workcenter,
 };
 use crate::manufacturing::costing::{
     mrp_production_cost, mrp_productivity_cost, mrp_valuation_config,
 };
-use crate::manufacturing::manufacturing_orders::{mrp_production, mrp_workorder, MrpProduction};
+use crate::manufacturing::manufacturing_orders::{
+    mrp_production, mrp_workorder, FinishManufacturingTrackingParams, MrpProduction,
+};
 use crate::manufacturing::work_centers::{mrp_workcenter, mrp_workcenter_productivity};
 
 // Dependency-safe parent order, then a stable table/primary-key order.
@@ -72,6 +75,7 @@ pub(crate) struct ManufacturingEffectSnapshot {
     products: BTreeSet<u64>,
     locations: BTreeSet<u64>,
     workcenters: BTreeSet<u64>,
+    serials: BTreeSet<u64>,
     before: SnapshotRows,
 }
 
@@ -85,13 +89,56 @@ impl ManufacturingEffectSnapshot {
         mo: &MrpProduction,
         workcenter_id: Option<u64>,
     ) -> Result<Self, String> {
+        Self::capture_scope(ctx, mo, workcenter_id, &[], &[], &[])
+    }
+
+    /// Explicit close attribution must be captured before any output move is
+    /// inserted, because an existing serial then acquires its output location.
+    pub(crate) fn capture_for_tracking(
+        ctx: &ReducerContext,
+        mo: &MrpProduction,
+        tracking: Option<&FinishManufacturingTrackingParams>,
+    ) -> Result<Self, String> {
+        let serials: Vec<_> = tracking
+            .into_iter()
+            .flat_map(|params| {
+                params
+                    .serial_id
+                    .into_iter()
+                    .chain(params.byproducts.iter().filter_map(|row| row.serial_id))
+            })
+            .collect();
+        Self::capture_scope(ctx, mo, None, &[], &[], &serials)
+    }
+
+    /// Scrap stock locations are caller-selected and need their before images,
+    /// including any existing destination quant that will merge the waste.
+    /// Callers validate these exact product/location references first.
+    pub(crate) fn capture_with_stock_scope(
+        ctx: &ReducerContext,
+        mo: &MrpProduction,
+        product_ids: &[u64],
+        location_ids: &[u64],
+    ) -> Result<Self, String> {
+        Self::capture_scope(ctx, mo, None, product_ids, location_ids, &[])
+    }
+
+    fn capture_scope(
+        ctx: &ReducerContext,
+        mo: &MrpProduction,
+        workcenter_id: Option<u64>,
+        product_ids: &[u64],
+        location_ids: &[u64],
+        serial_ids: &[u64],
+    ) -> Result<Self, String> {
         let mut snapshot = Self {
             organization_id: mo.organization_id,
             company_id: mo.company_id,
             production_id: mo.id,
-            products: BTreeSet::new(),
-            locations: BTreeSet::new(),
+            products: product_ids.iter().copied().collect(),
+            locations: location_ids.iter().copied().collect(),
             workcenters: workcenter_id.into_iter().collect(),
+            serials: serial_ids.iter().copied().collect(),
             before: BTreeMap::new(),
         };
         snapshot.before = snapshot.read_owned_rows(ctx, mo)?;
@@ -246,6 +293,7 @@ impl ManufacturingEffectSnapshot {
         {
             if movement.company_id == self.company_id && movement.production_id == Some(mo.id) {
                 move_ids.insert(movement.id);
+                self.serials.extend(movement.serial_id);
                 self.products.insert(movement.product_id);
                 self.locations
                     .extend([movement.location_id, movement.location_dest_id]);
@@ -257,6 +305,27 @@ impl ManufacturingEffectSnapshot {
                     &movement,
                 )?;
             }
+        }
+        for serial_id in &self.serials {
+            let serial = ctx
+                .db
+                .stock_production_serial()
+                .id()
+                .find(serial_id)
+                .ok_or("manufacturing output serial missing before commit recording")?;
+            if serial.organization_id != self.organization_id
+                || serial.company_id != self.company_id
+                || !self.products.contains(&serial.product_id)
+            {
+                return Err("manufacturing output serial commit scope mismatch".to_string());
+            }
+            add_row(
+                &mut rows,
+                3,
+                "stock_production_serial",
+                json!({"id": serial.id}),
+                &serial,
+            )?;
         }
         for line in ctx
             .db
