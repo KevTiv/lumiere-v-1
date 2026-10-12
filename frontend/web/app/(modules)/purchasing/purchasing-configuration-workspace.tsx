@@ -300,6 +300,11 @@ export function PurchasingConfigurationWorkspace({
           <>
             <div className="space-y-1.5"><Label htmlFor="purchasing-principal">Principal identity</Label><Input id="purchasing-principal" value={String(values.principalIdentity ?? "")} onChange={(event) => setValue("principalIdentity", event.target.value)} required /></div>
             <div className="space-y-1.5"><Label htmlFor="purchasing-delegate">Delegate identity</Label><Input id="purchasing-delegate" value={String(values.delegateIdentity ?? "")} onChange={(event) => setValue("delegateIdentity", event.target.value)} required /></div>
+            {values.isActive === true ? <>
+              <div className="space-y-1.5"><Label htmlFor="purchasing-delegation-start">Starts</Label><Input id="purchasing-delegation-start" type="datetime-local" value={String(values.validFrom ?? "")} onChange={(event) => setValue("validFrom", event.target.value)} required /></div>
+              <div className="space-y-1.5"><Label htmlFor="purchasing-delegation-end">Ends</Label><Input id="purchasing-delegation-end" type="datetime-local" value={String(values.validUntil ?? "")} onChange={(event) => setValue("validUntil", event.target.value)} required /></div>
+              <div className="space-y-1.5"><Label htmlFor="purchasing-delegation-reason">Reason</Label><Input id="purchasing-delegation-reason" value={String(values.reason ?? "")} onChange={(event) => setValue("reason", event.target.value)} required /></div>
+            </> : null}
             <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={values.isActive === true} onChange={(event) => setValue("isActive", event.target.checked)} /> Delegation is active</label>
           </>
         ) : null}

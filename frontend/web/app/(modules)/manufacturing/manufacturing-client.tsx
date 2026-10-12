@@ -586,6 +586,9 @@ function ManufacturingClientLoaded({
       />
       {csvKind && csvFormConfig ? (
         <CsvImportModal
+          trackedImport={{ companyId: operatingCompanyId }}
+          organizationId={orgId}
+          tableName={csvKind === "mo" ? "mrp_production" : csvKind === "bom" ? "mrp_bom" : csvKind === "bom_line" ? "mrp_bom_line" : "mrp_workcenter"}
           key={csvKind}
           onClose={() => setCsvKind(null)}
           config={csvFormConfig}

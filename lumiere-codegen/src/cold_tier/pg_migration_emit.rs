@@ -1117,16 +1117,39 @@ mod tests {
             &std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("pg-migration-ledger"),
         )
         .unwrap();
-        assert_eq!(ledger.released.len(), 2);
-        // The v0.3.80 migration 1 that existing databases recorded.
+        let released = ledger
+            .released
+            .iter()
+            .map(|migration| (migration.version, checksum(&migration.sql)))
+            .collect::<Vec<_>>();
         assert_eq!(
-            checksum(&ledger.released[0].sql),
-            "sha256:5598834cc650011744abb9b9ad090e6ba09bfc824bc6d853f89f34930ef8d9ab"
+            released,
+            [
+                (
+                    1,
+                    "sha256:5598834cc650011744abb9b9ad090e6ba09bfc824bc6d853f89f34930ef8d9ab"
+                        .to_owned(),
+                ),
+                (
+                    11,
+                    "sha256:15e0a40dc9c99df670e6d4e2a970541ac11ee4c39fd6357d3d10dee03d193080"
+                        .to_owned(),
+                ),
+                (
+                    12,
+                    "sha256:705ec94eaba121894e5ffc566f4adbd6b39215baa6dff7e02bf4732cf106a1f8"
+                        .to_owned(),
+                ),
+                (
+                    13,
+                    "sha256:358ad2fabc94849a625e797e0fc70573857b56de641c6108f6d86b685e23329e"
+                        .to_owned(),
+                ),
+            ]
         );
-        assert_eq!(ledger.released[1].version, 11);
         assert_eq!(
             (ledger.pending_version, ledger.pending_name.as_str()),
-            (12, "0012_durable_projection_delta")
+            (14, "0014_durable_projection_delta")
         );
     }
 }

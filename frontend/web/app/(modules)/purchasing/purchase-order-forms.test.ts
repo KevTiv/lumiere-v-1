@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import {
+  billTaxOptions,
   canAddPurchaseOrderLine,
   canEditPurchaseOrder,
   canInvoicePurchaseOrderLine,
@@ -78,4 +79,16 @@ test('quantity can be invoiced only on lines received beyond what is invoiced', 
   assert.equal(canInvoicePurchaseOrderLine({ qtyReceived: 5, qtyInvoiced: 2 }), true);
   assert.equal(canInvoicePurchaseOrderLine({ qtyReceived: 5, qtyInvoiced: 5 }), false);
   assert.equal(canInvoicePurchaseOrderLine({ qtyReceived: 0 }), false);
+});
+
+test('bill tax choices require canonical supported purchase-tax evidence', () => {
+  const tax = { id: 7, name: 'Input VAT', active: true, typeTaxUse: { tag: 'Purchase' }, amountType: { tag: 'Percent' }, includeBaseAmount: false, hasNegativeFactor: false, taxGroupId: 8, invoiceRepartitionLineIds: [] };
+  const hidden = [
+    { ...tax, active: false }, { ...tax, typeTaxUse: 'Sale' }, { ...tax, amountType: 'Fixed' },
+    { ...tax, includeBaseAmount: true }, { ...tax, hasNegativeFactor: true },
+    { ...tax, taxGroupId: null }, { ...tax, invoiceRepartitionLineIds: [3] }, { id: 9, name: 'Missing flags' },
+  ];
+  assert.deepEqual(billTaxOptions((key) => key, [tax, ...hidden]), [
+    { value: '', label: 'purchasing.forms.createBillFromOrder.noTax' }, { value: '7', label: 'Input VAT' },
+  ]);
 });

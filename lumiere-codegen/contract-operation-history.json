@@ -1622,6 +1622,10 @@
       "name": "create_purchase_order",
       "shape_fingerprint": "sha256:72c3563be3fe13e2bee2c88145886ed73fcbd6d74dbedb53e034be598ec72d62"
     },
+    "erp.create_purchase_order_once": {
+      "name": "create_purchase_order_once",
+      "shape_fingerprint": "sha256:fe8389e742aa0a34165a1c65d1e803551480847ff58ec6a7de42004d4e5d7d16"
+    },
     "erp.create_purchase_requisition": {
       "name": "create_purchase_requisition",
       "shape_fingerprint": "sha256:2bd104fe03947cfea9a8abedc40bcc042adb5e390ce841332a533c8ae3fc76ab"
@@ -2494,6 +2498,10 @@
       "name": "import_country_csv",
       "shape_fingerprint": "sha256:829179ebd58342eadad794ccd8cb2bd1e205c5a289fd1f8b848417dd6c6c9928"
     },
+    "erp.import_csv_tracked": {
+      "name": "import_csv_tracked",
+      "shape_fingerprint": "sha256:aded555c9ffd334ff08dc7e75017b7667a8071faa52c96edcbda7feab470fbab"
+    },
     "erp.import_currency_csv": {
       "name": "import_currency_csv",
       "shape_fingerprint": "sha256:2764c35188a9096de1cfb22a632da5d5e00d348d40142a6bb1a7891b650557e1"
@@ -3021,6 +3029,10 @@
     "erp.receive_po_line": {
       "name": "receive_po_line",
       "shape_fingerprint": "sha256:273ab43f8c5af8e01ae9a4cfa555a52a01986f81bfe8d40032f2942fe8896d63"
+    },
+    "erp.receive_po_line_once": {
+      "name": "receive_po_line_once",
+      "shape_fingerprint": "sha256:ed72f39907b8dbea680b43eaaea086c17504aa180cd0908b0d04141ba565f92f"
     },
     "erp.recognize_amortization_line": {
       "name": "recognize_amortization_line",
@@ -5884,6 +5896,22 @@
       "current_operations_fingerprint": "sha256:73a45e16698b877aee4bb418e0292459a4405e718618c3ff7ca1a45a0ff35432",
       "operation_count": 1427,
       "reason": "release on top of v0.3.84: add none; change the shape of unreserve_stock_picking, update_stock_picking"
+    },
+    {
+      "previous_release": "v0.3.103",
+      "previous_ir_sha256": "sha256:1a4cd753eec28b33b60a186187c0eab191793f7b7e467a07f777ba3074c86b6b",
+      "previous_operations_fingerprint": "sha256:73a45e16698b877aee4bb418e0292459a4405e718618c3ff7ca1a45a0ff35432",
+      "current_operations_fingerprint": "sha256:81b56eae37bef8f4ba88f0c8fab940cdf7d17909a5f87ab8f14fe6e5d73cc989",
+      "operation_count": 1428,
+      "reason": "Add receive_po_line_once for actor- and company-scoped durable receipt replay; preserve every existing operation ID and semantic shape."
+    },
+    {
+      "previous_release": "v0.3.104",
+      "previous_ir_sha256": "sha256:03dc269b6b63f1912478c6677fe13b6ab9d04b02fd1917f02a9a821e3333a889",
+      "previous_operations_fingerprint": "sha256:81b56eae37bef8f4ba88f0c8fab940cdf7d17909a5f87ab8f14fe6e5d73cc989",
+      "current_operations_fingerprint": "sha256:e40a182fb1105703e57fc2ac5c44529f48da1b1adbf32b0dd35f356317e3e4e8",
+      "operation_count": 1430,
+      "reason": "release on top of v0.3.104: add create_purchase_order_once, import_csv_tracked; change the shape of none"
     }
   ]
 }

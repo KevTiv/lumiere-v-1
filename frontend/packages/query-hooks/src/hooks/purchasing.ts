@@ -464,6 +464,19 @@ export async function receivePurchaseOrderLineCommand({
   }
 }
 
+export async function receivePurchaseOrderLineOnceCommand(companyId: bigint, lineId: string, pending: import("./purchasing-receipt-invocation").PendingReceipt): Promise<void> {
+  const { urlPath, init } = stdbBffCommandPost("receive_po_line_once", {
+    companyId, lineId: toScalarU64(lineId), params: {
+      operationKey: pending.operationKey, quantity: pending.quantity,
+      lotId: pending.lotId == null ? null : toScalarU64(pending.lotId), expectedReceived: pending.expectedReceived,
+      expectedMoveId: pending.expectedMoveId == null ? null : toScalarU64(pending.expectedMoveId),
+      expectedPickingId: pending.expectedPickingId == null ? null : toScalarU64(pending.expectedPickingId),
+    },
+  })
+  const response = await apiFetch(urlPath, init)
+  if (!response.ok) throw workflowErrorFromResponse(response.status, await response.text().catch(() => ""), "Failed to receive keyed purchase receipt")
+}
+
 export async function awardPurchaseRfqBidCommand(
   companyId: bigint,
   { rfqId, bidId }: { rfqId: ScalarId; bidId: ScalarId },
@@ -1673,6 +1686,7 @@ export function useSetPurchaseApprovalDelegate(
   organizationId: bigint,
   companyId: bigint,
 ) {
+  const qc = useQueryClient()
   return useMutation<void, Error, SetPurchaseApprovalDelegateParams>({
     mutationFn: async (params) => {
       const encoded = stdbParamsToJson({
@@ -1685,6 +1699,9 @@ export function useSetPurchaseApprovalDelegate(
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallErrorPo(r))
     },
+    onSuccess: () => invalidateQueryResources(qc, organizationId, [
+      "workflow-human-tasks-inbox", "workflow-human-tasks", "workflow-human-task-events", "purchase-approval-delegates",
+    ]),
   })
 }
 

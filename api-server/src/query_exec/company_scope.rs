@@ -346,7 +346,9 @@ pub(crate) fn inventory_resource(resource: &str) -> bool {
 pub(crate) fn purchasing_resource(resource: &str) -> bool {
     matches!(
         resource,
-        "purchase-orders"
+        "purchase-order-creations"
+            | "purchase-receipt-operations"
+            | "purchase-orders"
             | "purchase-orders-to-approve"
             | "purchase-orders-partial-receipt"
             | "purchase-order-lines"
@@ -400,6 +402,7 @@ pub(crate) fn accounting_resource(resource: &str) -> bool {
             | "budget-lines"
             | "budget-posts"
             | "consolidation-elimination-entries"
+            | "currency-rates"
             | "depreciation-lines"
             | "fiscal-years"
             | "fixed-assets"
@@ -421,7 +424,7 @@ pub(crate) fn accounting_resource(resource: &str) -> bool {
 /// Accounting resources whose rows are either owned by the selected company
 /// or explicitly shared inside the organization with a null `company_id`.
 pub(crate) fn optional_company_accounting_resource(resource: &str) -> bool {
-    matches!(resource, "account-account-types")
+    matches!(resource, "account-account-types" | "currency-rates")
 }
 
 pub(crate) fn iot_resource(resource: &str) -> bool {

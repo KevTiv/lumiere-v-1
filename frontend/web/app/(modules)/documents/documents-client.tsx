@@ -1109,6 +1109,9 @@ function DocumentsClientLoaded({
       />
       {csvKind && csvFormConfig ? (
         <CsvImportModal
+          trackedImport={{ companyId: operatingCompanyId }}
+          organizationId={orgId}
+          tableName={csvKind === "knowledge_category" ? "knowledge_article_category" : "knowledge_article"}
           key={csvKind}
           onClose={() => setCsvKind(null)}
           config={csvFormConfig}

@@ -138,6 +138,15 @@ static HTTP_SQL_INCLUDED_COLUMNS: Lazy<HashMap<String, HashSet<String>>> = Lazy:
         "dashboards".to_string(),
         ["widget_ids"].into_iter().map(String::from).collect(),
     );
+    // Purchase-tax eligibility needs explicit repartition evidence, under the
+    // same resource and field authorization as the other tax attributes.
+    m.insert(
+        "account-taxes".to_string(),
+        ["invoice_repartition_line_ids"]
+            .into_iter()
+            .map(String::from)
+            .collect(),
+    );
     m.insert(
         "purchase-orders".to_string(),
         ["picking_ids", "invoice_ids"]
@@ -1010,6 +1019,42 @@ mod tests {
     }
 
     #[test]
+    fn purchase_tax_selection_has_canonical_flags_without_bypassing_field_policy() {
+        let columns = resolve_http_sql_columns("account-taxes", None).expect("tax projection");
+        for field in [
+            "active",
+            "type_tax_use",
+            "amount_type",
+            "price_include",
+            "include_base_amount",
+            "has_negative_factor",
+            "tax_group_id",
+            "invoice_repartition_line_ids",
+        ] {
+            assert!(
+                columns.iter().any(|column| column == field),
+                "missing selector evidence: {field}"
+            );
+        }
+        let mut access = field_access(&["account-taxes:read"]);
+        access.field_permissions.push(FieldPermissionLike {
+            id: Some(1),
+            organization_id: Some(7),
+            role_id: Some(9),
+            resource: "account-taxes".to_string(),
+            action: "read".to_string(),
+            allowed_fields: vec!["name".to_string()],
+            subject_user_hex: None,
+            subject_role_id: Some(9),
+        });
+        let restricted = resolve_http_sql_columns("account-taxes", Some(&access))
+            .expect("restricted tax projection");
+        assert!(!restricted.iter().any(|column| column == "active"));
+        assert!(!restricted.iter().any(|column| column == "tax_group_id"));
+        assert!(restricted.iter().any(|column| column == "company_id"));
+    }
+
+    #[test]
     fn selective_accounting_field_policies_keep_company_scope_metadata() {
         for resource in ["account-accounts", "account-journals", "account-taxes"] {
             let mut access = field_access(&[&format!("{resource}:read")]);
@@ -1114,5 +1159,30 @@ mod tests {
             pairing_cols.iter().any(|column| column == "token"),
             "the current operator pairing flow reads the newly generated token"
         );
+    }
+
+    #[test]
+    fn tracked_import_read_projections_use_only_generated_columns() {
+        for (resource, row_type) in [
+            ("countries", "Country"),
+            ("currencies", "Currency"),
+            ("currency-rates", "CurrencyRate"),
+            ("uom-categories", "UomCategory"),
+            ("knowledge-categories", "KnowledgeArticleCategory"),
+            ("product-variants", "ProductVariant"),
+            ("expense-sheets", "HrExpenseSheet"),
+        ] {
+            let generated = sql_column_list_for_generated_type(row_type)
+                .unwrap_or_else(|error| panic!("{resource}: {error}"));
+            let projected = resolve_http_sql_columns(resource, None)
+                .unwrap_or_else(|error| panic!("{resource}: {error}"));
+            assert!(!projected.is_empty(), "{resource}");
+            for field in projected {
+                assert!(
+                    generated.iter().any(|column| column == &field),
+                    "{resource} projects unknown {row_type} field {field}"
+                );
+            }
+        }
     }
 }

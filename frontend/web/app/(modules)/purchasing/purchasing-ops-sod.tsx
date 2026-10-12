@@ -7,10 +7,11 @@ import {
   humanTaskSubjectId,
   humanTaskSubjectModel,
   taskStatusTag,
-  useApprovalInbox,
+  useHumanTaskInbox,
   useApproveApprovalRequest,
   useRejectApprovalRequest,
 } from '@lumiere/query-hooks/hooks/approvals'
+import { approvalSelection } from '@lumiere/query-hooks/hooks/approval-controls'
 import { useOperatingCompanyId } from '@lumiere/query-hooks/hooks/use-operating-company'
 import { Button, formText, useFormDialog } from '@lumiere/ui'
 
@@ -97,7 +98,7 @@ export function PurchasingOpsSod({
   const orgId =
     organizationId != null && organizationId > 0 ? organizationId : 0
   const operatingCompanyId = useOperatingCompanyId(orgId)
-  const inboxQuery = useApprovalInbox(orgId, orgId > 0)
+  const inboxQuery = useHumanTaskInbox(orgId, operatingCompanyId, orgId > 0 && operatingCompanyId != null)
   const approveRequest = useApproveApprovalRequest(
     orgId,
     operatingCompanyId ?? 0,
@@ -107,14 +108,23 @@ export function PurchasingOpsSod({
     operatingCompanyId ?? 0,
   )
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null)
+  const [actingFor, setActingFor] = useState('')
   const [actionError, setActionError] = useState<string | null>(null)
   const [advancedPending, setAdvancedPending] = useState(false)
 
   const queueRows = useMemo(
-    () =>
-      ordersToApprove ??
-      orders.filter((o) => poState(o) === 'ToApprove'),
-    [ordersToApprove, orders],
+    () => {
+      const pendingOrderIds = new Set((inboxQuery.data ?? []).filter((task) =>
+        ['Open', 'Claimed'].includes(taskStatusTag(task)) && humanTaskSubjectModel(task) === 'purchase_order',
+      ).map((task) => String(humanTaskSubjectId(task))))
+      // Guarded send/confirm leaves the PO in its original state. Include the
+      // exact task subjects, not only the historical ToApprove worklist.
+      const queued = new Map((ordersToApprove ?? orders.filter((order) => poState(order) === 'ToApprove'))
+        .map((order) => [rowId(order), order]))
+      for (const order of orders) if (pendingOrderIds.has(rowId(order))) queued.set(rowId(order), order)
+      return [...queued.values()]
+    },
+    [ordersToApprove, orders, inboxQuery.data],
   )
 
   const pendingApprovalForSelected = useMemo(() => {
@@ -214,6 +224,7 @@ export function PurchasingOpsSod({
                     data-testid={`purchasing-ops-po-${id}`}
                     onClick={() => {
                       setSelectedOrderId(id)
+                      setActingFor('')
                       setActionError(null)
                     }}
                   >
@@ -228,6 +239,23 @@ export function PurchasingOpsSod({
           </ul>
           {selectedOrderId ? (
             <div className="flex flex-wrap gap-2">
+              {pendingApprovalForSelected?.actingForOptions?.length ? (
+                <label className="flex items-center gap-2 text-sm">
+                  {t('purchasing.ops.actingAs', { defaultValue: 'Acting as' })}
+                  <select
+                    className="rounded border bg-background px-2 py-1"
+                    data-testid="purchasing-ops-acting-for"
+                    value={actingFor}
+                    onChange={(event) => setActingFor(event.target.value)}
+                    disabled={approveRequest.isPending || rejectRequest.isPending}
+                  >
+                    <option value="">{t('purchasing.ops.myself', { defaultValue: 'Myself' })}</option>
+                    {pendingApprovalForSelected.actingForOptions.map((option) => (
+                      <option key={option.identityHex} value={option.identityHex}>{option.label}</option>
+                    ))}
+                  </select>
+                </label>
+              ) : null}
               <Button
                 size="sm"
                 data-testid="purchasing-ops-approve-request"
@@ -260,7 +288,7 @@ export function PurchasingOpsSod({
                         return
                       }
                       await approveRequest.mutateAsync(
-                        Number(pendingApprovalForSelected.id),
+                        approvalSelection(pendingApprovalForSelected, Number(operatingCompanyId), actingFor),
                       )
                     } catch (e) {
                       setActionError(
@@ -278,6 +306,7 @@ export function PurchasingOpsSod({
                 data-testid="purchasing-ops-reject-request"
                 disabled={
                   !pendingApprovalForSelected ||
+                  isApprovalRequester ||
                   approveRequest.isPending ||
                   rejectRequest.isPending ||
                   operatingCompanyId == null
@@ -295,6 +324,7 @@ export function PurchasingOpsSod({
                         )
                         return
                       }
+                      const selection = approvalSelection(pendingApprovalForSelected, Number(operatingCompanyId), actingFor)
                       const values = await askForm({
                         title: t('purchasing.ops.reject', { defaultValue: 'Reject' }),
                         submitLabel: t('purchasing.ops.reject', { defaultValue: 'Reject' }),
@@ -317,6 +347,7 @@ export function PurchasingOpsSod({
                       await rejectRequest.mutateAsync({
                         requestId: Number(pendingApprovalForSelected.id),
                         reason,
+                        selection,
                       })
                     } catch (e) {
                       setActionError(
@@ -334,7 +365,7 @@ export function PurchasingOpsSod({
                 data-testid="purchasing-ops-open-approvals"
                 onClick={() => {
                   if (typeof window !== 'undefined') {
-                    window.location.href = `/workflow?tab=approvals&model=purchase_order&resId=${encodeURIComponent(selectedOrderId)}`
+                    window.location.href = `/approvals?model=purchase_order&resId=${encodeURIComponent(selectedOrderId)}`
                   }
                 }}
               >

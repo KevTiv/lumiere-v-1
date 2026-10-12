@@ -4419,7 +4419,9 @@
       "table": "country",
       "module": "core",
       "rationale": "C0 pre-organization ISO reference catalog",
-      "authoritative_resources": [],
+      "authoritative_resources": [
+        "countries"
+      ],
       "durability_class": "durable_business_record",
       "organization_ownership": "direct",
       "organization_column": "organization_id",
@@ -4762,7 +4764,9 @@
       "table": "currency",
       "module": "core",
       "rationale": "C0 pre-organization ISO reference catalog",
-      "authoritative_resources": [],
+      "authoritative_resources": [
+        "currencies"
+      ],
       "durability_class": "durable_business_record",
       "organization_ownership": "direct",
       "organization_column": "organization_id",
@@ -4791,7 +4795,9 @@
       "table": "currency_rate",
       "module": "accounting",
       "rationale": "Independent organization-owned aggregate root; related rows do not determine storage routing.",
-      "authoritative_resources": [],
+      "authoritative_resources": [
+        "currency-rates"
+      ],
       "durability_class": "durable_business_record",
       "organization_ownership": "direct",
       "organization_column": "organization_id",
@@ -10543,7 +10549,9 @@
       "table": "product_variant",
       "module": "inventory",
       "rationale": "Independent organization-owned aggregate root; related rows do not determine storage routing.",
-      "authoritative_resources": [],
+      "authoritative_resources": [
+        "product-variants"
+      ],
       "durability_class": "durable_business_record",
       "organization_ownership": "direct",
       "organization_column": "organization_id",
@@ -15078,7 +15086,9 @@
       "table": "uom_cat",
       "module": "inventory",
       "rationale": "Independent organization-owned aggregate root; related rows do not determine storage routing.",
-      "authoritative_resources": [],
+      "authoritative_resources": [
+        "uom-categories"
+      ],
       "durability_class": "durable_business_record",
       "organization_ownership": "direct",
       "organization_column": "organization_id",
@@ -16635,6 +16645,72 @@
       "hot_retention": "always",
       "cooling_eligibility": "never",
       "cooling_eligibility_source": "reviewed:c5/people-platform/always-hot/missing-semantic-safety-contract",
+      "dependency_behavior": "independent",
+      "hydration_policy": "not_applicable",
+      "delete_behavior": "tombstone",
+      "postgres_access_path": "organization_index"
+    },
+    {
+      "table": "purchase_order_creation_operation",
+      "module": "purchasing",
+      "rationale": "Immutable scoped purchase-order creation result; preserve exact producer-owned identity for replay and custom-field attachment.",
+      "authoritative_resources": [
+        "purchase-order-creations"
+      ],
+      "durability_class": "durable_operational_state",
+      "organization_ownership": "direct",
+      "organization_column": "organization_id",
+      "company_ownership": "direct",
+      "company_column_path": [
+        "company_id"
+      ],
+      "company_column_nullable": false,
+      "aggregate": {
+        "kind": "root",
+        "parent": null
+      },
+      "primary_key": {
+        "strategy": "natural",
+        "column": "id",
+        "version_strategy": "none"
+      },
+      "projection_mode": "upsert-current",
+      "hot_retention": "always",
+      "cooling_eligibility": "never",
+      "cooling_eligibility_source": "reviewed:c5/finance-commercial/always-hot/exact-creation-replay-identity",
+      "dependency_behavior": "independent",
+      "hydration_policy": "not_applicable",
+      "delete_behavior": "tombstone",
+      "postgres_access_path": "organization_index"
+    },
+    {
+      "table": "purchase_receipt_operation",
+      "module": "purchasing",
+      "rationale": "Immutable scoped receipt invocation result; preserve replay identity independently of subsequent PO or stock changes.",
+      "authoritative_resources": [
+        "purchase-receipt-operations"
+      ],
+      "durability_class": "durable_operational_state",
+      "organization_ownership": "direct",
+      "organization_column": "organization_id",
+      "company_ownership": "direct",
+      "company_column_path": [
+        "company_id"
+      ],
+      "company_column_nullable": false,
+      "aggregate": {
+        "kind": "root",
+        "parent": null
+      },
+      "primary_key": {
+        "strategy": "natural",
+        "column": "id",
+        "version_strategy": "none"
+      },
+      "projection_mode": "upsert-current",
+      "hot_retention": "always",
+      "cooling_eligibility": "never",
+      "cooling_eligibility_source": "reviewed:c5/finance-commercial/always-hot/missing-semantic-safety-contract",
       "dependency_behavior": "independent",
       "hydration_policy": "not_applicable",
       "delete_behavior": "tombstone",

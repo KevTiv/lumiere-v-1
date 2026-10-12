@@ -1,5 +1,7 @@
 import { useMemo } from "react"
 import { useQueryClient } from "@tanstack/react-query"
+import { useErpSession } from "@lumiere/erp-session"
+import { purchasingReceiptReplayAvailable } from "@lumiere/stdb/commands"
 import type { CreateBillFromPurchaseOrderParams } from "@lumiere/stdb/types"
 import {
   APPLY_LANDED_COST_AFFECTS,
@@ -34,6 +36,7 @@ import {
   createVendorCreditFromReturnAction,
   holdSupplierIntakeAction,
   observeAwardedRfq,
+  observeApprovedSupplierIntake,
   observeBlanketRelease,
   observeConfirmedPurchaseOrder,
   observeConfirmedPurchaseReturn,
@@ -47,13 +50,11 @@ import {
   recordRef,
   supplierIntakeWorkflow,
   requisitionPurchaseIds,
-  observeReceivedLine,
   observeReturnVendorCredit,
   observeSameRecord,
   observeSentPurchaseOrder,
   postLandedCostAction,
   receivePurchaseLineAction,
-  resolveOpenReceiptTarget,
   rejectSupplierIntakeAction,
   releaseBlanketAction,
   reviewSupplierIntakeAction,
@@ -66,7 +67,6 @@ import {
   type CreateBillFromPurchaseOrderInput,
   type CreateVendorCreditInput,
   type ObservedTransition,
-  type ReceiptTarget,
   type ReceivePurchaseLineInput,
   type ReleaseBlanketInput,
   type ReviewSupplierIntakeInput,
@@ -76,7 +76,8 @@ import {
 } from "@lumiere/erp-workflows"
 
 import { fetchQueryList } from "../http"
-import { stockMovesQueryOptions } from "./inventory/stock-operations"
+import { captureReceiptSnapshot, type ReceiptReads } from "./purchasing-receipt-effect"
+import { executeReceiptInvocation, clearReceiptInvocation, observeReceiptInvocation, readPendingReceipt, receiptStorageKey, type PendingReceipt, type InvocationScope } from "./purchasing-receipt-invocation"
 import {
   applyLandedCostsCommand,
   approvePurchaseRequisitionCommand,
@@ -98,7 +99,7 @@ import {
   purchaseRequisitionsQueryOptions,
   purchaseReturnsQueryOptions,
   purchaseRfqsQueryOptions,
-  receivePurchaseOrderLineCommand,
+  receivePurchaseOrderLineOnceCommand,
   rejectSupplierIntakeCommand,
   releaseBlanketToPoCommand,
   reviewSupplierIntakeCommand,
@@ -140,7 +141,8 @@ export interface PurchasingWorkflowLabels {
 type BillInput = CreateBillFromPurchaseOrderInput<CreateBillFromPurchaseOrderParams>
 type BillRunInput = BillInput & { invoiceIdsBefore: string[] }
 type ConvertRunInput = { requisitionId: string; purchaseIdsBefore: string[] }
-type ReceiveRunInput = ReceivePurchaseLineInput & { receiptTarget?: ReceiptTarget }
+type ReceiveRunInput = ReceivePurchaseLineInput & { pendingReceipt?: PendingReceipt; receiptEvidence?: RowValueMap[] }
+type ResolveReceiptInput = { lineId: string; pendingReceipt?: PendingReceipt; receiptEvidence?: RowValueMap[] }
 type VendorCreditInput = CreateVendorCreditInput<VendorCreditFromReturnParams>
 type ReleaseInput = ReleaseBlanketInput<ReleaseBlanketToPoParams>
 
@@ -167,6 +169,8 @@ export function usePurchasingWorkflow(
 ) {
   const qc = useQueryClient()
   const runner = useWorkflowRunner(organizationId, callbacks)
+  const { identity } = useErpSession()
+  const actorHex = identity?.replace(/^0x/, "").toLowerCase() ?? ""
 
   const specs = useMemo(() => {
     const fresh = <T,>(options: { queryKey: readonly unknown[]; queryFn: () => Promise<unknown>; staleTime: number }) =>
@@ -196,6 +200,31 @@ export function usePurchasingWorkflow(
     const intakeIn = (state: string) => sameRecordIn(supplierIntakeWorkflow, intakes, state)
     const landedCosts = () => fetchQueryList("/api/query/landed-costs", "Failed to read landed costs")
     const landedCostIn = (state: string) => sameRecordIn(landedCostWorkflow, landedCosts, state)
+
+    // Correctness reads bypass subscription/cache state; each record is also scope-checked.
+    const receiptReads: ReceiptReads = {
+      lines: () => fetchQueryList("/api/query/purchase-order-lines", "Failed to read purchase receipt quantities"),
+      products: () => fetchQueryList("/api/query/products", "Failed to read purchase receipt products"),
+      moves: () => fetchQueryList("/api/query/stock-moves", "Failed to read purchase receipt moves"),
+    }
+
+    const receiptScope = (): InvocationScope => {
+      const scope = { organizationId, companyId: requireCompany("receive a purchase line"), actorHex }
+      receiptStorageKey(scope, "1") // Validate identity before reading or writing storage.
+      return scope
+    }
+    const receiptEvidence = (key: string) => fetchQueryList(
+      `/api/query/purchase-receipt-operations?company_id=${requireCompany("read a receipt")}&operation_key=${encodeURIComponent(key)}`,
+      "Cannot read canonical receipt evidence",
+    )
+    const observePending = async (input: ResolveReceiptInput) => {
+      const proof = observeReceiptInvocation(input.pendingReceipt, input.receiptEvidence ?? await receiptEvidence(input.pendingReceipt?.operationKey ?? "capability_probe"))
+      if (proof.outcome === "applied" && input.pendingReceipt) {
+        // Storage cleanup cannot undo authoritative proof of a committed receipt.
+        try { clearReceiptInvocation(receiptScope(), input.pendingReceipt, window.localStorage) } catch { /* Safe replay remains available. */ }
+      }
+      return proof
+    }
 
     return {
       submitRequisition: idSpec("purchasing.requisition.submit", submitPurchaseRequisitionCommand, REQUISITION_TRANSITION_AFFECTS, {
@@ -245,19 +274,36 @@ export function usePurchasingWorkflow(
 
       receiveLine: typed<ReceiveRunInput>({
         id: "purchasing.line.receive",
-        command: (input) =>
-          receivePurchaseOrderLineCommand({
-            lineId: input.lineId,
-            qty: input.qty,
-            lotId: input.lotId,
-          }),
+        command: async (input) => {
+          if (!purchasingReceiptReplayAvailable()) throw new WorkflowError("validation", "Receipt replay contracts are unavailable")
+          if (typeof navigator === "undefined" || !navigator.locks) throw new WorkflowError("validation", "This browser cannot safely coordinate receipt retries")
+          const scope = receiptScope()
+          await navigator.locks.request(receiptStorageKey(scope, input.lineId), async () => {
+            // Keep identity available to the runner even when acknowledgement is lost.
+            const ports = {
+              capture: () => captureReceiptSnapshot(input.lineId, input.qty, scope, receiptReads),
+              makeKey: () => crypto.randomUUID(),
+              read: receiptEvidence,
+              dispatch: async (pending: PendingReceipt) => {
+                input.pendingReceipt = pending
+                await receivePurchaseOrderLineOnceCommand(scope.companyId, input.lineId, pending)
+              },
+            }
+            Object.assign(input, await executeReceiptInvocation(scope, input.lineId, input.qty, input.lotId, window.localStorage, ports))
+          })
+        },
         affects: RECEIVE_PO_LINE_AFFECTS,
-        observe: async ({ lineId, receiptTarget }) =>
-          observeReceivedLine(
-            lineId,
-            receiptTarget,
-            await fresh<RowValueMap[]>(stockMovesQueryOptions(organizationId)),
-          ),
+        observe: observePending,
+      }),
+      resolveReceipt: typed<ResolveReceiptInput>({
+        id: "purchasing.line.resolve-receipt",
+        command: async (input) => {
+          input.pendingReceipt = readPendingReceipt(receiptScope(), input.lineId, window.localStorage)
+          if (!input.pendingReceipt) throw new WorkflowError("validation", "No pending receipt exists for this actor and line")
+          input.receiptEvidence = await receiptEvidence(input.pendingReceipt.operationKey)
+        },
+        affects: RECEIVE_PO_LINE_AFFECTS,
+        observe: observePending,
       }),
 
       awardBid: typed<AwardRfqBidInput>({
@@ -283,7 +329,7 @@ export function usePurchasingWorkflow(
         id: "purchasing.supplier-intake.approve",
         command: approveSupplierIntakeCommand,
         affects: SUPPLIER_INTAKE_TRANSITION_AFFECTS,
-        observe: ({ intakeId }) => intakeIn("Approved")(intakeId),
+        observe: async (input) => observeApprovedSupplierIntake(input, await intakes()),
       }),
       holdIntake: typed<SupplierIntakeReasonInput>({
         id: "purchasing.supplier-intake.hold",
@@ -351,7 +397,7 @@ export function usePurchasingWorkflow(
         },
       }),
     }
-  }, [qc, organizationId, companyId])
+  }, [qc, organizationId, companyId, actorHex])
 
   const actions = useMemo(() => {
     /** Runs `spec` for one input under a per-input single-flight key. */
@@ -441,16 +487,12 @@ export function usePurchasingWorkflow(
           )
         },
       }),
-      /** Row dispatch receives the full open quantity; capture exact receipt identity before dispatch. */
-      receiveLine: receivePurchaseLineAction({
+      /** Snapshot/readback run inside the existing per-line single-flight. */
+      receiveLine: (() => {
+        const action = receivePurchaseLineAction({
         label: labels.receiveLine,
         execute: async (input, context) => {
-          const moves = (await qc.fetchQuery({
-            ...stockMovesQueryOptions(organizationId),
-            staleTime: 0,
-          })) as RowValueMap[]
-          const receiptTarget = resolveOpenReceiptTarget(input.lineId, moves)
-          const runInput: ReceiveRunInput = { ...input, receiptTarget }
+          const runInput: ReceiveRunInput = { ...input }
           return runner.run(
             `${specs.receiveLine.id}:${input.lineId}`,
             specs.receiveLine,
@@ -458,7 +500,9 @@ export function usePurchasingWorkflow(
             { navigateToNext: context?.navigateToNext },
           )
         },
-      }),
+        })
+        return { ...action, canPresent: (row: RowValueMap) => purchasingReceiptReplayAvailable() && action.canPresent(row) }
+      })(),
       awardBid: awardRfqBidAction({ label: labels.awardBid, execute: bind(specs.awardBid, (i) => i.rfqId) }),
       createVendorCredit: createVendorCreditFromReturnAction<VendorCreditFromReturnParams>({
         label: labels.createVendorCredit,
@@ -480,6 +524,13 @@ export function usePurchasingWorkflow(
     purchaseReturnActions: actions.purchaseReturn,
     createBill: actions.createBill,
     receiveLine: actions.receiveLine,
+    canResolveReceipt: (lineId: string) => {
+      if (!companyId || typeof window === "undefined") return false
+      try {
+        return window.localStorage.getItem(receiptStorageKey({ organizationId, companyId, actorHex }, lineId)) != null
+      } catch { return false }
+    },
+    resolveReceipt: (lineId: string) => runner.run(`${specs.resolveReceipt.id}:${lineId}`, specs.resolveReceipt, { lineId }),
     awardBid: actions.awardBid,
     createVendorCredit: actions.createVendorCredit,
     releaseBlanket: actions.releaseBlanket,

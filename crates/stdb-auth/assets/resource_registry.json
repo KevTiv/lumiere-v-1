@@ -263,7 +263,15 @@
     "default_restricted": [
       "name",
       "amount",
-      "company_id"
+      "company_id",
+      "active",
+      "type_tax_use",
+      "amount_type",
+      "price_include",
+      "include_base_amount",
+      "has_negative_factor",
+      "tax_group_id",
+      "invoice_repartition_line_ids"
     ],
     "mandatory": [
       "id",
@@ -998,6 +1006,66 @@
       "organization_id"
     ],
     "table": "company"
+  },
+  "countries": {
+    "aliases": [
+      "countries",
+      "country"
+    ],
+    "default_restricted": [
+      "code",
+      "name",
+      "official_name",
+      "iso_3",
+      "numcode",
+      "phone_code",
+      "currency_id",
+      "is_active"
+    ],
+    "mandatory": [
+      "organization_code_key",
+      "organization_id"
+    ],
+    "table": "country"
+  },
+  "currencies": {
+    "aliases": [
+      "currencies",
+      "currency"
+    ],
+    "default_restricted": [
+      "code",
+      "name",
+      "symbol",
+      "decimal_places",
+      "rounding_factor",
+      "active",
+      "position"
+    ],
+    "mandatory": [
+      "id",
+      "organization_id"
+    ],
+    "table": "currency"
+  },
+  "currency-rates": {
+    "aliases": [
+      "currency-rates",
+      "currency_rate"
+    ],
+    "default_restricted": [
+      "from_currency_id",
+      "to_currency_id",
+      "rate",
+      "inverse_rate",
+      "date",
+      "company_id"
+    ],
+    "mandatory": [
+      "id",
+      "organization_id"
+    ],
+    "table": "currency_rate"
   },
   "compensation-events": {
     "aliases": [
@@ -1966,7 +2034,8 @@
   "expense-sheets": {
     "aliases": [
       "expense-sheets",
-      "expense_sheet"
+      "expense_sheet",
+      "hr_expense_sheet"
     ],
     "default_restricted": [
       "name",
@@ -2933,7 +3002,8 @@
   "knowledge-categories": {
     "aliases": [
       "knowledge-categories",
-      "kb_category"
+      "kb_category",
+      "knowledge_article_category"
     ],
     "default_restricted": [
       "name",
@@ -4294,6 +4364,26 @@
     ],
     "table": "product"
   },
+  "product-variants": {
+    "aliases": [
+      "product-variants",
+      "product_variant"
+    ],
+    "default_restricted": [
+      "product_tmpl_id",
+      "name",
+      "default_code",
+      "barcode",
+      "lst_price",
+      "price_extra",
+      "is_active"
+    ],
+    "mandatory": [
+      "id",
+      "organization_id"
+    ],
+    "table": "product_variant"
+  },
   "profit-loss-lines": {
     "aliases": [
       "profit-loss-lines",
@@ -5012,6 +5102,52 @@
       "order_id"
     ],
     "table": "purchase_order_line"
+  },
+  "purchase-order-creations": {
+    "aliases": [
+      "purchase-order-creations",
+      "purchase_order_creation_operation"
+    ],
+    "default_restricted": [
+      "operation_key",
+      "purchase_order_id",
+      "payload_hash",
+      "created_by",
+      "created_at"
+    ],
+    "mandatory": [
+      "id",
+      "organization_id",
+      "company_id"
+    ],
+    "table": "purchase_order_creation_operation"
+  },
+  "purchase-receipt-operations": {
+    "aliases": [
+      "purchase-receipt-operations",
+      "purchase_receipt_operation"
+    ],
+    "default_restricted": [
+      "operation_key",
+      "line_id",
+      "order_id",
+      "quantity",
+      "lot_id",
+      "received_before",
+      "received_after",
+      "move_id",
+      "picking_id",
+      "continuation_move_id",
+      "continuation_picking_id",
+      "created_by",
+      "created_at"
+    ],
+    "mandatory": [
+      "id",
+      "organization_id",
+      "company_id"
+    ],
+    "table": "purchase_receipt_operation"
   },
   "purchase-orders": {
     "aliases": [
@@ -6646,6 +6782,23 @@
       "organization_id"
     ],
     "table": "uom"
+  },
+  "uom-categories": {
+    "aliases": [
+      "uom-categories",
+      "uom_category",
+      "uom_cat"
+    ],
+    "default_restricted": [
+      "name",
+      "description",
+      "sequence"
+    ],
+    "mandatory": [
+      "id",
+      "organization_id"
+    ],
+    "table": "uom_cat"
   },
   "user-custom-fields": {
     "aliases": [

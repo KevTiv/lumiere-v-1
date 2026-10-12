@@ -86,7 +86,7 @@ pub fn request_guarded_action(
         plan.version.id,
         snapshot.subject_id,
         params.action.as_str(),
-        params.idempotency_key
+        gate_start_digest(&params.idempotency_key, &snapshot.subject_revision_hash)
     );
     start_workflow_internal(
         ctx,
@@ -409,6 +409,33 @@ fn active_token(
         return Err("guarded workflow requires exactly one active token before Wave 4".to_string());
     }
     Ok(active.remove(0))
+}
+
+fn gate_start_digest(key: &str, revision: &str) -> String {
+    use sha2::{Digest, Sha256};
+    let mut hash = Sha256::new();
+    for value in [key, revision] {
+        hash.update((value.len() as u64).to_be_bytes());
+        hash.update(value.as_bytes());
+    }
+    format!("{:x}", hash.finalize())
+}
+
+#[cfg(test)]
+mod revision_key_tests {
+    use super::gate_start_digest;
+    #[test]
+    fn a_revised_subject_can_request_fresh_approval_without_changing_the_callers_key() {
+        assert_eq!(
+            gate_start_digest("confirm:7", "revision-a"),
+            gate_start_digest("confirm:7", "revision-a")
+        );
+        assert_ne!(
+            gate_start_digest("confirm:7", "revision-a"),
+            gate_start_digest("confirm:7", "revision-b")
+        );
+        assert_eq!(gate_start_digest(&"k".repeat(256), "revision-b").len(), 64);
+    }
 }
 
 fn gate_transition_hash(start_key: &str, edge_id: u64, revision: u64) -> String {

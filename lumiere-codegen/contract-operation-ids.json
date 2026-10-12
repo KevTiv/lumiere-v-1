@@ -405,6 +405,7 @@
     "create_purchase_blanket_order": "erp.create_purchase_blanket_order",
     "create_purchase_contract": "erp.create_purchase_contract",
     "create_purchase_order": "erp.create_purchase_order",
+    "create_purchase_order_once": "erp.create_purchase_order_once",
     "create_purchase_requisition": "erp.create_purchase_requisition",
     "create_purchase_return": "erp.create_purchase_return",
     "create_purchase_rfq": "erp.create_purchase_rfq",
@@ -623,6 +624,7 @@
     "import_company_csv": "erp.import_company_csv",
     "import_contact_csv": "erp.import_contact_csv",
     "import_country_csv": "erp.import_country_csv",
+    "import_csv_tracked": "erp.import_csv_tracked",
     "import_currency_csv": "erp.import_currency_csv",
     "import_currency_rate_csv": "erp.import_currency_rate_csv",
     "import_expense_csv": "erp.import_expense_csv",
@@ -1427,6 +1429,7 @@
     "verify_contact_identity": "erp.verify_contact_identity",
     "void_payment_transaction": "erp.void_payment_transaction",
     "waive_tax_deadline": "erp.waive_tax_deadline",
-    "worker_heartbeat": "erp.worker_heartbeat"
+    "worker_heartbeat": "erp.worker_heartbeat",
+    "receive_po_line_once": "erp.receive_po_line_once"
   }
 }

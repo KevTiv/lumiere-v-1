@@ -301,7 +301,10 @@ export function useUpdateAccountMoveLine(organizationId: number, companyId: bigi
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
-    onSuccess: () => invalidateMoveQueries(qc, organizationId),
+    onSuccess: () => {
+      invalidateMoveQueries(qc, organizationId)
+      invalidateStdbQueryResources(qc, organizationId, ["purchase-orders", "purchase-order-lines", "purchase-order-lines-over-billed"])
+    },
   })
 }
 

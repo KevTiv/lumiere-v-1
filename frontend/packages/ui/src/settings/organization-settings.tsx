@@ -52,14 +52,11 @@ import {
 import { createCountryForm, createCurrencyForm } from "../lib/settings-platform-form-configs"
 import { useRBAC } from "@/lib/rbac-context"
 import { cn } from "@/lib/utils"
-
-type OrgMasterCsvKind =
-  | "country"
-  | "currency"
-  | "currencyRate"
-  | "company"
-  | "role"
-  | "aiAgent"
+import {
+  organizationCsvImportTable,
+  trackedImportCompanyId,
+  type OrgMasterCsvKind,
+} from "./organization-csv-import"
 
 function strVal(v: unknown): string {
   return v == null ? "" : String(v)
@@ -80,7 +77,7 @@ export function OrganizationSettings() {
   const { confirm: confirmDialog, dialog: confirmDialogNode } = useConfirmDialog()
   const { toast } = useToast()
   const [isLoading, setIsLoading] = useState(false)
-  const { organizationId } = useErpSession()
+  const { organizationId, activeCompanyId, activeCompanyReady } = useErpSession()
   const [csvKind, setCsvKind] = useState<OrgMasterCsvKind | null>(null)
   const [referenceModal, setReferenceModal] = useState<"country" | "currency" | null>(null)
   const [referenceError, setReferenceError] = useState<string | null>(null)
@@ -1345,6 +1342,11 @@ export function OrganizationSettings() {
 
       {csvKind && csvFormConfig && hasValidOrganizationId(organizationId) ? (
         <CsvImportModal
+          organizationId={orgBigInt}
+          tableName={organizationCsvImportTable(csvKind)}
+          trackedImport={{
+            companyId: trackedImportCompanyId(activeCompanyId, activeCompanyReady),
+          }}
           key={csvKind}
           onClose={() => setCsvKind(null)}
           config={csvFormConfig}

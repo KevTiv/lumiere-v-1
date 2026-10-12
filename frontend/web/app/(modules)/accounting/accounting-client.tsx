@@ -4151,6 +4151,9 @@ function AccountingClientReady({
 
       {csvKind && csvFormConfig ? (
         <CsvImportModal
+          trackedImport={{ companyId: operatingCompanyId }}
+          organizationId={orgId}
+          tableName={{ account: "account_account", accountMove: "account_move", accountMoveLine: "account_move_line", tax: "account_tax", budget: "crossovered_budget", budgetLine: "crossovered_budget_lines", analytic: "account_analytic_account" }[csvKind]}
           key={csvKind}
           onClose={() => setCsvKind(null)}
           config={csvFormConfig}

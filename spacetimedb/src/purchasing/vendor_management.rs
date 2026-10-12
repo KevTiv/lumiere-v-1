@@ -640,12 +640,21 @@ pub fn approve_supplier_intake(
     if !vendor.is_vendor {
         return Err("Approved partner is not a vendor".to_string());
     }
+    if let Some(company_id) = vendor.company_id {
+        crate::workflow::authorization::require_workflow_company_access(
+            ctx, organization_id, company_id, ctx.sender(),
+        )?;
+    }
 
     if !matches!(
         intake.state,
         IntakeState::UnderReview | IntakeState::Submitted
     ) {
         return Err("Can only approve under-review or submitted requests".to_string());
+    }
+
+    if intake.submitted_by == Some(ctx.sender()) {
+        return Err("Supplier intake requires an independent approver".to_string());
     }
 
     ctx.db

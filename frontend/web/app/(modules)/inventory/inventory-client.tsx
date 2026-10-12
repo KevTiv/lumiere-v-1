@@ -5787,6 +5787,9 @@ function InventoryClientLoaded({
       ) : null}
       {csvKind && csvKind !== 'product' && csvFormConfig ? (
         <CsvImportModal
+          trackedImport={{ companyId: operatingCompanyId, currencyId: csvKind === "product" ? pricelists.find((p) => p.currencyId != null && String(p.currencyId).trim() !== "")?.currencyId as string | number | bigint | undefined : undefined }}
+          organizationId={orgId}
+          tableName={{ uomCategory: "uom_category", uom: "uom", productCategory: "product_category", product: "product", productVariant: "product_variant", warehouse: "warehouse", stockLocation: "stock_location", stockQuant: "stock_quant", lot: "stock_production_lot" }[csvKind]}
           key={csvKind}
           onClose={() => setCsvKind(null)}
           config={csvFormConfig}

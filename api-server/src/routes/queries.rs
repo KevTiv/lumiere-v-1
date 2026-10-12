@@ -28,6 +28,7 @@ pub(crate) struct OrgQuery {
     #[serde(rename = "companyId")]
     company_id: Option<u64>,
     cursor: Option<String>,
+    operation_key: Option<String>,
     limit: Option<u32>,
 }
 
@@ -38,7 +39,11 @@ pub(crate) struct AuthoritativeQuery {
 }
 
 fn owner_read_permission_resource(resource: &str) -> Option<&str> {
-    if resource == "replenishment-run-jobs" {
+    if resource == "purchase-order-creations" {
+        Some("purchase-orders")
+    } else if resource == "purchase-receipt-operations" {
+        Some("purchase-order-lines")
+    } else if resource == "replenishment-run-jobs" {
         Some("replenishment-rules")
     } else if crate::query_exec::crm_resource(resource) {
         Some(resource)
@@ -57,7 +62,12 @@ fn owner_read_permission_resource(resource: &str) -> Option<&str> {
 }
 
 fn owner_read_module(resource: &str) -> Option<&'static str> {
-    if crate::query_exec::crm_resource(resource) {
+    if matches!(
+        resource,
+        "purchase-order-creations" | "purchase-receipt-operations"
+    ) {
+        Some("purchasing")
+    } else if crate::query_exec::crm_resource(resource) {
         Some("crm")
     } else if crate::workflow_reads::is_private_workflow_resource(resource) {
         Some("workflows")
@@ -128,6 +138,50 @@ pub(crate) async fn get_query(
     let owner_read = owner_read_permission_resource(&resource).is_some();
     if owner_read {
         require_owner_read_permission(&resource, &context)?;
+    }
+    let operation_table = match resource.as_str() {
+        "purchase-order-creations" => Some((
+            "purchase_order_creation_operation",
+            "purchase order creation",
+        )),
+        "purchase-receipt-operations" => Some(("purchase_receipt_operation", "receipt")),
+        _ => None,
+    };
+    if let Some((table, operation_label)) = operation_table {
+        let key = q.operation_key.as_deref().ok_or_else(|| {
+            ApiError::BadRequest(format!(
+                "operation_key is required for {operation_label} readback"
+            ))
+        })?;
+        if key.is_empty()
+            || key.len() > 128
+            || !key
+                .bytes()
+                .all(|c| c.is_ascii_alphanumeric() || matches!(c, b'-' | b'_'))
+        {
+            return Err(ApiError::BadRequest(format!(
+                "invalid {operation_label} operation key"
+            )));
+        }
+        let company_id = crate::query_exec::resolve_purchasing_company_id(
+            context.client(),
+            org_id,
+            context.actor_identity(),
+            q.company_id,
+        )
+        .await?;
+        let identity = stdb_auth::identity_sql_literal(context.actor_identity())
+            .map_err(ApiError::Internal)?;
+        let id = format!("{org_id}:{company_id}:{key}");
+        let columns = stdb_auth::resolve_http_sql_columns(&resource, Some(context.field_access()))
+            .map_err(ApiError::Internal)?;
+        let sql = format!("SELECT {} FROM {table} WHERE id = '{id}' AND organization_id = {org_id} AND company_id = {company_id} AND created_by = {identity}", columns.join(", "));
+        let data = state
+            .stdb
+            .query_sql(&sql)
+            .await
+            .map_err(ApiError::internal)?;
+        return Ok(Json(json!({"data": data})));
     }
     // Only this exact registered private inventory resource uses the bounded
     // adapter. Membership scope is resolved with the actor client, not owner authority.
@@ -257,7 +311,7 @@ pub(crate) async fn get_authoritative_resource(
 
 #[cfg(test)]
 mod tests {
-    use super::owner_read_permission_resource;
+    use super::{owner_read_module, owner_read_permission_resource};
 
     #[test]
     fn owner_reads_use_the_resource_permission() {
@@ -268,10 +322,33 @@ mod tests {
         );
         assert_eq!(owner_read_permission_resource("products"), None);
         assert_eq!(
+            owner_read_permission_resource("purchase-order-creations"),
+            Some("purchase-orders")
+        );
+        assert_eq!(
+            owner_read_permission_resource("purchase-receipt-operations"),
+            Some("purchase-order-lines")
+        );
+        assert_eq!(
+            owner_read_module("purchase-order-creations"),
+            Some("purchasing")
+        );
+        assert_eq!(
+            owner_read_module("purchase-receipt-operations"),
+            Some("purchasing")
+        );
+        assert_eq!(
+            owner_read_permission_resource("purchase-receipt-operations-extra"),
+            None
+        );
+        assert_eq!(
             owner_read_permission_resource("replenishment-run-jobs"),
             Some("replenishment-rules")
         );
-        assert_eq!(owner_read_permission_resource("replenishment_run_job"), None);
+        assert_eq!(
+            owner_read_permission_resource("replenishment_run_job"),
+            None
+        );
         assert_eq!(
             owner_read_permission_resource("replenishment-run-jobs-extra"),
             None
