@@ -56,9 +56,54 @@ pub fn run(paths: &Paths) -> Result<()> {
     let module_schema: Value = serde_json::from_str(&read_to_string(&paths.module_schema_json)?)
         .with_context(|| format!("parse {}", paths.module_schema_json.display()))?;
     let view_names = module_view_names(&module_schema)?;
-    let schema_manifest =
+    let mut schema_manifest =
         stdb_bindings_parse::parse_bindings(&paths.stdb_bindings_dir, &view_names)
             .context("extracting schema IR from STDB Rust bindings")?;
+    // SDK IxCols omits composite indexes. Recover an organization-leading
+    // access path from the canonical module schema only where the SDK lacks one.
+    for table in &mut schema_manifest.tables {
+        if table.primary_key.column_name == "organization_id"
+            || table.indexes.iter().any(|index| {
+                index
+                    .columns
+                    .first()
+                    .is_some_and(|name| name == "organization_id")
+            })
+        {
+            continue;
+        }
+        let raw = module_schema["tables"].as_array().and_then(|tables| {
+            tables
+                .iter()
+                .find(|raw| raw["name"].as_str() == Some(&table.sql_name))
+        });
+        let indexes = raw.and_then(|raw| raw["indexes"].as_array());
+        for index in indexes.into_iter().flatten() {
+            let Some(ids) = index["algorithm"]["BTree"].as_array() else {
+                continue;
+            };
+            let columns: Option<Vec<_>> = ids
+                .iter()
+                .map(|id| {
+                    id.as_u64()
+                        .and_then(|id| table.columns.get(id as usize))
+                        .map(|column| column.sql_name.clone())
+                })
+                .collect();
+            let Some(columns) = columns else { continue };
+            if columns
+                .first()
+                .is_some_and(|name| name == "organization_id")
+            {
+                table.indexes.push(schema_ir::GeneratedIndex {
+                    name: format!("{}_{}", table.sql_name, columns.join("_")),
+                    columns,
+                    unique: false,
+                });
+                break;
+            }
+        }
+    }
     let c0_enforced = std::env::var("C0_ENFORCE_TENANT_OWNERSHIP").as_deref() == Ok("1");
     let ownership_counts: Option<OwnershipCounts> = match schema_manifest.ownership_counts() {
         Ok(counts) => Some(counts),
