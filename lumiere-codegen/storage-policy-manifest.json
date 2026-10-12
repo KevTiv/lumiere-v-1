@@ -4419,7 +4419,9 @@
       "table": "country",
       "module": "core",
       "rationale": "C0 pre-organization ISO reference catalog",
-      "authoritative_resources": [],
+      "authoritative_resources": [
+        "countries"
+      ],
       "durability_class": "durable_business_record",
       "organization_ownership": "direct",
       "organization_column": "organization_id",
@@ -4762,7 +4764,9 @@
       "table": "currency",
       "module": "core",
       "rationale": "C0 pre-organization ISO reference catalog",
-      "authoritative_resources": [],
+      "authoritative_resources": [
+        "currencies"
+      ],
       "durability_class": "durable_business_record",
       "organization_ownership": "direct",
       "organization_column": "organization_id",
@@ -4791,7 +4795,9 @@
       "table": "currency_rate",
       "module": "accounting",
       "rationale": "Independent organization-owned aggregate root; related rows do not determine storage routing.",
-      "authoritative_resources": [],
+      "authoritative_resources": [
+        "currency-rates"
+      ],
       "durability_class": "durable_business_record",
       "organization_ownership": "direct",
       "organization_column": "organization_id",
@@ -10543,7 +10549,9 @@
       "table": "product_variant",
       "module": "inventory",
       "rationale": "Independent organization-owned aggregate root; related rows do not determine storage routing.",
-      "authoritative_resources": [],
+      "authoritative_resources": [
+        "product-variants"
+      ],
       "durability_class": "durable_business_record",
       "organization_ownership": "direct",
       "organization_column": "organization_id",
@@ -15078,7 +15086,9 @@
       "table": "uom_cat",
       "module": "inventory",
       "rationale": "Independent organization-owned aggregate root; related rows do not determine storage routing.",
-      "authoritative_resources": [],
+      "authoritative_resources": [
+        "uom-categories"
+      ],
       "durability_class": "durable_business_record",
       "organization_ownership": "direct",
       "organization_column": "organization_id",
