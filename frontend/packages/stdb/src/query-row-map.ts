@@ -66,11 +66,14 @@ import type {
   ContactSegmentRule,
   ContactTag,
   ContactTagAssignment,
+  Country,
   CrmConversation,
   CrmConversationMessage,
   CrmForecastSnapshot,
   CrossoveredBudget,
   CrossoveredBudgetLines,
+  Currency,
+  CurrencyRate,
   Dashboard,
   DashboardWidget,
   DataClassification,
@@ -206,6 +209,7 @@ import type {
   ProductPricelist,
   ProductPricelistItem,
   ProductSupplierInfo,
+  ProductVariant,
   ProfitLossLine,
   ProjectBaseline,
   ProjectChangeOrder,
@@ -244,6 +248,7 @@ import type {
   PurchaseBlanketRelease,
   PurchaseContract,
   PurchaseOrder,
+  PurchaseOrderCreationOperation,
   PurchaseOrderLine,
   PurchaseReceiptOperation,
   PurchaseRequisition,
@@ -322,6 +327,7 @@ import type {
   TaxSchedule,
   TrialBalance,
   Uom,
+  UomCategory,
   UserCustomField,
   UserOrganization,
   UserProfile,
@@ -417,9 +423,12 @@ export interface QueryRowMap {
   "contact-tags": ContactTag
   "contacts": Contact
   "contracts": HrContract
+  "countries": Country
   "crm-conversation-messages": CrmConversationMessage
   "crm-conversations": CrmConversation
   "crm-forecast-snapshots": CrmForecastSnapshot
+  "currencies": Currency
+  "currency-rates": CurrencyRate
   "dashboard-widgets": DashboardWidget
   "dashboards": Dashboard
   "data-classification-rules": DataClassificationRule
@@ -564,6 +573,7 @@ export interface QueryRowMap {
   "product-categories": ProductCategory
   "product-packagings": ProductPackaging
   "product-supplier-infos": ProductSupplierInfo
+  "product-variants": ProductVariant
   "products": Product
   "profit-loss-lines": ProfitLossLine
   "project-baselines": ProjectBaseline
@@ -600,6 +610,7 @@ export interface QueryRowMap {
   "purchase-blanket-orders": PurchaseBlanketOrder
   "purchase-blanket-releases": PurchaseBlanketRelease
   "purchase-contracts": PurchaseContract
+  "purchase-order-creations": PurchaseOrderCreationOperation
   "purchase-order-lines": PurchaseOrderLine
   "purchase-order-lines-over-billed": PurchaseOrderLine
   "purchase-orders": PurchaseOrder
@@ -689,6 +700,7 @@ export interface QueryRowMap {
   "timesheets-to-validate": ProjectTimesheet
   "timesheets-unbilled": ProjectTimesheet
   "trial-balances": TrialBalance
+  "uom-categories": UomCategory
   "uoms": Uom
   "user-custom-fields": UserCustomField
   "user-organization": UserOrganization
