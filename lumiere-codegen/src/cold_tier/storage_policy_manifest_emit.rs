@@ -2,7 +2,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-const EXPECTED_SCHEMA_TABLES: usize = 505;
+const EXPECTED_SCHEMA_TABLES: usize = 506;
 
 use anyhow::{bail, Context, Result};
 use serde::{Deserialize, Serialize};
@@ -1226,7 +1226,7 @@ mod tests {
             emit_storage_policy_manifest(&source, &manifest(), registry())
                 .unwrap_err()
                 .to_string()
-                .contains("requires 505 schema tables")
+                .contains("requires 506 schema tables")
         );
     }
 
