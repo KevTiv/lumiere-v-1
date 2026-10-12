@@ -346,7 +346,8 @@ pub(crate) fn inventory_resource(resource: &str) -> bool {
 pub(crate) fn purchasing_resource(resource: &str) -> bool {
     matches!(
         resource,
-        "purchase-orders"
+        "purchase-receipt-operations"
+            | "purchase-orders"
             | "purchase-orders-to-approve"
             | "purchase-orders-partial-receipt"
             | "purchase-order-lines"

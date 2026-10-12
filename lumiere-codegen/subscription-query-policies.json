@@ -2193,6 +2193,11 @@
           "direction": "desc"
         }
       ]
+    },
+    "purchase-receipt-operations": {
+      "table": "purchase_receipt_operation",
+      "predicates": [],
+      "order_by": []
     }
   }
 }

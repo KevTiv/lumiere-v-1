@@ -27,6 +27,7 @@ pub mod landed_costs;
 pub mod procurement_advanced;
 pub mod purchase_orders;
 pub mod purchase_returns;
+pub mod receipt_operations;
 pub mod sourcing;
 pub mod vendor_management;
 

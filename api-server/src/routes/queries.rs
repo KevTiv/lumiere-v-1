@@ -28,6 +28,7 @@ pub(crate) struct OrgQuery {
     #[serde(rename = "companyId")]
     company_id: Option<u64>,
     cursor: Option<String>,
+    operation_key: Option<String>,
     limit: Option<u32>,
 }
 
@@ -38,7 +39,9 @@ pub(crate) struct AuthoritativeQuery {
 }
 
 fn owner_read_permission_resource(resource: &str) -> Option<&str> {
-    if resource == "replenishment-run-jobs" {
+    if resource == "purchase-receipt-operations" {
+        Some("purchase-order-lines")
+    } else if resource == "replenishment-run-jobs" {
         Some("replenishment-rules")
     } else if crate::query_exec::crm_resource(resource) {
         Some(resource)
@@ -128,6 +131,38 @@ pub(crate) async fn get_query(
     let owner_read = owner_read_permission_resource(&resource).is_some();
     if owner_read {
         require_owner_read_permission(&resource, &context)?;
+    }
+    if resource == "purchase-receipt-operations" {
+        let key = q.operation_key.as_deref().ok_or_else(|| {
+            ApiError::BadRequest("operation_key is required for receipt readback".into())
+        })?;
+        if key.is_empty()
+            || key.len() > 128
+            || !key
+                .bytes()
+                .all(|c| c.is_ascii_alphanumeric() || matches!(c, b'-' | b'_'))
+        {
+            return Err(ApiError::BadRequest("Invalid receipt operation key".into()));
+        }
+        let company_id = crate::query_exec::resolve_purchasing_company_id(
+            context.client(),
+            org_id,
+            context.actor_identity(),
+            q.company_id,
+        )
+        .await?;
+        let identity = stdb_auth::identity_sql_literal(context.actor_identity())
+            .map_err(ApiError::Internal)?;
+        let id = format!("{org_id}:{company_id}:{key}");
+        let columns = stdb_auth::resolve_http_sql_columns(&resource, Some(context.field_access()))
+            .map_err(ApiError::Internal)?;
+        let sql = format!("SELECT {} FROM purchase_receipt_operation WHERE id = '{id}' AND organization_id = {org_id} AND company_id = {company_id} AND created_by = {identity}", columns.join(", "));
+        let data = state
+            .stdb
+            .query_sql(&sql)
+            .await
+            .map_err(ApiError::internal)?;
+        return Ok(Json(json!({"data": data})));
     }
     // Only this exact registered private inventory resource uses the bounded
     // adapter. Membership scope is resolved with the actor client, not owner authority.
@@ -271,7 +306,10 @@ mod tests {
             owner_read_permission_resource("replenishment-run-jobs"),
             Some("replenishment-rules")
         );
-        assert_eq!(owner_read_permission_resource("replenishment_run_job"), None);
+        assert_eq!(
+            owner_read_permission_resource("replenishment_run_job"),
+            None
+        );
         assert_eq!(
             owner_read_permission_resource("replenishment-run-jobs-extra"),
             None

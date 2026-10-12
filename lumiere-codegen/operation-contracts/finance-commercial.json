@@ -5480,6 +5480,16 @@
         "version": 1
       },
       "evidence": "accounting/tax_management.rs: reducer checks current state or duplicate before transition"
+    },
+    "receive_po_line_once": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "purchasing/receipt_operations.rs: atomic uniquely scoped invocation receipt rejects conflicting reuse and returns same-input replay after current authorization"
     }
   }
 }

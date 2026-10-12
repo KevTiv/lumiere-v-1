@@ -9,6 +9,7 @@ pub mod phase1_relational_integrity_test;
 pub mod phase1_returns_advanced_test;
 pub mod phase2_blanket_release_test;
 pub mod purchase_bill_test;
+pub mod receipt_replay_test;
 pub mod strict_provenance_test;
 pub mod tax_fx_bill_test;
 pub mod wave_e_test;
@@ -19,6 +20,8 @@ use spacetimedb::ReducerContext;
 pub fn run_purchasing_bill_balanced_test(ctx: &ReducerContext) -> Result<(), String> {
     purchase_bill_test::test_po_confirm_to_balanced_bill(ctx)
         .map_err(|e| format!("po_confirm_to_balanced_bill: {e}"))?;
+    receipt_replay_test::test_durable_partial_receipt(ctx)
+        .map_err(|e| format!("durable_partial_receipt: {e}"))?;
     invoice_provenance_test::test_purchase_bill_exact_invoice_provenance(ctx)
         .map_err(|e| format!("purchase_bill_exact_invoice_provenance: {e}"))
 }
