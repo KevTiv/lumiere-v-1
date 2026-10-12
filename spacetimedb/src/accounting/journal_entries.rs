@@ -319,6 +319,11 @@ pub struct CreateBillFromPurchaseOrderParams {
 /// `None` means "no change"; `Some(None)` clears a nullable field.
 #[derive(SpacetimeType, Clone, Debug)]
 pub struct UpdateAccountMoveLineParams {
+    /// Economic correction: optional replacements with mandatory reviewed values.
+    pub quantity: Option<f64>,
+    pub price_unit: Option<f64>,
+    pub expected_quantity: Option<f64>,
+    pub expected_price_unit: Option<f64>,
     pub company_id: Option<u64>,
     pub name: Option<String>,
     pub debit: Option<f64>,
@@ -1649,16 +1654,16 @@ pub fn reset_account_move_to_draft(
     match move_record.state {
         AccountMoveState::Cancelled => {}
         AccountMoveState::Draft => return Err("Move is already in draft state".to_string()),
-        AccountMoveState::Posted => {
-            return Err(
-                "Posted moves cannot be reset to draft; cancel the move first or issue a credit note"
-                    .to_string(),
-            )
-        }
+        AccountMoveState::Posted => return Err(
+            "Posted moves cannot be reset to draft; cancel the move first or issue a credit note"
+                .to_string(),
+        ),
     }
 
     if move_record.posted_before {
-        return Err("Previously posted moves cannot be reset to draft; issue a credit note".to_string());
+        return Err(
+            "Previously posted moves cannot be reset to draft; issue a credit note".to_string(),
+        );
     }
 
     let company_id = move_record.company_id;
@@ -1700,6 +1705,326 @@ pub fn reset_account_move_to_draft(
     Ok(())
 }
 
+/// Correct a tax-free, functional-currency PO bill without changing its source identity.
+/// All validation precedes writes; SpacetimeDB commits the correction atomically.
+fn correct_po_bill_line(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    line: AccountMoveLine,
+    params: &UpdateAccountMoveLineParams,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "account_move", "write")?;
+    let bill = load_account_move_in_scope(ctx, organization_id, line.move_id)?;
+    if bill.move_type != MoveType::InInvoice
+        || bill.state != AccountMoveState::Draft
+        || bill.posted_before
+    {
+        return Err("Economic correction requires a never-posted draft vendor bill".into());
+    }
+    if bill.currency_id != bill.company_currency_id || bill.amount_tax != 0.0 {
+        return Err(
+            "Economic correction currently requires a tax-free functional-currency bill".into(),
+        );
+    }
+    if params.debit.is_some()
+        || params.credit.is_some()
+        || params.partner_id.is_some()
+        || params.analytic_account_id.is_some()
+        || params.metadata.is_some()
+    {
+        return Err("Economic correction cannot be combined with journal or relation edits".into());
+    }
+    let expected_qty = params
+        .expected_quantity
+        .ok_or("Reviewed quantity is required")?;
+    let expected_price = params
+        .expected_price_unit
+        .ok_or("Reviewed unit price is required")?;
+    if !expected_qty.is_finite()
+        || !expected_price.is_finite()
+        || line.quantity != expected_qty
+        || line.price_unit != expected_price
+    {
+        return Err("Bill line changed; refresh and review before correcting".into());
+    }
+    let quantity = params.quantity.unwrap_or(line.quantity);
+    let price = params.price_unit.unwrap_or(line.price_unit);
+    let subtotal = correction_subtotal(quantity, price)?;
+    let origin = bill
+        .invoice_origin
+        .as_deref()
+        .ok_or("Canonical PO origin is required")?;
+    let po_id: u64 = origin
+        .strip_prefix("PO")
+        .and_then(|v| v.parse().ok())
+        .ok_or("Canonical PO origin is required")?;
+    if origin != format!("PO{po_id}") {
+        return Err("Canonical PO origin is required".into());
+    }
+    let mut po = ctx
+        .db
+        .purchase_order()
+        .id()
+        .find(&po_id)
+        .ok_or("Linked purchase order unavailable")?;
+    if po.organization_id != organization_id
+        || po.company_id != bill.company_id
+        || po.currency_id != bill.currency_id
+        || Some(po.partner_id) != bill.partner_id
+        || po.invoice_ids.iter().filter(|id| **id == bill.id).count() != 1
+    {
+        return Err("Bill purchase-order lineage is invalid".into());
+    }
+    let po_lines: Vec<_> = ctx
+        .db
+        .purchase_order_line()
+        .purchase_order_line_by_order()
+        .filter(&po.id)
+        .collect();
+    let owners: Vec<_> = po_lines
+        .iter()
+        .filter(|p| p.invoice_lines.contains(&line.id))
+        .collect();
+    if owners.len() != 1
+        || owners[0]
+            .invoice_lines
+            .iter()
+            .filter(|id| **id == line.id)
+            .count()
+            != 1
+    {
+        return Err(
+            "Bill line requires one exact PO-line relationship; legacy lineage cannot be guessed"
+                .into(),
+        );
+    }
+    let mut source = ctx
+        .db
+        .purchase_order_line()
+        .id()
+        .find(&owners[0].id)
+        .ok_or("Source PO line unavailable")?;
+    if ctx
+        .db
+        .purchase_order_line()
+        .iter()
+        .filter(|p| p.invoice_lines.contains(&line.id))
+        .count()
+        != 1
+        || source.price_tax != 0.0
+        || source.organization_id != organization_id
+        || source.company_id != bill.company_id
+        || line.product_id != Some(source.product_id)
+        || line.product_uom_id != Some(source.product_uom)
+        || line.partner_id != bill.partner_id
+    {
+        return Err("Bill-line source identity is invalid".into());
+    }
+    let mut source_billed = 0.0;
+    let mut unique_ids = std::collections::BTreeSet::new();
+    for id in &source.invoice_lines {
+        if !unique_ids.insert(*id) {
+            return Err("Duplicate bill-line relationship".into());
+        }
+        let related = ctx
+            .db
+            .account_move_line()
+            .id()
+            .find(id)
+            .ok_or("Dangling bill-line relationship")?;
+        let related_bill = load_account_move_in_scope(ctx, organization_id, related.move_id)?;
+        if related.company_id != bill.company_id
+            || related.organization_id != organization_id
+            || related.product_id != line.product_id
+            || related.product_uom_id != line.product_uom_id
+            || related_bill.move_type != MoveType::InInvoice
+            || related_bill.state == AccountMoveState::Cancelled
+            || related_bill.invoice_origin.as_deref() != Some(origin)
+            || !po.invoice_ids.contains(&related.move_id)
+            || !related.quantity.is_finite()
+            || related.quantity < 0.0
+        {
+            return Err("Bill-line quantity lineage is invalid".into());
+        }
+        source_billed += related.quantity;
+    }
+    let tolerance = crate::purchasing::purchase_orders::qty_match_tolerance_for_order(&po);
+    if !tolerance.is_finite()
+        || !source.qty_invoiced.is_finite()
+        || (source_billed - source.qty_invoiced).abs() > 1e-8
+        || !source.qty_received.is_finite()
+        || !source.product_qty.is_finite()
+        || source.qty_received < 0.0
+        || source.product_qty < 0.0
+        || source.qty_invoiced < 0.0
+    {
+        return Err("PO billed quantity does not agree with exact bill-line lineage".into());
+    }
+    let next_billed = source_billed - line.quantity + quantity;
+    if !next_billed.is_finite()
+        || next_billed > source.qty_received + tolerance
+        || next_billed > source.product_qty + tolerance
+    {
+        return Err("Corrected billed quantity exceeds received or ordered quantity".into());
+    }
+    let bill_lines = load_move_lines_in_scope(ctx, organization_id, &bill)?;
+    let counterparts: Vec<_> = bill_lines
+        .iter()
+        .filter(|l| is_receivable_or_payable_line_type(l.account_internal_type.as_deref()))
+        .collect();
+    if counterparts.len() != 1
+        || !counterparts[0]
+            .account_internal_type
+            .as_deref()
+            .is_some_and(|v| v.eq_ignore_ascii_case("payable"))
+        || counterparts[0].partner_id != bill.partner_id
+    {
+        return Err("Economic correction requires one canonical payable line".into());
+    }
+    let mut payable = counterparts[0].clone();
+    let mut total = 0.0;
+    let mut previous_total = 0.0;
+    for expense in bill_lines.iter().filter(|l| l.id != payable.id) {
+        let exact_sources: Vec<_> = po_lines
+            .iter()
+            .filter(|p| p.invoice_lines.contains(&expense.id))
+            .collect();
+        if exact_sources.len() != 1
+            || ctx
+                .db
+                .purchase_order_line()
+                .iter()
+                .filter(|p| p.invoice_lines.contains(&expense.id))
+                .count()
+                != 1
+            || expense.is_matching
+            || expense.payment_id.is_some()
+            || expense.statement_line_id.is_some()
+            || expense.product_id != Some(exact_sources[0].product_id)
+            || expense.product_uom_id != Some(exact_sources[0].product_uom)
+            || expense.partner_id != bill.partner_id
+            || expense.exclude_from_invoice_tab
+            || !expense.tax_ids.is_empty()
+            || expense.tax_line_id.is_some()
+            || expense.tax_group_id.is_some()
+            || expense.discount != 0.0
+            || expense.credit != 0.0
+        {
+            return Err("Economic correction requires untaxed canonical PO expense lines".into());
+        }
+        let old_subtotal = correction_subtotal(expense.quantity, expense.price_unit)?;
+        if !expense.debit.is_finite()
+            || (expense.debit - old_subtotal).abs() > 1e-8
+            || !expense.price_subtotal.is_finite()
+            || (expense.price_subtotal - old_subtotal).abs() > 1e-8
+        {
+            return Err(
+                "Bill-line economics do not agree; journal amounts cannot be guessed".into(),
+            );
+        }
+        previous_total += old_subtotal;
+        total += if expense.id == line.id {
+            subtotal
+        } else {
+            old_subtotal
+        };
+    }
+    if !total.is_finite()
+        || payable.is_matching
+        || payable.payment_id.is_some()
+        || payable.statement_line_id.is_some()
+        || !payable.credit.is_finite()
+        || payable.debit != 0.0
+        || (payable.credit - previous_total).abs() > 1e-8
+        || !payable.tax_ids.is_empty()
+        || payable.tax_line_id.is_some()
+    {
+        return Err("Bill payable economics do not agree".into());
+    }
+    let before = serde_json::json!({"quantity": line.quantity, "price_unit": line.price_unit, "subtotal": line.price_subtotal, "total": bill.amount_total});
+    let mut updated = line;
+    updated.quantity = quantity;
+    updated.price_unit = price;
+    updated.name = params.name.clone().unwrap_or(updated.name);
+    updated.price = subtotal;
+    updated.price_subtotal = subtotal;
+    updated.price_total = subtotal;
+    updated.debit = subtotal;
+    updated.credit = 0.0;
+    updated.balance = subtotal;
+    updated.amount_currency = subtotal;
+    updated.amount_residual = subtotal;
+    updated.amount_residual_currency = subtotal;
+    updated.debit_currency = subtotal;
+    updated.credit_currency = 0.0;
+    updated.write_uid = Some(ctx.sender());
+    updated.write_date = Some(ctx.timestamp);
+    payable.quantity = 1.0;
+    payable.price_unit = total;
+    payable.price = total;
+    payable.price_subtotal = total;
+    payable.price_total = total;
+    payable.credit = total;
+    payable.balance = -total;
+    payable.amount_currency = -total;
+    payable.amount_residual = -total;
+    payable.amount_residual_currency = -total;
+    payable.debit_currency = 0.0;
+    payable.credit_currency = total;
+    payable.write_uid = Some(ctx.sender());
+    payable.write_date = Some(ctx.timestamp);
+    source.qty_invoiced = next_billed;
+    source.qty_to_invoice = (source.qty_received - next_billed).max(0.0);
+    source.match_state =
+        crate::purchasing::purchase_orders::compute_line_match_state(&source, tolerance);
+    source.write_uid = ctx.sender();
+    source.write_date = ctx.timestamp;
+    let any_billed = po_lines.iter().any(|p| {
+        if p.id == source.id {
+            next_billed > 0.0
+        } else {
+            p.qty_invoiced > 0.0
+        }
+    });
+    let all_billed = po_lines.iter().all(|p| {
+        p.qty_received
+            <= (if p.id == source.id {
+                next_billed
+            } else {
+                p.qty_invoiced
+            })
+    });
+    po.invoice_status = if !any_billed {
+        PoInvoiceStatus::No
+    } else if all_billed {
+        PoInvoiceStatus::Invoiced
+    } else {
+        PoInvoiceStatus::Partial
+    };
+    po.write_uid = ctx.sender();
+    po.write_date = ctx.timestamp;
+    ctx.db.account_move_line().id().update(updated.clone());
+    ctx.db.account_move_line().id().update(payable);
+    ctx.db.purchase_order_line().id().update(source);
+    ctx.db.purchase_order().id().update(po);
+    compute_invoice_totals_internal(ctx, organization_id, bill.id)?;
+    write_audit_log_v2(ctx, organization_id, AuditLogParams { company_id: Some(bill.company_id), table_name: "account_move_line", record_id: updated.id, action: "CORRECT_ECONOMICS", old_values: Some(before.to_string()), new_values: Some(serde_json::json!({"quantity": quantity, "price_unit": price, "subtotal": subtotal, "total": total}).to_string()), changed_fields: vec!["quantity".into(), "price_unit".into(), "price_subtotal".into()], metadata: None });
+    Ok(())
+}
+
+fn correction_subtotal(quantity: f64, price: f64) -> Result<f64, String> {
+    if !quantity.is_finite() || quantity <= 0.0 || !price.is_finite() || price < 0.0 {
+        return Err(
+            "Quantity must be finite and positive; unit price finite and non-negative".into(),
+        );
+    }
+    let subtotal = quantity * price;
+    if !subtotal.is_finite() {
+        return Err("Corrected subtotal is not finite".into());
+    }
+    Ok(subtotal)
+}
+
 #[spacetimedb::reducer]
 pub fn update_account_move_line(
     ctx: &ReducerContext,
@@ -1733,6 +2058,19 @@ pub fn update_account_move_line(
 
     if move_record.state != AccountMoveState::Draft {
         return Err("Cannot edit lines of a posted move".to_string());
+    }
+
+    if line.organization_id != organization_id
+        || line.company_id != company_id
+        || move_record.organization_id != organization_id
+    {
+        return Err("Move line does not belong to this scope".into());
+    }
+    if params.quantity.is_some() || params.price_unit.is_some() {
+        return correct_po_bill_line(ctx, organization_id, line, &params);
+    }
+    if params.expected_quantity.is_some() || params.expected_price_unit.is_some() {
+        return Err("Reviewed economic values require an economic correction".into());
     }
 
     let new_debit = params.debit.unwrap_or(line.debit);
@@ -2398,10 +2736,13 @@ pub fn create_bill_from_purchase_order(
         // Always take tags from the PO line — do not treat template `[]` as preserve.
         line_params.analytic_tag_ids = analytic_tag_ids;
 
-        insert_draft_account_move_line(ctx, &move_record, line_params)?;
+        let inserted = insert_draft_account_move_line(ctx, &move_record, line_params)?;
+        let mut invoice_lines = line.invoice_lines.clone();
+        invoice_lines.push(inserted.id);
 
         ctx.db.purchase_order_line().id().update(
             crate::purchasing::purchase_orders::PurchaseOrderLine {
+                invoice_lines,
                 qty_invoiced: qty_invoiced_prev + qty,
                 qty_to_invoice: (product_qty - (qty_invoiced_prev + qty)).max(0.0),
                 write_uid: ctx.sender(),

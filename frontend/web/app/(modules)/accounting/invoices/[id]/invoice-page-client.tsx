@@ -72,7 +72,9 @@ import {
 } from '@lumiere/query-hooks/hooks/accounting';
 import { useInvoiceToPaymentWorkflow } from '@lumiere/query-hooks/hooks/accounting/invoice-workflow';
 import { useCreateDocument } from '@lumiere/query-hooks/hooks/documents';
-import { usePurchaseOrders } from '@lumiere/query-hooks/hooks/purchasing';
+import { UpdateAccountMoveLineParams } from '@lumiere/stdb/types';
+import { billLineCorrectionSource, billLineCorrectionParams } from '../../bill-line-correction';
+import { usePurchaseOrderLines, usePurchaseOrders } from '@lumiere/query-hooks/hooks/purchasing';
 import { useSaleOrders } from '@lumiere/query-hooks/hooks/sales';
 import {
   downloadDocumentPdf,
@@ -162,6 +164,7 @@ function InvoicePageLoaded({
   const { data: accounts = [] } = useAccountAccounts(orgId, { enabled: true });
   const { data: saleOrders = [] } = useSaleOrders(orgId);
   const { data: purchaseOrders = [] } = usePurchaseOrders(orgId);
+  const { data: purchaseLines = [] } = usePurchaseOrderLines(orgId);
 
   const mailTemplates = useMailTemplates(organizationId, true);
   const queueMail = useQueueMailFromTemplate(organizationId, Number(operatingCompanyId));
@@ -424,6 +427,30 @@ function InvoicePageLoaded({
   }));
   const lineActions: EntityAction[] = canEditMoveLines(move)
     ? [
+        {
+          id: 'bill-line-correct-economics',
+          label: t('accounting.billCorrection.action'),
+          requiresSelection: true,
+          selection: 'single',
+          isApplicable: (rows) => Object.hasOwn(UpdateAccountMoveLineParams.elements, 'quantity') && rows.length === 1 && checkPermission('account_move_line', 'write').allowed && checkPermission('account_move', 'write').allowed && billLineCorrectionSource(move as Row, rows[0], purchaseOrders as unknown as Row[], purchaseLines as unknown as Row[]) != null,
+          onClick: async (rows) => {
+            const line = rows[0];
+            if (!line?.id) return;
+            const source = billLineCorrectionSource(move as Row, line, purchaseOrders as unknown as Row[], purchaseLines as unknown as Row[]);
+            if (!source) throw new Error(t('accounting.billCorrection.unavailable'));
+            const values = await askForm({
+              id: 'correct-po-bill-line',
+              title: t('accounting.billCorrection.action'),
+              description: t('accounting.billCorrection.description', { price: String(source.priceUnit ?? source.price_unit), received: String(source.qtyReceived ?? source.qty_received) }),
+              fields: [
+                { id: 'quantity', name: 'quantity', type: 'number', label: t('accounting.billCorrection.quantity'), required: true, defaultValue: Number(line.quantity) },
+                { id: 'priceUnit', name: 'priceUnit', type: 'number', label: t('accounting.billCorrection.price'), required: true, defaultValue: Number(line.priceUnit ?? line.price_unit) },
+              ],
+            });
+            if (!values) return;
+            await updateLine.mutateAsync({ lineId: BigInt(String(line.id)), params: updateAccountMoveLineParamsToJson(billLineCorrectionParams(line, values, operatingCompanyId)) });
+          },
+        } satisfies EntityAction,
         {
           id: 'move-line-add',
           label: t('accounting.actions.addMoveLine'),

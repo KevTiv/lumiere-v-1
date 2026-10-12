@@ -5,7 +5,7 @@ use crate::accounting::chart_of_accounts::{
     account_journal, create_account_journal, CreateAccountJournalParams,
 };
 use crate::accounting::journal_entries::{
-    account_move_line, create_bill_from_purchase_order, post_invoice, AccountMoveLine,
+    account_move, account_move_line, create_bill_from_purchase_order, post_invoice,
     AddAccountMoveLineParams, CreateBillFromPurchaseOrderParams,
 };
 use crate::crm::contacts::{contact, create_contact, CreateContactParams};
@@ -495,14 +495,130 @@ pub fn test_price_match_blocks_post_invoice(ctx: &ReducerContext) -> Result<(), 
         .find(&line_id)
         .map(|l| l.price_unit)
         .ok_or("po line")?;
-    ctx.db.account_move_line().id().update(AccountMoveLine {
-        price_unit: po_price + 5.0,
-        ..product_line
-    });
-
-    match post_invoice(ctx, org_id, bill_id, expense_id, expense_id) {
-        Err(e) if e.contains("three-way match failed") && e.contains("bill price") => Ok(()),
-        Err(e) => Err(format!("expected price match error, got: {e}")),
-        Ok(()) => Err("price match should have blocked post_invoice".into()),
+    let correction = |qty, price, expected_qty, expected_price| {
+        crate::accounting::journal_entries::UpdateAccountMoveLineParams {
+            company_id: Some(fixture.company_id),
+            name: None,
+            debit: None,
+            credit: None,
+            partner_id: None,
+            analytic_account_id: None,
+            metadata: None,
+            quantity: Some(qty),
+            price_unit: Some(price),
+            expected_quantity: Some(expected_qty),
+            expected_price_unit: Some(expected_price),
+        }
+    };
+    let update = crate::accounting::journal_entries::update_account_move_line;
+    update(
+        ctx,
+        org_id,
+        product_line.id,
+        correction(
+            3.0,
+            po_price + 5.0,
+            product_line.quantity,
+            product_line.price_unit,
+        ),
+    )?;
+    let altered = ctx
+        .db
+        .account_move_line()
+        .id()
+        .find(&product_line.id)
+        .ok_or("corrected line")?;
+    let bill_before = ctx.db.account_move().id().find(&bill_id).ok_or("bill")?;
+    if (altered.debit - 3.0 * (po_price + 5.0)).abs() > 1e-8
+        || (bill_before.amount_total - altered.debit).abs() > 1e-8
+    {
+        return Err("correction did not rebalance bill economics".into());
     }
+    match post_invoice(ctx, org_id, bill_id, expense_id, expense_id) {
+        Err(e) if e.contains("three-way match failed") && e.contains("bill price") => {}
+        Err(e) => return Err(format!("expected price match error, got: {e}")),
+        Ok(()) => return Err("price match should have blocked post_invoice".into()),
+    }
+    if update(
+        ctx,
+        org_id,
+        product_line.id,
+        correction(
+            3.0,
+            po_price,
+            product_line.quantity,
+            product_line.price_unit,
+        ),
+    )
+    .is_ok()
+    {
+        return Err("stale reviewed price was accepted".into());
+    }
+    if update(
+        ctx,
+        org_id,
+        product_line.id,
+        correction(f64::NAN, po_price, 3.0, po_price + 5.0),
+    )
+    .is_ok()
+    {
+        return Err("non-finite correction was accepted".into());
+    }
+    if update(
+        ctx,
+        org_id,
+        product_line.id,
+        correction(4.0, po_price, 3.0, po_price + 5.0),
+    )
+    .is_ok()
+    {
+        return Err("over-received correction was accepted".into());
+    }
+    let rejected = ctx
+        .db
+        .account_move()
+        .id()
+        .find(&bill_id)
+        .ok_or("rejected bill")?;
+    if rejected.state != crate::types::AccountMoveState::Draft
+        || rejected.amount_total != bill_before.amount_total
+    {
+        return Err("rejection changed bill state or totals".into());
+    }
+    update(
+        ctx,
+        org_id,
+        product_line.id,
+        correction(2.0, po_price, 3.0, po_price + 5.0),
+    )?;
+    let source = ctx
+        .db
+        .purchase_order_line()
+        .id()
+        .find(&line_id)
+        .ok_or("source")?;
+    if source.qty_invoiced != 2.0
+        || source.qty_to_invoice != 1.0
+        || source.match_state != "under_billed"
+    {
+        return Err("quantity correction did not refresh source quantities".into());
+    }
+    update(
+        ctx,
+        org_id,
+        product_line.id,
+        correction(3.0, po_price, 2.0, po_price),
+    )?;
+    post_invoice(ctx, org_id, bill_id, expense_id, expense_id)?;
+    if update(
+        ctx,
+        org_id,
+        product_line.id,
+        correction(3.0, po_price, 3.0, po_price),
+    )
+    .is_ok()
+    {
+        return Err("posted bill accepted correction".into());
+    }
+    Ok(())
 }
