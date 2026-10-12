@@ -1715,6 +1715,12 @@ fn correct_po_bill_line(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "account_move", "write")?;
     let bill = load_account_move_in_scope(ctx, organization_id, line.move_id)?;
+    crate::workflow::authorization::require_workflow_company_access(
+        ctx,
+        organization_id,
+        Some(bill.company_id),
+        ctx.sender(),
+    )?;
     if bill.move_type != MoveType::InInvoice
         || bill.state != AccountMoveState::Draft
         || bill.posted_before
@@ -2005,7 +2011,7 @@ fn correct_po_bill_line(
     po.write_date = ctx.timestamp;
     ctx.db.account_move_line().id().update(updated.clone());
     ctx.db.account_move_line().id().update(payable);
-    ctx.db.purchase_order_line().id().update(source);
+    crate::purchasing::purchase_orders::persist_line_match_state(ctx, &po, source);
     ctx.db.purchase_order().id().update(po);
     compute_invoice_totals_internal(ctx, organization_id, bill.id)?;
     write_audit_log_v2(ctx, organization_id, AuditLogParams { company_id: Some(bill.company_id), table_name: "account_move_line", record_id: updated.id, action: "CORRECT_ECONOMICS", old_values: Some(before.to_string()), new_values: Some(serde_json::json!({"quantity": quantity, "price_unit": price, "subtotal": subtotal, "total": total}).to_string()), changed_fields: vec!["quantity".into(), "price_unit".into(), "price_subtotal".into()], metadata: None });
