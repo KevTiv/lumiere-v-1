@@ -1,5 +1,7 @@
 # COV-05e1/f0/f1 implementation and validation status
 
+> Integration update (2026-10-12): [Purchasing stack integration](erp-cov05-purchasing-stack-integration.md) supersedes the original build/release blockers below. This document retains evidence from its original base; it does not claim current integrated acceptance.
+
 **Base:** `16f87f9ffc5be5fb18dcde6b184c344a56c52665`
 
 **Disposition:** `REVIEW` — bounded source implementation and review fixes complete;
