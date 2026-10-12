@@ -57,6 +57,7 @@ import type { EntityRow, EntityViewConfig, EntityTableConfig, EntityRecordSheetC
 import type { Product, Uom } from "@lumiere/stdb/types"
 import { purchasingModuleConfig } from "@/lib/module-dashboard-configs"
 import { usePurchasingModuleSubscription } from "@/lib/module-subscription-hooks"
+import { purchaseMatchRecovery, type PoLineMatchStatus } from "./purchase-match-recovery"
 import { PurchasingOpsSod } from "./purchasing-ops-sod"
 import { purchaseOrderLineCanBeRemoved, requisitionCanCreateRfq } from "./purchasing-action-gates"
 import { PurchasingBlanketWorkspace } from "./purchasing-blanket-workspace"
@@ -281,15 +282,6 @@ function stockPickingRowsToSelectOptions(
   }))
 }
 
-const PO_QTY_MATCH_TOLERANCE = 0.001
-
-type PoLineMatchStatus =
-  | "matched"
-  | "pending"
-  | "under_received"
-  | "over_received"
-  | "under_billed"
-  | "over_billed"
 
 function isDropshipPo(row: Record<string, unknown>): boolean {
   const origin = String(row.origin ?? "")
@@ -306,70 +298,10 @@ function isDropshipPo(row: Record<string, unknown>): boolean {
   return false
 }
 
-function matchStateFromMetadata(row: Record<string, unknown>): PoLineMatchStatus | null {
-  const metaRaw = row.metadata
-  if (typeof metaRaw !== "string" || !metaRaw.trim()) return null
-  try {
-    const parsed = JSON.parse(metaRaw) as Record<string, unknown>
-    const state = String(parsed.match_state ?? "")
-    if (
-      state === "matched" ||
-      state === "pending" ||
-      state === "under_received" ||
-      state === "over_received" ||
-      state === "under_billed" ||
-      state === "over_billed"
-    ) {
-      return state
-    }
-  } catch {
-    /* ignore */
-  }
-  return null
-}
-
-function computeLineMatchState(
-  row: Record<string, unknown>,
-  tolerance = PO_QTY_MATCH_TOLERANCE,
-): { status: PoLineMatchStatus; tooltip: string } {
-  const fromMeta = matchStateFromMetadata(row)
-  const ordered = Number(row.productQty ?? row.product_qty ?? 0)
-  const received = Number(row.qtyReceived ?? row.qty_received ?? 0)
-  const billed = Number(row.qtyInvoiced ?? row.qty_invoiced ?? 0)
-
-  let status: PoLineMatchStatus = fromMeta ?? "pending"
-  if (fromMeta == null) {
-    if (received <= tolerance && billed <= tolerance) {
-      status = "pending"
-    } else if (received > ordered + tolerance) {
-      status = "over_received"
-    } else if (billed > received + tolerance || billed > ordered + tolerance) {
-      status = "over_billed"
-    } else if (Math.abs(received - billed) <= tolerance && received <= ordered + tolerance) {
-      status = "matched"
-    } else if (billed < received - tolerance) {
-      status = "under_billed"
-    } else if (received < ordered - tolerance) {
-      status = "under_received"
-    }
-  }
-
-  const variance =
-    status === "over_billed" || status === "under_billed"
-      ? billed - received
-      : status === "over_received" || status === "under_received"
-        ? received - ordered
-        : 0
-
-  const tooltipKey = `purchasing.orderLines.matchStatus.tooltips.${status}`
-  const tooltip = variance !== 0 ? `${tooltipKey}:var=${variance.toFixed(4)}` : tooltipKey
-
-  return { status, tooltip }
-}
-
 function poLineMatchBadges(t: (key: string) => string) {
   return {
     badgeVariants: {
+      unavailable: "destructive",
       matched: "default",
       pending: "secondary",
       under_received: "outline",
@@ -378,6 +310,7 @@ function poLineMatchBadges(t: (key: string) => string) {
       over_billed: "destructive",
     },
     badgeLabels: {
+      unavailable: t("purchasing.orderLines.matchStatus.unavailable"),
       matched: t("purchasing.orderLines.matchStatus.matched"),
       pending: t("purchasing.orderLines.matchStatus.pending"),
       under_received: t("purchasing.orderLines.matchStatus.under_received"),
@@ -1568,6 +1501,20 @@ function PurchasingClientLoaded({
             },
           },
           {
+            key: "matchRecovery",
+            label: t("purchasing.orderLines.recovery.title"),
+            render: (_value, row) => {
+              const order = (orders as Record<string, unknown>[]).find((o) => String(o.id) === String(row.orderId ?? row.order_id))
+              const recovery = purchaseMatchRecovery(row, order)
+              return (
+                <div className="max-w-xs space-y-1" data-testid={`po-match-recovery-${String(row.id)}`}>
+                  <p className="text-sm">{t(`purchasing.orderLines.recovery.${recovery.guidance}`)}</p>
+                  {order ? <a className="text-sm underline" href={purchaseOrderRecordHref(order)}>{t("purchasing.orderLines.recovery.reviewOrder")}</a> : null}
+                </div>
+              )
+            },
+          },
+          {
             key: "qtyToInvoice",
             label: t("purchasing.orderLines.columns.qtyToInvoice"),
             type: "number",
@@ -1650,6 +1597,26 @@ function PurchasingClientLoaded({
             },
           },
           {
+            id: "pol-recover-match",
+            label: t("purchasing.orderLines.recovery.receiveMissing"),
+            requiresSelection: true,
+            selection: "single",
+            isApplicable: (rows) => rows.length === 1 && purchasingWorkflow.receiveLine.canPresent(rows[0] as EntityRow) && purchaseMatchRecovery(rows[0], (orders as Record<string, unknown>[]).find((o) => String(o.id) === String(rows[0].orderId ?? rows[0].order_id))).receiptQty != null,
+            onClick: (rows) => {
+              const selected = rows[0]
+              // Re-read the current query row rather than the selection's older snapshot.
+              const line = selected && (lines as Record<string, unknown>[]).find((l) => String(l.id) === String(selected.id))
+              if (!line || !purchasingWorkflow.receiveLine.canPresent(line as EntityRow)) return
+              const order = (orders as Record<string, unknown>[]).find((o) => String(o.id) === String(line.orderId ?? line.order_id))
+              const recovery = purchaseMatchRecovery(line, order)
+              if (recovery.receiptQty == null) return
+              setQuickActionForm({
+                form: mergeFieldDefaultValues({ ...receiveLineFormConfig, description: t("purchasing.orderLines.recovery.confirmReceipt") }, { lineId: String(line.id), qty: recovery.receiptQty }),
+                action: "receivePurchaseOrderLine",
+              })
+            },
+          },
+          {
             id: "pol-receive-qty",
             label: t("purchasing.actions.receiveFullOpenQty"),
             requiresSelection: true,
@@ -1672,6 +1639,7 @@ function PurchasingClientLoaded({
     invoiceLineFormConfig,
     removePurchaseOrderLine,
     orders,
+    lines,
     purchasingWorkflow.receiveLine,
   ])
 
@@ -2324,14 +2292,15 @@ function PurchasingClientLoaded({
   const enrichedLines = useMemo(
     () =>
       (lines as Record<string, unknown>[]).map((line) => {
-        const match = computeLineMatchState(line)
+        const order = (orders as Record<string, unknown>[]).find((o) => String(o.id) === String(line.orderId ?? line.order_id))
+        const match = purchaseMatchRecovery(line, order)
         return {
           ...line,
           matchStatus: match.status,
-          matchTooltip: match.tooltip,
+          matchTooltip: `purchasing.orderLines.matchStatus.tooltips.${match.status}${match.variance !== 0 ? `:var=${match.variance.toFixed(4)}` : ""}`,
         }
       }),
-    [lines],
+    [lines, orders],
   )
 
   const enrichedOrders = useMemo(
