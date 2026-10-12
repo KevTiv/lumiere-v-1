@@ -21,7 +21,7 @@ use crate::types::JournalType;
 
 use super::gap_fixes_test::seed_vendor_po;
 
-fn empty_move_line(account_id: u64) -> AddAccountMoveLineParams {
+pub(super) fn empty_move_line(account_id: u64) -> AddAccountMoveLineParams {
     AddAccountMoveLineParams {
         account_id,
         name: String::new(),
@@ -60,7 +60,7 @@ fn empty_move_line(account_id: u64) -> AddAccountMoveLineParams {
     }
 }
 
-fn expense_and_ap(fixture: &OrgFixture) -> Result<(u64, u64), String> {
+pub(super) fn expense_and_ap(fixture: &OrgFixture) -> Result<(u64, u64), String> {
     let ap_id = *fixture
         .chart_account_ids
         .get(chart_keys::AP)

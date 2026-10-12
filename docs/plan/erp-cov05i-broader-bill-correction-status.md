@@ -1,5 +1,7 @@
 # COV-05i — broader draft bill correction
 
+> Producer follow-up: [COV-05j](erp-cov05j-tax-fx-bill-creation-status.md) now creates explicit tax/FX accounting rows from the existing bill command. Its source validation and runtime limits are recorded separately.
+
 Date: 2026-10-12 (Europe/Amsterdam). Integration lane: PR #179.
 
 ## Supported correction shapes

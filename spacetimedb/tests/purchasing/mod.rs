@@ -10,6 +10,7 @@ pub mod phase1_returns_advanced_test;
 pub mod phase2_blanket_release_test;
 pub mod purchase_bill_test;
 pub mod strict_provenance_test;
+pub mod tax_fx_bill_test;
 pub mod wave_e_test;
 
 use spacetimedb::ReducerContext;
@@ -54,6 +55,8 @@ pub fn run_purchasing_wave_e_test(ctx: &ReducerContext) -> Result<(), String> {
         .map_err(|e| format!("strict_po_provenance_rejections: {e}"))?;
     strict_provenance_test::test_strict_provenance_manual_vendor_bill(ctx)
         .map_err(|e| format!("strict_provenance_manual_vendor_bill: {e}"))?;
+    tax_fx_bill_test::test_tax_fx_bill_creation(ctx)
+        .map_err(|e| format!("tax_fx_bill_creation: {e}"))?;
     Ok(())
 }
 

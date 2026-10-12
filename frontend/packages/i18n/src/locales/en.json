@@ -6184,7 +6184,7 @@
       },
       "createBillFromOrder": {
         "title": "Create bill from purchase order",
-        "description": "Generate a vendor bill for the selected confirmed purchase order.",
+        "description": "Bill the received quantity in the purchase order currency. The bill date selects the exchange rate. Select the purchase tax matching the order; its tax group must have an input-tax account.",
         "submitLabel": "Create bill",
         "sections": {
           "accounting": "Accounting"
@@ -6194,6 +6194,9 @@
           "defaultExpenseAccountId": "Default expense account",
           "payableAccountId": "Payable account",
           "invoiceDate": "Bill date",
+          "taxId": "Purchase tax",
+          "taxHint": "Applies to all billable lines and must agree with their PO tax amounts.",
+          "discount": "Supplier discount (%)",
           "payableLineName": "Payable line label (optional)",
           "narration": "Bill notes",
           "narrationPlaceholder": "Defaults to the purchase order's notes if left blank…",
@@ -6202,6 +6205,7 @@
           "payableExcludeFromInvoiceTab": "Exclude payable line from bill tab",
           "payableBlocked": "Block payable line"
         },
+        "noTax": "No tax",
         "noPayableAccounts": "No payable accounts — create chart of accounts first",
         "noJournals": "No purchase journals — create one in Accounting",
         "noAccounts": "No GL accounts — create chart of accounts first"

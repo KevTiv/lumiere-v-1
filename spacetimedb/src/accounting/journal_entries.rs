@@ -12,8 +12,10 @@ use crate::accounting::budgeting::{
 use crate::accounting::chart_of_accounts::{account_account, account_journal};
 use crate::accounting::fiscal_periods::ensure_accounting_period_open_for_date;
 use crate::accounting::idempotency::{record_result, replayed_result};
-use crate::accounting::relations::{require_active_tax, require_explicit_company_id};
-use crate::accounting::tax_management::account_tax;
+use crate::accounting::relations::{
+    require_active_account, require_active_tax, require_explicit_company_id,
+};
+use crate::accounting::tax_management::{account_tax, account_tax_group};
 use crate::core::organization::{company, require_company_in_organization};
 use crate::core::persistence::{record_organization_commit, OrganizationCommitInput, RowChange};
 use crate::crm::contacts::contact;
@@ -2270,22 +2272,15 @@ fn correct_po_bill_line(
     Ok(())
 }
 
-fn correction_economics(
+fn bill_percentage_tax_rules(
     ctx: &ReducerContext,
-    bill: &AccountMove,
-    line: &AccountMoveLine,
-    quantity: f64,
-    price: f64,
-) -> Result<crate::accounting::bill_correction_math::Economics, String> {
+    organization_id: u64,
+    company_id: u64,
+    ids: &[u64],
+) -> Result<Vec<crate::accounting::bill_correction_math::PercentageTax>, String> {
     let mut taxes = Vec::new();
-    for id in &line.tax_ids {
-        let tax = require_active_tax(
-            ctx,
-            bill.organization_id,
-            bill.company_id,
-            *id,
-            "correction",
-        )?;
+    for id in ids {
+        let tax = require_active_tax(ctx, organization_id, company_id, *id, "vendor bill")?;
         if tax.amount_type != crate::types::TaxAmountType::Percent
             || !matches!(
                 tax.type_tax_use,
@@ -2296,7 +2291,7 @@ fn correction_economics(
             || !tax.invoice_repartition_line_ids.is_empty()
         {
             return Err(
-                "Correction supports non-compounding percentage purchase taxes only".into(),
+                "Vendor bills support non-compounding percentage purchase taxes only".into(),
             );
         }
         taxes.push(crate::accounting::bill_correction_math::PercentageTax {
@@ -2305,40 +2300,70 @@ fn correction_economics(
             included: tax.price_include,
         });
     }
+    Ok(taxes)
+}
+
+fn correction_economics(
+    ctx: &ReducerContext,
+    bill: &AccountMove,
+    line: &AccountMoveLine,
+    quantity: f64,
+    price: f64,
+) -> Result<crate::accounting::bill_correction_math::Economics, String> {
+    let taxes =
+        bill_percentage_tax_rules(ctx, bill.organization_id, bill.company_id, &line.tax_ids)?;
     crate::accounting::bill_correction_math::economics(quantity, price, line.discount, &taxes)
 }
 
 fn correction_fx(ctx: &ReducerContext, bill: &AccountMove) -> Result<(f64, Option<f64>), String> {
-    require_company_in_organization(ctx, bill.organization_id, bill.company_id)?;
-    let company = ctx
-        .db
-        .company()
-        .id()
-        .find(&bill.company_id)
-        .ok_or("Bill company unavailable")?;
-    if company.currency_id != bill.company_currency_id {
-        return Err("Bill company currency is inconsistent".into());
-    }
-    if bill.currency_id == bill.company_currency_id {
-        return Ok((1.0, None));
-    }
-    crate::core::reference::require_active_currency_for_organization(
-        ctx,
-        bill.organization_id,
-        bill.currency_id,
-    )?;
-    let currency = crate::core::reference::require_active_currency_for_organization(
-        ctx,
-        bill.organization_id,
-        bill.company_currency_id,
-    )?;
-    let rate = crate::core::reference::resolve_currency_rate_as_of(
+    vendor_bill_fx(
         ctx,
         bill.organization_id,
         bill.company_id,
         bill.currency_id,
         bill.company_currency_id,
         bill.invoice_date.unwrap_or(bill.date),
+    )
+}
+
+fn vendor_bill_fx(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    currency_id: u64,
+    company_currency_id: u64,
+    invoice_date: Timestamp,
+) -> Result<(f64, Option<f64>), String> {
+    require_company_in_organization(ctx, organization_id, company_id)?;
+    let company = ctx
+        .db
+        .company()
+        .id()
+        .find(&company_id)
+        .ok_or("Bill company unavailable")?;
+    if company.currency_id != company_currency_id {
+        return Err("Bill company currency is inconsistent".into());
+    }
+    if currency_id == company_currency_id {
+        return Ok((1.0, None));
+    }
+    crate::core::reference::require_active_currency_for_organization(
+        ctx,
+        organization_id,
+        currency_id,
+    )?;
+    let currency = crate::core::reference::require_active_currency_for_organization(
+        ctx,
+        organization_id,
+        company_currency_id,
+    )?;
+    let rate = crate::core::reference::resolve_currency_rate_as_of(
+        ctx,
+        organization_id,
+        company_id,
+        currency_id,
+        company_currency_id,
+        invoice_date,
     )?;
     Ok((rate, Some(currency.rounding_factor)))
 }
@@ -3000,14 +3025,30 @@ pub fn create_bill_from_purchase_order(
         return Err("Purchase order must be confirmed before billing".to_string());
     }
 
-    let billable_lines: Vec<_> = ctx
+    let order_lines: Vec<_> = ctx
         .db
         .purchase_order_line()
         .purchase_order_line_by_order()
         .filter(&purchase_order_id)
-        .filter(|l| l.qty_received > l.qty_invoiced)
         .collect();
 
+    for line in &order_lines {
+        if line.organization_id != organization_id
+            || line.company_id != po.company_id
+            || line.currency_id != po.currency_id
+            || line.partner_id != po.partner_id
+            || !line.qty_received.is_finite()
+            || !line.qty_invoiced.is_finite()
+            || line.qty_received < 0.0
+            || line.qty_invoiced < 0.0
+        {
+            return Err("PO bill source scope or quantities are inconsistent".into());
+        }
+    }
+    let billable_lines: Vec<_> = order_lines
+        .into_iter()
+        .filter(|l| l.qty_received > l.qty_invoiced)
+        .collect();
     if billable_lines.is_empty() {
         return Err("No received quantity to bill on this purchase order".to_string());
     }
@@ -3021,6 +3062,154 @@ pub fn create_bill_from_purchase_order(
         .id()
         .find(&po.company_id)
         .ok_or("Company not found")?;
+
+    crate::workflow::authorization::require_workflow_company_access(
+        ctx,
+        organization_id,
+        po.company_id,
+        ctx.sender(),
+    )?;
+    if journal
+        .currency_id
+        .is_some_and(|id| id != po.currency_id && id != company.currency_id)
+    {
+        return Err("Purchase journal currency is incompatible with the PO".into());
+    }
+    let expense_account = require_active_account(
+        ctx,
+        organization_id,
+        po.company_id,
+        params.default_expense_account_id,
+        "expense",
+    )?;
+    let payable_account = require_active_account(
+        ctx,
+        organization_id,
+        po.company_id,
+        params.payable_line.account_id,
+        "payable",
+    )?;
+    if matches!(
+        expense_account.internal_type,
+        Some(AccountTypeInternal::Receivable | AccountTypeInternal::Payable)
+    ) || payable_account.internal_type != Some(AccountTypeInternal::Payable)
+    {
+        return Err("Vendor bill expense/payable account roles are invalid".into());
+    }
+    for template in [&params.expense_line, &params.payable_line] {
+        if template.tax_line_id.is_some()
+            || template.tax_group_id.is_some()
+            || template.tax_repartition_line_id.is_some()
+            || template.display_type.is_some()
+            || template.payment_id.is_some()
+            || template.statement_line_id.is_some()
+            || template.matching_number.is_some()
+            || template.is_downpayment
+        {
+            return Err(
+                "PO bills cannot inherit tax journal, display or payment identities from templates"
+                    .into(),
+            );
+        }
+    }
+    if params.expense_line.exclude_from_invoice_tab
+        || params.payable_line.discount != 0.0
+        || !params.payable_line.tax_ids.is_empty()
+        || params.payable_line.product_id.is_some()
+    {
+        return Err(
+            "PO bill templates must preserve expense visibility and a plain payable".into(),
+        );
+    }
+    let (fx, rounding) = vendor_bill_fx(
+        ctx,
+        organization_id,
+        po.company_id,
+        po.currency_id,
+        company.currency_id,
+        params.invoice_date,
+    )?;
+    let taxes = bill_percentage_tax_rules(
+        ctx,
+        organization_id,
+        po.company_id,
+        &params.expense_line.tax_ids,
+    )?;
+    let mut tax_accounts = std::collections::BTreeMap::new();
+    for rule in &taxes {
+        let tax = require_active_tax(ctx, organization_id, po.company_id, rule.id, "vendor bill")?;
+        let group_id = tax
+            .tax_group_id
+            .ok_or("Selected purchase tax needs a configured input-tax group")?;
+        let group = ctx
+            .db
+            .account_tax_group()
+            .id()
+            .find(&group_id)
+            .ok_or("Input-tax group unavailable")?;
+        if group.organization_id != organization_id || group.company_id != po.company_id {
+            return Err("Input-tax group is outside the bill company".into());
+        }
+        let account_id = group
+            .tax_receivable_account_id
+            .ok_or("Tax group needs an input-tax account")?;
+        let account =
+            require_active_account(ctx, organization_id, po.company_id, account_id, "input tax")?;
+        if account.internal_group != Some(crate::types::AccountInternalGroup::Asset)
+            || matches!(
+                account.internal_type,
+                Some(AccountTypeInternal::Receivable | AccountTypeInternal::Payable)
+            )
+        {
+            return Err(
+                "Input-tax account must be an asset account outside receivable/payable control"
+                    .into(),
+            );
+        }
+        tax_accounts.insert(rule.id, (account_id, group_id));
+    }
+    let mut planned = Vec::new();
+    let mut tax_totals = std::collections::BTreeMap::<u64, (f64, f64)>::new();
+    let mut amount_total = 0.0;
+    let mut ledger_total = 0.0;
+    for line in billable_lines {
+        let qty = line.qty_received - line.qty_invoiced;
+        let economics = crate::accounting::bill_correction_math::economics(
+            qty,
+            line.price_unit,
+            params.expense_line.discount,
+            &taxes,
+        )?;
+        let tax_amount: f64 = economics.taxes.values().sum();
+        crate::accounting::bill_correction_math::validate_po_tax_evidence(
+            line.price_tax,
+            line.product_qty,
+            qty,
+            params.expense_line.discount,
+            tax_amount,
+        )?;
+        let ledger = crate::accounting::bill_correction_math::ledger_amount(
+            economics.subtotal,
+            fx,
+            rounding,
+        )?;
+        amount_total += economics.subtotal;
+        ledger_total += ledger;
+        for (id, amount) in &economics.taxes {
+            let aggregate = tax_totals.entry(*id).or_default();
+            aggregate.0 += amount;
+            aggregate.1 += economics.subtotal;
+        }
+        planned.push((line, qty, economics, ledger));
+    }
+    for (amount, _) in tax_totals.values() {
+        amount_total += amount;
+        ledger_total +=
+            crate::accounting::bill_correction_math::ledger_amount(*amount, fx, rounding)?;
+    }
+    if !amount_total.is_finite() || !ledger_total.is_finite() {
+        return Err("Vendor bill totals overflow".into());
+    }
 
     let partner_display_name = ctx
         .db
@@ -3059,7 +3248,7 @@ pub fn create_bill_from_purchase_order(
         medium_id: None,
         company_id: po.company_id,
         journal_id: params.journal_id,
-        currency_id: journal.currency_id.unwrap_or(po.currency_id),
+        currency_id: po.currency_id,
         company_currency_id: company.currency_id,
         amount_untaxed: 0.0,
         amount_tax: 0.0,
@@ -3085,14 +3274,9 @@ pub fn create_bill_from_purchase_order(
         metadata: params.metadata.clone().or_else(|| po.notes.clone()),
     });
 
-    let mut amount_untaxed = 0.0f64;
-    let mut amount_tax = 0.0f64;
-    let bill_line_count = billable_lines.len();
-
-    for (seq, line) in billable_lines.into_iter().enumerate() {
-        let qty = line.qty_received - line.qty_invoiced;
-        let subtotal = qty * line.price_unit;
-        let tax_amount = line.price_tax * (qty / line.product_qty.max(1.0));
+    let bill_line_count = planned.len();
+    for (seq, (line, qty, economics, ledger)) in planned.into_iter().enumerate() {
+        let subtotal = economics.subtotal;
         let analytic_tag_ids = line.analytic_tag_ids.clone();
         let account_analytic_id = line.account_analytic_id;
         let product_id = line.product_id;
@@ -3103,7 +3287,7 @@ pub fn create_bill_from_purchase_order(
         let mut line_params = params.expense_line.clone();
         line_params.account_id = params.default_expense_account_id;
         line_params.name = format!("Product {}", product_id);
-        line_params.debit = subtotal;
+        line_params.debit = ledger;
         line_params.credit = 0.0;
         line_params.sequence = seq as u32;
         line_params.quantity = qty;
@@ -3117,7 +3301,10 @@ pub fn create_bill_from_purchase_order(
         // Always take tags from the PO line — do not treat template `[]` as preserve.
         line_params.analytic_tag_ids = analytic_tag_ids;
 
-        let created_line = insert_draft_account_move_line(ctx, &move_record, line_params)?;
+        let mut created_line = insert_draft_account_move_line(ctx, &move_record, line_params)?;
+        apply_correction_amounts(&mut created_line, subtotal, ledger, false);
+        created_line.price_total = economics.total;
+        ctx.db.account_move_line().id().update(created_line.clone());
         let mut invoice_lines = line.invoice_lines.clone();
         // Capture the exact inserted row once, preserving earlier partial bills.
         if !invoice_lines.contains(&created_line.id) {
@@ -3134,17 +3321,33 @@ pub fn create_bill_from_purchase_order(
                 ..line
             },
         );
-
-        amount_untaxed += subtotal;
-        amount_tax += tax_amount;
+    }
+    for (offset, (id, (amount, base))) in tax_totals.iter().enumerate() {
+        let (account_id, group_id) = tax_accounts[id];
+        let ledger = crate::accounting::bill_correction_math::ledger_amount(*amount, fx, rounding)?;
+        let mut tax_params = crate::accounting::line_params::journal_line_params(
+            account_id,
+            format!("Purchase tax {id}"),
+            ledger,
+            0.0,
+            (bill_line_count + offset) as u32,
+        );
+        tax_params.quantity = 1.0;
+        tax_params.price_unit = *amount;
+        tax_params.partner_id = Some(po.partner_id);
+        tax_params.tax_line_id = Some(*id);
+        tax_params.tax_group_id = Some(group_id);
+        tax_params.exclude_from_invoice_tab = true;
+        let mut tax_line = insert_draft_account_move_line(ctx, &move_record, tax_params)?;
+        apply_correction_amounts(&mut tax_line, *amount, ledger, false);
+        tax_line.tax_base_amount = *base;
+        ctx.db.account_move_line().id().update(tax_line);
     }
 
-    let amount_total = amount_untaxed + amount_tax;
-
     let mut payable_params = params.payable_line.clone();
-    payable_params.credit = amount_total;
+    payable_params.credit = ledger_total;
     payable_params.debit = 0.0;
-    payable_params.sequence = bill_line_count as u32;
+    payable_params.sequence = (bill_line_count + tax_totals.len()) as u32;
     payable_params.quantity = 1.0;
     payable_params.price_unit = amount_total;
     if payable_params.name.is_empty() {
@@ -3153,23 +3356,11 @@ pub fn create_bill_from_purchase_order(
             .unwrap_or_else(|| "Accounts Payable".to_string());
     }
     payable_params.partner_id = Some(po.partner_id);
-    insert_draft_account_move_line(ctx, &move_record, payable_params)?;
+    let mut payable = insert_draft_account_move_line(ctx, &move_record, payable_params)?;
+    apply_correction_amounts(&mut payable, amount_total, ledger_total, true);
+    ctx.db.account_move_line().id().update(payable);
 
-    // Update AccountMove totals
-    ctx.db.account_move().id().update(AccountMove {
-        amount_untaxed,
-        amount_tax,
-        amount_total,
-        amount_residual: amount_total,
-        amount_untaxed_signed: amount_untaxed,
-        amount_tax_signed: amount_tax,
-        amount_total_signed: amount_total,
-        amount_total_in_currency_signed: amount_total,
-        amount_residual_signed: amount_total,
-        write_uid: Some(ctx.sender()),
-        write_date: Some(ctx.timestamp),
-        ..move_record.clone()
-    });
+    compute_invoice_totals_internal(ctx, organization_id, move_record.id)?;
 
     // Preserve exact bill relations; Purchasing owns derived invoice coverage.
     let mut updated_invoice_ids = po.invoice_ids.clone();
@@ -3207,6 +3398,11 @@ pub fn create_bill_from_purchase_order(
                     "move_type": "InInvoice",
                     "purchase_order_id": purchase_order_id,
                     "amount_total": amount_total,
+                    "company_amount_total": ledger_total,
+                    "currency_id": move_record.currency_id,
+                    "fx_rate": fx,
+                    "tax_ids": params.expense_line.tax_ids,
+                    "discount": params.expense_line.discount,
                 })
                 .to_string(),
             ),

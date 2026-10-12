@@ -108,3 +108,18 @@ export function toReceiveLineInput(
 export function linesOfOrder(lines: readonly Row[], orderId: string): Row[] {
   return lines.filter((line) => String(line.orderId ?? line.order_id ?? '') === orderId);
 }
+
+/** Only explicit, active non-compounding percentage purchase rules are selectable. */
+export function billTaxOptions(t: (key: string) => string, taxes: readonly Row[]): Array<{ value: string; label: string }> {
+  return [
+    { value: '', label: t('purchasing.forms.createBillFromOrder.noTax') },
+    ...taxes.filter((tax) => tax.active === true && ['Purchase', 'None'].includes(enumTag(tax.typeTaxUse ?? tax.type_tax_use))
+      && enumTag(tax.amountType ?? tax.amount_type) === 'Percent'
+      && (tax.includeBaseAmount ?? tax.include_base_amount) === false
+      && (tax.hasNegativeFactor ?? tax.has_negative_factor) === false
+      && (tax.taxGroupId ?? tax.tax_group_id) != null
+      && Array.isArray(tax.invoiceRepartitionLineIds ?? tax.invoice_repartition_line_ids)
+      && ((tax.invoiceRepartitionLineIds ?? tax.invoice_repartition_line_ids) as unknown[]).length === 0)
+      .map((tax) => ({ value: String(tax.id), label: String(tax.name ?? '') })),
+  ];
+}

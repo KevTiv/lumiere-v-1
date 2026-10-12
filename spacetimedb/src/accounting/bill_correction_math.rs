@@ -72,6 +72,35 @@ pub(crate) fn ledger_amount(amount: f64, rate: f64, rounding: Option<f64>) -> Re
     Ok(result)
 }
 
+/// Verify an explicitly selected rule against the PO's retained aggregate tax.
+/// This is a consistency check, not tax identity discovery from an amount.
+pub(crate) fn validate_po_tax_evidence(
+    ordered_tax: f64,
+    ordered_qty: f64,
+    billed_qty: f64,
+    discount: f64,
+    computed_tax: f64,
+) -> Result<(), String> {
+    if !ordered_tax.is_finite()
+        || ordered_tax < 0.0
+        || !ordered_qty.is_finite()
+        || ordered_qty <= 0.0
+        || !billed_qty.is_finite()
+        || billed_qty <= 0.0
+        || !discount.is_finite()
+        || !(0.0..=100.0).contains(&discount)
+        || !computed_tax.is_finite()
+        || computed_tax < 0.0
+    {
+        return Err("PO tax evidence or bill quantities are invalid".into());
+    }
+    let expected = ordered_tax * (billed_qty / ordered_qty) * (1.0 - discount / 100.0);
+    if !expected.is_finite() || (expected - computed_tax).abs() > 1e-8 {
+        return Err("Selected purchase taxes do not agree with the PO tax amount; review the PO and tax selection".into());
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -143,6 +172,17 @@ mod tests {
         )
         .is_err());
     }
+    #[test]
+    fn partial_and_fractional_receipts_use_exact_ordered_tax_ratio() {
+        assert!(validate_po_tax_evidence(200.0, 10.0, 4.0, 0.0, 80.0).is_ok());
+        assert!(validate_po_tax_evidence(200.0, 10.0, 6.0, 10.0, 108.0).is_ok());
+        assert!(validate_po_tax_evidence(5.0, 0.5, 0.25, 0.0, 2.5).is_ok());
+        assert!(validate_po_tax_evidence(20.0, 1.0, 1.0, 0.0, 0.0).is_err());
+        assert!(validate_po_tax_evidence(0.0, 1.0, 1.0, 0.0, 20.0).is_err());
+        assert!(validate_po_tax_evidence(f64::NAN, 1.0, 1.0, 0.0, 0.0).is_err());
+        assert!(validate_po_tax_evidence(20.0, 0.0, 1.0, 0.0, 20.0).is_err());
+    }
+
     #[test]
     fn fx_uses_company_rounding_and_rejects_invalid_rates() {
         assert_eq!(ledger_amount(10.01, 1.25, Some(0.01)).unwrap(), 12.51);

@@ -69,4 +69,6 @@ Full operator acceptance remains explicitly deferred.
   rows and consistent FX evidence: [COV-05i](erp-cov05i-broader-bill-correction-status.md).
   Reconciled/posted bills, unsupported tax structures and historical missing lineage
   remain outside correction support.
+  [COV-05j](erp-cov05j-tax-fx-bill-creation-status.md) adds explicit tax selection and
+  canonical tax/FX bill production to the same integration lane.
 - Remote CI and review. This integration does not mark Purchasing accepted.
