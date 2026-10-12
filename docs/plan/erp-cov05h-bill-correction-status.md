@@ -1,6 +1,6 @@
 # COV-05h Bill economic correction and price recovery
 
-**Disposition:** `IMPLEMENTED` — paired draft contracts; release pin and acceptance pending.
+**Disposition:** `LOCAL_ACTIVATED` — full-stack business acceptance remains deferred.
 
 The existing `update_account_move_line` command adds optional `quantity`,
 `price_unit`, `expected_quantity` and `expected_price_unit` fields. Economic
@@ -46,8 +46,35 @@ posting/provenance changes from companion PR #178.
   rejection, reviewed price after navigation and same-bill posting.
 - Full-stack acceptance remains deferred by user request.
 
-The application consumes v0.3.92. Its generated candidate must not replace the
-newer v0.3.100 contract history on main. Review contracts and producer source
-together, then integrate the compatible immutable contract before rollout.
+The application now pins immutable contracts `v0.3.102`, commit
+`ee3994efd6c36229cb656306ddde996a6e7c0d7b`, in Rust, all frontend consumers,
+both lockfiles and the release compatibility manifest. The release comes from
+the reviewed v0.3.92-compatible branch; newer contract main history was preserved.
 
-Contract companion: [lumiere-contracts #19](https://github.com/KevTiv/lumiere-contracts/pull/19), commit `e91e5d6`, based on an exact v0.3.92 release-line branch. No newer contract main history was rewritten. Package version and application pins remain unchanged pending integration/release. The two fields with reviewed values invalidate stale edits; changed approval snapshots require fresh review rather than reuse.
+Contract companion: [lumiere-contracts #19](https://github.com/KevTiv/lumiere-contracts/pull/19), released as v0.3.102. The reviewed fields invalidate stale edits; changed approval snapshots require fresh review rather than reuse.
+
+## Local activation evidence
+
+- Final source built as development WASM with development seeding enabled, then
+  published to local module `lumiere-cov05-local` at `http://127.0.0.1:3185`.
+  Live schema inspection confirms all four correction fields.
+- Published module WASM SHA-256: `e770802b6c47b7dda0a26b8f2361204a36399efa9eacc442541f13e046665f4f`.
+- Frozen frontend installation and Rust dependency resolution use the released
+  commit. Installed `accountingBillCorrectionAvailable()` returns true.
+- Web TypeScript check, final API binary build, release compatibility verifier
+  and diff whitespace check passed against the real release pin.
+- Local demo initialization succeeded. PostgreSQL 17.11 runs on loopback port
+  55432; the application migration runner completed through migration 11.
+- API `http://127.0.0.1:8082/ready` returns 200/ready, reports contract release
+  0.3.102 and migration 11, and marks SpacetimeDB, PostgreSQL, migration and
+  release compatibility healthy.
+- `http://localhost:3100/accounting` and `/purchasing` return 200; authenticated
+  `/api/query/account-moves` returns six demo rows.
+
+Services remain running. Local connection settings/credentials are kept in
+ignored `.tmp/cov05-activation/env.sh`; logs and the readiness report are in the
+same directory. The module uses a dedicated local data directory. This is local
+activation evidence, not the deferred multi-actor business acceptance run or a
+projection convergence certification. Exact source lineage still gates the
+action, so it is offered for eligible newly generated PO bills, without guessed
+legacy backfill.
