@@ -1718,7 +1718,7 @@ fn correct_po_bill_line(
     crate::workflow::authorization::require_workflow_company_access(
         ctx,
         organization_id,
-        Some(bill.company_id),
+        bill.company_id,
         ctx.sender(),
     )?;
     if bill.move_type != MoveType::InInvoice
