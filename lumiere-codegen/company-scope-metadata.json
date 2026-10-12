@@ -111,7 +111,7 @@
           "path": [
             "company_id"
           ],
-          "required": false,
+          "required": true,
           "nullable": true,
           "meaning": "selected legal entity recorded in the tracked import receipt; required by the authenticated import BFF"
         }

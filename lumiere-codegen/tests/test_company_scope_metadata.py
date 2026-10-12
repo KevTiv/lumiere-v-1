@@ -87,6 +87,11 @@ class CompanyScopeMetadataTest(unittest.TestCase):
         )
         self.assertTrue(self.reducers["delete_company"]["company_paths"][0]["required"])
 
+        tracked_import = self.reducers["import_csv_tracked"]["company_paths"][0]
+        self.assertEqual(tracked_import["path"], ["company_id"])
+        self.assertTrue(tracked_import["required"])
+        self.assertTrue(tracked_import["nullable"])
+
         for reducer in self.reducers.values():
             for annotation in reducer["company_paths"]:
                 self.assertTrue(annotation["path"])
