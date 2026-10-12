@@ -1,7 +1,12 @@
 # COV-05k — durable partial-receipt replay
 
-Date: 2026-10-12 (Europe/Amsterdam). Integration lane: PR #179.
+Date: 2026-10-12 (UTC). Integration lane: PR #179.
 Disposition: source implementation; runtime activation and Purchasing acceptance deferred.
+
+Contracts: v0.3.104 (`482f4f9804015f466f9ec29fce5c0a643f421989`),
+companion [lumiere-contracts#20](https://github.com/KevTiv/lumiere-contracts/pull/20),
+stacked on bill-correction #19. The parallel tax/FX release consumed v0.3.103;
+its app pin commit is preserved in the integration branch's merge history.
 
 ## Receipt identity and evidence
 
@@ -64,6 +69,13 @@ fixtures are authored and compiled, not executed as acceptance evidence.
   partitioned, service receipts carry no stock targets, lost acknowledgement
   resolves without another command, and an unavailable producer fails before
   persistence or dispatch.
+- All 15 existing receipt-evidence tests also passed on the pinned consumer.
+- Web TypeScript checking and v0.3.104 release-manifest verification passed.
+  The operation history adds exactly `erp.receive_po_line_once` and preserves
+  every previous operation's semantic shape against released v0.3.103.
+- API compilation including test targets passed with one existing saved-draft
+  warning. Final native module compilation, including generated reconstruction,
+  passed with 14 existing warnings. No API/reducer runtime acceptance is claimed.
 - Contract IR verification, default codegen and drift checks passed; all 30
   companion generator tests passed. The optional strict C0 census still reports
   its pre-existing 471-versus-505 table-count disagreement; it is not claimed
