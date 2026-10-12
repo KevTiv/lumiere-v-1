@@ -396,7 +396,7 @@ test.describe("MVP procure-to-pay workflow", { tag: "@p0" }, () => {
       ])
       expect(response.ok()).toBe(true)
       await assertMoveLinesBalanced(page, billId)
-      await expect.poll(async () => Number((await fetchVendorBillById(page, billId)).amountTotal)).toBe(3 * Number(price))
+      await expect.poll(async () => Number((await fetchVendorBillById(page, billId))?.amountTotal)).toBe(3 * Number(price))
     }
     await correctPrice("505", "500")
     await expectPostDraftBillRejected(page, billId, /three-way match failed.*bill price/i)

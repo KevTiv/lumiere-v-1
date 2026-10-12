@@ -72,7 +72,7 @@ import {
 } from '@lumiere/query-hooks/hooks/accounting';
 import { useInvoiceToPaymentWorkflow } from '@lumiere/query-hooks/hooks/accounting/invoice-workflow';
 import { useCreateDocument } from '@lumiere/query-hooks/hooks/documents';
-import { UpdateAccountMoveLineParams } from '@lumiere/stdb/types';
+import { accountingBillCorrectionAvailable } from '@lumiere/stdb/commands';
 import { billLineCorrectionSource, billLineCorrectionParams } from '../../bill-line-correction';
 import { usePurchaseOrderLines, usePurchaseOrders } from '@lumiere/query-hooks/hooks/purchasing';
 import { useSaleOrders } from '@lumiere/query-hooks/hooks/sales';
@@ -432,7 +432,7 @@ function InvoicePageLoaded({
           label: t('accounting.billCorrection.action'),
           requiresSelection: true,
           selection: 'single',
-          isApplicable: (rows) => Object.hasOwn(UpdateAccountMoveLineParams.elements, 'quantity') && rows.length === 1 && checkPermission('account_move_line', 'write').allowed && checkPermission('account_move', 'write').allowed && billLineCorrectionSource(move as Row, rows[0], purchaseOrders as unknown as Row[], purchaseLines as unknown as Row[]) != null,
+          isApplicable: (rows) => accountingBillCorrectionAvailable() && rows.length === 1 && checkPermission('account_move_line', 'write').allowed && checkPermission('account_move', 'write').allowed && billLineCorrectionSource(move as Row, rows[0], purchaseOrders as unknown as Row[], purchaseLines as unknown as Row[]) != null,
           onClick: async (rows) => {
             const line = rows[0];
             if (!line?.id) return;
