@@ -2,24 +2,24 @@
   "_comment": "Checked-in release compatibility contract. Update this file with every release-significant version or generated artifact change.",
   "schema_version": 1,
   "application_contract": {
+    "artifact_sha256": "03dc269b6b63f1912478c6677fe13b6ab9d04b02fd1917f02a9a821e3333a889",
     "ir_version": 2,
+    "schema_hash": "sha256:f5294a8f72691cf7d0dbe273c947eee7c6b6ae7127e35e614c83f2e3e05f1b36",
+    "source_commit": "5c7980f6bdcd8db235171fdd9352e4338498d566",
+    "source_repository": "https://github.com/KevTiv/lumiere-v-1.git",
     "ir_path": "ir/lumiere-contract-ir-v2.json",
-    "pin_path": "ir/PIN.json",
-    "artifact_sha256": "cc75c69f6e0f531a1e337361bf848e5dd01c31d92e501c276834eeeb36ad457c",
-    "schema_hash": "sha256:396fbb3b4f8280bce681c9397c4762b4ecde2893673ba75b962f95860f2079db",
-    "source_commit": "09812db2ad18e8ad4dcbbb84a9520285798dd095",
-    "source_repository": "https://github.com/KevTiv/lumiere-v-1"
+    "pin_path": "ir/PIN.json"
   },
   "lumiere_contracts": {
     "package": "lumiere-contracts",
-    "version": "0.3.102",
-    "tag": "v0.3.102",
-    "revision": "ee3994efd6c36229cb656306ddde996a6e7c0d7b",
+    "version": "0.3.104",
+    "tag": "v0.3.104",
+    "revision": "482f4f9804015f466f9ec29fce5c0a643f421989",
     "repository": "ssh://git@github.com/KevTiv/lumiere-contracts.git"
   },
   "operation_history": {
     "path": "lumiere-codegen/contract-operation-history.json",
-    "checksum": "sha256:a2837b0902eff861077f738f04c115199870dcc81de09578aae0df8b295fcce1"
+    "checksum": "sha256:e1efbab1fd11ab5ec12b3e0e18a771351b98af7104a84da21cdd10cd50adc49c"
   },
   "stdb_module": {
     "name": "lumiere_v1",
@@ -35,8 +35,8 @@
     "manifest_path": "manifests/durable-pg-schema-manifest.json",
     "checksum": "sha256:5598834cc650011744abb9b9ad090e6ba09bfc824bc6d853f89f34930ef8d9ab",
     "application_catalog_path": "api-server/src/cold_tier/migrate.rs",
-    "application_catalog_version": 11,
-    "application_catalog_checksum": "sha256:a45f4ea1ae3e5b7f7093960dec0eb1ea475741b7f0e5d6380c5aea21bcf65ab5"
+    "application_catalog_version": 12,
+    "application_catalog_checksum": "sha256:0317642eb55757abc92804466b5fbd4c5047c5c32eb599b9a00819c74b9387ef"
   },
   "services": {
     "api_server": {
@@ -51,7 +51,7 @@
   "minimum_client_contract": {
     "version": "ir-v2",
     "ir_version": 2,
-    "generated_contract_release": "0.3.102"
+    "generated_contract_release": "0.3.104"
   },
   "deployment": {
     "config_generation": 2,

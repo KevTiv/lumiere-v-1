@@ -3022,6 +3022,10 @@
       "name": "receive_po_line",
       "shape_fingerprint": "sha256:273ab43f8c5af8e01ae9a4cfa555a52a01986f81bfe8d40032f2942fe8896d63"
     },
+    "erp.receive_po_line_once": {
+      "name": "receive_po_line_once",
+      "shape_fingerprint": "sha256:ed72f39907b8dbea680b43eaaea086c17504aa180cd0908b0d04141ba565f92f"
+    },
     "erp.recognize_amortization_line": {
       "name": "recognize_amortization_line",
       "shape_fingerprint": "sha256:89504b28b03f27217a65d50652c76e18c53767999e9092b6013408e54dac4815"
@@ -5884,6 +5888,14 @@
       "current_operations_fingerprint": "sha256:73a45e16698b877aee4bb418e0292459a4405e718618c3ff7ca1a45a0ff35432",
       "operation_count": 1427,
       "reason": "release on top of v0.3.84: add none; change the shape of unreserve_stock_picking, update_stock_picking"
+    },
+    {
+      "previous_release": "v0.3.103",
+      "previous_ir_sha256": "sha256:1a4cd753eec28b33b60a186187c0eab191793f7b7e467a07f777ba3074c86b6b",
+      "previous_operations_fingerprint": "sha256:73a45e16698b877aee4bb418e0292459a4405e718618c3ff7ca1a45a0ff35432",
+      "current_operations_fingerprint": "sha256:81b56eae37bef8f4ba88f0c8fab940cdf7d17909a5f87ab8f14fe6e5d73cc989",
+      "operation_count": 1428,
+      "reason": "Add receive_po_line_once for actor- and company-scoped durable receipt replay; preserve every existing operation ID and semantic shape."
     }
   ]
 }

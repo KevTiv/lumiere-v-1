@@ -161,7 +161,8 @@ const PURCHASING_HINT_OVERRIDES: Partial<
     "purchase-order-lines",
     "purchase-order-lines-over-billed",
   ],
-  receive_po_line_once: ["purchase-receipt-operations", "purchase-orders", "purchase-order-lines", "stock-moves", "stock-pickings", "stock-quants"],
+  // Private invocation evidence is read through its protected exact-key API.
+  receive_po_line_once: ["purchase-orders", "purchase-order-lines", "stock-moves", "stock-pickings", "stock-quants"],
   record_purchasing_integration_result: ["purchasing-integration-intents"],
   reject_supplier_intake: ["supplier-intakes", "contacts"],
   release_blanket_to_po: ["purchase-blanket-orders", "purchase-blanket-order-lines", "purchase-blanket-releases", "purchase-orders", "purchase-order-lines", "purchase-orders-to-approve"],

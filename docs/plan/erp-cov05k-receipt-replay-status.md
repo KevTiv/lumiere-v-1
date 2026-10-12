@@ -52,3 +52,20 @@ permission revocation.
 The localhost app module and API have not been upgraded by this slice. The new
 schema was published only to an isolated, unseeded export module. Native reducer
 fixtures are authored and compiled, not executed as acceptance evidence.
+
+## Validation
+
+- Native and WASM module builds passed, including the authored two-cycle receipt
+  fixture. Its repeated-key, conflicting-input, stale-target and continuation
+  assertions are compiled rather than claimed executed.
+- Eight browser-persistence/dispatch tests passed: refresh retains the original
+  target, conflicting inputs cannot replace it, malformed evidence remains
+  unknown, cleanup cannot remove a newer intent, actor/company storage is
+  partitioned, service receipts carry no stock targets, lost acknowledgement
+  resolves without another command, and an unavailable producer fails before
+  persistence or dispatch.
+- Contract IR verification, default codegen and drift checks passed; all 30
+  companion generator tests passed. The optional strict C0 census still reports
+  its pre-existing 471-versus-505 table-count disagreement; it is not claimed
+  green. Default ownership classification covers all 505 tables, including the
+  new event's real organization-leading composite index.

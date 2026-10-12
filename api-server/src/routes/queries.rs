@@ -304,9 +304,18 @@ mod tests {
             Some("workflows")
         );
         assert_eq!(owner_read_permission_resource("products"), None);
-        assert_eq!(owner_read_permission_resource("purchase-receipt-operations"), Some("purchase-order-lines"));
-        assert_eq!(owner_read_module("purchase-receipt-operations"), Some("purchasing"));
-        assert_eq!(owner_read_permission_resource("purchase-receipt-operations-extra"), None);
+        assert_eq!(
+            owner_read_permission_resource("purchase-receipt-operations"),
+            Some("purchase-order-lines")
+        );
+        assert_eq!(
+            owner_read_module("purchase-receipt-operations"),
+            Some("purchasing")
+        );
+        assert_eq!(
+            owner_read_permission_resource("purchase-receipt-operations-extra"),
+            None
+        );
         assert_eq!(
             owner_read_permission_resource("replenishment-run-jobs"),
             Some("replenishment-rules")
