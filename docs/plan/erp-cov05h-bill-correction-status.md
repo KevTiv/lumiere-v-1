@@ -35,7 +35,7 @@ posting/provenance changes from companion PR #178.
 ## Verification ledger
 
 - Four correction eligibility/parameter tests and twelve existing invoice-action/Purchasing recovery tests passed.
-- Web type check against the current pin passed. Candidate-package web type check is tracked below.
+- Web type checks passed against both the current pin and the generated companion candidate.
 - Final producer native compile passed. A schema-extraction WASM build passed before the final company-access guard; no final deployed-runtime pass is claimed.
 - SpacetimeDB 2.8.2 generated both SDKs. Clean canonical IR pins producer `09812db2ad18e8ad4dcbbb84a9520285798dd095`, with 1,427 operations, 364 resources, 504 tables and 1,364 types.
 - Contract generator/drift check, 30 Python tests, TypeScript package build/tests, two SDK binary round trips and Rust all-feature compile passed.
