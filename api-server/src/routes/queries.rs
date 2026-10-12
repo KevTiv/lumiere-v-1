@@ -60,7 +60,9 @@ fn owner_read_permission_resource(resource: &str) -> Option<&str> {
 }
 
 fn owner_read_module(resource: &str) -> Option<&'static str> {
-    if crate::query_exec::crm_resource(resource) {
+    if resource == "purchase-receipt-operations" {
+        Some("purchasing")
+    } else if crate::query_exec::crm_resource(resource) {
         Some("crm")
     } else if crate::workflow_reads::is_private_workflow_resource(resource) {
         Some("workflows")
@@ -292,7 +294,7 @@ pub(crate) async fn get_authoritative_resource(
 
 #[cfg(test)]
 mod tests {
-    use super::owner_read_permission_resource;
+    use super::{owner_read_module, owner_read_permission_resource};
 
     #[test]
     fn owner_reads_use_the_resource_permission() {
@@ -302,6 +304,9 @@ mod tests {
             Some("workflows")
         );
         assert_eq!(owner_read_permission_resource("products"), None);
+        assert_eq!(owner_read_permission_resource("purchase-receipt-operations"), Some("purchase-order-lines"));
+        assert_eq!(owner_read_module("purchase-receipt-operations"), Some("purchasing"));
+        assert_eq!(owner_read_permission_resource("purchase-receipt-operations-extra"), None);
         assert_eq!(
             owner_read_permission_resource("replenishment-run-jobs"),
             Some("replenishment-rules")

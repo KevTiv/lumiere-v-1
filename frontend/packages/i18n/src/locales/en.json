@@ -5882,6 +5882,7 @@
       "addLineForm": "Add line…",
       "invoiceQtyForm": "Invoice qty…",
       "receiveFullOpenQty": "Receive all open qty",
+      "resolveReceipt": "Resolve pending receipt",
       "lockSelected": "Lock",
       "unlockSelected": "Unlock",
       "editLineForm": "Edit draft line…",

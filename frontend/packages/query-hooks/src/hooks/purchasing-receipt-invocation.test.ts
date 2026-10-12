@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 import test from "node:test"
-import { beginReceiptInvocation, clearReceiptInvocation, observeReceiptInvocation, receiptStorageKey, type PendingReceipt, type ReceiptStorage } from "./purchasing-receipt-invocation"
+import { beginReceiptInvocation, clearReceiptInvocation, executeReceiptInvocation, observeReceiptInvocation, receiptStorageKey, type PendingReceipt, type ReceiptStorage } from "./purchasing-receipt-invocation"
 import type { ReceiptSnapshot } from "./purchasing-receipt-effect"
 const scope = { organizationId: 1n, companyId: 2n, actorHex: "ab".repeat(32) }
 const snapshot: ReceiptSnapshot = { ...scope, lineId: "3", orderId: 4n, productId: 5n, qtyReceived: 0, qty: 1, service: false, target: { moveId: "6", pickingId: "7" } }
@@ -44,4 +44,19 @@ test("actor/company partitioning and service receipt proof remain exact", async 
   assert.notEqual(receiptStorageKey(scope, "3"), receiptStorageKey({ ...scope, companyId: 9n }, "3"))
   const p = await begin(storage(), async () => ({ ...snapshot, service: true, target: undefined }))
   assert.equal(observeReceiptInvocation(p, [{ ...receipt(p), moveId: null, pickingId: null }]).next?.resource, "purchase_order_line")
+})
+test("lost acknowledgement followed by refresh resolves evidence without another dispatch", async () => {
+  const store = storage(); let committed: PendingReceipt | undefined; let sends = 0
+  const ports = { capture: async () => snapshot, makeKey: () => "lost_ack_key", read: async () => committed ? [receipt(committed)] : [],
+    dispatch: async (p: PendingReceipt) => { sends++; committed = p; throw Error("connection lost after commit") } }
+  await assert.rejects(executeReceiptInvocation(scope, "3", 1, null, store, ports), /connection lost/)
+  const recovered = await executeReceiptInvocation(scope, "3", 1, null, store, { ...ports, capture: async () => { throw Error("must not retarget") } })
+  assert.equal(observeReceiptInvocation(recovered.pendingReceipt, recovered.receiptEvidence!).outcome, "applied")
+  assert.equal(sends, 1)
+})
+test("unavailable producer probe cannot persist or dispatch a new invocation", async () => {
+  const store = storage()
+  await assert.rejects(executeReceiptInvocation(scope, "3", 1, null, store, { capture: async () => snapshot, makeKey: () => "key",
+    read: async () => { throw Error("old backend") }, dispatch: async () => { assert.fail("must not dispatch") } }), /old backend/)
+  assert.equal(store.getItem(receiptStorageKey(scope, "3")), null)
 })

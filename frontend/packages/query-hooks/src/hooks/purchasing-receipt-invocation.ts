@@ -68,6 +68,24 @@ export function clearReceiptInvocation(scope: InvocationScope, pending: PendingR
   const raw = storage.getItem(key)
   if (raw != null && stored(raw, scope, pending.lineId).operationKey === pending.operationKey) storage.removeItem(key)
 }
+
+/** Caller holds the browser's per-line lock until this dispatch finishes. */
+export async function executeReceiptInvocation(scope: InvocationScope, lineId: string, quantity: number, lotId: unknown,
+    storage: ReceiptStorage, ports: {
+      capture(): Promise<ReceiptSnapshot>; makeKey(): string
+      read(key: string): Promise<RowValueMap[]>; dispatch(pending: PendingReceipt): Promise<void>
+    }): Promise<{ pendingReceipt: PendingReceipt; receiptEvidence?: RowValueMap[] }> {
+  const previous = readPendingReceipt(scope, lineId, storage)
+  // Verify the protected producer read path before preserving a new intent.
+  const rows = await ports.read(previous?.operationKey ?? "capability_probe")
+  const pendingReceipt = await beginReceiptInvocation(scope, lineId, quantity, lotId, storage, ports.capture, ports.makeKey)
+  if (previous && rows.length > 0) {
+    if (observeReceiptInvocation(previous, rows).outcome !== "applied") throw new WorkflowError("conflict", "Saved receipt does not agree with canonical evidence")
+    return { pendingReceipt, receiptEvidence: rows }
+  }
+  await ports.dispatch(pendingReceipt)
+  return { pendingReceipt }
+}
 const field = (row: RowValueMap, camel: string, snake: string) => Object.hasOwn(row, camel) ? row[camel] : row[snake]
 /** Immutable operation evidence proves the original event even after a subsequent receipt. */
 export function observeReceiptInvocation(pending: PendingReceipt | undefined, rows: readonly RowValueMap[]): ObservedTransition {

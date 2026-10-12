@@ -245,6 +245,7 @@ import type {
   PurchaseContract,
   PurchaseOrder,
   PurchaseOrderLine,
+  PurchaseReceiptOperation,
   PurchaseRequisition,
   PurchaseRequisitionLine,
   PurchaseReturn,
@@ -604,6 +605,7 @@ export interface QueryRowMap {
   "purchase-orders": PurchaseOrder
   "purchase-orders-partial-receipt": PurchaseOrder
   "purchase-orders-to-approve": PurchaseOrder
+  "purchase-receipt-operations": PurchaseReceiptOperation
   "purchase-requisition-lines": PurchaseRequisitionLine
   "purchase-requisitions": PurchaseRequisition
   "purchase-return-lines": PurchaseReturnLine
