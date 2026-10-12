@@ -1634,6 +1634,11 @@
       "reason": "invoked by an enumerated frontend BFF call site"
     },
     {
+      "name": "create_purchase_order_once",
+      "exposure": "session",
+      "reason": "reviewed keyed purchase-order create: producer rechecks current create permission, actor/company scope and exact immutable request identity"
+    },
+    {
       "name": "create_purchase_requisition",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
@@ -2553,6 +2558,11 @@
       "name": "import_country_csv",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
+    },
+    {
+      "name": "import_csv_tracked",
+      "exposure": "session",
+      "reason": "authenticated import BFF dispatches a request-keyed reducer after trusted organization, company, entity permission and read-policy checks"
     },
     {
       "name": "import_currency_csv",

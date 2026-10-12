@@ -65,6 +65,19 @@
       ]
     },
     {
+      "name": "create_purchase_order_once",
+      "company_paths": [
+        {
+          "path": [
+            "company_id"
+          ],
+          "required": true,
+          "nullable": false,
+          "meaning": "selected legal entity for exact purchase order creation"
+        }
+      ]
+    },
+    {
       "name": "create_whatsapp_business_account",
       "company_paths": [
         {
@@ -88,6 +101,19 @@
           "required": true,
           "nullable": false,
           "meaning": "company being deleted"
+        }
+      ]
+    },
+    {
+      "name": "import_csv_tracked",
+      "company_paths": [
+        {
+          "path": [
+            "company_id"
+          ],
+          "required": false,
+          "nullable": true,
+          "meaning": "selected legal entity recorded in the tracked import receipt; required by the authenticated import BFF"
         }
       ]
     },

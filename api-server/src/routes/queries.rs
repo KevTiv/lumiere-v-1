@@ -39,7 +39,9 @@ pub(crate) struct AuthoritativeQuery {
 }
 
 fn owner_read_permission_resource(resource: &str) -> Option<&str> {
-    if resource == "purchase-receipt-operations" {
+    if resource == "purchase-order-creations" {
+        Some("purchase-orders")
+    } else if resource == "purchase-receipt-operations" {
         Some("purchase-order-lines")
     } else if resource == "replenishment-run-jobs" {
         Some("replenishment-rules")
@@ -60,7 +62,10 @@ fn owner_read_permission_resource(resource: &str) -> Option<&str> {
 }
 
 fn owner_read_module(resource: &str) -> Option<&'static str> {
-    if resource == "purchase-receipt-operations" {
+    if matches!(
+        resource,
+        "purchase-order-creations" | "purchase-receipt-operations"
+    ) {
         Some("purchasing")
     } else if crate::query_exec::crm_resource(resource) {
         Some("crm")
@@ -134,9 +139,19 @@ pub(crate) async fn get_query(
     if owner_read {
         require_owner_read_permission(&resource, &context)?;
     }
-    if resource == "purchase-receipt-operations" {
+    let operation_table = match resource.as_str() {
+        "purchase-order-creations" => Some((
+            "purchase_order_creation_operation",
+            "purchase order creation",
+        )),
+        "purchase-receipt-operations" => Some(("purchase_receipt_operation", "receipt")),
+        _ => None,
+    };
+    if let Some((table, operation_label)) = operation_table {
         let key = q.operation_key.as_deref().ok_or_else(|| {
-            ApiError::BadRequest("operation_key is required for receipt readback".into())
+            ApiError::BadRequest(format!(
+                "operation_key is required for {operation_label} readback"
+            ))
         })?;
         if key.is_empty()
             || key.len() > 128
@@ -144,7 +159,9 @@ pub(crate) async fn get_query(
                 .bytes()
                 .all(|c| c.is_ascii_alphanumeric() || matches!(c, b'-' | b'_'))
         {
-            return Err(ApiError::BadRequest("Invalid receipt operation key".into()));
+            return Err(ApiError::BadRequest(format!(
+                "invalid {operation_label} operation key"
+            )));
         }
         let company_id = crate::query_exec::resolve_purchasing_company_id(
             context.client(),
@@ -158,7 +175,7 @@ pub(crate) async fn get_query(
         let id = format!("{org_id}:{company_id}:{key}");
         let columns = stdb_auth::resolve_http_sql_columns(&resource, Some(context.field_access()))
             .map_err(ApiError::Internal)?;
-        let sql = format!("SELECT {} FROM purchase_receipt_operation WHERE id = '{id}' AND organization_id = {org_id} AND company_id = {company_id} AND created_by = {identity}", columns.join(", "));
+        let sql = format!("SELECT {} FROM {table} WHERE id = '{id}' AND organization_id = {org_id} AND company_id = {company_id} AND created_by = {identity}", columns.join(", "));
         let data = state
             .stdb
             .query_sql(&sql)
@@ -305,8 +322,16 @@ mod tests {
         );
         assert_eq!(owner_read_permission_resource("products"), None);
         assert_eq!(
+            owner_read_permission_resource("purchase-order-creations"),
+            Some("purchase-orders")
+        );
+        assert_eq!(
             owner_read_permission_resource("purchase-receipt-operations"),
             Some("purchase-order-lines")
+        );
+        assert_eq!(
+            owner_read_module("purchase-order-creations"),
+            Some("purchasing")
         );
         assert_eq!(
             owner_read_module("purchase-receipt-operations"),

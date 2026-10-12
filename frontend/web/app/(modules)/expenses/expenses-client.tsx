@@ -856,6 +856,9 @@ function ExpensesClientLoaded({
 
       {csvKind && csvFormConfig ? (
         <CsvImportModal
+          trackedImport={{ companyId: operatingCompanyId }}
+          organizationId={orgId}
+          tableName={csvKind === "expense" ? "hr_expense" : "hr_expense_sheet"}
           key={csvKind}
           onClose={() => setCsvKind(null)}
           config={csvFormConfig}

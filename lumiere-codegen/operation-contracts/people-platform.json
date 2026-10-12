@@ -1811,6 +1811,16 @@
       },
       "evidence": "spacetimedb/src/data_ops/core_imports.rs: body inserts or appends a new effect without a replay guard"
     },
+    "import_csv_tracked": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/data_ops/import_tracker.rs: authenticated actor and request_id select at most one exact receipt; byte, file, entity and scope conflicts are rejected"
+    },
     "import_currency_csv": {
       "semantic_kind": "command",
       "client_facing": true,

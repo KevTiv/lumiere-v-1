@@ -2772,6 +2772,9 @@ function PurchasingClientLoaded({
       />
       {csvKind && csvFormConfig ? (
         <CsvImportModal
+          trackedImport={{ companyId: operatingCompanyId }}
+          organizationId={orgId}
+          tableName={csvKind === "order" ? "purchase_order" : csvKind === "orderLine" ? "purchase_order_line" : "product_supplier_info"}
           key={csvKind}
           onClose={() => setCsvKind(null)}
           config={csvFormConfig}

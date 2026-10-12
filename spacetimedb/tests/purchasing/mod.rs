@@ -1,6 +1,7 @@
 //! Purchasing domain test suite — invoke via `run_purchasing_*_test` reducers.
 pub mod gap_fixes_test;
 pub mod invoice_provenance_test;
+pub mod order_creation_identity_test;
 pub mod phase0_containment_test;
 pub mod phase0_fixture_test;
 pub mod phase1_landed_costs_test;
@@ -20,6 +21,8 @@ use spacetimedb::ReducerContext;
 pub fn run_purchasing_bill_balanced_test(ctx: &ReducerContext) -> Result<(), String> {
     purchase_bill_test::test_po_confirm_to_balanced_bill(ctx)
         .map_err(|e| format!("po_confirm_to_balanced_bill: {e}"))?;
+    order_creation_identity_test::test_exact_purchase_order_creation_identity(ctx)
+        .map_err(|e| format!("exact_purchase_order_creation_identity: {e}"))?;
     receipt_replay_test::test_durable_partial_receipt(ctx)
         .map_err(|e| format!("durable_partial_receipt: {e}"))?;
     invoice_provenance_test::test_purchase_bill_exact_invoice_provenance(ctx)

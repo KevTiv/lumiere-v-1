@@ -24,6 +24,7 @@ pub mod integrity_inventory;
 /// └── procurement_advanced.rs ← Wave D advanced procurement
 /// ```
 pub mod landed_costs;
+pub mod order_creation_operations;
 pub mod procurement_advanced;
 pub mod purchase_orders;
 pub mod purchase_returns;

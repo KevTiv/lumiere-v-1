@@ -1160,4 +1160,29 @@ mod tests {
             "the current operator pairing flow reads the newly generated token"
         );
     }
+
+    #[test]
+    fn tracked_import_read_projections_use_only_generated_columns() {
+        for (resource, row_type) in [
+            ("countries", "Country"),
+            ("currencies", "Currency"),
+            ("currency-rates", "CurrencyRate"),
+            ("uom-categories", "UomCategory"),
+            ("knowledge-categories", "KnowledgeArticleCategory"),
+            ("product-variants", "ProductVariant"),
+            ("expense-sheets", "HrExpenseSheet"),
+        ] {
+            let generated = sql_column_list_for_generated_type(row_type)
+                .unwrap_or_else(|error| panic!("{resource}: {error}"));
+            let projected = resolve_http_sql_columns(resource, None)
+                .unwrap_or_else(|error| panic!("{resource}: {error}"));
+            assert!(!projected.is_empty(), "{resource}");
+            for field in projected {
+                assert!(
+                    generated.iter().any(|column| column == &field),
+                    "{resource} projects unknown {row_type} field {field}"
+                );
+            }
+        }
+    }
 }
