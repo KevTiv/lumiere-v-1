@@ -146,7 +146,7 @@ fn gate_creates_and_converges_real_guarded_action(ctx: &ReducerContext) -> Resul
         causation_id: None,
     };
     let outcome = request_guarded_action(ctx, fixture.organization_id, request.clone())?;
-    let (instance_id, task_id) = match outcome {
+    let (mut instance_id, mut task_id) = match outcome {
         GuardedActionGateOutcome::HumanTaskCreated {
             workflow_instance_id,
             task_id,
@@ -156,7 +156,7 @@ fn gate_creates_and_converges_real_guarded_action(ctx: &ReducerContext) -> Resul
             return Err("matching published workflow did not create a task".to_string())
         }
     };
-    let replay = request_guarded_action(ctx, fixture.organization_id, request)?;
+    let replay = request_guarded_action(ctx, fixture.organization_id, request.clone())?;
     if !matches!(
         replay,
         GuardedActionGateOutcome::HumanTaskCreated {
@@ -166,6 +166,56 @@ fn gate_creates_and_converges_real_guarded_action(ctx: &ReducerContext) -> Resul
         } if workflow_instance_id == instance_id && replay_task_id == task_id
     ) {
         return Err("guarded request replay did not return the original task".to_string());
+    }
+    let current = ctx
+        .db
+        .purchase_order()
+        .id()
+        .find(&order.id)
+        .ok_or("order missing")?;
+    ctx.db.purchase_order().id().update(PurchaseOrder {
+        partner_ref: Some("new vendor quote requiring fresh approval".to_string()),
+        ..current
+    });
+    let old_error = decide_workflow_human_task_for_actor(
+        ctx,
+        fixture.organization_id,
+        actor,
+        DecideWorkflowHumanTaskParams {
+            company_id: fixture.company_id,
+            task_id,
+            expected_task_revision: 1,
+            expected_instance_revision: 2,
+            decision: WorkflowHumanTaskDecision::Approve,
+            acting_for: None,
+            comment: Some("stale quote".to_string()),
+            idempotency_key: format!("stale-gate-decision-{nonce}"),
+            correlation_id: format!("stale-gate-correlation-{nonce}"),
+            causation_id: None,
+        },
+    )
+    .err()
+    .ok_or("changed vendor quote consumed the old task")?;
+    assert_contains(&old_error, "subject changed")?;
+    let old_task = ctx
+        .db
+        .workflow_human_task()
+        .id()
+        .find(&task_id)
+        .ok_or("old task missing")?;
+    if old_task.status != WorkflowHumanTaskStatus::Open || old_task.revision != 1 {
+        return Err("stale approval consumed its task".to_string());
+    }
+    match request_guarded_action(ctx, fixture.organization_id, request)? {
+        GuardedActionGateOutcome::HumanTaskCreated {
+            workflow_instance_id,
+            task_id: fresh_task,
+            ..
+        } if workflow_instance_id != instance_id && fresh_task != task_id => {
+            instance_id = workflow_instance_id;
+            task_id = fresh_task;
+        }
+        _ => return Err("revised subject did not receive a fresh approval task".to_string()),
     }
     decide_workflow_human_task_for_actor(
         ctx,

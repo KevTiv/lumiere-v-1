@@ -179,7 +179,38 @@ pub fn test_requisition_convert_copies_lines(ctx: &ReducerContext) -> Result<(),
     }
 
     submit_purchase_requisition(ctx, org_id, requisition.id)?;
+    if approve_purchase_requisition(ctx, org_id, requisition.id).is_ok() {
+        return Err("requester approved their own requisition".into());
+    }
+    let submitted = ctx
+        .db
+        .purchase_requisition()
+        .id()
+        .find(&requisition.id)
+        .ok_or("submitted requisition missing")?;
+    if submitted.state != crate::types::RequisitionState::InProgress {
+        return Err("self-approval changed requisition state".into());
+    }
+    // This single-context reducer harness seeds a separate requester. The
+    // browser certification uses two real authenticated sessions instead.
+    let requester = spacetimedb::Identity::from_byte_array(
+        if ctx.sender() == spacetimedb::Identity::from_byte_array([0xfa; 32]) {
+            [0xfb; 32]
+        } else {
+            [0xfa; 32]
+        },
+    );
+    ctx.db.purchase_requisition().id().update(
+        crate::purchasing::purchase_orders::PurchaseRequisition {
+            user_id: requester,
+            create_uid: requester,
+            ..submitted
+        },
+    );
     approve_purchase_requisition(ctx, org_id, requisition.id)?;
+    if approve_purchase_requisition(ctx, org_id, requisition.id).is_ok() {
+        return Err("approved requisition accepted a stale approval".into());
+    }
     convert_purchase_requisition_to_po(ctx, org_id, company_id, requisition.id)?;
 
     let po = ctx

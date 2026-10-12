@@ -363,6 +363,9 @@ fn validate_order_in_organization(
     if order.organization_id != organization_id {
         return Err("Purchase order does not belong to this organization".to_string());
     }
+    crate::workflow::authorization::require_workflow_company_access(
+        ctx, organization_id, order.company_id, ctx.sender(),
+    )?;
     Ok(order)
 }
 
@@ -384,6 +387,9 @@ fn require_requisition_in_organization(
         return Err("Purchase requisition does not belong to this organization".to_string());
     }
     require_company_in_organization(ctx, organization_id, requisition.company_id)?;
+    crate::workflow::authorization::require_workflow_company_access(
+        ctx, organization_id, requisition.company_id, ctx.sender(),
+    )?;
     Ok(requisition)
 }
 
@@ -2838,6 +2844,10 @@ pub fn submit_purchase_requisition(
         return Err("Purchase requisition must be in Draft state to submit".to_string());
     }
 
+    if requisition_lines(ctx, requisition_id).is_empty() {
+        return Err("Purchase requisition must have lines before submission".to_string());
+    }
+
     ctx.db
         .purchase_requisition()
         .id()
@@ -2882,6 +2892,10 @@ pub fn approve_purchase_requisition(
         return Err("Purchase requisition must be in InProgress state to approve".to_string());
     }
 
+    if requisition.user_id == ctx.sender() || requisition.create_uid == ctx.sender() {
+        return Err("Purchase requisition requires an independent approver".to_string());
+    }
+
     ctx.db
         .purchase_requisition()
         .id()
@@ -2901,7 +2915,7 @@ pub fn approve_purchase_requisition(
             record_id: requisition_id,
             action: "UPDATE",
             old_values: Some("InProgress".to_string()),
-            new_values: Some("Open".to_string()),
+            new_values: Some("Approved".to_string()),
             changed_fields: vec!["state".to_string()],
             metadata: None,
         },

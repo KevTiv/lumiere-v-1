@@ -6194,6 +6194,11 @@
         },
         "title": "Edit purchase order"
       },
+      "intakeApproval": {
+        "title": "Approve supplier intake",
+        "description": "Select the vendor to link to this supplier request. Approval requires a different person from the submitter.",
+        "submit": "Approve supplier"
+      },
       "rfqAward": {
         "description": "Select an open RFQ and one of its submitted bids.",
         "title": "Award RFQ bid"

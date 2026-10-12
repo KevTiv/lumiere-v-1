@@ -86,6 +86,7 @@ import {
   toUpdatePurchaseOrderHeaderArgs,
 } from "./purchase-order-forms"
 import { usePurchasingWorkflow } from "@lumiere/query-hooks/hooks/purchasing-workflow"
+import { useCreateWorkflowDelegation } from "@lumiere/query-hooks/hooks/approvals"
 import { recordRef, type TransitionNotice } from "@lumiere/erp-workflows"
 import {
   usePurchaseOrders,
@@ -145,8 +146,8 @@ import {
   useUpsertVendorScorecard,
   useSetVendorRiskFlag,
   useCreateConsignmentAgreement,
-  useSetPurchaseApprovalDelegate,
   useSetCommodityPriceIndex,
+  useSetPurchaseApprovalDelegate,
   useCreatePurchasingIntegrationIntent,
   useRecordPurchasingIntegrationResult,
 } from "@lumiere/query-hooks/hooks/purchasing"
@@ -652,10 +653,8 @@ function PurchasingClientLoaded({
     orgId,
     operatingCompanyId,
   )
-  const setPurchaseApprovalDelegate = useSetPurchaseApprovalDelegate(
-    orgId,
-    operatingCompanyId,
-  )
+  const createWorkflowDelegation = useCreateWorkflowDelegation(organizationId, Number(operatingCompanyId))
+  const setPurchaseApprovalDelegate = useSetPurchaseApprovalDelegate(orgId, operatingCompanyId)
   const setCommodityPriceIndex = useSetCommodityPriceIndex(
     orgId,
     operatingCompanyId,
@@ -829,16 +828,20 @@ function PurchasingClientLoaded({
       fields: [
         { id: "principal", name: "principal", label: t("purchasing.ops.prompt.principalIdentity", { defaultValue: "Principal identity hex (64 chars)" }), type: "text", required: true, validation: { custom: hex64 } },
         { id: "delegate", name: "delegate", label: t("purchasing.ops.prompt.delegateIdentity", { defaultValue: "Delegate identity hex (64 chars)" }), type: "text", required: true, validation: { custom: hex64 } },
+        { id: "validFrom", name: "validFrom", label: t("purchasing.ops.delegationStarts", { defaultValue: "Starts" }), type: "datetime", required: true },
+        { id: "validUntil", name: "validUntil", label: t("purchasing.ops.delegationEnds", { defaultValue: "Ends" }), type: "datetime", required: true },
+        { id: "reason", name: "reason", label: t("purchasing.ops.delegationReason", { defaultValue: "Reason" }), type: "textarea", required: true },
       ],
     })
     const principalIdentity = formText(values?.principal)
     const delegateIdentity = formText(values?.delegate)
     if (principalIdentity == null || delegateIdentity == null) return
-    await setPurchaseApprovalDelegate.mutateAsync({
+    await createWorkflowDelegation.mutateAsync({
       principalIdentity,
       delegateIdentity,
-      isActive: true,
-      metadata: null,
+      validFrom: String(values?.validFrom ?? ""),
+      validUntil: String(values?.validUntil ?? ""),
+      reason: String(values?.reason ?? ""),
     })
   }
 
@@ -1199,17 +1202,13 @@ function PurchasingClientLoaded({
     const submittedBids = (rfqBids as EntityRow[]).filter(
       (row) => String(row.state ?? "").toLowerCase() === "submitted",
     )
-    const awardableRfqIds = new Set(
-      submittedBids.map((row) => String(row.rfqId ?? row.rfq_id ?? "")),
-    )
-
     return {
-      requisitions: (requisitions as EntityRow[]).map((row) => ({
+      requisitions: (requisitions as EntityRow[]).filter(requisitionCanCreateRfq).map((row) => ({
         value: String(row.id ?? ""),
         label: String(row.name ?? row.origin ?? `Requisition ${String(row.id ?? "")}`),
       })),
       rfqs: (rfqs as EntityRow[])
-        .filter((row) => awardableRfqIds.has(String(row.id ?? "")))
+        .filter((row) => !["awarded", "cancelled"].includes(String(row.state ?? "")))
         .map((row) => ({
           value: String(row.id ?? ""),
           label: String(row.name ?? `RFQ ${String(row.id ?? "")}`),
@@ -1883,7 +1882,8 @@ function PurchasingClientLoaded({
           purchasingWorkflow.supplierIntakeActions.filter(
             (action) =>
               action.id !== "purchasing.supplier-intake.reject" &&
-              action.id !== "purchasing.supplier-intake.hold",
+              action.id !== "purchasing.supplier-intake.hold" &&
+              action.id !== "purchasing.supplier-intake.approve",
           ),
           {
           ids: {
@@ -1892,6 +1892,23 @@ function PurchasingClientLoaded({
           confirmation: WORKFLOW_CONFIRMATION(t),
           },
         ),
+        {
+          id: "si-approve",
+          label: t("purchasing.actions.approveSelected"),
+          requiresSelection: true,
+          isApplicable: (rows) => rows.length === 1 &&
+            purchasingWorkflow.supplierIntakeActions.some((action) =>
+              action.id === "purchasing.supplier-intake.approve" && action.canPresent(rows[0])),
+          onClick: (rows) => {
+            const row = rows[0]
+            if (!row) return
+            setOperationDialogRequest({
+              kind: "approve-supplier-intake",
+              intakeId: String(row.id),
+              intakeLabel: String(row.companyName ?? row.id),
+            })
+          },
+        },
         ...(["hold", "reject"] as const).map((kind) => {
           const action = purchasingWorkflow.supplierIntakeActions.find(
             (candidate) => candidate.id === `purchasing.supplier-intake.${kind}`,
@@ -2683,6 +2700,13 @@ function PurchasingClientLoaded({
         options={operationDialogOptions}
         t={t}
         onDismiss={() => setOperationDialogRequest(null)}
+        onApproveSupplierIntake={async (input) => {
+          const action = purchasingWorkflow.supplierIntakeActions.find(
+            (candidate) => candidate.id === "purchasing.supplier-intake.approve",
+          )
+          if (!action) throw new Error("Supplier approval is unavailable")
+          await action.execute(input)
+        }}
         onCreateRfq={(params) => createPurchaseRfq.mutateAsync(params)}
         onAddRfqBid={(params) => addPurchaseRfqBid.mutateAsync(params)}
         onAwardRfqBid={(input) =>
