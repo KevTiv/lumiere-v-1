@@ -31,6 +31,8 @@ runs:
         ssh-add ~/.ssh/id_ed25519
         # pnpm records the private contracts package as an HTTPS Git URL.
         # Route that URL through the authenticated SSH agent.
-        git config --global url."git@github.com:".insteadOf "https://github.com/"
+        git config --global \
+          url."ssh://git@github.com/KevTiv/lumiere-contracts.git".insteadOf \
+          "https://github.com/KevTiv/lumiere-contracts.git"
         echo "SSH_AUTH_SOCK=$SSH_AUTH_SOCK" >> "$GITHUB_ENV"
         echo "SSH_AGENT_PID=$SSH_AGENT_PID" >> "$GITHUB_ENV"
