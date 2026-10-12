@@ -1,5 +1,7 @@
 # COV-05h Bill economic correction and price recovery
 
+> Broader support: [COV-05i](erp-cov05i-broader-bill-correction-status.md) extends draft correction to preserved discounts, explicit percentage-tax rows and consistent foreign-currency accounting. The original verification ledger below remains historical.
+
 **Disposition:** `LOCAL_ACTIVATED` — full-stack business acceptance remains deferred.
 
 The existing `update_account_move_line` command adds optional `quantity`,

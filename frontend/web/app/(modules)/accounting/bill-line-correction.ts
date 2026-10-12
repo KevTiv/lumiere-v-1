@@ -8,8 +8,8 @@ function finite(value: unknown): number | undefined {
 }
 /** Presentation eligibility follows exact producer-owned relations; reducer checks remain authoritative. */
 export function billLineCorrectionSource(bill: Row, line: Row, orders: readonly Row[], sources: readonly Row[]): Row | undefined {
-  if (tag(bill.state) !== 'Draft' || tag(field(bill, 'moveType', 'move_type')) !== 'InInvoice' || field(bill, 'postedBefore', 'posted_before') !== false || finite(field(bill, 'amountTax', 'amount_tax')) !== 0) return;
-  if (bill.id == null || field(bill, 'companyId', 'company_id') == null || field(bill, 'currencyId', 'currency_id') == null || String(field(bill, 'currencyId', 'currency_id')) !== String(field(bill, 'companyCurrencyId', 'company_currency_id'))) return;
+  if (tag(bill.state) !== 'Draft' || tag(field(bill, 'moveType', 'move_type')) !== 'InInvoice' || field(bill, 'postedBefore', 'posted_before') !== false || (finite(field(bill, 'amountTax', 'amount_tax')) ?? -1) < 0) return;
+  if (bill.id == null || field(bill, 'companyId', 'company_id') == null || field(bill, 'currencyId', 'currency_id') == null || field(bill, 'companyCurrencyId', 'company_currency_id') == null) return;
   if (String(field(line, 'moveId', 'move_id')) !== String(bill.id) || String(field(line, 'companyId', 'company_id')) !== String(field(bill, 'companyId', 'company_id')) || field(line, 'productId', 'product_id') == null) return;
   const origin = field(bill, 'invoiceOrigin', 'invoice_origin');
   const owners = orders.filter((o) => origin === `PO${String(o.id)}` && String(field(o, 'companyId', 'company_id')) === String(field(bill, 'companyId', 'company_id')) && Array.isArray(field(o, 'invoiceIds', 'invoice_ids')) && (field(o, 'invoiceIds', 'invoice_ids') as unknown[]).filter((id) => String(id) === String(bill.id)).length === 1);

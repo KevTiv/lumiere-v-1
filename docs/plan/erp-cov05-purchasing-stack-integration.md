@@ -65,6 +65,8 @@ Full operator acceptance remains explicitly deferred.
   receipts/two bills, response loss, strict posting, approvals and bill correction.
 - Durable invocation identity/replay for partial receipt operations and exact
   PO creation-key result ownership for concurrent custom-field attachment.
-- Broader correction support for tax, discounts, FX, reconciled/posted bills and
-  historical missing lineage; current correction intentionally rejects these.
+- Broader draft correction now supports existing discounts, explicit percentage-tax
+  rows and consistent FX evidence: [COV-05i](erp-cov05i-broader-bill-correction-status.md).
+  Reconciled/posted bills, unsupported tax structures and historical missing lineage
+  remain outside correction support.
 - Remote CI and review. This integration does not mark Purchasing accepted.

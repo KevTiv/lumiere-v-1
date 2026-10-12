@@ -454,6 +454,10 @@ fn compute_invoice_totals_internal(
     let mut amount_tax = 0.0f64;
     let mut amount_total = 0.0f64;
     let mut amount_residual = 0.0f64;
+    let mut untaxed_ledger = 0.0f64;
+    let mut tax_ledger = 0.0f64;
+    let mut total_ledger = 0.0f64;
+    let mut residual_ledger = 0.0f64;
 
     for line in lines {
         let is_counterpart =
@@ -462,15 +466,19 @@ fn compute_invoice_totals_internal(
             // The AR/AP balance is the invoice face value. Summing every debit and credit would
             // count the balanced invoice twice and make a wholly unpaid invoice look partially
             // paid as soon as it is posted.
-            amount_total += line.balance.abs();
-            amount_residual += line.amount_residual.abs();
+            amount_total += line.amount_currency.abs();
+            amount_residual += line.amount_residual_currency.abs();
+            total_ledger += line.balance.abs();
+            residual_ledger += line.amount_residual.abs();
             continue;
         }
 
         if line.tax_line_id.is_some() || line.tax_group_id.is_some() {
             amount_tax += line.price_total.abs();
+            tax_ledger += line.balance.abs();
         } else if !line.exclude_from_invoice_tab {
             amount_untaxed += line.price_subtotal.abs();
+            untaxed_ledger += line.balance.abs();
         }
     }
 
@@ -482,11 +490,15 @@ fn compute_invoice_totals_internal(
         amount_untaxed + amount_tax
     };
     move_record.amount_residual = amount_residual;
-    move_record.amount_untaxed_signed = amount_untaxed;
-    move_record.amount_tax_signed = amount_tax;
-    move_record.amount_total_signed = move_record.amount_total;
+    move_record.amount_untaxed_signed = untaxed_ledger;
+    move_record.amount_tax_signed = tax_ledger;
+    move_record.amount_total_signed = if total_ledger > 0.0 {
+        total_ledger
+    } else {
+        untaxed_ledger + tax_ledger
+    };
     move_record.amount_total_in_currency_signed = move_record.amount_total;
-    move_record.amount_residual_signed = amount_residual;
+    move_record.amount_residual_signed = residual_ledger;
     move_record.write_uid = Some(ctx.sender());
     move_record.write_date = Some(ctx.timestamp);
 
@@ -1901,7 +1913,7 @@ pub fn reset_account_move_to_draft(
     Ok(())
 }
 
-/// Correct a tax-free, functional-currency PO bill without changing its source identity.
+/// Correct a PO bill with exact source, tax-line and FX evidence without changing identities.
 /// All validation precedes writes; SpacetimeDB commits the correction atomically.
 fn correct_po_bill_line(
     ctx: &ReducerContext,
@@ -1923,11 +1935,7 @@ fn correct_po_bill_line(
     {
         return Err("Economic correction requires a never-posted draft vendor bill".into());
     }
-    if bill.currency_id != bill.company_currency_id || bill.amount_tax != 0.0 {
-        return Err(
-            "Economic correction currently requires a tax-free functional-currency bill".into(),
-        );
-    }
+    let (fx, rounding) = correction_fx(ctx, &bill)?;
     if params.debit.is_some()
         || params.credit.is_some()
         || params.partner_id.is_some()
@@ -1951,7 +1959,8 @@ fn correct_po_bill_line(
     }
     let quantity = params.quantity.unwrap_or(line.quantity);
     let price = params.price_unit.unwrap_or(line.price_unit);
-    let subtotal = correction_subtotal(quantity, price)?;
+    let proposed = correction_economics(ctx, &bill, &line, quantity, price)?;
+    let subtotal = proposed.subtotal;
     let origin = bill
         .invoice_origin
         .as_deref()
@@ -1963,7 +1972,7 @@ fn correct_po_bill_line(
     if origin != format!("PO{po_id}") {
         return Err("Canonical PO origin is required".into());
     }
-    let mut po = ctx
+    let po = ctx
         .db
         .purchase_order()
         .id()
@@ -1974,6 +1983,13 @@ fn correct_po_bill_line(
         || po.currency_id != bill.currency_id
         || Some(po.partner_id) != bill.partner_id
         || po.invoice_ids.iter().filter(|id| **id == bill.id).count() != 1
+        || ctx
+            .db
+            .purchase_order()
+            .iter()
+            .filter(|p| p.invoice_ids.contains(&bill.id))
+            .count()
+            != 1
     {
         return Err("Bill purchase-order lineage is invalid".into());
     }
@@ -2013,9 +2029,9 @@ fn correct_po_bill_line(
         .filter(|p| p.invoice_lines.contains(&line.id))
         .count()
         != 1
-        || source.price_tax != 0.0
         || source.organization_id != organization_id
         || source.company_id != bill.company_id
+        || source.currency_id != bill.currency_id
         || line.product_id != Some(source.product_id)
         || line.product_uom_id != Some(source.product_uom)
         || line.partner_id != bill.partner_id
@@ -2040,6 +2056,7 @@ fn correct_po_bill_line(
             || related.product_id != line.product_id
             || related.product_uom_id != line.product_uom_id
             || related_bill.move_type != MoveType::InInvoice
+            || related_bill.currency_id != bill.currency_id
             || related_bill.state == AccountMoveState::Cancelled
             || related_bill.invoice_origin.as_deref() != Some(origin)
             || !po.invoice_ids.contains(&related.move_id)
@@ -2086,7 +2103,15 @@ fn correct_po_bill_line(
     let mut payable = counterparts[0].clone();
     let mut total = 0.0;
     let mut previous_total = 0.0;
-    for expense in bill_lines.iter().filter(|l| l.id != payable.id) {
+    let mut ledger_total = 0.0;
+    let mut previous_ledger_total = 0.0;
+    // Each tax must have one explicit aggregate journal row. Repartitioned or
+    // unlinked tax amounts cannot be reconstructed from PO price_tax.
+    let mut tax_totals = std::collections::BTreeMap::<u64, (f64, f64, f64, f64)>::new();
+    for expense in bill_lines
+        .iter()
+        .filter(|l| l.id != payable.id && l.tax_line_id.is_none())
+    {
         let exact_sources: Vec<_> = po_lines
             .iter()
             .filter(|p| p.invoice_lines.contains(&expense.id))
@@ -2099,80 +2124,132 @@ fn correct_po_bill_line(
                 .filter(|p| p.invoice_lines.contains(&expense.id))
                 .count()
                 != 1
-            || expense.is_matching
-            || expense.payment_id.is_some()
-            || expense.statement_line_id.is_some()
             || expense.product_id != Some(exact_sources[0].product_id)
             || expense.product_uom_id != Some(exact_sources[0].product_uom)
             || expense.partner_id != bill.partner_id
             || expense.exclude_from_invoice_tab
-            || !expense.tax_ids.is_empty()
-            || expense.tax_line_id.is_some()
+            || expense.display_type.is_some()
             || expense.tax_group_id.is_some()
-            || expense.discount != 0.0
-            || expense.credit != 0.0
+            || expense.tax_repartition_line_id.is_some()
+            || exact_sources[0].organization_id != organization_id
+            || exact_sources[0].company_id != bill.company_id
+            || exact_sources[0].currency_id != bill.currency_id
+            || exact_sources[0]
+                .invoice_lines
+                .iter()
+                .filter(|id| **id == expense.id)
+                .count()
+                != 1
         {
-            return Err("Economic correction requires untaxed canonical PO expense lines".into());
+            return Err("Economic correction requires canonical PO expense lines".into());
         }
-        let old_subtotal = correction_subtotal(expense.quantity, expense.price_unit)?;
-        if !expense.debit.is_finite()
-            || (expense.debit - old_subtotal).abs() > 1e-8
-            || !expense.price_subtotal.is_finite()
-            || (expense.price_subtotal - old_subtotal).abs() > 1e-8
-        {
-            return Err(
-                "Bill-line economics do not agree; journal amounts cannot be guessed".into(),
-            );
-        }
-        previous_total += old_subtotal;
-        total += if expense.id == line.id {
-            subtotal
+        let old = correction_economics(ctx, &bill, expense, expense.quantity, expense.price_unit)?;
+        let new = if expense.id == line.id {
+            &proposed
         } else {
-            old_subtotal
+            &old
         };
+        let old_ledger =
+            crate::accounting::bill_correction_math::ledger_amount(old.subtotal, fx, rounding)?;
+        let new_ledger =
+            crate::accounting::bill_correction_math::ledger_amount(new.subtotal, fx, rounding)?;
+        validate_correction_amounts(
+            ctx,
+            expense,
+            &bill,
+            old.subtotal,
+            old.total,
+            old_ledger,
+            false,
+        )?;
+        previous_total += old.subtotal;
+        total += new.subtotal;
+        previous_ledger_total += old_ledger;
+        ledger_total += new_ledger;
+        for (id, old_tax) in &old.taxes {
+            let values = tax_totals.entry(*id).or_default();
+            values.0 += old_tax;
+            values.1 += new.taxes[id];
+            values.2 += old.subtotal;
+            values.3 += new.subtotal;
+        }
     }
-    if !total.is_finite()
-        || payable.is_matching
-        || payable.payment_id.is_some()
-        || payable.statement_line_id.is_some()
-        || !payable.credit.is_finite()
-        || payable.debit != 0.0
-        || (payable.credit - previous_total).abs() > 1e-8
+    let mut tax_updates = Vec::new();
+    let mut seen_taxes = std::collections::BTreeSet::new();
+    for tax_line in bill_lines.iter().filter(|l| l.tax_line_id.is_some()) {
+        let id = tax_line.tax_line_id.ok_or("Tax identity missing")?;
+        let values = tax_totals
+            .get(&id)
+            .ok_or("Tax journal row has no expense tax relationship")?;
+        let tax = require_active_tax(ctx, organization_id, bill.company_id, id, "correction")?;
+        if !seen_taxes.insert(id)
+            || tax_line.product_id.is_some()
+            || !tax_line.tax_ids.is_empty()
+            || tax_line.tax_repartition_line_id.is_some()
+            || tax_line.tax_group_id != tax.tax_group_id
+            || tax_line.partner_id != bill.partner_id
+            || tax_line.discount != 0.0
+            || !correction_equal(tax_line.tax_base_amount, values.2)
+        {
+            return Err("Tax journal identity or base is inconsistent".into());
+        }
+        let old_ledger =
+            crate::accounting::bill_correction_math::ledger_amount(values.0, fx, rounding)?;
+        let new_ledger =
+            crate::accounting::bill_correction_math::ledger_amount(values.1, fx, rounding)?;
+        validate_correction_amounts(ctx, tax_line, &bill, values.0, values.0, old_ledger, false)?;
+        let mut updated_tax = tax_line.clone();
+        apply_correction_amounts(&mut updated_tax, values.1, new_ledger, false);
+        updated_tax.quantity = 1.0;
+        updated_tax.price_unit = values.1;
+        updated_tax.tax_base_amount = values.3;
+        updated_tax.write_uid = Some(ctx.sender());
+        updated_tax.write_date = Some(ctx.timestamp);
+        tax_updates.push(updated_tax);
+        previous_total += values.0;
+        total += values.1;
+        previous_ledger_total += old_ledger;
+        ledger_total += new_ledger;
+    }
+    if seen_taxes.len() != tax_totals.len() {
+        return Err("Every expense tax requires one exact tax journal row".into());
+    }
+    validate_correction_amounts(
+        ctx,
+        &payable,
+        &bill,
+        previous_total,
+        previous_total,
+        previous_ledger_total,
+        true,
+    )?;
+    let old_tax_total: f64 = tax_totals.values().map(|v| v.0).sum();
+    if !correction_equal(bill.amount_tax, old_tax_total)
+        || !total.is_finite()
+        || !ledger_total.is_finite()
         || !payable.tax_ids.is_empty()
         || payable.tax_line_id.is_some()
+        || payable.tax_group_id.is_some()
     {
-        return Err("Bill payable economics do not agree".into());
+        return Err("Bill tax or payable economics do not agree".into());
     }
-    let before = serde_json::json!({"quantity": line.quantity, "price_unit": line.price_unit, "subtotal": line.price_subtotal, "total": bill.amount_total});
+    let before = serde_json::json!({"quantity": line.quantity, "price_unit": line.price_unit, "discount": line.discount, "subtotal": line.price_subtotal, "total": bill.amount_total});
     let mut updated = line;
     updated.quantity = quantity;
     updated.price_unit = price;
     updated.name = params.name.clone().unwrap_or(updated.name);
-    updated.price = subtotal;
-    updated.price_subtotal = subtotal;
-    updated.price_total = subtotal;
-    updated.debit = subtotal;
-    updated.credit = 0.0;
-    updated.balance = subtotal;
-    updated.amount_currency = subtotal;
-    updated.amount_residual = subtotal;
-    updated.amount_residual_currency = subtotal;
-    updated.debit_currency = subtotal;
-    updated.credit_currency = 0.0;
+    apply_correction_amounts(
+        &mut updated,
+        subtotal,
+        crate::accounting::bill_correction_math::ledger_amount(subtotal, fx, rounding)?,
+        false,
+    );
+    updated.price_total = proposed.total;
     updated.write_uid = Some(ctx.sender());
     updated.write_date = Some(ctx.timestamp);
     payable.quantity = 1.0;
     payable.price_unit = total;
-    payable.price = total;
-    payable.price_subtotal = total;
-    payable.price_total = total;
-    payable.credit = total;
-    payable.balance = -total;
-    payable.amount_currency = -total;
-    payable.amount_residual = -total;
-    payable.amount_residual_currency = -total;
-    payable.debit_currency = 0.0;
-    payable.credit_currency = total;
+    apply_correction_amounts(&mut payable, total, ledger_total, true);
     payable.write_uid = Some(ctx.sender());
     payable.write_date = Some(ctx.timestamp);
     source.qty_invoiced = next_billed;
@@ -2183,24 +2260,153 @@ fn correct_po_bill_line(
     source.write_date = ctx.timestamp;
     ctx.db.account_move_line().id().update(updated.clone());
     ctx.db.account_move_line().id().update(payable);
+    for tax_line in tax_updates {
+        ctx.db.account_move_line().id().update(tax_line);
+    }
     crate::purchasing::purchase_orders::persist_line_match_state(ctx, &po, source);
     crate::purchasing::purchase_orders::refresh_po_invoice_status(ctx, organization_id, po.id)?;
     compute_invoice_totals_internal(ctx, organization_id, bill.id)?;
-    write_audit_log_v2(ctx, organization_id, AuditLogParams { company_id: Some(bill.company_id), table_name: "account_move_line", record_id: updated.id, action: "CORRECT_ECONOMICS", old_values: Some(before.to_string()), new_values: Some(serde_json::json!({"quantity": quantity, "price_unit": price, "subtotal": subtotal, "total": total}).to_string()), changed_fields: vec!["quantity".into(), "price_unit".into(), "price_subtotal".into()], metadata: None });
+    write_audit_log_v2(ctx, organization_id, AuditLogParams { company_id: Some(bill.company_id), table_name: "account_move_line", record_id: updated.id, action: "CORRECT_ECONOMICS", old_values: Some(before.to_string()), new_values: Some(serde_json::json!({"quantity": quantity, "price_unit": price, "subtotal": subtotal, "total": total}).to_string()), changed_fields: vec!["quantity".into(), "price_unit".into(), "price_subtotal".into()], metadata: Some(serde_json::json!({"currency_id": bill.currency_id, "company_currency_id": bill.company_currency_id, "fx_rate": fx, "discount": updated.discount, "tax_ids": updated.tax_ids}).to_string()) });
     Ok(())
 }
 
-fn correction_subtotal(quantity: f64, price: f64) -> Result<f64, String> {
-    if !quantity.is_finite() || quantity <= 0.0 || !price.is_finite() || price < 0.0 {
-        return Err(
-            "Quantity must be finite and positive; unit price finite and non-negative".into(),
-        );
+fn correction_economics(
+    ctx: &ReducerContext,
+    bill: &AccountMove,
+    line: &AccountMoveLine,
+    quantity: f64,
+    price: f64,
+) -> Result<crate::accounting::bill_correction_math::Economics, String> {
+    let mut taxes = Vec::new();
+    for id in &line.tax_ids {
+        let tax = require_active_tax(
+            ctx,
+            bill.organization_id,
+            bill.company_id,
+            *id,
+            "correction",
+        )?;
+        if tax.amount_type != crate::types::TaxAmountType::Percent
+            || !matches!(
+                tax.type_tax_use,
+                crate::types::TaxTypeUse::Purchase | crate::types::TaxTypeUse::None
+            )
+            || tax.include_base_amount
+            || tax.has_negative_factor
+            || !tax.invoice_repartition_line_ids.is_empty()
+        {
+            return Err(
+                "Correction supports non-compounding percentage purchase taxes only".into(),
+            );
+        }
+        taxes.push(crate::accounting::bill_correction_math::PercentageTax {
+            id: *id,
+            rate: tax.amount,
+            included: tax.price_include,
+        });
     }
-    let subtotal = quantity * price;
-    if !subtotal.is_finite() {
-        return Err("Corrected subtotal is not finite".into());
+    crate::accounting::bill_correction_math::economics(quantity, price, line.discount, &taxes)
+}
+
+fn correction_fx(ctx: &ReducerContext, bill: &AccountMove) -> Result<(f64, Option<f64>), String> {
+    require_company_in_organization(ctx, bill.organization_id, bill.company_id)?;
+    let company = ctx
+        .db
+        .company()
+        .id()
+        .find(&bill.company_id)
+        .ok_or("Bill company unavailable")?;
+    if company.currency_id != bill.company_currency_id {
+        return Err("Bill company currency is inconsistent".into());
     }
-    Ok(subtotal)
+    if bill.currency_id == bill.company_currency_id {
+        return Ok((1.0, None));
+    }
+    crate::core::reference::require_active_currency_for_organization(
+        ctx,
+        bill.organization_id,
+        bill.currency_id,
+    )?;
+    let currency = crate::core::reference::require_active_currency_for_organization(
+        ctx,
+        bill.organization_id,
+        bill.company_currency_id,
+    )?;
+    let rate = crate::core::reference::resolve_currency_rate_as_of(
+        ctx,
+        bill.organization_id,
+        bill.company_id,
+        bill.currency_id,
+        bill.company_currency_id,
+        bill.invoice_date.unwrap_or(bill.date),
+    )?;
+    Ok((rate, Some(currency.rounding_factor)))
+}
+
+fn correction_equal(actual: f64, expected: f64) -> bool {
+    actual.is_finite() && expected.is_finite() && (actual - expected).abs() <= 1e-8
+}
+
+fn validate_correction_amounts(
+    ctx: &ReducerContext,
+    line: &AccountMoveLine,
+    bill: &AccountMove,
+    amount: f64,
+    total: f64,
+    ledger: f64,
+    credit: bool,
+) -> Result<(), String> {
+    let sign = if credit { -1.0 } else { 1.0 };
+    let account = ctx
+        .db
+        .account_account()
+        .id()
+        .find(&line.account_id)
+        .ok_or("Correction account unavailable")?;
+    let payable = matches!(account.internal_type, Some(AccountTypeInternal::Payable));
+    if account.organization_id != bill.organization_id
+        || account.company_id != bill.company_id
+        || account.deprecated
+        || payable != credit
+        || matches!(account.internal_type, Some(AccountTypeInternal::Receivable))
+        || line.currency_id != bill.currency_id
+        || line.company_currency_id != bill.company_currency_id
+        || line.currency_id_field != Some(bill.currency_id)
+        || line.parent_state != AccountMoveState::Draft
+        || line.is_matching
+        || line.payment_id.is_some()
+        || line.statement_line_id.is_some()
+        || line.matching_number.is_some()
+        || !correction_equal(line.price_subtotal, amount)
+        || !correction_equal(line.price, amount)
+        || !correction_equal(line.price_total, total)
+        || !correction_equal(line.debit, if credit { 0.0 } else { ledger })
+        || !correction_equal(line.credit, if credit { ledger } else { 0.0 })
+        || !correction_equal(line.balance, sign * ledger)
+        || !correction_equal(line.amount_residual, sign * ledger)
+        || !correction_equal(line.amount_currency, sign * amount)
+        || !correction_equal(line.amount_residual_currency, sign * amount)
+        || !correction_equal(line.debit_currency, if credit { 0.0 } else { amount })
+        || !correction_equal(line.credit_currency, if credit { amount } else { 0.0 })
+    {
+        return Err("Stored bill amounts, reconciliation or currency evidence is inconsistent; refresh and review".into());
+    }
+    Ok(())
+}
+
+fn apply_correction_amounts(line: &mut AccountMoveLine, amount: f64, ledger: f64, credit: bool) {
+    let sign = if credit { -1.0 } else { 1.0 };
+    line.price = amount;
+    line.price_subtotal = amount;
+    line.price_total = amount;
+    line.debit = if credit { 0.0 } else { ledger };
+    line.credit = if credit { ledger } else { 0.0 };
+    line.balance = sign * ledger;
+    line.amount_currency = sign * amount;
+    line.amount_residual = sign * ledger;
+    line.amount_residual_currency = sign * amount;
+    line.debit_currency = if credit { 0.0 } else { amount };
+    line.credit_currency = if credit { amount } else { 0.0 };
 }
 
 #[spacetimedb::reducer]
