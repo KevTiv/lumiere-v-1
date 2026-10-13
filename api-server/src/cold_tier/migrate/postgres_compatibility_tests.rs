@@ -5,7 +5,6 @@ use crate::cold_tier::{conventions, pg_codec, pg_pool, projection_worker};
 use anyhow::{ensure, Context, Result};
 use deadpool_postgres::Pool;
 use serde_json::json;
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 const NEXT_EXPAND_SQL: &str = r#"
@@ -294,16 +293,7 @@ fn unique_database_name() -> Result<String> {
         .duration_since(UNIX_EPOCH)
         .context("read clock for C4 PostgreSQL database")?
         .as_micros();
-    // Tests in one process run in parallel and can read the same microsecond,
-    // so a per-process sequence keeps each disposable database name unique.
-    static NEXT_DATABASE: AtomicU64 = AtomicU64::new(0);
-    let sequence = NEXT_DATABASE.fetch_add(1, Ordering::Relaxed);
-    Ok(format!(
-        "lumiere_c4_{}_{}_{}",
-        std::process::id(),
-        micros,
-        sequence
-    ))
+    Ok(format!("lumiere_c4_{}_{}", std::process::id(), micros))
 }
 
 fn admin_pool(config: &pg_pool::PgConfig) -> Result<Pool> {
