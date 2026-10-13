@@ -84,6 +84,21 @@ export function DashboardWidgetRenderer({ widget, widthClass, testId, isLoading 
       )
     }
     switch (widget.type) {
+      case "diagnostic":
+        return (
+          <div
+            className="space-y-1 rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive"
+            role="alert"
+            data-testid="dashboard-widget-diagnostic"
+          >
+            <p>{widget.data.message}</p>
+            {widget.data.rejectedRows != null ? (
+              <p className="text-xs">
+                {widget.data.rejectedRows} source {widget.data.rejectedRows === 1 ? "row was" : "rows were"} rejected.
+              </p>
+            ) : null}
+          </div>
+        )
       case "kpi":
         return <KPIWidget data={widget.data} />
       case "area-chart":

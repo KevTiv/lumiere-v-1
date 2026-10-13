@@ -401,6 +401,29 @@ fn is_index_line(line: &str) -> bool {
         || line.starts_with("CREATE UNIQUE INDEX IF NOT EXISTS ")
 }
 
+fn is_column_definition_line(line: &str) -> bool {
+    let Some(rest) = line.strip_prefix("    \"") else {
+        return false;
+    };
+    rest.split_once('"')
+        .is_some_and(|(_, definition)| definition.starts_with(' '))
+}
+
+fn split_table_shape<'a>(lines: impl IntoIterator<Item = &'a str>) -> (Vec<&'a str>, Vec<&'a str>) {
+    lines
+        .into_iter()
+        .partition(|line| is_column_definition_line(line))
+}
+
+fn canonical_columns<'a>(lines: &[&'a str]) -> Vec<&'a str> {
+    let mut columns = lines
+        .iter()
+        .map(|line| line.strip_suffix(',').unwrap_or(line))
+        .collect::<Vec<_>>();
+    columns.sort_unstable();
+    columns
+}
+
 /// The follow-up body for what `current` adds over `covered`, or an empty
 /// string when nothing is new.  Tables are processed in name order.
 ///
@@ -427,13 +450,17 @@ fn pending_delta_body(
             .lines()
             .filter(|line| !line.is_empty() && !line.starts_with(TABLE_HEADER))
             .collect();
-        let (now_indexes, now_rest): (Vec<&str>, Vec<&str>) =
+        let (now_indexes, now_shape): (Vec<&str>, Vec<&str>) =
             now.iter().partition(|line| is_index_line(line));
-        let (covered_indexes, covered_rest): (Vec<&str>, Vec<&str>) = covered_lines
+        let (covered_indexes, covered_shape): (Vec<&str>, Vec<&str>) = covered_lines
             .iter()
             .map(String::as_str)
             .partition(|line| is_index_line(line));
-        if now_rest != covered_rest {
+        let (now_columns, now_rest) = split_table_shape(now_shape);
+        let (covered_columns, covered_rest) = split_table_shape(covered_shape);
+        if canonical_columns(&now_columns) != canonical_columns(&covered_columns)
+            || now_rest != covered_rest
+        {
             bail!(
                 "released durable table '{table}' changed beyond new indexes (columns, \
                  keys, constraints or partitioning); author an explicit migration"
@@ -1076,6 +1103,20 @@ mod tests {
     }
 
     #[test]
+    fn reordered_columns_do_not_need_a_postgres_migration() {
+        let manifest = fixture_manifest();
+        let baseline = released_baseline(&manifest);
+        let ledger = ledger_from(&[(1, BASELINE, &baseline)], PENDING);
+        let mut reordered = manifest;
+        reordered.tables[1].columns.swap(0, 1);
+
+        let set = emit_durable_migrations(&reordered, &fixture_policies(), &ledger).unwrap();
+
+        assert_eq!(set.migrations.len(), 1);
+        assert!(set.migrations[0].released);
+    }
+
+    #[test]
     fn a_removed_released_table_needs_an_authored_migration() {
         let baseline = released_baseline(&fixture_manifest());
         let ledger = ledger_from(&[(1, BASELINE, &baseline)], PENDING);
@@ -1117,7 +1158,7 @@ mod tests {
             &std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("pg-migration-ledger"),
         )
         .unwrap();
-        assert_eq!(ledger.released.len(), 3);
+        assert_eq!(ledger.released.len(), 4);
         // The v0.3.80 migration 1 that existing databases recorded.
         assert_eq!(
             checksum(&ledger.released[0].sql),
@@ -1125,13 +1166,14 @@ mod tests {
         );
         assert_eq!(ledger.released[1].version, 11);
         assert_eq!(ledger.released[2].version, 12);
+        assert_eq!(ledger.released[3].version, 13);
         assert_eq!(
-            checksum(&ledger.released[2].sql),
-            "sha256:ea4cc157bc6750ccfee3f6645d51491c6c87480048e185f97dcdfd34489acde1"
+            checksum(&ledger.released[3].sql),
+            "sha256:a06969f4217bd58dba68cc5291fab2699a1252e6c9269e3bc86e3eb2cd4f719e"
         );
         assert_eq!(
             (ledger.pending_version, ledger.pending_name.as_str()),
-            (13, "0013_durable_projection_delta")
+            (14, "0014_durable_projection_delta")
         );
     }
 }

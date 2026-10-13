@@ -314,8 +314,10 @@ pub async fn get_role_name_in_organization(
         .map(|s| s.to_string()))
 }
 
-pub async fn user_has_organization_rows(state: &AppState, identity_hex: &str, token: &str) -> bool {
-    let client = state.client_with_token(token);
+pub async fn user_has_organization_rows(state: &AppState, identity_hex: &str) -> bool {
+    let Ok(client) = admin_client(state) else {
+        return false;
+    };
     let id = normalize_identity_hex_for_sql(identity_hex);
     let Ok(sql) = select_user_organization_for_identity_sql(&id, None) else {
         return false;

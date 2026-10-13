@@ -6,6 +6,15 @@ import {
   storedDashboardExportGate,
 } from "./stored-dashboard-resolver"
 
+const strictBinding = (timeField: string | null, measureField: string | null) =>
+  JSON.stringify({
+    version: 1,
+    timeField,
+    measureField,
+    missingTimestampPolicy: "reject",
+    missingMeasurePolicy: "reject",
+  })
+
 const baseWidget: Record<string, unknown> = {
   id: 1,
   name: "Revenue",
@@ -13,17 +22,18 @@ const baseWidget: Record<string, unknown> = {
   model: "sale_order",
   fields: ["amount_total"],
   aggregation: "sum",
+  configuration: strictBinding(null, "amount_total"),
   width: 6,
   isActive: true,
 }
 
 describe("stored dashboard resolver", () => {
   it.each([
-    ["malformed JSON", "{", "not valid JSON"],
-    ["non-object JSON", "[]", "must be a JSON object"],
-    ["unsupported operator", JSON.stringify({ state: { $contains: "draft" } }), "not supported"],
-    ["malformed in operator", JSON.stringify({ state: { $in: "draft" } }), "must use an array"],
-  ])("fails closed for %s", (_label, domain, message) => {
+    ["malformed JSON", "{", "invalid-filter"],
+    ["non-object JSON", "[]", "invalid-filter"],
+    ["unsupported operator", JSON.stringify({ state: { $contains: "draft" } }), "invalid-operator"],
+    ["malformed in operator", JSON.stringify({ state: { $in: "draft" } }), "invalid-filter"],
+  ])("fails closed for %s", (_label, domain, code) => {
     const result = resolveStoredDashboard(
       [{ ...baseWidget, domain }],
       [1],
@@ -31,18 +41,18 @@ describe("stored dashboard resolver", () => {
     )
 
     expect(result.state).toBe("invalid-definition")
-    expect(result.widgets).toEqual([])
-    expect(result.issues[0]?.message).toContain(message)
+    expect(result.widgets[0]).toMatchObject({ type: "diagnostic", data: { code } })
+    expect(storedDashboardExportGate(result)).toMatchObject({ allowed: false })
     expect(resolveStoredDashboardWidgets(
       [{ ...baseWidget, domain }],
       [1],
       { sale_order: [{ amount_total: 50, state: "draft" }] },
-    )).toEqual([])
+    )[0]).toMatchObject({ type: "diagnostic", data: { code } })
   })
 
-  it("excludes missing timestamps from bounded periods and declares partial completeness", () => {
+  it("rejects missing timestamps from bounded periods and declares partial completeness", () => {
     const result = resolveStoredDashboard(
-      [{ ...baseWidget, aggregation: "count", fields: [] }],
+      [{ ...baseWidget, aggregation: "count", fields: [], configuration: strictBinding("date_order", null) }],
       [1],
       {
         sale_order: [
@@ -55,10 +65,10 @@ describe("stored dashboard resolver", () => {
 
     expect(result.state).toBe("partial")
     expect(result.issues).toContainEqual(expect.objectContaining({ kind: "missing-timestamp", rejectedRows: 1 }))
-    expect(result.widgets[0]).toMatchObject({ data: { value: "1" } })
+    expect(result.widgets[0]).toMatchObject({ type: "diagnostic", data: { code: "invalid-timestamp", rejectedRows: 1 } })
   })
 
-  it("excludes missing and invalid measures instead of coercing them to zero", () => {
+  it("rejects missing and invalid measures instead of coercing them to zero", () => {
     const result = resolveStoredDashboard(
       [baseWidget],
       [1],
@@ -73,7 +83,7 @@ describe("stored dashboard resolver", () => {
 
     expect(result.state).toBe("partial")
     expect(result.issues).toContainEqual(expect.objectContaining({ kind: "missing-measure", rejectedRows: 2 }))
-    expect(result.widgets[0]).toMatchObject({ data: { value: "$20" } })
+    expect(result.widgets[0]).toMatchObject({ type: "diagnostic", data: { code: "missing-measure", rejectedRows: 2 } })
   })
 
   it("preserves denied and partial source state in the resolution", () => {
@@ -107,5 +117,55 @@ describe("stored dashboard resolver", () => {
     const empty = resolveStoredDashboard([baseWidget], [1], { sale_order: [] })
     expect(empty.state).toBe("empty")
     expect(storedDashboardExportGate(empty)).toEqual({ allowed: true })
+  })
+
+  it("requires an explicit time binding when a dashboard date range is active", () => {
+    const result = resolveStoredDashboard(
+      [{ ...baseWidget, aggregation: "count", fields: [], configuration: undefined }],
+      [1],
+      { sale_order: [{ id: 1, dateOrder: "2026-10-10T12:00:00Z" }] },
+      { startMs: Date.parse("2026-10-01T00:00:00Z"), endMs: Date.parse("2026-10-31T23:59:59Z") },
+    )
+
+    expect(result.widgets[0]).toMatchObject({
+      type: "diagnostic",
+      data: { code: "missing-time-field" },
+    })
+    expect(storedDashboardExportGate(result)).toMatchObject({ allowed: false })
+  })
+
+  it("filters and aggregates only when strict timestamp and measure bindings are complete", () => {
+    const result = resolveStoredDashboard(
+      [{ ...baseWidget, configuration: strictBinding("date_order", "amount_total") }],
+      [1],
+      {
+        sale_order: [
+          { id: 1, amountTotal: 5, dateOrder: "2026-09-30T12:00:00Z" },
+          { id: 2, amountTotal: 20, dateOrder: "2026-10-10T12:00:00Z" },
+        ],
+      },
+      { startMs: Date.parse("2026-10-01T00:00:00Z"), endMs: Date.parse("2026-10-31T23:59:59Z") },
+    )
+
+    expect(result.state).toBe("ready")
+    expect(result.widgets[0]).toMatchObject({ type: "kpi", data: { value: "$20" } })
+    expect(storedDashboardExportGate(result)).toEqual({ allowed: true })
+  })
+
+  it.each([
+    [{ sortOrder: "{" }, "invalid-sort"],
+    [{ aggregation: "median" }, "invalid-aggregation"],
+    [{ widgetType: "Chart", groupBy: "state", chartType: "radar" }, "invalid-chart-type"],
+    [{ configuration: "{}" }, "invalid-binding"],
+  ])("renders a diagnostic for invalid persisted definitions", (overrides, code) => {
+    const result = resolveStoredDashboard(
+      [{ ...baseWidget, ...overrides }],
+      [1],
+      { sale_order: [{ amount_total: 20, state: "sale" }] },
+    )
+
+    expect(result.state).toBe("invalid-definition")
+    expect(result.widgets[0]).toMatchObject({ type: "diagnostic", data: { code } })
+    expect(storedDashboardExportGate(result)).toMatchObject({ allowed: false })
   })
 })

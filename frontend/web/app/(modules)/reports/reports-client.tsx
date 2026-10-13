@@ -131,7 +131,7 @@ import { useOpenErpAiChat } from "@/lib/erp-ai-context"
 import { PivotExplorer } from "./pivot-explorer"
 import { VatReportPanel } from "./vat-report-panel"
 import { StatementsPanel } from "./statements-panel"
-import { QueryBuilder } from "./query-builder"
+import { QueryBuilder, type QueryBuilderStatus } from "./query-builder"
 import { OwnerReportsPanel } from "./owner-reports-panel"
 
 export { REPORTS_UI_REDUCERS } from "@/lib/reports-ui-reducers"
@@ -199,6 +199,7 @@ function ReportsClientLoaded({
   const [updateLayoutWidgetId, setUpdateLayoutWidgetId] = useState<string | null>(null)
   const [viewDashboardId, setViewDashboardId] = useState<string | null>(null)
   const [viewDashboardRange, setViewDashboardRange] = useState<"all" | "7d" | "30d" | "90d" | "ytd">("all")
+  const [queryBuilderStatus, setQueryBuilderStatus] = useState<QueryBuilderStatus | null>(null)
   const openErpAiChat = useOpenErpAiChat()
 
   const { data: reportsRaw = [] } = useFinancialReports(orgId, initialReports)
@@ -285,6 +286,9 @@ function ReportsClientLoaded({
     dataSources: storedDashboardDataSources,
     sourceStates: storedDashboardSourceStates,
     isLoading: storedDashboardLoading,
+    isRefreshing: storedDashboardRefreshing,
+    issue: storedDashboardIssue,
+    retry: retryStoredDashboard,
   } = useStoredDashboardDataSources(orgId, viewDashboardModels)
 
   const viewDashboardTimeRange = useMemo(
@@ -941,7 +945,10 @@ function ReportsClientLoaded({
             customContent: (
               <QueryBuilder
                 organizationId={orgId}
+                companyId={operatingCompanyId}
                 dashboards={dashboards as unknown as Record<string, unknown>[]}
+                status={queryBuilderStatus}
+                onStatusChange={setQueryBuilderStatus}
               />
             ),
           }
@@ -966,6 +973,7 @@ function ReportsClientLoaded({
       reports,
       trialBalances,
       dashboards,
+      queryBuilderStatus,
       companies,
       operatingCompanyId,
       orgId,
@@ -1007,7 +1015,10 @@ function ReportsClientLoaded({
       await createDashboard.mutateAsync(toCreateDashboardPayload(formData))
       setCreateDashboardOpen(false)
     } else if (action === "createDashboardWidget") {
-      await createDashboardWidget.mutateAsync(toCreateDashboardWidgetPayload(formData))
+      await createDashboardWidget.mutateAsync({
+        ...toCreateDashboardWidgetPayload(formData),
+        creationRequestId: globalThis.crypto.randomUUID(),
+      })
       setCreateWidgetOpen(false)
     }
   }
@@ -1331,7 +1342,11 @@ function ReportsClientLoaded({
                     size="sm"
                     className="gap-2"
                     onClick={() => void handleStoredDashboardExport()}
-                    disabled={storedDashboardLoading || !storedDashboardExport.allowed}
+                    disabled={
+                      storedDashboardLoading
+                      || storedDashboardRefreshing
+                      || !storedDashboardExport.allowed
+                    }
                     title={storedDashboardExport.reason}
                   >
                     <Download className="h-4 w-4" />
@@ -1342,15 +1357,62 @@ function ReportsClientLoaded({
             </div>
           </DialogHeader>
           {viewDashboard ? (
-            <StoredDashboardView
-              ref={storedDashboardRef}
-              dashboard={viewDashboard}
-              widgets={dashboardWidgets as unknown as Record<string, unknown>[]}
-              dataSources={storedDashboardDataSources}
-              sourceStates={storedDashboardSourceStates}
-              resolution={storedDashboardResolution ?? undefined}
-              timeRange={viewDashboardTimeRange}
-            />
+            storedDashboardLoading ? (
+              <p
+                role="status"
+                className="text-sm text-muted-foreground"
+                data-testid="stored-dashboard-loading"
+              >
+                {t("common.loading", "Loading…")}
+              </p>
+            ) : (
+              <div className="space-y-3">
+                {storedDashboardRefreshing ? (
+                  <p
+                    role="status"
+                    className="text-sm text-muted-foreground"
+                    data-testid="stored-dashboard-refreshing"
+                  >
+                    {t("reports.dashboards.sourceRefreshing")}
+                  </p>
+                ) : null}
+                {storedDashboardIssue ? (
+                  <div
+                    role="alert"
+                    className="space-y-3 rounded-md border border-destructive/40 bg-destructive/5 p-4 text-sm"
+                    data-testid={
+                      storedDashboardIssue.kind === "denied"
+                        ? "stored-dashboard-denied"
+                        : "stored-dashboard-error"
+                    }
+                  >
+                    <p>
+                      {storedDashboardIssue.kind === "denied"
+                        ? t("reports.dashboards.sourceDenied")
+                        : t("reports.dashboards.sourceError")}
+                    </p>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => void retryStoredDashboard()}
+                      data-testid="stored-dashboard-retry"
+                    >
+                      {t("reports.dashboards.retrySource")}
+                    </Button>
+                  </div>
+                ) : null}
+                <StoredDashboardView
+                  ref={storedDashboardRef}
+                  dashboard={viewDashboard}
+                  widgets={dashboardWidgets as unknown as Record<string, unknown>[]}
+                  dataSources={storedDashboardDataSources}
+                  sourceStates={storedDashboardSourceStates}
+                  resolution={storedDashboardResolution ?? undefined}
+                  timeRange={viewDashboardTimeRange}
+                />
+              </div>
+            )
           ) : null}
         </DialogContent>
       </Dialog>

@@ -1453,8 +1453,20 @@
       "name",
       "model",
       "widget_type",
+      "domain",
+      "fields",
+      "group_by",
+      "aggregation",
+      "chart_type",
+      "sort_order",
+      "limit",
+      "configuration",
+      "position_x",
+      "position_y",
+      "width",
       "is_active",
-      "company_id"
+      "company_id",
+      "metadata"
     ],
     "mandatory": [
       "id",

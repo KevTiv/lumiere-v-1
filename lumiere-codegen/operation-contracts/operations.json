@@ -2390,6 +2390,16 @@
       "idempotency": "idempotent",
       "semantic_kind": "internal"
     },
+    "set_helpdesk_related_record": {
+      "client_facing": false,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/helpdesk/related_records.rs: exact ticket-keyed relation is inserted, replaced, or explicitly cleared after tenant and target authorization",
+      "idempotency": "idempotent",
+      "semantic_kind": "internal"
+    },
     "set_iot_threshold": {
       "client_facing": true,
       "codec": {

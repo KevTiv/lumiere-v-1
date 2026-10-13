@@ -5957,14 +5957,6 @@
     }
   },
   "purchasing": {
-    "handoffs": {
-      "title": "Receipts & vendor bills",
-      "empty": "No receipts or vendor bills yet",
-      "receipt": "Receipt",
-      "bill": "Vendor bill",
-      "loading": "Loading receipts and vendor bills…",
-      "error": "Receipts or vendor bills could not be loaded. Check your access and try again."
-    },
     "csvImport": {
       "ordersTitle": "Import purchase orders (CSV)",
       "toolbarOrders": "Import orders (CSV)",
@@ -5982,6 +5974,14 @@
       "onTimePct": "On-time %",
       "overBilled": "Over-billed lines",
       "partialReceipt": "Partial receipt"
+    },
+    "handoffs": {
+      "title": "Receipts and vendor bills",
+      "loading": "Loading receipts and vendor bills...",
+      "error": "Receipts and vendor bills could not be loaded.",
+      "empty": "No receipts or vendor bills found.",
+      "receipt": "Receipt",
+      "bill": "Vendor bill"
     },
     "purchaseOrders": {
       "title": "Purchase Orders",
@@ -6261,6 +6261,10 @@
       "rfqBid": {
         "title": "New RFQ bid",
         "description": "Record a vendor bid for a request for quotation."
+      },
+      "rfqAward": {
+        "title": "Award RFQ bid",
+        "description": "Select an open RFQ and one of its submitted bids."
       },
       "vendorCredit": {
         "title": "New vendor credit",
@@ -6552,10 +6556,6 @@
           "header": "Header"
         },
         "title": "Edit purchase order"
-      },
-      "rfqAward": {
-        "description": "Select an open RFQ and one of its submitted bids.",
-        "title": "Award RFQ bid"
       }
     },
     "ops": {
@@ -11966,17 +11966,26 @@
       },
       "aggregation": "Aggregation",
       "aggregationField": "Aggregation field",
+      "timeField": "Time field",
+      "timeFieldNone": "No time filter",
+      "timeFieldDescription": "Select a timestamp field to make dashboard date ranges strict and complete.",
       "groupBy": "Group by",
       "chartType": "Chart type",
       "displayFields": "Display fields",
       "filters": "Filters",
       "addFilter": "Add filter",
+      "removeFilter": "Remove filter",
       "sortBy": "Sort by",
       "sortNone": "None",
       "limit": "Limit",
       "preview": "Live preview",
       "previewEmpty": "Configure a model and widget to see a live preview.",
       "previewNoRows": "No rows match the current filters.",
+      "previewUnavailable": "The preview is unavailable until the data source can be read.",
+      "sourceRefreshing": "Refreshing source data…",
+      "sourceDenied": "You do not have permission to read this data source.",
+      "sourceError": "The data source could not be loaded.",
+      "retrySource": "Retry data source",
       "widgetName": "Widget name",
       "widgetNamePlaceholder": "e.g. Open orders by state",
       "attachDashboard": "Add to dashboard (optional)",
@@ -11989,7 +11998,9 @@
         "denied": "You do not have access to this dashboard source.",
         "unavailable": "This dashboard source is unavailable.",
         "partial": "Only partial dashboard source data is available."
-      }
+      },
+      "rowsLoaded_one": "{{count}} row loaded",
+      "rowsLoaded_other": "{{count}} rows loaded"
     },
     "ownerReports": {
       "title": "Owner Reports",
@@ -12171,6 +12182,10 @@
       "description": "Custom analytics dashboards",
       "searchPlaceholder": "Search dashboards…",
       "emptyMessage": "No dashboards yet.",
+      "sourceRefreshing": "Refreshing dashboard data…",
+      "sourceDenied": "You do not have permission to read one or more dashboard data sources.",
+      "sourceError": "One or more dashboard data sources could not be loaded.",
+      "retrySource": "Retry dashboard data",
       "columns": {
         "name": "Name",
         "description": "Description",

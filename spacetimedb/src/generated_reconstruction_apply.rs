@@ -458,63 +458,64 @@ pub(crate) fn generated_restore_order(table: &str) -> Option<u32> {
         "form_config_field" => Some(445),
         "form_role_config" => Some(446),
         "helpdesk_team_member" => Some(447),
-        "hr_expense_advance_application" => Some(448),
-        "hr_expense_allocation" => Some(449),
-        "hr_expense_policy_exception" => Some(450),
-        "hr_leave_allocation" => Some(451),
-        "hr_onboarding_template_item" => Some(452),
-        "import_job_error" => Some(453),
-        "import_job_record" => Some(454),
-        "mrp_bom_byproduct" => Some(455),
-        "mrp_bom_line" => Some(456),
-        "opportunity_line" => Some(457),
-        "pos_order_line" => Some(458),
-        "pos_payment" => Some(459),
-        "presentation_module_version" => Some(460),
-        "product_attribute_line" => Some(461),
-        "product_pricelist_item" => Some(462),
-        "project_rate_card_line" => Some(463),
-        "project_revenue_line" => Some(464),
-        "proposal_line_item" => Some(465),
-        "proposal_section" => Some(466),
-        "proposal_version" => Some(467),
-        "purchase_blanket_order_line" => Some(468),
-        "purchase_blanket_release" => Some(469),
-        "purchase_order_line" => Some(470),
-        "purchase_requisition_line" => Some(471),
-        "purchase_return_line" => Some(472),
-        "purchase_rfq_bid" => Some(473),
-        "purchase_rfq_line" => Some(474),
-        "return_order_creation" => Some(475),
-        "return_order_line" => Some(476),
-        "sale_commission_plan_split" => Some(477),
-        "sale_order_line" => Some(478),
-        "sale_order_option" => Some(479),
-        "segment_member" => Some(480),
-        "stock_inventory_line" => Some(481),
-        "stock_landed_cost_allocation" => Some(482),
-        "stock_landed_cost_application" => Some(483),
-        "stock_move_line" => Some(484),
-        "stock_picking" => Some(485),
-        "subscription_bundle_item" => Some(486),
-        "subscription_line" => Some(487),
-        "subscription_usage_event" => Some(488),
-        "tax_deadline_reminder" => Some(489),
-        "workflow_calendar_version" => Some(490),
-        "workflow_decision_event" => Some(491),
-        "workflow_human_task_candidate" => Some(492),
-        "workflow_human_task_event" => Some(493),
-        "workflow_simulation_step" => Some(494),
-        "workflow_version" => Some(495),
-        "ai_knowledge_review" => Some(496),
-        "ai_knowledge_skill_promotion" => Some(497),
-        "form_field_label" => Some(498),
-        "workflow_calendar_exception" => Some(499),
+        "helpdesk_ticket_related_record" => Some(448),
+        "hr_expense_advance_application" => Some(449),
+        "hr_expense_allocation" => Some(450),
+        "hr_expense_policy_exception" => Some(451),
+        "hr_leave_allocation" => Some(452),
+        "hr_onboarding_template_item" => Some(453),
+        "import_job_error" => Some(454),
+        "import_job_record" => Some(455),
+        "mrp_bom_byproduct" => Some(456),
+        "mrp_bom_line" => Some(457),
+        "opportunity_line" => Some(458),
+        "pos_order_line" => Some(459),
+        "pos_payment" => Some(460),
+        "presentation_module_version" => Some(461),
+        "product_attribute_line" => Some(462),
+        "product_pricelist_item" => Some(463),
+        "project_rate_card_line" => Some(464),
+        "project_revenue_line" => Some(465),
+        "proposal_line_item" => Some(466),
+        "proposal_section" => Some(467),
+        "proposal_version" => Some(468),
+        "purchase_blanket_order_line" => Some(469),
+        "purchase_blanket_release" => Some(470),
+        "purchase_order_line" => Some(471),
+        "purchase_requisition_line" => Some(472),
+        "purchase_return_line" => Some(473),
+        "purchase_rfq_bid" => Some(474),
+        "purchase_rfq_line" => Some(475),
+        "return_order_creation" => Some(476),
+        "return_order_line" => Some(477),
+        "sale_commission_plan_split" => Some(478),
+        "sale_order_line" => Some(479),
+        "sale_order_option" => Some(480),
+        "segment_member" => Some(481),
+        "stock_inventory_line" => Some(482),
+        "stock_landed_cost_allocation" => Some(483),
+        "stock_landed_cost_application" => Some(484),
+        "stock_move_line" => Some(485),
+        "stock_picking" => Some(486),
+        "subscription_bundle_item" => Some(487),
+        "subscription_line" => Some(488),
+        "subscription_usage_event" => Some(489),
+        "tax_deadline_reminder" => Some(490),
+        "workflow_calendar_version" => Some(491),
+        "workflow_decision_event" => Some(492),
+        "workflow_human_task_candidate" => Some(493),
+        "workflow_human_task_event" => Some(494),
+        "workflow_simulation_step" => Some(495),
+        "workflow_version" => Some(496),
+        "ai_knowledge_review" => Some(497),
+        "ai_knowledge_skill_promotion" => Some(498),
+        "form_field_label" => Some(499),
+        "workflow_calendar_exception" => Some(500),
         _ => None,
     }
 }
 
-pub(crate) const GENERATED_FINAL_RESTORE_ORDER: u32 = 499;
+pub(crate) const GENERATED_FINAL_RESTORE_ORDER: u32 = 500;
 
 pub(crate) fn apply_generated_reconstruction_row(
     ctx: &ReducerContext,
@@ -20831,6 +20832,34 @@ pub(crate) fn apply_generated_reconstruction_row(
                         ));
                     }
                 }
+            }
+        },
+        "helpdesk_ticket_related_record" => {
+            use crate::helpdesk::related_records::{helpdesk_ticket_related_record as _, HelpdeskTicketRelatedRecord};
+            let spacetimedb_sats::serde::SerdeWrapper(row) =
+                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<HelpdeskTicketRelatedRecord>>(row_json)
+                    .map_err(|error| format!("invalid canonical row JSON for helpdesk_ticket_related_record: {error}"))?;
+            if row.organization_id != organization_id {
+                return Err("reconstruction row belongs to a different organization".to_string());
+            }
+            let rows = ctx.db.helpdesk_ticket_related_record();
+            if let Some(existing) = rows.ticket_id().find(&row.ticket_id) {
+                let existing_json = serde_json::to_value(
+                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
+                )
+                .map_err(|error| format!("serialize existing helpdesk_ticket_related_record row: {error}"))?;
+                let incoming_json = serde_json::to_value(
+                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
+                )
+                .map_err(|error| format!("serialize incoming helpdesk_ticket_related_record row: {error}"))?;
+                if existing_json == incoming_json {
+                    Ok(GeneratedApplyOutcome::AlreadyPresent)
+                } else {
+                    Err("reconstruction primary-key conflict with different row data".to_string())
+                }
+            } else {
+                rows.insert(row);
+                Ok(GeneratedApplyOutcome::Inserted)
             }
         },
         "hr_expense_advance_application" => {
