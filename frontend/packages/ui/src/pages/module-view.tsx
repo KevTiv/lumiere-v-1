@@ -1,7 +1,7 @@
 "use client"
 
 import { ModuleDataNotice } from "./module-data-notice"
-import type { ModuleDataState } from "../lib/module-data-state"
+import { canUseModuleData, type ModuleDataState } from "../lib/module-data-state"
 
 import { useEffect, useRef, useState, useCallback } from "react"
 import { useErpSession } from "@lumiere/erp-session"
@@ -163,11 +163,24 @@ export function ModuleView({
     setSelectedRecord(null)
   }, [activeTab, aiReporter])
 
+  // A create form or record sheet must not outlive the collection it was opened from.
+  const tabUsable = (tabId: string | null) => {
+    const state = tabId == null ? undefined : dataState?.[tabId]
+    return state == null || canUseModuleData(state)
+  }
+  const openFormUsable = tabUsable(openForm)
+  const activeTabUsable = tabUsable(activeTab)
+  useEffect(() => {
+    if (!openFormUsable) setOpenForm(null)
+  }, [openFormUsable])
+  useEffect(() => {
+    if (!activeTabUsable) setSelectedRecord(null)
+  }, [activeTabUsable])
+
   const activeTabConfig = config.tabs.find((tab) => tab.id === activeTab)
   const showDashboardTimeRange =
     activeTabConfig?.type === "dashboard" && onDashboardTimeRangeChange != null
-  const showDashboardExport = activeTabConfig?.type === "dashboard" &&
-    dataState?.[activeTab]?.status !== "error" && dataState?.[activeTab]?.status !== "denied"
+  const showDashboardExport = activeTabConfig?.type === "dashboard" && activeTabUsable
 
   return (
     <div

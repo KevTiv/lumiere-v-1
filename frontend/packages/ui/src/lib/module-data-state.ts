@@ -26,3 +26,30 @@ export function moduleQueryState(query: {
 export function canUseModuleData(state: ModuleDataState): boolean {
   return state.status !== "error" && state.status !== "denied"
 }
+
+const NO_ROWS: never[] = []
+
+/**
+ * One read of a primary collection: its tab state plus the rows consumers (tabs, joins,
+ * dialogs, form options) may use. Unavailable collections yield a stable empty list.
+ */
+export function moduleCollection<Row>(
+  query: Parameters<typeof moduleQueryState>[0] & { data?: Row[] },
+): { state: ModuleDataState; rows: Row[] } {
+  const state = moduleQueryState(query)
+  return { state, rows: canUseModuleData(state) ? query.data ?? NO_ROWS : NO_ROWS }
+}
+
+/**
+ * State of a view composed from several collections (dashboards, joined tabs): any denial
+ * denies; any failure or stale input fails, and retry re-reads every failed collection.
+ */
+export function mergeModuleStates(states: readonly ModuleDataState[]): ModuleDataState {
+  if (states.some((state) => state.status === "denied")) return { status: "denied" }
+  const failed = states.filter((state) => state.status === "error" || state.status === "partial")
+  if (failed.length) return {
+    status: "error",
+    onRetry: () => failed.forEach((state) => { if ("onRetry" in state) state.onRetry?.() }),
+  }
+  return { status: states.some((state) => state.status === "loading") ? "loading" : "ready" }
+}
