@@ -3,6 +3,7 @@ import { mapDashboardWidgets, withDashboardSections } from "@lumiere/ui/lib/dash
 import { useModuleTab } from "@/hooks/use-module-tab"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
+import { canUseModuleData, mergeModuleStates, moduleCollection } from "@lumiere/ui/lib/module-data-state"
 import { useTranslation } from "@lumiere/i18n"
 import { useConfirmDialog } from "@lumiere/ui/hooks/use-confirm-dialog"
 import {
@@ -688,7 +689,7 @@ function AccountingClientReady({
   const { t } = useTranslation()
   const { confirm: confirmDialog, dialog: confirmDialogNode } = useConfirmDialog()
   const { toast } = useToast()
-  const { askForm, formDialog } = useFormDialog()
+  const { askForm, cancelForm, formDialog } = useFormDialog()
   const { currentUser, checkPermission } = useRBAC()
   const runtimeRoleId = currentUser?.roles[0]
   const moduleConfigBase = useMemo(() => accountingModuleConfig(t), [t])
@@ -776,81 +777,117 @@ function AccountingClientReady({
   const [chatterTarget, setChatterTarget] = useState<ChatterTarget | null>(null)
   const [glDrilldownAccount, setGlDrilldownAccount] = useState<AccountAccount | null>(null)
   // ── Data hooks ──────────────────────────────────────────────────────────────
-  const { data: accounts = [] } = useAccountAccounts(orgId, {
+  const accountsRead = moduleCollection(useAccountAccounts(orgId, {
     enabled: organizationId > 0,
-  })
-  const { data: allMoves = [], isLoading: movesLoading } = useAccountMoves(orgId, {
+  }))
+  const accounts = accountsRead.rows
+  const allMovesRead = moduleCollection(useAccountMoves(orgId, {
     enabled: organizationId > 0,
-  })
-  const { data: accountMoveLines = [] } = useAccountMoveLines(orgId, { enabled: organizationId > 0 })
-  const { data: taxes = [] } = useAccountTaxes(orgId, { enabled: organizationId > 0 })
-  const { data: budgets = [] } = useCrossoveredBudgets(orgId, {
+  }))
+  const allMoves = allMovesRead.rows
+  const movesLoading = allMovesRead.state.status === "loading"
+  const accountMoveLinesRead = moduleCollection(useAccountMoveLines(orgId, { enabled: organizationId > 0 }))
+  const accountMoveLines = accountMoveLinesRead.rows
+  const taxesRead = moduleCollection(useAccountTaxes(orgId, { enabled: organizationId > 0 }))
+  const taxes = taxesRead.rows
+  const budgetsRead = moduleCollection(useCrossoveredBudgets(orgId, {
     enabled: organizationId > 0,
     initialData: initialBudgets,
-  })
-  const { data: budgetLines = [] } = useBudgetLines(orgId, { enabled: organizationId > 0 })
+  }))
+  const budgets = budgetsRead.rows
+  const budgetLinesRead = moduleCollection(useBudgetLines(orgId, { enabled: organizationId > 0 }))
+  const budgetLines = budgetLinesRead.rows
   const { data: budgetPosts = [] } = useBudgetPosts(orgId, { enabled: organizationId > 0 })
-  const { data: taxDeadlines = [] } = useTaxDeadlines(orgId, { enabled: organizationId > 0 })
-  const { data: taxGroups = [] } = useAccountTaxGroups(orgId, { enabled: organizationId > 0 })
-  const { data: taxJurisdictions = [] } = useTaxJurisdictions(orgId, { enabled: organizationId > 0 })
-  const { data: taxSchedules = [] } = useTaxSchedules(orgId, { enabled: organizationId > 0 })
-  const { data: analytic = [] } = useAccountAnalyticAccounts(orgId, { enabled: organizationId > 0 })
-  const { data: analyticLines = [] } = useAccountAnalyticLines(orgId, { enabled: organizationId > 0 })
-  const { data: analyticDistribution = [] } = useAccountAnalyticDistributionModels(orgId, {
+  const taxDeadlinesRead = moduleCollection(useTaxDeadlines(orgId, { enabled: organizationId > 0 }))
+  const taxDeadlines = taxDeadlinesRead.rows
+  const taxGroupsRead = moduleCollection(useAccountTaxGroups(orgId, { enabled: organizationId > 0 }))
+  const taxGroups = taxGroupsRead.rows
+  const taxJurisdictionsRead = moduleCollection(useTaxJurisdictions(orgId, { enabled: organizationId > 0 }))
+  const taxJurisdictions = taxJurisdictionsRead.rows
+  const taxSchedulesRead = moduleCollection(useTaxSchedules(orgId, { enabled: organizationId > 0 }))
+  const taxSchedules = taxSchedulesRead.rows
+  const analyticRead = moduleCollection(useAccountAnalyticAccounts(orgId, { enabled: organizationId > 0 }))
+  const analytic = analyticRead.rows
+  const analyticLinesRead = moduleCollection(useAccountAnalyticLines(orgId, { enabled: organizationId > 0 }))
+  const analyticLines = analyticLinesRead.rows
+  const analyticDistributionRead = moduleCollection(useAccountAnalyticDistributionModels(orgId, {
     enabled: organizationId > 0,
-  })
-  const { data: bankStatements = [], isLoading: bankStatementsLoading } = useAccountBankStatements(orgId, { enabled: organizationId > 0 })
-  const { data: bankStatementLines = [] } = useAccountBankStatementLines(orgId, { enabled: organizationId > 0 })
+  }))
+  const analyticDistribution = analyticDistributionRead.rows
+  const bankStatementsRead = moduleCollection(useAccountBankStatements(orgId, { enabled: organizationId > 0 }))
+  const bankStatements = bankStatementsRead.rows
+  const bankStatementsLoading = bankStatementsRead.state.status === "loading"
+  const bankStatementLinesRead = moduleCollection(useAccountBankStatementLines(orgId, { enabled: organizationId > 0 }))
+  const bankStatementLines = bankStatementLinesRead.rows
   const { data: bankMatchCandidates = [] } = useBankMatchCandidates(orgId, { enabled: organizationId > 0 })
-  const { data: reconciliationWidgets = [] } = useAccountReconciliationWidgets(orgId, {
+  const reconciliationWidgetsRead = moduleCollection(useAccountReconciliationWidgets(orgId, {
     enabled: organizationId > 0,
-  })
-  const { data: fixedAssets = [] } = useAccountFixedAssets(orgId, { enabled: organizationId > 0 })
-  const { data: accountPayments = [], isLoading: paymentsLoading } = useAccountPayments(orgId, { enabled: organizationId > 0 })
-  const { data: paymentTerms = [] } = useAccountPaymentTerms(orgId, { enabled: organizationId > 0 })
-  const { data: paymentTermLines = [] } = useAccountPaymentTermLines(orgId, { enabled: organizationId > 0 })
-  const { data: depreciationLines = [] } = useDepreciationLines(orgId, { enabled: organizationId > 0 })
+  }))
+  const reconciliationWidgets = reconciliationWidgetsRead.rows
+  const fixedAssetsRead = moduleCollection(useAccountFixedAssets(orgId, { enabled: organizationId > 0 }))
+  const fixedAssets = fixedAssetsRead.rows
+  const accountPaymentsRead = moduleCollection(useAccountPayments(orgId, { enabled: organizationId > 0 }))
+  const accountPayments = accountPaymentsRead.rows
+  const paymentsLoading = accountPaymentsRead.state.status === "loading"
+  const paymentTermsRead = moduleCollection(useAccountPaymentTerms(orgId, { enabled: organizationId > 0 }))
+  const paymentTerms = paymentTermsRead.rows
+  const paymentTermLinesRead = moduleCollection(useAccountPaymentTermLines(orgId, { enabled: organizationId > 0 }))
+  const paymentTermLines = paymentTermLinesRead.rows
+  const depreciationLinesRead = moduleCollection(useDepreciationLines(orgId, { enabled: organizationId > 0 }))
+  const depreciationLines = depreciationLinesRead.rows
   const { data: companies = [] } = useCompanies(organizationId, organizationId > 0)
   const { data: currencies = [] } = useCurrencies()
-  const { data: intercompanyRules = [] } = useIntercompanyRules(orgId, { enabled: organizationId > 0 })
-  const { data: intercompanyTransactions = [] } = useIntercompanyTransactions(orgId, {
+  const intercompanyRulesRead = moduleCollection(useIntercompanyRules(orgId, { enabled: organizationId > 0 }))
+  const intercompanyRules = intercompanyRulesRead.rows
+  const intercompanyTransactionsRead = moduleCollection(useIntercompanyTransactions(orgId, {
     enabled: organizationId > 0,
-  })
+  }))
+  const intercompanyTransactions = intercompanyTransactionsRead.rows
   const { data: saleOrders = [] } = useSaleOrders(orgId)
   const { data: contacts = [] } = useContacts(orgId)
-  const { data: journals = [] } = useAccountJournals(orgId, { enabled: organizationId > 0 })
+  const journalsRead = moduleCollection(useAccountJournals(orgId, { enabled: organizationId > 0 }))
+  const journals = journalsRead.rows
   const { data: accountTypes = [] } = useAccountAccountTypes(orgId, { enabled: organizationId > 0 })
   const { data: accountGroups = [] } = useAccountGroups(orgId, { enabled: organizationId > 0 })
-  const { data: consolidationAccounts = [] } = useConsolidationAccounts(orgId, {
+  const consolidationAccountsRead = moduleCollection(useConsolidationAccounts(orgId, {
     enabled: organizationId > 0,
-  })
-  const { data: consolidationJournals = [] } = useConsolidationJournals(orgId, {
+  }))
+  const consolidationAccounts = consolidationAccountsRead.rows
+  const consolidationJournalsRead = moduleCollection(useConsolidationJournals(orgId, {
     enabled: organizationId > 0,
-  })
-  const { data: eliminationEntries = [] } = useConsolidationEliminationEntries(orgId, {
+  }))
+  const consolidationJournals = consolidationJournalsRead.rows
+  const eliminationEntriesRead = moduleCollection(useConsolidationEliminationEntries(orgId, {
     enabled: organizationId > 0,
-  })
-  const { data: fxRevaluationRuns = [] } = useFxRevaluationRuns(orgId, {
+  }))
+  const eliminationEntries = eliminationEntriesRead.rows
+  const fxRevaluationRunsRead = moduleCollection(useFxRevaluationRuns(orgId, {
     enabled: organizationId > 0,
-  })
-  const { data: partnerCreditControls = [] } = usePartnerCreditControls(orgId, {
+  }))
+  const fxRevaluationRuns = fxRevaluationRunsRead.rows
+  const partnerCreditControlsRead = moduleCollection(usePartnerCreditControls(orgId, {
     enabled: organizationId > 0,
-  })
-  const { data: amortizationSchedules = [] } = useAmortizationSchedules(orgId, {
+  }))
+  const partnerCreditControls = partnerCreditControlsRead.rows
+  const amortizationSchedulesRead = moduleCollection(useAmortizationSchedules(orgId, {
     enabled: organizationId > 0,
-  })
-  const { data: amortizationLines = [] } = useAmortizationLines(orgId, {
+  }))
+  const amortizationSchedules = amortizationSchedulesRead.rows
+  const amortizationLinesRead = moduleCollection(useAmortizationLines(orgId, {
     enabled: organizationId > 0,
-  })
-  const { data: fiscalYearsRaw = [] } = useAccountFiscalYears(orgId, {
+  }))
+  const amortizationLines = amortizationLinesRead.rows
+  const fiscalYearsRawRead = moduleCollection(useAccountFiscalYears(orgId, {
     enabled: organizationId > 0,
     initialData: initialFiscalYears,
     staleTime: 0,
-  })
-  const { data: accountPeriodsRaw = [] } = useAccountPeriods(orgId, {
+  }))
+  const fiscalYearsRaw = fiscalYearsRawRead.rows
+  const accountPeriodsRawRead = moduleCollection(useAccountPeriods(orgId, {
     enabled: organizationId > 0,
     initialData: initialAccountPeriods,
-  })
+  }))
+  const accountPeriodsRaw = accountPeriodsRawRead.rows
   const { data: financialReportsRaw = [] } = useFinancialReports(orgId)
 
   const createFiscalYear = useCreateFiscalYear(organizationId, operatingCompanyId)
@@ -4205,11 +4242,104 @@ function AccountingClientReady({
   )
 
   // ── Form submit handler (entity tabs: taxes, budgets) ───────────────────────
+  const dataState = {
+    dashboard: mergeModuleStates([
+      accountsRead.state, allMovesRead.state, budgetsRead.state, taxDeadlinesRead.state, accountPaymentsRead.state,
+    ]),
+    accounts: accountsRead.state,
+    "journal-entries": allMovesRead.state,
+    invoices: allMovesRead.state,
+    bills: allMovesRead.state,
+    taxes: taxesRead.state,
+    payments: accountPaymentsRead.state,
+    "payment-operations": accountPaymentsRead.state,
+    "tax-groups": taxGroupsRead.state,
+    "tax-jurisdictions": taxJurisdictionsRead.state,
+    "tax-schedules": taxSchedulesRead.state,
+    "tax-deadlines": taxDeadlinesRead.state,
+    "payment-terms": paymentTermsRead.state,
+    "payment-term-lines": paymentTermLinesRead.state,
+    budgets: mergeModuleStates([budgetsRead.state, budgetLinesRead.state]),
+    analytic: analyticRead.state,
+    "analytic-lines": analyticLinesRead.state,
+    "analytic-distribution": analyticDistributionRead.state,
+    "bank-statements": mergeModuleStates([bankStatementsRead.state, bankStatementLinesRead.state]),
+    "reconciliation-widgets": reconciliationWidgetsRead.state,
+    "fixed-assets": mergeModuleStates([fixedAssetsRead.state, depreciationLinesRead.state]),
+    "fiscal-years": fiscalYearsRawRead.state,
+    "account-periods": accountPeriodsRawRead.state,
+    "fx-revaluation": fxRevaluationRunsRead.state,
+    "credit-control": partnerCreditControlsRead.state,
+    amortization: mergeModuleStates([amortizationSchedulesRead.state, amortizationLinesRead.state]),
+    consolidation: mergeModuleStates([consolidationAccountsRead.state, consolidationJournalsRead.state, eliminationEntriesRead.state]),
+    "intercompany-rules": intercompanyRulesRead.state,
+    "intercompany-transactions": intercompanyTransactionsRead.state,
+    "account-journals": journalsRead.state,
+    "move-lines": accountMoveLinesRead.state,
+  }
+  type AccountingTab = keyof typeof dataState
+  const tabUsable = (tab: string | undefined) =>
+    tab == null || !(tab in dataState) || canUseModuleData(dataState[tab as AccountingTab])
+  const actionTabs: Record<string, AccountingTab> = {
+    createAccount: "accounts", createMove: "journal-entries", createTax: "taxes", createBudget: "budgets",
+    createAnalyticAccount: "analytic", createAnalyticLine: "analytic-lines",
+    createAnalyticDistributionModel: "analytic-distribution", createReconciliationWidget: "reconciliation-widgets",
+    createFiscalYear: "fiscal-years", createAccountPeriod: "account-periods", createAccountPayment: "payments",
+    createPaymentTerm: "payment-terms", createPaymentTermLine: "payment-term-lines",
+    createAccountJournal: "account-journals", addAccountMoveLine: "move-lines",
+    createDepreciationLine: "fixed-assets", createIntercompanyRule: "intercompany-rules",
+    createIntercompanyTransaction: "intercompany-transactions",
+  }
+  const csvTabs: Record<AccountingCsvImportKind, AccountingTab> = {
+    account: "accounts", accountMove: "journal-entries", accountMoveLine: "journal-entries",
+    tax: "taxes", budget: "budgets", budgetLine: "budgets", analytic: "analytic",
+  }
+  const quickActionUsable = quickActionForm == null || tabUsable(actionTabs[quickActionForm.action])
+  const csvUsable = csvKind == null || tabUsable(csvTabs[csvKind])
+  // Record sheets, row editors and prompts are opened from the active tab's rows.
+  const activeTabUsable = tabUsable(accountingActiveTab)
+  useEffect(() => {
+    // Dialogs close when the collection their rows came from is denied or fails.
+    if (!quickActionUsable) setQuickActionForm(null)
+    if (!csvUsable) setCsvKind(null)
+    if (!activeTabUsable) {
+      setSelectedInvoice(null)
+      setInvoiceSheetRecord(null)
+      setShowCreateInvoice(false)
+      setShowCreateBill(false)
+      setCreditNoteSource(null)
+      setAnalyticAccountEdit(null)
+      setAnalyticLineEdit(null)
+      setAnalyticDistEdit(null)
+      setBankStatementDetail(null)
+      setBankLineCreateOpen(false)
+      setBankLineEdit(null)
+      setBankLineMatchFocus(null)
+      setReconciliationWidgetEdit(null)
+      setFiscalYearEdit(null)
+      setFiscalSetupOpen(false)
+      setAccountPeriodEdit(null)
+      setRegisterPaymentForId(null)
+      setReconcilePaymentOpen(false)
+      setJournalEdit(null)
+      setPaymentTermLineEdit(null)
+      setSelectedFixedAsset(null)
+      setDepreciationLineCreateOpen(false)
+      setIntercompanyRuleEdit(null)
+      setIntercompanyTxCreateOpen(false)
+      setMoveLineEdit(null)
+      setChatterTarget(null)
+      setGlDrilldownAccount(null)
+      cancelForm()
+    }
+  }, [quickActionUsable, csvUsable, activeTabUsable, cancelForm])
+
   const handleFormSubmit = async (
     _tabId: string,
     action: string,
     formData: Record<string, unknown>,
   ) => {
+    if (!tabUsable(actionTabs[action])) return
     if (action === "createAccount") {
       const p = toCreateAccountAccountParams(formData, {
         companyId: operatingCompanyId,
@@ -5155,11 +5285,12 @@ function AccountingClientReady({
 
   return (
     <>
-      {formDialog}
+      {activeTabUsable && formDialog}
       <ModuleView
         config={config}
         data={data}
         dataLoading={dataLoading}
+        dataState={dataState}
         onFormSubmit={handleFormSubmit}
         onRowClick={handleEntityRowClick}
         activeTab={accountingActiveTab}
@@ -5307,7 +5438,7 @@ function AccountingClientReady({
         />
       ) : null}
 
-      {csvKind && csvFormConfig ? (
+      {csvKind && csvUsable && csvFormConfig ? (
         <CsvImportModal
           key={csvKind}
           onClose={() => setCsvKind(null)}
@@ -5469,7 +5600,7 @@ function AccountingClientReady({
 
       {/* Dashboard quick-action form modal */}
       <RuntimeFormModal
-        open={quickActionForm !== null}
+        open={quickActionForm !== null && quickActionUsable}
         onOpenChange={(open) => !open && setQuickActionForm(null)}
         staticConfig={quickActionForm?.form ?? journalEntryFormConfig}
         moduleId="accounting"
