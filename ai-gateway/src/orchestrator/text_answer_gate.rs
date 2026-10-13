@@ -10,9 +10,9 @@
 //!   as validated.
 //! - **Figures trace to data.** A material figure (money, a percentage, a
 //!   decimal, a four-digit-plus integer) must appear in the evidence the server
-//!   holds — live ERP rows, tool outputs — or in the user's own question. An
-//!   untraceable figure qualifies the answer, and the limitation is appended to
-//!   the released text so a caveat cannot be dropped after the gate.
+//!   holds — live ERP rows, tool outputs — or in the user's own question.
+//!   Figure traceability alone does not establish that arbitrary prose is
+//!   entailed by a tool result; non-passage claims require semantic review.
 //! - **Nothing unverified is released.** `RequiresReview` and `Blocked`
 //!   withhold the candidate entirely; the caller gets the reason, not the text.
 //!
@@ -24,9 +24,7 @@
 //! semantic checker. No checker, or a failing one, requires review — retrieval
 //! alone is never support.
 //!
-//! What this does *not* establish: a model-assisted verdict is fallible and
-//! confers no domain approval, and a live-snapshot claim is checked only for
-//! traceability, not against the snapshot semantically.
+//! A model-assisted verdict remains fallible and confers no domain approval.
 
 use std::collections::HashSet;
 
@@ -244,8 +242,10 @@ fn parse_candidate(
 ) -> Result<StructuredTextDraft, String> {
     let trimmed = candidate.trim();
     if trimmed.starts_with('{') {
+        // serde's diagnostic can echo a model-authored field name or value.
+        // A withheld verdict is public, so keep parser detail server-side.
         return serde_json::from_str(trimmed)
-            .map_err(|error| format!("structured answer is malformed: {error}"));
+            .map_err(|_| "structured answer is malformed".to_string());
     }
     Ok(StructuredTextDraft {
         content: candidate.to_string(),
@@ -594,10 +594,9 @@ async fn gate_candidate(
                     .iter()
                     .find(|passage| passage.id != 0 && passage_ref(passage) == *support)
                 else {
-                    return Ok(blocked_text_answer(format!(
-                        "claim cites passage '{}' that is not authorized for this answer",
-                        support.id
-                    )));
+                    return Ok(blocked_text_answer(
+                        "claim cites a passage that is not authorized for this answer",
+                    ));
                 };
                 let citation = bound_citation(passage);
                 if !bound.contains(&citation) {
@@ -606,10 +605,9 @@ async fn gate_candidate(
             } else if known.contains(support) {
                 run.push(support.clone());
             } else {
-                return Ok(blocked_text_answer(format!(
-                    "claim support '{}:{}' was not produced by this run",
-                    support.kind, support.id
-                )));
+                return Ok(blocked_text_answer(
+                    "claim support was not produced by this run",
+                ));
             }
             if !citations.contains(support) {
                 citations.push(support.clone());
@@ -835,15 +833,18 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn an_answer_whose_figures_trace_to_the_data_is_admitted_unchanged() {
+    async fn figure_traceability_alone_does_not_admit_answer_prose() {
         let evidence = evidence(json!({ "amount_total": 1250.5, "state": "sale" }));
         let content = "Order #42 totals $1,250.50 and is confirmed.";
         let answer = structured(content, "live_snapshot", "sale_order:42");
         let gated = gate_text_answer(1, 2, &answer, &evidence).await.unwrap();
-        assert_eq!(gated.verification.outcome, TextAnswerOutcome::Admitted);
-        assert_eq!(gated.released.as_deref(), Some(content));
+        assert_eq!(
+            gated.verification.outcome,
+            TextAnswerOutcome::RequiresReview
+        );
+        assert!(gated.released.is_none());
         assert_eq!(gated.verification.methods, vec!["deterministic"]);
-        assert_eq!(gated.provenance.claims[0].verification_outcome, "traceable");
+        assert!(gated.provenance.claims.is_empty());
     }
 
     #[tokio::test]
@@ -988,7 +989,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn a_loop_candidate_grounded_in_a_tool_result_is_released() {
+    async fn a_loop_candidate_grounded_in_a_tool_result_requires_semantic_review() {
         let transcript = vec![
             LlmMessage::text("user", "How much did we sell?"),
             tool_result(
@@ -999,8 +1000,11 @@ mod tests {
         let evidence = evidence_from_transcript(&transcript);
         let answer = structured("We sold $12,345.67.", "tool_result", "call-1");
         let gated = gate_text_answer(1, 2, &answer, &evidence).await.unwrap();
-        assert_eq!(gated.verification.outcome, TextAnswerOutcome::Admitted);
-        assert!(gated.is_released());
+        assert_eq!(
+            gated.verification.outcome,
+            TextAnswerOutcome::RequiresReview
+        );
+        assert!(!gated.is_released());
     }
 
     #[tokio::test]
@@ -1015,6 +1019,26 @@ mod tests {
             let gated = gate_text_answer(1, 2, candidate, &evidence).await.unwrap();
             assert_eq!(gated.verification.outcome, TextAnswerOutcome::Blocked);
             assert!(gated.released.is_none());
+        }
+    }
+
+    #[tokio::test]
+    async fn malformed_or_unknown_support_diagnostics_do_not_echo_model_text() {
+        let secret = "SECRET MODEL AUTHORED VALUE";
+        let malformed = format!(r#"{{"content":"answer","{secret}":true}}"#);
+        let unknown_support = structured("answer", secret, secret);
+        for candidate in [malformed, unknown_support] {
+            let gated = gate_text_answer(1, 2, &candidate, &evidence(json!({"a": 1})))
+                .await
+                .unwrap();
+            assert_eq!(gated.verification.outcome, TextAnswerOutcome::Blocked);
+            let public = serde_json::to_string(&json!({
+                "notice": gated.withheld_notice(),
+                "verification": gated.verification,
+                "provenance": gated.provenance,
+            }))
+            .unwrap();
+            assert!(!public.contains(secret), "{public}");
         }
     }
 
