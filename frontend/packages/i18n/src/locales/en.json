@@ -72,6 +72,9 @@
       "invalidFormat": "Invalid format",
       "invalidEmail": "Invalid email address"
     },
+    "form": {
+      "unavailableSelection": "Unavailable selection: {{value}}"
+    },
     "formSubmit": {
       "busy": "Please wait — another request is still in progress.",
       "validationFailed": "Fix the highlighted fields, then try again.",
@@ -195,6 +198,9 @@
       }
     },
     "retry": "Retry",
+    "recordsDenied": "You do not have access to these records.",
+    "recordsPartial": "Some records could not be refreshed. Displayed records may be out of date.",
+    "recordsUnavailable": "Records could not be loaded.",
     "discardChanges": {
       "navigate": "You have edits that were not saved. They will be lost if you leave this page.",
       "description": "You have edits that were not saved. They will be lost if you close this form.",
@@ -205,14 +211,33 @@
     "loadFailed": "Could not load this list",
     "loadFailedHint": "Try again in a moment.",
     "csvImportDialog": {
+      "checkResult": "Check results",
+      "correctedFileNotice": "Submit a corrected file as a new submission. Retrying this reference preserves its original result.",
       "downloadTemplate": "Download template",
+      "errorsRestricted": "Your permissions do not include all row error details.",
+      "exactResult": "Results for this file submission",
       "failure": "Import failed",
       "fileLabel": "CSV file",
+      "historyEmpty": "No matching import jobs are visible yet. History refreshes while this dialog is open.",
+      "historyFailed": "Import history or row errors could not be loaded. Refresh to try again. The file may already have been imported; do not resubmit it to check.",
+      "historyLimit": "History includes up to 100 recent jobs and 500 recent row errors across the organization. Some errors may no longer be available here.",
+      "historyNotice": "The file was submitted. This organization's recent import history may include other users' imports. Select a job to review its results; jobs are not automatically linked to this file.",
+      "importAnotherFile": "Import another file",
+      "loadingErrors": "Loading row errors…",
+      "manualResultNotice": "This import uses manual history selection. Its results cannot yet be linked automatically to this file.",
       "missingColumns": "Missing required columns: {{columns}}",
       "noRows": "The file has a header but no data rows.",
       "outcomeUnknown": "Import outcome not verified",
       "outcomeUnknownDescription": "The server accepted {{file}}, but no exact import job was returned. Review import history before you retry.",
+      "recoveryNotice": "The server may already have imported this file. Retry keeps the same submission reference and cannot create a second import. Avoid starting a new submission until this result is known.",
+      "refreshHistory": "Refresh history",
+      "requestReference": "Submission reference: {{requestId}}",
+      "retrySameSubmission": "Retry same submission",
       "rowCount": "{{count}} rows found",
+      "rowError": "Row {{row}}: {{message}}",
+      "scopeChanged": "The active organization or company changed. Return to the original scope to check this submission.",
+      "selectJob": "Import job",
+      "selectJobPrompt": "Select a job to review",
       "submit": "Import",
       "success": "Import submitted",
       "successDescription": "{{count}} rows from {{file}} were sent. Rows the server rejects are listed in the import job history.",
