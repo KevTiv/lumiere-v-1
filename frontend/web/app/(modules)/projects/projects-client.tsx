@@ -1065,6 +1065,7 @@ function ProjectsClientLoaded({
             const view = tab.entityConfig.view
             return {
               ...tab,
+              createForm: projectFormConfig,
               entityConfig: withInlineEdits({
                 ...tab.entityConfig,
                 view: {
