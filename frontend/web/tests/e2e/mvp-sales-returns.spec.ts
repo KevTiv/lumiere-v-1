@@ -31,7 +31,8 @@ import {
   waitForSaleOrderDraftInQuery,
   waitForSaleOrderLineExists,
   waitForSaleOrderLineQtyDelivered,
-  fetchDraftInvoiceMoveIdByPartner,
+  fetchDraftInvoiceMoveIdForSaleOrder,
+  openCreateInvoiceFromOrder,
 } from "./helpers"
 
 /**
@@ -170,9 +171,7 @@ test.describe("MVP sales returns (RMA)", { tag: "@p0" }, () => {
     const receivableLabel = await fetchAccountSelectLabelByInternalType(page, "receivable")
     await gotoModule(page, "/sales", "sales")
     await page.getByTestId("module-tab-sales-orders").click()
-    await selectEntityRowById(page, orderId)
-    await waitForEntityActionEnabled(page, "entity-action-create-invoice")
-    await page.getByTestId("entity-action-create-invoice").click()
+    await openCreateInvoiceFromOrder(page, orderId)
     await chooseSelectOptionByLabel(page, "journalId", journalLabel)
     await chooseSelectOptionByLabel(page, "defaultIncomeAccountId", incomeLabel)
     await chooseSelectOptionByLabel(page, "receivableAccountId", receivableLabel)
@@ -184,8 +183,8 @@ test.describe("MVP sales returns (RMA)", { tag: "@p0" }, () => {
       ),
       submitForm(page, "create-invoice-from-sale-order"),
     ])
-    await fetchDraftInvoiceMoveIdByPartner(page, leadName)
-    await postDraftInvoiceViaUi(page, leadName)
+    const invoiceMoveId = await fetchDraftInvoiceMoveIdForSaleOrder(page, orderId)
+    await postDraftInvoiceViaUi(page, invoiceMoveId)
 
     const saleOrderLabel = await fetchSaleOrderSelectLabel(page, orderId)
 

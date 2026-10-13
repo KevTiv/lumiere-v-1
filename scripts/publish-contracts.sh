@@ -18,6 +18,10 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 STAGING="$ROOT/.contracts-staging"
 CONTRACTS_REPO="${LUMIERE_CONTRACTS_REPO:-git@github.com:KevTiv/lumiere-contracts.git}"
 VERSION="${1:?usage: publish-contracts.sh <version, e.g. 0.1.0>}"
+BUILD_CACHE_ROOT="${LUMIERE_CONTRACTS_BUILD_CACHE_DIR:-$ROOT/target/contracts-release}"
+CONTRACTS_CARGO_TARGET_DIR="${LUMIERE_CONTRACTS_CARGO_TARGET_DIR:-$BUILD_CACHE_ROOT/cargo}"
+CONTRACTS_NPM_CACHE_DIR="${LUMIERE_CONTRACTS_NPM_CACHE_DIR:-$BUILD_CACHE_ROOT/npm-cache}"
+mkdir -p "$CONTRACTS_CARGO_TARGET_DIR" "$CONTRACTS_NPM_CACHE_DIR"
 if [[ ! -d "$STAGING/bindings" || ! -d "$STAGING/manifests" ]]; then
   echo "error: $STAGING/{bindings,manifests} missing — run make generate-stdb-rust-sdk && make codegen first" >&2
   exit 1
@@ -268,7 +272,12 @@ serde_json = "1.0"
 )
 PY
 
-CARGO_INCREMENTAL=0 cargo build --manifest-path crates/lumiere-contracts/Cargo.toml
+# The release publishes Rust source, not a compiled library. Type-check every
+# generated feature while reusing one stable target directory across releases.
+# This is stronger than the former default-feature-only `cargo build` and avoids
+# code generation for an artifact that is discarded.
+CARGO_INCREMENTAL=0 CARGO_TARGET_DIR="$CONTRACTS_CARGO_TARGET_DIR" \
+  cargo check --quiet --all-features --manifest-path crates/lumiere-contracts/Cargo.toml
 
 # TypeScript package: verbatim spacetime-generate output + lumiere-codegen
 # TS/JSON artifacts. Kept at the exact same relative paths as they had in
@@ -319,7 +328,7 @@ node -e '
 
 (
   cd packages/contracts
-  npm install --no-save --silent
+  npm install --no-save --silent --cache "$CONTRACTS_NPM_CACHE_DIR"
   ./node_modules/.bin/tsc --noEmit -p tsconfig.json
 
   # Let the package own its build graph and entrypoints; keeping this here

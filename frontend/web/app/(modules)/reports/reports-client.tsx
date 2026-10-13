@@ -26,6 +26,8 @@ import {
   mergeFieldDefaultValues,
   StoredDashboardView,
   widgetModelsForDashboard,
+  resolveStoredDashboard,
+  storedDashboardExportGate,
   exportDashboardToPng,
   timeRangeToMs,
   Button,
@@ -132,6 +134,8 @@ import { QueryBuilder } from "./query-builder"
 import { OwnerReportsPanel } from "./owner-reports-panel"
 
 export { REPORTS_UI_REDUCERS } from "@/lib/reports-ui-reducers"
+
+type DashboardRecord = { [key: string]: unknown }
 
 interface ReportsClientProps {
   initialReports?: FinancialReport[]
@@ -272,26 +276,52 @@ function ReportsClientLoaded({
     if (!viewDashboard) return []
     return widgetModelsForDashboard(
       viewDashboard,
-      dashboardWidgets as unknown as Record<string, unknown>[],
+      dashboardWidgets as unknown as DashboardRecord[],
     )
   }, [viewDashboard, dashboardWidgets])
 
-  const { dataSources: storedDashboardDataSources, isLoading: storedDashboardLoading } =
-    useStoredDashboardDataSources(orgId, viewDashboardModels)
+  const {
+    dataSources: storedDashboardDataSources,
+    sourceStates: storedDashboardSourceStates,
+    isLoading: storedDashboardLoading,
+  } = useStoredDashboardDataSources(orgId, viewDashboardModels)
 
   const viewDashboardTimeRange = useMemo(
     () => (viewDashboardRange === "all" ? undefined : timeRangeToMs(viewDashboardRange)),
     [viewDashboardRange],
   )
 
+  const storedDashboardResolution = useMemo(() => {
+    if (!viewDashboard) return null
+    const widgetIds = (viewDashboard.widgetIds ?? viewDashboard.widget_ids) as
+      | Array<bigint | number>
+      | undefined
+    return resolveStoredDashboard(
+      dashboardWidgets as unknown as Record<string, unknown>[],
+      widgetIds ?? [],
+      storedDashboardDataSources,
+      {
+        ...(viewDashboardTimeRange ?? {}),
+        sourceStates: storedDashboardSourceStates,
+      },
+    )
+  }, [viewDashboard, dashboardWidgets, storedDashboardDataSources, storedDashboardSourceStates, viewDashboardTimeRange])
+
+  const storedDashboardExport = useMemo(
+    () => storedDashboardResolution
+      ? storedDashboardExportGate(storedDashboardResolution)
+      : { allowed: false, reason: "No dashboard is selected." },
+    [storedDashboardResolution],
+  )
+
   const storedDashboardRef = useRef<HTMLDivElement>(null)
   const handleStoredDashboardExport = useCallback(async () => {
-    if (!storedDashboardRef.current || !viewDashboard) return
+    if (!storedDashboardRef.current || !viewDashboard || !storedDashboardExport.allowed) return
     await exportDashboardToPng(
       storedDashboardRef.current,
       String(viewDashboard.name ?? "dashboard"),
     )
-  }, [viewDashboard])
+  }, [viewDashboard, storedDashboardExport.allowed])
 
   const addWidgetFormConfig = useMemo(
     () =>
@@ -423,10 +453,13 @@ function ReportsClientLoaded({
             label: t("reports.actions.exportPdf"),
             icon: FileDown,
             requiresSelection: true,
-            onClick: (rows) => {
+            selection: "multiple",
+            isApplicable: (rows) => rows.some((row) => String(row.state) === "generated"),
+            successMessage: t("common.actionCompleted", { action: t("reports.actions.exportPdf") }),
+            onClick: async (rows) => {
               for (const r of rows) {
                 if (String(r.state) === "generated") {
-                  void exportFinancialReport.mutateAsync({
+                  await exportFinancialReport.mutateAsync({
                     reportId: r.id as string | number | bigint,
                     exportFormat: "pdf",
                   })
@@ -439,10 +472,13 @@ function ReportsClientLoaded({
             label: t("reports.actions.exportXlsx"),
             icon: FileSpreadsheet,
             requiresSelection: true,
-            onClick: (rows) => {
+            selection: "multiple",
+            isApplicable: (rows) => rows.some((row) => String(row.state) === "generated"),
+            successMessage: t("common.actionCompleted", { action: t("reports.actions.exportXlsx") }),
+            onClick: async (rows) => {
               for (const r of rows) {
                 if (String(r.state) === "generated") {
-                  void exportFinancialReport.mutateAsync({
+                  await exportFinancialReport.mutateAsync({
                     reportId: r.id as string | number | bigint,
                     exportFormat: "xlsx",
                   })
@@ -455,10 +491,13 @@ function ReportsClientLoaded({
             label: t("reports.actions.exportCsv"),
             icon: FileText,
             requiresSelection: true,
-            onClick: (rows) => {
+            selection: "multiple",
+            isApplicable: (rows) => rows.some((row) => String(row.state) === "generated"),
+            successMessage: t("common.actionCompleted", { action: t("reports.actions.exportCsv") }),
+            onClick: async (rows) => {
               for (const r of rows) {
                 if (String(r.state) === "generated") {
-                  void exportFinancialReport.mutateAsync({
+                  await exportFinancialReport.mutateAsync({
                     reportId: r.id as string | number | bigint,
                     exportFormat: "csv",
                   })
@@ -471,10 +510,13 @@ function ReportsClientLoaded({
             label: t("reports.actions.regenerate"),
             icon: RefreshCw,
             requiresSelection: true,
-            onClick: (rows) => {
+            selection: "multiple",
+            isApplicable: (rows) => rows.some((row) => String(row.state) === "draft"),
+            successMessage: t("common.actionCompleted", { action: t("reports.actions.regenerate") }),
+            onClick: async (rows) => {
               for (const r of rows) {
                 if (String(r.state) === "draft") {
-                  void generateFinancialReport.mutateAsync(r.id as string | number | bigint)
+                  await generateFinancialReport.mutateAsync(r.id as string | number | bigint)
                 }
               }
             },
@@ -484,10 +526,13 @@ function ReportsClientLoaded({
             label: t("reports.actions.archive"),
             icon: Archive,
             requiresSelection: true,
-            onClick: (rows) => {
+            selection: "multiple",
+            isApplicable: (rows) => rows.some((row) => String(row.state) === "exported"),
+            successMessage: t("common.actionCompleted", { action: t("reports.actions.archive") }),
+            onClick: async (rows) => {
               for (const r of rows) {
                 if (String(r.state) === "exported") {
-                  void archiveFinancialReport.mutateAsync(r.id as string | number | bigint)
+                  await archiveFinancialReport.mutateAsync(r.id as string | number | bigint)
                 }
               }
             },
@@ -497,12 +542,15 @@ function ReportsClientLoaded({
             label: t("reports.actions.delete"),
             icon: Trash2,
             requiresSelection: true,
+            selection: "multiple",
             variant: "destructive",
-            onClick: (rows) => {
+            isApplicable: (rows) => rows.some((row) => String(row.state) !== "archived"),
+            successMessage: t("common.actionCompleted", { action: t("reports.actions.delete") }),
+            onClick: async (rows) => {
               for (const r of rows) {
                 const st = String(r.state)
                 if (st !== "archived") {
-                  void deleteFinancialReport.mutateAsync(r.id as string | number | bigint)
+                  await deleteFinancialReport.mutateAsync(r.id as string | number | bigint)
                 }
               }
             },
@@ -1267,7 +1315,8 @@ function ReportsClientLoaded({
                     size="sm"
                     className="gap-2"
                     onClick={() => void handleStoredDashboardExport()}
-                    disabled={storedDashboardLoading}
+                    disabled={storedDashboardLoading || !storedDashboardExport.allowed}
+                    title={storedDashboardExport.reason}
                   >
                     <Download className="h-4 w-4" />
                     {t("reports.actions.exportDashboard")}
@@ -1282,6 +1331,8 @@ function ReportsClientLoaded({
               dashboard={viewDashboard}
               widgets={dashboardWidgets as unknown as Record<string, unknown>[]}
               dataSources={storedDashboardDataSources}
+              sourceStates={storedDashboardSourceStates}
+              resolution={storedDashboardResolution ?? undefined}
               timeRange={viewDashboardTimeRange}
             />
           ) : null}

@@ -44,6 +44,8 @@ import {
   Calculator,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { StatCard, StatCardGrid } from "../components/stat-card"
+import { TablePager, usePagedRows } from "../components/table-pager"
 import { accountingListStatusBadgeClass } from "../lib/theme-colors"
 import type { AccountMove } from "../lib/accounting-types"
 import {
@@ -112,14 +114,18 @@ export function InvoiceListView({
   const [searchQuery, setSearchQuery] = useState("")
   const [statusFilter, setStatusFilter] = useState<DisplayStatus | "all">("all")
 
-  const filtered = invoices.filter((inv) => {
-    const name = inv.name?.toLowerCase() ?? ""
-    const partner = inv.invoicePartnerDisplayName?.toLowerCase() ?? ""
-    const matchesSearch = name.includes(searchQuery.toLowerCase()) || partner.includes(searchQuery.toLowerCase())
-    const status = getMoveStatus(inv)
-    const matchesStatus = statusFilter === "all" || status === statusFilter
-    return matchesSearch && matchesStatus
-  })
+  const filtered = invoices
+    .filter((inv) => {
+      const name = inv.name?.toLowerCase() ?? ""
+      const partner = inv.invoicePartnerDisplayName?.toLowerCase() ?? ""
+      const matchesSearch = name.includes(searchQuery.toLowerCase()) || partner.includes(searchQuery.toLowerCase())
+      const status = getMoveStatus(inv)
+      const matchesStatus = statusFilter === "all" || status === statusFilter
+      return matchesSearch && matchesStatus
+    })
+    // Newest first, matching EntityTable's default (auto-inc ids only increase).
+    .sort((a, b) => Number(b.id) - Number(a.id))
+  const pager = usePagedRows(filtered, `${searchQuery}|${statusFilter}`)
 
   const stats = {
     total: invoices.length,
@@ -133,48 +139,14 @@ export function InvoiceListView({
   return (
     <div className="space-y-6">
       {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card><CardContent className="p-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-info/10"><FileText className="h-5 w-5 text-info" /></div>
-            <div><p className="text-sm text-muted-foreground">{t("accounting.invoices.totalInvoices")}</p><p className="text-2xl font-bold">{stats.total}</p></div>
-          </div>
-        </CardContent></Card>
-        <Card><CardContent className="p-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-success/10"><CheckCircle2 className="h-5 w-5 text-success" /></div>
-            <div><p className="text-sm text-muted-foreground">{t("accounting.states.paid")}</p><p className="text-2xl font-bold">{stats.paid}</p></div>
-          </div>
-        </CardContent></Card>
-        <Card><CardContent className="p-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-warning/10"><Clock className="h-5 w-5 text-warning" /></div>
-            <div><p className="text-sm text-muted-foreground">{t("accounting.states.pending")}</p><p className="text-2xl font-bold">{stats.pending}</p></div>
-          </div>
-        </CardContent></Card>
-        <Card><CardContent className="p-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-destructive/10"><AlertTriangle className="h-5 w-5 text-destructive" /></div>
-            <div><p className="text-sm text-muted-foreground">{t("accounting.states.overdue")}</p><p className="text-2xl font-bold">{stats.overdue}</p></div>
-          </div>
-        </CardContent></Card>
-      </div>
-
-      {/* Summary */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Card><CardContent className="p-4">
-          <div className="flex items-center justify-between">
-            <div><p className="text-sm text-muted-foreground">{t("accounting.invoices.totalInvoiced")}</p><p className="text-2xl font-bold">{formatCurrency(stats.totalAmount)}</p></div>
-            <DollarSign className="h-8 w-8 text-muted-foreground/30" />
-          </div>
-        </CardContent></Card>
-        <Card><CardContent className="p-4">
-          <div className="flex items-center justify-between">
-            <div><p className="text-sm text-muted-foreground">{t("accounting.invoices.outstandingBalance")}</p><p className="text-2xl font-bold text-warning">{formatCurrency(stats.totalDue)}</p></div>
-            <Clock className="h-8 w-8 text-muted-foreground/30" />
-          </div>
-        </CardContent></Card>
-      </div>
+      <StatCardGrid className="lg:grid-cols-6">
+        <StatCard label={t("accounting.invoices.totalInvoices")} value={stats.total} icon={FileText} tone="info" />
+        <StatCard label={t("accounting.states.paid")} value={stats.paid} icon={CheckCircle2} tone="success" />
+        <StatCard label={t("accounting.states.pending")} value={stats.pending} icon={Clock} tone="warning" />
+        <StatCard label={t("accounting.states.overdue")} value={stats.overdue} icon={AlertTriangle} tone="destructive" />
+        <StatCard label={t("accounting.invoices.totalInvoiced")} value={formatCurrency(stats.totalAmount)} icon={DollarSign} />
+        <StatCard label={t("accounting.invoices.outstandingBalance")} value={formatCurrency(stats.totalDue)} icon={DollarSign} />
+      </StatCardGrid>
 
       {/* Table */}
       <Card>
@@ -221,11 +193,16 @@ export function InvoiceListView({
             <TableBody>
               {filtered.length === 0 ? (
                 <TableRow><TableCell colSpan={8} className="text-center py-8 text-muted-foreground">{t("accounting.invoices.noResults")}</TableCell></TableRow>
-              ) : filtered.map((inv) => {
+              ) : pager.pageRows.map((inv) => {
                 const status = getMoveStatus(inv)
                 const conf = statusConfig[status]
                 return (
-                  <TableRow key={String(inv.id)} className="cursor-pointer hover:bg-muted/50" onClick={() => onSelectInvoice?.(inv)}>
+                  <TableRow
+                    key={String(inv.id)}
+                    data-testid={`entity-row-${inv.id}`}
+                    className="cursor-pointer hover:bg-muted/50"
+                    onClick={() => onSelectInvoice?.(inv)}
+                  >
                     <TableCell className="font-medium">{inv.name}</TableCell>
                     <TableCell>
                       <p className="font-medium">{inv.invoicePartnerDisplayName ?? `Partner #${inv.partnerId}`}</p>
@@ -234,7 +211,7 @@ export function InvoiceListView({
                     <TableCell>{formatTimestamp(inv.invoiceDateDue)}</TableCell>
                     <TableCell className="font-medium">{formatCurrency(inv.amountTotal ?? 0)}</TableCell>
                     <TableCell>
-                      <span className={cn("font-medium", (inv.amountResidual ?? 0) > 0 ? "text-warning" : "text-success")}>
+                      <span className={cn("font-medium", (inv.amountResidual ?? 0) > 0 ? "text-foreground" : "text-success")}>
                         {formatCurrency(inv.amountResidual ?? 0)}
                       </span>
                     </TableCell>
@@ -275,6 +252,7 @@ export function InvoiceListView({
               })}
             </TableBody>
           </Table>
+          <TablePager {...pager} />
         </CardContent>
       </Card>
     </div>

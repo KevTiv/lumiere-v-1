@@ -17,7 +17,7 @@ use crate::manufacturing::bill_of_materials::{
     CreateBomByproductParams, CreateBomParams, MrpBomLine,
 };
 use crate::manufacturing::manufacturing_orders::{
-    confirm_manufacturing_order, consume_mo_materials, create_manufacturing_order,
+    confirm_manufacturing_order, consume_mo_materials, update_manufacturing_order, UpdateManufacturingOrderParams, create_manufacturing_order,
     create_workorder, finish_manufacturing_order, mrp_production, mrp_workorder,
     produce_manufacturing_order, scrap_finished_manufacturing_output, start_manufacturing_order, start_workorder, finish_workorder, CreateMrpProductionParams,
     CreateWorkorderParams, MrpProduction, MrpWorkorder,
@@ -150,6 +150,78 @@ pub fn test_bom_byproduct_output_exact_effect(ctx: &ReducerContext) -> Result<()
             && q.location_id == fixture.location_id).collect();
     if quants.len() != 1 || (quants[0].quantity - 0.5).abs() > 1e-9 {
         return Err("byproduct quant did not converge exactly".to_string());
+    }
+    Ok(())
+}
+
+pub fn test_update_manufacturing_order_draft_only(ctx: &ReducerContext) -> Result<(), String> {
+    ensure_test_superuser(ctx)?;
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let mo = create_test_production(ctx, &fixture, "MFG-UPDATE-DRAFT")?;
+    let new_finish = mo.date_planned_start + Duration::from_secs(7_200);
+
+    update_manufacturing_order(
+        ctx,
+        fixture.organization_id,
+        fixture.company_id,
+        mo.id,
+        UpdateManufacturingOrderParams {
+            product_qty: Some(3.0),
+            date_planned_start: None,
+            date_planned_finished: Some(new_finish),
+            date_deadline: Some(Some(new_finish)),
+            origin: None,
+            metadata: Some(None),
+        },
+    )?;
+    let updated = ctx.db.mrp_production().id().find(&mo.id).ok_or("MO missing after update")?;
+    if (updated.product_qty - 3.0).abs() > 1e-9 || (updated.product_uom_qty - 3.0).abs() > 1e-9 {
+        return Err("update did not persist product_qty".to_string());
+    }
+    if updated.date_planned_finished != new_finish || updated.date_deadline != Some(new_finish) {
+        return Err("update did not persist planned dates".to_string());
+    }
+    if updated.origin != mo.origin || updated.metadata.is_some() {
+        return Err("update did not preserve origin / clear metadata".to_string());
+    }
+
+    if update_manufacturing_order(
+        ctx,
+        fixture.organization_id,
+        fixture.company_id,
+        mo.id,
+        UpdateManufacturingOrderParams {
+            product_qty: Some(0.0),
+            date_planned_start: None,
+            date_planned_finished: None,
+            date_deadline: None,
+            origin: None,
+            metadata: None,
+        },
+    )
+    .is_ok()
+    {
+        return Err("update accepted a non-positive product_qty".to_string());
+    }
+
+    confirm_manufacturing_order(ctx, fixture.organization_id, fixture.company_id, mo.id)?;
+    if update_manufacturing_order(
+        ctx,
+        fixture.organization_id,
+        fixture.company_id,
+        mo.id,
+        UpdateManufacturingOrderParams {
+            product_qty: Some(5.0),
+            date_planned_start: None,
+            date_planned_finished: None,
+            date_deadline: None,
+            origin: None,
+            metadata: None,
+        },
+    )
+    .is_ok()
+    {
+        return Err("update accepted a non-Draft manufacturing order".to_string());
     }
     Ok(())
 }

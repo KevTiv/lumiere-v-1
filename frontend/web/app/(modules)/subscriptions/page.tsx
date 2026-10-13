@@ -1,5 +1,5 @@
 import { getStdbSession } from "@/lib/api-session"
-import { serverFetchQueryListsAllowEmpty } from "@/lib/server-query"
+import { serverFetchQueryListsRequired } from "@/lib/server-query"
 import { SubscriptionsClient } from "./subscriptions-client"
 
 const SSR_RESOURCES = [
@@ -29,7 +29,7 @@ export default async function SubscriptionsPage() {
     saleOrders,
     pricelists,
     products,
-  ] = await serverFetchQueryListsAllowEmpty(session, SSR_RESOURCES)
+  ] = await serverFetchQueryListsRequired(session, SSR_RESOURCES)
 
   return (
     <SubscriptionsClient

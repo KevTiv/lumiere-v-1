@@ -358,6 +358,14 @@ export const accountingModuleConfig = (t: TFunction): ModuleConfig => ({
   title: "Accounting",
   description: "Financial overview — P&L, cash position, and budget tracking",
   defaultTab: "dashboard",
+  tabGroups: [
+    { label: t("modules.tabGroups.invoicing", { defaultValue: "Invoicing" }), tabIds: ["invoices", "bills", "payments", "payment-operations", "credit-control"] },
+    { label: t("modules.tabGroups.ledger", { defaultValue: "Ledger" }), tabIds: ["journal-entries", "move-lines", "accounts", "account-journals"] },
+    { label: t("modules.tabGroups.banking", { defaultValue: "Banking" }), tabIds: ["bank-statements", "reconciliation-widgets", "fx-revaluation"] },
+    { label: t("modules.tabGroups.planning", { defaultValue: "Planning" }), tabIds: ["budgets", "analytic", "analytic-lines", "analytic-distribution", "fixed-assets", "amortization"] },
+    { label: t("modules.tabGroups.close", { defaultValue: "Close" }), tabIds: ["period-close", "fiscal-years", "account-periods", "consolidation", "intercompany-rules", "intercompany-transactions"] },
+    { label: t("modules.tabGroups.setup", { defaultValue: "Setup" }), tabIds: ["taxes", "payment-terms", "payment-term-lines"] },
+  ],
   tabs: [
     {
       id: "dashboard",
@@ -698,6 +706,12 @@ export const salesModuleConfig = (t: TFunction): ModuleConfig => ({
   title: "Sales",
   description: "Revenue performance, pipeline health, and deal activity",
   defaultTab: "dashboard",
+  tabGroups: [
+    { label: t("modules.tabGroups.orders", { defaultValue: "Orders" }), tabIds: ["orders", "order-lines", "invoices", "returns"] },
+    { label: t("modules.tabGroups.fulfillment", { defaultValue: "Fulfillment" }), tabIds: ["deliveries", "fulfillment"] },
+    { label: t("modules.tabGroups.pricing", { defaultValue: "Pricing" }), tabIds: ["pricelists", "pricelist-items", "loyalty-programs", "loyalty-cards"] },
+    { label: t("modules.tabGroups.setup", { defaultValue: "Setup" }), tabIds: ["delivery-price-rules", "delivery-carriers", "shipping-methods", "pos-payment-methods"] },
+  ],
   tabs: [
     {
       id: "dashboard",
@@ -1139,6 +1153,13 @@ export const inventoryModuleConfig = (t: TFunction): ModuleConfig => ({
   title: "Inventory",
   description: "Stock levels, movements, valuations, and reorder alerts",
   defaultTab: "dashboard",
+  tabGroups: [
+    { label: t("modules.tabGroups.stock", { defaultValue: "Stock" }), tabIds: ["products", "product-categories", "stock", "valuations", "lots", "serials"] },
+    { label: t("modules.tabGroups.movements", { defaultValue: "Movements" }), tabIds: ["transfers", "stock-moves", "adjustments", "picking-waves", "warehouse-tasks", "replenishment"] },
+    { label: t("modules.tabGroups.warehouse", { defaultValue: "Warehouse" }), tabIds: ["warehouses", "locations", "location-tree", "3d-view", "routes", "rules"] },
+    { label: t("modules.tabGroups.quality", { defaultValue: "Quality" }), tabIds: ["quality", "quality-alerts", "cycle-counts", "cycle-wizard", "traceability-records", "traceability-reports"] },
+    { label: t("modules.tabGroups.setup", { defaultValue: "Setup" }), tabIds: ["barcode-rules", "barcode-nomenclatures", "adjustment-reasons"] },
+  ],
   tabs: [
     {
       id: "dashboard",
@@ -1605,6 +1626,11 @@ export const hrModuleConfig = (t: TFunction): ModuleConfig => ({
   title: "HR & People",
   description: "Workforce overview, recruitment, attendance, and performance",
   defaultTab: "dashboard",
+  tabGroups: [
+    { label: t("modules.tabGroups.people", { defaultValue: "People" }), tabIds: ["employees", "departments", "org-chart", "job-positions", "recruitment", "onboarding-templates", "performance"] },
+    { label: t("modules.tabGroups.timeoff", { defaultValue: "Time off" }), tabIds: ["leaves", "attendance", "leave-types"] },
+    { label: t("modules.tabGroups.pay", { defaultValue: "Pay" }), tabIds: ["contracts", "payslips", "payroll-structures", "salary-rules", "benefits"] },
+  ],
   tabs: [
     {
       id: "dashboard",
@@ -2064,7 +2090,7 @@ export const iotDashboard: DashboardConfig = {
               },
               { id: "register_hub", label: "Register hub", icon: "plus", color: "green" },
               { id: "register_device", label: "Register device", icon: "package", color: "purple" },
-              { id: "sync_devices_dev", label: "Sync devices (dev)", icon: "template", color: "teal" },
+              { id: "sync_devices_dev", label: "Sync devices", icon: "template", color: "teal" },
             ],
           },
         },
@@ -2592,6 +2618,11 @@ export const subscriptionsModuleConfig = (t: TFunction): ModuleConfig => ({
   title: "Subscriptions",
   description: "Recurring revenue, plans, and subscription management",
   defaultTab: "dashboard",
+  tabGroups: [
+    { label: t("modules.tabGroups.subscriptions", { defaultValue: "Subscriptions" }), tabIds: ["subscriptions", "plans", "lines", "amendments", "entitlements"] },
+    { label: t("modules.tabGroups.billing", { defaultValue: "Billing" }), tabIds: ["usage-events", "usage-charges", "rating-backlog", "price-tiers", "due-to-bill", "past-due", "payment-intents"] },
+    { label: t("modules.tabGroups.revenue", { defaultValue: "Revenue" }), tabIds: ["deferred-schedules", "deferred-lines", "recognition-rules"] },
+  ],
   tabs: [
     {
       id: "dashboard",
@@ -3136,11 +3167,10 @@ export const proposalsModuleConfig = (t: TFunction): ModuleConfig => ({
               title: "Quick Actions",
               width: "full",
               data: {
-                columns: 4,
+                columns: 3,
                 actions: [
                   { id: "new_proposal", label: "New Proposal", icon: "plus", color: "blue" },
                   { id: "use_template", label: "Use Template", icon: "file", color: "green" },
-                  { id: "import_rfp", label: "Import RFP (coming soon)", icon: "upload", color: "orange" },
                   { id: "review_pending", label: "Review Pending", icon: "eye", color: "purple" },
                 ],
               },
@@ -3232,7 +3262,7 @@ export const fleetModuleConfig = (
 ): ModuleConfig => ({
   id: "fleet",
   title: t("fleet.title"),
-  description: t("fleet.forms.newVehicle.description"),
+  description: t("fleet.description"),
   defaultTab: "fleet-vehicles",
   tabs: [
     {

@@ -268,7 +268,7 @@ pub fn create_ai_run_action_draft(
     }
     let payload_hash =
         creation_payload_hash(organization_id, company_id, run_id, request_key, &params);
-    if let Some(existing) = ctx
+    let existing = ctx
         .db
         .ai_action_draft_request()
         .ai_action_draft_request_by_run()
@@ -278,12 +278,14 @@ pub fn create_ai_run_action_draft(
                 && link.company_id == company_id
                 && link.run_id == run_id
                 && link.request_key == request_key
-        })
-    {
-        if existing.creation_payload_hash == payload_hash {
-            return Ok(());
-        }
-        return Err("request key is already bound to a different draft payload".to_string());
+        });
+    if validate_request_replay(
+        existing
+            .as_ref()
+            .map(|link| link.creation_payload_hash.as_str()),
+        &payload_hash,
+    )? {
+        return Ok(());
     }
     if run.status != "running" && run.status != "pending" {
         return Err("cannot create a new draft for a terminal AI agent run".to_string());
@@ -672,6 +674,17 @@ fn creation_payload_hash(
     let canonical = serde_json::to_vec(&payload).expect("JSON payload is serializable");
     let digest = Sha256::digest(canonical);
     format!("sha256:{digest:x}")
+}
+
+fn validate_request_replay(
+    existing_payload_hash: Option<&str>,
+    requested_payload_hash: &str,
+) -> Result<bool, String> {
+    match existing_payload_hash {
+        None => Ok(false),
+        Some(existing) if existing == requested_payload_hash => Ok(true),
+        Some(_) => Err("request key is already bound to a different draft payload".to_string()),
+    }
 }
 
 fn mark_expired(ctx: &ReducerContext, draft: &AiActionDraft) {
@@ -1191,6 +1204,18 @@ mod tests {
         assert_eq!(
             creation_payload_hash(1, 2, 3, "request-1", &trimmed),
             creation_payload_hash(1, 2, 3, "request-1", &hash_params())
+        );
+    }
+
+    #[test]
+    fn request_replay_is_exact_and_payload_bound() {
+        assert!(!validate_request_replay(None, "sha256:new").expect("new request"));
+        assert!(validate_request_replay(Some("sha256:same"), "sha256:same").expect("exact replay"));
+        let error = validate_request_replay(Some("sha256:first"), "sha256:changed")
+            .expect_err("changed replay must fail");
+        assert_eq!(
+            error,
+            "request key is already bound to a different draft payload"
         );
     }
 }

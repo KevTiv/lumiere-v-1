@@ -247,15 +247,18 @@ def verify(repo_root: Path, metadata_path: Path, operation_ids_path: Path) -> No
         if not isinstance(entry, dict):
             raise CoverageError("each C2 reducer entry must be an object")
         required = {"source", "function", "operation", "operation_id", "change_constructors"}
-        if set(entry) != required:
+        allowed = required | {"change_helpers"}
+        if not required.issubset(entry) or not set(entry).issubset(allowed):
             raise CoverageError(
-                f"C2 reducer entry keys must be {sorted(required)}, got {sorted(entry)}"
+                f"C2 reducer entry keys must include {sorted(required)} and may include "
+                f"change_helpers, got {sorted(entry)}"
             )
         source_name = entry["source"]
         function = entry["function"]
         operation = entry["operation"]
         operation_id = entry["operation_id"]
         constructors = entry["change_constructors"]
+        change_helpers = entry.get("change_helpers", [])
         if not all(isinstance(value, str) and value for value in (source_name, function, operation, operation_id)):
             raise CoverageError("C2 reducer source/function/operation values must be non-empty strings")
         source_path = Path(source_name)
@@ -265,6 +268,10 @@ def verify(repo_root: Path, metadata_path: Path, operation_ids_path: Path) -> No
             not isinstance(value, str) or not value for value in constructors
         ):
             raise CoverageError(f"C2 reducer {operation} must declare change constructors")
+        if not isinstance(change_helpers, list) or any(
+            not isinstance(value, str) or not value for value in change_helpers
+        ):
+            raise CoverageError(f"C2 reducer {operation} change_helpers must be function names")
         key = (source_name, function)
         if key in seen:
             raise CoverageError(f"duplicate C2 reducer entry {source_name}:{function}")
@@ -290,8 +297,12 @@ def verify(repo_root: Path, metadata_path: Path, operation_ids_path: Path) -> No
             )
         if "OrganizationCommitInput" not in body or "changes" not in body:
             raise CoverageError(f"{source_name}:{function} must construct a complete commit input")
+        change_bodies = [body]
+        for helper in change_helpers:
+            _, helper_body = _function_body(source, helper)
+            change_bodies.append(helper_body)
         for constructor in constructors:
-            if f"RowChange::{constructor}" not in body:
+            if not any(f"RowChange::{constructor}" in candidate for candidate in change_bodies):
                 raise CoverageError(f"{source_name}:{function} lacks RowChange::{constructor}")
         if ".organization_commit()" in body or ".organization_row_change()" in body:
             raise CoverageError(

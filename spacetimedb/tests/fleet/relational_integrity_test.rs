@@ -4,8 +4,8 @@ use spacetimedb::{ReducerContext, Table};
 
 use crate::fleet::fleet::{
     create_fleet_vehicle, create_fleet_vehicle_service_type, fleet_vehicle,
-    fleet_vehicle_service_type, update_fleet_vehicle, CreateFleetVehicleParams,
-    CreateFleetVehicleServiceTypeParams, UpdateFleetVehicleParams,
+    fleet_vehicle_service_type, update_fleet_vehicle, update_fleet_vehicle_details, CreateFleetVehicleParams,
+    CreateFleetVehicleServiceTypeParams, UpdateFleetVehicleDetailsParams, UpdateFleetVehicleParams,
 };
 use crate::hr::employees::{create_employee, hr_employee, CreateEmployeeParams};
 use crate::test_harness::OrgFixture;
@@ -338,5 +338,139 @@ pub fn test_service_type_id_relations(ctx: &ReducerContext) -> Result<(), String
         return Err("valid service_type_id was not persisted".to_string());
     }
 
+    Ok(())
+}
+
+/// update_fleet_vehicle_details patches descriptive columns, preserves the rest,
+/// and rejects invalid values and cross-company callers without mutating.
+pub fn test_update_fleet_vehicle_details(ctx: &ReducerContext) -> Result<(), String> {
+    let local = OrgFixture::seed_minimal(ctx)?;
+    let vehicle_id = create_vehicle(ctx, &local, "FLT-DETAILS Base")?;
+
+    update_fleet_vehicle_details(
+        ctx,
+        local.organization_id,
+        local.company_id,
+        vehicle_id,
+        UpdateFleetVehicleDetailsParams {
+            name: Some("  FLT-DETAILS Renamed ".to_string()),
+            vehicle_type: None,
+            license_plate: Some(Some("PLATE-1".to_string())),
+            driver_name: None,
+            odometer_km: Some(Some(1234.5)),
+            fuel_level: None,
+            metadata: None,
+        },
+    )?;
+    let updated = ctx
+        .db
+        .fleet_vehicle()
+        .id()
+        .find(&vehicle_id)
+        .ok_or("vehicle missing after details update")?;
+    if updated.name != "FLT-DETAILS Renamed"
+        || updated.license_plate.as_deref() != Some("PLATE-1")
+        || updated.odometer_km != Some(1234.5)
+        || updated.vehicle_type != "van"
+    {
+        return Err("details update did not persist/preserve expected fields".to_string());
+    }
+
+    update_fleet_vehicle_details(
+        ctx,
+        local.organization_id,
+        local.company_id,
+        vehicle_id,
+        UpdateFleetVehicleDetailsParams {
+            name: None,
+            vehicle_type: None,
+            license_plate: Some(None),
+            driver_name: None,
+            odometer_km: None,
+            fuel_level: None,
+            metadata: None,
+        },
+    )?;
+    let cleared = ctx
+        .db
+        .fleet_vehicle()
+        .id()
+        .find(&vehicle_id)
+        .ok_or("vehicle missing after clear")?;
+    if cleared.license_plate.is_some() || cleared.odometer_km != Some(1234.5) {
+        return Err("Some(None) did not clear license_plate only".to_string());
+    }
+
+    for (label, params) in [
+        (
+            "empty name",
+            UpdateFleetVehicleDetailsParams {
+                name: Some("   ".to_string()),
+                vehicle_type: None,
+                license_plate: None,
+                driver_name: None,
+                odometer_km: None,
+                fuel_level: None,
+                metadata: None,
+            },
+        ),
+        (
+            "negative odometer",
+            UpdateFleetVehicleDetailsParams {
+                name: None,
+                vehicle_type: None,
+                license_plate: None,
+                driver_name: None,
+                odometer_km: Some(Some(-1.0)),
+                fuel_level: None,
+                metadata: None,
+            },
+        ),
+        (
+            "fuel out of range",
+            UpdateFleetVehicleDetailsParams {
+                name: None,
+                vehicle_type: None,
+                license_plate: None,
+                driver_name: None,
+                odometer_km: None,
+                fuel_level: Some(Some(1.5)),
+                metadata: None,
+            },
+        ),
+    ] {
+        if update_fleet_vehicle_details(
+            ctx,
+            local.organization_id,
+            local.company_id,
+            vehicle_id,
+            params,
+        )
+        .is_ok()
+        {
+            return Err(format!("details update accepted {label}"));
+        }
+    }
+
+    let foreign = OrgFixture::seed_minimal(ctx)?;
+    if update_fleet_vehicle_details(
+        ctx,
+        foreign.organization_id,
+        foreign.company_id,
+        vehicle_id,
+        UpdateFleetVehicleDetailsParams {
+            name: Some("Hijacked".to_string()),
+            vehicle_type: None,
+            license_plate: None,
+            driver_name: None,
+            odometer_km: None,
+            fuel_level: None,
+            metadata: None,
+        },
+    )
+    .is_ok()
+    {
+        return Err("details update accepted a cross-organization caller".to_string());
+    }
     Ok(())
 }

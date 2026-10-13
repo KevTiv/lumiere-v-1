@@ -8,10 +8,10 @@ import { buttonVariants } from "@lumiere/ui/components/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@lumiere/ui/components/card"
 
 interface OwnerControlLoopProps {
-  overdueInvoices: number
-  unreconciledPayments: number
-  lowStockProducts: number
-  pendingMessageApprovals: number
+  overdueInvoices: number | string
+  unreconciledPayments: number | string
+  lowStockProducts: number | string
+  pendingMessageApprovals: number | string
 }
 
 const CONTROL_ITEMS: Array<{
@@ -29,7 +29,9 @@ const CONTROL_ITEMS: Array<{
 ]
 
 export function OwnerControlLoop(props: OwnerControlLoopProps) {
-  const attentionCount = Object.values(props).reduce((total, value) => total + value, 0)
+  const values = Object.values(props)
+  const hasIncompleteReads = values.some((value) => typeof value !== "number")
+  const attentionCount = values.reduce<number>((total, value) => total + (typeof value === "number" ? value : 0), 0)
 
   return (
     <Card data-testid="owner-control-loop">
@@ -39,7 +41,9 @@ export function OwnerControlLoop(props: OwnerControlLoopProps) {
             <CardTitle>Owner control loop</CardTitle>
             <CardDescription>Resolve today’s cash, stock, and customer exceptions from one queue.</CardDescription>
           </div>
-          <Badge variant={attentionCount > 0 ? "destructive" : "secondary"}>{attentionCount} needing attention</Badge>
+          <Badge variant={attentionCount > 0 ? "destructive" : "secondary"}>
+            {hasIncompleteReads ? "Attention total unavailable" : `${attentionCount} needing attention`}
+          </Badge>
         </div>
       </CardHeader>
       <CardContent className="grid grid-cols-1 gap-3 lg:grid-cols-2">
@@ -53,7 +57,7 @@ export function OwnerControlLoop(props: OwnerControlLoopProps) {
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
                     <p className="font-medium">{item.title}</p>
-                    <Badge variant={count > 0 ? "destructive" : "secondary"}>{count}</Badge>
+                    <Badge variant={typeof count === "number" && count > 0 ? "destructive" : "secondary"}>{count}</Badge>
                   </div>
                   <p className="mt-1 text-sm text-muted-foreground">{item.description}</p>
                 </div>

@@ -28,6 +28,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { TablePager, usePagedRows } from "../components/table-pager"
 
 function rowState(row: Record<string, unknown>): string {
   const v = row.state
@@ -451,6 +452,7 @@ export function BudgetsWorkspace({
     await onUpdateLineActuals(BigInt(lineId), { practicalAmount, theoreticalAmount })
   }
 
+  const budgetLinesPager = usePagedRows(linesForBudget, selectedId)
   return (
     <div className="space-y-8">
       <EntityView
@@ -589,7 +591,7 @@ export function BudgetsWorkspace({
                             </TableCell>
                           </TableRow>
                         ) : (
-                          linesForBudget.map((line) => {
+                          budgetLinesPager.pageRows.map((line) => {
                             const lid = line.id != null ? BigInt(String(line.id)) : 0n
                             const canDelete = selectedState === "Draft"
                             const canActuals =
@@ -655,6 +657,7 @@ export function BudgetsWorkspace({
                         )}
                       </TableBody>
                     </Table>
+                    <TablePager {...budgetLinesPager} />
                   </div>
                 </div>
               </div>

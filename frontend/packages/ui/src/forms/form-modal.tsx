@@ -8,6 +8,16 @@ import React from "react"
 import { toast } from "sonner"
 
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "../components/alert-dialog"
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -15,8 +25,10 @@ import {
   DialogTitle,
 } from "../components/dialog"
 import type { AiFormAssistConfig, FormConfig } from "../lib/form-types"
+import { showSemanticOperationOutcome } from "../lib/semantic-operation-outcome"
 import { cn } from "../lib/utils"
 import { ModularForm } from "./modular-form"
+import { useUnsavedChangesGuard } from "./use-unsaved-changes-guard"
 
 const sizeClasses: Record<string, string> = {
   md: "sm:max-w-[600px]",
@@ -24,7 +36,7 @@ const sizeClasses: Record<string, string> = {
   xl: "sm:max-w-[920px]",
 }
 
-interface FormModalProps {
+export interface FormModalProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   config: FormConfig
@@ -49,22 +61,12 @@ interface FormModalProps {
   formLeadingActions?: React.ReactNode
   /** Forwarded to {@link ModularForm} — e.g. parent mutation `isPending`. */
   isPending?: boolean
+  /** Blocks submission while leaving cancel and inspection available. */
+  submissionDisabled?: boolean
   /** Forwarded to {@link ModularForm} to enable advisory AI form fill. */
   aiAssist?: AiFormAssistConfig
   /** Forwarded to {@link ModularForm} — e.g. swap dependent select options when a field changes. */
   onValuesChange?: (values: Record<string, unknown>) => void
-}
-
-function showSemanticOutcome(detail: SemanticOperationOutcomeDetail): void {
-  const action =
-    detail.href && detail.actionLabel
-      ? {
-          label: detail.actionLabel,
-          onClick: () => window.location.assign(detail.href!),
-        }
-      : undefined
-
-  toast.success(detail.message, action ? { action } : undefined)
 }
 
 export function FormModal({
@@ -79,15 +81,41 @@ export function FormModal({
   submitError,
   formLeadingActions,
   isPending,
+  submissionDisabled,
   aiAssist,
   onValuesChange,
 }: FormModalProps) {
   const { t } = useTranslation()
+  const [dirty, setDirty] = React.useState(false)
+  const [confirmingDiscard, setConfirmingDiscard] = React.useState(false)
+  const submittingRef = React.useRef(false)
+  const [submitting, setSubmitting] = React.useState(false)
+
+  // Nothing survives a closed dialog, so nothing is left to protect.
+  React.useEffect(() => {
+    if (!open) {
+      setDirty(false)
+      setConfirmingDiscard(false)
+    }
+  }, [open])
+
+  const navigationDialog = useUnsavedChangesGuard(open && dirty, open && (submitting || !!isPending))
+
+  /** Dismissals (Cancel, Escape, overlay, X) ask first when fields were edited. */
+  const requestOpenChange = (next: boolean) => {
+    // Closing during a save loses the form and its eventual failure feedback.
+    if (!next && (submittingRef.current || isPending)) return
+    if (!next && dirty) {
+      setConfirmingDiscard(true)
+      return
+    }
+    onOpenChange(next)
+  }
 
   const handleSubmit = async (data: Record<string, unknown>) => {
     // A form without an admitted submit binding must never report a successful
     // save. Leave it open so the missing binding is visible during integration.
-    if (!onSubmit) return
+    if (!onSubmit) throw new Error(t("common.formSubmit.noHandler"))
 
     let semanticOutcome: SemanticOperationOutcomeDetail | undefined
     const captureSemanticOutcome = (event: Event) => {
@@ -99,9 +127,13 @@ export function FormModal({
       window.addEventListener(SEMANTIC_OPERATION_OUTCOME_EVENT, captureSemanticOutcome)
     }
 
+    submittingRef.current = true
+    setSubmitting(true)
     try {
       await onSubmit(data)
     } finally {
+      submittingRef.current = false
+      setSubmitting(false)
       if (typeof window !== "undefined") {
         window.removeEventListener(SEMANTIC_OPERATION_OUTCOME_EVENT, captureSemanticOutcome)
       }
@@ -112,7 +144,7 @@ export function FormModal({
     }
 
     if (semanticOutcome) {
-      showSemanticOutcome(semanticOutcome)
+      showSemanticOperationOutcome(semanticOutcome)
       return
     }
 
@@ -124,7 +156,7 @@ export function FormModal({
   }
 
   const handleCancel = () => {
-    onOpenChange(false)
+    requestOpenChange(false)
   }
 
   const size = config.size ?? "md"
@@ -136,7 +168,7 @@ export function FormModal({
     : undefined
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={requestOpenChange}>
       <DialogContent
         data-testid={`form-modal-${config.id}`}
         className={cn(
@@ -180,10 +212,40 @@ export function FormModal({
             onCancel={handleCancel}
             leadingActions={formLeadingActions}
             isPending={isPending}
+            submissionDisabled={submissionDisabled}
             aiAssist={aiAssist}
             onValuesChange={onValuesChange}
+            onDirtyChange={setDirty}
           />
         </div>
+        <AlertDialog open={confirmingDiscard} onOpenChange={setConfirmingDiscard}>
+          <AlertDialogContent data-testid="discard-changes-dialog">
+            <AlertDialogHeader>
+              <AlertDialogTitle>{t("common.discardChanges.title", { defaultValue: "Discard changes?" })}</AlertDialogTitle>
+              <AlertDialogDescription>
+                {t("common.discardChanges.description", {
+                  defaultValue: "You have edits that were not saved. They will be lost if you close this form.",
+                })}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel data-testid="discard-changes-keep">
+                {t("common.discardChanges.keep", { defaultValue: "Keep editing" })}
+              </AlertDialogCancel>
+              <AlertDialogAction
+                data-testid="discard-changes-confirm"
+                onClick={() => {
+                  setConfirmingDiscard(false)
+                  setDirty(false)
+                  onOpenChange(false)
+                }}
+              >
+                {t("common.discardChanges.discard", { defaultValue: "Discard" })}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+        {navigationDialog}
       </DialogContent>
     </Dialog>
   )

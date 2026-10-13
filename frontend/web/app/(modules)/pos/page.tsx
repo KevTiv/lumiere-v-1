@@ -1,5 +1,5 @@
 import { getStdbSession } from "@/lib/api-session"
-import { serverFetchQueryListsAllowEmpty } from "@/lib/server-query"
+import { serverFetchQueryListsRequired } from "@/lib/server-query"
 import { PosClient } from "./pos-client"
 
 const SSR_RESOURCES = [
@@ -15,7 +15,7 @@ export default async function PosPage() {
     return <PosClient />
   }
 
-  const [products, terminals, configs, sessions] = await serverFetchQueryListsAllowEmpty(
+  const [products, terminals, configs, sessions] = await serverFetchQueryListsRequired(
     session,
     SSR_RESOURCES,
   )

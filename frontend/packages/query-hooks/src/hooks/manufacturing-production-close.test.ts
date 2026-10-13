@@ -5,6 +5,7 @@ import {
   resolveManufacturingFinishedEffect,
   resolveManufacturingProductionQuantityEffect,
 } from "./manufacturing-production-close"
+import { AmbiguousOperationEffectError } from "./operation-effect"
 
 const producedOrder = {
   id: 5,
@@ -201,5 +202,92 @@ test("unowned newer moves, duplicate quants, and wrong terminal move state fail 
       7n,
       { quantity: 5 },
     ),
+  )
+})
+
+const primaryOutput = {
+  id: 88, companyId: 7, productionId: 5, productId: 20, productUom: 3,
+  productUomQty: 2, quantityDone: 2, locationId: 30, locationDestId: 40,
+  state: "done", isDone: true, scrapped: false, reference: "MO/5",
+}
+const byproductOutput = {
+  ...primaryOutput, id: 89, productId: 21, productUomQty: 1, quantityDone: 1,
+  reference: "MO/5/BYPRODUCT/12",
+}
+const anotherByproductOutput = {
+  ...byproductOutput, id: 90, productId: 22, productUomQty: 0.5, quantityDone: 0.5,
+  reference: "MO/5/BYPRODUCT/13",
+}
+const finishedQuant = {
+  id: 101, companyId: 7, productId: 20, locationId: 40, quantity: 7,
+}
+
+test("finish resolves zero, one and multiple legitimate MO-owned byproducts", () => {
+  for (const byproducts of [[], [byproductOutput], [byproductOutput, anotherByproductOutput]]) {
+    // Put primary last: relation membership/product identity, not list position, owns it.
+    const moves = [...byproducts, primaryOutput]
+    const order = {
+      ...producedOrder, state: "Done",
+      moveFinishedIds: moves.map(move => move.id), moveFinishedCount: moves.length,
+    }
+    assert.deepEqual(
+      resolveManufacturingFinishedEffect([order], moves, [finishedQuant], 5n, 7n, { id: 101n, quantity: 5 }),
+      {
+        resource: "mrp-productions", id: "5", companyId: "7",
+        finishedMoveId: "88", destinationQuantId: "101",
+      },
+    )
+  }
+})
+
+test("byproduct output sets reject missing, duplicate, unowned and unfinished effects", () => {
+  const order = {
+    ...producedOrder, state: "Done", moveFinishedIds: [88, 89], moveFinishedCount: 2,
+  }
+  const resolve = (moves: Array<typeof primaryOutput>) =>
+    resolveManufacturingFinishedEffect([order], moves, [finishedQuant], 5n, 7n, { id: 101n, quantity: 5 })
+  assert.equal(resolve([primaryOutput]), null)
+  assert.equal(resolve([byproductOutput]), null)
+  for (const invalid of [
+    { ...byproductOutput, productionId: 6 },
+    { ...byproductOutput, companyId: 8 },
+    { ...byproductOutput, locationDestId: 41 },
+    { ...byproductOutput, state: "assigned" },
+    { ...byproductOutput, quantityDone: 0.5 },
+    { ...byproductOutput, scrapped: true },
+    { ...byproductOutput, reference: "MO/6/BYPRODUCT/12" },
+    { ...byproductOutput, reference: "MO/5/RAW/12" },
+  ]) assert.equal(resolve([primaryOutput, invalid]), null)
+  assert.throws(() => resolve([primaryOutput, byproductOutput, byproductOutput]), AmbiguousOperationEffectError)
+  assert.throws(
+    () => resolve([primaryOutput, { ...byproductOutput, productId: 20 }]),
+    AmbiguousOperationEffectError,
+  )
+  assert.equal(
+    resolveManufacturingFinishedEffect([{ ...order, moveFinishedCount: 1 }], [primaryOutput, byproductOutput], [finishedQuant], 5n, 7n, { quantity: 5 }),
+    null,
+  )
+  assert.throws(
+    () => resolveManufacturingFinishedEffect(
+      [{ ...order, moveFinishedIds: [88, 88] }],
+      [primaryOutput], [finishedQuant], 5n, 7n, { quantity: 5 },
+    ),
+    AmbiguousOperationEffectError,
+  )
+  assert.throws(
+    () => resolveManufacturingFinishedEffect(
+      [{ ...order, moveFinishedIds: [88, 89, 90], moveFinishedCount: 3 }],
+      [primaryOutput, byproductOutput, { ...anotherByproductOutput, productId: 21 }],
+      [finishedQuant], 5n, 7n, { quantity: 5 },
+    ),
+    AmbiguousOperationEffectError,
+  )
+  assert.throws(
+    () => resolveManufacturingFinishedEffect(
+      [{ ...order, moveFinishedIds: [88, 89, 90], moveFinishedCount: 3 }],
+      [primaryOutput, byproductOutput, { ...anotherByproductOutput, reference: byproductOutput.reference }],
+      [finishedQuant], 5n, 7n, { quantity: 5 },
+    ),
+    AmbiguousOperationEffectError,
   )
 })

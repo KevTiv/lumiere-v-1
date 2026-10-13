@@ -1,13 +1,14 @@
 "use client"
 
 
-import React, { useState, useCallback, useEffect, useMemo } from "react"
+import React, { useState, useCallback, useEffect, useMemo, useRef } from "react"
 import { useTranslation } from "@lumiere/i18n"
 import { useAiFormSuggest } from "@lumiere/query-hooks/hooks/ai-forms"
 import { cn } from "../lib/utils"
 import type { AiFormAssistConfig, FormConfig, FormField } from "../lib/form-types"
 import { serializeAiFormSchema } from "../lib/ai-form-schema"
 import { FormFieldRenderer } from "./forms-field-render"
+import { formValuesDiffer } from "./use-unsaved-changes-guard"
 import { Button } from "../components/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/card"
 import { Separator } from "../components/separator"
@@ -40,8 +41,12 @@ interface ModularFormProps {
   onValuesChange?: (values: Record<string, unknown>) => void
   /** External mutation in-flight (e.g. React Query) — disables actions and shows loading on submit. */
   isPending?: boolean
+  /** Blocks submission without presenting a false in-progress state. */
+  submissionDisabled?: boolean
   /** Enables advisory AI suggestions that only update local form state when the user applies them. */
   aiAssist?: AiFormAssistConfig
+  /** Reports whether the fields differ from their initial (or last submitted) values. */
+  onDirtyChange?: (dirty: boolean) => void
 }
 
 export function ModularForm({
@@ -52,7 +57,9 @@ export function ModularForm({
   leadingActions,
   onValuesChange,
   isPending,
+  submissionDisabled = false,
   aiAssist,
+  onDirtyChange,
 }: ModularFormProps) {
   const { t } = useTranslation()
   const aiSuggest = useAiFormSuggest()
@@ -86,6 +93,7 @@ export function ModularForm({
   }, [config])
 
   const [values, setValues] = useState<Record<string, unknown>>(getInitialValues)
+  const baselineRef = useRef<Record<string, unknown>>(values)
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [aiPanelOpen, setAiPanelOpen] = useState(false)
@@ -94,6 +102,15 @@ export function ModularForm({
   const [aiAppliedFields, setAiAppliedFields] = useState<Record<string, { confidence: number; note?: string }>>({})
   const [aiValidationNotes, setAiValidationNotes] = useState<string[]>([])
   const busy = isSubmitting || !!isPending
+  const dirty = formValuesDiffer(values, baselineRef.current)
+  const onDirtyChangeRef = useRef(onDirtyChange)
+  onDirtyChangeRef.current = onDirtyChange
+
+  useEffect(() => {
+    onDirtyChangeRef.current?.(dirty)
+  }, [dirty])
+
+  useEffect(() => () => onDirtyChangeRef.current?.(false), [])
   const aiSchema = useMemo(() => serializeAiFormSchema(config), [config])
   const aiEnabled = aiAssist?.enabled !== false && !!aiAssist?.companyId && !!aiAssist?.entityType
 
@@ -273,6 +290,8 @@ export function ModularForm({
       const submitHandler = onSubmit || config.onSubmit
       if (submitHandler) {
         await submitHandler(values)
+        // Saved: what is on screen is now the baseline, not unsaved work.
+        baselineRef.current = values
       } else {
         toast.warning(t("common.formSubmit.noHandler"))
       }
@@ -445,7 +464,12 @@ export function ModularForm({
                 {config.cancelLabel || t("common.cancel")}
               </Button>
             )}
-            <Button type="submit" size="sm" disabled={busy} data-testid={`form-submit-${config.id}`}>
+            <Button
+              type="submit"
+              size="sm"
+              disabled={busy || submissionDisabled}
+              data-testid={`form-submit-${config.id}`}
+            >
               {busy
                 ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 : <Check className="mr-2 h-4 w-4" />

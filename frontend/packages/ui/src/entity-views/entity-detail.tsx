@@ -5,8 +5,10 @@ import { cn } from "../lib/utils"
 import type { EntityDetailConfig } from "../lib/entity-view-types"
 import { filterEntitySurface } from "../lib/entity-view-types"
 import { useRBAC } from "../lib/rbac-context"
-import { Badge } from "../components/badge"
+import { formatEntityFieldValue } from "../lib/entity-row-utils"
+import { unwrapEntityValue } from "../lib/entity-row-values"
 import { Separator } from "../components/separator"
+import { TooltipProvider } from "../components/tooltip"
 
 interface EntityDetailProps {
   config: EntityDetailConfig
@@ -20,55 +22,11 @@ function formatDetailValue(
   badgeVariants?: Record<string, string>,
   badgeLabels?: Record<string, string>,
 ): React.ReactNode {
-  if (value === null || value === undefined || value === "") {
+  // Same formatting as table cells, so a record reads identically in both.
+  if (unwrapEntityValue(value) == null || unwrapEntityValue(value) === "") {
     return <span className="text-muted-foreground italic">—</span>
   }
-
-  switch (type) {
-    case "currency":
-      return typeof value === "number"
-        ? new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value)
-        : String(value)
-
-    case "number":
-      return typeof value === "number"
-        ? new Intl.NumberFormat("en-US").format(value)
-        : String(value)
-
-    case "percent":
-      return typeof value === "number" ? `${value.toFixed(2)}%` : String(value)
-
-    case "date":
-      return value instanceof Date
-        ? value.toLocaleDateString()
-        : typeof value === "string"
-          ? new Date(value).toLocaleDateString()
-          : String(value)
-
-    case "datetime":
-      return value instanceof Date
-        ? value.toLocaleString()
-        : typeof value === "string"
-          ? new Date(value).toLocaleString()
-          : String(value)
-
-    case "boolean":
-      return (
-        <Badge variant={value ? "default" : "secondary"}>
-          {value ? "Yes" : "No"}
-        </Badge>
-      )
-
-    case "badge": {
-      const raw = String(value)
-      const variant = (badgeVariants?.[raw] ?? "secondary") as "default" | "secondary" | "destructive" | "outline"
-      const label = badgeLabels?.[raw] ?? raw
-      return <Badge variant={variant}>{label}</Badge>
-    }
-
-    default:
-      return String(value)
-  }
+  return formatEntityFieldValue(value, type, badgeVariants, badgeLabels)
 }
 
 const widthClasses: Record<string, string> = {
@@ -94,6 +52,8 @@ export function EntityDetail({ config, data, className }: EntityDetailProps) {
   )
 
   return (
+    // Shared cell formatting can render tooltips (e.g. relative dates).
+    <TooltipProvider>
     <div className={cn("space-y-8", className)}>
       {sections.map((section, sectionIndex) => (
         <div key={section.id}>
@@ -131,5 +91,6 @@ export function EntityDetail({ config, data, className }: EntityDetailProps) {
         </div>
       ))}
     </div>
+    </TooltipProvider>
   )
 }

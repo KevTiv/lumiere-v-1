@@ -9,8 +9,12 @@ export function SubscriptionHandoffLinks({ handoffs }: { handoffs: SubscriptionH
   const { t } = useTranslation()
   return (
     <div className="space-y-3" data-testid="subscription-handoffs">
+      {handoffs.invariantFailure ? (
+        <p role="alert" data-testid="subscription-handoff-invariant">{t("subscriptions.handoffs.invariant")}</p>
+      ) : null}
       {handoffs.unavailable ? <p role="alert">{t("subscriptions.handoffs.unavailable")}</p> : null}
-      {handoffs.invoices.length === 0 && handoffs.payments.length === 0 && !handoffs.unavailable ? (
+      {handoffs.invoices.length === 0 && handoffs.payments.length === 0
+        && !handoffs.unavailable && !handoffs.invariantFailure ? (
         <p className="text-muted-foreground" data-testid="subscription-handoff-none">
           {t("subscriptions.handoffs.empty")}
         </p>
