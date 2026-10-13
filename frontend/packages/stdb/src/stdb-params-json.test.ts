@@ -181,6 +181,52 @@ describe("stdbParamsToJson", () => {
     assert.deepEqual(params.stage_id, { none: [] })
   })
 
+  it("encodeReducerCallArgs SATS-encodes CreateAccountAccountParams fixtures", () => {
+    const encoded = encodeReducerCallArgs("create_account_account", [
+      9,
+      {
+        company_id: 28,
+        code: "PTESTD",
+        name: "Permission test debit account",
+        user_type_id: 7,
+        currency_id: null,
+        internal_type: { tag: "Expense" },
+        internal_group: { tag: "Expense" },
+        group_id: null,
+        reconcile: false,
+        tax_ids: [],
+        note: null,
+        opening_debit: 0,
+        opening_credit: 0,
+        allowed_journal_ids: [],
+        non_trade: false,
+        is_off_balance: false,
+        metadata: JSON.stringify({ test: "auth-permission-enforcement" }),
+      },
+    ])
+
+    assert.equal(encoded[0], 9)
+    assert.deepEqual(encoded[1], {
+      company_id: { some: 28 },
+      code: "PTESTD",
+      name: "Permission test debit account",
+      user_type_id: 7,
+      currency_id: { none: [] },
+      internal_type: { some: { expense: [] } },
+      internal_group: { some: { expense: [] } },
+      group_id: { none: [] },
+      reconcile: false,
+      tax_ids: [],
+      note: { none: [] },
+      opening_debit: 0,
+      opening_credit: 0,
+      allowed_journal_ids: [],
+      non_trade: false,
+      is_off_balance: false,
+      metadata: { some: JSON.stringify({ test: "auth-permission-enforcement" }) },
+    })
+  })
+
   it("encodeReducerCallArgs SATS-encodes convert_lead_to_customer params", () => {
     const encoded = encodeReducerCallArgs("convert_lead_to_customer", [
       1,
