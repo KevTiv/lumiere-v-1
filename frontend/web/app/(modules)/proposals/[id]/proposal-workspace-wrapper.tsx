@@ -1,7 +1,7 @@
 "use client"
 
 import { useMemo } from "react"
-import { ProposalWorkspace, type ProposalWorkspaceHooks } from "@lumiere/ui"
+import { ProposalWorkspace, useRBAC, type ProposalWorkspaceHooks } from "@lumiere/ui"
 import type { AIAnalysis } from "@lumiere/ui"
 import {
   useProposalSections,
@@ -30,6 +30,7 @@ import {
   useApplyProposalTemplate,
   useUpsertProposalComplianceRequirement,
   useCreateProposalIntegrationIntent,
+  useRecordProposalBidDecision,
 } from "@lumiere/query-hooks/hooks/proposals"
 import { useProducts } from "@lumiere/query-hooks/hooks/inventory"
 import type { ProposalStatus } from "@lumiere/ui"
@@ -200,6 +201,13 @@ function createHttpHooks(
       organizationId,
       companyId,
     ),
+    useRecordProposalBidDecision: () => {
+      const mutation = useRecordProposalBidDecision(organizationId, companyId)
+      return {
+        mutateAsync: (params) => mutation.mutateAsync(params),
+        isPending: mutation.isPending,
+      }
+    },
   }
 }
 
@@ -213,6 +221,7 @@ export function ProposalWorkspaceWrapper({
   currentUserName,
   onAnalyze,
 }: ProposalWorkspaceWrapperProps) {
+  const { checkPermission } = useRBAC()
   const httpHooks = useMemo(
     () => createHttpHooks(organizationId, companyId),
     [organizationId, companyId],
@@ -227,6 +236,7 @@ export function ProposalWorkspaceWrapper({
       currentUserId={currentUserId}
       currentUserName={currentUserName}
       onAnalyze={onAnalyze}
+      canRecordBidDecision={checkPermission("proposal", "write").allowed}
       hooks={httpHooks}
     />
   )

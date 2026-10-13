@@ -33,6 +33,7 @@ import type {
   DepreciationMethod,
   UpdateAccountAccountTypeParams,
   UpdateAccountGroupParams,
+  UpdateAccountTaxParams,
   UpdateAnalyticAccountParams,
   UpdateAnalyticDistributionModelParams,
   UpdateAnalyticLineParams,
@@ -277,6 +278,7 @@ export function toCreateAccountMoveFromInvoiceModal(
 
 function toTypeTaxUse(raw: string): CreateAccountTaxParams['typeTaxUse'] {
   if (raw === 'purchase') return { tag: 'Purchase' }
+  if (raw === 'withholding') return { tag: 'Withholding' }
   if (raw === 'none') return { tag: 'None' }
   return { tag: 'Sale' }
 }
@@ -314,6 +316,43 @@ export function toCreateAccountTaxParams(
     refundRepartitionLineIds: [],
     metadata: optionalTrimmedString(formData.metadata),
   }
+}
+
+/**
+ * Form values to `update_account_tax` params. Only the editable fields are sent; the reducer
+ * keeps every field left `undefined`, so an empty description means "no change".
+ */
+export function toUpdateAccountTaxParams(
+  formData: Record<string, unknown>,
+): UpdateAccountTaxParams {
+  const typeTaxUse = String(formData.typeTaxUse ?? '')
+  const amount = formData.amount == null || formData.amount === '' ? NaN : Number(formData.amount)
+  return {
+    name: optionalTrimmedString(formData.name),
+    description: optionalTrimmedString(formData.description),
+    typeTaxUse: typeTaxUse === '' ? undefined : toTypeTaxUse(typeTaxUse),
+    amount: Number.isFinite(amount) ? amount : undefined,
+    active: hasOwn(formData, 'active') ? Boolean(formData.active) : undefined,
+    priceInclude: hasOwn(formData, 'priceInclude') ? Boolean(formData.priceInclude) : undefined,
+    includeBaseAmount: undefined,
+    isBaseAffected: undefined,
+    sequence: undefined,
+    taxGroupId: undefined,
+    tags: undefined,
+    metadata: undefined,
+  }
+}
+
+/**
+ * `stdbParamsToJson` wraps only the `Option` fields its generated field list names, and that list
+ * misses `type_tax_use` (`Option<TaxTypeUse>`) and cannot tell the nested `Option<Option<String>>`
+ * description from a single option. Wrap both explicitly so the SATS JSON matches the reducer.
+ */
+export function updateAccountTaxParamsForWire(params: UpdateAccountTaxParams): UpdateAccountTaxParams {
+  const wire: Record<string, unknown> = { ...params }
+  wire.typeTaxUse = params.typeTaxUse === undefined ? { none: [] } : { some: params.typeTaxUse }
+  if (params.description !== undefined) wire.description = { some: { some: params.description } }
+  return wire as unknown as UpdateAccountTaxParams
 }
 
 /** SATS unit-variant sum JSON for SpacetimeDB HTTP (keys are camelCase, e.g. `{ "percent": [] }`). */

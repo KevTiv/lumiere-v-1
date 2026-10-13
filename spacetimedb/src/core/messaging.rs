@@ -461,7 +461,11 @@ pub fn mark_notification_read(
     organization_id: u64,
     message_id: u64,
 ) -> Result<(), String> {
-    check_permission(ctx, organization_id, "mail_message", "write")?;
+    // Reading a notification is a caller-owned acknowledgement, not a mutation
+    // of another user's message content. The recipient check below is the
+    // write boundary; requiring `mail_message:write` would deny read-only users
+    // access to their own notification state.
+    check_permission(ctx, organization_id, "mail_message", "read")?;
 
     let message = ctx
         .db
@@ -503,7 +507,7 @@ pub fn mark_all_notifications_read(
     ctx: &ReducerContext,
     organization_id: u64,
 ) -> Result<(), String> {
-    check_permission(ctx, organization_id, "mail_message", "write")?;
+    check_permission(ctx, organization_id, "mail_message", "read")?;
 
     let sender_hex = ctx.sender().to_hex().to_string();
     let mut unread: Vec<MailMessage> = ctx

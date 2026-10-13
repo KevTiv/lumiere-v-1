@@ -24,6 +24,9 @@ import { VersionHistoryBar, SaveVersionButton } from "./version-history-bar"
 import { PresenceBar } from "./presence-bar"
 import { DocumentInputPanel } from "./document-input-panel"
 import { ComplianceChecklist } from "./compliance-checklist"
+import { parseBidDecisionInput } from "./bid-decision"
+import { useFormDialog } from "../forms/use-form-dialog"
+import { showWorkflowToast } from "../lib/workflow-toast"
 import { rowBool, rowNumber, rowString } from "./row-field-utils"
 
 /** Stable fallback when query hooks return undefined — inline `= []` creates a new ref each render. */
@@ -112,6 +115,12 @@ export type UseQueryHookWithId<T = unknown> = (
 
 export type MutationResult<T> = {
   mutate: (params: T, options?: { onSettled?: () => void }) => void
+  isPending?: boolean
+}
+
+/** A mutation the caller awaits, so the workspace can report success or failure itself. */
+export type AsyncMutationResult<T> = {
+  mutateAsync: (params: T) => Promise<unknown>
   isPending?: boolean
 }
 
@@ -224,6 +233,11 @@ export interface ProposalWorkspaceHooks {
     payload: string
     metadata?: string | null
   }>
+  useRecordProposalBidDecision: () => AsyncMutationResult<{
+    proposalId: bigint | number | string
+    decision: string
+    rationale: string
+  }>
 }
 
 // ─── Props ────────────────────────────────────────────────────────────────────
@@ -237,6 +251,8 @@ interface ProposalWorkspaceProps {
   currentUserId?: string
   currentUserName?: string
   onAnalyze: (text: string) => Promise<AIAnalysis>
+  /** Shows the bid / no-bid action; the caller passes the user's `proposal:write` permission. */
+  canRecordBidDecision?: boolean
   hooks: ProposalWorkspaceHooks
 }
 
@@ -251,6 +267,7 @@ export function ProposalWorkspace({
   currentUserId,
   currentUserName,
   onAnalyze,
+  canRecordBidDecision = false,
   hooks,
 }: ProposalWorkspaceProps) {
   const { t } = useTranslation()
@@ -306,6 +323,7 @@ export function ProposalWorkspace({
     useApplyProposalTemplate,
     useUpsertProposalComplianceRequirement,
     useCreateProposalIntegrationIntent,
+    useRecordProposalBidDecision,
   } = hooks
 
   // ── Data queries ──────────────────────────────────────────────────────────────
@@ -432,6 +450,8 @@ export function ProposalWorkspace({
   const applyTemplate = useApplyProposalTemplate()
   const upsertCompliance = useUpsertProposalComplianceRequirement()
   const createIntent = useCreateProposalIntegrationIntent()
+  const recordBidDecision = useRecordProposalBidDecision()
+  const { askForm, formDialog } = useFormDialog()
 
   const libraryTemplates = useMemo(
     () =>
@@ -624,6 +644,62 @@ export function ProposalWorkspace({
     updateStatus.mutate({ proposalId: proposalIdBig, status: newStatus })
   }, [proposalIdBig, updateStatus])
 
+  const handleRecordBidDecision = useCallback(async () => {
+    const title = t("proposalWorkspace.bidDecision.title", { defaultValue: "Record bid decision" })
+    const values = await askForm({
+      title,
+      description: t("proposalWorkspace.bidDecision.description", {
+        defaultValue: "A bid decision is required before this proposal can be submitted.",
+      }),
+      fields: [
+        {
+          id: "decision",
+          name: "decision",
+          label: t("proposalWorkspace.bidDecision.decision", { defaultValue: "Decision" }),
+          type: "select",
+          required: true,
+          options: [
+            { value: "bid", label: t("proposalWorkspace.bidDecision.bid", { defaultValue: "Bid" }) },
+            { value: "no_bid", label: t("proposalWorkspace.bidDecision.noBid", { defaultValue: "No bid" }) },
+          ],
+        },
+        {
+          id: "rationale",
+          name: "rationale",
+          label: t("proposalWorkspace.bidDecision.rationale", { defaultValue: "Rationale" }),
+          type: "textarea",
+          required: true,
+        },
+      ],
+    })
+    if (values == null) return
+    const failed = t("proposalWorkspace.bidDecision.failed", { defaultValue: "Record bid decision failed" })
+    const input = parseBidDecisionInput(values)
+    if (input == null) {
+      showWorkflowToast({
+        kind: "error",
+        title: failed,
+        description: t("proposalWorkspace.bidDecision.invalid", {
+          defaultValue: "Choose bid or no bid and give a rationale.",
+        }),
+      })
+      return
+    }
+    try {
+      await recordBidDecision.mutateAsync({ proposalId: proposalIdBig, ...input })
+      showWorkflowToast({
+        kind: "success",
+        title: t("proposalWorkspace.bidDecision.done", { defaultValue: "Bid decision recorded" }),
+      })
+    } catch (error) {
+      showWorkflowToast({
+        kind: "error",
+        title: failed,
+        description: error instanceof Error ? error.message : String(error),
+      })
+    }
+  }, [askForm, proposalIdBig, recordBidDecision, t])
+
   const handleSaveVersion = useCallback((message: string) => {
     saveVersion.mutate({ proposalId: proposalIdBig, message })
   }, [proposalIdBig, saveVersion])
@@ -721,6 +797,8 @@ export function ProposalWorkspace({
         }
       `}</style>
 
+      {formDialog}
+
       {/* Hidden print target */}
       <div id="proposal-print-root" className="hidden print:block">
         <h1>{proposalTitle}</h1>
@@ -773,6 +851,18 @@ export function ProposalWorkspace({
                 versionCount={localVersions.length}
               />
             </div>
+
+            {canRecordBidDecision ? (
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={recordBidDecision.isPending || proposalIdBig === 0n}
+                data-testid="proposal-bid-decision"
+                onClick={() => void handleRecordBidDecision()}
+              >
+                {t("proposalWorkspace.bidDecision.button", { defaultValue: "Bid / no bid" })}
+              </Button>
+            ) : null}
 
             <div className="relative group">
               <Button variant="outline" size="sm" className="gap-1">
