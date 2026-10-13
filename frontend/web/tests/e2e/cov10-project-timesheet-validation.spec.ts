@@ -20,7 +20,7 @@ import {
   submitForm,
 } from "./helpers"
 import { matchesOperationResponse } from "./operation-response"
-import { actorIdentity, canonicalRow, sessionActor } from "./sod-evidence"
+import { actorIdentity, canonicalOptionValue, canonicalRow, sessionActor } from "./sod-evidence"
 
 // COV-10 — see docs/plan/erp-cov10-project-timesheet-validation-status.md.
 const PERSONA_PASSWORD = process.env.E2E_FIRST_ORG_PERSONA_PASSWORD ?? "Password123$"
@@ -124,7 +124,7 @@ async function billTimesheetThroughUi(page: Page, timesheetId: number): Promise<
 async function billingEffect(page: Page, timesheetId: number) {
   const timesheet = await canonicalRow(page, "timesheets", timesheetId)
   const invoiceId = scalarQueryId(
-    timesheet.timesheetInvoiceId ?? timesheet.timesheet_invoice_id,
+    canonicalOptionValue(timesheet.timesheetInvoiceId ?? timesheet.timesheet_invoice_id),
   )
   if (invoiceId == null) return null
   const invoice = await canonicalRow(page, "account-moves", invoiceId)
@@ -133,7 +133,9 @@ async function billingEffect(page: Page, timesheetId: number) {
     invoiceId,
     invoiceOrganizationId: scalarQueryId(invoice.organizationId ?? invoice.organization_id),
     invoiceCompanyId: scalarQueryId(invoice.companyId ?? invoice.company_id),
-    invoiceOrigin: String(invoice.invoiceOrigin ?? invoice.invoice_origin ?? ""),
+    invoiceOrigin: String(
+      canonicalOptionValue(invoice.invoiceOrigin ?? invoice.invoice_origin) ?? "",
+    ),
   }
 }
 
