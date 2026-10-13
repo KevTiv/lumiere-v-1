@@ -1,4 +1,4 @@
-import { accountMoveHref, accountPaymentHref, saleOrderHref, stockPickingHref } from "@lumiere/erp-shared/record-links"
+import { accountMoveHref, saleOrderHref, stockPickingHref } from "@lumiere/erp-shared/record-links"
 import { parseStrictU64 } from "@lumiere/erp-shared/u64"
 import { stateName, type OrderToCashScope } from "./order-to-cash"
 
@@ -28,16 +28,6 @@ interface PickingRow extends ScopedRow {
 interface ProposalRow extends ScopedRow {
   readonly saleOrderId?: Raw
   readonly sale_order_id?: Raw
-}
-interface BillingRunRow extends ScopedRow {
-  readonly subscriptionId?: Raw
-  readonly subscription_id?: Raw
-  readonly invoiceMoveId?: Raw
-  readonly invoice_move_id?: Raw
-}
-interface PaymentRow extends ScopedRow {
-  readonly reconciledInvoiceIds?: Raw
-  readonly reconciled_invoice_ids?: Raw
 }
 export type CrossRecordLink = { id: string; kind: "receipt" | "bill" | "invoice" | "payment" | "order"; href: string; label: string }
 export type CrossRecordLinks =
@@ -102,37 +92,4 @@ export function proposalOrderLinks(parent: ProposalRow, scope: OrderToCashScope,
     return invariant("Invalid proposal sale order relation")
   }
   return targets([id], orders, scope, "order", saleOrderHref)
-}
-
-/** Billing runs expose the exact invoice relation; subscriptions' default projection does not. */
-export function subscriptionRecordLinks(parent: ScopedRow, scope: OrderToCashScope, runs: readonly BillingRunRow[], moves: readonly ScopedRow[], payments: readonly PaymentRow[] | undefined): CrossRecordLinks {
-  if (!scoped(parent, scope)) return unavailable("Subscription is outside the current scope")
-  const subscriptionId = parseStrictU64(parent.id)
-  if (subscriptionId == null) return invariant("Subscription has no canonical ID")
-  const relatedRuns = runs.filter((run) => scoped(run, scope) &&
-    parseStrictU64(run.subscriptionId ?? run.subscription_id) === subscriptionId)
-  const invoiceIds = ids(relatedRuns.map((run) => run.invoiceMoveId ?? run.invoice_move_id))
-  if (invoiceIds == null) return unavailable("Billing run invoice relation is unavailable")
-  const invoices = targets(invoiceIds, moves, scope, "invoice", accountMoveHref)
-  if (invoices.status !== "ready") return invoices
-  const paymentUnavailable = (reason: string): CrossRecordLinks => ({
-    ...invoices, paymentNotice: { status: "unavailable", reason },
-  })
-  if (payments == null) return paymentUnavailable("Payment records are unavailable")
-  const relatedPayments: PaymentRow[] = []
-  for (const row of payments.filter((row) => scoped(row, scope))) {
-    const reconciled = ids(row.reconciledInvoiceIds ?? row.reconciled_invoice_ids)
-    if (reconciled == null) return paymentUnavailable("Payment invoice relation is unavailable")
-    if (new Set(reconciled.map(String)).size !== reconciled.length) {
-      return { ...invoices, paymentNotice: { status: "invariant_failure", reason: "Duplicate payment invoice relation IDs" } }
-    }
-    if (reconciled.some((id) => invoiceIds.includes(id))) relatedPayments.push(row)
-  }
-  const paymentIds = ids(relatedPayments.map((row) => row.id))
-  const paymentLinks = paymentIds == null
-    ? invariant("Payment has no canonical ID")
-    : targets(paymentIds, relatedPayments, scope, "payment", accountPaymentHref)
-  return paymentLinks.status === "ready"
-    ? { status: "ready", links: [...invoices.links, ...paymentLinks.links] }
-    : { ...invoices, paymentNotice: { status: paymentLinks.status, reason: paymentLinks.reason } }
 }

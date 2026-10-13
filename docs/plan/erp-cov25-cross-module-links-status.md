@@ -54,8 +54,8 @@ to billing-run invoices; it does not silently infer historical invoices or pendi
 After merging `main`, the subscription list record sheet keeps #150's stricter `subscriptionHandoffs` builder and
 `SubscriptionHandoffLinks` component (link 3 below: cancelled invoices excluded, `OutInvoice` only, payments only when
 Paid with an exact `reconciled_invoice_ids` intersection). Main's stricter duplicate rule is ported into it: a duplicated
-canonical relation is an invariant failure (`invariantFailure`), never deduplicated. Main's `subscriptionRecordLinks`
-remains only because the `/subscriptions/[id]` detail page still imports it.
+canonical relation is an invariant failure (`invariantFailure`), never deduplicated. The `/subscriptions/[id]` detail
+page's Invoices & payments tab uses the same builder and component, and main's `subscriptionRecordLinks` was removed.
 
 ## Prerequisites / decisions
 
