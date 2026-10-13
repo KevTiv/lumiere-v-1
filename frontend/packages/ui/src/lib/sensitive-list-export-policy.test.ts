@@ -28,7 +28,7 @@ describe("sensitive list export policies", () => {
 
   it("keeps employee operational columns exportable without personal identifiers or contact data", () => {
     const table = entityTableConfigFromView(hrEntityConfigs(t)["employees-table"]!.view)
-    expect(table.allowExport).not.toBe(false)
+    expect(table.allowExport).toBe(true)
     const csv = buildEntityTableCsv(table.columns, [{
       employeeNumber: "EMP-SECRET", name: "Private Person", workEmail: "private@example.test",
       jobTitle: "Engineer", departmentId: 4, employmentType: "FullTime", isActive: true,
@@ -42,7 +42,7 @@ describe("sensitive list export policies", () => {
 
   it("keeps folder structure metadata exportable without names or paths", () => {
     const table = entityTableConfigFromView(documentsEntityConfigs(t)["document-folders-table"]!.view)
-    expect(table.allowExport).not.toBe(false)
+    expect(table.allowExport).toBe(true)
     expect(exportableColumns(table.columns).map(({ key }) => key)).toEqual([
       "documentCount", "isFavorite", "isHidden", "createDate",
     ])
@@ -63,7 +63,7 @@ describe("sensitive list export policies", () => {
 
   it("keeps goals metadata exportable without employee identifiers or free-text goals", () => {
     const table = entityTableConfigFromView(hrEntityConfigs(t)["performance-goals-table"]!.view)
-    expect(table.allowExport).not.toBe(false)
+    expect(table.allowExport).toBe(true)
     expect(exportableColumns(table.columns).map(({ key }) => key)).toEqual(["cycleId", "state", "weight"])
   })
 
@@ -73,7 +73,7 @@ describe("sensitive list export policies", () => {
     "performance-cycles-table", "benefit-plans-table",
   ])("keeps reference list %s exportable", (id) => {
     const table = entityTableConfigFromView(hrEntityConfigs(t)[id]!.view)
-    expect(table.allowExport).not.toBe(false)
+    expect(table.allowExport).toBe(true)
     expect(exportableColumns(table.columns).length).toBeGreaterThan(0)
   })
 
@@ -82,7 +82,22 @@ describe("sensitive list export policies", () => {
     "document-templates-table", "mail-templates-table",
   ])("keeps document setup/status list %s exportable", (id) => {
     const table = entityTableConfigFromView(documentsEntityConfigs(t)[id]!.view)
-    expect(table.allowExport).not.toBe(false)
+    expect(table.allowExport).toBe(true)
     expect(exportableColumns(table.columns).length).toBeGreaterThan(0)
+  })
+
+  it("keeps every other HR and document list closed to generic CSV by default", () => {
+    const reviewed = new Set([
+      "employees-table", "performance-goals-table", "departments-table", "job-positions-table",
+      "leave-types-table", "payroll-structures-table", "salary-rules-table", "onboarding-templates-table",
+      "performance-cycles-table", "benefit-plans-table", "document-folders-table", "knowledge-categories-table",
+      "document-processing-jobs-table", "document-templates-table", "mail-templates-table",
+    ])
+    const configs = { ...hrEntityConfigs(t), ...documentsEntityConfigs(t) }
+    for (const [id, config] of Object.entries(configs)) {
+      if (config.view.mode !== "table" && config.view.mode !== "table-or-board") continue
+      const allowExport = entityTableConfigFromView(config.view).allowExport
+      expect({ id, allowExport: allowExport === true }).toEqual({ id, allowExport: reviewed.has(id) })
+    }
   })
 })
