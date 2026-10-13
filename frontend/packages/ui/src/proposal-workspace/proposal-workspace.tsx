@@ -513,8 +513,8 @@ export function ProposalWorkspace({
     return map
   }, [proposalPresence])
 
-  // Total proposal value from all line items
-  const totalValue = lineItemsList.reduce((sum: number, item) => {
+  // Total proposal value across this proposal's sections
+  const totalValue = proposalLineItems.reduce((sum: number, item) => {
     const quantity = (item as { quantity?: number }).quantity ?? 1
     const priceUnit = (item as { priceUnit?: number }).priceUnit ?? 0
     const discount = (item as { discount?: number }).discount ?? 0
