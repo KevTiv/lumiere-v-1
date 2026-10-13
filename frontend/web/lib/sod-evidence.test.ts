@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import { test } from "node:test"
 
-import { actorIdentity, canonicalOptionValue } from "../tests/e2e/sod-evidence"
+import { actorIdentity, canonicalOptionValue, canonicalSumTag } from "../tests/e2e/sod-evidence"
 
 test("persisted actor evidence decodes supported SATS identity and option shapes", () => {
   const hex = "ab".repeat(32)
@@ -34,4 +34,14 @@ test("canonical option evidence decodes raw SATS SQL and object wrappers", () =>
   assert.equal(canonicalOptionValue({ none: [] }), null)
   assert.deepEqual(canonicalOptionValue([2, [42]]), [2, [42]])
   assert.deepEqual(canonicalOptionValue([0, []]), [])
+})
+
+test("canonical sum evidence decodes raw SATS SQL and object variants", () => {
+  const states = ["Draft", "Verify", "Done", "Cancelled"] as const
+  assert.equal(canonicalSumTag([0, []], states), "Draft")
+  assert.equal(canonicalSumTag([2, []], states), "Done")
+  assert.equal(canonicalSumTag({ verify: [] }, states), "Verify")
+  assert.equal(canonicalSumTag({ tag: "Cancelled" }, states), "Cancelled")
+  assert.equal(canonicalSumTag("Draft", states), "Draft")
+  assert.equal(canonicalSumTag([9, []], states), "")
 })
