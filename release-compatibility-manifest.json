@@ -5,21 +5,21 @@
     "ir_version": 2,
     "ir_path": "ir/lumiere-contract-ir-v2.json",
     "pin_path": "ir/PIN.json",
-    "artifact_sha256": "d6c06231aaa3458d8a7fc8b9b8e10d6dea7f17d5519989454464d8441911da3a",
-    "schema_hash": "sha256:1e97b9448f49e120640632ea468c7acd0917ab8cea09ba0acc4747b037e51c56",
-    "source_commit": "2d6192ce83fb1aa56b83e6a753196c86377c8e19",
+    "artifact_sha256": "67da58a17038a82a8da59c4365cb27fba85f687bbe4afa8b36cf43300f333094",
+    "schema_hash": "sha256:f3249873421df45d6efa88de8136ae00e9ce3873162d4511eb3994f390ebed11",
+    "source_commit": "8bf0a5ef836991b135bebf9e9c1b6e63d85615ca",
     "source_repository": "https://github.com/KevTiv/lumiere-v-1"
   },
   "lumiere_contracts": {
     "package": "lumiere-contracts",
-    "version": "0.3.100",
-    "tag": "v0.3.100",
-    "revision": "c7efc900130fcf6a43d23cbadb2581e3de52aa67",
+    "version": "0.3.106",
+    "tag": "v0.3.106",
+    "revision": "10ab3a7d0b2d805661b42205a23904982d09eb77",
     "repository": "ssh://git@github.com/KevTiv/lumiere-contracts.git"
   },
   "operation_history": {
     "path": "lumiere-codegen/contract-operation-history.json",
-    "checksum": "sha256:206b35f371bf44247a70143473b95a16735f76e9fa20bc0eff0c0180367e4144"
+    "checksum": "sha256:0619740112fae6611d7a19da0462432e2258d1cb8813a3f91c034a4f822d0ce0"
   },
   "stdb_module": {
     "name": "lumiere_v1",
@@ -36,7 +36,7 @@
     "checksum": "sha256:5598834cc650011744abb9b9ad090e6ba09bfc824bc6d853f89f34930ef8d9ab",
     "application_catalog_path": "api-server/src/cold_tier/migrate.rs",
     "application_catalog_version": 15,
-    "application_catalog_checksum": "sha256:4f2a5f0eccb50e0f48a9aa5c2eeb07b3604ec49c67d157c7db49154ed6766861"
+    "application_catalog_checksum": "sha256:d52b11267d18e56fd923b687e927b54a5d930218b1cc03fe1ec3eb95883866a3"
   },
   "services": {
     "api_server": {
@@ -51,7 +51,7 @@
   "minimum_client_contract": {
     "version": "ir-v2",
     "ir_version": 2,
-    "generated_contract_release": "0.3.100"
+    "generated_contract_release": "0.3.106"
   },
   "deployment": {
     "config_generation": 3,
