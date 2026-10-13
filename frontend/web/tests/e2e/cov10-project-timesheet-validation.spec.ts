@@ -1,6 +1,7 @@
 import { expect, test, type Page, type Request, type Response } from "@playwright/test"
 
 import {
+  callReducerBff,
   chooseFirstOption,
   chooseSelectOptionByLabel,
   chooseSelectOptionByValue,
@@ -19,7 +20,7 @@ import {
   submitForm,
 } from "./helpers"
 import { matchesOperationResponse } from "./operation-response"
-import { actorIdentity, canonicalRow, sessionActor } from "./sod-evidence"
+import { actorIdentity, canonicalOptionValue, canonicalRow, sessionActor } from "./sod-evidence"
 
 // COV-10 — see docs/plan/erp-cov10-project-timesheet-validation-status.md.
 const PERSONA_PASSWORD = process.env.E2E_FIRST_ORG_PERSONA_PASSWORD ?? "Password123$"
@@ -123,7 +124,7 @@ async function billTimesheetThroughUi(page: Page, timesheetId: number): Promise<
 async function billingEffect(page: Page, timesheetId: number) {
   const timesheet = await canonicalRow(page, "timesheets", timesheetId)
   const invoiceId = scalarQueryId(
-    timesheet.timesheetInvoiceId ?? timesheet.timesheet_invoice_id,
+    canonicalOptionValue(timesheet.timesheetInvoiceId ?? timesheet.timesheet_invoice_id),
   )
   if (invoiceId == null) return null
   const invoice = await canonicalRow(page, "account-moves", invoiceId)
@@ -132,7 +133,9 @@ async function billingEffect(page: Page, timesheetId: number) {
     invoiceId,
     invoiceOrganizationId: scalarQueryId(invoice.organizationId ?? invoice.organization_id),
     invoiceCompanyId: scalarQueryId(invoice.companyId ?? invoice.company_id),
-    invoiceOrigin: String(invoice.invoiceOrigin ?? invoice.invoice_origin ?? ""),
+    invoiceOrigin: String(
+      canonicalOptionValue(invoice.invoiceOrigin ?? invoice.invoice_origin) ?? "",
+    ),
   }
 }
 
@@ -150,6 +153,31 @@ test.describe("COV-10 exact timesheet validation / rejection", { tag: ["@p0", "@
       employees.find((row) => scalarQueryId(row.companyId ?? row.company_id) === companyId)?.id,
     )
     if (employeeId == null) throw new Error("no employee in the default company")
+
+    // This lifecycle owns an active create prerequisite. Merely finding a
+    // pricelist row is insufficient: another lifecycle may have archived all
+    // existing rows, and the project form intentionally excludes those rows.
+    // The public pricelist read model omits companyId, so identify this fixture
+    // by its unique name and organization; create_pricelist validates companyId
+    // belongs to that organization before inserting it.
+    const pricelistName = smokeName("cov10-pricelist")
+    await callReducerBff(page, "create_pricelist", [organizationId, {
+      companyId,
+      name: pricelistName,
+      currencyId,
+      discountPolicy: { tag: "WithDiscount" },
+    }])
+    await expect
+      .poll(async () => (await rows(page, "pricelists")).filter((row) =>
+        row.name === pricelistName
+        && scalarQueryId(row.organizationId ?? row.organization_id) === organizationId
+        && (row.isActive ?? row.is_active) !== false
+        && (row.isActive ?? row.is_active) !== 0,
+      ).length, {
+        timeout: 30_000,
+        message: "COV-10 requires its exact active organization pricelist",
+      })
+      .toBe(1)
 
     // ── Operator creation path; the admin is the logger ────────────────────
     const tag = smokeName("cov10")

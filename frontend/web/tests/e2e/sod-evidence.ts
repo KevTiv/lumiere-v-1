@@ -25,6 +25,45 @@ export async function sessionActor(page: Page): Promise<string> {
   )
 }
 
+/** Unwrap one raw SATS `Option<T>` cell returned by the SQL HTTP endpoint. */
+export function canonicalOptionValue(value: unknown): unknown {
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    const row = value as Record<string, unknown>
+    if ("some" in row) return canonicalOptionValue(row.some)
+    if ("none" in row) return null
+  }
+  // A SATS sum variant carries its payload after the tag. Some payloads are
+  // themselves encoded as single-field products, so unwrap those as well.
+  if (Array.isArray(value) && value.length === 1) {
+    return canonicalOptionValue(value[0])
+  }
+  if (Array.isArray(value) && value.length === 2) {
+    if (value[0] === 1) return null
+    if (value[0] === 0) {
+      return canonicalOptionValue(value[1])
+    }
+  }
+  return value
+}
+
+/** Decode one raw SATS unit-sum cell using its generated variant order. */
+export function canonicalSumTag(value: unknown, variants: readonly string[]): string {
+  if (typeof value === "string") return value
+  if (Array.isArray(value) && value.length === 2 && Number.isInteger(value[0])) {
+    return variants[value[0] as number] ?? ""
+  }
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    const row = value as Record<string, unknown>
+    if (typeof row.tag === "string") return row.tag
+    const keys = Object.keys(row)
+    if (keys.length === 1) {
+      const key = keys[0]!
+      return key.charAt(0).toUpperCase() + key.slice(1)
+    }
+  }
+  return ""
+}
+
 /**
  * Supplemental, fixture-only persisted actor/full-row evidence. The governed API
  * projections omit these actor fields. This read-only owner SQL observer does not
@@ -32,8 +71,10 @@ export async function sessionActor(page: Page): Promise<string> {
  */
 export async function canonicalRow(_page: Page, resource: string, id: number) {
   const tables: Record<string, string> = {
+    "account-moves": "account_move",
     employees: "hr_employee",
     "leave-requests": "hr_leave",
+    payslips: "hr_payslip",
     timesheets: "project_timesheet",
     proposals: "proposal",
     "mrp-boms": "mrp_bom",

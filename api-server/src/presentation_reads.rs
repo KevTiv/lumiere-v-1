@@ -292,32 +292,59 @@ mod tests {
     #[tokio::test]
     async fn acquisition_resolves_membership_and_executes_bounded_scoped_query() {
         let membership = sats_response(&["company_id"], &[vec![9]]);
+        let authorization_membership = sats_response(&["role_id"], &[vec![1]]);
+        let assignments = sats_response(&["role_id", "expires_at"], &[]);
+        let roles = sats_response(&["id"], &[]);
         let moves = sats_response(
             &["id", "organization_id", "company_id"],
             &[vec![1, 7, 9], vec![2, 7, 9], vec![3, 7, 9]],
         );
-        let (base_url, count, queries, task) = mock_stdb(vec![membership, moves]).await;
+        let (base_url, count, queries, task) = mock_stdb(vec![
+            membership,
+            authorization_membership,
+            assignments,
+            roles,
+            moves,
+        ])
+        .await;
         let context = trusted_context(&base_url);
         let page = acquire_account_moves(&context, 9, 2).await.unwrap();
         assert_eq!(page.rows.len(), 2);
         assert!(page.truncated);
-        assert_eq!(count.load(Ordering::SeqCst), 2);
+        assert_eq!(count.load(Ordering::SeqCst), 5);
         let captured = queries.lock().unwrap();
         assert!(captured[0].contains("user_organization"));
-        assert!(captured[1].contains("organization_id = 7 AND company_id = 9"));
-        assert!(captured[1].contains("LIMIT 3"));
+        assert!(captured[1].contains("SELECT role_id FROM user_organization"));
+        assert!(captured[2].contains("user_role_assignment"));
+        assert!(captured[3].contains("SELECT id, name, permissions, is_active FROM role"));
+        assert!(captured[4].contains("organization_id = 7 AND company_id = 9"));
+        assert!(captured[4].contains("LIMIT 3"));
         task.abort();
     }
 
     #[tokio::test]
     async fn acquisition_denies_wrong_company_before_account_query() {
         let membership = sats_response(&["company_id"], &[vec![9]]);
-        let (base_url, count, queries, task) = mock_stdb(vec![membership]).await;
+        let authorization_membership = sats_response(&["role_id"], &[vec![1]]);
+        let assignments = sats_response(&["role_id", "expires_at"], &[]);
+        let roles = sats_response(&["id"], &[]);
+        let (base_url, count, queries, task) = mock_stdb(vec![
+            membership,
+            authorization_membership,
+            assignments,
+            roles,
+        ])
+        .await;
         let context = trusted_context(&base_url);
         let error = acquire_account_moves(&context, 8, 2).await.unwrap_err();
         assert!(matches!(error, ApiError::Forbidden(_)));
-        assert_eq!(count.load(Ordering::SeqCst), 1);
-        assert_eq!(queries.lock().unwrap().len(), 1);
+        assert_eq!(count.load(Ordering::SeqCst), 4);
+        let captured = queries.lock().unwrap();
+        assert_eq!(captured.len(), 4);
+        assert!(captured[0].contains("user_organization"));
+        assert!(captured[1].contains("SELECT role_id FROM user_organization"));
+        assert!(captured[2].contains("user_role_assignment"));
+        assert!(captured[3].contains("SELECT id, name, permissions, is_active FROM role"));
         task.abort();
     }
 }

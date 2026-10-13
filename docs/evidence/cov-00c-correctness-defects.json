@@ -263,6 +263,7 @@
       "frontend/web/app/(modules)/sales/sale-order-dialogs.tsx"
     ],
     "operator_bypass_files": [
+      "frontend/web/tests/e2e/account-deprecation-readback.spec.ts",
       "frontend/web/tests/e2e/accounting-post-reconcile.spec.ts",
       "frontend/web/tests/e2e/ai-human-review-provenance.spec.ts",
       "frontend/web/tests/e2e/ai-rag-evidence-access.spec.ts",
@@ -271,6 +272,7 @@
       "frontend/web/tests/e2e/bank-statement-import.spec.ts",
       "frontend/web/tests/e2e/cov04-sales-order-confirmation.spec.ts",
       "frontend/web/tests/e2e/cov09-hr-leave-approval.spec.ts",
+      "frontend/web/tests/e2e/cov10-project-timesheet-validation.spec.ts",
       "frontend/web/tests/e2e/cov11-expense-sheet-lifecycle.spec.ts",
       "frontend/web/tests/e2e/cov13-pos-session-close.spec.ts",
       "frontend/web/tests/e2e/cov14-helpdesk-ticket-lifecycle.spec.ts",

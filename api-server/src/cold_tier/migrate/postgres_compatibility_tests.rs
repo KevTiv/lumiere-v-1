@@ -3,7 +3,10 @@ use crate::cold_tier::{conventions, pg_codec, pg_pool, projection_worker};
 use anyhow::{ensure, Context, Result};
 use deadpool_postgres::Pool;
 use serde_json::json;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
+
+static DATABASE_SEQUENCE: AtomicU64 = AtomicU64::new(0);
 
 const NEXT_EXPAND_SQL: &str = r#"
 create table c4_next_release_probe (
@@ -392,11 +395,31 @@ fn column(name: &str, pg_type: &str, stdb_type: &str) -> pg_codec::ColumnCodec {
 }
 
 fn unique_database_name() -> Result<String> {
-    let micros = SystemTime::now()
+    let micros: u64 = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .context("read clock for C4 PostgreSQL database")?
-        .as_micros();
-    Ok(format!("lumiere_c4_{}_{}", std::process::id(), micros))
+        .as_micros()
+        .try_into()
+        .context("C4 PostgreSQL database clock exceeds u64 micros")?;
+    let sequence = DATABASE_SEQUENCE.fetch_add(1, Ordering::Relaxed);
+    Ok(database_name(std::process::id(), micros, sequence))
+}
+
+fn database_name(process_id: u32, micros: u64, sequence: u64) -> String {
+    format!("lumiere_c4_{process_id}_{micros}_{sequence}")
+}
+
+#[test]
+fn database_names_distinguish_same_microsecond_and_fit_postgres_identifier() {
+    let first = database_name(u32::MAX, u64::MAX, 0);
+    let second = database_name(u32::MAX, u64::MAX, 1);
+    let longest = database_name(u32::MAX, u64::MAX, u64::MAX);
+
+    assert_ne!(first, second);
+    assert_eq!(longest.len(), 63);
+    assert!(longest
+        .bytes()
+        .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'_'));
 }
 
 fn admin_pool(config: &pg_pool::PgConfig) -> Result<Pool> {

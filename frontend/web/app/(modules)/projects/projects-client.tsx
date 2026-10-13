@@ -1065,6 +1065,7 @@ function ProjectsClientLoaded({
             const view = tab.entityConfig.view
             return {
               ...tab,
+              createForm: projectFormConfig,
               entityConfig: withInlineEdits({
                 ...tab.entityConfig,
                 view: {
@@ -1181,6 +1182,7 @@ function ProjectsClientLoaded({
             return {
               ...tab,
               createForm: timesheetFormConfig,
+              createAction: "logTimesheet",
               entityConfig: withTimesheetLifecycleColumns(addCsvToolbar(tab.entityConfig, [
                 {
                   id: "csv-timesheet",

@@ -17,7 +17,7 @@ import {
 } from "./helpers"
 import { matchesOperationResponse } from "./operation-response"
 import { loseNextResponse } from "./pretenant-support"
-import { canonicalRow, sessionActor } from "./sod-evidence"
+import { canonicalOptionValue, canonicalRow, canonicalSumTag, sessionActor } from "./sod-evidence"
 
 const PERSONA_PASSWORD = process.env.E2E_FIRST_ORG_PERSONA_PASSWORD ?? "Password123$"
 const PAYROLL_APPROVER = "fixture.hr-project@example.test"
@@ -48,14 +48,6 @@ async function exactId(
   return id
 }
 
-function stateTag(value: unknown): string {
-  if (typeof value === "string") return value
-  if (value && typeof value === "object" && "tag" in value) {
-    return String((value as { tag: unknown }).tag)
-  }
-  return ""
-}
-
 async function replay(page: Page, request: Request) {
   const url = new URL(request.url())
   return page.request.post(`${url.pathname}${url.search}`, {
@@ -77,15 +69,19 @@ async function selectPayslipAction(page: Page, payslipId: number, actionId: stri
 
 async function payrollEffect(page: Page, payslipId: number) {
   const payslip = await canonicalRow(page, "payslips", payslipId)
-  const accountMoveId = scalarQueryId(payslip.accountMoveId ?? payslip.account_move_id)
+  const accountMoveId = scalarQueryId(
+    canonicalOptionValue(payslip.accountMoveId ?? payslip.account_move_id),
+  )
   const move = accountMoveId == null ? null : await canonicalRow(page, "account-moves", accountMoveId)
   return {
     payslipId,
-    state: stateTag(payslip.state),
+    state: canonicalSumTag(payslip.state, ["Draft", "Verify", "Done", "Cancelled"]),
     organizationId: scalarQueryId(payslip.organizationId ?? payslip.organization_id),
     companyId: scalarQueryId(payslip.companyId ?? payslip.company_id),
     employeeId: scalarQueryId(payslip.employeeId ?? payslip.employee_id),
-    contractId: scalarQueryId(payslip.contractId ?? payslip.contract_id),
+    contractId: scalarQueryId(
+      canonicalOptionValue(payslip.contractId ?? payslip.contract_id),
+    ),
     accountMoveId,
     moveOrganizationId: move == null ? null : scalarQueryId(move.organizationId ?? move.organization_id),
     moveCompanyId: move == null ? null : scalarQueryId(move.companyId ?? move.company_id),
@@ -121,16 +117,20 @@ test.describe("COV-09 operator payroll lifecycle", { tag: ["@p0", "@cov09"] }, (
     const contractId = await exactId(page, "contracts", (row) => row.name === contractName, contractName)
 
     const structures = await rows(page, "payroll-structures")
-    const structId = scalarQueryId(structures[0]?.id)
-    if (structId == null) throw new Error("no payroll structure seeded")
+    const structure = structures.find((row) =>
+      (row.isActive ?? row.is_active) !== false && (row.isActive ?? row.is_active) !== 0,
+    )
+    const structId = scalarQueryId(structure?.id)
+    const structureName = String(structure?.name ?? "").trim()
+    if (structId == null || structureName === "") throw new Error("no active payroll structure seeded")
 
     await openEntityCreate(page, "/hr", "hr", "payslips", "new-payslip")
-    await fillField(page, "employeeId", String(employeeId))
-    await fillField(page, "structId", String(structId))
+    await chooseSelectOptionByLabel(page, "employeeId", employeeName)
+    await chooseSelectOptionByLabel(page, "structId", structureName)
     await fillField(page, "dateFrom", isoDate(-1))
     await fillField(page, "dateTo", isoDate(28))
     await fillField(page, "basicWage", "5500")
-    await fillField(page, "contractId", String(contractId))
+    await chooseSelectOptionByLabel(page, "contractId", contractName)
     await submitForm(page, "new-payslip")
     const payslipId = await exactId(
       page,
@@ -174,9 +174,10 @@ test.describe("COV-09 operator payroll lifecycle", { tag: ["@p0", "@cov09"] }, (
         if (request.url().includes("create_hr_integration_intent")) stpDispatches += 1
       })
       await selectPayslipAction(approverPage, payslipId, "create-stp-intent")
-      await expect(approverPage.getByRole("alert")).toContainText(
-        "STP submission is unavailable because no provider adapter is configured",
-      )
+      const stpUnavailable = "STP submission is unavailable because no provider adapter is configured"
+      await expect(
+        approverPage.getByRole("alert").filter({ hasText: stpUnavailable }),
+      ).toContainText(stpUnavailable)
       expect(stpDispatches).toBe(0)
 
       const journal = (await rows(page, "account-journals")).find(

@@ -454,6 +454,7 @@ const REDUCER_PARAM_STRUCTS: Partial<Record<string, keyof OptionFieldMap & strin
   create_inventory_adjustment: "CreateInventoryAdjustmentParams",
   create_crossovered_budget: "CreateCrossoveredBudgetParams",
   create_crossovered_budget_line: "CreateCrossoveredBudgetLineParams",
+  create_account_account: "CreateAccountAccountParams",
   create_account_journal: "CreateAccountJournalParams",
   create_account_move: "CreateAccountMoveParams",
   create_account_bank_statement: "CreateAccountBankStatementParams",

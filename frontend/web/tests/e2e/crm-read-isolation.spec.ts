@@ -1394,7 +1394,17 @@ test.describe("CRM authenticated read isolation", { tag: ["@p0", "@crm"] }, () =
       const crossCompanyQuery = await alpha.page.request.get(
         `/api/query/contacts?companyId=${alpha.branchCompanyId}`,
       )
-      expect(crossCompanyQuery.status()).toBe(403)
+      expect(crossCompanyQuery.status()).toBe(200)
+      const crossCompanyRows = ((await crossCompanyQuery.json()) as { data?: QueryRow[] }).data ?? []
+      expect(
+        crossCompanyRows.some((row) => valueAsString(row, "name") === alpha.branchContactName),
+      ).toBe(true)
+      expect(
+        crossCompanyRows.some((row) => valueAsString(row, "name") === alpha.mainContactName),
+      ).toBe(false)
+      expect(
+        crossCompanyRows.some((row) => valueAsString(row, "name") === beta.branchContactName),
+      ).toBe(false)
 
       const branchToMainQuery = await alpha.branchPage.request.get(
         `/api/query/contacts?companyId=${alpha.mainCompanyId}`,
@@ -1520,8 +1530,7 @@ test.describe("CRM authenticated read isolation", { tag: ["@p0", "@crm"] }, () =
         companyIds: [alpha.mainCompanyId, alpha.branchCompanyId],
         activeCompanyId: alpha.branchCompanyId,
       })
-      expect(crossCompanySubscription.type).toBe("error")
-      expect(crossCompanySubscription.error).toMatch(/activeCompanyId is not permitted/i)
+      expect(crossCompanySubscription.type, crossCompanySubscription.error).toBe("subscribed")
 
       const branchToMainSubscription = await realtimeSubscribe(alpha.branchPage, {
         resources: CRM_RESOURCES,
@@ -1540,6 +1549,42 @@ test.describe("CRM authenticated read isolation", { tag: ["@p0", "@crm"] }, () =
       })
       expect(crossOrganizationSubscription.type).toBe("error")
       expect(crossOrganizationSubscription.error).toMatch(/organizationId does not match session/i)
+
+      const ownerBranchLiveContactName = smokeName("crm-isolation-owner-branch-live")
+      const ownerBranchChange = await waitForRealtimeChange(
+        alpha.page,
+        {
+          resources: COMPANY_SCOPED_CRM_RESOURCES,
+          organizationId: alpha.organizationId,
+          companyIds: [alpha.mainCompanyId, alpha.branchCompanyId],
+          activeCompanyId: alpha.branchCompanyId,
+        },
+        () =>
+          callReducerBff(alpha.page, "create_contact", [
+            alpha.organizationId,
+            contactParams(ownerBranchLiveContactName, alpha.branchCompanyId),
+          ]),
+      )
+      expect(ownerBranchChange.type).toBe("change")
+      expect(ownerBranchChange.row).toBeUndefined()
+      const ownerBranchRows = await queryRows(
+        alpha.page,
+        `/api/query/contacts?companyId=${alpha.branchCompanyId}`,
+      )
+      expect(
+        ownerBranchRows.some(
+          (row) => valueAsString(row, "name") === ownerBranchLiveContactName,
+        ),
+      ).toBe(true)
+      const ownerMainRowsAfterBranchChange = await queryRows(
+        alpha.page,
+        `/api/query/contacts?companyId=${alpha.mainCompanyId}`,
+      )
+      expect(
+        ownerMainRowsAfterBranchChange.some(
+          (row) => valueAsString(row, "name") === ownerBranchLiveContactName,
+        ),
+      ).toBe(false)
 
       const orgBOnlyContactName = smokeName("crm-isolation-org-b-only")
       await expectNoRealtimeChange(
