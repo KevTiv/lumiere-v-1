@@ -201,6 +201,7 @@ impl ToolRegistry {
     ///
     /// This namespace never falls back to the local runtime tools. Nonempty
     /// catalogs remain unsupported until the contract supplies provider metadata.
+    #[cfg(test)]
     pub fn generated_specs(&self) -> Result<Vec<crate::providers::llm::ToolSpec>> {
         Ok(super::generated::embedded_catalog()?.specs()?)
     }

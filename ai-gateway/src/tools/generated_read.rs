@@ -12,11 +12,17 @@ use super::{
     generated::{embedded_catalog, GeneratedReadGrant, PreparedGeneratedRead},
     types::{ToolContext, ToolOutput},
 };
+use crate::orchestrator::resolve_effective_generated_capabilities;
 use crate::providers::llm::ToolCallRequest;
 
 #[derive(Deserialize)]
-#[serde(deny_unknown_fields)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
 struct GrantEnvelope {
+    organization_id: u64,
+    company_id: u64,
+    actor_identity: String,
+    #[serde(default)]
+    _knowledge_team_refs: Vec<String>,
     grants: Vec<GeneratedReadGrant>,
 }
 
@@ -30,6 +36,7 @@ pub(crate) async fn resolve_actor_grants(context: &ToolContext) -> Result<Vec<Ge
         .state
         .http
         .get(format!("{api_base}/v1/ai/capability-grants"))
+        .query(&[("companyId", context.company_id)])
         .bearer_auth(actor.stdb_token.trim())
         .header("x-stdb-identity", actor.identity_hex.trim())
         .send()
@@ -45,16 +52,24 @@ pub(crate) async fn resolve_actor_grants(context: &ToolContext) -> Result<Vec<Ge
         .json()
         .await
         .context("generated capability grants returned invalid JSON")?;
+    ensure!(
+        envelope.organization_id == context.org_id
+            && envelope.company_id == context.company_id
+            && envelope.actor_identity == actor.identity_hex.trim(),
+        "generated capability grant envelope scope mismatch"
+    );
     Ok(envelope.grants)
 }
 
 pub(crate) struct GeneratedReadTools<'a> {
-    grants: &'a [GeneratedReadGrant],
+    declared_tool_names: &'a [String],
 }
 
 impl<'a> GeneratedReadTools<'a> {
-    pub(crate) fn new(grants: &'a [GeneratedReadGrant]) -> Self {
-        Self { grants }
+    pub(crate) fn new(declared_tool_names: &'a [String]) -> Self {
+        Self {
+            declared_tool_names,
+        }
     }
 
     pub(crate) async fn execute(
@@ -67,8 +82,23 @@ impl<'a> GeneratedReadTools<'a> {
             .actor
             .as_ref()
             .context("generated reads require actor credentials")?;
+        // Grants are deliberately resolved for every invocation. A run may be
+        // long lived, so caching them at run admission would let a revoked or
+        // narrowed capability survive until the next run.
+        let current_grants = resolve_actor_grants(context).await?;
+        let effective =
+            resolve_effective_generated_capabilities(self.declared_tool_names, &current_grants)?;
+        ensure!(
+            effective.specs.iter().any(|spec| spec.name == call.name),
+            "generated capability is not currently visible to this invocation"
+        );
         let prepared = embedded_catalog()?
-            .prepare_read(&call.name, &call.arguments, context.company_id, self.grants)
+            .prepare_read(
+                &call.name,
+                &call.arguments,
+                context.company_id,
+                &effective.grants,
+            )
             .map_err(anyhow::Error::from)?;
         let api_base = api_base(context)?;
         let limit =
