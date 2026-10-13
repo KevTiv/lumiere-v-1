@@ -518,6 +518,16 @@ pub fn test_cancel_payment_audited(ctx: &ReducerContext) -> Result<(), String> {
             posted.state
         ));
     }
+    let original_move_id = posted.move_id.ok_or("Posted payment is missing its move")?;
+    let original_lines: Vec<_> = ctx
+        .db
+        .account_move_line()
+        .move_line_by_move()
+        .filter(&original_move_id)
+        .collect();
+    if original_lines.len() < 2 {
+        return Err("Posted payment move has fewer than two lines".to_string());
+    }
 
     cancel_payment(ctx, org_id, payment_id)?;
 
@@ -533,6 +543,71 @@ pub fn test_cancel_payment_audited(ctx: &ReducerContext) -> Result<(), String> {
             "Expected Reversed state after cancel, got {:?}",
             cancelled.state
         ));
+    }
+
+    let reversal_moves: Vec<_> = ctx
+        .db
+        .account_move()
+        .iter()
+        .filter(|move_row| {
+            if move_row.organization_id != org_id || move_row.company_id != company_id {
+                return false;
+            }
+            move_row.metadata.as_deref().is_some_and(|metadata| {
+                serde_json::from_str::<serde_json::Value>(metadata)
+                    .ok()
+                    .and_then(|value| value["reverses_payment_move_id"].as_u64())
+                    == Some(original_move_id)
+            })
+        })
+        .collect();
+    if reversal_moves.len() != 1 || reversal_moves[0].state != crate::types::AccountMoveState::Posted {
+        return Err(format!(
+            "Expected one posted reversal move, got {}",
+            reversal_moves.len()
+        ));
+    }
+    let reversal_lines: Vec<_> = ctx
+        .db
+        .account_move_line()
+        .move_line_by_move()
+        .filter(&reversal_moves[0].id)
+        .collect();
+    if reversal_lines.len() != original_lines.len() {
+        return Err("Payment reversal line count does not match original".to_string());
+    }
+    for original in &original_lines {
+        let matches = reversal_lines.iter().filter(|reversal| {
+            reversal.account_id == original.account_id
+                && (reversal.debit - original.credit).abs() < 1e-9
+                && (reversal.credit - original.debit).abs() < 1e-9
+                && reversal.payment_id == Some(payment_id)
+        });
+        if matches.count() != 1 {
+            return Err(format!(
+                "Payment reversal did not exactly invert original line {}",
+                original.id
+            ));
+        }
+    }
+    if cancel_payment(ctx, org_id, payment_id).is_ok() {
+        return Err("Payment cancellation replay unexpectedly succeeded".to_string());
+    }
+    let reversal_count_after_replay = ctx
+        .db
+        .account_move()
+        .iter()
+        .filter(|move_row| {
+            move_row.metadata.as_deref().is_some_and(|metadata| {
+                serde_json::from_str::<serde_json::Value>(metadata)
+                    .ok()
+                    .and_then(|value| value["reverses_payment_move_id"].as_u64())
+                    == Some(original_move_id)
+            })
+        })
+        .count();
+    if reversal_count_after_replay != 1 {
+        return Err("Cancellation replay duplicated the reversal move".to_string());
     }
 
     let has_cancel_audit = ctx

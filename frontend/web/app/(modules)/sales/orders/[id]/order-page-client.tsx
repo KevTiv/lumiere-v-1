@@ -65,6 +65,7 @@ import {
   useSaleOrderLines,
   useSaleOrderOptions,
   useSaleOrders,
+  useReturnOrders,
   type SaleOrder,
   type SaleOrderLine,
 } from '@lumiere/query-hooks/hooks/sales';
@@ -149,6 +150,7 @@ function SaleOrderPageLoaded({
   const { data: orderLines = [] } = useSaleOrderLines(orgId, initialOrderLines);
   const { data: stockPickings = [] } = useStockPickings(orgId, initialStockPickings);
   const { data: accountMoves = [] } = useAccountMoves(orgId);
+  const { data: returnOrders = [] } = useReturnOrders(orgId);
   const { data: contacts = [] } = useContacts(orgId, initialContacts);
   const { data: productRows = [] } = useProducts(orgId);
   const orderOptionsQuery = useSaleOrderOptions(orgId);
@@ -379,6 +381,7 @@ function SaleOrderPageLoaded({
     { organizationId: orgId, companyId: operatingCompanyId },
     stockPickings as never,
     accountMoves as never,
+    returnOrders as never,
   );
 
   const createReturnLabel = t('sales.order.createReturn', { defaultValue: 'Create return' });

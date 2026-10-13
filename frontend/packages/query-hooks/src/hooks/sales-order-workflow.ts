@@ -39,6 +39,7 @@ import {
 } from "@lumiere/erp-workflows"
 
 import { stockPickingsQueryOptions } from "./inventory/stock-operations"
+import { executeCommandWithAppliedRecovery } from "./canonical-command-recovery"
 import {
   acceptSaleOrderQuotationCommand,
   cancelSaleOrderCommand,
@@ -95,11 +96,8 @@ export function useSaleOrderWorkflow(
   )
 
   const confirmSpec = useMemo<TransitionSpec<string>>(
-    () => ({
-      id: "sales.order.confirm",
-      command: (orderId) => confirmSaleOrderCommand(companyId, orderId),
-      affects: CONFIRM_SALE_ORDER_AFFECTS,
-      observe: async (orderId) => {
+    () => {
+      const observe = async (orderId: string) => {
         const [orders, pickings] = await Promise.all([
           qc.fetchQuery({ ...saleOrdersQueryOptions(organizationId), staleTime: 0 }),
           qc.fetchQuery({ ...stockPickingsQueryOptions(organizationId), staleTime: 0 }),
@@ -109,21 +107,38 @@ export function useSaleOrderWorkflow(
           orders as unknown as RowValueMap[],
           pickings as unknown as RowValueMap[],
         )
-      },
-    }),
+      }
+      return {
+        id: "sales.order.confirm",
+        command: (orderId) =>
+          executeCommandWithAppliedRecovery(
+            () => confirmSaleOrderCommand(companyId, orderId),
+            () => observe(orderId),
+          ),
+        affects: CONFIRM_SALE_ORDER_AFFECTS,
+        observe,
+      }
+    },
     [qc, organizationId, companyId],
   )
 
   const createInvoiceSpec = useMemo<TransitionSpec<InvoiceRunInput>>(
-    () => ({
-      id: "sales.order.create-invoice",
-      command: ({ orderId, params }) => createInvoiceFromSaleOrderCommand({ orderId, params }),
-      affects: CREATE_INVOICE_FROM_SALE_ORDER_AFFECTS,
-      observe: async ({ orderId, invoiceIdsBefore }) => {
+    () => {
+      const observe = async ({ orderId, invoiceIdsBefore }: InvoiceRunInput) => {
         const orders = await qc.fetchQuery({ ...saleOrdersQueryOptions(organizationId), staleTime: 0 })
         return observeCreatedInvoice(orderId, invoiceIdsBefore, orders as unknown as RowValueMap[])
-      },
-    }),
+      }
+      return {
+        id: "sales.order.create-invoice",
+        command: (input) =>
+          executeCommandWithAppliedRecovery(
+            () => createInvoiceFromSaleOrderCommand({ orderId: input.orderId, params: input.params }),
+            () => observe(input),
+          ),
+        affects: CREATE_INVOICE_FROM_SALE_ORDER_AFFECTS,
+        observe,
+      }
+    },
     [qc, organizationId],
   )
 

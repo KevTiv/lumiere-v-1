@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 
-import { accountMoveHref, saleOrderHref, stockPickingHref } from "@lumiere/erp-shared/record-links"
+import { accountMoveHref, returnOrderHref, saleOrderHref, stockPickingHref } from "@lumiere/erp-shared/record-links"
 import type { OrderHandoffs } from "@lumiere/query-hooks/hooks/order-to-cash"
 import type { CrossRecordLinks as Result } from "@lumiere/query-hooks/hooks/cross-record-links"
 
@@ -46,7 +46,7 @@ export function OrderHandoffLinks({
   pickingLabel?: string
   invoiceLabel?: string
 }) {
-  if (handoffs.pickings.length === 0 && handoffs.invoices.length === 0) {
+  if (handoffs.pickings.length === 0 && handoffs.invoices.length === 0 && (handoffs.returns?.length ?? 0) === 0) {
     return <span className="text-muted-foreground" data-testid={`${testIdPrefix}-none`}>{emptyLabel}</span>
   }
   return (
@@ -67,6 +67,14 @@ export function OrderHandoffLinks({
           <span className="ml-2 text-muted-foreground">
             {invoice.state}{invoice.residual > 0 ? ` · open ${invoice.residual.toFixed(2)}` : ""}
           </span>
+        </li>
+      ))}
+      {(handoffs.returns ?? []).map((returned) => (
+        <li key={`r${returned.id}`}>
+          <Link className="underline underline-offset-2" href={returnOrderHref(returned.id)} data-testid={`${testIdPrefix}-return-${returned.id}`}>
+            {returned.name || `Return #${returned.id}`}
+          </Link>
+          <span className="ml-2 text-muted-foreground">{returned.state}</span>
         </li>
       ))}
     </ul>

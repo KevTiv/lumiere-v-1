@@ -63,6 +63,22 @@ test.describe(
         smokeName("cov06c-quant"),
         3,
       )
+      const raceSourceLocationId = await createInternalLocation(
+        page,
+        smokeName("cov06c-race-src"),
+      )
+      const raceTargetLocationId = await createInternalLocation(
+        page,
+        smokeName("cov06c-race-dst"),
+      )
+      const raceQuantId = await createStockQuantFixture(
+        page,
+        companyId,
+        productId,
+        raceSourceLocationId,
+        smokeName("cov06c-race-quant"),
+        3,
+      )
 
       expect(await fetchQuantById(page, sourceQuantId)).toMatchObject({
         id: sourceQuantId,
@@ -165,6 +181,45 @@ test.describe(
             targetLocationId,
           ),
         ).toEqual([destination])
+
+        // Two operators act on the same three available units from the same
+        // snapshot.  Exactly one two-unit move may commit; the competing
+        // request must observe the updated stock and fail without overdraw.
+        const [raceA, raceB] = await Promise.all([
+          moveQuantRequest(
+            warehousePage,
+            companyId,
+            raceQuantId,
+            raceTargetLocationId,
+            2,
+          ),
+          moveQuantRequest(
+            warehousePage,
+            companyId,
+            raceQuantId,
+            raceTargetLocationId,
+            2,
+          ),
+        ])
+        expect([raceA.status(), raceB.status()].sort()).toEqual([200, 422])
+        const raceSource = await fetchQuantById(page, raceQuantId)
+        const raceDestinations = await fetchQuantsAtProductLocation(
+          page,
+          productId,
+          raceTargetLocationId,
+        )
+        expect(raceSource).toMatchObject({
+          quantity: 1,
+          availableQuantity: 1,
+          reservedQuantity: 0,
+        })
+        expect(raceDestinations).toHaveLength(1)
+        expect(raceDestinations[0]).toMatchObject({
+          quantity: 2,
+          availableQuantity: 2,
+          reservedQuantity: 0,
+        })
+        expect((raceSource?.quantity ?? 0) + raceDestinations[0]!.quantity).toBe(3)
 
         await signIn(
           readerPage,

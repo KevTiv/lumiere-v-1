@@ -49,6 +49,7 @@ interface TimestampProjection {
 }
 
 export type PickingHandoff = { readonly id: bigint; readonly state: string; readonly name: string }
+export type ReturnHandoff = { readonly id: bigint; readonly state: string; readonly name: string }
 export type InvoiceHandoff = {
   readonly id: bigint
   readonly state: string
@@ -60,6 +61,8 @@ export type InvoiceHandoff = {
 export type OrderHandoffs = {
   readonly pickings: readonly PickingHandoff[]
   readonly invoices: readonly InvoiceHandoff[]
+  /** Sales-only reverse relation; Purchasing handoff builders omit it. */
+  readonly returns?: readonly ReturnHandoff[]
 }
 
 export type OrderToCashException =
@@ -134,6 +137,7 @@ export function orderHandoffs(
   scope: OrderToCashScope,
   pickings: readonly OrderToCashProjection[],
   moves: readonly OrderToCashProjection[],
+  returns: readonly OrderToCashProjection[] = [],
 ): OrderHandoffs {
   const deliveries: PickingHandoff[] = []
   for (const picking of pickings) {
@@ -163,7 +167,20 @@ export function orderHandoffs(
       dueMicros: timestampMicros(move.invoiceDateDue ?? move.invoice_date_due),
     })
   }
-  return { pickings: byId(deliveries), invoices: byId(invoices) }
+  const linkedReturns: ReturnHandoff[] = []
+  for (const returned of returns) {
+    const id = parseStrictU64(returned.id)
+    if (id == null || !inScope(returned, scope)) continue
+    if (parseStrictU64(returned.saleOrderId ?? returned.sale_order_id) !== orderId) continue
+    const state = stateName(returned.state)
+    if (state === "cancel" || state === "cancelled") continue
+    linkedReturns.push({ id, state, name: String(returned.name ?? "") })
+  }
+  return {
+    pickings: byId(deliveries),
+    invoices: byId(invoices),
+    returns: byId(linkedReturns),
+  }
 }
 
 function partnerOnHold(

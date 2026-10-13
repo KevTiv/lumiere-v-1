@@ -1,5 +1,5 @@
 //! Wave E purchasing gap-fix domain tests.
-use spacetimedb::{ReducerContext, Table};
+use spacetimedb::{Identity, ReducerContext, Table};
 
 use crate::accounting::chart_of_accounts::{
     account_journal, create_account_journal, CreateAccountJournalParams,
@@ -179,7 +179,35 @@ pub fn test_requisition_convert_copies_lines(ctx: &ReducerContext) -> Result<(),
     }
 
     submit_purchase_requisition(ctx, org_id, requisition.id)?;
+    let self_approval = approve_purchase_requisition(ctx, org_id, requisition.id)
+        .err()
+        .ok_or("requester self-approved purchase requisition")?;
+    if !self_approval.contains("Requester cannot approve") {
+        return Err(format!("unexpected self-approval error: {self_approval}"));
+    }
+    let independent_requester = Identity::from_byte_array([0x5a; 32]);
+    ctx.db
+        .purchase_requisition()
+        .id()
+        .update(crate::purchasing::purchase_orders::PurchaseRequisition {
+            user_id: independent_requester,
+            ..ctx
+                .db
+                .purchase_requisition()
+                .id()
+                .find(&requisition.id)
+                .ok_or("submitted requisition missing")?
+        });
     approve_purchase_requisition(ctx, org_id, requisition.id)?;
+    let approved = ctx
+        .db
+        .purchase_requisition()
+        .id()
+        .find(&requisition.id)
+        .ok_or("approved requisition missing")?;
+    if approved.write_uid != ctx.sender() || approved.user_id != independent_requester {
+        return Err("purchase requisition did not record the independent approver".into());
+    }
     convert_purchase_requisition_to_po(ctx, org_id, company_id, requisition.id)?;
 
     let po = ctx

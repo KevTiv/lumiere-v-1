@@ -31,6 +31,7 @@ const byId = (moduleId: string, tabId: string) => (id: RecordId) =>
   moduleTabHref(moduleId, tabId, { id: String(id) })
 
 export const saleOrderHref = byId("sales", "orders")
+export const returnOrderHref = byId("sales", "returns")
 export const purchaseOrderHref = byId("purchasing", "orders")
 export const stockPickingHref = byId("inventory", "transfers")
 /**

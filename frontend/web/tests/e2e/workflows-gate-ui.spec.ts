@@ -56,7 +56,7 @@ test.describe("Gate UI — workflows and approvals", { tag: ["@gate-ui", "@p0"] 
     await expectNoAppError(page)
   })
 
-  test("creates a workflow, publishes a seeded draft, and simulates from the version dialog", async ({
+  test("creates a workflow, publishes, simulates, and retires from the version dialog", async ({
     page,
   }) => {
     test.setTimeout(180_000)
@@ -105,6 +105,17 @@ test.describe("Gate UI — workflows and approvals", { tag: ["@gate-ui", "@p0"] 
     await page.getByTestId("workflow-version-simulate").click()
     const simulateRes = await simulateWait
     expect(simulateRes.ok(), await simulateRes.text()).toBe(true)
+
+    await openWorkflowVersionRow(page, seeded.versionId)
+    await expect(page.getByTestId("workflow-version-retire")).toBeVisible()
+    const retireWait = page.waitForResponse(
+      (res) => matchesOperationResponse(res, "retire_workflow_version"),
+      { timeout: 30_000 },
+    )
+    await page.getByTestId("workflow-version-retire").click()
+    const retireRes = await retireWait
+    expect(retireRes.ok(), await retireRes.text()).toBe(true)
+    await waitForWorkflowVersionStatus(page, seeded.versionId, "Retired")
     await expectNoAppError(page)
   })
 

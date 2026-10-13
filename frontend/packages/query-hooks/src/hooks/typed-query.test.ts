@@ -1,7 +1,10 @@
 import assert from "node:assert/strict"
 import { test } from "node:test"
 import { QueryClient, type QueryKey } from "@tanstack/react-query"
-import { resolveAllowedActiveCompanyId } from "@lumiere/erp-session"
+import {
+  resolveAllowedActiveCompanyId,
+  resolveRequestedActiveCompanyId,
+} from "@lumiere/erp-session"
 import { SUBSCRIPTIONS_WORKSPACE_RESOURCE_KEYS } from "@lumiere/stdb/subscriptions"
 
 import {
@@ -28,6 +31,9 @@ test("a fresh session resolves its first authorized company for typed reads", ()
   assert.equal(resolveAllowedActiveCompanyId(null, [42]), 42)
   assert.equal(resolveAllowedActiveCompanyId(7, [42, 7]), 7)
   assert.equal(resolveAllowedActiveCompanyId(99, [42, 7]), 42)
+  assert.equal(resolveRequestedActiveCompanyId(7, [42, 7]), 7)
+  assert.equal(resolveRequestedActiveCompanyId(99, [42, 7]), null)
+  assert.equal(resolveRequestedActiveCompanyId(Number.NaN, [42, 7]), null)
 })
 
 test("resource invalidation always includes the typed HTTP namespace", () => {
