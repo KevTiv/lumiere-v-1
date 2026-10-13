@@ -34,7 +34,7 @@ import {
 } from "@lumiere/query-hooks/hooks/organization-company"
 import { useUpdateOrganization, useUpsertOrganizationSettings, useCreateCountry, useCreateCurrency } from "@lumiere/query-hooks/hooks/settings"
 import { useErpSession } from "@lumiere/erp-session"
-import { CsvImportModal, csvImportForm, FormModal } from "@lumiere/ui"
+import { CSV_IMPORT_CONTRACTS, CsvImportModal, csvImportForm, FormModal } from "@lumiere/ui"
 import { hasValidOrganizationId } from "@/lib/org-scoped"
 import { ModularForm } from "../forms/modular-form"
 import { mergeFieldDefaultValues, mergeSelectOptionsByFieldName } from "../lib/form-config-merge"
@@ -315,6 +315,8 @@ export function OrganizationSettings() {
 
   const countryFormConfig = useMemo(() => createCountryForm(t), [t])
   const currencyFormConfig = useMemo(() => createCurrencyForm(t), [t])
+  const canImportCsv = (kind: OrgMasterCsvKind) =>
+    checkPermission(CSV_IMPORT_CONTRACTS[kind].resource, "create").allowed
   const canManageReference = isAdmin() || checkPermission("admin:organization", "manage").allowed
   const canManagePrivacyOps = isAdmin() || checkPermission("admin:organization", "manage").allowed
 
@@ -1140,12 +1142,16 @@ export function OrganizationSettings() {
             </div>
           </CardHeader>
           <CardContent className="flex flex-wrap gap-2">
-            <Button type="button" variant="outline" size="sm" onClick={() => setCsvKind("country")}>
-              {t("settings.organization.csvImport.toolbarCountries")}
-            </Button>
-            <Button type="button" variant="outline" size="sm" onClick={() => setCsvKind("currency")}>
-              {t("settings.organization.csvImport.toolbarCurrencies")}
-            </Button>
+            {canImportCsv("country") ? (
+              <Button type="button" variant="outline" size="sm" onClick={() => setCsvKind("country")}>
+                {t("settings.organization.csvImport.toolbarCountries")}
+              </Button>
+            ) : null}
+            {canImportCsv("currency") ? (
+              <Button type="button" variant="outline" size="sm" onClick={() => setCsvKind("currency")}>
+                {t("settings.organization.csvImport.toolbarCurrencies")}
+              </Button>
+            ) : null}
             {canManageReference ? (
               <>
                 <Button
@@ -1172,18 +1178,26 @@ export function OrganizationSettings() {
                 </Button>
               </>
             ) : null}
-            <Button type="button" variant="outline" size="sm" onClick={() => setCsvKind("currencyRate")}>
-              {t("settings.organization.csvImport.toolbarCurrencyRates")}
-            </Button>
-            <Button type="button" variant="outline" size="sm" onClick={() => setCsvKind("company")}>
-              {t("settings.organization.csvImport.toolbarCompanies")}
-            </Button>
-            <Button type="button" variant="outline" size="sm" onClick={() => setCsvKind("role")}>
-              {t("settings.organization.csvImport.toolbarRoles")}
-            </Button>
-            <Button type="button" variant="outline" size="sm" onClick={() => setCsvKind("aiAgent")}>
-              {t("settings.organization.csvImport.toolbarAiAgents")}
-            </Button>
+            {canImportCsv("currencyRate") ? (
+              <Button type="button" variant="outline" size="sm" onClick={() => setCsvKind("currencyRate")}>
+                {t("settings.organization.csvImport.toolbarCurrencyRates")}
+              </Button>
+            ) : null}
+            {canImportCsv("company") ? (
+              <Button type="button" variant="outline" size="sm" onClick={() => setCsvKind("company")}>
+                {t("settings.organization.csvImport.toolbarCompanies")}
+              </Button>
+            ) : null}
+            {canImportCsv("role") ? (
+              <Button type="button" variant="outline" size="sm" onClick={() => setCsvKind("role")}>
+                {t("settings.organization.csvImport.toolbarRoles")}
+              </Button>
+            ) : null}
+            {canImportCsv("aiAgent") ? (
+              <Button type="button" variant="outline" size="sm" onClick={() => setCsvKind("aiAgent")}>
+                {t("settings.organization.csvImport.toolbarAiAgents")}
+              </Button>
+            ) : null}
           </CardContent>
         </Card>
       ) : null}
@@ -1348,6 +1362,8 @@ export function OrganizationSettings() {
           key={csvKind}
           onClose={() => setCsvKind(null)}
           config={csvFormConfig}
+          columns={CSV_IMPORT_CONTRACTS[csvKind]}
+          templateFileName={`organization-${csvKind}-import-template.csv`}
           onImport={async (text) => {
             if (csvKind === "country") await csvImports.importCountry.mutateAsync(text)
             else if (csvKind === "currency") await csvImports.importCurrency.mutateAsync(text)
