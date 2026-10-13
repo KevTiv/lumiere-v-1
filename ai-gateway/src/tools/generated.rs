@@ -92,6 +92,18 @@ pub(crate) struct PreparedGeneratedRead {
     pub max_bytes: u64,
 }
 
+/// The generated capabilities that one invocation may expose and execute.
+///
+/// Both fields are derived from the same intersection so an execution adapter
+/// cannot accidentally retain an actor grant for a tool that the released
+/// skill did not declare. Callers must rebuild this view from current actor
+/// grants for each invocation; it is deliberately not a long-lived cache.
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct EffectiveGeneratedCapabilityView {
+    pub specs: Vec<ToolSpec>,
+    pub grants: Vec<GeneratedReadGrant>,
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Risk {
     ReadOnly,
@@ -143,6 +155,7 @@ impl GeneratedCatalog {
     /// input schema are advertisable. An entry without one is fail-closed:
     /// it is omitted here, so a model can never be offered a capability whose
     /// input contract nobody derived.
+    #[cfg(test)]
     pub(crate) fn specs(&self) -> Result<Vec<ToolSpec>, GeneratedCatalogError> {
         Ok(self
             .entries
@@ -156,36 +169,81 @@ impl GeneratedCatalog {
             .collect())
     }
 
+    #[cfg(test)]
     pub(crate) fn specs_for_grants(
         &self,
         grants: &[GeneratedReadGrant],
     ) -> Result<Vec<ToolSpec>, GeneratedCatalogError> {
+        let declared = self
+            .entries
+            .iter()
+            .filter_map(|entry| entry.tool.as_ref().map(|tool| tool.name.clone()))
+            .collect::<Vec<_>>();
+        Ok(self.effective_view(&declared, grants)?.specs)
+    }
+
+    /// Intersect a released skill's exact tool declarations with the reviewed
+    /// generated catalog and the actor's current grants.
+    ///
+    /// Repeated grant rows are treated as independent restrictions: the
+    /// smallest row and byte limits win, including zero (revocation). Reviewed
+    /// result-policy limits remain hard ceilings.
+    pub(crate) fn effective_view(
+        &self,
+        declared_tool_names: &[String],
+        grants: &[GeneratedReadGrant],
+    ) -> Result<EffectiveGeneratedCapabilityView, GeneratedCatalogError> {
+        let declared = declared_tool_names
+            .iter()
+            .map(String::as_str)
+            .collect::<HashSet<_>>();
         let mut specs = Vec::new();
+        let mut effective_grants = Vec::new();
         for entry in &self.entries {
             let Some(tool) = &entry.tool else {
                 continue;
             };
-            let Some(grant) = grants
-                .iter()
-                .find(|grant| grant.capability_key == entry.capability_key)
+            if !declared.contains(tool.name.as_str())
+                || entry.risk != Risk::ReadOnly
+                || entry.requires_confirmation
+                || !matches!(&entry.target, Target::Resource { .. })
+            {
+                continue;
+            }
+            let Some((actor_rows, actor_bytes)) =
+                effective_grant_bounds(grants, &entry.capability_key)
             else {
                 continue;
             };
-            if grant.max_rows == 0 || grant.max_bytes == 0 {
-                continue;
-            }
-            let ResultPolicy::Dataset { max_rows, .. } = entry.result_policy else {
+            let ResultPolicy::Dataset {
+                max_rows: reviewed_rows,
+                max_bytes: reviewed_bytes,
+            } = &entry.result_policy
+            else {
                 continue;
             };
+            let max_rows = actor_rows.min(*reviewed_rows);
+            let max_bytes = actor_bytes.min(*reviewed_bytes);
+            if max_rows == 0 || max_bytes == 0 {
+                continue;
+            }
             let mut parameters = tool.input_schema.clone();
-            parameters["properties"]["max_rows"]["maximum"] = grant.max_rows.min(max_rows).into();
+            parameters["properties"]["max_rows"]["maximum"] = max_rows.into();
             specs.push(ToolSpec {
                 name: tool.name.clone(),
                 description: tool.description.clone(),
                 parameters,
             });
+            effective_grants.push(GeneratedReadGrant {
+                capability_key: entry.capability_key.clone(),
+                max_rows,
+                max_bytes,
+            });
         }
-        Ok(specs)
+        Ok(EffectiveGeneratedCapabilityView {
+            specs,
+            grants: effective_grants,
+        })
     }
 
     pub(crate) fn advertises(&self, tool_name: &str) -> bool {
@@ -240,11 +298,9 @@ impl GeneratedCatalog {
                 "generated read does not have a dataset result policy",
             ));
         };
-        let grant = grants
-            .iter()
-            .find(|grant| grant.capability_key == entry.capability_key)
+        let (actor_rows, actor_bytes) = effective_grant_bounds(grants, &entry.capability_key)
             .ok_or_else(|| invalid("actor has no grant for the generated capability"))?;
-        if grant.max_rows == 0 || grant.max_bytes == 0 {
+        if actor_rows == 0 || actor_bytes == 0 {
             return Err(invalid("actor grant limits must be positive"));
         }
 
@@ -263,7 +319,7 @@ impl GeneratedCatalog {
                 "requested company does not match the trusted run scope",
             ));
         }
-        let effective_rows = (*reviewed_rows).min(grant.max_rows);
+        let effective_rows = (*reviewed_rows).min(actor_rows);
         let requested_rows = optional_positive(object, "max_rows")?.unwrap_or(effective_rows);
         if requested_rows > effective_rows {
             return Err(invalid(
@@ -277,9 +333,20 @@ impl GeneratedCatalog {
             resource: resource.clone(),
             company_id,
             max_rows: requested_rows,
-            max_bytes: (*reviewed_bytes).min(grant.max_bytes),
+            max_bytes: (*reviewed_bytes).min(actor_bytes),
         })
     }
+}
+
+fn effective_grant_bounds(
+    grants: &[GeneratedReadGrant],
+    capability_key: &str,
+) -> Option<(u64, u64)> {
+    grants
+        .iter()
+        .filter(|grant| grant.capability_key == capability_key)
+        .map(|grant| (grant.max_rows, grant.max_bytes))
+        .reduce(|left, right| (left.0.min(right.0), left.1.min(right.1)))
 }
 
 fn optional_positive(
@@ -785,6 +852,86 @@ mod tests {
             .specs_for_grants(&[])
             .expect("denied specs")
             .is_empty());
+    }
+
+    #[test]
+    fn effective_view_intersects_skill_catalog_and_actor_grants() {
+        let catalog = parse_catalog(&artifact(json!([advertisable()])).to_string())
+            .expect("valid advertisable entry");
+        let grants = [GeneratedReadGrant {
+            capability_key: "erp.read.a".into(),
+            max_rows: 10,
+            max_bytes: 2_048,
+        }];
+
+        let undeclared = catalog
+            .effective_view(&[], &grants)
+            .expect("empty intersection");
+        assert!(undeclared.specs.is_empty());
+        assert!(undeclared.grants.is_empty());
+
+        let effective = catalog
+            .effective_view(&["erp_read_a".into()], &grants)
+            .expect("effective view");
+        assert_eq!(effective.specs.len(), 1);
+        assert_eq!(effective.specs[0].name, "erp_read_a");
+        assert_eq!(
+            effective.specs[0].parameters["properties"]["max_rows"]["maximum"],
+            json!(10)
+        );
+        assert_eq!(effective.grants, grants);
+    }
+
+    #[test]
+    fn duplicate_and_revoked_grants_can_only_narrow_effective_bounds() {
+        let catalog = parse_catalog(&artifact(json!([advertisable()])).to_string())
+            .expect("valid advertisable entry");
+        let declared = ["erp_read_a".into()];
+        let narrowed = [
+            GeneratedReadGrant {
+                capability_key: "erp.read.a".into(),
+                max_rows: 20,
+                max_bytes: 3_000,
+            },
+            GeneratedReadGrant {
+                capability_key: "erp.read.a".into(),
+                max_rows: 4,
+                max_bytes: 1_000,
+            },
+        ];
+        let effective = catalog
+            .effective_view(&declared, &narrowed)
+            .expect("narrowed view");
+        assert_eq!(
+            effective.grants,
+            [GeneratedReadGrant {
+                capability_key: "erp.read.a".into(),
+                max_rows: 4,
+                max_bytes: 1_000,
+            }]
+        );
+        let prepared = catalog
+            .prepare_read("erp_read_a", &json!({}), 7, &narrowed)
+            .expect("narrowed read");
+        assert_eq!(prepared.max_rows, 4);
+        assert_eq!(prepared.max_bytes, 1_000);
+
+        let revoked = [
+            narrowed[0].clone(),
+            GeneratedReadGrant {
+                capability_key: "erp.read.a".into(),
+                max_rows: 0,
+                max_bytes: 1_000,
+            },
+        ];
+        let next_invocation = catalog
+            .effective_view(&declared, &revoked)
+            .expect("revoked view");
+        assert!(next_invocation.specs.is_empty());
+        assert!(next_invocation.grants.is_empty());
+        assert!(catalog
+            .prepare_read("erp_read_a", &json!({}), 7, &revoked)
+            .is_err());
     }
 
     #[test]

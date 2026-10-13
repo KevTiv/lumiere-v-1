@@ -74,7 +74,7 @@ use crate::{
     },
     state::AppState,
     tools::{
-        generated_read::{resolve_actor_grants, GeneratedReadTools},
+        generated_read::GeneratedReadTools,
         registry::{persist_step, ToolRegistry},
         types::{hash_tool_input, SkillCitation, ToolContext},
     },
@@ -846,14 +846,27 @@ pub async fn run_skill_admitted(
         };
 
         let graph = catalog.graph;
-        let generated_grants = if graph_requests_generated_capabilities(&graph)? {
-            resolve_actor_grants(&tool_ctx).await?
+        // These names are deterministic graph instructions, not provider tool
+        // advertisements. The execution adapter intersects them with the
+        // reviewed catalog and freshly fetched actor grants on every call.
+        let generated_tool_names = if graph_requests_generated_capabilities(&graph)? {
+            let catalog = crate::tools::generated::embedded_catalog()?;
+            graph
+                .nodes
+                .iter()
+                .filter_map(|node| match &node.kind {
+                    DecisionNode::Capability(capability) => Some(capability.capability.clone()),
+                    DecisionNode::AcquireEvidence(acquire) => Some(acquire.capability.clone()),
+                    _ => None,
+                })
+                .filter(|name| catalog.advertises(name))
+                .collect::<Vec<_>>()
         } else {
             Vec::new()
         };
         let loop_tools = AuthorizedLoopTools {
             view: &view,
-            generated: GeneratedReadTools::new(&generated_grants),
+            generated: GeneratedReadTools::new(&generated_tool_names),
             context: &tool_ctx,
         };
         let capability_admission = PolicyBackedCapabilityAdmission::new(&policy);
