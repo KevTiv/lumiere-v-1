@@ -269,6 +269,7 @@
       "frontend/web/tests/e2e/analytics-lifecycle.spec.ts",
       "frontend/web/tests/e2e/auth-permission-enforcement.spec.ts",
       "frontend/web/tests/e2e/bank-statement-import.spec.ts",
+      "frontend/web/tests/e2e/cov04-sales-order-confirmation.spec.ts",
       "frontend/web/tests/e2e/cov09-hr-leave-approval.spec.ts",
       "frontend/web/tests/e2e/cov11-expense-sheet-lifecycle.spec.ts",
       "frontend/web/tests/e2e/cov13-pos-session-close.spec.ts",
