@@ -93,6 +93,32 @@ async fn postgres_migration_13_adds_manufacturing_cost_projection_14() -> Result
     Ok(())
 }
 
+#[tokio::test]
+async fn postgres_migration_14_adds_ai_recovery_attribution_15() -> Result<()> {
+    if std::env::var("C4_TEST_PG").as_deref() != Ok("1") {
+        eprintln!(
+            "skipping postgres_migration_14_adds_ai_recovery_attribution_15 (set C4_TEST_PG=1 to run)"
+        );
+        return Ok(());
+    }
+
+    let base_config = pg_pool::PgConfig::from_env()?;
+    let database = unique_database_name()?;
+    let admin_pool = admin_pool(&base_config)?;
+    create_database(&admin_pool, &database, &base_config.user).await?;
+
+    let mut test_config = base_config.clone();
+    test_config.database.clone_from(&database);
+    let test_pool = pg_pool::build_pool(&test_config)?;
+    let test_result = exercise_ai_recovery_attribution_upgrade(&test_pool).await;
+    drop(test_pool);
+    let cleanup_result = drop_database(&admin_pool, &database).await;
+
+    test_result?;
+    cleanup_result?;
+    Ok(())
+}
+
 async fn exercise_durable_projection_upgrade(pool: &Pool) -> Result<()> {
     let migration_11_index = "cold_tier_service_identity_identity";
     let frozen_migration_1 =
@@ -177,6 +203,46 @@ async fn exercise_manufacturing_cost_projection_upgrade(pool: &Pool) -> Result<(
     Ok(())
 }
 
+async fn exercise_ai_recovery_attribution_upgrade(pool: &Pool) -> Result<()> {
+    let migration_15_index = MIGRATIONS
+        .iter()
+        .position(|migration| migration.version == 15)
+        .context("migration 15 is missing from the catalog")?;
+    let frozen_migration_15 = include_str!(
+        "../../../../lumiere-codegen/pg-migration-ledger/0015_durable_projection_delta.sql"
+    );
+    ensure!(MIGRATIONS[migration_15_index].name == "ai_provider_attempt_recovery_attribution");
+    ensure!(MIGRATIONS[migration_15_index].sql == frozen_migration_15);
+
+    apply_migration_prefix(pool, migration_15_index).await?;
+    let previous_history = applied_migration_history(pool).await?;
+    let columns = [
+        "recovery_actor",
+        "recovery_approval_id",
+        "recovery_at",
+        "reconciliation_actor",
+        "reconciliation_approval_id",
+    ];
+    for column in columns {
+        ensure!(!column_exists(pool, "ai_provider_attempt", column).await?);
+    }
+
+    ensure_schema(pool).await?;
+
+    ensure!(
+        applied_migration_history(pool).await?[..migration_15_index] == previous_history,
+        "AI recovery migration changed prior migration history"
+    );
+    ensure!(applied_checksum(pool, 15).await? == migration_checksum(frozen_migration_15));
+    for column in columns {
+        ensure!(column_exists(pool, "ai_provider_attempt", column).await?);
+    }
+
+    ensure_schema(pool).await?;
+    ensure!(migration_count(pool).await? == MIGRATIONS.len() as i64);
+    Ok(())
+}
+
 type AppliedMigrationHistory = (i64, String, i64, String, String, String);
 
 async fn applied_migration_history(pool: &Pool) -> Result<Vec<AppliedMigrationHistory>> {
@@ -232,6 +298,17 @@ async fn relation_exists(pool: &Pool, relation: &str) -> Result<bool> {
     let client = pool.get().await?;
     Ok(client
         .query_one("select to_regclass($1) is not null", &[&relation])
+        .await?
+        .get(0))
+}
+
+async fn column_exists(pool: &Pool, table: &str, column: &str) -> Result<bool> {
+    let client = pool.get().await?;
+    Ok(client
+        .query_one(
+            "select exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = $1 and column_name = $2)",
+            &[&table, &column],
+        )
         .await?
         .get(0))
 }
