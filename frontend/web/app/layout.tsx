@@ -7,7 +7,7 @@ import './globals.css'
 
 import { getBrowserStdbSession, hasAuthenticatedIdentity } from '@/lib/browser-session'
 import { requireServerQueryRows, serverFetchQueryListState } from '@/lib/server-query'
-import { resolveSessionCompanyIds } from '@/lib/session-company-scope'
+import { resolveSessionCompanyIds, resolveSessionRoleNames } from '@/lib/session-company-scope'
 
 export const metadata: Metadata = {
   title: 'Lumiere ERP',
@@ -42,34 +42,24 @@ export default async function RootLayout({
   const fieldAccess = session?.fieldAccess
 
   let serverRoleNames: string[] = []
-  if (identityHex && session) {
+  let companyIds: readonly number[] | undefined
+  if (identityHex && organizationId != null && session) {
     {
-      const [assignmentsState, rolesState] = await Promise.all([
+      const [assignmentsState, rolesState, companiesState, membershipsState] = await Promise.all([
         serverFetchQueryListState(session, "user-roles"),
         serverFetchQueryListState(session, "roles"),
-      ])
-      const assignments = requireServerQueryRows(assignmentsState, "user-roles")
-      const allRoles = requireServerQueryRows(rolesState, "roles")
-      const assignedIds = new Set(
-        assignments
-          .filter((a) => a["isActive"])
-          .map((a) => String(a["roleId"]))
-      )
-      serverRoleNames = allRoles
-        .filter((r) => assignedIds.has(String(r["id"])))
-        .map((r) => String(r["name"]))
-    }
-  }
-
-  let companyIds: readonly number[] | undefined
-  if (organizationId != null && session) {
-    {
-      const [companiesState, membershipsState] = await Promise.all([
         serverFetchQueryListState(session, "companies"),
         serverFetchQueryListState(session, "user-organization"),
       ])
+      const assignments = requireServerQueryRows(assignmentsState, "user-roles")
+      const allRoles = requireServerQueryRows(rolesState, "roles")
       const companies = requireServerQueryRows(companiesState, "companies")
       const memberships = requireServerQueryRows(membershipsState, "user-organization")
+      serverRoleNames = resolveSessionRoleNames({
+        roles: allRoles,
+        memberships,
+        assignments,
+      })
       const validCompanies = companies
         .map((row) => ({
           id: Number(row["id"]),

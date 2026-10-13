@@ -1394,7 +1394,17 @@ test.describe("CRM authenticated read isolation", { tag: ["@p0", "@crm"] }, () =
       const crossCompanyQuery = await alpha.page.request.get(
         `/api/query/contacts?companyId=${alpha.branchCompanyId}`,
       )
-      expect(crossCompanyQuery.status()).toBe(403)
+      expect(crossCompanyQuery.status()).toBe(200)
+      const crossCompanyRows = ((await crossCompanyQuery.json()) as { data?: QueryRow[] }).data ?? []
+      expect(
+        crossCompanyRows.some((row) => valueAsString(row, "name") === alpha.branchContactName),
+      ).toBe(true)
+      expect(
+        crossCompanyRows.some((row) => valueAsString(row, "name") === alpha.mainContactName),
+      ).toBe(false)
+      expect(
+        crossCompanyRows.some((row) => valueAsString(row, "name") === beta.branchContactName),
+      ).toBe(false)
 
       const branchToMainQuery = await alpha.branchPage.request.get(
         `/api/query/contacts?companyId=${alpha.mainCompanyId}`,
