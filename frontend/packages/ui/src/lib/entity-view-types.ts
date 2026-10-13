@@ -174,6 +174,16 @@ export interface EntityTableConfig {
     actionLabel?: string
     onAction?: () => void
     icon?: ReactNode
+    /** Gates `onAction`: without it the CTA is replaced by `readOnlyMessage`. */
+    permission?: EntitySurfacePermission
+    /** `id` of an `actions` entry used as the primary CTA; it reuses that action's permission and handler. */
+    primaryActionId?: string
+    /** `id` of an `actions` entry offered next to the primary CTA, e.g. a CSV import. */
+    secondaryActionId?: string
+    /** A short "why this matters" or "learn how" line under the CTAs. */
+    learnHint?: string
+    /** Shown instead of the CTA when the user may not create records. */
+    readOnlyMessage?: string
   }
 }
 

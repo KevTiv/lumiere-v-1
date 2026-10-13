@@ -161,6 +161,11 @@ export interface RBACContext {
   checkPermission: (resource: Resource, action: Action) => PermissionCheckResult
   hasRole: (roleId: string) => boolean
   isAdmin: () => boolean
+  /**
+   * False while the signed-in user's roles/policies are still loading, so `checkPermission` would
+   * deny everyone. Absent means ready. UI that hides controls on denial should not do so until ready.
+   */
+  permissionsReady?: boolean
 }
 
 // Settings module configuration

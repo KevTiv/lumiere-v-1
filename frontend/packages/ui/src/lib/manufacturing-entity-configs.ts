@@ -91,6 +91,13 @@ export const manufacturingOrdersTableConfig = (t: TFunction): EntityViewConfig =
       { key: "origin", label: t("manufacturing.manufacturingOrders.columns.origin"), width: "min-w-24" },
     ],
     emptyMessage: t("manufacturing.manufacturingOrders.emptyMessage"),
+    emptyState: {
+      title: t("manufacturing.manufacturingOrders.emptyMessage"),
+      description: t("manufacturing.manufacturingOrders.emptyState.description", { defaultValue: "Manufacturing orders consume components and produce finished goods, keeping stock and costs in step with the shop floor." }),
+      permission: { resource: "mrp_production", action: "create" },
+      secondaryActionId: "csv-mo",
+      learnHint: t("manufacturing.manufacturingOrders.emptyState.hint", { defaultValue: "Define a bill of materials first so orders know what to consume." }),
+    },
   },
 })
 

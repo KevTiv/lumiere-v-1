@@ -58,6 +58,12 @@ export const subscriptionsTableConfig = (
       { key: "recurringNextDate", label: t("subscriptions.subscriptions.columns.recurringNextDate"), type: "date" },
     ],
     emptyMessage: t("subscriptions.subscriptions.emptyMessage"),
+    emptyState: {
+      title: t("subscriptions.subscriptions.emptyMessage"),
+      description: t("subscriptions.subscriptions.emptyState.description", { defaultValue: "Subscriptions bill customers on a schedule and drive recurring revenue reporting." }),
+      permission: { resource: "subscription", action: "create" },
+      learnHint: t("subscriptions.subscriptions.emptyState.hint", { defaultValue: "Create a plan first, then attach it to a customer's subscription." }),
+    },
     ...(actions?.length ? { actions } : {}),
   },
 })
