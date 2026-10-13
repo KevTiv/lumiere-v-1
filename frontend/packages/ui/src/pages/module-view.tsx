@@ -1,5 +1,8 @@
 "use client"
 
+import { ModuleDataNotice } from "./module-data-notice"
+import type { ModuleDataState } from "../lib/module-data-state"
+
 import { useEffect, useRef, useState, useCallback } from "react"
 import { useErpSession } from "@lumiere/erp-session"
 import { buildEntitySelection, resolveAiEntityType } from "@lumiere/query-hooks/ai-ui-context"
@@ -56,6 +59,8 @@ interface ModuleViewProps {
   entityBoardContext?: Record<string, EntityBoardRuntimeContext>
   /** Per-tab loading flags keyed by tab id — forwarded to EntityTable as skeleton rows. */
   dataLoading?: Record<string, boolean>
+  /** Explicit collection status. Failed or denied reads must not look like empty lists. */
+  dataState?: Record<string, ModuleDataState>
   /** Dashboard time range — shown in header only on the dashboard tab. */
   dashboardTimeRange?: TimeRangeValue
   onDashboardTimeRangeChange?: (value: TimeRangeValue) => void
@@ -86,6 +91,7 @@ export function ModuleView({
   isPending,
   entityBoardContext,
   dataLoading,
+  dataState,
   dashboardTimeRange,
   onDashboardTimeRangeChange,
   urlFilters: urlFiltersProp,
@@ -160,7 +166,8 @@ export function ModuleView({
   const activeTabConfig = config.tabs.find((tab) => tab.id === activeTab)
   const showDashboardTimeRange =
     activeTabConfig?.type === "dashboard" && onDashboardTimeRangeChange != null
-  const showDashboardExport = activeTabConfig?.type === "dashboard"
+  const showDashboardExport = activeTabConfig?.type === "dashboard" &&
+    dataState?.[activeTab]?.status !== "error" && dataState?.[activeTab]?.status !== "denied"
 
   return (
     <div
@@ -189,7 +196,7 @@ export function ModuleView({
           variant="line"
           className="h-auto w-max min-w-full justify-start gap-1 border-b border-border p-0 group-data-horizontal/tabs:h-auto"
         >
-          {buildModuleTabRow(config.tabs, config.tabGroups).map((item, i) =>
+          {buildModuleTabRow(config.tabs, config.tabGroups).map((item) =>
             item.kind === "group" ? (
               <span
                 key={`group-${item.label}`}
@@ -200,7 +207,6 @@ export function ModuleView({
               </span>
             ) : (
               <TabsTrigger
-                tabIndex={i}
                 key={item.tab.id}
                 // Natural width with an underline on the active tab; the
                 // default pseudo-underline is clipped by the scroll container.
@@ -216,13 +222,15 @@ export function ModuleView({
         </div>
 
         {config.tabs.map((tab) => (
-          <TabsContent key={tab.id} value={tab.id} className="mt-6">
+          <TabsContent key={tab.id} value={tab.id} className="mt-6" aria-busy={dataState?.[tab.id]?.status === "loading"}>
+            <ModuleDataNotice state={dataState?.[tab.id]} />
+            {dataState?.[tab.id]?.status !== "error" && dataState?.[tab.id]?.status !== "denied" && (<>
             {tab.type === "dashboard" && tab.sections && (
               <DashboardGrid
                 ref={dashboardGridRef}
                 sections={tab.sections}
                 // Dashboard figures derive from the module's collections.
-                isLoading={Object.values(dataLoading ?? {}).some(Boolean)}
+                isLoading={dataState?.[tab.id]?.status === "loading" || Object.values(dataLoading ?? {}).some(Boolean)}
               />
             )}
 
@@ -289,7 +297,7 @@ export function ModuleView({
                       ? filterRowsByKpi(data[tab.id] ?? [], kpiStrips[tab.id]!.tiles, kpiSelection[tab.id] ?? null)
                       : (data[tab.id] ?? [])
                   }
-                  isLoading={dataLoading?.[tab.id]}
+                  isLoading={dataState?.[tab.id]?.status === "loading" || dataLoading?.[tab.id]}
                   initialFilters={activeTab === tab.id ? urlFilters : undefined}
                   onInitialFilterClear={clearRouteFilter}
                   boardColumns={entityBoardContext?.[tab.id]?.columns}
@@ -388,6 +396,7 @@ export function ModuleView({
                   ))}
               </div>
             )}
+            </>)}
           </TabsContent>
         ))}
       </Tabs>
