@@ -53,19 +53,33 @@ pub struct ActionDraftRequestIdentity {
 }
 
 impl ActionDraftRequestIdentity {
+    pub fn new(
+        organization_id: u64,
+        company_id: u64,
+        run_id: u64,
+        request_id: impl Into<String>,
+    ) -> Result<Self, BridgeError> {
+        let identity = Self {
+            organization_id,
+            company_id,
+            run_id,
+            request_id: request_id.into().trim().to_string(),
+        };
+        identity.validate()?;
+        Ok(identity)
+    }
+
     /// Bind a policy-controlled request to a durable run.
     pub fn from_request(
         request: &PolicyControlledRequest,
         run_id: u64,
     ) -> Result<Self, BridgeError> {
-        let identity = Self {
-            organization_id: request.execution.organization_id,
-            company_id: request.execution.company_id,
+        Self::new(
+            request.execution.organization_id,
+            request.execution.company_id,
             run_id,
-            request_id: request.execution.correlation_id.trim().to_string(),
-        };
-        identity.validate()?;
-        Ok(identity)
+            &request.execution.correlation_id,
+        )
     }
 
     fn validate(&self) -> Result<(), BridgeError> {
@@ -493,6 +507,13 @@ mod tests {
             Err(ActionDraftResumeError::ScopeMismatch)
         ));
 
+        let mut wrong_run = wait.identity.clone();
+        wrong_run.run_id += 1;
+        assert!(matches!(
+            wait.resume(&wrong_run, observed(&wait, ActionDraftResolution::Pending)),
+            Err(ActionDraftResumeError::ScopeMismatch)
+        ));
+
         let mut replayed_request = wait.identity.clone();
         replayed_request.request_id = "corr-red-replay".to_string();
         assert!(matches!(
@@ -539,6 +560,37 @@ mod tests {
         assert!(matches!(
             ActionDraftWait::for_proposal(identity, &proposal, 0),
             Err(BridgeError::InvalidInput(_))
+        ));
+    }
+
+    #[test]
+    fn serialized_wait_resumes_the_same_exact_request_after_restart() {
+        let request = red_request();
+        let proposal = build_proposal(&request).expect("proposal");
+        let identity =
+            ActionDraftRequestIdentity::from_request(&request, 41).expect("request identity");
+        let wait = ActionDraftWait::for_proposal(identity, &proposal, 73).expect("wait token");
+        let encoded = serde_json::to_string(&wait).expect("serialize wait token");
+        let restored: ActionDraftWait =
+            serde_json::from_str(&encoded).expect("restore wait token after restart");
+
+        assert_eq!(restored, wait);
+        assert!(matches!(
+            restored
+                .resume(
+                    &restored.identity,
+                    observed(
+                        &restored,
+                        ActionDraftResolution::Approved {
+                            execution_record_id: Some(91),
+                        },
+                    ),
+                )
+                .expect("resume restored token"),
+            ActionDraftControlOutcome::Resume {
+                resolution: ActionDraftResolution::Approved { .. },
+                ..
+            }
         ));
     }
 }
