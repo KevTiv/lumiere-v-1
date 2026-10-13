@@ -1,7 +1,8 @@
 "use client"
 import { mapDashboardWidgets, withDashboardSections } from "@lumiere/ui/lib/dashboard-sections"
 
-import { useCallback, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
+import { canUseModuleData, moduleCollection } from "@lumiere/ui/lib/module-data-state"
 import { useRouter } from "next/navigation"
 import { useQueryClient } from "@tanstack/react-query"
 import { useTranslation } from "@lumiere/i18n"
@@ -142,7 +143,8 @@ function ProposalsClientLoaded({ initialProposals, organizationId }: ProposalsCl
     moduleConfig.tabs.map((tab) => tab.id),
   )
 
-  const { data: proposals = [] } = useProposals(orgId, initialProposals)
+  const proposalsRead = moduleCollection(useProposals(orgId, initialProposals))
+  const proposals = proposalsRead.rows
   const { data: currencies = [] } = useCurrencies()
   const createProposal = useCreateProposal(orgId, operatingCompanyId)
   const updateProposal = useUpdateProposal(orgId, operatingCompanyId)
@@ -433,11 +435,22 @@ function ProposalsClientLoaded({ initialProposals, organizationId }: ProposalsCl
     [proposals],
   )
 
+  const dataState = { dashboard: proposalsRead.state, proposals: proposalsRead.state }
+  const proposalsUsable = canUseModuleData(proposalsRead.state)
+  useEffect(() => {
+    // Proposal dialogs close when the proposals read is denied or fails.
+    if (proposalsUsable) return
+    setQuickActionForm(null)
+    setEditRow(null)
+    setConvertProposalId(null)
+  }, [proposalsUsable])
+
   const handleFormSubmit = async (
     _tabId: string,
     action: string,
     formData: Record<string, unknown>,
   ) => {
+    if (!proposalsUsable) return
     if (action === "createProposal") {
       const title = String(formData.title ?? "").trim()
       if (!title) return
@@ -505,13 +518,14 @@ function ProposalsClientLoaded({ initialProposals, organizationId }: ProposalsCl
       <ModuleView
         config={config}
         data={data}
+        dataState={dataState}
         activeTab={activeTab}
         onActiveTabChange={setActiveTab}
         isPending={isPending}
         onFormSubmit={handleFormSubmit}
       />
       <FormModal
-        open={quickActionForm !== null}
+        open={quickActionForm !== null && proposalsUsable}
         onOpenChange={(open) => !open && setQuickActionForm(null)}
         config={quickActionForm?.form ?? proposalCreateForm}
         isPending={isPending}
@@ -519,7 +533,7 @@ function ProposalsClientLoaded({ initialProposals, organizationId }: ProposalsCl
           if (quickActionForm) await handleFormSubmit("dashboard", quickActionForm.action, formData)
         }}
       />
-      {convertProposalId != null ? (
+      {convertProposalId != null && proposalsUsable ? (
         <FormModal
           open
           onOpenChange={(open) => !open && setConvertProposalId(null)}
@@ -535,7 +549,7 @@ function ProposalsClientLoaded({ initialProposals, organizationId }: ProposalsCl
           }}
         />
       ) : null}
-      {editFormConfig ? (
+      {editFormConfig && proposalsUsable ? (
         <FormModal
           open
           onOpenChange={(open) => !open && setEditRow(null)}
