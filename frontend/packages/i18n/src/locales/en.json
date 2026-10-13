@@ -9873,6 +9873,7 @@
           "paymentModeCorporateCard": "Corporate card",
           "merchantKey": "Merchant",
           "merchantKeyPlaceholder": "e.g. starbucks",
+          "receiptFile": "Receipt file",
           "storageKey": "Receipt storage key",
           "storageKeyPlaceholder": "Opaque key (auto-generated if empty when receipt checked)",
           "hasReceipt": "Receipt attached (required to submit report)",
@@ -9938,6 +9939,7 @@
           "taxIds": "Tax IDs",
           "paymentMode": "Payment mode",
           "merchantKey": "Merchant",
+          "receiptFile": "Receipt file",
           "hasReceipt": "Receipt attached",
           "description": "Notes"
         }
