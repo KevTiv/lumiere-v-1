@@ -3031,6 +3031,16 @@
       },
       "evidence": "spacetimedb/src/ai/intelligence.rs: body writes or refreshes deterministic state and safely repeats the same input"
     },
+    "request_workflow_subject_snapshot": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/workflow/subject_snapshot.rs: requester-scoped natural key upserts the canonical snapshot and exact replay returns before a duplicate write"
+    },
     "reserve_ai_spend": {
       "semantic_kind": "internal",
       "client_facing": false,
@@ -4392,6 +4402,16 @@
       "evidence": "spacetimedb/tests/workflow/mod.rs: test reducer executes assertions; retry classification is not applicable"
     },
     "run_workflow_runtime_tests": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/tests/workflow/mod.rs: test reducer executes assertions; retry classification is not applicable"
+    },
+    "run_workflow_subject_snapshot_tests": {
       "semantic_kind": "test",
       "client_facing": false,
       "idempotency": "not_applicable",
