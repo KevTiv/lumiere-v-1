@@ -434,9 +434,8 @@ export function useScheduleDocumentRetentionPurge(organizationId: bigint) {
       )
       const beforeIds = new Set(
         before.flatMap((row) => {
-          const value = row.scheduledId ?? row.scheduled_id
           try {
-            return [BigInt(String(value))]
+            return [BigInt(String(row.scheduledId))]
           } catch {
             return []
           }
