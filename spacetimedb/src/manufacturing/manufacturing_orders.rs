@@ -13,7 +13,7 @@ use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 use crate::inventory::product::product;
 use crate::inventory::quality::quality_check;
 use crate::inventory::stock::{
-    create_stock_move, create_stock_move_internal, done_stock_move, move_stock_quant, stock_move, stock_quant,
+    create_stock_move_internal, done_stock_move, move_stock_quant, stock_move, stock_quant,
     ensure_lot_for_product, ensure_serial_usable, CreateStockMoveParams, DoneStockMoveParams, MoveStockQuantParams, StockMove, StockQuant,
 };
 use crate::inventory::tracking::{stock_production_lot, stock_production_serial, StockProductionSerial};

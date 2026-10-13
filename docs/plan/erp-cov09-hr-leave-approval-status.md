@@ -93,3 +93,19 @@ persona approves and posts; the approval response is deliberately lost after com
 hook converges through exact readback; a duplicate post retains one exact GL relation; and
 the reader persona is denied compensation fields (or the whole payslip feed) and the posting operation. Same-head runtime
 execution and the shared certification gates remain required before promotion.
+
+## STP fail-closed boundary (2026-10-13)
+
+The prior visible STP action fabricated `stp-stub-*` submission ids, and native
+intent processing could fabricate `stub:<kind>:<id>` result references. Both
+synthetic-success paths are removed. Until a real provider adapter is configured,
+the visible action reports STP as unavailable and dispatches no operation.
+
+Native statutory intent processing now persists a canonical `failed` outcome
+with an unavailable-provider error. A statutory result cannot become `sent` or
+`applied` without a non-empty provider `external_ref` or `result_ref`. The native
+test `test_statutory_integration_requires_canonical_provider_result` covers the
+unavailable transition, rejected reference-free success with an unchanged row,
+and exact recovery after a canonical provider receipt. The browser lifecycle
+asserts the unavailable action emits no create-intent request. HR remains non-U5
+until the provider adapter and these proofs run in the release environment.

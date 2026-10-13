@@ -646,6 +646,31 @@ describe("stdbParamsToJson", () => {
   })
 })
 
+describe("workflow subject snapshot reducer params", () => {
+  it("encodes the generated params struct with SATS snake_case fields", () => {
+    assert.deepEqual(
+      encodeReducerCallArgs("request_workflow_subject_snapshot", [
+        2n,
+        3n,
+        {
+          subjectModel: "sale_order",
+          subjectId: 5n,
+          workflowVersionId: 7n,
+        },
+      ]),
+      [
+        2n,
+        3n,
+        {
+          subject_model: "sale_order",
+          subject_id: 5,
+          workflow_version_id: 7,
+        },
+      ],
+    )
+  })
+})
+
 describe("encodeTaggedUnitEnum", () => {
   it("lowercases the first character of the tag", () => {
     assert.deepEqual(encodeTaggedUnitEnum({ tag: "Percent" }), { percent: [] })

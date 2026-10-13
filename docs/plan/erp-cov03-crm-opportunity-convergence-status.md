@@ -46,3 +46,7 @@ This accepts one CRM cross-module transition. Direct navigation and ambiguous/lo
 ## Next slice
 
 Start COV-04 with one Sales quotation/order operator transition and an explicit stable downstream identity. Reuse the accepted `sales-crm` persona and canonical Sales authority; do not expand this CRM slice into fulfillment or invoicing.
+
+## Wave 3 certification additions
+
+`cov26-crm-sales-resilience.spec.ts` adds targeted CRM operator evidence at 320px and 390px: the Contacts surface remains horizontally bounded, the create action is keyboard reachable, focus enters the modal and returns to its trigger on Escape, the read-only persona cannot reach create controls, and the canonical contacts query refetches after an offline window. Runtime execution remains part of the current-head COV-27 run; Playwright discovery is the local static gate.

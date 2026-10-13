@@ -1121,6 +1121,10 @@ check-cov00d-evidence-matrix:
 check-cov02-seed-inventory:
 	@python3 scripts/validate-cov02-seed-inventory.py
 
+check-cov27-launch-manifest:
+	@python3 scripts/validate-cov27-launch-manifest.py
+	@python3 -m unittest scripts/test_validate_cov27_launch_manifest.py
+
 check-cov02-first-org-fixture:
 	@node frontend/web/scripts/seed-test-user.mjs --check-manifest
 

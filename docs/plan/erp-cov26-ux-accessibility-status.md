@@ -133,6 +133,26 @@ reported GitHub checks, including the targeted Playwright smoke, E2E gate,
 frontend contracts, semantic index, i18n, and security checks. No unresolved
 review thread remained when this evidence was recorded.
 
+## Workforce bounded pass (2026-10-13)
+
+**State:** IMPLEMENTED LOCALLY — release-environment browser execution and
+same-head CI remain open.
+
+HR/Payroll, Projects/Tasks, and Expenses now pass their primary collections to
+the shared typed module-data-state boundary. Loading remains distinct from a
+successful empty result; server failures expose an alert and retry; 401/403 reads
+fail closed as denied; and cached rows from denied or unclassified failures are
+not reused by pickers, joins, dialogs, or dashboards. Concrete 5xx refresh
+failures may retain rows only with an explicit partial/stale warning.
+
+`cov26-workforce-resilience.spec.ts` adds a seeded browser matrix for successful
+no-result empty states, read-only mutation-control denial, keyboard dialog focus
+and return, 320px/390px viewport reachability, and offline reconnect followed by
+exact canonical-id readback for employees, projects, and expenses. Shared pure
+tests cover loading, empty, error, partial, denied, retry, stale-row suppression,
+and keyboard tab navigation. The browser file was discovered locally; runtime
+execution against the selected release environment remains required.
+
 ## Remaining gates
 
 1. If public hosted-application certification is required, deploy the accepted

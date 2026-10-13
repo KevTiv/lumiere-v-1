@@ -18,7 +18,8 @@ use crate::helpers::{
     calculate_tax, check_permission, next_doc_number, write_audit_log_v2, AuditLogParams,
 };
 use crate::hr::employees::hr_department;
-use crate::inventory::product::{product, product_variant, Product};
+use crate::inventory::inventory_close::assert_inventory_writable;
+use crate::inventory::product::{product, product_supplier_info, product_variant, Product};
 use crate::inventory::tracking::stock_production_lot;
 use crate::manufacturing::relations::{require_uom_compatible, require_uom_in_org};
 use crate::sales::oms_extensions::{account_fiscal_position, account_incoterm};
@@ -271,6 +272,21 @@ pub struct AddPurchaseOrderLineParams {
     pub propagate_cancel: Option<bool>,
     pub lot_id: Option<u64>,
     pub metadata: Option<String>,
+}
+
+/// Narrow service contract used only by automatic Inventory replenishment.
+/// Unlike the interactive reducers, the caller cannot supply arbitrary reverse
+/// relations, tax/accounting links, or impersonated audit identities.
+pub(crate) struct ReplenishmentPurchaseDemandParams {
+    pub company_id: u64,
+    pub rule_id: u64,
+    pub partner_id: u64,
+    pub product_id: u64,
+    pub uom_id: u64,
+    pub quantity: f64,
+    pub price_unit: f64,
+    pub currency_id: u64,
+    pub date_planned: Option<Timestamp>,
 }
 
 #[derive(SpacetimeType, Clone, Debug)]
@@ -782,7 +798,18 @@ pub(crate) fn create_purchase_order_record(
     organization_id: u64,
     params: CreatePurchaseOrderParams,
 ) -> Result<u64, String> {
-    check_permission(ctx, organization_id, "purchase_order", "create")?;
+    create_purchase_order_record_impl(ctx, organization_id, params, true)
+}
+
+fn create_purchase_order_record_impl(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    params: CreatePurchaseOrderParams,
+    enforce_user_permission: bool,
+) -> Result<u64, String> {
+    if enforce_user_permission {
+        check_permission(ctx, organization_id, "purchase_order", "create")?;
+    }
 
     if let Some(ref iqc) = params.is_quantity_copy {
         IsQuantityCopy::from_str(iqc)?;
@@ -1595,7 +1622,19 @@ pub fn add_purchase_order_line(
     order_id: u64,
     params: AddPurchaseOrderLineParams,
 ) -> Result<(), String> {
-    check_permission(ctx, organization_id, "purchase_order_line", "create")?;
+    add_purchase_order_line_impl(ctx, organization_id, order_id, params, true).map(|_| ())
+}
+
+fn add_purchase_order_line_impl(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    order_id: u64,
+    params: AddPurchaseOrderLineParams,
+    enforce_user_permission: bool,
+) -> Result<u64, String> {
+    if enforce_user_permission {
+        check_permission(ctx, organization_id, "purchase_order_line", "create")?;
+    }
 
     let order = validate_order_in_organization(ctx, organization_id, order_id)?;
 
@@ -1723,7 +1762,109 @@ pub fn add_purchase_order_line(
     );
 
     log::info!("Line added to purchase order {}", order_id);
-    Ok(())
+    Ok(line.id)
+}
+
+/// Create the exact draft PO and line authorized by an automatic replenishment
+/// rule. This is deliberately one atomic, crate-internal operation: scheduled
+/// reducers have no interactive membership, while the narrow input shape and
+/// supplier relation below prevent the service path from becoming a generic
+/// RBAC bypass. Audit ownership remains `ctx.sender()` (the scheduler actor).
+pub(crate) fn create_replenishment_purchase_demand(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    params: ReplenishmentPurchaseDemandParams,
+) -> Result<(u64, u64), String> {
+    crate::core::reconstruction::require_writes_unfenced(ctx, organization_id)?;
+    require_company_in_organization(ctx, organization_id, params.company_id)?;
+    assert_inventory_writable(ctx, organization_id, params.company_id)?;
+
+    if !params.quantity.is_finite() || params.quantity <= 0.0 {
+        return Err("Replenishment purchase quantity must be positive and finite".to_string());
+    }
+    if !params.price_unit.is_finite() || params.price_unit < 0.0 {
+        return Err("Replenishment purchase price must be non-negative and finite".to_string());
+    }
+
+    // Service authorization is bounded to a real active supplier relation for
+    // this tenant/company/product/currency. Header and line helpers below then
+    // revalidate vendor, product, UOM, currency, and every persisted relation.
+    let supplier_authorized = ctx.db.product_supplier_info().iter().any(|info| {
+        info.organization_id == organization_id
+            && info.is_active
+            && info.partner_id == params.partner_id
+            && (info.product_id == Some(params.product_id)
+                || info.product_tmpl_id == Some(params.product_id))
+            && info.currency_id == params.currency_id
+            && (info.company_id.is_none() || info.company_id == Some(params.company_id))
+    });
+    if !supplier_authorized {
+        return Err(
+            "No active company-compatible supplier relation authorizes this replenishment demand"
+                .to_string(),
+        );
+    }
+
+    let service_metadata = Some(
+        serde_json::json!({
+            "replenishment_rule_id": params.rule_id,
+            "service_path": "scheduled_replenishment",
+            "service_actor": ctx.sender().to_string(),
+        })
+        .to_string(),
+    );
+    let order_id = create_purchase_order_record_impl(
+        ctx,
+        organization_id,
+        CreatePurchaseOrderParams {
+            company_id: Some(params.company_id),
+            partner_id: params.partner_id,
+            currency_id: params.currency_id,
+            origin: Some(format!("REPLENISH-{}", params.rule_id)),
+            partner_ref: Some(format!("RPL-{}", params.rule_id)),
+            notes: Some("Auto replenishment purchase demand".to_string()),
+            date_planned: params.date_planned,
+            payment_term_id: None,
+            fiscal_position_id: None,
+            incoterm_id: None,
+            incoterm_location: None,
+            user_id: None,
+            invoice_ids: vec![],
+            picking_ids: vec![],
+            message_follower_ids: vec![],
+            message_ids: vec![],
+            activity_ids: vec![],
+            is_quantity_copy: None,
+            metadata: service_metadata.clone(),
+        },
+        false,
+    )?;
+
+    let line_id = add_purchase_order_line_impl(
+        ctx,
+        organization_id,
+        order_id,
+        AddPurchaseOrderLineParams {
+            product_id: params.product_id,
+            quantity: params.quantity,
+            uom_id: params.uom_id,
+            price_unit: params.price_unit,
+            discount: 0.0,
+            tax_ids: vec![],
+            name: Some(format!("Replenish product {}", params.product_id)),
+            sequence: Some(10),
+            display_type: None,
+            product_variant_id: None,
+            account_analytic_id: None,
+            date_planned: params.date_planned,
+            propagate_cancel: Some(true),
+            lot_id: None,
+            metadata: service_metadata,
+        },
+        false,
+    )?;
+
+    Ok((order_id, line_id))
 }
 
 /// Remove a line from a purchase order

@@ -28,6 +28,45 @@ const baseWidget: Record<string, unknown> = {
 }
 
 describe("stored dashboard resolver", () => {
+  it("emits a canonical allowlisted drill target and withholds callbacks for unadmitted fields", () => {
+    const targets: unknown[] = []
+    const chart = {
+      ...baseWidget,
+      widgetType: "Chart",
+      groupBy: "state",
+      chartType: "bar",
+      aggregation: "count",
+      fields: [],
+      configuration: strictBinding(null, null),
+    }
+    const admitted = resolveStoredDashboard(
+      [chart],
+      [1],
+      { sale_order: [{ id: 1, state: "Sale" }] },
+      { onDrillTarget: (target) => targets.push(target) },
+    )
+    expect(admitted.widgets[0]).toMatchObject({ type: "bar-chart" })
+    if (admitted.widgets[0]?.type !== "bar-chart") throw new Error("expected bar chart")
+    admitted.widgets[0].data.onCategoryClick?.("Sale")
+    expect(targets).toEqual([expect.objectContaining({
+      version: 1,
+      model: "sale_order",
+      sourceField: "state",
+      sourceValue: "Sale",
+      href: "/sales?tab=orders&filter=state%3ASale",
+    })])
+
+    const blocked = resolveStoredDashboard(
+      [{ ...chart, groupBy: "internalSecret" }],
+      [1],
+      { sale_order: [{ id: 1, internalSecret: "hidden" }] },
+      { onDrillTarget: () => { throw new Error("must not navigate") } },
+    )
+    expect(blocked.widgets[0]).toMatchObject({ type: "bar-chart" })
+    if (blocked.widgets[0]?.type !== "bar-chart") throw new Error("expected bar chart")
+    expect(blocked.widgets[0].data.onCategoryClick).toBeUndefined()
+  })
+
   it.each([
     ["malformed JSON", "{", "invalid-filter"],
     ["non-object JSON", "[]", "invalid-filter"],

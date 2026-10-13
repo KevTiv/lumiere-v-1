@@ -37,7 +37,7 @@ interface HrRecruitmentPanelProps {
   companyId: bigint
 }
 
-/** Recruitment tab — open positions + applicant pipeline stub. */
+/** Recruitment tab — open positions and the persisted applicant pipeline. */
 export function HrRecruitmentPanel({
   organizationId,
   companyId,

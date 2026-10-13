@@ -1,4 +1,8 @@
 import type { DashboardWidget, DiagnosticWidget, GridWidth } from "./dashboard-types"
+import {
+  resolveStoredDashboardDrillTarget,
+  type StoredDashboardDrillTarget,
+} from "./stored-dashboard-drill-target"
 
 type DashboardRecord = { [key: string]: unknown }
 
@@ -24,6 +28,7 @@ export interface StoredDashboardResolverOptions {
   startMs?: number
   endMs?: number
   sourceStates?: StoredDashboardSourceStates
+  onDrillTarget?: (target: StoredDashboardDrillTarget) => void
 }
 
 export type StoredDashboardResolutionState =
@@ -630,6 +635,15 @@ export function resolveStoredDashboard(
         groupedValues.sort((a, b) => b.value - a.value)
       }
       const entries = groupedValues.slice(0, Number(row.limit ?? 12))
+      const admittedDrillTarget = entries.some((entry) =>
+        resolveStoredDashboardDrillTarget(model, groupBy, entry.name) !== null,
+      )
+      const onDrill = admittedDrillTarget && options?.onDrillTarget
+        ? (value: string) => {
+            const target = resolveStoredDashboardDrillTarget(model, groupBy, value)
+            if (target) options.onDrillTarget?.(target)
+          }
+        : undefined
 
       if (chartType === "pie" || chartType === "donut") {
         widgets.push({
@@ -643,6 +657,7 @@ export function resolveStoredDashboard(
               value: entry.value,
               color: CHART_COLORS[colorIndex % CHART_COLORS.length],
             })),
+            onSegmentClick: onDrill,
           },
         })
         return
@@ -678,6 +693,7 @@ export function resolveStoredDashboard(
           layout: "horizontal",
           series: [{ name: "Value", color: CHART_COLORS[0] }],
           values: entries.map((entry) => ({ category: entry.name, Value: entry.value })),
+          onCategoryClick: onDrill,
         },
       })
       return

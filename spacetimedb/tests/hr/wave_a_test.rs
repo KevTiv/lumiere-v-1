@@ -16,6 +16,11 @@ use crate::hr::leaves::{
     hr_leave_type, refuse_leave, submit_leave, CreateLeaveRequestParams, CreateLeaveTypeParams,
     HrLeave,
 };
+use crate::hr::integrations::{
+    apply_hr_integration_intent, create_hr_integration_intent, hr_integration_intent,
+    record_hr_integration_result, CreateHrIntegrationIntentParams,
+    RecordHrIntegrationResultParams,
+};
 use crate::hr::offboarding::{
     complete_offboarding_item, start_offboarding, ArchiveEmployeeParams,
     CompleteOffboardingItemParams,
@@ -174,6 +179,117 @@ fn latest_payslip_for_employee(
         .max_by_key(|p| p.id)
         .map(|p| p.id)
         .ok_or_else(|| "payslip missing".to_string())
+}
+
+pub fn test_statutory_integration_requires_canonical_provider_result(
+    ctx: &ReducerContext,
+) -> Result<(), String> {
+    ensure_test_superuser(ctx)?;
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let idempotency_key = format!("stp-unavailable-{}", fixture.company_id);
+    create_hr_integration_intent(
+        ctx,
+        fixture.organization_id,
+        CreateHrIntegrationIntentParams {
+            company_id: Some(fixture.company_id),
+            intent_kind: "stp".to_string(),
+            idempotency_key: idempotency_key.clone(),
+            payslip_id: None,
+            export_intent_id: None,
+            payload: r#"{"requested_action":"submit"}"#.to_string(),
+            metadata: None,
+        },
+    )?;
+    let intent = ctx
+        .db
+        .hr_integration_intent()
+        .hr_intent_by_key()
+        .filter(&idempotency_key)
+        .find(|row| row.organization_id == fixture.organization_id)
+        .ok_or("STP integration intent missing")?;
+
+    apply_hr_integration_intent(ctx, fixture.organization_id, intent.id)?;
+    let unavailable = ctx
+        .db
+        .hr_integration_intent()
+        .id()
+        .find(&intent.id)
+        .ok_or("STP integration intent missing after apply")?;
+    if unavailable.status != "failed"
+        || unavailable.result_ref.is_some()
+        || unavailable.external_ref.is_some()
+        || unavailable.applied_at.is_some()
+        || unavailable.attempt_count != 1
+        || !unavailable
+            .last_error
+            .as_deref()
+            .unwrap_or_default()
+            .contains("provider adapter is unavailable")
+    {
+        return Err("unconfigured STP must persist a canonical failed outcome".into());
+    }
+
+    let missing_reference = record_hr_integration_result(
+        ctx,
+        fixture.organization_id,
+        fixture.company_id,
+        intent.id,
+        RecordHrIntegrationResultParams {
+            status: "applied".to_string(),
+            external_ref: None,
+            payload_hash: None,
+            result_ref: None,
+            last_error: None,
+            metadata: None,
+            gross_wage: None,
+            net_wage: None,
+            calculation_metadata: None,
+        },
+    );
+    if missing_reference.is_ok() {
+        return Err("STP applied status must require a real provider reference".into());
+    }
+    let after_rejection = ctx
+        .db
+        .hr_integration_intent()
+        .id()
+        .find(&intent.id)
+        .ok_or("STP integration intent missing after rejected result")?;
+    if after_rejection.status != "failed" || after_rejection.attempt_count != 1 {
+        return Err("rejected provider result must leave the failed row unchanged".into());
+    }
+
+    record_hr_integration_result(
+        ctx,
+        fixture.organization_id,
+        fixture.company_id,
+        intent.id,
+        RecordHrIntegrationResultParams {
+            status: "applied".to_string(),
+            external_ref: None,
+            payload_hash: Some("sha256:provider-payload".to_string()),
+            result_ref: Some("provider-receipt-001".to_string()),
+            last_error: None,
+            metadata: None,
+            gross_wage: None,
+            net_wage: None,
+            calculation_metadata: None,
+        },
+    )?;
+    let applied = ctx
+        .db
+        .hr_integration_intent()
+        .id()
+        .find(&intent.id)
+        .ok_or("STP integration intent missing after canonical result")?;
+    if applied.status != "applied"
+        || applied.result_ref.as_deref() != Some("provider-receipt-001")
+        || applied.applied_at.is_none()
+        || applied.attempt_count != 2
+    {
+        return Err("canonical provider result was not persisted exactly".into());
+    }
+    Ok(())
 }
 
 pub fn test_company_isolation_on_leave_and_payslip(ctx: &ReducerContext) -> Result<(), String> {

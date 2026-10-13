@@ -497,6 +497,7 @@ const REDUCER_PARAM_STRUCTS: Partial<Record<string, keyof OptionFieldMap & strin
   add_workflow_human_task_comment: "AddWorkflowHumanTaskCommentParams",
   invalidate_workflow_human_task: "InvalidateWorkflowHumanTaskParams",
   create_workflow: "CreateWorkflowParams",
+  request_workflow_subject_snapshot: "RequestWorkflowSubjectSnapshotParams",
   start_workflow: "StartWorkflowParams",
   signal_workflow: "SignalWorkflowParams",
   cancel_workflow: "CancelWorkflowParams",

@@ -2,6 +2,7 @@
 import { mapDashboardWidgets, withDashboardSections } from "@lumiere/ui/lib/dashboard-sections"
 
 import { useMemo, useState, useRef, useCallback } from "react"
+import { useRouter } from "next/navigation"
 import { useTranslation } from "@lumiere/i18n"
 import {
   ModuleView,
@@ -29,6 +30,7 @@ import {
   resolveStoredDashboard,
   storedDashboardExportGate,
   exportDashboardToPng,
+  reportExportSourceProvenance,
   timeRangeToMs,
   Button,
   Dialog,
@@ -171,6 +173,7 @@ function ReportsClientLoaded({
   organizationId,
 }: ReportsClientLoadedProps) {
   useReportsModuleSubscription()
+  const router = useRouter()
   const { t } = useTranslation()
   const moduleConfig = useMemo(() => reportsModuleConfig(t), [t])
   /** BigInt organization id for React Query keys (matches `@lumiere/query-hooks` `organizationId` param). */
@@ -201,6 +204,10 @@ function ReportsClientLoaded({
   const [viewDashboardRange, setViewDashboardRange] = useState<"all" | "7d" | "30d" | "90d" | "ytd">("all")
   const [queryBuilderStatus, setQueryBuilderStatus] = useState<QueryBuilderStatus | null>(null)
   const openErpAiChat = useOpenErpAiChat()
+  const handleStoredDashboardDrill = useCallback(
+    (target: { href: string }) => router.push(target.href),
+    [router],
+  )
 
   const { data: reportsRaw = [] } = useFinancialReports(orgId, initialReports)
   const { data: trialBalances = [] } = useTrialBalances(orgId, initialBalances)
@@ -308,9 +315,10 @@ function ReportsClientLoaded({
       {
         ...(viewDashboardTimeRange ?? {}),
         sourceStates: storedDashboardSourceStates,
+        onDrillTarget: handleStoredDashboardDrill,
       },
     )
-  }, [viewDashboard, dashboardWidgets, storedDashboardDataSources, storedDashboardSourceStates, viewDashboardTimeRange])
+  }, [viewDashboard, dashboardWidgets, storedDashboardDataSources, storedDashboardSourceStates, viewDashboardTimeRange, handleStoredDashboardDrill])
 
   const storedDashboardExport = useMemo(
     () => storedDashboardResolution
@@ -320,13 +328,30 @@ function ReportsClientLoaded({
   )
 
   const storedDashboardRef = useRef<HTMLDivElement>(null)
+  const storedDashboardProvenance = useMemo(() => {
+    if (!viewDashboard) return undefined
+    return reportExportSourceProvenance({
+      organizationId: orgId,
+      companyId: (viewDashboard.companyId ?? viewDashboard.company_id ?? operatingCompanyId ?? "") as string | number | bigint,
+      dashboardId: (viewDashboard.id ?? "") as string | number | bigint,
+      model: [...viewDashboardModels].sort().join(","),
+      domain: JSON.stringify(
+        (dashboardWidgets as unknown as Record<string, unknown>[])
+          .filter((widget) => ((viewDashboard.widgetIds ?? viewDashboard.widget_ids) as Array<string | number | bigint> | undefined)
+            ?.some((id) => String(id) === String(widget.id)))
+          .map((widget) => ({ id: String(widget.id ?? ""), domain: widget.domain ?? null })),
+      ),
+      ...(viewDashboardTimeRange ?? {}),
+    })
+  }, [dashboardWidgets, operatingCompanyId, orgId, viewDashboard, viewDashboardModels, viewDashboardTimeRange])
   const handleStoredDashboardExport = useCallback(async () => {
     if (!storedDashboardRef.current || !viewDashboard || !storedDashboardExport.allowed) return
     await exportDashboardToPng(
       storedDashboardRef.current,
       String(viewDashboard.name ?? "dashboard"),
+      storedDashboardProvenance,
     )
-  }, [viewDashboard, storedDashboardExport.allowed])
+  }, [viewDashboard, storedDashboardExport.allowed, storedDashboardProvenance])
 
   const addWidgetFormConfig = useMemo(
     () =>
@@ -1410,6 +1435,8 @@ function ReportsClientLoaded({
                   sourceStates={storedDashboardSourceStates}
                   resolution={storedDashboardResolution ?? undefined}
                   timeRange={viewDashboardTimeRange}
+                  organizationId={orgId}
+                  onDrillTarget={handleStoredDashboardDrill}
                 />
               </div>
             )

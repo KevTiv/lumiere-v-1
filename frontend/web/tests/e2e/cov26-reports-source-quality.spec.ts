@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test"
+import { readFile } from "node:fs/promises"
 import { toCreateDashboardWidgetParams } from "@lumiere/erp-shared/reports-dashboard-params"
 import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
 import { stdbBffCommandPost } from "@lumiere/stdb/commands"
@@ -176,6 +177,27 @@ test.describe("COV-26 Reports source quality", { tag: "@dev-fixture" }, () => {
     }).data ?? []
     expect(afterStaleRows.filter((row) => row.metadata === creationMetadata)).toHaveLength(1)
 
+    // Direct API requests cannot escape the session organization by supplying a
+    // company id in the payload. Use a distinct request key so this proves scope
+    // rejection rather than duplicate-request rejection.
+    const foreignMetadata = `lumiere.dashboard-widget.create/v1:foreign-${Date.now()}`
+    const foreignCompany = await page.request.post(
+      "/api/operations/erp.create_dashboard_widget",
+      {
+        data: {
+          ...acceptedCreateBody,
+          companyId: Number.MAX_SAFE_INTEGER,
+          params: { ...acceptedParams, metadata: { some: foreignMetadata } },
+        },
+      },
+    )
+    expect([403, 422]).toContain(foreignCompany.status())
+    const afterForeignAttempt = await page.request.get("/api/query/dashboard-widgets")
+    expect(afterForeignAttempt.ok()).toBe(true)
+    expect((((await afterForeignAttempt.json()) as {
+      data?: Array<{ metadata?: unknown }>
+    }).data ?? []).some((row) => row.metadata === foreignMetadata)).toBe(false)
+
     const readerContext = await browser.newContext({ storageState: { cookies: [], origins: [] } })
     const readerPage = await readerContext.newPage()
     try {
@@ -207,7 +229,29 @@ test.describe("COV-26 Reports source quality", { tag: "@dev-fixture" }, () => {
     await dashboardRow.click()
     await page.getByTestId("entity-action-view-dashboard").click()
     await expect(page.getByRole("dialog", { name: dashboardName })).toBeVisible()
-    await expect(page.getByTestId(`stored-dashboard-widget-${targetId}`)).toBeVisible()
+    const storedWidget = page.getByTestId(`stored-dashboard-widget-${targetId}`)
+    await expect(storedWidget).toBeVisible()
+
+    const csvDownload = page.waitForEvent("download")
+    await storedWidget.getByRole("button", { name: new RegExp(`Export ${widgetName} as CSV`) }).click()
+    const downloadedCsv = await csvDownload
+    const csvPath = await downloadedCsv.path()
+    if (!csvPath) throw new Error("CSV download path is required")
+    const firstLine = (await readFile(csvPath, "utf8")).split("\r\n")[0] ?? ""
+    expect(firstLine).toMatch(/^# lumiere-provenance:/)
+    expect(JSON.parse(firstLine.replace("# lumiere-provenance:", ""))).toMatchObject({
+      schema: "lumiere.report-export-provenance/v1",
+      organizationId: String(organizationId),
+      dashboardId: String(dashboardId),
+      widgetId: String(targetId),
+      model: "sale_order",
+      groupBy: "state",
+    })
+
+    const drillPoint = storedWidget.locator(".recharts-bar-rectangle").first()
+    await expect(drillPoint).toBeVisible()
+    await drillPoint.click({ force: true })
+    await expect(page).toHaveURL(/\/sales\?tab=orders&filter=state%3A/)
   })
 
   test("surfaces a malformed persisted operator as a card diagnostic", async ({ page }) => {

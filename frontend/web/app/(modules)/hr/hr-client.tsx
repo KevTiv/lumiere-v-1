@@ -1,6 +1,7 @@
 "use client"
 import { recordOptions, withLinkedPickers } from "@/lib/linked-options"
 import { mapDashboardWidgets, withDashboardSections } from "@lumiere/ui/lib/dashboard-sections"
+import { canUseModuleData, moduleQueryState } from "@lumiere/ui/lib/module-data-state"
 import { withInlineEdits } from "@lumiere/ui/lib/with-inline-edits"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
@@ -50,6 +51,7 @@ import type { QueryRows } from "@lumiere/query-hooks/http"
 import { hrModuleConfig } from "@/lib/module-dashboard-configs"
 import { useHrModuleSubscription } from "@/lib/module-subscription-hooks"
 import { groupBy } from "@/lib/utils"
+import { hrStpProviderState } from "@/lib/hr-stp-availability"
 import {
   useEmployees,
   useDepartments,
@@ -100,7 +102,6 @@ import {
   useConfirmPayslip,
   useCancelPayslip,
   useCreatePayrollExportIntent,
-  useCreateHrIntegrationIntent,
   usePostPayslip,
   useHrCsvImportMutations,
   useOnboardingTemplates,
@@ -415,12 +416,20 @@ function HrClientLoaded({
   const [rowActionError, setRowActionError] = useState<string | null>(null)
   const [dashboardTimeRange, setDashboardTimeRange] = useState<TimeRangeValue>("30d")
 
-  const { data: employees = [], isLoading: employeesLoading } = useEmployees(orgId, initialEmployees)
+  const employeesQuery = useEmployees(orgId, initialEmployees)
   const { data: departments = [] } = useDepartments(orgId, initialDepartments)
-  const { data: leaves = [], isLoading: leavesLoading } = useLeaveRequests(orgId, initialLeaves)
+  const leavesQuery = useLeaveRequests(orgId, initialLeaves)
   const { data: leavesToApprove = [] } = useLeavesToApprove(orgId)
-  const { data: contracts = [], isLoading: contractsLoading } = useContracts(orgId, initialContracts)
-  const { data: payslips = [] } = usePayslips(orgId, initialPayslips)
+  const contractsQuery = useContracts(orgId, initialContracts)
+  const payslipsQuery = usePayslips(orgId, initialPayslips)
+  const employeesState = moduleQueryState(employeesQuery)
+  const leavesState = moduleQueryState(leavesQuery)
+  const contractsState = moduleQueryState(contractsQuery)
+  const payslipsState = moduleQueryState(payslipsQuery)
+  const employees = canUseModuleData(employeesState) ? employeesQuery.data ?? [] : []
+  const leaves = canUseModuleData(leavesState) ? leavesQuery.data ?? [] : []
+  const contracts = canUseModuleData(contractsState) ? contractsQuery.data ?? [] : []
+  const payslips = canUseModuleData(payslipsState) ? payslipsQuery.data ?? [] : []
   const { data: payslipsToExport = [] } = usePayslipsToExport(orgId)
   const { data: hrIntegrationIntentsPending = [] } = useHrIntegrationIntentsPending(orgId)
   const { data: jobPositions = [] } = useJobPositions(orgId)
@@ -472,7 +481,6 @@ function HrClientLoaded({
   const confirmPayslip = useConfirmPayslip(orgId, operatingCompanyId)
   const cancelPayslip = useCancelPayslip(orgId, operatingCompanyId)
   const createPayrollExportIntent = useCreatePayrollExportIntent(orgId, operatingCompanyId)
-  const createHrIntegrationIntent = useCreateHrIntegrationIntent(orgId, operatingCompanyId)
   const postPayslip = usePostPayslip(orgId, operatingCompanyId)
   const createOnboardingTemplate = useCreateOnboardingTemplate(orgId, operatingCompanyId)
   const csvImports = useHrCsvImportMutations(orgId)
@@ -1264,36 +1272,18 @@ function HrClientLoaded({
                 },
                 {
                   id: "create-stp-intent",
-                  label: "Create STP intent",
+                  label: "STP unavailable",
                   requiresSelection: true,
                   selection: "multiple",
                   isApplicable: (rows) => rows.some((row) => hrRowState(row) === "Verify"),
-                  successMessage: t("common.actionCompleted", { action: "Create STP intent" }),
-                  onClick: async (rows) => {
+                  onClick: (rows) => {
                     setToolbarError(null)
                     const verifyRows = rows.filter((row) => payslipState(row) === "Verify")
                     if (verifyRows.length === 0) {
                       setToolbarError("Select Verify (approved) payslips for STP integration.")
                       return
                     }
-                    try {
-                      for (const row of verifyRows) {
-                        const payslipId = Number(row.id)
-                        await createHrIntegrationIntent.mutateAsync({
-                          intentKind: "stp",
-                          idempotencyKey: `stp-${payslipId}-${Date.now()}`,
-                          payslipId,
-                          payload: JSON.stringify({
-                            payslipId,
-                            exportStatus: "sent",
-                            submissionId: `stp-stub-${payslipId}`,
-                          }),
-                        })
-                      }
-                    } catch (e) {
-                      setToolbarError(e instanceof Error ? e.message : String(e))
-                      throw e
-                    }
+                    setToolbarError(hrStpProviderState().reason)
                   },
                 },
                 {
@@ -1655,14 +1645,19 @@ function HrClientLoaded({
     cancelPayslip.isPending ||
     Object.values(csvImports).some((m) => m.isPending)
 
-  const dataLoading = useMemo(
+  const dataState = useMemo(
     () => ({
-      employees: employeesLoading,
-      leaves: leavesLoading,
-      "leave-allocations": leaveAllocationsLoading,
-      contracts: contractsLoading,
+      employees: employeesState,
+      leaves: leavesState,
+      contracts: contractsState,
+      payslips: payslipsState,
     }),
-    [employeesLoading, leavesLoading, contractsLoading],
+    [employeesState, leavesState, contractsState, payslipsState],
+  )
+
+  const dataLoading = useMemo(
+    () => ({ "leave-allocations": leaveAllocationsLoading }),
+    [leaveAllocationsLoading],
   )
 
   return (
@@ -1675,6 +1670,7 @@ function HrClientLoaded({
       <ModuleView
         config={config}
         data={data}
+        dataState={dataState}
         dataLoading={dataLoading}
         onFormSubmit={handleFormSubmit}
         isPending={isFormMutationPending}
