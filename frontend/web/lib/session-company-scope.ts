@@ -10,7 +10,11 @@ export type SessionCompany = {
   readonly isParent: boolean
 }
 
-type SessionRoleRow = Readonly<Record<string, unknown>>
+type SessionRoleRow = {
+  readonly [key: string]: unknown
+  readonly id?: unknown
+  readonly name?: unknown
+}
 
 function positiveId(value: unknown): number | null {
   const id = Number(value)
@@ -27,7 +31,7 @@ function timestampMicros(value: unknown): number | null {
     return Number.isSafeInteger(micros) ? micros : null
   }
   if (value == null || typeof value !== "object") return null
-  const record = value as Record<string, unknown>
+  const record = value as { readonly [key: string]: unknown }
   return timestampMicros(
     record["__timestamp_micros_since_unix_epoch__"]
       ?? record["microsSinceUnixEpoch"]
