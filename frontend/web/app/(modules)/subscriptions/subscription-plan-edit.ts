@@ -1,11 +1,20 @@
+import {
+  PLAN_BILLING_PERIODS,
+  normalizeBillingPeriod as normalizeSharedBillingPeriod,
+  type PlanBillingPeriod,
+} from '@lumiere/erp-shared/subscription-billing-periods';
 import { optionalBigIntU64, unwrapSome } from '@lumiere/erp-shared/form-coercion';
 import type { CreateSubscriptionBundleParams, UpdateSubscriptionPlanParams } from '@lumiere/stdb/types';
 
 type Row = Record<string, unknown>;
 
-/** Plan catalogue billing periods the reducer stores (`day|week|month|year`). */
-export const PLAN_BILLING_PERIODS = ['day', 'week', 'month', 'year'] as const;
-export type PlanBillingPeriod = (typeof PLAN_BILLING_PERIODS)[number];
+export { PLAN_BILLING_PERIODS };
+export type { PlanBillingPeriod };
+
+/** Billing period as the reducer normalises it; null if unknown. */
+export function normalizeBillingPeriod(raw: unknown): PlanBillingPeriod | null {
+  return normalizeSharedBillingPeriod(unwrapSome(raw));
+}
 
 /** Payment modes the reducer stores. */
 export const PLAN_PAYMENT_MODES = ['draft_invoice', 'automated_payment'] as const;
@@ -17,32 +26,6 @@ const some = <T>(value: T) => ({ some: value });
 function text(value: unknown): string {
   const unwrapped = unwrapSome(value);
   return unwrapped == null ? '' : String(unwrapped).trim();
-}
-
-/** Billing period as the reducer normalises it (it also accepts daily/weekly/monthly/yearly); null if unknown. */
-export function normalizeBillingPeriod(raw: unknown): PlanBillingPeriod | null {
-  switch (text(raw).toLowerCase()) {
-    case 'day':
-    case 'daily':
-    case 'd':
-      return 'day';
-    case 'week':
-    case 'weekly':
-    case 'w':
-      return 'week';
-    case 'month':
-    case 'monthly':
-    case 'm':
-      return 'month';
-    case 'year':
-    case 'yearly':
-    case 'annual':
-    case 'annually':
-    case 'y':
-      return 'year';
-    default:
-      return null;
-  }
 }
 
 /** Payment mode as the reducer normalises it (it also accepts manual/automatic); null if unknown. */

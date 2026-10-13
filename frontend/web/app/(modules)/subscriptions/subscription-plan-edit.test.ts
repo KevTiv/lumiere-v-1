@@ -1,9 +1,11 @@
+import { newSubscriptionPlanForm } from '../../../../packages/ui/src/lib/subscriptions-form-configs';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { stdbParamsToJson } from '@lumiere/erp-shared/stdb-params-json';
 
 import {
+  PLAN_BILLING_PERIODS,
   normalizeBillingPeriod,
   normalizePaymentMode,
   planEditDefaults,
@@ -114,4 +116,14 @@ test('a bundle needs an existing plan, a name and a code', () => {
   assert.equal(toBundleCreateParams({ planId: '5', name: 'a', code: '' }, plans), null);
   assert.equal(toBundleCreateParams({ planId: '', name: 'a', code: 'b' }, plans), null);
   assert.equal(toBundleCreateParams({ planId: '5', name: 'a', code: 'b', active: false }, plans)?.active, false);
+});
+
+test('the create-plan form offers exactly the billing periods the reducer accepts', () => {
+  assert.deepEqual([...PLAN_BILLING_PERIODS], ['day', 'week', 'month', 'year']);
+  const form = newSubscriptionPlanForm(((key: string, opts?: { defaultValue?: string }) => opts?.defaultValue ?? key) as never);
+  const field = form.sections.flatMap((section) => section.fields).find((f) => f.name === 'billingPeriod');
+  const values = ((field as { options?: { value: string }[] } | undefined)?.options ?? []).map((o) => o.value);
+  assert.deepEqual(values, [...PLAN_BILLING_PERIODS]);
+  for (const value of values) assert.equal(normalizeBillingPeriod(value), value);
+  assert.equal((values as string[]).includes('quarterly'), false);
 });

@@ -488,6 +488,29 @@ export const subscriptionEntitlementsTableConfig = (t: TFunction): EntityViewCon
   },
 })
 
+export const subscriptionBundlesTableConfig = (t: TFunction): EntityViewConfig => ({
+  id: "subscription-bundles-table",
+  title: t("subscriptions.bundles.title", { defaultValue: "Bundles" }),
+  description: t("subscriptions.bundles.description", {
+    defaultValue: "Bundles group extra items on top of a subscription plan",
+  }),
+  view: {
+    mode: "table",
+    rowKey: "id",
+    searchable: true,
+    searchKeys: ["name", "code", "planName"],
+    columns: [
+      { key: "name", label: t("subscriptions.bundles.columns.name", { defaultValue: "Name" }), width: "min-w-40" },
+      { key: "code", label: t("subscriptions.bundles.columns.code", { defaultValue: "Code" }), width: "min-w-24" },
+      { key: "planName", label: t("subscriptions.bundles.columns.plan", { defaultValue: "Plan" }), width: "min-w-40" },
+      { key: "active", label: t("subscriptions.bundles.columns.active", { defaultValue: "Active" }), type: "boolean" },
+    ],
+    emptyMessage: t("subscriptions.bundles.emptyMessage", {
+      defaultValue: "No bundles yet. Use New bundle on the Plans tab.",
+    }),
+  },
+})
+
 export const subscriptionPaymentIntentsTableConfig = (t: TFunction): EntityViewConfig => ({
   id: "subscription-payment-intents-table",
   title: t("subscriptions.paymentIntents.title", { defaultValue: "Payment intents" }),
@@ -525,6 +548,7 @@ export const subscriptionsEntityConfigs = (t: TFunction): Record<string, EntityV
   "subscription-past-due-table": subscriptionPastDueTableConfig(t),
   "subscription-due-to-bill-table": subscriptionDueToBillTableConfig(t),
   "subscription-entitlements-table": subscriptionEntitlementsTableConfig(t),
+  "subscription-bundles-table": subscriptionBundlesTableConfig(t),
   "subscription-payment-intents-table": subscriptionPaymentIntentsTableConfig(t),
   "deferred-revenue-schedules-table": deferredRevenueSchedulesTableConfig(t),
   "deferred-revenue-lines-table": deferredRevenueLinesTableConfig(t),

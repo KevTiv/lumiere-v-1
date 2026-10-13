@@ -38,6 +38,7 @@ import {
   subscriptionPriceTiersTableConfig,
   subscriptionPastDueTableConfig,
   subscriptionDueToBillTableConfig,
+  subscriptionBundlesTableConfig,
   subscriptionEntitlementsTableConfig,
   subscriptionPaymentIntentsTableConfig,
   deferredRevenueLinesTableConfig,
@@ -74,6 +75,7 @@ import {
   useCreateSubscriptionPriceTier,
   useSubscriptionPastDue,
   useSubscriptionDueToBill,
+  useSubscriptionBundles,
   useSubscriptionEntitlements,
   useSubscriptionPaymentIntents,
   useCreateSubscription,
@@ -219,6 +221,15 @@ function SubscriptionsClientLoaded({
   const { data: pastDue = [] } = useSubscriptionPastDue(orgId)
   const { data: dueToBill = [] } = useSubscriptionDueToBill(orgId)
   const { data: entitlements = [] } = useSubscriptionEntitlements(orgId)
+  const { data: bundles = [] } = useSubscriptionBundles(orgId)
+  const bundleRows = useMemo(
+    () =>
+      (bundles as unknown as Record<string, unknown>[]).map((bundle) => {
+        const plan = (plans as unknown as Record<string, unknown>[]).find((p) => String(p.id) === String(bundle.planId))
+        return { ...bundle, planName: plan?.name ?? (bundle.planId != null ? `#${String(bundle.planId)}` : "") }
+      }),
+    [bundles, plans],
+  )
   const { data: paymentIntents = [] } = useSubscriptionPaymentIntents(orgId)
   const { data: deferredSchedules = [] } = useDeferredRevenueSchedules(orgId, initialDeferredSchedules)
   const { data: deferredLines = [] } = useDeferredRevenueLines(orgId, initialDeferredLines)
@@ -809,6 +820,7 @@ function SubscriptionsClientLoaded({
             return { ...tab, entityConfig: subscriptionPastDueTableConfig(t) }
           if (tab.id === "due-to-bill")
             return { ...tab, entityConfig: subscriptionDueToBillTableConfig(t) }
+          if (tab.id === "bundles") return { ...tab, entityConfig: subscriptionBundlesTableConfig(t) }
           if (tab.id === "entitlements")
             return { ...tab, entityConfig: subscriptionEntitlementsTableConfig(t) }
           if (tab.id === "payment-intents")
@@ -867,6 +879,7 @@ function SubscriptionsClientLoaded({
       "price-tiers": priceTiers as unknown as Record<string, unknown>[],
       "past-due": pastDue as unknown as Record<string, unknown>[],
       "due-to-bill": dueToBill as unknown as Record<string, unknown>[],
+      bundles: bundleRows,
       entitlements: entitlements as unknown as Record<string, unknown>[],
       "payment-intents": paymentIntents as unknown as Record<string, unknown>[],
       "deferred-schedules": deferredSchedules as unknown as Record<string, unknown>[],
@@ -884,6 +897,7 @@ function SubscriptionsClientLoaded({
       priceTiers,
       pastDue,
       dueToBill,
+      bundleRows,
       entitlements,
       paymentIntents,
       deferredSchedules,

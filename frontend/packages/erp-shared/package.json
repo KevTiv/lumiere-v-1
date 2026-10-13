@@ -15,6 +15,7 @@
     "./form-coercion": "./src/form-coercion.ts",
     "./create-params-helpers": "./src/create-params-helpers.ts",
     "./accounting-create-params": "./src/accounting-create-params.ts",
+    "./subscription-billing-periods": "./src/subscription-billing-periods.ts",
     "./ai-coverage-create-params": "./src/ai-coverage-create-params.ts",
     "./inventory-coverage-create-params": "./src/inventory-coverage-create-params.ts",
     "./messaging-create-params": "./src/messaging-create-params.ts",
