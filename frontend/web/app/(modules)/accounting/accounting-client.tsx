@@ -3329,7 +3329,6 @@ function AccountingClientReady({
                   <ListPivotSwitch
                     storageId="accounting-invoices-list"
                     t={t}
-                    // ACC-RI-018 rationale: safe because the pivot only reads AccountMove fields from these invoices rows.
                     rows={invoices as unknown as Record<string, unknown>[]}
                     {...accountMovePivotSetup(t)}
                   >
@@ -3357,7 +3356,6 @@ function AccountingClientReady({
                   <ListPivotSwitch
                     storageId="accounting-bills-list"
                     t={t}
-                    // ACC-RI-018 rationale: safe because the pivot only reads AccountMove fields from these bills rows.
                     rows={bills as unknown as Record<string, unknown>[]}
                     {...accountMovePivotSetup(t)}
                   >
