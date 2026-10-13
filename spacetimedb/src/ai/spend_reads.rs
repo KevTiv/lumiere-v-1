@@ -6,17 +6,13 @@
 
 use spacetimedb::{SpacetimeType, ViewContext};
 
-use crate::ai::action_drafts::{
-    ai_action_draft_request__view, AiActionDraftRequest,
-};
+use crate::ai::action_drafts::{ai_action_draft_request__view, AiActionDraftRequest};
 use crate::ai::spend::{
     ai_price_snapshot__view, ai_provider_attempt__view, ai_spend_budget__view,
     ai_spend_reservation__view, AiPriceSnapshot, AiProviderAttempt, AiSpendBudget,
     AiSpendReservation,
 };
-use crate::core::cold_tier_identity::{
-    cold_tier_service_identity__view, AI_SPEND_READER_SERVICE,
-};
+use crate::core::cold_tier_identity::{cold_tier_service_identity__view, AI_SPEND_READER_SERVICE};
 
 #[derive(Clone, SpacetimeType)]
 pub struct AiSpendPriceSnapshotRead {
@@ -91,6 +87,11 @@ pub struct AiProviderAttemptRead {
     pub input_tokens: u32,
     pub output_tokens: u32,
     pub failure_reason: Option<String>,
+    pub resolution: Option<String>,
+    pub recovery_actor: Option<String>,
+    pub recovery_approval_id: Option<String>,
+    pub reconciliation_actor: Option<String>,
+    pub reconciliation_approval_id: Option<String>,
 }
 
 fn authorized_organization_ids(ctx: &ViewContext) -> Vec<u64> {
@@ -268,6 +269,11 @@ impl From<AiProviderAttempt> for AiProviderAttemptRead {
             input_tokens: row.input_tokens,
             output_tokens: row.output_tokens,
             failure_reason: row.failure_reason,
+            resolution: row.resolution,
+            recovery_actor: row.recovery_actor,
+            recovery_approval_id: row.recovery_approval_id,
+            reconciliation_actor: row.reconciliation_actor,
+            reconciliation_approval_id: row.reconciliation_approval_id,
         }
     }
 }

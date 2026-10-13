@@ -6299,6 +6299,10 @@ const PARAMS_1421: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "worker_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
 ];
+const PARAMS_1422: &[ReducerParam] = &[
+    ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
+    ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("RecoverAiProviderAttemptParams") },
+];
 
 pub const REDUCER_CONTRACTS: &[ReducerContract] = &[
     ReducerContract { name: "accept_ai_provider_attempt", contract_operation_id: "erp.accept_ai_provider_attempt", params: PARAMS_0, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: None, unscoped_reason: None },
@@ -7106,6 +7110,7 @@ pub const REDUCER_CONTRACTS: &[ReducerContract] = &[
     ReducerContract { name: "record_whatsapp_health_check", contract_operation_id: "erp.record_whatsapp_health_check", params: PARAMS_802, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: None, unscoped_reason: None },
     ReducerContract { name: "record_whatsapp_message_sent", contract_operation_id: "erp.record_whatsapp_message_sent", params: PARAMS_803, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: None, unscoped_reason: None },
     ReducerContract { name: "record_workflow_outbox_result", contract_operation_id: "erp.record_workflow_outbox_result", params: PARAMS_804, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "recover_ai_provider_attempt", contract_operation_id: "erp.recover_ai_provider_attempt", params: PARAMS_1422, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: None, unscoped_reason: None },
     ReducerContract { name: "refresh_capacity_forecast", contract_operation_id: "erp.refresh_capacity_forecast", params: PARAMS_805, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
     ReducerContract { name: "refresh_hr_capacity_forecast", contract_operation_id: "erp.refresh_hr_capacity_forecast", params: PARAMS_806, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
     ReducerContract { name: "refresh_inventory_exceptions", contract_operation_id: "erp.refresh_inventory_exceptions", params: PARAMS_807, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
@@ -8542,6 +8547,7 @@ pub mod reducer_names {
     pub const RECORD_WHATSAPP_HEALTH_CHECK: ReducerName = ReducerName::new("record_whatsapp_health_check");
     pub const RECORD_WHATSAPP_MESSAGE_SENT: ReducerName = ReducerName::new("record_whatsapp_message_sent");
     pub const RECORD_WORKFLOW_OUTBOX_RESULT: ReducerName = ReducerName::new("record_workflow_outbox_result");
+    pub const RECOVER_AI_PROVIDER_ATTEMPT: ReducerName = ReducerName::new("recover_ai_provider_attempt");
     pub const REFRESH_CAPACITY_FORECAST: ReducerName = ReducerName::new("refresh_capacity_forecast");
     pub const REFRESH_HR_CAPACITY_FORECAST: ReducerName = ReducerName::new("refresh_hr_capacity_forecast");
     pub const REFRESH_INVENTORY_EXCEPTIONS: ReducerName = ReducerName::new("refresh_inventory_exceptions");
@@ -9968,6 +9974,7 @@ macro_rules! reducer_call {
     ("record_whatsapp_health_check", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::RECORD_WHATSAPP_HEALTH_CHECK, $args) };
     ("record_whatsapp_message_sent", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::RECORD_WHATSAPP_MESSAGE_SENT, $args) };
     ("record_workflow_outbox_result", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::RECORD_WORKFLOW_OUTBOX_RESULT, $args) };
+    ("recover_ai_provider_attempt", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::RECOVER_AI_PROVIDER_ATTEMPT, $args) };
     ("refresh_capacity_forecast", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::REFRESH_CAPACITY_FORECAST, $args) };
     ("refresh_hr_capacity_forecast", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::REFRESH_HR_CAPACITY_FORECAST, $args) };
     ("refresh_inventory_exceptions", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::REFRESH_INVENTORY_EXCEPTIONS, $args) };
