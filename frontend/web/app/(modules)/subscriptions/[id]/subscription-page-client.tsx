@@ -36,7 +36,7 @@ import {
 import { Skeleton } from '@lumiere/ui/components/skeleton';
 import { showWorkflowToast } from '@lumiere/ui/lib/workflow-toast';
 import { useAccountMoves, useAccountPayments } from '@lumiere/query-hooks/hooks/accounting';
-import { subscriptionRecordLinks } from '@lumiere/query-hooks/hooks/cross-record-links';
+import { subscriptionHandoffs } from '@lumiere/query-hooks/hooks/subscription-handoffs';
 import {
   useSubscriptionAmendments,
   useSubscriptionBillingRuns,
@@ -49,7 +49,7 @@ import { useSubscriptionsModuleSubscription } from '@/lib/module-subscription-ho
 import { useRecordNavigation } from '@/hooks/use-record-navigation';
 import { hasValidOrganizationId, orgBigInts } from '@/lib/org-scoped';
 import { RecordDocumentAttachments } from '../../../../components/record-document-attachments';
-import { CrossRecordLinks } from '../../../../components/order-handoff-links';
+import { SubscriptionHandoffLinks } from '../../../../components/subscription-handoff-links';
 import { subscriptionStateOf, subscriptionStatusBar } from '../subscription-status';
 import { subscriptionPageActions, type SubscriptionActionId } from '../subscription-actions';
 import { isSubscriptionDialogAction, useSubscriptionActions } from '../use-subscription-actions';
@@ -88,9 +88,9 @@ function SubscriptionPageLoaded({
   const { data: subscriptions = [], isLoading } = useSubscriptions(orgId, initialSubscriptions);
   const { data: lines = [] } = useSubscriptionLines(orgId);
   const { data: amendments = [] } = useSubscriptionAmendments(orgId);
-  const { data: billingRuns = [], isLoading: runsLoading, isError: runsError } = useSubscriptionBillingRuns(orgId);
-  const { data: accountMoves = [], isLoading: movesLoading, isError: movesError } = useAccountMoves(orgId);
-  const { data: accountPayments = [], isLoading: paymentsLoading, isError: paymentsError } = useAccountPayments(orgId);
+  const { data: billingRuns = [], isPending: runsLoading, isError: runsError } = useSubscriptionBillingRuns(orgId);
+  const { data: accountMoves = [], isPending: movesLoading, isError: movesError } = useAccountMoves(orgId);
+  const { data: accountPayments = [], isPending: paymentsLoading, isError: paymentsError } = useAccountPayments(orgId);
 
   const subscriptionActions = useSubscriptionActions(orgId, operatingCompanyId);
 
@@ -186,12 +186,13 @@ function SubscriptionPageLoaded({
     mode: 'detail' as const,
     sections: [{ id: 'subscription', fields: columns.map(({ width: _width, ...field }) => field) }],
   };
-  const billingLinks = subscriptionRecordLinks(
-    subscription as never,
+  // Same canonical chain and filters as the list record sheet (subscriptions-client.tsx).
+  const billingHandoffs = subscriptionHandoffs(
+    subscription,
     { organizationId: orgId, companyId: operatingCompanyId },
-    billingRuns as never,
-    accountMoves as never,
-    paymentsError || paymentsLoading ? undefined : (accountPayments as never),
+    billingRuns,
+    accountMoves,
+    accountPayments,
   );
 
   const busy = subscriptionActions.pending;
@@ -330,19 +331,17 @@ function SubscriptionPageLoaded({
         {
           id: 'billing',
           label: t('subscriptions.page.billing', { defaultValue: 'Invoices & payments' }),
-          content:
-            runsLoading || movesLoading ? (
-              <p>{t('common.loading', { defaultValue: 'Loading…' })}</p>
-            ) : (
-              <CrossRecordLinks
-                testIdPrefix="subscription-handoff"
-                result={
-                  runsError || movesError
-                    ? { status: 'unavailable', links: [], reason: 'Linked billing records are unavailable' }
-                    : billingLinks
-                }
-              />
-            ),
+          content: (
+            <div className="p-4">
+              {runsError || movesError || paymentsError ? (
+                <p role="alert">{t('subscriptions.handoffs.error')}</p>
+              ) : runsLoading || movesLoading || paymentsLoading ? (
+                <p role="status">{t('subscriptions.handoffs.loading')}</p>
+              ) : (
+                <SubscriptionHandoffLinks handoffs={billingHandoffs} />
+              )}
+            </div>
+          ),
         },
         {
           id: 'discussion',
