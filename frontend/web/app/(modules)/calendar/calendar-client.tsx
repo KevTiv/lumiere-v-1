@@ -6,6 +6,7 @@ import { useCalendarModuleSubscription } from "@/lib/module-subscription-hooks"
 import { toCreateCalendarEventParams } from "@/lib/calendar-create-params"
 import { toCreateActivityParams } from "@/lib/crm-create-params"
 import { useTranslation } from "@lumiere/i18n"
+import { useConfirmDialog } from "@lumiere/ui/hooks/use-confirm-dialog"
 import { useCalendarEvents, useCreateCalendarEvent, useUpdateCalendarEvent, useDeleteCalendarEvent } from "@lumiere/query-hooks/hooks/calendar"
 import type { UpdateCalendarEventParams, CalendarEvent as StdbCalendarEvent } from "@lumiere/query-hooks/hooks/calendar"
 import { useActivities, useCreateActivity } from "@lumiere/query-hooks/hooks/crm"
@@ -14,6 +15,9 @@ import { FormModal, ModuleView, newCalendarEventForm, newActivityForm, MissingOr
 import { useEffect, useMemo, useState } from "react"
 import { CalendarView } from "../../../../packages/ui/src/calendar-components/calendar-view"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
+import { calendarEventHref } from "./calendar-event"
+import { withInlineEdits } from "@lumiere/ui/lib/with-inline-edits"
+import { requiredInlineText } from "@/lib/inline-edit-params"
 
 interface CalendarClientProps {
   initialEvents?: StdbCalendarEvent[]
@@ -38,6 +42,7 @@ export function CalendarClient(props: CalendarClientProps) {
 function CalendarClientLoaded({ initialEvents, organizationId }: CalendarClientLoadedProps) {
   useCalendarModuleSubscription()
   const { t } = useTranslation()
+  const { confirm: confirmDialog, dialog: confirmDialogNode } = useConfirmDialog()
   const moduleConfig = useMemo(() => calendarModuleConfig(t), [t])
   const { orgId } = orgBigInts(organizationId)
   const [quickActionForm, setQuickActionForm] = useState<{ form: FormConfig; action: string; eventId?: string } | null>(null)
@@ -105,6 +110,45 @@ function CalendarClientLoaded({ initialEvents, organizationId }: CalendarClientL
             createForm: newActivityForm(t),
           }
         }
+        if (tab.id === "events") {
+          return {
+            ...tab,
+            entityConfig: tab.entityConfig
+              ? withInlineEdits(tab.entityConfig, {
+                  name: {
+                    kind: "text",
+                    save: async (row, value) => {
+                      const name = requiredInlineText(
+                        value,
+                        t("calendar.inlineEdit.nameRequired", { defaultValue: "An event needs a title" }),
+                      )
+                      await updateCalendarEvent.mutateAsync({ eventId: row.id as string | number, params: { name } })
+                    },
+                  },
+                })
+              : tab.entityConfig,
+            recordSheet: {
+              titleKey: "name",
+              auditTableName: "calendar_event",
+              discussion: {},
+              openHref: calendarEventHref,
+              detailConfig: {
+                mode: "detail" as const,
+                sections: [
+                  {
+                    id: "event",
+                    fields: [
+                      { key: "start", label: t("calendar.events.columns.start"), type: "datetime" as const },
+                      { key: "stop", label: t("calendar.events.columns.stop"), type: "datetime" as const },
+                      { key: "location", label: t("calendar.events.columns.location") },
+                      { key: "description", label: "Description" },
+                    ],
+                  },
+                ],
+              },
+            },
+          }
+        }
         if (tab.id === "calendar") {
           const uiEvents: UICalendarEvent[] = events.map((e) => ({
             id: String(e.id),
@@ -157,8 +201,9 @@ function CalendarClientLoaded({ initialEvents, organizationId }: CalendarClientL
                     })
                   }
                 }}
-                onDeleteEvent={(eventId) => {
-                  if (confirm(t("calendar.confirmDelete"))) {
+                eventHref={(eventId) => calendarEventHref({ id: eventId })}
+                onDeleteEvent={async (eventId) => {
+                  if (await confirmDialog({ description: t("calendar.confirmDelete") })) {
                     deleteCalendarEvent.mutate(eventId, {
                       onSuccess: () => setSelectedEventId(null),
                     })
@@ -171,7 +216,7 @@ function CalendarClientLoaded({ initialEvents, organizationId }: CalendarClientL
         return tab
       }),
     }),
-    [viewMode, selectedEventId, selectedDate, searchTerm, events, currentDate, liveSections, moduleConfig, t],
+    [viewMode, selectedEventId, selectedDate, searchTerm, events, currentDate, liveSections, moduleConfig, t, updateCalendarEvent, confirmDialog],
   )
 
   const data = useMemo(
@@ -247,6 +292,7 @@ function CalendarClientLoaded({ initialEvents, organizationId }: CalendarClientL
           }
         }}
       />
+      {confirmDialogNode}
     </>
   )
 }

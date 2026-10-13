@@ -1,7 +1,7 @@
 //! Timer and crash/replay behavior; simulation support is test-only.
 use super::adapter::{dispatch_allowlisted, outbox_record_idempotency_key, OutboxPayload};
-use super::outbox::fresh_lease_token_at;
-use super::timers::{timer_fire_idempotency_key, timer_is_due};
+use super::outbox::{fresh_lease_token_at, select_pending_jobs, QueueJobRow};
+use super::timers::{select_due_timers, timer_fire_idempotency_key, timer_is_due, TimerRow};
 use super::*;
 
 /// Forced crash points for Gate W crash/replay suite (WF-10–WF-12).
@@ -94,6 +94,114 @@ fn dispatch_env_flag_defaults_off() {
         .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
         .unwrap_or(false);
     let _ = enabled;
+}
+
+#[test]
+fn pending_timer_organizations_filter_deduplicate_sort_and_bound() {
+    let mut rows = (1..=105)
+        .rev()
+        .map(|organization_id| TimerOrganizationRow {
+            organization_id,
+            status: "Pending".into(),
+        })
+        .collect::<Vec<_>>();
+    rows.push(TimerOrganizationRow {
+        organization_id: 3,
+        status: "Pending".into(),
+    });
+    rows.push(TimerOrganizationRow {
+        organization_id: 2,
+        status: "Fired".into(),
+    });
+
+    let selected = pending_organization_ids(rows);
+
+    assert_eq!(selected.len(), ORGANIZATION_SCAN_LIMIT);
+    assert_eq!(selected.first(), Some(&1));
+    assert_eq!(selected.last(), Some(&100));
+}
+
+#[test]
+fn due_timer_selection_preserves_tenant_status_order_and_bound() {
+    let mut rows = (1..=BATCH_SIZE + 2)
+        .rev()
+        .map(|id| TimerRow {
+            id: id as u64,
+            organization_id: 7,
+            company_id: 11,
+            revision: 1,
+            instance_id: 100 + id as u64,
+            status: "Pending".into(),
+            due_at: json!({"microsSinceUnixEpoch": id as u64}),
+        })
+        .collect::<Vec<_>>();
+    rows.push(TimerRow {
+        id: 200,
+        organization_id: 8,
+        company_id: 11,
+        revision: 1,
+        instance_id: 200,
+        status: "Pending".into(),
+        due_at: json!({"microsSinceUnixEpoch": 1}),
+    });
+    rows.push(TimerRow {
+        id: 201,
+        organization_id: 7,
+        company_id: 11,
+        revision: 1,
+        instance_id: 201,
+        status: "Fired".into(),
+        due_at: json!({"microsSinceUnixEpoch": 1}),
+    });
+    rows.push(TimerRow {
+        id: 202,
+        organization_id: 7,
+        company_id: 11,
+        revision: 1,
+        instance_id: 202,
+        status: "Pending".into(),
+        due_at: json!({"microsSinceUnixEpoch": 10_001}),
+    });
+
+    let selected = select_due_timers(rows, 7, 10_000);
+
+    assert_eq!(selected.len(), BATCH_SIZE);
+    assert_eq!(selected.first().map(|row| row.id), Some(1));
+    assert_eq!(selected.last().map(|row| row.id), Some(BATCH_SIZE as u64));
+}
+
+#[test]
+fn pending_outbox_selection_preserves_tenant_status_order_and_bound() {
+    let mut rows = (1..=BATCH_SIZE + 2)
+        .rev()
+        .map(|id| QueueJobRow {
+            id: id as u64,
+            organization_id: 7,
+            revision: 1,
+            payload: "{}".into(),
+            status: "Pending".into(),
+        })
+        .collect::<Vec<_>>();
+    rows.push(QueueJobRow {
+        id: 200,
+        organization_id: 8,
+        revision: 1,
+        payload: "{}".into(),
+        status: "Pending".into(),
+    });
+    rows.push(QueueJobRow {
+        id: 201,
+        organization_id: 7,
+        revision: 1,
+        payload: "{}".into(),
+        status: "Leased".into(),
+    });
+
+    let selected = select_pending_jobs(rows, 7);
+
+    assert_eq!(selected.len(), BATCH_SIZE);
+    assert_eq!(selected.first().map(|row| row.id), Some(1));
+    assert_eq!(selected.last().map(|row| row.id), Some(BATCH_SIZE as u64));
 }
 
 #[test]

@@ -8,7 +8,11 @@ import type {
   PolicyResult,
 } from "@lumiere/erp-shared/ai-policy-schemas"
 import { apiFetch } from "../http"
-import type { GatewayActionDraft } from "./ai-action-drafts"
+import {
+  normalizeGatewayActionDraftResponse,
+  type GatewayActionDraft,
+  type GatewayActionDraftWireDto,
+} from "./ai-action-drafts"
 
 export type { AiUiContext } from "../ai-ui-context"
 
@@ -19,11 +23,11 @@ export function useAiActionDraft() {
     mutationFn: async (args: {
       companyId: number
       query: string
-      ui_context?: AiUiContext
-      allowed_reducers?: string[]
-      allowed_entity_types?: string[]
-      agent_id?: number
-      team_member_id?: number
+      uiContext?: AiUiContext
+      allowedReducers?: string[]
+      allowedEntityTypes?: string[]
+      agentId?: number
+      teamMemberId?: number
     }) => {
       const r = await apiFetch("/api/ai/actions/draft", {
         method: "POST",
@@ -31,17 +35,18 @@ export function useAiActionDraft() {
         body: JSON.stringify({
           companyId: args.companyId,
           query: args.query,
-          ...(args.ui_context ? { ui_context: args.ui_context } : {}),
-          ...(args.allowed_reducers?.length ? { allowed_reducers: args.allowed_reducers } : {}),
-          ...(args.allowed_entity_types?.length
-            ? { allowed_entity_types: args.allowed_entity_types }
+          ...(args.uiContext ? { ui_context: args.uiContext } : {}),
+          ...(args.allowedReducers?.length ? { allowed_reducers: args.allowedReducers } : {}),
+          ...(args.allowedEntityTypes?.length
+            ? { allowed_entity_types: args.allowedEntityTypes }
             : {}),
-          ...(args.agent_id != null ? { agent_id: args.agent_id } : {}),
-          ...(args.team_member_id != null ? { team_member_id: args.team_member_id } : {}),
+          ...(args.agentId != null ? { agent_id: args.agentId } : {}),
+          ...(args.teamMemberId != null ? { team_member_id: args.teamMemberId } : {}),
         }),
       })
       if (!r.ok) throw new Error(await parseAiError(r))
-      return (await r.json()) as { drafts: GatewayActionDraft[] }
+      const wire = (await r.json()) as { drafts?: GatewayActionDraftWireDto[] }
+      return normalizeGatewayActionDraftResponse(wire)
     },
   })
 }

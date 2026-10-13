@@ -1,10 +1,13 @@
 "use client"
 import { mapDashboardWidgets, withDashboardSections } from "@lumiere/ui/lib/dashboard-sections"
+import { withInlineEdits } from "@lumiere/ui/lib/with-inline-edits"
+import { requiredInlineText, ticketPriorityPatch } from "@/lib/inline-edit-params"
 
 import { useMemo, useState } from "react"
 import { useTranslation } from "@lumiere/i18n"
 import {
   ModuleView,
+  RecordChatter,
   FormModal,
   newHelpdeskTicketForm,
   newHelpdeskTeamForm,
@@ -14,6 +17,7 @@ import {
   MissingOrganization,
   mergeSelectOptionsForFields,
   helpdeskTicketDetailForm,
+  helpdeskTicketsWithBoard,
 } from "@lumiere/ui"
 import type { FormConfig, ModuleConfig, EntityAction, EntityTableConfig, EntityViewConfig } from "@lumiere/ui"
 import { helpdeskModuleConfig } from "@/lib/module-dashboard-configs"
@@ -253,10 +257,11 @@ function HelpdeskClientLoaded({
         label: t("helpdesk.forms.ticketDetail.closeTicket"),
         icon: XCircle,
         requiresSelection: true,
+        isApplicable: (rows) => rows.every((row) => helpdeskEnumTag(row.state) !== "Closed"),
+        successMessage: t("common.actionCompleted", { action: t("helpdesk.forms.ticketDetail.closeTicket") }),
         onClick: async (rows) => {
           const row = rows[0]
           if (!row?.id) return
-          if (helpdeskEnumTag(row.state) === "Closed") return
           await closeTicket.mutateAsync({ ticketId: Number(row.id) })
         },
       },
@@ -265,11 +270,15 @@ function HelpdeskClientLoaded({
         label: t("helpdesk.forms.ticketDetail.reopenTicket"),
         icon: RotateCcw,
         requiresSelection: true,
+        isApplicable: (rows) =>
+          rows.every((row) => {
+            const st = helpdeskEnumTag(row.state)
+            return st === "Closed" || st === "Cancelled"
+          }),
+        successMessage: t("common.actionCompleted", { action: t("helpdesk.forms.ticketDetail.reopenTicket") }),
         onClick: async (rows) => {
           const row = rows[0]
           if (!row?.id) return
-          const st = helpdeskEnumTag(row.state)
-          if (st !== "Closed" && st !== "Cancelled") return
           await reopenTicket.mutateAsync({ ticketId: Number(row.id) })
         },
       },
@@ -287,14 +296,35 @@ function HelpdeskClientLoaded({
       }
     }
     const view = base.view as EntityTableConfig
-    return {
-      ...base,
-      view: {
-        ...view,
-        actions: ticketRowActions,
+    return withInlineEdits(
+      {
+        ...base,
+        view: {
+          ...view,
+          actions: ticketRowActions,
+        },
       },
-    }
-  }, [moduleConfig.tabs, t, ticketRowActions])
+      {
+        name: {
+          kind: "text",
+          save: async (row, value) => {
+            const name = requiredInlineText(
+              value,
+              t("helpdesk.inlineEdit.nameRequired", { defaultValue: "A ticket needs a subject" }),
+            )
+            await updateTicket.mutateAsync({ ticketId: Number(row.id), params: { name } })
+          },
+        },
+        priority: {
+          kind: "select",
+          options: priorityOptions,
+          save: async (row, value) => {
+            await updateTicket.mutateAsync({ ticketId: Number(row.id), params: ticketPriorityPatch(value) })
+          },
+        },
+      },
+    )
+  }, [moduleConfig.tabs, t, ticketRowActions, updateTicket, priorityOptions])
 
   const liveSections = useMemo(() => {
     const active = tickets.filter((tk) => {
@@ -348,7 +378,7 @@ function HelpdeskClientLoaded({
             return {
               ...tab,
               createForm: ticketFormConfig,
-              entityConfig: ticketsEntityConfig,
+              entityConfig: helpdeskTicketsWithBoard(t, ticketsEntityConfig),
             }
           }
           if (tab.id === "teams") return { ...tab, createForm: teamFormConfig }
@@ -499,6 +529,16 @@ function HelpdeskClientLoaded({
           formConfig={ticketDetailFormConfig}
           stateTag={helpdeskEnumTag(selectedTicket.state)}
           isBusy={ticketBusy}
+          discussion={
+            organizationId && /^\d+$/.test(String(selectedTicket.id)) ? (
+              <RecordChatter
+                organizationId={organizationId}
+                resModel="helpdesk_ticket"
+                resId={BigInt(String(selectedTicket.id))}
+                recordTitle={String(selectedTicket.name ?? "")}
+              />
+            ) : undefined
+          }
           onSave={handleTicketSave}
           onCloseTicket={async () => {
             if (!selectedTicket) return

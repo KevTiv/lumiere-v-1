@@ -216,13 +216,15 @@ pub(crate) async fn ensure_runtime_role_grants(
     projection_user: &str,
     finalization_user: &str,
     reconstruction_user: &str,
-    finalization_tables: &[String],
+    finalization_read_tables: &[String],
+    finalization_write_tables: &[String],
 ) -> Result<()> {
     let sql = runtime_role_grants_sql(
         projection_user,
         finalization_user,
         reconstruction_user,
-        finalization_tables,
+        finalization_read_tables,
+        finalization_write_tables,
     )?;
     pool.get()
         .await
@@ -236,16 +238,31 @@ fn runtime_role_grants_sql(
     projection_user: &str,
     finalization_user: &str,
     reconstruction_user: &str,
-    finalization_tables: &[String],
+    finalization_read_tables: &[String],
+    finalization_write_tables: &[String],
 ) -> Result<String> {
     let projection = quote_identifier(projection_user)?;
     let finalization = quote_identifier(finalization_user)?;
     let reconstruction = quote_identifier(reconstruction_user)?;
-    let mut finalization_relations = vec!["organization_projection_watermark".to_string()];
-    finalization_relations.extend(finalization_tables.iter().cloned());
+    let mut finalization_relations = vec![
+        "archive_transfer".to_string(),
+        "organization_commit".to_string(),
+        "organization_projection_watermark".to_string(),
+        "organization_row_change".to_string(),
+    ];
+    finalization_relations.extend(finalization_read_tables.iter().cloned());
     finalization_relations.sort();
     finalization_relations.dedup();
     let finalization_relations = finalization_relations
+        .iter()
+        .map(|table| quote_identifier(table))
+        .collect::<Result<Vec<_>>>()?
+        .join(", ");
+    let mut finalization_write_relations = vec!["archive_transfer".to_string()];
+    finalization_write_relations.extend(finalization_write_tables.iter().cloned());
+    finalization_write_relations.sort();
+    finalization_write_relations.dedup();
+    let finalization_write_relations = finalization_write_relations
         .iter()
         .map(|table| quote_identifier(table))
         .collect::<Result<Vec<_>>>()?
@@ -258,6 +275,7 @@ fn runtime_role_grants_sql(
          GRANT USAGE, SELECT, UPDATE ON ALL SEQUENCES IN SCHEMA public TO {projection};\n\
          GRANT SELECT ON ALL TABLES IN SCHEMA public TO {reconstruction};\n\
          GRANT SELECT ON TABLE {finalization_relations} TO {finalization};\n\
+         GRANT INSERT, UPDATE ON TABLE {finalization_write_relations} TO {finalization};\n\
          ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO {projection};\n\
          ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT USAGE, SELECT, UPDATE ON SEQUENCES TO {projection};\n\
          ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO {reconstruction};"
@@ -547,16 +565,20 @@ mod tests {
             "projection_worker",
             "finalization_worker",
             "reconstruction_worker",
+            &["pos_order".to_string(), "cold_pos_order".to_string()],
             &["cold_pos_order".to_string()],
         )
         .expect("grant SQL");
         assert!(sql.contains(
-            "GRANT SELECT ON TABLE \"cold_pos_order\", \"organization_projection_watermark\" TO \"finalization_worker\""
+            "GRANT SELECT ON TABLE \"archive_transfer\", \"cold_pos_order\", \"organization_commit\", \"organization_projection_watermark\", \"organization_row_change\", \"pos_order\" TO \"finalization_worker\""
+        ));
+        assert!(sql.contains(
+            "GRANT INSERT, UPDATE ON TABLE \"archive_transfer\", \"cold_pos_order\" TO \"finalization_worker\""
         ));
         assert!(sql
             .contains("GRANT SELECT ON ALL TABLES IN SCHEMA public TO \"reconstruction_worker\""));
         assert!(!sql.contains("DELETE ON ALL TABLES IN SCHEMA public TO \"finalization_worker\""));
         assert!(!sql.contains("DELETE ON ALL TABLES IN SCHEMA public TO \"reconstruction_worker\""));
-        assert!(runtime_role_grants_sql("bad-role", "finalizer", "reader", &[]).is_err());
+        assert!(runtime_role_grants_sql("bad-role", "finalizer", "reader", &[], &[]).is_err());
     }
 }

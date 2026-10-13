@@ -15,8 +15,14 @@ export type SubscriptionHandoff = { readonly id: bigint; readonly name: string; 
 export type SubscriptionHandoffs = {
   readonly invoices: readonly SubscriptionHandoff[]
   readonly payments: readonly SubscriptionHandoff[]
-  /** A billing run names an invoice that the available projection cannot uniquely resolve. */
+  /** A billing run names an invoice that the available projection cannot resolve. */
   readonly unavailable: boolean
+  /**
+   * A canonical relation is duplicated (same invoice on two runs, two rows for one ID, a repeated
+   * reconciliation ID, or two rows for one payment). Never deduplicated or resolved to first/latest:
+   * invoice-side duplicates withhold every link; payment-side duplicates withhold only payments.
+   */
+  readonly invariantFailure: boolean
 }
 
 function inScope(row: SubscriptionHandoffProjection, scope: OrderToCashScope): boolean {
@@ -31,6 +37,9 @@ function ids(value: unknown): bigint[] {
   }) : []
 }
 
+const invariantFailure = (): SubscriptionHandoffs =>
+  ({ invoices: [], payments: [], unavailable: false, invariantFailure: true })
+
 /** Canonical read-only billing chain: subscription → billing run → invoice ← reconciled payment. */
 export function subscriptionHandoffs(
   subscription: SubscriptionHandoffProjection,
@@ -41,7 +50,7 @@ export function subscriptionHandoffs(
 ): SubscriptionHandoffs {
   const subscriptionId = parseStrictU64(subscription.id)
   if (subscriptionId == null || subscriptionId === 0n || !inScope(subscription, scope)) {
-    return { invoices: [], payments: [], unavailable: true }
+    return { invoices: [], payments: [], unavailable: true, invariantFailure: false }
   }
   const invoiceIds = new Set<bigint>()
   let unavailable = false
@@ -49,13 +58,15 @@ export function subscriptionHandoffs(
     if (!inScope(run, scope) || parseStrictU64(run.subscriptionId ?? run.subscription_id) !== subscriptionId) continue
     const invoiceId = parseStrictU64(run.invoiceMoveId ?? run.invoice_move_id)
     if (invoiceId == null || invoiceId === 0n) { unavailable = true; continue }
+    if (invoiceIds.has(invoiceId)) return invariantFailure()
     invoiceIds.add(invoiceId)
   }
   const invoices: SubscriptionHandoff[] = []
   for (const id of invoiceIds) {
     const matches = moves.filter((move) => inScope(move, scope) && parseStrictU64(move.id) === id)
+    if (matches.length > 1) return invariantFailure()
     const move = matches[0]
-    if (matches.length !== 1 || !move || stateName(move.moveType ?? move.move_type) !== "outinvoice") {
+    if (!move || stateName(move.moveType ?? move.move_type) !== "outinvoice") {
       unavailable = true
       continue
     }
@@ -64,20 +75,26 @@ export function subscriptionHandoffs(
     invoices.push({ id, name: String(move.name ?? ""), state })
   }
   const resolvedInvoiceIds = new Set(invoices.map((invoice) => invoice.id))
-  const linkedPayments = payments.filter((payment) => inScope(payment, scope)
-    && stateName(payment.state) === "paid"
-    && ids(payment.reconciledInvoiceIds ?? payment.reconciled_invoice_ids).some((id) => resolvedInvoiceIds.has(id)))
-  const paymentCounts = new Map<bigint, number>()
-  for (const payment of linkedPayments) {
-    const id = parseStrictU64(payment.id)
-    if (id != null) paymentCounts.set(id, (paymentCounts.get(id) ?? 0) + 1)
+  const byId = (a: SubscriptionHandoff, b: SubscriptionHandoff) => a.id < b.id ? -1 : a.id > b.id ? 1 : 0
+  const sortedInvoices = invoices.sort(byId)
+  const linkedPayments: SubscriptionHandoffProjection[] = []
+  for (const payment of payments) {
+    if (!inScope(payment, scope) || stateName(payment.state) !== "paid") continue
+    const reconciled = ids(payment.reconciledInvoiceIds ?? payment.reconciled_invoice_ids)
+    if (!reconciled.some((id) => resolvedInvoiceIds.has(id))) continue
+    if (new Set(reconciled).size !== reconciled.length) {
+      return { invoices: sortedInvoices, payments: [], unavailable, invariantFailure: true }
+    }
+    linkedPayments.push(payment)
   }
   const paymentLinks: SubscriptionHandoff[] = []
+  const seenPayments = new Set<bigint>()
   for (const payment of linkedPayments) {
     const id = parseStrictU64(payment.id)
-    if (id == null || id === 0n || paymentCounts.get(id) !== 1) { unavailable = true; continue }
+    if (id == null || id === 0n) { unavailable = true; continue }
+    if (seenPayments.has(id)) return { invoices: sortedInvoices, payments: [], unavailable, invariantFailure: true }
+    seenPayments.add(id)
     paymentLinks.push({ id, name: String(payment.name ?? ""), state: stateName(payment.state) })
   }
-  const byId = (a: SubscriptionHandoff, b: SubscriptionHandoff) => a.id < b.id ? -1 : a.id > b.id ? 1 : 0
-  return { invoices: invoices.sort(byId), payments: paymentLinks.sort(byId), unavailable }
+  return { invoices: sortedInvoices, payments: paymentLinks.sort(byId), unavailable, invariantFailure: false }
 }

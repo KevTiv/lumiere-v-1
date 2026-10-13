@@ -11,9 +11,7 @@
 import { cookies } from 'next/headers'
 import type { FieldAccessContext, StdbHttpOptions } from '@lumiere/stdb/server'
 import { resolveApiServerBaseUrl } from '@/lib/api-server-forward'
-import { serverQueryUserOrganizationWithFallback } from '@/lib/stdb-org-resolve'
 import { callReducer } from '@/lib/stdb-reducer'
-import { decodeIdentityHexFromStdbToken } from '@/lib/stdb-token-identity'
 
 /** Mirrors `stdb_config::runtime_is_production` — dev bypasses must not run in prod. */
 export function runtimeIsProduction(): boolean {
@@ -23,57 +21,43 @@ export function runtimeIsProduction(): boolean {
   )
 }
 
-/** When true with `NEXT_PUBLIC_DEV_ADMIN`, auto-call `ensure_dev_admin` and dev seed org fallbacks. */
+/** Optional provisioning for an already authenticated development caller. */
 const DEV_ADMIN_AUTO_ORG = process.env.NEXT_PUBLIC_DEV_ADMIN_AUTO_ORG === 'true'
 
 const DEV_ADMIN_ENABLED = process.env.NEXT_PUBLIC_DEV_ADMIN === 'true'
 
-function devSeedOrgId(): number | undefined {
-  const raw = process.env['NEXT_PUBLIC_DEV_SEED_ORG_ID'] ?? process.env['DEV_SEED_ORG_ID']
-  if (!raw) return undefined
-  const n = Number(raw)
-  return Number.isFinite(n) && n > 0 ? n : undefined
+type VerifiedSession = {
+  identityHex: string
+  organizationId: number | undefined
+  fieldAccess?: FieldAccessContext
 }
 
-/** Field-access context is built only on the Rust api-server (`load_field_access_context`); avoid duplicating STDB queries in Next. */
-async function fetchFieldAccessFromApiServer(input: {
-  token: string
-  identityHex: string
-  cookieHeader?: string
-}): Promise<FieldAccessContext | undefined> {
+/** Resolve actor, membership and policy together from the trusted API authority. */
+async function fetchVerifiedSession(token: string): Promise<VerifiedSession | null> {
   const base = resolveApiServerBaseUrl()
-  if (!base) return undefined
-
-  const headers = new Headers()
-  headers.set('Authorization', `Bearer ${input.token.trim()}`)
-  if (input.identityHex && input.identityHex !== 'unknown') {
-    headers.set('x-stdb-identity', input.identityHex)
-  }
-  if (input.cookieHeader) {
-    headers.set('Cookie', input.cookieHeader)
-  }
+  if (!base) return null
 
   try {
     const res = await fetch(`${base}/v1/session/field-access`, {
-      headers,
+      headers: { Authorization: `Bearer ${token}` },
       cache: 'no-store',
     })
-    if (!res.ok) return undefined
-    const data = (await res.json()) as { fieldAccess?: FieldAccessContext | null }
-    return data.fieldAccess ?? undefined
+    if (!res.ok) return null
+    const data = (await res.json()) as {
+      identityHex?: unknown
+      organizationId?: unknown
+      fieldAccess?: FieldAccessContext | null
+    }
+    if (typeof data.identityHex !== 'string' || !/^[0-9a-f]{64}$/i.test(data.identityHex)) return null
+    if (data.organizationId != null &&
+      (typeof data.organizationId !== 'number' || !Number.isSafeInteger(data.organizationId) || data.organizationId <= 0)) return null
+    return {
+      identityHex: data.identityHex,
+      organizationId: (data.organizationId ?? undefined) as number | undefined,
+      fieldAccess: data.fieldAccess ?? undefined,
+    }
   } catch {
-    return undefined
-  }
-}
-
-async function browserCookieHeader(): Promise<string | undefined> {
-  try {
-    const store = await cookies()
-    const all = store.getAll()
-    if (all.length === 0) return undefined
-    return all.map((c) => `${c.name}=${c.value}`).join('; ')
-  } catch {
-    return undefined
+    return null
   }
 }
 
@@ -105,138 +89,60 @@ export interface ApiSession {
 export const getStdbSession = (req?: Request) => resolveApiSession(req)
 
 export async function resolveApiSession(req?: Request): Promise<ApiSession | null> {
-  // Dev mock: DEV_MOCK_ORG_ID + STDB_SERVER_TOKEN (local dev only — never in production).
-  if (!runtimeIsProduction()) {
-    const mockOrgId = process.env['DEV_MOCK_ORG_ID']
-    const mockToken = process.env['STDB_SERVER_TOKEN']?.trim()
-    if (mockOrgId && mockToken) {
-      const opts: StdbHttpOptions = { token: mockToken }
-      const organizationId = Number(mockOrgId)
-      const identityHex = 'dev-mock-identity'
-      let fieldAccess: FieldAccessContext | undefined
-      try {
-        fieldAccess = await fetchFieldAccessFromApiServer({
-          token: mockToken,
-          identityHex,
-        })
-      } catch {
-        fieldAccess = undefined
-      }
-      return {
-        stdbToken: mockToken,
-        identityHex,
-        organizationId,
-        opts,
-        fieldAccess,
-      }
-    }
-  }
-
   let token: string | undefined
-  let identityHex: string | undefined
+  let credentialsPresented = false
 
   if (req) {
-    // Expo/Mobile: Extract from Authorization header
     const authHeader = req.headers.get('authorization')
-    if (authHeader?.startsWith('Bearer ')) {
-      token = authHeader.slice(7)
+    credentialsPresented = authHeader !== null
+    if (authHeader !== null) {
+      // Explicit credentials must never fall back to the server's development identity.
+      if (!authHeader.startsWith('Bearer ') || !authHeader.slice(7).trim()) return null
+      token = authHeader.slice(7).trim()
     }
-
-    // Try to get identity from custom header (Expo can send this)
-    identityHex = req.headers.get('x-stdb-identity') || undefined
   }
 
-  // Web: If no token from header, try cookies
-  if (!token) {
+  // Web: If no bearer credentials were supplied, try the browser session.
+  if (!credentialsPresented) {
     try {
       const store = await cookies()
-      token = store.get('stdb_token')?.value ?? undefined
-      identityHex = store.get('stdb_identity')?.value ?? undefined
+      const tokenCookie = store.get('stdb_token')
+      credentialsPresented = tokenCookie !== undefined
+      token = tokenCookie?.value.trim()
     } catch {
-      // Cookies() throws if called outside of request context
-      // This is fine - we'll check for token below
+      // Cookies() throws outside a request context.
     }
   }
 
-  if (!token) {
-    return null
+  // Anonymous local development only: never replace an explicit caller's credentials.
+  if (!credentialsPresented && !runtimeIsProduction() && process.env['DEV_MOCK_ORG_ID']) {
+    token = process.env['STDB_SERVER_TOKEN']?.trim()
   }
 
-  // Recover identity from JWT when stdb_identity cookie is missing (e.g. legacy clients).
-  if (!identityHex) {
-    const fromJwt = decodeIdentityHexFromStdbToken(token)
-    if (fromJwt) identityHex = fromJwt
-  }
-
+  if (!token) return null
+  let verified = await fetchVerifiedSession(token)
+  if (!verified) return null
   const opts: StdbHttpOptions = { token }
 
-  let organizationId: number | undefined
-
-  // Only try to resolve organization if we have an identity
-  if (identityHex) {
-    try {
-      const orgs = await serverQueryUserOrganizationWithFallback(identityHex, opts)
-      const org = (orgs as Array<Record<string, unknown>>).find(
-        (o) => o['isDefault'],
-      ) ?? orgs[0]
-      if (org) {
-        organizationId = Number((org as Record<string, unknown>)['organizationId'])
-      }
-    } catch {
-      // No organization yet — user hasn't completed onboarding
-    }
-  }
-
-  // Dev: provision caller into the seeded / first org before RSC runs, so layout and
-  // /api/query see organizationId (client WS also calls ensureDevAdmin — idempotent).
   if (
+    !runtimeIsProduction() &&
     DEV_ADMIN_ENABLED &&
     DEV_ADMIN_AUTO_ORG &&
-    organizationId === undefined &&
-    identityHex &&
-    identityHex !== 'unknown'
+    verified.organizationId === undefined
   ) {
     try {
       await callReducer('ensure_dev_admin', [], opts)
-      const orgs = await serverQueryUserOrganizationWithFallback(identityHex, opts)
-      const org = (orgs as Array<Record<string, unknown>>).find(
-        (o) => o['isDefault'],
-      ) ?? orgs[0]
-      if (org) {
-        organizationId = Number((org as Record<string, unknown>)['organizationId'])
-      }
+      const provisioned = await fetchVerifiedSession(token)
+      if (!provisioned) return null
+      verified = provisioned
     } catch {
-      const fallbackId = devSeedOrgId()
-      if (fallbackId !== undefined) organizationId = fallbackId
-    }
-  }
-
-  // Dev admin: org id from env so /api/query and RSC role hydration work before membership sync.
-  if (DEV_ADMIN_ENABLED && DEV_ADMIN_AUTO_ORG && organizationId === undefined) {
-    const fallbackId = devSeedOrgId()
-    if (fallbackId !== undefined) organizationId = fallbackId
-  }
-
-  const resolvedIdentity = identityHex || 'unknown'
-  let fieldAccess: FieldAccessContext | undefined
-  if (organizationId !== undefined && resolvedIdentity !== 'unknown') {
-    const cookieHeader = req?.headers.get('cookie') ?? (await browserCookieHeader())
-    try {
-      fieldAccess = await fetchFieldAccessFromApiServer({
-        token,
-        identityHex: resolvedIdentity,
-        cookieHeader: cookieHeader ?? undefined,
-      })
-    } catch {
-      fieldAccess = undefined
+      // Remain authenticated but without membership; never infer a seeded org.
     }
   }
 
   return {
     stdbToken: token,
-    identityHex: resolvedIdentity,
-    organizationId,
     opts,
-    fieldAccess,
+    ...verified,
   }
 }

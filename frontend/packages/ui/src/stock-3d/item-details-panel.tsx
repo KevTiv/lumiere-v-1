@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from 'react'
+import { useConfirmDialog } from '../hooks/use-confirm-dialog'
 import { cn } from '../lib/utils'
 import { Button } from '../components/button'
 import { Input } from '../components/input'
@@ -38,6 +39,7 @@ const categoryLabels: Record<StockCategory, string> = {
 }
 
 export function ItemDetailsPanel({ className }: ItemDetailsPanelProps) {
+  const { confirm: confirmDialog, dialog: confirmDialogNode } = useConfirmDialog()
   const [isEditing, setIsEditing] = useState(false)
   const [editQuantity, setEditQuantity] = useState('')
 
@@ -69,8 +71,8 @@ export function ItemDetailsPanel({ className }: ItemDetailsPanelProps) {
     setEditQuantity('')
   }
 
-  const handleDelete = () => {
-    if (confirm(`Remove "${item.name}" from inventory?`)) {
+  const handleDelete = async () => {
+    if (await confirmDialog({ description: `Remove "${item.name}" from inventory?` })) {
       onRemoveItem?.(item.id)
       setSelectedItem(null)
     }
@@ -236,6 +238,7 @@ export function ItemDetailsPanel({ className }: ItemDetailsPanelProps) {
           </div>
         </div>
       </div>
+      {confirmDialogNode}
     </div>
   )
 }

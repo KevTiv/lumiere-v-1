@@ -142,6 +142,36 @@ describe("useFormConfiguration", () => {
     expect(result.current.config).toBeNull()
   })
 
+  it("resolves to no runtime overlay when the query proves no row and no registry default exists", async () => {
+    const { result } = renderHook(() =>
+      useFormConfiguration({ moduleId: "crm", formId: "edit-contact", organizationId: 1 })
+    )
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false)
+    })
+
+    expect(result.current.error).toBeNull()
+    expect(result.current.config).toBeNull()
+    expect(result.current.dbConfigurationId).toBe(0)
+  })
+
+  it("still reports a failed query for a form without a registry default", async () => {
+    const { stdbBrowserQuery } = await import("@lumiere/stdb/browser-http")
+    vi.mocked(stdbBrowserQuery).mockRejectedValueOnce(new Error("query failed"))
+
+    const { result } = renderHook(() =>
+      useFormConfiguration({ moduleId: "crm", formId: "edit-contact", organizationId: 1 })
+    )
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false)
+    })
+
+    expect(result.current.error).toBeTruthy()
+    expect(result.current.config).toBeNull()
+  })
+
   it("should parse field options correctly", async () => {
     const { result } = renderHook(() => useFormConfiguration(defaultOptions))
 

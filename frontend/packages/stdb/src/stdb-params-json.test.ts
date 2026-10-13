@@ -645,4 +645,16 @@ describe("camelToSnakeIdentifier", () => {
     assert.equal(camelToSnakeIdentifier("image1920Url"), "image_1920_url")
     assert.equal(camelToSnakeIdentifier("image128Url"), "image_128_url")
   })
+
+  it("preserves the generated 1K acronym boundary", () => {
+    assert.equal(camelToSnakeIdentifier("costPer1KTokens"), "cost_per_1k_tokens")
+    assert.equal(
+      camelToSnakeIdentifier("inputCostPer1KMicrounits"),
+      "input_cost_per_1k_microunits",
+    )
+    assert.equal(
+      camelToSnakeIdentifier("outputCostPer1KMicrounits"),
+      "output_cost_per_1k_microunits",
+    )
+  })
 })

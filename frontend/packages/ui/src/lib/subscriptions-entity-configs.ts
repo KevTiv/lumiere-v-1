@@ -1,5 +1,6 @@
 import type { TFunction } from "i18next"
 import type { EntityAction, EntityViewConfig } from "./entity-view-types"
+import { withReadOnlyStateBoard } from "./entity-state-board"
 
 const subscriptionStateBadges = (t: TFunction) => ({
   badgeVariants: { draft: "secondary", active: "default", paused: "outline", closed: "destructive" },
@@ -529,3 +530,17 @@ export const subscriptionsEntityConfigs = (t: TFunction): Record<string, EntityV
   "deferred-revenue-lines-table": deferredRevenueLinesTableConfig(t),
   "revenue-recognition-rules-table": revenueRecognitionRulesTableConfig(t),
 })
+
+/** Read-only board of subscriptions by state; state changes stay workflow actions. */
+export const subscriptionsWithBoard = (t: TFunction, config: EntityViewConfig): EntityViewConfig =>
+  withReadOnlyStateBoard(t, config, {
+    groupKey: "state",
+    card: {
+      titleKey: "code",
+      fields: [{ key: "description", label: t("subscriptions.subscriptions.columns.description") }],
+      footerFields: [
+        { key: "recurringMonthly", label: t("subscriptions.subscriptions.columns.recurringMonthly"), type: "currency" },
+        { key: "recurringNextDate", label: t("subscriptions.subscriptions.columns.recurringNextDate"), type: "date" },
+      ],
+    },
+  })

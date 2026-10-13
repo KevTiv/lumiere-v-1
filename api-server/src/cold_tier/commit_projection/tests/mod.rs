@@ -3,13 +3,13 @@ use super::checksum::{
     canonical_json, change_checksum, commit_checksum, commit_id, projection_plan,
 };
 use super::prepare::{
-    cached_projection_codec, load_projection_codec, projection_codecs, validate_commit,
-    validate_sequence,
+    cached_projection_codec, load_projection_codec, normalize_row_for_codec, projection_codecs,
+    validate_commit, validate_full_row, validate_sequence,
 };
 use super::sql::build_upsert_sql;
 use super::*;
 use crate::cold_tier::conventions::quote_identifier;
-use crate::cold_tier::pg_codec::{ColumnCodec, PgValue};
+use crate::cold_tier::pg_codec::{rust_field_name, ColumnCodec, PgValue};
 use crate::cold_tier::{migrate, pg_pool, projection_observability, projection_worker};
 use anyhow::{anyhow, bail, Context, Result};
 use deadpool_postgres::Pool;
@@ -194,7 +194,8 @@ fn pinned_projection_codecs_are_parsed_once_and_reused() {
     let manifest = projection_worker::PROJECTION_CODEC_MANIFEST_JSON;
     let parsed = projection_codecs(manifest).expect("pinned projection codecs");
     // Every projected (non-snapshot) table in the pinned manifest gets exactly one codec.
-    let projected = serde_json::from_str::<Value>(manifest).expect("pinned codec manifest JSON")["tables"]
+    let projected = serde_json::from_str::<Value>(manifest).expect("pinned codec manifest JSON")
+        ["tables"]
         .as_object()
         .expect("codec manifest tables")
         .values()
@@ -969,4 +970,60 @@ async fn projection_watermark(pool: &Pool, organization_id: u64) -> Result<Optio
             .await?
             .map(|row| row.get::<_, String>(0).parse::<u64>())
             .transpose()?)
+}
+
+fn full_row(codec: &ProjectionCodec, key: impl Fn(&str) -> String) -> Map<String, Value> {
+    codec
+        .columns
+        .iter()
+        .map(|column| (key(&column.name), json!(7)))
+        .collect()
+}
+
+fn identity_for(codec: &ProjectionCodec) -> Value {
+    json!({ codec.primary_key.clone(): 7 })
+}
+
+#[test]
+fn every_pinned_table_accepts_the_spacetimedb_row_keys() {
+    // `RowChange::upsert_stdb_row` serializes the Rust struct, so keyword-escaped
+    // fields arrive as `type_`/`ref_` and digit-adjacent ones as `street2`/`iso3`.
+    let codecs = projection_codecs(projection_worker::PROJECTION_CODEC_MANIFEST_JSON)
+        .expect("pinned projection codecs");
+    assert!(codecs.contains_key("mrp_bom"));
+    for (table, codec) in &codecs {
+        let row = Value::Object(full_row(codec, |name| rust_field_name(name).to_owned()));
+        validate_full_row(codec, &identity_for(codec), &row, 7)
+            .unwrap_or_else(|error| panic!("{table}: {error}"));
+        normalize_row_for_codec(codec, &row).unwrap_or_else(|error| panic!("{table}: {error}"));
+    }
+}
+
+#[test]
+fn column_name_spelling_is_still_accepted() {
+    let codec = cached_projection_codec("mrp_bom").unwrap();
+    let row = Value::Object(full_row(&codec, str::to_owned));
+    validate_full_row(&codec, &identity_for(&codec), &row, 7).unwrap();
+    normalize_row_for_codec(&codec, &row).unwrap();
+}
+
+#[test]
+fn row_with_both_spellings_or_a_missing_column_is_rejected() {
+    let codec = cached_projection_codec("mrp_bom").unwrap();
+    let identity = identity_for(&codec);
+
+    let mut both = full_row(&codec, |name| rust_field_name(name).to_owned());
+    both.insert("type".to_owned(), json!("normal"));
+    let error = validate_full_row(&codec, &identity, &Value::Object(both), 7).unwrap_err();
+    assert!(error.to_string().contains("exactly the generated full row"));
+
+    let mut missing = full_row(&codec, |name| rust_field_name(name).to_owned());
+    missing.remove("type_");
+    let error = validate_full_row(&codec, &identity, &Value::Object(missing.clone()), 7).unwrap_err();
+    assert!(error.to_string().contains("exactly the generated full row"));
+    assert!(normalize_row_for_codec(&codec, &Value::Object(missing)).is_err());
+
+    let mut extra = full_row(&codec, |name| rust_field_name(name).to_owned());
+    extra.insert("not_a_column".to_owned(), json!(1));
+    assert!(validate_full_row(&codec, &identity, &Value::Object(extra), 7).is_err());
 }

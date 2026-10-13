@@ -37,6 +37,8 @@ pub(crate) const WORKFLOW_WORKER_SERVICE: &str = "workflow_worker";
 /// Dedicated identity used by the IoT gateway after a hub proves its opaque
 /// post-pair credential.
 pub(crate) const IOT_GATEWAY_SERVICE: &str = "iot_gateway";
+/// Dedicated identity allowed to query the sender-scoped H5b spend views.
+pub(crate) const AI_SPEND_READER_SERVICE: &str = "ai_spend_reader";
 
 #[derive(Clone)]
 #[spacetimedb::table(
@@ -53,6 +55,10 @@ pub(crate) const IOT_GATEWAY_SERVICE: &str = "iot_gateway";
     index(
         accessor = cold_tier_service_identity_by_platform_identity,
         btree(columns = [organization_id, identity])
+    ),
+    index(
+        accessor = cold_tier_service_identity_by_identity,
+        btree(columns = [identity])
     )
 )]
 pub struct ColdTierServiceIdentity {
@@ -107,6 +113,25 @@ pub fn register_cold_tier_service_identity(
         }
     } else {
         require_empty_target_reconstruction_bootstrap(ctx, &service_name, identity)?;
+    }
+
+    // `platform_id` is the primary key. A duplicate insert panics the module
+    // (HTTP 530) instead of failing the call, so resolve it first: repeating an
+    // identical active binding is a no-op and any other reuse is an error.
+    if let Some(existing) = ctx
+        .db
+        .cold_tier_service_identity()
+        .platform_id()
+        .find(&platform_id)
+    {
+        if existing.is_active
+            && existing.organization_id == organization_id
+            && existing.service_name == service_name
+            && existing.identity == identity
+        {
+            return Ok(());
+        }
+        return Err("platform_id is already registered for a different binding".to_string());
     }
 
     let active: Vec<_> = ctx

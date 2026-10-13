@@ -792,47 +792,59 @@ export const accountMoveLinesTableConfig = (
 })
 
 // ── Journal entries (account moves) ───────────────────────────────────────────
-const moveStateBadges = (_t: TFunction) => ({
-  badgeVariants: {
-    Draft: "secondary",
-    Posted: "default",
-    Cancelled: "destructive",
-    draft: "secondary",
-    posted: "default",
-    cancel: "destructive",
-  },
-  badgeLabels: {
-    Draft: "Draft",
-    Posted: "Posted",
-    Cancelled: "Cancelled",
-    draft: "Draft",
-    posted: "Posted",
-    cancel: "Cancelled",
-  },
-}) as const
+const moveStateBadges = (t: TFunction) => {
+  const draft = t("accounting.journalEntries.states.draft", { defaultValue: "Draft" })
+  const posted = t("accounting.journalEntries.states.posted", { defaultValue: "Posted" })
+  const cancelled = t("accounting.journalEntries.states.cancelled", { defaultValue: "Cancelled" })
+  return {
+    badgeVariants: {
+      Draft: "secondary",
+      Posted: "default",
+      Cancelled: "destructive",
+      draft: "secondary",
+      posted: "default",
+      cancel: "destructive",
+    },
+    badgeLabels: {
+      Draft: draft,
+      Posted: posted,
+      Cancelled: cancelled,
+      draft,
+      posted,
+      cancel: cancelled,
+    },
+  } as const
+}
 
-const movePaymentStateBadges = (_t: TFunction) => ({
-  badgeVariants: {
-    NotPaid: "destructive",
-    Paid: "default",
-    Partial: "outline",
-    Reversed: "secondary",
-    not_paid: "destructive",
-    partial: "outline",
-    paid: "default",
-    reversed: "secondary",
-  },
-  badgeLabels: {
-    NotPaid: "Not paid",
-    Paid: "Paid",
-    Partial: "Partial",
-    Reversed: "Reversed",
-    not_paid: "Unpaid",
-    partial: "Partial",
-    paid: "Paid",
-    reversed: "Reversed",
-  },
-}) as const
+const movePaymentStateBadges = (t: TFunction) => {
+  const notPaid = t("accounting.invoices.paymentStates.notPaid", { defaultValue: "Not paid" })
+  const unpaid = t("accounting.invoices.paymentStates.unpaid", { defaultValue: "Unpaid" })
+  const paid = t("accounting.invoices.paymentStates.paid", { defaultValue: "Paid" })
+  const partial = t("accounting.invoices.paymentStates.partial", { defaultValue: "Partial" })
+  const reversed = t("accounting.invoices.paymentStates.reversed", { defaultValue: "Reversed" })
+  return {
+    badgeVariants: {
+      NotPaid: "destructive",
+      Paid: "default",
+      Partial: "outline",
+      Reversed: "secondary",
+      not_paid: "destructive",
+      partial: "outline",
+      paid: "default",
+      reversed: "secondary",
+    },
+    badgeLabels: {
+      NotPaid: notPaid,
+      Paid: paid,
+      Partial: partial,
+      Reversed: reversed,
+      not_paid: unpaid,
+      partial,
+      paid,
+      reversed,
+    },
+  } as const
+}
 
 export type JournalEntriesTableConfigOptions = {
   onEmptyAction?: () => void
@@ -900,9 +912,9 @@ export const accountingJournalEntriesTableConfig = (
         label: t("accounting.journalEntries.state"),
         type: "select",
         options: [
-          { value: "Draft", label: "Draft" },
-          { value: "Posted", label: "Posted" },
-          { value: "Cancelled", label: "Cancelled" },
+          { value: "Draft", label: t("accounting.journalEntries.states.draft", { defaultValue: "Draft" }) },
+          { value: "Posted", label: t("accounting.journalEntries.states.posted", { defaultValue: "Posted" }) },
+          { value: "Cancelled", label: t("accounting.journalEntries.states.cancelled", { defaultValue: "Cancelled" }) },
         ],
       },
       {
@@ -910,11 +922,11 @@ export const accountingJournalEntriesTableConfig = (
         label: t("accounting.journalEntries.type"),
         type: "select",
         options: [
-          { value: "Entry", label: "Journal Entry" },
-          { value: "OutInvoice", label: "Customer Invoice" },
-          { value: "InInvoice", label: "Vendor Bill" },
-          { value: "OutRefund", label: "Credit Note" },
-          { value: "InRefund", label: "Vendor Credit" },
+          { value: "Entry", label: t("accounting.journalEntries.types.entry", { defaultValue: "Journal Entry" }) },
+          { value: "OutInvoice", label: t("accounting.journalEntries.types.outInvoice", { defaultValue: "Customer Invoice" }) },
+          { value: "InInvoice", label: t("accounting.journalEntries.types.inInvoice", { defaultValue: "Vendor Bill" }) },
+          { value: "OutRefund", label: t("accounting.journalEntries.types.outRefund", { defaultValue: "Credit Note" }) },
+          { value: "InRefund", label: t("accounting.journalEntries.types.inRefund", { defaultValue: "Vendor Credit" }) },
         ],
       },
     ],

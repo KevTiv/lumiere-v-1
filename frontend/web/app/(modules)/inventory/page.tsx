@@ -1,5 +1,5 @@
 import { getStdbSession } from "@/lib/api-session"
-import { serverFetchQueryListsAllowEmpty } from "@/lib/server-query"
+import { serverFetchQueryListsRequired } from "@/lib/server-query"
 import { InventoryClient } from "./inventory-client"
 
 const SSR_RESOURCES = [
@@ -42,7 +42,7 @@ export default async function InventoryPage() {
     inventoryValuations,
     replenishmentRules,
     stockProductionSerials,
-  ] = await serverFetchQueryListsAllowEmpty(session, SSR_RESOURCES)
+  ] = await serverFetchQueryListsRequired(session, SSR_RESOURCES)
 
   return (
     <InventoryClient

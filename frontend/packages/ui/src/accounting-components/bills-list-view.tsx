@@ -45,6 +45,8 @@ import {
   Calculator,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { StatCard, StatCardGrid } from "../components/stat-card"
+import { TablePager, usePagedRows } from "../components/table-pager"
 import { accountingListStatusBadgeClass } from "../lib/theme-colors"
 import type { AccountMove } from "../lib/accounting-types"
 import {
@@ -112,14 +114,18 @@ export function BillsListView({
   const [searchQuery, setSearchQuery] = useState("")
   const [statusFilter, setStatusFilter] = useState<BillStatus | "all">("all")
 
-  const filtered = bills.filter((bill) => {
-    const name = bill.name?.toLowerCase() ?? ""
-    const partner = bill.invoicePartnerDisplayName?.toLowerCase() ?? ""
-    const matchesSearch = name.includes(searchQuery.toLowerCase()) || partner.includes(searchQuery.toLowerCase())
-    const status = getBillStatus(bill)
-    const matchesStatus = statusFilter === "all" || status === statusFilter
-    return matchesSearch && matchesStatus
-  })
+  const filtered = bills
+    .filter((bill) => {
+      const name = bill.name?.toLowerCase() ?? ""
+      const partner = bill.invoicePartnerDisplayName?.toLowerCase() ?? ""
+      const matchesSearch = name.includes(searchQuery.toLowerCase()) || partner.includes(searchQuery.toLowerCase())
+      const status = getBillStatus(bill)
+      const matchesStatus = statusFilter === "all" || status === statusFilter
+      return matchesSearch && matchesStatus
+    })
+    // Newest first, matching EntityTable's default (auto-inc ids only increase).
+    .sort((a, b) => Number(b.id) - Number(a.id))
+  const pager = usePagedRows(filtered, `${searchQuery}|${statusFilter}`)
 
   const stats = {
     total: bills.length,
@@ -133,48 +139,14 @@ export function BillsListView({
   return (
     <div className="space-y-6">
       {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card><CardContent className="p-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-info/10"><FileText className="h-5 w-5 text-info" /></div>
-            <div><p className="text-sm text-muted-foreground">{t("accounting.bills.totalBills")}</p><p className="text-2xl font-bold">{stats.total}</p></div>
-          </div>
-        </CardContent></Card>
-        <Card><CardContent className="p-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-success/10"><CheckCircle2 className="h-5 w-5 text-success" /></div>
-            <div><p className="text-sm text-muted-foreground">{t("accounting.states.paid")}</p><p className="text-2xl font-bold">{stats.paid}</p></div>
-          </div>
-        </CardContent></Card>
-        <Card><CardContent className="p-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-warning/10"><Clock className="h-5 w-5 text-warning" /></div>
-            <div><p className="text-sm text-muted-foreground">{t("accounting.states.pending")}</p><p className="text-2xl font-bold">{stats.pending}</p></div>
-          </div>
-        </CardContent></Card>
-        <Card><CardContent className="p-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-destructive/10"><AlertTriangle className="h-5 w-5 text-destructive" /></div>
-            <div><p className="text-sm text-muted-foreground">{t("accounting.states.overdue")}</p><p className="text-2xl font-bold">{stats.overdue}</p></div>
-          </div>
-        </CardContent></Card>
-      </div>
-
-      {/* Summary */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Card><CardContent className="p-4">
-          <div className="flex items-center justify-between">
-            <div><p className="text-sm text-muted-foreground">{t("accounting.bills.totalBilled")}</p><p className="text-2xl font-bold">{formatCurrency(stats.totalAmount)}</p></div>
-            <Building className="h-8 w-8 text-muted-foreground/30" />
-          </div>
-        </CardContent></Card>
-        <Card><CardContent className="p-4">
-          <div className="flex items-center justify-between">
-            <div><p className="text-sm text-muted-foreground">{t("accounting.bills.amountOwed")}</p><p className="text-2xl font-bold text-destructive">{formatCurrency(stats.totalDue)}</p></div>
-            <DollarSign className="h-8 w-8 text-muted-foreground/30" />
-          </div>
-        </CardContent></Card>
-      </div>
+      <StatCardGrid className="lg:grid-cols-6">
+        <StatCard label={t("accounting.bills.totalBills")} value={stats.total} icon={FileText} tone="info" />
+        <StatCard label={t("accounting.states.paid")} value={stats.paid} icon={CheckCircle2} tone="success" />
+        <StatCard label={t("accounting.states.pending")} value={stats.pending} icon={Clock} tone="warning" />
+        <StatCard label={t("accounting.states.overdue")} value={stats.overdue} icon={AlertTriangle} tone="destructive" />
+        <StatCard label={t("accounting.bills.totalBilled")} value={formatCurrency(stats.totalAmount)} icon={Building} />
+        <StatCard label={t("accounting.bills.amountOwed")} value={formatCurrency(stats.totalDue)} icon={DollarSign} />
+      </StatCardGrid>
 
       {/* Table */}
       <Card>
@@ -222,11 +194,16 @@ export function BillsListView({
             <TableBody>
               {filtered.length === 0 ? (
                 <TableRow><TableCell colSpan={8} className="text-center py-8 text-muted-foreground">{t("accounting.bills.noResults")}</TableCell></TableRow>
-              ) : filtered.map((bill) => {
+              ) : pager.pageRows.map((bill) => {
                 const status = getBillStatus(bill)
                 const conf = statusConfig[status]
                 return (
-                  <TableRow key={String(bill.id)} className="cursor-pointer hover:bg-muted/50" onClick={() => onSelectBill?.(bill)}>
+                  <TableRow
+                    key={String(bill.id)}
+                    data-testid={`entity-row-${bill.id}`}
+                    className="cursor-pointer hover:bg-muted/50"
+                    onClick={() => onSelectBill?.(bill)}
+                  >
                     <TableCell className="font-medium">{bill.name}</TableCell>
                     <TableCell>
                       <p className="font-medium">{bill.invoicePartnerDisplayName ?? `Partner #${bill.partnerId}`}</p>
@@ -235,7 +212,7 @@ export function BillsListView({
                     <TableCell>{formatTimestamp(bill.invoiceDateDue)}</TableCell>
                     <TableCell className="font-medium">{formatCurrency(bill.amountTotal ?? 0)}</TableCell>
                     <TableCell>
-                      <span className={cn("font-medium", (bill.amountResidual ?? 0) > 0 ? "text-destructive" : "text-success")}>
+                      <span className={cn("font-medium", (bill.amountResidual ?? 0) > 0 ? "text-foreground" : "text-success")}>
                         {formatCurrency(bill.amountResidual ?? 0)}
                       </span>
                     </TableCell>
@@ -280,6 +257,7 @@ export function BillsListView({
               })}
             </TableBody>
           </Table>
+          <TablePager {...pager} />
         </CardContent>
       </Card>
     </div>

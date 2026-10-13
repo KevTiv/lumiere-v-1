@@ -151,6 +151,9 @@ test.describe("Gate UI — workflows and approvals", { tag: ["@gate-ui", "@p0"] 
       .getByTestId("form-modal-create-migration-plan")
       .getByRole("button", { name: /^cancel$/i })
       .click()
+    // The form was edited, so closing it asks before discarding.
+    await page.getByTestId("discard-changes-confirm").click()
+    await expect(page.getByTestId("form-modal-create-migration-plan")).toBeHidden()
 
     await page.getByTestId("module-tab-workflows-deadLetters").click()
     await expect(activeTabEntityTable(page)).toBeVisible()
