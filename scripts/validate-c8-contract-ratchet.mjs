@@ -35,7 +35,7 @@ if (!registrySource.includes("compileOrganizationSubscription")) {
 
 if (organizationPolicies.schema_version !== 1) fail("unsupported organization policy schema");
 const organizationEntries = Object.entries(organizationPolicies.resources ?? {});
-if (organizationEntries.length !== 287) fail("organization subscription policy coverage drift");
+if (organizationEntries.length !== 299) fail("organization subscription policy coverage drift");
 const identifier = /^[a-z_][a-z0-9_]*$/;
 for (const [resource, descriptor] of organizationEntries) {
   if (registry[resource]?.table !== descriptor.table) fail(`${resource} organization policy table drift`);
