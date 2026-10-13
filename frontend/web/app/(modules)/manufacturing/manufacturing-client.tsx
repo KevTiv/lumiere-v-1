@@ -2,6 +2,7 @@
 import { mapDashboardWidgets, withDashboardSections } from "@lumiere/ui/lib/dashboard-sections"
 
 import { useEffect, useMemo, useState } from "react"
+import { canUseModuleData, mergeModuleStates, moduleCollection } from "@lumiere/ui/lib/module-data-state"
 import type { QueryResourceState } from "@lumiere/api-client"
 import { useModuleTab } from "@/hooks/use-module-tab"
 import { useTranslation } from "@lumiere/i18n"
@@ -118,21 +119,18 @@ function ManufacturingClientLoaded({
   const [csvKind, setCsvKind] = useState<ManufacturingCsvImportKind | null>(null)
   // activeTab is now URL-synced via useModuleTab below (after moduleConfig is defined)
 
-  const { data: productions = [] } = useMrpProductions(
-    orgId,
-    initialProductions,
-  );
-  const { data: boms = [] } = useMrpBoms(orgId, initialBoms);
-  const { data: bomLines = [] } = useMrpBomLines(orgId, initialBomLines);
-  const { data: workorders = [] } = useMrpWorkorders(orgId, initialWorkorders);
-  const { data: workcenters = [] } = useMrpWorkcenters(
-    orgId,
-    initialWorkcenters,
-  );
-  const { data: routingOperations = [] } = useMrpRoutingWorkcenters(
-    orgId,
-    initialRoutingOperations,
-  );
+  const productionsRead = moduleCollection(useMrpProductions(orgId, initialProductions))
+  const productions = productionsRead.rows
+  const bomsRead = moduleCollection(useMrpBoms(orgId, initialBoms))
+  const boms = bomsRead.rows
+  const bomLinesRead = moduleCollection(useMrpBomLines(orgId, initialBomLines))
+  const bomLines = bomLinesRead.rows
+  const workordersRead = moduleCollection(useMrpWorkorders(orgId, initialWorkorders))
+  const workorders = workordersRead.rows
+  const workcentersRead = moduleCollection(useMrpWorkcenters(orgId, initialWorkcenters))
+  const workcenters = workcentersRead.rows
+  const routingOperationsRead = moduleCollection(useMrpRoutingWorkcenters(orgId, initialRoutingOperations))
+  const routingOperations = routingOperationsRead.rows
   const iotDevicesQuery = useIotDevices(
     orgId,
     initialIotDevicesState?.status === "ready" || initialIotDevicesState?.status === "empty"
@@ -147,7 +145,8 @@ function ManufacturingClientLoaded({
       : iotDevicesQuery.status === "error" || initialIotDevicesState?.status === "unavailable"
         ? "Unavailable"
         : "Loading"
-  const { data: qualityChecks = [] } = useQualityChecks(orgId);
+  const qualityChecksRead = moduleCollection(useQualityChecks(orgId))
+  const qualityChecks = qualityChecksRead.rows
   const { data: products = [] } = useProducts(orgId, initialProducts);
   const { data: warehouses = [] } = useWarehouses(orgId, initialWarehouses);
   const { data: transfers = [] } = useStockPickings(
@@ -504,11 +503,40 @@ function ManufacturingClientLoaded({
     [enrichedProductions, enrichedBoms, bomLines, enrichedWorkorders, workcenters, enrichedRoutingOperations, qualityChecks],
   )
 
+  const dataState = {
+    dashboard: mergeModuleStates([productionsRead.state, workordersRead.state, workcentersRead.state]),
+    orders: productionsRead.state,
+    boms: bomsRead.state,
+    "bom-lines": bomLinesRead.state,
+    workorders: workordersRead.state,
+    workcenters: workcentersRead.state,
+    "routing-operations": routingOperationsRead.state,
+    quality: qualityChecksRead.state,
+  }
+  const tabUsable = (tabId: string | null | undefined) =>
+    tabId == null || !(tabId in dataState) || canUseModuleData(dataState[tabId as keyof typeof dataState])
+  const actionTabs: Record<string, keyof typeof dataState> = {
+    createManufacturingOrder: "orders", createBom: "boms", createWorkcenter: "workcenters",
+  }
+  const csvTabs: Record<ManufacturingCsvImportKind, keyof typeof dataState> = {
+    mo: "orders", bom: "boms", bom_line: "bom-lines", workcenter: "workcenters",
+  }
+  const quickActionUsable = quickActionForm == null || tabUsable(actionTabs[quickActionForm.action])
+  const rowPickUsable = rowPick == null || tabUsable(rowPick.tabId)
+  const csvUsable = csvKind == null || tabUsable(csvTabs[csvKind])
+  useEffect(() => {
+    // Dialogs close when the collection they were opened from becomes denied or fails.
+    if (!quickActionUsable) setQuickActionForm(null)
+    if (!rowPickUsable) setRowPick(null)
+    if (!csvUsable) setCsvKind(null)
+  }, [quickActionUsable, rowPickUsable, csvUsable])
+
   const handleFormSubmit = async (
     _tabId: string,
     action: string,
     formData: Record<string, unknown>
   ) => {
+    if (!tabUsable(actionTabs[action])) return
     if (!hasActiveCompany) {
       throw new Error(t("manufacturing.errors.noActiveCompany"))
     }
@@ -572,6 +600,7 @@ function ManufacturingClientLoaded({
       <ModuleView
         config={config}
         data={data}
+        dataState={dataState}
         onFormSubmit={handleFormSubmit}
         activeTab={activeTab}
         onActiveTabChange={setActiveTab}
@@ -583,7 +612,7 @@ function ManufacturingClientLoaded({
         }}
       />
       <ManufacturingRowDialog
-        open={rowPick !== null}
+        open={rowPick !== null && rowPickUsable}
         onOpenChange={(o) => {
           if (!o) setRowPick(null)
         }}
@@ -597,7 +626,7 @@ function ManufacturingClientLoaded({
         mutations={m}
         t={t}
       />
-      {csvKind && csvFormConfig ? (
+      {csvKind && csvUsable && csvFormConfig ? (
         <CsvImportModal
           key={csvKind}
           onClose={() => setCsvKind(null)}
@@ -618,7 +647,7 @@ function ManufacturingClientLoaded({
         />
       ) : null}
       <FormModal
-        open={quickActionForm !== null}
+        open={quickActionForm !== null && quickActionUsable}
         onOpenChange={(open) => !open && setQuickActionForm(null)}
         config={quickActionForm?.form ?? moFormConfig}
         isPending={isFormMutationPending}
