@@ -8,21 +8,21 @@ This artifact classifies operation ownership and current disposition only. It do
 
 | Dimension | Count |
 | --- | ---: |
-| Total contract operations | 1427 |
-| Client-facing operations | 929 |
-| Non-client operations | 498 |
+| Total contract operations | 1445 |
+| Client-facing operations | 936 |
+| Non-client operations | 509 |
 | Unowned client-facing operations | 0 |
 | Review-required rows | 0 |
-| Reconciled Rust reducer rows | 1202 |
-| Contract-only operations | 225 |
+| Reconciled Rust reducer rows | 1212 |
+| Contract-only operations | 233 |
 
 ### Dispositions
 
 | Disposition | Count |
 | --- | ---: |
-| `future-disabled` | 62 |
-| `horizontal` | 153 |
-| `internal-support` | 503 |
+| `future-disabled` | 68 |
+| `horizontal` | 154 |
+| `internal-support` | 514 |
 | `primary-workflow` | 709 |
 
 ### Owners
@@ -33,22 +33,22 @@ This artifact classifies operation ownership and current disposition only. It do
 | `COV-04` | 95 |
 | `COV-05` | 73 |
 | `COV-06` | 142 |
-| `COV-07` | 27 |
-| `COV-08` | 166 |
+| `COV-07` | 38 |
+| `COV-08` | 167 |
 | `COV-09` | 68 |
 | `COV-10` | 47 |
 | `COV-11` | 37 |
 | `COV-12` | 45 |
 | `COV-13` | 2 |
-| `COV-14` | 11 |
+| `COV-14` | 13 |
 | `COV-15` | 7 |
 | `COV-16` | 25 |
 | `COV-17` | 40 |
 | `COV-18` | 44 |
 | `COV-19` | 19 |
-| `COV-20` | 23 |
-| `COV-21` | 39 |
-| `COV-22` | 83 |
+| `COV-20` | 24 |
+| `COV-21` | 41 |
+| `COV-22` | 84 |
 | `COV-23` | 84 |
 | `GOV/CAP` | 134 |
 | `INTERNAL` | 138 |
@@ -266,6 +266,8 @@ This artifact classifies operation ownership and current disposition only. It do
 | `compute_so_totals` | yes | `COV-04` | `primary-workflow` | `reachable-ui` | `sales/sales_core.rs` |
 | `configure_ai_spend` | no | `GOV/CAP` | `internal-support` | `backend-only` | `ai/spend.rs` |
 | `configure_contact_identity_verification_authority` | no | `COV-03` | `internal-support` | `backend-only` | `crm/contact_identities.rs` |
+| `configure_manufacturing_valuation` | yes | `COV-07` | `future-disabled` | `backend-only` | `manufacturing/costing.rs` |
+| `configure_workcenter_cost_rate` | yes | `COV-07` | `future-disabled` | `backend-only` | `manufacturing/costing.rs` |
 | `confirm_account_asset` | yes | `COV-08` | `primary-workflow` | `reachable-ui` | `accounting/fixed_assets.rs` |
 | `confirm_budget` | yes | `COV-08` | `primary-workflow` | `reachable-ui` | `accounting/budgeting.rs` |
 | `confirm_manufacturing_order` | yes | `COV-07` | `primary-workflow` | `reachable-ui` | `manufacturing/manufacturing_orders.rs` |
@@ -657,6 +659,7 @@ This artifact classifies operation ownership and current disposition only. It do
 | `finalize_pos_order_archive` | no | `COV-04` | `internal-support` | `backend-only` | `sales/pos_transactions.rs` |
 | `find_duplicate_contacts` | yes | `COV-03` | `primary-workflow` | `reachable-ui` | `crm/duplicate.rs` |
 | `finish_manufacturing_order` | yes | `COV-07` | `primary-workflow` | `reachable-ui` | `manufacturing/manufacturing_orders.rs` |
+| `finish_manufacturing_order_with_tracking` | yes | `COV-07` | `future-disabled` | `backend-only` | `manufacturing/manufacturing_orders.rs` |
 | `finish_workorder` | yes | `COV-07` | `primary-workflow` | `reachable-ui` | `manufacturing/manufacturing_orders.rs` |
 | `fire_workflow_timer` | yes | `COV-21` | `horizontal` | `reachable-ui` | `workflow/delivery.rs` |
 | `fork_ai_run_checked` | no | `GOV/CAP` | `internal-support` | `backend-only` | `ai/run_lifecycle.rs` |
@@ -670,6 +673,7 @@ This artifact classifies operation ownership and current disposition only. It do
 | `grant_field_permission` | yes | `COV-23` | `primary-workflow` | `reachable-ui` | `core/permissions.rs` |
 | `grant_permission` | yes | `COV-23` | `primary-workflow` | `reachable-ui` | `core/permissions.rs` |
 | `grant_subscription_entitlement` | no | `COV-12` | `internal-support` | `command-only` | `subscriptions/subscription_entitlements.rs` |
+| `helpdesk_related_record_read` | no | `COV-14` | `internal-support` | `contract-only` | `helpdesk/related_records.rs` |
 | `hold_supplier_intake` | yes | `COV-05` | `primary-workflow` | `reachable-ui` | `purchasing/vendor_management.rs` |
 | `hydrate_pos_order_aggregate` | no | `COV-04` | `internal-support` | `backend-only` | `sales/pos_transactions.rs` |
 | `identity_connected` | no | `INTERNAL` | `internal-support` | `contract-only` | `src/lib.rs` |
@@ -687,6 +691,7 @@ This artifact classifies operation ownership and current disposition only. It do
 | `import_company_csv` | yes | `COV-22` | `horizontal` | `reachable-ui` | `data_ops/core_imports.rs` |
 | `import_contact_csv` | yes | `COV-22` | `horizontal` | `reachable-ui` | `data_ops/crm_imports.rs` |
 | `import_country_csv` | yes | `COV-22` | `horizontal` | `reachable-ui` | `data_ops/core_imports.rs` |
+| `import_csv_tracked` | yes | `COV-22` | `horizontal` | `future-disabled` | `data_ops/import_tracker.rs` |
 | `import_currency_csv` | yes | `COV-22` | `horizontal` | `reachable-ui` | `data_ops/core_imports.rs` |
 | `import_currency_rate_csv` | yes | `COV-22` | `horizontal` | `reachable-ui` | `data_ops/core_imports.rs` |
 | `import_expense_csv` | yes | `COV-22` | `horizontal` | `reachable-ui` | `data_ops/expenses_imports.rs` |
@@ -904,7 +909,7 @@ This artifact classifies operation ownership and current disposition only. It do
 | `reject_supplier_intake` | yes | `COV-05` | `primary-workflow` | `reachable-ui` | `purchasing/vendor_management.rs` |
 | `reject_timesheets` | yes | `COV-10` | `primary-workflow` | `reachable-ui` | `projects/timesheets.rs` |
 | `release_blanket_to_po` | yes | `COV-05` | `primary-workflow` | `reachable-ui` | `purchasing/procurement_advanced.rs` |
-| `release_document_legal_hold` | yes | `COV-18` | `horizontal` | `reachable-ui` | `documents/legal_hold.rs` |
+| `release_document_legal_hold` | yes | `COV-18` | `future-disabled` | `command-only` | `documents/legal_hold.rs` |
 | `release_picking_wave` | yes | `COV-06` | `primary-workflow` | `reachable-ui` | `inventory/warehouse_operations.rs` |
 | `remove_article_member` | yes | `COV-18` | `horizontal` | `reachable-ui` | `documents/knowledge.rs` |
 | `remove_contact_categories` | yes | `COV-03` | `primary-workflow` | `reachable-ui` | `crm/contacts.rs` |
@@ -925,6 +930,7 @@ This artifact classifies operation ownership and current disposition only. It do
 | `request_ai_skill_certification` | no | `GOV/CAP` | `internal-support` | `backend-only` | `ai/skill_registry.rs` |
 | `request_embedding_job` | no | `GOV/CAP` | `internal-support` | `internal-intentional` | `ai/intelligence.rs` |
 | `request_expense_policy_exception` | yes | `COV-11` | `primary-workflow` | `reachable-ui` | `expenses/expense_wave_d.rs` |
+| `request_workflow_subject_snapshot` | yes | `COV-21` | `horizontal` | `reachable-ui` | `workflow/subject_snapshot.rs` |
 | `reserve_ai_spend` | no | `GOV/CAP` | `internal-support` | `backend-only` | `ai/spend.rs` |
 | `reserve_serial` | yes | `COV-06` | `primary-workflow` | `reachable-ui` | `inventory/tracking.rs` |
 | `reserve_stock_quant` | yes | `COV-06` | `primary-workflow` | `reachable-ui` | `inventory/stock.rs` |
@@ -1008,6 +1014,7 @@ This artifact classifies operation ownership and current disposition only. It do
 | `run_all_workflow_human_effect_tests` | no | `COV-21` | `internal-support` | `contract-only` | `workflow/mod.rs` |
 | `run_analytics_cross_company_widget_add_test` | no | `COV-20` | `internal-support` | `contract-only` | `analytics/mod.rs` |
 | `run_analytics_dashboard_company_scope_test` | no | `COV-20` | `internal-support` | `contract-only` | `analytics/mod.rs` |
+| `run_analytics_dashboard_widget_idempotency_test` | no | `COV-20` | `internal-support` | `contract-only` | `analytics/mod.rs` |
 | `run_c_0_organization_ownership_backfill` | no | `INTERNAL` | `internal-support` | `future-disabled` | `contract evidence` |
 | `run_cartonization` | yes | `COV-06` | `primary-workflow` | `reachable-ui` | `inventory/warehouse_operations.rs` |
 | `run_core_operational_messaging_test` | no | `INTERNAL` | `internal-support` | `contract-only` | `tests/mod.rs` |
@@ -1101,14 +1108,19 @@ This artifact classifies operation ownership and current disposition only. It do
 | `run_inventory_warehouse_sync_test` | no | `INTERNAL` | `internal-support` | `contract-only` | `contract evidence` |
 | `run_inventory_wave_release_test` | no | `INTERNAL` | `internal-support` | `contract-only` | `contract evidence` |
 | `run_iot_relational_integrity_test` | no | `INTERNAL` | `internal-support` | `contract-only` | `contract evidence` |
+| `run_manufacturing_actual_cost_valuation_test` | no | `COV-07` | `internal-support` | `contract-only` | `manufacturing/mod.rs` |
 | `run_manufacturing_bom_byproduct_output_exact_effect_test` | no | `INTERNAL` | `internal-support` | `contract-only` | `contract evidence` |
+| `run_manufacturing_bom_routing_lifecycle_test` | no | `COV-07` | `internal-support` | `contract-only` | `manufacturing/mod.rs` |
+| `run_manufacturing_bom_to_close_domain_lifecycle_test` | no | `COV-07` | `internal-support` | `contract-only` | `manufacturing/mod.rs` |
 | `run_manufacturing_consume_materials_cross_org_component_test` | no | `INTERNAL` | `internal-support` | `contract-only` | `contract evidence` |
 | `run_manufacturing_consume_materials_exact_effect_test` | no | `INTERNAL` | `internal-support` | `contract-only` | `contract evidence` |
+| `run_manufacturing_cost_configuration_scope_test` | no | `COV-07` | `internal-support` | `contract-only` | `manufacturing/mod.rs` |
 | `run_manufacturing_finished_output_scrap_exact_effect_test` | no | `INTERNAL` | `internal-support` | `contract-only` | `contract evidence` |
 | `run_manufacturing_loss_category_create_test` | no | `INTERNAL` | `internal-support` | `contract-only` | `contract evidence` |
 | `run_manufacturing_loss_category_invalid_category_test` | no | `INTERNAL` | `internal-support` | `contract-only` | `contract evidence` |
 | `run_manufacturing_production_close_exact_effect_test` | no | `INTERNAL` | `internal-support` | `contract-only` | `contract evidence` |
 | `run_manufacturing_productivity_relational_integrity_test` | no | `INTERNAL` | `internal-support` | `contract-only` | `contract evidence` |
+| `run_manufacturing_tracked_output_test` | no | `COV-07` | `internal-support` | `contract-only` | `manufacturing/tracked_output_test.rs` |
 | `run_manufacturing_workcenter_create_test` | no | `INTERNAL` | `internal-support` | `contract-only` | `contract evidence` |
 | `run_manufacturing_workcenter_cross_org_test` | no | `INTERNAL` | `internal-support` | `contract-only` | `contract evidence` |
 | `run_manufacturing_workcenter_test` | no | `INTERNAL` | `internal-support` | `contract-only` | `platform/mod.rs` |
@@ -1185,6 +1197,7 @@ This artifact classifies operation ownership and current disposition only. It do
 | `run_workflow_migration_tests` | no | `COV-21` | `internal-support` | `contract-only` | `workflow/mod.rs` |
 | `run_workflow_provenance_tests` | no | `GOV/CAP` | `internal-support` | `contract-only` | `ai/mod.rs` |
 | `run_workflow_runtime_tests` | no | `COV-21` | `internal-support` | `contract-only` | `workflow/mod.rs` |
+| `run_workflow_subject_snapshot_tests` | no | `COV-21` | `internal-support` | `contract-only` | `workflow/mod.rs` |
 | `save_import_mapping_template` | yes | `COV-22` | `horizontal` | `reachable-ui` | `data_ops/import_mapping_templates.rs` |
 | `save_presentation_module` | no | `INTERNAL` | `internal-support` | `backend-only` | `presentation/mod.rs` |
 | `save_proposal_version` | yes | `COV-17` | `primary-workflow` | `reachable-ui` | `proposals/proposals.rs` |
@@ -1193,6 +1206,8 @@ This artifact classifies operation ownership and current disposition only. It do
 | `schedule_sales_sla_escalation` | yes | `COV-04` | `primary-workflow` | `reachable-ui` | `sales/oms_advanced.rs` |
 | `schedule_tax_deadline_updates` | yes | `COV-08` | `primary-workflow` | `reachable-ui` | `accounting/tax_management.rs` |
 | `scrap_finished_manufacturing_output` | yes | `COV-07` | `future-disabled` | `backend-only` | `manufacturing/manufacturing_orders.rs` |
+| `scrap_manufacturing_material` | yes | `COV-07` | `future-disabled` | `backend-only` | `manufacturing/manufacturing_orders.rs` |
+| `scrap_tracked_manufacturing_output` | yes | `COV-07` | `future-disabled` | `backend-only` | `manufacturing/manufacturing_orders.rs` |
 | `seed_dev_data` | no | `INTERNAL` | `internal-support` | `internal-intentional` | `src/seed.rs` |
 | `seed_hr_country_pack_overlays` | no | `COV-09` | `internal-support` | `internal-intentional` | `hr/country_pack_hr.rs` |
 | `seed_organization_form_configs` | no | `COV-22` | `internal-support` | `internal-intentional` | `forms/migrations.rs` |
@@ -1222,6 +1237,7 @@ This artifact classifies operation ownership and current disposition only. It do
 | `set_article_published` | yes | `COV-18` | `horizontal` | `reachable-ui` | `documents/knowledge.rs` |
 | `set_asset_active` | yes | `COV-08` | `primary-workflow` | `reachable-ui` | `accounting/fixed_assets.rs` |
 | `set_billing_status` | no | `COV-23` | `internal-support` | `future-disabled` | `core/billing.rs` |
+| `set_bom_operations` | no | `COV-07` | `internal-support` | `backend-only` | `manufacturing/bill_of_materials.rs` |
 | `set_commodity_price_index` | yes | `COV-05` | `primary-workflow` | `reachable-ui` | `purchasing/procurement_advanced.rs` |
 | `set_company_country_pack` | yes | `COV-23` | `primary-workflow` | `reachable-ui` | `core/country_pack.rs` |
 | `set_company_vertical_pack` | yes | `COV-23` | `primary-workflow` | `reachable-ui` | `core/organization.rs` |
@@ -1234,6 +1250,7 @@ This artifact classifies operation ownership and current disposition only. It do
 | `set_form_field_label` | no | `COV-22` | `internal-support` | `backend-only` | `forms/mod.rs` |
 | `set_form_role_config` | yes | `COV-22` | `horizontal` | `reachable-ui` | `forms/mod.rs` |
 | `set_google_drive_conflict_policy` | no | `COV-18` | `internal-support` | `command-only` | `documents/drive_sync.rs` |
+| `set_helpdesk_related_record` | no | `COV-14` | `internal-support` | `backend-only` | `helpdesk/related_records.rs` |
 | `set_intercompany_rule_active` | yes | `COV-08` | `primary-workflow` | `reachable-ui` | `accounting/intercompany.rs` |
 | `set_iot_threshold` | yes | `COV-16` | `primary-workflow` | `reachable-ui` | `iot/telemetry.rs` |
 | `set_project_active` | yes | `COV-10` | `primary-workflow` | `reachable-ui` | `projects/projects.rs` |
@@ -1296,6 +1313,7 @@ This artifact classifies operation ownership and current disposition only. It do
 | `unmatch_elimination_entry` | yes | `COV-08` | `primary-workflow` | `reachable-ui` | `accounting/consolidation.rs` |
 | `unmatch_expense_card_statement_line` | yes | `COV-11` | `primary-workflow` | `reachable-ui` | `expenses/expense_wave_e.rs` |
 | `unreconciled_account_bank_statement_line` | yes | `COV-08` | `primary-workflow` | `reachable-ui` | `accounting/bank_reconciliation.rs` |
+| `unregister_payment_allocations` | no | `COV-08` | `internal-support` | `backend-only` | `accounting/payments.rs` |
 | `unreserve_stock_picking` | yes | `COV-06` | `future-disabled` | `backend-only` | `inventory/stock.rs` |
 | `unreserve_stock_quant` | yes | `COV-06` | `primary-workflow` | `reachable-ui` | `inventory/stock.rs` |
 | `unsubscribe_from_record` | yes | `COV-19` | `horizontal` | `reachable-ui` | `core/messaging.rs` |

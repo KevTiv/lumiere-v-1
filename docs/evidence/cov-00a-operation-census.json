@@ -1,42 +1,42 @@
 {
   "schema_version": 1,
   "summary": {
-    "total_operations": 1427,
-    "client_facing_operations": 929,
-    "non_client_operations": 498,
+    "total_operations": 1445,
+    "client_facing_operations": 936,
+    "non_client_operations": 509,
     "unowned_client_facing": 0,
     "review_required": 0,
-    "reconciled_reducer_rows": 1202,
-    "contract_only_operations": 225,
+    "reconciled_reducer_rows": 1212,
+    "contract_only_operations": 233,
     "by_owner": {
       "COV-03": 78,
       "COV-04": 95,
       "COV-05": 73,
       "COV-06": 142,
-      "COV-07": 27,
-      "COV-08": 166,
+      "COV-07": 38,
+      "COV-08": 167,
       "COV-09": 68,
       "COV-10": 47,
       "COV-11": 37,
       "COV-12": 45,
       "COV-13": 2,
-      "COV-14": 11,
+      "COV-14": 13,
       "COV-15": 7,
       "COV-16": 25,
       "COV-17": 40,
       "COV-18": 44,
       "COV-19": 19,
-      "COV-20": 23,
-      "COV-21": 39,
-      "COV-22": 83,
+      "COV-20": 24,
+      "COV-21": 41,
+      "COV-22": 84,
       "COV-23": 84,
       "GOV/CAP": 134,
       "INTERNAL": 138
     },
     "by_disposition": {
-      "future-disabled": 62,
-      "horizontal": 153,
-      "internal-support": 503,
+      "future-disabled": 68,
+      "horizontal": 154,
+      "internal-support": 514,
       "primary-workflow": 709
     }
   },
@@ -2452,6 +2452,30 @@
       "reducer": "configure_contact_identity_verification_authority",
       "source": "crm/contact_identities.rs",
       "basis": "canonical source domain crm; contract client_facing=false"
+    },
+    {
+      "operation": "configure_manufacturing_valuation",
+      "contract_file": "operations.json",
+      "semantic_kind": "operator",
+      "client_facing": true,
+      "owner": "COV-07",
+      "disposition": "future-disabled",
+      "coverage_status": "backend-only",
+      "reducer": "configure_manufacturing_valuation",
+      "source": "manufacturing/costing.rs",
+      "basis": "canonical source domain manufacturing; no detected UI caller (backend-only)"
+    },
+    {
+      "operation": "configure_workcenter_cost_rate",
+      "contract_file": "operations.json",
+      "semantic_kind": "operator",
+      "client_facing": true,
+      "owner": "COV-07",
+      "disposition": "future-disabled",
+      "coverage_status": "backend-only",
+      "reducer": "configure_workcenter_cost_rate",
+      "source": "manufacturing/costing.rs",
+      "basis": "canonical source domain manufacturing; no detected UI caller (backend-only)"
     },
     {
       "operation": "confirm_account_asset",
@@ -7146,6 +7170,18 @@
       "basis": "canonical source domain manufacturing; detected UI caller"
     },
     {
+      "operation": "finish_manufacturing_order_with_tracking",
+      "contract_file": "operations.json",
+      "semantic_kind": "command",
+      "client_facing": true,
+      "owner": "COV-07",
+      "disposition": "future-disabled",
+      "coverage_status": "backend-only",
+      "reducer": "finish_manufacturing_order_with_tracking",
+      "source": "manufacturing/manufacturing_orders.rs",
+      "basis": "canonical source domain manufacturing; no detected UI caller (backend-only)"
+    },
+    {
       "operation": "finish_workorder",
       "contract_file": "operations.json",
       "semantic_kind": "command",
@@ -7300,6 +7336,18 @@
       "reducer": "grant_subscription_entitlement",
       "source": "subscriptions/subscription_entitlements.rs",
       "basis": "canonical source domain subscriptions; contract client_facing=false"
+    },
+    {
+      "operation": "helpdesk_related_record_read",
+      "contract_file": "people-platform.json",
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "owner": "COV-14",
+      "disposition": "internal-support",
+      "coverage_status": "contract-only",
+      "reducer": null,
+      "source": "helpdesk/related_records.rs",
+      "basis": "canonical source domain helpdesk; contract client_facing=false"
     },
     {
       "operation": "hold_supplier_intake",
@@ -7503,6 +7551,18 @@
       "coverage_status": "reachable-ui",
       "reducer": "import_country_csv",
       "source": "data_ops/core_imports.rs",
+      "basis": "canonical source domain data_ops; import/forms horizontal owner"
+    },
+    {
+      "operation": "import_csv_tracked",
+      "contract_file": "people-platform.json",
+      "semantic_kind": "command",
+      "client_facing": true,
+      "owner": "COV-22",
+      "disposition": "horizontal",
+      "coverage_status": "future-disabled",
+      "reducer": "import_csv_tracked",
+      "source": "data_ops/import_tracker.rs",
       "basis": "canonical source domain data_ops; import/forms horizontal owner"
     },
     {
@@ -10115,11 +10175,11 @@
       "semantic_kind": "command",
       "client_facing": true,
       "owner": "COV-18",
-      "disposition": "horizontal",
-      "coverage_status": "reachable-ui",
+      "disposition": "future-disabled",
+      "coverage_status": "command-only",
       "reducer": "release_document_legal_hold",
       "source": "documents/legal_hold.rs",
-      "basis": "canonical source domain documents; detected UI caller on horizontal surface"
+      "basis": "canonical source domain documents; no detected UI caller (command-only)"
     },
     {
       "operation": "release_picking_wave",
@@ -10360,6 +10420,18 @@
       "reducer": "request_expense_policy_exception",
       "source": "expenses/expense_wave_d.rs",
       "basis": "canonical source domain expenses; detected UI caller"
+    },
+    {
+      "operation": "request_workflow_subject_snapshot",
+      "contract_file": "people-platform.json",
+      "semantic_kind": "command",
+      "client_facing": true,
+      "owner": "COV-21",
+      "disposition": "horizontal",
+      "coverage_status": "reachable-ui",
+      "reducer": "request_workflow_subject_snapshot",
+      "source": "workflow/subject_snapshot.rs",
+      "basis": "canonical source domain workflow; detected UI caller on horizontal surface"
     },
     {
       "operation": "reserve_ai_spend",
@@ -11347,6 +11419,18 @@
     },
     {
       "operation": "run_analytics_dashboard_company_scope_test",
+      "contract_file": "people-platform.json",
+      "semantic_kind": "test",
+      "client_facing": false,
+      "owner": "COV-20",
+      "disposition": "internal-support",
+      "coverage_status": "contract-only",
+      "reducer": null,
+      "source": "analytics/mod.rs",
+      "basis": "canonical source domain analytics; contract client_facing=false"
+    },
+    {
+      "operation": "run_analytics_dashboard_widget_idempotency_test",
       "contract_file": "people-platform.json",
       "semantic_kind": "test",
       "client_facing": false,
@@ -12474,6 +12558,18 @@
       "basis": "contract denies client exposure; contract client_facing=false"
     },
     {
+      "operation": "run_manufacturing_actual_cost_valuation_test",
+      "contract_file": "operations.json",
+      "semantic_kind": "operator",
+      "client_facing": false,
+      "owner": "COV-07",
+      "disposition": "internal-support",
+      "coverage_status": "contract-only",
+      "reducer": null,
+      "source": "manufacturing/mod.rs",
+      "basis": "canonical source domain manufacturing; contract client_facing=false"
+    },
+    {
       "operation": "run_manufacturing_bom_byproduct_output_exact_effect_test",
       "contract_file": "operations.json",
       "semantic_kind": "test",
@@ -12484,6 +12580,30 @@
       "reducer": null,
       "source": null,
       "basis": "contract denies client exposure; contract client_facing=false"
+    },
+    {
+      "operation": "run_manufacturing_bom_routing_lifecycle_test",
+      "contract_file": "operations.json",
+      "semantic_kind": "operator",
+      "client_facing": false,
+      "owner": "COV-07",
+      "disposition": "internal-support",
+      "coverage_status": "contract-only",
+      "reducer": null,
+      "source": "manufacturing/mod.rs",
+      "basis": "canonical source domain manufacturing; contract client_facing=false"
+    },
+    {
+      "operation": "run_manufacturing_bom_to_close_domain_lifecycle_test",
+      "contract_file": "operations.json",
+      "semantic_kind": "operator",
+      "client_facing": false,
+      "owner": "COV-07",
+      "disposition": "internal-support",
+      "coverage_status": "contract-only",
+      "reducer": null,
+      "source": "manufacturing/mod.rs",
+      "basis": "canonical source domain manufacturing; contract client_facing=false"
     },
     {
       "operation": "run_manufacturing_consume_materials_cross_org_component_test",
@@ -12508,6 +12628,18 @@
       "reducer": null,
       "source": null,
       "basis": "contract denies client exposure; contract client_facing=false"
+    },
+    {
+      "operation": "run_manufacturing_cost_configuration_scope_test",
+      "contract_file": "operations.json",
+      "semantic_kind": "operator",
+      "client_facing": false,
+      "owner": "COV-07",
+      "disposition": "internal-support",
+      "coverage_status": "contract-only",
+      "reducer": null,
+      "source": "manufacturing/mod.rs",
+      "basis": "canonical source domain manufacturing; contract client_facing=false"
     },
     {
       "operation": "run_manufacturing_finished_output_scrap_exact_effect_test",
@@ -12568,6 +12700,18 @@
       "reducer": null,
       "source": null,
       "basis": "contract denies client exposure; contract client_facing=false"
+    },
+    {
+      "operation": "run_manufacturing_tracked_output_test",
+      "contract_file": "operations.json",
+      "semantic_kind": "operator",
+      "client_facing": false,
+      "owner": "COV-07",
+      "disposition": "internal-support",
+      "coverage_status": "contract-only",
+      "reducer": null,
+      "source": "manufacturing/tracked_output_test.rs",
+      "basis": "canonical source domain manufacturing; contract client_facing=false"
     },
     {
       "operation": "run_manufacturing_workcenter_create_test",
@@ -13482,6 +13626,18 @@
       "basis": "canonical source domain workflow; contract client_facing=false"
     },
     {
+      "operation": "run_workflow_subject_snapshot_tests",
+      "contract_file": "people-platform.json",
+      "semantic_kind": "test",
+      "client_facing": false,
+      "owner": "COV-21",
+      "disposition": "internal-support",
+      "coverage_status": "contract-only",
+      "reducer": null,
+      "source": "workflow/mod.rs",
+      "basis": "canonical source domain workflow; contract client_facing=false"
+    },
+    {
       "operation": "save_import_mapping_template",
       "contract_file": "people-platform.json",
       "semantic_kind": "command",
@@ -13574,6 +13730,30 @@
       "disposition": "future-disabled",
       "coverage_status": "backend-only",
       "reducer": "scrap_finished_manufacturing_output",
+      "source": "manufacturing/manufacturing_orders.rs",
+      "basis": "canonical source domain manufacturing; no detected UI caller (backend-only)"
+    },
+    {
+      "operation": "scrap_manufacturing_material",
+      "contract_file": "operations.json",
+      "semantic_kind": "command",
+      "client_facing": true,
+      "owner": "COV-07",
+      "disposition": "future-disabled",
+      "coverage_status": "backend-only",
+      "reducer": "scrap_manufacturing_material",
+      "source": "manufacturing/manufacturing_orders.rs",
+      "basis": "canonical source domain manufacturing; no detected UI caller (backend-only)"
+    },
+    {
+      "operation": "scrap_tracked_manufacturing_output",
+      "contract_file": "operations.json",
+      "semantic_kind": "command",
+      "client_facing": true,
+      "owner": "COV-07",
+      "disposition": "future-disabled",
+      "coverage_status": "backend-only",
+      "reducer": "scrap_tracked_manufacturing_output",
       "source": "manufacturing/manufacturing_orders.rs",
       "basis": "canonical source domain manufacturing; no detected UI caller (backend-only)"
     },
@@ -13926,6 +14106,18 @@
       "basis": "canonical source core/billing.rs; contract client_facing=false"
     },
     {
+      "operation": "set_bom_operations",
+      "contract_file": "operations.json",
+      "semantic_kind": "operator",
+      "client_facing": false,
+      "owner": "COV-07",
+      "disposition": "internal-support",
+      "coverage_status": "backend-only",
+      "reducer": "set_bom_operations",
+      "source": "manufacturing/bill_of_materials.rs",
+      "basis": "canonical source domain manufacturing; contract client_facing=false"
+    },
+    {
       "operation": "set_commodity_price_index",
       "contract_file": "finance-commercial.json",
       "semantic_kind": "command",
@@ -14068,6 +14260,18 @@
       "reducer": "set_google_drive_conflict_policy",
       "source": "documents/drive_sync.rs",
       "basis": "canonical source domain documents; contract client_facing=false"
+    },
+    {
+      "operation": "set_helpdesk_related_record",
+      "contract_file": "operations.json",
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "owner": "COV-14",
+      "disposition": "internal-support",
+      "coverage_status": "backend-only",
+      "reducer": "set_helpdesk_related_record",
+      "source": "helpdesk/related_records.rs",
+      "basis": "canonical source domain helpdesk; contract client_facing=false"
     },
     {
       "operation": "set_intercompany_rule_active",
@@ -14812,6 +15016,18 @@
       "reducer": "unreconciled_account_bank_statement_line",
       "source": "accounting/bank_reconciliation.rs",
       "basis": "canonical source domain accounting; detected UI caller"
+    },
+    {
+      "operation": "unregister_payment_allocations",
+      "contract_file": "finance-commercial.json",
+      "semantic_kind": "operator",
+      "client_facing": false,
+      "owner": "COV-08",
+      "disposition": "internal-support",
+      "coverage_status": "backend-only",
+      "reducer": "unregister_payment_allocations",
+      "source": "accounting/payments.rs",
+      "basis": "canonical source domain accounting; contract client_facing=false"
     },
     {
       "operation": "unreserve_stock_picking",
