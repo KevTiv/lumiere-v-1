@@ -126,7 +126,12 @@ def verify_contract(root: Path, manifest: dict[str, Any], contracts: Path) -> No
     require(package_match is not None, "Cargo.lock has no lumiere-contracts package entry")
     locked_version, locked_source = package_match.groups()
     require(locked_version == version, "Cargo.lock lumiere-contracts version does not match manifest")
-    require(f"?tag={tag}#{revision}" in locked_source, "Cargo.lock does not pin the manifest tag and immutable revision")
+    locked_by_tag = f"?tag={tag}#{revision}" in locked_source
+    locked_by_revision = f"?rev={revision}#{revision}" in locked_source
+    require(
+        locked_by_tag or locked_by_revision,
+        "Cargo.lock does not pin the manifest tag or immutable revision",
+    )
 
 
 def verify_operation_history(root: Path, contracts: Path, manifest: dict[str, Any]) -> None:
