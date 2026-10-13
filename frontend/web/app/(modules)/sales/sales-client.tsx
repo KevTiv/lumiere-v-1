@@ -3,6 +3,7 @@ import { mapDashboardWidgets, withDashboardSections } from "@lumiere/ui/lib/dash
 
 import { phCapture } from '@/lib/posthog-browser';
 import { useEffect, useMemo, useState, useCallback } from 'react';
+import { canUseModuleData, mergeModuleStates, moduleCollection } from '@lumiere/ui/lib/module-data-state';
 import { useRouter } from 'next/navigation';
 import { useTranslation } from '@lumiere/i18n';
 import {
@@ -369,7 +370,7 @@ function SalesClientLoaded({
   const { currentUser } = useRBAC();
   const runtimeRoleId = currentUser?.roles[0];
   const { orgId } = orgBigInts(organizationId)
-  const { askForm, formDialog } = useFormDialog();
+  const { askForm, cancelForm, formDialog } = useFormDialog();
   const operatingCompanyId = useDefaultOperatingCompanyBigInt(organizationId) ?? 0n;
 
   const saleOrdersTableRuntime = useRuntimeListConfig({
@@ -402,62 +403,57 @@ function SalesClientLoaded({
   const [openReturnForm, setOpenReturnForm] = useState(false);
   const [createReturnError, setCreateReturnError] = useState<string | null>(null);
 
-  const { data: orders = [], isLoading: ordersLoading } = useSaleOrders(orgId, initialOrders);
-  const { data: orderLines = [] } = useSaleOrderLines(
-    orgId,
-    initialOrderLines,
-  );
-  const { data: pricelists = [] } = usePricelists(orgId, initialPricelists);
-  const { data: pricelistItems = [] } = usePricelistItems(
-    orgId,
-    initialPricelistItems,
-  );
-  const { data: deliveries = [] } = usePickingBatches(
-    orgId,
-    initialDeliveries,
-  );
-  const { data: deliveryCarriers = [] } = useDeliveryCarriers(
-    orgId,
-    initialDeliveryCarriers,
-  );
-  const { data: deliveryPriceRules = [] } = useDeliveryPriceRules(
-    orgId,
-    initialDeliveryPriceRules,
-  );
-  const { data: shippingMethods = [] } = useShippingMethods(
-    orgId,
-    initialShippingMethods,
-  );
-  const { data: posPaymentMethods = [] } = usePosPaymentMethods(
-    orgId,
-    initialPosPaymentMethods,
-  );
-  const { data: loyaltyPrograms = [] } = usePosLoyaltyPrograms(
-    orgId,
-    initialLoyaltyPrograms,
-  );
-  const { data: loyaltyCards = [] } = usePosLoyaltyCards(orgId, initialLoyaltyCards);
+  const ordersRead = moduleCollection(useSaleOrders(orgId, initialOrders));
+  const orders = ordersRead.rows;
+  const ordersLoading = ordersRead.state.status === 'loading';
+  const orderLinesRead = moduleCollection(useSaleOrderLines(orgId, initialOrderLines));
+  const orderLines = orderLinesRead.rows;
+  const pricelistsRead = moduleCollection(usePricelists(orgId, initialPricelists));
+  const pricelists = pricelistsRead.rows;
+  const pricelistItemsRead = moduleCollection(usePricelistItems(orgId, initialPricelistItems));
+  const pricelistItems = pricelistItemsRead.rows;
+  const deliveriesRead = moduleCollection(usePickingBatches(orgId, initialDeliveries));
+  const deliveries = deliveriesRead.rows;
+  const deliveryCarriersRead = moduleCollection(useDeliveryCarriers(orgId, initialDeliveryCarriers));
+  const deliveryCarriers = deliveryCarriersRead.rows;
+  const deliveryPriceRulesRead = moduleCollection(useDeliveryPriceRules(orgId, initialDeliveryPriceRules));
+  const deliveryPriceRules = deliveryPriceRulesRead.rows;
+  const shippingMethodsRead = moduleCollection(useShippingMethods(orgId, initialShippingMethods));
+  const shippingMethods = shippingMethodsRead.rows;
+  const posPaymentMethodsRead = moduleCollection(usePosPaymentMethods(orgId, initialPosPaymentMethods));
+  const posPaymentMethods = posPaymentMethodsRead.rows;
+  const loyaltyProgramsRead = moduleCollection(usePosLoyaltyPrograms(orgId, initialLoyaltyPrograms));
+  const loyaltyPrograms = loyaltyProgramsRead.rows;
+  const loyaltyCardsRead = moduleCollection(usePosLoyaltyCards(orgId, initialLoyaltyCards));
+  const loyaltyCards = loyaltyCardsRead.rows;
   const { data: contacts = [] } = useContacts(orgId, initialContacts);
   const { data: users = [] } = useUsers(orgId);
   const { data: warehouses = [] } = useWarehouses(orgId, initialWarehouses);
   const { data: products = [] } = useProducts(orgId);
   const { data: productCategories = [] } = useProductCategories(orgId);
   const { data: uoms = [] } = useUoms(orgId);
-  const { data: accountMoves = [] } = useAccountMoves(orgId);
+  const accountMovesRead = moduleCollection(useAccountMoves(orgId));
+  const accountMoves = accountMovesRead.rows;
   const { data: accountJournals = [] } = useAccountJournals(orgId);
   const { data: accountAccounts = [] } = useAccountAccounts(orgId);
   const { data: paymentTerms = [] } = useAccountPaymentTerms(orgId);
   const { data: partnerCreditControls = [] } = usePartnerCreditControls(orgId);
   const { data: partnerCreditHolds = [] } = usePartnerCreditHolds(orgId);
   const { data: currencies = [] } = useCurrencies();
-  const { data: stockPickings = [] } = useStockPickings(orgId, initialStockPickings);
+  const stockPickingsRead = moduleCollection(useStockPickings(orgId, initialStockPickings));
+  const stockPickings = stockPickingsRead.rows;
   const { data: stockMoves = [] } = useStockMoves(orgId);
-  const { data: returnOrders = [] } = useReturnOrders(orgId, initialReturnOrders);
-  const { data: returnOrderLines = [] } = useReturnOrderLines(orgId, initialReturnOrderLines);
-  const { data: saleCommissions = [] } = useSaleCommissions(orgId);
+  const returnOrdersRead = moduleCollection(useReturnOrders(orgId, initialReturnOrders));
+  const returnOrders = returnOrdersRead.rows;
+  const returnOrderLinesRead = moduleCollection(useReturnOrderLines(orgId, initialReturnOrderLines));
+  const returnOrderLines = returnOrderLinesRead.rows;
+  const saleCommissionsRead = moduleCollection(useSaleCommissions(orgId));
+  const saleCommissions = saleCommissionsRead.rows;
   const { data: saleCommissionPlans = [] } = useSaleCommissionPlans(orgId);
-  const { data: saleOrdersToApprove = [] } = useSaleOrdersToApprove(orgId);
-  const { data: saleCommissionsPending = [] } = useSaleCommissionsPending(orgId);
+  const saleOrdersToApproveRead = moduleCollection(useSaleOrdersToApprove(orgId));
+  const saleOrdersToApprove = saleOrdersToApproveRead.rows;
+  const saleCommissionsPendingRead = moduleCollection(useSaleCommissionsPending(orgId));
+  const saleCommissionsPending = saleCommissionsPendingRead.rows;
   const settleSaleCommissions = useSettleSaleCommissions(orgId, operatingCompanyId);
   const cancelSaleCommission = useCancelSaleCommission(orgId, operatingCompanyId);
   const reverseSaleCommissionSettlement = useReverseSaleCommissionSettlement(
@@ -2338,11 +2334,67 @@ function SalesClientLoaded({
     [data.orders, currencies, ordersLoading, t],
   );
 
+  const dataState = {
+    dashboard: mergeModuleStates([
+      ordersRead.state, orderLinesRead.state, returnOrdersRead.state, stockPickingsRead.state,
+      saleCommissionsRead.state, saleOrdersToApproveRead.state, saleCommissionsPendingRead.state,
+    ]),
+    ops: mergeModuleStates([ordersRead.state, orderLinesRead.state]),
+    orders: ordersRead.state,
+    'order-lines': orderLinesRead.state,
+    pricelists: pricelistsRead.state,
+    'pricelist-items': pricelistItemsRead.state,
+    deliveries: deliveriesRead.state,
+    fulfillment: stockPickingsRead.state,
+    returns: mergeModuleStates([returnOrdersRead.state, returnOrderLinesRead.state]),
+    invoices: accountMovesRead.state,
+    'delivery-price-rules': deliveryPriceRulesRead.state,
+    'delivery-carriers': deliveryCarriersRead.state,
+    'shipping-methods': shippingMethodsRead.state,
+    'pos-payment-methods': posPaymentMethodsRead.state,
+    'loyalty-programs': loyaltyProgramsRead.state,
+    'loyalty-cards': loyaltyCardsRead.state,
+  };
+  type SalesTab = keyof typeof dataState;
+  const tabUsable = (tab: string | undefined) =>
+    tab == null || !(tab in dataState) || canUseModuleData(dataState[tab as SalesTab]);
+  const actionTabs: Record<string, SalesTab> = {
+    createSaleOrder: 'orders', createPricelist: 'pricelists', createPricelistItem: 'pricelist-items',
+    createSaleOrderLine: 'order-lines', updateSaleOrderLine: 'order-lines', createReturnOrder: 'returns',
+    createPickingBatch: 'deliveries', createDeliveryPriceRule: 'delivery-price-rules',
+    createDeliveryCarrier: 'delivery-carriers', createShippingMethod: 'shipping-methods',
+    createPaymentMethod: 'pos-payment-methods', createLoyaltyProgram: 'loyalty-programs',
+    createLoyaltyCard: 'loyalty-cards',
+  };
+  const quickActionUsable = quickActionForm == null || tabUsable(actionTabs[quickActionForm.action]);
+  const csvUsable = csvKind == null || tabUsable(csvKind === 'order' ? 'orders' : 'order-lines');
+  const chatterUsable = chatterTarget == null || tabUsable(activeTab);
+  const fulfillmentUsable = tabUsable('fulfillment');
+  const returnsUsable = tabUsable('returns');
+  const opsUsable = tabUsable('ops');
+  useEffect(() => {
+    // Dialogs close when the collection their rows came from is denied or fails.
+    if (!quickActionUsable) setQuickActionForm(null);
+    if (!csvUsable) setCsvKind(null);
+    if (!chatterUsable) setChatterTarget(null);
+    if (!fulfillmentUsable) {
+      setPartialDeliveryPicking(null);
+      setCancelPickingTarget(null);
+    }
+    if (!returnsUsable) {
+      setOpenReturnForm(false);
+      setCreditReturnOrderId(null);
+      setSelectedReturnOrderId(null);
+    }
+    if (!opsUsable) cancelForm();
+  }, [quickActionUsable, csvUsable, chatterUsable, fulfillmentUsable, returnsUsable, opsUsable, cancelForm]);
+
   const handleFormSubmit = async (
     _tabId: string,
     action: string,
     formData: Record<string, unknown>,
   ) => {
+    if (!tabUsable(actionTabs[action])) return;
     if (action === 'createSaleOrder') {
       const p = toCreateSaleOrderParams(formData, pricelists, operatingCompanyId);
       if (p) {
@@ -2457,6 +2509,7 @@ function SalesClientLoaded({
         config={config}
         data={data}
         dataLoading={{ orders: ordersLoading }}
+        dataState={dataState}
         kpiStrips={kpiStrips}
         onFormSubmit={handleFormSubmit}
         isPending={isFormMutationPending}
@@ -2474,7 +2527,7 @@ function SalesClientLoaded({
           if (target) setChatterTarget(target);
         }}
       />
-      {chatterTarget ? (
+      {chatterTarget && chatterUsable ? (
         <>
           <RecordChatterDialog
             key={`${chatterTarget.resModel}-${chatterTarget.resId.toString()}`}
@@ -2498,7 +2551,7 @@ function SalesClientLoaded({
         </>
       ) : null}
       <RuntimeFormModal
-        open={quickActionForm !== null}
+        open={quickActionForm !== null && quickActionUsable}
         onOpenChange={(open) => !open && setQuickActionForm(null)}
         staticConfig={quickActionForm?.form ?? saleOrderFormConfig}
         moduleId="sales"
@@ -2513,7 +2566,7 @@ function SalesClientLoaded({
           }
         }}
       />
-      {csvKind === 'order' ? (
+      {csvKind === 'order' && csvUsable ? (
         <ImportAssistantWizard
           key="order-assistant"
           open
@@ -2538,7 +2591,7 @@ function SalesClientLoaded({
           }}
         />
       ) : null}
-      {csvKind && csvKind !== 'order' && csvFormConfig ? (
+      {csvKind && csvKind !== 'order' && csvUsable && csvFormConfig ? (
         <CsvImportModal
           key={csvKind}
           onClose={() => setCsvKind(null)}
@@ -2549,7 +2602,7 @@ function SalesClientLoaded({
           }}
         />
       ) : null}
-      {partialDeliveryPicking != null && partialDeliveryFormConfig ? (
+      {partialDeliveryPicking != null && fulfillmentUsable && partialDeliveryFormConfig ? (
         <FormModal
           key={`partial-delivery-${String(pickingRowId(partialDeliveryPicking))}`}
           open
@@ -2595,7 +2648,7 @@ function SalesClientLoaded({
           }}
         />
       ) : null}
-      {cancelPickingTarget != null && cancelPickingFormConfig ? (
+      {cancelPickingTarget != null && fulfillmentUsable && cancelPickingFormConfig ? (
         <FormModal
           key={`cancel-picking-${String(pickingRowId(cancelPickingTarget))}`}
           open
@@ -2626,9 +2679,9 @@ function SalesClientLoaded({
           }}
         />
       ) : null}
-      {formDialog}
+      {opsUsable && formDialog}
       <FormModal
-        open={openReturnForm}
+        open={openReturnForm && returnsUsable}
         onOpenChange={(open) => {
           setOpenReturnForm(open);
           if (!open) setCreateReturnError(null);
@@ -2652,7 +2705,7 @@ function SalesClientLoaded({
           }
         }}
       />
-      {creditReturnOrderId != null ? (
+      {creditReturnOrderId != null && returnsUsable ? (
         <RuntimeFormModal
           key={`credit-return-${creditReturnOrderId.toString()}`}
           open
