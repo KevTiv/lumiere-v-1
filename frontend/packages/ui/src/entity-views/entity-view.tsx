@@ -43,6 +43,8 @@ interface EntityViewProps {
   /** Current URL or parent-owned filters, applied as transient overlays. */
   initialFilters?: Record<string, string>
   onInitialFilterClear?: (key: string) => void
+  /** Narrowing applied above the list (a KPI tile), so an empty list reads as "no results". */
+  externalFilter?: { active: boolean; onClear?: () => void }
 }
 
 export function useEntitySurfaceFilter<T extends EntityPermissioned>(
@@ -300,6 +302,7 @@ export function EntityView({
   isLoading,
   initialFilters,
   onInitialFilterClear,
+  externalFilter,
 }: EntityViewProps) {
   const hybrid =
     config.view.mode === "table-or-board" ? (config.view as EntityTableBoardViewConfig) : null
@@ -407,6 +410,7 @@ export function EntityView({
               isLoading={isLoading}
               initialFilters={initialFilters}
               onInitialFilterClear={onInitialFilterClear}
+              externalFilter={externalFilter}
             />
           ) : surfaceMode === "pivot" && pivotConfig ? (
             <EntityPivotView
@@ -478,6 +482,7 @@ export function EntityView({
           isLoading={isLoading}
           initialFilters={initialFilters}
           onInitialFilterClear={onInitialFilterClear}
+          externalFilter={externalFilter}
         />
       )
     }

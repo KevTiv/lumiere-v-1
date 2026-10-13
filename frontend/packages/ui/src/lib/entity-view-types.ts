@@ -78,6 +78,8 @@ export interface EntityColumn extends EntityPermissioned {
    * (numeric currency ids are not resolved here).
    */
   currencyKey?: string
+  /** Secret or masked values (e.g. statutory IDs): never written by the table's CSV export. */
+  sensitive?: boolean
   /** Override rendering entirely */
   render?: (value: unknown, row: EntityRow) => ReactNode
   /** Makes the cell editable in place (double-click). The caller owns the write. */
@@ -152,6 +154,8 @@ export interface EntityTableConfig {
   rowKey?: string
   /** When set, filter UI state is persisted in localStorage under this key. */
   listViewKey?: string
+  /** Explicitly enable export for a reviewed list. Defaults to false. */
+  allowExport?: boolean
   searchable?: boolean
   searchPlaceholder?: string
   searchKeys?: string[]
@@ -170,6 +174,16 @@ export interface EntityTableConfig {
     actionLabel?: string
     onAction?: () => void
     icon?: ReactNode
+    /** Gates `onAction`: without it the CTA is replaced by `readOnlyMessage`. */
+    permission?: EntitySurfacePermission
+    /** `id` of an `actions` entry used as the primary CTA; it reuses that action's permission and handler. */
+    primaryActionId?: string
+    /** `id` of an `actions` entry offered next to the primary CTA, e.g. a CSV import. */
+    secondaryActionId?: string
+    /** A short "why this matters" or "learn how" line under the CTAs. */
+    learnHint?: string
+    /** Shown instead of the CTA when the user may not create records. */
+    readOnlyMessage?: string
   }
 }
 

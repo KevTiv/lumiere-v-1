@@ -17,7 +17,8 @@ name: Release contracts
 on:
   push:
     # main only receives pins through merged branches.
-    branches-ignore: [main]
+    # Draft backend prerequisites must be reviewed before publishing immutable tags.
+    branches-ignore: [main, "codex/draft-backend-*"]
     # Everything codegen reads to produce the contract IR.
     paths:
       - spacetimedb/**

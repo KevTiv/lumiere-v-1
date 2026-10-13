@@ -4,6 +4,7 @@ export type GridWidth = "full" | "2/3" | "1/2" | "1/3"
 
 export type WidgetType =
   | "kpi"
+  | "diagnostic"
   | "area-chart"
   | "line-chart"
   | "bar-chart"
@@ -40,6 +41,27 @@ export interface KPIWidget extends BaseWidget {
     changeLabel?: string
     trend?: "up" | "down" | "neutral"
     icon?: string
+  }
+}
+
+export interface DiagnosticWidget extends BaseWidget {
+  type: "diagnostic"
+  data: {
+    code:
+      | "invalid-binding"
+      | "invalid-filter"
+      | "invalid-operator"
+      | "invalid-aggregation"
+      | "invalid-sort"
+      | "invalid-chart-type"
+      | "invalid-widget-type"
+      | "missing-model"
+      | "missing-group-by"
+      | "missing-time-field"
+      | "invalid-timestamp"
+      | "missing-measure"
+    message: string
+    rejectedRows?: number
   }
 }
 
@@ -228,6 +250,7 @@ export interface QuickActionsWidget extends BaseWidget {
 
 export type DashboardWidget =
   | KPIWidget
+  | DiagnosticWidget
   | AreaChartWidget
   | LineChartWidget
   | BarChartWidget

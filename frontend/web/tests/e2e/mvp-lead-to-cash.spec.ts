@@ -3,6 +3,7 @@ import type { QueryRowFor } from "@lumiere/stdb/query-row-map"
 
 import { matchesOperationResponse } from "./operation-response"
 import { ORDER_SUMMARY, expectOrderSummary } from "./sales-order-fixtures"
+import { clickCanonicalHandoff, openCanonicalHandoffs } from "./cov25-link-navigation"
 
 import {
   chooseFirstEnabledOption,
@@ -424,6 +425,20 @@ test.describe("MVP lead-to-cash workflow", { tag: "@p0" }, () => {
       absent: [ORDER_SUMMARY.payment.unpaid, ORDER_SUMMARY.payment.partial],
       reload: true,
     })
+    const orderSource = { module: "sales", tab: "orders", id: orderId }
+    const handoffs = await openCanonicalHandoffs(page, orderSource)
+    const paymentLink = handoffs.getByTestId(`sale-order-handoff-payment-${paymentId}`)
+    await expect(paymentLink).toBeVisible()
+    await expect(paymentLink).toHaveAttribute(
+      "href",
+      `/accounting?tab=payments&filter=${encodeURIComponent(`id:${paymentId}`)}`,
+    )
+    await clickCanonicalHandoff(
+      page,
+      orderSource,
+      `sale-order-handoff-payment-${paymentId}`,
+      { module: "accounting", tab: "payments", id: paymentId },
+    )
     await expectNoAppError(page)
 
     // Step 13 — dashboard / report updates (live KPI widgets)

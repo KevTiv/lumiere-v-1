@@ -6,6 +6,7 @@ export * from "./benefits"
 export * from "./performance"
 export * from "./integration"
 export * from "./imports"
+export * from "./reads"
 
 // ── Types (re-exported so client components import from one place) ────────────
 export type {

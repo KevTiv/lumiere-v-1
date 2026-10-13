@@ -33,6 +33,8 @@ interface RBACProviderProps {
   initialPolicies?: PolicyRule[]
   /** Seed demo users/roles when props are omitted (storybook/dev only). Default false. */
   useDefaultFixtures?: boolean
+  /** Set false while roles/policies are loading from the backend. Defaults to true. */
+  permissionsReady?: boolean
 }
 
 export function RBACProvider({
@@ -41,6 +43,7 @@ export function RBACProvider({
   initialRoles,
   initialPolicies,
   useDefaultFixtures = false,
+  permissionsReady = true,
 }: RBACProviderProps) {
   const [currentUser, setCurrentUser] = useState<User | null>(() => {
     if (initialUser !== undefined) return initialUser
@@ -163,7 +166,8 @@ export function RBACProvider({
     checkPermission,
     hasRole,
     isAdmin,
-  }), [currentUser, roles, policies, checkPermission, hasRole, isAdmin])
+    permissionsReady,
+  }), [currentUser, roles, policies, checkPermission, hasRole, isAdmin, permissionsReady])
 
   // Expose setters for admin components
   const extendedContext = useMemo(() => ({

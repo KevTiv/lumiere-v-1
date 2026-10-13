@@ -1003,6 +1003,21 @@
       "reason": "invoked by an enumerated frontend BFF call site"
     },
     {
+      "name": "configure_workcenter_cost_rate",
+      "exposure": "session",
+      "reason": "invoked by the typed manufacturing workcenter cost configuration frontend BFF caller; domain reducer enforces company ownership and workcenter write authority"
+    },
+    {
+      "name": "configure_manufacturing_valuation",
+      "exposure": "session",
+      "reason": "invoked by the typed manufacturing valuation configuration frontend BFF caller; domain reducer enforces company ownership and accounting authority"
+    },
+    {
+      "name": "set_bom_operations",
+      "exposure": "denied",
+      "reason": "BOM routing assignment has no enumerated frontend BFF caller; reducer remains permission-gated in the domain runtime"
+    },
+    {
       "name": "create_bom_byproduct",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
@@ -2555,6 +2570,11 @@
       "reason": "invoked by an enumerated frontend BFF call site"
     },
     {
+      "name": "import_csv_tracked",
+      "exposure": "session",
+      "reason": "required by the authenticated tracked CSV import endpoint"
+    },
+    {
       "name": "import_currency_csv",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
@@ -3350,6 +3370,11 @@
       "reason": "invoked by an enumerated frontend BFF call site"
     },
     {
+      "name": "release_document_legal_hold",
+      "exposure": "session",
+      "reason": "reviewed document-page action: releases an active legal hold behind document admin permission and audit logging, mirroring apply_document_legal_hold"
+    },
+    {
       "name": "release_picking_wave",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
@@ -3428,6 +3453,11 @@
       "name": "request_expense_policy_exception",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
+    },
+    {
+      "name": "request_workflow_subject_snapshot",
+      "exposure": "session",
+      "reason": "reviewed requester-scoped workflow snapshot read guarded by workflow command permission, subject read permission, and organization/company ownership checks"
     },
     {
       "name": "reserve_serial",
@@ -3633,6 +3663,46 @@
       "name": "scrap_finished_manufacturing_output",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
+    },
+    {
+      "name": "run_manufacturing_tracked_output_test",
+      "exposure": "denied",
+      "reason": "isolated persisted domain proof; never exposed through the session BFF"
+    },
+    {
+      "name": "run_manufacturing_bom_to_close_domain_lifecycle_test",
+      "exposure": "denied",
+      "reason": "isolated persisted manufacturing lifecycle proof; never exposed through the session BFF"
+    },
+    {
+      "name": "run_manufacturing_bom_routing_lifecycle_test",
+      "exposure": "denied",
+      "reason": "isolated persisted routing ownership proof; never exposed through the session BFF"
+    },
+    {
+      "name": "run_manufacturing_actual_cost_valuation_test",
+      "exposure": "denied",
+      "reason": "isolated persisted cost and accounting valuation proof; never exposed through the session BFF"
+    },
+    {
+      "name": "run_manufacturing_cost_configuration_scope_test",
+      "exposure": "denied",
+      "reason": "isolated persisted cost configuration authorization proof; never exposed through the session BFF"
+    },
+    {
+      "name": "finish_manufacturing_order_with_tracking",
+      "exposure": "session",
+      "reason": "explicit tracked manufacturing close intent with exact lot and serial attribution"
+    },
+    {
+      "name": "scrap_manufacturing_material",
+      "exposure": "session",
+      "reason": "explicit in-progress BOM material wastage intent before consumption"
+    },
+    {
+      "name": "scrap_tracked_manufacturing_output",
+      "exposure": "session",
+      "reason": "explicit tracked output scrap intent from an exact MO-owned move"
     },
     {
       "name": "seed_statutory_expense_mileage_rates",
@@ -4013,6 +4083,11 @@
       "name": "unreconciled_account_bank_statement_line",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
+    },
+    {
+      "name": "unregister_payment_allocations",
+      "exposure": "denied",
+      "reason": "allocation unwind is an internal accounting primitive reached atomically through cancel_payment; no enumerated frontend BFF caller"
     },
     {
       "name": "unreserve_stock_picking",

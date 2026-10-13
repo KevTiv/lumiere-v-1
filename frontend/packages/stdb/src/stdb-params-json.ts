@@ -6,9 +6,12 @@
  */
 
 import optionFieldsJson from "./stdb-http-option-fields.json" with { type: "json" }
+import optionTypesJson from "./stdb-http-option-types.json" with { type: "json" }
 
 type OptionFieldMap = Record<string, readonly string[]>
 const OPTION_FIELDS = optionFieldsJson as OptionFieldMap
+type OptionTypes = Readonly<Record<string, string>>
+const OPTION_TYPES = optionTypesJson as Record<string, OptionTypes>
 
 /** Vec-of-struct fields that need per-item Option encoding via `stdbParamsToJson`. */
 const NESTED_ARRAY_STRUCTS: Partial<
@@ -188,6 +191,7 @@ function encodeValue(
   value: unknown,
   optionFields: ReadonlySet<string> | undefined,
   fieldKey?: string,
+  optionTypes?: OptionTypes,
 ): unknown {
   if (value === undefined) return undefined
 
@@ -218,7 +222,8 @@ function encodeValue(
   if (isSatsOption(value)) {
     const obj = value as Record<string, unknown>
     if ("none" in obj) return { none: [] }
-    return { some: encodeValue(obj.some, optionFields) }
+    // An explicit `some` carries its own presence decision, including ID zero.
+    return { some: encodeValue(obj.some, undefined, fieldKey, optionTypes) }
   }
 
   if (value === null) {
@@ -229,32 +234,44 @@ function encodeValue(
   }
 
   if (typeof value === "bigint") {
-    if (fieldKey && optionFields?.has(fieldKey)) {
-      if (value <= 0n) return { none: [] }
-      return { some: bigintToJson(value) }
+    const isOptionalId = fieldKey !== undefined &&
+      optionTypes?.[fieldKey] === "u64" && /_(?:id|uid)$/.test(fieldKey)
+    const isSigned = fieldKey !== undefined &&
+      /^i(?:8|16|32|64|128|256)$/.test(optionTypes?.[fieldKey] ?? "")
+    if (fieldKey && optionFields?.has(fieldKey) && isOptionalId && value <= 0n) {
+      return { none: [] }
     }
-    return bigintToJson(value)
+    // Signed optional integers use the same lossless JSON-number boundary.
+    const encoded = isSigned && value < 0n ? -bigintToJson(-value) : bigintToJson(value)
+    if (fieldKey && optionFields?.has(fieldKey)) {
+      return { some: encoded }
+    }
+    return encoded
   }
 
   if (typeof value === "number" && fieldKey && optionFields?.has(fieldKey)) {
-    if (value <= 0) return { none: [] }
+    // Create forms historically use zero for an unselected optional relation.
+    // Scalar zero (amount, duration, limits, etc.) is a present value.
+    if (optionTypes?.[fieldKey] === "u64" && /_(?:id|uid)$/.test(fieldKey) && value <= 0) {
+      return { none: [] }
+    }
     return { some: value }
   }
 
   if (Array.isArray(value)) {
-    return value.map((item) => encodeValue(item, optionFields))
+    return value.map((item) => encodeValue(item, optionFields, undefined, optionTypes))
   }
 
   if (isSatsSumJson(value)) {
     const key = Object.keys(value)[0]!
-    return { [key]: encodeValue(value[key], optionFields) }
+    return { [key]: encodeValue(value[key], optionFields, undefined, optionTypes) }
   }
 
   if (typeof value === "object") {
     const out: Record<string, unknown> = {}
     for (const [key, nested] of Object.entries(value as Record<string, unknown>)) {
       const snakeKey = camelToSnakeIdentifier(key)
-      const encoded = encodeValue(nested, optionFields, snakeKey)
+      const encoded = encodeValue(nested, optionFields, snakeKey, optionTypes)
       if (encoded !== undefined) {
         out[snakeKey] = encoded
       }
@@ -353,7 +370,9 @@ export function stdbParamsToJson(
 ): Record<string, unknown> {
   const optionFieldList = structName ? (OPTION_FIELDS[structName] ?? []) : []
   const optionFields = structName ? new Set(optionFieldList) : undefined
-  const encoded = encodeValue(params, optionFields)
+  const encoded = encodeValue(
+    params, optionFields, undefined, structName ? OPTION_TYPES[structName] : undefined,
+  )
   const out = { ...((encoded ?? {}) as Record<string, unknown>) }
 
   const nestedArrays = structName ? NESTED_ARRAY_STRUCTS[structName] : undefined
@@ -478,6 +497,7 @@ const REDUCER_PARAM_STRUCTS: Partial<Record<string, keyof OptionFieldMap & strin
   add_workflow_human_task_comment: "AddWorkflowHumanTaskCommentParams",
   invalidate_workflow_human_task: "InvalidateWorkflowHumanTaskParams",
   create_workflow: "CreateWorkflowParams",
+  request_workflow_subject_snapshot: "RequestWorkflowSubjectSnapshotParams",
   start_workflow: "StartWorkflowParams",
   signal_workflow: "SignalWorkflowParams",
   cancel_workflow: "CancelWorkflowParams",

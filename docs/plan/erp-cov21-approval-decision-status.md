@@ -52,6 +52,18 @@ rejected), late/closed-task rejection, and self-approval denial. No reducer chan
 - **Semantics note:** the plan's "replay → 422" does not apply to an identical replay — the
   idempotency receipt makes that a safe success. The 422 proof uses a fresh idempotency key.
 
+## Wave 2 closure evidence (2026-10-13)
+
+- The workflow gate browser proof now covers create → publish → simulate → retire, canonical
+  start/signal subject snapshots, and captured publish/retire request replay returning 422 without
+  changing the version. The existing human-task proof retains independent-approver SoD, safe
+  identical retry, fresh-key stale rejection, and reader denial.
+- Playwright discovery succeeds for the combined COV-21/22/23 Wave-2 selection: 13 browser cases
+  plus authentication setup (14 total across six files). This is discovery evidence, not execution.
+- Runtime acceptance remains blocked on a seeded same-head browser stack and the associated native
+  workflow suites. COV-26 still needs the module UX/accessibility states; COV-27 still needs the
+  all-module seeded launch run, classification/stub ratchets, and all required suites green.
+
 ## Prerequisites / decisions
 
 Approver persona and PO approval workflow fixture (provided by the spec via `seedPurchaseOrderApprovalWorkflow`).

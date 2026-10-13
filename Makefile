@@ -113,6 +113,7 @@ E2E_DOMAIN_TEST_REDUCERS := \
 	e2e-pretenant pretenant-cert-stdb pretenant-cert-native \
 	init-stack refresh-stack-tokens docker-dev docker-dev-iot \
 	register-stack-identities \
+	generate-stdb-http-option-metadata check-stdb-http-option-metadata \
 	codegen check-codegen check-codegen-pinned check-contract-ir check-operation-history check-release-compatibility check-tenant-ownership check-storage-policy check-c2-commit-coverage check-cov00c-correctness-census check-cov00d-evidence-matrix check-cov02-seed-inventory check-cov02-first-org-fixture check-reducer-contracts-drift check-contracts-source-drift check-contracts-drift check-c9-isolation-matrix lint-trusted-route-boundaries \
 	clean-contracts-live-staging generate-presentation-schemas generate-presentation-contracts lint-reducer-call-literals api-server-run \
 	lint-no-magic-fk-zero lint-accounting-as-unknown-as lint-accounting-currency-refs \
@@ -1067,8 +1068,16 @@ docker-dev:
 docker-dev-iot:
 	docker compose --env-file .env.docker -f docker-compose.dev.yml --profile iot up --build
 
+generate-stdb-http-option-metadata:
+	python3 scripts/generate-stdb-http-option-metadata.py
+
+check-stdb-http-option-metadata:
+	python3 scripts/generate-stdb-http-option-metadata.py --check
+	PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s scripts/tests -p test_stdb_http_option_metadata.py
+
 codegen: schema-snapshot
 	cargo run -p lumiere-codegen
+	python3 scripts/generate-stdb-http-option-metadata.py
 
 check-agent-capabilities: codegen
 	python3 scripts/verify-agent-capability-artifact.py .contracts-staging/ir/agent-capability-registry-v1.json
@@ -1112,6 +1121,10 @@ check-cov00d-evidence-matrix:
 check-cov02-seed-inventory:
 	@python3 scripts/validate-cov02-seed-inventory.py
 
+check-cov27-launch-manifest:
+	@python3 scripts/validate-cov27-launch-manifest.py
+	@python3 -m unittest scripts/test_validate_cov27_launch_manifest.py
+
 check-cov02-first-org-fixture:
 	@node frontend/web/scripts/seed-test-user.mjs --check-manifest
 
@@ -1131,9 +1144,12 @@ check-c2-commit-coverage:
 	python3 lumiere-codegen/tests/test_c2_commit_coverage.py
 
 check-codegen: codegen check-contract-ir check-tenant-ownership check-storage-policy check-c2-commit-coverage check-c8-contract-ratchet lint-reducer-call-literals lint-trusted-route-boundaries
+	$(MAKE) check-stdb-http-option-metadata
 	@git add -N \
 		frontend/packages/stdb/src/query-resource-row-type.json \
 		frontend/packages/stdb/src/query-row-map.ts \
+		frontend/packages/stdb/src/stdb-http-option-fields.json \
+		frontend/packages/stdb/src/stdb-http-option-types.json \
 		frontend/packages/stdb/src/generated/org-subscription-descriptors.ts \
 		crates/stdb-client/src/generated_reducer_contract.rs \
 		crates/stdb-auth/assets/resource_registry.json \
@@ -1142,6 +1158,8 @@ check-codegen: codegen check-contract-ir check-tenant-ownership check-storage-po
 	@git diff --exit-code -- \
 		frontend/packages/stdb/src/query-resource-row-type.json \
 		frontend/packages/stdb/src/query-row-map.ts \
+		frontend/packages/stdb/src/stdb-http-option-fields.json \
+		frontend/packages/stdb/src/stdb-http-option-types.json \
 		frontend/packages/stdb/src/generated/org-subscription-descriptors.ts \
 		crates/stdb-client/src/generated_reducer_contract.rs \
 		crates/stdb-auth/assets/resource_registry.json \
@@ -1152,12 +1170,15 @@ check-codegen: codegen check-contract-ir check-tenant-ownership check-storage-po
 # contract regeneration belongs to check-contracts-source-drift; this target
 # must not couple ordinary Rust checks to whichever module is currently deployed.
 check-codegen-pinned: check-agent-capabilities-pinned check-operation-history-pinned check-release-compatibility check-tenant-ownership check-c2-commit-coverage check-c8-contract-ratchet lint-reducer-call-literals lint-trusted-route-boundaries
+	$(MAKE) check-stdb-http-option-metadata
 	python3 scripts/verify-contract-ir.py .contracts-staging/ir/lumiere-contract-ir-v2.json --require-clean
 	python3 lumiere-codegen/tests/test_contract_ir_pin.py
 	node scripts/bootstrap-storage-policies.mjs --check
 	@git diff --exit-code -- \
 		frontend/packages/stdb/src/query-resource-row-type.json \
 		frontend/packages/stdb/src/query-row-map.ts \
+		frontend/packages/stdb/src/stdb-http-option-fields.json \
+		frontend/packages/stdb/src/stdb-http-option-types.json \
 		frontend/packages/stdb/src/generated/org-subscription-descriptors.ts \
 		crates/stdb-client/src/generated_reducer_contract.rs \
 		crates/stdb-auth/assets/resource_registry.json \
@@ -1223,6 +1244,8 @@ check-reducer-contracts-drift: schema-snapshot codegen
 # CI source check that does not depend on a separately deployed module. The
 # live deployment compatibility check remains available as check-contracts-drift.
 check-contracts-source-drift: clean-contracts-live-staging generate-stdb-rust-sdk generate-stdb-ts-sdk
+	@git diff --exit-code -- frontend/packages/stdb/src/stdb-http-option-fields.json || \
+		(echo "Generated HTTP option-field registry is out of date. Run: make generate-stdb-ts-sdk" && exit 1)
 	@CHECKOUT="$$(bash scripts/resolve-pinned-contracts.sh)"; \
 	if [ -z "$$CHECKOUT" ] || [ ! -d "$$CHECKOUT/crates/lumiere-contracts/src/bindings" ]; then \
 		echo "check-contracts-source-drift: could not resolve pinned contracts" >&2; \

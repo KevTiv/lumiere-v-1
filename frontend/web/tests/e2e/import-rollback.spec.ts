@@ -14,7 +14,12 @@ import {
   waitForImportJobRollbackReady,
 } from "./helpers"
 
-async function mockContactImportAssistantAi(page: Page, contactName: string, email: string) {
+async function mockContactImportAssistantAi(
+  page: Page,
+  contactName: string,
+  email: string,
+  validationErrors: Array<{ row_index: number; field: string; message: string; severity: string }> = [],
+) {
   await page.route("**/api/ai/import/analyze", async (route) => {
     await route.fulfill({
       status: 200,
@@ -48,8 +53,8 @@ async function mockContactImportAssistantAi(page: Page, contactName: string, ema
       contentType: "application/json",
       body: JSON.stringify({
         target_entity: "contact",
-        rows: [{ name: contactName, email }],
-        validation_errors: [],
+        rows: [{ name: validationErrors.length > 0 ? "" : contactName, email }],
+        validation_errors: validationErrors,
         safety: { findings: [], blocked_cell_count: 0, is_safe_for_ai: true },
         warnings: [],
       }),
@@ -96,6 +101,32 @@ test.describe("Import rollback", { tag: ["@phase-4", "@import"] }, () => {
 
     await fetchContactIdByName(page, contactName)
     await waitForImportJobRollbackReady(page, "contact")
+    const beforeReplay = await Promise.all([
+      page.request.get("/api/query/contacts").then(async (response) =>
+        ((await response.json()) as { data?: Array<Record<string, unknown>> }).data
+          ?.filter((row) => row.name === contactName).length ?? 0),
+      page.request.get("/api/query/import-jobs").then(async (response) =>
+        ((await response.json()) as { data?: Array<Record<string, unknown>> }).data
+          ?.filter((row) => String(row.tableName ?? row.table_name) === "contact").length ?? 0),
+    ])
+
+    // The canonical CSV produced by upload → map → preview has one exact file
+    // identity. A lost-response replay must not create a second contact/job.
+    const replayUrl = new URL(importRes.request().url())
+    const replay = await page.request.post(`${replayUrl.pathname}${replayUrl.search}`, {
+      headers: { "Content-Type": "application/json" },
+      data: importRes.request().postDataJSON(),
+    })
+    expect(replay.status()).toBe(422)
+    const afterReplay = await Promise.all([
+      page.request.get("/api/query/contacts").then(async (response) =>
+        ((await response.json()) as { data?: Array<Record<string, unknown>> }).data
+          ?.filter((row) => row.name === contactName).length ?? 0),
+      page.request.get("/api/query/import-jobs").then(async (response) =>
+        ((await response.json()) as { data?: Array<Record<string, unknown>> }).data
+          ?.filter((row) => String(row.tableName ?? row.table_name) === "contact").length ?? 0),
+    ])
+    expect(afterReplay).toEqual(beforeReplay)
 
     const rollbackBtn = dialog.getByRole("button", { name: /^Rollback import$/i })
     await expect(rollbackBtn).toBeVisible({ timeout: 30_000 })
@@ -115,5 +146,30 @@ test.describe("Import rollback", { tag: ["@phase-4", "@import"] }, () => {
       return rowName === contactName
     })
     await expectNoAppError(page)
+  })
+
+  test("blocks a malformed mapped row at preview without dispatching an import", async ({ page }) => {
+    const contactName = smokeName("import-malformed")
+    const email = `${contactName}@example.test`
+    const csvPath = await writeContactImportCsv("", email)
+    await mockContactImportAssistantAi(page, contactName, email, [{
+      row_index: 0,
+      field: "name",
+      message: "name is required",
+      severity: "error",
+    }])
+
+    await gotoModule(page, "/crm", "crm")
+    await page.getByTestId("module-tab-crm-contacts").click()
+    await page.getByTestId("entity-action-csv-contacts").click()
+    const dialog = page.getByRole("dialog")
+    await dialog.locator("#import-assistant-file").setInputFiles(csvPath)
+    await dialog.getByRole("button", { name: /^Analyze columns$/i }).click()
+    await dialog.getByRole("button", { name: /^Preview import$/i }).click()
+    await expect(dialog.getByText("name is required")).toBeVisible({ timeout: 30_000 })
+    await expect(dialog.getByRole("button", { name: /^Confirm import$/i })).toBeDisabled()
+    expect(await page.request.get("/api/query/contacts").then(async (response) =>
+      ((await response.json()) as { data?: Array<Record<string, unknown>> }).data
+        ?.some((row) => row.name === contactName) ?? false)).toBe(false)
   })
 })

@@ -9,6 +9,7 @@ import type {
 import type { Timestamp } from "spacetimedb"
 
 import { optionalTrimmedString } from "@lumiere/erp-shared/form-coercion"
+import { normalizeBillingPeriod } from "@lumiere/erp-shared/subscription-billing-periods"
 
 import { stbTimestampFromDate } from "@/lib/stb-timestamp"
 
@@ -153,14 +154,7 @@ export function toCreateSubscriptionPlanParams(
 
   const billingPeriodUnit = Math.max(1, Math.floor(Number(formData.billingPeriodUnit ?? 1)))
   const rawPeriod = String(formData.billingPeriod ?? "month")
-  const billingPeriod =
-    rawPeriod === "daily" || rawPeriod === "day"
-      ? "day"
-      : rawPeriod === "weekly" || rawPeriod === "week"
-        ? "week"
-        : rawPeriod === "yearly" || rawPeriod === "year" || rawPeriod === "annual"
-          ? "year"
-          : "month"
+  const billingPeriod = normalizeBillingPeriod(rawPeriod) ?? "month"
 
   return {
     companyId,

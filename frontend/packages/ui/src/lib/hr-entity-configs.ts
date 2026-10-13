@@ -83,6 +83,8 @@ const employeeEmptyState = (t: TFunction) => ({
   title: t("hr.employees.emptyState.title"),
   description: t("hr.employees.emptyState.description"),
   actionLabel: t("hr.employees.emptyState.actionLabel"),
+  permission: { resource: "hr_employee", action: "create" as const },
+  learnHint: t("hr.employees.emptyState.hint", { defaultValue: "Employees anchor leave, contracts, payslips and expenses." }),
 })
 
 const leaveRequestEmptyState = (t: TFunction) => ({
@@ -104,6 +106,8 @@ export const employeesTableConfig = (t: TFunction): EntityViewConfig => ({
   description: t("hr.employees.description"),
   view: {
     mode: "table",
+    // Reviewed for generic CSV: sensitive columns are excluded from the file.
+    allowExport: true,
     rowKey: "id",
     searchable: true,
     searchPlaceholder: t("hr.employees.searchPlaceholder"),
@@ -124,11 +128,12 @@ export const employeesTableConfig = (t: TFunction): EntityViewConfig => ({
     columns: [
       {
         key: "employeeNumber",
+        sensitive: true,
         label: t("hr.employees.columns.employeeNumber"),
         width: "min-w-20",
         sortable: true,
       },
-      { key: "name", label: t("hr.employees.columns.name"), width: "min-w-40", sortable: true },
+      { key: "name", label: t("hr.employees.columns.name"), width: "min-w-40", sortable: true, sensitive: true },
       { key: "jobTitle", label: t("hr.employees.columns.jobTitle"), width: "min-w-36" },
       { key: "departmentId", label: t("hr.employees.columns.departmentId"), width: "min-w-32" },
       {
@@ -138,7 +143,7 @@ export const employeesTableConfig = (t: TFunction): EntityViewConfig => ({
         sortable: true,
         ...employmentTypeBadges(t),
       },
-      { key: "workEmail", label: t("hr.employees.columns.workEmail"), width: "min-w-40" },
+      { key: "workEmail", label: t("hr.employees.columns.workEmail"), width: "min-w-40", sensitive: true },
       {
         key: "dateHired",
         label: t("hr.employees.columns.dateHired"),
@@ -198,6 +203,8 @@ export const departmentsTableConfig = (t: TFunction): EntityViewConfig => ({
   description: t("hr.departments.description"),
   view: {
     mode: "table",
+    // Reviewed for generic CSV: sensitive columns are excluded from the file.
+    allowExport: true,
     rowKey: "id",
     searchable: true,
     searchPlaceholder: t("hr.departments.searchPlaceholder"),
@@ -220,6 +227,9 @@ export const leaveRequestsTableConfig = (t: TFunction): EntityViewConfig => ({
   description: t("hr.leaveRequests.description"),
   view: {
     mode: "table",
+    // Leave dates and types disclose individual absence information.
+    // Generic CSV has no dedicated export authorization; keep this list in the app.
+    allowExport: false,
     rowKey: "id",
     searchable: true,
     searchPlaceholder: t("hr.leaveRequests.searchPlaceholder"),
@@ -315,6 +325,9 @@ export const contractsTableConfig = (t: TFunction): EntityViewConfig => ({
   description: t("hr.contracts.description"),
   view: {
     mode: "table",
+    // Individual contracts include compensation information.
+    // Generic CSV has no dedicated export authorization; keep this list in the app.
+    allowExport: false,
     rowKey: "id",
     searchable: true,
     searchPlaceholder: t("hr.contracts.searchPlaceholder"),
@@ -351,6 +364,7 @@ export const contractsTableConfig = (t: TFunction): EntityViewConfig => ({
       { key: "dateEnd", label: t("hr.contracts.columns.dateEnd"), type: "relative-date" },
       {
         key: "wage",
+        sensitive: true,
         label: t("hr.contracts.columns.wage"),
         type: "currency",
         align: "right",
@@ -409,6 +423,9 @@ export const attendanceTableConfig = (t: TFunction): EntityViewConfig => ({
   description: t("hr.attendance.description"),
   view: {
     mode: "table",
+    // Attendance exposes individual work schedules.
+    // Generic CSV has no dedicated export authorization; keep this list in the app.
+    allowExport: false,
     rowKey: "id",
     searchable: true,
     searchPlaceholder: t("hr.attendance.searchPlaceholder"),
@@ -441,6 +458,9 @@ export const payslipsTableConfig = (t: TFunction): EntityViewConfig => ({
   description: t("hr.payslips.description"),
   view: {
     mode: "table",
+    // Payroll uses the explicit payroll export-intent workflow.
+    // Generic CSV has no dedicated export authorization; keep this list in the app.
+    allowExport: false,
     rowKey: "id",
     searchable: true,
     searchPlaceholder: t("hr.payslips.searchPlaceholder"),
@@ -464,9 +484,9 @@ export const payslipsTableConfig = (t: TFunction): EntityViewConfig => ({
       { key: "state", label: t("hr.payslips.columns.state"), type: "badge", ...payslipStateBadges(t) },
       { key: "dateFrom", label: t("hr.payslips.columns.dateFrom"), type: "date" },
       { key: "dateTo", label: t("hr.payslips.columns.dateTo"), type: "date" },
-      { key: "basicWage", label: t("hr.payslips.columns.basicWage"), type: "currency", align: "right" },
-      { key: "grossWage", label: t("hr.payslips.columns.grossWage"), type: "currency", align: "right" },
-      { key: "netWage", label: t("hr.payslips.columns.netWage"), type: "currency", align: "right" },
+      { key: "basicWage", sensitive: true, label: t("hr.payslips.columns.basicWage"), type: "currency", align: "right" },
+      { key: "grossWage", sensitive: true, label: t("hr.payslips.columns.grossWage"), type: "currency", align: "right" },
+      { key: "netWage", sensitive: true, label: t("hr.payslips.columns.netWage"), type: "currency", align: "right" },
     ],
     emptyMessage: t("hr.payslips.emptyMessage"),
   },
@@ -479,6 +499,8 @@ export const jobPositionsTableConfig = (t: TFunction): EntityViewConfig => ({
   description: t("hr.jobPositions.description"),
   view: {
     mode: "table",
+    // Reviewed for generic CSV: sensitive columns are excluded from the file.
+    allowExport: true,
     rowKey: "id",
     searchable: true,
     searchPlaceholder: t("hr.jobPositions.searchPlaceholder"),
@@ -513,6 +535,8 @@ export const leaveTypesTableConfig = (t: TFunction): EntityViewConfig => ({
   description: t("hr.leaveTypes.description"),
   view: {
     mode: "table",
+    // Reviewed for generic CSV: sensitive columns are excluded from the file.
+    allowExport: true,
     rowKey: "id",
     searchable: true,
     searchPlaceholder: t("hr.leaveTypes.searchPlaceholder"),
@@ -528,6 +552,74 @@ export const leaveTypesTableConfig = (t: TFunction): EntityViewConfig => ({
   },
 })
 
+// ── Leave Allocations ─────────────────────────────────────────────────────────
+export interface LeaveAllocationsConfigOptions {
+  employeeOptions?: Array<{ value: string; label: string }>
+  leaveTypeOptions?: Array<{ value: string; label: string }>
+  /** Optional columns, shown only when at least one row carries the data. */
+  showPeriod?: boolean
+  showValidity?: boolean
+  showState?: boolean
+  /** Replaces the empty message (e.g. a load error). */
+  emptyMessage?: string
+}
+
+export const leaveAllocationsTableConfig = (
+  t: TFunction,
+  opts: LeaveAllocationsConfigOptions = {},
+): EntityViewConfig => ({
+  id: "leave-allocations-table",
+  title: t("hr.leaveAllocations.title", { defaultValue: "Leave Allocations" }),
+  description: t("hr.leaveAllocations.description", {
+    defaultValue: "Days allocated to each employee per leave type, with usage and remaining balance.",
+  }),
+  view: {
+    mode: "table",
+    // Individual leave balances are personnel records.
+    // Generic CSV has no dedicated export authorization; keep this list in the app.
+    allowExport: false,
+    rowKey: "id",
+    searchable: true,
+    searchPlaceholder: t("hr.leaveAllocations.searchPlaceholder", { defaultValue: "Search by employee or leave type" }),
+    searchKeys: ["employeeName", "leaveTypeName"],
+    filters: [
+      {
+        key: "employeeId",
+        label: t("hr.leaveAllocations.filters.employee", { defaultValue: "Employee" }),
+        type: "select",
+        options: opts.employeeOptions ?? [],
+      },
+      {
+        key: "leaveTypeId",
+        label: t("hr.leaveAllocations.filters.leaveType", { defaultValue: "Leave type" }),
+        type: "select",
+        options: opts.leaveTypeOptions ?? [],
+      },
+    ],
+    columns: [
+      { key: "employeeName", label: t("hr.leaveAllocations.columns.employee", { defaultValue: "Employee" }), width: "min-w-36", sortable: true },
+      { key: "leaveTypeName", label: t("hr.leaveAllocations.columns.leaveType", { defaultValue: "Leave type" }), width: "min-w-32", sortable: true },
+      ...(opts.showPeriod
+        ? [{ key: "periodYear", label: t("hr.leaveAllocations.columns.period", { defaultValue: "Year" }), align: "right" as const, sortable: true }]
+        : []),
+      { key: "allocatedDays", label: t("hr.leaveAllocations.columns.allocated", { defaultValue: "Allocated" }), type: "number", align: "right", sortable: true },
+      { key: "usedDays", label: t("hr.leaveAllocations.columns.used", { defaultValue: "Used" }), type: "number", align: "right", sortable: true },
+      { key: "remainingDays", label: t("hr.leaveAllocations.columns.remaining", { defaultValue: "Remaining" }), type: "number", align: "right", sortable: true },
+      ...(opts.showValidity
+        ? [
+            { key: "validFrom", label: t("hr.leaveAllocations.columns.validFrom", { defaultValue: "Valid from" }), width: "min-w-28" },
+            { key: "validTo", label: t("hr.leaveAllocations.columns.validTo", { defaultValue: "Valid to" }), width: "min-w-28" },
+          ]
+        : []),
+      ...(opts.showState
+        ? [{ key: "state", label: t("hr.leaveAllocations.columns.state", { defaultValue: "State" }) }]
+        : []),
+    ],
+    emptyMessage:
+      opts.emptyMessage ?? t("hr.leaveAllocations.emptyMessage", { defaultValue: "No leave allocations yet." }),
+  },
+})
+
 // ── Payroll Structures ────────────────────────────────────────────────────────
 export const payrollStructuresTableConfig = (t: TFunction): EntityViewConfig => ({
   id: "payroll-structures-table",
@@ -535,6 +627,8 @@ export const payrollStructuresTableConfig = (t: TFunction): EntityViewConfig => 
   description: t("hr.payrollStructures.description"),
   view: {
     mode: "table",
+    // Reviewed for generic CSV: sensitive columns are excluded from the file.
+    allowExport: true,
     rowKey: "id",
     searchable: true,
     searchPlaceholder: t("hr.payrollStructures.searchPlaceholder"),
@@ -555,6 +649,8 @@ export const salaryRulesTableConfig = (t: TFunction): EntityViewConfig => ({
   description: t("hr.salaryRules.description"),
   view: {
     mode: "table",
+    // Reviewed for generic CSV: sensitive columns are excluded from the file.
+    allowExport: true,
     rowKey: "id",
     searchable: true,
     searchPlaceholder: t("hr.salaryRules.searchPlaceholder"),
@@ -578,6 +674,8 @@ export const onboardingTemplatesTableConfig = (t: TFunction): EntityViewConfig =
   description: "Reusable hire checklists assigned to new employees",
   view: {
     mode: "table",
+    // Reviewed for generic CSV: sensitive columns are excluded from the file.
+    allowExport: true,
     rowKey: "id",
     searchable: true,
     searchPlaceholder: "Search templates…",
@@ -598,6 +696,8 @@ export const performanceCyclesTableConfig = (t: TFunction): EntityViewConfig => 
   description: "Review periods for goals and employee evaluations",
   view: {
     mode: "table",
+    // Reviewed for generic CSV: sensitive columns are excluded from the file.
+    allowExport: true,
     rowKey: "id",
     searchable: true,
     searchPlaceholder: "Search cycles…",
@@ -619,13 +719,15 @@ export const performanceGoalsTableConfig = (t: TFunction): EntityViewConfig => (
   description: "Employee goals linked to review cycles",
   view: {
     mode: "table",
+    // Reviewed for generic CSV: sensitive columns are excluded from the file.
+    allowExport: true,
     rowKey: "id",
     searchable: true,
     searchPlaceholder: "Search goals…",
     searchKeys: ["title", "employeeId", "cycleId"],
     columns: [
-      { key: "title", label: "Goal", width: "min-w-40" },
-      { key: "employeeId", label: "Employee", width: "min-w-28" },
+      { key: "title", sensitive: true, label: "Goal", width: "min-w-40" },
+      { key: "employeeId", sensitive: true, label: "Employee", width: "min-w-28" },
       { key: "cycleId", label: "Cycle", width: "min-w-24" },
       { key: "state", label: "State", type: "badge", width: "min-w-24" },
       { key: "weight", label: "Weight", type: "number", align: "right", width: "min-w-20" },
@@ -640,6 +742,9 @@ export const performanceReviewsTableConfig = (t: TFunction): EntityViewConfig =>
   description: "Self and manager review workflow per employee and cycle",
   view: {
     mode: "table",
+    // Individual ratings are personnel records.
+    // Generic CSV has no dedicated export authorization; keep this list in the app.
+    allowExport: false,
     rowKey: "id",
     searchable: true,
     searchPlaceholder: "Search reviews…",
@@ -673,6 +778,8 @@ export const benefitPlansTableConfig = (t: TFunction): EntityViewConfig => ({
   description: "Catalog of benefit offerings for employee enrollment",
   view: {
     mode: "table",
+    // Reviewed for generic CSV: sensitive columns are excluded from the file.
+    allowExport: true,
     rowKey: "id",
     searchable: true,
     searchPlaceholder: "Search plans…",
@@ -693,6 +800,9 @@ export const benefitEnrollmentsTableConfig = (t: TFunction): EntityViewConfig =>
   description: "Active and terminated employee benefit assignments",
   view: {
     mode: "table",
+    // Benefit participation is individual personnel information.
+    // Generic CSV has no dedicated export authorization; keep this list in the app.
+    allowExport: false,
     rowKey: "id",
     searchable: true,
     searchPlaceholder: "Search enrollments…",
@@ -738,3 +848,4 @@ export const hrEntityConfigs = (t: TFunction): Record<string, EntityViewConfig> 
   "benefit-plans-table": benefitPlansTableConfig(t),
   "benefit-enrollments-table": benefitEnrollmentsTableConfig(t),
 })
+

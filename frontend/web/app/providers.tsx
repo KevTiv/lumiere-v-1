@@ -44,11 +44,11 @@ function RBACBridge({
   organizationId?: number
 }) {
   const hasIdentity = Boolean(serverIdentity && serverIdentity !== "unknown")
-  const { data: rolesData = [] } = useStdbQuery("roles", 0, {
+  const { data: rolesData = [], isLoading: rolesLoading } = useStdbQuery("roles", 0, {
     enabled: hasIdentity,
   })
 
-  const { orgPolicyRules } = usePolicySnapshot(organizationId, serverIdentity)
+  const { orgPolicyRules, isLoading: policiesLoading } = usePolicySnapshot(organizationId, serverIdentity)
 
   const rbacRoles = useMemo<Role[]>(() => {
     return mapBackendRolesToRoles(rolesData as unknown as BackendRoleRow[])
@@ -70,6 +70,7 @@ function RBACBridge({
       initialUser={hasIdentity ? rbacUser : null}
       initialRoles={hasIdentity ? rbacRoles : undefined}
       initialPolicies={hasIdentity ? mergedPolicies : undefined}
+      permissionsReady={!hasIdentity || !(rolesLoading || policiesLoading)}
     >
       {children}
     </RBACProvider>

@@ -4651,6 +4651,16 @@
       },
       "evidence": "accounting/bank_reconciliation.rs: reducer inserts/appends or performs an unguarded domain mutation"
     },
+    "unregister_payment_allocations": {
+      "semantic_kind": "operator",
+      "client_facing": false,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/payments.rs: internal allocation unwind validates payment-owned matching identity, rejects replay or rematched lines, and is invoked atomically by cancel_payment"
+    },
     "update_account_account": {
       "semantic_kind": "command",
       "client_facing": true,

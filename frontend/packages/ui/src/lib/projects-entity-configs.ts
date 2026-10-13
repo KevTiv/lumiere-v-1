@@ -67,6 +67,13 @@ export const projectsTableConfig = (t: TFunction): EntityViewConfig => ({
       { key: "taskCount", label: t("projects.projects.columns.taskCount"), type: "number", align: "right" },
     ],
     emptyMessage: t("projects.projects.emptyMessage"),
+    emptyState: {
+      title: t("projects.projects.emptyMessage"),
+      description: t("projects.projects.emptyState.description", { defaultValue: "Projects group tasks, timesheets and billing for a piece of work, so progress and profitability are visible." }),
+      permission: { resource: "project_project", action: "create" },
+      secondaryActionId: "csv-project",
+      learnHint: t("projects.projects.emptyState.hint", { defaultValue: "Add tasks to a project, then log time against them." }),
+    },
   },
 })
 

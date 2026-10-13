@@ -75,6 +75,7 @@ export {
   stdbCommandContract,
   type StdbBffCommandInput,
   type StdbBffNamedReducerKey,
+  type StdbNamedOperationInput,
   type StdbBffReducerKey,
 } from "./stdb-http";
 export { APPROVALS_BFF_REDUCERS, APPROVALS_COMMAND_SUBSCRIPTION_HINTS, approvalsCommandContract, type ApprovalsBffReducerKey } from "./approvals-http";

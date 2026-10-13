@@ -994,8 +994,18 @@ export const ORG_SUBSCRIPTION_QUERY_DESCRIPTORS = {
     "predicates": [],
     "order_by": []
   },
+  "mrp-production-costs": {
+    "table": "mrp_production_cost",
+    "predicates": [],
+    "order_by": []
+  },
   "mrp-productions": {
     "table": "mrp_production",
+    "predicates": [],
+    "order_by": []
+  },
+  "mrp-productivity-costs": {
+    "table": "mrp_productivity_cost",
     "predicates": [],
     "order_by": []
   },
@@ -1012,6 +1022,16 @@ export const ORG_SUBSCRIPTION_QUERY_DESCRIPTORS = {
         "direction": "asc"
       }
     ]
+  },
+  "mrp-valuation-configs": {
+    "table": "mrp_valuation_config",
+    "predicates": [],
+    "order_by": []
+  },
+  "mrp-workcenter-cost-rates": {
+    "table": "mrp_workcenter_cost_rate",
+    "predicates": [],
+    "order_by": []
   },
   "mrp-workcenters": {
     "table": "mrp_workcenter",

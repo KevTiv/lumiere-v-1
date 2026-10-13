@@ -63,7 +63,7 @@ pub(super) async fn signin(
     let identity_hex = normalize_identity_hex_for_sql(&cred.identity_hex);
     set_stdb_session_cookies(&state.config, &cookies, &token, &identity_hex);
 
-    let has_org = user_has_organization_rows(&state, &identity_hex, &token).await;
+    let has_org = user_has_organization_rows(&state, &identity_hex).await;
     let dest = post_auth_destination_after_session(has_org);
 
     Ok(Json(json!({ "redirectTo": dest })))

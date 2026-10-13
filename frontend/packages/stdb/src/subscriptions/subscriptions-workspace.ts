@@ -7,6 +7,7 @@ import type { SubscriptionQueryContext } from "../queries/erp-subscriptions";
 export const SUBSCRIPTIONS_WORKSPACE_RESOURCE_KEYS = [
   "account-move-lines",
   "account-moves",
+  "account-payments",
   "deferred-revenue-lines",
   "deferred-revenue-schedules",
   "revenue-recognition-rules",

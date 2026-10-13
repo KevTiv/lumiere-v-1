@@ -103,6 +103,10 @@ that action.
   development debug symbols. This keeps the large generated contracts crate
   within the default OrbStack memory limit. Override `CARGO_BUILD_JOBS`,
   `CARGO_INCREMENTAL`, or `CARGO_PROFILE_DEV_DEBUG` when the VM has more memory.
+- The Rust development image links with `lld` to reduce peak linker memory.
+  Compose restarts a Rust watcher if the VM still terminates it under memory
+  pressure; the shared `cargo-target` volume lets the restarted watcher resume
+  from the existing build cache.
 - The SpacetimeDB and Qdrant volumes persist data across `up` / `down`.
   SpacetimeDB keeps its local JWT signing key under the same data volume so
   credentials in `.env.docker` survive container recreation.

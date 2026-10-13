@@ -676,12 +676,18 @@
       "amount",
       "comparison_amount",
       "variance",
-      "variance_percentage"
+      "variance_percentage",
+      "sequence",
+      "parent_id",
+      "level",
+      "is_leaf",
+      "currency_id"
     ],
     "mandatory": [
       "id",
       "organization_id",
-      "company_id"
+      "company_id",
+      "report_id"
     ],
     "table": "balance_sheet_line"
   },
@@ -714,11 +720,14 @@
       "amount",
       "reference",
       "description",
-      "validation_error"
+      "validation_error",
+      "row_number",
+      "created_statement_line_id"
     ],
     "mandatory": [
       "id",
-      "organization_id"
+      "organization_id",
+      "import_id"
     ],
     "table": "bank_statement_import_line"
   },
@@ -963,12 +972,18 @@
       "amount",
       "comparison_amount",
       "variance",
-      "variance_percentage"
+      "variance_percentage",
+      "sequence",
+      "parent_id",
+      "level",
+      "is_leaf",
+      "currency_id"
     ],
     "mandatory": [
       "id",
       "organization_id",
-      "company_id"
+      "company_id",
+      "report_id"
     ],
     "table": "cash_flow_line"
   },
@@ -1046,11 +1061,12 @@
       "rate_type",
       "effective_date",
       "currency_id",
-      "company_id"
+      "period_id"
     ],
     "mandatory": [
       "id",
-      "organization_id"
+      "organization_id",
+      "company_id"
     ],
     "table": "consolidation_company_rate"
   },
@@ -1437,8 +1453,20 @@
       "name",
       "model",
       "widget_type",
+      "domain",
+      "fields",
+      "group_by",
+      "aggregation",
+      "chart_type",
+      "sort_order",
+      "limit",
+      "configuration",
+      "position_x",
+      "position_y",
+      "width",
       "is_active",
-      "company_id"
+      "company_id",
+      "metadata"
     ],
     "mandatory": [
       "id",
@@ -1657,7 +1685,6 @@
       "document_external_ref"
     ],
     "default_restricted": [
-      "document_id",
       "provider",
       "connection_id",
       "external_id",
@@ -1666,7 +1693,8 @@
     ],
     "mandatory": [
       "id",
-      "organization_id"
+      "organization_id",
+      "document_id"
     ],
     "table": "document_external_ref"
   },
@@ -1693,7 +1721,6 @@
       "document_legal_hold"
     ],
     "default_restricted": [
-      "document_id",
       "reason",
       "is_active",
       "held_at",
@@ -1701,9 +1728,24 @@
     ],
     "mandatory": [
       "id",
-      "organization_id"
+      "organization_id",
+      "document_id"
     ],
     "table": "document_legal_hold"
+  },
+  "document-retention-purge-jobs": {
+    "aliases": [
+      "document-retention-purge-jobs",
+      "document_retention_purge_job"
+    ],
+    "default_restricted": [
+      "scheduled_at"
+    ],
+    "mandatory": [
+      "scheduled_id",
+      "organization_id"
+    ],
+    "table": "document_retention_purge_job"
   },
   "document-signature-requests": {
     "aliases": [
@@ -1711,8 +1753,6 @@
       "document_signature_request"
     ],
     "default_restricted": [
-      "document_id",
-      "company_id",
       "provider",
       "external_envelope_id",
       "status",
@@ -1722,7 +1762,9 @@
     ],
     "mandatory": [
       "id",
-      "organization_id"
+      "organization_id",
+      "company_id",
+      "document_id"
     ],
     "table": "document_signature_request"
   },
@@ -1752,7 +1794,6 @@
       "document_version"
     ],
     "default_restricted": [
-      "document_id",
       "version_number",
       "file_name",
       "file_size",
@@ -1763,7 +1804,8 @@
     ],
     "mandatory": [
       "id",
-      "organization_id"
+      "organization_id",
+      "document_id"
     ],
     "table": "document_version"
   },
@@ -2486,8 +2528,6 @@
       "hr_leave_allocation"
     ],
     "default_restricted": [
-      "employee_id",
-      "company_id",
       "leave_type_id",
       "period_year",
       "allocated_days",
@@ -2495,7 +2535,9 @@
     ],
     "mandatory": [
       "id",
-      "organization_id"
+      "organization_id",
+      "company_id",
+      "employee_id"
     ],
     "table": "hr_leave_allocation"
   },
@@ -2505,8 +2547,6 @@
       "hr_offboarding_checklist"
     ],
     "default_restricted": [
-      "employee_id",
-      "company_id",
       "status",
       "assets_returned",
       "access_revoked",
@@ -2517,7 +2557,9 @@
     ],
     "mandatory": [
       "id",
-      "organization_id"
+      "organization_id",
+      "company_id",
+      "employee_id"
     ],
     "table": "hr_offboarding_checklist"
   },
@@ -2560,13 +2602,13 @@
       "hr_statutory_id"
     ],
     "default_restricted": [
-      "employee_id",
-      "id_kind",
-      "company_id"
+      "id_kind"
     ],
     "mandatory": [
       "id",
-      "organization_id"
+      "organization_id",
+      "company_id",
+      "employee_id"
     ],
     "table": "hr_statutory_id"
   },
@@ -2922,7 +2964,9 @@
     ],
     "default_restricted": [
       "name",
-      "is_published"
+      "is_published",
+      "member_ids",
+      "article_member_count"
     ],
     "mandatory": [
       "id",
@@ -2937,6 +2981,8 @@
     ],
     "default_restricted": [
       "name",
+      "description",
+      "color",
       "article_count",
       "parent_id",
       "sequence"
@@ -3358,6 +3404,44 @@
       "organization_id"
     ],
     "table": "mrp_production"
+  },
+  "mrp-production-costs": {
+    "aliases": ["mrp-production-costs", "mrp_production_cost"],
+    "default_restricted": [
+      "company_id", "currency_id", "material_value", "workcenter_value",
+      "total_value", "inventory_value", "variance_value", "raw_move_ids",
+      "output_move_ids", "productivity_cost_ids", "account_move_id",
+      "account_move_line_ids", "created_at"
+    ],
+    "mandatory": ["production_id", "organization_id"],
+    "table": "mrp_production_cost"
+  },
+  "mrp-productivity-costs": {
+    "aliases": ["mrp-productivity-costs", "mrp_productivity_cost"],
+    "default_restricted": [
+      "company_id", "production_id", "workorder_id", "workcenter_id",
+      "currency_id", "duration_minutes", "hourly_rate", "configured",
+      "value", "created_at"
+    ],
+    "mandatory": ["productivity_id", "organization_id"],
+    "table": "mrp_productivity_cost"
+  },
+  "mrp-valuation-configs": {
+    "aliases": ["mrp-valuation-configs", "mrp_valuation_config"],
+    "default_restricted": [
+      "currency_id", "journal_id", "material_account_id", "output_account_id",
+      "workcenter_account_id", "variance_account_id", "updated_at", "updated_by"
+    ],
+    "mandatory": ["company_id", "organization_id"],
+    "table": "mrp_valuation_config"
+  },
+  "mrp-workcenter-cost-rates": {
+    "aliases": ["mrp-workcenter-cost-rates", "mrp_workcenter_cost_rate"],
+    "default_restricted": [
+      "company_id", "currency_id", "hourly_rate", "updated_by", "updated_at"
+    ],
+    "mandatory": ["workcenter_id", "organization_id"],
+    "table": "mrp_workcenter_cost_rate"
   },
   "mrp-routing-workcenters": {
     "aliases": [
@@ -4146,7 +4230,8 @@
     "default_restricted": [
       "product_tmpl_id",
       "attribute_id",
-      "active"
+      "active",
+      "value_ids"
     ],
     "mandatory": [
       "id",
@@ -4307,12 +4392,18 @@
       "amount",
       "comparison_amount",
       "variance",
-      "variance_percentage"
+      "variance_percentage",
+      "sequence",
+      "parent_id",
+      "level",
+      "is_leaf",
+      "currency_id"
     ],
     "mandatory": [
       "id",
       "organization_id",
-      "company_id"
+      "company_id",
+      "report_id"
     ],
     "table": "profit_loss_line"
   },
@@ -6478,11 +6569,14 @@
       "reminder_date",
       "days_before_deadline",
       "notification_type",
-      "status"
+      "status",
+      "sent_at",
+      "acknowledged_at"
     ],
     "mandatory": [
       "id",
-      "organization_id"
+      "organization_id",
+      "tax_deadline_id"
     ],
     "table": "tax_deadline_reminder"
   },

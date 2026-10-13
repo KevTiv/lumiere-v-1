@@ -84,6 +84,7 @@ import type {
   DocumentExternalRef,
   DocumentFolder,
   DocumentLegalHold,
+  DocumentRetentionPurgeJob,
   DocumentSignatureRequest,
   DocumentTemplate,
   DocumentVersion,
@@ -172,8 +173,12 @@ import type {
   MrpBomByproduct,
   MrpBomLine,
   MrpProduction,
+  MrpProductionCost,
+  MrpProductivityCost,
   MrpRoutingWorkcenter,
+  MrpValuationConfig,
   MrpWorkcenter,
+  MrpWorkcenterCostRate,
   MrpWorkorder,
   OperationalMessage,
   Opportunity,
@@ -434,6 +439,7 @@ export interface QueryRowMap {
   "document-external-refs": DocumentExternalRef
   "document-folders": DocumentFolder
   "document-legal-holds": DocumentLegalHold
+  "document-retention-purge-jobs": DocumentRetentionPurgeJob
   "document-signature-requests": DocumentSignatureRequest
   "document-templates": DocumentTemplate
   "document-versions": DocumentVersion
@@ -516,8 +522,12 @@ export interface QueryRowMap {
   "mrp-bom-byproducts": MrpBomByproduct
   "mrp-bom-lines": MrpBomLine
   "mrp-boms": MrpBom
+  "mrp-production-costs": MrpProductionCost
   "mrp-productions": MrpProduction
+  "mrp-productivity-costs": MrpProductivityCost
   "mrp-routing-workcenters": MrpRoutingWorkcenter
+  "mrp-valuation-configs": MrpValuationConfig
+  "mrp-workcenter-cost-rates": MrpWorkcenterCostRate
   "mrp-workcenters": MrpWorkcenter
   "mrp-workorders": MrpWorkorder
   "my-employee": HrEmployee

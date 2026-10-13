@@ -1,5 +1,8 @@
 "use client"
 
+import { ModuleDataNotice } from "./module-data-notice"
+import type { ModuleDataState } from "../lib/module-data-state"
+
 import { useEffect, useRef, useState, useCallback } from "react"
 import { useErpSession } from "@lumiere/erp-session"
 import { buildEntitySelection, resolveAiEntityType } from "@lumiere/query-hooks/ai-ui-context"
@@ -20,10 +23,13 @@ import { FormModal } from "../forms/form-modal"
 import { RuntimeFormModal } from "../forms/runtime-form-modal"
 import { buildModuleTabRow, type ModuleConfig } from "../lib/module-types"
 import type { EntityBoardRuntimeContext } from "../lib/module-types"
-import { isEntitySurfaceVisible } from "../lib/entity-view-types"
+import type { EntitySurfacePermission } from "../lib/entity-view-types"
 import { getEntityRowKey } from "../lib/entity-row-utils"
+import { decideCreateGate, withTabCreateCta } from "../lib/list-empty-state"
 import { useRBAC } from "../lib/rbac-context"
 import { exportDashboardToPng } from "../lib/export-dashboard-png"
+import { KpiStrip } from "../components/kpi-strip"
+import { filterRowsByKpi, activeKpiTile, toggleKpiKey, type KpiTileDef } from "../lib/kpi-tiles"
 
 /** When set, tab create forms use STDB-merged {@link RuntimeFormModal} instead of static-only FormModal. */
 export interface ModuleViewRuntimeForms {
@@ -53,6 +59,8 @@ interface ModuleViewProps {
   entityBoardContext?: Record<string, EntityBoardRuntimeContext>
   /** Per-tab loading flags keyed by tab id — forwarded to EntityTable as skeleton rows. */
   dataLoading?: Record<string, boolean>
+  /** Explicit collection status. Failed or denied reads must not look like empty lists. */
+  dataState?: Record<string, ModuleDataState>
   /** Dashboard time range — shown in header only on the dashboard tab. */
   dashboardTimeRange?: TimeRangeValue
   onDashboardTimeRangeChange?: (value: TimeRangeValue) => void
@@ -66,6 +74,11 @@ interface ModuleViewProps {
    * Static `createForm` remains the reducer field-name scaffold.
    */
   runtimeForms?: ModuleViewRuntimeForms
+  /**
+   * Actionable KPI strip above an entity tab's list, keyed by tab id. Figures come from rows the
+   * module already holds; selecting a tile narrows the list to the rows behind it.
+   */
+  kpiStrips?: Record<string, { tiles: KpiTileDef[]; loading?: boolean }>
 }
 
 export function ModuleView({
@@ -78,15 +91,19 @@ export function ModuleView({
   isPending,
   entityBoardContext,
   dataLoading,
+  dataState,
   dashboardTimeRange,
   onDashboardTimeRangeChange,
   urlFilters: urlFiltersProp,
   runtimeForms,
+  kpiStrips,
 }: ModuleViewProps) {
   const routeFilters = useModuleUrlFilters()
   const clearRouteFilter = useClearModuleUrlFilter()
   const urlFilters = urlFiltersProp ?? routeFilters
-  const { checkPermission } = useRBAC()
+  const { checkPermission, permissionsReady } = useRBAC()
+  const createGate = (permission: EntitySurfacePermission | undefined) =>
+    decideCreateGate(permission, (p) => checkPermission(p.resource, p.action).allowed, permissionsReady !== false)
   const { companyIds } = useErpSession()
   const aiReporter = useErpAiSelectionReporter()
   const aiSelection = useErpAiSelectionState()
@@ -126,6 +143,7 @@ export function ModuleView({
     trigger?.scrollIntoView({ block: "nearest", inline: "nearest" })
   }, [activeTab])
   const [openForm, setOpenForm] = useState<string | null>(null)
+  const [kpiSelection, setKpiSelection] = useState<Record<string, string | null>>({})
   const [selectedRecord, setSelectedRecord] = useState<Record<string, unknown> | null>(null)
   const dashboardGridRef = useRef<HTMLDivElement>(null)
 
@@ -148,7 +166,8 @@ export function ModuleView({
   const activeTabConfig = config.tabs.find((tab) => tab.id === activeTab)
   const showDashboardTimeRange =
     activeTabConfig?.type === "dashboard" && onDashboardTimeRangeChange != null
-  const showDashboardExport = activeTabConfig?.type === "dashboard"
+  const showDashboardExport = activeTabConfig?.type === "dashboard" &&
+    dataState?.[activeTab]?.status !== "error" && dataState?.[activeTab]?.status !== "denied"
 
   return (
     <div
@@ -177,7 +196,7 @@ export function ModuleView({
           variant="line"
           className="h-auto w-max min-w-full justify-start gap-1 border-b border-border p-0 group-data-horizontal/tabs:h-auto"
         >
-          {buildModuleTabRow(config.tabs, config.tabGroups).map((item, i) =>
+          {buildModuleTabRow(config.tabs, config.tabGroups).map((item) =>
             item.kind === "group" ? (
               <span
                 key={`group-${item.label}`}
@@ -188,7 +207,6 @@ export function ModuleView({
               </span>
             ) : (
               <TabsTrigger
-                tabIndex={i}
                 key={item.tab.id}
                 // Natural width with an underline on the active tab; the
                 // default pseudo-underline is clipped by the scroll container.
@@ -204,13 +222,15 @@ export function ModuleView({
         </div>
 
         {config.tabs.map((tab) => (
-          <TabsContent key={tab.id} value={tab.id} className="mt-6">
+          <TabsContent key={tab.id} value={tab.id} className="mt-6" aria-busy={dataState?.[tab.id]?.status === "loading"}>
+            <ModuleDataNotice state={dataState?.[tab.id]} />
+            {dataState?.[tab.id]?.status !== "error" && dataState?.[tab.id]?.status !== "denied" && (<>
             {tab.type === "dashboard" && tab.sections && (
               <DashboardGrid
                 ref={dashboardGridRef}
                 sections={tab.sections}
                 // Dashboard figures derive from the module's collections.
-                isLoading={Object.values(dataLoading ?? {}).some(Boolean)}
+                isLoading={dataState?.[tab.id]?.status === "loading" || Object.values(dataLoading ?? {}).some(Boolean)}
               />
             )}
 
@@ -218,11 +238,30 @@ export function ModuleView({
 
             {tab.type === "entity" && tab.entityConfig && (
               <div className="space-y-3">
+                {kpiStrips?.[tab.id] ? (
+                  <KpiStrip
+                    loading={kpiStrips[tab.id]!.loading}
+                    tiles={kpiStrips[tab.id]!.tiles.map((kpi) => ({
+                      key: kpi.key,
+                      label: kpi.label,
+                      value: kpi.value,
+                      hint: kpi.hint,
+                      tone: kpi.tone,
+                      active: activeKpiTile(kpiStrips[tab.id]!.tiles, kpiSelection[tab.id] ?? null)?.key === kpi.key,
+                      onSelect: kpi.matches
+                        ? () =>
+                            setKpiSelection((prev) => ({
+                              ...prev,
+                              [tab.id]: toggleKpiKey(prev[tab.id] ?? null, kpi.key),
+                            }))
+                        : undefined,
+                    }))}
+                  />
+                ) : null}
                 <EntityView
                   useCard={false}
                   headerAction={
-                    tab.createForm &&
-                    isEntitySurfaceVisible({ permission: tab.createPermission }, checkPermission) ? (
+                    tab.createForm && createGate(tab.createPermission) !== "denied" ? (
                       <Button
                         onClick={() => setOpenForm(tab.id)}
                         data-testid={`module-create-${config.id}-${tab.id}`}
@@ -232,9 +271,33 @@ export function ModuleView({
                       </Button>
                     ) : undefined
                   }
-                  config={tab.entityConfig}
-                  data={data[tab.id] ?? []}
-                  isLoading={dataLoading?.[tab.id]}
+                  config={
+                    tab.createForm
+                      ? {
+                          ...tab.entityConfig,
+                          view: withTabCreateCta(tab.entityConfig.view, {
+                            label: tab.createLabel ?? "New",
+                            onClick: () => setOpenForm(tab.id),
+                            // Not gated until permissions load, so the empty state never flashes read-only.
+                            permission: createGate(tab.createPermission) === "loading" ? undefined : tab.createPermission,
+                          }),
+                        }
+                      : tab.entityConfig
+                  }
+                  externalFilter={
+                    kpiStrips?.[tab.id]
+                      ? {
+                          active: activeKpiTile(kpiStrips[tab.id]!.tiles, kpiSelection[tab.id] ?? null) != null,
+                          onClear: () => setKpiSelection((prev) => ({ ...prev, [tab.id]: null })),
+                        }
+                      : undefined
+                  }
+                  data={
+                    kpiStrips?.[tab.id]
+                      ? filterRowsByKpi(data[tab.id] ?? [], kpiStrips[tab.id]!.tiles, kpiSelection[tab.id] ?? null)
+                      : (data[tab.id] ?? [])
+                  }
+                  isLoading={dataState?.[tab.id]?.status === "loading" || dataLoading?.[tab.id]}
                   initialFilters={activeTab === tab.id ? urlFilters : undefined}
                   onInitialFilterClear={clearRouteFilter}
                   boardColumns={entityBoardContext?.[tab.id]?.columns}
@@ -333,6 +396,7 @@ export function ModuleView({
                   ))}
               </div>
             )}
+            </>)}
           </TabsContent>
         ))}
       </Tabs>

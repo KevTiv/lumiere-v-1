@@ -13,6 +13,7 @@
     "cov-correctness:check": "python3 ../scripts/validate-cov00c-correctness-census.py",
     "cov-evidence:check": "python3 ../scripts/validate-cov00d-evidence-matrix.py",
     "cov-seed-inventory:check": "python3 ../scripts/validate-cov02-seed-inventory.py && pnpm --dir web first-org-fixture:check",
+    "cov-launch-manifest:check": "python3 ../scripts/validate-cov27-launch-manifest.py && python3 ../scripts/test_validate_cov27_launch_manifest.py",
     "web": "pnpm --filter ./web dev",
     "mobile": "pnpm --filter mobile start",
     "stdb:generate": "spacetime generate --lang typescript --out-dir packages/stdb/src/generated --module-path ../spacetimedb",
