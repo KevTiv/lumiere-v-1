@@ -3350,6 +3350,11 @@
       "reason": "invoked by an enumerated frontend BFF call site"
     },
     {
+      "name": "release_document_legal_hold",
+      "exposure": "session",
+      "reason": "reviewed document-page action: releases an active legal hold behind document admin permission and audit logging, mirroring apply_document_legal_hold"
+    },
+    {
       "name": "release_picking_wave",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"

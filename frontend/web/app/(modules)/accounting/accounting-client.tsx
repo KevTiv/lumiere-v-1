@@ -355,6 +355,12 @@ import {
   type AccountAccount,
 } from "@lumiere/ui"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
+import {
+  BankStatementImportLinesSection,
+  ConsolidationCompanyRatesSection,
+  TaxDeadlineRemindersSection,
+  taxDeadlinesTableConfig,
+} from "./read-sections"
 import { fetchQueryList } from "@lumiere/query-hooks/http"
 import {
   customFieldEntriesFromMetadata,
@@ -1101,6 +1107,17 @@ function AccountingClientReady({
           },
         },
         {
+          id: "import-lines",
+          label: t("accounting.bankStatementImportLines.tab", { defaultValue: "Imported lines" }),
+          content: (record) => (
+            <BankStatementImportLinesSection
+              organizationId={orgId}
+              companyId={operatingCompanyId}
+              statementId={String(record.id ?? "")}
+            />
+          ),
+        },
+        {
           id: "reconcile",
           label: t("accounting.actions.reconcile"),
           content: (record) => (
@@ -1111,7 +1128,64 @@ function AccountingClientReady({
         },
       ],
     }
-  }, [t, bankStatementLines])
+  }, [t, bankStatementLines, orgId, operatingCompanyId])
+
+  const consolidationRateLabels = useMemo(() => {
+    const toMap = (opts: Array<{ value: string; label: string }>) =>
+      new Map(opts.filter((o) => o.value !== "").map((o) => [o.value, o.label] as const))
+    return {
+      company: toMap(companySelectOptions),
+      currency: toMap(currencySelectOptions),
+      period: new Map(
+        (accountPeriodsRaw as Record<string, unknown>[]).map(
+          (p) => [String(p.id ?? ""), String(p.name ?? "")] as const,
+        ),
+      ),
+    }
+  }, [companySelectOptions, currencySelectOptions, accountPeriodsRaw])
+
+  const taxDeadlineRows = useMemo(
+    () =>
+      (taxDeadlines as Record<string, unknown>[])
+        .filter((d) => d.deletedAt == null && d.deleted_at == null)
+        .map((d) => ({
+          ...d,
+          dueDate: d.dueDate ?? d.due_date,
+          statusLabel: taxDeadlineStatusStr(d),
+        })),
+    [taxDeadlines],
+  )
+
+  const taxDeadlineRecordSheet = useMemo(
+    (): EntityRecordSheetConfig => ({
+      titleKey: "title",
+      statusKey: "statusLabel",
+      detailConfig: {
+        mode: "detail",
+        sections: [
+          {
+            id: "header",
+            fields: [
+              { key: "title", label: t("accounting.taxDeadlines.columns.title", { defaultValue: "Deadline" }) },
+              { key: "dueDate", label: t("accounting.taxDeadlines.columns.dueDate", { defaultValue: "Due date" }), type: "date" },
+              { key: "statusLabel", label: t("accounting.taxDeadlines.columns.status", { defaultValue: "Status" }) },
+              { key: "description", label: t("accounting.taxDeadlines.columns.description", { defaultValue: "Description" }) },
+            ],
+          },
+        ],
+      },
+      customTabs: [
+        {
+          id: "reminders",
+          label: t("accounting.taxDeadlines.reminders.tab", { defaultValue: "Reminders" }),
+          content: (record) => (
+            <TaxDeadlineRemindersSection organizationId={orgId} deadlineId={String(record.id ?? "")} />
+          ),
+        },
+      ],
+    }),
+    [t, orgId],
+  )
 
   const accountMoveRecordSheet = useMemo((): EntityRecordSheetConfig => {
     const moveStatus = {
@@ -3587,6 +3661,13 @@ function AccountingClientReady({
                 ),
               }
             }
+            if (tab.id === "tax-deadlines") {
+              return {
+                ...tab,
+                entityConfig: taxDeadlinesTableConfig(t),
+                recordSheet: taxDeadlineRecordSheet,
+              }
+            }
             if (tab.id === "bank-statements") {
               return {
                 ...tab,
@@ -3716,6 +3797,12 @@ function AccountingClientReady({
                     currencySelectOptions={currencySelectOptions}
                     consolidationJournalSelectOptions={consolidationJournalSelectOptions}
                     consolidationAccountSelectOptions={consolidationAccountSelectOptions}
+                    companyRatesSection={
+                      <ConsolidationCompanyRatesSection
+                        organizationId={orgId}
+                        labels={consolidationRateLabels}
+                      />
+                    }
                     onCreateConsolidationAccount={(params) =>
                       createConsolidationAccount.mutateAsync(params)
                     }
@@ -3933,6 +4020,7 @@ function AccountingClientReady({
       "intercompany-transactions": intercompanyTransactions,
       payments: accountPayments,
       "bank-statements": bankStatements,
+      "tax-deadlines": taxDeadlineRows,
       "payment-terms": paymentTerms,
       "payment-term-lines": paymentTermLinesDisplay,
       "account-journals": journals,
@@ -3948,6 +4036,7 @@ function AccountingClientReady({
       fixedAssets,
       accountPayments,
       bankStatements,
+      taxDeadlineRows,
       paymentTerms,
       paymentTermLinesDisplay,
       journals,

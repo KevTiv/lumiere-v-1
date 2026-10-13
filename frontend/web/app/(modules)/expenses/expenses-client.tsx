@@ -15,6 +15,7 @@ import {
   ModuleView,
   FormModal,
   CsvImportModal,
+  CSV_IMPORT_CONTRACTS,
   newExpenseForm,
   newExpenseSheetForm,
   editExpenseForm,
@@ -419,6 +420,7 @@ function ExpensesClientLoaded({
                   {
                     id: "csv-expenses",
                     label: t("expenses.csvImport.toolbarExpenses"),
+                    permission: { resource: CSV_IMPORT_CONTRACTS.expense.resource, action: "create" },
                     onClick: () => setCsvKind("expense"),
                   },
                 ]),
@@ -460,6 +462,7 @@ function ExpensesClientLoaded({
                 {
                   id: "csv-sheets",
                   label: t("expenses.csvImport.toolbarSheets"),
+                  permission: { resource: CSV_IMPORT_CONTRACTS.expenseSheet.resource, action: "create" },
                   onClick: () => setCsvKind("sheet"),
                 },
                 {
@@ -859,6 +862,8 @@ function ExpensesClientLoaded({
           key={csvKind}
           onClose={() => setCsvKind(null)}
           config={csvFormConfig}
+          columns={csvKind === "expense" ? CSV_IMPORT_CONTRACTS.expense : CSV_IMPORT_CONTRACTS.expenseSheet}
+          templateFileName={`${csvKind}-import-template.csv`}
           isPending={isFormMutationPending}
           onImport={async (text) => {
             if (csvKind === "expense") await csvImports.importExpense.mutateAsync(text)

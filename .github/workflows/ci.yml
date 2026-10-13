@@ -121,7 +121,9 @@ jobs:
           PG_USER: lumiere
           PG_PASSWORD: lumiere
           PG_TLS_MODE: disable
-        run: python3 scripts/run-required-cargo-tests.py --locked -p api-server --lib cold_tier::migrate::postgres_compatibility_tests:: -- --nocapture
+        run: >-
+          python3 scripts/run-required-cargo-tests.py --locked -p api-server --lib
+          cold_tier::migrate::postgres_compatibility_tests:: -- --nocapture
 
       - name: C5 manifest-driven finalization
         env:

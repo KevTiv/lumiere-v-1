@@ -101,6 +101,7 @@ import {
   qualityChecksTableConfig,
   cycleCountsTableConfig,
   pickingWavesTableConfig,
+  stockPackagesTableConfig,
   warehouseTasksTableConfig,
   stockRoutesTableConfig,
   stockRulesTableConfig,
@@ -140,6 +141,7 @@ import {
   employeesTableConfig,
   departmentsTableConfig,
   leaveRequestsTableConfig,
+  leaveAllocationsTableConfig,
   contractsTableConfig,
   payslipsTableConfig,
   newEmployeeForm,
@@ -364,7 +366,7 @@ export const accountingModuleConfig = (t: TFunction): ModuleConfig => ({
     { label: t("modules.tabGroups.banking", { defaultValue: "Banking" }), tabIds: ["bank-statements", "reconciliation-widgets", "fx-revaluation"] },
     { label: t("modules.tabGroups.planning", { defaultValue: "Planning" }), tabIds: ["budgets", "analytic", "analytic-lines", "analytic-distribution", "fixed-assets", "amortization"] },
     { label: t("modules.tabGroups.close", { defaultValue: "Close" }), tabIds: ["period-close", "fiscal-years", "account-periods", "consolidation", "intercompany-rules", "intercompany-transactions"] },
-    { label: t("modules.tabGroups.setup", { defaultValue: "Setup" }), tabIds: ["taxes", "payment-terms", "payment-term-lines"] },
+    { label: t("modules.tabGroups.setup", { defaultValue: "Setup" }), tabIds: ["taxes", "tax-deadlines", "payment-terms", "payment-term-lines"] },
   ],
   tabs: [
     {
@@ -433,6 +435,12 @@ export const accountingModuleConfig = (t: TFunction): ModuleConfig => ({
       id: "payment-operations",
       label: t("accounting.tabs.operationalPayments"),
       type: "custom",
+    },
+    {
+      id: "tax-deadlines",
+      label: t("accounting.tabs.taxDeadlines", { defaultValue: "Tax Deadlines" }),
+      type: "entity",
+      entityConfig: { id: "tax-deadlines-table", title: "", view: { mode: "table", rowKey: "id", columns: [] } },
     },
     {
       id: "payment-terms",
@@ -710,7 +718,7 @@ export const salesModuleConfig = (t: TFunction): ModuleConfig => ({
     { label: t("modules.tabGroups.orders", { defaultValue: "Orders" }), tabIds: ["orders", "order-lines", "invoices", "returns"] },
     { label: t("modules.tabGroups.fulfillment", { defaultValue: "Fulfillment" }), tabIds: ["deliveries", "fulfillment"] },
     { label: t("modules.tabGroups.pricing", { defaultValue: "Pricing" }), tabIds: ["pricelists", "pricelist-items", "loyalty-programs", "loyalty-cards"] },
-    { label: t("modules.tabGroups.setup", { defaultValue: "Setup" }), tabIds: ["delivery-price-rules", "delivery-carriers", "shipping-methods", "pos-payment-methods"] },
+    { label: t("modules.tabGroups.setup", { defaultValue: "Setup" }), tabIds: ["delivery-price-rules", "delivery-carriers", "shipping-methods", "pos-payment-methods", "commission-plans"] },
   ],
   tabs: [
     {
@@ -780,6 +788,11 @@ export const salesModuleConfig = (t: TFunction): ModuleConfig => ({
     {
       id: "invoices",
       label: t("sales.tabs.invoices"),
+      type: "custom" as const,
+    },
+    {
+      id: "commission-plans",
+      label: t("sales.tabs.commissionPlans", { defaultValue: "Commission plans" }),
       type: "custom" as const,
     },
     {
@@ -1155,7 +1168,7 @@ export const inventoryModuleConfig = (t: TFunction): ModuleConfig => ({
   defaultTab: "dashboard",
   tabGroups: [
     { label: t("modules.tabGroups.stock", { defaultValue: "Stock" }), tabIds: ["products", "product-categories", "stock", "valuations", "lots", "serials"] },
-    { label: t("modules.tabGroups.movements", { defaultValue: "Movements" }), tabIds: ["transfers", "stock-moves", "adjustments", "picking-waves", "warehouse-tasks", "replenishment"] },
+    { label: t("modules.tabGroups.movements", { defaultValue: "Movements" }), tabIds: ["transfers", "stock-moves", "adjustments", "picking-waves", "stock-packages", "warehouse-tasks", "replenishment"] },
     { label: t("modules.tabGroups.warehouse", { defaultValue: "Warehouse" }), tabIds: ["warehouses", "locations", "location-tree", "3d-view", "routes", "rules"] },
     { label: t("modules.tabGroups.quality", { defaultValue: "Quality" }), tabIds: ["quality", "quality-alerts", "cycle-counts", "cycle-wizard", "traceability-records", "traceability-reports"] },
     { label: t("modules.tabGroups.setup", { defaultValue: "Setup" }), tabIds: ["barcode-rules", "barcode-nomenclatures", "adjustment-reasons"] },
@@ -1272,6 +1285,12 @@ export const inventoryModuleConfig = (t: TFunction): ModuleConfig => ({
       label: t("inventory.pickingWaves.title"),
       type: "entity",
       entityConfig: pickingWavesTableConfig(t),
+    },
+    {
+      id: "stock-packages",
+      label: t("inventory.stockPackages.title", { defaultValue: "Packages" }),
+      type: "entity",
+      entityConfig: stockPackagesTableConfig(t),
     },
     {
       id: "warehouse-tasks",
@@ -1628,7 +1647,7 @@ export const hrModuleConfig = (t: TFunction): ModuleConfig => ({
   defaultTab: "dashboard",
   tabGroups: [
     { label: t("modules.tabGroups.people", { defaultValue: "People" }), tabIds: ["employees", "departments", "org-chart", "job-positions", "recruitment", "onboarding-templates", "performance"] },
-    { label: t("modules.tabGroups.timeoff", { defaultValue: "Time off" }), tabIds: ["leaves", "attendance", "leave-types"] },
+    { label: t("modules.tabGroups.timeoff", { defaultValue: "Time off" }), tabIds: ["leaves", "leave-allocations", "attendance", "leave-types"] },
     { label: t("modules.tabGroups.pay", { defaultValue: "Pay" }), tabIds: ["contracts", "payslips", "payroll-structures", "salary-rules", "benefits"] },
   ],
   tabs: [
@@ -1661,6 +1680,12 @@ export const hrModuleConfig = (t: TFunction): ModuleConfig => ({
       createForm: newLeaveRequestForm(t),
       createLabel: "New Request",
       createAction: "createLeaveRequest",
+    },
+    {
+      id: "leave-allocations",
+      label: t("hr.leaveAllocations.tab", { defaultValue: "Allocations" }),
+      type: "entity",
+      entityConfig: leaveAllocationsTableConfig(t),
     },
     {
       id: "attendance",
@@ -2596,6 +2621,11 @@ export const reportsModuleConfig = (t: TFunction): ModuleConfig => ({
     {
       id: "pivot-explorer",
       label: t("reports.tabs.pivotExplorer"),
+      type: "custom",
+    },
+    {
+      id: "statements",
+      label: t("reports.tabs.statements", { defaultValue: "Statements" }),
       type: "custom",
     },
     {

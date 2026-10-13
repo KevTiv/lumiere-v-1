@@ -3364,7 +3364,7 @@
     },
     "erp.release_document_legal_hold": {
       "name": "release_document_legal_hold",
-      "shape_fingerprint": "sha256:758ad7f2f8c0b47b0e189732b12850f0c018279c19355819004e724bddcbaa6d"
+      "shape_fingerprint": "sha256:b1ff97ee92b6e265a3f767f3e2b924103d79c10314d76953302a4a10deed34ce"
     },
     "erp.release_picking_wave": {
       "name": "release_picking_wave",
@@ -5884,6 +5884,14 @@
       "current_operations_fingerprint": "sha256:73a45e16698b877aee4bb418e0292459a4405e718618c3ff7ca1a45a0ff35432",
       "operation_count": 1427,
       "reason": "release on top of v0.3.84: add none; change the shape of unreserve_stock_picking, update_stock_picking"
+    },
+    {
+      "previous_release": "v0.3.86",
+      "previous_ir_sha256": "sha256:6f7ee6259a0f85fcce7a074caa48d033ea6bf93bd6da8cf278301ae57f997399",
+      "previous_operations_fingerprint": "sha256:73a45e16698b877aee4bb418e0292459a4405e718618c3ff7ca1a45a0ff35432",
+      "current_operations_fingerprint": "sha256:810d98bb268eccb3275d4fe82e4a605d7674933a03b2ed32554423552d4936fe",
+      "operation_count": 1427,
+      "reason": "release on top of v0.3.86: add none; change the shape of release_document_legal_hold"
     }
   ]
 }

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { canResetMove, canCancelMove, canEditMoveLines, canRecomputeInvoiceTotals, canRegisterPayment, paymentOptionLabel, registrablePayments } from './invoice-actions';
+import { canReconcilePayment, reconcilablePaymentMoves, canResetMove, canCancelMove, canEditMoveLines, canRecomputeInvoiceTotals, canRegisterPayment, paymentOptionLabel, registrablePayments } from './invoice-actions';
 
 const tag = (value: string) => ({ tag: value });
 
@@ -50,4 +50,26 @@ test('lines are editable on a draft only, and plain entries have no totals to re
   assert.equal(canEditMoveLines({ state: tag('Posted') }), false);
   assert.equal(canRecomputeInvoiceTotals('bill'), true);
   assert.equal(canRecomputeInvoiceTotals('entry'), false);
+});
+
+test('reconcile is offered only for open posted invoices and bills', () => {
+  const open = { state: tag('Posted'), amountResidual: 50 };
+  assert.equal(canReconcilePayment(open, 'invoice'), true);
+  assert.equal(canReconcilePayment(open, 'bill'), true);
+  assert.equal(canReconcilePayment(open, 'entry'), false);
+  assert.equal(canReconcilePayment({ ...open, amountResidual: 0 }, 'invoice'), false);
+  assert.equal(canReconcilePayment({ state: tag('Draft'), amountResidual: 50 }, 'invoice'), false);
+});
+
+test('reconcilable payment moves are posted entries of the same company and partner with a balance', () => {
+  const invoice = { id: 1, companyId: 7, partnerId: 3, state: tag('Posted'), moveType: tag('OutInvoice') };
+  const entry = (over: Record<string, unknown>) => ({ id: 2, companyId: 7, partnerId: 3, state: tag('Posted'), moveType: tag('Entry'), amountResidual: 20, ...over });
+  const ids = (rows: Record<string, unknown>[]) => reconcilablePaymentMoves(rows, invoice).map((r) => r.id);
+  assert.deepEqual(ids([entry({})]), [2]);
+  assert.deepEqual(ids([entry({ state: tag('Draft') })]), []);
+  assert.deepEqual(ids([entry({ companyId: 8 })]), []);
+  assert.deepEqual(ids([entry({ partnerId: 4 })]), []);
+  assert.deepEqual(ids([entry({ amountResidual: 0 })]), []);
+  assert.deepEqual(ids([entry({ moveType: tag('OutInvoice') })]), []);
+  assert.deepEqual(ids([entry({ id: 1 })]), []);
 });

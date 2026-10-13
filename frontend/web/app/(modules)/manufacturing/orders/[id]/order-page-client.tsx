@@ -22,21 +22,32 @@ import {
   SmartButtons,
   StatusBar,
   buildModuleTabHref,
+  useFormDialog,
   manufacturingOrdersTableConfig,
   workordersTableConfig,
 } from '@lumiere/ui';
+import type { EntityAction, EntityTableConfig } from '@lumiere/ui';
 import { Badge } from '@lumiere/ui/components/badge';
+import { useConfirmDialog } from '@lumiere/ui/hooks/use-confirm-dialog';
+import { showWorkflowToast } from '@lumiere/ui/lib/workflow-toast';
 import { Skeleton } from '@lumiere/ui/components/skeleton';
 import {
+  useCancelManufacturingOrder,
+  useConfirmManufacturingOrder,
+  useConsumeMoMaterials,
+  useFinishManufacturingOrder,
   useManufacturingMutations,
   useMrpProductions,
   useMrpWorkcenters,
   useMrpWorkorders,
+  useProduceManufacturingOrder,
   useQualityChecks,
+  useStartManufacturingOrder,
   type MrpProduction,
   type MrpWorkcenter,
   type MrpWorkorder,
 } from '@lumiere/query-hooks/hooks/manufacturing';
+import { useFinishWorkorder, useStartWorkorder } from '@lumiere/query-hooks/hooks/manufacturing-workorder-execution';
 import { useProducts } from '@lumiere/query-hooks/hooks/inventory';
 import { useIotDevices } from '@lumiere/query-hooks/hooks/iot';
 import { useDefaultOperatingCompanyBigInt } from '@lumiere/query-hooks/hooks/use-operating-company';
@@ -46,6 +57,18 @@ import { useRecordNavigation } from '@/hooks/use-record-navigation';
 import { useManufacturingModuleSubscription } from '@/lib/module-subscription-hooks';
 import { hasValidOrganizationId, orgBigInts } from '@/lib/org-scoped';
 import { ManufacturingRowDialog } from '../../manufacturing-row-dialog';
+import {
+  canCancelOrder,
+  canConfirmOrder,
+  canConsumeMaterials,
+  canFinishOrder,
+  canFinishWorkorder,
+  canProduceOrder,
+  canStartOrder,
+  canStartWorkorder,
+  parseProduceQty,
+  remainingQty,
+} from '../../manufacturing-order-actions';
 import { manufacturingOrderStatusBar, producedPercent, workordersOfOrder } from '../../manufacturing-order';
 
 interface ManufacturingOrderPageClientProps {
@@ -92,6 +115,16 @@ function ManufacturingOrderPageLoaded({
   const { data: qualityChecks = [] } = useQualityChecks(orgId);
   const { data: products = [] } = useProducts(orgId, initialProducts);
   const mutations = useManufacturingMutations(orgId, operatingCompanyId);
+  const confirmMo = useConfirmManufacturingOrder(orgId, operatingCompanyId);
+  const startMo = useStartManufacturingOrder(orgId, operatingCompanyId);
+  const consumeMaterials = useConsumeMoMaterials(orgId, operatingCompanyId);
+  const produceMo = useProduceManufacturingOrder(orgId, operatingCompanyId);
+  const finishMo = useFinishManufacturingOrder(orgId, operatingCompanyId);
+  const cancelMo = useCancelManufacturingOrder(orgId, operatingCompanyId);
+  const startWorkorder = useStartWorkorder(orgId, operatingCompanyId);
+  const finishWorkorder = useFinishWorkorder(orgId, operatingCompanyId);
+  const { confirm: confirmAction, dialog: confirmDialog } = useConfirmDialog();
+  const { askForm, formDialog } = useFormDialog();
 
   const [actionsOpen, setActionsOpen] = useState(false);
 
@@ -165,6 +198,111 @@ function ManufacturingOrderPageLoaded({
   };
   const iotReferenceStatus = iotDevicesQuery.status === 'success' ? undefined : iotDevicesQuery.status === 'error' ? 'Unavailable' : 'Loading';
 
+  const busy =
+    confirmMo.isPending ||
+    startMo.isPending ||
+    consumeMaterials.isPending ||
+    produceMo.isPending ||
+    finishMo.isPending ||
+    cancelMo.isPending;
+
+  /** Run one lifecycle command; the reducer re-validates, so failures surface as an error toast. */
+  const runAction = async (title: string, work: () => Promise<unknown>) => {
+    try {
+      await work();
+      showWorkflowToast({ kind: 'success', title: t('manufacturing.page.actionDone', { defaultValue: '{{action}} completed', action: title }) });
+    } catch (error) {
+      showWorkflowToast({
+        kind: 'error',
+        title: t('manufacturing.page.actionFailed', { defaultValue: '{{action}} failed', action: title }),
+        description: error instanceof Error ? error.message : String(error),
+      });
+    }
+  };
+  const confirmThenRun = async (title: string, description: string, work: () => Promise<unknown>) => {
+    if (!(await confirmAction({ title, description }))) return;
+    await runAction(title, work);
+  };
+
+  const confirmLabel = t('manufacturing.page.actions.confirm', { defaultValue: 'Confirm' });
+  const startLabel = t('manufacturing.page.actions.start', { defaultValue: 'Start' });
+  const consumeLabel = t('manufacturing.page.actions.consume', { defaultValue: 'Consume materials' });
+  const produceLabel = t('manufacturing.page.actions.produce', { defaultValue: 'Record output' });
+  const finishLabel = t('manufacturing.page.actions.finish', { defaultValue: 'Finish' });
+  const cancelLabel = t('manufacturing.page.actions.cancel', { defaultValue: 'Cancel order' });
+
+  const produce = async () => {
+    const remaining = remainingQty(order);
+    const values = await askForm({
+      title: produceLabel,
+      description: t('manufacturing.page.actions.produceHint', {
+        defaultValue: 'Quantity produced now. {{remaining}} remaining.',
+        remaining,
+      }),
+      fields: [
+        {
+          id: 'qty',
+          name: 'qty',
+          label: t('manufacturing.page.actions.produceQty', { defaultValue: 'Quantity produced' }),
+          type: 'number',
+          required: true,
+          defaultValue: remaining,
+        },
+      ],
+    });
+    if (!values) return;
+    const qty = parseProduceQty(values.qty, order);
+    if (qty == null) {
+      showWorkflowToast({
+        kind: 'error',
+        title: t('manufacturing.page.actionFailed', { defaultValue: '{{action}} failed', action: produceLabel }),
+        description: t('manufacturing.page.actions.produceInvalid', {
+          defaultValue: 'Enter a quantity above 0 and no more than the {{remaining}} remaining.',
+          remaining,
+        }),
+      });
+      return;
+    }
+    await runAction(produceLabel, () => produceMo.mutateAsync({ moId: id, qty }));
+  };
+
+  const workorderActions: EntityAction[] = [
+    {
+      id: 'workorder-start',
+      label: t('manufacturing.page.workorderActions.start', { defaultValue: 'Start work order' }),
+      requiresSelection: true,
+      isApplicable: (rows) => rows.length === 1 && canStartWorkorder(rows[0] as Row, order, ownWorkorders),
+      onClick: (rows) =>
+        runAction(t('manufacturing.page.workorderActions.start', { defaultValue: 'Start work order' }), () =>
+          startWorkorder.mutateAsync(BigInt(String((rows[0] as Row).id))),
+        ),
+    },
+    {
+      id: 'workorder-finish',
+      label: t('manufacturing.page.workorderActions.finish', { defaultValue: 'Finish work order' }),
+      requiresSelection: true,
+      isApplicable: (rows) => rows.length === 1 && canFinishWorkorder(rows[0] as Row, order),
+      onClick: async (rows) => {
+        const title = t('manufacturing.page.workorderActions.finish', { defaultValue: 'Finish work order' });
+        await confirmThenRun(
+          title,
+          t('manufacturing.page.workorderActions.finishConfirm', {
+            defaultValue: 'Stop the clock and mark this work order done. Open quality checks must already pass.',
+          }),
+          () => finishWorkorder.mutateAsync(BigInt(String((rows[0] as Row).id))),
+        );
+      },
+    },
+  ];
+  const workordersBase = workordersTableConfig(t);
+  const workordersView = workordersBase.view as EntityTableConfig;
+  const workordersConfig = {
+    ...workordersBase,
+    title: '',
+    description: undefined,
+    view: { ...workordersView, actions: [...(workordersView.actions ?? []), ...workorderActions] },
+  };
+
   return (
     <>
       <RecordPage
@@ -201,6 +339,60 @@ function ManufacturingOrderPageLoaded({
         }
         actions={
           <>
+          {canConfirmOrder(order) ? (
+            <Button size="sm" disabled={busy} data-testid="manufacturing-order-confirm" onClick={() => void runAction(confirmLabel, () => confirmMo.mutateAsync(id))}>
+              {confirmLabel}
+            </Button>
+          ) : null}
+          {canStartOrder(order) ? (
+            <Button size="sm" disabled={busy} data-testid="manufacturing-order-start" onClick={() => void runAction(startLabel, () => startMo.mutateAsync(id))}>
+              {startLabel}
+            </Button>
+          ) : null}
+          {canProduceOrder(order) ? (
+            <Button size="sm" disabled={busy} data-testid="manufacturing-order-produce" onClick={() => void produce()}>
+              {produceLabel}
+            </Button>
+          ) : null}
+          {canFinishOrder(order) ? (
+            <Button size="sm" disabled={busy} data-testid="manufacturing-order-finish" onClick={() => void runAction(finishLabel, () => finishMo.mutateAsync(id))}>
+              {finishLabel}
+            </Button>
+          ) : null}
+          {canConsumeMaterials(order) ? (
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={busy}
+              data-testid="manufacturing-order-consume"
+              onClick={() =>
+                void confirmThenRun(
+                  consumeLabel,
+                  t('manufacturing.page.actions.consumeConfirm', { defaultValue: 'Consume the bill-of-materials components for this order from stock.' }),
+                  () => consumeMaterials.mutateAsync(id),
+                )
+              }
+            >
+              {consumeLabel}
+            </Button>
+          ) : null}
+          {canCancelOrder(order) ? (
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={busy}
+              data-testid="manufacturing-order-cancel"
+              onClick={() =>
+                void confirmThenRun(
+                  cancelLabel,
+                  t('manufacturing.page.actions.cancelConfirm', { defaultValue: 'Cancel this manufacturing order? A done order cannot be cancelled.' }),
+                  () => cancelMo.mutateAsync(id),
+                )
+              }
+            >
+              {cancelLabel}
+            </Button>
+          ) : null}
           <RecordHeaderActions model="manufacturing" record={order} organizationId={orgId} companyId={operatingCompanyId ?? undefined} />
           <Button size="sm" data-testid="manufacturing-order-actions" onClick={() => setActionsOpen(true)}>
             {t('manufacturing.rowActions.titleOrder')}
@@ -219,7 +411,7 @@ function ManufacturingOrderPageLoaded({
             id: 'workorders',
             label: t('manufacturing.workOrders.title', { defaultValue: 'Work orders' }),
             content: (
-              <EntityView config={{ ...workordersTableConfig(t), title: '', description: undefined }} data={ownWorkorders} useCard={false} />
+              <EntityView config={workordersConfig} data={ownWorkorders} useCard={false} />
             ),
           },
           {
@@ -239,6 +431,8 @@ function ManufacturingOrderPageLoaded({
         ]}
       />
 
+      {confirmDialog}
+      {formDialog}
       <ManufacturingRowDialog
         open={actionsOpen}
         onOpenChange={setActionsOpen}

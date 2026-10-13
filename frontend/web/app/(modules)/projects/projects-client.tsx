@@ -10,6 +10,7 @@ import {
   ModuleView,
   FormModal,
   CsvImportModal,
+  CSV_IMPORT_CONTRACTS,
   newProjectForm,
   newTaskForm,
   editProjectForm,
@@ -1022,6 +1023,15 @@ function ProjectsClientLoaded({
                 ...tab.entityConfig,
                 view: {
                   ...view,
+                  actions: [
+                    ...(view.actions ?? []),
+                    {
+                      id: "csv-project",
+                      label: t("projects.toolbar.importProjectCsv"),
+                      permission: { resource: CSV_IMPORT_CONTRACTS.project.resource, action: "create" },
+                      onClick: () => setCsvKind("project"),
+                    },
+                  ],
                   columns: view.columns.map((column) =>
                     column.key === "name"
                       ? {
@@ -1085,6 +1095,7 @@ function ProjectsClientLoaded({
                 {
                   id: "csv-task",
                   label: t("projects.toolbar.importTaskCsv"),
+                  permission: { resource: "project_task", action: "create" },
                   onClick: () => setCsvKind("task"),
                 },
                 {
@@ -1128,6 +1139,7 @@ function ProjectsClientLoaded({
                 {
                   id: "csv-timesheet",
                   label: t("projects.toolbar.importTimesheetCsv"),
+                  permission: { resource: CSV_IMPORT_CONTRACTS.timesheet.resource, action: "create" },
                   onClick: () => setCsvKind("timesheet"),
                 },
                 {
@@ -1642,6 +1654,8 @@ function ProjectsClientLoaded({
           key={csvKind}
           onClose={() => setCsvKind(null)}
           config={csvFormConfig}
+          columns={csvKind === "project" ? CSV_IMPORT_CONTRACTS.project : CSV_IMPORT_CONTRACTS.timesheet}
+          templateFileName={`${csvKind}-import-template.csv`}
           isPending={isFormMutationPending}
           onImport={async (text) => {
             if (csvKind === "project") await csvImports.importProject.mutateAsync(text)

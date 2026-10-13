@@ -24,6 +24,8 @@ import { isEntitySurfaceVisible } from "../lib/entity-view-types"
 import { getEntityRowKey } from "../lib/entity-row-utils"
 import { useRBAC } from "../lib/rbac-context"
 import { exportDashboardToPng } from "../lib/export-dashboard-png"
+import { KpiStrip } from "../components/kpi-strip"
+import { filterRowsByKpi, activeKpiTile, toggleKpiKey, type KpiTileDef } from "../lib/kpi-tiles"
 
 /** When set, tab create forms use STDB-merged {@link RuntimeFormModal} instead of static-only FormModal. */
 export interface ModuleViewRuntimeForms {
@@ -66,6 +68,11 @@ interface ModuleViewProps {
    * Static `createForm` remains the reducer field-name scaffold.
    */
   runtimeForms?: ModuleViewRuntimeForms
+  /**
+   * Actionable KPI strip above an entity tab's list, keyed by tab id. Figures come from rows the
+   * module already holds; selecting a tile narrows the list to the rows behind it.
+   */
+  kpiStrips?: Record<string, { tiles: KpiTileDef[]; loading?: boolean }>
 }
 
 export function ModuleView({
@@ -82,6 +89,7 @@ export function ModuleView({
   onDashboardTimeRangeChange,
   urlFilters: urlFiltersProp,
   runtimeForms,
+  kpiStrips,
 }: ModuleViewProps) {
   const routeFilters = useModuleUrlFilters()
   const clearRouteFilter = useClearModuleUrlFilter()
@@ -126,6 +134,7 @@ export function ModuleView({
     trigger?.scrollIntoView({ block: "nearest", inline: "nearest" })
   }, [activeTab])
   const [openForm, setOpenForm] = useState<string | null>(null)
+  const [kpiSelection, setKpiSelection] = useState<Record<string, string | null>>({})
   const [selectedRecord, setSelectedRecord] = useState<Record<string, unknown> | null>(null)
   const dashboardGridRef = useRef<HTMLDivElement>(null)
 
@@ -218,6 +227,26 @@ export function ModuleView({
 
             {tab.type === "entity" && tab.entityConfig && (
               <div className="space-y-3">
+                {kpiStrips?.[tab.id] ? (
+                  <KpiStrip
+                    loading={kpiStrips[tab.id]!.loading}
+                    tiles={kpiStrips[tab.id]!.tiles.map((kpi) => ({
+                      key: kpi.key,
+                      label: kpi.label,
+                      value: kpi.value,
+                      hint: kpi.hint,
+                      tone: kpi.tone,
+                      active: activeKpiTile(kpiStrips[tab.id]!.tiles, kpiSelection[tab.id] ?? null)?.key === kpi.key,
+                      onSelect: kpi.matches
+                        ? () =>
+                            setKpiSelection((prev) => ({
+                              ...prev,
+                              [tab.id]: toggleKpiKey(prev[tab.id] ?? null, kpi.key),
+                            }))
+                        : undefined,
+                    }))}
+                  />
+                ) : null}
                 <EntityView
                   useCard={false}
                   headerAction={
@@ -233,7 +262,11 @@ export function ModuleView({
                     ) : undefined
                   }
                   config={tab.entityConfig}
-                  data={data[tab.id] ?? []}
+                  data={
+                    kpiStrips?.[tab.id]
+                      ? filterRowsByKpi(data[tab.id] ?? [], kpiStrips[tab.id]!.tiles, kpiSelection[tab.id] ?? null)
+                      : (data[tab.id] ?? [])
+                  }
                   isLoading={dataLoading?.[tab.id]}
                   initialFilters={activeTab === tab.id ? urlFilters : undefined}
                   onInitialFilterClear={clearRouteFilter}

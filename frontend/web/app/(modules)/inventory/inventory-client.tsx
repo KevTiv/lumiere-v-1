@@ -69,10 +69,20 @@ import type {
   EntityViewConfig,
   EntityRecordSheetConfig,
   FormConfig,
+  FormField,
   ModuleConfig,
 } from '@lumiere/ui';
 import { inventoryModuleConfig } from '@/lib/module-dashboard-configs';
 import { useModuleTab } from '@/hooks/use-module-tab';
+import { recordOptions as linkedRecordOptions, withLinkedPickers } from '@/lib/linked-options';
+import {
+  ProductPackagingTab,
+  ProductVariantsTab,
+  ProductVendorPricesTab,
+} from './product-record-read-tabs';
+import { packagingOptionLabel, vendorPriceOptionLabel } from './product-record-tabs';
+import { canReleaseWave } from './picking-wave-actions';
+import { canConfirmPackage, canDonePackage } from './stock-package-actions';
 import { useInventoryModuleSubscription } from '@/lib/module-subscription-hooks';
 import { useWorkflowSurface } from '@/hooks/use-workflow-surface';
 import { usePickingWorkflow } from '@lumiere/query-hooks/hooks/picking-workflow';
@@ -84,6 +94,8 @@ import { useSerialUseWorkflow } from '@lumiere/query-hooks/hooks/serial-use-work
 import { useSerialBlockWorkflow } from '@lumiere/query-hooks/hooks/serial-block-workflow';
 import { planPartialDelivery, variantTag } from '@lumiere/erp-workflows';
 import { showWorkflowToast } from '@lumiere/ui/lib/workflow-toast';
+import type { KpiTileDef } from '@lumiere/ui/lib/kpi-tiles';
+import { transferKpis } from './transfer-kpis';
 import { groupBy } from '@/lib/utils';
 import { transferRecordHref } from './transfer-record';
 import { InventoryOpsPanel } from './inventory-ops-panel';
@@ -101,6 +113,9 @@ import {
   useQualityTeams,
   useStockCycleCounts,
   usePickingWaves,
+  useStockPackages,
+  useConfirmStockPackage,
+  useDoneStockPackage,
   useWarehouseTasks,
   useStockRoutes,
   useStockRules,
@@ -222,6 +237,8 @@ import {
   useCreateProductSupplierInfo,
   useUpdateProductSupplierInfo,
   useCreateProductPackaging,
+  useProductPackagings,
+  useProductSupplierInfos,
   useUpdateProductPackaging,
   useRestoreProductCategory,
   useUpsertWarehouseGeo,
@@ -246,6 +263,18 @@ import { useDefaultOperatingCompanyBigInt } from '@lumiere/query-hooks/hooks/use
 import { inventoryProductPrimaryLabel } from '@lumiere/stdb/read-models';
 
 type ScalarId = bigint | number | string;
+
+/** Swaps number fields that ask for a record id for searchable pickers (via `withLinkedPickers`). */
+function recordPickerFields(
+  fields: FormField[],
+  options: Record<string, ReturnType<typeof linkedRecordOptions>>,
+): FormField[] {
+  const picked = withLinkedPickers(
+    { id: 'record-picker', title: '', sections: [{ id: 'main', fields }] } as FormConfig,
+    options,
+  );
+  return picked.sections[0].fields;
+}
 
 /** Lower-cased state/status of a row (handles `{tag}` enum values), for action gating. */
 function rowState(row: Record<string, unknown>, key = 'state'): string {
@@ -557,6 +586,7 @@ function InventoryClientLoaded({
     initialStockCycleCounts,
   );
   const { data: pickingWaves = [] } = usePickingWaves(orgId);
+  const { data: stockPackages = [] } = useStockPackages(orgId);
   const { data: warehouseTasks = [] } = useWarehouseTasks(orgId);
   const { data: stockRoutes = [] } = useStockRoutes(orgId);
   const { data: stockRules = [] } = useStockRules(orgId);
@@ -583,6 +613,8 @@ function InventoryClientLoaded({
   const { data: orgUsers = [] } = useOrgUsers();
   const { data: pricelists = [] } = usePricelists(orgId, initialPricelists);
   const { data: contacts = [] } = useContacts(orgId);
+  const { data: productSupplierInfos = [] } = useProductSupplierInfos(orgId);
+  const { data: productPackagings = [] } = useProductPackagings(orgId);
   const { data: erpDocuments = [] } = useDocuments(orgId);
   const csvImports = {
     importUomCategory: useImportUomCategoryCsv(orgId),
@@ -668,6 +700,15 @@ function InventoryClientLoaded({
     if (fromApi.length > 0) return fromApi;
     return [{ value: '', label: t('common.lookup.noVendors'), disabled: true }];
   }, [contacts, t]);
+
+  const vendorNameById = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const contact of contacts as Record<string, unknown>[]) {
+      const name = String(contact.displayName ?? contact.name ?? '').trim();
+      if (contact.id != null && name) map.set(String(contact.id), name);
+    }
+    return map;
+  }, [contacts]);
 
   const documentSelectOptions = useMemo(
     () =>
@@ -1123,6 +1164,8 @@ function InventoryClientLoaded({
   const createPickingWave = useCreatePickingWave(orgId, operatingCompanyId);
   const confirmPickingWave = useConfirmPickingWave(orgId, operatingCompanyId);
   const completePickingWave = useCompletePickingWave(orgId, operatingCompanyId);
+  const confirmStockPackage = useConfirmStockPackage(orgId, operatingCompanyId);
+  const doneStockPackage = useDoneStockPackage(orgId, operatingCompanyId);
 
   // Product category hooks
   const createProductCategory = useCreateProductCategory(
@@ -1593,8 +1636,27 @@ function InventoryClientLoaded({
       detailConfig: productDetailConfig(t),
       auditTableName: 'product',
       discussion: {},
+      customTabs: [
+        {
+          id: 'variants',
+          label: t('inventory.productTabs.variants.title', { defaultValue: 'Variants' }),
+          content: (record) => <ProductVariantsTab orgId={orgId} record={record} />,
+        },
+        {
+          id: 'vendor-prices',
+          label: t('inventory.productTabs.vendors.title', { defaultValue: 'Vendor prices' }),
+          content: (record) => (
+            <ProductVendorPricesTab orgId={orgId} record={record} vendorNameById={vendorNameById} />
+          ),
+        },
+        {
+          id: 'packaging',
+          label: t('inventory.productTabs.packaging.title', { defaultValue: 'Packaging' }),
+          content: (record) => <ProductPackagingTab orgId={orgId} record={record} />,
+        },
+      ],
     };
-  }, [t]);
+  }, [t, orgId, vendorNameById]);
 
   const stockQuantRecordSheet = useMemo((): EntityRecordSheetConfig => {
     const baseDetail = stockQuantDetailConfig(t);
@@ -2690,18 +2752,25 @@ function InventoryClientLoaded({
                   onClick: async () => {
                     const values = await askForm({
                       title: t('inventory.productActions.updateSupplierLineById'),
-                      fields: [
+                      fields: recordPickerFields(
+                        [
+                          {
+                            id: 'recordId',
+                            name: 'recordId',
+                            label: t('inventory.byRecord.supplierLineId', { defaultValue: 'Supplier line ID' }),
+                            type: 'number',
+                            required: true,
+                            min: 1,
+                          },
+                          { id: 'price', name: 'price', label: t('inventory.byRecord.price', { defaultValue: 'Price' }), type: 'number', min: 0, step: 0.01 },
+                          { id: 'minQty', name: 'minQty', label: t('inventory.byRecord.minQty', { defaultValue: 'Minimum quantity' }), type: 'number', min: 0 },
+                        ],
                         {
-                          id: 'recordId',
-                          name: 'recordId',
-                          label: t('inventory.byRecord.supplierLineId', { defaultValue: 'Supplier line ID' }),
-                          type: 'number',
-                          required: true,
-                          min: 1,
+                          recordId: linkedRecordOptions(productSupplierInfos as Record<string, unknown>[], (row) =>
+                            vendorPriceOptionLabel(row, vendorNameById, productLabelById),
+                          ),
                         },
-                        { id: 'price', name: 'price', label: t('inventory.byRecord.price', { defaultValue: 'Price' }), type: 'number', min: 0, step: 0.01 },
-                        { id: 'minQty', name: 'minQty', label: t('inventory.byRecord.minQty', { defaultValue: 'Minimum quantity' }), type: 'number', min: 0 },
-                      ],
+                      ),
                     });
                     if (!values) return;
                     await updateProductSupplierInfo.mutateAsync({
@@ -2717,17 +2786,24 @@ function InventoryClientLoaded({
                   onClick: async () => {
                     const values = await askForm({
                       title: t('inventory.productActions.updatePackagingById'),
-                      fields: [
+                      fields: recordPickerFields(
+                        [
+                          {
+                            id: 'recordId',
+                            name: 'recordId',
+                            label: t('inventory.byRecord.packagingId', { defaultValue: 'Packaging ID' }),
+                            type: 'number',
+                            required: true,
+                            min: 1,
+                          },
+                          { id: 'name', name: 'name', label: t('inventory.byRecord.name', { defaultValue: 'Name' }), type: 'text', required: true },
+                        ],
                         {
-                          id: 'recordId',
-                          name: 'recordId',
-                          label: t('inventory.byRecord.packagingId', { defaultValue: 'Packaging ID' }),
-                          type: 'number',
-                          required: true,
-                          min: 1,
+                          recordId: linkedRecordOptions(productPackagings as Record<string, unknown>[], (row) =>
+                            packagingOptionLabel(row, productLabelById),
+                          ),
                         },
-                        { id: 'name', name: 'name', label: t('inventory.byRecord.name', { defaultValue: 'Name' }), type: 'text', required: true },
-                      ],
+                      ),
                     });
                     if (!values) return;
                     await updateProductPackaging.mutateAsync({
@@ -4130,8 +4206,7 @@ function InventoryClientLoaded({
                   label: t('inventory.pickingWaveActions.confirm'),
                   icon: CheckCircle,
                   requiresSelection: true,
-                  isApplicable: (rows) =>
-                    rows.every((row) => !['done', 'cancelled'].includes(rowState(row, 'state'))),
+                  isApplicable: (rows) => rows.length === 1 && canReleaseWave(rows[0]),
                   successMessage: t('common.actionCompleted', { action: t('inventory.pickingWaveActions.confirm') }),
                   onClick: async (rows) => {
                     const id = rows[0]?.id as ScalarId | undefined;
@@ -4149,6 +4224,50 @@ function InventoryClientLoaded({
                   onClick: async (rows) => {
                     const id = rows[0]?.id as ScalarId | undefined;
                     if (id != null) await completePickingWave.mutateAsync(id);
+                  },
+                },
+              ],
+            },
+          },
+        };
+      }
+      // Stock package actions
+      if (tab.id === 'stock-packages') {
+        return {
+          ...tab,
+          entityConfig: {
+            ...tab.entityConfig,
+            view: {
+              ...v,
+              actions: [
+                {
+                  id: 'confirm-package',
+                  label: t('inventory.stockPackageActions.confirm', { defaultValue: 'Confirm package' }),
+                  icon: CheckCircle,
+                  requiresSelection: true,
+                  permission: { resource: 'stock_picking', action: 'update' },
+                  isApplicable: (rows) => rows.length === 1 && canConfirmPackage(rows[0]),
+                  successMessage: t('common.actionCompleted', {
+                    action: t('inventory.stockPackageActions.confirm', { defaultValue: 'Confirm package' }),
+                  }),
+                  onClick: async (rows) => {
+                    const id = rows[0]?.id as ScalarId | undefined;
+                    if (id != null) await confirmStockPackage.mutateAsync(id);
+                  },
+                },
+                {
+                  id: 'done-package',
+                  label: t('inventory.stockPackageActions.done', { defaultValue: 'Mark package done' }),
+                  icon: ListChecks,
+                  requiresSelection: true,
+                  permission: { resource: 'stock_picking', action: 'update' },
+                  isApplicable: (rows) => rows.length === 1 && canDonePackage(rows[0]),
+                  successMessage: t('common.actionCompleted', {
+                    action: t('inventory.stockPackageActions.done', { defaultValue: 'Mark package done' }),
+                  }),
+                  onClick: async (rows) => {
+                    const id = rows[0]?.id as ScalarId | undefined;
+                    if (id != null) await doneStockPackage.mutateAsync(id);
                   },
                 },
               ],
@@ -4677,6 +4796,7 @@ function InventoryClientLoaded({
           if (tab.id === 'quality') return withTransferActions(tab);
           if (tab.id === 'replenishment') return withTransferActions(tab);
           if (tab.id === 'picking-waves') return withTransferActions(tab);
+          if (tab.id === 'stock-packages') return withTransferActions(tab);
           if (tab.id === 'product-categories') return withTransferActions(tab);
           if (tab.id === 'routes') return withTransferActions(tab);
           if (tab.id === 'rules') return withTransferActions(tab);
@@ -4749,6 +4869,8 @@ function InventoryClientLoaded({
     // Picking waves
     confirmPickingWave,
     completePickingWave,
+    confirmStockPackage,
+    doneStockPackage,
     // Product categories
     deleteProductCategory,
     // Stock routes and rules
@@ -4789,6 +4911,10 @@ function InventoryClientLoaded({
     restoreProductCategory,
     updateProductSupplierInfo,
     updateProductPackaging,
+    productSupplierInfos,
+    productPackagings,
+    vendorNameById,
+    productLabelById,
     stockQuantFormConfig,
     traceRecordFormConfig,
     useSerial,
@@ -4864,6 +4990,7 @@ function InventoryClientLoaded({
       quality: qualityChecks as unknown as Record<string, unknown>[],
       'cycle-counts': cycleCounts as unknown as Record<string, unknown>[],
       'picking-waves': pickingWaves as unknown as Record<string, unknown>[],
+      'stock-packages': stockPackages as unknown as Record<string, unknown>[],
       'warehouse-tasks': warehouseTasks as unknown as Record<string, unknown>[],
       routes: stockRoutes as unknown as Record<string, unknown>[],
       rules: stockRules as unknown as Record<string, unknown>[],
@@ -4911,6 +5038,7 @@ function InventoryClientLoaded({
       qualityChecks,
       cycleCounts,
       pickingWaves,
+      stockPackages,
       warehouseTasks,
       stockRoutes,
       stockRules,
@@ -4924,6 +5052,16 @@ function InventoryClientLoaded({
       serialLotTraceability,
       stockTraceabilityReports,
     ],
+  );
+
+  const kpiStrips = useMemo<Record<string, { tiles: KpiTileDef[]; loading?: boolean }>>(
+    () => ({
+      transfers: {
+        tiles: transferKpis(data.transfers, { t, now: new Date(), currencyCodeById: new Map() }),
+        loading: transfersLoading,
+      },
+    }),
+    [data.transfers, transfersLoading, t],
   );
 
   const handleFormSubmit = async (
@@ -5267,6 +5405,7 @@ function InventoryClientLoaded({
           stock: stockQuantsLoading,
           transfers: transfersLoading,
         }}
+        kpiStrips={kpiStrips}
         onFormSubmit={handleFormSubmit}
         isPending={isFormMutationPending}
         activeTab={activeTab}

@@ -2001,14 +2001,14 @@
       "semantic_kind": "command"
     },
     "release_document_legal_hold": {
-      "client_facing": false,
+      "client_facing": true,
       "codec": {
         "id": "spacetimedb-sats-json",
         "version": 1
       },
-      "evidence": "spacetimedb/src/documents/legal_hold.rs:156 reducer body shows keyed overwrite/delete or recomputation; denied.",
+      "evidence": "spacetimedb/src/documents/legal_hold.rs:156 reducer releases an active legal hold behind document admin permission with audit logging; session-exposed for the document page.",
       "idempotency": "idempotent",
-      "semantic_kind": "internal"
+      "semantic_kind": "command"
     },
     "release_picking_wave": {
       "client_facing": true,

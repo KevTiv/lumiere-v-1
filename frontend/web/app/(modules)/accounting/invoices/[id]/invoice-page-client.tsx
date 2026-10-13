@@ -36,6 +36,7 @@ import {
   mergeFieldDefaultValues,
   mergeSelectOptionsForFields,
   useFormDialog,
+  recordOptions,
 } from '@lumiere/ui';
 import type { EntityAction, EntityTableConfig, FormConfig } from '@lumiere/ui';
 import { Badge } from '@lumiere/ui/components/badge';
@@ -96,7 +97,9 @@ import {
   canResetMove,
   canEditMoveLines,
   canRecomputeInvoiceTotals,
+  canReconcilePayment,
   canRegisterPayment,
+  reconcilablePaymentMoves,
 } from '../../invoice-actions';
 import { invoiceKind, invoiceStatus } from '../../invoice-status';
 import { RegisterPaymentOnInvoiceDialog } from '../../register-payment-on-invoice-dialog';
@@ -341,6 +344,37 @@ function InvoicePageLoaded({
     });
   };
 
+  const reconcilePayment = async () => {
+    const candidates = reconcilablePaymentMoves(moves as unknown as Row[], move);
+    const title = t('accounting.invoices.invoiceActions.reconcilePayment', { defaultValue: 'Reconcile payment' });
+    const values = await askForm({
+      title,
+      description: t('accounting.invoices.reconcilePaymentHint', {
+        defaultValue: 'Match a posted payment entry to this document. The lesser of the two open balances is applied.',
+      }),
+      fields: [
+        {
+          id: 'paymentMoveId',
+          name: 'paymentMoveId',
+          label: t('accounting.invoices.payment', { defaultValue: 'Payment' }),
+          type: 'select',
+          required: true,
+          options: candidates.length > 0
+            ? recordOptions(candidates, (row) => String(row.name || `#${row.id}`))
+            : [{ value: '', disabled: true, label: t('accounting.invoices.noReconcilablePayments', { defaultValue: 'No posted payments available' }) }],
+        },
+      ],
+    });
+    const raw = formText(values?.paymentMoveId);
+    if (raw == null) return;
+    try {
+      await workflow.reconcilePayment({ paymentMoveId: BigInt(raw), invoiceMoveId: BigInt(moveId) });
+      showWorkflowToast({ kind: 'success', title, description: label });
+    } catch (error) {
+      report(error, title);
+    }
+  };
+
   const moreActions: Array<{ id: string; label: string; show: boolean; run: () => Promise<void> | void }> = [
     {
       id: 'reset-to-draft',
@@ -366,6 +400,12 @@ function InvoicePageLoaded({
       label: t('accounting.invoices.invoiceActions.registerPayment', { defaultValue: 'Register payment' }),
       show: canRegisterPayment(move, kind),
       run: () => setRegisterOpen(true),
+    },
+    {
+      id: 'reconcile-payment',
+      label: t('accounting.invoices.invoiceActions.reconcilePayment', { defaultValue: 'Reconcile payment' }),
+      show: canReconcilePayment(move, kind) && checkPermission('account_move', 'write').allowed,
+      run: reconcilePayment,
     },
     {
       id: 'cancel',

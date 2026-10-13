@@ -31,6 +31,7 @@ import {
   employeeDetailConfig,
   leaveDetailConfig,
   contractDetailConfig,
+  leaveAllocationsTableConfig,
   employeeStatusBadges,
   leaveRequestStatusBadges,
   contractStatusBadges,
@@ -40,6 +41,10 @@ import {
   previousPeriodMs,
   timeRangeToMs,
 } from "@lumiere/ui"
+import { allocationOptionalColumns, mapAllocationRows } from "@lumiere/query-hooks/hooks/hr-allocations"
+import { HrOffboardingPanel } from "./hr-offboarding-panel"
+import { HrStatutoryIdsPanel } from "./hr-statutory-ids-panel"
+import type { QueryResourceState } from "@lumiere/api-client"
 import type { EntityAction, EntityRecordSheetConfig, EntityViewConfig, FormConfig, HrCsvImportKind, ModuleConfig } from "@lumiere/ui"
 import type { QueryRows } from "@lumiere/query-hooks/http"
 import { hrModuleConfig } from "@/lib/module-dashboard-configs"
@@ -56,6 +61,9 @@ import {
   useHrIntegrationIntentsPending,
   useJobPositions,
   useLeaveTypes,
+  useLeaveAllocations,
+  useOffboardingChecklists,
+  useStatutoryIds,
   usePayrollStructures,
   useSalaryRules,
   useAttendance,
@@ -418,6 +426,13 @@ function HrClientLoaded({
   const { data: jobPositions = [] } = useJobPositions(orgId)
   const { data: applicants = [] } = useApplicants(orgId)
   const { data: leaveTypes = [] } = useLeaveTypes(orgId)
+  const {
+    data: leaveAllocations = [],
+    isLoading: leaveAllocationsLoading,
+    isError: leaveAllocationsError,
+  } = useLeaveAllocations(orgId)
+  const offboardingQuery = useOffboardingChecklists(orgId)
+  const statutoryIdsQuery = useStatutoryIds(orgId)
   const { data: payrollStructures = [] } = usePayrollStructures(orgId)
   const { data: salaryRules = [] } = useSalaryRules(orgId)
   const { data: onboardingTemplates = [] } = useOnboardingTemplates(orgId)
@@ -679,6 +694,16 @@ function HrClientLoaded({
     [contractFormConfig],
   )
 
+  const allocationRows = useMemo(
+    () =>
+      mapAllocationRows(
+        leaveAllocations as Record<string, unknown>[],
+        employees as unknown as Record<string, unknown>[],
+        leaveTypes as unknown as Record<string, unknown>[],
+      ),
+    [leaveAllocations, employees, leaveTypes],
+  )
+
   const employeeRecordSheet = useMemo((): EntityRecordSheetConfig => {
     const status = employeeStatusBadges(t)
     return {
@@ -712,9 +737,52 @@ function HrClientLoaded({
             />
           ),
         },
+        // Hidden entirely when the user cannot read the resource.
+        ...(offboardingQuery.data?.status === "denied"
+          ? []
+          : [
+              {
+                id: "offboarding",
+                label: t("hr.offboarding.tab", { defaultValue: "Offboarding" }),
+                content: (record: Record<string, unknown>) => (
+                  <HrOffboardingPanel
+                    state={offboardingQuery.data as QueryResourceState<Record<string, unknown>> | undefined}
+                    isLoading={offboardingQuery.isLoading}
+                    isError={offboardingQuery.isError}
+                    employeeId={employeeRowId(record)}
+                  />
+                ),
+              },
+            ]),
+        ...(statutoryIdsQuery.data?.status === "denied"
+          ? []
+          : [
+              {
+                id: "statutory-ids",
+                label: t("hr.statutoryIds.tab", { defaultValue: "Statutory IDs" }),
+                content: (record: Record<string, unknown>) => (
+                  <HrStatutoryIdsPanel
+                    state={statutoryIdsQuery.data as QueryResourceState<Record<string, unknown>> | undefined}
+                    isLoading={statutoryIdsQuery.isLoading}
+                    isError={statutoryIdsQuery.isError}
+                    employeeId={employeeRowId(record)}
+                  />
+                ),
+              },
+            ]),
       ],
     }
-  }, [t, orgId, operatingCompanyId])
+  }, [
+    t,
+    orgId,
+    operatingCompanyId,
+    offboardingQuery.data,
+    offboardingQuery.isLoading,
+    offboardingQuery.isError,
+    statutoryIdsQuery.data,
+    statutoryIdsQuery.isLoading,
+    statutoryIdsQuery.isError,
+  ])
 
   const leaveRecordSheet = useMemo((): EntityRecordSheetConfig => {
     const status = leaveRequestStatusBadges(t)
@@ -1082,6 +1150,22 @@ function HrClientLoaded({
               ),
             }
           }
+          if (tab.id === "leave-allocations") {
+            const cols = allocationOptionalColumns(allocationRows)
+            return {
+              ...tab,
+              entityConfig: leaveAllocationsTableConfig(t, {
+                employeeOptions: employeeRowsToSelectOptions(employees as unknown as Record<string, unknown>[]),
+                leaveTypeOptions: leaveTypeRowsToSelectOptions(leaveTypes as unknown as Record<string, unknown>[]),
+                showPeriod: cols.period,
+                showValidity: cols.validity,
+                showState: cols.state,
+                emptyMessage: leaveAllocationsError
+                  ? t("hr.leaveAllocations.loadError", { defaultValue: "Could not load leave allocations." })
+                  : undefined,
+              }),
+            }
+          }
           if (tab.id === "attendance" && tab.entityConfig) {
             return {
               ...tab,
@@ -1408,6 +1492,10 @@ function HrClientLoaded({
       }) as ModuleConfig,
     [
       moduleConfig,
+      allocationRows,
+      leaveAllocationsError,
+      employees,
+      leaveTypes,
       orgChartTab,
       performanceTab,
       benefitsTab,
@@ -1463,13 +1551,14 @@ function HrClientLoaded({
       "job-positions": jobPositions as unknown as Record<string, unknown>[],
       recruitment: recruitmentPositions as unknown as Record<string, unknown>[],
       "leave-types": leaveTypes as unknown as Record<string, unknown>[],
+      "leave-allocations": allocationRows as unknown as Record<string, unknown>[],
       "payroll-structures": payrollStructures as unknown as Record<string, unknown>[],
       "salary-rules": salaryRules as unknown as Record<string, unknown>[],
       "onboarding-templates": onboardingTemplates as unknown as Record<string, unknown>[],
       attendance: attendance as unknown as Record<string, unknown>[],
       "compensation-events": compensationEvents as unknown as Record<string, unknown>[],
     }),
-    [employees, departments, leaves, contracts, payslips, jobPositions, recruitmentPositions, leaveTypes, payrollStructures, salaryRules, onboardingTemplates, attendance, compensationEvents]
+    [employees, departments, leaves, contracts, payslips, jobPositions, recruitmentPositions, leaveTypes, allocationRows, payrollStructures, salaryRules, onboardingTemplates, attendance, compensationEvents]
   )
 
   const handleFormSubmit = async (
@@ -1570,6 +1659,7 @@ function HrClientLoaded({
     () => ({
       employees: employeesLoading,
       leaves: leavesLoading,
+      "leave-allocations": leaveAllocationsLoading,
       contracts: contractsLoading,
     }),
     [employeesLoading, leavesLoading, contractsLoading],
@@ -1758,8 +1848,7 @@ function HrClientLoaded({
                   await csvImports.importSalaryRule.mutateAsync(text)
                   break
                 case "payslip":
-                  await csvImports.importPayslip.mutateAsync(text)
-                  break
+                  return await csvImports.importPayslip.mutateAsync(text)
               default:
                 break
             }

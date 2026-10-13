@@ -28,6 +28,7 @@ import type {
 
 import { responseErrorMessage as parseCallErrorDocuments } from "@lumiere/api-client/response-error"
 
+import { dispatchNamedOperation } from "../operation-dispatch"
 import { resolveDocumentVersionEffect } from "./document-version-effect"
 import { resolveDocumentCreateEffect } from "./document-create-effect"
 import { resolveDocumentLockEffect, type DocumentLockProjection } from "./document-lock-effect"
@@ -115,6 +116,36 @@ export function useDocumentVersions(organizationId: bigint, initialData?: QueryR
     queryKey: ['document-versions', rqBigIntKey(organizationId)],
     queryFn: () =>
       fetchQueryList('/api/query/document-versions', 'Failed to fetch document versions'),
+    staleTime: 30_000,
+    initialData,
+  })
+}
+
+export function useDocumentLegalHolds(organizationId: bigint, initialData?: QueryRows) {
+  return useQuery<QueryRows>({
+    queryKey: ['document-legal-holds', rqBigIntKey(organizationId)],
+    queryFn: () =>
+      fetchQueryList('/api/query/document-legal-holds', 'Failed to fetch document legal holds'),
+    staleTime: 30_000,
+    initialData,
+  })
+}
+
+export function useDocumentSignatureRequests(organizationId: bigint, initialData?: QueryRows) {
+  return useQuery<QueryRows>({
+    queryKey: ['document-signature-requests', rqBigIntKey(organizationId)],
+    queryFn: () =>
+      fetchQueryList('/api/query/document-signature-requests', 'Failed to fetch document signature requests'),
+    staleTime: 30_000,
+    initialData,
+  })
+}
+
+export function useDocumentExternalRefs(organizationId: bigint, initialData?: QueryRows) {
+  return useQuery<QueryRows>({
+    queryKey: ['document-external-refs', rqBigIntKey(organizationId)],
+    queryFn: () =>
+      fetchQueryList('/api/query/document-external-refs', 'Failed to fetch document external references'),
     staleTime: 30_000,
     initialData,
   })
@@ -415,7 +446,35 @@ export function useApplyDocumentLegalHold(organizationId: bigint) {
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallErrorDocuments(r))
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['documents', rqBigIntKey(organizationId)] }),
+    onSuccess: () => {
+      const k = rqBigIntKey(organizationId)
+      void qc.invalidateQueries({ queryKey: ['documents', k] })
+      void qc.invalidateQueries({ queryKey: ['document-legal-holds', k] })
+    },
+  })
+}
+
+export function useReleaseDocumentLegalHold(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({
+      holdId,
+      metadata,
+    }: {
+      holdId: bigint | number | string
+      metadata?: string
+    }) => {
+      await dispatchNamedOperation(
+        "release_document_legal_hold",
+        { holdId: toScalarU64(holdId), params: stdbParamsToJson({ metadata } as object, "ReleaseDocumentLegalHoldParams") },
+        "Failed to release legal hold",
+      )
+    },
+    onSuccess: () => {
+      const k = rqBigIntKey(organizationId)
+      void qc.invalidateQueries({ queryKey: ['documents', k] })
+      void qc.invalidateQueries({ queryKey: ['document-legal-holds', k] })
+    },
   })
 }
 
