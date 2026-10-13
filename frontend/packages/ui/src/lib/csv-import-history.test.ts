@@ -1,5 +1,5 @@
 import assert from "node:assert/strict"
-import { describe, it } from "node:test"
+import { describe, it } from "vitest"
 import { csvImportHistoryJobs, selectedCsvImportJob } from "./csv-import-history"
 
 describe("CSV import history selection", () => {
