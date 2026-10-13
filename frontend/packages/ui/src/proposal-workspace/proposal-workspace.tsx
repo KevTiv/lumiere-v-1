@@ -25,6 +25,14 @@ import { PresenceBar } from "./presence-bar"
 import { DocumentInputPanel } from "./document-input-panel"
 import { ComplianceChecklist } from "./compliance-checklist"
 import { parseBidDecisionInput } from "./bid-decision"
+import { parseProcurementScoreInput, procurementScoresForProposal, type ProcurementScoreView } from "./procurement-score"
+import { moveLineItemOrder, proposalLineItemsInOrder, type LineItemMoveDirection } from "./line-item-order"
+import {
+  DEFAULT_TEMPLATE_CATEGORY,
+  DEFAULT_TEMPLATE_LOCALE,
+  parseSectionTemplateInput,
+} from "./section-template"
+import { ProcurementScoresPanel } from "./procurement-scores-panel"
 import { PROJECT_BILL_TYPES, PROJECT_PRICING_TYPES, parseProjectConversionInput } from "./project-conversion"
 import { useFormDialog } from "../forms/use-form-dialog"
 import { showWorkflowToast } from "../lib/workflow-toast"
@@ -209,6 +217,7 @@ export interface ProposalWorkspaceHooks {
   useResolveProposalComment: () => MutationResult<bigint | number | string>
   useProposalTemplates: UseQueryHook<unknown>
   useProposalComplianceRequirements: UseQueryHook<unknown>
+  useProposalProcurementScores: UseQueryHook<unknown>
   useApplyProposalTemplate: () => MutationResult<{
     proposalId: bigint | number | string
     templateId: bigint | number | string
@@ -244,6 +253,27 @@ export interface ProposalWorkspaceHooks {
     billType: string
     pricingType: string
   }>
+  useCreateProposalTemplate: () => AsyncMutationResult<{
+    name: string
+    category: string
+    locale: string
+    countryPackKey?: string | null
+    sectionsJson: string
+    isActive: boolean
+    metadata?: string | null
+  }>
+  useReorderProposalLineItems: () => AsyncMutationResult<{
+    proposalId: bigint | number | string
+    orderedIds: Array<bigint | number | string>
+  }>
+  useUpsertProposalProcurementScore: () => AsyncMutationResult<{
+    proposalId: bigint | number | string
+    countryPackKey: string
+    scoreKind: string
+    scoreValue: number
+    maxValue: number
+    notes?: string | null
+  }>
 }
 
 // ─── Props ────────────────────────────────────────────────────────────────────
@@ -263,6 +293,12 @@ interface ProposalWorkspaceProps {
   canConvertToProject?: boolean
   /** Enables it: the proposal is Awarded and has no project yet (see `canConvertProposalToProject`). */
   convertToProjectReady?: boolean
+  /** Shows the procurement score add / edit actions; the caller passes the user's `proposal:write` permission. */
+  canManageProcurementScores?: boolean
+  /** Shows the line item move up / down controls; the caller passes the user's `proposal:write` permission. */
+  canReorderLineItems?: boolean
+  /** Shows "Save as template"; the caller passes the user's `proposal:write` permission. */
+  canSaveAsTemplate?: boolean
   hooks: ProposalWorkspaceHooks
 }
 
@@ -280,6 +316,9 @@ export function ProposalWorkspace({
   canRecordBidDecision = false,
   canConvertToProject = false,
   convertToProjectReady = false,
+  canManageProcurementScores = false,
+  canReorderLineItems = false,
+  canSaveAsTemplate = false,
   hooks,
 }: ProposalWorkspaceProps) {
   const { t } = useTranslation()
@@ -337,6 +376,10 @@ export function ProposalWorkspace({
     useCreateProposalIntegrationIntent,
     useRecordProposalBidDecision,
     useConvertProposalToProject,
+    useProposalProcurementScores,
+    useUpsertProposalProcurementScore,
+    useReorderProposalLineItems,
+    useCreateProposalTemplate,
   } = hooks
 
   // ── Data queries ──────────────────────────────────────────────────────────────
@@ -349,6 +392,7 @@ export function ProposalWorkspace({
   const { data: products } = useProducts(organizationId)
   const { data: templates } = useProposalTemplates(organizationId)
   const { data: complianceRows } = useProposalComplianceRequirements(organizationId)
+  const { data: procurementScoreRows } = useProposalProcurementScores(organizationId)
   const sectionsList = sections ?? EMPTY_QUERY_ROWS
   const sourceDocsList = sourceDocs ?? EMPTY_QUERY_ROWS
   const versionsList = versions ?? EMPTY_QUERY_ROWS
@@ -358,6 +402,7 @@ export function ProposalWorkspace({
   const lineItemsList = lineItems ?? EMPTY_QUERY_ROWS
   const templatesList = templates ?? EMPTY_QUERY_ROWS
   const complianceList = complianceRows ?? EMPTY_QUERY_ROWS
+  const procurementScoreList = procurementScoreRows ?? EMPTY_QUERY_ROWS
 
   // Filter to this proposal (memoized so effect/callback deps stay referentially
   // stable across renders — otherwise fresh arrays each render trigger setState
@@ -399,6 +444,11 @@ export function ProposalWorkspace({
     [complianceList, proposalId],
   )
 
+  const procurementScores = useMemo(
+    () => procurementScoresForProposal(procurementScoreList as Record<string, unknown>[], proposalId),
+    [procurementScoreList, proposalId],
+  )
+
   const [draftSources, setDraftSources] = useState<SourceDocument[]>([])
 
   useEffect(() => {
@@ -412,7 +462,13 @@ export function ProposalWorkspace({
 
   const effectiveActiveSectionId = (activeSection as { id?: bigint } | null)?.id ?? null
 
-  const activeSectionLineItems = lineItemsList.filter(
+  // The line items query is org-wide; reorder needs this proposal's complete, ordered set.
+  const proposalLineItems = useMemo(
+    () => proposalLineItemsInOrder(lineItemsList as Record<string, unknown>[], proposalId),
+    [lineItemsList, proposalId],
+  )
+
+  const activeSectionLineItems = proposalLineItems.filter(
     (item) => effectiveActiveSectionId && String((item as { sectionId?: unknown }).sectionId) === String(effectiveActiveSectionId)
   )
 
@@ -465,6 +521,9 @@ export function ProposalWorkspace({
   const createIntent = useCreateProposalIntegrationIntent()
   const recordBidDecision = useRecordProposalBidDecision()
   const convertToProject = useConvertProposalToProject()
+  const upsertProcurementScore = useUpsertProposalProcurementScore()
+  const reorderLineItems = useReorderProposalLineItems()
+  const createTemplate = useCreateProposalTemplate()
   const { askForm, formDialog } = useFormDialog()
 
   const libraryTemplates = useMemo(
@@ -782,6 +841,190 @@ export function ProposalWorkspace({
     }
   }, [askForm, convertToProject, proposalIdBig, t])
 
+  const handleEditProcurementScore = useCallback(
+    async (existing?: ProcurementScoreView) => {
+      const values = await askForm({
+        title: existing
+          ? t("proposalWorkspace.procurementScores.editTitle", { defaultValue: "Edit procurement score" })
+          : t("proposalWorkspace.procurementScores.addTitle", { defaultValue: "Add procurement score" }),
+        description: t("proposalWorkspace.procurementScores.description", {
+          defaultValue: "A score is identified by its country pack and score kind; saving an existing pair updates it.",
+        }),
+        fields: [
+          {
+            id: "countryPackKey",
+            name: "countryPackKey",
+            label: t("proposalWorkspace.procurementScores.countryPackKey", { defaultValue: "Country pack key" }),
+            type: "text",
+            required: true,
+            defaultValue: existing?.countryPackKey,
+            width: "1/2",
+          },
+          {
+            id: "scoreKind",
+            name: "scoreKind",
+            label: t("proposalWorkspace.procurementScores.scoreKind", { defaultValue: "Score kind" }),
+            type: "text",
+            required: true,
+            defaultValue: existing?.scoreKind,
+            width: "1/2",
+          },
+          {
+            id: "scoreValue",
+            name: "scoreValue",
+            label: t("proposalWorkspace.procurementScores.scoreValue", { defaultValue: "Score" }),
+            type: "number",
+            required: true,
+            defaultValue: existing?.scoreValue,
+            width: "1/2",
+          },
+          {
+            id: "maxValue",
+            name: "maxValue",
+            label: t("proposalWorkspace.procurementScores.maxValue", { defaultValue: "Maximum" }),
+            type: "number",
+            required: true,
+            defaultValue: existing?.maxValue,
+            width: "1/2",
+          },
+          {
+            id: "notes",
+            name: "notes",
+            label: t("proposalWorkspace.procurementScores.notes", { defaultValue: "Notes" }),
+            type: "textarea",
+            defaultValue: existing?.notes,
+          },
+        ],
+      })
+      if (values == null) return
+      const failed = t("proposalWorkspace.procurementScores.failed", { defaultValue: "Save procurement score failed" })
+      const parsed = parseProcurementScoreInput(values)
+      if (!parsed.ok) {
+        showWorkflowToast({
+          kind: "error",
+          title: failed,
+          description:
+            parsed.reason === "required"
+              ? t("proposalWorkspace.procurementScores.invalidKeys", {
+                  defaultValue: "Country pack key and score kind are required.",
+                })
+              : t("proposalWorkspace.procurementScores.invalidNumbers", {
+                  defaultValue: "Score and maximum must be numbers.",
+                }),
+        })
+        return
+      }
+      try {
+        await upsertProcurementScore.mutateAsync({ proposalId: proposalIdBig, ...parsed.value })
+        showWorkflowToast({
+          kind: "success",
+          title: t("proposalWorkspace.procurementScores.done", { defaultValue: "Procurement score saved" }),
+        })
+      } catch (error) {
+        showWorkflowToast({
+          kind: "error",
+          title: failed,
+          description: error instanceof Error ? error.message : String(error),
+        })
+      }
+    },
+    [askForm, proposalIdBig, upsertProcurementScore, t],
+  )
+
+  const handleSaveAsTemplate = useCallback(async () => {
+    const values = await askForm({
+      title: t("proposalWorkspace.saveAsTemplate.title", { defaultValue: "Save as template" }),
+      description: t("proposalWorkspace.saveAsTemplate.description", {
+        defaultValue: "Saves this proposal's sections (titles and content) to the template library.",
+      }),
+      fields: [
+        {
+          id: "name",
+          name: "name",
+          label: t("proposalWorkspace.saveAsTemplate.name", { defaultValue: "Template name" }),
+          type: "text",
+          required: true,
+          defaultValue: proposalTitle,
+        },
+        {
+          id: "category",
+          name: "category",
+          label: t("proposalWorkspace.saveAsTemplate.category", { defaultValue: "Category" }),
+          type: "text",
+          required: true,
+          defaultValue: DEFAULT_TEMPLATE_CATEGORY,
+          width: "1/2",
+        },
+        {
+          id: "locale",
+          name: "locale",
+          label: t("proposalWorkspace.saveAsTemplate.locale", { defaultValue: "Locale" }),
+          type: "text",
+          required: true,
+          defaultValue: DEFAULT_TEMPLATE_LOCALE,
+          width: "1/2",
+        },
+        {
+          id: "countryPackKey",
+          name: "countryPackKey",
+          label: t("proposalWorkspace.saveAsTemplate.countryPackKey", { defaultValue: "Country pack key (optional)" }),
+          type: "text",
+        },
+      ],
+    })
+    if (values == null) return
+    const failed = t("proposalWorkspace.saveAsTemplate.failed", { defaultValue: "Save as template failed" })
+    const parsed = parseSectionTemplateInput(values, proposalSections as Record<string, unknown>[])
+    if (!parsed.ok) {
+      showWorkflowToast({
+        kind: "error",
+        title: failed,
+        description:
+          parsed.reason === "sections"
+            ? t("proposalWorkspace.saveAsTemplate.noSections", { defaultValue: "Add at least one section first." })
+            : t("proposalWorkspace.saveAsTemplate.invalid", {
+                defaultValue: "Template name, category and locale are required.",
+              }),
+      })
+      return
+    }
+    try {
+      await createTemplate.mutateAsync(parsed.value)
+      showWorkflowToast({
+        kind: "success",
+        title: t("proposalWorkspace.saveAsTemplate.done", { defaultValue: "Template saved" }),
+      })
+    } catch (error) {
+      showWorkflowToast({
+        kind: "error",
+        title: failed,
+        description: error instanceof Error ? error.message : String(error),
+      })
+    }
+  }, [askForm, createTemplate, proposalSections, proposalTitle, t])
+
+  const handleMoveLineItem = useCallback(
+    async (id: bigint, direction: LineItemMoveDirection) => {
+      const orderedIds = moveLineItemOrder(
+        proposalLineItems,
+        activeSectionLineItems.map((item) => String((item as { id?: unknown }).id)),
+        String(id),
+        direction,
+      )
+      if (orderedIds == null) return
+      try {
+        await reorderLineItems.mutateAsync({ proposalId: proposalIdBig, orderedIds })
+      } catch (error) {
+        showWorkflowToast({
+          kind: "error",
+          title: t("proposalWorkspace.reorderLineItems.failed", { defaultValue: "Reorder line items failed" }),
+          description: error instanceof Error ? error.message : String(error),
+        })
+      }
+    },
+    [activeSectionLineItems, proposalIdBig, proposalLineItems, reorderLineItems, t],
+  )
+
   const handleSaveVersion = useCallback((message: string) => {
     saveVersion.mutate({ proposalId: proposalIdBig, message })
   }, [proposalIdBig, saveVersion])
@@ -965,6 +1208,18 @@ export function ProposalWorkspace({
               </Button>
             ) : null}
 
+            {canSaveAsTemplate ? (
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={createTemplate.isPending || proposalSections.length === 0}
+                data-testid="proposal-save-as-template"
+                onClick={() => void handleSaveAsTemplate()}
+              >
+                {t("proposalWorkspace.saveAsTemplate.button", { defaultValue: "Save as template" })}
+              </Button>
+            ) : null}
+
             <div className="relative group">
               <Button variant="outline" size="sm" className="gap-1">
                 {t("proposalWorkspace.status.label")}
@@ -1010,11 +1265,20 @@ export function ProposalWorkspace({
             onAddSourceDoc={() => setShowDocInput(true)}
             onDeleteSourceDoc={(id) => deleteSourceDoc.mutate({ docId: id })}
             complianceSlot={
-              <ComplianceChecklist
-                rows={proposalCompliance as Record<string, unknown>[]}
-                proposalId={proposalIdBig}
-                onToggleComplete={handleToggleCompliance}
-              />
+              <>
+                <ComplianceChecklist
+                  rows={proposalCompliance as Record<string, unknown>[]}
+                  proposalId={proposalIdBig}
+                  onToggleComplete={handleToggleCompliance}
+                />
+                <ProcurementScoresPanel
+                  scores={procurementScores}
+                  canEdit={canManageProcurementScores}
+                  disabled={upsertProcurementScore.isPending || proposalIdBig === 0n}
+                  onAdd={() => void handleEditProcurementScore()}
+                  onEdit={(score) => void handleEditProcurementScore(score)}
+                />
+              </>
             }
           />
 
@@ -1050,6 +1314,8 @@ export function ProposalWorkspace({
                 })
               }
               onDeleteLineItem={(id) => deleteLineItem.mutate({ lineItemId: id })}
+              onMoveLineItem={canReorderLineItems ? (id, direction) => void handleMoveLineItem(id, direction) : undefined}
+              isReorderingLineItems={reorderLineItems.isPending || proposalIdBig === 0n}
               onAddComment={(content) => {
                 if (!effectiveActiveSectionId) return
                 addComment.mutate({

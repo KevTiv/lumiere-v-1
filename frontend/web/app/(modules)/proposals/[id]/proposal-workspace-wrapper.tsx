@@ -32,6 +32,10 @@ import {
   useCreateProposalIntegrationIntent,
   useRecordProposalBidDecision,
   useConvertProposalToProject,
+  useProposalProcurementScores,
+  useUpsertProposalProcurementScore,
+  useReorderProposalLineItems,
+  useCreateProposalTemplate,
   useProposals,
 } from "@lumiere/query-hooks/hooks/proposals"
 import { useProducts } from "@lumiere/query-hooks/hooks/inventory"
@@ -210,6 +214,29 @@ function createHttpHooks(
         isPending: mutation.isPending,
       }
     },
+    useProposalProcurementScores:
+      useProposalProcurementScores as unknown as ProposalWorkspaceHooks['useProposalProcurementScores'],
+    useCreateProposalTemplate: () => {
+      const mutation = useCreateProposalTemplate(organizationId, companyId)
+      return {
+        mutateAsync: (params) => mutation.mutateAsync(params),
+        isPending: mutation.isPending,
+      }
+    },
+    useReorderProposalLineItems: () => {
+      const mutation = useReorderProposalLineItems(organizationId, companyId)
+      return {
+        mutateAsync: (params) => mutation.mutateAsync(params),
+        isPending: mutation.isPending,
+      }
+    },
+    useUpsertProposalProcurementScore: () => {
+      const mutation = useUpsertProposalProcurementScore(organizationId, companyId)
+      return {
+        mutateAsync: (params) => mutation.mutateAsync(params),
+        isPending: mutation.isPending,
+      }
+    },
     useConvertProposalToProject: () => {
       const mutation = useConvertProposalToProject(organizationId, companyId)
       return {
@@ -254,6 +281,9 @@ export function ProposalWorkspaceWrapper({
       canConvertToProject={
         checkPermission("proposal", "write").allowed && checkPermission("project_project", "create").allowed
       }
+      canManageProcurementScores={checkPermission("proposal", "write").allowed}
+      canReorderLineItems={checkPermission("proposal", "write").allowed}
+      canSaveAsTemplate={checkPermission("proposal", "write").allowed}
       convertToProjectReady={canConvertProposalToProject(proposalRow)}
       hooks={httpHooks}
     />
