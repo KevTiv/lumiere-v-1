@@ -1,6 +1,7 @@
 import { expect, test, type Page, type Request, type Response } from "@playwright/test"
 
 import {
+  callReducerBff,
   chooseFirstOption,
   chooseSelectOptionByLabel,
   chooseSelectOptionByValue,
@@ -150,6 +151,23 @@ test.describe("COV-10 exact timesheet validation / rejection", { tag: ["@p0", "@
       employees.find((row) => scalarQueryId(row.companyId ?? row.company_id) === companyId)?.id,
     )
     if (employeeId == null) throw new Error("no employee in the default company")
+
+    // This lifecycle owns its create prerequisites. A sharded run must not
+    // depend on another smoke test creating the first selectable pricelist.
+    if ((await rows(page, "pricelists")).length === 0) {
+      await callReducerBff(page, "create_pricelist", [organizationId, {
+        companyId,
+        name: smokeName("cov10-pricelist"),
+        currencyId,
+        discountPolicy: { tag: "WithDiscount" },
+      }])
+    }
+    await expect
+      .poll(async () => (await rows(page, "pricelists")).length, {
+        timeout: 30_000,
+        message: "COV-10 requires one selectable pricelist",
+      })
+      .toBeGreaterThan(0)
 
     // ── Operator creation path; the admin is the logger ────────────────────
     const tag = smokeName("cov10")

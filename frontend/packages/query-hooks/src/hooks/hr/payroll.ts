@@ -105,7 +105,9 @@ export function useCreateContract(organizationId: bigint, companyId?: bigint) {
         ...params,
         companyId: params.companyId ?? companyId,
       })
-      const { urlPath, init } = stdbBffCommandPost("create_contract", { params: stdbParamsToJson(finalized) })
+      const { urlPath, init } = stdbBffCommandPost("create_contract", {
+        params: stdbParamsToJson(finalized, "CreateContractParams"),
+      })
 
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create contract')
@@ -123,7 +125,9 @@ export function useCreatePayslip(organizationId: bigint, companyId?: bigint) {
         ...params,
         companyId: params.companyId ?? companyId,
       })
-      const { urlPath, init } = stdbBffCommandPost("create_payslip", { params: stdbParamsToJson(finalized) })
+      const { urlPath, init } = stdbBffCommandPost("create_payslip", {
+        params: stdbParamsToJson(finalized, "CreatePayslipParams"),
+      })
 
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create payslip')
@@ -242,12 +246,15 @@ export function useConfirmPayslip(organizationId: bigint, companyId?: bigint) {
             "Verify",
           ),
         dispatch: async () => {
-          const { urlPath, init } = stdbBffCommandPost("confirm_payslip", { payslipId: scopedPayslipId, params: stdbParamsToJson({
+          const { urlPath, init } = stdbBffCommandPost("confirm_payslip", {
+            payslipId: scopedPayslipId,
+            params: stdbParamsToJson({
               companyId: scopedCompanyId,
               grossWage: grossWage ?? 0,
               netWage: netWage ?? 0,
               calculationSource: calculationSource ?? "manual",
-            }) })
+            }, "ConfirmPayslipParams"),
+          })
           return decodeOperationDispatch(
             await apiFetch(urlPath, init),
             'Failed to approve payslip for export',
@@ -320,14 +327,18 @@ export function usePostPayslip(organizationId: bigint, companyId?: bigint) {
             scopedPayslipId,
           ),
         dispatch: async () => {
-          const { urlPath, init } = stdbBffCommandPost("post_payslip", { companyId: scopedCompanyId, payslipId: scopedPayslipId, params: stdbParamsToJson({
+          const { urlPath, init } = stdbBffCommandPost("post_payslip", {
+            companyId: scopedCompanyId,
+            payslipId: scopedPayslipId,
+            params: stdbParamsToJson({
               journalId: toScalarU64(journalId),
               expenseAccountId: toScalarU64(expenseAccountId),
               payableAccountId: toScalarU64(payableAccountId),
               taxWithholdingAccountId:
                 taxWithholdingAccountId != null ? toScalarU64(taxWithholdingAccountId) : undefined,
               accountingDate: stbTimestampFromDate(accountingDate),
-            }) })
+            }, "PostPayslipParams"),
+          })
           return decodeOperationDispatch(
             await apiFetch(urlPath, init),
             'Failed to post payslip to GL',
