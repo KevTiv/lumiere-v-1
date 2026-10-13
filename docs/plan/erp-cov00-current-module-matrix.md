@@ -169,16 +169,21 @@ These are **source/evidence floors, not certification awards**. `U3` below means
 
 ### U4/U5 blockers common to all rows
 
-No row is promoted to U4/U5 by this audit because the following shared gates remain open:
+No row is promoted to U4/U5 by this audit. Shared gate state (refreshed 2026-10-13):
 
-- COV-01 common operation outcome/error/record-ref/readback seam depends on COH-02;
-- COV-02 now supplies the accepted reproducible first-test-org seed/persona authority; module-specific permission, SoD, lifecycle, and recovery proof remains open;
-- COV-25 cross-module relation/navigation consistency has not been audited/closed;
-- COV-26 common loading/empty/error/denied/responsive/accessibility/reconnect proof has not run;
-- COV-27 all-module integrated certification/launch manifest has not run;
-- BASE-03 communication defects remain blockers for affected surfaces;
-- BASE-04 payment/import/recovery defects remain blockers for affected surfaces;
-- BASE-05 integrated pre-tenant evidence still contains known unfinished certification/defect classes.
+Closed:
+
+- COV-01 common operation outcome/error/record-ref/readback seam — ACCEPTED as a representative spine ([`erp-cov01-reference-spine-status.md`](./erp-cov01-reference-spine-status.md)); each module must still adopt it and prove its own effect identity;
+- BASE-03 communication defects — ACCEPTED 2026-09-24 ([`erp-base03-communications-completion-status.md`](./erp-base03-communications-completion-status.md));
+- BASE-04 payment/import/recovery defects — ACCEPTED 2026-09-24 ([`erp-base04-payment-import-completion-status.md`](./erp-base04-payment-import-completion-status.md));
+- BASE-05 integrated pre-tenant certification — ACCEPTED 2026-09-24 ([`erp-base05-pretenant-integrated-status.md`](./erp-base05-pretenant-integrated-status.md)).
+
+Open:
+
+- COV-02 supplies the accepted reproducible first-test-org seed/persona authority; module-specific permission, SoD, lifecycle, and recovery proof remains open;
+- COV-25 cross-module relation/navigation — sale order, purchase order, subscription and proposal handoff links implemented; runtime acceptance pending, ticket → related record needs the Helpdesk relation model ([`erp-cov25-cross-module-links-status.md`](./erp-cov25-cross-module-links-status.md));
+- COV-26 common loading/empty/error/denied/responsive/accessibility/reconnect proof — shared read-state contract exists for Subscriptions and Reports only ([`erp-cov26-ux-accessibility-status.md`](./erp-cov26-ux-accessibility-status.md));
+- COV-27 all-module integrated certification/launch manifest has not run.
 
 ## 6. Test evidence taxonomy
 
