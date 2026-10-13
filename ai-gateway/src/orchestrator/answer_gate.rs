@@ -188,7 +188,8 @@ pub(crate) struct ClaimVerdict {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(super) enum ClaimVerification {
     /// The claim selects server-produced non-passage evidence from this run.
-    /// It is deterministically traceable, but not reusable as a sourced fact.
+    /// It is deterministically traceable, but its meaning has not been checked
+    /// against that evidence and therefore cannot by itself admit prose.
     RunEvidence,
     /// The claim cited no passage at all.
     NoSupportCited,
@@ -414,6 +415,21 @@ impl EvidenceGatedAnswerAdmission<'_> {
         }
 
         let mut findings = Findings::default();
+
+        // A citation list is not claim coverage. Without material claims,
+        // model-authored prose could skip semantic verification entirely while
+        // still carrying a real run citation. Keep this check in the shared
+        // gate so governed callers cannot depend on adapter-only validation.
+        // Text adapters enforce the stronger exact-content partition required
+        // by their structured wire format; governed drafts may state only the
+        // material assertions and therefore need not duplicate connective
+        // prose word-for-word.
+        if draft.claims.is_empty() {
+            findings.add(
+                Severity::RequiresReview,
+                "final draft does not identify its material claims",
+            );
+        }
 
         // 1. Run-level citations must be evidence the server produced.
         for citation in &draft.citations {
@@ -702,6 +718,14 @@ impl EvidenceGatedAnswerAdmission<'_> {
                     .iter()
                     .all(|support| draft.citations.contains(support));
                 if all_known {
+                    // Selecting a real tool result proves lineage, not that the
+                    // result entails arbitrary prose. A passage checker or an
+                    // equivalent deterministic domain verifier is required
+                    // before such a claim can be released.
+                    findings.add(
+                        Severity::RequiresReview,
+                        "non-passage claim support is traceable but was not semantically verified",
+                    );
                     assessments.push(assess(Vec::new(), ClaimVerification::RunEvidence));
                 } else {
                     findings.add(
@@ -717,7 +741,7 @@ impl EvidenceGatedAnswerAdmission<'_> {
             }
             if claim.supports.is_empty() {
                 findings.add(
-                    Severity::Qualified,
+                    Severity::RequiresReview,
                     format!("unsupported claim (no cited passage): {}", claim.text),
                 );
                 assessments.push(assess(Vec::new(), ClaimVerification::NoSupportCited));
@@ -1411,7 +1435,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn server_known_non_passage_support_is_deterministically_traceable() {
+    async fn server_known_non_passage_support_requires_semantic_review() {
         let support = EvidenceRef {
             kind: "named_resource".into(),
             id: "reports.daily_business_summary.v1".into(),
@@ -1429,7 +1453,11 @@ mod tests {
 
         let report = run_gate(&MemoryCatalog(Vec::new()), None, &draft, &[], &[1250.0]).await;
 
-        assert_eq!(report.outcome, AnswerAdmissionOutcome::Admitted);
+        assert!(matches!(
+            report.outcome,
+            AnswerAdmissionOutcome::RequiresReview { ref reason }
+                if reason.contains("not semantically verified")
+        ));
         assert_eq!(report.methods, vec![VerificationMethod::Deterministic]);
     }
 
@@ -2027,7 +2055,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn arithmetic_error_blocks_and_correct_math_passes() {
+    async fn arithmetic_is_checked_but_does_not_replace_claim_coverage() {
         let catalog = MemoryCatalog(vec![]);
         let mut d = FinalDraft {
             content: "Total is 60.".into(),
@@ -2047,7 +2075,11 @@ mod tests {
         assert!(blocked_or_review_reason(&bad).contains("recomputes to 60"));
         d.calculations[0].claimed_result = 60.0;
         let good = run_gate(&catalog, None, &d, &[], &[]).await;
-        assert_eq!(good.outcome, AnswerAdmissionOutcome::Admitted);
+        assert!(matches!(
+            good.outcome,
+            AnswerAdmissionOutcome::RequiresReview { ref reason }
+                if reason.contains("does not identify its material claims")
+        ));
     }
 
     #[test]
@@ -2069,7 +2101,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn unsupported_claim_qualifies_and_missing_checker_forces_review() {
+    async fn unsupported_or_unchecked_claims_force_review() {
         let catalog = MemoryCatalog(vec![passage("2", "s1", "t")]);
         let mut d = draft("x", vec![claim("no source", vec![])]);
         d.citations = vec![EvidenceRef {
@@ -2079,7 +2111,7 @@ mod tests {
         let report = run_gate(&catalog, None, &d, &[], &[]).await;
         assert!(matches!(
             report.outcome,
-            AnswerAdmissionOutcome::Qualified { .. }
+            AnswerAdmissionOutcome::RequiresReview { .. }
         ));
 
         // With no citation of any kind the answer needs review instead.
@@ -2187,7 +2219,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn ungrounded_figures_qualify_and_grounded_ones_pass() {
+    async fn claimless_drafts_never_admit_even_when_figures_are_grounded() {
         let catalog = MemoryCatalog(vec![]);
         let known: HashSet<EvidenceRef> = [EvidenceRef {
             kind: "capability_output".into(),
@@ -2223,7 +2255,11 @@ mod tests {
             )
             .await
             .unwrap();
-        assert_eq!(grounded.outcome, AnswerAdmissionOutcome::Admitted);
+        assert!(matches!(
+            grounded.outcome,
+            AnswerAdmissionOutcome::RequiresReview { ref reason }
+                if reason.contains("does not identify its material claims")
+        ));
 
         let ungrounded = gate
             .admit_with_report(&make("Revenue was $9,999.99."), &evidence)
@@ -2231,7 +2267,8 @@ mod tests {
             .unwrap();
         assert!(matches!(
             ungrounded.outcome,
-            AnswerAdmissionOutcome::Qualified { ref limitations } if limitations[0].contains("9,999.99")
+            AnswerAdmissionOutcome::RequiresReview { ref reason }
+                if reason.contains("does not identify its material claims")
         ));
     }
 

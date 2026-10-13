@@ -153,6 +153,17 @@ pub(crate) struct GovernedProgramOutcome {
     pub generation_output_tokens: u32,
 }
 
+impl GovernedProgramOutcome {
+    /// Content is releasable only after the governed answer gate completes.
+    /// `final_content` may also retain a protected review candidate for later
+    /// adjudication and must never be used directly by a route.
+    pub(crate) fn released_content(&self) -> Option<&str> {
+        matches!(&self.stop, GovernedProgramStop::Completed)
+            .then(|| self.final_content.as_deref())
+            .flatten()
+    }
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 enum NodeValue {
     Json(Value),
@@ -3844,7 +3855,7 @@ mod threshold_gate_tests {
     }
 
     #[tokio::test]
-    async fn a_generated_answer_with_ungrounded_figures_completes_qualified() {
+    async fn a_generated_answer_with_ungrounded_figures_requires_review() {
         let recorder = RecordingIntelligenceRecorder::default();
         let outcome = run_with_real_gate(
             &generate_graph(),
@@ -3853,19 +3864,20 @@ mod threshold_gate_tests {
             &recorder,
         )
         .await;
-        assert!(matches!(outcome.stop, GovernedProgramStop::Completed));
-        let content = outcome.final_content.unwrap();
-        assert!(content.contains("Revenue was $9,999.99"));
-        assert!(content.contains("Limitations of this answer:"));
-        assert!(content.contains("9,999.99"));
+        assert!(matches!(
+            outcome.stop,
+            GovernedProgramStop::ReviewRequired(_)
+        ));
+        // The candidate remains available to the protected reviewer workflow,
+        // but the stop state prevents it from being released as a completed answer.
         assert_eq!(
-            outcome.trace.last().unwrap().summary,
-            "generated answer admitted with limitations"
+            outcome.final_content.as_deref(),
+            Some("Revenue was $9,999.99 this quarter.")
         );
     }
 
     #[tokio::test]
-    async fn a_generated_answer_without_material_figures_is_admitted_plainly() {
+    async fn a_claimless_generated_answer_requires_review() {
         let recorder = RecordingIntelligenceRecorder::default();
         let outcome = run_with_real_gate(
             &generate_graph(),
@@ -3874,8 +3886,14 @@ mod threshold_gate_tests {
             &recorder,
         )
         .await;
-        assert!(matches!(outcome.stop, GovernedProgramStop::Completed));
-        assert_eq!(outcome.final_content.unwrap(), "3 orders shipped in 2024.");
+        assert!(matches!(
+            outcome.stop,
+            GovernedProgramStop::ReviewRequired(_)
+        ));
+        assert_eq!(
+            outcome.final_content.as_deref(),
+            Some("3 orders shipped in 2024.")
+        );
     }
 
     #[tokio::test]
