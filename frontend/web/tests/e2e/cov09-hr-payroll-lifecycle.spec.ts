@@ -3,7 +3,6 @@ import { expect, test, type Page, type Request } from "@playwright/test"
 import {
   chooseFirstOption,
   chooseSelectOptionByLabel,
-  chooseSelectOptionByValue,
   fetchAccountIdByCode,
   fetchDefaultCompanyId,
   fetchSessionOrganizationId,
@@ -122,15 +121,16 @@ test.describe("COV-09 operator payroll lifecycle", { tag: ["@p0", "@cov09"] }, (
       (row.isActive ?? row.is_active) !== false && (row.isActive ?? row.is_active) !== 0,
     )
     const structId = scalarQueryId(structure?.id)
-    if (structId == null) throw new Error("no payroll structure seeded")
+    const structureName = String(structure?.name ?? "").trim()
+    if (structId == null || structureName === "") throw new Error("no active payroll structure seeded")
 
     await openEntityCreate(page, "/hr", "hr", "payslips", "new-payslip")
-    await chooseSelectOptionByValue(page, "employeeId", employeeId)
-    await chooseSelectOptionByValue(page, "structId", structId)
+    await chooseSelectOptionByLabel(page, "employeeId", employeeName)
+    await chooseSelectOptionByLabel(page, "structId", structureName)
     await fillField(page, "dateFrom", isoDate(-1))
     await fillField(page, "dateTo", isoDate(28))
     await fillField(page, "basicWage", "5500")
-    await chooseSelectOptionByValue(page, "contractId", contractId)
+    await chooseSelectOptionByLabel(page, "contractId", contractName)
     await submitForm(page, "new-payslip")
     const payslipId = await exactId(
       page,
