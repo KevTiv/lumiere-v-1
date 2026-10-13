@@ -93,7 +93,6 @@ persona approves and posts; the approval response is deliberately lost after com
 hook converges through exact readback; a duplicate post retains one exact GL relation; and
 the reader persona is denied compensation fields (or the whole payslip feed) and the posting operation. Same-head runtime
 execution and the shared certification gates remain required before promotion.
-
 ## STP fail-closed boundary (2026-10-13)
 
 The prior visible STP action fabricated `stp-stub-*` submission ids, and native

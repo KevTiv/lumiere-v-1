@@ -63,7 +63,6 @@ Focused validation on this tree:
 - Playwright discovery lists the updated authenticated `mvp-sales-returns.spec.ts`; runtime execution still requires the full local service stack.
 
 The remaining Sales-specific U5 work is current-head runtime execution of the expanded RMA and lead-to-cash payment-link assertions, concurrent confirmation/approval adversarial proof, and COV-26 responsive/accessibility certification.
-
 ## Wave 3 certification additions
 
 - `cov04-sales-order-confirmation.spec.ts` now races two Sales confirmations and requires exactly one accepted transition, one stale rejection, and one canonical fulfillment effect.

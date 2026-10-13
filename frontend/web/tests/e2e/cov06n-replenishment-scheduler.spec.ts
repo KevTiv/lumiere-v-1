@@ -194,6 +194,64 @@ test.describe("COV-06n operator replenishment schedule and cancel", {
       await selectEntityRowById(warehousePage, buyRuleId)
       await warehousePage.getByTestId("entity-action-cancel-replenishment-run").click()
       await expect.poll(async () => (await buyJobs()).length, { timeout: 30_000 }).toBe(0)
+
+      // A rule whose destination already has the maximum quantity still runs
+      // and recurs, but must not create either a transfer or purchase demand.
+      const stockedItem = await product(page)
+      const stockedDestination = await location(page, companyId)
+      await createStockQuantFixture(
+        page,
+        companyId,
+        id(stockedItem),
+        id(stockedDestination),
+        `cov06n-on-hand-${id(stockedItem)}`,
+        20,
+      )
+      const stockedRule = await create(page, "replenishment-rules", "create_replenishment_rule", {
+        companyId,
+        params: stdbParamsToJson({
+          productId: id(stockedItem), locationId: id(stockedDestination),
+          uomId: id(stockedItem, "uomId", "uom_id"), productMinQty: 10,
+          productMaxQty: 20, qtyMultiple: 1, leadDays: 1, trigger: "auto",
+          active: true, warehouseId: null, routeId: null, groupId: null,
+          lastRun: null, nextRun: timestamp(Date.now() + 45_000), metadata: null,
+        }, "CreateReplenishmentRuleParams"),
+      }, row => id(row, "productId", "product_id") === id(stockedItem) &&
+        id(row, "locationId", "location_id") === id(stockedDestination) &&
+        id(row, "companyId", "company_id") === companyId)
+      const stockedRuleId = id(stockedRule)
+      const stockedJobs = async () => (await rows(page, "replenishment-run-jobs")).filter(row =>
+        id(row, "ruleId", "rule_id") === stockedRuleId &&
+        id(row, "companyId", "company_id") === companyId)
+
+      await gotoModule(warehousePage, `/inventory?tab=replenishment&filter=id:${stockedRuleId}`, "inventory")
+      await selectEntityRowById(warehousePage, stockedRuleId)
+      await warehousePage.getByTestId("entity-action-schedule-replenishment-run").click()
+      await expect.poll(async () => (await stockedJobs()).length, { timeout: 30_000 }).toBe(1)
+      const stockedScheduledId = id((await stockedJobs())[0]!, "scheduledId", "scheduled_id")
+      await expect.poll(async () => {
+        const current = (await rows(page, "replenishment-rules")).find(row => id(row) === stockedRuleId)
+        return value(current ?? {}, "lastRun", "last_run") ?? null
+      }, { timeout: 75_000 }).not.toBeNull()
+      await expect.poll(async () => {
+        const pending = await stockedJobs()
+        return pending.length === 1
+          ? id(pending[0]!, "scheduledId", "scheduled_id")
+          : 0
+      }, { timeout: 30_000 }).toBeGreaterThan(stockedScheduledId)
+      const stockedDemands = (await rows(page, "stock-pickings")).filter(row =>
+        value(row, "name", "name") === `INT-RPL-${stockedRuleId}` &&
+        id(row, "companyId", "company_id") === companyId)
+      expect(stockedDemands).toHaveLength(0)
+      const stockedBuyOrders = (await rows(page, "purchase-orders")).filter(row =>
+        value(row, "origin", "origin") === `REPLENISH-${stockedRuleId}` &&
+        id(row, "companyId", "company_id") === companyId)
+      expect(stockedBuyOrders).toHaveLength(0)
+
+      await gotoModule(warehousePage, `/inventory?tab=replenishment&filter=id:${stockedRuleId}`, "inventory")
+      await selectEntityRowById(warehousePage, stockedRuleId)
+      await warehousePage.getByTestId("entity-action-cancel-replenishment-run").click()
+      await expect.poll(async () => (await stockedJobs()).length, { timeout: 30_000 }).toBe(0)
     } finally {
       await operator.close()
       await reader.close()
