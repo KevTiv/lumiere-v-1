@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest"
 
 import type { DashboardWidget } from "./dashboard-types"
 import { rowsToCsv, widgetDataToCsv } from "./export-csv"
+import { reportExportSourceProvenance } from "./report-export-provenance"
 
 describe("report CSV export", () => {
   it("preserves a large chart result in deterministic source order", () => {
@@ -38,5 +39,28 @@ describe("report CSV export", () => {
     )).toBe(
       'source report,definition,company\r\n"Report #42, generated","Definition ""Quarterly"" #7","Company\nNorth"',
     )
+  })
+
+  it("embeds a machine-readable source snapshot ahead of exported rows", () => {
+    const widget: DashboardWidget = {
+      id: "orders",
+      type: "table",
+      title: "Orders",
+      width: "full",
+      data: { columns: [{ key: "state", label: "State" }], rows: [{ state: "sale" }] },
+    }
+    const provenance = reportExportSourceProvenance({
+      organizationId: 7,
+      companyId: 11,
+      dashboardId: 13,
+      widgetId: "orders",
+      model: "sale_order",
+      domain: '{"state":"sale"}',
+      groupBy: "state",
+    })
+    const csv = widgetDataToCsv(widget, provenance)!
+    const [metadata, header, row] = csv.split("\r\n")
+    expect(JSON.parse(metadata.replace("# lumiere-provenance:", ""))).toEqual(provenance)
+    expect([header, row]).toEqual(["State", "sale"])
   })
 })

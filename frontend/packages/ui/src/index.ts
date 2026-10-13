@@ -130,6 +130,8 @@ export * from "./pages/stored-dashboard-view";
 export * from "./lib/dashboard-types";
 export * from "./lib/dashboard-config";
 export * from "./lib/dashboard-drill-down";
+export * from "./lib/stored-dashboard-drill-target";
+export * from "./lib/report-export-provenance";
 export * from "./lib/stored-dashboard-resolver";
 export * from "./lib/export-dashboard-png";
 export * from "./lib/export-csv";

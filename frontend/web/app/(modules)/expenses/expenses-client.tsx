@@ -1,6 +1,7 @@
 "use client"
 import { accountMoveHref } from "@lumiere/erp-shared/record-links"
 import { mapDashboardWidgets, withDashboardSections } from "@lumiere/ui/lib/dashboard-sections"
+import { canUseModuleData, moduleQueryState } from "@lumiere/ui/lib/module-data-state"
 import { withInlineEdits } from "@lumiere/ui/lib/with-inline-edits"
 import {
   inlineNumberAbove,
@@ -185,8 +186,12 @@ function ExpensesClientLoaded({
   const [toolbarError, setToolbarError] = useState<string | null>(null)
   const [timelineSheet, setTimelineSheet] = useState<Record<string, unknown> | null>(null)
 
-  const { data: expensesRaw = [] } = useExpenses(orgId, initialExpenses)
-  const { data: sheetsRaw = [] } = useExpenseSheets(orgId, initialSheets)
+  const expensesQuery = useExpenses(orgId, initialExpenses)
+  const sheetsQuery = useExpenseSheets(orgId, initialSheets)
+  const expensesState = moduleQueryState(expensesQuery)
+  const sheetsState = moduleQueryState(sheetsQuery)
+  const expensesRaw = canUseModuleData(expensesState) ? expensesQuery.data ?? [] : []
+  const sheetsRaw = canUseModuleData(sheetsState) ? sheetsQuery.data ?? [] : []
   const { data: sheetsToApprove = [] } = useExpenseSheetsToApprove(orgId)
   const { data: missingReceipts = [] } = useExpensesMissingReceipt(orgId)
   const { data: unmatchedCards = [] } = useExpenseCardStatementUnmatched(orgId)
@@ -850,6 +855,7 @@ function ExpensesClientLoaded({
       <ModuleView
         config={config}
         data={data}
+        dataState={{ expenses: expensesState, "expense-sheets": sheetsState }}
         onFormSubmit={handleFormSubmit}
         onRowClick={handleRowClick}
         isPending={isFormMutationPending}

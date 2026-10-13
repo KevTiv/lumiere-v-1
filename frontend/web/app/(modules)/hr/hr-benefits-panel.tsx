@@ -45,7 +45,7 @@ const PLAN_TYPES = [
   { value: "other", label: "Other" },
 ]
 
-/** HR module tab — benefit plans and employee enrollments (MVP stub). */
+/** HR module tab — persisted benefit plans and employee enrollments. */
 export function HrBenefitsPanel({
   organizationId,
   companyId,

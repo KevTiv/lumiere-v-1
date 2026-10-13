@@ -63,6 +63,14 @@ Focused validation on this tree:
 - Playwright discovery lists the updated authenticated `mvp-sales-returns.spec.ts`; runtime execution still requires the full local service stack.
 
 The remaining Sales-specific U5 work is current-head runtime execution of the expanded RMA and lead-to-cash payment-link assertions, concurrent confirmation/approval adversarial proof, and COV-26 responsive/accessibility certification.
+## Wave 3 certification additions
+
+- `cov04-sales-order-confirmation.spec.ts` now races two Sales confirmations and requires exactly one accepted transition, one stale rejection, and one canonical fulfillment effect.
+- The same spec publishes a company-scoped `confirm_sales_order` approval workflow, proves exactly one active task for the order, and proves that the candidate-scoped task projection returns no task to the non-candidate requester. The client therefore remains outcome-unknown rather than inferring approval from order state, time, or display fields.
+- It then races a requester confirmation replay against the exact approver task decision and requires the final order to produce exactly one fulfillment effect; a subsequent stale confirmation remains rejected.
+- `cov26-crm-sales-resilience.spec.ts` covers the Sales Orders surface at 320px and 390px, keyboard/modal focus entry and restoration, hidden mutation controls for the read-only persona, and canonical Sales-query recovery after an offline window.
+
+The API's workflow task projection is intentionally candidate-scoped. It does not currently provide a requester-visible canonical task relation for an admin-only approval. That is recorded as a release dependency rather than weakened with newest/name/time discovery. Full U5 promotion still requires these expanded browser specs to pass on the exact launch head and the broader COV-26 accessibility audit.
 
 ## Next slice
 

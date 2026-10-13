@@ -1,6 +1,7 @@
 "use client"
 import { accountMoveHref, projectTimesheetsHref } from "@lumiere/erp-shared/record-links"
 import { mapDashboardWidgets, withDashboardSections } from "@lumiere/ui/lib/dashboard-sections"
+import { canUseModuleData, moduleQueryState } from "@lumiere/ui/lib/module-data-state"
 import { withInlineEdits } from "@lumiere/ui/lib/with-inline-edits"
 
 import { useMemo, useState, useCallback, useEffect } from "react"
@@ -348,9 +349,15 @@ function ProjectsClientLoaded({
   const [lifecycleError, setLifecycleError] = useState<string | null>(null)
   const [csvKind, setCsvKind] = useState<ProjectsCsvImportKind | null>(null)
 
-  const { data: projects = [] } = useProjects(orgId, initialProjects)
-  const { data: tasks = [] } = useTasks(orgId, initialTasks)
-  const { data: timesheets = [] } = useTimesheets(orgId, initialTimesheets)
+  const projectsQuery = useProjects(orgId, initialProjects)
+  const tasksQuery = useTasks(orgId, initialTasks)
+  const timesheetsQuery = useTimesheets(orgId, initialTimesheets)
+  const projectsState = moduleQueryState(projectsQuery)
+  const tasksState = moduleQueryState(tasksQuery)
+  const timesheetsState = moduleQueryState(timesheetsQuery)
+  const projects = canUseModuleData(projectsState) ? projectsQuery.data ?? [] : []
+  const tasks = canUseModuleData(tasksState) ? tasksQuery.data ?? [] : []
+  const timesheets = canUseModuleData(timesheetsState) ? timesheetsQuery.data ?? [] : []
   const { data: timesheetsToValidate = [] } = useTimesheetsToValidate(orgId)
   const { data: timesheetsUnbilled = [] } = useTimesheetsUnbilled(orgId)
   const { data: rateCards = [] } = useProjectRateCards(orgId)
@@ -1413,6 +1420,7 @@ function ProjectsClientLoaded({
       <ModuleView
         config={config}
         data={data}
+        dataState={{ projects: projectsState, tasks: tasksState, timesheets: timesheetsState }}
         onFormSubmit={handleFormSubmit}
         onRowClick={handleRowClick}
         isPending={isFormMutationPending}
