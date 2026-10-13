@@ -152,22 +152,27 @@ test.describe("COV-10 exact timesheet validation / rejection", { tag: ["@p0", "@
     )
     if (employeeId == null) throw new Error("no employee in the default company")
 
-    // This lifecycle owns its create prerequisites. A sharded run must not
-    // depend on another smoke test creating the first selectable pricelist.
-    if ((await rows(page, "pricelists")).length === 0) {
-      await callReducerBff(page, "create_pricelist", [organizationId, {
-        companyId,
-        name: smokeName("cov10-pricelist"),
-        currencyId,
-        discountPolicy: { tag: "WithDiscount" },
-      }])
-    }
+    // This lifecycle owns an active create prerequisite. Merely finding a
+    // pricelist row is insufficient: another lifecycle may have archived all
+    // existing rows, and the project form intentionally excludes those rows.
+    const pricelistName = smokeName("cov10-pricelist")
+    await callReducerBff(page, "create_pricelist", [organizationId, {
+      companyId,
+      name: pricelistName,
+      currencyId,
+      discountPolicy: { tag: "WithDiscount" },
+    }])
     await expect
-      .poll(async () => (await rows(page, "pricelists")).length, {
+      .poll(async () => (await rows(page, "pricelists")).filter((row) =>
+        row.name === pricelistName
+        && scalarQueryId(row.companyId ?? row.company_id) === companyId
+        && (row.isActive ?? row.is_active) !== false
+        && (row.isActive ?? row.is_active) !== 0,
+      ).length, {
         timeout: 30_000,
-        message: "COV-10 requires one selectable pricelist",
+        message: "COV-10 requires its active company-scoped pricelist",
       })
-      .toBeGreaterThan(0)
+      .toBe(1)
 
     // ── Operator creation path; the admin is the logger ────────────────────
     const tag = smokeName("cov10")
