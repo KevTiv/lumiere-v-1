@@ -3266,6 +3266,10 @@
       "name": "record_workflow_outbox_result",
       "shape_fingerprint": "sha256:482460a0832ff96b0552f8317e5a54cc1e26e147e05f891bc3fccaf3a0188fca"
     },
+    "erp.recover_ai_provider_attempt": {
+      "name": "recover_ai_provider_attempt",
+      "shape_fingerprint": "sha256:d2c72d17ee3e3344476b43726e8db93bb3456ef88d0bd11b430f7d5ae4b86168"
+    },
     "erp.refresh_capacity_forecast": {
       "name": "refresh_capacity_forecast",
       "shape_fingerprint": "sha256:6361ff5536eaee003d3b0d204b16501fef17aeb2953da5ce687116fe5833484e"
@@ -3701,6 +3705,10 @@
     "erp.run_ai_intelligence_events_tests": {
       "name": "run_ai_intelligence_events_tests",
       "shape_fingerprint": "sha256:2071b25e5137007b1b695f0c7974cd3d11b81b2d33bb373ff4a274c52f890a79"
+    },
+    "erp.run_ai_spend_recovery_tests": {
+      "name": "run_ai_spend_recovery_tests",
+      "shape_fingerprint": "sha256:1c9cfe0d48de65ca8f44a405095af6626639bd2a1969912b61c824bb79d2a2dc"
     },
     "erp.run_all_accounting_tests": {
       "name": "run_all_accounting_tests",
@@ -5996,6 +6004,14 @@
       "current_operations_fingerprint": "sha256:b0256ff3294362745bfe373602729ce1f504236aad8f433ba883dec107a20339",
       "operation_count": 1445,
       "reason": "release on top of v0.3.105: add denied internal unregister_payment_allocations; update convert_purchase_requisition_to_po for the scheduled replenishment source path"
+    },
+    {
+      "previous_release": "v0.3.100",
+      "previous_ir_sha256": "sha256:d6c06231aaa3458d8a7fc8b9b8e10d6dea7f17d5519989454464d8441911da3a",
+      "previous_operations_fingerprint": "sha256:b0256ff3294362745bfe373602729ce1f504236aad8f433ba883dec107a20339",
+      "current_operations_fingerprint": "sha256:5e79fc2351520d97e276ae7a8554a4d919fc9e8e62240b608ca4bbf297affd36",
+      "operation_count": 1447,
+      "reason": "release on top of v0.3.100: add recover_ai_provider_attempt, run_ai_spend_recovery_tests; change the shape of none"
     }
   ]
 }
