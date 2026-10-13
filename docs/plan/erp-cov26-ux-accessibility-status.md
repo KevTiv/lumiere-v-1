@@ -100,11 +100,10 @@ Not converted in this slice:
 - Lookup-only reads (contacts, products, currencies, journals used for options) keep
   their prior fallback; only primary collections are gated.
 
-Validation: web `tsc --noEmit` adds no errors over the stacked base (the base carries 5
-pre-existing errors in `documents.ts`, `workflows.ts` and `module-data-notice.tsx`);
-web unit suite 373/373; `module-data-state` node tests 7/7; ModuleView vitest includes a
-new dialog-closure test. `module-view-create-gate.test.tsx` "leaves tab order and arrow
-navigation to the tab primitive" fails on the base as well and is unchanged here.
+Validation (after merging #171 at 9476a0b9): web `tsc --noEmit` reports only the base's
+pre-existing `query-hooks/workflows.ts` error; ui `tsc` is clean; web unit suite 373/373;
+ui vitest `src/pages`, `src/forms` and `module-data-state` 96/96, including the new
+ModuleView dialog-closure and collection-helper tests.
 
 Remaining before COV-26 acceptance: keyboard/focus proof per module, responsive
 viewport proof, browser reconnect/readback evidence for denied (401/403) and failed
