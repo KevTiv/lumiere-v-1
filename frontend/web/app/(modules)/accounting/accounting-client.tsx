@@ -468,6 +468,14 @@ import { Button } from "@lumiere/ui/components/button"
 import { cn } from "@lumiere/ui/lib/utils"
 import { TablePager, usePagedRows } from "@lumiere/ui/components/table-pager"
 
+function copyAsRecord<T extends object>(row: T): Record<string, unknown> {
+  return Object.fromEntries(Object.entries(row))
+}
+
+function copyAsRecords<T extends object>(rows: readonly T[]): Record<string, unknown>[] {
+  return rows.map(copyAsRecord)
+}
+
 function moveTypeTag(row: Record<string, unknown>): string {
   return enumTag(row.moveType ?? row.move_type)
 }
@@ -2362,7 +2370,7 @@ function AccountingClientReady({
 
   const taxGroupRows = useMemo(() => {
     const accountLabel = new Map<string, string>()
-    for (const a of accounts as unknown as Record<string, unknown>[]) {
+    for (const a of copyAsRecords(accounts)) {
       const id = cellId(a.id)
       if (id != null) accountLabel.set(id.toString(), `${cellText(a.code)} ${cellText(a.name)}`.trim())
     }
@@ -2371,7 +2379,7 @@ function AccountingClientReady({
       const id = cellId(v)
       return id == null ? "" : (map.get(id.toString()) ?? id.toString())
     }
-    return (taxGroups as unknown as Record<string, unknown>[]).map((g) => ({
+    return copyAsRecords(taxGroups).map((g) => ({
       ...g,
       sequence: Number(cellText(g.sequence)) || 0,
       companyName: labelOf(companyLabel, g.companyId),
@@ -2389,7 +2397,7 @@ function AccountingClientReady({
     const newLabel = t("accounting.taxGroups.actions.new", { defaultValue: "New tax group" })
     const editLabel = t("accounting.taxGroups.actions.edit", { defaultValue: "Edit tax group" })
     const noneLabel = t("accounting.taxGroups.form.none", { defaultValue: "None" })
-    const accountRows = accounts as unknown as Record<string, unknown>[]
+    const accountRows = copyAsRecords(accounts)
     const fields = (current: ReturnType<typeof taxGroupEditDefaults> | null): FormField[] => [
       { id: "name", name: "name", label: t("accounting.taxGroups.columns.name", { defaultValue: "Name" }), type: "text", required: true, defaultValue: current?.name ?? "", width: "2/3" },
       { id: "sequence", name: "sequence", label: t("accounting.taxGroups.columns.sequence", { defaultValue: "Sequence" }), type: "number", required: true, min: 0, step: 1, defaultValue: current?.sequence ?? 10, width: "1/3" },
@@ -2447,7 +2455,7 @@ function AccountingClientReady({
 
   const taxJurisdictionRows = useMemo(
     () =>
-      (taxJurisdictions as unknown as Record<string, unknown>[]).map((j) => {
+      copyAsRecords(taxJurisdictions).map((j) => {
         const current = taxJurisdictionEditDefaults(j)
         return {
           ...j,
@@ -2529,12 +2537,12 @@ function AccountingClientReady({
   const taxScheduleRows = useMemo(() => {
     const companyLabel = new Map(companySelectOptions.map((o) => [String(o.value), o.label] as const))
     const jurisdictionLabel = new Map(
-      (taxJurisdictions as unknown as Record<string, unknown>[]).map((j) => [cellId(j.id)?.toString() ?? "", cellText(j.name)] as const),
+      copyAsRecords(taxJurisdictions).map((j) => [cellId(j.id)?.toString() ?? "", cellText(j.name)] as const),
     )
     const taxLabel = new Map(
-      (taxes as unknown as Record<string, unknown>[]).map((x) => [cellId(x.id)?.toString() ?? "", cellText(x.name)] as const),
+      copyAsRecords(taxes).map((x) => [cellId(x.id)?.toString() ?? "", cellText(x.name)] as const),
     )
-    return (taxSchedules as unknown as Record<string, unknown>[]).map((s) => {
+    return copyAsRecords(taxSchedules).map((s) => {
       const current = taxScheduleEditDefaults(s)
       const companyKey = cellId(s.companyId)?.toString() ?? ""
       return {
@@ -2560,8 +2568,8 @@ function AccountingClientReady({
     const editLabel = t("accounting.taxSchedules.actions.edit", { defaultValue: "Edit schedule" })
     const noneLabel = t("accounting.taxSchedules.form.none", { defaultValue: "None" })
     const inactiveSuffix = t("accounting.taxSchedules.form.inactive", { defaultValue: "(inactive)" })
-    const taxRows = taxes as unknown as Record<string, unknown>[]
-    const jurisdictionRows = taxJurisdictions as unknown as Record<string, unknown>[]
+    const taxRows = copyAsRecords(taxes)
+    const jurisdictionRows = copyAsRecords(taxJurisdictions)
     const fields = (current: ReturnType<typeof taxScheduleEditDefaults> | null): FormField[] => [
       { id: "name", name: "name", label: t("accounting.taxSchedules.columns.name", { defaultValue: "Name" }), type: "text", required: true, defaultValue: current?.name ?? "" },
       { id: "description", name: "description", label: t("accounting.taxSchedules.columns.description", { defaultValue: "Description" }), type: "textarea", defaultValue: current?.description ?? "" },
@@ -2683,7 +2691,7 @@ function AccountingClientReady({
   /** Deprecate (after a confirmation) or reactivate a chart-of-accounts row; the reducer re-validates. */
   const toggleAccountDeprecated = useCallback(
     async (account: AccountAccount): Promise<void> => {
-      const row = account as unknown as Record<string, unknown>
+      const row = copyAsRecord(account)
       const params = deprecateAccountParams(row, operatingCompanyId)
       const label = params?.deprecated === false
         ? t("accounting.accounts.rowActions.reactivate", { defaultValue: "Reactivate account" })
@@ -2725,7 +2733,7 @@ function AccountingClientReady({
   /** Edit a chart-of-accounts row; only the fields the user changed are sent. */
   const editAccount = useCallback(
     async (account: AccountAccount): Promise<void> => {
-      const row = account as unknown as Record<string, unknown>
+      const row = copyAsRecord(account)
       const label = t("accounting.accounts.rowActions.edit", { defaultValue: "Edit account" })
       const current = accountEditDefaults(row)
       const values = await askForm({
@@ -2776,7 +2784,7 @@ function AccountingClientReady({
 
   const promptNewBankStatement = useCallback(async (): Promise<void> => {
     const label = t("accounting.bankStatements.actions.new", { defaultValue: "New statement" })
-    const bank = bankJournals(journals as unknown as Record<string, unknown>[])
+    const bank = bankJournals(copyAsRecords(journals))
     if (bank.length === 0) {
       showWorkflowToast({
         kind: "error",
@@ -2815,7 +2823,7 @@ function AccountingClientReady({
       ],
     })
     if (values == null) return
-    const input = toBankStatementCreateInput(values, journals as unknown as Record<string, unknown>[])
+    const input = toBankStatementCreateInput(values, copyAsRecords(journals))
     if (input == null) {
       showWorkflowToast({
         kind: "error",
@@ -3042,8 +3050,8 @@ function AccountingClientReady({
     const editAssetLabel = t("accounting.entities.fixedAssets.actions.edit", { defaultValue: "Edit asset" })
     const staleSuffix = t("accounting.entities.fixedAssets.form.unavailable", { defaultValue: "(unavailable)" })
     const noneLabel = t("accounting.entities.fixedAssets.form.none", { defaultValue: "None" })
-    const accountRows = accounts as unknown as Record<string, unknown>[]
-    const journalRows = journals as unknown as Record<string, unknown>[]
+    const accountRows = copyAsRecords(accounts)
+    const journalRows = copyAsRecords(journals)
     const assetFailureMessage = (reason: AssetFailure): string => {
       switch (reason) {
         case "code":
@@ -4362,15 +4370,12 @@ function AccountingClientReady({
                   <ListPivotSwitch
                     storageId="accounting-invoices-list"
                     t={t}
-                    rows={invoices as unknown as Record<string, unknown>[]}
+                    rows={copyAsRecords(invoices)}
                     {...accountMovePivotSetup(t)}
                   >
                   <InvoiceListView
                     invoices={invoices}
-                    onSelectInvoice={(invoice) =>
-                      // ACC-RI-018 rationale: safe because this sheet receives only InvoiceListView AccountMove rows.
-                      setInvoiceSheetRecord(invoice as unknown as Record<string, unknown>)
-                    }
+                    onSelectInvoice={(invoice) => setInvoiceSheetRecord(copyAsRecord(invoice))}
                     onCreateInvoice={() => setShowCreateInvoice(true)}
                     onRecalculateTotals={(inv) =>
                       void runMutation(() => computeInvoiceTotals.mutateAsync(inv.id as string | number | bigint))
@@ -4389,16 +4394,13 @@ function AccountingClientReady({
                   <ListPivotSwitch
                     storageId="accounting-bills-list"
                     t={t}
-                    rows={bills as unknown as Record<string, unknown>[]}
+                    rows={copyAsRecords(bills)}
                     {...accountMovePivotSetup(t)}
                   >
                   <BillsListView
                     bills={bills}
                     onCreateBill={() => setShowCreateBill(true)}
-                    onSelectBill={(bill) =>
-                      // ACC-RI-018 rationale: safe because this sheet receives only BillsListView AccountMove rows.
-                      setInvoiceSheetRecord(bill as unknown as Record<string, unknown>)
-                    }
+                    onSelectBill={(bill) => setInvoiceSheetRecord(copyAsRecord(bill))}
                     onRecalculateTotals={(bill) =>
                       void runMutation(() => computeInvoiceTotals.mutateAsync(bill.id as string | number | bigint))
                     }
