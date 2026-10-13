@@ -174,9 +174,10 @@ test.describe("COV-09 operator payroll lifecycle", { tag: ["@p0", "@cov09"] }, (
         if (request.url().includes("create_hr_integration_intent")) stpDispatches += 1
       })
       await selectPayslipAction(approverPage, payslipId, "create-stp-intent")
-      await expect(approverPage.getByRole("alert")).toContainText(
-        "STP submission is unavailable because no provider adapter is configured",
-      )
+      const stpUnavailable = "STP submission is unavailable because no provider adapter is configured"
+      await expect(
+        approverPage.getByRole("alert").filter({ hasText: stpUnavailable }),
+      ).toContainText(stpUnavailable)
       expect(stpDispatches).toBe(0)
 
       const journal = (await rows(page, "account-journals")).find(
