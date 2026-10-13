@@ -38,6 +38,8 @@ export type AiSkillListItem = {
   category: string
   is_system: boolean
   source?: string
+  execution_route?: string
+  legacy_run_supported: boolean
 }
 
 export type AiSkillCitation = {
@@ -79,6 +81,51 @@ export type AiSkillRunResponse = {
   skill_key: string
 }
 
+export type LegacyAiSkillRunRetirement = {
+  code: "legacy_skill_run_retired"
+  skill_key: string
+  replacement_path?: string
+  error: string
+}
+
+const GOVERNED_SKILL_BFF_ROUTES: Readonly<Record<string, string>> = {
+  report_composer: "/api/ai/report/compose",
+  low_stock: "/api/ai/inventory/low-stock",
+  import_mapping: "/api/ai/skills/import-mapping",
+  insights_scan: "/api/ai/skills/insights-scan",
+  daily_briefing: "/api/ai/skills/daily-briefing",
+  report_analysis: "/api/ai/skills/report-analysis",
+  process_research: "/api/ai/skills/process-research",
+  price_search: "/api/ai/skills/price-search",
+  supplier_discovery: "/api/ai/skills/supplier-discovery",
+  rag_generation: "/api/ai/rag",
+  form_suggestion: "/api/ai/forms/suggest",
+  action_draft_generation: "/api/ai/actions/draft",
+}
+
+export function legacyAiSkillRunRetirement(skillKey: string): LegacyAiSkillRunRetirement {
+  const normalized = skillKey.trim()
+  const replacementPath = GOVERNED_SKILL_BFF_ROUTES[normalized]
+  return {
+    code: "legacy_skill_run_retired",
+    skill_key: normalized,
+    ...(replacementPath ? { replacement_path: replacementPath } : {}),
+    error: replacementPath
+      ? `Skill '${normalized}' no longer runs through the legacy skill hook; use ${replacementPath}.`
+      : `Skill '${normalized}' has no governed execution adapter; register and certify one before execution.`,
+  }
+}
+
+export class LegacyAiSkillRunRetiredError extends Error {
+  readonly retirement: LegacyAiSkillRunRetirement
+
+  constructor(retirement: LegacyAiSkillRunRetirement) {
+    super(retirement.error)
+    this.name = "LegacyAiSkillRunRetiredError"
+    this.retirement = retirement
+  }
+}
+
 export function useAiSkills() {
   return useQuery({
     queryKey: ["ai-skills"],
@@ -101,20 +148,9 @@ export function useRunAiSkill() {
       teamMemberId?: number
       overrides?: { max_steps?: number }
     }) => {
-      const r = await apiFetch("/api/ai/skills/run", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          companyId: args.companyId,
-          skillKey: args.skillKey,
-          ...(args.inputs ? { inputs: args.inputs } : {}),
-          ...(args.agentId != null ? { agentId: args.agentId } : {}),
-          ...(args.teamMemberId != null ? { teamMemberId: args.teamMemberId } : {}),
-          ...(args.overrides ? { overrides: args.overrides } : {}),
-        }),
-      })
-      if (!r.ok) throw new Error(await parseAiError(r))
-      return (await r.json()) as AiSkillRunResponse
+      // Compatibility export only. Keeping this hook fail-fast avoids a
+      // misleading network request to the permanently retired endpoint.
+      throw new LegacyAiSkillRunRetiredError(legacyAiSkillRunRetirement(args.skillKey))
     },
   })
 }

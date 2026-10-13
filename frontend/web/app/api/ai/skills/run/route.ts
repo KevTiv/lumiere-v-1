@@ -1,18 +1,15 @@
 /**
- * POST /api/ai/skills/run — execute a configured AI skill.
+ * POST /api/ai/skills/run — retired compatibility boundary.
  */
 import { type NextRequest, NextResponse } from 'next/server'
-
-import { sanitizeImportSkillInputs } from '@lumiere/erp-shared/csv-import-safety'
 
 import {
   optionalPositiveInteger,
   parseJsonBody,
-  proxyAiGateway,
   requireAiRouteContext,
-  sanitizeRecord,
   validateCompanyScope,
 } from '../../_lib/route-helpers'
+import { legacyRunRetirement } from './retirement'
 
 export async function POST(request: NextRequest) {
   const contextResult = await requireAiRouteContext(request)
@@ -38,38 +35,5 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'skillKey is required' }, { status: 400 })
   }
 
-  const inputs = sanitizeRecord(body.inputs) ?? {}
-
-  let safeInputs = inputs
-  if (skillKey === 'import_mapping') {
-    try {
-      safeInputs = sanitizeImportSkillInputs(inputs)
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error)
-      return NextResponse.json({ error: message }, { status: 400 })
-    }
-  }
-
-  const agentId = optionalPositiveInteger(body.agentId ?? body.agent_id)
-  const teamMemberId = optionalPositiveInteger(body.teamMemberId ?? body.team_member_id)
-  const overrides = sanitizeRecord(body.overrides)
-
-  if (agentId != null && !Number.isFinite(agentId)) {
-    return NextResponse.json({ error: 'agentId must be a positive integer' }, { status: 400 })
-  }
-  if (teamMemberId != null && !Number.isFinite(teamMemberId)) {
-    return NextResponse.json({ error: 'teamMemberId must be a positive integer' }, { status: 400 })
-  }
-
-  return proxyAiGateway('/v1/skills/run', {
-    org_id: orgId,
-    company_id: companyId,
-    skill_key: skillKey,
-    inputs: safeInputs,
-    stdb_token: session.stdbToken,
-    triggered_by_hex: session.identityHex,
-    ...(agentId != null ? { agent_id: agentId } : {}),
-    ...(teamMemberId != null ? { team_member_id: teamMemberId } : {}),
-    ...(overrides ? { overrides } : {}),
-  })
+  return NextResponse.json(legacyRunRetirement(skillKey), { status: 410 })
 }
