@@ -10,6 +10,7 @@ import {
 } from "@/lib/inline-edit-params"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
+import { canUseModuleData, mergeModuleStates, moduleCollection } from "@lumiere/ui/lib/module-data-state"
 import { useTranslation } from "@lumiere/i18n"
 import {
   ModuleView,
@@ -183,11 +184,18 @@ function ExpensesClientLoaded({
   const [toolbarError, setToolbarError] = useState<string | null>(null)
   const [timelineSheet, setTimelineSheet] = useState<Record<string, unknown> | null>(null)
 
-  const { data: expensesRaw = [] } = useExpenses(orgId, initialExpenses)
-  const { data: sheetsRaw = [] } = useExpenseSheets(orgId, initialSheets)
-  const { data: sheetsToApprove = [] } = useExpenseSheetsToApprove(orgId)
-  const { data: missingReceipts = [] } = useExpensesMissingReceipt(orgId)
-  const { data: unmatchedCards = [] } = useExpenseCardStatementUnmatched(orgId)
+  const expensesRead = moduleCollection(useExpenses(orgId, initialExpenses))
+  const expensesRaw = expensesRead.rows
+  const sheetsRead = moduleCollection(useExpenseSheets(orgId, initialSheets))
+  const sheetsRaw = sheetsRead.rows
+  const sheetsToApproveRead = moduleCollection(useExpenseSheetsToApprove(orgId))
+  const sheetsToApprove = sheetsToApproveRead.rows
+  const missingReceiptsRead = moduleCollection(useExpensesMissingReceipt(orgId))
+  const missingReceipts = missingReceiptsRead.rows
+  const unmatchedCardsRead = moduleCollection(useExpenseCardStatementUnmatched(orgId))
+  const unmatchedCards = unmatchedCardsRead.rows
+  const expensesUsable = canUseModuleData(expensesRead.state)
+  const sheetsUsable = canUseModuleData(sheetsRead.state)
   const timelineQuery = useExpenseSheetApprovalTimeline(
     organizationId,
     timelineSheet ? rowId(timelineSheet) : undefined,
@@ -248,7 +256,7 @@ function ExpensesClientLoaded({
   const submitExpenseSheet = useSubmitExpenseSheet(orgId, operatingCompanyId)
   const approveExpenseSheet = useApproveExpenseSheet(orgId, operatingCompanyId)
   const refuseExpenseSheet = useRefuseExpenseSheet(orgId)
-  const finance = useExpenseReportFinance(orgId, operatingCompanyId)
+  const finance = useExpenseReportFinance(orgId, operatingCompanyId, sheetsUsable)
   const setExpenseAllocations = useSetExpenseAllocations(orgId)
   const csvImports = useExpensesCsvImportMutations(orgId)
 
@@ -610,11 +618,37 @@ function ExpensesClientLoaded({
     }
   }, [expenses, sheets, employees])
 
+  const dataState = {
+    dashboard: mergeModuleStates([
+      expensesRead.state, sheetsRead.state, sheetsToApproveRead.state, missingReceiptsRead.state, unmatchedCardsRead.state,
+    ]),
+    expenses: expensesRead.state,
+    "expense-sheets": sheetsRead.state,
+  }
+  const actionUsable = (action: string) =>
+    action === "createExpense" ? expensesUsable
+      : action === "createExpenseSheet" || action === "createSheet" ? sheetsUsable : true
+  const quickActionUsable = quickActionForm == null || actionUsable(quickActionForm.action)
+  const csvUsable = csvKind == null || (csvKind === "expense" ? expensesUsable : sheetsUsable)
+  const rowActionUsable = rowAction == null || (rowAction.tabId === "expenses" ? expensesUsable : sheetsUsable)
+  useEffect(() => {
+    // Dialogs close when the collection their rows came from is denied or fails.
+    if (!quickActionUsable) setQuickActionForm(null)
+    if (!csvUsable) setCsvKind(null)
+    if (!rowActionUsable) setRowAction(null)
+    if (!expensesUsable) setWorkflowForm(null)
+    if (!sheetsUsable) {
+      setConfirmDialog(null)
+      setTimelineSheet(null)
+    }
+  }, [quickActionUsable, csvUsable, rowActionUsable, expensesUsable, sheetsUsable])
+
   const handleFormSubmit = async (
     _tabId: string,
     action: string,
     formData: Record<string, unknown>,
   ) => {
+    if (!actionUsable(action)) return
     if (action === "createExpense") {
       const plRaw = formData.pricelistId
       const empRaw = formData.employeeId
@@ -726,7 +760,7 @@ function ExpensesClientLoaded({
   ])
 
   const handleWorkflowSubmit = async (formData: Record<string, unknown>) => {
-    if (!workflowForm) return
+    if (!workflowForm || !expensesUsable) return
     if (workflowForm.kind === "editExpense") {
       const id = rowId(workflowForm.row)
       if (!id) return
@@ -840,12 +874,13 @@ function ExpensesClientLoaded({
       <ModuleView
         config={config}
         data={data}
+        dataState={dataState}
         onFormSubmit={handleFormSubmit}
         onRowClick={handleRowClick}
         isPending={isFormMutationPending}
       />
       <FormModal
-        open={quickActionForm !== null}
+        open={quickActionForm !== null && quickActionUsable}
         onOpenChange={(open) => !open && setQuickActionForm(null)}
         config={quickActionForm?.form ?? expenseFormConfig}
         isPending={isFormMutationPending}
@@ -857,7 +892,7 @@ function ExpensesClientLoaded({
         }}
       />
 
-      {csvKind && csvFormConfig ? (
+      {csvKind && csvUsable && csvFormConfig ? (
         <CsvImportModal
           key={csvKind}
           onClose={() => setCsvKind(null)}
@@ -872,7 +907,7 @@ function ExpensesClientLoaded({
         />
       ) : null}
 
-      <Dialog open={rowAction !== null} onOpenChange={(open) => !open && setRowAction(null)}>
+      <Dialog open={rowAction !== null && rowActionUsable} onOpenChange={(open) => !open && setRowAction(null)}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>
@@ -1077,7 +1112,7 @@ function ExpensesClientLoaded({
         </DialogContent>
       </Dialog>
 
-      <Dialog open={timelineSheet !== null} onOpenChange={(open) => !open && setTimelineSheet(null)}>
+      <Dialog open={timelineSheet !== null && sheetsUsable} onOpenChange={(open) => !open && setTimelineSheet(null)}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>{t("expenses.workflow.approvalTimeline")}</DialogTitle>
@@ -1141,7 +1176,7 @@ function ExpensesClientLoaded({
       </Dialog>
 
       <Dialog
-        open={confirmDialog !== null}
+        open={confirmDialog !== null && sheetsUsable}
         onOpenChange={(open) => {
           if (!open) {
             setConfirmDialog(null)
@@ -1227,7 +1262,7 @@ function ExpensesClientLoaded({
       </Dialog>
 
       {finance.modal}
-      {workflowFormConfig && workflowForm && (
+      {workflowFormConfig && workflowForm && expensesUsable && (
         <FormModal
           key={`${workflowForm.kind}-${rowId(workflowForm.row)}`}
           open
