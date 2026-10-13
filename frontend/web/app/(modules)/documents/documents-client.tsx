@@ -2,7 +2,8 @@
 import { recordOptions, withLinkedPickers } from "@/lib/linked-options"
 import { mapDashboardWidgets, withDashboardSections } from "@lumiere/ui/lib/dashboard-sections"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
+import { canUseModuleData, mergeModuleStates, moduleCollection } from "@lumiere/ui/lib/module-data-state"
 import { useTranslation } from "@lumiere/i18n"
 import {
   ModuleView,
@@ -274,18 +275,24 @@ function DocumentsClientLoaded({
   const [ackSubmitError, setAckSubmitError] = useState<string | null>(null)
   const openErpAiChat = useOpenErpAiChat()
 
-  const { data: documents = [] } = useDocuments(orgId, initialDocuments)
-  const { data: deletedDocuments = [] } = useDeletedDocuments(
-    orgId,
-    initialDeletedDocuments,
-  )
-  const { data: articles = [] } = useKnowledgeArticles(orgId, initialArticles)
-  const { data: categories = [] } = useKnowledgeCategories(orgId, initialCategories)
-  const { data: folders = [] } = useDocumentFolders(orgId, initialFolders)
-  const { data: processingJobs = [] } = useAiDocumentProcessingJobs(orgId, initialProcessingJobs)
-  const { data: aiInsights = [] } = useAiInsightsForOrg(orgId, initialAiInsights)
-  const { data: documentTemplates = [] } = useDocumentTemplates(organizationId)
-  const { data: mailTemplates = [] } = useMailTemplates(organizationId)
+  const documentsRead = moduleCollection(useDocuments(orgId, initialDocuments))
+  const documents = documentsRead.rows
+  const deletedDocumentsRead = moduleCollection(useDeletedDocuments(orgId, initialDeletedDocuments))
+  const deletedDocuments = deletedDocumentsRead.rows
+  const articlesRead = moduleCollection(useKnowledgeArticles(orgId, initialArticles))
+  const articles = articlesRead.rows
+  const categoriesRead = moduleCollection(useKnowledgeCategories(orgId, initialCategories))
+  const categories = categoriesRead.rows
+  const foldersRead = moduleCollection(useDocumentFolders(orgId, initialFolders))
+  const folders = foldersRead.rows
+  const processingJobsRead = moduleCollection(useAiDocumentProcessingJobs(orgId, initialProcessingJobs))
+  const processingJobs = processingJobsRead.rows
+  const aiInsightsRead = moduleCollection(useAiInsightsForOrg(orgId, initialAiInsights))
+  const aiInsights = aiInsightsRead.rows
+  const documentTemplatesRead = moduleCollection(useDocumentTemplates(organizationId))
+  const documentTemplates = documentTemplatesRead.rows
+  const mailTemplatesRead = moduleCollection(useMailTemplates(organizationId))
+  const mailTemplates = mailTemplatesRead.rows
   const { data: aiAgents = [] } = useAiAgents(organizationId, organizationId > 0)
   const createDocument = useCreateDocument(orgId, operatingCompanyId)
   const updateDocument = useUpdateDocument(orgId)
@@ -311,7 +318,7 @@ function DocumentsClientLoaded({
   const updateKnowledgeCategory = useUpdateKnowledgeCategory(orgId)
   const deleteKnowledgeCategory = useDeleteKnowledgeCategory(orgId)
   const scheduleRetentionPurge = useScheduleDocumentRetentionPurge(orgId)
-  const { askForm, formDialog } = useFormDialog()
+  const { askForm, cancelForm, formDialog } = useFormDialog()
   const { confirm: confirmDialog, dialog: confirmDialogNode } = useConfirmDialog()
   const createKnowledgeCategory = useCreateKnowledgeCategory(orgId, operatingCompanyId)
   const createDocumentFolder = useCreateDocumentFolder(orgId)
@@ -1155,11 +1162,53 @@ function DocumentsClientLoaded({
     ],
   )
 
+  const dataState = {
+    dashboard: mergeModuleStates([documentsRead.state, articlesRead.state]),
+    documents: documentsRead.state,
+    "knowledge-base": articlesRead.state,
+    "knowledge-categories": categoriesRead.state,
+    "document-folders": foldersRead.state,
+    "documents-recycle-bin": deletedDocumentsRead.state,
+    "document-templates": documentTemplatesRead.state,
+    "mail-templates": mailTemplatesRead.state,
+    "document-processing": processingJobsRead.state,
+    "document-insights": aiInsightsRead.state,
+  }
+  type DocumentsTab = keyof typeof dataState
+  const tabUsable = (tab: DocumentsTab | undefined) => tab == null || canUseModuleData(dataState[tab])
+  const actionTabs: Record<string, DocumentsTab> = {
+    createDocument: "documents", uploadDocument: "documents", createArticle: "knowledge-base",
+    createKnowledgeCategory: "knowledge-categories", createDocumentFolder: "document-folders",
+    createDocumentTemplate: "document-templates", createMailTemplate: "mail-templates",
+    createDocumentProcessingJob: "document-processing",
+  }
+  const rowActionTabs: Record<NonNullable<DocumentRowAction>["action"], DocumentsTab> = {
+    updateDocument: "documents", uploadVersion: "documents", setRetention: "documents",
+    updateArticle: "knowledge-base", addArticleMember: "knowledge-base", updateFolder: "document-folders",
+  }
+  const quickActionUsable = quickActionForm == null || tabUsable(actionTabs[quickActionForm.action])
+  const csvUsable = csvKind == null || tabUsable(csvKind === "knowledge_category" ? "knowledge-categories" : "knowledge-base")
+  const rowActionUsable = documentRowAction == null || tabUsable(rowActionTabs[documentRowAction.action])
+  const processingUsable = tabUsable("document-processing")
+  const insightsUsable = tabUsable("document-insights")
+  // Prompted category/article/retention dialogs read rows from these collections.
+  const promptsUsable = tabUsable("documents") && tabUsable("knowledge-base") && tabUsable("knowledge-categories")
+  useEffect(() => {
+    // Dialogs close when the collection their rows came from is denied or fails.
+    if (!quickActionUsable) setQuickActionForm(null)
+    if (!csvUsable) setCsvKind(null)
+    if (!rowActionUsable) setDocumentRowAction(null)
+    if (!processingUsable) setCompleteModalRows(null)
+    if (!insightsUsable) setAckModalRows(null)
+    if (!promptsUsable) cancelForm()
+  }, [quickActionUsable, csvUsable, rowActionUsable, processingUsable, insightsUsable, promptsUsable, cancelForm])
+
   const handleFormSubmit = async (
     _tabId: string,
     action: string,
     formData: Record<string, unknown>,
   ) => {
+    if (!tabUsable(actionTabs[action])) return
     if (action === "createDocument" || action === "uploadDocument") {
       const file = firstFileFromFormValue(formData.file)
       if (!file) {
@@ -1272,16 +1321,17 @@ function DocumentsClientLoaded({
           {documentToolbarError}
         </p>
       ) : null}
-      {formDialog}
+      {promptsUsable && formDialog}
       {confirmDialogNode}
       <ModuleView
         config={config}
         data={data}
+        dataState={dataState}
         onFormSubmit={handleFormSubmit}
         isPending={isFormMutationPending}
       />
       <FormModal
-        open={quickActionForm !== null}
+        open={quickActionForm !== null && quickActionUsable}
         onOpenChange={(open) => !open && setQuickActionForm(null)}
         config={quickActionForm?.form ?? documentFormConfig}
         isPending={isFormMutationPending}
@@ -1292,7 +1342,7 @@ function DocumentsClientLoaded({
           }
         }}
       />
-      {csvKind && csvFormConfig ? (
+      {csvKind && csvUsable && csvFormConfig ? (
         <CsvImportModal
           key={csvKind}
           onClose={() => setCsvKind(null)}
@@ -1307,7 +1357,7 @@ function DocumentsClientLoaded({
           }}
         />
       ) : null}
-      {documentRowAction ? (
+      {documentRowAction && rowActionUsable ? (
         <FormModal
           open
           onOpenChange={(o) => {
@@ -1401,7 +1451,7 @@ function DocumentsClientLoaded({
           }}
         />
       ) : null}
-      {completeModalRows?.length === 1 ? (
+      {completeModalRows?.length === 1 && processingUsable ? (
         <FormModal
           open
           onOpenChange={(o) => {
@@ -1460,7 +1510,7 @@ function DocumentsClientLoaded({
           }}
         />
       ) : null}
-      {ackModalRows && ackModalRows.length > 0 ? (
+      {ackModalRows && ackModalRows.length > 0 && insightsUsable ? (
         <FormModal
           open
           onOpenChange={(o) => {
