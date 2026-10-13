@@ -5,6 +5,7 @@ import {
   ALL_ERP_RESOURCE_KEYS,
   createClientSubscriptions,
   subscriptionQueriesForResource,
+  type SubscriptionQueryContext,
 } from "./erp-subscriptions"
 import { hasHrPermission } from "../field-policy"
 
@@ -13,7 +14,7 @@ describe("ACC-RI-012: account-payment-term-lines live subscription", () => {
     assert.ok(
       ALL_ERP_RESOURCE_KEYS.includes("account-payment-term-lines"),
       "account-payment-term-lines is missing from ALL_ERP_RESOURCE_KEYS — it will silently " +
-        "stop auto-refreshing once global subscriptions are ready (falls back to no live sync)",
+      "stop auto-refreshing once global subscriptions are ready (falls back to no live sync)",
     )
   })
 
@@ -187,6 +188,72 @@ describe("PUR-RI-017: company-scoped Purchasing subscriptions", () => {
       null,
     )
   })
+})
+
+describe("Pass12 sensitive feeds remain on authorized HTTP", () => {
+  const resources = [
+    "profit-loss-lines",
+    "balance-sheet-lines",
+    "cash-flow-lines",
+    "bank-statement-import-lines",
+    "tax-deadline-reminders",
+    "consolidation-company-rates",
+    "hr-leave-allocations",
+    "hr-offboarding-checklists",
+    "hr-statutory-ids",
+    "document-signature-requests",
+    "document-legal-holds",
+    "document-external-refs",
+  ]
+  const identityHex = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+  const organizationContext = {
+    organizationId: 42,
+    companyIds: [7],
+    identityHex,
+    managerEmployeeId: 7,
+  }
+  const normalAccess = {
+    organizationId: 42,
+    roleId: 9,
+    roleName: "manager",
+    isSuperuser: false,
+    rolePermissions: ["module:hr:read"],
+    identityHex,
+    fieldPermissions: [],
+  }
+  const contexts: Record<string, SubscriptionQueryContext> = {
+    "no context": {},
+    organization: organizationContext,
+    normal: { ...organizationContext, fieldAccess: normalAccess },
+    superuser: {
+      ...organizationContext,
+      fieldAccess: { ...normalAccess, roleName: "superuser", isSuperuser: true },
+    },
+  }
+
+  for (const [label, context] of Object.entries(contexts)) {
+    it(`emits no direct subscription SQL with ${label} context`, () => {
+      for (const resource of resources) {
+        assert.equal(
+          subscriptionQueriesForResource(resource, context),
+          null,
+          `${resource} must use authorized HTTP with ${label} context`,
+        )
+      }
+    })
+
+    it(`omits HTTP-only feeds from aggregate and mixed requests with ${label} context`, () => {
+      assert.deepEqual(createClientSubscriptions(resources, context), [])
+      const control = subscriptionQueriesForResource("account-payment-term-lines", context) ?? []
+      if (context.organizationId !== undefined) {
+        assert.ok(control.length > 0, "unrelated feed must remain subscribed")
+      }
+      assert.deepEqual(
+        createClientSubscriptions([...resources, "account-payment-term-lines"], context),
+        control,
+      )
+    })
+  }
 })
 
 describe("HR subscription SQL dialect", () => {

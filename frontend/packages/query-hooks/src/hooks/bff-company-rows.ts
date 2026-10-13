@@ -5,7 +5,7 @@
  * (see crates/stdb-auth/src/erp_subscriptions.rs). They are only served by the authorized
  * HTTP query path `/api/query/<key>?companyId=<active company>`, exactly like the
  * BFF-only `depreciation-lines` / `landed-cost-lines` reads. The BFF performs the company
- * filtering; if it cannot serve the key the hook yields an empty list.
+ * filtering; HTTP or response decoding failures surface as query errors, not empty lists.
  */
 
 import { decodeQueryListResponse } from "@lumiere/api-client"
