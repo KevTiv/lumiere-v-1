@@ -234,6 +234,65 @@ pub fn test_company_isolation_on_leave_and_payslip(ctx: &ReducerContext) -> Resu
     Ok(())
 }
 
+pub fn test_payslip_approval_rejects_self_approval(
+    ctx: &ReducerContext,
+) -> Result<(), String> {
+    ensure_test_superuser(ctx)?;
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let employee_id = seed_employee(ctx, &fixture, "Payroll Self Approval Emp")?;
+    let employee = ctx
+        .db
+        .hr_employee()
+        .id()
+        .find(&employee_id)
+        .ok_or("employee missing")?;
+    ctx.db.hr_employee().id().update(HrEmployee {
+        user_id: Some(ctx.sender()),
+        ..employee
+    });
+    let structure_id = seed_payroll_structure(ctx, &fixture)?;
+    create_payslip(
+        ctx,
+        fixture.organization_id,
+        CreatePayslipParams {
+            company_id: Some(fixture.company_id),
+            employee_id,
+            struct_id: structure_id,
+            date_from: ctx.timestamp,
+            date_to: ctx.timestamp + Duration::from_secs(86400 * 30),
+            basic_wage: 5000.0,
+            contract_id: None,
+            notes: Some("self-approval-proof".to_string()),
+        },
+    )?;
+    let payslip_id = latest_payslip_for_employee(ctx, &fixture, employee_id)?;
+    let result = confirm_payslip(
+        ctx,
+        fixture.organization_id,
+        payslip_id,
+        ConfirmPayslipParams {
+            company_id: Some(fixture.company_id),
+            gross_wage: 5000.0,
+            net_wage: 4000.0,
+            calculation_source: "manual".to_string(),
+        },
+    );
+    let error = result.expect_err("employee must not approve own payslip");
+    if !error.contains("own payslip") {
+        return Err(format!("unexpected self-approval error: {error}"));
+    }
+    let unchanged = ctx
+        .db
+        .hr_payslip()
+        .id()
+        .find(&payslip_id)
+        .ok_or("payslip missing after denied approval")?;
+    if unchanged.state != PayslipState::Draft {
+        return Err("denied self-approval changed payslip state".to_string());
+    }
+    Ok(())
+}
+
 pub fn test_leave_approve_consumes_balance(ctx: &ReducerContext) -> Result<(), String> {
     ensure_test_superuser(ctx)?;
     let fixture = OrgFixture::seed_minimal(ctx)?;

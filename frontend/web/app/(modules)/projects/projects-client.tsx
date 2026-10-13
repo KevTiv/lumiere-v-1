@@ -1,5 +1,5 @@
 "use client"
-import { projectTimesheetsHref } from "@lumiere/erp-shared/record-links"
+import { accountMoveHref, projectTimesheetsHref } from "@lumiere/erp-shared/record-links"
 import { mapDashboardWidgets, withDashboardSections } from "@lumiere/ui/lib/dashboard-sections"
 import { withInlineEdits } from "@lumiere/ui/lib/with-inline-edits"
 
@@ -283,6 +283,45 @@ function idLines(value: unknown): Array<string | number | bigint> {
 
 function timesheetStatus(row: Record<string, unknown>): string {
   return String(row.validationStatus ?? row.validation_status ?? "")
+}
+
+function withTimesheetLifecycleColumns(config: EntityViewConfig): EntityViewConfig {
+  if (config.view.mode !== "table") return config
+  const existing = new Set(config.view.columns.map((column) => column.key))
+  const columns = [...config.view.columns]
+  if (!existing.has("validationStatus")) {
+    columns.push({
+      key: "validationStatus",
+      label: "Validation",
+      type: "badge",
+      badgeVariants: {
+        draft: "secondary",
+        submitted: "info",
+        validated: "success",
+        rejected: "destructive",
+      },
+    })
+  }
+  if (!existing.has("timesheetInvoiceId")) {
+    columns.push({
+      key: "timesheetInvoiceId",
+      label: "Invoice",
+      render: (value, row) => {
+        const invoiceId = value ?? row.timesheet_invoice_id
+        if (invoiceId == null || String(invoiceId).trim() === "") return "—"
+        return (
+          <Link
+            href={accountMoveHref(String(invoiceId))}
+            className="font-medium text-primary underline-offset-4 hover:underline"
+            onClick={(event) => event.stopPropagation()}
+          >
+            Invoice {String(invoiceId)}
+          </Link>
+        )
+      },
+    })
+  }
+  return { ...config, view: { ...config.view, columns } }
 }
 
 export function ProjectsClient(props: ProjectsClientProps) {
@@ -1135,7 +1174,7 @@ function ProjectsClientLoaded({
             return {
               ...tab,
               createForm: timesheetFormConfig,
-              entityConfig: addCsvToolbar(tab.entityConfig, [
+              entityConfig: withTimesheetLifecycleColumns(addCsvToolbar(tab.entityConfig, [
                 {
                   id: "csv-timesheet",
                   label: t("projects.toolbar.importTimesheetCsv"),
@@ -1200,7 +1239,7 @@ function ProjectsClientLoaded({
                     setLifecycleModal({ type: "billTimesheets", rows, form: billTimesheetsFormConfig })
                   },
                 },
-              ], { selectOnRowClick: true }),
+              ], { selectOnRowClick: true })),
             }
           }
           return tab
@@ -1454,13 +1493,22 @@ function ProjectsClientLoaded({
                 if (formData.invoiceDate == null || String(formData.invoiceDate).trim() === "") {
                   throw new Error("Invoice date is required")
                 }
-                await billTimesheets.mutateAsync({
+                const outcome = await billTimesheets.mutateAsync({
                   companyId: operatingCompanyId,
                   timesheetIds: ids,
                   journalId: formData.journalId as string | number,
                   incomeAccountId: formData.incomeAccountId as string | number,
                   partnerId: formData.partnerId as string | number,
                   invoiceDate: formData.invoiceDate as string | number | Date,
+                })
+                showWorkflowToast({
+                  kind: "success",
+                  title: "Timesheets billed",
+                  description: `Created accounting invoice ${outcome.ref.id}.`,
+                  action: {
+                    label: "Open invoice",
+                    onClick: () => window.location.assign(accountMoveHref(outcome.ref.id)),
+                  },
                 })
               } else if (lifecycleModal.type === "expenseRebill") {
                 // Surface expenses reducer create_expense_project_rebill (do not reimplement).

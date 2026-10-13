@@ -17,7 +17,7 @@
       "evidence": [
         {
           "path": "frontend/packages/ui/src/forms/form-modal.tsx",
-          "markers": ["if (!onSubmit) return", "await onSubmit(data)", "toast.success"]
+          "markers": ["if (!onSubmit) throw new Error(t(\"common.formSubmit.noHandler\"))", "await onSubmit(data)", "toast.success"]
         }
       ]
     },
@@ -122,7 +122,7 @@
       "evidence": [
         {
           "path": "frontend/packages/ui/src/lib/stored-dashboard-resolver.ts",
-          "markers": ["kind: \"missing-timestamp\"", "code: \"invalid-timestamp\"", "code: \"missing-measure\"", "rejectedRows"]
+          "markers": ["| \"missing-timestamp\"", "code: \"invalid-timestamp\"", "code: \"missing-measure\"", "rejectedRows"]
         },
         {
           "path": "frontend/web/app/(modules)/reports/query-builder-semantics.ts",
@@ -147,7 +147,7 @@
         },
         {
           "path": "frontend/web/app/(modules)/reports/reports-client.tsx",
-          "markers": ["storedDashboardIssue != null", "storedDashboardIssue ?"]
+          "markers": ["issue: storedDashboardIssue", "storedDashboardIssue ?"]
         }
       ]
     },
@@ -258,7 +258,9 @@
       "frontend/web/app/(modules)/crm/crm-client.tsx",
       "frontend/web/app/(modules)/messages/message-batches-panel.tsx",
       "frontend/web/app/(modules)/purchasing/purchasing-client.tsx",
-      "frontend/web/app/(modules)/sales/sales-client.tsx"
+      "frontend/web/app/(modules)/purchasing/purchase-order-dialogs.tsx",
+      "frontend/web/app/(modules)/sales/sales-client.tsx",
+      "frontend/web/app/(modules)/sales/sale-order-dialogs.tsx"
     ],
     "operator_bypass_files": [
       "frontend/web/tests/e2e/accounting-post-reconcile.spec.ts",

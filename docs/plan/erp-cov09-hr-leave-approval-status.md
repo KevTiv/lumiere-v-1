@@ -68,3 +68,21 @@ Needs an HR manager persona distinct from the employee persona in the first-org 
 
 Becomes IMPLEMENTED when the bounded path and proofs above exist, and ACCEPTED only
 with same-head green CI (plus the contract release, when required).
+
+## U5 closure increment — payroll approval and GL handoff
+
+- `confirm_payslip` now denies an employee approving their own payslip by resolving the
+  payslip's employee and comparing its linked `user_id` with the authenticated caller.
+  `test_payslip_approval_rejects_self_approval` proves the denial leaves the Draft row
+  unchanged.
+- Confirm, post and cancel hooks now use canonical cache-independent readback of the exact
+  organization/company/payslip identity. Ambiguous transport outcomes are reconciled and are
+  never automatically redispatched.
+- Payroll posting is successful only after the exact payslip is `Done`, carries a non-null
+  `account_move_id`, and that exact scoped account move exists. This supplies the canonical
+  employee-to-payroll-to-GL result reference.
+- The cancel hook's transposed `companyId`/`payslipId` payload was corrected.
+
+Still required for whole-module U5: current-head browser execution of employee → contract →
+payslip → distinct-person approval → post/export, sensitive-field denied-reader proof, and
+the shared responsive/accessibility/reconnect and launch-manifest gates.

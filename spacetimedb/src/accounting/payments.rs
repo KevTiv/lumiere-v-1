@@ -770,7 +770,94 @@ pub fn post_payment_impl(
     Ok(())
 }
 
-/// Cancel a posted payment. Sets state to Reversed.
+fn reverse_posted_payment_move(
+    ctx: &ReducerContext,
+    payment: &AccountPayment,
+    original_move_id: u64,
+) -> Result<u64, String> {
+    let original = ctx
+        .db
+        .account_move()
+        .id()
+        .find(&original_move_id)
+        .ok_or("Payment journal move not found")?;
+    if original.organization_id != payment.organization_id
+        || original.company_id != payment.company_id
+        || original.state != AccountMoveState::Posted
+    {
+        return Err("Payment journal move is not posted in payment scope".to_string());
+    }
+    let original_lines: Vec<_> = ctx
+        .db
+        .account_move_line()
+        .move_line_by_move()
+        .filter(&original_move_id)
+        .collect();
+    if original_lines.len() < 2 {
+        return Err("Payment journal move must have at least two lines".to_string());
+    }
+    let debit: f64 = original_lines.iter().map(|line| line.debit).sum();
+    let credit: f64 = original_lines.iter().map(|line| line.credit).sum();
+    if (debit - credit).abs() > 0.01 {
+        return Err("Payment journal move is not balanced".to_string());
+    }
+
+    ensure_accounting_period_open_for_date(ctx, payment.company_id, ctx.timestamp)?;
+    let reversal = ctx.db.account_move().insert(AccountMove {
+        id: 0,
+        name: next_doc_number(ctx, payment.organization_id, "PAYREV"),
+        ref_: Some(format!("Reversal of payment move {original_move_id}")),
+        state: AccountMoveState::Draft,
+        date: ctx.timestamp,
+        invoice_origin: Some(format!("account-payment:{}", payment.id)),
+        posted_before: false,
+        create_uid: Some(ctx.sender()),
+        create_date: Some(ctx.timestamp),
+        write_uid: Some(ctx.sender()),
+        write_date: Some(ctx.timestamp),
+        metadata: Some(
+            serde_json::json!({
+                "reverses_payment_move_id": original_move_id,
+                "account_payment_id": payment.id,
+            })
+            .to_string(),
+        ),
+        ..original
+    });
+    for (index, line) in original_lines.into_iter().enumerate() {
+        let inserted = insert_draft_account_move_line(
+            ctx,
+            &reversal,
+            payment_line_params(
+                line.account_id,
+                format!("Reversal: {}", line.name),
+                line.credit,
+                line.debit,
+                (index + 1) as u32,
+                payment.partner_id,
+                payment.id,
+            ),
+        )?;
+        ctx.db.account_move_line().id().update(AccountMoveLine {
+            parent_state: AccountMoveState::Posted,
+            amount_residual: 0.0,
+            amount_residual_currency: 0.0,
+            is_matching: true,
+            ..inserted
+        });
+    }
+    let reversal_id = reversal.id;
+    ctx.db.account_move().id().update(AccountMove {
+        state: AccountMoveState::Posted,
+        posted_before: true,
+        write_uid: Some(ctx.sender()),
+        write_date: Some(ctx.timestamp),
+        ..reversal
+    });
+    Ok(reversal_id)
+}
+
+/// Cancel a payment. Posted payments receive one exact, posted reversing move.
 #[reducer]
 pub fn cancel_payment(
     ctx: &ReducerContext,
@@ -790,6 +877,16 @@ pub fn cancel_payment(
     if payment.state == PaymentState::Reversed {
         return Err("Payment is already cancelled".to_string());
     }
+    if !payment.reconciled_invoice_ids.is_empty() || !payment.reconciled_bill_ids.is_empty() {
+        return Err("Reconciled payments must be unreconciled before cancellation".to_string());
+    }
+    let reversal_move_id = match payment.move_id {
+        Some(move_id) if payment.state == PaymentState::Paid => {
+            Some(reverse_posted_payment_move(ctx, &payment, move_id)?)
+        }
+        Some(_) => return Err("Only posted payment moves can be reversed".to_string()),
+        None => None,
+    };
     let old_state = format!("{:?}", payment.state);
     ctx.db.account_payment().id().update(AccountPayment {
         state: PaymentState::Reversed,
@@ -804,7 +901,14 @@ pub fn cancel_payment(
             record_id: payment_id,
             action: "CANCEL",
             old_values: Some(serde_json::json!({ "state": old_state }).to_string()),
-            new_values: Some(serde_json::json!({ "state": "Reversed" }).to_string()),
+            new_values: Some(
+                serde_json::json!({
+                    "state": "Reversed",
+                    "reversal_move_id": reversal_move_id,
+                    "reverses_move_id": payment.move_id,
+                })
+                .to_string(),
+            ),
             changed_fields: vec!["state".to_string()],
             metadata: None,
         },
