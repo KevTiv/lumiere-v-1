@@ -25,12 +25,57 @@ const MAX_DERIVATION_DEPTH: u8 = 16;
 /// durable grant. Long-running work must obtain a fresh, reauthorized envelope.
 pub(crate) const MAX_ENVELOPE_LIFETIME_SECONDS: i64 = 24 * 60 * 60;
 
+/// Server-resolved versions whose exact equality makes cached authority current.
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct AuthorizationGeneration {
+    placement_generation: u64,
+    policy_snapshot_hash: String,
+    capability_grants_hash: String,
+}
+
+impl AuthorizationGeneration {
+    pub(crate) fn new(
+        placement_generation: u64,
+        policy_snapshot_hash: impl Into<String>,
+        capability_grants_hash: impl Into<String>,
+    ) -> Result<Self, EnvelopeError> {
+        let generation = Self {
+            placement_generation,
+            policy_snapshot_hash: policy_snapshot_hash.into(),
+            capability_grants_hash: capability_grants_hash.into(),
+        };
+        generation.validate()?;
+        Ok(generation)
+    }
+
+    pub(crate) fn placement_generation(&self) -> u64 {
+        self.placement_generation
+    }
+
+    fn validate(&self) -> Result<(), EnvelopeError> {
+        if self.placement_generation == 0 {
+            return Err(EnvelopeError::InvalidGeneration);
+        }
+        validate_identifier(
+            "authorization generation",
+            &self.policy_snapshot_hash,
+            MAX_SCOPE_VALUE_BYTES,
+        )?;
+        validate_identifier(
+            "authorization generation",
+            &self.capability_grants_hash,
+            MAX_SCOPE_VALUE_BYTES,
+        )
+    }
+}
+
 /// Policy dimensions that further restrict the actor and tenant authority.
 ///
 /// Values are identifiers resolved by the existing policy sources. They are
 /// intentionally not interpreted here: doing so would create a second policy
 /// engine. Deterministic sets make subset checks and sealing unambiguous.
-#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct ExecutionRestrictions {
     data_classes: BTreeSet<String>,
@@ -157,6 +202,17 @@ impl TrustedExecutionScope {
         self.capabilities.contains(&capability)
     }
 
+    pub(crate) fn narrowed_to(
+        &self,
+        capabilities: impl IntoIterator<Item = Capability>,
+    ) -> Result<Self, EnvelopeError> {
+        let mut child = self.clone();
+        child.capabilities = capabilities.into_iter().collect();
+        child.validate()?;
+        child.ensure_subset_of(self)?;
+        Ok(child)
+    }
+
     fn validate(&self) -> Result<(), EnvelopeError> {
         validate_identifier(
             "actor identity",
@@ -168,9 +224,11 @@ impl TrustedExecutionScope {
                 "organization and company must be nonzero",
             ));
         }
-        if self.capabilities.is_empty() || self.capabilities.len() > MAX_SCOPE_VALUES {
+        // An empty set is explicit no-tool authority for generation-only
+        // surfaces. It can never be widened by child derivation.
+        if self.capabilities.len() > MAX_SCOPE_VALUES {
             return Err(EnvelopeError::InvalidScope(
-                "capability scope must be nonempty and bounded",
+                "capability scope exceeds its bound",
             ));
         }
         self.restrictions.validate()
@@ -197,7 +255,7 @@ impl TrustedExecutionScope {
 #[serde(rename_all = "camelCase")]
 struct EnvelopePayload {
     version: u8,
-    authorization_generation: u64,
+    authorization_generation: AuthorizationGeneration,
     issued_at_epoch_seconds: i64,
     expires_at_epoch_seconds: i64,
     derivation_depth: u8,
@@ -244,8 +302,8 @@ impl TrustedExecutionEnvelope {
         &self.payload.scope
     }
 
-    pub(crate) fn authorization_generation(&self) -> u64 {
-        self.payload.authorization_generation
+    pub(crate) fn authorization_generation(&self) -> &AuthorizationGeneration {
+        &self.payload.authorization_generation
     }
 
     pub(crate) fn expires_at_epoch_seconds(&self) -> i64 {
@@ -288,7 +346,7 @@ impl ExecutionEnvelopeAuthority {
     pub(crate) fn issue_root(
         &self,
         scope: TrustedExecutionScope,
-        authorization_generation: u64,
+        authorization_generation: AuthorizationGeneration,
         issued_at_epoch_seconds: i64,
         expires_at_epoch_seconds: i64,
     ) -> Result<TrustedExecutionEnvelope, EnvelopeError> {
@@ -309,7 +367,7 @@ impl ExecutionEnvelopeAuthority {
     pub(crate) fn verify<'a>(
         &self,
         envelope: &'a TrustedExecutionEnvelope,
-        current_authorization_generation: u64,
+        current_authorization_generation: &AuthorizationGeneration,
         now_epoch_seconds: i64,
     ) -> Result<&'a TrustedExecutionScope, EnvelopeError> {
         let expected = self.mac(&envelope.payload)?;
@@ -317,7 +375,7 @@ impl ExecutionEnvelopeAuthority {
             return Err(EnvelopeError::Tampered);
         }
         validate_payload(&envelope.payload)?;
-        if envelope.payload.authorization_generation != current_authorization_generation {
+        if &envelope.payload.authorization_generation != current_authorization_generation {
             return Err(EnvelopeError::GenerationMismatch);
         }
         if now_epoch_seconds < envelope.payload.issued_at_epoch_seconds {
@@ -335,7 +393,7 @@ impl ExecutionEnvelopeAuthority {
         &self,
         parent: &TrustedExecutionEnvelope,
         child_scope: TrustedExecutionScope,
-        current_authorization_generation: u64,
+        current_authorization_generation: &AuthorizationGeneration,
         issued_at_epoch_seconds: i64,
         expires_at_epoch_seconds: i64,
     ) -> Result<TrustedExecutionEnvelope, EnvelopeError> {
@@ -356,7 +414,7 @@ impl ExecutionEnvelopeAuthority {
             .ok_or(EnvelopeError::DerivationLimit)?;
         self.seal(EnvelopePayload {
             version: ENVELOPE_VERSION,
-            authorization_generation: parent.payload.authorization_generation,
+            authorization_generation: parent.payload.authorization_generation.clone(),
             issued_at_epoch_seconds,
             expires_at_epoch_seconds,
             derivation_depth,
@@ -406,9 +464,7 @@ fn validate_payload(payload: &EnvelopePayload) -> Result<(), EnvelopeError> {
     if payload.version != ENVELOPE_VERSION || payload.derivation_depth > MAX_DERIVATION_DEPTH {
         return Err(EnvelopeError::InvalidValidity);
     }
-    if payload.authorization_generation == 0 {
-        return Err(EnvelopeError::InvalidGeneration);
-    }
+    payload.authorization_generation.validate()?;
     payload
         .expires_at_epoch_seconds
         .checked_sub(payload.issued_at_epoch_seconds)
@@ -422,14 +478,14 @@ fn string_set(values: impl IntoIterator<Item = impl Into<String>>) -> BTreeSet<S
 }
 
 fn validate_dimension(name: &'static str, values: &BTreeSet<String>) -> Result<(), EnvelopeError> {
-    if values.is_empty() || values.len() > MAX_SCOPE_VALUES {
+    if values.len() > MAX_SCOPE_VALUES {
         return Err(EnvelopeError::InvalidScope(match name {
-            "data classes" => "data-class scope must be nonempty and bounded",
-            "regions" => "region scope must be nonempty and bounded",
-            "processors" => "processor scope must be nonempty and bounded",
-            "runtimes" => "runtime scope must be nonempty and bounded",
-            "disclosures" => "disclosure scope must be nonempty and bounded",
-            _ => "retention scope must be nonempty and bounded",
+            "data classes" => "data-class scope exceeds its bound",
+            "regions" => "region scope exceeds its bound",
+            "processors" => "processor scope exceeds its bound",
+            "runtimes" => "runtime scope exceeds its bound",
+            "disclosures" => "disclosure scope exceeds its bound",
+            _ => "retention scope exceeds its bound",
         }));
     }
     for value in values {
@@ -455,6 +511,7 @@ fn validate_identifier(
             "processors" => "processor identifier is malformed",
             "runtimes" => "runtime identifier is malformed",
             "disclosures" => "disclosure identifier is malformed",
+            "authorization generation" => "authorization generation is malformed",
             _ => "retention identifier is malformed",
         }));
     }
@@ -519,7 +576,11 @@ mod tests {
     use super::*;
 
     const NOW: i64 = 1_700_000_000;
-    const GENERATION: u64 = 41;
+
+    fn generation() -> AuthorizationGeneration {
+        AuthorizationGeneration::new(41, "policy:8d34a812", format!("sha256:{}", "a".repeat(64)))
+            .expect("valid generation")
+    }
 
     fn authority() -> ExecutionEnvelopeAuthority {
         ExecutionEnvelopeAuthority::new(&[0x5a; 32]).expect("strong test key")
@@ -557,7 +618,7 @@ mod tests {
 
     fn root() -> TrustedExecutionEnvelope {
         authority()
-            .issue_root(root_scope(), GENERATION, NOW, NOW + 600)
+            .issue_root(root_scope(), generation(), NOW, NOW + 600)
             .expect("valid envelope")
     }
 
@@ -565,18 +626,18 @@ mod tests {
     fn verified_root_exposes_server_derived_scope() {
         let authority = authority();
         let envelope = authority
-            .issue_root(root_scope(), GENERATION, NOW, NOW + 600)
+            .issue_root(root_scope(), generation(), NOW, NOW + 600)
             .expect("valid envelope");
 
         let verified = authority
-            .verify(&envelope, GENERATION, NOW + 1)
+            .verify(&envelope, &generation(), NOW + 1)
             .expect("current envelope");
 
         assert_eq!(verified.organization_id(), 7);
         assert_eq!(verified.company_id(), 11);
         assert_eq!(verified.actor_identity(), "actor:4f5e");
         assert!(verified.permits(Capability::NamedRead));
-        assert_eq!(envelope.authorization_generation(), GENERATION);
+        assert_eq!(envelope.authorization_generation(), &generation());
     }
 
     #[test]
@@ -593,11 +654,11 @@ mod tests {
         .expect("valid child scope");
 
         let child = authority
-            .derive_child(&parent, child_scope, GENERATION, NOW + 10, NOW + 300)
+            .derive_child(&parent, child_scope, &generation(), NOW + 10, NOW + 300)
             .expect("narrow child");
 
         let verified = authority
-            .verify(&child, GENERATION, NOW + 11)
+            .verify(&child, &generation(), NOW + 11)
             .expect("valid child");
         assert_eq!(child.derivation_depth(), 1);
         assert_eq!(child.expires_at_epoch_seconds(), NOW + 300);
@@ -651,13 +712,13 @@ mod tests {
 
         for widened in cases {
             assert!(matches!(
-                authority.derive_child(&parent, widened, GENERATION, NOW + 1, NOW + 300),
+                authority.derive_child(&parent, widened, &generation(), NOW + 1, NOW + 300),
                 Err(EnvelopeError::ScopeWidened(_))
             ));
         }
         assert_eq!(
             authority
-                .derive_child(&parent, root_scope(), GENERATION, NOW + 1, NOW + 601)
+                .derive_child(&parent, root_scope(), &generation(), NOW + 1, NOW + 601)
                 .expect_err("expiry may not widen"),
             EnvelopeError::ScopeWidened("expiry")
         );
@@ -671,22 +732,50 @@ mod tests {
         let mut tampered = envelope.clone();
         tampered.payload.scope.company_id = 99;
         assert_eq!(
-            authority.verify(&tampered, GENERATION, NOW + 1),
+            authority.verify(&tampered, &generation(), NOW + 1),
             Err(EnvelopeError::Tampered)
         );
 
         let other_authority =
             ExecutionEnvelopeAuthority::new(&[0x6b; 32]).expect("strong alternate key");
         assert_eq!(
-            other_authority.verify(&envelope, GENERATION, NOW + 1),
+            other_authority.verify(&envelope, &generation(), NOW + 1),
             Err(EnvelopeError::Tampered)
         );
         assert_eq!(
-            authority.verify(&envelope, GENERATION + 1, NOW + 1),
+            authority.verify(
+                &envelope,
+                &AuthorizationGeneration::new(
+                    42,
+                    "policy:8d34a812",
+                    format!("sha256:{}", "a".repeat(64)),
+                )
+                .expect("new generation"),
+                NOW + 1,
+            ),
             Err(EnvelopeError::GenerationMismatch)
         );
+        for changed in [
+            AuthorizationGeneration::new(
+                41,
+                "policy:changed",
+                format!("sha256:{}", "a".repeat(64)),
+            )
+            .expect("changed policy generation"),
+            AuthorizationGeneration::new(
+                41,
+                "policy:8d34a812",
+                format!("sha256:{}", "b".repeat(64)),
+            )
+            .expect("changed grant generation"),
+        ] {
+            assert_eq!(
+                authority.verify(&envelope, &changed, NOW + 1),
+                Err(EnvelopeError::GenerationMismatch)
+            );
+        }
         assert_eq!(
-            authority.verify(&envelope, GENERATION, NOW + 600),
+            authority.verify(&envelope, &generation(), NOW + 600),
             Err(EnvelopeError::Expired)
         );
     }
@@ -711,13 +800,63 @@ mod tests {
             authority()
                 .issue_root(
                     root_scope(),
-                    GENERATION,
+                    generation(),
                     NOW,
                     NOW + MAX_ENVELOPE_LIFETIME_SECONDS + 1
                 )
                 .expect_err("overlong lifetime"),
             EnvelopeError::InvalidValidity
         );
+    }
+
+    #[test]
+    fn empty_unresolved_processor_dimensions_grant_no_extra_target_scope() {
+        let scope = TrustedExecutionScope::new(
+            "actor:4f5e",
+            7,
+            11,
+            [Capability::NamedRead],
+            ExecutionRestrictions::default(),
+        )
+        .expect("empty restrictions are a deny-by-default scope");
+        let envelope = authority()
+            .issue_root(scope, generation(), NOW, NOW + 60)
+            .expect("valid local read envelope");
+        assert!(envelope.scope().restrictions().regions().is_empty());
+        assert!(envelope.scope().restrictions().processors().is_empty());
+    }
+
+    #[test]
+    fn capability_free_surface_is_sealed_as_no_tool_authority() {
+        let authority = authority();
+        let scope =
+            TrustedExecutionScope::new("actor:4f5e", 7, 11, [], ExecutionRestrictions::default())
+                .expect("generation-only surfaces have an explicit empty capability set");
+        let envelope = authority
+            .issue_root(scope, generation(), NOW, NOW + 60)
+            .expect("valid no-tool envelope");
+
+        let verified = authority
+            .verify(&envelope, &generation(), NOW + 1)
+            .expect("current no-tool envelope");
+        assert!(verified.capabilities().is_empty());
+        assert!(matches!(
+            authority.derive_child(
+                &envelope,
+                TrustedExecutionScope::new(
+                    "actor:4f5e",
+                    7,
+                    11,
+                    [Capability::NamedRead],
+                    ExecutionRestrictions::default(),
+                )
+                .expect("well-formed read scope"),
+                &generation(),
+                NOW + 1,
+                NOW + 30,
+            ),
+            Err(EnvelopeError::ScopeWidened("capabilities"))
+        ));
     }
 
     #[test]
