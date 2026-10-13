@@ -7,13 +7,35 @@ no code): `docs/plan/workflow-subject-snapshot-read-design.md`.
 
 ## Implementation status
 
-Task 1 is implemented on top of the design branch. Local acceptance includes a
-release WebAssembly build, an isolated SpacetimeDB 2.8.2 Docker publish, the
-focused in-database workflow snapshot test, API reader tests, code-generator
-tests, and the full `check-codegen` gate. Migration 12 is promoted and frozen.
+Task 1 is complete on `codex/workflow-snapshot-backend`. Local acceptance
+includes a release WebAssembly build, an isolated SpacetimeDB 2.8.2 Docker
+publish, the focused in-database workflow snapshot test, API reader tests,
+code-generator tests, and the full `check-codegen` gate. Migration 12 is
+promoted and frozen.
 
-The remote contracts release, pin commit, and `frontend-contracts` check remain
-pending. Task 2 remains intentionally unstarted until that pin lands.
+The remote `Release contracts` run
+[`37972434929`](https://github.com/KevTiv/lumiere-v-1/actions/runs/37972434929)
+passed. It published `lumiere-contracts` `v0.3.90` and pinned it in commit
+`c0012a78f` (`chore(contracts): publish and pin v0.3.90`).
+
+Task 2 is implemented on the dependent branch
+`codex/pass26-workflow-runtime`. The client requests and exact-reads the
+canonical snapshot before start or signal. It passes only the snapshot revision
+hash to `start_workflow` and passes the complete snapshot unchanged to
+`signal_workflow`. The start action is available on published versions. The
+signal action is available on active instances and uses signal keys from the
+same version's workflow edges. The API workflow-edge projection now includes
+`signal_key` for this exact selection.
+
+Static acceptance is complete: query-hooks and web type checks pass against the
+pinned `v0.3.90` contract, all 325 query-hooks tests pass, all 97 STDB package
+tests pass, the five focused workflow-runtime wire tests pass, the focused API
+workflow reader tests pass, and the focused Rust file passes `rustfmt --check`.
+Production Docker browser acceptance also passes on an isolated, clean E2E
+module: authenticate, publish the version, request and exact-read the canonical
+snapshot, start the workflow, find the exact instance, request and exact-read a
+fresh snapshot, signal the instance, and wait for durable projection
+convergence.
 
 ## Goal
 
@@ -74,10 +96,10 @@ in the repo), or computing in the api-server (rejected: would duplicate the hash
 Acceptance: Rust tests pass; Release contracts workflow green and the pin commit
 lands; `frontend-contracts` passes against the new pin.
 
-## Task 2 - frontend (after Task 1 is merged and pinned)
+## Task 2 - frontend (implemented after the Task 1 pin)
 
-Branch `claude/pass26-ui` (identical to `claude/pass25-ui`, no commits yet) was
-cut for this. Hooks and wrappers already exist: `useStartWorkflow`,
+The implementation is on `codex/pass26-workflow-runtime`. Hooks and wrappers
+already existed: `useStartWorkflow`,
 `useSignalWorkflow` (`frontend/packages/query-hooks/src/hooks/workflows.ts` ~280,
 ~294; `frontend/packages/stdb/src/commands/workflows-http.ts`).
 
@@ -135,6 +157,19 @@ Manifest/exposure rules:
   in the generator.
 - Do not hand-edit generated bindings or contract artifacts; the workflow
   regenerates them.
+
+Docker acceptance notes:
+- `docker-compose.e2e.yml` must run the production web build from
+  `/workspace/frontend`. The service working directory is
+  `/workspace/frontend/web`, where `pnpm --filter ./web` matches no project.
+- The `v0.3.90` generated Rust bindings peaked near 9.7 GiB while the Docker
+  api-server compiled. Do not overlap that compile with the release WebAssembly
+  build on an 8 GiB OrbStack allocation. The accepted run used a temporary
+  12 GiB allocation and restored the prior setting afterward.
+- Reuse `.tmp/e2e/env.sh` when a setup retry keeps the same E2E PostgreSQL
+  database. Generating a new `STDB_CREDENTIAL_ENCRYPTION_KEY` against existing
+  encrypted credentials fails closed with `aead::Error`. Otherwise, use
+  `E2E_CLEAR_DB=1` to reset both scoped E2E stores.
 
 ## Open decisions not covered above
 

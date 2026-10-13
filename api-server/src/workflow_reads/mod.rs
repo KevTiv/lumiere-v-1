@@ -53,8 +53,8 @@ write_date, metadata";
 
 const WORKFLOW_EDGE_COLS: &str =
     "id, organization_id, company_id, workflow_id, workflow_version_id, \
-edge_key, from_node_key, to_node_key, sequence, create_uid, create_date, write_uid, write_date, \
-metadata";
+edge_key, from_node_key, to_node_key, sequence, signal_key, create_uid, create_date, write_uid, \
+write_date, metadata";
 
 const WORKFLOW_INSTANCE_COLS: &str =
     "id, organization_id, company_id, workflow_id, workflow_version_id, \

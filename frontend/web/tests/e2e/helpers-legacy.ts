@@ -2885,7 +2885,7 @@ export async function waitForWorkflowVersionStatus(
 /** Seed a minimal publishable linear draft (start → end) via BFF reducers. */
 export async function seedPublishableWorkflowDraft(
   page: Page,
-  options?: { workflowKey?: string; model?: string; name?: string },
+  options?: { workflowKey?: string; model?: string; name?: string; signalKey?: string },
 ): Promise<{
   organizationId: number
   companyId: number
@@ -2950,7 +2950,9 @@ export async function seedPublishableWorkflowDraft(
       fromNodeKey: "start",
       toNodeKey: "end",
       sequence: 1,
-      signalKey: WORKFLOW_NONE,
+      signalKey: options?.signalKey
+        ? WORKFLOW_SOME(options.signalKey)
+        : WORKFLOW_NONE,
       condition: WORKFLOW_NONE,
       metadata: WORKFLOW_NONE,
     },
