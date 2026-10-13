@@ -72,9 +72,10 @@ function stdbTypeToModular(type: StdbFieldType): FormField["type"] {
     case "Slider":
       return "number"
     case "Select":
-    case "MultiSelect":
     case "UserSelect":
       return "select"
+    case "MultiSelect":
+      return "multiselect"
     case "Checkbox":
       return "checkbox"
     case "Switch":
@@ -92,7 +93,7 @@ function stdbTypeToModular(type: StdbFieldType): FormField["type"] {
     case "Hidden":
       return "hidden"
     default:
-      return "text"
+      throw new Error(`Unsupported runtime field type: ${type}`)
   }
 }
 
@@ -118,11 +119,23 @@ export function parsedFieldToModularField(field: ParsedFormField): FormField {
   }
 
   const modularType = stdbTypeToModular(field.type)
+  if (modularType === "multiselect") {
+    if (field.defaultValue !== undefined &&
+        (!Array.isArray(field.defaultValue) || !field.defaultValue.every((value) => typeof value === "string"))) {
+      throw new Error(`MultiSelect default must be an array of strings: ${field.fieldId}`)
+    }
+    return {
+      ...base,
+      type: "multiselect",
+      options: field.options.map((option) => ({ ...option })),
+      defaultValue: field.defaultValue as string[] | undefined,
+    }
+  }
   if (modularType === "select" || modularType === "radio") {
     return {
       ...base,
       type: modularType,
-      options: field.options.map((o) => ({ value: o.value, label: o.label, disabled: false })),
+      options: field.options.map((o) => ({ value: o.value, label: o.label, disabled: o.disabled })),
       defaultValue: typeof field.defaultValue === "string" ? field.defaultValue : undefined,
     }
   }
@@ -198,15 +211,16 @@ export function mergeRuntimeFormConfig(
     preferStdbVisibility?: boolean
     runtimeFromDatabase?: boolean
   },
-): { config: FormConfig; customFieldIds: string[] } {
+): { config: FormConfig; customFieldIds: string[]; bindingErrors: string[] } {
   if (!runtime) {
-    return { config: staticConfig, customFieldIds: [] }
+    return { config: staticConfig, customFieldIds: [], bindingErrors: [] }
   }
 
   const preferStdb =
     Boolean(options?.preferStdbVisibility) && Boolean(options?.runtimeFromDatabase)
   const sourceFields = runtime.sourceFields?.length ? runtime.sourceFields : runtime.fields
 
+  const bindingErrors: string[] = []
   const matchedStdbIds = new Set<string>()
   const sections: FormSection[] = staticConfig.sections.map((section) => ({
     ...section,
@@ -215,6 +229,16 @@ export function mergeRuntimeFormConfig(
         const inRoleOrEnabled = findMatchingStdbField(field, runtime.fields)
         if (inRoleOrEnabled) {
           matchedStdbIds.add(inRoleOrEnabled.fieldId)
+          const runtimeIsArray = inRoleOrEnabled.type === "MultiSelect" || inRoleOrEnabled.type === "Tags"
+          const staticIsArray = field.type === "multiselect"
+          const defaultIsArray = Array.isArray(inRoleOrEnabled.defaultValue)
+          const invalidArrayDefault = staticIsArray && inRoleOrEnabled.defaultValue !== undefined &&
+            (!defaultIsArray || !(inRoleOrEnabled.defaultValue as unknown[]).every((item) => typeof item === "string"))
+          if (runtimeIsArray !== staticIsArray || invalidArrayDefault || (!staticIsArray && defaultIsArray)) {
+            bindingErrors.push(`Runtime field ${inRoleOrEnabled.fieldId} has incompatible cardinality for ${field.name}`)
+            return field
+          }
+          // The static renderer remains authoritative, including Custom runtime metadata.
           return applyStdbOverrides(field, inRoleOrEnabled)
         }
         if (preferStdb && findMatchingStdbField(field, sourceFields)) {
@@ -237,7 +261,14 @@ export function mergeRuntimeFormConfig(
   const extraFields = runtime.fields
     .filter((f) => f.isEnabled && !matchedStdbIds.has(f.fieldId) && isCustomField(f.fieldId))
     .sort((a, b) => a.order - b.order)
-    .map(parsedFieldToModularField)
+    .flatMap((field) => {
+      try {
+        return [parsedFieldToModularField(field)]
+      } catch (error) {
+        bindingErrors.push(`Runtime field ${field.fieldId}: ${error instanceof Error ? error.message : "Invalid field binding"}`)
+        return []
+      }
+    })
 
   if (extraFields.length > 0) {
     sections.push({
@@ -249,6 +280,7 @@ export function mergeRuntimeFormConfig(
 
   return {
     config: { ...staticConfig, sections },
+    bindingErrors,
     customFieldIds: runtime.fields.filter((f) => isCustomField(f.fieldId)).map((f) => f.fieldId),
   }
 }
