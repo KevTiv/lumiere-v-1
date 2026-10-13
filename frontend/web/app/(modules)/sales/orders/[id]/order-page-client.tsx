@@ -52,7 +52,7 @@ import {
 } from '@lumiere/erp-workflows';
 import { saleOrderPrimaryLabel } from '@lumiere/stdb/read-models';
 import type { StockPicking } from '@lumiere/stdb/types';
-import { useAccountMoves } from '@lumiere/query-hooks/hooks/accounting';
+import { useAccountMoves, useAccountPayments } from '@lumiere/query-hooks/hooks/accounting';
 import { useContacts, type Contact } from '@lumiere/query-hooks/hooks/crm';
 import { useCreateDocument } from '@lumiere/query-hooks/hooks/documents';
 import { useProducts, useStockPickings } from '@lumiere/query-hooks/hooks/inventory';
@@ -150,6 +150,7 @@ function SaleOrderPageLoaded({
   const { data: orderLines = [] } = useSaleOrderLines(orgId, initialOrderLines);
   const { data: stockPickings = [] } = useStockPickings(orgId, initialStockPickings);
   const { data: accountMoves = [] } = useAccountMoves(orgId);
+  const { data: accountPayments = [] } = useAccountPayments(orgId);
   const { data: returnOrders = [] } = useReturnOrders(orgId);
   const { data: contacts = [] } = useContacts(orgId, initialContacts);
   const { data: productRows = [] } = useProducts(orgId);
@@ -382,6 +383,7 @@ function SaleOrderPageLoaded({
     stockPickings as never,
     accountMoves as never,
     returnOrders as never,
+    accountPayments as never,
   );
 
   const createReturnLabel = t('sales.order.createReturn', { defaultValue: 'Create return' });

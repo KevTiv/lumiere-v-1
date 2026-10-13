@@ -641,6 +641,45 @@ export const settingsSections: SettingsSection[] = [
   },
 ]
 
+export type SettingsSectionExposure = "enabled" | "admin-only" | "hidden"
+
+export interface SettingsSectionExposurePolicy {
+  readonly id: string
+  readonly exposure: SettingsSectionExposure
+  readonly owner: string
+  readonly minimumEvidence: string
+  readonly hiddenReason: string | null
+}
+
+/**
+ * Authoritative first-organization Settings exposure manifest. Every section
+ * must be classified exactly once; tests fail if a new internal/admin panel is
+ * added without an explicit launch disposition.
+ */
+export const SETTINGS_SECTION_EXPOSURE: readonly SettingsSectionExposurePolicy[] = [
+  { id: "profile", exposure: "enabled", owner: "COV-23", minimumEvidence: "authenticated profile settings", hiddenReason: null },
+  { id: "notifications", exposure: "enabled", owner: "COV-23", minimumEvidence: "authenticated notification settings", hiddenReason: null },
+  { id: "appearance", exposure: "enabled", owner: "UX-02", minimumEvidence: "theme and density persistence", hiddenReason: null },
+  { id: "custom-fields", exposure: "enabled", owner: "COV-23", minimumEvidence: "user-owned custom fields", hiddenReason: null },
+  { id: "users", exposure: "admin-only", owner: "COV-23", minimumEvidence: "membership assign and revoke", hiddenReason: "organization administrators only" },
+  { id: "roles", exposure: "admin-only", owner: "COV-23", minimumEvidence: "role and permission lifecycle", hiddenReason: "organization administrators only" },
+  { id: "sso", exposure: "admin-only", owner: "COV-23", minimumEvidence: "SSO status and account-link lifecycle", hiddenReason: "organization administrators only" },
+  { id: "form-config", exposure: "admin-only", owner: "COV-22", minimumEvidence: "versioned form publish and stale rejection", hiddenReason: "organization administrators only" },
+  { id: "audit", exposure: "admin-only", owner: "COV-23", minimumEvidence: "organization-scoped audit read", hiddenReason: "organization administrators only" },
+  { id: "organization", exposure: "admin-only", owner: "COV-23", minimumEvidence: "organization and company lifecycle", hiddenReason: "organization administrators only" },
+  { id: "ai", exposure: "hidden", owner: "GOV/CAP", minimumEvidence: "governed AI settings admission", hiddenReason: "AI governance is outside the first-organization ERP denominator" },
+] as const
+
+const settingsExposureById = new Map(
+  SETTINGS_SECTION_EXPOSURE.map((policy) => [policy.id, policy]),
+)
+
+export function isSettingsSectionAdmitted(sectionId: string, isAdmin: boolean): boolean {
+  const policy = settingsExposureById.get(sectionId)
+  if (!policy || policy.exposure === "hidden") return false
+  return policy.exposure === "enabled" || isAdmin
+}
+
 // Dashboard view to permission mapping
 export const dashboardViewPermissions: DashboardViewPermission[] = [
   { viewId: "overview", resource: "dashboard:overview", label: "Overview" },

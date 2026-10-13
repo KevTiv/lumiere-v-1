@@ -2,7 +2,12 @@
 
 use spacetimedb::{ReducerContext, Table};
 
+use crate::crm::contacts::contact;
+use crate::data_ops::crm_imports::import_contact_csv;
 use crate::data_ops::hr_imports::import_hr_payslip_csv;
+use crate::data_ops::import_mapping_templates::{
+    finalize_import_assistant_job, FinalizeImportAssistantJobParams,
+};
 use crate::data_ops::import_tracker::{
     import_content_sha256, import_job, import_job_error,
 };
@@ -15,6 +20,100 @@ fn payslip_count(ctx: &ReducerContext, organization_id: u64) -> usize {
         .iter()
         .filter(|slip| slip.organization_id == organization_id)
         .count()
+}
+
+pub fn test_contact_assistant_import_replay_is_rejected_by_file_hash(
+    ctx: &ReducerContext,
+) -> Result<(), String> {
+    ensure_test_superuser(ctx)?;
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let org = fixture.organization_id;
+    let file = "name,email\nCOV22 Assistant Contact,cov22-assistant@example.test".to_string();
+
+    let contacts_before = ctx
+        .db
+        .contact()
+        .iter()
+        .filter(|row| row.organization_id == org)
+        .count();
+    import_contact_csv(ctx, org, file.clone())?;
+    let contacts_after = ctx
+        .db
+        .contact()
+        .iter()
+        .filter(|row| row.organization_id == org)
+        .count();
+    if contacts_after != contacts_before + 1 {
+        return Err("assistant import must create exactly one contact".to_string());
+    }
+
+    let file_sha256 = import_content_sha256(&file);
+    let expected_hash = serde_json::json!({ "sha256": &file_sha256 }).to_string();
+    let jobs: Vec<_> = ctx
+        .db
+        .import_job()
+        .import_job_by_org()
+        .filter(&org)
+        .filter(|job| job.table_name == "contact")
+        .collect();
+    if jobs.len() != 1
+        || jobs[0].status != "success"
+        || jobs[0].metadata.as_deref() != Some(expected_hash.as_str())
+    {
+        return Err("assistant import must retain one exact successful hash identity".to_string());
+    }
+
+    finalize_import_assistant_job(
+        ctx,
+        org,
+        jobs[0].id,
+        FinalizeImportAssistantJobParams {
+            metadata_json: serde_json::json!({
+                "ai_assisted": true,
+                "column_mapping": {"name": "name", "email": "email"},
+                "sha256": "forged",
+            })
+            .to_string(),
+            template_id: None,
+        },
+    )?;
+    let finalized = ctx
+        .db
+        .import_job()
+        .id()
+        .find(&jobs[0].id)
+        .ok_or("finalized assistant job missing")?;
+    let finalized_metadata = serde_json::from_str::<serde_json::Value>(
+        finalized.metadata.as_deref().unwrap_or("{}"),
+    )
+    .map_err(|error| format!("finalized metadata is invalid: {error}"))?;
+    if finalized_metadata.get("sha256").and_then(|value| value.as_str())
+        != Some(file_sha256.as_str())
+        || finalized_metadata.get("ai_assisted").and_then(|value| value.as_bool()) != Some(true)
+    {
+        return Err("assistant finalization erased or forged the exact file identity".to_string());
+    }
+
+    if import_contact_csv(ctx, org, file).is_ok() {
+        return Err("assistant import replay must be rejected".to_string());
+    }
+    let contacts_after_replay = ctx
+        .db
+        .contact()
+        .iter()
+        .filter(|row| row.organization_id == org)
+        .count();
+    let jobs_after_replay = ctx
+        .db
+        .import_job()
+        .import_job_by_org()
+        .filter(&org)
+        .filter(|job| job.table_name == "contact")
+        .count();
+    if contacts_after_replay != contacts_after || jobs_after_replay != 1 {
+        return Err("assistant import replay changed contacts or jobs".to_string());
+    }
+    Ok(())
 }
 
 fn job_count(ctx: &ReducerContext, organization_id: u64) -> usize {

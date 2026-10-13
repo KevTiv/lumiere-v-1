@@ -4,6 +4,7 @@ import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
 import { stdbBffCommandPost } from "@lumiere/stdb/commands"
 
 import {
+  fetchDefaultCompanyId,
   fetchSessionOrganizationId,
   gotoModule,
   scalarQueryId,
@@ -375,5 +376,59 @@ test.describe("COV-26 Reports source quality", { tag: "@dev-fixture" }, () => {
     await expect(page.getByTestId("qb-source-error")).toHaveAttribute("role", "alert")
     await expect(page.getByTestId("qb-preview-unavailable")).toBeVisible()
     await expect(page.getByTestId("qb-source-row-count")).toHaveCount(0)
+  })
+
+  test("recovers after a disconnected source read without retaining stale success", async ({
+    page,
+  }) => {
+    let connected = false
+    await page.route("**/api/query/sale-orders", async (route) => {
+      if (!connected) {
+        await route.abort("internetdisconnected")
+        return
+      }
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ data: [{ id: 17, state: { tag: "Sale" }, amountTotal: 125 }] }),
+      })
+    })
+
+    await openSaleOrderQueryBuilder(page)
+
+    await expect(page.getByTestId("qb-source-error")).toHaveAttribute("role", "alert")
+    await expect(page.getByTestId("qb-source-row-count")).toHaveCount(0)
+    connected = true
+    await page.getByTestId("qb-source-retry").click()
+
+    await expect(page.getByTestId("qb-source-row-count")).toContainText("1 row loaded")
+    await expect(page.getByTestId("qb-source-error")).toHaveCount(0)
+    await expect(page.getByTestId("qb-model")).toBeFocused()
+  })
+
+  test("shows only saved report definitions for the active company", async ({ page }) => {
+    const companyId = await fetchDefaultCompanyId(page)
+
+    const currentName = `COV-26 current company ${Date.now()}`
+    const foreignName = `COV-26 foreign company ${Date.now()}`
+    await page.route("**/api/query/saved-reports", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          data: [
+            { id: 91, companyId, name: currentName },
+            { id: 92, companyId: companyId + 1, name: foreignName },
+          ],
+        }),
+      })
+    })
+
+    await gotoModule(page, "/reports", "reports")
+    await page.getByTestId("module-tab-reports-pivot-explorer").click()
+    await page.getByTestId("pivot-saved-select").click()
+
+    await expect(page.getByRole("option", { name: currentName, exact: true })).toBeVisible()
+    await expect(page.getByRole("option", { name: foreignName, exact: true })).toHaveCount(0)
   })
 })

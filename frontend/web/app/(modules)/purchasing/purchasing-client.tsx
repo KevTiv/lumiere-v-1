@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from "react"
 import type { QueryResourceState } from "@lumiere/api-client"
 import { useModuleTab } from "@/hooks/use-module-tab"
 import { useTranslation } from "@lumiere/i18n"
+import { useErpSession } from "@lumiere/erp-session"
 import { Badge } from "@lumiere/ui/components/badge"
 import {
   ModuleView,
@@ -59,7 +60,11 @@ import type { Product, Uom } from "@lumiere/stdb/types"
 import { purchasingModuleConfig } from "@/lib/module-dashboard-configs"
 import { usePurchasingModuleSubscription } from "@/lib/module-subscription-hooks"
 import { PurchasingOpsSod } from "./purchasing-ops-sod"
-import { purchaseOrderLineCanBeRemoved, requisitionCanCreateRfq } from "./purchasing-action-gates"
+import {
+  purchaseOrderLineCanBeRemoved,
+  requisitionCanApprove,
+  requisitionCanCreateRfq,
+} from "./purchasing-action-gates"
 import { requisitionCanAddLine, toRequisitionLineInput } from "./purchase-requisition-line"
 import { showWorkflowToast } from "@lumiere/ui/lib/workflow-toast"
 import { PurchasingBlanketWorkspace } from "./purchasing-blanket-workspace"
@@ -453,6 +458,7 @@ function PurchasingClientLoaded({
 }: PurchasingClientLoadedProps) {
   usePurchasingModuleSubscription()
   const { t } = useTranslation()
+  const { identity } = useErpSession()
   const { currentUser } = useRBAC()
   const runtimeRoleId = currentUser?.roles[0]
   const { orgId } = orgBigInts(organizationId)
@@ -1721,22 +1727,31 @@ function PurchasingClientLoaded({
   const requisitionsEntityConfig = useMemo((): EntityViewConfig => {
     const base = purchaseRequisitionsTableConfig(t)
     const view = base.view as EntityTableConfig
+    const workflowActions = workflowActionsToEntityActions(purchasingWorkflow.requisitionActions, {
+      ids: {
+        "purchasing.requisition.submit": "req-submit",
+        "purchasing.requisition.approve": "req-approve",
+        "purchasing.requisition.convert": "req-convert-po",
+        "purchasing.requisition.close": "req-close",
+        "purchasing.requisition.cancel": "req-cancel",
+      },
+      confirmation: WORKFLOW_CONFIRMATION(t),
+    }).map((action) =>
+      action.id === "req-approve"
+        ? {
+            ...action,
+            isApplicable: (rows: EntityRow[]) =>
+              rows.length > 0 && rows.every((row) => requisitionCanApprove(row, identity)),
+          }
+        : action,
+    )
     return {
       ...base,
       view: {
         ...view,
         actions: [
           // Legacy ids keep the existing e2e selectors while the actions run through the workflow seam.
-          ...workflowActionsToEntityActions(purchasingWorkflow.requisitionActions, {
-            ids: {
-              "purchasing.requisition.submit": "req-submit",
-              "purchasing.requisition.approve": "req-approve",
-              "purchasing.requisition.convert": "req-convert-po",
-              "purchasing.requisition.close": "req-close",
-              "purchasing.requisition.cancel": "req-cancel",
-            },
-            confirmation: WORKFLOW_CONFIRMATION(t),
-          }),
+          ...workflowActions,
           {
             id: "req-add-line",
             label: t("purchasing.requisition.addLine.title", { defaultValue: "Add requisition line" }),
@@ -1768,7 +1783,7 @@ function PurchasingClientLoaded({
         ],
       },
     }
-  }, [t, purchasingWorkflow.requisitionActions, openCreateRfqFromRequisition, promptAddRequisitionLine])
+  }, [t, identity, purchasingWorkflow.requisitionActions, openCreateRfqFromRequisition, promptAddRequisitionLine])
 
   const landedCostsEntityConfig = useMemo((): EntityViewConfig => {
     const view: EntityTableConfig = {

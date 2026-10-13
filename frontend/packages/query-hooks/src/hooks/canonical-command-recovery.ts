@@ -1,5 +1,6 @@
 import {
   toWorkflowError,
+  type WorkflowOutcome,
   type ObservedTransition,
 } from "@lumiere/erp-workflows"
 
@@ -15,6 +16,7 @@ import {
 export async function executeCommandWithAppliedRecovery(
   command: () => Promise<void>,
   observe: () => Promise<ObservedTransition>,
+  recoverOutcomes: readonly WorkflowOutcome[] = ["applied"],
 ): Promise<void> {
   try {
     await command()
@@ -23,7 +25,7 @@ export async function executeCommandWithAppliedRecovery(
 
     try {
       const observed = await observe()
-      if (observed.outcome === "applied") return
+      if (observed.outcome != null && recoverOutcomes.includes(observed.outcome)) return
     } catch {
       // Preserve the command failure. The caller's normal completion path
       // will refresh affected resources and report the unresolved outcome.

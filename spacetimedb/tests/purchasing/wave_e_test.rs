@@ -208,17 +208,37 @@ pub fn test_requisition_convert_copies_lines(ctx: &ReducerContext) -> Result<(),
     if approved.write_uid != ctx.sender() || approved.user_id != independent_requester {
         return Err("purchase requisition did not record the independent approver".into());
     }
+    let company_mismatch = convert_purchase_requisition_to_po(
+        ctx,
+        org_id,
+        company_id.saturating_add(9_999),
+        requisition.id,
+    )
+    .err()
+    .ok_or("cross-company requisition conversion was accepted")?;
+    if !company_mismatch.contains("requested company") {
+        return Err(format!("unexpected company mismatch error: {company_mismatch}"));
+    }
+    convert_purchase_requisition_to_po(ctx, org_id, company_id, requisition.id)?;
+    // Same-request/lost-response retry resolves to the already-related PO.
     convert_purchase_requisition_to_po(ctx, org_id, company_id, requisition.id)?;
 
-    let po = ctx
+    let matching_pos: Vec<_> = ctx
         .db
         .purchase_order()
         .iter()
-        .find(|o| {
+        .filter(|o| {
             o.organization_id == org_id
                 && o.origin.as_deref() == Some(&format!("requisition:{}", requisition.id))
         })
-        .ok_or("converted PO missing")?;
+        .collect();
+    if matching_pos.len() != 1 {
+        return Err(format!(
+            "expected one converted PO after replay, got {}",
+            matching_pos.len()
+        ));
+    }
+    let po = &matching_pos[0];
 
     let lines: Vec<_> = ctx
         .db

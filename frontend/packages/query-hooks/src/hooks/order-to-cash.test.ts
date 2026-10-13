@@ -92,6 +92,49 @@ test("links active returns by exact sale-order foreign key within scope", () => 
   ])
 })
 
+test("links paid payments only through exact reconciled invoice IDs", () => {
+  const handoffs = orderHandoffs(
+    5n,
+    scope,
+    [],
+    [invoice(21n, 5n), invoice(22n, 6n)],
+    [],
+    [
+      { id: 41n, organizationId: 1n, companyId: 3n, state: "Paid", name: "PAY/41", reconciledInvoiceIds: [21n] },
+      { id: 42n, organizationId: 1n, companyId: 3n, state: "NotPaid", reconciledInvoiceIds: [21n] },
+      { id: 43n, organizationId: 1n, companyId: 3n, state: "Paid", reconciledInvoiceIds: [22n] },
+      { id: 44n, organizationId: 1n, companyId: 4n, state: "Paid", reconciledInvoiceIds: [21n] },
+    ],
+  )
+
+  assert.deepEqual(handoffs.payments, [{ id: 41n, state: "paid", name: "PAY/41" }])
+  assert.equal(handoffs.paymentNotice, undefined)
+})
+
+test("payment relation omission and malformed identity are explicit", () => {
+  const unavailable = orderHandoffs(
+    5n,
+    scope,
+    [],
+    [invoice(21n, 5n)],
+    [],
+    [{ id: 41n, organizationId: 1n, companyId: 3n, state: "Paid" }],
+  )
+  assert.equal(unavailable.paymentNotice, "relation_unavailable")
+  assert.deepEqual(unavailable.payments, [])
+
+  const malformed = orderHandoffs(
+    5n,
+    scope,
+    [],
+    [invoice(21n, 5n)],
+    [],
+    [{ id: 41n, organizationId: 1n, companyId: 3n, state: "Paid", reconciledInvoiceIds: [21n, 21n] }],
+  )
+  assert.equal(malformed.paymentNotice, "invariant_failure")
+  assert.deepEqual(malformed.payments, [])
+})
+
 test("reads snake_case rows", () => {
   const handoffs = orderHandoffs(
     5n,
