@@ -1,15 +1,13 @@
 import type { Metadata } from 'next'
-import { Geist, Geist_Mono } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
+import { GeistMono } from 'geist/font/mono'
+import { GeistSans } from 'geist/font/sans'
 import { Providers } from './providers'
 import './globals.css'
 
 import { getBrowserStdbSession, hasAuthenticatedIdentity } from '@/lib/browser-session'
 import { requireServerQueryRows, serverFetchQueryListState } from '@/lib/server-query'
 import { resolveSessionCompanyIds } from '@/lib/session-company-scope'
-
-const _geist = Geist({ subsets: ["latin"] });
-const _geistMono = Geist_Mono({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: 'Lumiere ERP',
@@ -92,7 +90,11 @@ export default async function RootLayout({
   }
 
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html
+      lang="en"
+      className={`${GeistSans.variable} ${GeistMono.variable}`}
+      suppressHydrationWarning
+    >
       <body className="font-sans antialiased">
         <Providers
           serverIdentity={identityHex}
