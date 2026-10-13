@@ -1,7 +1,8 @@
 "use client"
 import { mapDashboardWidgets, withDashboardSections } from "@lumiere/ui/lib/dashboard-sections"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
+import { canUseModuleData, mergeModuleStates, moduleCollection } from "@lumiere/ui/lib/module-data-state"
 import { useTranslation } from "@lumiere/i18n"
 import { ModuleView, FormModal, newWorkflowForm, MissingOrganization } from "@lumiere/ui"
 import type { FormConfig, ModuleConfig } from "@lumiere/ui"
@@ -86,16 +87,23 @@ function WorkflowsClientLoaded({
     row: Record<string, unknown>
   } | null>(null)
 
-  const { data: workflows = [] } = useWorkflows(orgId, initialWorkflows)
-  const { data: versionsRaw = [] } = useWorkflowVersions(orgId, initialVersions)
+  const workflowsRead = moduleCollection(useWorkflows(orgId, initialWorkflows))
+  const workflows = workflowsRead.rows
+  const versionsRead = moduleCollection(useWorkflowVersions(orgId, initialVersions))
+  const versionsRaw = versionsRead.rows
   const { data: nodesRaw = [] } = useWorkflowNodes(orgId)
   const { data: edgesRaw = [] } = useWorkflowEdges(orgId)
-  const { data: instancesRaw = [] } = useWorkflowInstances(orgId, initialInstances)
-  const { data: timersRaw = [] } = useWorkflowTimersLate(orgId)
-  const { data: outboxRaw = [] } = useWorkflowOutboxDead(orgId)
+  const instancesRead = moduleCollection(useWorkflowInstances(orgId, initialInstances))
+  const instancesRaw = instancesRead.rows
+  const timersRead = moduleCollection(useWorkflowTimersLate(orgId))
+  const timersRaw = timersRead.rows
+  const outboxRead = moduleCollection(useWorkflowOutboxDead(orgId))
+  const outboxRaw = outboxRead.rows
   const { data: eventsRaw = [] } = useWorkflowDecisionEvents(orgId)
-  const { data: plansRaw = [] } = useWorkflowMigrationPlans(orgId)
-  const { data: resultsRaw = [] } = useWorkflowMigrationResults(orgId)
+  const plansRead = moduleCollection(useWorkflowMigrationPlans(orgId))
+  const plansRaw = plansRead.rows
+  const resultsRead = moduleCollection(useWorkflowMigrationResults(orgId))
+  const resultsRaw = resultsRead.rows
 
   const versions = useMemo(
     () => {
@@ -395,7 +403,34 @@ function WorkflowsClientLoaded({
     ],
   )
 
+  const dataState = {
+    dashboard: mergeModuleStates([workflowsRead.state, versionsRead.state, instancesRead.state]),
+    workflows: workflowsRead.state,
+    versions: versionsRead.state,
+    instances: instancesRead.state,
+    // Late timers carry the owning instance revision used by fire/cancel.
+    operations: mergeModuleStates([timersRead.state, instancesRead.state]),
+    deadLetters: outboxRead.state,
+    migrations: plansRead.state,
+    migrationResults: resultsRead.state,
+  }
+  const actionTabs: Record<string, keyof typeof dataState> = {
+    createWorkflow: "workflows", importWorkflowCsv: "workflows", createMigrationPlan: "migrations",
+  }
+  const actionUsable = (action: string) => {
+    const tab = actionTabs[action]
+    return tab == null || canUseModuleData(dataState[tab])
+  }
+  const quickActionUsable = quickActionForm == null || actionUsable(quickActionForm.action)
+  const rowDialogUsable = rowDialog == null || canUseModuleData(dataState[rowDialog.tabId])
+  useEffect(() => {
+    // Dialogs close when the collection they act on becomes denied or fails.
+    if (!quickActionUsable) setQuickActionForm(null)
+    if (!rowDialogUsable) setRowDialog(null)
+  }, [quickActionUsable, rowDialogUsable])
+
   const handleFormSubmit = (_tabId: string, action: string, formData: Record<string, unknown>) => {
+    if (!actionUsable(action)) return
     if (action === "createWorkflow") {
       const payload = toCreateWorkflowParams(formData)
       if (!payload) return
@@ -444,6 +479,7 @@ function WorkflowsClientLoaded({
       <ModuleView
         config={config}
         data={data}
+        dataState={dataState}
         onFormSubmit={handleFormSubmit}
         onRowClick={(tabId, row) => {
           const allowed: WorkflowRowTab[] = [
@@ -461,7 +497,7 @@ function WorkflowsClientLoaded({
         }}
       />
       <FormModal
-        open={quickActionForm !== null}
+        open={quickActionForm !== null && quickActionUsable}
         onOpenChange={(open) => !open && setQuickActionForm(null)}
         config={quickActionForm?.form ?? newWorkflowForm(t)}
         onSubmit={(formData) => {
@@ -473,7 +509,7 @@ function WorkflowsClientLoaded({
       />
       <WorkflowsRowDialog
         key={rowDialog ? `${rowDialog.tabId}-${String(rowDialog.row.id)}` : "closed"}
-        open={rowDialog !== null}
+        open={rowDialog !== null && rowDialogUsable}
         onOpenChange={(open) => !open && setRowDialog(null)}
         tabId={rowDialog?.tabId ?? null}
         row={rowDialog?.row ?? null}
