@@ -199,6 +199,10 @@ async fn main() -> anyhow::Result<()> {
         .route("/v1/evidence/inspect", post(routes::evidence::post_inspect))
         .route("/v1/evidence/run", post(routes::evidence::post_run_inspect))
         .route(
+            "/v1/evidence/runs/history",
+            post(routes::evidence::post_run_history),
+        )
+        .route(
             "/v1/evidence/run/export",
             post(routes::evidence::post_run_export),
         )

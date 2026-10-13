@@ -15,6 +15,22 @@ export interface RunObservationView {
     durationMs: number
     error: boolean
   }>
+  economics: RunEconomicsView | null
+}
+
+export interface RunEconomicsView {
+  providerModels: Array<{ provider: string; model: string }>
+  providerModelsTruncated: boolean
+  attemptCount: number | null
+  attemptStatuses: string[]
+  reservationStatuses: string[]
+  outcomeUnknown: boolean
+  inputTokens: number | null
+  outputTokens: number | null
+  currency: string | null
+  reservedUnits: number | null
+  settledUnits: number | null
+  truncated: boolean
 }
 
 const MAX_STEPS = 200
@@ -35,6 +51,54 @@ function nonnegativeInteger(value: unknown): number | null {
 
 function boundedText(value: unknown, maxLength: number): string {
   return typeof value === 'string' ? value.slice(0, maxLength) : ''
+}
+
+const ATTEMPT_STATUSES = new Set(['accepted', 'dispatched', 'succeeded', 'failed', 'outcome_unknown', 'abandoned'])
+const RESERVATION_STATUSES = new Set(['reserved', 'settled', 'released'])
+
+export function mapRunEconomics(value: unknown): RunEconomicsView | null {
+  const item = record(value)
+  if (!item) return null
+  const truncated = item.truncated === true
+  const optionalCount = (field: unknown) => field == null ? null : nonnegativeInteger(field)
+  const attemptCount = optionalCount(item.attemptCount)
+  const inputTokens = optionalCount(item.inputTokens)
+  const outputTokens = optionalCount(item.outputTokens)
+  const reservedUnits = optionalCount(item.reservedUnits)
+  const settledUnits = optionalCount(item.settledUnits)
+  if ([attemptCount, inputTokens, outputTokens, reservedUnits, settledUnits].some((count, index) => {
+    const raw = [item.attemptCount, item.inputTokens, item.outputTokens, item.reservedUnits, item.settledUnits][index]
+    return raw != null && count === null
+  })) return null
+  // A truncated response must not present partial aggregates as complete totals.
+  if (truncated && [attemptCount, inputTokens, outputTokens, reservedUnits, settledUnits].some((value) => value !== null)) return null
+
+  const providerModels = (Array.isArray(item.providerModels) ? item.providerModels : [])
+    .slice(0, 8)
+    .flatMap((value) => {
+      const providerModel = record(value)
+      const provider = providerModel ? boundedText(providerModel.provider, 128) : ''
+      const model = providerModel ? boundedText(providerModel.model, 128) : ''
+      return provider && model ? [{ provider, model }] : []
+    })
+  const statuses = (value: unknown, allowed: Set<string>) => (Array.isArray(value) ? value : [])
+    .slice(0, 8)
+    .flatMap((status) => typeof status === 'string' && allowed.has(status) ? [status] : [])
+  const currency = item.currency == null ? null : boundedText(item.currency, 16) || null
+  return {
+    providerModels,
+    providerModelsTruncated: item.providerModelsTruncated === true,
+    attemptCount,
+    attemptStatuses: statuses(item.attemptStatuses, ATTEMPT_STATUSES),
+    reservationStatuses: statuses(item.reservationStatuses, RESERVATION_STATUSES),
+    outcomeUnknown: item.outcomeUnknown === true,
+    inputTokens,
+    outputTokens,
+    currency,
+    reservedUnits,
+    settledUnits,
+    truncated,
+  }
 }
 
 /**
@@ -88,5 +152,6 @@ export function mapRunObservation(payload: unknown): RunObservationView | null {
     stepCount,
     tokensUsed,
     transcript,
+    economics: root.economics == null ? null : mapRunEconomics(root.economics),
   }
 }
