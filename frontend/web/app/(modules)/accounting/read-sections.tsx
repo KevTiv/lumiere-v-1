@@ -174,6 +174,80 @@ export function taxDeadlinesTableConfig(t: (key: string, opts?: Record<string, u
   } as EntityViewConfig
 }
 
+/** Tax groups list config (rows carry the resolved company and account names). */
+export function taxGroupsTableConfig(t: (key: string, opts?: Record<string, unknown>) => string): EntityViewConfig {
+  return {
+    id: "tax-groups-table",
+    title: t("accounting.taxGroups.title", { defaultValue: "Tax groups" }),
+    view: {
+      mode: "table",
+      rowKey: "id",
+      searchable: true,
+      searchKeys: ["name", "companyName"],
+      columns: [
+        { key: "name", label: t("accounting.taxGroups.columns.name", { defaultValue: "Name" }), width: "min-w-48" },
+        { key: "sequence", label: t("accounting.taxGroups.columns.sequence", { defaultValue: "Sequence" }), align: "right" },
+        { key: "companyName", label: t("accounting.taxGroups.columns.company", { defaultValue: "Company" }) },
+        { key: "precedingSubtotalText", label: t("accounting.taxGroups.columns.precedingSubtotal", { defaultValue: "Preceding subtotal" }) },
+        { key: "payableAccountName", label: t("accounting.taxGroups.columns.payableAccount", { defaultValue: "Tax payable account" }) },
+        { key: "receivableAccountName", label: t("accounting.taxGroups.columns.receivableAccount", { defaultValue: "Tax receivable account" }) },
+        { key: "advanceAccountName", label: t("accounting.taxGroups.columns.advanceAccount", { defaultValue: "Advance tax payment account" }) },
+      ],
+      emptyMessage: t("accounting.taxGroups.empty", { defaultValue: "No tax groups." }),
+    },
+  } as EntityViewConfig
+}
+
+/** Tax jurisdictions list config (organization-level; rows carry the resolved active label). */
+export function taxJurisdictionsTableConfig(t: (key: string, opts?: Record<string, unknown>) => string): EntityViewConfig {
+  return {
+    id: "tax-jurisdictions-table",
+    title: t("accounting.taxJurisdictions.title", { defaultValue: "Tax jurisdictions" }),
+    view: {
+      mode: "table",
+      rowKey: "id",
+      searchable: true,
+      searchKeys: ["name", "code", "countryCode", "stateCode", "city"],
+      columns: [
+        { key: "name", label: t("accounting.taxJurisdictions.columns.name", { defaultValue: "Name" }), width: "min-w-48" },
+        { key: "code", label: t("accounting.taxJurisdictions.columns.code", { defaultValue: "Code" }) },
+        { key: "countryCode", label: t("accounting.taxJurisdictions.columns.countryCode", { defaultValue: "Country code" }) },
+        { key: "stateCode", label: t("accounting.taxJurisdictions.columns.stateCode", { defaultValue: "State" }) },
+        { key: "countyCode", label: t("accounting.taxJurisdictions.columns.countyCode", { defaultValue: "County" }) },
+        { key: "city", label: t("accounting.taxJurisdictions.columns.city", { defaultValue: "City" }) },
+        { key: "zipFrom", label: t("accounting.taxJurisdictions.columns.zipFrom", { defaultValue: "Postal code from" }) },
+        { key: "zipTo", label: t("accounting.taxJurisdictions.columns.zipTo", { defaultValue: "Postal code to" }) },
+        { key: "activeLabel", label: t("accounting.taxJurisdictions.columns.status", { defaultValue: "Status" }) },
+      ],
+      emptyMessage: t("accounting.taxJurisdictions.empty", { defaultValue: "No tax jurisdictions." }),
+    },
+  } as EntityViewConfig
+}
+
+/** Tax schedules list config (rows carry the resolved company, jurisdiction and tax names). */
+export function taxSchedulesTableConfig(t: (key: string, opts?: Record<string, unknown>) => string): EntityViewConfig {
+  return {
+    id: "tax-schedules-table",
+    title: t("accounting.taxSchedules.title", { defaultValue: "Tax schedules" }),
+    view: {
+      mode: "table",
+      rowKey: "id",
+      searchable: true,
+      searchKeys: ["name", "jurisdictionName", "taxNames"],
+      columns: [
+        { key: "name", label: t("accounting.taxSchedules.columns.name", { defaultValue: "Name" }), width: "min-w-48" },
+        { key: "companyName", label: t("accounting.taxSchedules.columns.company", { defaultValue: "Company" }) },
+        { key: "jurisdictionName", label: t("accounting.taxSchedules.columns.jurisdiction", { defaultValue: "Jurisdiction" }) },
+        { key: "taxNames", label: t("accounting.taxSchedules.columns.taxes", { defaultValue: "Taxes" }), width: "min-w-48" },
+        { key: "effectiveFromDate", label: t("accounting.taxSchedules.columns.effectiveFrom", { defaultValue: "Effective from" }), type: "date" },
+        { key: "effectiveToDate", label: t("accounting.taxSchedules.columns.effectiveTo", { defaultValue: "Effective to" }), type: "date" },
+        { key: "activeLabel", label: t("accounting.taxSchedules.columns.status", { defaultValue: "Status" }) },
+      ],
+      emptyMessage: t("accounting.taxSchedules.empty", { defaultValue: "No tax schedules." }),
+    },
+  } as EntityViewConfig
+}
+
 export interface CompanyRateLabels {
   readonly company: ReadonlyMap<string, string>
   readonly currency: ReadonlyMap<string, string>
