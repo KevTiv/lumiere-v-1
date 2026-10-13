@@ -1,4 +1,5 @@
 use anyhow::{Context, Result};
+use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::sync::Arc;
@@ -23,15 +24,15 @@ use super::{
     },
     governed_programs::governed_program_for_skill,
     governed_services::{
-        GovernedCapabilityService, PolicyBackedCapabilityAdmission, StdbApprovalCoordinator,
-        StdbExecutionRecovery, ToolsBackedCapabilityExecutor,
+        CapabilityAdmission, GovernedCapabilityService, PolicyBackedCapabilityAdmission,
+        StdbApprovalCoordinator, StdbExecutionRecovery, ToolsBackedCapabilityExecutor,
     },
     graduation::{
         production_deterministic_candidates, GovernedDecisionResolver,
         StdbAuthorityRollbackRecorder, StdbDecisionResolutionPolicy, StdbDriftMonitor,
         StdbModelShadowRecorder,
     },
-    intelligence::{EvidenceRef, GenerationRequest},
+    intelligence::{CapabilityProposal, EvidenceRef, GenerationRequest},
     intelligence_router::{
         generate_routed_for_run, ConfiguredIntelligenceRouter, NoopShadowDecisionRecorder,
         RoutedDecisionProvider, RoutedGenerationProvider, RoutedReasoningProvider,
@@ -51,6 +52,10 @@ use super::{
     run_review::{
         RunReviewDisposition, RunReviewProgram, RunReviewRecorder, StdbRunReviewRecorder,
     },
+    security_envelope::{
+        ExecutionEnvelopeAuthority, ExecutionRestrictions, TrustedExecutionEnvelope,
+        TrustedExecutionScope,
+    },
     spend_admission::StdbSpendLedger,
     text_answer_gate::{TextAnswerProvenance, TextAnswerVerification, TextEvidence},
 };
@@ -60,6 +65,7 @@ use crate::{
         ensure_within_budget, resolve_agent,
     },
     harness::{
+        audit::PolicyDecision,
         data_scope_resolver::ResourceRegistry,
         policy_engine::{
             ExecutionMetadata, ExecutionPlan, PlannedToolCall, PolicyEngine, PolicyExecutionRequest,
@@ -74,13 +80,86 @@ use crate::{
     },
     state::AppState,
     tools::{
-        generated_read::GeneratedReadTools,
+        generated_read::{
+            resolve_actor_grants, resolve_actor_grants_for_actor, GeneratedReadTools,
+        },
         registry::{persist_step, ToolRegistry},
         types::{hash_tool_input, SkillCitation, ToolContext},
     },
 };
 
 const DEFAULT_MAX_STEPS: u32 = 5;
+const EXECUTION_ENVELOPE_TTL_SECONDS: i64 = 15 * 60;
+
+struct EnvelopeCapabilityAdmission<'a> {
+    inner: &'a dyn CapabilityAdmission,
+    authority: &'a ExecutionEnvelopeAuthority,
+    envelope: &'a TrustedExecutionEnvelope,
+    context: &'a ToolContext,
+}
+
+impl EnvelopeCapabilityAdmission<'_> {
+    async fn verify_child(&self) -> Result<()> {
+        let snapshot = resolve_actor_grants(self.context).await?;
+        let now = chrono::Utc::now().timestamp();
+        self.authority
+            .verify(self.envelope, &snapshot.authorization_generation, now)?;
+        let child_scope = self
+            .envelope
+            .scope()
+            .narrowed_to(self.envelope.scope().capabilities().iter().copied())?;
+        let child_expiry = self
+            .envelope
+            .expires_at_epoch_seconds()
+            .min(now.saturating_add(5 * 60));
+        self.authority.derive_child(
+            self.envelope,
+            child_scope,
+            &snapshot.authorization_generation,
+            now,
+            child_expiry,
+        )?;
+        Ok(())
+    }
+}
+
+#[async_trait]
+impl CapabilityAdmission for EnvelopeCapabilityAdmission<'_> {
+    async fn admit(
+        &self,
+        proposal: &CapabilityProposal,
+        completed_calls: u32,
+    ) -> Result<PolicyDecision> {
+        self.verify_child().await?;
+        self.inner.admit(proposal, completed_calls).await
+    }
+
+    async fn protect_output(
+        &self,
+        proposal: &CapabilityProposal,
+        completed_calls: u32,
+        output: crate::tools::types::ToolOutput,
+    ) -> Result<crate::tools::types::ToolOutput> {
+        self.verify_child().await?;
+        self.inner
+            .protect_output(proposal, completed_calls, output)
+            .await
+    }
+}
+
+async fn verify_current_execution_authority(
+    authority: &ExecutionEnvelopeAuthority,
+    envelope: &TrustedExecutionEnvelope,
+    context: &ToolContext,
+) -> Result<()> {
+    let snapshot = resolve_actor_grants(context).await?;
+    authority.verify(
+        envelope,
+        &snapshot.authorization_generation,
+        chrono::Utc::now().timestamp(),
+    )?;
+    Ok(())
+}
 
 /// `key:value` scope tags a skill requires cited passages to apply to
 /// (`config_json.requiredApplicability`). Absent means no requirement. A
@@ -649,7 +728,8 @@ pub async fn run_skill_admitted(
         .stdb_token
         .as_ref()
         .zip(req.triggered_by_hex.as_ref())
-        .and_then(|(token, identity)| ActorCredentials::new(token.clone(), identity.clone()).ok());
+        .and_then(|(token, identity)| ActorCredentials::new(token.clone(), identity.clone()).ok())
+        .context("admitted runs require authenticated actor credentials")?;
     let stdb = req
         .stdb_token
         .as_ref()
@@ -678,6 +758,65 @@ pub async fn run_skill_admitted(
     ensure_allowed_action(&agent, "skill_run")?;
     ensure_model_allowed(&agent)?;
     ensure_within_budget(&agent)?;
+
+    // Resolve every envelope prerequisite before creating or resuming a run.
+    // Authorization/configuration failure must not leave a new running row.
+    let envelope_key = state
+        .config
+        .ai_execution_envelope_key
+        .as_deref()
+        .context("AI_EXECUTION_ENVELOPE_KEY is required for admitted runs")?;
+    let envelope_authority = ExecutionEnvelopeAuthority::new(envelope_key.as_bytes())?;
+    let admission_snapshot =
+        resolve_actor_grants_for_actor(state, req.org_id, req.company_id, &actor).await?;
+    let execution_scope = TrustedExecutionScope::new(
+        actor.identity_hex.clone(),
+        req.org_id,
+        req.company_id,
+        reviewed_calls.iter().map(|call| call.capability),
+        // Processor/residency policy is not yet canonical in the gateway.
+        // Empty restrictions grant no additional target authority; later
+        // processor/runtime selection must derive a non-widening child.
+        ExecutionRestrictions::default(),
+    )?;
+    let envelope_issued_at = chrono::Utc::now().timestamp();
+    let execution_envelope = envelope_authority.issue_root(
+        execution_scope,
+        admission_snapshot.authorization_generation,
+        envelope_issued_at,
+        envelope_issued_at.saturating_add(EXECUTION_ENVELOPE_TTL_SECONDS),
+    )?;
+
+    // Complete immutable manifest/policy admission before persisting a new
+    // run. Invalid reviewed calls must fail without creating runtime state.
+    let manifest = load_active_manifest(&stdb, req.org_id, &skill_key, req.skill_version)
+        .await
+        .map_err(|message| anyhow::anyhow!(message))?;
+    let max_steps = req
+        .max_steps
+        .unwrap_or(manifest.limits.max_steps)
+        .min(manifest.limits.max_steps);
+    let plan = ExecutionPlan {
+        named_resources: manifest.named_resources.clone(),
+        tool_calls: reviewed_calls.clone(),
+        steps: max_steps,
+        expected_rows: 0,
+        output_type: manifest.output_type.clone(),
+    };
+    let base = PolicyExecutionRequest {
+        skill: manifest.skill.clone(),
+        organization_id: req.org_id,
+        company_id: req.company_id,
+        correlation_id,
+        metadata: ExecutionMetadata::default(),
+        input: req.inputs.clone(),
+        plan,
+    };
+    let engine = PolicyEngine::new(
+        SkillRegistry::exact(manifest.clone()),
+        ResourceRegistry::built_in(),
+    );
+    let policy = ReviewedInvocationPolicy::new(engine, base, reviewed_calls.clone())?;
 
     let inputs_json = serde_json::to_string(&req.inputs).context("serialize inputs")?;
     let triggered_by_hex = req
@@ -721,42 +860,12 @@ pub async fn run_skill_admitted(
         }
     };
 
-    let manifest = load_active_manifest(&stdb, req.org_id, &skill_key, req.skill_version)
-        .await
-        .map_err(|message| anyhow::anyhow!(message))?;
-
     let ledger = StdbSpendLedger {
         writer: &state.stdb,
         reader: spend_reader,
     };
     let registry = ToolRegistry::new();
     let view = registry.authorized_view(&agent, &manifest.allowed_tools);
-
-    let max_steps = req
-        .max_steps
-        .unwrap_or(manifest.limits.max_steps)
-        .min(manifest.limits.max_steps);
-    let plan = ExecutionPlan {
-        named_resources: manifest.named_resources.clone(),
-        tool_calls: reviewed_calls.clone(),
-        steps: max_steps,
-        expected_rows: 0,
-        output_type: manifest.output_type.clone(),
-    };
-    let base = PolicyExecutionRequest {
-        skill: manifest.skill.clone(),
-        organization_id: req.org_id,
-        company_id: req.company_id,
-        correlation_id,
-        metadata: ExecutionMetadata::default(),
-        input: req.inputs.clone(),
-        plan,
-    };
-    let engine = PolicyEngine::new(
-        SkillRegistry::exact(manifest.clone()),
-        ResourceRegistry::built_in(),
-    );
-    let policy = ReviewedInvocationPolicy::new(engine, base, reviewed_calls)?;
 
     let tool_ctx = ToolContext {
         state: state.clone(),
@@ -768,7 +877,7 @@ pub async fn run_skill_admitted(
         config_json: skill.config_json.clone(),
         inputs: req.inputs.clone(),
         allowed_action_drafts: skill.allowed_action_drafts.clone(),
-        actor,
+        actor: Some(actor),
     };
 
     if let Some(catalog) = governed_catalog {
@@ -869,7 +978,13 @@ pub async fn run_skill_admitted(
             generated: GeneratedReadTools::new(&generated_tool_names),
             context: &tool_ctx,
         };
-        let capability_admission = PolicyBackedCapabilityAdmission::new(&policy);
+        let policy_capability_admission = PolicyBackedCapabilityAdmission::new(&policy);
+        let capability_admission = EnvelopeCapabilityAdmission {
+            inner: &policy_capability_admission,
+            authority: &envelope_authority,
+            envelope: &execution_envelope,
+            context: &tool_ctx,
+        };
         let capability_executor = ToolsBackedCapabilityExecutor::new(&loop_tools);
         let recovery = StdbExecutionRecovery {
             writer: state.stdb.as_ref(),
@@ -1029,12 +1144,18 @@ pub async fn run_skill_admitted(
             checkpoint_store
                 .validate_resume(&program_context, &graph)
                 .await?;
+            verify_current_execution_authority(&envelope_authority, &execution_envelope, &tool_ctx)
+                .await?;
             // This mutation happens only after the current actor, skill,
             // bounded inputs, graph and knowledge/source dependencies have
             // all been re-authorized and matched to the immutable checkpoint.
             resume_run(&stdb, req.org_id, req.company_id, run_id).await?;
         }
         let program = executor.run(&graph, &program_context).await?;
+        // Re-resolve immediately after execution and before any final content,
+        // wait state or approval summary can be released to the caller.
+        verify_current_execution_authority(&envelope_authority, &execution_envelope, &tool_ctx)
+            .await?;
         let trace_step_offset =
             load_run_step_count(state.stdb.as_ref(), req.org_id, req.company_id, run_id).await?;
         let durable_step_count = persist_governed_trace(
@@ -1087,6 +1208,12 @@ pub async fn run_skill_admitted(
                     .rationale
                     .clone()
                     .unwrap_or_else(|| format!("independent review: {:?}", review.disposition));
+                verify_current_execution_authority(
+                    &envelope_authority,
+                    &execution_envelope,
+                    &tool_ctx,
+                )
+                .await?;
                 return Ok(RunSkillResponse {
                     run_id,
                     run_key,
@@ -1191,6 +1318,8 @@ pub async fn run_skill_admitted(
             .await?;
         }
 
+        verify_current_execution_authority(&envelope_authority, &execution_envelope, &tool_ctx)
+            .await?;
         return Ok(RunSkillResponse {
             run_id,
             run_key,

@@ -134,6 +134,7 @@ services:
       PORT: 8080
       RUST_LOG: ${RUST_LOG:-ai_gateway=debug,tower_http=info}
       LUMIERE_AI_GATEWAY_INTERNAL_SECRET: ${LUMIERE_AI_GATEWAY_INTERNAL_SECRET:?set LUMIERE_AI_GATEWAY_INTERNAL_SECRET in .env.docker}
+      AI_EXECUTION_ENVELOPE_KEY: ${AI_EXECUTION_ENVELOPE_KEY:-local-dev-trusted-envelope-key-32-bytes}
       QDRANT_URL: http://qdrant:6334
       QDRANT_ACTIVITY_REFS_COLLECTION: ${QDRANT_ACTIVITY_REFS_COLLECTION:-lumiere_erp_activity_refs_v1}
       STDB_HOST: http://spacetimedb:3000

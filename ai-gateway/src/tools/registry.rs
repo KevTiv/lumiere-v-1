@@ -470,6 +470,7 @@ mod generated_registry_tests {
         let config = Config {
             port: 8080,
             internal_secret: None,
+            ai_execution_envelope_key: None,
             qdrant_url: "http://127.0.0.1:6334".into(),
             qdrant_api_key: None,
             qdrant_collection: "test".into(),

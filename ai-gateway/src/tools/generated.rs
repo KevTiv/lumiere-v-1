@@ -75,7 +75,7 @@ struct ToolDescriptor {
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
-#[serde(deny_unknown_fields)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub(crate) struct GeneratedReadGrant {
     pub capability_key: String,
     pub max_rows: u64,
