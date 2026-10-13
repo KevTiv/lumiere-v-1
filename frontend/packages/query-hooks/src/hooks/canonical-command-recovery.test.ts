@@ -65,6 +65,16 @@ test("approval-pending does not falsely resolve an ambiguous confirmation", asyn
   )
 })
 
+test("approval-pending can recover only when the caller already proved its exact task", async () => {
+  await executeCommandWithAppliedRecovery(
+    async () => {
+      throw new TypeError("response connection closed")
+    },
+    async () => ({ outcome: "approval_pending" }),
+    ["applied", "approval_pending"],
+  )
+})
+
 test("missing or failed readback preserves the original command failure", async () => {
   for (const observe of [
     async () => ({}),

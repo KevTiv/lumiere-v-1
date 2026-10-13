@@ -41,7 +41,7 @@ The slice reuses the existing CRM UI, generated named operation, API operation r
 
 ## Evidence limit
 
-This accepts one CRM cross-module transition. It does not prove direct navigation to the created Sales record, lost-response recovery, stale-write behavior across the wider CRM lifecycle, or complete CRM U4/U5 admission.
+This accepts one CRM cross-module transition. Direct navigation and ambiguous/lost-response reconciliation are now implemented through the exact `sale_order.opportunity_id` + company relation. It does not prove stale-write behavior across the wider lead/contact lifecycle, duplicate-contact merge recovery, responsive/accessibility coverage, or complete CRM U4/U5 admission.
 
 ## Next slice
 

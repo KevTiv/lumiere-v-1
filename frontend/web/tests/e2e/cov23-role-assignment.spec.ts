@@ -1,7 +1,8 @@
-import { expect, test, type Page, type Request, type Response } from "@playwright/test"
+import { expect, test, type Browser, type Page, type Request, type Response } from "@playwright/test"
 
 import {
   callReducerBff,
+  fetchDefaultCompanyId,
   fetchSessionOrganizationId,
   gotoModule,
   scalarQueryId,
@@ -81,6 +82,18 @@ async function toggleRoleInSettings(page: Page, roleId: number, reducer: string)
   return accepted
 }
 
+async function targetCanOpenProfileSettings(browser: Browser) {
+  const context = await browser.newContext({ storageState: { cookies: [], origins: [] } })
+  try {
+    const targetPage = await context.newPage()
+    await signIn(targetPage, TARGET_EMAIL, PERSONA_PASSWORD)
+    await gotoModule(targetPage, "/settings")
+    return await targetPage.getByTestId("settings-section-profile").isVisible({ timeout: 10_000 })
+  } finally {
+    await context.close()
+  }
+}
+
 test.describe("COV-23 exact role assignment", { tag: ["@p0", "@cov23"] }, () => {
   test("assigns then revokes one role and preserves it on stale and denied replay", async ({
     browser,
@@ -103,14 +116,14 @@ test.describe("COV-23 exact role assignment", { tag: ["@p0", "@cov23"] }, () => 
     }
     expect(targetIdentity).toMatch(/^[0-9a-f]{64}$/)
 
-    // Setup only: a fresh, minimal role so the assignment is unambiguous and
-    // grants nothing beyond what the persona already has.
+    // Setup only: a fresh role granting one capability the persona does not
+    // already hold, so a new browser session proves assignment and revocation.
     const roleName = smokeName("cov23-role")
     await callReducerBff(page, "create_role", [organizationId, {
       name: roleName,
       description: "COV-23 role assignment proof",
       parent_id: null,
-      permissions: ["organization:read"],
+      permissions: ["dashboard:settings:read"],
       is_active: true,
       metadata: null,
     }])
@@ -126,6 +139,7 @@ test.describe("COV-23 exact role assignment", { tag: ["@p0", "@cov23"] }, () => 
     const [active] = await roleAssignments(page, organizationId, roleId)
     expect(active).toMatchObject({ identity: targetIdentity, isActive: true })
     const assignmentId = active!.id
+    expect(await targetCanOpenProfileSettings(browser)).toBe(true)
 
     const staleAssign = await replay(page, assigned.request())
     expect(staleAssign.status()).toBe(422)
@@ -135,6 +149,7 @@ test.describe("COV-23 exact role assignment", { tag: ["@p0", "@cov23"] }, () => 
     const revoked = await toggleRoleInSettings(page, roleId, "revoke_role")
     const effect = [{ id: assignmentId, identity: targetIdentity, isActive: false }]
     await expect.poll(() => roleAssignments(page, organizationId, roleId), { timeout: 30_000 }).toEqual(effect)
+    expect(await targetCanOpenProfileSettings(browser)).toBe(false)
 
     // Before COV-23 a replayed revoke re-audited and rebuilt the policy
     // snapshot; the reducer now rejects an already-revoked assignment.
@@ -151,6 +166,88 @@ test.describe("COV-23 exact role assignment", { tag: ["@p0", "@cov23"] }, () => 
       const deniedRevoke = await replay(readerPage, revoked.request())
       expect(deniedRevoke.status()).toBe(403)
       expect(await roleAssignments(page, organizationId, roleId)).toEqual(effect)
+    } finally {
+      await readerContext.close()
+    }
+  })
+
+  test("admin switches companies while a bound persona rejects a forged selection and recovers", async ({
+    browser,
+    page,
+  }) => {
+    test.setTimeout(180_000)
+    const organizationId = await fetchSessionOrganizationId(page)
+    const defaultCompanyId = await fetchDefaultCompanyId(page)
+    const companyRows = await rows(page, "/api/query/companies")
+    const defaultCompany = companyRows.find((row) => scalarQueryId(row.id) === defaultCompanyId)
+    const currencyId = scalarQueryId(defaultCompany?.currencyId ?? defaultCompany?.currency_id)
+    if (currencyId == null) throw new Error("default company has no currency")
+
+    const branchName = smokeName("cov23-branch")
+    await callReducerBff(page, "create_company", [organizationId, {
+      name: branchName,
+      code: smokeName("c23b").slice(-12),
+      currency_id: currencyId,
+      fiscal_year_end_month: 12,
+      fiscal_year_end_day: 31,
+      is_parent: false,
+      parent_id: { some: defaultCompanyId },
+      tax_id: { none: [] },
+      company_registry: { none: [] },
+      address_street: { none: [] },
+      address_city: { none: [] },
+      address_zip: { none: [] },
+      address_country_code: { some: "NL" },
+      metadata: { some: JSON.stringify({ fixture: "COV-23", purpose: "company-switch" }) },
+    }])
+    await expect.poll(async () => {
+      const companies = await rows(page, "/api/query/companies")
+      return companies.find((row) => row.name === branchName) ?? null
+    }, { timeout: 30_000 }).not.toBeNull()
+    const branch = (await rows(page, "/api/query/companies")).find((row) => row.name === branchName)
+    const branchId = scalarQueryId(branch?.id)
+    if (branchId == null) throw new Error("branch company has no id")
+
+    // A fresh server render expands organization-admin scope to every company.
+    await page.reload()
+    await expect(page.getByTestId("company-switcher-trigger")).toBeVisible({ timeout: 30_000 })
+    await page.getByTestId("company-switcher-trigger").click()
+    await expect(page.getByTestId(`company-switcher-option-${branchId}`)).toBeVisible()
+    await page.getByTestId(`company-switcher-option-${branchId}`).click()
+    await expect.poll(() => page.evaluate(() => {
+      const raw = localStorage.getItem("lumiere:active-company")
+      return raw ? Number((JSON.parse(raw) as { companyId?: number }).companyId) : null
+    })).toBe(branchId)
+
+    await page.reload()
+    await expect.poll(() => page.evaluate(() => {
+      const raw = localStorage.getItem("lumiere:active-company")
+      return raw ? Number((JSON.parse(raw) as { companyId?: number }).companyId) : null
+    })).toBe(branchId)
+
+    // A company-bound persona cannot turn a forged local preference into
+    // authority. Session hydration repairs it to the membership company.
+    const readerContext = await browser.newContext({ storageState: { cookies: [], origins: [] } })
+    try {
+      const readerPage = await readerContext.newPage()
+      await signIn(readerPage, "fixture.reader@example.test", PERSONA_PASSWORD)
+      const membershipRows = await rows(readerPage, "/api/query/user-organization")
+      const activeMembership = membershipRows.find(
+        (row) => (row.isActive ?? row.is_active) === true,
+      )
+      const membershipCompanyId = scalarQueryId(
+        activeMembership?.companyId ?? activeMembership?.company_id,
+      )
+      if (membershipCompanyId == null) throw new Error("reader membership company is missing")
+      await readerPage.evaluate(({ organizationId: org, companyId }) => {
+        localStorage.setItem("lumiere:active-company", JSON.stringify({ organizationId: org, companyId }))
+      }, { organizationId, companyId: branchId })
+      await readerPage.reload()
+      await expect.poll(() => readerPage.evaluate(() => {
+        const raw = localStorage.getItem("lumiere:active-company")
+        return raw ? Number((JSON.parse(raw) as { companyId?: number }).companyId) : null
+      })).toBe(membershipCompanyId)
+      await expect(readerPage.getByTestId(`company-switcher-option-${branchId}`)).toHaveCount(0)
     } finally {
       await readerContext.close()
     }

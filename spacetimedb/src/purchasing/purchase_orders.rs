@@ -2910,7 +2910,7 @@ pub fn approve_purchase_requisition(
             record_id: requisition_id,
             action: "UPDATE",
             old_values: Some("InProgress".to_string()),
-            new_values: Some("Open".to_string()),
+            new_values: Some("Approved".to_string()),
             changed_fields: vec!["state".to_string()],
             metadata: None,
         },
@@ -2925,7 +2925,7 @@ pub fn approve_purchase_requisition(
 pub fn convert_purchase_requisition_to_po(
     ctx: &ReducerContext,
     organization_id: u64,
-    _company_id: u64,
+    company_id: u64,
     requisition_id: u64,
 ) -> Result<(), String> {
     use crate::core::organization::company;
@@ -2934,7 +2934,9 @@ pub fn convert_purchase_requisition_to_po(
     check_permission(ctx, organization_id, "purchase_requisition", "write")?;
 
     let requisition = require_requisition_in_organization(ctx, organization_id, requisition_id)?;
-    let company_id = requisition.company_id;
+    if requisition.company_id != company_id {
+        return Err("Purchase requisition does not belong to the requested company".to_string());
+    }
     if !matches!(requisition.state, RequisitionState::Approved) {
         return Err("Purchase requisition must be Approved to convert to a PO".to_string());
     }
@@ -2950,6 +2952,35 @@ pub fn convert_purchase_requisition_to_po(
         );
     }
 
+    let origin = format!("requisition:{requisition_id}");
+    let existing_orders: Vec<_> = ctx
+        .db
+        .purchase_order()
+        .iter()
+        .filter(|order| {
+            order.organization_id == organization_id
+                && order.company_id == company_id
+                && order.origin.as_deref() == Some(origin.as_str())
+        })
+        .collect();
+    if existing_orders.len() > 1 {
+        return Err(format!(
+            "Multiple purchase orders already match requisition {}",
+            requisition_id
+        ));
+    }
+    if let Some(existing) = existing_orders.first() {
+        if requisition.purchase_ids.contains(&existing.id) {
+            // Lost-response retry: the canonical PO and owning relation already
+            // committed, so return the original outcome without duplicating it.
+            return Ok(());
+        }
+        return Err(format!(
+            "Purchase order {} has requisition origin {} but is missing from the requisition relation",
+            existing.id, requisition_id
+        ));
+    }
+
     let company_row = ctx
         .db
         .company()
@@ -2957,7 +2988,6 @@ pub fn convert_purchase_requisition_to_po(
         .find(&company_id)
         .ok_or("Company not found")?;
 
-    let origin = format!("requisition:{requisition_id}");
     create_purchase_order(
         ctx,
         organization_id,
@@ -2986,7 +3016,7 @@ pub fn convert_purchase_requisition_to_po(
         },
     )?;
 
-    let po = ctx
+    let mut created_orders = ctx
         .db
         .purchase_order()
         .iter()
@@ -2995,9 +3025,16 @@ pub fn convert_purchase_requisition_to_po(
                 && p.company_id == company_id
                 && p.partner_id == vendor_id
                 && p.origin.as_deref() == Some(origin.as_str())
-        })
-        .max_by_key(|p| p.id)
+        });
+    let po = created_orders
+        .next()
         .ok_or("Purchase order not found after requisition conversion")?;
+    if created_orders.next().is_some() {
+        return Err(format!(
+            "Multiple purchase orders match requisition {} after conversion",
+            requisition_id
+        ));
+    }
 
     for line in &req_lines {
         let price_unit =

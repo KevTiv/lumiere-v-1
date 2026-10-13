@@ -35,6 +35,26 @@ import {
   openCreateInvoiceFromOrder,
 } from "./helpers"
 
+async function fetchExactExchangeOrderId(page: import("@playwright/test").Page, returnOrderId: number) {
+  const response = await page.request.get("/api/query/sale-orders")
+  expect(response.ok()).toBe(true)
+  const json = (await response.json()) as { data?: Array<Record<string, unknown>> }
+  const matches = (json.data ?? []).filter((row) => {
+    const origin = String(row.origin ?? "")
+    if (origin === `exchange:RMA/${returnOrderId}`) return true
+    if (typeof row.metadata !== "string") return false
+    try {
+      return String((JSON.parse(row.metadata) as { exchange_return_id?: unknown }).exchange_return_id) === String(returnOrderId)
+    } catch {
+      return false
+    }
+  })
+  expect(matches, "one exact exchange order for the return").toHaveLength(1)
+  const id = Number(matches[0]?.id)
+  expect(Number.isSafeInteger(id) && id > 0).toBe(true)
+  return id
+}
+
 /**
  * Sales RMA workflow: return order from delivered SO → receive → credit note → post.
  */
@@ -230,6 +250,22 @@ test.describe("MVP sales returns (RMA)", { tag: "@p0" }, () => {
       page.getByTestId("entity-action-receive-return").click(),
     ])
     await waitForReturnOrderState(page, returnOrderId, "received")
+
+    await selectEntityRowById(page, returnOrderId)
+    await waitForEntityActionEnabled(page, "entity-action-create-exchange-order")
+    await Promise.all([
+      page.waitForResponse(
+        (res) => matchesOperationResponse(res, "create_exchange_order_from_return") && res.ok(),
+        { timeout: 30_000 },
+      ),
+      page.getByTestId("entity-action-create-exchange-order").click(),
+    ])
+    const exchangeOrderId = await fetchExactExchangeOrderId(page, returnOrderId)
+    await expect(page).toHaveURL((url) =>
+      url.pathname === "/sales" &&
+      url.searchParams.get("tab") === "orders" &&
+      url.searchParams.get("filter") === `id:${exchangeOrderId}`,
+    )
 
     await gotoModule(page, "/sales", "sales")
     await page.getByTestId("module-tab-sales-returns").click()

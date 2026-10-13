@@ -45,7 +45,24 @@ The slice reuses the existing Sales surface, typed workflow runner, generated na
 
 ## Evidence limit
 
-This accepts one Sales state transition and its same-record navigation. It does not release sale-order-to-invoice or return-to-exchange effect identity, prove cross-module fallback navigation, or prove the complete fulfillment, invoicing, payment, return, lost-response, or concurrency lifecycle required for full Sales U4/U5 admission.
+This accepts one Sales state transition and its same-record navigation. It does not by itself prove the complete fulfillment, invoicing, payment, return, concurrency, responsive/accessibility, or current-head launch lifecycle required for full Sales U4/U5 admission.
+
+## Wave 2 closure implemented on current tree
+
+- confirmation and invoice creation reconcile ambiguous responses from canonical state without redispatching;
+- an unchanged order is `approval_pending` only when exactly one active, same-tenant/company `workflow_human_task` names `sale_order` + the exact order ID; duplicate active tasks are an invariant failure;
+- the Sales approval workspace uses that same task identity for approve/reject and links to `/approvals?taskId=<exact id>` rather than a model/name/time search;
+- order handoffs now resolve paid payments only through scoped `account_payment.reconciled_invoice_ids` intersecting the order's exact invoice IDs; omitted or malformed relations render an explicit unavailable/invariant notice;
+- both the order record sheet and dedicated order page expose canonical Accounting payment links;
+- the operator RMA browser path now includes receive → exact exchange-order readback/navigation → credit-note creation/posting. Exchange identity is `metadata.exchange_return_id` or the reducer-owned `origin=exchange:RMA/<return id>` stamp, with exactly-one enforcement.
+
+Focused validation on this tree:
+
+- `erp-workflows`: 26 Sales order/return tests passed;
+- `query-hooks`: 25 canonical recovery, approval identity, order handoff, and payment relation tests passed;
+- Playwright discovery lists the updated authenticated `mvp-sales-returns.spec.ts`; runtime execution still requires the full local service stack.
+
+The remaining Sales-specific U5 work is current-head runtime execution of the expanded RMA and lead-to-cash payment-link assertions, concurrent confirmation/approval adversarial proof, and COV-26 responsive/accessibility certification.
 
 ## Next slice
 

@@ -53,14 +53,14 @@ function parseU64IdList(raw: unknown): bigint[] {
   if (Array.isArray(raw)) {
     return raw
       .map((x) => optionalBigIntU64(x))
-      .filter((x): x is bigint => x !== undefined)
+      .filter((x): x is bigint => x !== undefined && x > 0n)
   }
   return String(raw)
     .split(/[,\s]+/)
     .map((s) => s.trim())
     .filter(Boolean)
     .map((s) => optionalBigIntU64(s))
-    .filter((x): x is bigint => x !== undefined)
+    .filter((x): x is bigint => x !== undefined && x > 0n)
 }
 
 /** Parse attachment ids from form; never invent stub id `1`. */

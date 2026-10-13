@@ -6,6 +6,7 @@ import './globals.css'
 
 import { getBrowserStdbSession, hasAuthenticatedIdentity } from '@/lib/browser-session'
 import { requireServerQueryRows, serverFetchQueryListState } from '@/lib/server-query'
+import { resolveSessionCompanyIds } from '@/lib/session-company-scope'
 
 const _geist = Geist({ subsets: ["latin"] });
 const _geistMono = Geist_Mono({ subsets: ["latin"] });
@@ -81,11 +82,12 @@ export default async function RootLayout({
       const membershipCompanyId = memberships
         .map((row) => Number(row["companyId"]))
         .find((id) => Number.isSafeInteger(id) && id > 0 && validCompanyIds.has(id))
-      const fallbackCompanyId = [...validCompanies].sort(
-        (a, b) => Number(b.isParent) - Number(a.isParent) || a.id - b.id,
-      )[0]?.id
-      const allowedCompanyId = membershipCompanyId ?? fallbackCompanyId
-      companyIds = allowedCompanyId == null ? undefined : [allowedCompanyId]
+      const allowedCompanyIds = resolveSessionCompanyIds({
+        companies: validCompanies,
+        membershipCompanyId,
+        roleNames: serverRoleNames,
+      })
+      companyIds = allowedCompanyIds.length === 0 ? undefined : allowedCompanyIds
     }
   }
 

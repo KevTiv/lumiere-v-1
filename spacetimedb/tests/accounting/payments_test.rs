@@ -12,16 +12,20 @@ use crate::accounting::journal_entries::{
 };
 use crate::accounting::payments::{
     account_payment, cancel_payment, create_payment, post_payment, register_payment_on_invoice,
-    CreatePaymentParams,
+    unregister_payment_allocations, CreatePaymentParams,
 };
 use crate::core::audit::audit_log;
 use crate::core::organization::company;
+use crate::core::permissions::{role, Role};
+use crate::core::users::{
+    find_user_profile_for_organization, user_organization, user_profile, UserProfile,
+};
 use crate::test_harness::{ensure_test_superuser, OrgFixture};
 use crate::types::{PartnerType, PaymentState, PaymentType};
 
 use super::helpers::{
     create_balanced_customer_invoice, create_balanced_customer_invoice_on_account,
-    seed_bank_journal, seed_distinctive_ar_account,
+    seed_bank_journal, seed_distinctive_ar_account, seed_sibling_company,
 };
 use crate::test_harness::chart_keys;
 
@@ -32,6 +36,340 @@ fn company_currency_id(ctx: &ReducerContext, company_id: u64) -> Result<u64, Str
         .find(&company_id)
         .map(|company| company.currency_id)
         .ok_or_else(|| format!("Company {company_id} not found"))
+}
+
+pub fn test_reconciled_payment_unwind_and_cancel_exact_effect(
+    ctx: &ReducerContext,
+) -> Result<(), String> {
+    ensure_test_superuser(ctx)?;
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let other = OrgFixture::seed_minimal(ctx)?;
+    let amount = 80.0;
+    let invoice_id = create_balanced_customer_invoice(ctx, &fixture, amount, true)?;
+    let (bank_journal_id, _) = seed_bank_journal(ctx, &fixture)?;
+    create_payment(
+        ctx,
+        fixture.organization_id,
+        CreatePaymentParams {
+            idempotency_key: "payment-unwind-cancel".to_string(),
+            company_id: fixture.company_id,
+            payment_type: PaymentType::InBound,
+            partner_type: PartnerType::Customer,
+            partner_id: fixture.partner_id,
+            amount,
+            currency_id: company_currency_id(ctx, fixture.company_id)?,
+            date: Some(ctx.timestamp),
+            journal_id: bank_journal_id,
+            ref_: Some("COV-08 payment unwind".to_string()),
+            memo: None,
+        },
+    )?;
+    let payment_id = ctx
+        .db
+        .account_payment()
+        .iter()
+        .find(|payment| {
+            payment.organization_id == fixture.organization_id
+                && payment.ref_.as_deref() == Some("COV-08 payment unwind")
+        })
+        .ok_or("unwind payment missing")?
+        .id;
+    post_payment(ctx, fixture.organization_id, payment_id)?;
+    register_payment_on_invoice(
+        ctx,
+        fixture.organization_id,
+        payment_id,
+        vec![invoice_id],
+        false,
+    )?;
+
+    let paid_invoice = ctx
+        .db
+        .account_move()
+        .id()
+        .find(&invoice_id)
+        .ok_or("paid invoice missing")?;
+    if paid_invoice.amount_residual.abs() > 0.01
+        || paid_invoice.payment_state != PaymentState::Paid
+    {
+        return Err("invoice did not settle before unwind".to_string());
+    }
+    let payment = ctx
+        .db
+        .account_payment()
+        .id()
+        .find(&payment_id)
+        .ok_or("posted payment missing")?;
+    let payment_move_id = payment.move_id.ok_or("posted payment move missing")?;
+
+    let allocated_line = ctx
+        .db
+        .account_move_line()
+        .move_line_by_move()
+        .filter(&invoice_id)
+        .find(|line| {
+            crate::accounting::journal_entries::is_receivable_or_payable_line_type(
+                line.account_internal_type.as_deref(),
+            ) && line.matching_number.is_some()
+        })
+        .ok_or("allocated invoice line missing")?;
+    ctx.db.account_move_line().id().update(
+        crate::accounting::journal_entries::AccountMoveLine {
+            matching_number: Some("MATCH-FOREIGN-OWNER".to_string()),
+            ..allocated_line.clone()
+        },
+    );
+    let stale_cancel = cancel_payment(ctx, fixture.organization_id, payment_id);
+    ctx.db.account_move_line().id().update(allocated_line);
+    match stale_cancel {
+        Err(error) if error.contains("another payment") => {}
+        Err(error) => return Err(format!("unexpected stale-owner cancellation error: {error}")),
+        Ok(()) => return Err("cancellation overwrote a foreign allocation owner".to_string()),
+    }
+    let after_stale_cancel = ctx
+        .db
+        .account_payment()
+        .id()
+        .find(&payment_id)
+        .ok_or("payment missing after stale-owner denial")?;
+    if after_stale_cancel.state != PaymentState::Paid
+        || after_stale_cancel.reconciled_invoice_ids != vec![invoice_id]
+    {
+        return Err("stale-owner denial changed canonical payment state".to_string());
+    }
+
+    if unregister_payment_allocations(ctx, other.organization_id, payment_id).is_ok() {
+        return Err("cross-organization allocation unwind succeeded".to_string());
+    }
+    let still_paid = ctx
+        .db
+        .account_move()
+        .id()
+        .find(&invoice_id)
+        .ok_or("invoice missing after cross-org denial")?;
+    if still_paid.amount_residual.abs() > 0.01 {
+        return Err("cross-organization denial changed invoice residual".to_string());
+    }
+
+    let sibling_company_id = seed_sibling_company(ctx, &fixture)?;
+    let canonical_invoice = ctx
+        .db
+        .account_move()
+        .id()
+        .find(&invoice_id)
+        .ok_or("invoice missing before cross-company test")?;
+    ctx.db.account_move().id().update(crate::accounting::journal_entries::AccountMove {
+        company_id: sibling_company_id,
+        ..canonical_invoice.clone()
+    });
+    let cross_company = unregister_payment_allocations(
+        ctx,
+        fixture.organization_id,
+        payment_id,
+    );
+    ctx.db.account_move().id().update(canonical_invoice);
+    match cross_company {
+        Err(error) if error.contains("scope") => {}
+        Err(error) => return Err(format!("unexpected cross-company unwind error: {error}")),
+        Ok(()) => return Err("cross-company allocation unwind succeeded".to_string()),
+    }
+    let after_company_denial = ctx
+        .db
+        .account_move()
+        .id()
+        .find(&invoice_id)
+        .ok_or("invoice missing after cross-company denial")?;
+    if after_company_denial.company_id != fixture.company_id
+        || after_company_denial.amount_residual.abs() > 0.01
+    {
+        return Err("cross-company denial changed canonical invoice state".to_string());
+    }
+
+    let membership = ctx
+        .db
+        .user_organization()
+        .user_org_by_user()
+        .filter(&ctx.sender())
+        .find(|row| row.organization_id == fixture.organization_id)
+        .ok_or("unwind authorization membership missing")?;
+    let owner_role = ctx
+        .db
+        .role()
+        .id()
+        .find(&membership.role_id)
+        .ok_or("unwind authorization role missing")?;
+    let caller_profile = find_user_profile_for_organization(
+        ctx,
+        ctx.sender(),
+        fixture.organization_id,
+    )
+    .ok_or("unwind authorization profile missing")?;
+    ctx.db.role().id().update(Role {
+        permissions: vec![],
+        ..owner_role.clone()
+    });
+    let caller_profile_id = caller_profile.id;
+    ctx.db.user_profile().id().update(UserProfile {
+        is_superuser: false,
+        ..caller_profile
+    });
+    let denied = unregister_payment_allocations(ctx, fixture.organization_id, payment_id);
+    ctx.db.role().id().update(owner_role);
+    let denied_profile = ctx
+        .db
+        .user_profile()
+        .id()
+        .find(&caller_profile_id)
+        .ok_or("unwind authorization profile disappeared")?;
+    ctx.db.user_profile().id().update(UserProfile {
+        is_superuser: true,
+        ..denied_profile
+    });
+    match denied {
+        Err(error) if error.contains("Permission denied") => {}
+        Err(error) => return Err(format!("unexpected unwind authorization error: {error}")),
+        Ok(()) => return Err("allocation unwind succeeded without permission".to_string()),
+    }
+    let after_denial = ctx
+        .db
+        .account_move()
+        .id()
+        .find(&invoice_id)
+        .ok_or("invoice missing after authorization denial")?;
+    if after_denial.amount_residual.abs() > 0.01 {
+        return Err("authorization denial changed invoice residual".to_string());
+    }
+
+    unregister_payment_allocations(ctx, fixture.organization_id, payment_id)?;
+    let unwound_payment = ctx
+        .db
+        .account_payment()
+        .id()
+        .find(&payment_id)
+        .ok_or("payment missing after unwind")?;
+    let unwound_invoice = ctx
+        .db
+        .account_move()
+        .id()
+        .find(&invoice_id)
+        .ok_or("invoice missing after unwind")?;
+    let unwound_payment_move = ctx
+        .db
+        .account_move()
+        .id()
+        .find(&payment_move_id)
+        .ok_or("payment move missing after unwind")?;
+    if !unwound_payment.reconciled_invoice_ids.is_empty()
+        || !unwound_payment.reconciled_bill_ids.is_empty()
+        || (unwound_invoice.amount_residual - amount).abs() > 0.01
+        || unwound_invoice.payment_state != PaymentState::NotPaid
+        || (unwound_payment_move.amount_residual - amount).abs() > 0.01
+    {
+        return Err("allocation unwind did not restore canonical residuals".to_string());
+    }
+    let restored_lines: Vec<_> = ctx
+        .db
+        .account_move_line()
+        .iter()
+        .filter(|line| line.move_id == invoice_id || line.move_id == payment_move_id)
+        .filter(|line| {
+            crate::accounting::journal_entries::is_receivable_or_payable_line_type(
+                line.account_internal_type.as_deref(),
+            )
+        })
+        .collect();
+    if restored_lines.is_empty()
+        || restored_lines.iter().any(|line| {
+            let expected_residual = if line.move_id == payment_move_id {
+                line.balance.abs()
+            } else {
+                line.balance
+            };
+            line.matching_number.is_some()
+                || line.is_matching
+                || (line.amount_residual - expected_residual).abs() > 0.01
+        })
+    {
+        return Err("allocation unwind did not restore exact line effects".to_string());
+    }
+    let unwind_snapshot: Vec<_> = restored_lines
+        .iter()
+        .map(|line| {
+            (
+                line.id,
+                line.amount_residual,
+                line.matching_number.clone(),
+                line.write_date,
+            )
+        })
+        .collect();
+    if unregister_payment_allocations(ctx, fixture.organization_id, payment_id).is_ok() {
+        return Err("allocation unwind replay unexpectedly succeeded".to_string());
+    }
+    let after_replay: Vec<_> = ctx
+        .db
+        .account_move_line()
+        .iter()
+        .filter(|line| unwind_snapshot.iter().any(|snapshot| snapshot.0 == line.id))
+        .map(|line| {
+            (
+                line.id,
+                line.amount_residual,
+                line.matching_number.clone(),
+                line.write_date,
+            )
+        })
+        .collect();
+    if after_replay != unwind_snapshot {
+        return Err("allocation unwind replay changed canonical lines".to_string());
+    }
+
+    register_payment_on_invoice(
+        ctx,
+        fixture.organization_id,
+        payment_id,
+        vec![invoice_id],
+        false,
+    )?;
+    cancel_payment(ctx, fixture.organization_id, payment_id)?;
+    let cancelled = ctx
+        .db
+        .account_payment()
+        .id()
+        .find(&payment_id)
+        .ok_or("cancelled payment missing")?;
+    let restored_invoice = ctx
+        .db
+        .account_move()
+        .id()
+        .find(&invoice_id)
+        .ok_or("restored invoice missing after cancel")?;
+    if cancelled.state != PaymentState::Reversed
+        || !cancelled.reconciled_invoice_ids.is_empty()
+        || (restored_invoice.amount_residual - amount).abs() > 0.01
+        || restored_invoice.payment_state != PaymentState::NotPaid
+    {
+        return Err("reconciled cancellation did not unwind before reversal".to_string());
+    }
+    let reversal_count = ctx
+        .db
+        .account_move()
+        .iter()
+        .filter(|move_row| {
+            move_row.metadata.as_deref().is_some_and(|metadata| {
+                serde_json::from_str::<serde_json::Value>(metadata)
+                    .ok()
+                    .and_then(|value| value["reverses_payment_move_id"].as_u64())
+                    == Some(payment_move_id)
+            })
+        })
+        .count();
+    if reversal_count != 1 {
+        return Err(format!(
+            "reconciled cancellation created {reversal_count} reversal moves"
+        ));
+    }
+    Ok(())
 }
 
 pub fn test_payment_reconciles_invoice(ctx: &ReducerContext) -> Result<(), String> {

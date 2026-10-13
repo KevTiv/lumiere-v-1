@@ -95,6 +95,13 @@ test.describe("Gate UI — workflows and approvals", { tag: ["@gate-ui", "@p0"] 
     const publishRes = await publishWait
     expect(publishRes.ok(), await publishRes.text()).toBe(true)
     await waitForWorkflowVersionStatus(page, seeded.versionId, "Published")
+    const publishUrl = new URL(publishRes.request().url())
+    const stalePublish = await page.request.post(`${publishUrl.pathname}${publishUrl.search}`, {
+      headers: { "Content-Type": "application/json" },
+      data: publishRes.request().postDataJSON(),
+    })
+    expect(stalePublish.status()).toBe(422)
+    await waitForWorkflowVersionStatus(page, seeded.versionId, "Published")
 
     await openWorkflowVersionRow(page, seeded.versionId)
     await expect(page.getByTestId("workflow-version-simulate")).toBeVisible()
@@ -115,6 +122,13 @@ test.describe("Gate UI — workflows and approvals", { tag: ["@gate-ui", "@p0"] 
     await page.getByTestId("workflow-version-retire").click()
     const retireRes = await retireWait
     expect(retireRes.ok(), await retireRes.text()).toBe(true)
+    await waitForWorkflowVersionStatus(page, seeded.versionId, "Retired")
+    const retireUrl = new URL(retireRes.request().url())
+    const staleRetire = await page.request.post(`${retireUrl.pathname}${retireUrl.search}`, {
+      headers: { "Content-Type": "application/json" },
+      data: retireRes.request().postDataJSON(),
+    })
+    expect(staleRetire.status()).toBe(422)
     await waitForWorkflowVersionStatus(page, seeded.versionId, "Retired")
     await expectNoAppError(page)
   })

@@ -166,6 +166,7 @@ import {
 } from '@lumiere/query-hooks/hooks/sales';
 import {
   useAccountMoves,
+  useAccountPayments,
   useAccountJournals,
   useAccountAccounts,
   useAccountPaymentTerms,
@@ -444,6 +445,7 @@ function SalesClientLoaded({
   const { data: productCategories = [] } = useProductCategories(orgId);
   const { data: uoms = [] } = useUoms(orgId);
   const { data: accountMoves = [] } = useAccountMoves(orgId);
+  const { data: accountPayments = [] } = useAccountPayments(orgId);
   const { data: accountJournals = [] } = useAccountJournals(orgId);
   const { data: accountAccounts = [] } = useAccountAccounts(orgId);
   const { data: paymentTerms = [] } = useAccountPaymentTerms(orgId);
@@ -1142,6 +1144,7 @@ function SalesClientLoaded({
                     stockPickings as EntityRow[],
                     accountMoves as unknown as EntityRow[],
                     returnOrders as unknown as EntityRow[],
+                    accountPayments as unknown as EntityRow[],
                   )}
                 />
               </div>
@@ -1150,7 +1153,7 @@ function SalesClientLoaded({
         },
       ],
     };
-  }, [t, orderLines, partnerLabelById, orgId, operatingCompanyId, stockPickings, accountMoves, returnOrders]);
+  }, [t, orderLines, partnerLabelById, orgId, operatingCompanyId, stockPickings, accountMoves, returnOrders, accountPayments]);
 
   const pickingBatchFormConfig = useMemo(() => newPickingBatchForm(t), [t]);
 

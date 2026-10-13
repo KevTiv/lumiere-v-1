@@ -152,6 +152,42 @@ describe("stored dashboard resolver", () => {
     expect(storedDashboardExportGate(result)).toEqual({ allowed: true })
   })
 
+  it("aggregates a large source deterministically and applies the persisted chart limit", () => {
+    const rows = Array.from({ length: 5_000 }, (_, index) => ({
+      state: `bucket-${index % 250}`,
+      amount_total: (index % 250) + 1,
+    }))
+    const result = resolveStoredDashboard(
+      [{
+        ...baseWidget,
+        widgetType: "Chart",
+        groupBy: "state",
+        chartType: "bar",
+        sortOrder: JSON.stringify({ value: "desc" }),
+        limit: 25,
+      }],
+      [1],
+      { sale_order: rows },
+    )
+
+    expect(result.state).toBe("ready")
+    expect(result.issues).toEqual([])
+    expect(result.widgets[0]).toMatchObject({
+      type: "bar-chart",
+      data: {
+        values: expect.arrayContaining([
+          { category: "bucket-249", Value: 5_000 },
+          { category: "bucket-248", Value: 4_980 },
+        ]),
+      },
+    })
+    if (result.widgets[0]?.type !== "bar-chart") throw new Error("expected bar chart")
+    expect(result.widgets[0].data.values).toHaveLength(25)
+    expect(result.widgets[0].data.values[0]).toEqual({ category: "bucket-249", Value: 5_000 })
+    expect(result.widgets[0].data.values.at(-1)).toEqual({ category: "bucket-225", Value: 4_520 })
+    expect(storedDashboardExportGate(result)).toEqual({ allowed: true })
+  })
+
   it.each([
     [{ sortOrder: "{" }, "invalid-sort"],
     [{ aggregation: "median" }, "invalid-aggregation"],
