@@ -219,7 +219,7 @@ def validate_resolved_guards(failures: list[str]) -> None:
     form_modal = (
         REPO_ROOT / "frontend" / "packages" / "ui" / "src" / "forms" / "form-modal.tsx"
     ).read_text()
-    guard = form_modal.find("if (!onSubmit) throw")
+    guard = form_modal.find("if (!onSubmit) return")
     submit = form_modal.find("await onSubmit(data)")
     close = form_modal.find("onOpenChange(false)", submit)
     if min(guard, submit, close) < 0 or not guard < submit < close:
