@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react"
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import type { ReactNode } from "react"
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest"
 import type { ModuleConfig } from "../lib/module-types"
@@ -131,7 +131,7 @@ describe("ModuleView collection states", () => {
     expect(screen.queryByRole("alert")).toBeNull()
   })
 
-  it("leaves tab order and arrow navigation to the tab primitive", () => {
+  it("leaves tab order and arrow navigation to the tab primitive", async () => {
     const twoTabs = { ...config, tabs: [...config.tabs, { ...config.tabs[0]!, id: "other", label: "Other" }] }
     render(<RBACProvider initialUser={user} initialRoles={[role([])]} initialPolicies={[]}>
       <ModuleView config={twoTabs} />
@@ -141,7 +141,8 @@ describe("ModuleView collection states", () => {
     expect(tabs[1]!.tabIndex).toBe(-1)
     tabs[0]!.focus()
     fireEvent.keyDown(tabs[0]!, { key: "ArrowRight" })
-    expect(document.activeElement).toBe(tabs[1])
+    // Base UI's composite root moves focus in a microtask after updating the highlight.
+    await waitFor(() => expect(document.activeElement).toBe(tabs[1]))
     expect(tabs.every((tab) => tab.tabIndex <= 0)).toBe(true)
   })
 })

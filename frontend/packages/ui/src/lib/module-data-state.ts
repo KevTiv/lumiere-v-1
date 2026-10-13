@@ -1,5 +1,6 @@
 export type ModuleDataState =
-  | { status: "ready" | "loading" }
+  | { status: "ready" }
+  | { status: "loading" }
   | { status: "error" | "denied" | "partial"; message?: string; onRetry?: () => void }
 
 /** Retain stale rows only for a concrete server failure; authorization and unknown failures close the view. */
