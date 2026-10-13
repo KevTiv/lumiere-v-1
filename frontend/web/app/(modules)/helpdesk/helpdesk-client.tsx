@@ -6,6 +6,7 @@ import { ticketKpis } from "./ticket-kpis"
 import { requiredInlineText, ticketPriorityPatch } from "@/lib/inline-edit-params"
 
 import { useCallback, useMemo, useState } from "react"
+import { useDefaultOperatingCompanyBigInt } from "@lumiere/query-hooks/hooks/use-operating-company"
 import { useTranslation } from "@lumiere/i18n"
 import {
   ModuleView,
@@ -124,6 +125,7 @@ function HelpdeskClientLoaded({
   const { t } = useTranslation()
   const moduleConfig = useMemo(() => helpdeskModuleConfig(t), [t])
   const { orgId } = orgBigInts(organizationId)
+  const operatingCompanyId = useDefaultOperatingCompanyBigInt(organizationId) ?? 0n
   const [quickActionForm, setQuickActionForm] = useState<{ form: FormConfig; action: string } | null>(null)
   const [csvImportKind, setCsvImportKind] = useState<"ticket" | "team" | "stage" | "sla" | null>(null)
 
@@ -574,6 +576,7 @@ function HelpdeskClientLoaded({
       />
       {csvImportKind ? (
         <CsvImportModal
+          trackedImport={{ companyId: operatingCompanyId }}
           organizationId={orgId}
           tableName={`helpdesk_${csvImportKind}`}
           key={csvImportKind}

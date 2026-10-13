@@ -11,6 +11,9 @@ import {
   type CsvImportColumns,
 } from "../lib/csv-import-preview"
 import { showWorkflowToast } from "../lib/workflow-toast"
+import { createCsvImportRequest, supportsTrackedCsvImport, type CsvImportRequest, type TrackedCsvImportScope } from "@lumiere/query-hooks/hooks/csv-import-request"
+import { useTrackedCsvImport } from "@lumiere/query-hooks/hooks/tracked-csv-import"
+import { CsvImportResult } from "../import-assistant/csv-import-result"
 import { CsvImportHistory } from "../import-assistant/csv-import-history"
 import { Button } from "./button"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "./dialog"
@@ -23,7 +26,7 @@ export interface CsvImportModalProps {
   /** Supplies the dialog title, description and button labels. */
   config: FormConfig
   isPending?: boolean
-  onImport: (csvText: string) => CsvImportRecordRef | void | Promise<CsvImportRecordRef | void>
+  onImport: (csvText: string) => void | Promise<void>
   /**
    * The reducer's header contract. When set, the preview checks the file's header against it, blocks
    * the import while a required column is missing, and offers a header-only template download.
@@ -31,15 +34,11 @@ export interface CsvImportModalProps {
   columns?: CsvImportColumns
   /** File name for the downloaded template; defaults to `import-template.csv`. */
   templateFileName?: string
-  /** Scope the explicitly uncorrelated import history to this organization and entity. */
+  /** Scope import results to this organization and entity. */
   organizationId?: bigint
   tableName?: string
-}
-
-export interface CsvImportRecordRef {
-  resource: "import-jobs"
-  id: string
-  href?: string
+  /** Use the dedicated tracked API. Legacy onImport remains supported when absent. */
+  trackedImport?: TrackedCsvImportScope
 }
 
 function downloadTemplate(columns: CsvImportColumns, fileName: string) {
@@ -55,8 +54,8 @@ function downloadTemplate(columns: CsvImportColumns, fileName: string) {
 /**
  * File-backed CSV import: pick a .csv, preview its first rows and header check, confirm, then submit
  * the raw text through `onImport`. The reducers skip bad rows and record them in the import job
- * history instead of failing the call. An exact record reference gives verified job feedback;
- * otherwise the dialog shows scoped history without assigning a job to this submission.
+ * history instead of failing the call. Tracked imports show this exact submission; legacy
+ * callbacks open entity-scoped history without guessing which job belongs to the file.
  */
 export function CsvImportModal({
   onClose,
@@ -67,6 +66,7 @@ export function CsvImportModal({
   templateFileName = "import-template.csv",
   organizationId,
   tableName,
+  trackedImport,
 }: CsvImportModalProps) {
   const { t } = useTranslation()
   const [fileName, setFileName] = useState("")
@@ -75,6 +75,9 @@ export function CsvImportModal({
   const [error, setError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
+  const [request, setRequest] = useState<CsvImportRequest | null>(null)
+  const trackedMutation = useTrackedCsvImport()
+  const trackSubmission = trackedImport && tableName && supportsTrackedCsvImport(tableName)
 
   const handleFile = async (file: File | undefined) => {
     setError(null)
@@ -96,33 +99,25 @@ export function CsvImportModal({
     setError(null)
     setIsSubmitting(true)
     try {
-      const record = await onImport(csvText)
+      if (trackSubmission) {
+        if (!organizationId || !tableName) throw new Error("Tracked import requires organization and entity scope")
+        const next = request ?? createCsvImportRequest(organizationId, tableName, csvText, fileName, trackedImport)
+        setRequest(next)
+        setSubmitted(true)
+        await trackedMutation.mutateAsync(next)
+      } else await onImport(csvText)
       showWorkflowToast({
-        kind: record ? "success" : "info",
-        title: record
-          ? t("common.csvImportDialog.success", { defaultValue: "Import job created" })
-          : t("common.csvImportDialog.outcomeUnknown", { defaultValue: "Import outcome not verified" }),
-        description: record
-          ? t("common.csvImportDialog.successDescription", {
-              defaultValue: "{{count}} rows from {{file}} were sent to import job {{jobId}}. Rows the server rejects are listed on that job.",
-              count: analysis?.rowCount ?? 0,
-              file: fileName,
-              jobId: record.id,
-            })
-          : t("common.csvImportDialog.outcomeUnknownDescription", {
-              defaultValue: "The server accepted {{file}}, but no exact import job was returned. Review import history before you retry.",
-              file: fileName,
-            }),
-        ...(record?.href
-          ? {
-              action: {
-                label: t("common.csvImportDialog.viewJob", { defaultValue: "View import job" }),
-                onClick: () => window.location.assign(record.href!),
-              },
-            }
-          : {}),
+        kind: "info",
+        title: t("common.csvImportDialog.success", { defaultValue: "Import submitted" }),
+        description: t("common.csvImportDialog.successDescription", {
+          defaultValue: trackSubmission
+            ? "{{count}} rows from {{file}} were sent. This submission’s results appear below."
+            : "{{count}} rows from {{file}} were sent. Rows the server rejects are listed in the import job history.",
+          count: analysis?.rowCount ?? 0,
+          file: fileName,
+        }),
       })
-      if (!record && organizationId && organizationId > 0n) setSubmitted(true)
+      if (organizationId && organizationId > 0n) setSubmitted(true)
       else onClose()
     } catch (cause) {
       const message = cause instanceof Error ? cause.message : String(cause)
@@ -137,7 +132,7 @@ export function CsvImportModal({
     }
   }
 
-  const busy = isPending || isSubmitting
+  const busy = isPending || isSubmitting || trackedMutation.isPending
 
   return (
     <Dialog open onOpenChange={(next) => !next && !busy && onClose()}>
@@ -148,10 +143,13 @@ export function CsvImportModal({
         </DialogHeader>
 
         <div className="space-y-4">
-          {submitted && organizationId ? (
+          {request ? <CsvImportResult request={request} initialPending={isSubmitting} initialError={error} activeOrganizationId={organizationId} activeCompanyId={trackedImport?.companyId} onNewFile={() => {
+            setRequest(null); setSubmitted(false); setError(null); setAnalysis(null); setCsvText(""); setFileName("")
+          }} /> : submitted && organizationId ? (
             <CsvImportHistory organizationId={organizationId} tableName={tableName} />
           ) : null}
           {!submitted ? <>
+          {trackedImport && !trackSubmission ? <p className="text-sm text-muted-foreground">{t("common.csvImportDialog.manualResultNotice", { defaultValue: "This import uses manual history selection. Its results cannot yet be linked automatically to this file." })}</p> : null}
           <div className="space-y-2">
             <Label htmlFor="csv-import-file">
               {t("common.csvImportDialog.fileLabel", { defaultValue: "CSV file" })}
@@ -229,7 +227,7 @@ export function CsvImportModal({
           ) : null}
 
           </> : null}
-          {error ? (
+          {error && !request ? (
             <p role="alert" className="text-sm text-destructive">
               {error}
             </p>

@@ -4,6 +4,9 @@ import { CsvImportModal } from "./csv-import-modal"
 import type { FormConfig } from "../lib/form-types"
 
 const toast = vi.hoisted(() => vi.fn())
+const tracked = vi.hoisted(() => ({ mutateAsync: vi.fn(), isPending: false }))
+vi.mock("@lumiere/query-hooks/hooks/tracked-csv-import", () => ({ useTrackedCsvImport: () => tracked }))
+vi.mock("../import-assistant/csv-import-result", () => ({ CsvImportResult: ({ request }: { request: { requestId: string } }) => <div>Exact submission {request.requestId}</div> }))
 vi.mock("../lib/workflow-toast", () => ({ showWorkflowToast: toast }))
 vi.mock("@lumiere/i18n", () => ({ useTranslation: () => ({ t: (key: string, options?: { defaultValue?: string }) => options?.defaultValue ?? key }) }))
 vi.mock("../import-assistant/csv-import-history", () => ({ CsvImportHistory: () => <div>Organization import history</div> }))
@@ -26,20 +29,6 @@ async function chooseFile() {
 }
 
 describe("CSV submission outcomes", () => {
-  it("closes with verified feedback when the server returns an exact job", async () => {
-    const onClose = vi.fn()
-    const onImport = vi.fn().mockResolvedValue({ resource: "import-jobs", id: "job-42" })
-    render(<CsvImportModal config={config} organizationId={1n} tableName="hr_employee" onImport={onImport} onClose={onClose} />)
-    await chooseFile()
-    fireEvent.click(screen.getByRole("button", { name: "Import" }))
-    await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1))
-    expect(screen.queryByText("Organization import history")).toBeNull()
-    expect(toast).toHaveBeenCalledWith(expect.objectContaining({
-      kind: "success",
-      title: "Import job created",
-    }))
-  })
-
   it("keeps the dialog open for history and prevents duplicate submission after acceptance", async () => {
     const onClose = vi.fn()
     const onImport = vi.fn().mockResolvedValue(undefined)
@@ -64,4 +53,19 @@ describe("CSV submission outcomes", () => {
     expect(screen.queryByText("Organization import history")).toBeNull()
     expect(screen.getByRole("button", { name: "Import" })).toBeTruthy()
   })
+  it("freezes a tracked request and never invokes the legacy callback after response loss", async () => {
+    const onImport = vi.fn()
+    tracked.mutateAsync.mockRejectedValue(new Error("Response lost"))
+    render(<CsvImportModal config={config} organizationId={1n} tableName="hr_employee" trackedImport={{ companyId: 2n }} onImport={onImport} onClose={vi.fn()} />)
+    await chooseFile()
+    fireEvent.click(screen.getByRole("button", { name: "Import" }))
+    await screen.findByText(/Exact submission/)
+    await waitFor(() => expect(tracked.mutateAsync).toHaveBeenCalledTimes(1))
+    expect(onImport).not.toHaveBeenCalled()
+    expect(tracked.mutateAsync.mock.calls[0]?.[0]).toEqual(expect.objectContaining({
+      entity: "hr_employee", companyId: "2", fileName: "employees.csv", csvData: "name\nAda\n", requestId: expect.stringMatching(/^[a-f0-9]{32}$/),
+    }))
+    expect(screen.queryByRole("button", { name: "Import" })).toBeNull()
+  })
+
 })

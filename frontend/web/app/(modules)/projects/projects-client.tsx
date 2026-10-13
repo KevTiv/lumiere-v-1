@@ -1651,6 +1651,7 @@ function ProjectsClientLoaded({
       ) : null}
       {csvKind && csvKind !== "task" && csvFormConfig ? (
         <CsvImportModal
+          trackedImport={{ companyId: operatingCompanyId }}
           organizationId={orgId}
           tableName={csvKind === "project" ? "project_project" : "project_timesheet"}
           key={csvKind}

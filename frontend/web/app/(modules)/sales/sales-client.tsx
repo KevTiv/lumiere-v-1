@@ -2540,6 +2540,7 @@ function SalesClientLoaded({
       ) : null}
       {csvKind && csvKind !== 'order' && csvFormConfig ? (
         <CsvImportModal
+          trackedImport={{ companyId: operatingCompanyId }}
           organizationId={orgId}
           tableName={"sale_order_line"}
           key={csvKind}
