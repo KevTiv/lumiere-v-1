@@ -5926,6 +5926,8 @@ function InventoryClientLoaded({
       ) : null}
       {csvKind && csvKind !== 'product' && csvFormConfig ? (
         <CsvImportModal
+          organizationId={orgId}
+          tableName={{ uomCategory: "uom_category", uom: "uom", productCategory: "product_category", product: "product", productVariant: "product_variant", warehouse: "warehouse", stockLocation: "stock_location", stockQuant: "stock_quant", lot: "stock_production_lot" }[csvKind]}
           key={csvKind}
           onClose={() => setCsvKind(null)}
           config={csvFormConfig}

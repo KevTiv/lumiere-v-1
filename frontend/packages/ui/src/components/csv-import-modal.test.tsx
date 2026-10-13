@@ -1,0 +1,67 @@
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react"
+import { afterEach, describe, expect, it, vi } from "vitest"
+import { CsvImportModal } from "./csv-import-modal"
+import type { FormConfig } from "../lib/form-types"
+
+const toast = vi.hoisted(() => vi.fn())
+vi.mock("../lib/workflow-toast", () => ({ showWorkflowToast: toast }))
+vi.mock("@lumiere/i18n", () => ({ useTranslation: () => ({ t: (key: string, options?: { defaultValue?: string }) => options?.defaultValue ?? key }) }))
+vi.mock("../import-assistant/csv-import-history", () => ({ CsvImportHistory: () => <div>Organization import history</div> }))
+vi.mock("./dialog", () => ({
+  Dialog: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  DialogContent: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  DialogHeader: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  DialogFooter: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  DialogTitle: ({ children }: { children: React.ReactNode }) => <h2>{children}</h2>,
+  DialogDescription: ({ children }: { children: React.ReactNode }) => <p>{children}</p>,
+}))
+const config = { title: "Import employees", submitLabel: "Import", fields: [] } as FormConfig
+afterEach(() => { cleanup(); vi.clearAllMocks() })
+
+async function chooseFile() {
+  const file = new File(["name\nAda\n"], "employees.csv", { type: "text/csv" })
+  Object.defineProperty(file, "text", { value: async () => "name\nAda\n" })
+  fireEvent.change(screen.getByLabelText("CSV file"), { target: { files: [file] } })
+  await waitFor(() => expect((screen.getByRole("button", { name: "Import" }) as HTMLButtonElement).disabled).toBe(false))
+}
+
+describe("CSV submission outcomes", () => {
+  it("closes with verified feedback when the server returns an exact job", async () => {
+    const onClose = vi.fn()
+    const onImport = vi.fn().mockResolvedValue({ resource: "import-jobs", id: "job-42" })
+    render(<CsvImportModal config={config} organizationId={1n} tableName="hr_employee" onImport={onImport} onClose={onClose} />)
+    await chooseFile()
+    fireEvent.click(screen.getByRole("button", { name: "Import" }))
+    await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1))
+    expect(screen.queryByText("Organization import history")).toBeNull()
+    expect(toast).toHaveBeenCalledWith(expect.objectContaining({
+      kind: "success",
+      title: "Import job created",
+    }))
+  })
+
+  it("keeps the dialog open for history and prevents duplicate submission after acceptance", async () => {
+    const onClose = vi.fn()
+    const onImport = vi.fn().mockResolvedValue(undefined)
+    render(<CsvImportModal config={config} organizationId={1n} tableName="hr_employee" onImport={onImport} onClose={onClose} />)
+    await chooseFile()
+    fireEvent.click(screen.getByRole("button", { name: "Import" }))
+    await screen.findByText("Organization import history")
+    expect(onClose).not.toHaveBeenCalled()
+    expect(onImport).toHaveBeenCalledWith("name\nAda\n")
+    expect(screen.queryByRole("button", { name: "Import" })).toBeNull()
+    expect(toast).toHaveBeenCalledWith(expect.objectContaining({ kind: "info" }))
+    fireEvent.click(screen.getByRole("button", { name: "Close" }))
+    expect(onClose).toHaveBeenCalledTimes(1)
+  })
+  it("preserves the selected file and displays reducer failure instead of opening history", async () => {
+    const onClose = vi.fn()
+    render(<CsvImportModal config={config} organizationId={1n} onImport={async () => { throw new Error("Permission denied") }} onClose={onClose} />)
+    await chooseFile()
+    fireEvent.click(screen.getByRole("button", { name: "Import" }))
+    await screen.findByText("Permission denied")
+    expect(onClose).not.toHaveBeenCalled()
+    expect(screen.queryByText("Organization import history")).toBeNull()
+    expect(screen.getByRole("button", { name: "Import" })).toBeTruthy()
+  })
+})

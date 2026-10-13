@@ -1814,41 +1814,44 @@ function HrClientLoaded({
       ) : null}
       {csvKind && csvFormConfig ? (
         <CsvImportModal
+          organizationId={orgId}
+          tableName={{ resource: "hr_resource", department: "hr_department", job_position: "hr_job_position", employee: "hr_employee", contract: "hr_contract", leave_type: "hr_leave_type", leave: "hr_leave", payroll_structure: "hr_payroll_structure", salary_rule: "hr_salary_rule", payslip: "hr_payslip" }[csvKind]}
           key={csvKind}
           onClose={() => setCsvKind(null)}
           config={csvFormConfig}
           isPending={isFormMutationPending}
           onImport={async (text) => {
             switch (csvKind) {
-                case "resource":
-                  await csvImports.importResource.mutateAsync(text)
-                  break
-                case "department":
-                  await csvImports.importDepartment.mutateAsync(text)
-                  break
-                case "job_position":
-                  await csvImports.importJobPosition.mutateAsync(text)
-                  break
-                case "employee":
-                  await csvImports.importEmployee.mutateAsync(text)
-                  break
-                case "contract":
-                  await csvImports.importContract.mutateAsync(text)
-                  break
-                case "leave_type":
-                  await csvImports.importLeaveType.mutateAsync(text)
-                  break
-                case "leave":
-                  await csvImports.importLeave.mutateAsync(text)
-                  break
-                case "payroll_structure":
-                  await csvImports.importPayrollStructure.mutateAsync(text)
-                  break
-                case "salary_rule":
-                  await csvImports.importSalaryRule.mutateAsync(text)
-                  break
-                case "payslip":
-                  return await csvImports.importPayslip.mutateAsync(text)
+              case "resource":
+                await csvImports.importResource.mutateAsync(text)
+                break
+              case "department":
+                await csvImports.importDepartment.mutateAsync(text)
+                break
+              case "job_position":
+                await csvImports.importJobPosition.mutateAsync(text)
+                break
+              case "employee":
+                await csvImports.importEmployee.mutateAsync(text)
+                break
+              case "contract":
+                await csvImports.importContract.mutateAsync(text)
+                break
+              case "leave_type":
+                await csvImports.importLeaveType.mutateAsync(text)
+                break
+              case "leave":
+                await csvImports.importLeave.mutateAsync(text)
+                break
+              case "payroll_structure":
+                await csvImports.importPayrollStructure.mutateAsync(text)
+                break
+              case "salary_rule":
+                await csvImports.importSalaryRule.mutateAsync(text)
+                break
+              case "payslip":
+                await csvImports.importPayslip.mutateAsync(text)
+                break
               default:
                 break
             }
