@@ -2,7 +2,7 @@
 
 import type { JsonObject } from "@lumiere/api-client/json-object"
 
-import { type FormEvent, useMemo, useState } from "react"
+import { type FormEvent, useMemo, useRef, useState } from "react"
 import { AlertCircle, GitCompareArrows, MessagesSquare, PauseCircle, PlayCircle } from "lucide-react"
 import { Button } from "@lumiere/ui"
 import { Alert, AlertDescription, AlertTitle } from "@lumiere/ui/components/alert"
@@ -21,6 +21,7 @@ import {
   type LifecycleIntent,
   type RunLifecycleView,
 } from "./run-lifecycle"
+import { mapRunObservation, type RunObservationView } from "./run-observation"
 
 interface RunLifecyclePanelProps {
   companies: JsonObject[]
@@ -33,15 +34,58 @@ type RequestState =
   | { status: "denied"; message: string }
   | { status: "error"; message: string }
   | { status: "success"; data: RunLifecycleView }
+type ObservationState =
+  | { status: "idle" }
+  | { status: "loading" }
+  | { status: "unavailable"; message: string }
+  | { status: "success"; data: RunObservationView }
 
 export function RunLifecyclePanel({ companies }: RunLifecyclePanelProps) {
   const companyOptions = useMemo(() => companyRowsToSelectOptions(companies), [companies])
   const [companyId, setCompanyId] = useState(() => companyOptions[0]?.value ?? "")
   const [runId, setRunId] = useState("")
   const [request, setRequest] = useState<RequestState>({ status: "idle" })
+  const [observation, setObservation] = useState<ObservationState>({ status: "idle" })
+  const lifecycleRequestId = useRef(0)
+  const observationRequest = useRef(0)
   const loading = request.status === "loading"
 
+  const loadObservation = async (selectedCompanyId: number, selectedRunId: number) => {
+    const requestId = ++observationRequest.current
+    setObservation({ status: "loading" })
+    try {
+      const response = await fetch("/api/ai/evidence/runs/inspect", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ companyId: selectedCompanyId, runId: selectedRunId }),
+      })
+      const payload = await response.json().catch(() => ({})) as JsonObject
+      if (requestId !== observationRequest.current) return
+      if (!response.ok) {
+        setObservation({
+          status: "unavailable",
+          message: response.status === 401 || response.status === 403
+            ? "The current session is not authorized to inspect this run's transcript."
+            : response.status === 404
+              ? "No governed tool transcript was found for this lifecycle run."
+              : "The governed tool transcript is temporarily unavailable.",
+        })
+        return
+      }
+      const mapped = mapRunObservation(payload)
+      setObservation(mapped && mapped.runId === selectedRunId
+        ? { status: "success", data: mapped }
+        : { status: "unavailable", message: "The governed tool transcript response was incomplete." })
+    } catch {
+      if (requestId === observationRequest.current) {
+        setObservation({ status: "unavailable", message: "The governed tool transcript is temporarily unavailable." })
+      }
+    }
+  }
+
   const submit = async (intent: LifecycleIntent) => {
+    const requestId = ++lifecycleRequestId.current
+    observationRequest.current += 1
     const parsedCompanyId = Number(companyId)
     if (!Number.isSafeInteger(parsedCompanyId) || parsedCompanyId <= 0) {
       setRequest({ status: "error", message: "Choose a company first." })
@@ -55,6 +99,7 @@ export function RunLifecyclePanel({ companies }: RunLifecyclePanelProps) {
         body: JSON.stringify(lifecycleRequest(parsedCompanyId, intent)),
       })
       const payload = await response.json().catch(() => ({})) as JsonObject
+      if (requestId !== lifecycleRequestId.current) return
       if (response.status === 401 || response.status === 403) {
         setRequest({ status: "denied", message: "This run is unavailable to the current session." })
         return
@@ -67,11 +112,17 @@ export function RunLifecyclePanel({ companies }: RunLifecyclePanelProps) {
         return
       }
       const mapped = mapRunLifecycle(payload)
-      setRequest(mapped
-        ? { status: "success", data: mapped }
-        : { status: "error", message: "The lifecycle response was incomplete." })
+      if (!mapped) {
+        setRequest({ status: "error", message: "The lifecycle response was incomplete." })
+        setObservation({ status: "idle" })
+        return
+      }
+      setRequest({ status: "success", data: mapped })
+      await loadObservation(parsedCompanyId, mapped.runId)
     } catch {
+      if (requestId !== lifecycleRequestId.current) return
       setRequest({ status: "error", message: "The lifecycle service is unavailable." })
+      setObservation({ status: "idle" })
     }
   }
 
@@ -86,8 +137,11 @@ export function RunLifecyclePanel({ companies }: RunLifecyclePanelProps) {
   }
 
   const changeRun = (update: () => void) => {
+    lifecycleRequestId.current += 1
+    observationRequest.current += 1
     update()
     setRequest({ status: "idle" })
+    setObservation({ status: "idle" })
   }
 
   return (
@@ -125,12 +179,12 @@ export function RunLifecyclePanel({ companies }: RunLifecyclePanelProps) {
       {request.status === "loading" ? <div className="flex flex-col gap-3"><Skeleton className="h-28 w-full" /><Skeleton className="h-52 w-full" /></div> : null}
       {request.status === "denied" ? <Alert variant="destructive"><AlertCircle /><AlertTitle>Access denied</AlertTitle><AlertDescription>{request.message}</AlertDescription></Alert> : null}
       {request.status === "error" ? <Alert variant="destructive"><AlertCircle /><AlertTitle>Lifecycle unavailable</AlertTitle><AlertDescription>{request.message}</AlertDescription></Alert> : null}
-      {request.status === "success" ? <LifecycleResult data={request.data} loading={loading} submit={submit} /> : null}
+      {request.status === "success" ? <LifecycleResult data={request.data} observation={observation} loading={loading} submit={submit} /> : null}
     </div>
   )
 }
 
-function LifecycleResult({ data, loading, submit }: { data: RunLifecycleView; loading: boolean; submit: (intent: LifecycleIntent) => Promise<void> }) {
+function LifecycleResult({ data, observation, loading, submit }: { data: RunLifecycleView; observation: ObservationState; loading: boolean; submit: (intent: LifecycleIntent) => Promise<void> }) {
   const [command, setCommand] = useState<CommandKind>("resume")
   const [primary, setPrimary] = useState("")
   const [secondary, setSecondary] = useState("")
@@ -168,6 +222,8 @@ function LifecycleResult({ data, loading, submit }: { data: RunLifecycleView; lo
         <CardHeader><div className="flex flex-wrap items-center gap-2"><CardTitle className="text-base">Run #{data.runId}</CardTitle><Badge>{data.state}</Badge>{continuation ? <Badge variant="outline">cursor {continuation.cursor}</Badge> : <Badge variant="destructive">No continuation</Badge>}</div></CardHeader>
       </Card>
 
+      <RunObservation observation={observation} />
+
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Card>
           <CardHeader><CardTitle className="text-base">Questions</CardTitle><CardDescription>Answer contents are intentionally not displayed.</CardDescription></CardHeader>
@@ -194,6 +250,57 @@ function LifecycleResult({ data, loading, submit }: { data: RunLifecycleView; lo
 
       {data.comparison ? <Card><CardHeader><CardTitle className="text-base">Comparison</CardTitle></CardHeader><CardContent className="text-sm"><p>Run #{data.comparison.leftRunId} at cursor {data.comparison.leftContinuation.cursor} compared with run #{data.comparison.rightRunId} at cursor {data.comparison.rightContinuation.cursor}.</p><p className="mt-1 text-muted-foreground">The current core response confirms the compared continuations but does not yet expose bounded component, evidence, or validation differences.</p></CardContent></Card> : null}
     </div>
+  )
+}
+
+function RunObservation({ observation }: { observation: ObservationState }) {
+  if (observation.status === "idle") return null
+  if (observation.status === "loading") return <Skeleton className="h-48 w-full" />
+  if (observation.status === "unavailable") {
+    return <Alert><AlertCircle /><AlertTitle>Transcript unavailable</AlertTitle><AlertDescription>{observation.message}</AlertDescription></Alert>
+  }
+
+  const run = observation.data
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <CardTitle className="text-base">Governed tool transcript</CardTitle>
+            <CardDescription>Ordered persisted steps; raw arguments, results, answers, and error messages are not exposed.</CardDescription>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Badge variant="outline">{run.status}</Badge>
+            <Badge variant="outline">{run.stepCount} step{run.stepCount === 1 ? "" : "s"}</Badge>
+            <Badge variant="outline">{run.tokensUsed.toLocaleString()} tokens</Badge>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent>
+        {run.transcript.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No observable tool steps were returned.</p>
+        ) : (
+          <ol className="flex flex-col gap-3">
+            {run.transcript.map((step) => (
+              <li key={step.id} className="rounded-md border p-3 text-sm">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge variant="outline">Step {step.stepNo}</Badge>
+                    <span className="font-medium">{step.toolName}</span>
+                    {step.error ? <Badge variant="destructive">Failed</Badge> : <Badge variant="outline">Completed</Badge>}
+                  </div>
+                  <span className="text-xs text-muted-foreground">{step.durationMs.toLocaleString()} ms</span>
+                </div>
+                <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                  <span>{step.resultSummary}</span>
+                  {step.inputHash ? <span title={step.inputHash}>input hash {step.inputHash.slice(0, 12)}…</span> : null}
+                </div>
+              </li>
+            ))}
+          </ol>
+        )}
+      </CardContent>
+    </Card>
   )
 }
 
