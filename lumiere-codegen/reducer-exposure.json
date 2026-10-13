@@ -4085,6 +4085,11 @@
       "reason": "invoked by an enumerated frontend BFF call site"
     },
     {
+      "name": "unregister_payment_allocations",
+      "exposure": "denied",
+      "reason": "allocation unwind is an internal accounting primitive reached atomically through cancel_payment; no enumerated frontend BFF caller"
+    },
+    {
       "name": "unreserve_stock_picking",
       "exposure": "session",
       "reason": "reviewed transfer-page action: company-scoped assigned-to-confirmed transition with reservation release and permission checks"

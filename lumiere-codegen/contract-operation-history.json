@@ -884,7 +884,7 @@
     },
     "erp.convert_purchase_requisition_to_po": {
       "name": "convert_purchase_requisition_to_po",
-      "shape_fingerprint": "sha256:1065e9199b5420f9d4e646b79a7b7c7da4d7a7b8ed786e03bc2d1129c4e1e111"
+      "shape_fingerprint": "sha256:730cab7a413c092f1987469386cbcb23b6f1f1c7f977f3cadbbbaeb82b798c35"
     },
     "erp.correct_ai_decision_case": {
       "name": "correct_ai_decision_case",
@@ -4998,6 +4998,10 @@
       "name": "unreconciled_account_bank_statement_line",
       "shape_fingerprint": "sha256:4bca3cc278e1dc27e504efa61f4f99b41a97c48e9205cdc90ce18eb7495b7b95"
     },
+    "erp.unregister_payment_allocations": {
+      "name": "unregister_payment_allocations",
+      "shape_fingerprint": "sha256:7610a6bd7dbad4b7578714a45e804b5f1cdaf77d5657996b76df09c2d0a8377f"
+    },
     "erp.unreserve_stock_picking": {
       "name": "unreserve_stock_picking",
       "shape_fingerprint": "sha256:1d219a0eeb9efa97404e9753987fd44cbbb2bee6fb6d5ebf55afb665001b2220"
@@ -5984,6 +5988,14 @@
       "current_operations_fingerprint": "sha256:246cc546a7d4c8caa66e58edfc8b7deb57bf757866c5fa379ab00a983664468a",
       "operation_count": 1444,
       "reason": "release on top of v0.3.99: add configure_manufacturing_valuation, configure_workcenter_cost_rate, finish_manufacturing_order_with_tracking, run_manufacturing_actual_cost_valuation_test, run_manufacturing_bom_routing_lifecycle_test, run_manufacturing_bom_to_close_domain_lifecycle_test, run_manufacturing_cost_configuration_scope_test, run_manufacturing_tracked_output_test, scrap_manufacturing_material, scrap_tracked_manufacturing_output, set_bom_operations; change the shape of confirm_manufacturing_order"
+    },
+    {
+      "previous_release": "v0.3.105",
+      "previous_ir_sha256": "sha256:4db7bdcfe4aa9e30ad8b845701d83e961236aa4a93fc8c0701b7e9d029b0af0a",
+      "previous_operations_fingerprint": "sha256:246cc546a7d4c8caa66e58edfc8b7deb57bf757866c5fa379ab00a983664468a",
+      "current_operations_fingerprint": "sha256:b0256ff3294362745bfe373602729ce1f504236aad8f433ba883dec107a20339",
+      "operation_count": 1445,
+      "reason": "release on top of v0.3.105: add denied internal unregister_payment_allocations; update convert_purchase_requisition_to_po for the scheduled replenishment source path"
     }
   ]
 }

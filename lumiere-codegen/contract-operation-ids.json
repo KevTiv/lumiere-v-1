@@ -1249,6 +1249,7 @@
     "unmatch_elimination_entry": "erp.unmatch_elimination_entry",
     "unmatch_expense_card_statement_line": "erp.unmatch_expense_card_statement_line",
     "unreconciled_account_bank_statement_line": "erp.unreconciled_account_bank_statement_line",
+    "unregister_payment_allocations": "erp.unregister_payment_allocations",
     "unreserve_stock_picking": "erp.unreserve_stock_picking",
     "unreserve_stock_quant": "erp.unreserve_stock_quant",
     "unsubscribe_from_record": "erp.unsubscribe_from_record",
