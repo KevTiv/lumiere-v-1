@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { RecordHeaderActions } from '../../../../../components/record-header-actions';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
@@ -57,6 +57,10 @@ import { useRecordNavigation } from '@/hooks/use-record-navigation';
 import { useManufacturingModuleSubscription } from '@/lib/module-subscription-hooks';
 import { hasValidOrganizationId, orgBigInts } from '@/lib/org-scoped';
 import { ManufacturingRowDialog } from '../../manufacturing-row-dialog';
+import { ManufacturingActionResult } from '../../manufacturing-action-result';
+import { ManufacturingCostReadback } from '../../manufacturing-cost-readback';
+import { ManufacturingTrackingPanel } from '../../manufacturing-tracking-panel';
+import { resolvedManufacturingResultLinks, type ManufacturingResultLink } from '@/lib/manufacturing-result-links';
 import {
   canCancelOrder,
   canConfirmOrder,
@@ -127,6 +131,8 @@ function ManufacturingOrderPageLoaded({
   const { askForm, formDialog } = useFormDialog();
 
   const [actionsOpen, setActionsOpen] = useState(false);
+  const [resultLinks, setResultLinks] = useState<ManufacturingResultLink[]>([]);
+  useEffect(() => setResultLinks([]), [orgId, operatingCompanyId, orderId]);
 
   const order = useMemo((): Row | undefined => {
     const row = (productions as unknown as Row[]).find((candidate) => String(candidate.id) === orderId);
@@ -208,8 +214,10 @@ function ManufacturingOrderPageLoaded({
 
   /** Run one lifecycle command; the reducer re-validates, so failures surface as an error toast. */
   const runAction = async (title: string, work: () => Promise<unknown>) => {
+    setResultLinks([]);
     try {
-      await work();
+      const outcome = await work();
+      setResultLinks(resolvedManufacturingResultLinks(outcome));
       showWorkflowToast({ kind: 'success', title: t('manufacturing.page.actionDone', { defaultValue: '{{action}} completed', action: title }) });
     } catch (error) {
       showWorkflowToast({
@@ -305,6 +313,9 @@ function ManufacturingOrderPageLoaded({
 
   return (
     <>
+      <ManufacturingActionResult links={resultLinks} onDismiss={() => setResultLinks([])} />
+      <ManufacturingTrackingPanel key={`${orgId}-${operatingCompanyId}-${orderId}`}
+        order={order} organizationId={orgId} companyId={operatingCompanyId} />
       <RecordPage
         testIdPrefix="manufacturing-order"
         breadcrumbs={[
@@ -394,7 +405,7 @@ function ManufacturingOrderPageLoaded({
             </Button>
           ) : null}
           <RecordHeaderActions model="manufacturing" record={order} organizationId={orgId} companyId={operatingCompanyId ?? undefined} />
-          <Button size="sm" data-testid="manufacturing-order-actions" onClick={() => setActionsOpen(true)}>
+          <Button size="sm" data-testid="manufacturing-order-actions" onClick={() => { setResultLinks([]); setActionsOpen(true); }}>
             {t('manufacturing.rowActions.titleOrder')}
           </Button>
           </>
@@ -405,7 +416,7 @@ function ManufacturingOrderPageLoaded({
           {
             id: 'overview',
             label: t('common.overview', { defaultValue: 'Overview' }),
-            content: <EntityDetail config={detailConfig} data={order} />,
+            content: <div className="space-y-6"><EntityDetail config={detailConfig} data={order} /><ManufacturingCostReadback organizationId={orgId} companyId={operatingCompanyId} productionId={id} /></div>,
           },
           {
             id: 'workorders',
@@ -434,6 +445,7 @@ function ManufacturingOrderPageLoaded({
       {confirmDialog}
       {formDialog}
       <ManufacturingRowDialog
+        onActionResult={(outcome) => setResultLinks(resolvedManufacturingResultLinks(outcome))}
         open={actionsOpen}
         onOpenChange={setActionsOpen}
         tabId="orders"

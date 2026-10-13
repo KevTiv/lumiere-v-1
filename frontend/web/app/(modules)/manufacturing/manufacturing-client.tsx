@@ -1,5 +1,7 @@
 "use client"
 import { mapDashboardWidgets, withDashboardSections } from "@lumiere/ui/lib/dashboard-sections"
+import { canUseModuleData, moduleQueryState } from "@lumiere/ui/lib/module-data-state"
+import { manufacturingResultLinks, type ManufacturingResultLink } from "@/lib/manufacturing-result-links"
 
 import { useEffect, useMemo, useState } from "react"
 import type { QueryResourceState } from "@lumiere/api-client"
@@ -27,6 +29,7 @@ import {
   useMrpProductions,
   useMrpBoms,
   useMrpBomLines,
+  useMrpBomByproducts,
   useMrpWorkorders,
   useMrpWorkcenters,
   useMrpRoutingWorkcenters,
@@ -44,6 +47,10 @@ import type {
 import Link from "next/link"
 import { manufacturingOrderHref } from "./manufacturing-order"
 import { ManufacturingRowDialog } from "./manufacturing-row-dialog"
+import { createBomComponentsField } from "./bom-components-field"
+import { ManufacturingActionResult } from "./manufacturing-action-result"
+import { ManufacturingCostSettings } from "./manufacturing-cost-settings"
+import { useMrpWorkcenterCostRates } from "@lumiere/query-hooks/hooks/manufacturing-costs"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
 import {
   toCreateBomParams,
@@ -115,7 +122,9 @@ function ManufacturingClientLoaded({
   const hasActiveCompany = operatingCompanyId > 0n
   const [quickActionForm, setQuickActionForm] = useState<{ form: FormConfig; action: string } | null>(null)
   const [rowPick, setRowPick] = useState<{ tabId: string; row: Record<string, unknown> } | null>(null)
+  const [resultLinks, setResultLinks] = useState<ManufacturingResultLink[]>([])
   const [csvKind, setCsvKind] = useState<ManufacturingCsvImportKind | null>(null)
+  useEffect(() => setResultLinks([]), [orgId, operatingCompanyId])
   // activeTab is now URL-synced via useModuleTab below (after moduleConfig is defined)
 
   const { data: productions = [] } = useMrpProductions(
@@ -124,6 +133,12 @@ function ManufacturingClientLoaded({
   );
   const { data: boms = [] } = useMrpBoms(orgId, initialBoms);
   const { data: bomLines = [] } = useMrpBomLines(orgId, initialBomLines);
+  const byproductsQuery = useMrpBomByproducts(orgId)
+  const byproductsState = moduleQueryState(byproductsQuery)
+  const byproducts = canUseModuleData(byproductsState) ? byproductsQuery.data ?? [] : []
+  const costRatesQuery = useMrpWorkcenterCostRates(orgId)
+  const costRatesState = moduleQueryState(costRatesQuery)
+  const costRates = canUseModuleData(costRatesState) ? costRatesQuery.data ?? [] : []
   const { data: workorders = [] } = useMrpWorkorders(orgId, initialWorkorders);
   const { data: workcenters = [] } = useMrpWorkcenters(
     orgId,
@@ -228,11 +243,21 @@ function ManufacturingClientLoaded({
   )
 
   const bomFormConfig = useMemo(
-    () =>
-      mergeSelectOptionsForFields(newBomForm(t), {
+    () => {
+      const config = mergeSelectOptionsForFields(newBomForm(t), {
         productTmplId: productFieldOptions,
-      }),
-    [t, productFieldOptions],
+      })
+      const component = createBomComponentsField(products.flatMap((product) => {
+        const uomId = optionalBigIntU64(product.uomId)
+        if (!uomId || products.filter((candidate) => String(candidate.id) === String(product.id)).length !== 1) return []
+        return [{ id: String(product.id), label: String(product.name), uomId: String(uomId) }]
+      }))
+      return { ...config, sections: [...config.sections, {
+        id: "bom-components", title: t("manufacturing.forms.newBom.components.title"),
+        fields: [{ type: "custom" as const, id: "bomLines", name: "bomLines", width: "full" as const, component }],
+      }] }
+    },
+    [t, productFieldOptions, products],
   )
 
   const workcenterFormConfig = useMemo(() => newWorkcenterForm(t), [t])
@@ -407,6 +432,7 @@ function ManufacturingClientLoaded({
       ({
         ...moduleConfig,
         tabs: withDashboardSections(moduleConfig, liveSections).tabs.map((tab) => {
+          if (tab.id === "cost-settings") return { ...tab, customContent: <ManufacturingCostSettings organizationId={orgId} companyId={operatingCompanyId} /> }
           if (tab.id === "orders" && tab.entityConfig && tab.entityConfig.view.mode === "table") {
             // The row opens the action form; the order's name opens its page.
             const view = tab.entityConfig.view
@@ -488,7 +514,7 @@ function ManufacturingClientLoaded({
           return tab
         }),
       }) as ModuleConfig,
-    [moduleConfig, liveSections, moFormConfig, bomFormConfig, workcenterFormConfig, t],
+    [moduleConfig, liveSections, moFormConfig, bomFormConfig, workcenterFormConfig, t, orgId, operatingCompanyId],
   )
 
   const data = useMemo(
@@ -496,12 +522,13 @@ function ManufacturingClientLoaded({
       orders: enrichedProductions as unknown as Record<string, unknown>[],
       boms: enrichedBoms as unknown as Record<string, unknown>[],
       "bom-lines": bomLines as unknown as Record<string, unknown>[],
+      "bom-byproducts": byproducts as unknown as Record<string, unknown>[],
       workorders: enrichedWorkorders as unknown as Record<string, unknown>[],
       workcenters: workcenters as unknown as Record<string, unknown>[],
       "routing-operations": enrichedRoutingOperations as unknown as Record<string, unknown>[],
       quality: qualityChecks as unknown as Record<string, unknown>[],
     }),
-    [enrichedProductions, enrichedBoms, bomLines, enrichedWorkorders, workcenters, enrichedRoutingOperations, qualityChecks],
+    [enrichedProductions, enrichedBoms, bomLines, byproducts, enrichedWorkorders, workcenters, enrichedRoutingOperations, qualityChecks],
   )
 
   const handleFormSubmit = async (
@@ -514,35 +541,47 @@ function ManufacturingClientLoaded({
     }
     if (action === "createManufacturingOrder") {
       const prodRaw = formData.productId
-      const productRow = products.find((p) => String(p.id) === String(prodRaw))
+      const matches = products.filter((p) => String(p.id) === String(prodRaw))
+      if (matches.length !== 1) throw new Error(t("manufacturing.forms.newBom.components.invalid"))
+      const productRow = matches[0]
       const uomFromProduct =
         productRow?.uomId != null
           ? optionalBigIntU64(productRow.uomId)
           : productRow?.uomPoId != null
             ? optionalBigIntU64(productRow.uomPoId)
             : undefined
-      if (uomFromProduct == null) return
+      if (uomFromProduct == null) throw new Error(t("manufacturing.forms.newBom.components.invalid"))
       const params = toCreateMrpProductionParams(formData, {
         productUomId: uomFromProduct,
         companyId: operatingCompanyId > 0n ? operatingCompanyId : undefined,
       })
-      if (!params) return
+      if (!params) throw new Error(t("manufacturing.forms.newBom.components.invalid"))
       await m.createManufacturingOrder.mutateAsync(params)
     } else if (action === "createBom") {
       const tmplRaw = formData.productTmplId
-      const productRow = products.find((p) => String(p.id) === String(tmplRaw))
+      const matches = products.filter((p) => String(p.id) === String(tmplRaw))
+      if (matches.length !== 1) throw new Error(t("manufacturing.forms.newBom.components.invalid"))
+      const productRow = matches[0]
       const uomFromProduct =
         productRow?.uomId != null
           ? optionalBigIntU64(productRow.uomId)
           : productRow?.uomPoId != null
             ? optionalBigIntU64(productRow.uomPoId)
             : undefined
-      if (uomFromProduct == null) return
+      if (uomFromProduct == null) throw new Error(t("manufacturing.forms.newBom.components.invalid"))
+      if (Array.isArray(formData.bomLines)) {
+        for (const line of formData.bomLines) {
+          const components = products.filter((product) => String(product.id) === String(line.productId))
+          if (components.length !== 1 || String(components[0]!.uomId) !== String(line.productUomId)) {
+            throw new Error(t("manufacturing.forms.newBom.components.invalid"))
+          }
+        }
+      }
       const params = toCreateBomParams(formData, {
         productUomId: uomFromProduct,
         companyId: operatingCompanyId > 0n ? operatingCompanyId : undefined,
       })
-      if (!params) return
+      if (!params) throw new Error(t("manufacturing.forms.newBom.components.invalid"))
       await m.createBom.mutateAsync(params)
     } else if (action === "createWorkcenter") {
       const params = toCreateWorkcenterParams(
@@ -564,6 +603,7 @@ function ManufacturingClientLoaded({
 
   return (
     <>
+      <ManufacturingActionResult links={resultLinks} onDismiss={() => setResultLinks([])} />
       {iotReferenceStatus && (
         <p role="status" className="text-sm text-muted-foreground">
           IoT device reference data: {iotReferenceStatus}. Device linking requires IoT device read access; manufacturing order and BOM workflows remain available.
@@ -572,6 +612,7 @@ function ManufacturingClientLoaded({
       <ModuleView
         config={config}
         data={data}
+        dataState={{ "bom-byproducts": byproductsState }}
         onFormSubmit={handleFormSubmit}
         activeTab={activeTab}
         onActiveTabChange={setActiveTab}
@@ -579,10 +620,12 @@ function ManufacturingClientLoaded({
         onRowClick={(tabId, row) => {
           if (["orders", "boms", "workorders", "workcenters"].includes(tabId)) {
             setRowPick({ tabId, row })
+            setResultLinks([])
           }
         }}
       />
       <ManufacturingRowDialog
+        onActionResult={(outcome) => setResultLinks(manufacturingResultLinks(outcome.ref))}
         open={rowPick !== null}
         onOpenChange={(o) => {
           if (!o) setRowPick(null)
@@ -590,6 +633,7 @@ function ManufacturingClientLoaded({
         tabId={rowPick?.tabId ?? null}
         row={rowPick?.row ?? null}
         workcenters={workcenters}
+        workcenterCostRates={costRates}
         iotDevices={iotDevices}
         iotReferenceStatus={iotReferenceStatus}
         qualityChecks={qualityChecks}

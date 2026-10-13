@@ -17,7 +17,7 @@ import {
 } from "./operation-effect"
 
 const PRODUCE_AFFECTS = ["mrp-productions"] as const
-const FINISH_AFFECTS = ["mrp-productions", "stock-moves", "stock-quants"] as const
+const FINISH_AFFECTS = ["mrp-productions", "stock-moves", "stock-quants", "mrp-production-costs", "mrp-productivity-costs", "account-moves", "account-move-lines"] as const
 
 export interface ManufacturingCloseOrderProjection {
   readonly id?: unknown
@@ -97,6 +97,7 @@ export interface ManufacturingFinishedEffectRef extends CanonicalRecordRef {
   readonly resource: "mrp-productions"
   readonly companyId: string
   readonly finishedMoveId: string
+  readonly finishedMoveIds: readonly string[]
   readonly destinationQuantId: string
 }
 
@@ -340,6 +341,7 @@ export function resolveManufacturingFinishedEffect(
     id: manufacturingOrderId.toString(),
     companyId: companyId.toString(),
     finishedMoveId: finishedMoveId.toString(),
+    finishedMoveIds: finishedIds.map(String),
     destinationQuantId: quantId.toString(),
   }
 }

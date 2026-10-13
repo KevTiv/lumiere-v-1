@@ -2,6 +2,8 @@ import { expect, test } from "@playwright/test"
 import { stdbBffCallUrl } from "@lumiere/stdb/commands"
 import { scalarQueryId, signIn, submitForm } from "./helpers"
 import { command, exact, id, location, manufacturingFixture, openRow, password, prepareOutput, quantQuantity, rows, tag, value } from "./cov-scheduler-manufacturing-fixtures"
+import { expectExactRecordFocus } from "./cov25-link-navigation"
+import { moduleTabHref } from "@lumiere/erp-shared/record-links"
 
 test.describe("COV-07f operator finished-output scrap", {
   tag: ["@p0", "@cov07", "@cov07f", "@unauthenticated"],
@@ -51,6 +53,12 @@ test.describe("COV-07f operator finished-output scrap", {
         await quantQuantity(page, companyId, id(primary), id(scrap)),
       ]).toEqual([beforeSource - 0.5, beforeScrap + 0.5])
       await expect(warehousePage.getByTestId(`form-modal-${formId}`)).not.toBeVisible()
+      const result = warehousePage.getByTestId(`manufacturing-result-stock-moves-${id(effect)}`)
+      await expect(result).toHaveAttribute("href", moduleTabHref("inventory", "stock-moves", { id: String(id(effect)) }))
+      await result.click()
+      await expectExactRecordFocus(warehousePage, { module: "inventory", tab: "stock-moves", id: id(effect) })
+      await warehousePage.reload({ waitUntil: "domcontentloaded" })
+      await expectExactRecordFocus(warehousePage, { module: "inventory", tab: "stock-moves", id: id(effect) })
 
       const input = { companyId, moId, scrapLocationId: id(scrap), quantity: 0.5, requestId }
       expect((await command(warehousePage, "scrap_finished_manufacturing_output", input)).status()).toBe(422)

@@ -466,6 +466,7 @@ export interface ManufacturingWorkcenterRowFormParams {
   iotDeviceOptions: Array<{ value: string; label: string; disabled?: boolean }>
   /** Device currently linked to this work center (for default select value). */
   linkedDeviceId?: string
+  defaultHourlyRate?: number
 }
 
 export function manufacturingWorkcenterRowActionForm(
@@ -501,6 +502,7 @@ export function manufacturingWorkcenterRowActionForm(
             defaultValue: "save_name",
             options: [
               { value: "save_name", label: t("manufacturing.rowActions.saveName") },
+              { value: "configure_cost_rate", label: "Configure hourly cost rate" },
               { value: "block", label: t("manufacturing.rowActions.block") },
               { value: "unblock", label: t("manufacturing.rowActions.unblock") },
               {
@@ -530,6 +532,18 @@ export function manufacturingWorkcenterRowActionForm(
         description: t("manufacturing.rowActions.form.wcParamsHint"),
         columns: 2,
         fields: [
+          {
+            type: "number",
+            id: "wcHourlyRate",
+            name: "wcHourlyRate",
+            label: "Hourly cost rate (company currency)",
+            defaultValue: p.defaultHourlyRate,
+            min: 0,
+            step: 0.01,
+            required: true,
+            visibleWhen: { field: "wcAction", equals: "configure_cost_rate" },
+            width: "full",
+          },
           {
             type: "select",
             id: "linkDeviceId",

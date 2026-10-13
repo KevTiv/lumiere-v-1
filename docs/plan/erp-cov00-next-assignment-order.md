@@ -100,13 +100,30 @@ COV-06's stock-movement lineage (picking lifecycle, backorder, quant transfer, c
 
 ### COV-07
 
-Current disposition: `IMPLEMENTED` for COV-07a through COV-07d; runtime acceptance is pending. COV-07a proves exact same-MO Draft → Confirmed readback. COV-07b closes exact BOM material consumption and the `move_raw_ids` effect set. COV-07c closes exact production quantity → finished move → destination quant → Done. COV-07d adds one exact workorder execution path and closes the previously disconnected workorder/productivity projections: workcenter `order_ids` and state counts are derived from authoritative workorders; Start requires an MO-owned workorder under an executing parent and a completed blocker when present; productivity is Progress-only and writes the exact inserted productivity ID into both `workorder.time_ids` and `workcenter.productivity_ids`; workorder duration/workcenter productive time advance by the submitted duration; Finish requires the productivity reverse relation to match authoritative rows, derives duration rather than adding a placeholder, closes open productivity logs, and refreshes workcenter state counters. The certified UI path logs productivity from the selected workorder row using its exact workcenter, rather than asking the operator to type a workorder ID. See [`erp-cov07a-mo-confirmation-status.md`](./erp-cov07a-mo-confirmation-status.md), [`erp-cov07b-material-consumption-status.md`](./erp-cov07b-material-consumption-status.md), [`erp-cov07c-production-close-status.md`](./erp-cov07c-production-close-status.md), and [`erp-cov07d-workorder-execution-status.md`](./erp-cov07d-workorder-execution-status.md).
+Current disposition: `REVIEW`, module floor U2. COV-07a–g are implemented:
+same-MO confirmation; exact raw consumption and finished output; MO-owned
+workorders, productivity and workcenter projections; required quality gating;
+untracked finished-output scrap; and authoritative BOM byproduct output.
+The historical Docker lane passed all 46 tests twice, including the four
+Manufacturing lifecycle specs and COV-07f/g. Its second run proved projection
+convergence. The 2026-10-07 follow-up passed two PostgreSQL upgrade tests and
+closed the migration checksum blocker at contracts v0.3.86. See
+[`cov-runtime-docker-acceptance-2026-10-04.md`](../evidence/cov-runtime-docker-acceptance-2026-10-04.md).
+This supersedes the earlier backend-only/runtime-pending descriptions for
+COV-07e/f/g without declaring full Manufacturing acceptance.
 
-Next bounded Manufacturing work is COV-07e: one production/workorder-linked quality gate with exact pass/fail effect, completion gating, and stale/replay/deny preservation. The backend gate and persisted test are implemented on `codex/cov07e-manufacturing-quality-gate`; contract release, UI readback, browser denial/replay, and runtime acceptance remain pending. See [`erp-cov07e-manufacturing-quality-gate-status.md`](./erp-cov07e-manufacturing-quality-gate-status.md). Keep scrap/byproducts and full costing separate.
-
-COV-07f now implements one bounded post-production scrap backend path, stacked on COV-07e. It records exact MO-owned scrap move identity and moves an untracked finished quantity to a designated scrap location; contract/UI and runtime certification remain pending. See [`erp-cov07f-finished-output-scrap-status.md`](./erp-cov07f-finished-output-scrap-status.md). Byproducts, tracked scrap, and full costing remain separate.
-
-COV-07g now implements authoritative BOM byproducts and exact untracked byproduct output at MO completion, stacked on COV-07f. Contract/UI and runtime certification remain pending. See [`erp-cov07g-bom-byproduct-output-status.md`](./erp-cov07g-bom-byproduct-output-status.md). Tracked byproducts and full accounting valuation remain separate.
+Remaining work is assigned as COV-07h complete domain lifecycle, COV-07i
+operator BOM/MO creation, COV-07j exact result navigation, COV-07k actual
+material/labor costing and accounting valuation, COV-07l lot/serial output and
+scrap during production, and COV-07m routing/workcenter integrity. The intended
+changes, upstream-stack verification and final D/A/O/E gates are recorded in
+[`erp-cov07-completion-stack-plan.md`](./erp-cov07-completion-stack-plan.md).
+Integrate on PR #175 head `9eb67a11` (aggregate contracts v0.3.99), then execute
+the final same-head domain, contract, unit, browser and projection gates.
+Historical browser evidence leaves fixture-assisted BOM/MO creation,
+result-navigation debt and complete material/cost identities open. The module
+stays U2/review until the complete lifecycle and required adversarial proof
+pass; keep unsupported capabilities hidden or explicitly restricted.
 
 
 ### COV-08

@@ -132,6 +132,7 @@ import {
   manufacturingOrdersTableConfig,
   bomsTableConfig,
   bomLinesTableConfig,
+  bomByproductsTableConfig,
   workordersTableConfig,
   workcentersTableConfig,
   routingOperationsTableConfig,
@@ -1936,6 +1937,12 @@ export const manufacturingModuleConfig = (t: TFunction): ModuleConfig => ({
       entityConfig: bomLinesTableConfig(t),
     },
     {
+      id: "bom-byproducts",
+      label: "BOM Byproducts",
+      type: "entity",
+      entityConfig: bomByproductsTableConfig(t),
+    },
+    {
       id: "workorders",
       label: "Work Orders",
       type: "entity",
@@ -1961,6 +1968,11 @@ export const manufacturingModuleConfig = (t: TFunction): ModuleConfig => ({
       label: "Quality Checks",
       type: "entity",
       entityConfig: qualityChecksTableConfig(t),
+    },
+    {
+      id: "cost-settings",
+      label: "Costing & Valuation",
+      type: "custom",
     },
   ],
 })

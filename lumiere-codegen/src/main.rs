@@ -5,6 +5,7 @@
 //! 3. [`query_exec_audit`] — lints `query_exec.rs` against the registry (no writes)
 //! 4. [`cold_tier`] — STDB bindings → schema IR → PG/archive/hydration/reconstruction manifests
 //! 5. [`contract_ir`] — canonical, versioned handoff for downstream emitters
+//! 6. [`durable_postgresql_ir`] — canonical handoff → all PostgreSQL DDL
 //!
 //! ```text
 //! cargo run -p lumiere-codegen
@@ -18,6 +19,7 @@
 mod agent_capabilities;
 mod cold_tier;
 mod contract_ir;
+mod durable_postgresql_ir;
 mod erp_org_sql;
 mod frontend_registry;
 mod paths;
@@ -43,8 +45,13 @@ fn main() -> Result<()> {
         [arg] if arg == "--agent-capabilities-only" => {
             return agent_capabilities::run(&paths);
         }
+        // Replays all PostgreSQL DDL (durable, archive, protocol bootstrap)
+        // from the existing canonical handoff without reading SDK bindings.
+        [arg] if arg == "--postgresql-ir-only" || arg == "--durable-postgresql-ir-only" => {
+            return durable_postgresql_ir::run(&paths);
+        }
         _ => bail!(
-            "unsupported lumiere-codegen arguments: {}; expected no arguments, --reconstruction-apply-only, or --agent-capabilities-only",
+            "unsupported lumiere-codegen arguments: {}; expected no arguments, --reconstruction-apply-only, --agent-capabilities-only, or --postgresql-ir-only (legacy alias --durable-postgresql-ir-only)",
             args.join(" ")
         ),
     }
@@ -60,6 +67,7 @@ fn main() -> Result<()> {
     reducer_contract::run(&paths)?;
     read_ir::run(&paths)?;
     contract_ir::run(&paths, &registry_text, source_provenance)?;
+    durable_postgresql_ir::run(&paths)?;
     agent_capabilities::run(&paths)?;
 
     Ok(())

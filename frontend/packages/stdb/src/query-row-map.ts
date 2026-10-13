@@ -173,8 +173,12 @@ import type {
   MrpBomByproduct,
   MrpBomLine,
   MrpProduction,
+  MrpProductionCost,
+  MrpProductivityCost,
   MrpRoutingWorkcenter,
+  MrpValuationConfig,
   MrpWorkcenter,
+  MrpWorkcenterCostRate,
   MrpWorkorder,
   OperationalMessage,
   Opportunity,
@@ -518,8 +522,12 @@ export interface QueryRowMap {
   "mrp-bom-byproducts": MrpBomByproduct
   "mrp-bom-lines": MrpBomLine
   "mrp-boms": MrpBom
+  "mrp-production-costs": MrpProductionCost
   "mrp-productions": MrpProduction
+  "mrp-productivity-costs": MrpProductivityCost
   "mrp-routing-workcenters": MrpRoutingWorkcenter
+  "mrp-valuation-configs": MrpValuationConfig
+  "mrp-workcenter-cost-rates": MrpWorkcenterCostRate
   "mrp-workcenters": MrpWorkcenter
   "mrp-workorders": MrpWorkorder
   "my-employee": HrEmployee

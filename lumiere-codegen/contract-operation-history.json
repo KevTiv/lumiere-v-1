@@ -810,6 +810,14 @@
       "name": "configure_contact_identity_verification_authority",
       "shape_fingerprint": "sha256:35d1d80a4c02e423a0af644dcdfc71532331771207d3c330851e610776b8a3c6"
     },
+    "erp.configure_manufacturing_valuation": {
+      "name": "configure_manufacturing_valuation",
+      "shape_fingerprint": "sha256:d59bd871ab39b2fbfd94b4bce420b9546b0c6c72d128b432d9849691a1bca1ee"
+    },
+    "erp.configure_workcenter_cost_rate": {
+      "name": "configure_workcenter_cost_rate",
+      "shape_fingerprint": "sha256:f2645fa39688e36ed22dc0bfdb377caccfa44dbd3aa78aa445ca1b865609c77d"
+    },
     "erp.confirm_account_asset": {
       "name": "confirm_account_asset",
       "shape_fingerprint": "sha256:ded18d9752f5605598f60747c2999537db2132a5e4f4d31e105fd086cd7adf65"
@@ -820,7 +828,7 @@
     },
     "erp.confirm_manufacturing_order": {
       "name": "confirm_manufacturing_order",
-      "shape_fingerprint": "sha256:f1bc6308fc3123bab081e04854fd869b2d3e02e69c453340fe2b0979fee82700"
+      "shape_fingerprint": "sha256:098e26e24d5d80436c24a9c87b6818d0eb513bb5777a9eaa0b72a5a5c89c27c3"
     },
     "erp.confirm_payslip": {
       "name": "confirm_payslip",
@@ -2373,6 +2381,10 @@
     "erp.finish_manufacturing_order": {
       "name": "finish_manufacturing_order",
       "shape_fingerprint": "sha256:78d762e7dedefd9ff9a2aeaccfd450a166419cc0d97b50daacb24cb656a5a4ba"
+    },
+    "erp.finish_manufacturing_order_with_tracking": {
+      "name": "finish_manufacturing_order_with_tracking",
+      "shape_fingerprint": "sha256:f35bf48908ce37233c8f905961c689a68f29acab8544e8b85298cb5f3fa45fd5"
     },
     "erp.finish_workorder": {
       "name": "finish_workorder",
@@ -4166,9 +4178,21 @@
       "name": "run_iot_relational_integrity_test",
       "shape_fingerprint": "sha256:4ef9a5a48db9b95950427acc942baf11415ccdd31255900b0c6774f07338366a"
     },
+    "erp.run_manufacturing_actual_cost_valuation_test": {
+      "name": "run_manufacturing_actual_cost_valuation_test",
+      "shape_fingerprint": "sha256:0d473f20e1f7554e76452334769514456003a67af77fc7f1be7983c1eb85f498"
+    },
     "erp.run_manufacturing_bom_byproduct_output_exact_effect_test": {
       "name": "run_manufacturing_bom_byproduct_output_exact_effect_test",
       "shape_fingerprint": "sha256:5d3faa87116ffa6a665fd805a44ec3aa3af606fa813e39a71fc5fee57ed10cb8"
+    },
+    "erp.run_manufacturing_bom_routing_lifecycle_test": {
+      "name": "run_manufacturing_bom_routing_lifecycle_test",
+      "shape_fingerprint": "sha256:a4ed3523f0c3f5a3943eecf8adc30b75f04b2ab1329ae7d656e934a40a3c6427"
+    },
+    "erp.run_manufacturing_bom_to_close_domain_lifecycle_test": {
+      "name": "run_manufacturing_bom_to_close_domain_lifecycle_test",
+      "shape_fingerprint": "sha256:c488183e98e5645fa9174dd58ca5aa945d95b6168df29454196ecc158f6fbf1a"
     },
     "erp.run_manufacturing_consume_materials_cross_org_component_test": {
       "name": "run_manufacturing_consume_materials_cross_org_component_test",
@@ -4177,6 +4201,10 @@
     "erp.run_manufacturing_consume_materials_exact_effect_test": {
       "name": "run_manufacturing_consume_materials_exact_effect_test",
       "shape_fingerprint": "sha256:d3499a6a879919795940b8593e2936aa63714f86341d3909a9de4d365d81c08d"
+    },
+    "erp.run_manufacturing_cost_configuration_scope_test": {
+      "name": "run_manufacturing_cost_configuration_scope_test",
+      "shape_fingerprint": "sha256:e6ac981101f63a56de04d8f0f2209fe0a2ec97865e252be96f9ebbac433bd62c"
     },
     "erp.run_manufacturing_finished_output_scrap_exact_effect_test": {
       "name": "run_manufacturing_finished_output_scrap_exact_effect_test",
@@ -4197,6 +4225,10 @@
     "erp.run_manufacturing_productivity_relational_integrity_test": {
       "name": "run_manufacturing_productivity_relational_integrity_test",
       "shape_fingerprint": "sha256:337a25d625bd908d1bb2c84b29d794a06826bfcb85ec43c2905944894f974e9f"
+    },
+    "erp.run_manufacturing_tracked_output_test": {
+      "name": "run_manufacturing_tracked_output_test",
+      "shape_fingerprint": "sha256:b4e295f0212d76078fc0dddb31a9e621ec20dcdb4cf59d2551571e55165cae12"
     },
     "erp.run_manufacturing_workcenter_create_test": {
       "name": "run_manufacturing_workcenter_create_test",
@@ -4538,6 +4570,14 @@
       "name": "scrap_finished_manufacturing_output",
       "shape_fingerprint": "sha256:4c0c2f26e704c65580e56b614dbd3bcd2885ea6b06e2076c6e001bb3bed73b10"
     },
+    "erp.scrap_manufacturing_material": {
+      "name": "scrap_manufacturing_material",
+      "shape_fingerprint": "sha256:2a96a906514cc0f7ef2ea9bf283d8d92f5f47204092938a73a98fea8fd3c51dc"
+    },
+    "erp.scrap_tracked_manufacturing_output": {
+      "name": "scrap_tracked_manufacturing_output",
+      "shape_fingerprint": "sha256:ce542ffa19bdf37db2409f0ef20c52adb062d493fab96b2c6ecfbcc1d1ef7568"
+    },
     "erp.seed_dev_data": {
       "name": "seed_dev_data",
       "shape_fingerprint": "sha256:1a3dd9665464ed4d48d755188260424bbd3732b8f32534944dd78c4afe43def6"
@@ -4653,6 +4693,10 @@
     "erp.set_billing_status": {
       "name": "set_billing_status",
       "shape_fingerprint": "sha256:4f04b2cac533efa1eacee5045f0cbe28662d1c9f49cf5aa63227b255e5249ca0"
+    },
+    "erp.set_bom_operations": {
+      "name": "set_bom_operations",
+      "shape_fingerprint": "sha256:98b0e86ec6db7c1fea9c5ee71751607cf10211597cb6cd7c28994fe9f351f8f0"
     },
     "erp.set_commodity_price_index": {
       "name": "set_commodity_price_index",
@@ -5932,6 +5976,14 @@
       "current_operations_fingerprint": "sha256:117baf801a8bd353d357f5c04a695b4be3e59d9fd4f5909d4915a9d343ab4fdb",
       "operation_count": 1433,
       "reason": "release on top of v0.3.91: add helpdesk_related_record_read, import_csv_tracked, run_analytics_dashboard_widget_idempotency_test, set_helpdesk_related_record; change the shape of none"
+    },
+    {
+      "previous_release": "v0.3.99",
+      "previous_ir_sha256": "sha256:813f74098de2220871149ebfd389404f82e4f59a1d65d1b22c877a2e3b39bf4b",
+      "previous_operations_fingerprint": "sha256:117baf801a8bd353d357f5c04a695b4be3e59d9fd4f5909d4915a9d343ab4fdb",
+      "current_operations_fingerprint": "sha256:246cc546a7d4c8caa66e58edfc8b7deb57bf757866c5fa379ab00a983664468a",
+      "operation_count": 1444,
+      "reason": "release on top of v0.3.99: add configure_manufacturing_valuation, configure_workcenter_cost_rate, finish_manufacturing_order_with_tracking, run_manufacturing_actual_cost_valuation_test, run_manufacturing_bom_routing_lifecycle_test, run_manufacturing_bom_to_close_domain_lifecycle_test, run_manufacturing_cost_configuration_scope_test, run_manufacturing_tracked_output_test, scrap_manufacturing_material, scrap_tracked_manufacturing_output, set_bom_operations; change the shape of confirm_manufacturing_order"
     }
   ]
 }

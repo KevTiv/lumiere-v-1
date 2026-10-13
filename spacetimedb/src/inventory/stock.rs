@@ -890,7 +890,7 @@ pub(crate) fn ensure_lot_for_product(
     Ok(())
 }
 
-fn ensure_serial_usable(
+pub(crate) fn ensure_serial_usable(
     ctx: &ReducerContext,
     organization_id: u64,
     company_id: u64,
