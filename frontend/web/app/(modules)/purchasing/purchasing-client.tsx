@@ -2,6 +2,7 @@
 import { mapDashboardWidgets, withDashboardSections } from "@lumiere/ui/lib/dashboard-sections"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
+import { canUseModuleData, mergeModuleStates, moduleCollection } from "@lumiere/ui/lib/module-data-state"
 import type { QueryResourceState } from "@lumiere/api-client"
 import { useModuleTab } from "@/hooks/use-module-tab"
 import { useTranslation } from "@lumiere/i18n"
@@ -456,7 +457,7 @@ function PurchasingClientLoaded({
   const { currentUser } = useRBAC()
   const runtimeRoleId = currentUser?.roles[0]
   const { orgId } = orgBigInts(organizationId)
-  const { askForm, formDialog } = useFormDialog()
+  const { askForm, cancelForm, formDialog } = useFormDialog()
 
   const purchaseOrdersTableRuntime = useRuntimeListConfig({
     base: purchaseOrdersTableConfig(t).view as EntityTableConfig,
@@ -508,7 +509,9 @@ function PurchasingClientLoaded({
     }
   }, [quickActionForm])
 
-  const { data: orders = [], isLoading: ordersLoading } = usePurchaseOrders(orgId, initialOrders)
+  const ordersRead = moduleCollection(usePurchaseOrders(orgId, initialOrders))
+  const orders = ordersRead.rows
+  const ordersLoading = ordersRead.state.status === "loading"
   const billOrder = useMemo(
     () =>
       billOrderId == null
@@ -516,18 +519,24 @@ function PurchasingClientLoaded({
         : (orders as Record<string, unknown>[]).find((order) => String(order.id) === String(billOrderId)),
     [orders, billOrderId],
   )
-  const { data: ordersToApprove = [] } = usePurchaseOrdersToApprove(orgId)
-  const { data: ordersPartialReceipt = [] } = usePurchaseOrdersPartialReceipt(orgId)
-  const { data: linesOverBilled = [] } = usePurchaseOrderLinesOverBilled(orgId)
-  const { data: lines = [] } = usePurchaseOrderLines(orgId, initialLines)
-  const { data: requisitions = [] } = usePurchaseRequisitions(orgId, initialRequisitions)
+  const ordersToApproveRead = moduleCollection(usePurchaseOrdersToApprove(orgId))
+  const ordersToApprove = ordersToApproveRead.rows
+  const ordersPartialReceiptRead = moduleCollection(usePurchaseOrdersPartialReceipt(orgId))
+  const ordersPartialReceipt = ordersPartialReceiptRead.rows
+  const linesOverBilledRead = moduleCollection(usePurchaseOrderLinesOverBilled(orgId))
+  const linesOverBilled = linesOverBilledRead.rows
+  const linesRead = moduleCollection(usePurchaseOrderLines(orgId, initialLines))
+  const lines = linesRead.rows
+  const requisitionsRead = moduleCollection(usePurchaseRequisitions(orgId, initialRequisitions))
+  const requisitions = requisitionsRead.rows
   const contactsQuery = useContacts(
     orgId,
     initialContactsState?.status === "ready" || initialContactsState?.status === "empty"
       ? initialContactsState.rows
       : undefined,
   )
-  const { data: allContacts = [] } = contactsQuery
+  const contactsRead = moduleCollection(contactsQuery)
+  const allContacts = contactsRead.rows
   const contactsReferenceStatus = contactsQuery.status === "success"
     ? undefined
     : initialContactsState?.status === "denied"
@@ -542,13 +551,20 @@ function PurchasingClientLoaded({
   const { data: stockPickings = [] } = receiptQuery
   const billQuery = useAccountMoves(orgId)
   const { data: accountMoves = [] } = billQuery
-  const { data: landedCosts = [] } = useLandedCosts(orgId)
-  const { data: landedCostLines = [] } = useLandedCostLines(orgId)
-  const { data: supplierIntakes = [] } = useSupplierIntakes(orgId)
-  const { data: rfqs = [] } = usePurchaseRfqs(orgId)
-  const { data: rfqBids = [] } = usePurchaseRfqBids(orgId)
-  const { data: purchaseReturns = [] } = usePurchaseReturns(orgId)
-  const { data: partnerBanks = [] } = usePartnerBanks(orgId, initialPartnerBanks)
+  const landedCostsRead = moduleCollection(useLandedCosts(orgId))
+  const landedCosts = landedCostsRead.rows
+  const landedCostLinesRead = moduleCollection(useLandedCostLines(orgId))
+  const landedCostLines = landedCostLinesRead.rows
+  const supplierIntakesRead = moduleCollection(useSupplierIntakes(orgId))
+  const supplierIntakes = supplierIntakesRead.rows
+  const rfqsRead = moduleCollection(usePurchaseRfqs(orgId))
+  const rfqs = rfqsRead.rows
+  const rfqBidsRead = moduleCollection(usePurchaseRfqBids(orgId))
+  const rfqBids = rfqBidsRead.rows
+  const purchaseReturnsRead = moduleCollection(usePurchaseReturns(orgId))
+  const purchaseReturns = purchaseReturnsRead.rows
+  const partnerBanksRead = moduleCollection(usePartnerBanks(orgId, initialPartnerBanks))
+  const partnerBanks = partnerBanksRead.rows
   const { data: departments = [] } = useDepartments(orgId, initialDepartments)
   const { data: accountJournals = [] } = useAccountJournals(orgId)
   const { data: accountAccounts = [] } = useAccountAccounts(orgId)
@@ -2428,11 +2444,64 @@ function PurchasingClientLoaded({
     [enrichedOrders, ordersLoading, t],
   )
 
+  const dataState = {
+    dashboard: mergeModuleStates([
+      ordersRead.state, ordersToApproveRead.state, ordersPartialReceiptRead.state, linesOverBilledRead.state, linesRead.state,
+    ]),
+    orders: ordersRead.state,
+    lines: linesRead.state,
+    requisitions: requisitionsRead.state,
+    vendors: contactsRead.state,
+    rfqs: rfqsRead.state,
+    "rfq-bids": rfqBidsRead.state,
+    "purchase-returns": purchaseReturnsRead.state,
+    "landed-costs": mergeModuleStates([landedCostsRead.state, landedCostLinesRead.state]),
+    "supplier-intakes": supplierIntakesRead.state,
+    "partner-banks": partnerBanksRead.state,
+  }
+  type PurchasingTab = keyof typeof dataState
+  const tabUsable = (tab: string | undefined) =>
+    tab == null || !(tab in dataState) || canUseModuleData(dataState[tab as PurchasingTab])
+  const actionTabs: Record<string, PurchasingTab> = {
+    updatePurchaseOrder: "orders", createPurchaseOrder: "orders", createPurchaseRequisition: "requisitions",
+    addPurchaseOrderLine: "lines", updatePurchaseOrderLine: "lines", receivePurchaseOrderLine: "lines",
+    invoicePurchaseOrderLine: "lines", createPartnerBank: "partner-banks", updatePartnerBank: "partner-banks",
+    createLandedCost: "landed-costs", updateLandedCost: "landed-costs", addLandedCostLine: "landed-costs",
+    removeLandedCostLine: "landed-costs", submitSupplierIntake: "supplier-intakes",
+    reviewSupplierIntake: "supplier-intakes", updateSupplierIntake: "supplier-intakes",
+  }
+  const csvTabs: Record<PurchasingCsvImportKind, PurchasingTab> = { order: "orders", orderLine: "lines", supplierInfo: "vendors" }
+  const operationTab = (request: PurchasingOperationDialogRequest): PurchasingTab =>
+    request.kind === "create-purchase-return" || request.kind === "create-vendor-credit" ? "purchase-returns"
+      : request.kind === "create-rfq" ? "rfqs" : "rfq-bids"
+  const quickActionUsable = quickActionForm == null || tabUsable(actionTabs[quickActionForm.action])
+  const csvUsable = csvKind == null || tabUsable(csvTabs[csvKind])
+  const operationUsable = operationDialogRequest == null || tabUsable(operationTab(operationDialogRequest))
+  const ordersUsable = tabUsable("orders")
+  const landedCostsUsable = tabUsable("landed-costs")
+  const intakesUsable = tabUsable("supplier-intakes")
+  // Chatter and prompted row commands act on the active tab's rows.
+  const activeTabUsable = tabUsable(activeTab)
+  useEffect(() => {
+    // Dialogs close when the collection their rows came from is denied or fails.
+    if (!quickActionUsable) setQuickActionForm(null)
+    if (!csvUsable) setCsvKind(null)
+    if (!operationUsable) setOperationDialogRequest(null)
+    if (!ordersUsable) setBillOrderId(null)
+    if (!landedCostsUsable) setLandedCostDetailRow(null)
+    if (!intakesUsable) setIntakeReasonRequest(null)
+    if (!activeTabUsable) {
+      setChatterTarget(null)
+      cancelForm()
+    }
+  }, [quickActionUsable, csvUsable, operationUsable, ordersUsable, landedCostsUsable, intakesUsable, activeTabUsable, cancelForm])
+
   const handleFormSubmit = async (
     _tabId: string,
     action: string,
     formData: Record<string, unknown>,
   ) => {
+    if (!tabUsable(actionTabs[action])) return
     if (action === "updatePurchaseOrder") {
       const args = toUpdatePurchaseOrderHeaderArgs(formData)
       if (args == null) return
@@ -2716,7 +2785,7 @@ function PurchasingClientLoaded({
 
   return (
     <>
-      {formDialog}
+      {activeTabUsable && formDialog}
       {contactsReferenceStatus && (
         <p role="status" className="text-sm text-muted-foreground">
           Contacts reference data: {contactsReferenceStatus}. Supplier selection requires CRM contact read access; existing purchasing records remain available.
@@ -2726,6 +2795,7 @@ function PurchasingClientLoaded({
         config={configWithOperations}
         data={data}
         dataLoading={{ orders: ordersLoading }}
+        dataState={dataState}
         kpiStrips={kpiStrips}
         onFormSubmit={handleFormSubmit}
         activeTab={activeTab}
@@ -2743,7 +2813,7 @@ function PurchasingClientLoaded({
         }}
       />
       <PurchasingOperationDialogs
-        request={operationDialogRequest}
+        request={operationUsable ? operationDialogRequest : null}
         defaultCurrencyId={defaultCurrencyId ? BigInt(defaultCurrencyId) : null}
         options={operationDialogOptions}
         t={t}
@@ -2758,7 +2828,7 @@ function PurchasingClientLoaded({
           purchasingWorkflow.createVendorCredit.execute(input, { navigateToNext: true })
         }
       />
-      {intakeReasonRequest ? (
+      {intakeReasonRequest && intakesUsable ? (
         <PurchasingIntakeReasonDialog
           kind={intakeReasonRequest.kind}
           open
@@ -2792,7 +2862,7 @@ function PurchasingClientLoaded({
           }}
         />
       ) : null}
-      {chatterTarget ? (
+      {chatterTarget && activeTabUsable ? (
         <>
           <RecordChatterDialog
             key={`${chatterTarget.resModel}-${chatterTarget.resId.toString()}`}
@@ -2817,7 +2887,7 @@ function PurchasingClientLoaded({
       ) : null}
       <RuntimeFormModal
         key={formModalKey}
-        open={quickActionForm !== null}
+        open={quickActionForm !== null && quickActionUsable}
         onOpenChange={(open) => !open && setQuickActionForm(null)}
         staticConfig={quickActionForm?.form ?? defaultQuickForm}
         moduleId="purchasing"
@@ -2832,7 +2902,7 @@ function PurchasingClientLoaded({
           }
         }}
       />
-      {csvKind && csvFormConfig ? (
+      {csvKind && csvUsable && csvFormConfig ? (
         <CsvImportModal
           key={csvKind}
           onClose={() => setCsvKind(null)}
@@ -2847,7 +2917,7 @@ function PurchasingClientLoaded({
           }}
         />
       ) : null}
-      {billOrder ? (
+      {billOrder && ordersUsable ? (
         <CreateBillFromPurchaseOrderDialog
           order={billOrder}
           organizationId={organizationId}
@@ -2855,7 +2925,7 @@ function PurchasingClientLoaded({
           onClose={() => setBillOrderId(null)}
         />
       ) : null}
-      <Dialog open={landedCostDetailRow != null} onOpenChange={(open) => !open && setLandedCostDetailRow(null)}>
+      <Dialog open={landedCostDetailRow != null && landedCostsUsable} onOpenChange={(open) => !open && setLandedCostDetailRow(null)}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>{t("purchasing.landedCostDetail.title")}</DialogTitle>
