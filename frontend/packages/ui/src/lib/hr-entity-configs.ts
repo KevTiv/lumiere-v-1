@@ -106,6 +106,8 @@ export const employeesTableConfig = (t: TFunction): EntityViewConfig => ({
   description: t("hr.employees.description"),
   view: {
     mode: "table",
+    // Reviewed for generic CSV: sensitive columns are excluded from the file.
+    allowExport: true,
     rowKey: "id",
     searchable: true,
     searchPlaceholder: t("hr.employees.searchPlaceholder"),
@@ -201,6 +203,8 @@ export const departmentsTableConfig = (t: TFunction): EntityViewConfig => ({
   description: t("hr.departments.description"),
   view: {
     mode: "table",
+    // Reviewed for generic CSV: sensitive columns are excluded from the file.
+    allowExport: true,
     rowKey: "id",
     searchable: true,
     searchPlaceholder: t("hr.departments.searchPlaceholder"),
@@ -495,6 +499,8 @@ export const jobPositionsTableConfig = (t: TFunction): EntityViewConfig => ({
   description: t("hr.jobPositions.description"),
   view: {
     mode: "table",
+    // Reviewed for generic CSV: sensitive columns are excluded from the file.
+    allowExport: true,
     rowKey: "id",
     searchable: true,
     searchPlaceholder: t("hr.jobPositions.searchPlaceholder"),
@@ -529,6 +535,8 @@ export const leaveTypesTableConfig = (t: TFunction): EntityViewConfig => ({
   description: t("hr.leaveTypes.description"),
   view: {
     mode: "table",
+    // Reviewed for generic CSV: sensitive columns are excluded from the file.
+    allowExport: true,
     rowKey: "id",
     searchable: true,
     searchPlaceholder: t("hr.leaveTypes.searchPlaceholder"),
@@ -619,6 +627,8 @@ export const payrollStructuresTableConfig = (t: TFunction): EntityViewConfig => 
   description: t("hr.payrollStructures.description"),
   view: {
     mode: "table",
+    // Reviewed for generic CSV: sensitive columns are excluded from the file.
+    allowExport: true,
     rowKey: "id",
     searchable: true,
     searchPlaceholder: t("hr.payrollStructures.searchPlaceholder"),
@@ -639,6 +649,8 @@ export const salaryRulesTableConfig = (t: TFunction): EntityViewConfig => ({
   description: t("hr.salaryRules.description"),
   view: {
     mode: "table",
+    // Reviewed for generic CSV: sensitive columns are excluded from the file.
+    allowExport: true,
     rowKey: "id",
     searchable: true,
     searchPlaceholder: t("hr.salaryRules.searchPlaceholder"),
@@ -662,6 +674,8 @@ export const onboardingTemplatesTableConfig = (t: TFunction): EntityViewConfig =
   description: "Reusable hire checklists assigned to new employees",
   view: {
     mode: "table",
+    // Reviewed for generic CSV: sensitive columns are excluded from the file.
+    allowExport: true,
     rowKey: "id",
     searchable: true,
     searchPlaceholder: "Search templates…",
@@ -682,6 +696,8 @@ export const performanceCyclesTableConfig = (t: TFunction): EntityViewConfig => 
   description: "Review periods for goals and employee evaluations",
   view: {
     mode: "table",
+    // Reviewed for generic CSV: sensitive columns are excluded from the file.
+    allowExport: true,
     rowKey: "id",
     searchable: true,
     searchPlaceholder: "Search cycles…",
@@ -703,6 +719,8 @@ export const performanceGoalsTableConfig = (t: TFunction): EntityViewConfig => (
   description: "Employee goals linked to review cycles",
   view: {
     mode: "table",
+    // Reviewed for generic CSV: sensitive columns are excluded from the file.
+    allowExport: true,
     rowKey: "id",
     searchable: true,
     searchPlaceholder: "Search goals…",
@@ -760,6 +778,8 @@ export const benefitPlansTableConfig = (t: TFunction): EntityViewConfig => ({
   description: "Catalog of benefit offerings for employee enrollment",
   view: {
     mode: "table",
+    // Reviewed for generic CSV: sensitive columns are excluded from the file.
+    allowExport: true,
     rowKey: "id",
     searchable: true,
     searchPlaceholder: "Search plans…",
