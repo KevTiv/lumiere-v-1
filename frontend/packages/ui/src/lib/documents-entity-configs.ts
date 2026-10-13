@@ -107,6 +107,8 @@ export const knowledgeCategoriesTableConfig = (t: TFunction): EntityViewConfig =
   description: t("documents.knowledgeCategories.description"),
   view: {
     mode: "table",
+    // Reviewed for generic CSV: sensitive columns are excluded from the file.
+    allowExport: true,
     rowKey: "id",
     searchable: true,
     searchPlaceholder: t("documents.knowledgeCategories.searchPlaceholder"),
@@ -128,6 +130,8 @@ export const documentFoldersTableConfig = (t: TFunction): EntityViewConfig => ({
   description: t("documents.folders.description"),
   view: {
     mode: "table",
+    // Reviewed for generic CSV: sensitive columns are excluded from the file.
+    allowExport: true,
     rowKey: "id",
     searchable: true,
     searchPlaceholder: t("documents.folders.searchPlaceholder"),
@@ -150,6 +154,8 @@ export const documentProcessingJobsTableConfig = (t: TFunction): EntityViewConfi
   description: t("documents.processing.description"),
   view: {
     mode: "table",
+    // Reviewed for generic CSV: sensitive columns are excluded from the file.
+    allowExport: true,
     rowKey: "id",
     searchable: true,
     searchPlaceholder: t("documents.processing.searchPlaceholder"),
@@ -270,6 +276,8 @@ export const documentTemplatesTableConfig = (_t: TFunction): EntityViewConfig =>
   description: "PDF / HTML document layouts.",
   view: {
     mode: "table",
+    // Reviewed for generic CSV: sensitive columns are excluded from the file.
+    allowExport: true,
     rowKey: "id",
     searchable: true,
     searchPlaceholder: "Search templates…",
@@ -291,6 +299,8 @@ export const mailTemplatesTableConfig = (_t: TFunction): EntityViewConfig => ({
   description: "Outbound email templates.",
   view: {
     mode: "table",
+    // Reviewed for generic CSV: sensitive columns are excluded from the file.
+    allowExport: true,
     rowKey: "id",
     searchable: true,
     searchPlaceholder: "Search mail templates…",
