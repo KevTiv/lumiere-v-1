@@ -29,6 +29,7 @@ import type {
 import { decodeOperationDispatch } from "@lumiere/api-client"
 import { responseErrorMessage as parseCallErrorDocuments } from "@lumiere/api-client/response-error"
 
+import { dispatchNamedOperation } from "../operation-dispatch"
 import { resolveDocumentVersionEffect } from "./document-version-effect"
 import { resolveDocumentCreateEffect } from "./document-create-effect"
 import { resolveDocumentLockEffect, type DocumentLockProjection } from "./document-lock-effect"
@@ -510,9 +511,11 @@ export function useReleaseDocumentLegalHold(organizationId: bigint) {
       holdId: bigint | number | string
       metadata?: string
     }) => {
-      const { urlPath, init } = stdbBffCommandPost("release_document_legal_hold", { holdId: toScalarU64(holdId), params: stdbParamsToJson({ metadata } as object, "ReleaseDocumentLegalHoldParams") })
-      const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error(await parseCallErrorDocuments(r))
+      await dispatchNamedOperation(
+        "release_document_legal_hold",
+        { holdId: toScalarU64(holdId), params: stdbParamsToJson({ metadata } as object, "ReleaseDocumentLegalHoldParams") },
+        "Failed to release legal hold",
+      )
     },
     onSuccess: () => {
       const k = rqBigIntKey(organizationId)
