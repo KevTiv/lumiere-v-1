@@ -1,6 +1,7 @@
 "use client"
 
 import { useMemo, useRef, useState } from "react"
+import { useTranslation } from "@lumiere/i18n"
 
 import {
   certificationHasPassingEvidence,
@@ -46,26 +47,54 @@ function fixtureRowId(row: AiSkillFixtureRow): number {
   return Number(row.id)
 }
 
-function certificationButtonLabel(passed: boolean, requestStatus: string): string {
-  if (passed) return "Passed"
-  if (requestStatus === "queued") return "Queued"
-  if (requestStatus === "running") return "Running"
-  if (requestStatus === "errored" || requestStatus === "completed") return "Retry certification"
-  return "Run certification"
+type Translate = ReturnType<typeof useTranslation>["t"]
+
+function certificationButtonLabel(t: Translate, passed: boolean, requestStatus: string): string {
+  if (passed) return t("aiSkills.registry.certification.passed")
+  if (requestStatus === "queued") return t("aiSkills.registry.certification.queued")
+  if (requestStatus === "running") return t("aiSkills.registry.certification.running")
+  if (requestStatus === "errored" || requestStatus === "completed") {
+    return t("aiSkills.registry.actions.retryCertification")
+  }
+  return t("aiSkills.registry.actions.runCertification")
 }
 
 function versionCertificationHint(
+  t: Translate,
   status: string,
   fixtureCount: number,
   certificationReady: boolean,
 ): string {
   if (status === "promoted") return ""
-  if (fixtureCount === 0) return " · certification blocked: fixture required"
-  if (certificationReady) return " · certification passed"
-  return " · certification pending"
+  if (fixtureCount === 0) return t("aiSkills.registry.certification.blockedFixtureRequired")
+  if (certificationReady) return t("aiSkills.registry.certification.passedSuffix")
+  return t("aiSkills.registry.certification.pendingSuffix")
+}
+
+function workflowStatusLabel(t: Translate, status: string): string {
+  if (status === "promoted") return t("aiSkills.registry.status.promoted")
+  if (status === "certified") return t("aiSkills.registry.status.certified")
+  if (status === "rolled_back") return t("aiSkills.registry.status.rolledBack")
+  if (status === "draft") return t("aiSkills.registry.status.draft")
+  return status
+}
+
+function registryStatusLabel(t: Translate, status: string): string {
+  if (status === "queued") return t("aiSkills.registry.status.queued")
+  if (status === "running") return t("aiSkills.registry.status.running")
+  if (status === "errored") return t("aiSkills.registry.status.errored")
+  if (status === "completed") return t("aiSkills.registry.status.completed")
+  if (status === "passed") return t("aiSkills.registry.status.passed")
+  if (status === "proposed") return t("aiSkills.registry.status.proposed")
+  if (status === "accepted") return t("aiSkills.registry.status.accepted")
+  if (status === "rejected") return t("aiSkills.registry.status.rejected")
+  if (status === "not_requested") return t("aiSkills.registry.status.notRequested")
+  if (status === "unknown") return t("aiSkills.registry.status.unknown")
+  return status
 }
 
 export function SkillRegistryPanel({ organizationId, companyId, skills }: SkillRegistryPanelProps) {
+  const { t } = useTranslation()
   const orgNumber = Number(organizationId)
   const versions = useAiSkillVersions(organizationId)
   const releases = useAiSkillReleases(organizationId)
@@ -170,7 +199,7 @@ export function SkillRegistryPanel({ organizationId, companyId, skills }: SkillR
   async function proposeSelectedKnowledge() {
     const versionId = Number(knowledgeVersionId)
     if (!Number.isInteger(versionId) || versionId <= 0 || !selectedSkill) {
-      throw new Error("Enter a positive approved knowledge version id and select a skill")
+      throw new Error(t("aiSkills.registry.errors.invalidKnowledgeVersion"))
     }
     const tuple = `promotion:${organizationId}:${companyId ?? 0}:${versionId}:${selectedSkill.id}`
     const idempotencyKey = requestKeys.current.get(tuple) ?? globalThis.crypto.randomUUID()
@@ -190,17 +219,16 @@ export function SkillRegistryPanel({ organizationId, companyId, skills }: SkillR
   return (
     <section className="rounded-xl border border-border bg-card">
       <div className="border-b border-border px-4 py-4">
-        <h2 className="text-base font-semibold">Skill registry</h2>
+        <h2 className="text-base font-semibold">{t("aiSkills.registry.title")}</h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          Review immutable skill versions, run server-owned fixture certification, and manage
-          release history.
+          {t("aiSkills.registry.description")}
         </p>
       </div>
 
       <div className="flex flex-col gap-6 p-4">
         <div className="flex flex-wrap items-end gap-3">
           <label className="flex flex-col gap-1 text-sm">
-            <span className="text-muted-foreground">Skill</span>
+            <span className="text-muted-foreground">{t("aiSkills.registry.fields.skill")}</span>
             <select
               className="min-w-[220px] rounded-md border border-border bg-background px-3 py-2"
               value={effectiveSkillId}
@@ -215,11 +243,13 @@ export function SkillRegistryPanel({ organizationId, companyId, skills }: SkillR
           </label>
           {activeRelease ? (
             <p className="text-sm text-muted-foreground">
-              Active release #{Number(activeRelease.releaseNumber ?? activeRelease.release_number)} ·
-              version id {Number(activeRelease.skillVersionId ?? activeRelease.skill_version_id)}
+              {t("aiSkills.registry.activeRelease", {
+                releaseNumber: Number(activeRelease.releaseNumber ?? activeRelease.release_number),
+                versionId: Number(activeRelease.skillVersionId ?? activeRelease.skill_version_id),
+              })}
             </p>
           ) : (
-            <p className="text-sm text-amber-600 dark:text-amber-400">No active release</p>
+            <p className="text-sm text-amber-600 dark:text-amber-400">{t("aiSkills.registry.noActiveRelease")}</p>
           )}
         </div>
 
@@ -231,7 +261,7 @@ export function SkillRegistryPanel({ organizationId, companyId, skills }: SkillR
 
         {registryLoading ? (
           <p className="text-sm text-muted-foreground" role="status">
-            Loading persisted certification state…
+            {t("aiSkills.registry.states.loadingCertification")}
           </p>
         ) : null}
 
@@ -240,26 +270,26 @@ export function SkillRegistryPanel({ organizationId, companyId, skills }: SkillR
             <p className="text-sm text-destructive">
               {registryError instanceof Error
                 ? registryError.message
-                : "Failed to load persisted certification state"}
+                : t("aiSkills.registry.errors.loadCertification")}
             </p>
             <Button size="sm" variant="outline" onClick={() => void retryRegistry()}>
-              Retry
+              {t("aiSkills.registry.actions.retry")}
             </Button>
           </div>
         ) : null}
 
         {!registryLoading && !registryError && skills.length === 0 ? (
           <p className="text-sm text-muted-foreground">
-            No persisted skills are available for certification.
+            {t("aiSkills.registry.empty.noSkillsForCertification")}
           </p>
         ) : null}
 
         {!registryLoading && !registryError && skills.length > 0 ? (
         <div className="grid gap-4 lg:grid-cols-2">
           <div className="space-y-3 rounded-lg border border-border p-4">
-            <h3 className="text-sm font-medium">Versions</h3>
+            <h3 className="text-sm font-medium">{t("aiSkills.registry.sections.versions")}</h3>
             {skillVersions.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No versions for this skill yet.</p>
+              <p className="text-sm text-muted-foreground">{t("aiSkills.registry.empty.noVersions")}</p>
             ) : (
               <ul className="space-y-2 text-sm">
                 {skillVersions.map((version) => {
@@ -285,8 +315,8 @@ export function SkillRegistryPanel({ organizationId, companyId, skills }: SkillR
                           v{version.version} · {String(version.risk ?? "").toLowerCase()}
                         </p>
                         <p className="text-xs text-muted-foreground">
-                          {status}
-                          {versionCertificationHint(status, skillFixtures.length, certificationReady)}
+                          {workflowStatusLabel(t, status)}
+                          {versionCertificationHint(t, status, skillFixtures.length, certificationReady)}
                         </p>
                       </div>
                       <Button
@@ -304,7 +334,7 @@ export function SkillRegistryPanel({ organizationId, companyId, skills }: SkillR
                           )
                         }
                       >
-                        Promote
+                        {t("aiSkills.registry.actions.promote")}
                       </Button>
                     </li>
                   )
@@ -314,7 +344,7 @@ export function SkillRegistryPanel({ organizationId, companyId, skills }: SkillR
 
             <div className="space-y-2 border-t border-border pt-3">
               <h4 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                Create version
+                {t("aiSkills.registry.sections.createVersion")}
               </h4>
               <Textarea
                 rows={6}
@@ -341,20 +371,20 @@ export function SkillRegistryPanel({ organizationId, companyId, skills }: SkillR
                   })
                 }
               >
-                Create reviewed version
+                {t("aiSkills.registry.actions.createReviewedVersion")}
               </Button>
             </div>
           </div>
 
           <div className="space-y-3 rounded-lg border border-border p-4">
-            <h3 className="text-sm font-medium">Fixtures & test runs</h3>
+            <h3 className="text-sm font-medium">{t("aiSkills.registry.sections.fixturesAndRuns")}</h3>
             {!companyId ? (
               <p className="text-sm text-amber-600 dark:text-amber-400" role="status">
-                Select an operating company before requesting certification.
+                {t("aiSkills.registry.messages.selectCompanyForCertification")}
               </p>
             ) : null}
             {skillFixtures.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No fixtures yet.</p>
+              <p className="text-sm text-muted-foreground">{t("aiSkills.registry.empty.noFixtures")}</p>
             ) : (
               <ul className="space-y-2 text-sm">
                 {skillFixtures.map((fixture) => {
@@ -378,7 +408,7 @@ export function SkillRegistryPanel({ organizationId, companyId, skills }: SkillR
                             [],
                           )
                           const active = requestStatus === "queued" || requestStatus === "running"
-                          const label = certificationButtonLabel(passed, requestStatus)
+                          const label = certificationButtonLabel(t, passed, requestStatus)
                           return (
                             <Button
                               key={`${fixtureId}-${vid}`}
@@ -423,14 +453,23 @@ export function SkillRegistryPanel({ organizationId, companyId, skills }: SkillR
                             className="mt-2 rounded bg-muted/40 px-2 py-1.5 text-xs text-muted-foreground"
                           >
                             <p>
-                              v{version.version} · request #{Number(request.id)} · {String(request.status ?? "unknown")} · {readinessCode}
+                              {t("aiSkills.registry.certification.requestSummary", {
+                                version: version.version,
+                                requestId: Number(request.id),
+                                status: registryStatusLabel(t, String(request.status ?? "unknown")),
+                                readinessCode,
+                              })}
                             </p>
                             {evidence ? (
                               <p className="mt-1 font-mono text-[10px] break-all">
-                                evidence #{Number(evidence.id)} · {String(evidence.status ?? "unknown")} · {String(evidence.executionEvidenceHash ?? evidence.execution_evidence_hash ?? "no execution hash")}
+                                {t("aiSkills.registry.certification.evidenceSummary", {
+                                  evidenceId: Number(evidence.id),
+                                  status: registryStatusLabel(t, String(evidence.status ?? "unknown")),
+                                  hash: String(evidence.executionEvidenceHash ?? evidence.execution_evidence_hash ?? t("aiSkills.registry.certification.noExecutionHash")),
+                                })}
                               </p>
                             ) : (
-                              <p className="mt-1">No terminal evidence has been persisted.</p>
+                              <p className="mt-1">{t("aiSkills.registry.empty.noTerminalEvidence")}</p>
                             )}
                           </div>
                         )
@@ -443,10 +482,10 @@ export function SkillRegistryPanel({ organizationId, companyId, skills }: SkillR
 
             <div className="space-y-2 border-t border-border pt-3">
               <h4 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                Add fixture
+                {t("aiSkills.registry.sections.addFixture")}
               </h4>
-              <Input value={fixtureKey} onChange={(event) => setFixtureKey(event.target.value)} placeholder="fixture key" />
-              <Input value={fixtureName} onChange={(event) => setFixtureName(event.target.value)} placeholder="name" />
+              <Input value={fixtureKey} onChange={(event) => setFixtureKey(event.target.value)} placeholder={t("aiSkills.registry.placeholders.fixtureKey")} />
+              <Input value={fixtureName} onChange={(event) => setFixtureName(event.target.value)} placeholder={t("aiSkills.registry.placeholders.name")} />
               <Textarea
                 rows={3}
                 className="font-mono text-xs"
@@ -476,7 +515,7 @@ export function SkillRegistryPanel({ organizationId, companyId, skills }: SkillR
                   )
                 }
               >
-                Create fixture
+                {t("aiSkills.registry.actions.createFixture")}
               </Button>
             </div>
           </div>
@@ -485,9 +524,9 @@ export function SkillRegistryPanel({ organizationId, companyId, skills }: SkillR
 
         {!registryLoading && !registryError && skills.length > 0 ? (
         <div className="space-y-2">
-          <h3 className="text-sm font-medium">Release history</h3>
+          <h3 className="text-sm font-medium">{t("aiSkills.registry.sections.releaseHistory")}</h3>
           {skillReleases.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No releases recorded.</p>
+            <p className="text-sm text-muted-foreground">{t("aiSkills.registry.empty.noReleases")}</p>
           ) : (
             <ul className="divide-y divide-border rounded-lg border border-border text-sm">
               {skillReleases.map((release) => {
@@ -499,10 +538,10 @@ export function SkillRegistryPanel({ organizationId, companyId, skills }: SkillR
                       <p className="font-medium">
                         #{Number(release.releaseNumber ?? release.release_number)} ·{" "}
                         {release.action}
-                        {isActive ? " · active" : ""}
+                        {isActive ? t("aiSkills.registry.release.activeSuffix") : ""}
                       </p>
                       <p className="text-xs text-muted-foreground">
-                        version {Number(release.skillVersionId ?? release.skill_version_id)}
+                        {t("aiSkills.registry.release.version", { versionId: Number(release.skillVersionId ?? release.skill_version_id) })}
                         {release.reason ? ` · ${release.reason}` : ""}
                       </p>
                     </div>
@@ -521,7 +560,7 @@ export function SkillRegistryPanel({ organizationId, companyId, skills }: SkillR
                           )
                         }
                       >
-                        Roll back to this
+                        {t("aiSkills.registry.actions.rollBackToThis")}
                       </Button>
                     ) : null}
                   </li>
@@ -534,15 +573,14 @@ export function SkillRegistryPanel({ organizationId, companyId, skills }: SkillR
 
         <div className="space-y-3 rounded-lg border border-border p-4">
           <div>
-            <h3 className="text-sm font-medium">Knowledge promotion</h3>
+            <h3 className="text-sm font-medium">{t("aiSkills.registry.knowledge.title")}</h3>
             <p className="mt-1 text-xs text-muted-foreground">
-              Independent acceptance creates an unreleased skill version. The server binds the
-              reviewed knowledge lineage; certification and release remain gated above.
+              {t("aiSkills.registry.knowledge.description")}
             </p>
           </div>
           <div className="flex flex-wrap items-end gap-2">
             <label className="flex min-w-[220px] flex-col gap-1 text-xs">
-              <span className="text-muted-foreground">Approved knowledge version id</span>
+              <span className="text-muted-foreground">{t("aiSkills.registry.fields.approvedKnowledgeVersionId")}</span>
               <Input
                 inputMode="numeric"
                 value={knowledgeVersionId}
@@ -554,18 +592,20 @@ export function SkillRegistryPanel({ organizationId, companyId, skills }: SkillR
               disabled={!companyId || !selectedSkill || proposeKnowledge.isPending}
               onClick={() => void runAction(proposeSelectedKnowledge)}
             >
-              {proposeKnowledge.isPending ? "Proposing…" : "Propose for review"}
+              {proposeKnowledge.isPending
+                ? t("aiSkills.registry.actions.proposing")
+                : t("aiSkills.registry.actions.proposeForReview")}
             </Button>
           </div>
           {knowledgePromotions.isLoading ? (
-            <p className="text-sm text-muted-foreground" role="status">Loading persisted promotions…</p>
+            <p className="text-sm text-muted-foreground" role="status">{t("aiSkills.registry.states.loadingPromotions")}</p>
           ) : knowledgePromotions.error ? (
             <div className="flex items-center gap-2" role="alert">
-              <p className="text-sm text-destructive">Failed to load knowledge promotions.</p>
-              <Button size="sm" variant="outline" onClick={() => void knowledgePromotions.refetch()}>Retry</Button>
+              <p className="text-sm text-destructive">{t("aiSkills.registry.errors.loadPromotions")}</p>
+              <Button size="sm" variant="outline" onClick={() => void knowledgePromotions.refetch()}>{t("aiSkills.registry.actions.retry")}</Button>
             </div>
           ) : (knowledgePromotions.data ?? []).length === 0 ? (
-            <p className="text-sm text-muted-foreground">No persisted knowledge promotions.</p>
+            <p className="text-sm text-muted-foreground">{t("aiSkills.registry.empty.noPromotions")}</p>
           ) : (
             <ul className="divide-y divide-border rounded-lg border border-border text-sm">
               {(knowledgePromotions.data ?? []).map((promotion) => {
@@ -573,14 +613,23 @@ export function SkillRegistryPanel({ organizationId, companyId, skills }: SkillR
                 return (
                   <li key={Number(promotion.id)} className="space-y-2 px-3 py-3">
                     <p className="font-medium">
-                      Knowledge version {Number(promotion.knowledgeVersionId ?? promotion.knowledge_version_id)} → {String(promotion.skillName ?? promotion.skill_name ?? promotion.skillKey ?? promotion.skill_key)}
+                      {t("aiSkills.registry.knowledge.promotionSummary", {
+                        versionId: Number(promotion.knowledgeVersionId ?? promotion.knowledge_version_id),
+                        skillName: String(promotion.skillName ?? promotion.skill_name ?? promotion.skillKey ?? promotion.skill_key),
+                      })}
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      {status} · certification {String(promotion.certificationState ?? promotion.certification_state ?? "not_requested")}
+                      {t("aiSkills.registry.knowledge.statusSummary", {
+                        status: registryStatusLabel(t, status),
+                        certification: registryStatusLabel(
+                          t,
+                          String(promotion.certificationState ?? promotion.certification_state ?? "not_requested"),
+                        ),
+                      })}
                     </p>
                     {status === "proposed" ? (
                       <div className="flex flex-wrap gap-2">
-                        <Input value={promotionReviewNote} onChange={(event) => setPromotionReviewNote(event.target.value)} placeholder="Independent review note" />
+                        <Input value={promotionReviewNote} onChange={(event) => setPromotionReviewNote(event.target.value)} placeholder={t("aiSkills.registry.placeholders.reviewNote")} />
                         {(["accepted", "rejected"] as const).map((outcome) => (
                           <Button
                             key={outcome}
@@ -589,7 +638,9 @@ export function SkillRegistryPanel({ organizationId, companyId, skills }: SkillR
                             disabled={reviewKnowledge.isPending}
                             onClick={() => void runAction(() => reviewKnowledge.mutateAsync({ promotionId: Number(promotion.id), outcome, note: promotionReviewNote.trim() || undefined }))}
                           >
-                            {outcome === "accepted" ? "Accept" : "Reject"}
+                            {outcome === "accepted"
+                              ? t("aiSkills.registry.actions.accept")
+                              : t("aiSkills.registry.actions.reject")}
                           </Button>
                         ))}
                       </div>

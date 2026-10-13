@@ -4254,7 +4254,28 @@
     },
     "recruitment": {
       "title": "Recruitment Pipeline",
-      "description": "Open positions actively recruiting"
+      "description": "Open positions actively recruiting",
+      "stages": {
+        "applied": "Applied",
+        "screening": "Screening",
+        "interview": "Interview",
+        "offer": "Offer",
+        "hired": "Hired",
+        "rejected": "Rejected"
+      },
+      "actionFailed": "Action failed",
+      "openPositions": "Open positions (recruit)",
+      "noOpenPositions": "No positions in recruit state.",
+      "addApplicant": "Add applicant",
+      "namePlaceholder": "Name",
+      "emailPlaceholder": "Email",
+      "jobPlaceholder": "Job position",
+      "add": "Add",
+      "applicantCount": "Applicants ({{count}})",
+      "applicantCount_one": "Applicant ({{count}})",
+      "applicantCount_other": "Applicants ({{count}})",
+      "noApplicants": "No applicants yet.",
+      "jobReference": "job #{{id}}"
     },
     "csvImport": {
       "description": "Choose a UTF-8 CSV file. Headers must match the template expected by SpacetimeDB.",
@@ -4567,7 +4588,12 @@
       "loadError": "Could not load the offboarding checklist.",
       "pending": "Pending",
       "progress": "{{done}} of {{total}} steps done",
-      "tab": "Offboarding"
+      "tab": "Offboarding",
+      "items": {
+        "assetsReturned": "Assets returned",
+        "accessRevoked": "Access revoked",
+        "docsCollected": "Documents collected"
+      }
     },
     "statutoryIds": {
       "country": "Country",
@@ -4576,6 +4602,106 @@
       "issued": "Issued",
       "loadError": "Could not load statutory IDs.",
       "tab": "Statutory IDs"
+    },
+    "performance": {
+      "status": {
+        "active": "Active",
+        "draft": "Draft",
+        "closed": "Closed"
+      },
+      "actionFailed": "Action failed",
+      "cycles": {
+        "title": "Performance cycles",
+        "namePlaceholder": "Cycle name",
+        "create": "Create cycle",
+        "fallbackName": "Cycle {{id}}",
+        "empty": "No active cycles yet.",
+        "selectPlaceholder": "Cycle"
+      },
+      "goals": {
+        "addTitle": "Add goal",
+        "titlePlaceholder": "Goal title",
+        "add": "Add goal",
+        "count": "{{count}} goals",
+        "count_one": "{{count}} goal",
+        "count_other": "{{count}} goals"
+      },
+      "employeePlaceholder": "Employee",
+      "reviews": {
+        "count": "{{count}} reviews",
+        "count_one": "{{count}} review",
+        "count_other": "{{count}} reviews",
+        "submitSelfTitle": "Submit review (self)",
+        "draftPlaceholder": "Draft review",
+        "option": "Employee {{employeeId}} / cycle {{cycleId}}",
+        "submit": "Submit",
+        "completeManagerTitle": "Complete review (manager)",
+        "submittedPlaceholder": "Submitted review",
+        "complete": "Complete"
+      }
+    },
+    "onboarding": {
+      "actionFailed": "Action failed",
+      "unassigned": "No onboarding checklist assigned. Choose a template to start hire onboarding.",
+      "selectTemplate": "Select template",
+      "templateFallback": "Template {{id}}",
+      "assignTemplate": "Assign template",
+      "statusLabel": "Status:",
+      "status": {
+        "complete": "Complete",
+        "inProgress": "In progress"
+      },
+      "markDone": "Mark onboarding done",
+      "itemFallback": "Item {{id}}",
+      "itemDone": "Done",
+      "completeItem": "Complete"
+    },
+    "benefits": {
+      "planTypes": {
+        "health": "Health",
+        "dental": "Dental",
+        "retirement": "Retirement",
+        "other": "Other"
+      },
+      "actionFailed": "Action failed",
+      "plans": {
+        "title": "Benefit plans",
+        "namePlaceholder": "Plan name",
+        "create": "Create plan",
+        "empty": "No benefit plans yet."
+      },
+      "enroll": {
+        "title": "Enroll employee",
+        "assign": "Assign",
+        "activeTitle": "Active enrollments",
+        "summary": "Employee {{employeeId}} → plan {{planId}}",
+        "unenroll": "Unenroll",
+        "empty": "No active enrollments."
+      },
+      "planPlaceholder": "Plan",
+      "employeePlaceholder": "Employee"
+    },
+    "documents": {
+      "purposes": {
+        "general": "General",
+        "taxId": "Tax ID",
+        "identity": "Identity",
+        "payroll": "Payroll"
+      },
+      "actionFailed": "Action failed",
+      "attachTitle": "Attach document reference",
+      "attachDescription": "Store attachment ID only — upload files via DMS separately.",
+      "typeLabel": "Document type",
+      "typePlaceholder": "passport, contract, …",
+      "attachmentIdLabel": "Attachment ID",
+      "attachmentIdPlaceholder": "DMS attachment ID",
+      "purposeLabel": "Purpose",
+      "titleOptionalLabel": "Title (optional)",
+      "attach": "Attach",
+      "empty": "No documents on file.",
+      "fallbackTitle": "Document",
+      "metadata": "{{type}} · purpose: {{purpose}} · attachment: {{attachmentId}}",
+      "remove": "Remove"
     }
   },
   "inventory": {
@@ -6252,7 +6378,8 @@
     "forms": {
       "purchaseReturn": {
         "title": "New purchase return",
-        "description": "Return received products to a vendor."
+        "description": "Return received products to a vendor.",
+        "refundableLine": "Create a refundable return line"
       },
       "rfq": {
         "title": "New request for quotation",
@@ -6556,6 +6683,53 @@
           "header": "Header"
         },
         "title": "Edit purchase order"
+      },
+      "common": {
+        "cancel": "Cancel",
+        "noChoices": "No choices are available.",
+        "none": "None",
+        "saving": "Saving…"
+      },
+      "fields": {
+        "expenseAccount": "Expense account",
+        "journal": "Journal",
+        "lineDescription": "Line description",
+        "notes": "Notes",
+        "payableAccount": "Payable account",
+        "product": "Product",
+        "purchaseOrder": "Purchase order",
+        "purchaseReturn": "Purchase return",
+        "quantity": "Quantity",
+        "requisition": "Requisition",
+        "returnReason": "Return reason",
+        "rfq": "RFQ",
+        "rfqBid": "RFQ bid",
+        "selection": "Selection",
+        "submittedBid": "Submitted bid",
+        "unitPrice": "Unit price",
+        "uom": "Unit of measure",
+        "vendor": "Vendor"
+      },
+      "placeholders": {
+        "expenseAccount": "Select an expense account",
+        "journal": "Select a journal",
+        "payableAccount": "Select a payable account",
+        "product": "Select a product",
+        "purchaseOrder": "Select a purchase order",
+        "purchaseReturn": "Select a purchase return",
+        "requisition": "Select a requisition",
+        "rfq": "Select an RFQ",
+        "rfqFirst": "Select an RFQ first",
+        "submittedBid": "Select a submitted bid",
+        "uom": "Select a unit",
+        "vendor": "Select a vendor"
+      },
+      "validation": {
+        "greaterThanZero": "greater than zero",
+        "minimum": "{{label}} must be {{minimum}}",
+        "noCurrency": "No active currency is available",
+        "required": "{{label}} is required",
+        "zeroOrGreater": "zero or greater"
       }
     },
     "ops": {
@@ -6702,6 +6876,155 @@
       "late": "Late",
       "rfqs": "RFQs",
       "toReceive": "To receive"
+    },
+    "blanket": {
+      "actions": {
+        "addLine": "Add line",
+        "cancel": "Cancel",
+        "closeCreateForm": "Close create form",
+        "create": "Create blanket order",
+        "createShort": "Create blanket",
+        "creating": "Creating…",
+        "openPo": "Open PO #{{id}}",
+        "release": "Release to purchase order",
+        "releaseToPo": "Release to PO",
+        "releasing": "Releasing…",
+        "remove": "Remove"
+      },
+      "authoritativeLines": "Authoritative lines",
+      "committedLines": "Committed lines",
+      "description": "Commit vendor pricing and release remaining quantities to purchase orders.",
+      "states": {
+        "draft": "Draft"
+      },
+      "effectiveDates": "Effective {{start}} – {{end}}",
+      "empty": "No blanket orders yet.",
+      "errors": {
+        "dateOrder": "Start date must be on or before the end date.",
+        "invalidLine": "Every line needs an active purchasable product, a compatible active UoM, a positive quantity, and a non-negative price.",
+        "noEligibleOrder": "There is no blanket order currently eligible for release.",
+        "notEligible": "This blanket is not eligible for release.",
+        "positiveReleaseQuantity": "Enter a positive release quantity for an available line.",
+        "quantityExceedsRemaining": "A release quantity exceeds the remaining committed quantity.",
+        "requiredHeader": "Name, an active vendor, and currency are required.",
+        "secureUuidUnavailable": "Secure UUID generation is unavailable; release cannot be started safely."
+      },
+      "fallback": {
+        "blanket": "Blanket {{id}}",
+        "currency": "Currency {{id}}",
+        "draft": "Draft",
+        "order": "Blanket order",
+        "product": "Product {{id}}",
+        "uom": "UoM {{id}}",
+        "vendor": "Vendor {{id}}"
+      },
+      "fields": {
+        "currency": "Currency",
+        "end": "End",
+        "name": "Name",
+        "plannedDate": "Planned date",
+        "productForLine": "Product for line {{line}}",
+        "quantity": "Quantity",
+        "quantityForLine": "Committed quantity for line {{line}}",
+        "releaseNotes": "Release notes",
+        "start": "Start",
+        "unitPrice": "Unit price",
+        "unitPriceForLine": "Unit price for line {{line}}",
+        "uomForLine": "UoM for line {{line}}",
+        "vendor": "Vendor"
+      },
+      "newOrder": "New blanket order",
+      "noCommittedLines": "No committed lines.",
+      "orders": "Orders",
+      "placeholders": {
+        "activeVendor": "Select an active vendor",
+        "compatibleUom": "Select compatible UoM",
+        "currency": "Select a currency",
+        "eligibleBlanket": "Select eligible blanket",
+        "notesOptional": "Notes (optional)",
+        "purchasableProduct": "Select active purchasable product"
+      },
+      "productAndUom": "{{product}} · {{uom}}",
+      "release": {
+        "chooseOrder": "Choose an eligible blanket order to enter release quantities.",
+        "eligibleBlanket": "Eligible blanket",
+        "emptyHistory": "No purchase orders have been released from this blanket.",
+        "history": "Release history",
+        "historyEntry": "PO #{{id}} · {{date}}",
+        "lineLabel": "{{product}} ({{remaining}} remaining)",
+        "option": "{{name}} · {{vendor}} · ends {{endDate}} · {{remaining}} remaining",
+        "retryHelp": "Retries use the same secure idempotency key until this attempt succeeds or is cancelled.",
+        "selectedQuantities": "Release selected quantities",
+        "title": "Release blanket to purchase order",
+        "windowClosed": "This blanket is not currently within its release window."
+      },
+      "releaseCount": "{{count}} releases",
+      "remainingAtPrice": "{{remaining}} remaining @ {{price}}",
+      "remainingParenthetical": "({{remaining}} remaining)",
+      "selectOrder": "Select a blanket order to view its details.",
+      "title": "Blanket orders",
+      "unavailableLine": "Unavailable product or UoM — not releasable",
+      "unavailableProduct": "Unavailable product"
+    },
+    "configuration": {
+      "actions": {
+        "save": "Save {{kind}}",
+        "saving": "Saving…"
+      },
+      "description": "Maintain vendor controls, sourcing settings, and integration requests.",
+      "errors": {
+        "save": "Unable to save configuration",
+        "validDate": "Enter a valid date"
+      },
+      "fields": {
+        "agreementName": "Agreement name",
+        "asOfDate": "As-of date",
+        "commodityCode": "Commodity code",
+        "contractName": "Contract name",
+        "delegateIdentity": "Delegate identity",
+        "delegationActive": "Delegation is active",
+        "endDate": "End date",
+        "idempotencyKey": "Idempotency key",
+        "intentType": "Intent type",
+        "otifScore": "OTIF score",
+        "principalIdentity": "Principal identity",
+        "product": "Product",
+        "provider": "Provider",
+        "purchaseOrder": "Purchase order",
+        "qualityScore": "Quality score",
+        "rate": "Rate",
+        "reason": "Reason",
+        "requestPayload": "Request payload",
+        "riskLevel": "Risk level",
+        "startDate": "Start date",
+        "type": "Configuration type",
+        "vendor": "Vendor",
+        "vendorFlagged": "Vendor is flagged",
+        "warehouse": "Warehouse"
+      },
+      "kinds": {
+        "approvalDelegate": "Approval delegate",
+        "commodityIndex": "Commodity price index",
+        "consignment": "Consignment agreement",
+        "contract": "Purchase contract",
+        "integrationIntent": "Integration intent",
+        "riskFlag": "Vendor risk flag",
+        "scorecard": "Vendor scorecard"
+      },
+      "none": "None",
+      "placeholders": {
+        "optionalRecordId": "Optional record id",
+        "recordId": "{{label}} id",
+        "select": "Select {{label}}"
+      },
+      "risk": {
+        "critical": "Critical",
+        "high": "High",
+        "low": "Low",
+        "medium": "Medium"
+      },
+      "saved": "{{kind}} saved",
+      "title": "Purchasing configuration"
     }
   },
   "erpWorkflow": {
@@ -6948,11 +7271,44 @@
         "qtyInvoiced": "Invoiced",
         "priceUnit": "Unit Price",
         "priceSubtotal": "Subtotal",
-        "discount": "Disc %"
+        "discount": "Disc %",
+        "description": "Description"
       },
       "add": "Add line",
       "delete": "Remove line",
-      "update": "Update line"
+      "update": "Update line",
+      "addLine": "Add line",
+      "addProductPlaceholder": "Add a product…",
+      "discountOf": "Discount of {{product}}",
+      "discountPercent": "Discount %",
+      "empty": "No lines yet",
+      "estimatedTotal": "Total (estimated until saved)",
+      "fromPricelist": "From pricelist",
+      "keep": "Keep",
+      "listPrice": "List {{price}}",
+      "noProductMatches": "No products match",
+      "priceHelp": "Leave the price empty to use the order's pricelist. Taxes are applied when the line is saved.",
+      "product": "Product",
+      "productFallback": "Product {{id}}",
+      "quantity": "Quantity",
+      "quantityOf": "Quantity of {{product}}",
+      "removeDescription": "The order's totals are recalculated without it.",
+      "removeProduct": "Remove {{product}}",
+      "removeTitle": "Remove this line?",
+      "searchProductsPlaceholder": "Search products…",
+      "subtotal": "Subtotal",
+      "taxes": "Taxes",
+      "total": "Total",
+      "unitPrice": "Unit price",
+      "unitPriceOf": "Unit price of {{product}}",
+      "untaxed": "Untaxed",
+      "validation": {
+        "discountRange": "Discount is a percentage from 0 to 100",
+        "missingUom": "This product has no unit of measure",
+        "nonNegativePrice": "Price cannot be negative",
+        "pickProduct": "Pick a product",
+        "quantityAboveZero": "Quantity must be above zero"
+      }
     },
     "pricelistItems": {
       "title": "Pricelist rules",
@@ -9873,6 +10229,7 @@
           "paymentModeCorporateCard": "Corporate card",
           "merchantKey": "Merchant",
           "merchantKeyPlaceholder": "e.g. starbucks",
+          "receiptFile": "Receipt file",
           "storageKey": "Receipt storage key",
           "storageKeyPlaceholder": "Opaque key (auto-generated if empty when receipt checked)",
           "hasReceipt": "Receipt attached (required to submit report)",
@@ -9938,6 +10295,7 @@
           "taxIds": "Tax IDs",
           "paymentMode": "Payment mode",
           "merchantKey": "Merchant",
+          "receiptFile": "Receipt file",
           "hasReceipt": "Receipt attached",
           "description": "Notes"
         }
@@ -10756,10 +11114,112 @@
   "aiHarness": {
     "title": "AI Workbench",
     "description": "Compose AI reports, scan stock and review AI-proposed actions with their evidence",
+    "enums": {
+      "verificationMethods": {
+        "none": "Not verified",
+        "deterministic": "Deterministic",
+        "modelAssisted": "Model assisted",
+        "humanReviewed": "Human reviewed"
+      },
+      "verificationOutcomes": {
+        "unverified": "Unverified",
+        "supported": "Supported",
+        "qualified": "Qualified",
+        "unsupported": "Unsupported",
+        "unresolved": "Unresolved",
+        "traceable": "Traceable"
+      },
+      "evidenceStatuses": {
+        "proposed": "Proposed",
+        "accepted": "Accepted",
+        "rejected": "Rejected",
+        "superseded": "Superseded",
+        "needsReview": "Needs review",
+        "current": "Current",
+        "invalid": "Invalid"
+      },
+      "runStatuses": {
+        "pending": "Pending",
+        "ready": "Ready",
+        "running": "Running",
+        "waitingInput": "Waiting for input",
+        "waitingApproval": "Waiting for approval",
+        "interrupted": "Interrupted",
+        "completed": "Completed",
+        "cancelled": "Cancelled",
+        "failed": "Failed",
+        "agentSettled": "Agent settled"
+      },
+      "questionStatuses": {
+        "open": "Open",
+        "answered": "Answered",
+        "skipped": "Skipped"
+      },
+      "eventKinds": {
+        "initialized": "Initialized",
+        "checkpoint": "Checkpoint advanced",
+        "questionAsked": "Question asked",
+        "questionReplied": "Question answered",
+        "steered": "Steered",
+        "interrupted": "Interrupted",
+        "resumed": "Resumed",
+        "forked": "Forked",
+        "compared": "Compared"
+      },
+      "linkStates": {
+        "linked": "Linked",
+        "changed": "Changed",
+        "unresolved": "Unresolved"
+      },
+      "availability": {
+        "available": "Available",
+        "restricted": "Restricted",
+        "tombstoned": "Deleted",
+        "outOfScope": "Out of scope",
+        "missing": "Missing"
+      },
+      "reviewTargets": {
+        "claim": "claim",
+        "decision": "decision",
+        "workflowStep": "workflow step"
+      },
+      "reviewOutcomes": {
+        "confirmed": "Confirmed"
+      },
+      "claimKinds": {
+        "policy": "Policy",
+        "inference": "Inference",
+        "sourcedFact": "Sourced fact",
+        "calculation": "Calculation",
+        "quotation": "Quotation",
+        "paraphrase": "Paraphrase",
+        "recommendation": "Recommendation",
+        "concept": "Concept"
+      },
+      "proposerKinds": {
+        "agent": "Agent",
+        "contributor": "Contributor",
+        "human": "Human",
+        "user": "User",
+        "system": "System"
+      },
+      "policyOutcomes": {
+        "allow": "Allowed",
+        "draftOnly": "Draft only",
+        "deny": "Denied"
+      },
+      "riskClasses": {
+        "green": "Green risk",
+        "amber": "Amber risk",
+        "red": "Red risk"
+      }
+    },
     "tabs": {
       "reportComposer": "Report composer",
       "lowStock": "Low stock",
-      "redActionDrafts": "Red action drafts"
+      "redActionDrafts": "Red action drafts",
+      "evidenceReviewer": "Evidence reviewer",
+      "runLifecycle": "Run lifecycle"
     },
     "auditTrail": {
       "title": "Audit trail",
@@ -10832,6 +11292,229 @@
       "nameColumn": "Product",
       "qtyColumn": "On hand",
       "reorderColumn": "Reorder level"
+    },
+    "companyDataError": "Company data {{status}}: {{message}}",
+    "reviewQueue": {
+      "accept": "Accept",
+      "accessDenied": "Access denied",
+      "adoptedClaims": "Adopts claims {{claims}} · created by {{creator}}",
+      "adoptedClaims_one": "Adopts claim {{claims}} · created by {{creator}}",
+      "adoptedClaims_other": "Adopts claims {{claims}} · created by {{creator}}",
+      "affects": "Affects: {{steps}}",
+      "awaitingPerson": "Awaiting a person",
+      "claimNumber": "Claim #{{id}}",
+      "claimsAriaLabel": "Claims awaiting review",
+      "claimsCount": "Claims ({{count}}{{suffix}})",
+      "confirmContent": "Confirm this content",
+      "contentHash": "Content {{hash}}",
+      "contributor": "contributor",
+      "createdBy": "Created by {{creator}}{{proposal}}",
+      "decisionTitle": "Decision #{{id}}: {{title}}",
+      "decisionsAriaLabel": "Decisions awaiting review",
+      "decisionsCount": "Decisions ({{count}}{{suffix}})",
+      "description": "Claims and decisions awaiting a person, and workflow steps whose links need confirming. You cannot review what you created or proposed.",
+      "errors": {
+        "loadFailed": "The review queue could not be loaded.",
+        "qualifiedNoteRequired": "A qualified verdict must say how it is qualified. Add a note.",
+        "reviewFailed": "The review could not be recorded.",
+        "reviewerRequired": "Reviewer access is required.",
+        "unavailable": "The review queue is unavailable.",
+        "verdictFailed": "That verdict could not be recorded."
+      },
+      "inspect": "Inspect",
+      "leaveUnresolved": "Leave unresolved",
+      "needsReview": "Needs review",
+      "noClaims": "No claims are waiting for review.",
+      "noDecisions": "No decisions are waiting for review.",
+      "noWorkflowSteps": "No workflow step needs its links confirmed.",
+      "none": "none",
+      "noteLabel": "Note for the next verdict",
+      "otherReviewerRequired": "You created or proposed this, so another reviewer must decide.",
+      "proposedBy": " · proposed by {{kind}} {{proposer}}",
+      "qualified": "Qualified",
+      "queueUnavailable": "Queue unavailable",
+      "recorded": "Recorded",
+      "refresh": "Refresh",
+      "reject": "Reject",
+      "reviewRejected": "Review rejected",
+      "sources": "Sources: {{sources}}",
+      "supported": "Supported",
+      "thisCompany": "This company",
+      "title": "Review queue",
+      "unsupported": "Unsupported",
+      "untitledDecision": "Untitled decision",
+      "verdictRecorded": "{{kind}} #{{id}}: {{outcome}}.",
+      "workflowStep": "workflow step",
+      "workflowStepLabel": "workflow {{workflowId}} · step {{nodeKey}}",
+      "workflowStepsAriaLabel": "Workflow steps needing link review",
+      "workflowStepsCount": "Workflow steps ({{count}}{{suffix}})"
+    },
+    "evidenceReviewer": {
+      "accepted": "Accepted",
+      "accessDenied": "Access denied",
+      "adoptedClaimIds": "Adopted claim IDs",
+      "adoptedClaimIdsPlaceholder": "12, 18",
+      "authorUnknown": "Author unknown",
+      "captureDecisionDescription": "The active assistant discussion supplies the user-attributed contribution; the decision remains proposed until reviewed.",
+      "captureDecisionTitle": "Capture a discussion decision",
+      "captureProposedDecision": "Capture proposed decision",
+      "claim": "Claim",
+      "claimHeading": "Claim #{{id}}",
+      "company": "Company",
+      "companyPlaceholder": "Select a company…",
+      "decision": "Decision",
+      "decisionCaptured": "Decision #{{id}} was captured with its user contribution and is awaiting review.",
+      "decisionHeading": "Decision #{{id}}: {{title}}",
+      "decisionTitle": "Title",
+      "description": "Inspect a decision or claim and trace it back to reviewed passages and attributed sources.",
+      "errors": {
+        "chooseCompanyAndRecord": "Choose a company and enter a positive record ID.",
+        "decisionCaptureFailed": "The decision could not be captured.",
+        "decisionFieldsRequired": "Choose a company, start an assistant discussion, and provide a title, rationale, and adopted claim IDs.",
+        "decisionResponseIncomplete": "The captured decision response was incomplete.",
+        "exportFailed": "The authorized run export could not be created.",
+        "inspectionIncomplete": "The inspection response was incomplete.",
+        "inspectionLoadFailed": "The evidence inspection could not be loaded.",
+        "inspectionUnavailable": "The evidence inspection service is unavailable.",
+        "lineageNotFound": "No evidence lineage was found for that record.",
+        "noPersistedClaims": "This run has no persisted answer claims.",
+        "nodeKeyRequired": "Enter the workflow step's node key.",
+        "reviewFailed": "The review could not be recorded.",
+        "reviewerRequired": "Reviewer access is required.",
+        "runInspectionLoadFailed": "The run evidence inspection could not be loaded.",
+        "runInspectionUnavailable": "The run evidence inspection is unavailable."
+      },
+      "excerptUnavailable": "Excerpt unavailable for this reviewer.",
+      "exportRun": "Export run #{{id}}",
+      "findLineage": "Find evidence lineage",
+      "fromRevision": " · from #{{id}}",
+      "inspectLineage": "Inspect lineage",
+      "inspectionUnavailable": "Inspection unavailable",
+      "lineagePasses": "Lineage passes",
+      "mutationRejected": "Mutation rejected",
+      "noAuthor": "No author recorded",
+      "noEvidenceDescription": "Select a company and enter a decision or claim ID to inspect its lineage.",
+      "noEvidenceSelected": "No evidence selected",
+      "noLineageDescription": "The record exists, but no inspectable decision, claim, passage, or source links were returned.",
+      "noLineageRecords": "No lineage records",
+      "noRationale": "No rationale recorded.",
+      "observableRationale": "Observable rationale",
+      "originalRevision": " · original",
+      "outOfScope": "Out of scope",
+      "outcome": "Outcome",
+      "passageHeading": "Passage #{{id}}",
+      "qualified": "Qualified",
+      "recordId": "Record ID",
+      "recordReview": "Record review",
+      "recordType": "Record type",
+      "recordVerdict": "Record reviewer verdict",
+      "recordVerdictDescription": "The authenticated reviewer and timestamp are recorded by the evidence reducer.",
+      "rejected": "Rejected",
+      "reviewNote": "Review note",
+      "reviewRecorded": "{{kind}} review recorded.",
+      "reviewRequired": "Review required",
+      "reviewedBy": " · reviewed by {{reviewer}}",
+      "reviewerOnly": "Reviewer only",
+      "saved": "Saved",
+      "scopeUnknown": "Scope unknown",
+      "sessionIdentity": "Organization and reviewer identity come from your session.",
+      "sourceHeading": "Source #{{id}}",
+      "sourceMetadataHidden": "Source metadata is hidden for this reviewer.",
+      "stepNodeKey": "Step node key",
+      "stepRevisions": "Step revisions",
+      "stepRevisionsDescription": "Newest first, following each edit or fork back to the original.",
+      "supported": "Supported",
+      "title": "Evidence reviewer",
+      "unsupported": "Unsupported",
+      "untitledDecision": "Untitled decision",
+      "untitledSource": "Untitled source",
+      "workflowStep": "Workflow step",
+      "workflowVersionId": "Workflow version ID"
+    },
+    "runLifecycle": {
+      "accessDenied": "Access denied",
+      "answeredSuffix": " · answered",
+      "answersHidden": "Answer contents are intentionally not displayed.",
+      "authenticatedSession": "Authenticated session",
+      "command": "Command",
+      "commands": {
+        "ask": "Ask question",
+        "compare": "Compare",
+        "fork": "Fork",
+        "interrupt": "Interrupt",
+        "reply": "Reply",
+        "resume": "Resume",
+        "steer": "Steer"
+      },
+      "company": "Company",
+      "companyPlaceholder": "Select company…",
+      "comparison": "Comparison",
+      "comparisonDescription": "The current core response confirms the compared continuations but does not yet expose bounded component, evidence, or validation differences.",
+      "comparisonSummary": "Run #{{leftRunId}} at cursor {{leftCursor}} compared with run #{{rightRunId}} at cursor {{rightCursor}}.",
+      "completed": "Completed",
+      "controlDescription": "Every command uses the latest returned continuation token.",
+      "controlTitle": "Run control",
+      "controlsUnavailable": "Controls unavailable",
+      "cursor": "cursor {{cursor}}",
+      "description": "Inspect and steer durable AI runs without supplying organization, identity, or credentials.",
+      "durationMs": "{{duration}} ms",
+      "errors": {
+        "chooseCompany": "Choose a company first.",
+        "operationFailed": "The run operation could not be completed.",
+        "positiveRunId": "Enter a positive run ID.",
+        "responseIncomplete": "The lifecycle response was incomplete.",
+        "runDenied": "This run is unavailable to the current session.",
+        "runNotFound": "No authorized run was found.",
+        "serviceUnavailable": "The lifecycle service is unavailable.",
+        "transcriptIncomplete": "The governed tool transcript response was incomplete.",
+        "transcriptNotFound": "No governed tool transcript was found for this lifecycle run.",
+        "transcriptUnauthorized": "The current session is not authorized to inspect this run's transcript.",
+        "transcriptUnavailable": "The governed tool transcript is temporarily unavailable."
+      },
+      "events": "Events",
+      "executeCommand": "Execute {{command}}",
+      "failed": "Failed",
+      "fields": {
+        "answer": "Answer",
+        "childRunKey": "Child run key",
+        "forkKey": "Fork key",
+        "instruction": "Instruction",
+        "otherCheckpointHash": "Other checkpoint hash",
+        "otherConcurrencyVersion": "Other concurrency version",
+        "otherCursor": "Other cursor",
+        "otherRunId": "Other run ID",
+        "prompt": "Prompt",
+        "question": "Question",
+        "questionKey": "Question key",
+        "questionPlaceholder": "Select question…",
+        "reason": "Reason"
+      },
+      "idle": "Inspect an authorized run to view questions, events, and available controls.",
+      "inputHash": "input hash {{hash}}",
+      "inspect": "Inspect",
+      "inspectDescription": "Company access and run ownership are rechecked on the server.",
+      "inspectTitle": "Inspect a run",
+      "noContinuation": "No continuation",
+      "noEvents": "No observable events.",
+      "noQuestions": "No questions.",
+      "noToolSteps": "No observable tool steps were returned.",
+      "noValidContinuation": "This response has no valid continuation.",
+      "questionNumber": "Question {{id}}",
+      "questionStatus": "{{status}} · revision {{revision}}{{answered}}",
+      "questions": "Questions",
+      "required": "Required",
+      "runId": "Run ID",
+      "runNumber": "Run #{{id}}",
+      "stepCount": "{{count}} steps",
+      "stepCount_one": "{{count}} step",
+      "stepCount_other": "{{count}} steps",
+      "stepNumber": "Step {{number}}",
+      "title": "Run lifecycle",
+      "tokenCount": "{{count}} tokens",
+      "transcriptDescription": "Ordered persisted steps; raw arguments, results, answers, and error messages are not exposed.",
+      "transcriptTitle": "Governed tool transcript",
+      "transcriptUnavailable": "Transcript unavailable",
+      "unavailable": "Lifecycle unavailable"
     }
   },
   "map": {
@@ -11025,7 +11708,90 @@
         "Cancelled": "Cancelled"
       },
       "changeState": "Move to…",
-      "viewProjects": "Open in Projects"
+      "viewProjects": "Open in Projects",
+      "allMembers": "All Members",
+      "assigneeFilterPlaceholder": "Filter by assignee",
+      "boardView": "Board view",
+      "dropTasksHere": "Drop tasks here",
+      "listView": "List view",
+      "wipLimitReached": "WIP limit reached ({{limit}})"
+    },
+    "actions": {
+      "addComment": "Add comment",
+      "create": "Create Task",
+      "openMenu": "Open actions for {{key}}",
+      "viewDetails": "View Details"
+    },
+    "assignee": {
+      "select": "Select assignee",
+      "unassigned": "Unassigned"
+    },
+    "card": {
+      "storyPoints": "{{count}} SP"
+    },
+    "create": {
+      "descriptionPlaceholder": "Enter task description",
+      "labelsPlaceholder": "frontend, bug-fix, urgent",
+      "title": "Create New Task",
+      "titlePlaceholder": "Enter task title"
+    },
+    "detail": {
+      "commentPlaceholder": "Add a comment...",
+      "commentsCount": "Comments ({{count}})",
+      "createdOn": "Created: {{date}}",
+      "descriptionPlaceholder": "Add a description...",
+      "noDescription": "No description provided",
+      "noLabels": "No labels",
+      "notSet": "Not set",
+      "updatedOn": "Updated: {{date}}"
+    },
+    "fields": {
+      "assignee": "Assignee",
+      "description": "Description",
+      "dueDate": "Due Date",
+      "key": "Key",
+      "labels": "Labels",
+      "labelsCommaSeparated": "Labels (comma-separated)",
+      "priority": "Priority",
+      "requiredTitle": "Title *",
+      "status": "Status",
+      "storyPoints": "Story Points",
+      "title": "Title",
+      "type": "Type"
+    },
+    "identity": {
+      "currentUser": "Current User"
+    },
+    "priorities": {
+      "high": "High",
+      "low": "Low",
+      "medium": "Medium",
+      "urgent": "Urgent"
+    },
+    "sprint": {
+      "statuses": {
+        "active": "Active",
+        "completed": "Completed",
+        "planning": "Planning"
+      }
+    },
+    "stats": {
+      "completed": "Completed",
+      "totalTasks": "Total Tasks"
+    },
+    "statuses": {
+      "backlog": "Backlog",
+      "done": "Done",
+      "in-progress": "In Progress",
+      "review": "Review",
+      "todo": "To Do"
+    },
+    "types": {
+      "bug": "Bug",
+      "epic": "Epic",
+      "feature": "Feature",
+      "story": "Story",
+      "task": "Task"
     }
   },
   "trackers": {
@@ -13207,5 +13973,415 @@
     "unreserveDescription": "Release the stock reserved for this transfer? You can check availability again afterwards.",
     "reset": "Reset to draft",
     "resetDescription": "Return this cancelled document to draft for editing? Only documents that have never been posted can be reset."
+  },
+  "aiSkills": {
+    "actions": {
+      "assignSkill": "Assign skill",
+      "cancel": "Cancel",
+      "configure": "Configure",
+      "createSkill": "Create skill",
+      "saveConfig": "Save config",
+      "setActive": "Set active",
+      "syncBundledSkills": "Sync bundled skills → STDB",
+      "syncing": "Syncing…",
+      "unassign": "Unassign",
+      "update": "Update"
+    },
+    "agentRuns": {
+      "description": "Live skill orchestration runs for this organization.",
+      "empty": "No runs yet.",
+      "stepCount": " ({{count}} steps)",
+      "stepCount_one": " ({{count}} step)",
+      "stepCount_other": " ({{count}} steps)",
+      "status": {
+        "agentSettled": "Agent settled",
+        "awaitingApproval": "Awaiting approval",
+        "cancelled": "Cancelled",
+        "completed": "Completed",
+        "failed": "Failed",
+        "pending": "Pending",
+        "running": "Running"
+      },
+      "title": "Agent runs"
+    },
+    "assignments": {
+      "description": "Link AI personas to skills they may run by default.",
+      "empty": "No skill assignments yet.",
+      "title": "Team member skill assignments"
+    },
+    "confirm": {
+      "removeAssignment": "Remove this skill assignment?"
+    },
+    "description": "Manage org skill playbooks, registry releases, and AI team member assignments. Skills are invoked by the ERP Assistant, not from this page.",
+    "fields": {
+      "active": "Active",
+      "category": "Category",
+      "configJson": "Config JSON",
+      "customInstructions": "Custom instructions",
+      "defaultSkill": "Default skill",
+      "description": "Description",
+      "enabled": "Enabled",
+      "maxSteps": "Max steps",
+      "maxToolCalls": "Max tool calls",
+      "moduleHintOptional": "Module hint (optional)",
+      "name": "Name",
+      "optionalToolsCsv": "Optional tools (CSV)",
+      "promptTemplate": "Prompt template",
+      "requiredToolsCsv": "Required tools (CSV)",
+      "skillId": "Skill ID",
+      "skillKey": "Skill key",
+      "teamMemberId": "Team member ID"
+    },
+    "forms": {
+      "assign": {
+        "title": "Assign Skill to Team Member"
+      },
+      "configure": {
+        "title": "Configure {{skillName}}"
+      },
+      "create": {
+        "title": "Create AI Skill"
+      },
+      "setActive": {
+        "title": "Set active — {{skillName}}"
+      }
+    },
+    "labels": {
+      "assignmentNumber": "Assignment #{{id}}",
+      "categorySkill": "{{category}} skill",
+      "defaultSuffix": " · default",
+      "memberNumber": "Member #{{id}}",
+      "number": "#{{id}}",
+      "skillNumber": "Skill #{{id}}"
+    },
+    "messages": {
+      "syncSuccess": "Synced {{count}} bundled skill(s) to SpacetimeDB."
+    },
+    "registry": {
+      "actions": {
+        "accept": "Accept",
+        "createFixture": "Create fixture",
+        "createReviewedVersion": "Create reviewed version",
+        "promote": "Promote",
+        "proposeForReview": "Propose for review",
+        "proposing": "Proposing…",
+        "reject": "Reject",
+        "retry": "Retry",
+        "retryCertification": "Retry certification",
+        "rollBackToThis": "Roll back to this",
+        "runCertification": "Run certification"
+      },
+      "activeRelease": "Active release #{{releaseNumber}} · version id {{versionId}}",
+      "certification": {
+        "blockedFixtureRequired": " · certification blocked: fixture required",
+        "evidenceSummary": "evidence #{{evidenceId}} · {{status}} · {{hash}}",
+        "noExecutionHash": "no execution hash",
+        "passed": "Passed",
+        "passedSuffix": " · certification passed",
+        "pendingSuffix": " · certification pending",
+        "queued": "Queued",
+        "requestSummary": "v{{version}} · request #{{requestId}} · {{status}} · {{readinessCode}}",
+        "running": "Running"
+      },
+      "description": "Review immutable skill versions, run server-owned fixture certification, and manage release history.",
+      "empty": {
+        "noFixtures": "No fixtures yet.",
+        "noPromotions": "No persisted knowledge promotions.",
+        "noReleases": "No releases recorded.",
+        "noSkillsForCertification": "No persisted skills are available for certification.",
+        "noTerminalEvidence": "No terminal evidence has been persisted.",
+        "noVersions": "No versions for this skill yet."
+      },
+      "errors": {
+        "invalidKnowledgeVersion": "Enter a positive approved knowledge version id and select a skill",
+        "loadCertification": "Failed to load persisted certification state",
+        "loadPromotions": "Failed to load knowledge promotions."
+      },
+      "fields": {
+        "approvedKnowledgeVersionId": "Approved knowledge version id",
+        "skill": "Skill"
+      },
+      "knowledge": {
+        "description": "Independent acceptance creates an unreleased skill version. The server binds the reviewed knowledge lineage; certification and release remain gated above.",
+        "promotionSummary": "Knowledge version {{versionId}} → {{skillName}}",
+        "statusSummary": "{{status}} · certification {{certification}}",
+        "title": "Knowledge promotion"
+      },
+      "messages": {
+        "selectCompanyForCertification": "Select an operating company before requesting certification."
+      },
+      "noActiveRelease": "No active release",
+      "placeholders": {
+        "fixtureKey": "fixture key",
+        "name": "name",
+        "reviewNote": "Independent review note"
+      },
+      "release": {
+        "activeSuffix": " · active",
+        "version": "version {{versionId}}"
+      },
+      "sections": {
+        "addFixture": "Add fixture",
+        "createVersion": "Create version",
+        "fixturesAndRuns": "Fixtures & test runs",
+        "releaseHistory": "Release history",
+        "versions": "Versions"
+      },
+      "states": {
+        "loadingCertification": "Loading persisted certification state…",
+        "loadingPromotions": "Loading persisted promotions…"
+      },
+      "status": {
+        "certified": "Certified",
+        "accepted": "Accepted",
+        "completed": "Completed",
+        "draft": "Draft",
+        "errored": "Errored",
+        "notRequested": "Not requested",
+        "passed": "Passed",
+        "promoted": "Promoted",
+        "proposed": "Proposed",
+        "queued": "Queued",
+        "rejected": "Rejected",
+        "running": "Running",
+        "rolledBack": "Rolled back",
+        "unknown": "unknown"
+      },
+      "title": "Skill registry"
+    },
+    "sources": {
+      "localMd": "Local MD",
+      "organization": "Organization",
+      "systemStdb": "System (STDB)"
+    },
+    "states": {
+      "loadingSkills": "Loading skills…"
+    },
+    "title": "AI Skills"
+  },
+  "ui": {
+    "journal": {
+      "actions": {
+        "archive": "Archive",
+        "dragToMove": "Drag to move",
+        "markResolved": "Mark Resolved",
+        "maximize": "Maximize",
+        "minimize": "Minimize",
+        "noteMenu": "Note actions",
+        "reopen": "Reopen",
+        "restore": "Restore",
+        "saveNote": "Save Note",
+        "startRecording": "Start voice recording",
+        "stopRecording": "Stop voice recording"
+      },
+      "addTagPlaceholder": "add tag",
+      "allStatuses": "All Status",
+      "allTypes": "All Types",
+      "empty": {
+        "description": "Use the quick actions above to add your first note",
+        "title": "No notes yet"
+      },
+      "filter": "Filter",
+      "linkTaskPlaceholder": "Link to task ID (optional)",
+      "notePlaceholder": "Write your note...",
+      "noteTypes": {
+        "blocker": "Blocker",
+        "decision": "Decision",
+        "idea": "Idea",
+        "meetingNote": "Meeting Note",
+        "observation": "Observation",
+        "question": "Question",
+        "reminder": "Reminder",
+        "taskUpdate": "Task Update"
+      },
+      "other": "Other",
+      "priorities": {
+        "high": "High",
+        "low": "Low",
+        "normal": "Normal",
+        "urgent": "Urgent"
+      },
+      "priority": "Priority:",
+      "quickAdd": "Quick add:",
+      "quickTemplates": {
+        "adminBlocker": {
+          "label": "Critical Issue",
+          "placeholder": "Blocking issue identified..."
+        },
+        "adminDecision": {
+          "label": "Policy Decision",
+          "placeholder": "Decision made regarding..."
+        },
+        "adminObservation": {
+          "label": "System Observation",
+          "placeholder": "Noticed something about the system..."
+        },
+        "defaultIdea": {
+          "label": "Idea",
+          "placeholder": "What if we..."
+        },
+        "defaultObservation": {
+          "label": "Observation",
+          "placeholder": "I noticed..."
+        },
+        "defaultUpdate": {
+          "label": "Task Update",
+          "placeholder": "Progress on..."
+        },
+        "managerDecision": {
+          "label": "Project Decision",
+          "placeholder": "Decided to..."
+        },
+        "managerMeeting": {
+          "label": "Meeting Note",
+          "placeholder": "Key points from meeting..."
+        },
+        "managerUpdate": {
+          "label": "Team Update",
+          "placeholder": "Team progress update..."
+        },
+        "salesObservation": {
+          "label": "Customer Insight",
+          "placeholder": "Customer mentioned..."
+        },
+        "salesReminder": {
+          "label": "Follow-up Reminder",
+          "placeholder": "Remember to follow up on..."
+        },
+        "salesUpdate": {
+          "label": "Deal Update",
+          "placeholder": "Deal status changed..."
+        },
+        "viewerIdea": {
+          "label": "Suggestion",
+          "placeholder": "It would be helpful if..."
+        },
+        "viewerObservation": {
+          "label": "Data Observation",
+          "placeholder": "Noticed in the data..."
+        },
+        "viewerQuestion": {
+          "label": "Question",
+          "placeholder": "Need clarification on..."
+        },
+        "warehouseBlocker": {
+          "label": "Issue Report",
+          "placeholder": "Problem with..."
+        },
+        "warehouseObservation": {
+          "label": "Inventory Note",
+          "placeholder": "Noticed in warehouse..."
+        },
+        "warehouseUpdate": {
+          "label": "Task Complete",
+          "placeholder": "Completed..."
+        }
+      },
+      "searchPlaceholder": "Search notes...",
+      "stats": {
+        "activeNotes": "{{count}} active notes",
+        "activeNotes_one": "{{count}} active note",
+        "activeNotes_other": "{{count}} active notes",
+        "resolvedToday": "{{count}} resolved today",
+        "resolvedToday_one": "{{count}} resolved today",
+        "resolvedToday_other": "{{count}} resolved today"
+      },
+      "status": "Status",
+      "statuses": {
+        "active": "Active",
+        "archived": "Archived",
+        "resolved": "Resolved"
+      },
+      "subtitle": "Quick notes, observations & updates",
+      "time": {
+        "daysAgo": "{{count}}d ago",
+        "daysAgo_one": "{{count}}d ago",
+        "daysAgo_other": "{{count}}d ago",
+        "hoursAgo": "{{count}}h ago",
+        "hoursAgo_one": "{{count}}h ago",
+        "hoursAgo_other": "{{count}}h ago",
+        "justNow": "Just now",
+        "minutesAgo": "{{count}}m ago",
+        "minutesAgo_one": "{{count}}m ago",
+        "minutesAgo_other": "{{count}}m ago"
+      },
+      "title": "Work Notes",
+      "type": "Type"
+    },
+    "stock3d": {
+      "categories": {
+        "clothing": "Clothing",
+        "electronics": "Electronics",
+        "finishedGoods": "Finished Goods",
+        "food": "Food & Beverage",
+        "furniture": "Furniture",
+        "packaging": "Packaging",
+        "rawMaterials": "Raw Materials",
+        "tools": "Tools"
+      },
+      "details": {
+        "actions": "Actions",
+        "close": "Close item details",
+        "editQuantity": "Edit quantity",
+        "lastUpdated": "Last Updated",
+        "location": "Location",
+        "move": "Move",
+        "quantity": "Quantity",
+        "removeConfirmation": "Remove \"{{name}}\" from inventory?",
+        "saveQuantity": "Save quantity",
+        "stockRange": "Min: {{min}} / Max: {{max}}"
+      },
+      "emptySlot": {
+        "addItemHint": "Click to add item",
+        "title": "Empty Slot"
+      },
+      "locationCoordinates": "Row {{row}}, Col {{column}}, Level {{level}}",
+      "lowStock": "Low Stock",
+      "quantityAbbreviation": "Qty:",
+      "quantityWithValue": "Qty: {{quantity}}",
+      "search": {
+        "clear": "Clear search",
+        "lowBadge": "Low",
+        "noResults": "No items found matching \"{{query}}\"",
+        "placeholder": "Search items by name or SKU...",
+        "resultLocation": "{{zone}} - Row {{row}}, Col {{column}}, Level {{level}}",
+        "resultsFound": "{{count}} results found",
+        "resultsFound_one": "{{count}} result found",
+        "resultsFound_other": "{{count}} results found"
+      },
+      "sidebar": {
+        "belowMinimum": "{{count}} items below minimum stock level",
+        "belowMinimum_one": "{{count}} item below minimum stock level",
+        "belowMinimum_other": "{{count}} items below minimum stock level",
+        "categories": "Categories",
+        "colorLegend": "Color Legend",
+        "emptySlots": "{{count}} empty",
+        "emptySlots_one": "{{count}} empty",
+        "emptySlots_other": "{{count}} empty",
+        "lowStockAlert": "Low Stock Alert",
+        "subtitle": "3D Warehouse Visualization",
+        "title": "Stock Overview",
+        "totalItems": "Total Items",
+        "units": "{{count}} units",
+        "units_one": "{{count}} unit",
+        "units_other": "{{count}} units",
+        "utilization": "Utilization",
+        "viewLowStock": "View Low Stock",
+        "viewMode": "View Mode",
+        "viewModes": {
+          "all": "All Items",
+          "emptySlots": "Empty Slots",
+          "lowStock": "Low Stock Only"
+        },
+        "zones": "Zones"
+      },
+      "zoneTypes": {
+        "bin": "Bin",
+        "coldStorage": "Cold Storage",
+        "floor": "Floor",
+        "rack": "Rack",
+        "shelf": "Shelf"
+      }
+    }
   }
 }

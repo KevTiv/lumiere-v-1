@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useMemo } from "react"
+import { useTranslation } from "@lumiere/i18n"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
@@ -42,6 +43,7 @@ import {
   sampleTeamMembers,
   sampleSprint,
   type Task,
+  type TaskPriority,
   type TaskStatus,
 } from "@/lib/task-board-types"
 import { TablePager, usePagedRows } from "../components/table-pager"
@@ -51,6 +53,26 @@ interface TaskBoardViewProps {
 }
 
 export function TaskBoardView({ className }: TaskBoardViewProps) {
+  const { t, i18n } = useTranslation()
+  const locale = i18n.resolvedLanguage ?? i18n.language
+  const statusLabels: Record<TaskStatus, string> = {
+    backlog: t("tasks.statuses.backlog"),
+    todo: t("tasks.statuses.todo"),
+    "in-progress": t("tasks.statuses.in-progress"),
+    review: t("tasks.statuses.review"),
+    done: t("tasks.statuses.done"),
+  }
+  const priorityLabels: Record<TaskPriority, string> = {
+    low: t("tasks.priorities.low"),
+    medium: t("tasks.priorities.medium"),
+    high: t("tasks.priorities.high"),
+    urgent: t("tasks.priorities.urgent"),
+  }
+  const sprintStatusLabels = {
+    planning: t("tasks.sprint.statuses.planning"),
+    active: t("tasks.sprint.statuses.active"),
+    completed: t("tasks.sprint.statuses.completed"),
+  }
   const [tasks, setTasks] = useState<Task[]>(sampleTasks)
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false)
@@ -127,7 +149,7 @@ export function TaskBoardView({ className }: TaskBoardViewProps) {
             variant={sampleSprint.status === "active" ? "default" : "secondary"}
             className="capitalize"
           >
-            {sampleSprint.status}
+            {sprintStatusLabels[sampleSprint.status]}
           </Badge>
         </div>
 
@@ -139,7 +161,7 @@ export function TaskBoardView({ className }: TaskBoardViewProps) {
             </div>
             <div>
               <p className="text-2xl font-bold">{sprintStats.total}</p>
-              <p className="text-xs text-muted-foreground">Total Tasks</p>
+              <p className="text-xs text-muted-foreground">{t("tasks.stats.totalTasks")}</p>
             </div>
           </div>
           <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
@@ -148,7 +170,7 @@ export function TaskBoardView({ className }: TaskBoardViewProps) {
             </div>
             <div>
               <p className="text-2xl font-bold">{sprintStats.inProgress}</p>
-              <p className="text-xs text-muted-foreground">In Progress</p>
+              <p className="text-xs text-muted-foreground">{t("tasks.statuses.in-progress")}</p>
             </div>
           </div>
           <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
@@ -157,7 +179,7 @@ export function TaskBoardView({ className }: TaskBoardViewProps) {
             </div>
             <div>
               <p className="text-2xl font-bold">{sprintStats.done}</p>
-              <p className="text-xs text-muted-foreground">Completed</p>
+              <p className="text-xs text-muted-foreground">{t("tasks.stats.completed")}</p>
             </div>
           </div>
           <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
@@ -168,7 +190,7 @@ export function TaskBoardView({ className }: TaskBoardViewProps) {
               <p className="text-2xl font-bold">
                 {sprintStats.completedPoints}/{sprintStats.totalPoints}
               </p>
-              <p className="text-xs text-muted-foreground">Story Points</p>
+              <p className="text-xs text-muted-foreground">{t("tasks.fields.storyPoints")}</p>
             </div>
           </div>
         </div>
@@ -181,7 +203,7 @@ export function TaskBoardView({ className }: TaskBoardViewProps) {
           <div className="relative w-64">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Search tasks..."
+              placeholder={t("tasks.board.searchPlaceholder")}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-9"
@@ -192,11 +214,11 @@ export function TaskBoardView({ className }: TaskBoardViewProps) {
           <Select value={filterAssignee} onValueChange={setFilterAssignee}>
             <SelectTrigger className="w-48">
               <Users className="h-4 w-4 mr-2" />
-              <SelectValue placeholder="Filter by assignee" />
+              <SelectValue placeholder={t("tasks.board.assigneeFilterPlaceholder")} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All Members</SelectItem>
-              <SelectItem value="unassigned">Unassigned</SelectItem>
+              <SelectItem value="all">{t("tasks.board.allMembers")}</SelectItem>
+              <SelectItem value="unassigned">{t("tasks.assignee.unassigned")}</SelectItem>
               {sampleTeamMembers.map((member) => (
                 <SelectItem key={member.id} value={member.id}>
                   <div className="flex items-center gap-2">
@@ -247,6 +269,7 @@ export function TaskBoardView({ className }: TaskBoardViewProps) {
               size="sm"
               className="h-7 px-2"
               onClick={() => setViewMode("board")}
+              aria-label={t("tasks.board.boardView")}
             >
               <LayoutGrid className="h-4 w-4" />
             </Button>
@@ -255,13 +278,14 @@ export function TaskBoardView({ className }: TaskBoardViewProps) {
               size="sm"
               className="h-7 px-2"
               onClick={() => setViewMode("list")}
+              aria-label={t("tasks.board.listView")}
             >
               <List className="h-4 w-4" />
             </Button>
           </div>
           <Button onClick={() => setIsCreateModalOpen(true)} className="gap-2">
             <Plus className="h-4 w-4" />
-            Create Task
+            {t("tasks.actions.create")}
           </Button>
         </div>
       </div>
@@ -271,7 +295,7 @@ export function TaskBoardView({ className }: TaskBoardViewProps) {
         <KanbanBoard
           columns={defaultColumns.map((column) => ({
             id: column.id,
-            title: column.title,
+            title: statusLabels[column.id],
             colorClass: column.color,
             limit: column.limit,
           }))}
@@ -294,8 +318,8 @@ export function TaskBoardView({ className }: TaskBoardViewProps) {
             )
           }}
           labels={{
-            emptyColumn: "Drop tasks here",
-            wipLimitReached: (limit) => `WIP limit reached (${limit})`,
+            emptyColumn: t("tasks.board.dropTasksHere"),
+            wipLimitReached: (limit) => t("tasks.board.wipLimitReached", { limit }),
           }}
           className="flex-1"
         />
@@ -307,12 +331,12 @@ export function TaskBoardView({ className }: TaskBoardViewProps) {
           <table className="w-full">
             <thead className="sticky top-0 bg-background border-b border-border">
               <tr className="text-left text-sm text-muted-foreground">
-                <th className="p-3 font-medium">Key</th>
-                <th className="p-3 font-medium">Title</th>
-                <th className="p-3 font-medium">Status</th>
-                <th className="p-3 font-medium">Priority</th>
-                <th className="p-3 font-medium">Assignee</th>
-                <th className="p-3 font-medium">Due Date</th>
+                <th className="p-3 font-medium">{t("tasks.fields.key")}</th>
+                <th className="p-3 font-medium">{t("tasks.fields.title")}</th>
+                <th className="p-3 font-medium">{t("tasks.fields.status")}</th>
+                <th className="p-3 font-medium">{t("tasks.fields.priority")}</th>
+                <th className="p-3 font-medium">{t("tasks.fields.assignee")}</th>
+                <th className="p-3 font-medium">{t("tasks.fields.dueDate")}</th>
                 <th className="p-3 font-medium w-12"></th>
               </tr>
             </thead>
@@ -329,7 +353,7 @@ export function TaskBoardView({ className }: TaskBoardViewProps) {
                   <td className="p-3 text-sm font-medium">{task.title}</td>
                   <td className="p-3">
                     <Badge variant="outline" className="capitalize">
-                      {task.status.replace("-", " ")}
+                      {statusLabels[task.status]}
                     </Badge>
                   </td>
                   <td className="p-3">
@@ -340,7 +364,7 @@ export function TaskBoardView({ className }: TaskBoardViewProps) {
                         taskPriorityOutlineBadgeClass[task.priority]
                       )}
                     >
-                      {task.priority}
+                      {priorityLabels[task.priority]}
                     </Badge>
                   </td>
                   <td className="p-3">
@@ -358,13 +382,13 @@ export function TaskBoardView({ className }: TaskBoardViewProps) {
                       </div>
                     ) : (
                       <span className="text-sm text-muted-foreground">
-                        Unassigned
+                        {t("tasks.assignee.unassigned")}
                       </span>
                     )}
                   </td>
                   <td className="p-3 text-sm">
                     {task.dueDate
-                      ? new Date(task.dueDate).toLocaleDateString()
+                      ? new Date(task.dueDate).toLocaleDateString(locale)
                       : "-"}
                   </td>
                   <td className="p-3">
@@ -375,17 +399,18 @@ export function TaskBoardView({ className }: TaskBoardViewProps) {
                           size="icon"
                           className="h-8 w-8"
                           onClick={(e) => e.stopPropagation()}
+                          aria-label={t("tasks.actions.openMenu", { key: task.key })}
                         >
                           <MoreHorizontal className="h-4 w-4" />
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         <DropdownMenuItem onClick={() => handleTaskClick(task)}>
-                          View Details
+                          {t("tasks.actions.viewDetails")}
                         </DropdownMenuItem>
-                        <DropdownMenuItem>Edit</DropdownMenuItem>
+                        <DropdownMenuItem>{t("common.edit")}</DropdownMenuItem>
                         <DropdownMenuItem className="text-destructive">
-                          Delete
+                          {t("common.delete")}
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>

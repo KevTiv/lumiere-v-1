@@ -317,6 +317,7 @@ export function PurchasingOpsSod({
                             type: 'textarea',
                             rows: 3,
                             required: true,
+                            // Persist a stable audit value; only the field chrome is localized.
                             defaultValue: 'Rejected',
                           },
                         ],
