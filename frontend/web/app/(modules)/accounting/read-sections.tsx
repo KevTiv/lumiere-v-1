@@ -2,7 +2,7 @@
 
 import { useMemo } from "react"
 import { useTranslation } from "@lumiere/i18n"
-import { useBankStatementImports } from "@lumiere/query-hooks/hooks/accounting"
+import { useBankStatementImports, useSetConsolidationCompanyRate } from "@lumiere/query-hooks/hooks/accounting"
 import {
   useBankStatementImportLines,
   useConsolidationCompanyRates,
@@ -12,8 +12,11 @@ import {
   importIdsApprovedIntoStatement,
   remindersForDeadline,
 } from "@lumiere/query-hooks/hooks/read-ui-rows"
-import { EntityView } from "@lumiere/ui"
+import { EntityView, useFormDialog, useRBAC } from "@lumiere/ui"
 import type { EntityViewConfig } from "@lumiere/ui"
+import { Button } from "@lumiere/ui/components/button"
+import { showWorkflowToast } from "@lumiere/ui/lib/workflow-toast"
+import { CONSOLIDATION_RATE_TYPES, toConsolidationRateParams } from "./consolidation-rate-actions"
 
 type QueryLike = { isLoading: boolean; isError: boolean; error: unknown }
 
@@ -187,6 +190,70 @@ export function ConsolidationCompanyRatesSection({
 }) {
   const { t } = useTranslation()
   const query = useConsolidationCompanyRates(organizationId)
+  const setRate = useSetConsolidationCompanyRate(Number(organizationId))
+  const { checkPermission } = useRBAC()
+  const { askForm, formDialog } = useFormDialog()
+  const canSetRate = checkPermission("consolidation_company_rate", "create").allowed
+  const toOptions = (labelMap: ReadonlyMap<string, string>) =>
+    Array.from(labelMap, ([value, label]) => ({ value, label }))
+
+  /** Add a rate, or update the one already recorded for the same company and period (the reducer upserts). */
+  const promptSetRate = async () => {
+    const label = t("accounting.consolidation.rates.set", { defaultValue: "Add / update rate" })
+    const values = await askForm({
+      title: label,
+      description: t("accounting.consolidation.rates.setHint", {
+        defaultValue: "A company and period that already has a rate gets its rate, type and effective date updated.",
+      }),
+      fields: [
+        { id: "companyId", name: "companyId", label: t("accounting.consolidation.rates.company", { defaultValue: "Company" }), type: "select", required: true, options: toOptions(labels.company), width: "1/2" },
+        { id: "periodId", name: "periodId", label: t("accounting.consolidation.rates.period", { defaultValue: "Period" }), type: "select", required: true, options: toOptions(labels.period), width: "1/2" },
+        { id: "currencyId", name: "currencyId", label: t("accounting.consolidation.rates.currency", { defaultValue: "Currency" }), type: "select", required: true, options: toOptions(labels.currency), width: "1/2" },
+        { id: "exchangeRate", name: "exchangeRate", label: t("accounting.consolidation.rates.rate", { defaultValue: "Rate" }), type: "number", required: true, step: 0.000001, min: 0, width: "1/2" },
+        {
+          id: "rateType",
+          name: "rateType",
+          label: t("accounting.consolidation.rates.type", { defaultValue: "Type" }),
+          type: "select",
+          required: true,
+          defaultValue: "average",
+          width: "1/2",
+          options: CONSOLIDATION_RATE_TYPES.map((value) => ({
+            value,
+            label: t(`accounting.consolidation.rates.types.${value}`, { defaultValue: value.charAt(0).toUpperCase() + value.slice(1) }),
+          })),
+        },
+        { id: "effectiveDate", name: "effectiveDate", label: t("accounting.consolidation.rates.effectiveDate", { defaultValue: "Effective" }), type: "date", required: true, width: "1/2" },
+      ],
+    })
+    if (values == null) return
+    const failed = (description: string) =>
+      showWorkflowToast({
+        kind: "error",
+        title: t("accounting.taxDeadlines.actions.failed", { defaultValue: "{{action}} failed", action: label }),
+        description,
+      })
+    const params = toConsolidationRateParams(values)
+    if (params == null) {
+      failed(
+        t("accounting.consolidation.rates.invalid", {
+          defaultValue: "Choose a company, period and currency, and enter a rate above zero and an effective date.",
+        }),
+      )
+      return
+    }
+    try {
+      await setRate.mutateAsync(params)
+      showWorkflowToast({
+        kind: "success",
+        title: t("accounting.taxDeadlines.actions.done", { defaultValue: "{{action}} completed", action: label }),
+      })
+      void query.refetch()
+    } catch (error) {
+      failed(error instanceof Error ? error.message : String(error))
+    }
+  }
+
   const rows = useMemo(
     () =>
       (query.data ?? []).map((r) => ({
@@ -222,9 +289,24 @@ export function ConsolidationCompanyRatesSection({
   )
   return (
     <div className="space-y-2">
-      <h3 className="text-base font-semibold">
-        {t("accounting.consolidation.rates.title", { defaultValue: "Company exchange rates" })}
-      </h3>
+      <div className="flex items-center justify-between gap-2">
+        <h3 className="text-base font-semibold">
+          {t("accounting.consolidation.rates.title", { defaultValue: "Company exchange rates" })}
+        </h3>
+        {canSetRate ? (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={setRate.isPending}
+            data-testid="consolidation-rate-set"
+            onClick={() => void promptSetRate()}
+          >
+            {t("accounting.consolidation.rates.set", { defaultValue: "Add / update rate" })}
+          </Button>
+        ) : null}
+      </div>
+      {formDialog}
       <SectionState
         query={query}
         isEmpty={rows.length === 0}
