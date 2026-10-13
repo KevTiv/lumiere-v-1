@@ -39,6 +39,9 @@ import type {
   Workflow,
   WorkflowInstance,
 } from "@lumiere/stdb/types"
+import { parseStrictU64 } from "@lumiere/erp-shared/u64"
+
+import { resolveWorkflowVersionStateEffect } from "./workflow-version-effect"
 
 const wfKeys = (organizationId: bigint) => rqBigIntKey(organizationId)
 
@@ -215,6 +218,30 @@ function optionalCompanyArg(companyId?: number | null): { some: number } | { non
   return companyId != null && companyId > 0 ? { some: companyId } : { none: [] }
 }
 
+async function requireWorkflowVersionState(
+  organizationId: bigint,
+  workflowVersionId: bigint | number | string,
+  expectedStatus: "Published" | "Retired",
+): Promise<void> {
+  const exactId = parseStrictU64(workflowVersionId)
+  if (exactId == null) throw new Error("Workflow version id is invalid")
+
+  // Query projection propagation is normally immediate, but use a short,
+  // bounded reconciliation window so an acknowledged command cannot be shown
+  // as success until its exact sealed version reads back.
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    const rows = await fetchQueryList(
+      "/api/query/workflow-versions",
+      "Failed to read back workflow version",
+    )
+    if (resolveWorkflowVersionStateEffect(rows, organizationId, exactId, expectedStatus)) return
+    if (attempt < 3) await new Promise((resolve) => setTimeout(resolve, 75 * (attempt + 1)))
+  }
+  throw new Error(
+    `Workflow version ${exactId} did not read back as ${expectedStatus}`,
+  )
+}
+
 export function useCreateWorkflow(organizationId: bigint, companyId?: number | null) {
   const qc = useQueryClient()
   return useMutation<void, Error, CreateWorkflowParams>({
@@ -237,6 +264,7 @@ export function usePublishWorkflowVersion(organizationId: bigint, _companyId?: n
       const { urlPath, init } = stdbBffCommandPost("publish_workflow_version", { workflowVersionId: input.workflowVersionId, expectedRevision: input.expectedDraftRevision })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error("Failed to publish workflow version")
+      await requireWorkflowVersionState(organizationId, input.workflowVersionId, "Published")
     },
     onSuccess: () => invalidateAllWorkflowQueries(qc, organizationId),
   })
@@ -270,6 +298,7 @@ export function useRetireWorkflowVersion(organizationId: bigint, _companyId?: nu
       const { urlPath, init } = stdbBffCommandPost("retire_workflow_version", { workflowVersionId: input.workflowVersionId, expectedRevision: input.expectedDraftRevision })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error("Failed to retire workflow version")
+      await requireWorkflowVersionState(organizationId, input.workflowVersionId, "Retired")
     },
     onSuccess: () => invalidateAllWorkflowQueries(qc, organizationId),
   })

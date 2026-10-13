@@ -71,11 +71,13 @@ import { useDefaultOperatingCompanyBigInt } from "@lumiere/query-hooks/hooks/use
 import { usePricelists, type ProductPricelist } from "@lumiere/query-hooks/hooks/sales"
 import { useEmployees, type HrEmployee } from "@lumiere/query-hooks/hooks/hr"
 import {
+  newExpenseClientRequestId,
   newExpenseReceiptClientRequestId,
   parseAttachmentIds,
   toCreateExpenseParams,
   toCreateExpenseSheetParams,
 } from "@/lib/expenses-create-params"
+import { firstFileFromFormValue, uploadDocumentBlob } from "@/lib/document-blob-upload"
 import {
   pricelistRowsToSelectOptions,
   employeeRowsToSelectOptions,
@@ -223,26 +225,31 @@ function ExpensesClientLoaded({
         throw new Error("Employee is required to register a receipt")
       }
       const clientRequestId = newExpenseReceiptClientRequestId()
-      const storageKey =
-        formData.storageKey != null && String(formData.storageKey).trim() !== ""
-          ? String(formData.storageKey).trim()
-          : `local:${clientRequestId}`
+      const receiptFile = firstFileFromFormValue(formData.receiptFile)
+      const uploaded = receiptFile
+        ? await uploadDocumentBlob({ file: receiptFile, companyId: operatingCompanyId })
+        : null
+      const storageKey = uploaded?.objectKey ?? String(formData.storageKey ?? "").trim()
+      if (!storageKey) {
+        throw new Error("Choose a receipt file or provide an existing receipt storage key")
+      }
       const receiptId = await createExpenseReceipt.mutateAsync({
         employeeId,
         storageKey,
         clientRequestId,
-        fileName:
+        fileName: uploaded?.fileName ?? (
           formData.fileName != null && String(formData.fileName).trim() !== ""
             ? String(formData.fileName)
-            : undefined,
-        mimeType:
+            : undefined),
+        mimeType: uploaded?.mimetype ?? (
           formData.mimeType != null && String(formData.mimeType).trim() !== ""
             ? String(formData.mimeType)
-            : undefined,
+            : undefined),
+        contentHash: uploaded?.checksum,
       })
       return [receiptId]
     },
-    [createExpenseReceipt],
+    [createExpenseReceipt, operatingCompanyId],
   )
   const submitExpense = useSubmitExpense(orgId)
   const submitExpenseSheet = useSubmitExpenseSheet(orgId, operatingCompanyId)
@@ -623,7 +630,10 @@ function ExpensesClientLoaded({
       if (pl == null || pl.currencyId === undefined || pl.currencyId === null) return
       const attachmentIds = await resolveAttachmentIds(formData, empRaw)
       const params = toCreateExpenseParams(
-        formData,
+        {
+          ...formData,
+          clientRequestId: formData.clientRequestId ?? newExpenseClientRequestId(),
+        },
         {
           currencyId: pl.currencyId,
           pricelistId: plRaw,

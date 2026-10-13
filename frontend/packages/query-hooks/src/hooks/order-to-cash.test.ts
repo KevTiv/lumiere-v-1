@@ -74,6 +74,22 @@ test("links deliveries and invoices by exact foreign key within scope", () => {
   )
   assert.deepEqual(handoffs.pickings.map((p) => p.id), [11n, 12n])
   assert.deepEqual(handoffs.invoices.map((i) => i.id), [21n])
+  assert.deepEqual(handoffs.returns, [])
+})
+
+test("links active returns by exact sale-order foreign key within scope", () => {
+  const handoffs = orderHandoffs(5n, scope, [], [], [
+    { id: 31n, organizationId: 1n, companyId: 3n, saleOrderId: 5n, state: "confirmed", name: "RMA/31" },
+    { id: 32n, organizationId: 1n, companyId: 3n, saleOrderId: 6n, state: "confirmed" },
+    { id: 33n, organizationId: 1n, companyId: 4n, saleOrderId: 5n, state: "confirmed" },
+    { id: 34n, organizationId: 1n, companyId: 3n, saleOrderId: 5n, state: "cancelled" },
+    { id: 30n, organization_id: 1n, company_id: 3n, sale_order_id: 5n, state: "received" },
+  ])
+
+  assert.deepEqual(handoffs.returns, [
+    { id: 30n, state: "received", name: "" },
+    { id: 31n, state: "confirmed", name: "RMA/31" },
+  ])
 })
 
 test("reads snake_case rows", () => {

@@ -2882,6 +2882,15 @@ pub fn approve_purchase_requisition(
         return Err("Purchase requisition must be in InProgress state to approve".to_string());
     }
 
+    // A requisition is created on behalf of `user_id` and that identity stays
+    // immutable throughout the request lifecycle.  Permission to approve is
+    // necessary, but it must never let a requester approve their own spend.
+    // Keep this check at the reducer boundary so alternate clients cannot
+    // bypass the UI's separation-of-duties guard.
+    if requisition.user_id == ctx.sender() {
+        return Err("Requester cannot approve their own purchase requisition".to_string());
+    }
+
     ctx.db
         .purchase_requisition()
         .id()

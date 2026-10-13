@@ -1141,6 +1141,7 @@ function SalesClientLoaded({
                     { organizationId: orgId, companyId: operatingCompanyId },
                     stockPickings as EntityRow[],
                     accountMoves as unknown as EntityRow[],
+                    returnOrders as unknown as EntityRow[],
                   )}
                 />
               </div>
@@ -1149,7 +1150,7 @@ function SalesClientLoaded({
         },
       ],
     };
-  }, [t, orderLines, partnerLabelById, orgId, operatingCompanyId, stockPickings, accountMoves]);
+  }, [t, orderLines, partnerLabelById, orgId, operatingCompanyId, stockPickings, accountMoves, returnOrders]);
 
   const pickingBatchFormConfig = useMemo(() => newPickingBatchForm(t), [t]);
 

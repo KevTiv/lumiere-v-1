@@ -81,6 +81,14 @@ export function newExpenseReceiptClientRequestId(): string {
   return `rcpt-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
 }
 
+/** Stable command identity supplied to the reducer so a transport retry cannot duplicate a line. */
+export function newExpenseClientRequestId(): string {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+    return `expense-${crypto.randomUUID()}`
+  }
+  return `expense-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
+}
+
 export function toCreateExpenseParams(
   formData: Record<string, unknown>,
   currencyId: unknown,

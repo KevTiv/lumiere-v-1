@@ -2,6 +2,11 @@ import { expect, test } from "@playwright/test"
 import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
 import { fetchDefaultCompanyId, gotoModule, selectEntityRowById, signIn } from "./helpers"
 import { command, create, id, location, password, product, rows, value } from "./cov-scheduler-manufacturing-fixtures"
+import { createStockQuantFixture } from "./inventory-quant-fixtures"
+
+function timestamp(millis: number) {
+  return { microsSinceUnixEpoch: BigInt(millis) * 1_000n }
+}
 
 test.describe("COV-06n operator replenishment schedule and cancel", {
   tag: ["@p0", "@cov06", "@cov06n", "@unauthenticated"],
@@ -12,13 +17,21 @@ test.describe("COV-06n operator replenishment schedule and cancel", {
     const companyId = await fetchDefaultCompanyId(page)
     const item = await product(page)
     const destination = await location(page, companyId)
+    await createStockQuantFixture(
+      page,
+      companyId,
+      id(item),
+      id(destination),
+      `cov06n-on-hand-${id(item)}`,
+      20,
+    )
     const rule = await create(page, "replenishment-rules", "create_replenishment_rule", {
       companyId,
       params: stdbParamsToJson({
         productId: id(item), locationId: id(destination), uomId: id(item, "uomId", "uom_id"),
         productMinQty: 10, productMaxQty: 20, qtyMultiple: 1, leadDays: 1,
         trigger: "auto", active: true, warehouseId: null, routeId: null, groupId: null,
-        lastRun: null, nextRun: null, metadata: null,
+        lastRun: null, nextRun: timestamp(Date.now() + 45_000), metadata: null,
       }, "CreateReplenishmentRuleParams"),
     }, row => id(row, "productId", "product_id") === id(item) &&
       id(row, "locationId", "location_id") === id(destination) &&
@@ -34,7 +47,9 @@ test.describe("COV-06n operator replenishment schedule and cancel", {
     const reader = await browser.newContext({ storageState: { cookies: [], origins: [] } })
     try {
       const warehousePage = await operator.newPage()
+      const readerPage = await reader.newPage()
       await signIn(warehousePage, "fixture.warehouse@example.test", password)
+      await signIn(readerPage, "fixture.reader@example.test", password)
       await gotoModule(warehousePage, `/inventory?tab=replenishment&filter=id:${ruleId}`, "inventory")
       await expect(warehousePage.getByTestId("module-tab-inventory-replenishment")).toHaveAttribute("aria-selected", "true")
       await selectEntityRowById(warehousePage, ruleId)
@@ -48,10 +63,28 @@ test.describe("COV-06n operator replenishment schedule and cancel", {
       const duplicate = await command(warehousePage, "schedule_replenishment_run", { companyId, ruleId })
       expect(duplicate.status()).toBe(422)
       expect((await jobs()).map(row => id(row, "scheduledId", "scheduled_id"))).toEqual([scheduledId])
-      const readerPage = await reader.newPage()
-      await signIn(readerPage, "fixture.reader@example.test", password)
       expect((await command(readerPage, "cancel_replenishment_run", { companyId, ruleId })).status()).toBe(403)
       expect((await jobs()).map(row => id(row, "scheduledId", "scheduled_id"))).toEqual([scheduledId])
+
+      // This is the scheduler proof, rather than merely proving queue CRUD:
+      // the due job must execute the exact rule against sufficient on-hand
+      // stock, stamp last_run, create no demand, and replace itself with the
+      // next recurring job.
+      await expect.poll(async () => {
+        const current = (await rows(page, "replenishment-rules")).find(row => id(row) === ruleId)
+        return value(current ?? {}, "lastRun", "last_run") ?? null
+      }, { timeout: 75_000 }).not.toBeNull()
+      await expect.poll(async () => {
+        const pending = await jobs()
+        return pending.length === 1
+          ? id(pending[0]!, "scheduledId", "scheduled_id")
+          : 0
+      }, { timeout: 30_000 }).toBeGreaterThan(scheduledId)
+      const demandName = `INT-RPL-${ruleId}`
+      const demands = (await rows(page, "stock-pickings")).filter(row =>
+        value(row, "name", "name") === demandName &&
+        id(row, "companyId", "company_id") === companyId)
+      expect(demands).toHaveLength(0)
 
       await warehousePage.getByTestId("entity-action-cancel-replenishment-run").click()
       await expect.poll(async () => (await jobs()).length, { timeout: 30_000 }).toBe(0)

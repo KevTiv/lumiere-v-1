@@ -17,6 +17,16 @@ import type {
 import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
 import { scalarToU64 as toScalarU64 } from "@lumiere/erp-shared/u64"
 import { stbTimestampFromDate } from "@lumiere/erp-shared/stb-timestamp"
+import { decodeOperationDispatch } from "@lumiere/api-client"
+import {
+  executeOperationWithCanonicalReadback,
+  requireResolvedOperationEffect,
+  type ResolvedOperationEffectOutcome,
+} from "../operation-effect"
+import {
+  resolvePayslipPostingEffect,
+  resolvePayslipStateEffect,
+} from "../hr-payroll-effects"
 import {
   finalizeCreateContractParams,
   finalizeCreatePayslipParams,
@@ -217,20 +227,38 @@ export function useCreateSalaryRule(organizationId: bigint, _companyId?: bigint)
 
 export function useConfirmPayslip(organizationId: bigint, companyId?: bigint) {
   const qc = useQueryClient()
-  return useMutation<void, Error, { payslipId: number; grossWage?: number; netWage?: number; calculationSource?: string }>({
+  return useMutation<ResolvedOperationEffectOutcome, Error, { payslipId: number; grossWage?: number; netWage?: number; calculationSource?: string }>({
     mutationFn: async ({ payslipId, grossWage, netWage, calculationSource }) => {
-      const { urlPath, init } = stdbBffCommandPost("confirm_payslip", { payslipId: toScalarU64(payslipId), params: stdbParamsToJson({
-            companyId: companyId != null ? toScalarU64(companyId) : undefined,
-            grossWage: grossWage ?? 0,
-            netWage: netWage ?? 0,
-            calculationSource: calculationSource ?? "manual",
-          }) })
-
-      const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error('Failed to approve payslip for export')
+      if (companyId == null) throw new Error("companyId is required to approve a payslip")
+      const scopedCompanyId = toScalarU64(companyId)
+      const scopedPayslipId = toScalarU64(payslipId)
+      const outcome = await executeOperationWithCanonicalReadback({
+        resolveEffect: async () =>
+          resolvePayslipStateEffect(
+            await fetchQueryList('/api/query/payslips', 'Failed to read payslips'),
+            organizationId,
+            scopedCompanyId,
+            scopedPayslipId,
+            "Verify",
+          ),
+        dispatch: async () => {
+          const { urlPath, init } = stdbBffCommandPost("confirm_payslip", { payslipId: scopedPayslipId, params: stdbParamsToJson({
+              companyId: scopedCompanyId,
+              grossWage: grossWage ?? 0,
+              netWage: netWage ?? 0,
+              calculationSource: calculationSource ?? "manual",
+            }) })
+          return decodeOperationDispatch(
+            await apiFetch(urlPath, init),
+            'Failed to approve payslip for export',
+          )
+        },
+        afterDispatch: () => qc.invalidateQueries({ queryKey: ['hr-payslips', rqBigIntKey(organizationId)] }),
+        readbackAttempts: 6,
+        readbackDelayMs: 150,
+      })
+      return requireResolvedOperationEffect(outcome)
     },
-    onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['hr-payslips', rqBigIntKey(organizationId)] }),
   })
 }
 
@@ -260,7 +288,7 @@ export function useCreatePayrollExportIntent(organizationId: bigint, companyId?:
 export function usePostPayslip(organizationId: bigint, companyId?: bigint) {
   const qc = useQueryClient()
   return useMutation<
-    void,
+    ResolvedOperationEffectOutcome,
     Error,
     {
       payslipId: number
@@ -279,32 +307,77 @@ export function usePostPayslip(organizationId: bigint, companyId?: bigint) {
       taxWithholdingAccountId,
       accountingDate,
     }) => {
-      const { urlPath, init } = stdbBffCommandPost("post_payslip", { companyId: companyId ?? null, payslipId: toScalarU64(payslipId), params: stdbParamsToJson({
-          journalId: toScalarU64(journalId),
-          expenseAccountId: toScalarU64(expenseAccountId),
-          payableAccountId: toScalarU64(payableAccountId),
-          taxWithholdingAccountId:
-            taxWithholdingAccountId != null ? toScalarU64(taxWithholdingAccountId) : undefined,
-          accountingDate: stbTimestampFromDate(accountingDate),
-        }) })
-      const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error('Failed to post payslip to GL')
+      if (companyId == null) throw new Error("companyId is required to post a payslip")
+      const scopedCompanyId = toScalarU64(companyId)
+      const scopedPayslipId = toScalarU64(payslipId)
+      const outcome = await executeOperationWithCanonicalReadback({
+        resolveEffect: async () =>
+          resolvePayslipPostingEffect(
+            await fetchQueryList('/api/query/payslips', 'Failed to read payslips'),
+            await fetchQueryList('/api/query/account-moves', 'Failed to read payroll account move'),
+            organizationId,
+            scopedCompanyId,
+            scopedPayslipId,
+          ),
+        dispatch: async () => {
+          const { urlPath, init } = stdbBffCommandPost("post_payslip", { companyId: scopedCompanyId, payslipId: scopedPayslipId, params: stdbParamsToJson({
+              journalId: toScalarU64(journalId),
+              expenseAccountId: toScalarU64(expenseAccountId),
+              payableAccountId: toScalarU64(payableAccountId),
+              taxWithholdingAccountId:
+                taxWithholdingAccountId != null ? toScalarU64(taxWithholdingAccountId) : undefined,
+              accountingDate: stbTimestampFromDate(accountingDate),
+            }) })
+          return decodeOperationDispatch(
+            await apiFetch(urlPath, init),
+            'Failed to post payslip to GL',
+          )
+        },
+        afterDispatch: async () => {
+          await Promise.all([
+            qc.invalidateQueries({ queryKey: ['hr-payslips', rqBigIntKey(organizationId)] }),
+            qc.invalidateQueries({ queryKey: ['account-moves', rqBigIntKey(organizationId)] }),
+          ])
+        },
+        readbackAttempts: 6,
+        readbackDelayMs: 150,
+      })
+      return requireResolvedOperationEffect(outcome)
     },
-    onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['hr-payslips', rqBigIntKey(organizationId)] }),
   })
 }
 
 export function useCancelPayslip(organizationId: bigint, companyId?: bigint) {
   const qc = useQueryClient()
-  return useMutation<void, Error, number>({
+  return useMutation<ResolvedOperationEffectOutcome, Error, number>({
     mutationFn: async (payslipId) => {
-      const { urlPath, init } = stdbBffCommandPost("cancel_payslip", { companyId: payslipId, payslipId: companyId ?? null })
-
-      const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error('Failed to cancel payslip')
+      if (companyId == null) throw new Error("companyId is required to cancel a payslip")
+      const scopedCompanyId = toScalarU64(companyId)
+      const scopedPayslipId = toScalarU64(payslipId)
+      const outcome = await executeOperationWithCanonicalReadback({
+        resolveEffect: async () =>
+          resolvePayslipStateEffect(
+            await fetchQueryList('/api/query/payslips', 'Failed to read payslips'),
+            organizationId,
+            scopedCompanyId,
+            scopedPayslipId,
+            "Cancelled",
+          ),
+        dispatch: async () => {
+          const { urlPath, init } = stdbBffCommandPost("cancel_payslip", {
+            companyId: scopedCompanyId,
+            payslipId: scopedPayslipId,
+          })
+          return decodeOperationDispatch(
+            await apiFetch(urlPath, init),
+            'Failed to cancel payslip',
+          )
+        },
+        afterDispatch: () => qc.invalidateQueries({ queryKey: ['hr-payslips', rqBigIntKey(organizationId)] }),
+        readbackAttempts: 6,
+        readbackDelayMs: 150,
+      })
+      return requireResolvedOperationEffect(outcome)
     },
-    onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['hr-payslips', rqBigIntKey(organizationId)] }),
   })
 }
