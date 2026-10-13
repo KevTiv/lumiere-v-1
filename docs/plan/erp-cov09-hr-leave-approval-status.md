@@ -86,3 +86,10 @@ with same-head green CI (plus the contract release, when required).
 Still required for whole-module U5: current-head browser execution of employee → contract →
 payslip → distinct-person approval → post/export, sensitive-field denied-reader proof, and
 the shared responsive/accessibility/reconnect and launch-manifest gates.
+
+Wave 2 adds that browser proof in `cov09-hr-payroll-lifecycle.spec.ts`: the primary employee,
+contract and payslip records are created through visible forms; the seeded `hr-project`
+persona approves and posts; the approval response is deliberately lost after commit and the
+hook converges through exact readback; a duplicate post retains one exact GL relation; and
+the reader persona is denied compensation fields (or the whole payslip feed) and the posting operation. Same-head runtime
+execution and the shared certification gates remain required before promotion.

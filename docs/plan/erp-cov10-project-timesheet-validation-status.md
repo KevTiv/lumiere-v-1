@@ -87,3 +87,9 @@ Still required for whole-module U5: current-head browser execution beginning wit
 project/task/timesheet creation under separate logger and validator personas, duplicate-bill
 and ambiguous-response recovery execution, and the shared responsive/accessibility/reconnect
 and launch-manifest gates.
+
+Wave 2 extends `cov10-project-timesheet-validation.spec.ts` through the visible Bill form.
+It proves the exact persisted `timesheet_invoice_id`, the exact scoped Accounting move and
+`Timesheets` origin, then replays billing to prove duplicate denial leaves that relation
+unchanged and replays it as the reader persona to prove authorization denial. Current-head
+runtime execution and the shared certification gates remain required before promotion.

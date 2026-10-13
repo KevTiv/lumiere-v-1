@@ -94,6 +94,8 @@ pub fn run_accounting_post_invoice_test(ctx: &ReducerContext) -> Result<(), Stri
 pub fn run_accounting_payment_reconcile_test(ctx: &ReducerContext) -> Result<(), String> {
     payments_test::test_payment_reconciles_invoice(ctx)
         .map_err(|e| format!("payment_reconciles_invoice: {e}"))?;
+    payments_test::test_reconciled_payment_unwind_and_cancel_exact_effect(ctx)
+        .map_err(|e| format!("payment_unwind_and_cancel: {e}"))?;
     payments_test::test_payment_create_rejects_invalid_relations(ctx)
         .map_err(|e| format!("payment_create_relations: {e}"))
 }
@@ -125,7 +127,9 @@ pub fn run_accounting_period_lock_test(ctx: &ReducerContext) -> Result<(), Strin
     period_lock_test::test_post_blocked_in_closed_period(ctx)
         .map_err(|e| format!("period_lock invoice: {e}"))?;
     period_lock_test::test_post_payment_blocked_in_closed_period(ctx)
-        .map_err(|e| format!("period_lock payment: {e}"))
+        .map_err(|e| format!("period_lock payment: {e}"))?;
+    period_lock_test::test_payment_allocation_unwind_blocked_in_closed_period(ctx)
+        .map_err(|e| format!("period_lock payment unwind: {e}"))
 }
 
 #[spacetimedb::reducer]

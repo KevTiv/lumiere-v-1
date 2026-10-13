@@ -2,6 +2,7 @@
 
 use super::row_values::{row_not_soft_deleted, row_u64};
 use crate::error::ApiError;
+use serde_json::Value;
 use stdb_auth::{identity_sql_literal, select_org_scoped_sql, FieldAccessContext};
 use stdb_client::StdbClient;
 
@@ -134,6 +135,18 @@ pub(crate) async fn resolve_membership_company_id(
     denied_message: &str,
 ) -> Result<u64, ApiError> {
     let membership_company = membership_company_id(client, organization_id, identity_hex).await?;
+    if has_organization_wide_company_access(client, organization_id, identity_hex).await? {
+        let organization_company_ids =
+            company_ids_for_organization(client, organization_id, None).await?;
+        let selected = requested_company_id
+            .or(membership_company)
+            .or_else(|| organization_company_ids.first().copied())
+            .ok_or_else(|| ApiError::Forbidden("No company assigned".into()))?;
+        return organization_company_ids
+            .contains(&selected)
+            .then_some(selected)
+            .ok_or_else(|| ApiError::Forbidden(denied_message.into()));
+    }
     let allowed = match membership_company {
         Some(company_id) if company_id > 0 => company_id,
         _ => default_company_id(client, organization_id)
@@ -142,6 +155,136 @@ pub(crate) async fn resolve_membership_company_id(
     };
 
     enforce_requested_company(allowed, requested_company_id, denied_message)
+}
+
+async fn has_organization_wide_company_access(
+    client: &StdbClient,
+    organization_id: u64,
+    identity_hex: &str,
+) -> Result<bool, ApiError> {
+    let identity = identity_sql_literal(identity_hex).map_err(ApiError::Internal)?;
+    let membership_sql = format!(
+        "SELECT role_id FROM user_organization WHERE organization_id = {organization_id} AND user_identity = {identity} AND is_active = true"
+    );
+    let memberships = client
+        .query_sql(&membership_sql)
+        .await
+        .map_err(ApiError::internal)?;
+    let assignment_sql = format!(
+        "SELECT role_id, expires_at FROM user_role_assignment WHERE organization_id = {organization_id} AND user_identity = {identity} AND is_active = true"
+    );
+    let assignments = client
+        .query_sql(&assignment_sql)
+        .await
+        .map_err(ApiError::internal)?;
+    let role_sql = format!(
+        "SELECT id, name, permissions, is_active FROM role WHERE organization_id = {organization_id}"
+    );
+    let roles = client.query_sql(&role_sql).await.map_err(ApiError::internal)?;
+    let role_ids = current_company_scope_role_ids(
+        &memberships,
+        &assignments,
+        &roles,
+        chrono::Utc::now().timestamp_micros(),
+    );
+    Ok(roles.iter().any(|role| {
+        let id = row_u64(role, "id", "id").ok().flatten();
+        let active = role
+            .get("isActive")
+            .or_else(|| role.get("is_active"))
+            .and_then(|value| value.as_bool())
+            .unwrap_or(false);
+        if !active || !id.is_some_and(|id| role_ids.contains(&id)) {
+            return false;
+        }
+        let name = role
+            .get("name")
+            .and_then(|value| value.as_str())
+            .unwrap_or("")
+            .trim()
+            .to_lowercase()
+            .replace(' ', "-")
+            .replace('_', "-");
+        let named_admin = matches!(
+            name.as_str(),
+            "admin" | "administrator" | "organization-admin" | "owner"
+        );
+        let wildcard = role
+            .get("permissions")
+            .and_then(|value| value.as_array())
+            .is_some_and(|permissions| {
+                permissions
+                    .iter()
+                    .any(|value| value.as_str() == Some("*:*"))
+            });
+        named_admin || wildcard
+    }))
+}
+
+/// Resolve the canonical effective roles used by the authorization routes:
+/// one active membership's base role plus current additive assignments.
+/// Ambiguous membership authority and malformed expiries fail closed.
+fn current_company_scope_role_ids(
+    memberships: &[Value],
+    assignments: &[Value],
+    roles: &[Value],
+    now_micros: i64,
+) -> Vec<u64> {
+    let [membership] = memberships else {
+        return Vec::new();
+    };
+    let active_role_ids = roles
+        .iter()
+        .filter(|role| {
+            role.get("isActive")
+                .or_else(|| role.get("is_active"))
+                .and_then(Value::as_bool)
+                .unwrap_or(false)
+        })
+        .filter_map(|role| row_u64(role, "id", "id").ok().flatten())
+        .collect::<Vec<_>>();
+    let mut role_ids = row_u64(membership, "roleId", "role_id")
+        .ok()
+        .flatten()
+        .filter(|role_id| active_role_ids.contains(role_id))
+        .into_iter()
+        .collect::<Vec<_>>();
+    role_ids.extend(assignments.iter().filter_map(|assignment| {
+        let role_id = row_u64(assignment, "roleId", "role_id").ok().flatten()?;
+        (active_role_ids.contains(&role_id)
+            && company_scope_assignment_is_current(assignment, now_micros))
+        .then_some(role_id)
+    }));
+    role_ids.sort_unstable();
+    role_ids.dedup();
+    role_ids
+}
+
+fn company_scope_assignment_is_current(row: &Value, now_micros: i64) -> bool {
+    match row.get("expiresAt").or_else(|| row.get("expires_at")) {
+        None | Some(Value::Null) => true,
+        Some(value) => {
+            company_scope_timestamp_micros(value).is_some_and(|expires| expires > now_micros)
+        }
+    }
+}
+
+fn company_scope_timestamp_micros(value: &Value) -> Option<i64> {
+    value
+        .as_i64()
+        .or_else(|| value.as_u64().and_then(|value| i64::try_from(value).ok()))
+        .or_else(|| value.as_str().and_then(|value| value.parse().ok()))
+        .or_else(|| {
+            value
+                .get("__timestamp_micros_since_unix_epoch__")
+                .and_then(company_scope_timestamp_micros)
+        })
+        .or_else(|| {
+            value
+                .get("microsSinceUnixEpoch")
+                .and_then(company_scope_timestamp_micros)
+        })
+        .or_else(|| value.get("some").and_then(company_scope_timestamp_micros))
 }
 
 async fn membership_company_id(
@@ -154,9 +297,11 @@ async fn membership_company_id(
         "SELECT id, organization_id, company_id, is_active FROM user_organization WHERE organization_id = {organization_id} AND user_identity = {identity} AND is_active = true"
     );
     let memberships = client.query_sql(&sql).await.map_err(ApiError::internal)?;
-    let membership = memberships
-        .first()
-        .ok_or_else(|| ApiError::Forbidden("No active organization membership".into()))?;
+    let [membership] = memberships.as_slice() else {
+        return Err(ApiError::Forbidden(
+            "No unique active organization membership".into(),
+        ));
+    };
 
     row_u64(membership, "companyId", "company_id").map_err(ApiError::Internal)
 }
@@ -170,6 +315,18 @@ pub(crate) async fn authorize_membership_company_ids(
 ) -> Result<(), ApiError> {
     if requested_company_ids.is_empty() {
         return Ok(());
+    }
+    if has_organization_wide_company_access(client, organization_id, identity_hex).await? {
+        let organization_company_ids =
+            company_ids_for_organization(client, organization_id, None).await?;
+        return if requested_company_ids
+            .iter()
+            .all(|requested| organization_company_ids.contains(requested))
+        {
+            Ok(())
+        } else {
+            Err(ApiError::Forbidden(denied_message.into()))
+        };
     }
     if let Some(company_id) = membership_company_id(client, organization_id, identity_hex).await? {
         if requested_company_ids
@@ -476,6 +633,56 @@ pub(crate) fn iot_resource(resource: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn company_scope_roles_include_base_and_unexpired_assignments_only() {
+        let memberships = vec![json!({"roleId": 1})];
+        let assignments = vec![
+            json!({"roleId": 2, "expiresAt": null}),
+            json!({"roleId": 3, "expiresAt": {"__timestamp_micros_since_unix_epoch__": 101}}),
+            json!({"roleId": 4, "expiresAt": {"microsSinceUnixEpoch": 100}}),
+            json!({"roleId": 5, "expiresAt": 99}),
+            json!({"roleId": 6, "expiresAt": "malformed"}),
+        ];
+        let roles = (1..=6)
+            .map(|id| json!({"id": id, "isActive": true}))
+            .collect::<Vec<_>>();
+
+        assert_eq!(
+            current_company_scope_role_ids(&memberships, &assignments, &roles, 100),
+            vec![1, 2, 3]
+        );
+    }
+
+    #[test]
+    fn company_scope_base_membership_role_is_canonical_authority() {
+        let memberships = vec![json!({"roleId": 7})];
+        let roles = vec![json!({
+            "id": 7,
+            "name": "organization_admin",
+            "permissions": [],
+            "isActive": true
+        })];
+
+        assert_eq!(
+            current_company_scope_role_ids(&memberships, &[], &roles, 100),
+            vec![7]
+        );
+    }
+
+    #[test]
+    fn company_scope_roles_fail_closed_for_ambiguous_membership() {
+        let memberships = vec![json!({"roleId": 1}), json!({"roleId": 1})];
+        let assignments = vec![json!({"roleId": 2, "expiresAt": null})];
+        let roles = vec![
+            json!({"id": 1, "isActive": true}),
+            json!({"id": 2, "isActive": true}),
+        ];
+
+        assert!(current_company_scope_role_ids(&[], &assignments, &roles, 100).is_empty());
+        assert!(current_company_scope_role_ids(&memberships, &assignments, &roles, 100).is_empty());
+    }
 
     #[test]
     fn pass12_resources_use_only_schema_backed_company_classification() {

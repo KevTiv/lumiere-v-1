@@ -40,6 +40,9 @@ import {
 
 import { stockPickingsQueryOptions } from "./inventory/stock-operations"
 import { executeCommandWithAppliedRecovery } from "./canonical-command-recovery"
+import { fetchQueryList } from "../http"
+import type { HumanTaskRow } from "./approvals"
+import { resolveSaleOrderApprovalTask } from "./sales-approval-task"
 import {
   acceptSaleOrderQuotationCommand,
   cancelSaleOrderCommand,
@@ -102,10 +105,29 @@ export function useSaleOrderWorkflow(
           qc.fetchQuery({ ...saleOrdersQueryOptions(organizationId), staleTime: 0 }),
           qc.fetchQuery({ ...stockPickingsQueryOptions(organizationId), staleTime: 0 }),
         ])
+        const orderRows = orders as unknown as RowValueMap[]
+        const pickingRows = pickings as unknown as RowValueMap[]
+        const confirmed = observeConfirmedOrder(orderId, orderRows, pickingRows)
+        if (confirmed.outcome === "applied") return confirmed
+        const tasks = await fetchQueryList(
+          "/api/query/workflow-human-tasks-inbox",
+          "Failed to read sale-order approval task",
+        )
+        const approvalTask =
+          companyId == null || companyId === 0n
+            ? null
+            : resolveSaleOrderApprovalTask(
+                tasks as HumanTaskRow[],
+                { organizationId, companyId },
+                BigInt(orderId),
+              )
         return observeConfirmedOrder(
           orderId,
-          orders as unknown as RowValueMap[],
-          pickings as unknown as RowValueMap[],
+          orderRows,
+          pickingRows,
+          approvalTask
+            ? { resource: approvalTask.resource, id: approvalTask.id, module: "approvals" }
+            : undefined,
         )
       }
       return {
@@ -114,6 +136,7 @@ export function useSaleOrderWorkflow(
           executeCommandWithAppliedRecovery(
             () => confirmSaleOrderCommand(companyId, orderId),
             () => observe(orderId),
+            ["applied", "approval_pending"],
           ),
         affects: CONFIRM_SALE_ORDER_AFFECTS,
         observe,

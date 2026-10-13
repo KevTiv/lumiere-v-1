@@ -47,6 +47,29 @@ pub struct FinalizeImportAssistantJobParams {
     pub template_id: Option<u64>,
 }
 
+fn merge_assistant_metadata(
+    existing: Option<&str>,
+    assistant: &str,
+) -> Result<String, String> {
+    let mut base = existing
+        .and_then(|value| serde_json::from_str::<serde_json::Value>(value).ok())
+        .and_then(|value| value.as_object().cloned())
+        .unwrap_or_default();
+    let overlay = serde_json::from_str::<serde_json::Value>(assistant)
+        .map_err(|_| "metadata_json must be valid JSON".to_string())?;
+    let overlay = overlay
+        .as_object()
+        .ok_or_else(|| "metadata_json must be a JSON object".to_string())?;
+    for (key, value) in overlay {
+        // File identity is domain-owned. Finalizing assistant provenance must
+        // neither erase nor forge the hash used for replay reconciliation.
+        if key != "sha256" {
+            base.insert(key.clone(), value.clone());
+        }
+    }
+    Ok(serde_json::Value::Object(base).to_string())
+}
+
 // ── Reducers ─────────────────────────────────────────────────────────────────
 
 #[spacetimedb::reducer]
@@ -212,10 +235,6 @@ pub fn finalize_import_assistant_job(
     if params.metadata_json.trim().is_empty() {
         return Err("metadata_json is required".to_string());
     }
-    if serde_json::from_str::<serde_json::Value>(&params.metadata_json).is_err() {
-        return Err("metadata_json must be valid JSON".to_string());
-    }
-
     let job = ctx
         .db
         .import_job()
@@ -227,6 +246,7 @@ pub fn finalize_import_assistant_job(
     }
 
     check_permission(ctx, organization_id, &job.table_name, "create")?;
+    let merged_metadata = merge_assistant_metadata(job.metadata.as_deref(), &params.metadata_json)?;
 
     if let Some(template_id) = params.template_id {
         let template = ctx
@@ -254,7 +274,7 @@ pub fn finalize_import_assistant_job(
     }
 
     ctx.db.import_job().id().update(ImportJob {
-        metadata: Some(params.metadata_json.clone()),
+        metadata: Some(merged_metadata),
         ..job
     });
 
