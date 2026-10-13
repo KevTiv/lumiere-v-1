@@ -63,6 +63,10 @@ function rustApiRewrites() {
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  output: 'standalone',
+  // Keep workspace packages imported by the web app inside the standalone
+  // server bundle. The release workflow copies this traced tree verbatim.
+  outputFileTracingRoot: path.resolve(__dirname, '../..'),
   skipTrailingSlashRedirect: true,
   async rewrites() {
     return [...rustApiRewrites(), ...posthogRewrites()]
