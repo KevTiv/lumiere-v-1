@@ -602,8 +602,8 @@
   "AiModelProfile": [
     "temperature",
     "top_p",
-    "input_cost_per1_k_microunits",
-    "output_cost_per1_k_microunits",
+    "input_cost_per_1k_microunits",
+    "output_cost_per_1k_microunits",
     "per_request_cost_ceiling_microunits"
   ],
   "AiProviderAttempt": [
@@ -1078,7 +1078,7 @@
     "fax",
     "website",
     "street",
-    "street2",
+    "street_2",
     "city",
     "state_code",
     "zip",
@@ -1537,7 +1537,7 @@
     "fax",
     "website",
     "street",
-    "street2",
+    "street_2",
     "city",
     "state_code",
     "zip",
@@ -2218,8 +2218,8 @@
     "description_sale",
     "service_type",
     "service_tracking",
-    "image1920_url",
-    "image128_url",
+    "image_1920_url",
+    "image_128_url",
     "color",
     "responsible_id",
     "pricelist_id",
@@ -2793,7 +2793,7 @@
     "template_id",
     "invoice_mail_template_id",
     "website_url",
-    "image1920_url",
+    "image_1920_url",
     "metadata"
   ],
   "CreateSubscriptionPriceTierParams": [
@@ -4179,8 +4179,8 @@
     "description_sale",
     "service_type",
     "service_tracking",
-    "image1920_url",
-    "image128_url",
+    "image_1920_url",
+    "image_128_url",
     "color",
     "responsible_id",
     "pricelist_id",
@@ -4878,8 +4878,8 @@
   "RegisterAiModelProfileParams": [
     "temperature",
     "top_p",
-    "input_cost_per1_k_microunits",
-    "output_cost_per1_k_microunits",
+    "input_cost_per_1k_microunits",
+    "output_cost_per_1k_microunits",
     "per_request_cost_ceiling_microunits"
   ],
   "RegisterAiSkillCertificationRuntimeProfileParams": [
@@ -5592,7 +5592,7 @@
     "invoice_mail_template_id",
     "user_id",
     "website_url",
-    "image1920_url",
+    "image_1920_url",
     "close_reason_id"
   ],
   "SubscriptionPriceTier": [
@@ -6051,7 +6051,7 @@
   ],
   "UpdateContactAddressParams": [
     "street",
-    "street2",
+    "street_2",
     "city",
     "state_code",
     "zip",
@@ -6914,7 +6914,7 @@
     "is_published",
     "is_default",
     "color",
-    "image1920_url",
+    "image_1920_url",
     "metadata"
   ],
   "UpdateSupplierIntakeParams": [
