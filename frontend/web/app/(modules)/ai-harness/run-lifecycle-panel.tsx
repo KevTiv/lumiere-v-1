@@ -22,6 +22,7 @@ import {
   type RunLifecycleView,
 } from "./run-lifecycle"
 import { mapRunObservation, type RunObservationView } from "./run-observation"
+import { RunHistoryPanel } from "./run-history-panel"
 
 interface RunLifecyclePanelProps {
   companies: JsonObject[]
@@ -136,6 +137,11 @@ export function RunLifecyclePanel({ companies }: RunLifecyclePanelProps) {
     void submit({ kind: "inspect", runId: parsedRunId })
   }
 
+  const inspectHistoryRun = (selectedRunId: number) => {
+    setRunId(String(selectedRunId))
+    void submit({ kind: "inspect", runId: selectedRunId })
+  }
+
   const changeRun = (update: () => void) => {
     lifecycleRequestId.current += 1
     observationRequest.current += 1
@@ -174,6 +180,8 @@ export function RunLifecyclePanel({ companies }: RunLifecyclePanelProps) {
           </form>
         </CardContent>
       </Card>
+
+      <RunHistoryPanel key={companyId} companyId={Number(companyId) || null} onInspect={inspectHistoryRun} />
 
       {request.status === "idle" ? <Card><CardContent className="py-10 text-center text-sm text-muted-foreground">Inspect an authorized run to view questions, events, and available controls.</CardContent></Card> : null}
       {request.status === "loading" ? <div className="flex flex-col gap-3"><Skeleton className="h-28 w-full" /><Skeleton className="h-52 w-full" /></div> : null}
@@ -219,7 +227,7 @@ function LifecycleResult({ data, observation, loading, submit }: { data: RunLife
   return (
     <div className="flex flex-col gap-4">
       <Card>
-        <CardHeader><div className="flex flex-wrap items-center gap-2"><CardTitle className="text-base">Run #{data.runId}</CardTitle><Badge>{data.state}</Badge>{continuation ? <Badge variant="outline">cursor {continuation.cursor}</Badge> : <Badge variant="destructive">No continuation</Badge>}</div></CardHeader>
+        <CardHeader><div className="flex flex-wrap items-center gap-2"><CardTitle className="text-base">Run #{data.runId}</CardTitle><Badge>{data.state}</Badge>{continuation ? <Badge variant="outline">cursor {continuation.cursor}</Badge> : <Badge variant="destructive">No continuation</Badge>}{data.truncated ? <Badge variant="outline">Bounded view</Badge> : null}</div></CardHeader>
       </Card>
 
       <RunObservation observation={observation} />
@@ -248,7 +256,23 @@ function LifecycleResult({ data, observation, loading, submit }: { data: RunLife
         </CardContent>
       </Card>
 
-      {data.comparison ? <Card><CardHeader><CardTitle className="text-base">Comparison</CardTitle></CardHeader><CardContent className="text-sm"><p>Run #{data.comparison.leftRunId} at cursor {data.comparison.leftContinuation.cursor} compared with run #{data.comparison.rightRunId} at cursor {data.comparison.rightContinuation.cursor}.</p><p className="mt-1 text-muted-foreground">The current core response confirms the compared continuations but does not yet expose bounded component, evidence, or validation differences.</p></CardContent></Card> : null}
+      {data.comparison ? (
+        <Card>
+          <CardHeader><CardTitle className="text-base">Comparison</CardTitle></CardHeader>
+          <CardContent className="text-sm">
+            <p>Run #{data.comparison.leftRunId} at cursor {data.comparison.leftContinuation.cursor} compared with run #{data.comparison.rightRunId} at cursor {data.comparison.rightContinuation.cursor}.</p>
+            {data.comparison.details ? (
+              <div className="mt-3 flex flex-col gap-2 text-muted-foreground">
+                <p>Left: {data.comparison.details.leftStatus}, {data.comparison.details.leftStepCount} steps, {data.comparison.details.leftTokensUsed.toLocaleString()} tokens.</p>
+                <p>Right: {data.comparison.details.rightStatus}, {data.comparison.details.rightStepCount} steps, {data.comparison.details.rightTokensUsed.toLocaleString()} tokens.</p>
+                {data.comparison.details.toolsOnlyLeft.length > 0 ? <p>Only left: {data.comparison.details.toolsOnlyLeft.join(", ")}.</p> : null}
+                {data.comparison.details.toolsOnlyRight.length > 0 ? <p>Only right: {data.comparison.details.toolsOnlyRight.join(", ")}.</p> : null}
+                {data.comparison.details.toolDiffTruncated ? <Badge variant="outline">Tool difference truncated</Badge> : null}
+              </div>
+            ) : <p className="mt-1 text-muted-foreground">No bounded comparison details were available.</p>}
+          </CardContent>
+        </Card>
+      ) : null}
     </div>
   )
 }
@@ -277,6 +301,20 @@ function RunObservation({ observation }: { observation: ObservationState }) {
         </div>
       </CardHeader>
       <CardContent>
+        {run.economics ? (
+          <div className="mb-4 flex flex-wrap items-center gap-2 rounded-md border bg-muted/30 p-3 text-xs text-muted-foreground">
+            {run.economics.providerModels.map((pair) => <Badge key={`${pair.provider}:${pair.model}`} variant="outline">{pair.provider} / {pair.model}</Badge>)}
+            {run.economics.providerModelsTruncated ? <Badge variant="outline">Provider list truncated</Badge> : null}
+            {run.economics.attemptCount !== null ? <span>{run.economics.attemptCount} provider attempt{run.economics.attemptCount === 1 ? "" : "s"}</span> : null}
+            {run.economics.inputTokens !== null && run.economics.outputTokens !== null ? <span>{run.economics.inputTokens.toLocaleString()} input / {run.economics.outputTokens.toLocaleString()} output tokens</span> : null}
+            {run.economics.reservedUnits !== null ? <span>{run.economics.reservedUnits.toLocaleString()} {run.economics.currency ?? "units"} reserved</span> : null}
+            {run.economics.settledUnits !== null ? <span>{run.economics.settledUnits.toLocaleString()} {run.economics.currency ?? "units"} settled</span> : null}
+            {run.economics.attemptStatuses.map((status) => <Badge key={`attempt:${status}`} variant="outline">attempt {status}</Badge>)}
+            {run.economics.reservationStatuses.map((status) => <Badge key={`reservation:${status}`} variant="outline">reservation {status}</Badge>)}
+            {run.economics.outcomeUnknown ? <Badge variant="destructive">Outcome unknown</Badge> : null}
+            {run.economics.truncated ? <Badge variant="outline">Economics truncated</Badge> : null}
+          </div>
+        ) : null}
         {run.transcript.length === 0 ? (
           <p className="text-sm text-muted-foreground">No observable tool steps were returned.</p>
         ) : (
