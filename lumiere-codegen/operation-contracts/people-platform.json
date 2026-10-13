@@ -2621,6 +2621,16 @@
       },
       "evidence": "spacetimedb/src/ai/spend.rs: body loads current state and enforces a uniqueness, revision, or lifecycle guard"
     },
+    "recover_ai_provider_attempt": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/ai/spend.rs: approved recovery attribution is replay-safe and lifecycle transitions fail closed"
+    },
     "record_ai_agent_run_policy_snapshot": {
       "semantic_kind": "internal",
       "client_facing": false,
@@ -3300,6 +3310,16 @@
         "version": 1
       },
       "evidence": "spacetimedb/tests/ai/mod.rs: test reducer executes assertions; retry classification is not applicable"
+    },
+    "run_ai_spend_recovery_tests": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/tests/ai/mod.rs: persisted recovery test reducer executes assertions; retry classification is not applicable"
     },
     "run_all_ai_tests": {
       "semantic_kind": "test",
