@@ -34,6 +34,7 @@ use crate::support::{read_to_string, write_file};
 use anyhow::{Context, Result};
 use schema_ir::{LumiereSchemaManifest, OwnershipCounts};
 use serde_json::Value;
+use std::collections::BTreeSet;
 
 /// Fast path for regenerating the closed STDB apply dispatch from an already
 /// generated canonical contracts manifest.
@@ -52,8 +53,12 @@ pub fn run_reconstruction_apply(paths: &Paths) -> Result<()> {
 pub fn run(paths: &Paths) -> Result<()> {
     // ── 1. Schema IR: STDB Rust bindings → lumiere-schema-manifest.json ────
 
-    let schema_manifest = stdb_bindings_parse::parse_bindings(&paths.stdb_bindings_dir)
-        .context("extracting schema IR from STDB Rust bindings")?;
+    let module_schema: Value = serde_json::from_str(&read_to_string(&paths.module_schema_json)?)
+        .with_context(|| format!("parse {}", paths.module_schema_json.display()))?;
+    let view_names = module_view_names(&module_schema)?;
+    let schema_manifest =
+        stdb_bindings_parse::parse_bindings(&paths.stdb_bindings_dir, &view_names)
+            .context("extracting schema IR from STDB Rust bindings")?;
     let c0_enforced = std::env::var("C0_ENFORCE_TENANT_OWNERSHIP").as_deref() == Ok("1");
     let ownership_counts: Option<OwnershipCounts> = match schema_manifest.ownership_counts() {
         Ok(counts) => Some(counts),
@@ -178,21 +183,38 @@ pub fn run(paths: &Paths) -> Result<()> {
 
     // ── 4b. Versioned durable PG schema and migration ────────────────────
 
-    let durable_migration =
-        pg_migration_emit::emit_durable_migration(&schema_manifest, &storage_policy_manifest)
-            .context("generating durable PostgreSQL migration")?;
-    let migration_path = paths
-        .durable_migration_dir
-        .join(format!("{}.sql", pg_migration_emit::DURABLE_MIGRATION_NAME));
-    write_file(&migration_path, &durable_migration.sql)?;
+    let ledger = pg_migration_emit::MigrationLedger::load(&paths.durable_migration_ledger_dir)
+        .context("loading the released durable migration ledger")?;
+    let durable_migration = pg_migration_emit::emit_durable_migrations(
+        &schema_manifest,
+        &storage_policy_manifest,
+        &ledger,
+    )
+    .context("generating durable PostgreSQL migrations")?;
+    for migration in &durable_migration.migrations {
+        let migration_path = paths
+            .durable_migration_dir
+            .join(format!("{}.sql", migration.name));
+        write_file(&migration_path, &migration.sql)?;
+        println!(
+            "Wrote {} ({}, checksum {})",
+            migration_path.display(),
+            if migration.released {
+                "released, frozen"
+            } else {
+                "pending"
+            },
+            migration.checksum
+        );
+    }
     write_file(
         &paths.durable_migration_manifest_out,
         &durable_migration.manifest,
     )?;
-    println!("Wrote {}", migration_path.display());
     println!(
-        "Wrote {} durable PG tables (checksum {})",
-        durable_migration.applicable_table_count, durable_migration.sql_checksum
+        "Wrote {} durable PG tables across {} migration(s)",
+        durable_migration.applicable_table_count,
+        durable_migration.migrations.len()
     );
 
     // ── 5. Hydration manifest: reducers that may target archived rows ──────
@@ -265,6 +287,61 @@ pub fn run(paths: &Paths) -> Result<()> {
     println!("Wrote {}", paths.archive_manifest_out.display());
 
     Ok(())
+}
+
+fn module_view_names(module_schema: &Value) -> Result<BTreeSet<String>> {
+    let exports = module_schema["misc_exports"]
+        .as_array()
+        .context("module schema misc_exports must be an array")?;
+    let mut names = BTreeSet::new();
+    for export in exports {
+        let Some(view) = export.get("View") else {
+            continue;
+        };
+        let name = view["name"]
+            .as_str()
+            .filter(|name| !name.is_empty())
+            .context("module schema view must have a non-empty name")?;
+        if !names.insert(name.to_owned()) {
+            anyhow::bail!("module schema contains duplicate view {name}");
+        }
+    }
+    Ok(names)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::module_view_names;
+
+    #[test]
+    fn extracts_only_view_relations_from_misc_exports() {
+        let schema = serde_json::json!({
+            "misc_exports": [
+                { "View": { "name": "tenant_read" } },
+                { "Procedure": { "name": "refresh_projection" } },
+                { "ColumnDefaultValue": { "table": "orders", "col_id": 1, "value": "00" } }
+            ]
+        });
+
+        let names = module_view_names(&schema).unwrap();
+
+        assert_eq!(names.into_iter().collect::<Vec<_>>(), vec!["tenant_read"]);
+    }
+
+    #[test]
+    fn rejects_duplicate_view_names() {
+        let schema = serde_json::json!({
+            "misc_exports": [
+                { "View": { "name": "tenant_read" } },
+                { "View": { "name": "tenant_read" } }
+            ]
+        });
+
+        assert!(module_view_names(&schema)
+            .unwrap_err()
+            .to_string()
+            .contains("duplicate view tenant_read"));
+    }
 }
 
 fn emit_ddl(

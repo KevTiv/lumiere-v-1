@@ -5,6 +5,7 @@ import { useCallback, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import { useQueryClient } from "@tanstack/react-query"
 import { useTranslation } from "@lumiere/i18n"
+import { useModuleTab } from "@/hooks/use-module-tab"
 import {
   ModuleView,
   FormModal,
@@ -28,7 +29,9 @@ import {
   useApproveProposal,
   useConvertProposalToSaleOrder,
 } from "@lumiere/query-hooks/hooks/proposals"
-import { usePricelists } from "@lumiere/query-hooks/hooks/sales"
+import { usePricelists, useSaleOrders } from "@lumiere/query-hooks/hooks/sales"
+import { proposalOrderLinks } from "@lumiere/query-hooks/hooks/cross-record-links"
+import { CrossRecordLinks } from "../../../components/order-handoff-links"
 import { useWarehouses } from "@lumiere/query-hooks/hooks/inventory"
 import type { Proposal } from "@lumiere/query-hooks/hooks/proposals"
 import { useDefaultOperatingCompanyBigInt } from "@lumiere/query-hooks/hooks/use-operating-company"
@@ -134,7 +137,10 @@ function ProposalsClientLoaded({ initialProposals, organizationId }: ProposalsCl
   const [quickActionForm, setQuickActionForm] = useState<{ form: FormConfig; action: string } | null>(null)
   const [editRow, setEditRow] = useState<Record<string, unknown> | null>(null)
   const [convertProposalId, setConvertProposalId] = useState<string | number | null>(null)
-  const [activeTab, setActiveTab] = useState<string>("dashboard")
+  const { activeTab, setActiveTab } = useModuleTab(
+    moduleConfig.defaultTab ?? "dashboard",
+    moduleConfig.tabs.map((tab) => tab.id),
+  )
 
   const { data: proposals = [] } = useProposals(orgId, initialProposals)
   const { data: currencies = [] } = useCurrencies()
@@ -145,6 +151,7 @@ function ProposalsClientLoaded({ initialProposals, organizationId }: ProposalsCl
   const convertProposal = useConvertProposalToSaleOrder(orgId, operatingCompanyId)
   const { data: pricelists = [] } = usePricelists(orgId)
   const { data: warehouses = [] } = useWarehouses(orgId)
+  const { data: saleOrders = [], isLoading: saleOrdersLoading, isError: saleOrdersError } = useSaleOrders(orgId)
 
   const isPending =
     createProposal.isPending ||
@@ -230,10 +237,12 @@ function ProposalsClientLoaded({ initialProposals, organizationId }: ProposalsCl
         icon: Eye,
         variant: "outline",
         requiresSelection: true,
-        onClick: (rows) => {
+        isApplicable: (rows) => rows.every((row) => normalizeProposalStatus(row.status) === "Draft"),
+        successMessage: t("common.actionCompleted", { action: t("proposals.actions.submitForReview") }),
+        onClick: async (rows) => {
           const row = rows[0]
           if (!row?.id || normalizeProposalStatus(row.status) !== "Draft") return
-          void setStatus(row.id as string | number, "review")
+          await setStatus(row.id as string | number, "review")
         },
       },
       {
@@ -242,10 +251,12 @@ function ProposalsClientLoaded({ initialProposals, organizationId }: ProposalsCl
         icon: Send,
         variant: "outline",
         requiresSelection: true,
-        onClick: (rows) => {
+        isApplicable: (rows) => rows.every((row) => normalizeProposalStatus(row.status) === "Review"),
+        successMessage: t("common.actionCompleted", { action: t("proposals.actions.submit") }),
+        onClick: async (rows) => {
           const row = rows[0]
           if (!row?.id || normalizeProposalStatus(row.status) !== "Review") return
-          void setStatus(row.id as string | number, "submitted")
+          await setStatus(row.id as string | number, "submitted")
         },
       },
       {
@@ -254,13 +265,13 @@ function ProposalsClientLoaded({ initialProposals, organizationId }: ProposalsCl
         icon: Award,
         variant: "default",
         requiresSelection: true,
-        onClick: (rows) => {
+        isApplicable: (rows) => rows.every((row) => normalizeProposalStatus(row.status) === "Submitted"),
+        successMessage: t("common.actionCompleted", { action: t("proposals.actions.award") }),
+        onClick: async (rows) => {
           const row = rows[0]
           if (!row?.id || normalizeProposalStatus(row.status) !== "Submitted") return
-          void (async () => {
-            await approveProposal.mutateAsync(row.id as string | number)
-            await setStatus(row.id as string | number, "awarded")
-          })()
+          await approveProposal.mutateAsync(row.id as string | number)
+          await setStatus(row.id as string | number, "awarded")
         },
       },
       {
@@ -269,6 +280,8 @@ function ProposalsClientLoaded({ initialProposals, organizationId }: ProposalsCl
         icon: FileOutput,
         variant: "outline",
         requiresSelection: true,
+        isApplicable: (rows) =>
+          rows.every((row) => normalizeProposalStatus(row.status) === "Awarded" && row.saleOrderId == null && row.sale_order_id == null),
         onClick: (rows) => {
           const row = rows[0]
           if (!row?.id || normalizeProposalStatus(row.status) !== "Awarded") return
@@ -282,12 +295,18 @@ function ProposalsClientLoaded({ initialProposals, organizationId }: ProposalsCl
         icon: ThumbsDown,
         variant: "outline",
         requiresSelection: true,
-        onClick: (rows) => {
+        isApplicable: (rows) =>
+          rows.every((row) => {
+            const s = normalizeProposalStatus(row.status)
+            return s !== "Rejected" && s !== "Archived"
+          }),
+        successMessage: t("common.actionCompleted", { action: t("proposals.actions.reject") }),
+        onClick: async (rows) => {
           const row = rows[0]
           if (!row?.id) return
           const s = normalizeProposalStatus(row.status)
           if (s === "Rejected" || s === "Archived") return
-          void setStatus(row.id as string | number, "rejected")
+          await setStatus(row.id as string | number, "rejected")
         },
       },
       {
@@ -296,13 +315,19 @@ function ProposalsClientLoaded({ initialProposals, organizationId }: ProposalsCl
         icon: Archive,
         variant: "outline",
         requiresSelection: true,
-        onClick: (rows) => {
+        isApplicable: (rows) =>
+          rows.every((row) => {
+            const s = normalizeProposalStatus(row.status)
+            return s === "Awarded" || s === "Rejected"
+          }),
+        successMessage: t("common.actionCompleted", { action: t("proposals.actions.archive") }),
+        onClick: async (rows) => {
           const row = rows[0]
           if (!row?.id) return
           const s = normalizeProposalStatus(row.status)
           if (s === "Archived") return
           if (s !== "Awarded" && s !== "Rejected") return
-          void setStatus(row.id as string | number, "archived")
+          await setStatus(row.id as string | number, "archived")
         },
       },
     ]
@@ -343,8 +368,6 @@ function ProposalsClientLoaded({ initialProposals, organizationId }: ProposalsCl
           const handlers: Record<string, () => void> = {
             new_proposal: () => setQuickActionForm({ form: proposalCreateForm, action: "createProposal" }),
             use_template: () => setActiveTab("templates"),
-            // Label is "Import RFP (coming soon)" — still opens create form as a create-only shortcut
-            import_rfp: () => setQuickActionForm({ form: proposalCreateForm, action: "createProposal" }),
             review_pending: () => {
               const pending = proposals.find((p) => normalizeProposalStatus(p.status) === "Review")
               if (pending) router.push(`/proposals/${pending.id}`)
@@ -374,12 +397,32 @@ function ProposalsClientLoaded({ initialProposals, organizationId }: ProposalsCl
               formatProposalDisplayName: proposalPrimaryLabel,
               actions: proposalRowActions,
             }),
+            recordSheet: {
+              titleKey: "title",
+              statusKey: "status",
+              auditTableName: "proposal",
+              detailConfig: { mode: "detail", sections: [{ id: "proposal", fields: [
+                { key: "title", label: t("proposals.proposals.columns.title") },
+                { key: "clientName", label: t("proposals.proposals.columns.clientName") },
+              ] }] },
+              customTabs: [{
+                id: "handoffs",
+                label: "Sale order",
+                content: (record) => saleOrdersLoading ? <p>Loading linked records…</p> : (
+                  <CrossRecordLinks testIdPrefix="proposal-handoff"
+                    result={saleOrdersError
+                      ? { status: "unavailable", links: [], reason: "Linked sales records are unavailable" }
+                      : proposalOrderLinks(record, { organizationId: orgId, companyId: operatingCompanyId }, saleOrders)}
+                  />
+                ),
+              }],
+            },
           }
         }
         return tab
       }),
     }),
-    [liveSections, moduleConfig, proposalCreateForm, proposalRowActions, t],
+    [liveSections, moduleConfig, proposalCreateForm, proposalRowActions, t, orgId, operatingCompanyId, saleOrders, saleOrdersLoading, saleOrdersError],
   )
 
   const data = useMemo(

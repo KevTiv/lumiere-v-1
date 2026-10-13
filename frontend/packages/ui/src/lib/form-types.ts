@@ -68,6 +68,8 @@ export interface TextareaField extends BaseField {
 export interface SelectField extends BaseField {
   type: "select"
   defaultValue?: string
+  /** Type to narrow the options: for a list of linked records too long to scroll. */
+  searchable?: boolean
   options: ReadonlyArray<{
     value: string
     label: string

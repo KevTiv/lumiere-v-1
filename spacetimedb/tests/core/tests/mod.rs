@@ -36,7 +36,9 @@ pub fn run_core_operational_messaging_test(ctx: &ReducerContext) -> Result<(), S
 
 fn run_core_chatter_post_message_test(ctx: &ReducerContext) -> Result<(), String> {
     chatter_post_message_test::test_post_message_idempotency(ctx)
-        .map_err(|e| format!("post_message_idempotency: {e}"))
+        .map_err(|e| format!("post_message_idempotency: {e}"))?;
+    chatter_post_message_test::test_notification_read_state(ctx)
+        .map_err(|e| format!("notification_read_state: {e}"))
 }
 
 #[spacetimedb::reducer]

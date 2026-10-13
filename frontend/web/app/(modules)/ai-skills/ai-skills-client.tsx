@@ -1,7 +1,9 @@
 "use client"
 
+import { recordOptions, withLinkedPickers } from "@/lib/linked-options"
 import { useMemo, useState } from "react"
 import { useTranslation } from "@lumiere/i18n"
+import { useConfirmDialog } from "@lumiere/ui/hooks/use-confirm-dialog"
 import { toCreateAiSkillParams } from "@lumiere/erp-shared/ai-create-params"
 import { DashboardHeader, FormModal, MissingOrganization, type FormConfig } from "@lumiere/ui"
 import {
@@ -195,6 +197,7 @@ export function AiSkillsClient({ organizationId }: { organizationId?: number }) 
 
 function AiSkillsLoaded({ organizationId }: { organizationId: number }) {
   const { t } = useTranslation()
+  const { confirm: confirmDialog, dialog: confirmDialogNode } = useConfirmDialog()
   const { orgId } = orgBigInts(organizationId)
   const operatingCompanyId = useDefaultOperatingCompanyId(organizationId)
   const { data: skills = [], isLoading, error } = useAiSkills()
@@ -235,6 +238,15 @@ function AiSkillsLoaded({ organizationId }: { organizationId: number }) {
     }
     return map
   }, [teamMembers])
+
+  const assignSkillPickerForm = useMemo(
+    () =>
+      withLinkedPickers(assignSkillForm, {
+        teamMemberId: recordOptions(teamMembers as unknown as Record<string, unknown>[], (row) => row.name),
+        skillId: recordOptions(skills as unknown as Record<string, unknown>[], (row) => row.name),
+      }),
+    [teamMembers, skills],
+  )
 
   const skillNameById = useMemo(() => {
     const map = new Map<number, string>()
@@ -319,7 +331,7 @@ function AiSkillsLoaded({ organizationId }: { organizationId: number }) {
           },
           {
             label: syncSkills.isPending ? "Syncing…" : "Sync bundled skills → STDB",
-            onClick: () => void handleSync(),
+            onClick: () => handleSync(),
             variant: "outline",
           },
         ]}
@@ -440,9 +452,9 @@ function AiSkillsLoaded({ organizationId }: { organizationId: number }) {
                     type="button"
                     className="text-xs text-destructive hover:underline"
                     disabled={unassignSkill.isPending}
-                    onClick={() => {
-                      if (!window.confirm("Remove this skill assignment?")) return
-                      void unassignSkill.mutateAsync(assignmentId)
+                    onClick={async () => {
+                      if (!(await confirmDialog({ description: "Remove this skill assignment?" }))) return
+                      unassignSkill.mutateAsync(assignmentId).catch((e) => setSubmitError(String(e)))
                     }}
                   >
                     Unassign
@@ -488,7 +500,7 @@ function AiSkillsLoaded({ organizationId }: { organizationId: number }) {
           onOpenChange={(open) => {
             if (!open) closeModal()
           }}
-          config={assignSkillForm}
+          config={assignSkillPickerForm}
           isPending={isPending}
           closeOnSubmit={false}
           submitError={submitError}
@@ -543,6 +555,7 @@ function AiSkillsLoaded({ organizationId }: { organizationId: number }) {
           </ul>
         )}
       </section>
+      {confirmDialogNode}
     </div>
   )
 }

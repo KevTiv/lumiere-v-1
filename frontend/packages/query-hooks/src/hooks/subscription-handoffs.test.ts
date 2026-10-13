@@ -9,12 +9,13 @@ const invoice = (id: bigint, extra = {}) => ({ id, ...scope, moveType: "OutInvoi
 const payment = (id: bigint, reconciledInvoiceIds: bigint[], extra = {}) => ({ id, ...scope, state: "Paid", reconciledInvoiceIds, ...extra })
 
 test("links exact billing-run invoices and reconciled payments, including partial/multi-invoice payments", () => {
-  const result = subscriptionHandoffs(subscription, scope, [run(12n), run(11n), run(11n), run(13n, { subscriptionId: 6n })],
+  const result = subscriptionHandoffs(subscription, scope, [run(12n), run(11n), run(13n, { subscriptionId: 6n })],
     [invoice(11n), invoice(12n), invoice(13n)],
     [payment(22n, [12n]), payment(21n, [11n, 13n]), payment(23n, [13n]), payment(24n, [])])
   assert.deepEqual(result.invoices.map((row) => row.id), [11n, 12n])
   assert.deepEqual(result.payments.map((row) => row.id), [21n, 22n])
   assert.equal(result.unavailable, false)
+  assert.equal(result.invariantFailure, false)
 })
 
 test("scope-checks the parent, billing runs, invoices and payments independently", () => {
@@ -36,18 +37,42 @@ test("does not infer invoices or payments from names, references, pending approv
   assert.deepEqual(result.payments, [])
 })
 
-test("reports missing/ambiguous invoice relations, suppresses ambiguous payments and excludes cancelled/refund moves", () => {
+test("reports missing invoice relations and excludes cancelled/refund moves", () => {
   assert.equal(subscriptionHandoffs(subscription, scope, [run(11n)], [], []).unavailable, true)
-  assert.equal(subscriptionHandoffs(subscription, scope, [run(11n)], [invoice(11n), invoice(11n)], []).unavailable, true)
   assert.equal(subscriptionHandoffs(subscription, scope, [run(11n, { invoiceMoveId: null })], [], []).unavailable, true)
   assert.equal(subscriptionHandoffs(subscription, scope, [run(11n)], [invoice(11n, { moveType: "OutRefund" })], []).unavailable, true)
   const result = subscriptionHandoffs(subscription, scope, [run(11n), run(12n)],
     [invoice(11n), invoice(12n, { state: "Cancelled" })],
-    [payment(21n, [11n]), payment(21n, [11n]), payment(22n, [12n])])
+    [payment(21n, [11n]), payment(22n, [12n])])
   assert.deepEqual(result.invoices.map((row) => row.id), [11n])
-  assert.deepEqual(result.payments, [])
-  assert.equal(result.unavailable, true)
-  assert.deepEqual(subscriptionHandoffs(subscription, scope, [], [], []), { invoices: [], payments: [], unavailable: false })
+  assert.deepEqual(result.payments.map((row) => row.id), [21n])
+  assert.equal(result.unavailable, false)
+  assert.deepEqual(subscriptionHandoffs(subscription, scope, [], [], []),
+    { invoices: [], payments: [], unavailable: false, invariantFailure: false })
+})
+
+test("duplicate canonical relation IDs are an invariant failure, never deduplicated or first/latest", () => {
+  const none = { invoices: [], payments: [], unavailable: false, invariantFailure: true }
+  // Same invoice on two billing runs, or two scoped rows for one invoice ID: withhold every link.
+  assert.deepEqual(subscriptionHandoffs(subscription, scope, [run(11n), run(11n, { id: 999n })],
+    [invoice(11n)], [payment(21n, [11n])]), none)
+  assert.deepEqual(subscriptionHandoffs(subscription, scope, [run(11n)],
+    [invoice(11n), invoice(11n)], [payment(21n, [11n])]), none)
+  // Payment-side duplicates keep the independent exact invoices but withhold all payment links.
+  for (const duplicatedPayments of [
+    [payment(21n, [11n]), payment(21n, [11n])],
+    [payment(21n, [11n, 11n]), payment(22n, [11n])],
+  ]) {
+    const result = subscriptionHandoffs(subscription, scope, [run(11n)], [invoice(11n)], duplicatedPayments)
+    assert.deepEqual(result.invoices.map((row) => row.id), [11n])
+    assert.deepEqual(result.payments, [])
+    assert.equal(result.invariantFailure, true)
+  }
+  // Out-of-scope or unrelated duplicates do not trip the invariant.
+  const clean = subscriptionHandoffs(subscription, scope, [run(11n), run(11n, { companyId: 4n })], [invoice(11n)],
+    [payment(21n, [11n]), payment(21n, [11n], { companyId: 4n }), payment(30n, [99n, 99n])])
+  assert.equal(clean.invariantFailure, false)
+  assert.deepEqual(clean.payments.map((row) => row.id), [21n])
 })
 
 test("supports snake-case option IDs and preserves IDs above Number precision", () => {

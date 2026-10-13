@@ -40,7 +40,7 @@ function AiActionDraftsLoaded({ organizationId }: { organizationId: number }) {
 
   useEffect(() => {
     if (operatingCompanyId == null || operatingCompanyId <= 0) return
-    void expireDrafts.mutate()
+    expireDrafts.mutate()
   }, [operatingCompanyId, organizationId])
 
   useEffect(() => {
@@ -111,6 +111,14 @@ function AiActionDraftsLoaded({ organizationId }: { organizationId: number }) {
           {inboxQuery.error instanceof Error
             ? inboxQuery.error.message
             : "Unable to load approval inbox"}
+        </p>
+      ) : null}
+
+      {expireDrafts.isError ? (
+        <p className="text-sm text-destructive">
+          {expireDrafts.error instanceof Error
+            ? expireDrafts.error.message
+            : "Unable to expire stale drafts"}
         </p>
       ) : null}
 

@@ -1,5 +1,5 @@
 import { getStdbSession } from "@/lib/api-session"
-import { serverFetchQueryListAllowEmpty } from "@/lib/server-query"
+import { serverFetchQueryListState } from "@/lib/server-query"
 import { AiHarnessClient } from "./ai-harness-client"
 
 export default async function AiHarnessPage() {
@@ -8,12 +8,19 @@ export default async function AiHarnessPage() {
     return <AiHarnessClient organizationId={0n} companies={[]} />
   }
 
-  const companies = await serverFetchQueryListAllowEmpty(session, "companies")
+  const companies = await serverFetchQueryListState(session, "companies")
+  if (companies.status === "denied" || companies.status === "unavailable") {
+    return (
+      <main className="p-6" role="alert">
+        Company data {companies.status}: {companies.message}
+      </main>
+    )
+  }
 
   return (
     <AiHarnessClient
       organizationId={BigInt(session.organizationId)}
-      companies={companies}
+      companies={companies.rows}
     />
   )
 }

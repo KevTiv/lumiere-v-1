@@ -56,7 +56,7 @@ test.describe(
 
         // use_serial: free -> reserved -> in_use.
         const useSerialName = smokeName("cov06l-use-serial")
-        await createSerialViaUi(warehousePage, productId, useSerialName)
+        await createSerialViaUi(warehousePage, productName, useSerialName)
         const useSerialId = await fetchSerialIdByName(page, useSerialName)
         await reserveSerialViaUi(warehousePage, useSerialId)
         await expect
@@ -93,7 +93,7 @@ test.describe(
 
         // block_serial: free -> blocked directly, no reserve/use required.
         const blockSerialName = smokeName("cov06l-block-serial")
-        await createSerialViaUi(warehousePage, productId, blockSerialName)
+        await createSerialViaUi(warehousePage, productName, blockSerialName)
         const blockSerialId = await fetchSerialIdByName(page, blockSerialName)
         expect(await fetchSerialById(page, blockSerialId)).toMatchObject({
           state: "free",

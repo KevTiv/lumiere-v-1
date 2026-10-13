@@ -40,6 +40,7 @@ import { getRowField } from "../lib/entity-row-utils"
 import { useClearModuleUrlFilter, useModuleUrlFilters } from "../lib/module-url-filters"
 import { useTranslation } from "@lumiere/i18n"
 import type { RowValueMap } from "@lumiere/erp-shared/row-values"
+import { TablePager, usePagedRows } from "../components/table-pager"
 
 function formatTimestamp(ts?: { microsSinceUnixEpoch: bigint } | null): string {
   if (!ts) return "—"
@@ -149,6 +150,7 @@ export function GeneralLedgerView({
   const totalCredits = newLines.reduce((s, l) => s + l.credit, 0)
   const isBalanced = totalDebits === totalCredits && totalDebits > 0
 
+  const movesPager = usePagedRows(filtered)
   return (
     <div className="space-y-6" data-testid="entity-table">
       {/* Stats */}
@@ -245,7 +247,7 @@ export function GeneralLedgerView({
             <TableBody>
               {filtered.length === 0 ? (
                 <TableRow><TableCell colSpan={7} className="text-center py-8 text-muted-foreground">{t("accounting.journalEntries.noResults")}</TableCell></TableRow>
-              ) : filtered.map((move) => {
+              ) : movesPager.pageRows.map((move) => {
                 const isPosted = String(move.state) === "Posted"
                 return (
                   <TableRow key={String(move.id)} data-testid={`entity-row-${move.id}`} className="cursor-pointer hover:bg-muted/50" onClick={() => setSelectedMove(move)}>
@@ -273,6 +275,7 @@ export function GeneralLedgerView({
               })}
             </TableBody>
           </Table>
+          <TablePager {...movesPager} />
         </CardContent>
       </Card>
 

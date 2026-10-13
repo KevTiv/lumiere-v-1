@@ -2,6 +2,7 @@
 
 
 import { stdbBffCommandPost } from "@lumiere/stdb/commands"
+import { decodeOperationDispatch } from "@lumiere/api-client"
 import type {
   AccountAccountTypeQueryRow,
   AccountAccountQueryRow,
@@ -11,14 +12,17 @@ import type {
   AccountTaxQueryRow,
 } from "@lumiere/stdb/resource-reads"
 import { createStdbSdk } from "@lumiere/stdb/sdk"
-import { apiFetch } from "../../http"
+import { apiFetch, fetchQueryList } from "../../http"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import {
   paymentParamsToJson,
   type ClearablePatch,
 } from "@lumiere/erp-shared/accounting-create-params"
 import { stdbParamsToJson, encodeOptionalU64 } from "@lumiere/erp-shared/stdb-params-json"
-import { scalarToU64 as toScalarU64 } from "@lumiere/erp-shared/u64"
+import {
+  parseStrictU64,
+  scalarToU64 as toScalarU64,
+} from "@lumiere/erp-shared/u64"
 import type {
   AccountFiscalYear,
   AccountPeriod,
@@ -65,6 +69,41 @@ import { stdbInvalidationFor } from "@lumiere/contracts/stdb-reducer-invalidatio
 import { POST_INVOICE_AFFECTS, workflowErrorFromResponse } from "@lumiere/erp-workflows"
 
 import { responseErrorMessage as parseCallError } from "@lumiere/api-client/response-error"
+import {
+  executeOperationWithCanonicalReadback,
+  requireResolvedOperationEffect,
+  resolveUniqueRow,
+  type CanonicalRecordRef,
+  type ResolvedOperationEffectOutcome,
+} from "../operation-effect"
+
+export interface PostedAccountMoveEffectRef extends CanonicalRecordRef {
+  readonly resource: "account-moves"
+  readonly state: "Posted"
+}
+
+function accountMoveStateTag(value: unknown): string {
+  if (typeof value === "string") return value.toLowerCase()
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    if ("tag" in value) {
+      return String((value as { tag?: unknown }).tag ?? "").toLowerCase()
+    }
+    const keys = Object.keys(value)
+    if (keys.length === 1) return (keys[0] ?? "").toLowerCase()
+  }
+  return ""
+}
+
+/** Resolve the exact posted state of one account move; duplicate IDs fail closed. */
+export function resolvePostedAccountMoveEffect(
+  rows: readonly AccountMoveQueryRow[],
+  moveId: bigint,
+): PostedAccountMoveEffectRef | null {
+  const row = resolveUniqueRow(rows, (candidate) => parseStrictU64(candidate.id) === moveId)
+  if (row == null || accountMoveStateTag(row.state) !== "posted") return null
+  return { resource: "account-moves", id: moveId.toString(), state: "Posted" }
+}
+
 export function useAccountMoves(
   organizationId: bigint,
   options?: { staleTime?: number; enabled?: boolean },
@@ -108,14 +147,50 @@ export function useCreateAccountMove(organizationId: number) {
 
 export function usePostAccountMove(organizationId: number) {
   const qc = useQueryClient()
-  return useMutation({
+  return useMutation<
+    ResolvedOperationEffectOutcome<PostedAccountMoveEffectRef>,
+    Error,
+    bigint | number | string
+  >({
     mutationFn: async (moveId: bigint | number | string) => {
-      const { urlPath, init } = stdbBffCommandPost("post_account_move", { moveId: toScalarU64(moveId) })
-      const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error(await parseCallError(r))
+      const canonicalMoveId = toScalarU64(moveId)
+      const outcome = await executeOperationWithCanonicalReadback({
+        resolveEffect: async () =>
+          resolvePostedAccountMoveEffect(
+            await fetchQueryList(
+              "/api/query/account-moves",
+              "Failed to read posted account move",
+            ),
+            canonicalMoveId,
+          ),
+        dispatch: async () => {
+          const { urlPath, init } = stdbBffCommandPost("post_account_move", {
+            moveId: canonicalMoveId,
+          })
+          return decodeOperationDispatch(
+            await apiFetch(urlPath, init),
+            "Failed to post account move",
+          )
+        },
+        afterDispatch: () =>
+          invalidateStdbQueryResources(
+            qc,
+            organizationId,
+            stdbInvalidationFor("post_account_move"),
+          ),
+        readbackAttempts: 6,
+        readbackDelayMs: 150,
+      })
+      const resolved = requireResolvedOperationEffect(outcome)
+      if (resolved.kind === "already-applied") {
+        invalidateStdbQueryResources(
+          qc,
+          organizationId,
+          stdbInvalidationFor("post_account_move"),
+        )
+      }
+      return resolved
     },
-    onSuccess: () =>
-      invalidateStdbQueryResources(qc, organizationId, stdbInvalidationFor("post_account_move")),
   })
 }
 

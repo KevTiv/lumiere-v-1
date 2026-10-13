@@ -1,6 +1,6 @@
 import { Suspense } from "react"
 import { getStdbSession } from "@/lib/api-session"
-import { serverFetchQueryListsAllowEmpty } from "@/lib/server-query"
+import { serverFetchQueryListState, serverFetchQueryListsRequired } from "@/lib/server-query"
 import { ManufacturingClient } from "./manufacturing-client"
 
 const SSR_RESOURCES = [
@@ -10,7 +10,6 @@ const SSR_RESOURCES = [
   "mrp-workorders",
   "mrp-workcenters",
   "mrp-routing-workcenters",
-  "iot-devices",
   "products",
   "warehouses",
   "stock-pickings",
@@ -23,6 +22,10 @@ export default async function ManufacturingPage() {
     return <ManufacturingClient />
   }
 
+  const [records, iotDevicesState] = await Promise.all([
+    serverFetchQueryListsRequired(session, SSR_RESOURCES),
+    serverFetchQueryListState(session, "iot-devices"),
+  ])
   const [
     productions,
     boms,
@@ -30,12 +33,11 @@ export default async function ManufacturingPage() {
     workorders,
     workcenters,
     routingOperations,
-    iotDevices,
     products,
     warehouses,
     stockPickings,
     stockQuants,
-  ] = await serverFetchQueryListsAllowEmpty(session, SSR_RESOURCES)
+  ] = records
 
   return (
     <Suspense>
@@ -46,7 +48,7 @@ export default async function ManufacturingPage() {
         initialWorkorders={workorders}
         initialWorkcenters={workcenters}
         initialRoutingOperations={routingOperations}
-        initialIotDevices={iotDevices}
+        initialIotDevicesState={iotDevicesState}
         initialProducts={products}
         initialWarehouses={warehouses}
         initialStockPickings={stockPickings}

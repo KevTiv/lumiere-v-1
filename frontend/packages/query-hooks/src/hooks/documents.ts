@@ -29,6 +29,7 @@ import type {
 import { responseErrorMessage as parseCallErrorDocuments } from "@lumiere/api-client/response-error"
 
 import { resolveDocumentVersionEffect } from "./document-version-effect"
+import { resolveDocumentCreateEffect } from "./document-create-effect"
 import { resolveDocumentLockEffect, type DocumentLockProjection } from "./document-lock-effect"
 import type { CanonicalRecordRef } from "./operation-effect"
 
@@ -138,6 +139,33 @@ export function useCreateDocument(organizationId: bigint, companyId: bigint) {
       const { urlPath, init } = stdbBffCommandPost("create_document", { companyId: companyId, params: stdbParamsToJson(params as object, "CreateDocumentParams") })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create document')
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['documents', rqBigIntKey(organizationId)] }),
+  })
+}
+
+/**
+ * `create_document` returns nothing, so this reads `documents` before and after and resolves the
+ * created row (new id, same blob url + checksum, same host record). Resolves its `{resource,id}`.
+ */
+export function useCreateDocumentWithRef(organizationId: bigint, companyId: bigint) {
+  const qc = useQueryClient()
+  return useMutation<CanonicalRecordRef, Error, CreateDocumentParams>({
+    mutationFn: async (params) => {
+      const before = await fetchQueryList("/api/query/documents", "Failed to read documents")
+      const { urlPath, init } = stdbBffCommandPost("create_document", { companyId: companyId, params: stdbParamsToJson(params as object, "CreateDocumentParams") })
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error(await parseCallErrorDocuments(r))
+      const after = await fetchQueryList("/api/query/documents", "Failed to read documents")
+      const p = params as { url?: unknown; checksum?: unknown; resModel?: unknown; resId?: unknown }
+      const effect = resolveDocumentCreateEffect(before, after, organizationId, {
+        url: typeof p.url === "string" ? p.url : "",
+        checksum: typeof p.checksum === "string" ? p.checksum : "",
+        resModel: typeof p.resModel === "string" ? p.resModel : undefined,
+        resId: p.resId == null ? undefined : toScalarU64(p.resId as ScalarId),
+      })
+      if (!effect) throw new Error("Document did not read back")
+      return effect
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['documents', rqBigIntKey(organizationId)] }),
   })

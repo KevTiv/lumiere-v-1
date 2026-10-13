@@ -41,7 +41,21 @@ delivery and customer invoice with its state and open balance, linking to the ca
 `orderHandoffs` builder and `OrderHandoffLinks` component as the COV-24 workspace, so there is one definition of
 "this order's downstream records". No contract delta (the relation fields are already projected).
 
-**Next links (one per PR, not done):** proposal → sale order, ticket → record.
+**Remaining-link implementation review:** purchase order → receipt/vendor bill, subscription billing run → invoice,
+and proposal → sale order now have read-only record-sheet navigation and focused COV-25 browser specs. Runtime acceptance is still
+pending. Subscription → reconciled payment is also linked: the `account-payments` HTTP projection now includes
+`reconciled_invoice_ids` / `reconciled_bill_ids` (link 3 below). Ticket → related business record is blocked:
+the canonical ticket has no related-record model/ID relation.
+
+See [`cov25-remaining-link-review.md`](../evidence/cov25-remaining-link-review.md) for the exact relation inventory,
+query-field availability, scope/cardinality rules, operator clicks, and unproven limits. Subscription navigation is explicitly bounded
+to billing-run invoices; it does not silently infer historical invoices or pending/unreconciled payments.
+
+After merging `main`, the subscription list record sheet keeps #150's stricter `subscriptionHandoffs` builder and
+`SubscriptionHandoffLinks` component (link 3 below: cancelled invoices excluded, `OutInvoice` only, payments only when
+Paid with an exact `reconciled_invoice_ids` intersection). Main's stricter duplicate rule is ported into it: a duplicated
+canonical relation is an invariant failure (`invariantFailure`), never deduplicated. Main's `subscriptionRecordLinks`
+remains only because the `/subscriptions/[id]` detail page still imports it.
 
 ## Prerequisites / decisions
 

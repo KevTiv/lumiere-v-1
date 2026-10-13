@@ -1,14 +1,15 @@
 //! HR Wave A — isolation, leave balance, payslip artifact, offboarding gate.
 use std::time::Duration;
 
-use spacetimedb::{ReducerContext, Table};
+use spacetimedb::{Identity, ReducerContext, Table};
 
+use crate::core::audit::audit_log;
 use crate::core::organization::{company, create_company, CreateCompanyParams};
 use crate::core::persistence::{organization_commit, organization_row_change};
 use crate::hr::contracts::{create_contract, hr_contract, CreateContractParams};
 use crate::hr::employees::{
     archive_employee, create_employee, hr_employee, update_employee, CreateEmployeeParams,
-    UpdateEmployeeParams,
+    HrEmployee, UpdateEmployeeParams,
 };
 use crate::hr::leaves::{
     approve_leave, create_leave_request, create_leave_type, hr_leave, hr_leave_allocation,
@@ -889,6 +890,40 @@ fn expect_rejected_unchanged(
     op: impl FnOnce() -> Result<(), String>,
 ) -> Result<(), String> {
     let before = leave_row(ctx, leave_id)?;
+    let effects = || {
+        let mut allocations: Vec<_> = ctx
+            .db
+            .hr_leave_allocation()
+            .iter()
+            .filter(|row| {
+                row.employee_id == before.employee_id && row.leave_type_id == before.leave_type_id
+            })
+            .map(|row| (row.id, row.allocated_days, row.used_days))
+            .collect();
+        allocations.sort_by_key(|row| row.0);
+        let mut audits: Vec<_> = ctx
+            .db
+            .audit_log()
+            .iter()
+            .filter(|row| {
+                row.organization_id == before.organization_id
+                    && row.table_name == "hr_leave"
+                    && row.record_id == leave_id
+            })
+            .map(|row| row.id)
+            .collect();
+        audits.sort_unstable();
+        let mut commits: Vec<_> = ctx
+            .db
+            .organization_commit()
+            .iter()
+            .filter(|row| row.organization_id == before.organization_id)
+            .map(|row| row.id)
+            .collect();
+        commits.sort();
+        (allocations, audits, commits)
+    };
+    let before_effects = effects();
     match op() {
         Ok(()) => return Err(format!("{label}: must be rejected")),
         Err(message) if message.contains(expected) => {}
@@ -896,6 +931,11 @@ fn expect_rejected_unchanged(
     }
     if leave_row(ctx, leave_id)? != before {
         return Err(format!("{label}: rejected call mutated the leave"));
+    }
+    if effects() != before_effects {
+        return Err(format!(
+            "{label}: rejected call changed balance, audit or durable effects"
+        ));
     }
     Ok(())
 }
@@ -910,6 +950,20 @@ pub fn test_leave_approval_rejects_replay_and_self_approval(
     let fixture = OrgFixture::seed_minimal(ctx)?;
     let (org, company) = (fixture.organization_id, fixture.company_id);
     let employee_id = seed_employee(ctx, &fixture, "Cov09 Emp")?;
+    // A linked, distinct requester makes the successful SoD case explicit.
+    if ctx.sender() == Identity::__dummy() {
+        return Err("COV-09 requires a non-dummy test caller".into());
+    }
+    let employee = ctx
+        .db
+        .hr_employee()
+        .id()
+        .find(employee_id)
+        .ok_or("employee missing")?;
+    ctx.db.hr_employee().id().update(HrEmployee {
+        user_id: Some(Identity::__dummy()),
+        ..employee
+    });
     let leave_type_id = seed_leave_type(ctx, &fixture, "Cov09 Type", 30.0)?;
 
     // Submit → approve, with replays of both.

@@ -12,7 +12,7 @@ import {
   useRejectApprovalRequest,
 } from '@lumiere/query-hooks/hooks/approvals'
 import { useOperatingCompanyId } from '@lumiere/query-hooks/hooks/use-operating-company'
-import { Button } from '@lumiere/ui'
+import { Button, formText, useFormDialog } from '@lumiere/ui'
 
 function rowId(row: Record<string, unknown>): string {
   return String(row.id ?? '')
@@ -91,6 +91,7 @@ export function PurchasingOpsSod({
   onRecordIntegrationResult,
   children,
 }: PurchasingOpsSodProps) {
+  const { askForm, formDialog } = useFormDialog()
   const { t } = useTranslation()
   const { organizationId, identity } = useErpSession()
   const orgId =
@@ -178,6 +179,7 @@ export function PurchasingOpsSod({
 
   return (
     <div className="mb-4 space-y-4" data-testid="purchasing-ops-sod">
+      {formDialog}
       {queueRows.length > 0 ? (
         <div className="space-y-3 rounded-md border p-3">
           <div>
@@ -293,19 +295,28 @@ export function PurchasingOpsSod({
                         )
                         return
                       }
-                      const reason =
-                        typeof window !== 'undefined'
-                          ? window.prompt(
-                              t('purchasing.ops.rejectReasonPrompt', {
-                                defaultValue: 'Rejection reason',
-                              }),
-                              'Rejected',
-                            )
-                          : 'Rejected'
-                      if (reason == null || !reason.trim()) return
+                      const values = await askForm({
+                        title: t('purchasing.ops.reject', { defaultValue: 'Reject' }),
+                        submitLabel: t('purchasing.ops.reject', { defaultValue: 'Reject' }),
+                        fields: [
+                          {
+                            id: 'reason',
+                            name: 'reason',
+                            label: t('purchasing.ops.rejectReasonPrompt', {
+                              defaultValue: 'Rejection reason',
+                            }),
+                            type: 'textarea',
+                            rows: 3,
+                            required: true,
+                            defaultValue: 'Rejected',
+                          },
+                        ],
+                      })
+                      const reason = formText(values?.reason)
+                      if (reason == null) return
                       await rejectRequest.mutateAsync({
                         requestId: Number(pendingApprovalForSelected.id),
-                        reason: reason.trim(),
+                        reason,
                       })
                     } catch (e) {
                       setActionError(

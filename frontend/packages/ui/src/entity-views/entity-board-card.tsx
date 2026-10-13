@@ -19,7 +19,7 @@ export function EntityBoardCard({ row, card }: EntityBoardCardProps) {
     return <>{card.render(row)}</>
   }
 
-  const title = String(getRowField(row, card.titleKey) ?? "—")
+  const title = card.title?.(row).trim() || String(getRowField(row, card.titleKey) ?? "—")
 
   return (
     <>

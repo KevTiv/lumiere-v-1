@@ -1,5 +1,5 @@
 import { getStdbSession } from "@/lib/api-session"
-import { serverFetchQueryListsAllowEmpty } from "@/lib/server-query"
+import { serverFetchQueryListState, serverFetchQueryListsRequired } from "@/lib/server-query"
 import { ProjectsClient } from "./projects-client"
 
 const SSR_RESOURCES = [
@@ -7,7 +7,6 @@ const SSR_RESOURCES = [
   "tasks",
   "timesheets",
   "pricelists",
-  "contacts",
 ] as const
 
 export default async function ProjectsPage() {
@@ -16,8 +15,11 @@ export default async function ProjectsPage() {
     return <ProjectsClient />
   }
 
-  const [projects, tasks, timesheets, pricelists, contacts] =
-    await serverFetchQueryListsAllowEmpty(session, SSR_RESOURCES)
+  const [records, contactsState] = await Promise.all([
+    serverFetchQueryListsRequired(session, SSR_RESOURCES),
+    serverFetchQueryListState(session, "contacts"),
+  ])
+  const [projects, tasks, timesheets, pricelists] = records
 
   return (
     <ProjectsClient
@@ -25,7 +27,7 @@ export default async function ProjectsPage() {
       initialTasks={tasks}
       initialTimesheets={timesheets}
       initialPricelists={pricelists}
-      initialContacts={contacts}
+      initialContactsState={contactsState}
       organizationId={session.organizationId}
     />
   )

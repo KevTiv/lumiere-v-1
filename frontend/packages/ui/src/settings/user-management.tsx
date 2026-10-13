@@ -59,6 +59,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import type { Role } from "@/lib/rbac-types"
 import { useTranslation } from "@lumiere/i18n"
+import { useConfirmDialog } from "@lumiere/ui/hooks/use-confirm-dialog"
 import { rolePillClassForColor, userStatusPillClass } from "@/lib/theme-colors"
 import { FormModal } from "../forms/form-modal"
 import {
@@ -75,6 +76,7 @@ function identityHexForAssign(value: string): string {
 
 export function UserManagement() {
   const { t } = useTranslation()
+  const { confirm: confirmDialog, dialog: confirmDialogNode } = useConfirmDialog()
   const { organizationId } = useErpSession()
   const orgReady = hasValidOrganizationId(organizationId)
   const orgBigInt = orgReady ? BigInt(organizationId) : 0n
@@ -203,7 +205,7 @@ export function UserManagement() {
   }
 
   const handleDeleteUser = async (user: SettingsUserRecord) => {
-    if (!confirm(t("settings.users.deleteConfirm"))) return
+    if (!(await confirmDialog({ description: t("settings.users.deleteConfirm") }))) return
     try {
       await removeUser.mutateAsync(identityHexForAssign(user.id))
       await refetch()
@@ -579,6 +581,7 @@ export function UserManagement() {
           }}
         />
       ) : null}
+      {confirmDialogNode}
     </div>
   )
 }

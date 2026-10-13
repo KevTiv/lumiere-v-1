@@ -203,6 +203,21 @@ pub struct CreateMrpProductionParams {
     pub metadata: Option<String>,
 }
 
+/// Update params for manufacturing orders (Draft only).
+///
+/// `None` preserves the stored value. Double-option fields use
+/// `Some(None)` to clear and `Some(Some(v))` to set. State, company, product,
+/// locations and server-managed projection fields are not editable here.
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct UpdateManufacturingOrderParams {
+    pub product_qty: Option<f64>,
+    pub date_planned_start: Option<Timestamp>,
+    pub date_planned_finished: Option<Timestamp>,
+    pub date_deadline: Option<Option<Timestamp>>,
+    pub origin: Option<Option<String>>,
+    pub metadata: Option<Option<String>>,
+}
+
 /// Intent-shaped create params for work orders.
 ///
 /// Server-managed state fields are excluded — the server always derives:
@@ -628,6 +643,101 @@ pub fn create_manufacturing_order(
     );
 
     log::info!("Manufacturing order created: id={}", mo.id);
+    Ok(())
+}
+
+/// Update a Draft manufacturing order (quantity, planned dates, deadline, origin, metadata).
+#[reducer]
+pub fn update_manufacturing_order(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    mo_id: u64,
+    params: UpdateManufacturingOrderParams,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "mrp_production", "write")?;
+
+    let mo = require_mo_in_company(ctx, organization_id, company_id, mo_id)?;
+
+    if mo.state != MoState::Draft {
+        return Err("Manufacturing order must be in Draft state to update".to_string());
+    }
+
+    if let Some(qty) = params.product_qty {
+        validate_positive_qty(qty, "product_qty")?;
+    }
+
+    let date_planned_start = params.date_planned_start.unwrap_or(mo.date_planned_start);
+    let date_planned_finished = params
+        .date_planned_finished
+        .unwrap_or(mo.date_planned_finished);
+    if date_planned_finished < date_planned_start {
+        return Err("date_planned_finished must not be before date_planned_start".to_string());
+    }
+
+    let product_qty = params.product_qty.unwrap_or(mo.product_qty);
+    let date_deadline = match params.date_deadline {
+        None => mo.date_deadline,
+        Some(v) => v,
+    };
+    let origin = match params.origin {
+        None => mo.origin.clone(),
+        Some(v) => v,
+    };
+    let metadata = match params.metadata {
+        None => mo.metadata.clone(),
+        Some(v) => v,
+    };
+
+    let old_values = serde_json::json!({
+        "product_qty": mo.product_qty,
+        "origin": mo.origin,
+        "metadata": mo.metadata,
+    })
+    .to_string();
+    let new_values = serde_json::json!({
+        "product_qty": product_qty,
+        "origin": origin,
+        "metadata": metadata,
+    })
+    .to_string();
+
+    ctx.db.mrp_production().id().update(MrpProduction {
+        product_qty,
+        product_uom_qty: product_qty,
+        date_planned_start,
+        date_planned_finished,
+        date_deadline,
+        origin,
+        metadata,
+        write_uid: ctx.sender(),
+        write_date: ctx.timestamp,
+        ..mo
+    });
+
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "mrp_production",
+            record_id: mo_id,
+            action: "UPDATE",
+            old_values: Some(old_values),
+            new_values: Some(new_values),
+            changed_fields: vec![
+                "product_qty".to_string(),
+                "date_planned_start".to_string(),
+                "date_planned_finished".to_string(),
+                "date_deadline".to_string(),
+                "origin".to_string(),
+                "metadata".to_string(),
+            ],
+            metadata: None,
+        },
+    );
+
+    log::info!("Manufacturing order updated: id={}", mo_id);
     Ok(())
 }
 

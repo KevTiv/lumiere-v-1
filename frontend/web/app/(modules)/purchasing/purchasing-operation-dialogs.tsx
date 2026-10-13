@@ -50,6 +50,11 @@ export interface AddPurchaseRfqBidFormPayload {
   notes: string | null
 }
 
+export interface AwardPurchaseRfqBidFormPayload {
+  rfqId: string
+  bidId: string
+}
+
 export interface CreatePurchaseReturnFormPayload {
   purchaseOrderId: bigint
   partnerId: bigint
@@ -77,12 +82,18 @@ export interface CreateVendorCreditFormPayload {
 export type PurchasingOperationDialogRequest =
   | { kind: "create-rfq"; requisitionId?: string }
   | { kind: "add-rfq-bid"; rfqId?: string }
+  | { kind: "award-rfq-bid"; rfqId?: string; bidId?: string }
   | { kind: "create-purchase-return"; purchaseOrderId?: string; partnerId?: string }
   | { kind: "create-vendor-credit"; purchaseReturnId?: string }
+
+export interface PurchasingRfqBidDialogOption extends PurchasingDialogOption {
+  rfqId: string
+}
 
 export interface PurchasingOperationDialogOptions {
   requisitions: PurchasingDialogOption[]
   rfqs: PurchasingDialogOption[]
+  rfqBids: PurchasingRfqBidDialogOption[]
   vendors: PurchasingDialogOption[]
   products: PurchasingDialogOption[]
   uoms: PurchasingDialogOption[]
@@ -101,6 +112,7 @@ export interface PurchasingOperationDialogsProps {
   onDismiss: () => void
   onCreateRfq: (payload: CreatePurchaseRfqFormPayload) => Promise<unknown>
   onAddRfqBid: (payload: AddPurchaseRfqBidFormPayload) => Promise<unknown>
+  onAwardRfqBid: (payload: AwardPurchaseRfqBidFormPayload) => Promise<unknown>
   onCreatePurchaseReturn: (payload: CreatePurchaseReturnFormPayload) => Promise<unknown>
   onCreateVendorCredit: (payload: CreateVendorCreditFormPayload) => Promise<unknown>
 }
@@ -368,6 +380,65 @@ function AddRfqBidDialog({ request, currencyId, options, t, onDismiss, onSubmit 
   )
 }
 
+interface AwardRfqBidDialogProps {
+  request: Extract<PurchasingOperationDialogRequest, { kind: "award-rfq-bid" }>
+  options: PurchasingOperationDialogOptions
+  t: TFunction
+  onDismiss: () => void
+  onSubmit: (payload: AwardPurchaseRfqBidFormPayload) => Promise<unknown>
+}
+
+function AwardRfqBidDialog({ request, options, t, onDismiss, onSubmit }: AwardRfqBidDialogProps) {
+  const [rfqId, setRfqId] = useState(request.rfqId ?? "")
+  const [bidId, setBidId] = useState(request.bidId ?? "")
+  const submission = useAsyncSubmit(onDismiss)
+  const bidOptions = options.rfqBids.filter((option) => option.rfqId === rfqId)
+
+  const submit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    void submission.run(() =>
+      onSubmit({
+        rfqId: requiredIdString(rfqId, "RFQ"),
+        bidId: requiredIdString(bidId, "RFQ bid"),
+      }),
+    )
+  }
+
+  return (
+    <OperationDialog
+      title={t("purchasing.forms.rfqAward.title", { defaultValue: "Award RFQ bid" })}
+      description={t("purchasing.forms.rfqAward.description", {
+        defaultValue: "Select an open RFQ and one of its submitted bids.",
+      })}
+      submitLabel={t("purchasing.ops.awardRfqBid", { defaultValue: "Award RFQ bid" })}
+      pending={submission.pending}
+      error={submission.error}
+      onDismiss={onDismiss}
+      onSubmit={submit}
+    >
+      <ChoiceField
+        id="award-rfq"
+        label="RFQ"
+        value={rfqId}
+        options={options.rfqs}
+        onValueChange={(value) => {
+          setRfqId(value)
+          setBidId("")
+        }}
+        placeholder="Select an RFQ"
+      />
+      <ChoiceField
+        id="award-rfq-bid"
+        label="Submitted bid"
+        value={bidId}
+        options={bidOptions}
+        onValueChange={setBidId}
+        placeholder={rfqId ? "Select a submitted bid" : "Select an RFQ first"}
+      />
+    </OperationDialog>
+  )
+}
+
 interface CreatePurchaseReturnDialogProps {
   request: Extract<PurchasingOperationDialogRequest, { kind: "create-purchase-return" }>
   options: PurchasingOperationDialogOptions
@@ -493,6 +564,7 @@ export function PurchasingOperationDialogs({
   onDismiss,
   onCreateRfq,
   onAddRfqBid,
+  onAwardRfqBid,
   onCreatePurchaseReturn,
   onCreateVendorCredit,
 }: PurchasingOperationDialogsProps) {
@@ -503,6 +575,8 @@ export function PurchasingOperationDialogs({
       return <CreateRfqDialog request={request} currencyId={defaultCurrencyId} options={options} t={t} onDismiss={onDismiss} onSubmit={onCreateRfq} />
     case "add-rfq-bid":
       return <AddRfqBidDialog request={request} currencyId={defaultCurrencyId} options={options} t={t} onDismiss={onDismiss} onSubmit={onAddRfqBid} />
+    case "award-rfq-bid":
+      return <AwardRfqBidDialog request={request} options={options} t={t} onDismiss={onDismiss} onSubmit={onAwardRfqBid} />
     case "create-purchase-return":
       return <CreatePurchaseReturnDialog request={request} options={options} t={t} onDismiss={onDismiss} onSubmit={onCreatePurchaseReturn} />
     case "create-vendor-credit":

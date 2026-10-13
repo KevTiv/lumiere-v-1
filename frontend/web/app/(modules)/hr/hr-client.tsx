@@ -1,5 +1,7 @@
 "use client"
+import { recordOptions, withLinkedPickers } from "@/lib/linked-options"
 import { mapDashboardWidgets, withDashboardSections } from "@lumiere/ui/lib/dashboard-sections"
+import { withInlineEdits } from "@lumiere/ui/lib/with-inline-edits"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { useTranslation } from "@lumiere/i18n"
@@ -38,7 +40,7 @@ import {
   previousPeriodMs,
   timeRangeToMs,
 } from "@lumiere/ui"
-import type { EntityRecordSheetConfig, EntityViewConfig, FormConfig, HrCsvImportKind, ModuleConfig } from "@lumiere/ui"
+import type { EntityAction, EntityRecordSheetConfig, EntityViewConfig, FormConfig, HrCsvImportKind, ModuleConfig } from "@lumiere/ui"
 import type { QueryRows } from "@lumiere/query-hooks/http"
 import { hrModuleConfig } from "@/lib/module-dashboard-configs"
 import { useHrModuleSubscription } from "@/lib/module-subscription-hooks"
@@ -167,6 +169,12 @@ function isPendingLeaveState(state: unknown): boolean {
 
 function payslipState(row: Record<string, unknown>): string {
   return String(row.state ?? row.State ?? "")
+}
+
+function hrRowState(row: Record<string, unknown>): string {
+  const value = row.state ?? row.State
+  if (value && typeof value === "object" && "tag" in value) return String((value as { tag: unknown }).tag)
+  return String(value ?? "")
 }
 
 function employeeRowId(row: Record<string, unknown>): number {
@@ -458,12 +466,7 @@ function HrClientLoaded({
 
   const addCsvToolbar = (
     ec: EntityViewConfig,
-    actions: Array<{
-      id: string
-      label: string
-      requiresSelection?: boolean
-      onClick: (selectedRows: Record<string, unknown>[]) => void
-    }>,
+    actions: EntityAction[],
   ): EntityViewConfig => {
     if (ec.view.mode !== "table") return ec
     // No HR tab opens an editor on row click, so let the table's default apply:
@@ -491,6 +494,7 @@ function HrClientLoaded({
       for (const row of rows) await fn(row)
     } catch (e) {
       setToolbarError(e instanceof Error ? e.message : String(e))
+      throw e
     }
   }
 
@@ -583,12 +587,18 @@ function HrClientLoaded({
     [t, departmentFieldOptions],
   )
 
+  // Employee, structure and contract are number fields in the config, so they become searchable pickers here.
   const payslipFormConfig = useMemo(
     () =>
-      mergeSelectOptionsForFields(newPayslipForm(t), {
-        structId: payrollStructureFieldOptions,
+      withLinkedPickers(newPayslipForm(t), {
+        employeeId: recordOptions(employees as Record<string, unknown>[], (row) => row.name ?? row.workEmail ?? row.workPhone),
+        structId: recordOptions(
+          (payrollStructures as Record<string, unknown>[]).filter((row) => row.isActive !== false && row.isActive !== 0),
+          (row) => row.name,
+        ),
+        contractId: recordOptions(contracts as Record<string, unknown>[], (row) => row.name),
       }),
-    [t, payrollStructureFieldOptions],
+    [t, employees, payrollStructures, contracts],
   )
 
   const salaryRuleFormConfig = useMemo(
@@ -678,6 +688,7 @@ function HrClientLoaded({
       statusBadgeLabels: status.badgeLabels,
       detailConfig: employeeDetailConfig(t),
       auditTableName: "hr_employee",
+      discussion: {},
       customTabs: [
         {
           id: "onboarding",
@@ -714,6 +725,7 @@ function HrClientLoaded({
       statusBadgeLabels: status.badgeLabels,
       detailConfig: leaveDetailConfig(t),
       auditTableName: "hr_leave",
+      discussion: {},
       customTabs: [
         {
           id: "approval",
@@ -733,6 +745,7 @@ function HrClientLoaded({
       statusBadgeLabels: status.badgeLabels,
       detailConfig: contractDetailConfig(t),
       auditTableName: "hr_contract",
+      discussion: {},
       customTabs: [
         {
           id: "compensation",
@@ -895,7 +908,13 @@ function HrClientLoaded({
               return { ...w, data: { ...(w.data as Record<string, unknown>), values } }
             }
             if (w.id === "hr-leave-usage") {
-              const byType = groupBy(leaves, (l) => `Type ${String(l.leaveTypeId ?? "0").slice(-4)}`)
+              const leaveTypeNames = new Map(
+                (leaveTypes as Record<string, unknown>[]).map((lt) => [String(lt.id), String(lt.name ?? "")]),
+              )
+              const byType = groupBy(
+                leaves,
+                (l) => leaveTypeNames.get(String(l.leaveTypeId ?? "")) || "Unspecified",
+              )
               const colors = ["#6366f1", "#f59e0b", "#22c55e", "#8b5cf6"]
               const totalDays = leaves.reduce((s, l) => s + Number(l.numberOfDays ?? 0), 0)
               const metrics = Object.entries(byType)
@@ -955,6 +974,7 @@ function HrClientLoaded({
               })
   }, [
     employees,
+    leaveTypes,
     departments,
     leaves,
     leavesToApprove,
@@ -981,10 +1001,6 @@ function HrClientLoaded({
       ({
         ...moduleConfig,
         tabs: [
-          orgChartTab,
-          performanceTab,
-          benefitsTab,
-          recruitmentTab,
           ...withDashboardSections(moduleConfig, liveSections).tabs.map((tab) => {
           if (tab.id === "recruitment") return null
           if (tab.id === "departments" && tab.entityConfig) {
@@ -1029,25 +1045,37 @@ function HrClientLoaded({
                   id: "submit-leave",
                   label: "Submit",
                   requiresSelection: true,
-                  onClick: (rows) => void runSelectedRows(rows, "leave", (row) => submitLeave.mutateAsync(row.id as string | number)),
+                  selection: "multiple",
+                  isApplicable: (rows) => rows.every((row) => ["Draft"].includes(hrRowState(row))),
+                  successMessage: t("common.actionCompleted", { action: "Submit" }),
+                  onClick: (rows) => runSelectedRows(rows, "leave", (row) => submitLeave.mutateAsync(row.id as string | number)),
                 },
                 {
                   id: "approve-leave",
                   label: "Approve",
                   requiresSelection: true,
-                  onClick: (rows) => void runSelectedRows(rows, "leave", (row) => approveLeave.mutateAsync(row.id as string | number)),
+                  selection: "multiple",
+                  isApplicable: (rows) => rows.every((row) => ["Confirm", "ValidatedOne"].includes(hrRowState(row))),
+                  successMessage: t("common.actionCompleted", { action: "Approve" }),
+                  onClick: (rows) => runSelectedRows(rows, "leave", (row) => approveLeave.mutateAsync(row.id as string | number)),
                 },
                 {
                   id: "refuse-leave",
                   label: "Refuse",
                   requiresSelection: true,
-                  onClick: (rows) => void runSelectedRows(rows, "leave", (row) => refuseLeave.mutateAsync(row.id as string | number)),
+                  selection: "multiple",
+                  isApplicable: (rows) => rows.every((row) => ["Confirm", "ValidatedOne"].includes(hrRowState(row))),
+                  successMessage: t("common.actionCompleted", { action: "Refuse" }),
+                  onClick: (rows) => runSelectedRows(rows, "leave", (row) => refuseLeave.mutateAsync(row.id as string | number)),
                 },
                 {
                   id: "reset-leave",
                   label: "Reset to draft",
                   requiresSelection: true,
-                  onClick: (rows) => void runSelectedRows(rows, "leave", (row) => resetLeave.mutateAsync(row.id as string | number)),
+                  selection: "multiple",
+                  isApplicable: (rows) => rows.every((row) => ["Refused", "Confirm", "ValidatedOne"].includes(hrRowState(row))),
+                  successMessage: t("common.actionCompleted", { action: "Reset to draft" }),
+                  onClick: (rows) => runSelectedRows(rows, "leave", (row) => resetLeave.mutateAsync(row.id as string | number)),
                 },
               ]),
                 openCreateLeaveRequest,
@@ -1085,19 +1113,28 @@ function HrClientLoaded({
                   id: "open-contract",
                   label: "Open",
                   requiresSelection: true,
-                  onClick: (rows) => void runSelectedRows(rows, "contract", (row) => openContract.mutateAsync(Number(row.id))),
+                  selection: "multiple",
+                  isApplicable: (rows) => rows.every((row) => ["New"].includes(hrRowState(row))),
+                  successMessage: t("common.actionCompleted", { action: "Open" }),
+                  onClick: (rows) => runSelectedRows(rows, "contract", (row) => openContract.mutateAsync(Number(row.id))),
                 },
                 {
                   id: "expire-contract",
                   label: "Expire",
                   requiresSelection: true,
-                  onClick: (rows) => void runSelectedRows(rows, "contract", (row) => expireContract.mutateAsync({ contractId: Number(row.id) })),
+                  selection: "multiple",
+                  isApplicable: (rows) => rows.every((row) => ["Open"].includes(hrRowState(row))),
+                  successMessage: t("common.actionCompleted", { action: "Expire" }),
+                  onClick: (rows) => runSelectedRows(rows, "contract", (row) => expireContract.mutateAsync({ contractId: Number(row.id) })),
                 },
                 {
                   id: "cancel-contract",
                   label: "Cancel",
                   requiresSelection: true,
-                  onClick: (rows) => void runSelectedRows(rows, "contract", (row) => cancelContract.mutateAsync(Number(row.id))),
+                  selection: "multiple",
+                  isApplicable: (rows) => rows.every((row) => ["New", "Open"].includes(hrRowState(row))),
+                  successMessage: t("common.actionCompleted", { action: "Cancel" }),
+                  onClick: (rows) => runSelectedRows(rows, "contract", (row) => cancelContract.mutateAsync(Number(row.id))),
                 },
               ]),
                 openCreateContract,
@@ -1128,6 +1165,8 @@ function HrClientLoaded({
                   id: "approve-payslip",
                   label: "Approve for export",
                   requiresSelection: true,
+                  selection: "multiple",
+                  isApplicable: (rows) => rows.some((row) => hrRowState(row) === "Draft"),
                   onClick: (rows) => {
                     setToolbarError(null)
                     const draftRows = rows.filter((row) => payslipState(row) === "Draft")
@@ -1143,69 +1182,75 @@ function HrClientLoaded({
                   id: "create-stp-intent",
                   label: "Create STP intent",
                   requiresSelection: true,
-                  onClick: (rows) => {
+                  selection: "multiple",
+                  isApplicable: (rows) => rows.some((row) => hrRowState(row) === "Verify"),
+                  successMessage: t("common.actionCompleted", { action: "Create STP intent" }),
+                  onClick: async (rows) => {
                     setToolbarError(null)
                     const verifyRows = rows.filter((row) => payslipState(row) === "Verify")
                     if (verifyRows.length === 0) {
                       setToolbarError("Select Verify (approved) payslips for STP integration.")
                       return
                     }
-                    void (async () => {
-                      try {
-                        for (const row of verifyRows) {
-                          const payslipId = Number(row.id)
-                          await createHrIntegrationIntent.mutateAsync({
-                            intentKind: "stp",
-                            idempotencyKey: `stp-${payslipId}-${Date.now()}`,
+                    try {
+                      for (const row of verifyRows) {
+                        const payslipId = Number(row.id)
+                        await createHrIntegrationIntent.mutateAsync({
+                          intentKind: "stp",
+                          idempotencyKey: `stp-${payslipId}-${Date.now()}`,
+                          payslipId,
+                          payload: JSON.stringify({
                             payslipId,
-                            payload: JSON.stringify({
-                              payslipId,
-                              exportStatus: "sent",
-                              submissionId: `stp-stub-${payslipId}`,
-                            }),
-                          })
-                        }
-                      } catch (e) {
-                        setToolbarError(e instanceof Error ? e.message : String(e))
+                            exportStatus: "sent",
+                            submissionId: `stp-stub-${payslipId}`,
+                          }),
+                        })
                       }
-                    })()
+                    } catch (e) {
+                      setToolbarError(e instanceof Error ? e.message : String(e))
+                      throw e
+                    }
                   },
                 },
                 {
                   id: "export-payslip",
                   label: "Create export intent",
                   requiresSelection: true,
-                  onClick: (rows) => {
+                  selection: "multiple",
+                  isApplicable: (rows) => rows.some((row) => hrRowState(row) === "Verify"),
+                  successMessage: t("common.actionCompleted", { action: "Create export intent" }),
+                  onClick: async (rows) => {
                     setToolbarError(null)
                     const verifyRows = rows.filter((row) => payslipState(row) === "Verify")
                     if (verifyRows.length === 0) {
                       setToolbarError("Select Verify (approved) payslips to export.")
                       return
                     }
-                    void (async () => {
-                      try {
-                        for (const row of verifyRows) {
-                          const payslipId = Number(row.id)
-                          await createPayrollExportIntent.mutateAsync({
+                    try {
+                      for (const row of verifyRows) {
+                        const payslipId = Number(row.id)
+                        await createPayrollExportIntent.mutateAsync({
+                          payslipId,
+                          idempotencyKey: `payslip-export-${payslipId}-${Date.now()}`,
+                          payload: JSON.stringify({
                             payslipId,
-                            idempotencyKey: `payslip-export-${payslipId}-${Date.now()}`,
-                            payload: JSON.stringify({
-                              payslipId,
-                              grossWage: row.grossWage ?? row.gross_wage,
-                              netWage: row.netWage ?? row.net_wage,
-                            }),
-                          })
-                        }
-                      } catch (e) {
-                        setToolbarError(e instanceof Error ? e.message : String(e))
+                            grossWage: row.grossWage ?? row.gross_wage,
+                            netWage: row.netWage ?? row.net_wage,
+                          }),
+                        })
                       }
-                    })()
+                    } catch (e) {
+                      setToolbarError(e instanceof Error ? e.message : String(e))
+                      throw e
+                    }
                   },
                 },
                 {
                   id: "post-payslip",
                   label: "Post to GL",
                   requiresSelection: true,
+                  selection: "multiple",
+                  isApplicable: (rows) => rows.some((row) => hrRowState(row) === "Verify"),
                   onClick: (rows) => {
                     setToolbarError(null)
                     const verifyRows = rows.filter((row) => payslipState(row) === "Verify")
@@ -1221,7 +1266,10 @@ function HrClientLoaded({
                   id: "cancel-payslip",
                   label: "Cancel",
                   requiresSelection: true,
-                  onClick: (rows) => void runSelectedRows(rows, "payslip", (row) => cancelPayslip.mutateAsync(Number(row.id))),
+                  selection: "multiple",
+                  isApplicable: (rows) => rows.every((row) => !["Cancelled", "Done"].includes(hrRowState(row))),
+                  successMessage: t("common.actionCompleted", { action: "Cancel" }),
+                  onClick: (rows) => runSelectedRows(rows, "payslip", (row) => cancelPayslip.mutateAsync(Number(row.id))),
                 },
               ]),
             }
@@ -1303,8 +1351,59 @@ function HrClientLoaded({
               createAction: "createOnboardingTemplate",
             }
           }
+          if (tab.id === "employees" && tab.entityConfig) {
+            return {
+              ...tab,
+              entityConfig: withInlineEdits(tab.entityConfig, {
+                name: {
+                  kind: "text",
+                  save: async (row, value) => {
+                    const name = String(value).trim()
+                    if (!name) throw new Error(t("hr.inlineEdit.nameRequired", { defaultValue: "An employee needs a name" }))
+                    await updateEmployee.mutateAsync({ employeeId: Number(row.id), params: { name } })
+                  },
+                },
+                jobTitle: {
+                  kind: "text",
+                  save: async (row, value) => {
+                    const jobTitle = String(value).trim()
+                    if (!jobTitle) throw new Error(t("hr.inlineEdit.jobTitleRequired", { defaultValue: "Enter a job title" }))
+                    await updateEmployee.mutateAsync({ employeeId: Number(row.id), params: { jobTitle } })
+                  },
+                },
+              }),
+            }
+          }
           return tab
         }).filter((tab): tab is NonNullable<typeof tab> => tab != null),
+          orgChartTab,
+          performanceTab,
+          benefitsTab,
+          recruitmentTab,
+          {
+            // Work queues and workforce-planning counters, kept off the header.
+            id: "operations",
+            label: t("hr.operationsTab", { defaultValue: "Operations" }),
+            type: "custom" as const,
+            description: t("hr.operationsTabDescription", {
+              defaultValue: "Approval and export queues, workforce planning",
+            }),
+            customContent: (
+              <div className="space-y-4">
+                <HrOpsQueuePanel
+                  leavesToApprove={leavesToApprove.length}
+                  payslipsToExport={payslipsToExport.length}
+                  hrIntegrationIntentsPending={hrIntegrationIntentsPending.length}
+                />
+                <HrAdvancedWfmPanel
+                  laborCostSnapshots={laborCostSnapshots.length}
+                  shiftOptJobs={shiftOptJobs.length}
+                  globalAssignments={globalAssignments.length}
+                  capacityForecast={hrCapacityForecast.length}
+                />
+              </div>
+            ),
+          },
         ],
       }) as ModuleConfig,
     [
@@ -1313,6 +1412,13 @@ function HrClientLoaded({
       performanceTab,
       benefitsTab,
       recruitmentTab,
+      leavesToApprove.length,
+      payslipsToExport.length,
+      hrIntegrationIntentsPending.length,
+      laborCostSnapshots.length,
+      shiftOptJobs.length,
+      globalAssignments.length,
+      hrCapacityForecast.length,
       liveSections,
       employeeFormConfig,
       leaveFormConfig,
@@ -1343,6 +1449,7 @@ function HrClientLoaded({
       buildEditJobPositionForm,
       buildEditContractForm,
       buildEditLeaveTypeForm,
+      updateEmployee,
     ],
   )
 
@@ -1475,17 +1582,6 @@ function HrClientLoaded({
           {toolbarError}
         </p>
       ) : null}
-      <HrOpsQueuePanel
-        leavesToApprove={leavesToApprove.length}
-        payslipsToExport={payslipsToExport.length}
-        hrIntegrationIntentsPending={hrIntegrationIntentsPending.length}
-      />
-      <HrAdvancedWfmPanel
-        laborCostSnapshots={laborCostSnapshots.length}
-        shiftOptJobs={shiftOptJobs.length}
-        globalAssignments={globalAssignments.length}
-        capacityForecast={hrCapacityForecast.length}
-      />
       <ModuleView
         config={config}
         data={data}

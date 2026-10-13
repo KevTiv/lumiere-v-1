@@ -6,6 +6,7 @@ import {
 
 import { useMemo, useState } from 'react';
 import { useTranslation } from '@lumiere/i18n';
+import { useConfirmDialog } from '@lumiere/ui/hooks/use-confirm-dialog';
 import {
   ModuleView,
   FormModal,
@@ -339,6 +340,7 @@ function IotClientLoaded({
 }: Loaded) {
   useIotModuleSubscription();
   const { t } = useTranslation();
+  const { confirm: confirmDialog, dialog: confirmDialogNode } = useConfirmDialog();
   const { orgId } = orgBigInts(organizationId);
   const operatingCompanyId = useOperatingCompanyBigInt(organizationId);
   const moduleConfigBase = useMemo(() => iotModuleConfig(t), [t]);
@@ -532,7 +534,7 @@ function IotClientLoaded({
                   id: 'hub-heartbeat',
                   label: t('iot.hubs.pingHeartbeat'),
                   requiresSelection: true,
-                  onClick: (rows) => {
+                  onClick: async (rows) => {
                     setToolbarError(null);
                     if (rows.length !== 1) {
                       setToolbarError(t('iot.toolbar.selectOneHub'));
@@ -560,13 +562,18 @@ function IotClientLoaded({
                   label: t('common.delete'),
                   variant: 'destructive',
                   requiresSelection: true,
-                  onClick: (rows) => {
+                  confirm: {
+                    title: t('common.delete'),
+                    description: t('iot.hubs.confirmDeleteHub'),
+                    confirmLabel: t('common.confirm'),
+                    cancelLabel: t('common.cancel'),
+                  },
+                  onClick: async (rows) => {
                     setToolbarError(null);
                     if (rows.length !== 1) {
                       setToolbarError(t('iot.toolbar.selectOneHub'));
                       return;
                     }
-                    if (!confirm(t('iot.hubs.confirmDeleteHub'))) return;
                     const id = numField(rows[0]!, 'id', 'Id');
                     deleteHub.mutate(id, {
                       onSuccess: () =>
@@ -592,7 +599,9 @@ function IotClientLoaded({
                   id: 'mark-sent',
                   label: t('iot.actions.markSent'),
                   requiresSelection: true,
-                  onClick: (rows) => {
+                  isApplicable: (rows) =>
+                    rows.every((row) => str(row.status) === 'Pending'),
+                  onClick: async (rows) => {
                     setToolbarError(null);
                     if (rows.length !== 1) {
                       setToolbarError(t('iot.toolbar.selectOneAction'));
@@ -621,7 +630,9 @@ function IotClientLoaded({
                   id: 'ack-action',
                   label: 'Acknowledge',
                   requiresSelection: true,
-                  onClick: (rows) => {
+                  isApplicable: (rows) =>
+                    rows.every((row) => str(row.status) === 'Sent'),
+                  onClick: async (rows) => {
                     setToolbarError(null);
                     if (rows.length !== 1 || str(rows[0]?.status) !== 'Sent') {
                       setToolbarError(t('iot.toolbar.actionNotSent'));
@@ -629,7 +640,7 @@ function IotClientLoaded({
                     }
                     const actionId = selectedIds(rows)[0];
                     if (actionId == null) return;
-                    void acknowledgeAction.mutateAsync(actionId).then(
+                    await acknowledgeAction.mutateAsync(actionId).then(
                       () =>
                         setBanner({
                           kind: 'ok',
@@ -646,9 +657,12 @@ function IotClientLoaded({
                   id: 'retry-action',
                   label: 'Retry',
                   requiresSelection: true,
-                  onClick: (rows) => {
+                  selection: 'multiple',
+                  isApplicable: (rows) =>
+                    rows.every((row) => str(row.status) === 'Failed'),
+                  onClick: async (rows) => {
                     setToolbarError(null);
-                    void Promise.all(
+                    await Promise.all(
                       selectedIds(rows).map((actionId) =>
                         retryAction.mutateAsync(actionId),
                       ),
@@ -669,6 +683,7 @@ function IotClientLoaded({
                   id: 'fail-action',
                   label: 'Fail',
                   requiresSelection: true,
+                  selection: 'multiple',
                   variant: 'destructive',
                   onClick: (rows) => {
                     setIotModalError(null);
@@ -690,9 +705,12 @@ function IotClientLoaded({
                   id: 'resolve-alert',
                   label: 'Resolve',
                   requiresSelection: true,
-                  onClick: (rows) => {
+                  selection: 'multiple',
+                  isApplicable: (rows) =>
+                    rows.every((row) => (row.resolvedAt ?? row.resolved_at) == null),
+                  onClick: async (rows) => {
                     setToolbarError(null);
-                    void Promise.all(
+                    await Promise.all(
                       selectedIds(rows).map((alertId) =>
                         resolveAlert.mutateAsync(alertId),
                       ),
@@ -810,7 +828,7 @@ function IotClientLoaded({
     } else if (op === 'test') {
       await testDevice.mutateAsync(deviceId);
     } else if (op === 'delete') {
-      if (!confirm(t('iot.devices.confirmDelete'))) return;
+      if (!(await confirmDialog({ description: t('iot.devices.confirmDelete') }))) return;
       await deleteDevice.mutateAsync(deviceId);
       setDeviceRow(null);
     } else {
@@ -1039,6 +1057,7 @@ function IotClientLoaded({
           onSubmit={handleIotModalSubmit}
         />
       ) : null}
+      {confirmDialogNode}
     </>
   );
 }

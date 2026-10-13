@@ -8,6 +8,8 @@ COPY api-server ./api-server
 COPY ai-gateway ./ai-gateway
 COPY iot-gateway ./iot-gateway
 COPY crates ./crates
+# api-server embeds released durable migrations from the codegen ledger.
+COPY lumiere-codegen/pg-migration-ledger ./lumiere-codegen/pg-migration-ledger
 RUN cargo build --release --bin "${BIN}"
 
 FROM debian:bookworm-slim AS runtime

@@ -14,6 +14,7 @@ import {
   scalarQueryId,
   smokeName,
 } from "./helpers"
+import { saleOrderHref } from "@lumiere/erp-shared/record-links"
 
 const SEEDED_SALE_ORDER_REF = "SO/2024/0001"
 
@@ -46,8 +47,8 @@ test.describe("Parity phase 5 — chatter mutations", { tag: ["@dev-fixture", "@
     const noteBody = smokeName("chatter-note")
     const saleOrderId = await fetchSaleOrderIdByReference(page, SEEDED_SALE_ORDER_REF)
 
-    await gotoModule(page, "/sales", "sales")
-    await page.getByTestId("module-tab-sales-orders").click()
+    // Tables list newest first; focus the seeded (oldest) order exactly.
+    await gotoModule(page, saleOrderHref(saleOrderId), "sales")
     await openRecordChatterByRowText(page, SEEDED_SALE_ORDER_REF)
     await postChatterNote(page, noteBody)
 
