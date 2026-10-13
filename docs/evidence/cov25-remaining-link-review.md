@@ -168,8 +168,8 @@ only when its state is Paid **and** its `reconciled_invoice_ids` exactly interse
 an additional filter, never a substitute for the relation). Main's duplicate rule was ported: a duplicated canonical
 relation (same invoice on two runs, two rows for one invoice or payment ID, repeated reconciliation IDs) is an invariant
 failure, not deduplicated; invoice-side duplicates withhold all links, payment-side duplicates withhold only payments.
-`subscription-handoffs.test.ts` covers each rule. `subscriptionRecordLinks` here remains in use by the
-`/subscriptions/[id]` detail page only.
+`subscription-handoffs.test.ts` covers each rule. The `/subscriptions/[id]` detail page uses the same builder and
+component, so both surfaces apply identical filters; `subscriptionRecordLinks` and its tests were removed.
 
 The focused subscription browser spec now pays one generated invoice through the visible action and expects a real
 `subscription-handoff-payment-{id}` link (clicked, reloaded, back) with no handoff alert. Runtime acceptance remains pending same-head CI.
