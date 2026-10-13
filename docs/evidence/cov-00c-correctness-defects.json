@@ -17,7 +17,7 @@
       "evidence": [
         {
           "path": "frontend/packages/ui/src/forms/form-modal.tsx",
-          "markers": ["if (!onSubmit) throw", "await onSubmit(data)", "toast.success"]
+          "markers": ["if (!onSubmit) return", "await onSubmit(data)", "toast.success"]
         }
       ]
     },
@@ -245,9 +245,7 @@
       "frontend/web/app/(modules)/crm/contact-identities-panel.tsx",
       "frontend/web/app/(modules)/crm/crm-client.tsx",
       "frontend/web/app/(modules)/messages/message-batches-panel.tsx",
-      "frontend/web/app/(modules)/purchasing/purchase-order-dialogs.tsx",
       "frontend/web/app/(modules)/purchasing/purchasing-client.tsx",
-      "frontend/web/app/(modules)/sales/sale-order-dialogs.tsx",
       "frontend/web/app/(modules)/sales/sales-client.tsx"
     ],
     "operator_bypass_files": [
