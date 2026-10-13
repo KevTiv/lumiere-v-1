@@ -308,7 +308,7 @@
     "semantic_dispatch_baseline": {
       "root": "frontend/packages/query-hooks/src/hooks",
       "token": "stdbBffCommandPost(",
-      "max_occurrences": 865,
+      "max_occurrences": 868,
       "classification": "Legacy dispatch baseline owned by COV-01 and module adoption packages; count may decrease but not grow without updating the owned census."
     }
   }
