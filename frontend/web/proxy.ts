@@ -1,14 +1,6 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
-
-// Auth pages that don't require a session
-const AUTH_PATHS = [
-  '/sign-in',
-  '/forgot-password',
-  '/reset-password',
-  '/accept-invite',
-  '/auth/callback',
-]
+import { requiresPrivatePageLogin } from './lib/private-release-policy'
 
 /**
  * Extracts Bearer token from Authorization header.
@@ -58,11 +50,10 @@ export function proxy(request: NextRequest) {
   }
 
   const isLoggedIn = isAuthenticated(request)
-  const isAuthPage = AUTH_PATHS.some(p => pathname === p || pathname.startsWith(p + '/'))
 
   // Cheap crawler guard, not an authorization boundary: API/session handlers
   // still verify tokens. Do not render private ERP pages for anonymous traffic.
-  if (process.env.NODE_ENV === 'production' && !isLoggedIn && !isAuthPage) {
+  if (requiresPrivatePageLogin(pathname, process.env.NODE_ENV === 'production', isLoggedIn)) {
     const url = request.nextUrl.clone()
     url.pathname = '/sign-in'
     url.search = ''

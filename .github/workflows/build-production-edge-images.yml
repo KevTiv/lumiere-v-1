@@ -47,7 +47,13 @@ jobs:
         run: node frontend/scripts/verify-vendored-contracts.mjs
       - name: Validate gateway configuration rendering
         if: matrix.service == 'api-gateway'
-        run: sh infra/kong/test-render-config.sh
+        run: |
+          sh infra/kong/test-render-config.sh
+          docker run --rm --entrypoint /bin/sh \
+            --mount "type=bind,src=$PWD/infra/kong,dst=/test,readonly" \
+            -e KONG_DECLARATIVE_TEMPLATE=/test/kong.yml \
+            -e KONG_DECLARATIVE_CONFIG=/tmp/kong.yml \
+            kong:3.9 -ec 'sh /test/render-config.sh --render-only; kong config parse /tmp/kong.yml >/dev/null'
       - uses: docker/setup-buildx-action@v3
       - name: Log in to GHCR
         if: github.event_name != 'pull_request'
