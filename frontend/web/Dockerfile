@@ -4,6 +4,8 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/* && \
     npm install --global pnpm@10.31.0 --strict-ssl=true
 
+FROM dopplerhq/cli:3.75.1@sha256:f2ffb55128ed895ca3ee7a64a394661e89aa16cf9f9e05cea24021a4ba062e75 AS doppler
+
 # --- deps ---
 FROM base AS deps
 WORKDIR /app
@@ -39,8 +41,12 @@ COPY --from=builder /app/web/public ./web/public
 COPY --from=builder /app/web/package.json ./web/package.json
 COPY --from=builder /app/web/node_modules ./web/node_modules
 COPY --from=builder /app/node_modules ./node_modules
+COPY --from=doppler /bin/doppler /usr/local/bin/doppler
+COPY web/scripts/doppler-entrypoint.sh /usr/local/bin/lumiere-with-secrets
+RUN chmod 0755 /usr/local/bin/lumiere-with-secrets
 
 WORKDIR /app/web
 EXPOSE 3000
 
+ENTRYPOINT ["/usr/local/bin/lumiere-with-secrets"]
 CMD ["./node_modules/.bin/next", "start"]
