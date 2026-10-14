@@ -15,6 +15,71 @@ Print the checklist without validating:
 scripts/check-prod-env.sh --list
 ```
 
+## Shared immutable Rust runtime image
+
+`lumiere-contracts` is a versioned library dependency, not a Railway service.
+Do not deploy the contracts repository as an HTTP service or add a contracts
+service URL to application configuration. The generated types and metadata are
+compiled into the application artifacts; running services do not fetch them
+from a contracts server.
+
+Rust builds verify and unpack the vendored release archive against its checksum
+and `release-compatibility-manifest.json`. TypeScript builds install the vendored
+`@lumiere/contracts` package with the version and integrity pinned in
+`frontend/pnpm-lock.yaml`. Both consume the published release without regenerating
+or rewriting contract definitions during deployment.
+
+The Rust Dockerfiles prepare contracts before copying application sources, so
+source-only edits reuse that Docker layer when the build cache is available.
+A clean build still verifies the pinned contracts, and a contracts release change
+invalidates the layer. After the shared image is built, promoting or restarting
+its digest performs no contracts build or download. This is once per image build,
+not a one-time bootstrap dependency that can be dropped from future builds.
+
+The **Build Rust runtime image** workflow compiles the Rust service graph once
+and publishes one OCI image to GHCR. It deliberately includes only these six
+executables:
+
+| Railway service | `LUMIERE_BIN` | Purpose |
+|---|---|---|
+| `api-server` | `api-server` | HTTP API and readiness surface |
+| `ai-gateway` | `gateway` | AI gateway HTTP service |
+| `projection-worker` | `projection-worker` | SpacetimeDB to PostgreSQL projection |
+| `workflow-worker` | `workflow-worker` | Workflow execution |
+| `owner-report-worker` | `owner-report-worker` | Owner report generation |
+| `storage-migrate` | `storage-migrate` | One-shot PostgreSQL migration gate |
+
+Each Railway service remains an independently configured and scaled service.
+Set its `LUMIERE_BIN` to the value above, while pointing all six services at the
+same image digest. The entrypoint rejects missing and unknown selectors; it
+cannot be used to execute an arbitrary path from an environment variable.
+
+Push builds publish a full-commit tag such as
+`ghcr.io/kevtiv/lumiere-v-1-rust-runtime:<40-character-sha>`, generate BuildKit
+provenance and an SBOM, and report the resulting digest in the workflow summary.
+The workflow refuses to overwrite an existing commit tag. Pull requests build
+and validate the image without publishing it. Never configure Railway with a
+mutable tag such as `latest`; use the reported
+`ghcr.io/kevtiv/lumiere-v-1-rust-runtime@sha256:<digest>` coordinate.
+
+Before dispatching **Release Railway stack**, pass the reported digest as
+`rust_runtime_image`. The workflow first verifies that the digest is available
+through an anonymous registry pull, because the automated Railway image-source
+promotion does not install registry credentials. Keep this GHCR package public;
+the image contains executables and public build metadata, never runtime secrets.
+
+For each shared-runtime service, the release submits one environment-scoped
+Railway configuration patch that sets `source.image` to the exact digest while
+clearing `source.repo`, `source.branch`, `source.commitSha`, and
+`source.upstreamUrl`. The atomic source switch triggers the deployment. A retry
+at an already-configured digest explicitly redeploys the same source. Every
+phase then checks Railway's deployment metadata against the requested digest
+and stops the release on a mismatch.
+
+Building the image never deploys it. Promotion remains explicit and ordered by
+the release workflow, so a newly published image cannot replace production
+while the stack is still being validated.
+
 ## Ordered Railway release
 
 Use the **Release Railway stack** workflow for monorepo releases. It accepts an

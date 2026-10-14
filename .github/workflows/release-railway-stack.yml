@@ -20,6 +20,10 @@ on:
         required: true
         default: europe-west4-drams3a
         type: string
+      rust_runtime_image:
+        description: Immutable shared Rust image (ghcr.io/...@sha256:...)
+        required: true
+        type: string
       edge_readiness_url:
         description: Public API-gateway URL to probe after cutover (required for production)
         required: false
@@ -51,6 +55,7 @@ jobs:
       RAILWAY_EXPECTED_REGION: ${{ inputs.expected_region }}
       RELEASE_ROOT: .
       RELEASE_SHA: ${{ inputs.release_sha }}
+      RUST_RUNTIME_IMAGE: ${{ inputs.rust_runtime_image }}
       API_READINESS_URL: ${{ secrets.RAILWAY_API_READINESS_URL }}
       AI_READINESS_URL: ${{ secrets.RAILWAY_AI_READINESS_URL }}
       CHROMIUM_READINESS_URL: ${{ secrets.RAILWAY_CHROMIUM_READINESS_URL }}
@@ -70,6 +75,10 @@ jobs:
           }
           [[ "$RAILWAY_EXPECTED_REGION" =~ ^[a-z0-9-]+$ ]] || {
             echo "expected_region contains unsupported characters" >&2
+            exit 1
+          }
+          [[ "$RUST_RUNTIME_IMAGE" =~ ^ghcr\.io/[a-z0-9._/-]+@sha256:[0-9a-f]{64}$ ]] || {
+            echo "rust_runtime_image must be an immutable lowercase GHCR digest" >&2
             exit 1
           }
           : "${RAILWAY_TOKEN:?Configure RAILWAY_TOKEN on the selected GitHub Environment}"
@@ -100,6 +109,16 @@ jobs:
       - name: Install pinned Railway CLI
         run: npm install --global "@railway/cli@$RAILWAY_CLI_VERSION"
 
+      - name: Gate anonymous runtime image pull
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker manifest inspect "$RUST_RUNTIME_IMAGE" >/dev/null || {
+            echo "The shared runtime image is not anonymously readable by Railway." >&2
+            echo "Publish the GHCR package before promotion and make the package public." >&2
+            exit 1
+          }
+
       - name: Verify Railway access and context
         shell: bash
         run: |
@@ -120,9 +139,9 @@ jobs:
         shell: bash
         run: bash scripts/railway-stack-release.sh publish-stdb spacetimedb-publisher
 
-      - name: Phase 3 — apply PostgreSQL storage migrations
+      - name: Phase 3 — apply PostgreSQL storage migrations from shared runtime image
         shell: bash
-        run: bash scripts/railway-stack-release.sh migrate-storage storage-migrate
+        run: bash scripts/railway-stack-release.sh redeploy-storage storage-migrate
 
       - name: Phase 4 — deploy Chromium worker
         shell: bash
@@ -133,36 +152,36 @@ jobs:
         shell: bash
         run: bash scripts/railway-stack-release.sh probe "chromium=$CHROMIUM_READINESS_URL"
 
-      - name: Phase 5 — deploy API server
+      - name: Phase 5 — deploy API server from shared runtime image
         shell: bash
-        run: bash scripts/railway-stack-release.sh deploy api-server
+        run: bash scripts/railway-stack-release.sh redeploy-source api-server
 
       - name: Phase 5 gate — API readiness
         if: env.API_READINESS_URL != ''
         shell: bash
         run: bash scripts/railway-stack-release.sh probe "api-server=$API_READINESS_URL"
 
-      - name: Phase 6 — deploy AI gateway
+      - name: Phase 6 — deploy AI gateway from shared runtime image
         shell: bash
-        run: bash scripts/railway-stack-release.sh deploy ai-gateway
+        run: bash scripts/railway-stack-release.sh redeploy-source ai-gateway
 
       - name: Phase 6 gate — AI readiness
         if: env.AI_READINESS_URL != ''
         shell: bash
         run: bash scripts/railway-stack-release.sh probe "ai-gateway=$AI_READINESS_URL"
 
-      - name: Phase 7 — deploy projection worker
+      - name: Phase 7 — deploy projection worker from shared runtime image
         shell: bash
-        run: bash scripts/railway-stack-release.sh deploy projection-worker
+        run: bash scripts/railway-stack-release.sh redeploy-source projection-worker
 
       - name: Phase 7 gate — projection readiness
         if: env.PROJECTION_READINESS_URL != ''
         shell: bash
         run: bash scripts/railway-stack-release.sh probe "projection=$PROJECTION_READINESS_URL"
 
-      - name: Phase 8 — deploy workflow and owner-report workers concurrently
+      - name: Phase 8 — deploy workflow and owner-report workers from shared runtime image
         shell: bash
-        run: bash scripts/railway-stack-release.sh deploy workflow-worker owner-report-worker
+        run: bash scripts/railway-stack-release.sh redeploy-source workflow-worker owner-report-worker
 
       - name: Phase 8 gate — workflow and owner-report readiness
         if: env.WORKFLOW_READINESS_URL != '' || env.OWNER_REPORT_READINESS_URL != ''
