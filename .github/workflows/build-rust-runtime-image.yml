@@ -16,6 +16,18 @@ on:
       - vendor/**
       - Dockerfile.rust-runtime
       - .github/workflows/build-rust-runtime-image.yml
+  pull_request:
+    paths:
+      - Cargo.lock
+      - Cargo.toml
+      - api-server/**
+      - ai-gateway/**
+      - crates/**
+      - scripts/prepare-vendored-contracts-rust.sh
+      - scripts/lumiere-runtime-entrypoint.sh
+      - vendor/**
+      - Dockerfile.rust-runtime
+      - .github/workflows/build-rust-runtime-image.yml
   workflow_dispatch:
 
 permissions:
@@ -30,10 +42,13 @@ concurrency:
 
 jobs:
   build:
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Validate runtime dispatcher
         run: bash scripts/tests/lumiere-runtime-entrypoint.test.sh
@@ -52,9 +67,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          image_sha='${{ github.event.pull_request.head.sha || github.sha }}'
           repository="ghcr.io/${GITHUB_REPOSITORY,,}-rust-runtime"
           echo "repository=$repository" >> "$GITHUB_OUTPUT"
-          echo "tag=$repository:$GITHUB_SHA" >> "$GITHUB_OUTPUT"
+          echo "tag=$repository:$image_sha" >> "$GITHUB_OUTPUT"
 
       - name: Build and push once
         id: build
@@ -65,7 +81,7 @@ jobs:
           push: true
           tags: ${{ steps.image.outputs.tag }}
           labels: |
-            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.revision=${{ github.event.pull_request.head.sha || github.sha }}
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
           cache-from: type=gha,scope=lumiere-rust-runtime
           cache-to: type=gha,mode=max,scope=lumiere-rust-runtime
