@@ -60,6 +60,7 @@ rand.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 sha2.workspace = true
+s3 = { package = "rust-s3", version = "0.38.0", default-features = false, features = ["tokio-rustls-tls"] }
 stdb-config.workspace = true
 stdb-auth.workspace = true
 stdb-client.workspace = true

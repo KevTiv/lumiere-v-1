@@ -33,7 +33,9 @@ jobs:
       - name: Test external readiness probe
         run: node scripts/tests/test-compose-readiness.mjs
       - name: Test ordered Railway release orchestration
-        run: bash scripts/tests/test-railway-stack-release.sh
+        run: |
+          bash scripts/tests/test-railway-stack-release.sh
+          bash scripts/tests/test-railway-production-preflight.sh
 
   stdb-check:
     name: SpacetimeDB check

@@ -10,7 +10,7 @@ on:
       environment:
         description: GitHub and Railway environment
         required: true
-        default: dev
+        default: production
         type: choice
         options:
           - dev
@@ -24,6 +24,16 @@ on:
         description: Immutable shared Rust image (ghcr.io/...@sha256:...)
         required: true
         type: string
+      enable_ai:
+        description: Promote the optional AI gateway (disabled for the initial release)
+        required: true
+        default: false
+        type: boolean
+      enable_integrations:
+        description: Activate integration workers after real organization IDs and service bindings are configured
+        required: true
+        default: false
+        type: boolean
       edge_readiness_url:
         description: Public API-gateway URL to probe after cutover (required for production)
         required: false
@@ -56,12 +66,17 @@ jobs:
       RELEASE_ROOT: .
       RELEASE_SHA: ${{ inputs.release_sha }}
       RUST_RUNTIME_IMAGE: ${{ inputs.rust_runtime_image }}
+      RAILWAY_ENABLE_AI: ${{ inputs.enable_ai }}
+      RAILWAY_ENABLE_INTEGRATIONS: ${{ inputs.enable_integrations }}
       API_READINESS_URL: ${{ secrets.RAILWAY_API_READINESS_URL }}
       AI_READINESS_URL: ${{ secrets.RAILWAY_AI_READINESS_URL }}
       CHROMIUM_READINESS_URL: ${{ secrets.RAILWAY_CHROMIUM_READINESS_URL }}
       OWNER_REPORT_READINESS_URL: ${{ secrets.RAILWAY_OWNER_REPORT_READINESS_URL }}
       WORKFLOW_READINESS_URL: ${{ secrets.RAILWAY_WORKFLOW_READINESS_URL }}
       PROJECTION_READINESS_URL: ${{ secrets.RAILWAY_PROJECTION_READINESS_URL }}
+      EXPENSE_INTEGRATION_READINESS_URL: ${{ secrets.RAILWAY_EXPENSE_INTEGRATION_READINESS_URL }}
+      HR_INTEGRATION_READINESS_URL: ${{ secrets.RAILWAY_HR_INTEGRATION_READINESS_URL }}
+      PROJECT_INTEGRATION_READINESS_URL: ${{ secrets.RAILWAY_PROJECT_INTEGRATION_READINESS_URL }}
       WEB_READINESS_URL: ${{ secrets.RAILWAY_WEB_READINESS_URL }}
       EDGE_READINESS_URL: ${{ inputs.edge_readiness_url }}
     steps:
@@ -85,6 +100,17 @@ jobs:
           if [[ "$RAILWAY_ENVIRONMENT" == production && -z "$EDGE_READINESS_URL" ]]; then
             echo "Production releases require edge_readiness_url" >&2
             exit 1
+          fi
+          if [[ "$RAILWAY_ENVIRONMENT" == production && "$RAILWAY_ENABLE_INTEGRATIONS" == true ]]; then
+            for readiness_name in \
+              EXPENSE_INTEGRATION_READINESS_URL \
+              HR_INTEGRATION_READINESS_URL \
+              PROJECT_INTEGRATION_READINESS_URL; do
+              [[ -n "${!readiness_name}" ]] || {
+                echo "Production releases require $readiness_name" >&2
+                exit 1
+              }
+            done
           fi
 
       - name: Check out requested commit
@@ -113,21 +139,35 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          docker manifest inspect "$RUST_RUNTIME_IMAGE" >/dev/null || {
+          docker pull --quiet "$RUST_RUNTIME_IMAGE" >/dev/null || {
             echo "The shared runtime image is not anonymously readable by Railway." >&2
             echo "Publish the GHCR package before promotion and make the package public." >&2
             exit 1
           }
+          image_revision="$(docker image inspect \
+            --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}' \
+            "$RUST_RUNTIME_IMAGE")"
+          [[ "$image_revision" == "$RELEASE_SHA" ]] || {
+            echo "Runtime image revision $image_revision does not match release $RELEASE_SHA" >&2
+            exit 1
+          }
+
+      - name: Verify production Railway topology and worker configuration
+        if: inputs.environment == 'production'
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash scripts/railway-production-preflight.sh \
+            infra/railway/production-eu-services.json
 
       - name: Verify Railway access and context
         shell: bash
         run: |
           set -euo pipefail
-          railway link \
+          railway service list \
             --project "$RAILWAY_PROJECT_ID" \
             --environment "$RAILWAY_ENVIRONMENT" \
-            --service spacetimedb
-          railway status --json | jq '{project, environment, service}'
+            --json | jq '[.[] | {id, name}]'
 
       - name: Phase 1 — gate EU infrastructure
         shell: bash
@@ -162,11 +202,12 @@ jobs:
         run: bash scripts/railway-stack-release.sh probe "api-server=$API_READINESS_URL"
 
       - name: Phase 6 — deploy AI gateway from shared runtime image
+        if: inputs.enable_ai
         shell: bash
         run: bash scripts/railway-stack-release.sh redeploy-source ai-gateway
 
       - name: Phase 6 gate — AI readiness
-        if: env.AI_READINESS_URL != ''
+        if: inputs.enable_ai && env.AI_READINESS_URL != ''
         shell: bash
         run: bash scripts/railway-stack-release.sh probe "ai-gateway=$AI_READINESS_URL"
 
@@ -193,20 +234,37 @@ jobs:
           [[ -z "$WORKFLOW_READINESS_URL" ]] || probes+=("workflow=$WORKFLOW_READINESS_URL")
           bash scripts/railway-stack-release.sh probe "${probes[@]}"
 
-      - name: Phase 9 — deploy web
+      - name: Phase 9 — deploy production integration workers from shared runtime image
+        if: inputs.environment == 'production' && inputs.enable_integrations
+        shell: bash
+        run: >-
+          bash scripts/railway-stack-release.sh redeploy-source
+          expense-integration-worker hr-integration-worker project-integration-worker
+
+      - name: Phase 9 gate — production integration-worker readiness
+        if: inputs.environment == 'production' && inputs.enable_integrations
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash scripts/railway-stack-release.sh probe \
+            "expense-integration=$EXPENSE_INTEGRATION_READINESS_URL" \
+            "hr-integration=$HR_INTEGRATION_READINESS_URL" \
+            "project-integration=$PROJECT_INTEGRATION_READINESS_URL"
+
+      - name: Phase 10 — deploy web
         shell: bash
         run: bash scripts/railway-stack-release.sh deploy web
 
-      - name: Phase 9 gate — web readiness
+      - name: Phase 10 gate — web readiness
         if: env.WEB_READINESS_URL != ''
         shell: bash
         run: bash scripts/railway-stack-release.sh probe "web=$WEB_READINESS_URL"
 
-      - name: Phase 10 — deploy API gateway last
+      - name: Phase 11 — deploy API gateway last
         shell: bash
         run: bash scripts/railway-stack-release.sh deploy api-gateway
 
-      - name: Phase 10 gate — public edge readiness
+      - name: Phase 11 gate — public edge readiness
         if: env.EDGE_READINESS_URL != ''
         shell: bash
         run: bash scripts/railway-stack-release.sh probe "api-gateway=$EDGE_READINESS_URL"
@@ -219,7 +277,8 @@ jobs:
           for service in \
             Postgres Redis qdrant spacetimedb spacetimedb-publisher storage-migrate \
             api-server ai-gateway chromium-worker owner-report-worker \
-            workflow-worker projection-worker web api-gateway; do
+            workflow-worker projection-worker expense-integration-worker \
+            hr-integration-worker project-integration-worker web api-gateway; do
             echo "::group::$service deployments"
             railway deployment list \
               --project "$RAILWAY_PROJECT_ID" \

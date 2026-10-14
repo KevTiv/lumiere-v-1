@@ -29,6 +29,17 @@ case "${1:-}" in
       printf '{"staged":false,"committed":false,"message":"No changes to apply"}\n'
     fi
     ;;
+  service)
+    [[ "${2:-}" == list ]]
+    if [[ -n "${TEST_SERVICE_LIST_ARGS_FILE:-}" ]]; then
+      printf '%s\n' "$*" >"$TEST_SERVICE_LIST_ARGS_FILE"
+    fi
+    if [[ -n "${TEST_RAILWAY_SERVICES_JSON:-}" ]]; then
+      printf '%s\n' "$TEST_RAILWAY_SERVICES_JSON"
+    else
+      printf '[{"id":"service-api-id","name":"api-server"}]\n'
+    fi
+    ;;
   redeploy)
     printf '%s\n' "$*" >"${TEST_REDEPLOY_ARGS_FILE:?}"
     printf '{"status":"queued"}\n'
@@ -98,10 +109,12 @@ runtime_digest="ghcr.io/kevtiv/lumiere-v-1-rust-runtime@sha256:$(printf 'a%.0s' 
 source_patch_file="$TMP/source-patch.json"
 source_args_file="$TMP/source-args.txt"
 redeploy_args_file="$TMP/redeploy-args.txt"
+service_list_args_file="$TMP/service-list-args.txt"
 env "${common_env[@]}" \
   RUST_RUNTIME_IMAGE="$runtime_digest" \
   TEST_SOURCE_PATCH_FILE="$source_patch_file" \
   TEST_SOURCE_ARGS_FILE="$source_args_file" \
+  TEST_SERVICE_LIST_ARGS_FILE="$service_list_args_file" \
   TEST_REDEPLOY_ARGS_FILE="$redeploy_args_file" \
   bash -c '
     source "$1"
@@ -112,7 +125,7 @@ env "${common_env[@]}" \
   ' _ "$ROOT/scripts/railway-stack-release.sh"
 
 jq -e --arg image "$runtime_digest" '
-  . == {services: {"api-server": {source: {
+  . == {services: {"service-api-id": {source: {
     image: $image,
     repo: null,
     branch: null,
@@ -123,7 +136,24 @@ jq -e --arg image "$runtime_digest" '
 grep -Fq -- '--project project-test' "$source_args_file"
 grep -Fq -- '--environment production' "$source_args_file"
 grep -Fq -- '--json' "$source_args_file"
+grep -Fq -- '--project project-test' "$service_list_args_file"
+grep -Fq -- '--environment production' "$service_list_args_file"
+grep -Fq -- '--json' "$service_list_args_file"
 test ! -e "$redeploy_args_file"
+
+if env "${common_env[@]}" \
+  RUST_RUNTIME_IMAGE="$runtime_digest" \
+  TEST_RAILWAY_SERVICES_JSON='[{"id":"service-one","name":"api-server"},{"id":"service-two","name":"api-server"}]' \
+  TEST_SOURCE_PATCH_FILE="$source_patch_file" \
+  TEST_SOURCE_ARGS_FILE="$source_args_file" \
+  TEST_REDEPLOY_ARGS_FILE="$redeploy_args_file" \
+  bash -c '
+    source "$1"
+    redeploy_source_one api-server
+  ' _ "$ROOT/scripts/railway-stack-release.sh" >/dev/null 2>&1; then
+  echo "source promotion accepted an ambiguous environment-scoped service name" >&2
+  exit 1
+fi
 
 env "${common_env[@]}" \
   RUST_RUNTIME_IMAGE="$runtime_digest" \

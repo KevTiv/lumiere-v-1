@@ -32,6 +32,7 @@ export function sessionIsOrganizationAdmin(session: ApiSession): boolean {
     .replace(/[\s_]+/g, '-')
   return (
     fieldAccess.isSuperuser ||
+    normalizedRole === 'owner' ||
     normalizedRole === 'admin' ||
     normalizedRole === 'organization-admin'
   )

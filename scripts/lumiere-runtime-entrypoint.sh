@@ -4,7 +4,7 @@ set -eu
 binary="${LUMIERE_BIN:-${BIN:-}}"
 
 case "$binary" in
-  api-server|gateway|owner-report-worker|projection-worker|storage-migrate|workflow-worker)
+  api-server|expense-integration-worker|gateway|hr-integration-worker|owner-report-worker|projection-worker|project-integration-worker|storage-migrate|workflow-worker)
     ;;
   "")
     echo "LUMIERE_BIN is required" >&2

@@ -6,6 +6,11 @@ import 'server-only'
 
 /** Returns null when unset or disabled — callers return 503. */
 export function resolveAiGatewayBaseUrl(): string | null {
+  const enabled = process.env['LUMIERE_AI_ENABLED']?.trim().toLowerCase()
+  if (enabled === 'false' || enabled === '0' || enabled === 'off' || enabled === 'disabled') {
+    return null
+  }
+
   const raw = process.env['LUMIERE_AI_GATEWAY_URL'] ?? process.env['AI_GATEWAY_URL']
   if (raw === undefined || raw === null || raw === '' || raw === 'false' || raw === 'off') {
     return null

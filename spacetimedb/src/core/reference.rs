@@ -6,7 +6,7 @@
 /// it from authenticated context rather than supplying a writable tenant field.
 use spacetimedb::{ReducerContext, SpacetimeType, Table, Timestamp};
 
-use crate::core::organization::company;
+use crate::core::organization::{company, organization};
 use crate::core::users::find_user_profile_for_identity;
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 
@@ -255,6 +255,79 @@ pub struct DocumentSequence {
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
+
+/// Install missing canonical countries only. Callers must enter through tenant
+/// bootstrap or the permission-checked organization migration runner. Existing
+/// rows (including inactive/customized rows) are never changed. No currencies,
+/// tax rules, memberships, or platform privileges are created here.
+pub(crate) fn seed_country_catalog_for_organization(
+    ctx: &ReducerContext,
+    organization_id: u64,
+) -> Result<Vec<Country>, String> {
+    let organization = ctx
+        .db
+        .organization()
+        .id()
+        .find(&organization_id)
+        .ok_or("Organization not found")?;
+    if organization_id == 0 || organization.organization_id != organization_id {
+        return Err("country provisioning requires a valid organization".to_string());
+    }
+    let mut inserted = Vec::new();
+    for definition in crate::core::country_catalog::COUNTRIES {
+        let key = format!("{organization_id}:{}", definition.code);
+        if let Some(existing) = ctx.db.country().organization_code_key().find(&key) {
+            if existing.organization_id != organization_id || existing.code != definition.code {
+                return Err("country reference ownership is inconsistent".to_string());
+            }
+            continue;
+        }
+        let currency_id = ctx
+            .db
+            .currency()
+            .organization_code_key()
+            .find(format!("{organization_id}:{}", definition.currency_code))
+            .filter(|row| row.organization_id == organization_id && row.active)
+            .map(|row| row.id);
+        let row = ctx.db.country().insert(Country {
+            organization_code_key: key,
+            code: definition.code.to_string(),
+            organization_id,
+            name: definition.name.to_string(),
+            official_name: None,
+            iso3: definition.iso3.to_string(),
+            numcode: definition.numcode,
+            phone_code: definition.phone_code.to_string(),
+            currency_id,
+            language_codes: definition
+                .languages
+                .iter()
+                .map(|language| (*language).to_string())
+                .collect(),
+            is_active: true,
+            metadata: Some(r#"{"catalog":"onboarding-countries-v1"}"#.to_string()),
+        });
+        write_audit_log_v2(
+            ctx,
+            organization_id,
+            AuditLogParams {
+                company_id: None,
+                table_name: "country",
+                record_id: 0,
+                action: "CREATE",
+                old_values: None,
+                new_values: Some(
+                    serde_json::json!({"code": row.code, "catalog": "onboarding-countries-v1"})
+                        .to_string(),
+                ),
+                changed_fields: vec!["code".to_string(), "name".to_string()],
+                metadata: None,
+            },
+        );
+        inserted.push(row);
+    }
+    Ok(inserted)
+}
 
 fn require_superuser(ctx: &ReducerContext) -> Result<(), String> {
     let is_su = find_user_profile_for_identity(ctx, ctx.sender())

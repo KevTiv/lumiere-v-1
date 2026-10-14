@@ -15,12 +15,24 @@ workflow = (root / ".github/workflows/build-rust-runtime-image.yml").read_text(e
 
 expected = {
     "api-server",
+    "expense-integration-worker",
     "gateway",
+    "hr-integration-worker",
     "owner-report-worker",
     "projection-worker",
+    "project-integration-worker",
     "storage-migrate",
     "workflow-worker",
 }
+
+for binary in expected - {"gateway"}:
+    source = (
+        root / "api-server" / "src" / "main.rs"
+        if binary == "api-server"
+        else root / "api-server" / "src" / "bin" / f"{binary}.rs"
+    )
+    if not source.is_file():
+        raise SystemExit(f"runtime image selects missing api-server binary source: {binary}")
 
 dockerfile_commands = "\n".join(
     line for line in dockerfile.splitlines() if not line.lstrip().startswith("#")

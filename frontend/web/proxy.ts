@@ -1,15 +1,6 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
-
-// Auth pages that don't require a session
-const AUTH_PATHS = [
-  '/sign-in',
-  '/sign-up',
-  '/forgot-password',
-  '/reset-password',
-  '/accept-invite',
-  '/auth/callback',
-]
+import { requiresPrivatePageLogin } from './lib/private-release-policy'
 
 /**
  * Extracts Bearer token from Authorization header.
@@ -52,30 +43,26 @@ export function proxy(request: NextRequest) {
   if (
     pathname.startsWith('/_next/') ||
     pathname.startsWith('/public/') ||
+    pathname === '/robots.txt' ||
     pathname === '/favicon.ico'
   ) {
     return NextResponse.next()
   }
 
-  const _isLoggedIn = isAuthenticated(request)
-  const _isAuthPage = AUTH_PATHS.some(p => pathname === p || pathname.startsWith(p + '/'))
+  const isLoggedIn = isAuthenticated(request)
 
-  // Redirect unauthenticated users to sign-in (excluding auth pages)
-  // Currently disabled - uncomment when ready to enforce auth
-  // if (!isLoggedIn && !isAuthPage) {
-  //   const url = request.nextUrl.clone()
-  //   url.pathname = '/sign-in'
-  //   if (pathname !== '/') {
-  //     url.searchParams.set('callbackUrl', pathname)
-  //   }
-  //   return NextResponse.redirect(url)
-  // }
-
-  // Redirect authenticated users away from auth pages
-  // Currently disabled - uncomment when ready to enforce auth
-  // if (isLoggedIn && isAuthPage && pathname !== '/onboarding') {
-  //   return NextResponse.redirect(new URL('/overview', request.url))
-  // }
+  // Cheap crawler guard, not an authorization boundary: API/session handlers
+  // still verify tokens. Do not render private ERP pages for anonymous traffic.
+  if (requiresPrivatePageLogin(pathname, process.env.NODE_ENV === 'production', isLoggedIn)) {
+    const url = request.nextUrl.clone()
+    url.pathname = '/sign-in'
+    url.search = ''
+    if (pathname !== '/') url.searchParams.set('callbackUrl', pathname)
+    const response = NextResponse.redirect(url)
+    response.headers.set('Cache-Control', 'private, no-store')
+    response.headers.set('X-Robots-Tag', 'noindex, nofollow, noarchive')
+    return response
+  }
 
   const requestHeaders = new Headers(request.headers)
   requestHeaders.set('x-lumiere-pathname', pathname)

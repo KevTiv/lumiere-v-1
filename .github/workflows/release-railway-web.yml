@@ -7,17 +7,8 @@ on:
         description: Full 40-character commit SHA to build and deploy
         required: true
         type: string
-      environment:
-        description: GitHub and Railway environment to deploy
-        required: true
-        default: dev
-        type: choice
-        options:
-          - dev
-          - production
-
 concurrency:
-  group: railway-web-${{ inputs.environment }}
+  group: railway-web-production
   cancel-in-progress: false
 
 permissions:
@@ -25,17 +16,18 @@ permissions:
 
 env:
   RAILWAY_PROJECT_ID: cc695d4b-030c-43e3-bbd6-a41095b09257
-  RAILWAY_SERVICE_ID: 23ee8acf-1b14-4b1c-b6f5-ce8fd2ed683c
+  RAILWAY_ENVIRONMENT: production
+  RAILWAY_SERVICE_NAME: web
   RAILWAY_CLI_VERSION: 5.67.1
   RAILWAY_NO_AUTO_UPDATE: "1"
 
 jobs:
   release:
-    name: Build and deploy ${{ inputs.environment }}
+    name: Build and deploy production
     runs-on: ubuntu-latest
     timeout-minutes: 45
     environment:
-      name: ${{ inputs.environment }}
+      name: production
     env:
       # Configure this as an environment-scoped GitHub secret. Railway project
       # tokens are scoped to one Railway environment as an additional guard.
@@ -61,21 +53,18 @@ jobs:
       - name: Verify checked-out commit
         shell: bash
         env:
-          DEPLOY_ENVIRONMENT: ${{ inputs.environment }}
           RELEASE_SHA: ${{ inputs.release_sha }}
         run: |
           set -euo pipefail
           test "$(git rev-parse HEAD)" = "${RELEASE_SHA,,}"
-          if [[ "$DEPLOY_ENVIRONMENT" == "production" ]]; then
-            if [[ "$(git rev-parse --is-shallow-repository)" == "true" ]]; then
-              git fetch --no-tags --unshallow origin +refs/heads/main:refs/remotes/origin/main
-            else
-              git fetch --no-tags origin +refs/heads/main:refs/remotes/origin/main
-            fi
-            if ! git merge-base --is-ancestor HEAD origin/main; then
-              echo "Production releases must be the current main commit or an ancestor of main" >&2
-              exit 1
-            fi
+          if [[ "$(git rev-parse --is-shallow-repository)" == "true" ]]; then
+            git fetch --no-tags --unshallow origin +refs/heads/main:refs/remotes/origin/main
+          else
+            git fetch --no-tags origin +refs/heads/main:refs/remotes/origin/main
+          fi
+          if ! git merge-base --is-ancestor HEAD origin/main; then
+            echo "Production releases must be the current main commit or an ancestor of main" >&2
+            exit 1
           fi
 
       - uses: ./.github/actions/setup-frontend
@@ -134,31 +123,38 @@ jobs:
       - name: Deploy and verify terminal success
         shell: bash
         env:
-          DEPLOY_ENVIRONMENT: ${{ inputs.environment }}
           RELEASE_ROOT: ${{ steps.context.outputs.release_root }}
           RELEASE_SHA: ${{ inputs.release_sha }}
         run: |
           set -euo pipefail
           : "${RAILWAY_TOKEN:?Configure RAILWAY_TOKEN on the selected GitHub Environment}"
 
-          railway link \
+          services="$(railway service list \
             --project "$RAILWAY_PROJECT_ID" \
-            --environment "$DEPLOY_ENVIRONMENT" \
-            --service "$RAILWAY_SERVICE_ID"
+            --environment "$RAILWAY_ENVIRONMENT" \
+            --json)"
+          service_count="$(jq --arg name "$RAILWAY_SERVICE_NAME" \
+            '[.[] | select(.name == $name)] | length' <<<"$services")"
+          [[ "$service_count" == 1 ]] || {
+            echo "Expected exactly one production Railway service named $RAILWAY_SERVICE_NAME; found $service_count" >&2
+            exit 1
+          }
+          railway_service_id="$(jq -r --arg name "$RAILWAY_SERVICE_NAME" \
+            '.[] | select(.name == $name) | .id' <<<"$services")"
 
-          before_ids="$(railway deployment list --service "$RAILWAY_SERVICE_ID" --environment "$DEPLOY_ENVIRONMENT" --limit 100 --json | jq -c 'map(.id)')"
+          before_ids="$(railway deployment list --service "$railway_service_id" --environment "$RAILWAY_ENVIRONMENT" --limit 100 --json | jq -c 'map(.id)')"
 
           railway up "$RELEASE_ROOT" \
             --path-as-root \
             --detach \
             --project "$RAILWAY_PROJECT_ID" \
-            --environment "$DEPLOY_ENVIRONMENT" \
-            --service "$RAILWAY_SERVICE_ID" \
+            --environment "$RAILWAY_ENVIRONMENT" \
+            --service "$railway_service_id" \
             --message "web release $RELEASE_SHA"
 
           deployment_id=""
           for attempt in {1..30}; do
-            deployments="$(railway deployment list --service "$RAILWAY_SERVICE_ID" --environment "$DEPLOY_ENVIRONMENT" --limit 10 --json)"
+            deployments="$(railway deployment list --service "$railway_service_id" --environment "$RAILWAY_ENVIRONMENT" --limit 10 --json)"
             deployment_id="$(jq -r --argjson before_ids "$before_ids" '[.[] | select(.id as $candidate | ($before_ids | index($candidate) | not))][0].id // empty' <<<"$deployments")"
             [[ -n "$deployment_id" ]] && break
             sleep 5
@@ -169,7 +165,7 @@ jobs:
           fi
 
           for attempt in {1..180}; do
-            deployments="$(railway deployment list --service "$RAILWAY_SERVICE_ID" --environment "$DEPLOY_ENVIRONMENT" --limit 20 --json)"
+            deployments="$(railway deployment list --service "$railway_service_id" --environment "$RAILWAY_ENVIRONMENT" --limit 20 --json)"
             status="$(jq -r --arg id "$deployment_id" '.[] | select(.id == $id) | .status' <<<"$deployments")"
             echo "Railway deployment $deployment_id: ${status:-not-listed}"
             case "$status" in

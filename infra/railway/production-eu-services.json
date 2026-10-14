@@ -1,0 +1,91 @@
+{
+  "schemaVersion": 1,
+  "projectId": "cc695d4b-030c-43e3-bbd6-a41095b09257",
+  "environment": "production",
+  "expectedRegion": "europe-west4-drams3a",
+  "services": [
+    { "name": "Postgres", "role": "database" },
+    { "name": "Redis", "role": "cache" },
+    { "name": "qdrant", "role": "vector-store" },
+    { "name": "spacetimedb", "role": "system-of-record" },
+    { "name": "spacetimedb-publisher", "role": "schema-publisher" },
+    { "name": "storage-migrate", "role": "migration", "runtimeBinary": "storage-migrate" },
+    { "name": "chromium-worker", "role": "report-renderer" },
+    { "name": "api-server", "role": "api", "runtimeBinary": "api-server" },
+    {
+      "name": "ai-gateway",
+      "role": "ai",
+      "runtimeBinary": "gateway",
+      "required": false,
+      "featureGate": "RAILWAY_ENABLE_AI"
+    },
+    { "name": "projection-worker", "role": "projection", "runtimeBinary": "projection-worker" },
+    { "name": "workflow-worker", "role": "workflow", "runtimeBinary": "workflow-worker" },
+    { "name": "owner-report-worker", "role": "owner-report", "runtimeBinary": "owner-report-worker" },
+    {
+      "name": "expense-integration-worker",
+      "required": false,
+      "featureGate": "RAILWAY_ENABLE_INTEGRATIONS",
+      "role": "expense-integration",
+      "runtimeBinary": "expense-integration-worker",
+      "healthPort": 8092,
+      "requiredVariables": {
+        "LUMIERE_BIN": { "kind": "exact", "value": "expense-integration-worker" },
+        "LUMIERE_ENV": { "kind": "exact", "value": "production" },
+        "STDB_HOST": { "kind": "url" },
+        "STDB_MODULE": { "kind": "non-placeholder" },
+        "STDB_EXPENSE_WORKER_TOKEN": { "kind": "secret" },
+        "LUMIERE_EXPENSE_WORKER_ORG_IDS": { "kind": "positive-id-list" },
+        "LUMIERE_EXPENSE_WORKER_PORT": { "kind": "exact", "value": "8092" },
+        "LUMIERE_PLACEMENT_GENERATION": { "kind": "positive-integer" },
+        "LUMIERE_CELL_ID": { "kind": "non-placeholder" },
+        "LUMIERE_DURABLE_STORE_ID": { "kind": "non-placeholder" },
+        "AI_GATEWAY_URL": { "kind": "url" }
+      }
+    },
+    {
+      "name": "hr-integration-worker",
+      "required": false,
+      "featureGate": "RAILWAY_ENABLE_INTEGRATIONS",
+      "role": "hr-integration",
+      "runtimeBinary": "hr-integration-worker",
+      "healthPort": 8094,
+      "requiredVariables": {
+        "LUMIERE_BIN": { "kind": "exact", "value": "hr-integration-worker" },
+        "LUMIERE_ENV": { "kind": "exact", "value": "production" },
+        "STDB_HOST": { "kind": "url" },
+        "STDB_MODULE": { "kind": "non-placeholder" },
+        "STDB_HR_WORKER_TOKEN": { "kind": "secret" },
+        "LUMIERE_HR_WORKER_ORG_IDS": { "kind": "positive-id-list" },
+        "LUMIERE_HR_WORKER_PORT": { "kind": "exact", "value": "8094" },
+        "LUMIERE_PLACEMENT_GENERATION": { "kind": "positive-integer" },
+        "LUMIERE_CELL_ID": { "kind": "non-placeholder" },
+        "LUMIERE_DURABLE_STORE_ID": { "kind": "non-placeholder" },
+        "AI_GATEWAY_URL": { "kind": "url" }
+      }
+    },
+    {
+      "name": "project-integration-worker",
+      "required": false,
+      "featureGate": "RAILWAY_ENABLE_INTEGRATIONS",
+      "role": "project-integration",
+      "runtimeBinary": "project-integration-worker",
+      "healthPort": 8093,
+      "requiredVariables": {
+        "LUMIERE_BIN": { "kind": "exact", "value": "project-integration-worker" },
+        "LUMIERE_ENV": { "kind": "exact", "value": "production" },
+        "STDB_HOST": { "kind": "url" },
+        "STDB_MODULE": { "kind": "non-placeholder" },
+        "STDB_PROJECT_WORKER_TOKEN": { "kind": "secret" },
+        "LUMIERE_PROJECT_WORKER_ORG_IDS": { "kind": "positive-id-list" },
+        "LUMIERE_PROJECT_WORKER_PORT": { "kind": "exact", "value": "8093" },
+        "LUMIERE_PLACEMENT_GENERATION": { "kind": "positive-integer" },
+        "LUMIERE_CELL_ID": { "kind": "non-placeholder" },
+        "LUMIERE_DURABLE_STORE_ID": { "kind": "non-placeholder" },
+        "AI_GATEWAY_URL": { "kind": "url" }
+      }
+    },
+    { "name": "web", "role": "web" },
+    { "name": "api-gateway", "role": "edge" }
+  ]
+}

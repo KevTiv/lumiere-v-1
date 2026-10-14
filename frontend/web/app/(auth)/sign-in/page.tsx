@@ -122,10 +122,12 @@ export default function SignInPage() {
 
       <CardFooter className="justify-center">
         <p className="text-sm text-muted-foreground">
-          {t("auth.signIn.noAccount")}{" "}
-          <Link href="/sign-up" className="font-medium text-foreground hover:underline">
-            {t("auth.signIn.createOne")}
-          </Link>
+          {process.env.NODE_ENV === 'production' ? 'Access is by invitation. Contact your administrator.' : <>
+            {t("auth.signIn.noAccount")}{" "}
+            <Link href="/sign-up" className="font-medium text-foreground hover:underline">
+              {t("auth.signIn.createOne")}
+            </Link>
+          </>}
         </p>
       </CardFooter>
     </Card>

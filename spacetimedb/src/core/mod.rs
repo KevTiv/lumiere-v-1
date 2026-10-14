@@ -22,6 +22,7 @@ pub mod billing;
 pub mod cold_tier;
 pub mod cold_tier_identity;
 pub mod country_pack;
+mod country_catalog;
 pub mod messaging;
 pub mod migrations;
 pub mod operational_messaging;
