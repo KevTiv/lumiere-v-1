@@ -7,6 +7,7 @@ Canonical request flow for the Lumiere ERP web stack. For environment variables 
 ```mermaid
 flowchart LR
   Browser --> NextApi["Next.js /api/* BFF"]
+  Contracts["lumiere-contracts version service"] -. startup compatibility check .-> NextApi
   NextApi --> ApiServer["Rust api-server :8082"]
   ApiServer --> StdbHttp["SpacetimeDB HTTP SQL + reducers"]
   Browser --> RealtimeWs["/v1/realtime/ws"]
@@ -22,6 +23,12 @@ flowchart LR
 2. Next.js route handlers under [`frontend/web/app/api/`](../frontend/web/app/api/) forward most ERP paths to the Rust api-server via [`frontend/web/lib/api-server-forward.ts`](../frontend/web/lib/api-server-forward.ts) (`LUMIERE_API_SERVER_URL`).
 3. api-server resolves the session (cookie `stdb_token` or `Authorization: Bearer`), scopes queries by organization, and calls SpacetimeDB HTTP SQL or reducers.
 4. Optional direct gateway: set `NEXT_PUBLIC_API_GATEWAY_URL` to api-server origin (used by Kong in Docker compose) — see [`frontend/web/lib/api-url.ts`](../frontend/web/lib/api-url.ts).
+
+### Railway contracts compatibility
+
+- The production Next.js service checks the private `lumiere-contracts` service before it starts serving traffic.
+- `LUMIERE_CONTRACTS_URL` is a Railway service-reference URL, so the dashboard topology represents a real private-network dependency.
+- Startup fails closed when the service identity or health status is wrong, or when its version does not match `LUMIERE_CONTRACTS_EXPECTED_VERSION` for the application release.
 
 ### Realtime
 
@@ -58,6 +65,7 @@ flowchart LR
 | Service | Path | Owns |
 |---------|------|------|
 | **Next.js web** | `frontend/web/` | App shell, SSR, BFF forward, `/api/ai/*`, auth signup/signin forward |
+| **lumiere-contracts** | Separate contracts repository | Released generated contracts and private runtime compatibility identity/version endpoint |
 | **api-server** | `api-server/` | Session, `/v1/query`, `/v1/call`, typed REST (CRM, sales, …), realtime WS |
 | **SpacetimeDB module** | `spacetimedb/` | Tables, reducers, permissions, audit, domain logic |
 | **ai-gateway** | `ai-gateway/` | LLM, RAG, embeddings, action draft orchestration |

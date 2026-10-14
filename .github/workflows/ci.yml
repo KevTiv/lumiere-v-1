@@ -296,6 +296,9 @@ jobs:
       - name: Unit tests (web BFF helpers)
         run: pnpm --dir web test:unit
 
+      - name: Railway contracts startup check
+        run: pnpm --dir web test:railway-startup
+
   # Typecheck runs beside the frontend checks rather than after them, and keeps
   # turbo's task cache plus tsc incremental state between runs so packages a
   # change does not touch replay from cache.
