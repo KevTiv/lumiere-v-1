@@ -3,6 +3,14 @@ import test from "node:test"
 
 import nextConfig from "./next.config.mjs"
 
+test("private ERP responses discourage indexing without caching private data", async () => {
+  const headers = await nextConfig.headers()
+  assert.deepEqual(headers, [{
+    source: '/:path*',
+    headers: [{ key: 'X-Robots-Tag', value: 'noindex, nofollow, noarchive' }],
+  }])
+})
+
 test("Next forwards typed operation paths to api-server", async () => {
   const previous = process.env.LUMIERE_API_SERVER_URL
   process.env.LUMIERE_API_SERVER_URL = "http://127.0.0.1:8082/"

@@ -68,6 +68,12 @@ const nextConfig = {
   // server bundle. The release workflow copies this traced tree verbatim.
   outputFileTracingRoot: path.resolve(__dirname, '../..'),
   skipTrailingSlashRedirect: true,
+  async headers() {
+    return [{
+      source: '/:path*',
+      headers: [{ key: 'X-Robots-Tag', value: 'noindex, nofollow, noarchive' }],
+    }]
+  },
   async rewrites() {
     return [...rustApiRewrites(), ...posthogRewrites()]
   },
