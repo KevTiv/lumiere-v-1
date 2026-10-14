@@ -1186,12 +1186,11 @@ check-codegen-pinned: check-agent-capabilities-pinned check-operation-history-pi
 		(echo "Checked-in generated artifacts are out of date" && exit 1)
 
 # Populates .contracts-staging/{bindings,manifests} from the currently
-# pinned lumiere-contracts git dependency instead of a live `spacetime
-# generate` run. Use this when the schema hasn't changed and you just need
-# .contracts-staging present to build/check/test (e.g. in CI, which has no
-# `spacetime` CLI). Requires `cargo fetch` (or any prior cargo invocation)
-# to have already resolved the dependency.
+# pinned, checksum-verified lumiere-contracts release instead of a live
+# `spacetime generate` run. Use this when the schema hasn't changed and you
+# just need .contracts-staging present to build/check/test.
 contracts-staging-from-pinned:
+	@bash scripts/prepare-vendored-contracts-rust.sh
 	@cargo fetch --quiet
 	@CHECKOUT="$$(bash scripts/resolve-pinned-contracts.sh)"; \
 	if [ -z "$$CHECKOUT" ] || [ ! -d "$$CHECKOUT/crates/lumiere-contracts/src/bindings" ]; then \
