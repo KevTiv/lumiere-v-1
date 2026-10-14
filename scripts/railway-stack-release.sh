@@ -72,6 +72,25 @@ deployment_list() {
     --json
 }
 
+resolve_service_id() {
+  local service="$1"
+  local services matches
+  if ! services="$(timeout "$UPLOAD_TIMEOUT_SECONDS" railway service list \
+    --project "$RAILWAY_PROJECT_ID" \
+    --environment "$RAILWAY_ENVIRONMENT" \
+    --json)"; then
+    echo "[railway-release] $service: could not list environment-scoped services" >&2
+    return 1
+  fi
+  matches="$(jq -c --arg service "$service" \
+    '[.[] | select(.id == $service or .name == $service)]' <<<"$services")"
+  if [[ "$(jq 'length' <<<"$matches")" != 1 ]]; then
+    echo "[railway-release] $service: expected exactly one environment-scoped service" >&2
+    return 1
+  fi
+  jq -er '.[0].id | select(type == "string" and length > 0)' <<<"$matches"
+}
+
 deployment_status() {
   local service="$1"
   local deployment_id="$2"
@@ -224,7 +243,11 @@ deploy_one() {
 redeploy_source_one() {
   local service="$1"
   : "${RUST_RUNTIME_IMAGE:?RUST_RUNTIME_IMAGE is required}"
-  local before_ids
+  local before_ids service_id
+  if ! service_id="$(resolve_service_id "$service")"; then
+    dump_diagnostics "$service"
+    return 1
+  fi
   before_ids="$(deployment_list "$service" | jq -c 'map(.id)')"
 
   # A service source is an environment-scoped setting. Submit one patch so the
@@ -233,9 +256,9 @@ redeploy_source_one() {
   # the new image. Piped JSON also keeps this safe in a non-TTY CI runner.
   local source_patch edit_result
   source_patch="$(jq -cn \
-    --arg service "$service" \
+    --arg service_id "$service_id" \
     --arg image "$RUST_RUNTIME_IMAGE" \
-    '{services: {($service): {source: {
+    '{services: {($service_id): {source: {
       image: $image,
       repo: null,
       branch: null,
