@@ -116,6 +116,12 @@ class RailwayStackWorkflowTests(unittest.TestCase):
         self.assertIn("default: false", workflow)
         self.assertIn("if: inputs.enable_ai", workflow)
 
+    def test_integration_activation_requires_real_tenants(self):
+        workflow = (ROOT / ".github/workflows/release-railway-stack.yml").read_text()
+        self.assertIn("enable_integrations:", workflow)
+        self.assertIn("RAILWAY_ENABLE_INTEGRATIONS: ${{ inputs.enable_integrations }}", workflow)
+        self.assertIn("if: inputs.environment == 'production' && inputs.enable_integrations", workflow)
+
     def test_production_manifest_covers_exact_runtime_workers(self):
         manifest = json.loads(
             (ROOT / "infra/railway/production-eu-services.json").read_text()

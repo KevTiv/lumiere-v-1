@@ -10,7 +10,7 @@ on:
       environment:
         description: GitHub and Railway environment
         required: true
-        default: dev
+        default: production
         type: choice
         options:
           - dev
@@ -26,6 +26,11 @@ on:
         type: string
       enable_ai:
         description: Promote the optional AI gateway (disabled for the initial release)
+        required: true
+        default: false
+        type: boolean
+      enable_integrations:
+        description: Activate integration workers after real organization IDs and service bindings are configured
         required: true
         default: false
         type: boolean
@@ -62,6 +67,7 @@ jobs:
       RELEASE_SHA: ${{ inputs.release_sha }}
       RUST_RUNTIME_IMAGE: ${{ inputs.rust_runtime_image }}
       RAILWAY_ENABLE_AI: ${{ inputs.enable_ai }}
+      RAILWAY_ENABLE_INTEGRATIONS: ${{ inputs.enable_integrations }}
       API_READINESS_URL: ${{ secrets.RAILWAY_API_READINESS_URL }}
       AI_READINESS_URL: ${{ secrets.RAILWAY_AI_READINESS_URL }}
       CHROMIUM_READINESS_URL: ${{ secrets.RAILWAY_CHROMIUM_READINESS_URL }}
@@ -95,7 +101,7 @@ jobs:
             echo "Production releases require edge_readiness_url" >&2
             exit 1
           fi
-          if [[ "$RAILWAY_ENVIRONMENT" == production ]]; then
+          if [[ "$RAILWAY_ENVIRONMENT" == production && "$RAILWAY_ENABLE_INTEGRATIONS" == true ]]; then
             for readiness_name in \
               EXPENSE_INTEGRATION_READINESS_URL \
               HR_INTEGRATION_READINESS_URL \
@@ -229,14 +235,14 @@ jobs:
           bash scripts/railway-stack-release.sh probe "${probes[@]}"
 
       - name: Phase 9 — deploy production integration workers from shared runtime image
-        if: inputs.environment == 'production'
+        if: inputs.environment == 'production' && inputs.enable_integrations
         shell: bash
         run: >-
           bash scripts/railway-stack-release.sh redeploy-source
           expense-integration-worker hr-integration-worker project-integration-worker
 
       - name: Phase 9 gate — production integration-worker readiness
-        if: inputs.environment == 'production'
+        if: inputs.environment == 'production' && inputs.enable_integrations
         shell: bash
         run: |
           set -euo pipefail

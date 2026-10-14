@@ -8,7 +8,7 @@ trap 'rm -rf "$TMP"' EXIT
 
 jq '[
   .services[]
-  | select((if has("required") then .required else true end) == true)
+  | select(.name != "ai-gateway")
   | {
       id: ("service-" + .name),
       name,
@@ -75,11 +75,20 @@ common_env=(
   "RAILWAY_PROJECT_ID=cc695d4b-030c-43e3-bbd6-a41095b09257"
   "RAILWAY_ENVIRONMENT=production"
   "RAILWAY_EXPECTED_REGION=europe-west4-drams3a"
+  "RAILWAY_ENABLE_INTEGRATIONS=true"
   "TEST_SERVICES_FILE=$TMP/services.json"
   "TEST_VARIABLES_DIR=$TMP"
 )
 
 env "${common_env[@]}" bash "$ROOT/scripts/railway-production-preflight.sh" "$MANIFEST"
+
+# An empty production database has no tenant IDs to configure. The initial ERP
+# release may omit integration workers until onboarding and identity binding.
+jq 'map(select(.name | endswith("-integration-worker") | not))' \
+  "$TMP/services.json" >"$TMP/initial-services.json"
+env "${common_env[@]}" RAILWAY_ENABLE_INTEGRATIONS=false \
+  TEST_SERVICES_FILE="$TMP/initial-services.json" \
+  bash "$ROOT/scripts/railway-production-preflight.sh" "$MANIFEST"
 
 # A disabled optional service must not gate ERP even if its existing deployment
 # has no active EU replica. Enabling the feature makes the same service strict.

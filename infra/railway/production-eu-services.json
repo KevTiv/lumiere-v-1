@@ -24,6 +24,8 @@
     { "name": "owner-report-worker", "role": "owner-report", "runtimeBinary": "owner-report-worker" },
     {
       "name": "expense-integration-worker",
+      "required": false,
+      "featureGate": "RAILWAY_ENABLE_INTEGRATIONS",
       "role": "expense-integration",
       "runtimeBinary": "expense-integration-worker",
       "healthPort": 8092,
@@ -43,6 +45,8 @@
     },
     {
       "name": "hr-integration-worker",
+      "required": false,
+      "featureGate": "RAILWAY_ENABLE_INTEGRATIONS",
       "role": "hr-integration",
       "runtimeBinary": "hr-integration-worker",
       "healthPort": 8094,
@@ -62,6 +66,8 @@
     },
     {
       "name": "project-integration-worker",
+      "required": false,
+      "featureGate": "RAILWAY_ENABLE_INTEGRATIONS",
       "role": "project-integration",
       "runtimeBinary": "project-integration-worker",
       "healthPort": 8093,

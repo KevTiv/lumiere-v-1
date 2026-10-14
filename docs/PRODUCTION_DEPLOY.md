@@ -112,6 +112,14 @@ operation.
 
 ## Ordered Railway release
 
+For the initial empty production database, leave `enable_integrations=false`.
+Expense, HR, and project integration services can be configured in advance,
+but activation requires real organization IDs and the matching registered
+service identities. After onboarding, register those bindings with an authorized
+platform superuser, set each worker's organization allowlist, then release with
+`enable_integrations=true`. Never invent tenant IDs to satisfy a readiness gate.
+`enable_ai` also defaults to false while no AI provider is configured.
+
 Use the **Release Railway stack** workflow for monorepo releases. It accepts an
 immutable full commit SHA and serializes releases per Railway environment. The
 workflow fails closed between these phases:
