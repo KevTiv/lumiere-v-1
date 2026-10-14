@@ -83,17 +83,22 @@ async function main() {
   if (process.env.LUMIERE_GATEWAY_URL) {
     const gateway = privateBase('LUMIERE_GATEWAY_URL')
     const probes = [
-      ['/sign-in', false], ['/overview', false], ['/sign-up', false],
-      ['/robots.txt', false], ['/api/ai', false], ['/ingest', false],
-      ['/api/auth/signup', false], ['/api/auth/profile', true], ['/overview', true],
+      ['/sign-in', false, 200], ['/', false, 307], ['/overview', false, 307], ['/sign-up', false, 307],
+      ['/robots.txt', false, 200], ['/api/ai', false, 503], ['/ingest', false, 404],
+      ['/api/auth/signup', false, 403], ['/api/query/companies', false, 401],
+      ['/api/auth/profile', true, 200], ['/overview', true, 200],
     ]
-    for (const [path, authenticated] of probes) {
+    for (const [path, authenticated, expected] of probes) {
       const response = await fetch(new URL(path, gateway), {
+        method: path === '/api/auth/signup' ? 'POST' : 'GET',
         redirect: 'manual',
         headers: authenticated ? { Cookie: `stdb_token=${credential.token}; stdb_identity=${credential.identity}` } : {},
         signal: AbortSignal.timeout(45_000),
       })
       console.log(`WEB_PROBE path=${path} authenticated=${authenticated} status=${response.status}`)
+      if (process.env.BOOTSTRAP_VERIFY_PRIVATE_RELEASE === 'true' && response.status !== expected) {
+        throw new Error(`private release probe ${path} expected ${expected}, got ${response.status}`)
+      }
       await response.body?.cancel()
     }
   }

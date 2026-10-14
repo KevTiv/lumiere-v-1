@@ -4,6 +4,7 @@ import test from "node:test"
 import nextConfig from "./next.config.mjs"
 
 test("private ERP responses discourage indexing without caching private data", async () => {
+  assert.ok(nextConfig.headers)
   const headers = await nextConfig.headers()
   assert.deepEqual(headers, [{
     source: '/:path*',
