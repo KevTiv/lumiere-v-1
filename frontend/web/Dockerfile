@@ -19,6 +19,7 @@ COPY packages/query-hooks/package.json ./packages/query-hooks/
 COPY packages/stdb/package.json ./packages/stdb/
 COPY packages/ui/package.json ./packages/ui/
 COPY packages/i18n/package.json ./packages/i18n/
+COPY vendor/ ./vendor/
 RUN pnpm install --frozen-lockfile
 
 # --- builder ---

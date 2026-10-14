@@ -33,7 +33,7 @@
   },
   "dependencies": {
     "@lumiere/api-client": "workspace:*",
-    "@lumiere/contracts": "github:KevTiv/lumiere-contracts#4b90e7c2cdc5bd549b2e261a24d13f7a47dc0099&path:packages/contracts",
+    "@lumiere/contracts": "file:../../vendor/lumiere-contracts-0.3.106.tgz",
     "spacetimedb": "2.8.2"
   },
   "peerDependencies": {
