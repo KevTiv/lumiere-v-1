@@ -20,6 +20,8 @@ COPY packages/stdb/package.json ./packages/stdb/
 COPY packages/ui/package.json ./packages/ui/
 COPY packages/i18n/package.json ./packages/i18n/
 COPY vendor/ ./vendor/
+COPY scripts/verify-vendored-contracts.mjs ./scripts/verify-vendored-contracts.mjs
+RUN node ./scripts/verify-vendored-contracts.mjs
 RUN pnpm install --frozen-lockfile
 
 # --- builder ---
@@ -36,10 +38,9 @@ COPY --from=builder /app/web/.next ./web/.next
 COPY --from=builder /app/web/public ./web/public
 COPY --from=builder /app/web/package.json ./web/package.json
 COPY --from=builder /app/web/node_modules ./web/node_modules
-COPY --from=builder /app/web/scripts/start-with-contract-check.mjs ./web/scripts/start-with-contract-check.mjs
 COPY --from=builder /app/node_modules ./node_modules
 
 WORKDIR /app/web
 EXPOSE 3000
 
-CMD ["node", "./scripts/start-with-contract-check.mjs"]
+CMD ["./node_modules/.bin/next", "start"]

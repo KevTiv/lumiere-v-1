@@ -296,8 +296,8 @@ jobs:
       - name: Unit tests (web BFF helpers)
         run: pnpm --dir web test:unit
 
-      - name: Railway contracts startup check
-        run: pnpm --dir web test:railway-startup
+      - name: Verify vendored frontend contracts pin
+        run: pnpm contracts:verify-vendored
 
   # Typecheck runs beside the frontend checks rather than after them, and keeps
   # turbo's task cache plus tsc incremental state between runs so packages a
