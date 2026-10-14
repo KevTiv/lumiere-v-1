@@ -105,6 +105,8 @@ Set `NODE_ENV=production` or `LUMIERE_ENV=production`. **api-server refuses to s
 | `STDB_SERVER_TOKEN` | yes | Non-empty |
 | `AI_GATEWAY_URL` | yes | Internal ai-gateway base URL; must not contain `localhost` or `127.0.0.1` |
 | `LUMIERE_PROJECTION_LAG_BUDGET_SECS` | optional (default 300) | Maximum duration PostgreSQL may remain unavailable after a proven healthy probe while active ERP readiness remains degraded but available. |
+| `PG_TLS_MODE` | yes when PostgreSQL is used | Use `require` for normal/public endpoints. Railway services may explicitly use `private-network` only with an internal `PG_HOST` ending in `.railway.internal`. |
+| `PG_HOST` | yes when PostgreSQL is used | The database hostname. `private-network` fails closed unless this is Railway private DNS. |
 | `STDB_HOST` or `NEXT_PUBLIC_STDB_HOST` | recommended | Defaults to maincloud if unset |
 | `CORS_ORIGINS` | recommended | Comma-separated origins for credentialed browser calls |
 | `LUMIERE_AI_GATEWAY_INTERNAL_SECRET` | yes (compose) | BFF → gateway auth |
@@ -113,6 +115,16 @@ Set `NODE_ENV=production` or `LUMIERE_ENV=production`. **api-server refuses to s
 | `RESEND_API_KEY` | optional | Transactional email |
 
 In compose, `AI_GATEWAY_URL` is wired to `http://ai-gateway:8080`.
+
+`PG_TLS_MODE=private-network` is a narrow Railway deployment exception for the
+provider's project/environment-scoped private service network. It disables TLS
+between the application and PostgreSQL to avoid treating Railway's internal CA
+certificate as a public end-entity certificate. The runtime accepts it only in
+production and only for a host whose name ends exactly in `.railway.internal`;
+public Railway TCP proxy hosts and all non-Railway hosts are rejected. The DNS
+suffix check is a configuration guard, not a replacement for network isolation:
+keep both services in the same trusted Railway environment and use `require`
+whenever traffic can leave that private network.
 
 The api-server endpoints have separate purposes: `/live` is liveness-only (`/health` is its
 compatibility alias), while `/ready` returns structured SpacetimeDB, PostgreSQL, projection,

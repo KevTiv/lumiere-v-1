@@ -95,8 +95,9 @@ services:
       LUMIERE_REPORT_ARTIFACT_DIR: /var/lib/lumiere/owner-reports
       # Cold-tier storage (docs/plans/sliding-window-cold-tier.md). Readiness and
       # PG-backed reads fail closed when this durable store is unavailable.
-      # Point at the managed Postgres instance; PG_TLS_MODE
-      # must be "require" here since NODE_ENV=production fails closed otherwise.
+      # Point at the managed Postgres instance. Use PG_TLS_MODE=require unless
+      # this process and Postgres share Railway's private service network; that
+      # narrow case may use private-network with a *.railway.internal PG_HOST.
       PG_HOST: ${PG_HOST:-}
       PG_PORT: ${PG_PORT:-5432}
       PG_DATABASE: ${PG_DATABASE:-lumiere}
