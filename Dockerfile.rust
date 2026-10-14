@@ -3,6 +3,8 @@
 FROM rust:1-bookworm AS chef
 WORKDIR /app
 
+FROM dopplerhq/cli:3.75.1@sha256:f2ffb55128ed895ca3ee7a64a394661e89aa16cf9f9e05cea24021a4ba062e75 AS doppler
+
 FROM chef AS builder
 ARG BIN
 ARG CARGO_BUILD_JOBS=1
@@ -29,5 +31,9 @@ RUN apt-get update \
   && apt-get install -y --no-install-recommends ca-certificates \
   && rm -rf /var/lib/apt/lists/*
 COPY --from=builder "/app/target/release/${BIN}" /usr/local/bin/lumiere-service
+COPY --from=doppler /bin/doppler /usr/local/bin/doppler
+COPY infra/doppler/entrypoint.sh /usr/local/bin/lumiere-with-secrets
+RUN chmod 0755 /usr/local/bin/lumiere-with-secrets
 EXPOSE 8080
+ENTRYPOINT ["/usr/local/bin/lumiere-with-secrets"]
 CMD ["/usr/local/bin/lumiere-service"]
