@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { alphaDemoFixtures } from './alpha-demo-fixtures.mjs'
 
-export async function demoContractSchema(archive, operations) {
+export async function demoContractSchema(archive, operations, { tenantMigration = false } = {}) {
   const read = path => execFileSync('tar', ['-xOf', archive, `package/dist/generated/${path}`], { maxBuffer: 16 * 1024 * 1024 }).toString()
   const t = new Proxy({}, { get: (_target, kind) => (...args) => {
     if (kind === 'object' || kind === 'enum') return { kind, name: args[0], fields: args[1] }
@@ -33,11 +33,16 @@ export async function demoContractSchema(archive, operations) {
   const output = {}
   for (const name of operations) {
     const descriptor = descriptors.namespace.SESSION_OPERATION_DESCRIPTORS[name]
-    if (!descriptor) throw new Error(`Seed operation is not session-exposed: ${name}`)
+    // This existing operator reducer intentionally stays out of the public API.
+    // The private seed job may call this one tenant-permission-checked reducer
+    // directly with the owner's user token, never the server/SQL token.
+    const provisioning = tenantMigration && name === 'apply_org_migrations'
+    if (!descriptor && !provisioning) throw new Error(`Seed operation is not session-exposed: ${name}`)
     const binding = new SourceTextModule(read(`${name}_reducer.js`))
     await binding.link(path => path === 'spacetimedb' ? primitives : types)
     await binding.evaluate()
-    output[name] = { operationId: descriptor.contractOperationId,
+    output[name] = { operationId: descriptor?.contractOperationId ?? 'erp.apply_org_migrations',
+      ...(provisioning ? { transport: 'private-tenant-migration', reducer: name } : {}),
       fields: Object.fromEntries(Object.entries(binding.namespace.default).map(([key, value]) => [key, plain(value)])) }
   }
   return output
@@ -45,7 +50,7 @@ export async function demoContractSchema(archive, operations) {
 
 export async function alphaSeedPayload(archive) {
   const fixtures = alphaDemoFixtures()
-  const operations = await demoContractSchema(archive, [...new Set(fixtures.map(fixture => fixture.operation))])
+  const operations = await demoContractSchema(archive, [...new Set(['apply_org_migrations', ...fixtures.map(fixture => fixture.operation)])], { tenantMigration: true })
   const temporary = mkdtempSync(join(tmpdir(), 'alpha-contract-tables-'))
   try {
     execFileSync('tar', ['-xzf', archive, '-C', temporary, '--wildcards', 'package/dist/generated/*_table.js'])

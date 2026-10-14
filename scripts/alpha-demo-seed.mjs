@@ -101,6 +101,29 @@ export async function runAlphaDemoSeed(env = process.env) {
   const ids = { company: Number(companies[0].id), currency: Number(companies[0].currency_id), ownerIdentity: credential.identity }
   if (!Number.isSafeInteger(ids.currency) || ids.currency <= 0) throw new Error('Company currency is not valid')
   console.log(`ALPHA_ADMIN_VERIFIED organizationId=${org} role=${session.fieldAccess.roleName} settingsAccess=true platformSuperuserRequired=false`)
+  let referenceProvisioning
+  if (env.SEED_PROVISION_REFERENCE_DATA === 'true') {
+    const operation = schema.operations.apply_org_migrations
+    if (!operation || operation.transport !== 'private-tenant-migration' || operation.reducer !== 'apply_org_migrations'
+      || Object.keys(operation.fields).join(',') !== 'organizationId' || operation.fields.organizationId.kind !== 'u64') throw new Error('Pinned tenant migration contract is missing')
+    const verifyNonPlatformOwner = async () => {
+      const normalize = value => String(unwrap(value)?.__identity__ ?? unwrap(value)).replace(/^0x/, '').toLowerCase()
+      const profiles = (await sql(`SELECT identity, is_superuser FROM user_profile WHERE organization_id = ${org}`))
+        .filter(profile => normalize(profile.identity) === normalize(credential.identity))
+      if (profiles.length !== 1 || profiles[0].is_superuser !== false) throw new Error('Alpha owner must remain a non-platform-superuser')
+    }
+    await verifyNonPlatformOwner()
+    const migrated = await fetch(new URL(`/v1/database/${database}/call/${operation.reducer}`, stdb), {
+      method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify([org]), signal: AbortSignal.timeout(45000),
+    })
+    if (!migrated.ok) throw new Error(`Tenant reference provisioning HTTP ${migrated.status}; no privileged fallback attempted`)
+    const migrations = await sql(`SELECT version FROM org_schema_migration WHERE organization_id = ${org}`)
+    if (!migrations.some(row => Number(row.version) === 5)) throw new Error('Country catalog migration v5 is not deployed; no privileged fallback attempted')
+    await verifyNonPlatformOwner()
+    referenceProvisioning = { operation: operation.operationId, transport: operation.transport, migrationVersion: 5, platformSuperuser: false }
+    console.log('ALPHA_REFERENCE_PROVISIONED migrationVersion=5 platformSuperuser=false')
+  }
   const outcomes = []
   for (const fixture of fixtures) {
     try {
@@ -170,7 +193,7 @@ export async function runAlphaDemoSeed(env = process.env) {
     } catch { coverage.push({ table: table.name, status: 'read-unavailable' }) }
   }
   const report = { fixtureKey: 'alpha-demo-v1', organizationId: org, generatedAt: new Date().toISOString(),
-    adminVerified: true, fixtureCount: fixtures.length, populatedFixtures: outcomes.filter(row => row.status !== 'gap').length, outcomes, coverage }
+    adminVerified: true, referenceProvisioning, fixtureCount: fixtures.length, populatedFixtures: outcomes.filter(row => row.status !== 'gap').length, outcomes, coverage }
   if (env.SEED_GATEWAY_URL) {
     const gateway = new URL(env.SEED_GATEWAY_URL)
     if (gateway.protocol !== 'http:' || !gateway.hostname.endsWith('.railway.internal')) throw new Error('UI probe requires Railway private HTTP')

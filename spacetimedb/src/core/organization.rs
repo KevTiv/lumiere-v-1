@@ -13,8 +13,8 @@ use crate::core::country_pack::{
 use crate::core::permissions::{role, user_role_assignment, Role, UserRoleAssignment};
 use crate::core::persistence::{record_organization_commit, OrganizationCommitInput, RowChange};
 use crate::core::reference::{
-    currency, require_active_currency_by_id, require_active_currency_for_organization,
-    seed_currency_for_organization,
+    country, currency, require_active_currency_by_id, require_active_currency_for_organization,
+    seed_country_catalog_for_organization, seed_currency_for_organization,
 };
 use crate::core::users::{
     ensure_user_profile_for_organization, find_user_profile_for_identity, user_organization,
@@ -545,6 +545,7 @@ pub fn bootstrap_new_tenant(
         },
     );
 
+    seed_country_catalog_for_organization(ctx, org.id)?;
     record_bootstrap_organization_commit(ctx, org.id)?;
 
     Ok(())
@@ -584,6 +585,21 @@ fn record_bootstrap_organization_commit(
         changes.push(RowChange::upsert_stdb_row(
             "currency",
             serde_json::json!({"id": row.id}),
+            &row,
+        )?);
+    }
+
+    let mut countries: Vec<_> = ctx
+        .db
+        .country()
+        .country_by_organization()
+        .filter(&organization_id)
+        .collect();
+    countries.sort_by(|left, right| left.organization_code_key.cmp(&right.organization_code_key));
+    for row in countries {
+        changes.push(RowChange::upsert_stdb_row(
+            "country",
+            serde_json::json!({"organization_code_key": row.organization_code_key}),
             &row,
         )?);
     }
