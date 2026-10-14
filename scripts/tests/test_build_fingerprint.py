@@ -28,6 +28,9 @@ class FingerprintTests(unittest.TestCase):
         (self.root / "scripts").mkdir()
         for file in ("Cargo.toml", "Cargo.lock", "Makefile", "scripts/build-fingerprint.py", "scripts/e2e-dx.sh"):
             (self.root / file).write_text(file)
+        prepare = self.root / "scripts/prepare-vendored-contracts-rust.sh"
+        prepare.write_text("#!/bin/sh\nexit 0\n")
+        prepare.chmod(0o755)
         (self.root / "frontend/package.json").write_text("{}")
         self.module = load_module()
 
@@ -85,6 +88,9 @@ class HelperTests(unittest.TestCase):
         (self.root / "scripts").mkdir()
         for file in ("Cargo.toml", "Cargo.lock", "Makefile", "scripts/build-fingerprint.py", "scripts/e2e-dx.sh"):
             (self.root / file).write_text(file)
+        prepare = self.root / "scripts/prepare-vendored-contracts-rust.sh"
+        prepare.write_text("#!/bin/sh\nexit 0\n")
+        prepare.chmod(0o755)
         (self.root / "frontend/package.json").write_text("{}")
         self.bin = self.root / "bin"
         self.bin.mkdir()
