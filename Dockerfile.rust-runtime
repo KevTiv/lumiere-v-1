@@ -16,19 +16,15 @@ COPY iot-gateway ./iot-gateway
 COPY lumiere-codegen ./lumiere-codegen
 COPY crates ./crates
 
-RUN --mount=type=cache,id=cacheKey-lumiere-apt-cache,target=/var/cache/apt,sharing=locked \
-    --mount=type=cache,id=cacheKey-lumiere-apt-lists,target=/var/lib/apt/lists,sharing=locked \
-    apt-get update \
-    && apt-get install -y --no-install-recommends python3
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends python3 \
+    && rm -rf /var/lib/apt/lists/*
 
 RUN scripts/prepare-vendored-contracts-rust.sh
 
 # Build the production runtime set once. Keep the package builds separate because
 # Cargo's --bin filters apply to each selected package.
-RUN --mount=type=cache,id=cacheKey-lumiere-cargo-registry,target=/usr/local/cargo/registry,sharing=locked \
-    --mount=type=cache,id=cacheKey-lumiere-cargo-git,target=/usr/local/cargo/git,sharing=locked \
-    --mount=type=cache,id=cacheKey-lumiere-cargo-target,target=/app/target,sharing=locked \
-    cargo build --locked --release --jobs "${CARGO_BUILD_JOBS}" \
+RUN cargo build --locked --release --jobs "${CARGO_BUILD_JOBS}" \
       -p api-server \
       --bin api-server \
       --bin owner-report-worker \
