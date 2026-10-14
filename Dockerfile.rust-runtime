@@ -1,0 +1,61 @@
+# syntax=docker/dockerfile:1.7
+
+FROM rust:1-bookworm AS builder
+WORKDIR /app
+
+ARG CARGO_BUILD_JOBS=1
+
+COPY Cargo.toml Cargo.lock ./
+COPY Makefile ./
+COPY release-compatibility-manifest.json ./
+COPY scripts ./scripts
+COPY vendor ./vendor
+COPY api-server ./api-server
+COPY ai-gateway ./ai-gateway
+COPY iot-gateway ./iot-gateway
+COPY lumiere-codegen ./lumiere-codegen
+COPY crates ./crates
+
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt/lists,sharing=locked \
+    apt-get update \
+    && apt-get install -y --no-install-recommends python3
+
+RUN scripts/prepare-vendored-contracts-rust.sh
+
+# Build the production runtime set once. Keep the package builds separate because
+# Cargo's --bin filters apply to each selected package.
+RUN --mount=type=cache,id=lumiere-cargo-registry,target=/usr/local/cargo/registry,sharing=locked \
+    --mount=type=cache,id=lumiere-cargo-git,target=/usr/local/cargo/git,sharing=locked \
+    --mount=type=cache,id=lumiere-cargo-target,target=/app/target,sharing=locked \
+    cargo build --locked --release --jobs "${CARGO_BUILD_JOBS}" \
+      -p api-server \
+      --bin api-server \
+      --bin owner-report-worker \
+      --bin projection-worker \
+      --bin storage-migrate \
+      --bin workflow-worker \
+    && cargo build --locked --release --jobs "${CARGO_BUILD_JOBS}" \
+      -p ai-gateway --bin gateway \
+    && install -d /out \
+    && install -m 0755 \
+      target/release/api-server \
+      target/release/gateway \
+      target/release/owner-report-worker \
+      target/release/projection-worker \
+      target/release/storage-migrate \
+      target/release/workflow-worker \
+      /out/
+
+FROM debian:bookworm-slim AS runtime
+ENV RUST_LOG=info
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY --from=builder /out/ /usr/local/bin/
+COPY --chmod=0755 scripts/lumiere-runtime-entrypoint.sh /usr/local/bin/lumiere-runtime-entrypoint
+
+EXPOSE 8080
+ENTRYPOINT ["/usr/local/bin/lumiere-runtime-entrypoint"]

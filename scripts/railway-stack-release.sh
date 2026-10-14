@@ -15,6 +15,8 @@ Usage: scripts/railway-stack-release.sh COMMAND [ARGS...]
 Commands:
   gate SERVICE...        Wait for existing deployments to settle successfully.
   deploy SERVICE...      Deploy the same immutable release root concurrently.
+  redeploy-source SERVICE...
+                         Pull each service's preconfigured image source concurrently.
   probe NAME=URL...      Probe HTTP readiness endpoints concurrently.
   publish-stdb SERVICE  Deploy the one-shot publisher and verify its completion marker.
   migrate-storage SERVICE
@@ -25,6 +27,7 @@ Required environment:
 
 Additional deploy environment:
   RELEASE_SHA (full commit), RELEASE_ROOT (default: current directory)
+  RUST_RUNTIME_IMAGE (exact image digest expected for redeploy-source)
 
 Optional safety controls:
   RAILWAY_EXPECTED_REGION       Verify RAILWAY_REPLICA_REGION through railway ssh.
@@ -74,6 +77,13 @@ deployment_status() {
   local deployment_id="$2"
   deployment_list "$service" | jq -r --arg id "$deployment_id" \
     '.[] | select(.id == $id) | .status // empty' | head -1
+}
+
+deployment_image() {
+  local service="$1"
+  local deployment_id="$2"
+  deployment_list "$service" | jq -r --arg id "$deployment_id" \
+    '.[] | select(.id == $id) | .meta.image // empty' | head -1
 }
 
 dump_diagnostics() {
@@ -211,6 +221,39 @@ deploy_one() {
   wait_for_terminal_success "$service" "$deployment_id"
 }
 
+redeploy_source_one() {
+  local service="$1"
+  : "${RUST_RUNTIME_IMAGE:?RUST_RUNTIME_IMAGE is required}"
+  local before_ids
+  before_ids="$(deployment_list "$service" | jq -c 'map(.id)')"
+
+  echo "[railway-release] $service: pulling configured immutable image source"
+  if ! timeout "$UPLOAD_TIMEOUT_SECONDS" railway redeploy \
+    --service "$service" \
+    --from-source \
+    --yes; then
+    dump_diagnostics "$service"
+    return 1
+  fi
+
+  local deployment_id
+  if ! deployment_id="$(wait_for_new_deployment "$service" "$before_ids")"; then
+    echo "[railway-release] $service: redeploy returned but no new deployment appeared" >&2
+    dump_diagnostics "$service"
+    return 1
+  fi
+  wait_for_terminal_success "$service" "$deployment_id"
+
+  local observed_image
+  observed_image="$(deployment_image "$service" "$deployment_id")"
+  if [[ "$observed_image" != "$RUST_RUNTIME_IMAGE" ]]; then
+    echo "[railway-release] $service: expected image $RUST_RUNTIME_IMAGE, observed ${observed_image:-<empty>}" >&2
+    dump_diagnostics "$service" "$deployment_id"
+    return 1
+  fi
+  echo "[railway-release] $service: verified image $observed_image"
+}
+
 wait_for_log_marker() {
   local service="$1"
   local marker="$2"
@@ -323,6 +366,18 @@ migrate_storage() {
     'PostgreSQL storage migrations applied and verified successfully'
 }
 
+redeploy_storage() {
+  local service="$1"
+  redeploy_source_one "$service"
+
+  local deployment_id
+  deployment_id="$(deployment_list "$service" | jq -r '.[0].id // empty')"
+  [[ -n "$deployment_id" ]] || die "$service has no deployment after image redeploy"
+  wait_for_log_marker "$service" \
+    'PostgreSQL storage migrations applied and verified successfully' \
+    "$deployment_id"
+}
+
 main() {
   require_base_environment
   local command="${1:-}"
@@ -336,6 +391,9 @@ main() {
       : "${RELEASE_SHA:?RELEASE_SHA is required}"
       [[ "$RELEASE_SHA" =~ ^[0-9a-f]{40}$ ]] || die "RELEASE_SHA must be a lowercase full commit SHA"
       run_parallel deploy_one "$@"
+      ;;
+    redeploy-source)
+      run_parallel redeploy_source_one "$@"
       ;;
     probe)
       require_command curl
@@ -352,6 +410,10 @@ main() {
       [[ "$RELEASE_SHA" =~ ^[0-9a-f]{40}$ ]] || die "RELEASE_SHA must be a lowercase full commit SHA"
       [[ $# -eq 1 ]] || die "migrate-storage requires exactly one migration service"
       migrate_storage "$1"
+      ;;
+    redeploy-storage)
+      [[ $# -eq 1 ]] || die "redeploy-storage requires exactly one migration service"
+      redeploy_storage "$1"
       ;;
     -h|--help|help)
       usage
