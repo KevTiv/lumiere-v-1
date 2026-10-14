@@ -1,0 +1,106 @@
+name: Build production edge images
+
+on:
+  push:
+    branches: [main, codex/railway-production-completion]
+    paths:
+      - frontend/**
+      - infra/kong/**
+      - .dockerignore
+      - .github/workflows/build-production-edge-images.yml
+  pull_request:
+    paths:
+      - frontend/**
+      - infra/kong/**
+      - .dockerignore
+      - .github/workflows/build-production-edge-images.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: production-edge-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - service: web
+            context: frontend
+            dockerfile: frontend/web/Dockerfile
+          - service: api-gateway
+            context: .
+            dockerfile: infra/kong/Dockerfile
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Validate pinned frontend contracts
+        if: matrix.service == 'web'
+        run: node frontend/scripts/verify-vendored-contracts.mjs
+      - name: Validate gateway configuration rendering
+        if: matrix.service == 'api-gateway'
+        run: sh infra/kong/test-render-config.sh
+      - uses: docker/setup-buildx-action@v3
+      - name: Log in to GHCR
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Image coordinates
+        id: image
+        env:
+          SERVICE: ${{ matrix.service }}
+          IMAGE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          repository="ghcr.io/${GITHUB_REPOSITORY,,}-$SERVICE"
+          echo "repository=$repository" >> "$GITHUB_OUTPUT"
+          echo "tag=$repository:$IMAGE_SHA" >> "$GITHUB_OUTPUT"
+      - name: Preserve immutable commit images
+        if: github.event_name != 'pull_request'
+        env:
+          IMAGE: ${{ steps.image.outputs.tag }}
+        run: |
+          set -euo pipefail
+          if docker buildx imagetools inspect "$IMAGE" >/dev/null 2>&1; then
+            echo "Refusing to overwrite existing commit image $IMAGE" >&2
+            exit 1
+          fi
+      - name: Build image
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.dockerfile }}
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.image.outputs.tag }}
+          build-args: |
+            NEXT_PUBLIC_STDB_MODULE=lumiere-v1
+            NEXT_PUBLIC_API_GATEWAY_URL=
+            NEXT_PUBLIC_REALTIME_WS_URL=wss://api-gateway-production-d680.up.railway.app/v1/realtime/ws
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.event.pull_request.head.sha || github.sha }}
+          cache-from: type=gha,scope=production-${{ matrix.service }}
+          cache-to: type=gha,scope=production-${{ matrix.service }},mode=max
+          provenance: mode=max
+          sbom: true
+      - name: Publish deployment coordinate
+        if: github.event_name != 'pull_request'
+        env:
+          IMAGE: ${{ steps.image.outputs.repository }}@${{ steps.build.outputs.digest }}
+        run: |
+          set -euo pipefail
+          task_docker_config="$(mktemp -d)"
+          DOCKER_CONFIG="$task_docker_config" docker manifest inspect "$IMAGE" >/dev/null
+          echo "${{ matrix.service }}: $IMAGE" >> "$GITHUB_STEP_SUMMARY"
