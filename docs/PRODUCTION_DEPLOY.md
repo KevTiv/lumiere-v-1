@@ -37,20 +37,23 @@ its digest performs no contracts build or download. This is once per image build
 not a one-time bootstrap dependency that can be dropped from future builds.
 
 The **Build Rust runtime image** workflow compiles the Rust service graph once
-and publishes one OCI image to GHCR. It deliberately includes only these six
+and publishes one OCI image to GHCR. It deliberately includes only these nine
 executables:
 
 | Railway service | `LUMIERE_BIN` | Purpose |
 |---|---|---|
 | `api-server` | `api-server` | HTTP API and readiness surface |
 | `ai-gateway` | `gateway` | AI gateway HTTP service |
+| `expense-integration-worker` | `expense-integration-worker` | Expense intent integration |
+| `hr-integration-worker` | `hr-integration-worker` | HR and payroll partner integration |
 | `projection-worker` | `projection-worker` | SpacetimeDB to PostgreSQL projection |
+| `project-integration-worker` | `project-integration-worker` | Project payroll, calendar, and e-invoice integration |
 | `workflow-worker` | `workflow-worker` | Workflow execution |
 | `owner-report-worker` | `owner-report-worker` | Owner report generation |
 | `storage-migrate` | `storage-migrate` | One-shot PostgreSQL migration gate |
 
 Each Railway service remains an independently configured and scaled service.
-Set its `LUMIERE_BIN` to the value above, while pointing all six services at the
+Set its `LUMIERE_BIN` to the value above, while pointing all nine services at the
 same image digest. The entrypoint rejects missing and unknown selectors; it
 cannot be used to execute an arbitrary path from an environment variable.
 
@@ -67,6 +70,9 @@ Before dispatching **Release Railway stack**, pass the reported digest as
 through an anonymous registry pull, because the automated Railway image-source
 promotion does not install registry credentials. Keep this GHCR package public;
 the image contains executables and public build metadata, never runtime secrets.
+The release also reads `org.opencontainers.image.revision` from the pulled image
+and requires it to equal `release_sha`; a digest built from another commit is
+rejected before any Railway change.
 
 For each shared-runtime service, the release submits one environment-scoped
 Railway configuration patch that sets `source.image` to the exact digest while
@@ -86,6 +92,13 @@ Use the **Release Railway stack** workflow for monorepo releases. It accepts an
 immutable full commit SHA and serializes releases per Railway environment. The
 workflow fails closed between these phases:
 
+Before phase 1, production is checked against
+[`infra/railway/production-eu-services.json`](../infra/railway/production-eu-services.json).
+The preflight reports missing or ambiguous services, non-EU replicas, absent
+dedicated worker tokens, placeholder credentials, and invalid organization-ID
+lists without printing variable values. This pass intentionally defines only
+production; development infrastructure and data remain deferred.
+
 1. Existing `Postgres`, `Redis`, `qdrant`, and `spacetimedb` deployments must
    be successful and report the configured EU `RAILWAY_REPLICA_REGION`. The
    capitalization matches the live Railway service names exactly.
@@ -102,12 +115,17 @@ workflow fails closed between these phases:
    can depend on it.
 5. `api-server` deploys and reaches readiness against the published schema and
    migrated PostgreSQL catalog.
-6. `ai-gateway` deploys and reaches readiness against the new API release.
+6. `ai-gateway` deploys only when the explicit `enable_ai` input is true, and
+   is disabled by default for the initial ERP release. AI never gates the ERP
+   phases when that input is false.
 7. `projection-worker` deploys and reaches readiness before downstream workers.
 8. `workflow-worker` and `owner-report-worker` may then deploy concurrently;
    both must pass their configured readiness gates.
-9. `web` deploys only after the backend and worker graph is settled.
-10. `api-gateway` deploys last. Production dispatches require a public edge
+9. The expense, HR, and project integration workers deploy together from the
+   same immutable image and must reach readiness with dedicated service tokens
+   registered for every configured organization.
+10. `web` deploys only after the backend and worker graph is settled.
+11. `api-gateway` deploys last. Production dispatches require a public edge
    readiness URL and do not complete until it returns HTTP 2xx.
 
 Configure the matching `RAILWAY_*_READINESS_URL` GitHub Environment secrets to
@@ -123,6 +141,37 @@ automatically rolled back.
 The workflow uses service names rather than dashboard UUIDs. Keep those names
 stable or update [the workflow](../.github/workflows/release-railway-stack.yml)
 and the Railway canvas together.
+
+## Production integration workers
+
+The three integration workers are production services, not API-server threads.
+Each uses its own SpacetimeDB identity and explicit organization allowlist:
+
+| Service | Dedicated token | Organization IDs | Health port |
+|---|---|---|---:|
+| `expense-integration-worker` | `STDB_EXPENSE_WORKER_TOKEN` | `LUMIERE_EXPENSE_WORKER_ORG_IDS` | 8092 |
+| `hr-integration-worker` | `STDB_HR_WORKER_TOKEN` | `LUMIERE_HR_WORKER_ORG_IDS` | 8094 |
+| `project-integration-worker` | `STDB_PROJECT_WORKER_TOKEN` | `LUMIERE_PROJECT_WORKER_ORG_IDS` | 8093 |
+
+Tokens must be real, distinct dedicated credentials and must not reuse
+`STDB_SERVER_TOKEN` or another worker token. Register each token identity under
+`expense_integration_worker`, `hr_integration_worker`, or
+`project_integration_worker` for every organization listed by that service.
+Organization lists are comma-separated positive numeric IDs; an empty list
+leaves the worker permanently unready and is rejected by the production
+preflight. Do not commit token or organization values to this manifest.
+
+Configure all three GitHub Environment secrets
+`RAILWAY_EXPENSE_INTEGRATION_READINESS_URL`,
+`RAILWAY_HR_INTEGRATION_READINESS_URL`, and
+`RAILWAY_PROJECT_INTEGRATION_READINESS_URL`. Production release validation
+requires them and phase 9 probes every `/health/ready` endpoint.
+
+Each service also needs `LUMIERE_ENV=production`, its exact `LUMIERE_BIN` and
+worker port, `STDB_HOST`, `STDB_MODULE`, `AI_GATEWAY_URL`, and the production
+placement variables `LUMIERE_PLACEMENT_GENERATION`, `LUMIERE_CELL_ID`, and
+`LUMIERE_DURABLE_STORE_ID`. `AI_GATEWAY_URL` remains shared configuration even
+while AI promotion is disabled; the integration workers do not invoke AI.
 
 The ordered workflow runs the checksum-verified catalog through the one-shot
 `storage-migrate` service. For local operation or manual recovery, the

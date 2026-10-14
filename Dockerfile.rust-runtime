@@ -30,8 +30,11 @@ COPY crates ./crates
 RUN cargo build --locked --release --jobs "${CARGO_BUILD_JOBS}" \
       -p api-server \
       --bin api-server \
+      --bin expense-integration-worker \
+      --bin hr-integration-worker \
       --bin owner-report-worker \
       --bin projection-worker \
+      --bin project-integration-worker \
       --bin storage-migrate \
       --bin workflow-worker \
     && cargo build --locked --release --jobs "${CARGO_BUILD_JOBS}" \
@@ -39,9 +42,12 @@ RUN cargo build --locked --release --jobs "${CARGO_BUILD_JOBS}" \
     && install -d /out \
     && install -m 0755 \
       target/release/api-server \
+      target/release/expense-integration-worker \
       target/release/gateway \
+      target/release/hr-integration-worker \
       target/release/owner-report-worker \
       target/release/projection-worker \
+      target/release/project-integration-worker \
       target/release/storage-migrate \
       target/release/workflow-worker \
       /out/

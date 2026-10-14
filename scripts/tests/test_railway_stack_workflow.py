@@ -1,5 +1,6 @@
-from pathlib import Path
+import json
 import unittest
+from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -22,10 +23,12 @@ class RailwayStackWorkflowTests(unittest.TestCase):
             "Phase 7 gate — projection readiness",
             "Phase 8 — deploy workflow and owner-report workers from shared runtime image",
             "Phase 8 gate — workflow and owner-report readiness",
-            "Phase 9 — deploy web",
-            "Phase 9 gate — web readiness",
-            "Phase 10 — deploy API gateway last",
-            "Phase 10 gate — public edge readiness",
+            "Phase 9 — deploy production integration workers",
+            "Phase 9 gate — production integration-worker readiness",
+            "Phase 10 — deploy web",
+            "Phase 10 gate — web readiness",
+            "Phase 11 — deploy API gateway last",
+            "Phase 11 gate — public edge readiness",
         ]
         offsets = [workflow.index(phase) for phase in phases]
         self.assertEqual(offsets, sorted(offsets))
@@ -45,6 +48,9 @@ class RailwayStackWorkflowTests(unittest.TestCase):
             "owner-report-worker",
             "workflow-worker",
             "projection-worker",
+            "expense-integration-worker",
+            "hr-integration-worker",
+            "project-integration-worker",
             "web",
             "api-gateway",
         ):
@@ -71,6 +77,7 @@ class RailwayStackWorkflowTests(unittest.TestCase):
             "redeploy-source ai-gateway",
             "redeploy-source projection-worker",
             "redeploy-source workflow-worker owner-report-worker",
+            "expense-integration-worker hr-integration-worker project-integration-worker",
             "deploy web",
             "deploy api-gateway",
         ]
@@ -91,7 +98,9 @@ class RailwayStackWorkflowTests(unittest.TestCase):
         workflow = (ROOT / ".github/workflows/release-railway-stack.yml").read_text()
         orchestrator = (ROOT / "scripts/railway-stack-release.sh").read_text()
 
-        self.assertIn('docker manifest inspect "$RUST_RUNTIME_IMAGE"', workflow)
+        self.assertIn('docker pull --quiet "$RUST_RUNTIME_IMAGE"', workflow)
+        self.assertIn('org.opencontainers.image.revision', workflow)
+        self.assertIn('"$image_revision" == "$RELEASE_SHA"', workflow)
         self.assertIn("Gate anonymous runtime image pull", workflow)
         self.assertIn("railway environment edit", orchestrator)
         self.assertIn('--project "$RAILWAY_PROJECT_ID"', orchestrator)
@@ -100,6 +109,39 @@ class RailwayStackWorkflowTests(unittest.TestCase):
         self.assertIn("branch: null", orchestrator)
         self.assertIn("commitSha: null", orchestrator)
         self.assertIn("upstreamUrl: null", orchestrator)
+
+    def test_ai_is_explicitly_disabled_by_default(self):
+        workflow = (ROOT / ".github/workflows/release-railway-stack.yml").read_text()
+        self.assertIn("enable_ai:", workflow)
+        self.assertIn("default: false", workflow)
+        self.assertIn("if: inputs.enable_ai", workflow)
+
+    def test_production_manifest_covers_exact_runtime_workers(self):
+        manifest = json.loads(
+            (ROOT / "infra/railway/production-eu-services.json").read_text()
+        )
+        services = {service["name"]: service for service in manifest["services"]}
+        self.assertEqual(manifest["environment"], "production")
+        self.assertEqual(manifest["expectedRegion"], "europe-west4-drams3a")
+        self.assertFalse(services["ai-gateway"]["required"])
+        self.assertEqual(services["ai-gateway"]["featureGate"], "RAILWAY_ENABLE_AI")
+        for domain, port in (("expense", 8092), ("hr", 8094), ("project", 8093)):
+            service = services[f"{domain}-integration-worker"]
+            self.assertEqual(service["runtimeBinary"], f"{domain}-integration-worker")
+            self.assertEqual(service["healthPort"], port)
+            variables = service["requiredVariables"]
+            self.assertEqual(variables[f"STDB_{domain.upper()}_WORKER_TOKEN"]["kind"], "secret")
+            self.assertEqual(
+                variables[f"LUMIERE_{domain.upper()}_WORKER_ORG_IDS"]["kind"],
+                "positive-id-list",
+            )
+
+    def test_web_release_resolves_production_service_by_name(self):
+        workflow = (ROOT / ".github/workflows/release-railway-web.yml").read_text()
+        self.assertIn("RAILWAY_ENVIRONMENT: production", workflow)
+        self.assertIn("RAILWAY_SERVICE_NAME: web", workflow)
+        self.assertIn("railway service list", workflow)
+        self.assertNotIn("23ee8acf-1b14-4b1c-b6f5-ce8fd2ed683c", workflow)
 
 
 if __name__ == "__main__":
