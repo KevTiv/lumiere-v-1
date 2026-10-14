@@ -34,10 +34,10 @@ RUN cd /tmp \
     Cargo.toml \
   && sed -i '/^source = "git+ssh:\/\/git@github.com\/KevTiv\/lumiere-contracts\.git?/d' Cargo.lock \
   && rm /tmp/lumiere-contracts-rust.tar.gz /tmp/lumiere-contracts-rust.sha256
-# Re-resolve only the manifest/source identity after replacing the pinned Git
-# dependency with the checksum-verified local crate. Registry versions remain
-# pinned by Cargo.lock, and the actual compilation still enforces --locked.
-RUN cargo metadata --no-deps --format-version 1 >/dev/null \
+# Update only the contracts package after replacing its pinned Git source with
+# the checksum-verified local crate. All other versions remain in Cargo.lock,
+# and the actual compilation still enforces --locked.
+RUN cargo update -p lumiere-contracts \
   && cargo build --locked --release --jobs "${CARGO_BUILD_JOBS}" --bin "${BIN}"
 
 FROM debian:bookworm-slim AS runtime
