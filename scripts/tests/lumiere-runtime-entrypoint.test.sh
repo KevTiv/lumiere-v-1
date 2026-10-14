@@ -20,11 +20,17 @@ done
 sed "s#/usr/local/bin/#$TEST_BIN_DIR/#g" "$ENTRYPOINT" >"$TEST_BIN_DIR/entrypoint"
 chmod +x "$TEST_BIN_DIR/entrypoint"
 
-output="$(LUMIERE_BIN=api-server "$TEST_BIN_DIR/entrypoint" first second)"
-[[ "$output" == $'api-server\nfirst\nsecond' ]]
+for binary in \
+  api-server gateway owner-report-worker projection-worker storage-migrate workflow-worker; do
+  output="$(LUMIERE_BIN="$binary" "$TEST_BIN_DIR/entrypoint" first second)"
+  [[ "$output" == "$binary"$'\nfirst\nsecond' ]]
+done
 
 output="$(BIN=gateway "$TEST_BIN_DIR/entrypoint")"
 [[ "$output" == "gateway" ]]
+
+output="$(LUMIERE_BIN=api-server BIN=gateway "$TEST_BIN_DIR/entrypoint")"
+[[ "$output" == "api-server" ]]
 
 if LUMIERE_BIN=../../bin/sh "$TEST_BIN_DIR/entrypoint" 2>/dev/null; then
   echo "entrypoint accepted an arbitrary executable" >&2
