@@ -4,9 +4,9 @@ set -eu
 template="${KONG_DECLARATIVE_TEMPLATE:-/kong/templates/kong.yml}"
 config="${KONG_DECLARATIVE_CONFIG:-/kong/declarative/kong.yml}"
 web_host="${WEB_UPSTREAM_HOST:-web.railway.internal}"
-web_port="${WEB_UPSTREAM_PORT:-8080}"
+web_port="${WEB_UPSTREAM_PORT:-3000}"
 api_host="${API_SERVER_UPSTREAM_HOST:-api-server.railway.internal}"
-api_port="${API_SERVER_UPSTREAM_PORT:-8082}"
+api_port="${API_SERVER_UPSTREAM_PORT:-8080}"
 redis_host="${REDIS_UPSTREAM_HOST:-redis.railway.internal}"
 redis_port="${REDIS_UPSTREAM_PORT:-6379}"
 redis_username="${REDIS_UPSTREAM_USERNAME:-}"
@@ -82,6 +82,16 @@ sed \
   -e "s|__CORS_ORIGIN__|$cors_origin_escaped|g" \
   "$template" > "$config"
 
-export KONG_PROXY_LISTEN="${KONG_PROXY_LISTEN:-0.0.0.0:${PORT:-8000}}"
-export KONG_ADMIN_LISTEN="${KONG_ADMIN_LISTEN:-off}"
+if [ "${1:-}" = "--render-only" ]; then
+  exit 0
+fi
+
+# Railway private networking is IPv6. Keep a separate IPv4 listener for the
+# public edge while accepting private service traffic on the same proxy port.
+export KONG_PROXY_LISTEN="${KONG_PROXY_LISTEN:-0.0.0.0:${PORT:-8000}, [::]:${PORT:-8000} ipv6only=on}"
+
+# The declarative gateway has no operational reason to expose an Admin API or
+# Manager listener. Do not allow a stray Railway variable to turn either on.
+export KONG_ADMIN_LISTEN=off
+export KONG_ADMIN_GUI_LISTEN=off
 exec /docker-entrypoint.sh "$@"

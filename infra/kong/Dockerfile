@@ -11,6 +11,9 @@ USER kong
 ENV KONG_DATABASE=off \
     KONG_DECLARATIVE_CONFIG=/kong/declarative/kong.yml \
     KONG_DECLARATIVE_TEMPLATE=/kong/templates/kong.yml \
+    KONG_ADMIN_LISTEN=off \
+    KONG_ADMIN_GUI_LISTEN=off \
+    KONG_DNS_ORDER=LAST,SRV,A,AAAA,CNAME \
     KONG_PROXY_ACCESS_LOG=/dev/stdout \
     KONG_PROXY_ERROR_LOG=/dev/stderr
 EXPOSE 8000

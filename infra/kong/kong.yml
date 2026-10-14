@@ -2,6 +2,23 @@ _format_version: "3.0"
 _transform: true
 
 services:
+  # Railway probes this gateway-owned route. The request-termination plugin
+  # answers before proxying, so readiness never depends on web being deployed.
+  - name: gateway-health
+    url: http://127.0.0.1:1
+    routes:
+      - name: gateway-health
+        paths:
+          - /health/ready
+          - /health
+        strip_path: false
+    plugins:
+      - name: request-termination
+        config:
+          status_code: 200
+          content_type: application/json
+          body: '{"status":"ok","service":"api-gateway"}'
+
   - name: web
     url: http://__WEB_UPSTREAM_HOST__:__WEB_UPSTREAM_PORT__
     routes:
