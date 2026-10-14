@@ -15,8 +15,53 @@ Print the checklist without validating:
 scripts/check-prod-env.sh --list
 ```
 
-Apply the checksum-verified PostgreSQL catalog before starting services that
-use platform credentials or durable projections:
+## Ordered Railway release
+
+Use the **Release Railway stack** workflow for monorepo releases. It accepts an
+immutable full commit SHA and serializes releases per Railway environment. The
+workflow fails closed between these phases:
+
+1. Existing `Postgres`, `Redis`, `qdrant`, and `spacetimedb` deployments must
+   be successful and report the configured EU `RAILWAY_REPLICA_REGION`. The
+   capitalization matches the live Railway service names exactly.
+2. `spacetimedb-publisher` builds the module from the release commit, publishes
+   it without clearing data, and must describe a schema containing reducers,
+   tables, types, and a typespace, including the canonical `organization`
+   table.
+3. The one-shot `storage-migrate` service applies the checksum-verified
+   PostgreSQL catalog, must reach terminal success, and must emit the explicit
+   `PostgreSQL storage migrations applied and verified successfully` marker.
+   A fresh database cannot advance to API deployment without both gates; a
+   Railway success state without the marker is rejected.
+4. `chromium-worker` deploys and reaches readiness before API report rendering
+   can depend on it.
+5. `api-server` deploys and reaches readiness against the published schema and
+   migrated PostgreSQL catalog.
+6. `ai-gateway` deploys and reaches readiness against the new API release.
+7. `projection-worker` deploys and reaches readiness before downstream workers.
+8. `workflow-worker` and `owner-report-worker` may then deploy concurrently;
+   both must pass their configured readiness gates.
+9. `web` deploys only after the backend and worker graph is settled.
+10. `api-gateway` deploys last. Production dispatches require a public edge
+   readiness URL and do not complete until it returns HTTP 2xx.
+
+Configure the matching `RAILWAY_*_READINESS_URL` GitHub Environment secrets to
+add explicit HTTP readiness probes after each service deployment. Railway
+terminal deployment success remains mandatory even when no external probe URL
+is configured.
+
+Every upload, deployment wait, schema check, and HTTP probe has a timeout.
+Terminal failures print recent deployment metadata and logs. A failed phase
+prevents every downstream phase; successfully started deployments are not
+automatically rolled back.
+
+The workflow uses service names rather than dashboard UUIDs. Keep those names
+stable or update [the workflow](../.github/workflows/release-railway-stack.yml)
+and the Railway canvas together.
+
+The ordered workflow runs the checksum-verified catalog through the one-shot
+`storage-migrate` service. For local operation or manual recovery, the
+equivalent command is:
 
 ```bash
 cargo run --locked -p api-server --bin storage-migrate
