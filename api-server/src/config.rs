@@ -72,8 +72,15 @@ pub struct Config {
 
 #[derive(Clone, Debug)]
 pub enum ReportArtifactStoreConfig {
+    Disabled,
     Local { root: PathBuf },
     S3(ReportArtifactS3Config),
+}
+
+#[derive(Clone, Copy)]
+enum ReportArtifactAccess {
+    Required,
+    Disabled,
 }
 
 #[derive(Clone)]
@@ -132,16 +139,30 @@ impl Config {
     }
 
     pub fn from_env() -> Result<Self> {
-        Self::from_env_inner(true)
+        Self::from_env_inner(true, ReportArtifactAccess::Required)
     }
 
-    /// Standalone workers use dedicated identities and must not require the
-    /// interactive API owner credential merely to parse shared settings.
-    pub(crate) fn from_worker_env() -> Result<Self> {
-        Self::from_env_inner(false)
+    /// Projection uses the API owner credential but never handles reports.
+    pub(crate) fn from_projection_worker_env() -> Result<Self> {
+        Self::from_env_inner(true, ReportArtifactAccess::Disabled)
     }
 
-    fn from_env_inner(require_server_token: bool) -> Result<Self> {
+    /// Non-reporting workers use dedicated identities and must never receive
+    /// report bucket credentials.
+    pub(crate) fn from_nonreporting_worker_env() -> Result<Self> {
+        Self::from_env_inner(false, ReportArtifactAccess::Disabled)
+    }
+
+    /// The owner-report worker uses a dedicated identity and the same required
+    /// artifact backend as the API.
+    pub(crate) fn from_owner_report_worker_env() -> Result<Self> {
+        Self::from_env_inner(false, ReportArtifactAccess::Required)
+    }
+
+    fn from_env_inner(
+        require_server_token: bool,
+        report_artifact_access: ReportArtifactAccess,
+    ) -> Result<Self> {
         let port: u16 = std::env::var("PORT")
             .ok()
             .and_then(|s| s.parse().ok())
@@ -293,20 +314,25 @@ impl Config {
             .ok()
             .filter(|value| !value.trim().is_empty())
             .map(|value| value.trim_end_matches('/').to_string());
-        let report_artifact_dir = std::env::var("LUMIERE_REPORT_ARTIFACT_DIR")
-            .map(PathBuf::from)
-            .unwrap_or_else(|_| std::env::temp_dir().join("lumiere-owner-reports"));
-        let report_artifact_store = parse_report_artifact_store(
-            prod,
-            std::env::var("LUMIERE_REPORT_ARTIFACT_BACKEND").ok(),
-            report_artifact_dir,
-            std::env::var("LUMIERE_REPORT_S3_ENDPOINT").ok(),
-            std::env::var("LUMIERE_REPORT_S3_BUCKET").ok(),
-            std::env::var("LUMIERE_REPORT_S3_REGION").ok(),
-            std::env::var("LUMIERE_REPORT_S3_ACCESS_KEY_ID").ok(),
-            std::env::var("LUMIERE_REPORT_S3_SECRET_ACCESS_KEY").ok(),
-            std::env::var("LUMIERE_REPORT_S3_PREFIX").ok(),
-        )?;
+        let report_artifact_store = match report_artifact_access {
+            ReportArtifactAccess::Disabled => ReportArtifactStoreConfig::Disabled,
+            ReportArtifactAccess::Required => {
+                let report_artifact_dir = std::env::var("LUMIERE_REPORT_ARTIFACT_DIR")
+                    .map(PathBuf::from)
+                    .unwrap_or_else(|_| std::env::temp_dir().join("lumiere-owner-reports"));
+                parse_report_artifact_store(
+                    prod,
+                    std::env::var("LUMIERE_REPORT_ARTIFACT_BACKEND").ok(),
+                    report_artifact_dir,
+                    std::env::var("LUMIERE_REPORT_S3_ENDPOINT").ok(),
+                    std::env::var("LUMIERE_REPORT_S3_BUCKET").ok(),
+                    std::env::var("LUMIERE_REPORT_S3_REGION").ok(),
+                    std::env::var("LUMIERE_REPORT_S3_ACCESS_KEY_ID").ok(),
+                    std::env::var("LUMIERE_REPORT_S3_SECRET_ACCESS_KEY").ok(),
+                    std::env::var("LUMIERE_REPORT_S3_PREFIX").ok(),
+                )?
+            }
+        };
         let document_blob_dir = std::env::var("LUMIERE_DOCUMENT_BLOB_DIR")
             .map(PathBuf::from)
             .unwrap_or_else(|_| std::env::temp_dir().join("lumiere-document-blobs"));

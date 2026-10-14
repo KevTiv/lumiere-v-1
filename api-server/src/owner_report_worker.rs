@@ -152,7 +152,7 @@ struct DocumentRow {
 
 /// Start a bounded polling worker and its internal health endpoint.
 pub async fn serve() -> anyhow::Result<()> {
-    let config = Config::from_worker_env()?;
+    let config = Config::from_owner_report_worker_env()?;
     let worker_token = config.require_dedicated_worker_token("STDB_OWNER_REPORT_WORKER_TOKEN")?;
     let port = config.owner_report_worker_port;
     let mut app_state = AppState::new(config);

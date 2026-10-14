@@ -122,6 +122,7 @@ async fn put_artifact(
     bytes: &[u8],
 ) -> Result<ArtifactPut, ApiError> {
     match store {
+        ReportArtifactStoreConfig::Disabled => Err(disabled_store_error()),
         ReportArtifactStoreConfig::Local { root } => {
             let path = artifact_path(root, artifact_key)?;
             let directory = path
@@ -185,6 +186,7 @@ pub(crate) async fn read_artifact(
     artifact_key: &str,
 ) -> Result<Option<Vec<u8>>, ApiError> {
     match store {
+        ReportArtifactStoreConfig::Disabled => Err(disabled_store_error()),
         ReportArtifactStoreConfig::Local { root } => {
             let path = artifact_path(root, artifact_key)?;
             match tokio::fs::read(path).await {
@@ -215,6 +217,7 @@ pub(crate) async fn artifact_exists(
     artifact_key: &str,
 ) -> Result<bool, ApiError> {
     match store {
+        ReportArtifactStoreConfig::Disabled => Err(disabled_store_error()),
         ReportArtifactStoreConfig::Local { root } => {
             let path = artifact_path(root, artifact_key)?;
             match tokio::fs::metadata(path).await {
@@ -250,6 +253,7 @@ pub(crate) async fn cleanup_artifact(
     artifact_key: &str,
 ) -> Result<(), ApiError> {
     match store {
+        ReportArtifactStoreConfig::Disabled => Err(disabled_store_error()),
         ReportArtifactStoreConfig::Local { root } => {
             let path = artifact_path(root, artifact_key)?;
             match tokio::fs::remove_file(path).await {
@@ -308,6 +312,10 @@ fn ensure_s3_success(operation: &str, status: u16) -> Result<(), ApiError> {
 
 fn s3_status_error(operation: &str, status: u16) -> ApiError {
     ApiError::Internal(format!("{operation}: object store returned HTTP {status}"))
+}
+
+fn disabled_store_error() -> ApiError {
+    ApiError::Internal("report artifact storage is disabled for this process role".into())
 }
 
 #[cfg(test)]
@@ -445,5 +453,14 @@ mod tests {
         assert!(!artifact_exists(&store, "report.pdf")
             .await
             .expect("artifact existence check"));
+    }
+
+    #[tokio::test]
+    async fn disabled_store_fails_closed() {
+        let store = ReportArtifactStoreConfig::Disabled;
+        assert!(put_artifact(&store, "report.pdf", b"PDF").await.is_err());
+        assert!(read_artifact(&store, "report.pdf").await.is_err());
+        assert!(artifact_exists(&store, "report.pdf").await.is_err());
+        assert!(cleanup_artifact(&store, "report.pdf").await.is_err());
     }
 }
