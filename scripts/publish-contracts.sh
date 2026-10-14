@@ -356,10 +356,10 @@ git push --quiet origin "v$VERSION"
 
 echo
 echo "Published lumiere-contracts v$VERSION."
-echo "Bump the pinned dependencies in lumiere-v-1:"
+echo "Refresh the vendored release artifacts in lumiere-v-1:"
 echo
-echo "  Cargo.toml:"
-echo "  lumiere-contracts = { git = \"ssh://git@github.com/KevTiv/lumiere-contracts.git\", tag = \"v$VERSION\" }"
+echo "  vendor/lumiere-contracts-rust-$VERSION.tar.gz"
+echo "  vendor/lumiere-contracts-rust-$VERSION.sha256"
 echo
 echo "  frontend package.json (wherever @lumiere/contracts is a dependency):"
 echo "  Refresh frontend/vendor/lumiere-contracts-$VERSION.tgz from packages/contracts"

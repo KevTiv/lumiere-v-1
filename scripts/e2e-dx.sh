@@ -5,6 +5,9 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="${E2E_DX_ROOT:-$(cd "$SCRIPT_DIR/.." && pwd)}"
 cd "$ROOT"
 
+# Root Cargo manifests consume the checksum-verified local contracts package.
+"$ROOT/scripts/prepare-vendored-contracts-rust.sh" >/dev/null
+
 fingerprint() { python3 "$SCRIPT_DIR/build-fingerprint.py" "$1" --root "$ROOT"; }
 
 api_binary() {

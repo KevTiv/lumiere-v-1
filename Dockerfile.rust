@@ -6,13 +6,11 @@ WORKDIR /app
 FROM chef AS builder
 ARG BIN
 ARG CARGO_BUILD_JOBS=1
-ARG LUMIERE_CONTRACTS_VERSION=0.3.106
 COPY Cargo.toml Cargo.lock ./
 COPY Makefile ./
 COPY release-compatibility-manifest.json ./
 COPY scripts ./scripts
-COPY vendor/lumiere-contracts-rust-0.3.106.tar.gz /tmp/lumiere-contracts-rust.tar.gz
-COPY vendor/lumiere-contracts-rust-0.3.106.sha256 /tmp/lumiere-contracts-rust.sha256
+COPY vendor ./vendor
 COPY api-server ./api-server
 COPY ai-gateway ./ai-gateway
 COPY iot-gateway ./iot-gateway
@@ -21,24 +19,8 @@ COPY crates ./crates
 RUN apt-get update \
   && apt-get install -y --no-install-recommends python3 \
   && rm -rf /var/lib/apt/lists/*
-RUN cd /tmp \
-  && sed 's/lumiere-contracts-rust-0.3.106.tar.gz/lumiere-contracts-rust.tar.gz/' lumiere-contracts-rust.sha256 | sha256sum -c - \
-  && cd /app \
-  && mkdir -p vendor/lumiere-contracts .contracts-staging/bindings \
-  && tar -xzf /tmp/lumiere-contracts-rust.tar.gz \
-    -C vendor/lumiere-contracts --strip-components=1 \
-  && test "$(sed -n 's/^version = "\([^"]*\)"/\1/p' vendor/lumiere-contracts/crates/lumiere-contracts/Cargo.toml | head -1)" = "${LUMIERE_CONTRACTS_VERSION}" \
-  && cp -R vendor/lumiere-contracts/crates/lumiere-contracts/src/bindings/. .contracts-staging/bindings/ \
-  && sed -i \
-    's#lumiere-contracts = { git = "ssh://git@github.com/KevTiv/lumiere-contracts.git", rev = "4b90e7c2cdc5bd549b2e261a24d13f7a47dc0099"#lumiere-contracts = { path = "vendor/lumiere-contracts/crates/lumiere-contracts"#' \
-    Cargo.toml \
-  && sed -i '/^source = "git+ssh:\/\/git@github.com\/KevTiv\/lumiere-contracts\.git?/d' Cargo.lock \
-  && rm /tmp/lumiere-contracts-rust.tar.gz /tmp/lumiere-contracts-rust.sha256
-# Re-resolve only the manifest/source identity after replacing the pinned Git
-# dependency with the checksum-verified local crate. Registry versions remain
-# pinned by Cargo.lock, and the actual compilation still enforces --locked.
-RUN cargo metadata --no-deps --format-version 1 >/dev/null \
-  && cargo build --locked --release --jobs "${CARGO_BUILD_JOBS}" --bin "${BIN}"
+RUN scripts/prepare-vendored-contracts-rust.sh
+RUN cargo build --locked --release --jobs "${CARGO_BUILD_JOBS}" --bin "${BIN}"
 
 FROM debian:bookworm-slim AS runtime
 ARG BIN

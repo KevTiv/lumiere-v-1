@@ -18,3 +18,5 @@
 **/test-results
 .tmp
 .vscode
+/.contracts-staging/
+/vendor/lumiere-contracts/

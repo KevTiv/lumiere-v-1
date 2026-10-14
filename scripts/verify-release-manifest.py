@@ -120,17 +120,25 @@ def verify_contract(root: Path, manifest: dict[str, Any], contracts: Path) -> No
     require(contract_version_file.read_text(encoding="utf-8").strip() == version, "CONTRACT_VERSION does not match manifest")
 
     lock_path = root / "Cargo.lock"
-    require(lock_path.is_file(), "Cargo.lock is required to bind the immutable contract revision")
+    require(lock_path.is_file(), "Cargo.lock is required")
     lock = lock_path.read_text(encoding="utf-8")
-    package_match = re.search(r'(?ms)^\[\[package\]\]\s+name = "lumiere-contracts"\s+version = "([^"]+)"\s+source = "([^"]+)"', lock)
+    package_match = re.search(
+        r'(?ms)^\[\[package\]\]\s+name = "lumiere-contracts"\s+version = "([^"]+)"(?=\s)',
+        lock,
+    )
     require(package_match is not None, "Cargo.lock has no lumiere-contracts package entry")
-    locked_version, locked_source = package_match.groups()
-    require(locked_version == version, "Cargo.lock lumiere-contracts version does not match manifest")
-    locked_by_tag = f"?tag={tag}#{revision}" in locked_source
-    locked_by_revision = f"?rev={revision}#{revision}" in locked_source
+    require(package_match.group(1) == version, "Cargo.lock lumiere-contracts version does not match manifest")
+
+    archive = root / "vendor" / f"lumiere-contracts-rust-{version}.tar.gz"
+    checksum_file = root / "vendor" / f"lumiere-contracts-rust-{version}.sha256"
+    require(archive.is_file(), "vendored lumiere-contracts archive is missing")
+    require(checksum_file.is_file(), "vendored lumiere-contracts checksum is missing")
+    checksum_fields = checksum_file.read_text(encoding="utf-8").strip().split()
     require(
-        locked_by_tag or locked_by_revision,
-        "Cargo.lock does not pin the manifest tag or immutable revision",
+        len(checksum_fields) == 2
+        and checksum_fields[0] == sha256(archive)
+        and checksum_fields[1] == archive.name,
+        "vendored lumiere-contracts archive checksum does not match",
     )
 
 
@@ -324,7 +332,7 @@ def resolve_contracts_checkout(root: Path) -> Path:
         result = subprocess.run(["bash", str(resolver)], cwd=root, capture_output=True, text=True, check=False)
     except OSError as error:
         fail(f"could not resolve lumiere-contracts checkout: {error}")
-    require(result.returncode == 0 and result.stdout.strip(), "could not resolve the fetched lumiere-contracts checkout")
+    require(result.returncode == 0 and result.stdout.strip(), "could not resolve the vendored lumiere-contracts release")
     return Path(result.stdout.strip()).resolve()
 
 

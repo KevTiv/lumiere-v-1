@@ -148,14 +148,17 @@ mod tests {
     }
 
     #[test]
-    fn contract_pin_matches_api_dependency_pin() {
+    fn contract_release_uses_the_verified_vendored_dependency() {
         let cargo = include_str!("../Cargo.toml");
         assert!(
             cargo.contains("lumiere-contracts = { workspace = true, features = [\"bindings\"] }")
         );
         let workspace = include_str!("../../Cargo.toml");
         assert!(workspace.contains(
-            "lumiere-contracts = { git = \"ssh://git@github.com/KevTiv/lumiere-contracts.git\", rev = \"4b90e7c2cdc5bd549b2e261a24d13f7a47dc0099\""
+            "lumiere-contracts = { path = \"vendor/lumiere-contracts/crates/lumiere-contracts\""
         ));
+        let release = include_str!("../../release-compatibility-manifest.json");
+        assert!(release.contains("\"version\": \"0.3.106\""));
+        assert!(release.contains("\"revision\": \"4b90e7c2cdc5bd549b2e261a24d13f7a47dc0099\""));
     }
 }

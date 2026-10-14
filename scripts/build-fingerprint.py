@@ -9,7 +9,14 @@ import subprocess
 EXCLUDED = {"node_modules", ".git", ".next", ".turbo", ".tmp", "target", "dist",
             "__pycache__", "playwright-report", "test-results", ".auth"}
 COMMON = ("scripts/build-fingerprint.py", "scripts/e2e-dx.sh", "Makefile")
-RUST = ("Cargo.toml", "Cargo.lock", ".cargo", "rust-toolchain", "rust-toolchain.toml")
+RUST = (
+    "Cargo.toml",
+    "Cargo.lock",
+    ".cargo",
+    "rust-toolchain",
+    "rust-toolchain.toml",
+    "scripts/prepare-vendored-contracts-rust.sh",
+)
 
 
 def fingerprint(root: Path, kind: str, environ: dict, tool_version: str = "") -> str:
@@ -17,6 +24,8 @@ def fingerprint(root: Path, kind: str, environ: dict, tool_version: str = "") ->
         staging = Path(environ.get("CONTRACTS_STAGING_DIR", "../.contracts-staging"))
         staging = (root / "api-server" / staging).resolve()
         inputs = (*COMMON, *RUST, "api-server", "crates", staging / "bindings",
+                  *root.glob("vendor/lumiere-contracts-rust-*.tar.gz"),
+                  *root.glob("vendor/lumiere-contracts-rust-*.sha256"),
                   *root.glob("frontend/web/.env*"))
         prefixes = ("CARGO_", "RUST", "STDB_", "LUMIERE_", "PG_", "WORKOS_", "E2E_BUILD_")
     elif kind == "stdb":
