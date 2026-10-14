@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 
-FROM rust:1-bookworm
+FROM debian:bookworm-slim
 
 ARG SPACETIMEDB_VERSION=2.8.2
 
@@ -14,12 +14,10 @@ RUN apt-get update \
 ENV PATH="/root/.local/bin:${PATH}"
 WORKDIR /app
 
-COPY crates/presentation-core crates/presentation-core
-COPY spacetimedb spacetimedb
+COPY .ci/railway-lumiere-v1.wasm /app/lumiere_v1.wasm
 COPY scripts/railway-publish-spacetimedb.sh scripts/railway-publish-spacetimedb.sh
 
-RUN spacetime build --module-path /app/spacetimedb \
-  && test -s /app/spacetimedb/target/wasm32-unknown-unknown/release/lumiere_v1.wasm \
+RUN test -s /app/lumiere_v1.wasm \
   && chmod 0755 /app/scripts/railway-publish-spacetimedb.sh
 
 CMD ["/app/scripts/railway-publish-spacetimedb.sh"]
