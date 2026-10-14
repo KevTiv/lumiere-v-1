@@ -1,0 +1,25 @@
+# syntax=docker/dockerfile:1
+
+FROM rust:1-bookworm
+
+ARG SPACETIMEDB_VERSION=2.8.2
+
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends ca-certificates curl \
+  && rm -rf /var/lib/apt/lists/* \
+  && curl -sSf https://install.spacetimedb.com | sh -s -- -y \
+  && /root/.local/bin/spacetime version install "${SPACETIMEDB_VERSION}" \
+  && /root/.local/bin/spacetime version use "${SPACETIMEDB_VERSION}"
+
+ENV PATH="/root/.local/bin:${PATH}"
+WORKDIR /app
+
+COPY crates/presentation-core crates/presentation-core
+COPY spacetimedb spacetimedb
+COPY scripts/railway-publish-spacetimedb.sh scripts/railway-publish-spacetimedb.sh
+
+RUN spacetime build --module-path /app/spacetimedb \
+  && test -s /app/spacetimedb/target/wasm32-unknown-unknown/release/lumiere_v1.wasm \
+  && chmod 0755 /app/scripts/railway-publish-spacetimedb.sh
+
+CMD ["/app/scripts/railway-publish-spacetimedb.sh"]
