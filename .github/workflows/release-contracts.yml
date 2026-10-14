@@ -365,17 +365,30 @@ jobs:
         run: |
           REVISION="$(git -C "$RUNNER_TEMP/contracts-release/repo" rev-parse HEAD)"
           sed -i "s/tag = \"v$PREVIOUS_VERSION\"/tag = \"v$VERSION\"/" Cargo.toml
-          sed -i "s/lumiere-contracts#v$PREVIOUS_VERSION&/lumiere-contracts#v$VERSION\&/" \
+          sed -i "s/lumiere-contracts-$PREVIOUS_VERSION\.tgz/lumiere-contracts-$VERSION.tgz/" \
             frontend/packages/presentation-core/package.json \
             frontend/packages/query-hooks/package.json \
             frontend/packages/stdb/package.json
-          # The old revision appears in specifiers, package keys and the git
-          # resolution; the resolved package entry also records the version.
-          sed -i "s/lumiere-contracts#v$PREVIOUS_VERSION&/lumiere-contracts#v$VERSION\&/; s/$PREVIOUS_REVISION/$REVISION/g" \
-            frontend/pnpm-lock.yaml
-          sed -i "/resolution: {commit: $REVISION, path: packages\/contracts/{n;s/^    version: $PREVIOUS_VERSION\$/    version: $VERSION/}" \
-            frontend/pnpm-lock.yaml
-          if grep -q "$PREVIOUS_REVISION" frontend/pnpm-lock.yaml; then echo "pnpm-lock.yaml still references $PREVIOUS_REVISION"; exit 1; fi
+          # Keep the application build self-contained. Railway must not need a
+          # private GitHub credential merely to install the released frontend
+          # contracts package.
+          PACK_DIR="$RUNNER_TEMP/contracts-release/package"
+          rm -rf "$PACK_DIR"
+          mkdir -p "$PACK_DIR" frontend/vendor
+          PACK_JSON="$(npm pack "$RUNNER_TEMP/contracts-release/repo/packages/contracts" \
+            --pack-destination "$PACK_DIR" --json)"
+          PACK_FILENAME="$(jq -r '.[0].filename // empty' <<<"$PACK_JSON")"
+          test "$PACK_FILENAME" = "lumiere-contracts-$VERSION.tgz"
+          test "$(tar -xOf "$PACK_DIR/$PACK_FILENAME" package/package.json | jq -r .name)" = "@lumiere/contracts"
+          test "$(tar -xOf "$PACK_DIR/$PACK_FILENAME" package/package.json | jq -r .version)" = "$VERSION"
+          rm -f frontend/vendor/lumiere-contracts-*.tgz
+          cp "$PACK_DIR/$PACK_FILENAME" "frontend/vendor/$PACK_FILENAME"
+          pnpm --dir frontend install --lockfile-only --no-frozen-lockfile
+          pnpm --dir frontend install --frozen-lockfile
+          if grep -q 'github.com/KevTiv/lumiere-contracts' frontend/pnpm-lock.yaml; then
+            echo "pnpm-lock.yaml still requires private GitHub access" >&2
+            exit 1
+          fi
           sed -i "s/v$PREVIOUS_VERSION/v$VERSION/g" api-server/src/presentation_dictionary.rs
           cargo update -p lumiere-contracts
           grep -q "tag=v$VERSION#$REVISION" Cargo.lock
@@ -423,7 +436,8 @@ jobs:
         run: |
           git add Cargo.toml Cargo.lock frontend/packages/presentation-core/package.json \
             frontend/packages/query-hooks/package.json frontend/packages/stdb/package.json \
-            frontend/pnpm-lock.yaml api-server/src/presentation_dictionary.rs \
+            frontend/pnpm-lock.yaml frontend/vendor \
+            api-server/src/presentation_dictionary.rs \
             release-compatibility-manifest.json
           git -c user.name="github-actions[bot]" -c user.email="41898+github-actions[bot]@users.noreply.github.com" \
             commit -m "chore(contracts): publish and pin v$VERSION"

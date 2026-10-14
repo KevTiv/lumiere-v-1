@@ -362,4 +362,6 @@ echo "  Cargo.toml:"
 echo "  lumiere-contracts = { git = \"ssh://git@github.com/KevTiv/lumiere-contracts.git\", tag = \"v$VERSION\" }"
 echo
 echo "  frontend package.json (wherever @lumiere/contracts is a dependency):"
-echo "  \"@lumiere/contracts\": \"github:KevTiv/lumiere-contracts#v$VERSION&path:packages/contracts\""
+echo "  Refresh frontend/vendor/lumiere-contracts-$VERSION.tgz from packages/contracts"
+echo "  and regenerate frontend/pnpm-lock.yaml. The application consumes the"
+echo "  immutable vendored package so Railway builds need no private GitHub token."
