@@ -80,6 +80,23 @@ async function main() {
   // Prove the supplied password works; existing credentials are never overwritten.
   await apiRequest('/v1/auth/signin', '', { email, password })
   console.log(`FIRST_ORG_VERIFIED organizationId=${rows[0].id} ownerBound=true passwordSignin=true`)
+  if (process.env.LUMIERE_GATEWAY_URL) {
+    const gateway = privateBase('LUMIERE_GATEWAY_URL')
+    const probes = [
+      ['/sign-in', false], ['/overview', false], ['/sign-up', false],
+      ['/robots.txt', false], ['/api/ai', false], ['/ingest', false],
+      ['/api/auth/signup', false], ['/api/auth/profile', true], ['/overview', true],
+    ]
+    for (const [path, authenticated] of probes) {
+      const response = await fetch(new URL(path, gateway), {
+        redirect: 'manual',
+        headers: authenticated ? { Cookie: `stdb_token=${credential.token}; stdb_identity=${credential.identity}` } : {},
+        signal: AbortSignal.timeout(45_000),
+      })
+      console.log(`WEB_PROBE path=${path} authenticated=${authenticated} status=${response.status}`)
+      await response.body?.cancel()
+    }
+  }
 }
 
 try {
