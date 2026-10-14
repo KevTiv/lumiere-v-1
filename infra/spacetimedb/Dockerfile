@@ -6,6 +6,5 @@ RUN chmod 0755 /usr/local/bin/lumiere-spacetimedb \
   && mkdir -p /data \
   && chown -R 1000:1000 /data
 
-VOLUME ["/data"]
 EXPOSE 3000
 ENTRYPOINT ["/usr/local/bin/lumiere-spacetimedb"]
