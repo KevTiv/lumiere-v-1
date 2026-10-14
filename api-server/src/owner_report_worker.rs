@@ -7,7 +7,6 @@
 
 use std::{
     collections::{HashMap, HashSet},
-    fs,
     net::SocketAddr,
     sync::{
         atomic::{AtomicBool, Ordering},
@@ -27,7 +26,7 @@ use crate::{
     config::Config,
     integration_worker::ScheduledService,
     reports::{
-        artifacts::artifact_path,
+        artifacts::artifact_exists,
         common::{ReportKey, ReportPreviewRequest},
         execution_context::{
             ClaimedOwnerReportJob, ScheduledOwnerReportFacts, ScheduledReportContext,
@@ -689,14 +688,12 @@ async fn recover_completed_job(
             "completed owner-report document binding is invalid"
         ));
     }
-    let path = artifact_path(&state.config.report_artifact_dir, &artifact.artifact_key)
-        .map_err(|error| anyhow::anyhow!(error.to_string()))?;
-    if !fs::metadata(path)
-        .map(|metadata| metadata.is_file())
-        .unwrap_or(false)
+    if !artifact_exists(&state.config.report_artifact_store, &artifact.artifact_key)
+        .await
+        .map_err(|error| anyhow::anyhow!(error.to_string()))?
     {
         return Err(anyhow::anyhow!(
-            "completed owner-report artifact file is missing"
+            "completed owner-report artifact is missing"
         ));
     }
     Ok(artifact.output_hash)

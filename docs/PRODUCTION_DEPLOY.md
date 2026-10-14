@@ -86,6 +86,30 @@ Building the image never deploys it. Promotion remains explicit and ordered by
 the release workflow, so a newly published image cannot replace production
 while the stack is still being validated.
 
+### Shared owner-report artifact bucket
+
+`api-server` writes and downloads owner-report PDFs while
+`owner-report-worker` validates scheduled-run artifacts. Because those are
+separate Railway containers, production fails closed unless both services use
+the same S3-compatible bucket:
+
+| Variable | Railway bucket reference |
+|---|---|
+| `LUMIERE_REPORT_ARTIFACT_BACKEND` | literal `s3` |
+| `LUMIERE_REPORT_S3_ENDPOINT` | `${{report-artifacts.ENDPOINT}}` |
+| `LUMIERE_REPORT_S3_BUCKET` | `${{report-artifacts.BUCKET}}` |
+| `LUMIERE_REPORT_S3_REGION` | `${{report-artifacts.REGION}}` |
+| `LUMIERE_REPORT_S3_ACCESS_KEY_ID` | `${{report-artifacts.ACCESS_KEY_ID}}` |
+| `LUMIERE_REPORT_S3_SECRET_ACCESS_KEY` | `${{report-artifacts.SECRET_ACCESS_KEY}}` |
+| `LUMIERE_REPORT_S3_PREFIX` | optional; defaults to `owner-reports` |
+
+The client uses standard virtual-host S3 URLs, matching Railway buckets. Local
+filesystem storage remains the development default and is rejected when the
+runtime environment is production. Hash-named artifacts are not deleted when
+metadata recording fails because another report may already reference the same
+content-addressed object; orphan cleanup must be an explicit retention/repair
+operation.
+
 ## Ordered Railway release
 
 Use the **Release Railway stack** workflow for monorepo releases. It accepts an

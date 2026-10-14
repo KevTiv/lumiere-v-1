@@ -1,5 +1,5 @@
 //! Shared test-only session configuration; never loaded by production.
-use crate::config::Config;
+use crate::config::{Config, ReportArtifactStoreConfig};
 use crate::organization_placement::{
     ConfiguredPlacementResolver, INITIAL_CELL_ID, INITIAL_DURABLE_STORE_ID,
 };
@@ -28,7 +28,9 @@ pub(crate) fn test_config(server_token: Option<&str>) -> Config {
         app_url: "http://localhost:3000".into(),
         cookie_secure: false,
         report_renderer_url: None,
-        report_artifact_dir: std::env::temp_dir().join("lumiere-owner-reports-test"),
+        report_artifact_store: ReportArtifactStoreConfig::Local {
+            root: std::env::temp_dir().join("lumiere-owner-reports-test"),
+        },
         document_blob_dir: std::env::temp_dir().join("lumiere-document-blobs-test"),
         owner_report_worker_poll_secs: 15,
         owner_report_worker_name: "test-owner-report-worker".to_string(),

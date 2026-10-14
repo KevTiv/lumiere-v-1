@@ -1,5 +1,5 @@
 use anyhow::{Context, Result};
-use std::path::PathBuf;
+use std::{fmt, path::PathBuf};
 use stdb_config::{
     env_stdb_host_or_next_public, env_stdb_module_or_next_public, normalize_stdb_http_host,
     runtime_is_production, DEFAULT_STDB_MODULE_DEV,
@@ -39,8 +39,8 @@ pub struct Config {
     pub cookie_secure: bool,
     /// Trusted internal Chromium worker used only for owner-report PDFs.
     pub report_renderer_url: Option<String>,
-    /// Mounted, durable object-store volume for opaque owner-report artifacts.
-    pub report_artifact_dir: PathBuf,
+    /// Durable backend shared by the API and owner-report worker.
+    pub report_artifact_store: ReportArtifactStoreConfig,
     /// Local object-store root for DMS document blobs (presign/upload/complete).
     pub document_blob_dir: PathBuf,
     /// Bounded polling interval for the scheduled owner-report worker.
@@ -68,6 +68,36 @@ pub struct Config {
     pub workflow_external_webhook_url: Option<String>,
     /// HTTP timeout for the webhook adapter; must stay below lease TTL.
     pub workflow_external_webhook_timeout_ms: u64,
+}
+
+#[derive(Clone, Debug)]
+pub enum ReportArtifactStoreConfig {
+    Local { root: PathBuf },
+    S3(ReportArtifactS3Config),
+}
+
+#[derive(Clone)]
+pub struct ReportArtifactS3Config {
+    pub endpoint: String,
+    pub bucket: String,
+    pub region: String,
+    pub access_key_id: String,
+    pub secret_access_key: String,
+    pub prefix: String,
+}
+
+impl fmt::Debug for ReportArtifactS3Config {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("ReportArtifactS3Config")
+            .field("endpoint", &self.endpoint)
+            .field("bucket", &self.bucket)
+            .field("region", &self.region)
+            .field("access_key_id", &"<redacted>")
+            .field("secret_access_key", &"<redacted>")
+            .field("prefix", &self.prefix)
+            .finish()
+    }
 }
 
 impl Config {
@@ -266,6 +296,17 @@ impl Config {
         let report_artifact_dir = std::env::var("LUMIERE_REPORT_ARTIFACT_DIR")
             .map(PathBuf::from)
             .unwrap_or_else(|_| std::env::temp_dir().join("lumiere-owner-reports"));
+        let report_artifact_store = parse_report_artifact_store(
+            prod,
+            std::env::var("LUMIERE_REPORT_ARTIFACT_BACKEND").ok(),
+            report_artifact_dir,
+            std::env::var("LUMIERE_REPORT_S3_ENDPOINT").ok(),
+            std::env::var("LUMIERE_REPORT_S3_BUCKET").ok(),
+            std::env::var("LUMIERE_REPORT_S3_REGION").ok(),
+            std::env::var("LUMIERE_REPORT_S3_ACCESS_KEY_ID").ok(),
+            std::env::var("LUMIERE_REPORT_S3_SECRET_ACCESS_KEY").ok(),
+            std::env::var("LUMIERE_REPORT_S3_PREFIX").ok(),
+        )?;
         let document_blob_dir = std::env::var("LUMIERE_DOCUMENT_BLOB_DIR")
             .map(PathBuf::from)
             .unwrap_or_else(|_| std::env::temp_dir().join("lumiere-document-blobs"));
@@ -356,7 +397,7 @@ impl Config {
             app_url,
             cookie_secure,
             report_renderer_url,
-            report_artifact_dir,
+            report_artifact_store,
             document_blob_dir,
             owner_report_worker_poll_secs,
             owner_report_worker_name,
@@ -373,6 +414,82 @@ impl Config {
             workflow_external_webhook_timeout_ms,
         })
     }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn parse_report_artifact_store(
+    production: bool,
+    backend: Option<String>,
+    local_root: PathBuf,
+    endpoint: Option<String>,
+    bucket: Option<String>,
+    region: Option<String>,
+    access_key_id: Option<String>,
+    secret_access_key: Option<String>,
+    prefix: Option<String>,
+) -> Result<ReportArtifactStoreConfig> {
+    let backend = backend
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .unwrap_or(if production { "" } else { "local" });
+    match backend {
+        "local" if !production => Ok(ReportArtifactStoreConfig::Local { root: local_root }),
+        "local" => anyhow::bail!(
+            "LUMIERE_REPORT_ARTIFACT_BACKEND=local is not allowed in production; configure the shared s3 backend"
+        ),
+        "s3" => {
+            let endpoint = required_report_s3_value(
+                "LUMIERE_REPORT_S3_ENDPOINT",
+                endpoint,
+            )?
+            .trim_end_matches('/')
+            .to_owned();
+            if !endpoint.starts_with("https://") {
+                anyhow::bail!("LUMIERE_REPORT_S3_ENDPOINT must use https");
+            }
+            let prefix = prefix
+                .as_deref()
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+                .unwrap_or("owner-reports")
+                .trim_matches('/')
+                .to_owned();
+            if prefix.is_empty()
+                || prefix.contains('\\')
+                || prefix.split('/').any(|segment| segment.is_empty() || segment == "." || segment == "..")
+            {
+                anyhow::bail!("LUMIERE_REPORT_S3_PREFIX must be a safe object-key prefix");
+            }
+            Ok(ReportArtifactStoreConfig::S3(ReportArtifactS3Config {
+                endpoint,
+                bucket: required_report_s3_value("LUMIERE_REPORT_S3_BUCKET", bucket)?,
+                region: required_report_s3_value("LUMIERE_REPORT_S3_REGION", region)?,
+                access_key_id: required_report_s3_value(
+                    "LUMIERE_REPORT_S3_ACCESS_KEY_ID",
+                    access_key_id,
+                )?,
+                secret_access_key: required_report_s3_value(
+                    "LUMIERE_REPORT_S3_SECRET_ACCESS_KEY",
+                    secret_access_key,
+                )?,
+                prefix,
+            }))
+        }
+        "" if production => anyhow::bail!(
+            "LUMIERE_REPORT_ARTIFACT_BACKEND=s3 is required in production so API and worker share report artifacts"
+        ),
+        other => anyhow::bail!(
+            "LUMIERE_REPORT_ARTIFACT_BACKEND has unknown value '{other}' (expected: local | s3)"
+        ),
+    }
+}
+
+fn required_report_s3_value(name: &str, value: Option<String>) -> Result<String> {
+    value
+        .map(|value| value.trim().to_owned())
+        .filter(|value| !value.is_empty())
+        .with_context(|| format!("{name} is required when report artifact backend is s3"))
 }
 
 const DEFAULT_PROJECTION_LAG_BUDGET_SECS: u64 = 300;
@@ -425,7 +542,70 @@ fn parse_projection_lag_budget(raw: Option<&str>) -> Result<u64> {
 
 #[cfg(test)]
 mod tests {
-    use super::{parse_projection_lag_budget, validate_dedicated_worker_token};
+    use super::{
+        parse_projection_lag_budget, parse_report_artifact_store, validate_dedicated_worker_token,
+        ReportArtifactStoreConfig,
+    };
+    use std::path::PathBuf;
+
+    fn s3_config(
+        production: bool,
+        backend: Option<&str>,
+    ) -> anyhow::Result<ReportArtifactStoreConfig> {
+        parse_report_artifact_store(
+            production,
+            backend.map(str::to_owned),
+            PathBuf::from("/tmp/reports"),
+            Some("https://objects.example.test".into()),
+            Some("reports".into()),
+            Some("eu-west-1".into()),
+            Some("access".into()),
+            Some("secret".into()),
+            Some("owner-reports".into()),
+        )
+    }
+
+    #[test]
+    fn report_artifact_backend_defaults_local_only_in_development() {
+        assert!(matches!(
+            s3_config(false, None).unwrap(),
+            ReportArtifactStoreConfig::Local { .. }
+        ));
+        assert!(s3_config(true, None).is_err());
+        assert!(s3_config(true, Some("local")).is_err());
+    }
+
+    #[test]
+    fn report_s3_backend_requires_complete_secure_configuration() {
+        assert!(matches!(
+            s3_config(true, Some("s3")).unwrap(),
+            ReportArtifactStoreConfig::S3(_)
+        ));
+        assert!(parse_report_artifact_store(
+            true,
+            Some("s3".into()),
+            PathBuf::from("/tmp/reports"),
+            Some("http://objects.example.test".into()),
+            Some("reports".into()),
+            Some("eu-west-1".into()),
+            Some("access".into()),
+            Some("secret".into()),
+            None,
+        )
+        .is_err());
+        assert!(parse_report_artifact_store(
+            true,
+            Some("s3".into()),
+            PathBuf::from("/tmp/reports"),
+            Some("https://objects.example.test".into()),
+            None,
+            Some("eu-west-1".into()),
+            Some("access".into()),
+            Some("secret".into()),
+            None,
+        )
+        .is_err());
+    }
 
     #[test]
     fn projection_lag_budget_defaults_and_rejects_zero_or_invalid_values() {

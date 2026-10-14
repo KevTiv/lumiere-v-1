@@ -253,7 +253,9 @@ fn dispatch_allowlist_fail_closed_with_webhook() {
         app_url: String::new(),
         cookie_secure: false,
         report_renderer_url: None,
-        report_artifact_dir: std::env::temp_dir(),
+        report_artifact_store: crate::config::ReportArtifactStoreConfig::Local {
+            root: std::env::temp_dir(),
+        },
         document_blob_dir: std::env::temp_dir(),
         owner_report_worker_poll_secs: 15,
         owner_report_worker_name: String::new(),

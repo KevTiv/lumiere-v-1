@@ -1,6 +1,6 @@
 //! Auth-hardening session tests (Phase 1–2): no anonymous admin, database-bound identity.
 
-use api_server::config::Config;
+use api_server::config::{Config, ReportArtifactStoreConfig};
 use api_server::organization_placement::{
     ConfiguredPlacementResolver, INITIAL_CELL_ID, INITIAL_DURABLE_STORE_ID,
 };
@@ -33,7 +33,9 @@ fn test_config(server_token: Option<&str>, dev_mock_org_id: Option<u64>) -> Conf
         app_url: "http://localhost:3000".into(),
         cookie_secure: false,
         report_renderer_url: None,
-        report_artifact_dir: std::env::temp_dir().join("lumiere-owner-reports-test"),
+        report_artifact_store: ReportArtifactStoreConfig::Local {
+            root: std::env::temp_dir().join("lumiere-owner-reports-test"),
+        },
         document_blob_dir: std::env::temp_dir().join("lumiere-document-blobs-test"),
         owner_report_worker_poll_secs: 15,
         owner_report_worker_name: "test-owner-report-worker".to_string(),
