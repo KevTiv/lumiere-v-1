@@ -44,7 +44,10 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - name: Validate pinned frontend contracts
         if: matrix.service == 'web'
-        run: node frontend/scripts/verify-vendored-contracts.mjs
+        run: |
+          node frontend/scripts/verify-vendored-contracts.mjs
+          node --experimental-vm-modules --test scripts/tests/alpha-demo-seed.test.mjs
+          node --experimental-strip-types --test frontend/web/lib/demo-access-policy.test.mjs
       - name: Validate gateway configuration rendering
         if: matrix.service == 'api-gateway'
         run: |

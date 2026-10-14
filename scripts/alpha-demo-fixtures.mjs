@@ -10,6 +10,9 @@ export function alphaDemoFixtures(now = new Date()) {
   const currency = { currencyId: '@currency' }
   const label = text => `[Alpha demo] ${text}`
   const note = 'Synthetic Alpha demo fixture. No live payment, tax filing or external integration.'
+  add('countryNL', 'country', 'create_country', 'Netherlands', { iso3: 'NLD', numcode: 528, phoneCode: '31',
+    currencyId: '@currency', languageCodes: ['nl', 'en'], isActive: true,
+  }, { code: 'NL' }, { code: 'NL' })
 
   for (const [key, name, vendor] of [['customer', 'Aurora Retail', false], ['customer2', 'Northstar Studio', false],
     ['vendor', 'Beacon Components', true], ['vendor2', 'Cedar Supply', true]]) {
@@ -228,5 +231,28 @@ export function alphaDemoFixtures(now = new Date()) {
     ...currency, pricelistId: '@pricelist', warehouseId: '@warehouse', stockLocationId: '@stock', invoiceJournalId: '@salesJournal',
     receiptHeader: 'ALPHA DEMO — no real transactions', moduleConfig: {},
   }, company)
+  add('taxGroup', 'account_tax_group', 'create_account_tax_group', label('Illustrative VAT'), { sequence: 1 }, company)
+  add('salesTax', 'account_tax', 'create_account_tax', label('Demo VAT 21% — review before use'), { typeTaxUse: 'Sale', amountType: 'Percent', amount: 21,
+    active: true, sequence: 1, taxGroupId: '@taxGroup', countryCode: 'NL', isBaseAffected: true,
+  }, company)
+  const year = now.getUTCFullYear()
+  add('fiscalYear', 'account_fiscal_year', 'create_fiscal_year', label(`FY ${year}`), { dateFrom: `${year}-01-01T00:00:00Z`,
+    dateTo: `${year}-12-31T23:59:59Z`, type: 'normal', notes: note,
+  }, company)
+  add('period', 'account_period', 'create_account_period', label(`Demo period ${year}`), { code: `ADEMO${year}`,
+    dateFrom: `${year}-01-01T00:00:00Z`, dateTo: `${year}-12-31T23:59:59Z`, fiscalYearId: '@fiscalYear', notes: note,
+  }, company)
+  add('paymentTermLine', 'account_payment_term_line', 'create_payment_term_line', undefined, { paymentTermId: '@paymentTerm', value: 'Balance',
+    days: 30, sequence: 1 }, {}, { payment_term_id: '@paymentTerm', sequence: 1 })
+  add('cashType', 'account_account_type', 'create_account_account_type', label('Bank liquidity'), { ...company, type: 'liquidity', internalGroup: 'Asset', includeInitialBalance: true })
+  add('bankAccount', 'account_account', 'create_account_account', label('Demo bank ledger'), { ...company, code: 'ADEMO1200', userTypeId: '@cashType',
+    internalType: 'Liquidity', internalGroup: 'Asset', reconcile: true, note })
+  add('bankJournal', 'account_journal', 'create_account_journal', label('Demo bank journal'), { ...company, code: 'ADB', type: 'Bank', active: true, defaultAccountId: '@bankAccount' })
+  add('bankStatement', 'account_bank_statement', 'create_account_bank_statement', label('Unreconciled demo statement'), {
+    reference: 'ALPHA-DEMO-BANK', date: day(0), balanceStart: 0, ...currency,
+  }, { ...company, journalId: '@bankJournal' })
+  add('bankStatementLine', 'account_bank_statement_line', 'create_account_bank_statement_line', undefined, { date: day(-1), amount: 440, amountCurrency: 440,
+    ...currency, partnerId: '@customer', amountResidual: 440, transactionType: 'DEMO', isReconciled: false,
+  }, { ...company, statementId: '@bankStatement' }, { statement_id: '@bankStatement', amount: 440 })
   return fixtures
 }

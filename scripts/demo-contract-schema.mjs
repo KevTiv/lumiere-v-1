@@ -57,7 +57,9 @@ export async function alphaSeedPayload(archive) {
         if (!key) return []
         return [line.match(/\.name\("([^"]+)"\)/)?.[1] ?? key[1]]
       })
-      return { name: file.replace(/_table\.js$/, ''), organizationOwned: /^\s+organizationId:/m.test(contents), hasId: /^\s+id:/m.test(contents), columns }
+      const keyLine = contents.split('\n').find(line => line.includes('.primaryKey()'))
+      const primaryKey = keyLine?.match(/\.name\("([^"]+)"\)/)?.[1] ?? keyLine?.match(/^\s+(\w+):/)?.[1]
+      return { name: file.replace(/_table\.js$/, ''), organizationOwned: /^\s+organizationId:/m.test(contents), hasId: /^\s+id:/m.test(contents), primaryKey, columns }
     })
     return { fixtures, schema: { operations, tables } }
   } finally {

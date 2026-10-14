@@ -64,7 +64,6 @@ export async function runAlphaDemoSeed(env = process.env) {
   const database = encodeURIComponent(required('STDB_MODULE'))
   const ownerEmail = required('SEED_OWNER_EMAIL')
   const admin = required('STDB_SERVER_TOKEN')
-  const literal = value => typeof value === 'number' ? String(value) : `'${String(value).replace(/'/g, "''")}'`
   async function sql(statement) {
     const response = await fetch(new URL(`/v1/database/${database}/sql`, stdb), {
       method: 'POST', headers: { Authorization: `Bearer ${admin}`, 'Content-Type': 'text/plain' }, body: statement, signal: AbortSignal.timeout(30000),
@@ -106,6 +105,8 @@ export async function runAlphaDemoSeed(env = process.env) {
   for (const fixture of fixtures) {
     try {
       if (!tables.has(fixture.table) || !/^[a-z][a-z0-9_]*$/.test(fixture.table)) throw new Error('Fixture table is not in pinned contracts')
+      const tableDefinition = schema.tables.find(table => table.name === fixture.table)
+      const primaryKey = tableDefinition.primaryKey ?? 'id'
       const match = resolveSeedReferences(fixture.match, ids)
       const columns = Object.keys(match).map(column => {
         if (!/^[a-z][a-z0-9_]*$/.test(column)) throw new Error('Unsafe fixture match column')
@@ -114,7 +115,7 @@ export async function runAlphaDemoSeed(env = process.env) {
       // HTTP SQL cannot compare Option<String> columns with bare strings.
       // Read a bounded tenant slice and match canonical decoded values instead.
       const find = async () => {
-        const rows = await sql(`SELECT ${[...new Set(['id', ...columns])].join(', ')} FROM ${fixture.table} WHERE organization_id = ${org} LIMIT 1000`)
+        const rows = await sql(`SELECT ${[...new Set([primaryKey, ...columns])].join(', ')} FROM ${fixture.table} WHERE organization_id = ${org} LIMIT 1000`)
         if (rows.length === 1000) throw new Error('Fixture lookup exceeded its safe tenant bound')
         return rows.filter(row => Object.entries(match).every(([column, value]) => String(unwrap(row[column])) === String(value)))
       }
@@ -151,7 +152,7 @@ export async function runAlphaDemoSeed(env = process.env) {
         if (existing.length !== 1) throw new Error('Created fixture could not be read back canonically')
         created = true
       }
-      ids[fixture.key] = Number(existing[0].id)
+      ids[fixture.key] = tableDefinition.hasId ? Number(existing[0][primaryKey]) : existing[0][primaryKey]
       outcomes.push({ key: fixture.key, table: fixture.table, id: ids[fixture.key], status: created ? 'created' : 'existing' })
       console.log(`ALPHA_SEED_ROW key=${fixture.key} table=${fixture.table} status=${created ? 'created' : 'existing'}`)
     } catch (error) {
@@ -162,14 +163,43 @@ export async function runAlphaDemoSeed(env = process.env) {
   }
   const coverage = []
   for (const table of schema.tables) {
-    if (!table.organizationOwned || !table.hasId) { coverage.push({ table: table.name, status: 'not-directly-org-addressable' }); continue }
+    if (!table.organizationOwned || !table.primaryKey) { coverage.push({ table: table.name, status: 'not-directly-org-addressable' }); continue }
     try {
-      const rows = await sql(`SELECT id FROM ${table.name} WHERE organization_id = ${org} LIMIT 1`)
+      const rows = await sql(`SELECT ${table.primaryKey} FROM ${table.name} WHERE organization_id = ${org} LIMIT 1`)
       coverage.push({ table: table.name, status: rows.length ? 'populated' : 'empty' })
     } catch { coverage.push({ table: table.name, status: 'read-unavailable' }) }
   }
   const report = { fixtureKey: 'alpha-demo-v1', organizationId: org, generatedAt: new Date().toISOString(),
     adminVerified: true, fixtureCount: fixtures.length, populatedFixtures: outcomes.filter(row => row.status !== 'gap').length, outcomes, coverage }
+  if (env.SEED_GATEWAY_URL) {
+    const gateway = new URL(env.SEED_GATEWAY_URL)
+    if (gateway.protocol !== 'http:' || !gateway.hostname.endsWith('.railway.internal')) throw new Error('UI probe requires Railway private HTTP')
+    const cookie = `stdb_token=${token}; stdb_identity=${credential.identity}`
+    report.uiPages = []
+    for (const path of ['/overview', '/crm', '/sales', '/purchasing', '/inventory', '/manufacturing', '/accounting', '/hr', '/projects',
+      '/expenses', '/reports', '/documents', '/workflows', '/settings', '/helpdesk', '/fleet', '/pos', '/subscriptions', '/demo-readiness']) {
+      try {
+        const response = await fetch(new URL(path, gateway), { redirect: 'manual', headers: { Cookie: cookie }, signal: AbortSignal.timeout(45000) })
+        report.uiPages.push({ path, status: response.status })
+        console.log(`ALPHA_UI_PAGE path=${path} status=${response.status}`)
+        await response.body?.cancel()
+      } catch { report.uiPages.push({ path, status: 'unavailable' }) }
+    }
+    report.documentDownloads = []
+    for (const fixture of fixtures.filter(row => row.blob)) {
+      if (!ids[fixture.key]) continue
+      const [row] = await sql(`SELECT url FROM document WHERE organization_id = ${org} AND id = ${ids[fixture.key]}`)
+      const path = unwrap(row.url)
+      if (typeof path !== 'string' || !path.startsWith(`/api/documents/blobs/object/${org}/`)) throw new Error('Unexpected document URL')
+      const response = await fetch(new URL(path, gateway), { headers: { Cookie: cookie }, signal: AbortSignal.timeout(10000) })
+      const verified = response.ok && await response.text() === fixture.blob.content
+      report.documentDownloads.push({ key: fixture.key, verified })
+      console.log(`ALPHA_DOCUMENT_VERIFIED key=${fixture.key} verified=${verified}`)
+    }
+    const anonymous = await fetch(new URL('/demo-readiness', gateway), { redirect: 'manual', signal: AbortSignal.timeout(10000) })
+    report.anonymousDiagnosticsStatus = anonymous.status
+    await anonymous.body?.cancel()
+  }
   console.log(`ALPHA_SEED_REPORT ${JSON.stringify(report)}`)
   return report
 }
