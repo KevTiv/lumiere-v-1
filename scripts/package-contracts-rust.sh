@@ -23,7 +23,7 @@ STAGING="$(mktemp -d)"
 trap 'rm -rf "$STAGING"' EXIT
 BUNDLE="$STAGING/lumiere-contracts"
 
-mkdir -p "$BUNDLE/crates" "$BUNDLE/packages/contracts/src" "$BUNDLE/scripts"
+mkdir -p "$BUNDLE/crates" "$BUNDLE/packages/contracts" "$BUNDLE/scripts"
 cp "$SOURCE_ROOT/CONTRACT_VERSION" "$BUNDLE/"
 python3 - "$BUNDLE/VENDORED_SOURCE.json" "$VERSION" "$REVISION" "$REPOSITORY" <<'PY'
 import json
@@ -42,10 +42,7 @@ Path(path).write_text(
 PY
 cp -a "$SOURCE_ROOT/crates/lumiere-contracts" "$BUNDLE/crates/"
 cp -a "$SOURCE_ROOT/manifests" "$SOURCE_ROOT/ir" "$BUNDLE/"
-cp -a "$SOURCE_ROOT/packages/contracts/src/generated" "$BUNDLE/packages/contracts/src/"
-cp "$SOURCE_ROOT/packages/contracts/src/stdb-generated-sql-columns.json" \
-  "$SOURCE_ROOT/packages/contracts/src/stdb-reducer-invalidation.ts" \
-  "$BUNDLE/packages/contracts/src/"
+cp -a "$SOURCE_ROOT/packages/contracts/src" "$BUNDLE/packages/contracts/"
 cp "$SOURCE_ROOT/scripts/generate-from-ir.py" "$BUNDLE/scripts/"
 
 ARCHIVE="lumiere-contracts-rust-$VERSION.tar.gz"

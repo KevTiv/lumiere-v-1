@@ -14,9 +14,7 @@ The archive contains these release paths:
 - `lumiere-contracts/VENDORED_SOURCE.json`
 - `lumiere-contracts/crates/lumiere-contracts/`
 - `lumiere-contracts/manifests/`
-- `lumiere-contracts/packages/contracts/src/generated/`
-- `lumiere-contracts/packages/contracts/src/stdb-generated-sql-columns.json`
-- `lumiere-contracts/packages/contracts/src/stdb-reducer-invalidation.ts`
+- `lumiere-contracts/packages/contracts/src/`
 - `lumiere-contracts/ir/`
 - `lumiere-contracts/scripts/generate-from-ir.py`
 
