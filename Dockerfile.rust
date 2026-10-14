@@ -6,23 +6,35 @@ WORKDIR /app
 FROM chef AS builder
 ARG BIN
 ARG CARGO_BUILD_JOBS=1
+ARG LUMIERE_CONTRACTS_VERSION=0.3.106
 COPY Cargo.toml Cargo.lock ./
 COPY Makefile ./
 COPY release-compatibility-manifest.json ./
 COPY scripts ./scripts
+COPY vendor/lumiere-contracts-rust-0.3.106.tar.gz /tmp/lumiere-contracts-rust.tar.gz
+COPY vendor/lumiere-contracts-rust-0.3.106.sha256 /tmp/lumiere-contracts-rust.sha256
 COPY api-server ./api-server
 COPY ai-gateway ./ai-gateway
 COPY iot-gateway ./iot-gateway
 COPY lumiere-codegen ./lumiere-codegen
 COPY crates ./crates
-RUN install -d -m 0700 /root/.ssh \
-  && printf '%s\n' 'github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl' > /root/.ssh/known_hosts \
-  && chmod 0600 /root/.ssh/known_hosts
 RUN apt-get update \
   && apt-get install -y --no-install-recommends python3 \
   && rm -rf /var/lib/apt/lists/*
-RUN --mount=type=ssh make contracts-staging-from-pinned
-RUN --mount=type=ssh cargo build --locked --release --jobs "${CARGO_BUILD_JOBS}" --bin "${BIN}"
+RUN cd /tmp \
+  && sed 's/lumiere-contracts-rust-0.3.106.tar.gz/lumiere-contracts-rust.tar.gz/' lumiere-contracts-rust.sha256 | sha256sum -c - \
+  && cd /app \
+  && mkdir -p vendor/lumiere-contracts .contracts-staging/bindings \
+  && tar -xzf /tmp/lumiere-contracts-rust.tar.gz \
+    -C vendor/lumiere-contracts --strip-components=1 \
+  && test "$(sed -n 's/^version = "\([^"]*\)"/\1/p' vendor/lumiere-contracts/crates/lumiere-contracts/Cargo.toml | head -1)" = "${LUMIERE_CONTRACTS_VERSION}" \
+  && cp -R vendor/lumiere-contracts/crates/lumiere-contracts/src/bindings/. .contracts-staging/bindings/ \
+  && sed -i \
+    's#lumiere-contracts = { git = "ssh://git@github.com/KevTiv/lumiere-contracts.git", rev = "4b90e7c2cdc5bd549b2e261a24d13f7a47dc0099"#lumiere-contracts = { path = "vendor/lumiere-contracts/crates/lumiere-contracts"#' \
+    Cargo.toml \
+  && sed -i '/^source = "git+ssh:\/\/git@github.com\/KevTiv\/lumiere-contracts\.git?/d' Cargo.lock \
+  && rm /tmp/lumiere-contracts-rust.tar.gz /tmp/lumiere-contracts-rust.sha256
+RUN cargo build --locked --release --jobs "${CARGO_BUILD_JOBS}" --bin "${BIN}"
 
 FROM debian:bookworm-slim AS runtime
 ARG BIN

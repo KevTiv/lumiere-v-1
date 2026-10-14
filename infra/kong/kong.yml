@@ -3,7 +3,7 @@ _transform: true
 
 services:
   - name: web
-    url: http://web:3000
+    url: http://__WEB_UPSTREAM_HOST__:__WEB_UPSTREAM_PORT__
     routes:
       - name: web-root
         paths:
@@ -15,15 +15,17 @@ services:
           minute: 600
           policy: redis
           redis:
-            host: redis
-            port: 6379
+            host: __REDIS_UPSTREAM_HOST__
+            port: __REDIS_UPSTREAM_PORT__
+            username: __REDIS_UPSTREAM_USERNAME__
+            password: '__REDIS_UPSTREAM_PASSWORD__'
             timeout: 2000
       - name: request-size-limiting
         config:
           allowed_payload_size: 20
 
   - name: api-query
-    url: http://api-server:8082/v1/query
+    url: http://__API_SERVER_UPSTREAM_HOST__:__API_SERVER_UPSTREAM_PORT__/v1/query
     routes:
       - name: api-query
         paths:
@@ -35,12 +37,14 @@ services:
           minute: 240
           policy: redis
           redis:
-            host: redis
-            port: 6379
+            host: __REDIS_UPSTREAM_HOST__
+            port: __REDIS_UPSTREAM_PORT__
+            username: __REDIS_UPSTREAM_USERNAME__
+            password: '__REDIS_UPSTREAM_PASSWORD__'
             timeout: 2000
 
   - name: api-call
-    url: http://api-server:8082/v1/call
+    url: http://__API_SERVER_UPSTREAM_HOST__:__API_SERVER_UPSTREAM_PORT__/v1/call
     routes:
       - name: api-call
         paths:
@@ -52,15 +56,17 @@ services:
           minute: 90
           policy: redis
           redis:
-            host: redis
-            port: 6379
+            host: __REDIS_UPSTREAM_HOST__
+            port: __REDIS_UPSTREAM_PORT__
+            username: __REDIS_UPSTREAM_USERNAME__
+            password: '__REDIS_UPSTREAM_PASSWORD__'
             timeout: 2000
       - name: request-size-limiting
         config:
           allowed_payload_size: 20
 
   - name: api-stdb
-    url: http://api-server:8082/v1/stdb
+    url: http://__API_SERVER_UPSTREAM_HOST__:__API_SERVER_UPSTREAM_PORT__/v1/stdb
     routes:
       - name: api-stdb
         paths:
@@ -72,15 +78,17 @@ services:
           minute: 240
           policy: redis
           redis:
-            host: redis
-            port: 6379
+            host: __REDIS_UPSTREAM_HOST__
+            port: __REDIS_UPSTREAM_PORT__
+            username: __REDIS_UPSTREAM_USERNAME__
+            password: '__REDIS_UPSTREAM_PASSWORD__'
             timeout: 2000
       - name: request-size-limiting
         config:
           allowed_payload_size: 32
 
   - name: api-auth-signin
-    url: http://api-server:8082/v1/auth/signin
+    url: http://__API_SERVER_UPSTREAM_HOST__:__API_SERVER_UPSTREAM_PORT__/v1/auth/signin
     routes:
       - name: api-auth-signin
         paths:
@@ -92,12 +100,14 @@ services:
           minute: 30
           policy: redis
           redis:
-            host: redis
-            port: 6379
+            host: __REDIS_UPSTREAM_HOST__
+            port: __REDIS_UPSTREAM_PORT__
+            username: __REDIS_UPSTREAM_USERNAME__
+            password: '__REDIS_UPSTREAM_PASSWORD__'
             timeout: 2000
 
   - name: api-auth-invite
-    url: http://api-server:8082/v1/auth/invite
+    url: http://__API_SERVER_UPSTREAM_HOST__:__API_SERVER_UPSTREAM_PORT__/v1/auth/invite
     routes:
       - name: api-auth-invite
         paths:
@@ -106,7 +116,7 @@ services:
     plugins: *auth_plugins
 
   - name: api-auth-accept-invite
-    url: http://api-server:8082/v1/auth/accept-invite
+    url: http://__API_SERVER_UPSTREAM_HOST__:__API_SERVER_UPSTREAM_PORT__/v1/auth/accept-invite
     routes:
       - name: api-auth-accept-invite
         paths:
@@ -115,7 +125,7 @@ services:
     plugins: *auth_plugins
 
   - name: api-auth-forgot-password
-    url: http://api-server:8082/v1/auth/forgot-password
+    url: http://__API_SERVER_UPSTREAM_HOST__:__API_SERVER_UPSTREAM_PORT__/v1/auth/forgot-password
     routes:
       - name: api-auth-forgot-password
         paths:
@@ -124,7 +134,7 @@ services:
     plugins: *auth_plugins
 
   - name: api-auth-reset-password
-    url: http://api-server:8082/v1/auth/reset-password
+    url: http://__API_SERVER_UPSTREAM_HOST__:__API_SERVER_UPSTREAM_PORT__/v1/auth/reset-password
     routes:
       - name: api-auth-reset-password
         paths:
@@ -133,7 +143,7 @@ services:
     plugins: *auth_plugins
 
   - name: api-crm
-    url: http://api-server:8082/v1/crm
+    url: http://__API_SERVER_UPSTREAM_HOST__:__API_SERVER_UPSTREAM_PORT__/v1/crm
     routes:
       - name: api-crm
         paths:
@@ -145,15 +155,17 @@ services:
           minute: 180
           policy: redis
           redis:
-            host: redis
-            port: 6379
+            host: __REDIS_UPSTREAM_HOST__
+            port: __REDIS_UPSTREAM_PORT__
+            username: __REDIS_UPSTREAM_USERNAME__
+            password: '__REDIS_UPSTREAM_PASSWORD__'
             timeout: 2000
       - name: request-size-limiting
         config:
           allowed_payload_size: 20
 
   - name: api-sales
-    url: http://api-server:8082/v1/sales
+    url: http://__API_SERVER_UPSTREAM_HOST__:__API_SERVER_UPSTREAM_PORT__/v1/sales
     routes:
       - name: api-sales
         paths:
@@ -162,7 +174,7 @@ services:
     plugins: *domain_plugins
 
   - name: api-accounting
-    url: http://api-server:8082/v1/accounting
+    url: http://__API_SERVER_UPSTREAM_HOST__:__API_SERVER_UPSTREAM_PORT__/v1/accounting
     routes:
       - name: api-accounting
         paths:
@@ -171,7 +183,7 @@ services:
     plugins: *domain_plugins
 
   - name: api-inventory
-    url: http://api-server:8082/v1/inventory
+    url: http://__API_SERVER_UPSTREAM_HOST__:__API_SERVER_UPSTREAM_PORT__/v1/inventory
     routes:
       - name: api-inventory
         paths:
@@ -180,7 +192,7 @@ services:
     plugins: *domain_plugins
 
   - name: api-settings
-    url: http://api-server:8082/v1/settings
+    url: http://__API_SERVER_UPSTREAM_HOST__:__API_SERVER_UPSTREAM_PORT__/v1/settings
     routes:
       - name: api-settings
         paths:
@@ -189,7 +201,7 @@ services:
     plugins: *domain_plugins
 
   - name: api-proposals
-    url: http://api-server:8082/v1/proposals
+    url: http://__API_SERVER_UPSTREAM_HOST__:__API_SERVER_UPSTREAM_PORT__/v1/proposals
     routes:
       - name: api-proposals
         paths:
@@ -198,7 +210,7 @@ services:
     plugins: *domain_plugins
 
   - name: api-realtime
-    url: http://api-server:8082/v1/realtime
+    url: http://__API_SERVER_UPSTREAM_HOST__:__API_SERVER_UPSTREAM_PORT__/v1/realtime
     routes:
       - name: api-realtime
         paths:
@@ -213,12 +225,14 @@ services:
           minute: 120
           policy: redis
           redis:
-            host: redis
-            port: 6379
+            host: __REDIS_UPSTREAM_HOST__
+            port: __REDIS_UPSTREAM_PORT__
+            username: __REDIS_UPSTREAM_USERNAME__
+            password: '__REDIS_UPSTREAM_PASSWORD__'
             timeout: 2000
 
   - name: web-ai
-    url: http://web:3000
+    url: http://__WEB_UPSTREAM_HOST__:__WEB_UPSTREAM_PORT__
     routes:
       - name: web-ai
         paths:
@@ -230,8 +244,10 @@ services:
           minute: 60
           policy: redis
           redis:
-            host: redis
-            port: 6379
+            host: __REDIS_UPSTREAM_HOST__
+            port: __REDIS_UPSTREAM_PORT__
+            username: __REDIS_UPSTREAM_USERNAME__
+            password: '__REDIS_UPSTREAM_PASSWORD__'
             timeout: 2000
       - name: request-size-limiting
         config:
@@ -241,8 +257,7 @@ plugins:
   - name: cors
     config:
       origins:
-        - http://localhost:8000
-        - http://127.0.0.1:8000
+        - '__CORS_ORIGIN__'
       credentials: true
       methods:
         - GET
