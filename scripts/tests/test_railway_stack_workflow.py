@@ -20,7 +20,7 @@ class RailwayStackWorkflowTests(unittest.TestCase):
             "Phase 6 gate — AI readiness",
             "Phase 7 — deploy projection worker",
             "Phase 7 gate — projection readiness",
-            "Phase 8 — deploy workflow and owner-report workers concurrently",
+            "Phase 8 — deploy workflow and owner-report workers from shared runtime image",
             "Phase 8 gate — workflow and owner-report readiness",
             "Phase 9 — deploy web",
             "Phase 9 gate — web readiness",
@@ -62,15 +62,15 @@ class RailwayStackWorkflowTests(unittest.TestCase):
         self.assertIn("Postgres Redis qdrant spacetimedb", workflow)
         self.assertNotIn("deploy api-server ai-gateway", workflow)
         self.assertNotIn("deploy web api-gateway", workflow)
-        self.assertIn("deploy workflow-worker owner-report-worker", workflow)
+        self.assertIn("redeploy-source workflow-worker owner-report-worker", workflow)
         commands = [
             "publish-stdb spacetimedb-publisher",
-            "migrate-storage storage-migrate",
+            "redeploy-storage storage-migrate",
             "deploy chromium-worker",
-            "deploy api-server",
-            "deploy ai-gateway",
-            "deploy projection-worker",
-            "deploy workflow-worker owner-report-worker",
+            "redeploy-source api-server",
+            "redeploy-source ai-gateway",
+            "redeploy-source projection-worker",
+            "redeploy-source workflow-worker owner-report-worker",
             "deploy web",
             "deploy api-gateway",
         ]
@@ -83,9 +83,23 @@ class RailwayStackWorkflowTests(unittest.TestCase):
         marker = "PostgreSQL storage migrations applied and verified successfully"
         self.assertIn(marker, binary)
         self.assertIn(marker, orchestrator)
-        self.assertIn("migrate-storage storage-migrate", (
+        self.assertIn("redeploy-storage storage-migrate", (
             ROOT / ".github/workflows/release-railway-stack.yml"
         ).read_text())
+
+    def test_runtime_image_is_pull_gated_and_promoted_atomically(self):
+        workflow = (ROOT / ".github/workflows/release-railway-stack.yml").read_text()
+        orchestrator = (ROOT / "scripts/railway-stack-release.sh").read_text()
+
+        self.assertIn('docker manifest inspect "$RUST_RUNTIME_IMAGE"', workflow)
+        self.assertIn("Gate anonymous runtime image pull", workflow)
+        self.assertIn("railway environment edit", orchestrator)
+        self.assertIn('--project "$RAILWAY_PROJECT_ID"', orchestrator)
+        self.assertIn('--environment "$RAILWAY_ENVIRONMENT"', orchestrator)
+        self.assertIn("repo: null", orchestrator)
+        self.assertIn("branch: null", orchestrator)
+        self.assertIn("commitSha: null", orchestrator)
+        self.assertIn("upstreamUrl: null", orchestrator)
 
 
 if __name__ == "__main__":

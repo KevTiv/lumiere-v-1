@@ -43,12 +43,19 @@ and validate the image without publishing it. Never configure Railway with a
 mutable tag such as `latest`; use the reported
 `ghcr.io/kevtiv/lumiere-v-1-rust-runtime@sha256:<digest>` coordinate.
 
-Before dispatching **Release Railway stack**, update the configured source for
-the six services to that exact digest and pass the same digest as
-`rust_runtime_image`. Every shared-runtime phase checks Railway's deployment
-metadata against the requested digest and stops the release on a mismatch. The
-GHCR package must be readable by Railway: either keep it public or configure
-the corresponding private-registry credentials in Railway.
+Before dispatching **Release Railway stack**, pass the reported digest as
+`rust_runtime_image`. The workflow first verifies that the digest is available
+through an anonymous registry pull, because the automated Railway image-source
+promotion does not install registry credentials. Keep this GHCR package public;
+the image contains executables and public build metadata, never runtime secrets.
+
+For each shared-runtime service, the release submits one environment-scoped
+Railway configuration patch that sets `source.image` to the exact digest while
+clearing `source.repo`, `source.branch`, `source.commitSha`, and
+`source.upstreamUrl`. The atomic source switch triggers the deployment. A retry
+at an already-configured digest explicitly redeploys the same source. Every
+phase then checks Railway's deployment metadata against the requested digest
+and stops the release on a mismatch.
 
 Building the image never deploys it. Promotion remains explicit and ordered by
 the release workflow, so a newly published image cannot replace production

@@ -16,7 +16,7 @@ Commands:
   gate SERVICE...        Wait for existing deployments to settle successfully.
   deploy SERVICE...      Deploy the same immutable release root concurrently.
   redeploy-source SERVICE...
-                         Pull each service's preconfigured image source concurrently.
+                         Atomically switch each service to the immutable runtime image.
   probe NAME=URL...      Probe HTTP readiness endpoints concurrently.
   publish-stdb SERVICE  Deploy the one-shot publisher and verify its completion marker.
   migrate-storage SERVICE
@@ -227,18 +227,61 @@ redeploy_source_one() {
   local before_ids
   before_ids="$(deployment_list "$service" | jq -c 'map(.id)')"
 
-  echo "[railway-release] $service: pulling configured immutable image source"
-  if ! timeout "$UPLOAD_TIMEOUT_SECONDS" railway redeploy \
-    --service "$service" \
-    --from-source \
-    --yes; then
+  # A service source is an environment-scoped setting. Submit one patch so the
+  # image switch and removal of every repository selector are a single commit;
+  # otherwise Railway can briefly resolve the old repo/branch while promoting
+  # the new image. Piped JSON also keeps this safe in a non-TTY CI runner.
+  local source_patch edit_result
+  source_patch="$(jq -cn \
+    --arg service "$service" \
+    --arg image "$RUST_RUNTIME_IMAGE" \
+    '{services: {($service): {source: {
+      image: $image,
+      repo: null,
+      branch: null,
+      commitSha: null,
+      upstreamUrl: null
+    }}}}')"
+
+  echo "[railway-release] $service: switching source to immutable runtime image"
+  if ! edit_result="$(printf '%s\n' "$source_patch" | timeout "$UPLOAD_TIMEOUT_SECONDS" \
+    railway environment edit \
+      --project "$RAILWAY_PROJECT_ID" \
+      --environment "$RAILWAY_ENVIRONMENT" \
+      --message "promote shared Rust runtime ($service)" \
+      --json)"; then
     dump_diagnostics "$service"
     return 1
   fi
 
+  if ! jq -e \
+    '(.committed == true and .staged == true) or
+     (.committed == false and .staged == false)' \
+    >/dev/null <<<"$edit_result"; then
+    echo "[railway-release] $service: environment source edit returned an invalid result" >&2
+    dump_diagnostics "$service"
+    return 1
+  fi
+
+  # Re-running a release at the same digest is a no-op configuration patch and
+  # therefore creates no deployment. Explicitly redeploy only in that case.
+  if [[ "$(jq -r '.committed' <<<"$edit_result")" != true ]]; then
+    echo "[railway-release] $service: source already matched; redeploying exact image"
+    if ! timeout "$UPLOAD_TIMEOUT_SECONDS" railway redeploy \
+      --project "$RAILWAY_PROJECT_ID" \
+      --environment "$RAILWAY_ENVIRONMENT" \
+      --service "$service" \
+      --from-source \
+      --yes \
+      --json >/dev/null; then
+      dump_diagnostics "$service"
+      return 1
+    fi
+  fi
+
   local deployment_id
   if ! deployment_id="$(wait_for_new_deployment "$service" "$before_ids")"; then
-    echo "[railway-release] $service: redeploy returned but no new deployment appeared" >&2
+    echo "[railway-release] $service: source promotion returned but no new deployment appeared" >&2
     dump_diagnostics "$service"
     return 1
   fi

@@ -19,6 +19,20 @@ case "${1:-}" in
   logs)
     printf '%s\n' "${TEST_RAILWAY_LOGS:-}"
     ;;
+  environment)
+    [[ "${2:-}" == edit ]]
+    cat >"${TEST_SOURCE_PATCH_FILE:?}"
+    printf '%s\n' "$*" >"${TEST_SOURCE_ARGS_FILE:?}"
+    if [[ "${TEST_ENV_EDIT_COMMITTED:-true}" == true ]]; then
+      printf '{"staged":true,"committed":true,"environmentId":"environment-test"}\n'
+    else
+      printf '{"staged":false,"committed":false,"message":"No changes to apply"}\n'
+    fi
+    ;;
+  redeploy)
+    printf '%s\n' "$*" >"${TEST_REDEPLOY_ARGS_FILE:?}"
+    printf '{"status":"queued"}\n'
+    ;;
   *)
     echo "unexpected railway invocation: $*" >&2
     exit 90
@@ -79,6 +93,55 @@ if env "${common_env[@]}" \
   echo "storage migration accepted a deployment without its success marker" >&2
   exit 1
 fi
+
+runtime_digest="ghcr.io/kevtiv/lumiere-v-1-rust-runtime@sha256:$(printf 'a%.0s' {1..64})"
+source_patch_file="$TMP/source-patch.json"
+source_args_file="$TMP/source-args.txt"
+redeploy_args_file="$TMP/redeploy-args.txt"
+env "${common_env[@]}" \
+  RUST_RUNTIME_IMAGE="$runtime_digest" \
+  TEST_SOURCE_PATCH_FILE="$source_patch_file" \
+  TEST_SOURCE_ARGS_FILE="$source_args_file" \
+  TEST_REDEPLOY_ARGS_FILE="$redeploy_args_file" \
+  bash -c '
+    source "$1"
+    wait_for_new_deployment() { printf "dep-2\n"; }
+    wait_for_terminal_success() { :; }
+    deployment_image() { printf "%s\n" "$RUST_RUNTIME_IMAGE"; }
+    redeploy_source_one api-server
+  ' _ "$ROOT/scripts/railway-stack-release.sh"
+
+jq -e --arg image "$runtime_digest" '
+  . == {services: {"api-server": {source: {
+    image: $image,
+    repo: null,
+    branch: null,
+    commitSha: null,
+    upstreamUrl: null
+  }}}}
+' "$source_patch_file" >/dev/null
+grep -Fq -- '--project project-test' "$source_args_file"
+grep -Fq -- '--environment production' "$source_args_file"
+grep -Fq -- '--json' "$source_args_file"
+test ! -e "$redeploy_args_file"
+
+env "${common_env[@]}" \
+  RUST_RUNTIME_IMAGE="$runtime_digest" \
+  TEST_ENV_EDIT_COMMITTED=false \
+  TEST_SOURCE_PATCH_FILE="$source_patch_file" \
+  TEST_SOURCE_ARGS_FILE="$source_args_file" \
+  TEST_REDEPLOY_ARGS_FILE="$redeploy_args_file" \
+  bash -c '
+    source "$1"
+    wait_for_new_deployment() { printf "dep-3\n"; }
+    wait_for_terminal_success() { :; }
+    deployment_image() { printf "%s\n" "$RUST_RUNTIME_IMAGE"; }
+    redeploy_source_one api-server
+  ' _ "$ROOT/scripts/railway-stack-release.sh"
+grep -Fq -- '--project project-test' "$redeploy_args_file"
+grep -Fq -- '--environment production' "$redeploy_args_file"
+grep -Fq -- '--service api-server' "$redeploy_args_file"
+grep -Fq -- '--from-source' "$redeploy_args_file"
 
 publisher_bin="$TMP/publisher-bin"
 mkdir -p "$publisher_bin"
