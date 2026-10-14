@@ -1,6 +1,8 @@
 services:
   kong:
-    image: kong:3.9
+    build:
+      context: .
+      dockerfile: infra/kong/Dockerfile
     depends_on:
       - redis
       - web
@@ -14,11 +16,18 @@ services:
       KONG_ADMIN_ERROR_LOG: /dev/stderr
       KONG_PROXY_LISTEN: 0.0.0.0:8000
       KONG_ADMIN_LISTEN: 0.0.0.0:8001
+      WEB_UPSTREAM_HOST: web
+      WEB_UPSTREAM_PORT: 3000
+      API_SERVER_UPSTREAM_HOST: api-server
+      API_SERVER_UPSTREAM_PORT: 8082
+      REDIS_UPSTREAM_HOST: redis
+      REDIS_UPSTREAM_PORT: 6379
+      REDIS_UPSTREAM_USERNAME: ""
+      REDIS_UPSTREAM_PASSWORD: ""
+      CORS_ORIGIN: ${NEXT_PUBLIC_APP_URL:-http://localhost:8000}
     ports:
       - "8000:8000"
       - "127.0.0.1:8001:8001"
-    volumes:
-      - ./infra/kong/kong.yml:/kong/declarative/kong.yml:ro
     restart: unless-stopped
 
   redis:
