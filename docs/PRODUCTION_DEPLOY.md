@@ -17,6 +17,25 @@ scripts/check-prod-env.sh --list
 
 ## Shared immutable Rust runtime image
 
+`lumiere-contracts` is a versioned library dependency, not a Railway service.
+Do not deploy the contracts repository as an HTTP service or add a contracts
+service URL to application configuration. The generated types and metadata are
+compiled into the application artifacts; running services do not fetch them
+from a contracts server.
+
+Rust builds verify and unpack the vendored release archive against its checksum
+and `release-compatibility-manifest.json`. TypeScript builds install the vendored
+`@lumiere/contracts` package with the version and integrity pinned in
+`frontend/pnpm-lock.yaml`. Both consume the published release without regenerating
+or rewriting contract definitions during deployment.
+
+The Rust Dockerfiles prepare contracts before copying application sources, so
+source-only edits reuse that Docker layer when the build cache is available.
+A clean build still verifies the pinned contracts, and a contracts release change
+invalidates the layer. After the shared image is built, promoting or restarting
+its digest performs no contracts build or download. This is once per image build,
+not a one-time bootstrap dependency that can be dropped from future builds.
+
 The **Build Rust runtime image** workflow compiles the Rust service graph once
 and publishes one OCI image to GHCR. It deliberately includes only these six
 executables:
