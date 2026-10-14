@@ -1,0 +1,35 @@
+{
+  "sourceCommit": "69edabb7735e7aa1f9d974df9b155b0212e96c5c",
+  "image": "ghcr.io/kevtiv/lumiere-v-1-spacetimedb-publisher@sha256:9d79a678992e8205221fe8836f9980b7da476ec6c14d2a609f36f833d7c987ad",
+  "workflowUrl": "https://github.com/KevTiv/lumiere-v-1/actions/runs/38622947918",
+  "workflowConclusion": "success",
+  "isolatedDatabaseGate": {
+    "jobId": 116057533774,
+    "productionDevEscalationRejected": true,
+    "bootstrapDurableCountryRowsVerified": true,
+    "additiveMigrationAndReplayVerified": true,
+    "customizedCountryPreserved": true,
+    "tenantPermissionGuardsVerified": true,
+    "ownerRemainsNonSuperuser": true
+  },
+  "localVerification": {
+    "rustModuleCheck": "passed with pre-existing warnings",
+    "pythonTestsPassed": 63,
+    "seedContractTestsPassed": 5,
+    "countryCatalogTestsPassed": 2,
+    "workflowYamlParse": "passed"
+  },
+  "railway": {
+    "projectId": "cc695d4b-030c-43e3-bbd6-a41095b09257",
+    "environmentId": "dbeb35da-dcc5-43bb-ad1d-0066aa530199",
+    "serviceId": "6185f93d-9027-4248-b70b-cf29a1b24fdd",
+    "serviceName": "spacetimedb-publisher",
+    "region": "europe-west4",
+    "stagedPatchId": "06b7c9db-c49b-4465-9abc-5728c06c1062",
+    "state": "staged; requires dashboard two-factor verification",
+    "onlyChangedResource": "spacetimedb-publisher source",
+    "liveSeedStillPopulatedFixtures": 141,
+    "plannedFixtures": 143
+  },
+  "nextAction": "Apply the staged publisher change in the production Railway dashboard, verify publication, then run and repeat the private Alpha seed with SEED_PROVISION_REFERENCE_DATA=true. No live country or VAT success is claimed yet."
+}
