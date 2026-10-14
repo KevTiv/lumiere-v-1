@@ -226,6 +226,26 @@ services:
         strip_path: true
     plugins: *domain_plugins
 
+  # Generic ERP commands are Rust-owned. Route them here rather than relying on
+  # Next.js build-time rewrites, which may be absent in a standalone image.
+  - name: api-operations
+    url: http://__API_SERVER_UPSTREAM_HOST__:__API_SERVER_UPSTREAM_PORT__/v1/operations
+    routes:
+      - name: api-operations
+        paths:
+          - /api/operations
+        strip_path: true
+    plugins: *domain_plugins
+
+  - name: api-compat-reducer
+    url: http://__API_SERVER_UPSTREAM_HOST__:__API_SERVER_UPSTREAM_PORT__/v1/compat/reducer
+    routes:
+      - name: api-compat-reducer
+        paths:
+          - /api/compat/reducer
+        strip_path: true
+    plugins: *domain_plugins
+
   - name: api-realtime
     url: http://__API_SERVER_UPSTREAM_HOST__:__API_SERVER_UPSTREAM_PORT__/v1/realtime
     routes:

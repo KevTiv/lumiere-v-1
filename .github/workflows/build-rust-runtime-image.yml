@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - codex/railway-shared-rust-runtime
+      - codex/railway-production-completion
     paths:
       - Cargo.lock
       - Cargo.toml
