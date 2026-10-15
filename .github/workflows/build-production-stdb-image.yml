@@ -23,6 +23,8 @@ concurrency:
 jobs:
   module:
     uses: ./.github/workflows/build-contracts-module.yml
+    with:
+      production: true
   publish:
     needs: module
     runs-on: ubuntu-latest

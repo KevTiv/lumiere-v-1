@@ -2,6 +2,12 @@ name: Build contracts module
 
 on:
   workflow_call:
+    inputs:
+      production:
+        description: Exclude developer seed and test reducers from the artifact
+        required: false
+        default: false
+        type: boolean
 
 env:
   CONTRACTS_MODULE_ARTIFACT: contracts-module
@@ -29,7 +35,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: .ci/contracts-module.wasm
-          key: contracts-module-v3-production-lean-${{ runner.os }}-${{ hashFiles('spacetimedb/src/**', 'spacetimedb/tests/**', 'spacetimedb/assets/**', 'spacetimedb/Cargo.toml', 'spacetimedb/Cargo.lock', 'crates/presentation-core/src/**', 'crates/presentation-core/Cargo.toml') }}
+          key: contracts-module-v3-${{ inputs.production && 'production-lean' || 'development' }}-${{ runner.os }}-${{ hashFiles('spacetimedb/src/**', 'spacetimedb/tests/**', 'spacetimedb/assets/**', 'spacetimedb/Cargo.toml', 'spacetimedb/Cargo.lock', 'crates/presentation-core/src/**', 'crates/presentation-core/Cargo.toml') }}
 
       - uses: Swatinem/rust-cache@v2
         if: steps.contracts-module.outputs.cache-hit != 'true'
@@ -43,7 +49,12 @@ jobs:
         if: steps.contracts-module.outputs.cache-hit != 'true'
         env:
           LUMIERE_ENABLE_DEV_REDUCERS: '0'
-        run: make contracts-module-ci
+        run: |
+          if [[ '${{ inputs.production }}' == 'true' ]]; then
+            make contracts-module-production-ci
+          else
+            make contracts-module-ci
+          fi
 
       - name: Export contracts module
         uses: actions/upload-artifact@v4
