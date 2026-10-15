@@ -1314,7 +1314,7 @@ check-contracts-drift: clean-contracts-live-staging generate-presentation-schema
 # tagged release, then print the Cargo.toml dependency line to bump.
 contracts-module-ci:
 	mkdir -p .ci
-	@cargo build --quiet --manifest-path spacetimedb/Cargo.toml --target wasm32-unknown-unknown --profile ci-contracts \
+	@cargo build --quiet --manifest-path spacetimedb/Cargo.toml --target wasm32-unknown-unknown --profile ci-contracts --no-default-features \
 		2>.ci/contracts-module-build.log || \
 		(cat .ci/contracts-module-build.log >&2; exit 1)
 	cp spacetimedb/target/wasm32-unknown-unknown/ci-contracts/lumiere_v1.wasm .ci/contracts-module.wasm

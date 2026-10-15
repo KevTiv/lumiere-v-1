@@ -111,6 +111,7 @@ fn require_superuser(ctx: &ReducerContext) -> Result<(), String> {
     Ok(())
 }
 
+#[cfg(feature = "dev-module")]
 fn require_dev_reducers_enabled() -> Result<(), String> {
     let enabled = option_env!("LUMIERE_ENABLE_DEV_REDUCERS")
         .is_some_and(|value| value == "1" || value.eq_ignore_ascii_case("true"));
@@ -127,6 +128,7 @@ fn require_dev_reducers_enabled() -> Result<(), String> {
 /// Do **not** rely on this for production security — anyone who can invoke reducers as this identity
 /// can escalate; use only with local `spacetime` or controlled deployments.
 #[spacetimedb::reducer]
+#[cfg(feature = "dev-module")]
 pub fn dev_promote_caller_superuser(ctx: &ReducerContext) -> Result<(), String> {
     require_dev_reducers_enabled()?;
 

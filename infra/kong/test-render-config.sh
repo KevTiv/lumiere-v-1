@@ -8,7 +8,6 @@ trap 'rm -rf "$tmp"' EXIT HUP INT TERM
 render() {
   KONG_DECLARATIVE_TEMPLATE="$root/infra/kong/kong.yml" \
   KONG_DECLARATIVE_CONFIG="$tmp/kong.yml" \
-  REDIS_UPSTREAM_PASSWORD="redis'password" \
   CORS_ORIGIN=https://erp.example.test \
     sh "$root/infra/kong/render-config.sh" --render-only
 }
@@ -29,12 +28,17 @@ assert_contains 'url: http://api-server.railway.internal:8080/v1/operations'
 assert_contains 'url: http://api-server.railway.internal:8080/v1/compat/reducer'
 assert_contains '- /api/operations'
 assert_contains '- /api/compat/reducer'
-assert_contains "password: 'redis''password'"
+assert_contains 'policy: local'
 assert_contains "- /health/ready"
 assert_contains "body: '{\"status\":\"ok\",\"service\":\"api-gateway\"}'"
 
 if grep -Eq '__[A-Z0-9_]+__' "$tmp/kong.yml"; then
   echo 'render-kong-config test: unresolved placeholder' >&2
+  exit 1
+fi
+
+if grep -Eq 'policy: redis|^[[:space:]]+redis:' "$tmp/kong.yml"; then
+  echo 'render-kong-config test: Redis rate limiting remains enabled' >&2
   exit 1
 fi
 

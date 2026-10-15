@@ -25,17 +25,6 @@ services:
       retries: 20
       start_period: 10s
 
-  redis:
-    image: redis:7-alpine
-    command: ["redis-server", "--save", "", "--appendonly", "no"]
-    ports:
-      - "6379:6379"
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 3s
-      retries: 10
-
   # Cold-tier storage (docs/plans/sliding-window-cold-tier.md). NoTls locally —
   # api-server/src/cold_tier/pg_pool.rs enforces PG_TLS_MODE=require in production.
   postgres:

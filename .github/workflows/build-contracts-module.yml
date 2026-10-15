@@ -29,7 +29,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: .ci/contracts-module.wasm
-          key: contracts-module-v2-production-${{ runner.os }}-${{ hashFiles('spacetimedb/src/**', 'spacetimedb/tests/**', 'spacetimedb/assets/**', 'spacetimedb/Cargo.toml', 'spacetimedb/Cargo.lock', 'crates/presentation-core/src/**', 'crates/presentation-core/Cargo.toml') }}
+          key: contracts-module-v3-production-lean-${{ runner.os }}-${{ hashFiles('spacetimedb/src/**', 'spacetimedb/tests/**', 'spacetimedb/assets/**', 'spacetimedb/Cargo.toml', 'spacetimedb/Cargo.lock', 'crates/presentation-core/src/**', 'crates/presentation-core/Cargo.toml') }}
 
       - uses: Swatinem/rust-cache@v2
         if: steps.contracts-module.outputs.cache-hit != 'true'

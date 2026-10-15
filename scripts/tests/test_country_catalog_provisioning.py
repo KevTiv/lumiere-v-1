@@ -40,6 +40,7 @@ class CountryCatalogProvisioningTests(unittest.TestCase):
         self.assertIn("uses: ./.github/workflows/build-contracts-module.yml", workflow)
         self.assertIn("test_bootstrap_new_tenant_records_complete_commit", workflow)
         self.assertIn("dev_promote_caller_superuser", workflow)
+        self.assertIn("Production module must not expose test reducers", workflow)
         self.assertNotIn("RAILWAY_TOKEN", workflow)
         self.assertNotIn("railway up", workflow)
         shared = (ROOT / ".github/workflows/build-contracts-module.yml").read_text()

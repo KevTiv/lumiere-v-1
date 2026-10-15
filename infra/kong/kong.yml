@@ -72,13 +72,7 @@ services:
           hour: 6000
           limit_by: ip
           fault_tolerant: false
-          policy: redis
-          redis:
-            host: __REDIS_UPSTREAM_HOST__
-            port: __REDIS_UPSTREAM_PORT__
-            username: __REDIS_UPSTREAM_USERNAME__
-            password: '__REDIS_UPSTREAM_PASSWORD__'
-            timeout: 2000
+          policy: local
       - name: request-size-limiting
         config:
           allowed_payload_size: 20
@@ -97,13 +91,7 @@ services:
           hour: 3000
           limit_by: ip
           fault_tolerant: false
-          policy: redis
-          redis:
-            host: __REDIS_UPSTREAM_HOST__
-            port: __REDIS_UPSTREAM_PORT__
-            username: __REDIS_UPSTREAM_USERNAME__
-            password: '__REDIS_UPSTREAM_PASSWORD__'
-            timeout: 2000
+          policy: local
 
   - name: api-call
     url: http://__API_SERVER_UPSTREAM_HOST__:__API_SERVER_UPSTREAM_PORT__/v1/call
@@ -119,13 +107,7 @@ services:
           hour: 1000
           limit_by: ip
           fault_tolerant: false
-          policy: redis
-          redis:
-            host: __REDIS_UPSTREAM_HOST__
-            port: __REDIS_UPSTREAM_PORT__
-            username: __REDIS_UPSTREAM_USERNAME__
-            password: '__REDIS_UPSTREAM_PASSWORD__'
-            timeout: 2000
+          policy: local
       - name: request-size-limiting
         config:
           allowed_payload_size: 20
@@ -144,13 +126,7 @@ services:
           hour: 3000
           limit_by: ip
           fault_tolerant: false
-          policy: redis
-          redis:
-            host: __REDIS_UPSTREAM_HOST__
-            port: __REDIS_UPSTREAM_PORT__
-            username: __REDIS_UPSTREAM_USERNAME__
-            password: '__REDIS_UPSTREAM_PASSWORD__'
-            timeout: 2000
+          policy: local
       - name: request-size-limiting
         config:
           allowed_payload_size: 32
@@ -169,13 +145,7 @@ services:
           hour: 100
           limit_by: ip
           fault_tolerant: false
-          policy: redis
-          redis:
-            host: __REDIS_UPSTREAM_HOST__
-            port: __REDIS_UPSTREAM_PORT__
-            username: __REDIS_UPSTREAM_USERNAME__
-            password: '__REDIS_UPSTREAM_PASSWORD__'
-            timeout: 2000
+          policy: local
 
   - name: api-auth-signup
     url: http://127.0.0.1:1
@@ -240,13 +210,7 @@ services:
           hour: 2000
           limit_by: ip
           fault_tolerant: false
-          policy: redis
-          redis:
-            host: __REDIS_UPSTREAM_HOST__
-            port: __REDIS_UPSTREAM_PORT__
-            username: __REDIS_UPSTREAM_USERNAME__
-            password: '__REDIS_UPSTREAM_PASSWORD__'
-            timeout: 2000
+          policy: local
       - name: request-size-limiting
         config:
           allowed_payload_size: 20
@@ -333,13 +297,7 @@ services:
           hour: 1500
           limit_by: ip
           fault_tolerant: false
-          policy: redis
-          redis:
-            host: __REDIS_UPSTREAM_HOST__
-            port: __REDIS_UPSTREAM_PORT__
-            username: __REDIS_UPSTREAM_USERNAME__
-            password: '__REDIS_UPSTREAM_PASSWORD__'
-            timeout: 2000
+          policy: local
 
   - name: web-ai
     url: http://127.0.0.1:1
