@@ -23,6 +23,8 @@ concurrency:
 jobs:
   module:
     uses: ./.github/workflows/build-contracts-module.yml
+    with:
+      production: true
   publish:
     needs: module
     runs-on: ubuntu-latest
@@ -52,7 +54,10 @@ jobs:
             echo 'Production module must reject dev privilege escalation' >&2
             exit 1
           fi
-          spacetime call lumiere-provisioning-test test_bootstrap_new_tenant_records_complete_commit --server local -y --no-config
+          if spacetime call lumiere-provisioning-test test_bootstrap_new_tenant_records_complete_commit --server local -y --no-config; then
+            echo 'Production module must not expose test reducers' >&2
+            exit 1
+          fi
       - uses: docker/setup-buildx-action@v3
       - uses: docker/login-action@v3
         with:

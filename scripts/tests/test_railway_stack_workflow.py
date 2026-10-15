@@ -37,7 +37,6 @@ class RailwayStackWorkflowTests(unittest.TestCase):
         workflow = (ROOT / ".github/workflows/release-railway-stack.yml").read_text()
         for service in (
             "Postgres",
-            "Redis",
             "qdrant",
             "spacetimedb",
             "spacetimedb-publisher",
@@ -62,10 +61,12 @@ class RailwayStackWorkflowTests(unittest.TestCase):
             self.assertIn(f'has("{key}")', publisher)
         self.assertIn('canonical_table_name == "organization"', publisher)
         self.assertIn("SpacetimeDB publish and schema verification passed", publisher)
+        self.assertNotIn("sleep infinity", publisher)
 
     def test_downstream_services_are_not_deployed_in_the_same_phase(self):
         workflow = (ROOT / ".github/workflows/release-railway-stack.yml").read_text()
-        self.assertIn("Postgres Redis qdrant spacetimedb", workflow)
+        self.assertIn("Postgres spacetimedb", workflow)
+        self.assertIn("gate qdrant", workflow)
         self.assertNotIn("deploy api-server ai-gateway", workflow)
         self.assertNotIn("deploy web api-gateway", workflow)
         self.assertIn("redeploy-source workflow-worker owner-report-worker", workflow)
@@ -115,6 +116,11 @@ class RailwayStackWorkflowTests(unittest.TestCase):
         self.assertIn("enable_ai:", workflow)
         self.assertIn("default: false", workflow)
         self.assertIn("if: inputs.enable_ai", workflow)
+
+        topology = json.loads((ROOT / "infra/railway/production-eu-services.json").read_text())
+        qdrant = next(service for service in topology["services"] if service["name"] == "qdrant")
+        self.assertEqual(qdrant["featureGate"], "RAILWAY_ENABLE_AI")
+        self.assertFalse(qdrant["required"])
 
     def test_integration_activation_requires_real_tenants(self):
         workflow = (ROOT / ".github/workflows/release-railway-stack.yml").read_text()

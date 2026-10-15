@@ -7,10 +7,6 @@ web_host="${WEB_UPSTREAM_HOST:-web.railway.internal}"
 web_port="${WEB_UPSTREAM_PORT:-3000}"
 api_host="${API_SERVER_UPSTREAM_HOST:-api-server.railway.internal}"
 api_port="${API_SERVER_UPSTREAM_PORT:-8080}"
-redis_host="${REDIS_UPSTREAM_HOST:-redis.railway.internal}"
-redis_port="${REDIS_UPSTREAM_PORT:-6379}"
-redis_username="${REDIS_UPSTREAM_USERNAME:-}"
-redis_password="${REDIS_UPSTREAM_PASSWORD:-}"
 cors_origin="${CORS_ORIGIN:-http://localhost:8000}"
 
 umask 077
@@ -43,21 +39,8 @@ validate_port() {
 
 validate_host "$web_host" WEB_UPSTREAM_HOST
 validate_host "$api_host" API_SERVER_UPSTREAM_HOST
-validate_host "$redis_host" REDIS_UPSTREAM_HOST
 validate_port "$web_port" WEB_UPSTREAM_PORT
 validate_port "$api_port" API_SERVER_UPSTREAM_PORT
-validate_port "$redis_port" REDIS_UPSTREAM_PORT
-
-case "$redis_username" in
-  *[!A-Za-z0-9._-]*)
-    echo "render-kong-config: invalid REDIS_UPSTREAM_USERNAME" >&2
-    exit 1
-    ;;
-esac
-if [ -n "$redis_password" ] && printf '%s' "$redis_password" | LC_ALL=C grep -q '[[:cntrl:]]'; then
-  echo "render-kong-config: REDIS_UPSTREAM_PASSWORD contains control characters" >&2
-  exit 1
-fi
 
 if ! printf '%s\n' "$cors_origin" | grep -Eq '^https?://[A-Za-z0-9][A-Za-z0-9._:-]*(/[^[:space:]]*)?$'; then
   echo "render-kong-config: invalid CORS_ORIGIN" >&2
@@ -69,16 +52,11 @@ escape_single_quoted_yaml_for_sed() {
 }
 
 cors_origin_escaped="$(escape_single_quoted_yaml_for_sed "$cors_origin")"
-redis_password_escaped="$(escape_single_quoted_yaml_for_sed "$redis_password")"
 sed \
   -e "s|__WEB_UPSTREAM_HOST__|$web_host|g" \
   -e "s|__WEB_UPSTREAM_PORT__|$web_port|g" \
   -e "s|__API_SERVER_UPSTREAM_HOST__|$api_host|g" \
   -e "s|__API_SERVER_UPSTREAM_PORT__|$api_port|g" \
-  -e "s|__REDIS_UPSTREAM_HOST__|$redis_host|g" \
-  -e "s|__REDIS_UPSTREAM_PORT__|$redis_port|g" \
-  -e "s|__REDIS_UPSTREAM_USERNAME__|$redis_username|g" \
-  -e "s|__REDIS_UPSTREAM_PASSWORD__|$redis_password_escaped|g" \
   -e "s|__CORS_ORIGIN__|$cors_origin_escaped|g" \
   "$template" > "$config"
 

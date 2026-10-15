@@ -131,20 +131,23 @@ dedicated worker tokens, placeholder credentials, and invalid organization-ID
 lists without printing variable values. This pass intentionally defines only
 production; development infrastructure and data remain deferred.
 
-1. Existing `Postgres`, `Redis`, `qdrant`, and `spacetimedb` deployments must
-   be successful and report the configured EU `RAILWAY_REPLICA_REGION`. The
-   capitalization matches the live Railway service names exactly.
-2. `spacetimedb-publisher` builds the module from the release commit, publishes
+1. Existing `Postgres` and `spacetimedb` deployments must be successful and
+   report the configured EU `RAILWAY_REPLICA_REGION`. `qdrant` is required only
+   when `enable_ai=true`. Kong uses instance-local protective rate limits, so
+   Redis is not part of the baseline production topology.
+2. The one-shot `spacetimedb-publisher` builds the lean production module from the release commit, publishes
    it without clearing data, and must describe a schema containing reducers,
    tables, types, and a typespace, including the canonical `organization`
-   table.
+   table. Its Railway restart policy must be `NEVER`.
 3. The one-shot `storage-migrate` service applies the checksum-verified
    PostgreSQL catalog, must reach terminal success, and must emit the explicit
    `PostgreSQL storage migrations applied and verified successfully` marker.
    A fresh database cannot advance to API deployment without both gates; a
    Railway success state without the marker is rejected.
 4. `chromium-worker` deploys and reaches readiness before API report rendering
-   can depend on it.
+   can depend on it. Railway probes `/health`; the deeper `/health/ready` probe
+   starts Chromium only for release validation. An idle browser closes after
+   `CHROMIUM_IDLE_TIMEOUT_MS` (60 seconds by default).
 5. `api-server` deploys and reaches readiness against the published schema and
    migrated PostgreSQL catalog.
 6. `ai-gateway` deploys only when the explicit `enable_ai` input is true, and

@@ -38,12 +38,15 @@ class CountryCatalogProvisioningTests(unittest.TestCase):
     def test_publisher_is_build_only_with_production_module_runtime_tests(self):
         workflow = (ROOT / ".github/workflows/build-production-stdb-image.yml").read_text()
         self.assertIn("uses: ./.github/workflows/build-contracts-module.yml", workflow)
+        self.assertIn("production: true", workflow)
         self.assertIn("test_bootstrap_new_tenant_records_complete_commit", workflow)
         self.assertIn("dev_promote_caller_superuser", workflow)
+        self.assertIn("Production module must not expose test reducers", workflow)
         self.assertNotIn("RAILWAY_TOKEN", workflow)
         self.assertNotIn("railway up", workflow)
         shared = (ROOT / ".github/workflows/build-contracts-module.yml").read_text()
         self.assertIn("LUMIERE_ENABLE_DEV_REDUCERS: '0'", shared)
+        self.assertIn("make contracts-module-production-ci", shared)
         self.assertIn("'spacetimedb/tests/**'", shared)
 
 

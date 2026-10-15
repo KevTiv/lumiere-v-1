@@ -54,4 +54,3 @@ jq -e '
 
 rm -f -- "${config_file}" "${schema_file}"
 echo "SpacetimeDB publish and schema verification passed for ${STDB_MODULE}"
-exec sleep infinity

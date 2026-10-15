@@ -37,6 +37,7 @@ class ContractReleaseWorkflowTests(unittest.TestCase):
         self.assertNotIn("cargo build --manifest-path spacetimedb/Cargo.toml", release)
         self.assertNotIn("cargo build --manifest-path spacetimedb/Cargo.toml", ci)
         self.assertIn("make contracts-module-ci", shared)
+        self.assertIn("make contracts-module-production-ci", shared)
         self.assertIn("actions/upload-artifact@v4", shared)
 
     def test_release_uses_prepared_staging_and_cached_candidate_checks(self):

@@ -4,7 +4,6 @@ services:
       context: .
       dockerfile: infra/kong/Dockerfile
     depends_on:
-      - redis
       - web
       - api-server
     environment:
@@ -20,21 +19,10 @@ services:
       WEB_UPSTREAM_PORT: 3000
       API_SERVER_UPSTREAM_HOST: api-server
       API_SERVER_UPSTREAM_PORT: 8082
-      REDIS_UPSTREAM_HOST: redis
-      REDIS_UPSTREAM_PORT: 6379
-      REDIS_UPSTREAM_USERNAME: ""
-      REDIS_UPSTREAM_PASSWORD: ""
       CORS_ORIGIN: ${NEXT_PUBLIC_APP_URL:-http://localhost:8000}
     ports:
       - "8000:8000"
       - "127.0.0.1:8001:8001"
-    restart: unless-stopped
-
-  redis:
-    image: redis:7-alpine
-    command: ["redis-server", "--save", "", "--appendonly", "no"]
-    ports:
-      - "127.0.0.1:6379:6379"
     restart: unless-stopped
 
   web:

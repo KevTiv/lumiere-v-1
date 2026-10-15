@@ -5,8 +5,12 @@
   "expectedRegion": "europe-west4-drams3a",
   "services": [
     { "name": "Postgres", "role": "database" },
-    { "name": "Redis", "role": "cache" },
-    { "name": "qdrant", "role": "vector-store" },
+    {
+      "name": "qdrant",
+      "role": "vector-store",
+      "required": false,
+      "featureGate": "RAILWAY_ENABLE_AI"
+    },
     { "name": "spacetimedb", "role": "system-of-record" },
     { "name": "spacetimedb-publisher", "role": "schema-publisher" },
     { "name": "storage-migrate", "role": "migration", "runtimeBinary": "storage-migrate" },
