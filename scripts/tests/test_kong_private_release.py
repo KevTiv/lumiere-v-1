@@ -17,7 +17,7 @@ class PrivateReleaseTests(unittest.TestCase):
             self.assertEqual(plugin['name'], 'request-termination')
             self.assertEqual(plugin['config']['status_code'], status)
 
-    def test_every_proxy_service_has_fail_closed_rate_limits(self):
+    def test_every_proxy_service_has_local_fail_closed_rate_limits(self):
         config = yaml.safe_load((ROOT / 'infra/kong/kong.yml').read_text())
         for service in config['services']:
             if service['url'] == 'http://127.0.0.1:1':
@@ -25,7 +25,8 @@ class PrivateReleaseTests(unittest.TestCase):
             limiter = next(plugin['config'] for plugin in service['plugins']
                            if plugin['name'] == 'rate-limiting')
             self.assertFalse(limiter['fault_tolerant'], service['name'])
-            self.assertEqual(limiter['policy'], 'redis')
+            self.assertEqual(limiter['policy'], 'local')
+            self.assertNotIn('redis', limiter)
             self.assertGreater(limiter['hour'], limiter['minute'])
 
     def test_robots_never_reaches_web(self):
