@@ -7,6 +7,7 @@ pub mod fx_revaluation_test;
 pub mod helpers;
 pub mod ic_consolidation_test;
 pub mod journal_entries_test;
+pub mod manual_invoices_test;
 pub mod option_vec_semantics_test;
 pub mod payment_management_test;
 pub mod payment_terms_test;
@@ -87,7 +88,9 @@ pub fn run_accounting_post_invoice_test(ctx: &ReducerContext) -> Result<(), Stri
     journal_entries_test::test_add_account_move_line_rejects_invalid_and_cross_org_tax_id(ctx)
         .map_err(|e| format!("ACC-004 tax_id_validation: {e}"))?;
     journal_entries_test::test_reset_account_move_to_draft_only_from_cancelled(ctx)
-        .map_err(|e| format!("reset_account_move_to_draft: {e}"))
+        .map_err(|e| format!("reset_account_move_to_draft: {e}"))?;
+    manual_invoices_test::test_manual_invoice_is_atomic_balanced_and_idempotent(ctx)
+        .map_err(|e| format!("manual_account_invoice: {e}"))
 }
 
 #[spacetimedb::reducer]

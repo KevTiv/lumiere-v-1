@@ -70,6 +70,17 @@
       ]
     },
     {
+      "name": "create_manual_account_invoice",
+      "company_paths": [
+        {
+          "path": ["params", "company_id"],
+          "required": true,
+          "nullable": false,
+          "meaning": "selected legal entity owning the manual invoice or vendor bill and its journal lines"
+        }
+      ]
+    },
+    {
       "name": "create_contact",
       "company_paths": [
         {

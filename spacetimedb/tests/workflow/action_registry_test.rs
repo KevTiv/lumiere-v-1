@@ -215,6 +215,7 @@ fn executes_payment_and_order_once(ctx: &ReducerContext) -> Result<(), String> {
         company_id: fixture.company_id,
         name: None,
         move_id: None,
+        reversal_move_id: None,
         payment_type: PaymentType::InBound,
         partner_type: PartnerType::Customer,
         partner_id: fixture.partner_id,

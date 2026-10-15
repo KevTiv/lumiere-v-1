@@ -203,6 +203,8 @@
       "company_id",
       "state",
       "ref",
+      "move_id",
+      "reversal_move_id",
       "journal_id",
       "currency_id",
       "partner_id",

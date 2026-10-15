@@ -27,7 +27,7 @@ vi.mock("../entity-views/entity-view", () => ({
   EntityView: ({ headerAction, isLoading }: { headerAction?: ReactNode; isLoading?: boolean }) => <div data-testid="entity-view" data-loading={String(isLoading)}>{headerAction}</div>,
 }))
 vi.mock("../entity-views/entity-record-sheet", () => ({ EntityRecordSheet: () => null }))
-vi.mock("../forms/form-modal", () => ({ FormModal: () => null }))
+vi.mock("../forms/form-modal", () => ({ FormModal: ({ open }: { open: boolean }) => (open ? <div data-testid="create-form" /> : null) }))
 vi.mock("../forms/runtime-form-modal", () => ({ RuntimeFormModal: () => null }))
 vi.mock("./dashboard-grid", () => ({ DashboardGrid: () => null }))
 vi.mock("./dashboard-header", () => ({ DashboardHeader: () => null }))
@@ -144,5 +144,23 @@ describe("ModuleView collection states", () => {
     // Base UI's composite root moves focus in a microtask after updating the highlight.
     await waitFor(() => expect(document.activeElement).toBe(tabs[1]))
     expect(tabs.every((tab) => tab.tabIndex <= 0)).toBe(true)
+  })
+})
+
+describe("ModuleView dialogs follow collection availability", () => {
+  it("closes an open create form when the collection becomes denied and keeps it closed on recovery", () => {
+    const view = (state: ModuleDataState) => (
+      <RBACProvider initialUser={user} initialRoles={[role([rule("sale_order", "create")])]} initialPolicies={[]}>
+        <ModuleView config={config} data={{ orders: [{ id: 1 }] }} dataState={{ orders: state }} />
+      </RBACProvider>
+    )
+    const { rerender } = render(view({ status: "ready" }))
+    fireEvent.click(screen.getByTestId("module-create-sales-orders"))
+    expect(screen.getByTestId("create-form")).toBeTruthy()
+    rerender(view({ status: "denied" }))
+    expect(screen.queryByTestId("create-form")).toBeNull()
+    rerender(view({ status: "ready" }))
+    expect(screen.getByTestId("entity-view")).toBeTruthy()
+    expect(screen.queryByTestId("create-form")).toBeNull()
   })
 })

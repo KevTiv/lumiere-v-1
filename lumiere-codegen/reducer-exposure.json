@@ -1418,6 +1418,11 @@
       "reason": "invoked by an enumerated frontend BFF call site"
     },
     {
+      "name": "create_manual_account_invoice",
+      "exposure": "session",
+      "reason": "invoked by the Accounting manual invoice and bill workflow"
+    },
+    {
       "name": "create_manufacturing_order",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"

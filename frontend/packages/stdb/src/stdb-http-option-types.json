@@ -257,6 +257,7 @@
   "AccountPayment": {
     "name": "string",
     "move_id": "u64",
+    "reversal_move_id": "u64",
     "ref": "string",
     "memo": "string"
   },
@@ -1999,6 +2000,13 @@
   },
   "CreateMailTemplateParams": {
     "document_template_id": "u64",
+    "metadata": "string"
+  },
+  "CreateManualAccountInvoiceParams": {
+    "invoice_date_due": "timestamp",
+    "invoice_payment_term_id": "u64",
+    "ref": "string",
+    "payment_reference": "string",
     "metadata": "string"
   },
   "CreateMessageBatchParams": {
@@ -3826,6 +3834,9 @@
     "company_id": "u64",
     "document_template_id": "u64",
     "metadata": "string"
+  },
+  "ManualAccountInvoiceLineInput": {
+    "product_id": "u64"
   },
   "ManufacturingByproductTracking": {
     "lot_id": "u64",

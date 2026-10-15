@@ -25,7 +25,7 @@
   },
   "dependencies": {
     "@lumiere/api-client": "workspace:*",
-    "@lumiere/contracts": "file:../../vendor/lumiere-contracts-0.3.106.tgz",
+    "@lumiere/contracts": "file:../../vendor/lumiere-contracts-0.3.107.tgz",
     "@lumiere/erp-session": "workspace:*",
     "@lumiere/erp-shared": "workspace:*",
     "@lumiere/erp-workflows": "workspace:*",

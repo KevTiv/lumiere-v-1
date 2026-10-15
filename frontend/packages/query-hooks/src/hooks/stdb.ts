@@ -13,6 +13,7 @@
 import type { QueryClient, QueryKey } from '@tanstack/react-query'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useErpSession } from '@lumiere/erp-session'
+import { httpResponseError } from '@lumiere/api-client/response-error'
 
 import {
   stdbBffCommandPost,
@@ -320,6 +321,20 @@ export function useCompanyScopedTypedQuery<Row>(
   })
 }
 
+/** Fetch and decode one company-scoped resource while retaining HTTP failure status. */
+export async function fetchTypedStdbQueryRows<Resource extends TypedResourceReadKey>(
+  resource: Resource,
+  companyId: bigint | number,
+  fetcher: typeof apiFetch = apiFetch,
+): Promise<ResourceQueryRowMap[Resource][]> {
+  const companyQuery = `?companyId=${encodeURIComponent(String(companyId))}`
+  const response = await fetcher(`/api/query/${resource}${companyQuery}`)
+  if (!response.ok) {
+    throw await httpResponseError(response, `Query ${resource} failed`)
+  }
+  return decodeTypedResourceQueryResponse(resource, await response.json())
+}
+
 /** Fetch and decode any resource in the reviewed generated typed-read set. */
 export function useTypedStdbQuery<Resource extends TypedResourceReadKey>(
   resource: Resource,
@@ -338,13 +353,7 @@ export function useTypedStdbQuery<Resource extends TypedResourceReadKey>(
       if (companyId == null || companyId <= 0) {
         throw new Error(`An active company is required to query ${resource}`)
       }
-      const companyQuery = `?companyId=${encodeURIComponent(String(companyId))}`
-      const response = await apiFetch(`/api/query/${resource}${companyQuery}`)
-      if (!response.ok) {
-        const json = await response.json().catch(() => ({})) as Record<string, unknown>
-        throw new Error((json.error as string | undefined) ?? `Query ${resource} failed`)
-      }
-      return decodeTypedResourceQueryResponse(resource, await response.json())
+      return fetchTypedStdbQueryRows(resource, companyId)
     },
     enabled:
       (options?.enabled ?? true) &&

@@ -520,7 +520,7 @@
     },
     "erp.cancel_payment": {
       "name": "cancel_payment",
-      "shape_fingerprint": "sha256:a720b173c46b904dd80480a36f942be642cff1eaa7278a46f12222e8ba921559"
+      "shape_fingerprint": "sha256:310174089d41a0d60322df27be65c12ce91868868b4182f89f5b28b08db8d848"
     },
     "erp.cancel_payslip": {
       "name": "cancel_payslip",
@@ -1421,6 +1421,10 @@
     "erp.create_mail_template": {
       "name": "create_mail_template",
       "shape_fingerprint": "sha256:d8a71dd5523d9a65db72ca8fdb8b33c225929b45447aa86a0e5dd2fac8d10a75"
+    },
+    "erp.create_manual_account_invoice": {
+      "name": "create_manual_account_invoice",
+      "shape_fingerprint": "sha256:9ad91b5f01e10604918487f90022b00943758ca8a2a473b84eab28ad81f07a76"
     },
     "erp.create_manufacturing_order": {
       "name": "create_manufacturing_order",
@@ -5996,6 +6000,14 @@
       "current_operations_fingerprint": "sha256:b0256ff3294362745bfe373602729ce1f504236aad8f433ba883dec107a20339",
       "operation_count": 1445,
       "reason": "release on top of v0.3.105: add denied internal unregister_payment_allocations; update convert_purchase_requisition_to_po for the scheduled replenishment source path"
+    },
+    {
+      "previous_release": "v0.3.106",
+      "previous_ir_sha256": "sha256:1464375a45eac53de135f8c588e9349d61d1b895290856d3928726b3a3090a3d",
+      "previous_operations_fingerprint": "sha256:b0256ff3294362745bfe373602729ce1f504236aad8f433ba883dec107a20339",
+      "current_operations_fingerprint": "sha256:a7671fb5a29419595c45acfeb4591a7df1b091c69486e427cf8d0da9d5d55a5c",
+      "operation_count": 1446,
+      "reason": "COV-08 atomic manual accounting invoice creation and exact payment reversal identity"
     }
   ]
 }

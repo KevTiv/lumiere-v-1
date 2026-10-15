@@ -10,14 +10,117 @@ use axum::{
 };
 use serde::Deserialize;
 use serde_json::{json, Value};
+use stdb_auth::has_resource_read_permission;
 use tower_cookies::Cookies;
 
 use crate::commands::dispatch_session_reducer;
 use crate::error::ApiError;
-use crate::query_exec::execute_resource_query;
+use crate::query_exec::{
+    execute_authorized_resource_record, execute_resource_query, resolve_membership_company_id,
+};
 use crate::state::AppState;
 use crate::trusted_context::TrustedOperationContext;
-use crate::web_session::{require_org, resolve_session};
+use crate::web_session::{require_org, resolve_session, OrgSession};
+
+const MANUAL_INVOICE_ACTION: &str = "create_manual_account_invoice";
+
+fn validate_manual_invoice_idempotency_key(value: &str) -> Result<(), ApiError> {
+    if value.len() == 32
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+    {
+        Ok(())
+    } else {
+        Err(ApiError::BadRequest(
+            "manual invoice idempotency key must be 32 lowercase hexadecimal characters".into(),
+        ))
+    }
+}
+
+fn receipt_result_id(rows: &[Value]) -> Result<Option<u64>, ApiError> {
+    if rows.len() > 1 {
+        return Err(ApiError::Internal(
+            "multiple manual invoice receipts matched one exact request key".into(),
+        ));
+    }
+    let Some(row) = rows.first() else {
+        return Ok(None);
+    };
+    let table = row
+        .get("result_table")
+        .or_else(|| row.get("resultTable"))
+        .and_then(Value::as_str);
+    if table != Some("account_move") {
+        return Err(ApiError::Internal(
+            "manual invoice receipt has an unexpected result resource".into(),
+        ));
+    }
+    let value = row
+        .get("result_id")
+        .or_else(|| row.get("resultId"))
+        .ok_or_else(|| ApiError::Internal("manual invoice receipt has no result id".into()))?;
+    let id = value
+        .as_u64()
+        .or_else(|| value.as_str().and_then(|raw| raw.parse().ok()))
+        .filter(|id| *id > 0)
+        .ok_or_else(|| ApiError::Internal("manual invoice receipt result id is invalid".into()))?;
+    Ok(Some(id))
+}
+
+async fn manual_invoice_result_get(
+    State(state): State<Arc<AppState>>,
+    Path((company_id, idempotency_key)): Path<(u64, String)>,
+    OrgSession {
+        session,
+        organization_id,
+    }: OrgSession,
+) -> Result<Json<Value>, ApiError> {
+    validate_manual_invoice_idempotency_key(&idempotency_key)?;
+    let context = TrustedOperationContext::for_resource_read(&state, &session)?;
+    if !has_resource_read_permission(Some(context.field_access()), "account-moves") {
+        return Err(ApiError::Forbidden(
+            "Read permission denied for resource 'account-moves'".into(),
+        ));
+    }
+    let company_id = resolve_membership_company_id(
+        context.client(),
+        organization_id,
+        context.actor_identity(),
+        Some(company_id),
+        "manual invoice result company scope mismatch",
+    )
+    .await?;
+    let rows = state
+        .stdb
+        .query_sql(&format!(
+            "SELECT result_table, result_id FROM accounting_operation_receipt WHERE organization_id = {organization_id} AND company_id = {company_id} AND action_kind = '{MANUAL_INVOICE_ACTION}' AND idempotency_key = '{idempotency_key}'"
+        ))
+        .await
+        .map_err(ApiError::internal)?;
+    let Some(move_id) = receipt_result_id(&rows)? else {
+        return Ok(Json(json!({ "data": null })));
+    };
+    let move_row = execute_authorized_resource_record(
+        context.client(),
+        "account-moves",
+        organization_id,
+        company_id,
+        move_id,
+        Some(context.field_access()),
+    )
+    .await?;
+    if move_row.is_none() {
+        return Ok(Json(json!({ "data": null })));
+    }
+    Ok(Json(json!({
+        "data": {
+            "resource": "account-moves",
+            "id": move_id.to_string(),
+            "href": format!("/accounting/invoices/{move_id}"),
+        }
+    })))
+}
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -649,4 +752,46 @@ pub fn router() -> Router<Arc<AppState>> {
             get(payment_reconciliations_get),
         )
         .route("/accounting/payment-reversals", get(payment_reversals_get))
+        .route(
+            "/accounting/manual-invoice-results/:company_id/:idempotency_key",
+            get(manual_invoice_result_get),
+        )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn manual_invoice_result_key_is_exact_lowercase_hex() {
+        assert!(
+            validate_manual_invoice_idempotency_key("0123456789abcdef0123456789abcdef").is_ok()
+        );
+        for invalid in [
+            "0123456789abcdef",
+            "0123456789ABCDEF0123456789ABCDEF",
+            "g123456789abcdef0123456789abcdef",
+            "0123456789abcdef0123456789abcdef0",
+        ] {
+            assert!(validate_manual_invoice_idempotency_key(invalid).is_err());
+        }
+    }
+
+    #[test]
+    fn manual_invoice_receipt_result_requires_zero_or_one_account_move() {
+        assert_eq!(receipt_result_id(&[]).unwrap(), None);
+        assert_eq!(
+            receipt_result_id(&[json!({ "result_table": "account_move", "result_id": "42" })])
+                .unwrap(),
+            Some(42),
+        );
+        assert!(receipt_result_id(&[
+            json!({ "result_table": "account_move", "result_id": 42 }),
+            json!({ "result_table": "account_move", "result_id": 42 }),
+        ])
+        .is_err());
+        assert!(
+            receipt_result_id(&[json!({ "result_table": "contact", "result_id": 42 })]).is_err()
+        );
+    }
 }

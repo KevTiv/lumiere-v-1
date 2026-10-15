@@ -1,7 +1,10 @@
 "use client"
 
 
-import { stdbBffCommandPost } from "@lumiere/stdb/commands"
+import {
+  stdbBffCommandPost,
+  type StdbNamedOperationInput,
+} from "@lumiere/stdb/commands"
 import { decodeOperationDispatch } from "@lumiere/api-client"
 import type {
   AccountAccountTypeQueryRow,
@@ -74,12 +77,51 @@ import {
   requireResolvedOperationEffect,
   resolveUniqueRow,
   type CanonicalRecordRef,
+  type OperationEffectOutcome,
   type ResolvedOperationEffectOutcome,
 } from "../operation-effect"
 
 export interface PostedAccountMoveEffectRef extends CanonicalRecordRef {
   readonly resource: "account-moves"
   readonly state: "Posted"
+}
+
+export interface ManualAccountInvoiceEffectRef extends CanonicalRecordRef {
+  readonly resource: "account-moves"
+  readonly href: string
+}
+
+export type CreateManualAccountInvoiceParams =
+  StdbNamedOperationInput<"create_manual_account_invoice">["params"]
+
+export function decodeManualAccountInvoiceEffect(value: unknown): ManualAccountInvoiceEffectRef | null {
+  if (value == null || typeof value !== "object" || Array.isArray(value)) return null
+  const data = (value as { data?: unknown }).data
+  if (data == null) return null
+  if (typeof data !== "object" || Array.isArray(data)) {
+    throw new Error("Manual invoice result response is malformed")
+  }
+  const row = data as Record<string, unknown>
+  if (
+    row.resource !== "account-moves" ||
+    typeof row.id !== "string" ||
+    !/^[1-9][0-9]*$/.test(row.id) ||
+    row.href !== `/accounting/invoices/${row.id}`
+  ) {
+    throw new Error("Manual invoice result response is malformed")
+  }
+  return { resource: "account-moves", id: row.id, href: row.href }
+}
+
+export async function readManualAccountInvoiceEffect(
+  companyId: bigint,
+  idempotencyKey: string,
+): Promise<ManualAccountInvoiceEffectRef | null> {
+  const response = await apiFetch(
+    `/api/accounting/manual-invoice-results/${companyId.toString()}/${encodeURIComponent(idempotencyKey)}`,
+  )
+  if (!response.ok) throw new Error(await parseCallError(response))
+  return decodeManualAccountInvoiceEffect(await response.json())
 }
 
 function accountMoveStateTag(value: unknown): string {
@@ -142,6 +184,38 @@ export function useCreateAccountMove(organizationId: number) {
     },
     onSuccess: () =>
       invalidateStdbQueryResources(qc, organizationId, stdbInvalidationFor("create_account_move")),
+  })
+}
+
+export function useCreateManualAccountInvoice(organizationId: number) {
+  const qc = useQueryClient()
+  return useMutation<
+    OperationEffectOutcome<ManualAccountInvoiceEffectRef>,
+    Error,
+    CreateManualAccountInvoiceParams
+  >({
+    mutationFn: async (params) =>
+      executeOperationWithCanonicalReadback({
+        resolveEffect: () =>
+          readManualAccountInvoiceEffect(params.companyId, params.idempotencyKey),
+        dispatch: async () => {
+          const { urlPath, init } = stdbBffCommandPost("create_manual_account_invoice", {
+            params,
+          })
+          return decodeOperationDispatch(
+            await apiFetch(urlPath, init),
+            "Failed to create manual invoice",
+          )
+        },
+        afterDispatch: () =>
+          invalidateStdbQueryResources(
+            qc,
+            organizationId,
+            stdbInvalidationFor("create_manual_account_invoice"),
+          ),
+        readbackAttempts: 6,
+        readbackDelayMs: 150,
+      }),
   })
 }
 

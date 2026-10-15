@@ -257,6 +257,7 @@
   "AccountPayment": [
     "name",
     "move_id",
+    "reversal_move_id",
     "ref",
     "memo"
   ],
@@ -1999,6 +2000,13 @@
   ],
   "CreateMailTemplateParams": [
     "document_template_id",
+    "metadata"
+  ],
+  "CreateManualAccountInvoiceParams": [
+    "invoice_date_due",
+    "invoice_payment_term_id",
+    "ref",
+    "payment_reference",
     "metadata"
   ],
   "CreateMessageBatchParams": [
@@ -3826,6 +3834,9 @@
     "company_id",
     "document_template_id",
     "metadata"
+  ],
+  "ManualAccountInvoiceLineInput": [
+    "product_id"
   ],
   "ManufacturingByproductTracking": [
     "lot_id",
