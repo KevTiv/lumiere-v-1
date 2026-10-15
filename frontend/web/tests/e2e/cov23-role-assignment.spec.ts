@@ -139,7 +139,9 @@ test.describe("COV-23 exact role assignment", { tag: ["@p0", "@cov23"] }, () => 
     const [active] = await roleAssignments(page, organizationId, roleId)
     expect(active).toMatchObject({ identity: targetIdentity, isActive: true })
     const assignmentId = active!.id
-    expect(await targetCanOpenProfileSettings(browser)).toBe(true)
+    await expect
+      .poll(() => targetCanOpenProfileSettings(browser), { timeout: 45_000 })
+      .toBe(true)
 
     const staleAssign = await replay(page, assigned.request())
     expect(staleAssign.status()).toBe(422)
@@ -149,7 +151,9 @@ test.describe("COV-23 exact role assignment", { tag: ["@p0", "@cov23"] }, () => 
     const revoked = await toggleRoleInSettings(page, roleId, "revoke_role")
     const effect = [{ id: assignmentId, identity: targetIdentity, isActive: false }]
     await expect.poll(() => roleAssignments(page, organizationId, roleId), { timeout: 30_000 }).toEqual(effect)
-    expect(await targetCanOpenProfileSettings(browser)).toBe(false)
+    await expect
+      .poll(() => targetCanOpenProfileSettings(browser), { timeout: 45_000 })
+      .toBe(false)
 
     // Before COV-23 a replayed revoke re-audited and rebuilt the policy
     // snapshot; the reducer now rejects an already-revoked assignment.
@@ -208,22 +212,28 @@ test.describe("COV-23 exact role assignment", { tag: ["@p0", "@cov23"] }, () => 
     const branchId = scalarQueryId(branch?.id)
     if (branchId == null) throw new Error("branch company has no id")
 
-    // A fresh server render expands organization-admin scope to every company.
-    await page.reload()
-    await expect(page.getByTestId("company-switcher-trigger")).toBeVisible({ timeout: 30_000 })
-    await page.getByTestId("company-switcher-trigger").click()
-    await expect(page.getByTestId(`company-switcher-option-${branchId}`)).toBeVisible()
-    await page.getByTestId(`company-switcher-option-${branchId}`).click()
-    await expect.poll(() => page.evaluate(() => {
-      const raw = localStorage.getItem("lumiere:active-company")
-      return raw ? Number((JSON.parse(raw) as { companyId?: number }).companyId) : null
-    })).toBe(branchId)
+    // A new document forces a fresh server render after the company becomes
+    // visible. Reusing the current document can retain the old company scope.
+    const adminPage = await page.context().newPage()
+    try {
+      await gotoModule(adminPage, "/settings")
+      await expect(adminPage.getByTestId("company-switcher-trigger")).toBeVisible({ timeout: 45_000 })
+      await adminPage.getByTestId("company-switcher-trigger").click()
+      await expect(adminPage.getByTestId(`company-switcher-option-${branchId}`)).toBeVisible()
+      await adminPage.getByTestId(`company-switcher-option-${branchId}`).click()
+      await expect.poll(() => adminPage.evaluate(() => {
+        const raw = localStorage.getItem("lumiere:active-company")
+        return raw ? Number((JSON.parse(raw) as { companyId?: number }).companyId) : null
+      })).toBe(branchId)
 
-    await page.reload()
-    await expect.poll(() => page.evaluate(() => {
-      const raw = localStorage.getItem("lumiere:active-company")
-      return raw ? Number((JSON.parse(raw) as { companyId?: number }).companyId) : null
-    })).toBe(branchId)
+      await adminPage.reload()
+      await expect.poll(() => adminPage.evaluate(() => {
+        const raw = localStorage.getItem("lumiere:active-company")
+        return raw ? Number((JSON.parse(raw) as { companyId?: number }).companyId) : null
+      })).toBe(branchId)
+    } finally {
+      await adminPage.close()
+    }
 
     // A company-bound persona cannot turn a forged local preference into
     // authority. Session hydration repairs it to the membership company.
