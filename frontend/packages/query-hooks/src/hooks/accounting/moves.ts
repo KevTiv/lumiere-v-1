@@ -19,6 +19,7 @@ import { apiFetch, fetchQueryList } from "../../http"
 import { dispatchNamedOperation } from "../../operation-dispatch"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import {
+  manualAccountInvoiceParamsToJson,
   paymentParamsToJson,
   type ClearablePatch,
 } from "@lumiere/erp-shared/accounting-create-params"
@@ -209,7 +210,7 @@ export function useCreateManualAccountInvoice(organizationId: number) {
           dispatchNamedOperation(
             "create_manual_account_invoice",
             {
-            params,
+              params: manualAccountInvoiceParamsToJson(params),
             },
             "Failed to create manual invoice",
           ),

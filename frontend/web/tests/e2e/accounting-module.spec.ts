@@ -63,15 +63,7 @@ async function openAndAssertAccountingTab(page: Page, tabId: AccountingTabId) {
   )
   await expect(tab).toHaveAttribute("aria-selected", "true")
   await expect(page.locator('[role="tabpanel"]:visible')).toHaveCount(1)
-
-  // Bind the selected trigger to its visible panel. This catches a requested
-  // URL tab that is rejected by the controlled tab state and falls back to
-  // Dashboard even though the requested query parameter remains in the URL.
-  await expect.poll(async () => {
-    const panelId = await tab.getAttribute("aria-controls")
-    if (!panelId) return false
-    return page.locator(`[role="tabpanel"][id=${JSON.stringify(panelId)}]`).isVisible()
-  }).toBe(true)
+  await expect(page.getByTestId(`module-panel-accounting-${tabId}`)).toBeVisible()
 }
 
 async function assertAccountingTabRenders(page: Page, tabId: AccountingTabId) {
@@ -391,10 +383,9 @@ test.describe("Accounting module e2e", () => {
     await openAccountingTab(page, "taxes")
 
     await page.getByTestId("entity-action-csv-tax").click()
-    const csvModal = page.locator('[data-testid^="form-modal-csv-import-"]')
+    const csvModal = page.getByRole("dialog", { name: /import tax rates/i })
     await expect(csvModal).toBeVisible()
-    await csvModal.getByRole("button", { name: /^import$/i }).click()
-    await expect(csvModal.getByText(/this field is required/i)).toBeVisible()
+    await expect(csvModal.getByRole("button", { name: /^import$/i })).toBeDisabled()
 
     await csvModal.getByRole("button", { name: /^cancel$/i }).click()
     await expect(csvModal).toBeHidden()

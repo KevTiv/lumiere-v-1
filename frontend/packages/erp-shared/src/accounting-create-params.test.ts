@@ -3,6 +3,7 @@ import test from "node:test"
 
 import {
   accountPeriodStateTag,
+  manualAccountInvoiceParamsToJson,
   paymentParamsToJson,
   toCreateManualAccountInvoiceParams,
   toCreatePaymentParamsFromManualForm,
@@ -48,6 +49,25 @@ test("manual invoice params normalize the modal payload into the generated input
     discount: 10,
     taxIds: [5n],
     productId: 23n,
+  }])
+
+  const wire = manualAccountInvoiceParamsToJson(params)
+  assert.equal(wire.company_id, 42)
+  assert.equal(wire.companyId, undefined)
+  assert.deepEqual(wire.move_type, { outInvoice: [] })
+  assert.deepEqual(wire.invoice_date_due, {
+    some: {
+      __timestamp_micros_since_unix_epoch__: Date.parse("2026-11-15") * 1000,
+    },
+  })
+  assert.deepEqual(wire.lines, [{
+    account_id: 19,
+    name: "Consulting",
+    quantity: 2,
+    price_unit: 125,
+    discount: 10,
+    tax_ids: [5],
+    product_id: { some: 23 },
   }])
 })
 

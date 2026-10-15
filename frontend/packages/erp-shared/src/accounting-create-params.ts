@@ -1824,6 +1824,13 @@ export function toCreateManualAccountInvoiceParams(
   }
 }
 
+/** Encode generated camel-case fields as the reducer's SATS JSON field names. */
+export function manualAccountInvoiceParamsToJson(
+  params: CreateManualAccountInvoiceParams,
+): Record<string, unknown> {
+  return stdbParamsToJson(params, "CreateManualAccountInvoiceParams")
+}
+
 export function toCreateAccountBankStatementParams(
   formData: Record<string, unknown>,
 ): CreateAccountBankStatementParams | null {

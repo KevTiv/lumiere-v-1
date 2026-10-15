@@ -235,7 +235,13 @@ export function ModuleView({
         </div>
 
         {config.tabs.map((tab) => (
-          <TabsContent key={tab.id} value={tab.id} className="mt-6" aria-busy={dataState?.[tab.id]?.status === "loading"}>
+          <TabsContent
+            key={tab.id}
+            value={tab.id}
+            className="mt-6"
+            aria-busy={dataState?.[tab.id]?.status === "loading"}
+            data-testid={`module-panel-${config.id}-${tab.id}`}
+          >
             <ModuleDataNotice state={dataState?.[tab.id]} />
             {dataState?.[tab.id]?.status !== "error" && dataState?.[tab.id]?.status !== "denied" && (<>
             {tab.type === "dashboard" && tab.sections && (

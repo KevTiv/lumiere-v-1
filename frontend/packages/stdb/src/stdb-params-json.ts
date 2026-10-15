@@ -36,6 +36,9 @@ const NESTED_ARRAY_STRUCTS: Partial<
   CreateSaleOrderParams: {
     order_lines: "CreateSaleOrderLineParams",
   },
+  CreateManualAccountInvoiceParams: {
+    lines: "ManualAccountInvoiceLineInput",
+  },
   CreateBomParams: {
     lines: "BomLineInput",
   },

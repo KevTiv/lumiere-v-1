@@ -39,7 +39,7 @@ export const salesForms: FormRegistryEntry[] = [
           fieldId: "customer",
           name: "customer",
           label: "Customer",
-          fieldType: "UserSelect",
+          fieldType: "Select",
           validation: { required: true },
           aiSuggestions: [],
           order: 2,
