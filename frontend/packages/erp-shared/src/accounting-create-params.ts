@@ -27,6 +27,7 @@ import type {
   CreateCurrencyRateParams,
   CreateEliminationEntryParams,
   CreateFiscalYearParams,
+  CreateManualAccountInvoiceParams,
   CreatePaymentParams,
   CreatePaymentTermLineParams,
   CreatePaymentTermParams,
@@ -1684,6 +1685,100 @@ export function toCreateAccountMoveParams(
   companyId: bigint,
 ): CreateAccountMoveParams | null {
   return toCreateJournalEntryMoveParams(formData, companyId)
+}
+
+/** Normalize the manual invoice modal into the released generated operation input. */
+export function toCreateManualAccountInvoiceParams(
+  formData: Record<string, unknown>,
+): CreateManualAccountInvoiceParams | null {
+  const idempotencyKey = String(field(formData, "idempotencyKey", "idempotency_key") ?? "").trim()
+  const companyId = requiredBigIntU64(field(formData, "companyId", "company_id"))
+  const journalId = requiredBigIntU64(field(formData, "journalId", "journal_id"))
+  const partnerId = requiredBigIntU64(field(formData, "partnerId", "partner_id"))
+  const counterpartAccountId = requiredBigIntU64(
+    field(formData, "counterpartAccountId", "counterpart_account_id"),
+  )
+  const currencyId = requiredBigIntU64(field(formData, "currencyId", "currency_id"))
+  if (
+    !/^[0-9a-f]{32}$/.test(idempotencyKey) ||
+    companyId == null || companyId === 0n ||
+    journalId == null || journalId === 0n ||
+    partnerId == null || partnerId === 0n ||
+    counterpartAccountId == null || counterpartAccountId === 0n ||
+    currencyId == null || currencyId === 0n
+  ) return null
+
+  const rawMoveType = field(formData, "moveType", "move_type")
+  const moveTypeTag = typeof rawMoveType === "object" && rawMoveType != null
+    ? String((rawMoveType as { tag?: unknown }).tag ?? "")
+    : String(rawMoveType ?? "")
+  if (moveTypeTag !== "OutInvoice" && moveTypeTag !== "InInvoice") return null
+
+  const rawLines = formData.lines
+  if (!Array.isArray(rawLines) || rawLines.length === 0) return null
+  const lines: CreateManualAccountInvoiceParams["lines"] = []
+  for (const rawLine of rawLines) {
+    if (rawLine == null || typeof rawLine !== "object" || Array.isArray(rawLine)) return null
+    const line = rawLine as Record<string, unknown>
+    const accountId = requiredBigIntU64(field(line, "accountId", "account_id"))
+    const name = String(line.name ?? "").trim()
+    const quantity = Number(line.quantity)
+    const priceUnit = Number(field(line, "priceUnit", "price_unit"))
+    const discount = Number(line.discount ?? 0)
+    const rawTaxIds = field(line, "taxIds", "tax_ids")
+    const taxIds: bigint[] = []
+    for (const rawTaxId of Array.isArray(rawTaxIds) ? rawTaxIds : []) {
+      const taxId = requiredBigIntU64(rawTaxId)
+      if (taxId == null || taxId === 0n) return null
+      taxIds.push(taxId)
+    }
+    const rawProductId = field(line, "productId", "product_id")
+    const productId = rawProductId == null || String(rawProductId).trim() === ""
+      ? undefined
+      : requiredBigIntU64(rawProductId)
+    if (
+      accountId == null || accountId === 0n || !name ||
+      !Number.isFinite(quantity) || quantity <= 0 ||
+      !Number.isFinite(priceUnit) || priceUnit < 0 ||
+      !Number.isFinite(discount) || discount < 0 || discount > 100 ||
+      productId === null || productId === 0n
+    ) return null
+    lines.push({ accountId, name, quantity, priceUnit, discount, taxIds, productId })
+  }
+
+  const rawPaymentTermId = field(formData, "invoicePaymentTermId", "invoice_payment_term_id")
+  const invoicePaymentTermId = rawPaymentTermId == null || String(rawPaymentTermId).trim() === ""
+    ? undefined
+    : requiredBigIntU64(rawPaymentTermId)
+  if (invoicePaymentTermId === null || invoicePaymentTermId === 0n) return null
+
+  const rawDueDate = field(formData, "invoiceDateDue", "invoice_date_due")
+  const invoiceDateDue = optionalTimestampFromFormDate(rawDueDate)
+  if (rawDueDate != null && String(rawDueDate).trim() !== "" && invoiceDateDue == null) return null
+
+  try {
+    return {
+      idempotencyKey,
+      companyId,
+      moveType: { tag: moveTypeTag },
+      journalId,
+      partnerId,
+      counterpartAccountId,
+      currencyId,
+      date: timestampFromFormDate(formData.date),
+      invoiceDate: timestampFromFormDate(field(formData, "invoiceDate", "invoice_date")),
+      invoiceDateDue,
+      invoicePaymentTermId,
+      ref: optionalTrimmedString(formData.ref),
+      paymentReference: optionalTrimmedString(
+        field(formData, "paymentReference", "payment_reference"),
+      ),
+      metadata: optionalTrimmedString(formData.metadata),
+      lines,
+    }
+  } catch {
+    return null
+  }
 }
 
 export function toCreateAccountBankStatementParams(

@@ -4,7 +4,7 @@ import { alphaSeedPayload, demoContractSchema } from '../demo-contract-schema.mj
 import { encodeSeedValue, resolveSeedReferences, runAlphaDemoSeed } from '../alpha-demo-seed.mjs'
 
 test('fixtures consume pinned session contracts and have complete typed reference graphs', async () => {
-  const payload = await alphaSeedPayload(new URL('../../frontend/vendor/lumiere-contracts-0.3.106.tgz', import.meta.url).pathname)
+  const payload = await alphaSeedPayload(new URL('../../frontend/vendor/lumiere-contracts-0.3.107.tgz', import.meta.url).pathname)
   const ids = { company: 1, currency: 2, ownerIdentity: 'a'.repeat(64) }
   const keys = new Set()
   for (const fixture of payload.fixtures) {
@@ -34,7 +34,7 @@ test('missing references and invalid enums fail before a mutation is attempted',
 })
 
 test('private provisioning is limited to the existing tenant migration binding, not global operations', async () => {
-  const archive = new URL('../../frontend/vendor/lumiere-contracts-0.3.106.tgz', import.meta.url).pathname
+  const archive = new URL('../../frontend/vendor/lumiere-contracts-0.3.107.tgz', import.meta.url).pathname
   await assert.rejects(demoContractSchema(archive, ['apply_org_migrations']), /not session-exposed/)
   await assert.rejects(demoContractSchema(archive, ['apply_global_migrations'], { tenantMigration: true }), /not session-exposed/)
   const { schema } = await alphaSeedPayload(archive)

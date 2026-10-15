@@ -3,7 +3,7 @@
 import { useLayoutEffect, useMemo, useState } from "react"
 import type { CreateManualAccountInvoiceParams } from "@lumiere/query-hooks/hooks/accounting"
 import type { CanonicalRecordRef, OperationEffectOutcome } from "@lumiere/query-hooks/hooks/operation-effect"
-import { stbTimestampFromDate } from "@lumiere/erp-shared/stb-timestamp"
+import { toCreateManualAccountInvoiceParams } from "@lumiere/erp-shared/accounting-create-params"
 import { useTranslation } from "@lumiere/i18n"
 import { Plus, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -46,8 +46,6 @@ function taxAmount(subtotal: number, tax?: ManualInvoiceTaxOption): number {
   if (tax.amountType === "Division") return tax.amount < 100 ? subtotal / (1 - tax.amount / 100) - subtotal : 0
   return subtotal * tax.amount / 100
 }
-
-const formTimestamp = (value: string) => stbTimestampFromDate(new Date(`${value}T00:00:00.000Z`))
 
 interface CreateInvoiceModalProps {
   open: boolean
@@ -167,13 +165,13 @@ export function CreateInvoiceModal({
     )
     const metadata = notes.trim() || Object.values(custom).some((value) => value?.trim())
       ? JSON.stringify({ notes: notes.trim() || undefined, ...custom }) : undefined
-    return {
+    const params = toCreateManualAccountInvoiceParams({
       idempotencyKey, companyId,
       moveType: { tag: kind === "bill" ? "InInvoice" : "OutInvoice" },
       journalId: BigInt(journal.value), partnerId: BigInt(partnerId),
       counterpartAccountId: BigInt(counterpartAccountId), currencyId: BigInt(journal.currencyId),
-      date: formTimestamp(invoiceDate), invoiceDate: formTimestamp(invoiceDate),
-      invoiceDateDue: dueDate ? formTimestamp(dueDate) : undefined,
+      date: invoiceDate, invoiceDate,
+      invoiceDateDue: dueDate || undefined,
       invoicePaymentTermId: paymentTermId ? BigInt(paymentTermId) : undefined,
       ref: reference.trim() || undefined, paymentReference: paymentReference.trim() || undefined,
       metadata,
@@ -183,7 +181,9 @@ export function CreateInvoiceModal({
         taxIds: line.taxId ? [BigInt(line.taxId)] : [],
         productId: line.productId ? BigInt(line.productId) : undefined,
       })),
-    }
+    })
+    if (!params) throw new Error("Complete the required invoice fields with valid values")
+    return params
   }
 
   const reset = () => {

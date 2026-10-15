@@ -2266,7 +2266,7 @@ packages:
     resolution: {integrity: sha512-31FiUrU7z9+d/ElGQLJFXl+dKOdx0jALlP3KEOsGTex8mvj+SoE1FgItcHWK/axkxCHGUSpqIHt6JAWfWu9Rhg==}
 
   '@lumiere/contracts@file:vendor/lumiere-contracts-0.3.107.tgz':
-    resolution: {integrity: sha512-2ty6soBZhUSNganLj1xsiHqzaYxeRGZxDT2Ak/INkaSEISfB/iinVaE4G5RrumQyVkgQ2UHQPynOFFlMwYj55g==}
+    resolution: {integrity: sha512-2ty6soBZhUSNganLj1xsiHqzaYxeRGZxDT2Ak/INkaSEISfB/iinVaE4G5RrumQyVkgQ2UHQPynOFFlMwYj55g==, tarball: file:vendor/lumiere-contracts-0.3.107.tgz}
     version: 0.3.107
 
   '@marijn/find-cluster-break@1.0.2':

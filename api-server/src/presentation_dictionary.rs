@@ -158,7 +158,7 @@ mod tests {
             "lumiere-contracts = { path = \"vendor/lumiere-contracts/crates/lumiere-contracts\""
         ));
         let release = include_str!("../../release-compatibility-manifest.json");
-        assert!(release.contains("\"version\": \"0.3.106\""));
+        assert!(release.contains("\"version\": \"0.3.107\""));
         assert!(release.contains("\"revision\": \"83b393d76fe644167a1bb33150ec203291175452\""));
     }
 }
