@@ -36,6 +36,9 @@ E2E_SPEC_FILES     ?=
 # Playwright shard for e2e-smoke, e.g. 2/3 (CI splits the p0/full suites across runners).
 E2E_SHARD          ?=
 E2E_WORKERS        ?= 1
+# CI can install a checksum-verified, exact-commit build artifact before it
+# starts an isolated runtime for each Playwright shard.
+E2E_PREBUILT       ?= 0
 # Run reducer/domain validation before browser fixture seeding. Set to 0 when
 # reducer proof is run separately and the browser suite needs a pristine seed.
 E2E_RUN_DOMAIN_TESTS ?= 1
@@ -841,7 +844,7 @@ e2e-docker:
 	'
 
 e2e-smoke:
-	@env PATH="$(E2E_PATH):$$PATH" E2E_SUITE="$(E2E_SUITE)" E2E_WORKERS="$(E2E_WORKERS)" E2E_SPEC_FILES="$(E2E_SPEC_FILES)" E2E_SHARD="$(E2E_SHARD)" /bin/bash -c 'set -euo pipefail; \
+	@env PATH="$(E2E_PATH):$$PATH" E2E_SUITE="$(E2E_SUITE)" E2E_WORKERS="$(E2E_WORKERS)" E2E_SPEC_FILES="$(E2E_SPEC_FILES)" E2E_SHARD="$(E2E_SHARD)" E2E_PREBUILT="$(E2E_PREBUILT)" /bin/bash -c 'set -euo pipefail; \
 		ROOT="$$(pwd)"; \
 		LOG_DIR="$$ROOT/.tmp/e2e"; \
 		mkdir -p "$$LOG_DIR"; \
@@ -887,8 +890,12 @@ e2e-smoke:
 		echo "[e2e] Logging in to local SpacetimeDB (database owner for private-table SQL)..."; \
 		E2E_STDB_HOST="$$E2E_STDB_HOST" node "$$ROOT/scripts/e2e-local-stdb-token.mjs" --login-only; \
 		echo "[e2e] Publishing local database $(E2E_DB) (--no-config)..."; \
-		LUMIERE_ENABLE_DEV_REDUCERS=1 spacetime build --module-path "$(MODULE)"; \
-		wasm-tools validate "$(MODULE)/target/wasm32-unknown-unknown/release/lumiere_v1.wasm"; \
+		if [ "$${E2E_PREBUILT:-0}" = "1" ]; then \
+			"$$ROOT/scripts/e2e-ci-artifact.sh" verify "$${E2E_ARTIFACT_EXPECTED_SHA:-}"; \
+		else \
+			LUMIERE_ENABLE_DEV_REDUCERS=1 spacetime build --module-path "$(MODULE)"; \
+			wasm-tools validate "$(MODULE)/target/wasm32-unknown-unknown/release/lumiere_v1.wasm"; \
+		fi; \
 		if [ "$${E2E_CLEAR_DB:-0}" = "1" ]; then \
 			echo "[e2e] E2E_CLEAR_DB=1: clearing module data (--clear-database)"; \
 			LUMIERE_ENABLE_DEV_REDUCERS=1 spacetime publish "$(E2E_DB)" --bin-path "$(MODULE)/target/wasm32-unknown-unknown/release/lumiere_v1.wasm" --server local --clear-database -y --no-config; \
@@ -942,7 +949,7 @@ e2e-smoke:
 			lsof -ti:"$(E2E_API_PORT)" | xargs kill >/dev/null 2>&1 || true; \
 			sleep 1; \
 		fi; \
-		echo "[e2e] Building api-server (first run may take a few minutes)..."; \
+		if [ "$${E2E_PREBUILT:-0}" = "1" ]; then echo "[e2e] Loading prebuilt api-server."; else echo "[e2e] Building api-server (first run may take a few minutes)..."; fi; \
 		scripts/e2e-dx.sh api-build; \
 		set -a; [ ! -f "$$ROOT/frontend/web/.env.local" ] || . "$$ROOT/frontend/web/.env.local"; set +a; \
 		echo "[e2e] Applying checksum-verified PostgreSQL migrations..."; \
@@ -978,7 +985,7 @@ e2e-smoke:
 			sleep 1; \
 		fi; \
 		cd "$$ROOT/frontend/web"; \
-		echo "[e2e] Building Next.js (once, before Playwright)..."; \
+		if [ "$${E2E_PREBUILT:-0}" = "1" ]; then echo "[e2e] Loading prebuilt Next.js application."; else echo "[e2e] Building Next.js (once, before Playwright)..."; fi; \
 		PORT="" \
 		PLAYWRIGHT_PORT="$(E2E_WEB_PORT)" \
 		NEXT_PUBLIC_DEV_ADMIN="false" \
