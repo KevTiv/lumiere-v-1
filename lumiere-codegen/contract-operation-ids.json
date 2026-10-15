@@ -356,6 +356,7 @@
     "create_loyalty_card": "erp.create_loyalty_card",
     "create_loyalty_program": "erp.create_loyalty_program",
     "create_mail_template": "erp.create_mail_template",
+    "create_manual_account_invoice": "erp.create_manual_account_invoice",
     "create_manufacturing_order": "erp.create_manufacturing_order",
     "create_message_batch": "erp.create_message_batch",
     "create_message_template": "erp.create_message_template",

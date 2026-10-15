@@ -178,6 +178,15 @@ pub const MIGRATIONS: &[Migration] = &[
             "../../../lumiere-codegen/pg-migration-ledger/0014_durable_projection_delta.sql"
         ),
     },
+    Migration {
+        version: 15,
+        name: "account_payment_reversal_identity",
+        change_set: 7,
+        phase: MigrationPhase::Expand,
+        sql: include_str!(
+            "../../../lumiere-codegen/pg-migration-ledger/0015_durable_projection_delta.sql"
+        ),
+    },
 ];
 
 /// SQL used to bootstrap the migration history itself.
@@ -1110,6 +1119,29 @@ mod tests {
             .sql
             .contains("on conflict (organization_id) do update"));
         assert!(!migration.sql.contains("delete"));
+    }
+
+    #[test]
+    fn account_payment_reversal_identity_is_nullable_additive_and_unique() {
+        let migration = MIGRATIONS
+            .iter()
+            .find(|migration| migration.name == "account_payment_reversal_identity")
+            .expect("account payment reversal identity migration is shipped");
+        assert_eq!(migration.version, 15);
+        assert_eq!(migration.change_set, 7);
+        assert_eq!(migration.phase, MigrationPhase::Expand);
+        assert!(migration
+            .sql
+            .contains("ADD COLUMN IF NOT EXISTS \"reversal_move_id\" NUMERIC(20,0);"));
+        assert!(!migration.sql.contains("reversal_move_id\" NUMERIC(20,0) NOT NULL"));
+        assert!(!migration.sql.contains("reversal_move_id\" NUMERIC(20,0) DEFAULT"));
+        assert!(migration.sql.contains(
+            "CREATE UNIQUE INDEX IF NOT EXISTS \"account_payment_reversal_move_id\""
+        ));
+        assert!(migration
+            .sql
+            .contains("WHERE \"reversal_move_id\" IS NOT NULL;"));
+        assert!(!migration.sql.contains("drop "));
     }
 
     #[test]

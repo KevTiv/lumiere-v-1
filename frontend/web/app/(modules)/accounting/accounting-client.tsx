@@ -3,6 +3,8 @@ import { mapDashboardWidgets, withDashboardSections } from "@lumiere/ui/lib/dash
 import { useModuleTab } from "@/hooks/use-module-tab"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
+import { useRouter } from "next/navigation"
+import { canUseModuleData, mergeModuleStates, moduleCollection } from "@lumiere/ui/lib/module-data-state"
 import { useTranslation } from "@lumiere/i18n"
 import { useConfirmDialog } from "@lumiere/ui/hooks/use-confirm-dialog"
 import {
@@ -90,7 +92,6 @@ import {
   accountingParamsToJson,
   analyticParamsToJson,
   toCreateAccountAccountParams,
-  toCreateAccountMoveFromInvoiceModal,
   toCreateAccountMoveParams,
   toCreateAccountJournalParams,
   toCreateCrossoveredBudgetLineParams,
@@ -192,6 +193,8 @@ import {
   useAccountGroups,
   useCreateAccountAccount,
   useCreateAccountMove,
+  useCreateManualAccountInvoice,
+  readManualAccountInvoiceEffect,
   useCreateAccountTax,
   useCreateCrossoveredBudget,
   useUpdateCrossoveredBudget,
@@ -440,16 +443,12 @@ import {
   taxJurisdictionsTableConfig,
   taxSchedulesTableConfig,
 } from "./read-sections"
-import { fetchQueryList } from "@lumiere/query-hooks/http"
-import {
-  customFieldEntriesFromMetadata,
-  findNewestRowByField,
-  persistCustomFieldsToEav,
-} from "@/lib/persist-record-custom-fields"
+import { persistCustomFieldsToEav } from "@/lib/persist-record-custom-fields"
 import { useDefaultOperatingCompanyBigInt } from "@lumiere/query-hooks/hooks/use-operating-company"
 import { useCompanies } from "@lumiere/query-hooks/hooks/organization-company"
 import { useSaleOrders } from "@lumiere/query-hooks/hooks/sales"
 import { useContacts } from "@lumiere/query-hooks/hooks/crm"
+import { useProducts } from "@lumiere/query-hooks/hooks/inventory"
 import {
   downloadDocumentPdf,
   useDispatchQueuedMail,
@@ -474,6 +473,71 @@ function copyAsRecord<T extends object>(row: T): Record<string, unknown> {
 
 function copyAsRecords<T extends object>(rows: readonly T[]): Record<string, unknown>[] {
   return rows.map(copyAsRecord)
+}
+
+type ManualInvoiceAccountLookup = {
+  readonly id?: unknown
+  readonly code?: unknown
+  readonly name?: unknown
+  readonly companyId?: unknown
+  readonly company_id?: unknown
+  readonly deprecated?: unknown
+  readonly isOffBalance?: unknown
+  readonly internalType?: unknown
+  readonly internalGroup?: unknown
+  readonly allowedJournalIds?: unknown
+}
+
+type ManualInvoicePartnerLookup = {
+  readonly id?: unknown
+  readonly name?: unknown
+  readonly displayName?: unknown
+  readonly companyId?: unknown
+  readonly company_id?: unknown
+  readonly deletedAt?: unknown
+  readonly deleted_at?: unknown
+  readonly isCustomer?: unknown
+  readonly customerRank?: unknown
+  readonly isVendor?: unknown
+  readonly supplierRank?: unknown
+}
+
+type ManualInvoiceJournalLookup = {
+  readonly id?: unknown
+  readonly name?: unknown
+  readonly code?: unknown
+  readonly companyId?: unknown
+  readonly company_id?: unknown
+  readonly active?: unknown
+  readonly type?: unknown
+  readonly type_?: unknown
+  readonly currencyId?: unknown
+  readonly currency_id?: unknown
+}
+
+type ManualInvoiceTaxGroupLookup = {
+  readonly id?: unknown
+  readonly taxPayableAccountId?: unknown
+  readonly tax_payable_account_id?: unknown
+  readonly taxReceivableAccountId?: unknown
+  readonly tax_receivable_account_id?: unknown
+}
+
+type ManualInvoiceTaxLookup = {
+  readonly id?: unknown
+  readonly name?: unknown
+  readonly companyId?: unknown
+  readonly company_id?: unknown
+  readonly active?: unknown
+  readonly typeTaxUse?: unknown
+  readonly type_tax_use?: unknown
+  readonly priceInclude?: unknown
+  readonly hasNegativeFactor?: unknown
+  readonly amount?: unknown
+  readonly amountType?: unknown
+  readonly amount_type?: unknown
+  readonly taxGroupId?: unknown
+  readonly tax_group_id?: unknown
 }
 
 function moveTypeTag(row: Record<string, unknown>): string {
@@ -627,19 +691,6 @@ function moveLineIdsFromRow(line: Record<string, unknown>): bigint[] {
   return raw.map((id) => BigInt(String(id)))
 }
 
-/** Resolve journal for `create_account_move` from modal payload or first loaded journal. */
-function journalIdFromInvoiceModalSave(
-  params: unknown,
-  journals: readonly { id?: unknown }[],
-): bigint | null {
-  const j = (params as { journalId?: unknown }).journalId
-  if (j != null) {
-    return typeof j === "bigint" ? j : BigInt(String(j))
-  }
-  const id = journals[0]?.id
-  return id != null ? BigInt(String(id)) : null
-}
-
 type AccountingCsvImportKind =
   | "account"
   | "accountMove"
@@ -692,16 +743,22 @@ function AccountingClientReady({
   organizationId,
   operatingCompanyId,
 }: AccountingClientReadyProps) {
+  const router = useRouter()
   useAccountingModuleSubscription()
   const { t } = useTranslation()
   const { confirm: confirmDialog, dialog: confirmDialogNode } = useConfirmDialog()
   const { toast } = useToast()
-  const { askForm, formDialog } = useFormDialog()
+  const { askForm, cancelForm, formDialog } = useFormDialog()
   const { currentUser, checkPermission } = useRBAC()
   const runtimeRoleId = currentUser?.roles[0]
   const moduleConfigBase = useMemo(() => accountingModuleConfig(t), [t])
   const accountingTabIds = useMemo(
-    () => moduleConfigBase.tabs.map((tab) => tab.id),
+    () => [
+      ...moduleConfigBase.tabs.map((tab) => tab.id),
+      "account-journals",
+      "move-lines",
+      "period-close",
+    ],
     [moduleConfigBase],
   )
   const { activeTab: accountingActiveTab, setActiveTab: setAccountingActiveTab } = useModuleTab(
@@ -710,31 +767,12 @@ function AccountingClientReady({
   )
   /** BigInt organization id for `useStdbQuery` cache keys (not SpacetimeDB `company_id` reducers). */
   const { orgId } = orgBigInts(organizationId)
-  async function persistAccountMoveCustomFieldsAfterCreate(metadata: unknown, displayName: string) {
-    if (customFieldEntriesFromMetadata(metadata).length === 0) return
-    let row: Record<string, unknown> | undefined
-    for (let attempt = 0; attempt < 5; attempt++) {
-      const rows = await fetchQueryList(
-        "/api/query/account-moves",
-        "Failed to fetch account moves",
-      )
-      row = findNewestRowByField(rows, "invoicePartnerDisplayName", displayName)
-      if (row?.id) break
-      await new Promise((r) => setTimeout(r, 250 * (attempt + 1)))
-    }
-    if (!row?.id) {
-      toast({
-        variant: "destructive",
-        title: t("common.error.title"),
-        description: "Invoice saved, but custom fields could not be linked yet. Retry from the record.",
-      })
-      return
-    }
+  async function persistAccountMoveCustomFieldsExact(metadata: unknown, recordId: string) {
     await persistCustomFieldsToEav({
       organizationId,
       companyId: operatingCompanyId,
       model: "account_move",
-      recordId: BigInt(String(row.id)),
+      recordId: BigInt(recordId),
       metadata,
     })
   }
@@ -784,82 +822,129 @@ function AccountingClientReady({
   const [chatterTarget, setChatterTarget] = useState<ChatterTarget | null>(null)
   const [glDrilldownAccount, setGlDrilldownAccount] = useState<AccountAccount | null>(null)
   // ── Data hooks ──────────────────────────────────────────────────────────────
-  const { data: accounts = [] } = useAccountAccounts(orgId, {
+  const accountsRead = moduleCollection(useAccountAccounts(orgId, {
     enabled: organizationId > 0,
-  })
-  const { data: allMoves = [], isLoading: movesLoading } = useAccountMoves(orgId, {
+  }))
+  const accounts = accountsRead.rows
+  const allMovesRead = moduleCollection(useAccountMoves(orgId, {
     enabled: organizationId > 0,
-  })
-  const { data: accountMoveLines = [] } = useAccountMoveLines(orgId, { enabled: organizationId > 0 })
-  const { data: taxes = [] } = useAccountTaxes(orgId, { enabled: organizationId > 0 })
-  const { data: budgets = [] } = useCrossoveredBudgets(orgId, {
+  }))
+  const allMoves = allMovesRead.rows
+  const movesLoading = allMovesRead.state.status === "loading"
+  const accountMoveLinesRead = moduleCollection(useAccountMoveLines(orgId, { enabled: organizationId > 0 }))
+  const accountMoveLines = accountMoveLinesRead.rows
+  const taxesRead = moduleCollection(useAccountTaxes(orgId, { enabled: organizationId > 0 }))
+  const taxes = taxesRead.rows
+  const budgetsRead = moduleCollection(useCrossoveredBudgets(orgId, {
     enabled: organizationId > 0,
     initialData: initialBudgets,
-  })
-  const { data: budgetLines = [] } = useBudgetLines(orgId, { enabled: organizationId > 0 })
-  const { data: budgetPosts = [] } = useBudgetPosts(orgId, { enabled: organizationId > 0 })
-  const { data: taxDeadlines = [] } = useTaxDeadlines(orgId, { enabled: organizationId > 0 })
-  const { data: taxGroups = [] } = useAccountTaxGroups(orgId, { enabled: organizationId > 0 })
-  const { data: taxJurisdictions = [] } = useTaxJurisdictions(orgId, { enabled: organizationId > 0 })
-  const { data: taxSchedules = [] } = useTaxSchedules(orgId, { enabled: organizationId > 0 })
-  const { data: analytic = [] } = useAccountAnalyticAccounts(orgId, { enabled: organizationId > 0 })
-  const { data: analyticLines = [] } = useAccountAnalyticLines(orgId, { enabled: organizationId > 0 })
-  const { data: analyticDistribution = [] } = useAccountAnalyticDistributionModels(orgId, {
+  }))
+  const budgets = budgetsRead.rows
+  const budgetLinesRead = moduleCollection(useBudgetLines(orgId, { enabled: organizationId > 0 }))
+  const budgetLines = budgetLinesRead.rows
+  const budgetPostsRead = moduleCollection(useBudgetPosts(orgId, { enabled: organizationId > 0 }))
+  const budgetPosts = budgetPostsRead.rows
+  const taxDeadlinesRead = moduleCollection(useTaxDeadlines(orgId, { enabled: organizationId > 0 }))
+  const taxDeadlines = taxDeadlinesRead.rows
+  const taxGroupsRead = moduleCollection(useAccountTaxGroups(orgId, { enabled: organizationId > 0 }))
+  const taxGroups = taxGroupsRead.rows
+  const taxJurisdictionsRead = moduleCollection(useTaxJurisdictions(orgId, { enabled: organizationId > 0 }))
+  const taxJurisdictions = taxJurisdictionsRead.rows
+  const taxSchedulesRead = moduleCollection(useTaxSchedules(orgId, { enabled: organizationId > 0 }))
+  const taxSchedules = taxSchedulesRead.rows
+  const analyticRead = moduleCollection(useAccountAnalyticAccounts(orgId, { enabled: organizationId > 0 }))
+  const analytic = analyticRead.rows
+  const analyticLinesRead = moduleCollection(useAccountAnalyticLines(orgId, { enabled: organizationId > 0 }))
+  const analyticLines = analyticLinesRead.rows
+  const analyticDistributionRead = moduleCollection(useAccountAnalyticDistributionModels(orgId, {
     enabled: organizationId > 0,
-  })
-  const { data: bankStatements = [], isLoading: bankStatementsLoading } = useAccountBankStatements(orgId, { enabled: organizationId > 0 })
-  const { data: bankStatementLines = [] } = useAccountBankStatementLines(orgId, { enabled: organizationId > 0 })
-  const { data: bankMatchCandidates = [] } = useBankMatchCandidates(orgId, { enabled: organizationId > 0 })
-  const { data: reconciliationWidgets = [] } = useAccountReconciliationWidgets(orgId, {
+  }))
+  const analyticDistribution = analyticDistributionRead.rows
+  const bankStatementsRead = moduleCollection(useAccountBankStatements(orgId, { enabled: organizationId > 0 }))
+  const bankStatements = bankStatementsRead.rows
+  const bankStatementsLoading = bankStatementsRead.state.status === "loading"
+  const bankStatementLinesRead = moduleCollection(useAccountBankStatementLines(orgId, { enabled: organizationId > 0 }))
+  const bankStatementLines = bankStatementLinesRead.rows
+  const bankMatchCandidatesRead = moduleCollection(useBankMatchCandidates(orgId, { enabled: organizationId > 0 }))
+  const bankMatchCandidates = bankMatchCandidatesRead.rows
+  const reconciliationWidgetsRead = moduleCollection(useAccountReconciliationWidgets(orgId, {
     enabled: organizationId > 0,
-  })
-  const { data: fixedAssets = [] } = useAccountFixedAssets(orgId, { enabled: organizationId > 0 })
-  const { data: accountPayments = [], isLoading: paymentsLoading } = useAccountPayments(orgId, { enabled: organizationId > 0 })
-  const { data: paymentTerms = [] } = useAccountPaymentTerms(orgId, { enabled: organizationId > 0 })
-  const { data: paymentTermLines = [] } = useAccountPaymentTermLines(orgId, { enabled: organizationId > 0 })
-  const { data: depreciationLines = [] } = useDepreciationLines(orgId, { enabled: organizationId > 0 })
-  const { data: companies = [] } = useCompanies(organizationId, organizationId > 0)
-  const { data: currencies = [] } = useCurrencies()
-  const { data: intercompanyRules = [] } = useIntercompanyRules(orgId, { enabled: organizationId > 0 })
-  const { data: intercompanyTransactions = [] } = useIntercompanyTransactions(orgId, {
+  }))
+  const reconciliationWidgets = reconciliationWidgetsRead.rows
+  const fixedAssetsRead = moduleCollection(useAccountFixedAssets(orgId, { enabled: organizationId > 0 }))
+  const fixedAssets = fixedAssetsRead.rows
+  const accountPaymentsRead = moduleCollection(useAccountPayments(orgId, { enabled: organizationId > 0 }))
+  const accountPayments = accountPaymentsRead.rows
+  const paymentsLoading = accountPaymentsRead.state.status === "loading"
+  const paymentTermsRead = moduleCollection(useAccountPaymentTerms(orgId, { enabled: organizationId > 0 }))
+  const paymentTerms = paymentTermsRead.rows
+  const paymentTermLinesRead = moduleCollection(useAccountPaymentTermLines(orgId, { enabled: organizationId > 0 }))
+  const paymentTermLines = paymentTermLinesRead.rows
+  const depreciationLinesRead = moduleCollection(useDepreciationLines(orgId, { enabled: organizationId > 0 }))
+  const depreciationLines = depreciationLinesRead.rows
+  const companiesRead = moduleCollection(useCompanies(organizationId, organizationId > 0))
+  const companies = companiesRead.rows
+  const currenciesRead = moduleCollection(useCurrencies())
+  const currencies = currenciesRead.rows
+  const intercompanyRulesRead = moduleCollection(useIntercompanyRules(orgId, { enabled: organizationId > 0 }))
+  const intercompanyRules = intercompanyRulesRead.rows
+  const intercompanyTransactionsRead = moduleCollection(useIntercompanyTransactions(orgId, {
     enabled: organizationId > 0,
-  })
-  const { data: saleOrders = [] } = useSaleOrders(orgId)
-  const { data: contacts = [] } = useContacts(orgId)
-  const { data: journals = [] } = useAccountJournals(orgId, { enabled: organizationId > 0 })
-  const { data: accountTypes = [] } = useAccountAccountTypes(orgId, { enabled: organizationId > 0 })
-  const { data: accountGroups = [] } = useAccountGroups(orgId, { enabled: organizationId > 0 })
-  const { data: consolidationAccounts = [] } = useConsolidationAccounts(orgId, {
+  }))
+  const intercompanyTransactions = intercompanyTransactionsRead.rows
+  const saleOrdersRead = moduleCollection(useSaleOrders(orgId))
+  const saleOrders = saleOrdersRead.rows
+  const contactsRead = moduleCollection(useContacts(orgId))
+  const contacts = contactsRead.rows
+  const productsRead = moduleCollection(useProducts(orgId))
+  const products = productsRead.rows
+  const journalsRead = moduleCollection(useAccountJournals(orgId, { enabled: organizationId > 0 }))
+  const journals = journalsRead.rows
+  const accountTypesRead = moduleCollection(useAccountAccountTypes(orgId, { enabled: organizationId > 0 }))
+  const accountTypes = accountTypesRead.rows
+  const accountGroupsRead = moduleCollection(useAccountGroups(orgId, { enabled: organizationId > 0 }))
+  const accountGroups = accountGroupsRead.rows
+  const consolidationAccountsRead = moduleCollection(useConsolidationAccounts(orgId, {
     enabled: organizationId > 0,
-  })
-  const { data: consolidationJournals = [] } = useConsolidationJournals(orgId, {
+  }))
+  const consolidationAccounts = consolidationAccountsRead.rows
+  const consolidationJournalsRead = moduleCollection(useConsolidationJournals(orgId, {
     enabled: organizationId > 0,
-  })
-  const { data: eliminationEntries = [] } = useConsolidationEliminationEntries(orgId, {
+  }))
+  const consolidationJournals = consolidationJournalsRead.rows
+  const eliminationEntriesRead = moduleCollection(useConsolidationEliminationEntries(orgId, {
     enabled: organizationId > 0,
-  })
-  const { data: fxRevaluationRuns = [] } = useFxRevaluationRuns(orgId, {
+  }))
+  const eliminationEntries = eliminationEntriesRead.rows
+  const fxRevaluationRunsRead = moduleCollection(useFxRevaluationRuns(orgId, {
     enabled: organizationId > 0,
-  })
-  const { data: partnerCreditControls = [] } = usePartnerCreditControls(orgId, {
+  }))
+  const fxRevaluationRuns = fxRevaluationRunsRead.rows
+  const partnerCreditControlsRead = moduleCollection(usePartnerCreditControls(orgId, {
     enabled: organizationId > 0,
-  })
-  const { data: amortizationSchedules = [] } = useAmortizationSchedules(orgId, {
+  }))
+  const partnerCreditControls = partnerCreditControlsRead.rows
+  const amortizationSchedulesRead = moduleCollection(useAmortizationSchedules(orgId, {
     enabled: organizationId > 0,
-  })
-  const { data: amortizationLines = [] } = useAmortizationLines(orgId, {
+  }))
+  const amortizationSchedules = amortizationSchedulesRead.rows
+  const amortizationLinesRead = moduleCollection(useAmortizationLines(orgId, {
     enabled: organizationId > 0,
-  })
-  const { data: fiscalYearsRaw = [] } = useAccountFiscalYears(orgId, {
+  }))
+  const amortizationLines = amortizationLinesRead.rows
+  const fiscalYearsRawRead = moduleCollection(useAccountFiscalYears(orgId, {
     enabled: organizationId > 0,
     initialData: initialFiscalYears,
     staleTime: 0,
-  })
-  const { data: accountPeriodsRaw = [] } = useAccountPeriods(orgId, {
+  }))
+  const fiscalYearsRaw = fiscalYearsRawRead.rows
+  const accountPeriodsRawRead = moduleCollection(useAccountPeriods(orgId, {
     enabled: organizationId > 0,
     initialData: initialAccountPeriods,
-  })
-  const { data: financialReportsRaw = [] } = useFinancialReports(orgId)
+  }))
+  const accountPeriodsRaw = accountPeriodsRawRead.rows
+  const financialReportsRead = moduleCollection(useFinancialReports(orgId))
+  const financialReportsRaw = financialReportsRead.rows
 
   const createFiscalYear = useCreateFiscalYear(organizationId, operatingCompanyId)
   const updateFiscalYear = useUpdateFiscalYear(organizationId, operatingCompanyId)
@@ -1030,6 +1115,77 @@ function AccountingClientReady({
       0n
     )
   }, [companies, currencySelectOptions, operatingCompanyId])
+
+  const manualInvoiceOptions = useMemo(() => {
+    const companyKey = String(operatingCompanyId)
+    const accountLabel = (row: ManualInvoiceAccountLookup) =>
+      `${String(row.code ?? "").trim() ? `${String(row.code)} — ` : ""}${String(row.name ?? row.id ?? "")}`
+    const allowedJournals = (row: ManualInvoiceAccountLookup) =>
+      Array.isArray(row.allowedJournalIds) ? row.allowedJournalIds.map(String) : []
+    const accountsFor = (kind: "invoice" | "bill", counterpart: boolean) =>
+      (accounts as ManualInvoiceAccountLookup[])
+        .filter((row) => String(row.companyId ?? row.company_id ?? "") === companyKey)
+        .filter((row) => row.deprecated !== true && row.isOffBalance !== true)
+        .filter((row) => enumTag(counterpart ? row.internalType : row.internalGroup) === (
+          counterpart ? (kind === "invoice" ? "Receivable" : "Payable") : (kind === "invoice" ? "Income" : "Expense")
+        ))
+        .map((row) => ({ value: String(row.id), label: accountLabel(row), allowedJournalIds: allowedJournals(row) }))
+    const partnersFor = (kind: "invoice" | "bill") =>
+      (contacts as ManualInvoicePartnerLookup[])
+        .filter((row) => row.deletedAt == null && row.deleted_at == null)
+        .filter((row) => {
+          const rowCompany = row.companyId ?? row.company_id
+          return rowCompany == null || String(rowCompany) === companyKey
+        })
+        .filter((row) => kind === "invoice"
+          ? row.isCustomer === true || Number(row.customerRank ?? 0) > 0
+          : row.isVendor === true || Number(row.supplierRank ?? 0) > 0)
+        .map((row) => ({ value: String(row.id), label: String(row.displayName ?? row.name ?? row.id) }))
+    const journalsFor = (kind: "invoice" | "bill") =>
+      (journals as ManualInvoiceJournalLookup[])
+        .filter((row) => String(row.companyId ?? row.company_id ?? "") === companyKey && row.active !== false)
+        .filter((row) => enumTag(row.type ?? row.type_) === (kind === "invoice" ? "Sale" : "Purchase"))
+        .map((row) => ({
+          value: String(row.id),
+          label: `${String(row.code ?? "").trim() ? `${String(row.code)} — ` : ""}${String(row.name ?? row.id)}`,
+          currencyId: String(row.currencyId ?? row.currency_id ?? defaultCurrencyId),
+        }))
+    const taxGroupById = new Map(
+      (taxGroups as ManualInvoiceTaxGroupLookup[]).map((row) => [String(row.id), row]),
+    )
+    const taxesFor = (kind: "invoice" | "bill") =>
+      (taxes as ManualInvoiceTaxLookup[])
+        .filter((row) => String(row.companyId ?? row.company_id ?? "") === companyKey && row.active !== false)
+        .filter((row) => [kind === "invoice" ? "Sale" : "Purchase", "None"].includes(enumTag(row.typeTaxUse ?? row.type_tax_use)))
+        .filter((row) => row.priceInclude !== true && row.hasNegativeFactor !== true && Number(row.amount ?? 0) >= 0)
+        .filter((row) => ["Percent", "Fixed", "Division"].includes(enumTag(row.amountType ?? row.amount_type)))
+        .filter((row) => {
+          const group = taxGroupById.get(String(row.taxGroupId ?? row.tax_group_id ?? ""))
+          return group != null && (kind === "invoice"
+            ? group.taxPayableAccountId ?? group.tax_payable_account_id
+            : group.taxReceivableAccountId ?? group.tax_receivable_account_id) != null
+        })
+        .map((row) => ({
+          value: String(row.id), label: String(row.name ?? row.id), amount: Number(row.amount ?? 0),
+          amountType: enumTag(row.amountType ?? row.amount_type) as "Percent" | "Fixed" | "Division",
+        }))
+    const productsFor = (kind: "invoice" | "bill") =>
+      (products as Record<string, unknown>[])
+        .filter((row) => row.active !== false && (kind === "invoice" ? row.saleOk === true : row.purchaseOk === true))
+        .map((row) => ({
+          value: String(row.id),
+          label: String(row.displayName ?? row.name ?? row.id),
+          description: String((kind === "invoice" ? row.descriptionSale : row.descriptionPurchase) ?? row.name ?? ""),
+          price: Number(kind === "invoice" ? row.listPrice ?? row.price ?? 0 : row.standardPrice ?? 0),
+          accountId: String((kind === "invoice" ? row.propertyAccountIncomeId : row.propertyAccountExpenseId) ?? "") || undefined,
+          taxIds: (Array.isArray(kind === "invoice" ? row.taxesId : row.supplierTaxesId)
+            ? (kind === "invoice" ? row.taxesId : row.supplierTaxesId) as unknown[] : []).map(String),
+        }))
+    return {
+      invoice: { journals: journalsFor("invoice"), partners: partnersFor("invoice"), counterpart: accountsFor("invoice", true), commercial: accountsFor("invoice", false), taxes: taxesFor("invoice"), products: productsFor("invoice") },
+      bill: { journals: journalsFor("bill"), partners: partnersFor("bill"), counterpart: accountsFor("bill", true), commercial: accountsFor("bill", false), taxes: taxesFor("bill"), products: productsFor("bill") },
+    }
+  }, [accounts, contacts, defaultCurrencyId, journals, operatingCompanyId, products, taxGroups, taxes])
 
   const companySelectOptions = useMemo(
     () => companyRowsToSelectOptions(companies as Record<string, unknown>[]),
@@ -1689,6 +1845,7 @@ function AccountingClientReady({
   const createAccountGroup = useCreateAccountGroup(organizationId)
   const updateAccountGroup = useUpdateAccountGroup(organizationId)
   const createMove = useCreateAccountMove(organizationId)
+  const createManualInvoice = useCreateManualAccountInvoice(organizationId)
   const createTax = useCreateAccountTax(organizationId)
   const updateTax = useUpdateAccountTax(organizationId)
   const deprecateAccount = useDeprecateAccountAccount(organizationId)
@@ -3971,7 +4128,7 @@ function AccountingClientReady({
   const liveSections = useMemo(() => {
     const ar = invoices.reduce((s, m) => s + Number(m.amountResidual ?? 0), 0)
     const ap = bills.reduce((s, m) => s + Number(m.amountResidual ?? 0), 0)
-    const cash = accounts
+    const bankOpeningBalances = accounts
       .filter((a) => a.isBankAccount)
       .reduce((s, a) => s + Number(a.openingBalance ?? 0), 0)
 
@@ -3996,8 +4153,8 @@ function AccountingClientReady({
       rows
         .filter((m) => moveStateStr(m as Record<string, unknown>) === "Posted")
         .reduce((s, m) => s + Number(m.amountTotal ?? 0), 0)
-    const currentRevenue = revenueOf(currentIssuedInvoices)
-    const previousRevenue = revenueOf(previousIssuedInvoices)
+    const currentPostedInvoiceTotal = revenueOf(currentIssuedInvoices)
+    const previousPostedInvoiceTotal = revenueOf(previousIssuedInvoices)
 
     const paymentRows = accountPayments as Record<string, unknown>[]
     const paymentsReceivedIn = (range: { startMs: number; endMs: number }) =>
@@ -4019,11 +4176,19 @@ function AccountingClientReady({
               stats: [
                 { label: t("accounting.dashboard.accountsReceivable"), value: `$${ar.toLocaleString()}`, icon: "TrendingUp" },
                 { label: t("accounting.dashboard.accountsPayable"), value: `$${ap.toLocaleString()}`, icon: "TrendingDown" },
-                { label: t("accounting.dashboard.cashBalance"), value: `$${cash.toLocaleString()}`, icon: "DollarSign" },
                 {
-                  label: t("accounting.dashboard.revenue"),
-                  value: `$${currentRevenue.toLocaleString()}`,
-                  change: percentChange(currentRevenue, previousRevenue),
+                  label: t("accounting.dashboard.bankOpeningBalances", {
+                    defaultValue: "Bank opening balances",
+                  }),
+                  value: `$${bankOpeningBalances.toLocaleString()}`,
+                  icon: "DollarSign",
+                },
+                {
+                  label: t("accounting.dashboard.postedInvoiceTotal", {
+                    defaultValue: "Posted invoice total",
+                  }),
+                  value: `$${currentPostedInvoiceTotal.toLocaleString()}`,
+                  change: percentChange(currentPostedInvoiceTotal, previousPostedInvoiceTotal),
                   icon: "BarChart2",
                 },
                 {
@@ -4064,9 +4229,14 @@ function AccountingClientReady({
           }
         }
         if (w.id === "acc-overdue") {
-          const overdueInvoices = invoices.filter((m) => Number(m.amountResidual ?? 0) > 0)
-          const totalAmount = overdueInvoices.reduce((s, m) => s + Number(m.amountResidual ?? 0), 0)
           const nowMs = Date.now()
+          const overdueInvoices = invoices.filter((m) => {
+            if (moveStateStr(m as Record<string, unknown>) !== "Posted") return false
+            if (Number(m.amountResidual ?? 0) <= 0) return false
+            const dueMs = flexibleTimestampMs(m.invoiceDateDue)
+            return dueMs != null && dueMs < nowMs
+          })
+          const totalAmount = overdueInvoices.reduce((s, m) => s + Number(m.amountResidual ?? 0), 0)
           const oldestDays = overdueInvoices.reduce((max, m) => {
             if (!m.invoiceDateDue) return max
             const dueMs = flexibleTimestampMs(m.invoiceDateDue)
@@ -4092,7 +4262,13 @@ function AccountingClientReady({
             balance: Number(a.openingBalance ?? 0),
             type: String(a.internalGroup ?? "Asset"),
           }))
-          return { ...w, data: { accounts: accountRows } }
+          return {
+            ...w,
+            title: t("accounting.dashboard.keyAccountOpeningBalances", {
+              defaultValue: "Key account opening balances",
+            }),
+            data: { accounts: accountRows },
+          }
         }
         if (w.id === "accounting-ar-ap-aging") {
           const nowMs = Date.now()
@@ -4213,11 +4389,238 @@ function AccountingClientReady({
   )
 
   // ── Form submit handler (entity tabs: taxes, budgets) ───────────────────────
+  const dataState = {
+    dashboard: mergeModuleStates([
+      accountsRead.state, allMovesRead.state, budgetsRead.state, taxDeadlinesRead.state, accountPaymentsRead.state,
+    ]),
+    accounts: mergeModuleStates([accountsRead.state, accountTypesRead.state, accountGroupsRead.state]),
+    "journal-entries": mergeModuleStates([
+      allMovesRead.state,
+      accountMoveLinesRead.state,
+      accountsRead.state,
+      saleOrdersRead.state,
+      journalsRead.state,
+    ]),
+    invoices: mergeModuleStates([
+      allMovesRead.state,
+      accountMoveLinesRead.state,
+      accountsRead.state,
+      saleOrdersRead.state,
+      journalsRead.state,
+    ]),
+    bills: mergeModuleStates([
+      allMovesRead.state,
+      accountMoveLinesRead.state,
+      accountsRead.state,
+      saleOrdersRead.state,
+      journalsRead.state,
+    ]),
+    taxes: taxesRead.state,
+    payments: mergeModuleStates([
+      accountPaymentsRead.state,
+      contactsRead.state,
+      journalsRead.state,
+      currenciesRead.state,
+      companiesRead.state,
+      allMovesRead.state,
+    ]),
+    "payment-operations": mergeModuleStates([
+      accountMoveLinesRead.state,
+      accountsRead.state,
+      contactsRead.state,
+      journalsRead.state,
+      currenciesRead.state,
+      companiesRead.state,
+    ]),
+    "tax-groups": taxGroupsRead.state,
+    "tax-jurisdictions": taxJurisdictionsRead.state,
+    "tax-schedules": taxSchedulesRead.state,
+    "tax-deadlines": taxDeadlinesRead.state,
+    "payment-terms": paymentTermsRead.state,
+    "payment-term-lines": mergeModuleStates([paymentTermLinesRead.state, paymentTermsRead.state]),
+    budgets: mergeModuleStates([budgetsRead.state, budgetLinesRead.state, budgetPostsRead.state]),
+    analytic: mergeModuleStates([analyticRead.state, currenciesRead.state, companiesRead.state]),
+    "analytic-lines": mergeModuleStates([
+      analyticLinesRead.state,
+      analyticRead.state,
+      currenciesRead.state,
+      companiesRead.state,
+    ]),
+    "analytic-distribution": mergeModuleStates([analyticDistributionRead.state, analyticRead.state]),
+    "bank-statements": mergeModuleStates([
+      bankStatementsRead.state,
+      bankStatementLinesRead.state,
+      bankMatchCandidatesRead.state,
+      contactsRead.state,
+      journalsRead.state,
+      currenciesRead.state,
+      companiesRead.state,
+    ]),
+    "reconciliation-widgets": mergeModuleStates([
+      reconciliationWidgetsRead.state,
+      accountsRead.state,
+      contactsRead.state,
+    ]),
+    "fixed-assets": mergeModuleStates([
+      fixedAssetsRead.state,
+      depreciationLinesRead.state,
+      accountsRead.state,
+      journalsRead.state,
+      currenciesRead.state,
+      companiesRead.state,
+      allMovesRead.state,
+    ]),
+    "fiscal-years": fiscalYearsRawRead.state,
+    "account-periods": accountPeriodsRawRead.state,
+    "fx-revaluation": mergeModuleStates([
+      fxRevaluationRunsRead.state,
+      currenciesRead.state,
+      journalsRead.state,
+      accountsRead.state,
+      accountPaymentsRead.state,
+      allMovesRead.state,
+    ]),
+    "credit-control": mergeModuleStates([
+      partnerCreditControlsRead.state,
+      contactsRead.state,
+      journalsRead.state,
+      accountsRead.state,
+      allMovesRead.state,
+    ]),
+    amortization: mergeModuleStates([
+      amortizationSchedulesRead.state,
+      amortizationLinesRead.state,
+      journalsRead.state,
+      accountsRead.state,
+      currenciesRead.state,
+    ]),
+    consolidation: mergeModuleStates([
+      consolidationAccountsRead.state,
+      consolidationJournalsRead.state,
+      eliminationEntriesRead.state,
+      companiesRead.state,
+      currenciesRead.state,
+      accountPeriodsRawRead.state,
+    ]),
+    "intercompany-rules": mergeModuleStates([
+      intercompanyRulesRead.state,
+      companiesRead.state,
+      journalsRead.state,
+      accountsRead.state,
+    ]),
+    "intercompany-transactions": mergeModuleStates([
+      intercompanyTransactionsRead.state,
+      companiesRead.state,
+      currenciesRead.state,
+      saleOrdersRead.state,
+      allMovesRead.state,
+    ]),
+    "account-journals": journalsRead.state,
+    "move-lines": mergeModuleStates([
+      accountMoveLinesRead.state,
+      accountsRead.state,
+      saleOrdersRead.state,
+      allMovesRead.state,
+    ]),
+    "period-close": mergeModuleStates([
+      fiscalYearsRawRead.state,
+      accountPeriodsRawRead.state,
+      allMovesRead.state,
+      bankStatementsRead.state,
+      bankStatementLinesRead.state,
+      financialReportsRead.state,
+    ]),
+  }
+  type AccountingTab = keyof typeof dataState
+  const isAccountingTab = (tab: string): tab is AccountingTab =>
+    Object.prototype.hasOwnProperty.call(dataState, tab)
+  const tabUsable = (tab: string | undefined) =>
+    tab == null || (isAccountingTab(tab) && canUseModuleData(dataState[tab]))
+  type AccountingDataAction =
+    | "createAccount"
+    | "createMove"
+    | "createTax"
+    | "createBudget"
+    | "createAnalyticAccount"
+    | "createAnalyticLine"
+    | "createAnalyticDistributionModel"
+    | "createReconciliationWidget"
+    | "createFiscalYear"
+    | "createAccountPeriod"
+    | "createAccountPayment"
+    | "createPaymentTerm"
+    | "createPaymentTermLine"
+    | "createAccountJournal"
+    | "addAccountMoveLine"
+    | "createCurrencyRate"
+    | "createDepreciationLine"
+    | "createIntercompanyRule"
+    | "createIntercompanyTransaction"
+  const actionTabs = {
+    createAccount: "accounts", createMove: "journal-entries", createTax: "taxes", createBudget: "budgets",
+    createAnalyticAccount: "analytic", createAnalyticLine: "analytic-lines",
+    createAnalyticDistributionModel: "analytic-distribution", createReconciliationWidget: "reconciliation-widgets",
+    createFiscalYear: "fiscal-years", createAccountPeriod: "account-periods", createAccountPayment: "payments",
+    createPaymentTerm: "payment-terms", createPaymentTermLine: "payment-term-lines",
+    createAccountJournal: "account-journals", addAccountMoveLine: "move-lines",
+    createCurrencyRate: "fx-revaluation",
+    createDepreciationLine: "fixed-assets", createIntercompanyRule: "intercompany-rules",
+    createIntercompanyTransaction: "intercompany-transactions",
+  } satisfies Record<AccountingDataAction, AccountingTab>
+  const isAccountingDataAction = (action: string): action is AccountingDataAction =>
+    Object.prototype.hasOwnProperty.call(actionTabs, action)
+  const actionUsable = (action: string) =>
+    !isAccountingDataAction(action) || tabUsable(actionTabs[action])
+  const csvTabs: Record<AccountingCsvImportKind, AccountingTab> = {
+    account: "accounts", accountMove: "journal-entries", accountMoveLine: "journal-entries",
+    tax: "taxes", budget: "budgets", budgetLine: "budgets", analytic: "analytic",
+  }
+  const quickActionUsable = quickActionForm == null || actionUsable(quickActionForm.action)
+  const csvUsable = csvKind == null || tabUsable(csvTabs[csvKind])
+  // Record sheets, row editors and prompts are opened from the active tab's rows.
+  const activeTabUsable = tabUsable(accountingActiveTab)
+  useEffect(() => {
+    // Dialogs close when the collection their rows came from is denied or fails.
+    if (!quickActionUsable) setQuickActionForm(null)
+    if (!csvUsable) setCsvKind(null)
+    if (!activeTabUsable) {
+      setSelectedInvoice(null)
+      setInvoiceSheetRecord(null)
+      setShowCreateInvoice(false)
+      setShowCreateBill(false)
+      setCreditNoteSource(null)
+      setAnalyticAccountEdit(null)
+      setAnalyticLineEdit(null)
+      setAnalyticDistEdit(null)
+      setBankStatementDetail(null)
+      setBankLineCreateOpen(false)
+      setBankLineEdit(null)
+      setBankLineMatchFocus(null)
+      setReconciliationWidgetEdit(null)
+      setFiscalYearEdit(null)
+      setFiscalSetupOpen(false)
+      setAccountPeriodEdit(null)
+      setRegisterPaymentForId(null)
+      setReconcilePaymentOpen(false)
+      setJournalEdit(null)
+      setPaymentTermLineEdit(null)
+      setSelectedFixedAsset(null)
+      setDepreciationLineCreateOpen(false)
+      setIntercompanyRuleEdit(null)
+      setIntercompanyTxCreateOpen(false)
+      setMoveLineEdit(null)
+      setChatterTarget(null)
+      setGlDrilldownAccount(null)
+      cancelForm()
+    }
+  }, [quickActionUsable, csvUsable, activeTabUsable, cancelForm])
+
   const handleFormSubmit = async (
     _tabId: string,
     action: string,
     formData: Record<string, unknown>,
   ) => {
+    if (!actionUsable(action)) return
     if (action === "createAccount") {
       const p = toCreateAccountAccountParams(formData, {
         companyId: operatingCompanyId,
@@ -4919,6 +5322,7 @@ function AccountingClientReady({
                 fiscalYears={fiscalYearsRaw as Record<string, unknown>[]}
                 accountPeriods={accountPeriodsRaw as Record<string, unknown>[]}
                 moves={allMoves as Record<string, unknown>[]}
+                bankStatements={bankStatements as Record<string, unknown>[]}
                 bankStatementLines={bankStatementLines as Record<string, unknown>[]}
                 financialReports={financialReportsRaw as Record<string, unknown>[]}
                 onNavigateToTab={setAccountingActiveTab}
@@ -5157,11 +5561,12 @@ function AccountingClientReady({
 
   return (
     <>
-      {formDialog}
+      {activeTabUsable && formDialog}
       <ModuleView
         config={config}
         data={data}
         dataLoading={dataLoading}
+        dataState={dataState}
         onFormSubmit={handleFormSubmit}
         onRowClick={handleEntityRowClick}
         activeTab={accountingActiveTab}
@@ -5309,7 +5714,7 @@ function AccountingClientReady({
         />
       ) : null}
 
-      {csvKind && csvFormConfig ? (
+      {csvKind && csvUsable && csvFormConfig ? (
         <CsvImportModal
           trackedImport={{ companyId: operatingCompanyId }}
           organizationId={orgId}
@@ -5393,88 +5798,64 @@ function AccountingClientReady({
       {/* Create invoice */}
       <CreateInvoiceModal
         open={showCreateInvoice}
+        kind="invoice"
+        companyId={operatingCompanyId}
         onClose={() => setShowCreateInvoice(false)}
         organizationId={organizationId}
-        journalOptions={journalRowsAsSelectOptions}
+        journalOptions={manualInvoiceOptions.invoice.journals}
+        partnerOptions={manualInvoiceOptions.invoice.partners}
+        counterpartAccountOptions={manualInvoiceOptions.invoice.counterpart}
+        lineAccountOptions={manualInvoiceOptions.invoice.commercial}
+        taxOptions={manualInvoiceOptions.invoice.taxes}
+        productOptions={manualInvoiceOptions.invoice.products}
+        paymentTermOptions={paymentTermSelectOptions.filter((option) => option.value !== "")}
         onSave={async (params) => {
-          if (journals.length === 0) {
-            toast({
-              variant: "destructive",
-              title: t("accounting.forms.newInvoice.createTitle"),
-              description: t("accounting.forms.newInvoice.noJournalsHint"),
-            })
-            return
+          const outcome = await createManualInvoice.mutateAsync(params)
+          if (outcome.kind === "converged" || outcome.kind === "already-applied") {
+            await persistAccountMoveCustomFieldsExact(params.metadata, outcome.ref.id)
           }
-          const jid = journalIdFromInvoiceModalSave(params, journals)
-          if (jid == null) {
-            toast({
-              variant: "destructive",
-              title: t("accounting.forms.newInvoice.createTitle"),
-              description: t("accounting.forms.newInvoice.fields.journalPlaceholder"),
-            })
-            return
-          }
-          const p = toCreateAccountMoveFromInvoiceModal(
-            params as Record<string, unknown>,
-            "OutInvoice",
-            jid,
-            "Customer Invoice",
-            operatingCompanyId,
-          )
-          await createMove.mutateAsync(p)
-          if (p.metadata && p.invoicePartnerDisplayName) {
-            await persistAccountMoveCustomFieldsAfterCreate(
-              p.metadata,
-              p.invoicePartnerDisplayName,
-            )
-          }
+          return outcome
         }}
+        onCheckStatus={async (params) => {
+          const ref = await readManualAccountInvoiceEffect(params.companyId, params.idempotencyKey)
+          if (ref) await persistAccountMoveCustomFieldsExact(params.metadata, ref.id)
+          return ref
+        }}
+        onResolved={(ref) => ref.href && router.push(ref.href)}
       />
 
       {/* Create bill (same form, different move type) */}
       <CreateInvoiceModal
         open={showCreateBill}
+        kind="bill"
+        companyId={operatingCompanyId}
         onClose={() => setShowCreateBill(false)}
         organizationId={organizationId}
-        journalOptions={journalRowsAsSelectOptions}
+        journalOptions={manualInvoiceOptions.bill.journals}
+        partnerOptions={manualInvoiceOptions.bill.partners}
+        counterpartAccountOptions={manualInvoiceOptions.bill.counterpart}
+        lineAccountOptions={manualInvoiceOptions.bill.commercial}
+        taxOptions={manualInvoiceOptions.bill.taxes}
+        productOptions={manualInvoiceOptions.bill.products}
+        paymentTermOptions={paymentTermSelectOptions.filter((option) => option.value !== "")}
         onSave={async (params) => {
-          if (journals.length === 0) {
-            toast({
-              variant: "destructive",
-              title: t("accounting.forms.newBill.createTitle"),
-              description: t("accounting.forms.newBill.noJournalsHint"),
-            })
-            return
+          const outcome = await createManualInvoice.mutateAsync(params)
+          if (outcome.kind === "converged" || outcome.kind === "already-applied") {
+            await persistAccountMoveCustomFieldsExact(params.metadata, outcome.ref.id)
           }
-          const jid = journalIdFromInvoiceModalSave(params, journals)
-          if (jid == null) {
-            toast({
-              variant: "destructive",
-              title: t("accounting.forms.newBill.createTitle"),
-              description: t("accounting.forms.newBill.fields.journalPlaceholder"),
-            })
-            return
-          }
-          const p = toCreateAccountMoveFromInvoiceModal(
-            params as Record<string, unknown>,
-            "InInvoice",
-            jid,
-            "Vendor Bill",
-            operatingCompanyId,
-          )
-          await createMove.mutateAsync(p)
-          if (p.metadata && p.invoicePartnerDisplayName) {
-            await persistAccountMoveCustomFieldsAfterCreate(
-              p.metadata,
-              p.invoicePartnerDisplayName,
-            )
-          }
+          return outcome
         }}
+        onCheckStatus={async (params) => {
+          const ref = await readManualAccountInvoiceEffect(params.companyId, params.idempotencyKey)
+          if (ref) await persistAccountMoveCustomFieldsExact(params.metadata, ref.id)
+          return ref
+        }}
+        onResolved={(ref) => ref.href && router.push(ref.href)}
       />
 
       {/* Dashboard quick-action form modal */}
       <RuntimeFormModal
-        open={quickActionForm !== null}
+        open={quickActionForm !== null && quickActionUsable}
         onOpenChange={(open) => !open && setQuickActionForm(null)}
         staticConfig={quickActionForm?.form ?? journalEntryFormConfig}
         moduleId="accounting"

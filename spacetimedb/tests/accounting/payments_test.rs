@@ -89,8 +89,7 @@ pub fn test_reconciled_payment_unwind_and_cancel_exact_effect(
         .id()
         .find(&invoice_id)
         .ok_or("paid invoice missing")?;
-    if paid_invoice.amount_residual.abs() > 0.01
-        || paid_invoice.payment_state != PaymentState::Paid
+    if paid_invoice.amount_residual.abs() > 0.01 || paid_invoice.payment_state != PaymentState::Paid
     {
         return Err("invoice did not settle before unwind".to_string());
     }
@@ -113,17 +112,22 @@ pub fn test_reconciled_payment_unwind_and_cancel_exact_effect(
             ) && line.matching_number.is_some()
         })
         .ok_or("allocated invoice line missing")?;
-    ctx.db.account_move_line().id().update(
-        crate::accounting::journal_entries::AccountMoveLine {
+    ctx.db
+        .account_move_line()
+        .id()
+        .update(crate::accounting::journal_entries::AccountMoveLine {
             matching_number: Some("MATCH-FOREIGN-OWNER".to_string()),
             ..allocated_line.clone()
-        },
-    );
+        });
     let stale_cancel = cancel_payment(ctx, fixture.organization_id, payment_id);
     ctx.db.account_move_line().id().update(allocated_line);
     match stale_cancel {
         Err(error) if error.contains("another payment") => {}
-        Err(error) => return Err(format!("unexpected stale-owner cancellation error: {error}")),
+        Err(error) => {
+            return Err(format!(
+                "unexpected stale-owner cancellation error: {error}"
+            ))
+        }
         Ok(()) => return Err("cancellation overwrote a foreign allocation owner".to_string()),
     }
     let after_stale_cancel = ctx
@@ -158,15 +162,14 @@ pub fn test_reconciled_payment_unwind_and_cancel_exact_effect(
         .id()
         .find(&invoice_id)
         .ok_or("invoice missing before cross-company test")?;
-    ctx.db.account_move().id().update(crate::accounting::journal_entries::AccountMove {
-        company_id: sibling_company_id,
-        ..canonical_invoice.clone()
-    });
-    let cross_company = unregister_payment_allocations(
-        ctx,
-        fixture.organization_id,
-        payment_id,
-    );
+    ctx.db
+        .account_move()
+        .id()
+        .update(crate::accounting::journal_entries::AccountMove {
+            company_id: sibling_company_id,
+            ..canonical_invoice.clone()
+        });
+    let cross_company = unregister_payment_allocations(ctx, fixture.organization_id, payment_id);
     ctx.db.account_move().id().update(canonical_invoice);
     match cross_company {
         Err(error) if error.contains("scope") => {}
@@ -198,12 +201,9 @@ pub fn test_reconciled_payment_unwind_and_cancel_exact_effect(
         .id()
         .find(&membership.role_id)
         .ok_or("unwind authorization role missing")?;
-    let caller_profile = find_user_profile_for_organization(
-        ctx,
-        ctx.sender(),
-        fixture.organization_id,
-    )
-    .ok_or("unwind authorization profile missing")?;
+    let caller_profile =
+        find_user_profile_for_organization(ctx, ctx.sender(), fixture.organization_id)
+            .ok_or("unwind authorization profile missing")?;
     ctx.db.role().id().update(Role {
         permissions: vec![],
         ..owner_role.clone()
@@ -351,7 +351,7 @@ pub fn test_reconciled_payment_unwind_and_cancel_exact_effect(
     {
         return Err("reconciled cancellation did not unwind before reversal".to_string());
     }
-    let reversal_count = ctx
+    let reversal_moves: Vec<_> = ctx
         .db
         .account_move()
         .iter()
@@ -363,11 +363,15 @@ pub fn test_reconciled_payment_unwind_and_cancel_exact_effect(
                     == Some(payment_move_id)
             })
         })
-        .count();
-    if reversal_count != 1 {
+        .collect();
+    if reversal_moves.len() != 1 {
         return Err(format!(
-            "reconciled cancellation created {reversal_count} reversal moves"
+            "reconciled cancellation created {} reversal moves",
+            reversal_moves.len()
         ));
+    }
+    if cancelled.reversal_move_id != Some(reversal_moves[0].id) {
+        return Err("reconciled cancellation did not expose its exact reversal".to_string());
     }
     Ok(())
 }
@@ -899,11 +903,16 @@ pub fn test_cancel_payment_audited(ctx: &ReducerContext) -> Result<(), String> {
             })
         })
         .collect();
-    if reversal_moves.len() != 1 || reversal_moves[0].state != crate::types::AccountMoveState::Posted {
+    if reversal_moves.len() != 1
+        || reversal_moves[0].state != crate::types::AccountMoveState::Posted
+    {
         return Err(format!(
             "Expected one posted reversal move, got {}",
             reversal_moves.len()
         ));
+    }
+    if cancelled.reversal_move_id != Some(reversal_moves[0].id) {
+        return Err("Cancelled payment does not identify its exact reversal move".to_string());
     }
     let reversal_lines: Vec<_> = ctx
         .db
@@ -946,6 +955,15 @@ pub fn test_cancel_payment_audited(ctx: &ReducerContext) -> Result<(), String> {
         .count();
     if reversal_count_after_replay != 1 {
         return Err("Cancellation replay duplicated the reversal move".to_string());
+    }
+    let after_replay = ctx
+        .db
+        .account_payment()
+        .id()
+        .find(&payment_id)
+        .ok_or("Payment missing after cancellation replay")?;
+    if after_replay.reversal_move_id != cancelled.reversal_move_id {
+        return Err("Cancellation replay changed the canonical reversal identity".to_string());
     }
 
     let has_cancel_audit = ctx

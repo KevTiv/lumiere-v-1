@@ -629,7 +629,7 @@
         "id": "spacetimedb-sats-json",
         "version": 1
       },
-      "evidence": "accounting/payments.rs: reducer checks current state or duplicate before transition"
+      "evidence": "accounting/payments.rs: reducer atomically unwinds owned allocations, writes one posted reversing move, stores its exact reversal_move_id on account_payment, then rejects replay"
     },
     "cancel_picking_batch": {
       "semantic_kind": "command",
@@ -1740,6 +1740,16 @@
         "version": 1
       },
       "evidence": "sales/pos_config.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "create_manual_account_invoice": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/manual_invoices.rs: canonical accounting receipt returns before duplicate invoice and line writes"
     },
     "create_opportunity": {
       "semantic_kind": "command",

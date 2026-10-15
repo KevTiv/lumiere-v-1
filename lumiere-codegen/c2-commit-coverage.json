@@ -30,6 +30,13 @@
       "change_constructors": ["upsert_stdb_row"]
     },
     {
+      "source": "spacetimedb/src/core/migrations.rs",
+      "function": "apply_org_migration",
+      "operation": "apply_org_migrations",
+      "operation_id": "erp.apply_org_migrations",
+      "change_constructors": ["upsert_stdb_row"]
+    },
+    {
       "source": "spacetimedb/src/crm/opportunities.rs",
       "function": "convert_opportunity_to_sale_order",
       "operation": "convert_opportunity_to_sale_order",

@@ -457,6 +457,7 @@ fn post_ledger_payment(
         company_id,
         name: None,
         move_id: None,
+        reversal_move_id: None,
         payment_type,
         partner_type: transaction.partner_type.clone(),
         partner_id: transaction.partner_id,

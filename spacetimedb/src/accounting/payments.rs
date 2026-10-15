@@ -48,8 +48,10 @@ pub struct AccountPayment {
     pub id: u64,
     pub organization_id: u64,
     pub company_id: u64,
-    pub name: Option<String>,      // "PAY-0001" — set on post
-    pub move_id: Option<u64>,      // Linked AccountMove (set on post)
+    pub name: Option<String>, // "PAY-0001" — set on post
+    pub move_id: Option<u64>, // Linked AccountMove (set on post)
+    /// Exact posted reversal created by `cancel_payment`; at most one per payment.
+    pub reversal_move_id: Option<u64>,
     pub payment_type: PaymentType, // InBound (customer pays) | OutBound (we pay supplier)
     pub partner_type: PartnerType, // Customer | Supplier
     pub partner_id: u64,
@@ -510,6 +512,7 @@ pub fn create_payment(
         company_id: params.company_id,
         name: None,
         move_id: None,
+        reversal_move_id: None,
         payment_type: params.payment_type,
         partner_type: params.partner_type,
         partner_id: params.partner_id,
@@ -966,9 +969,9 @@ fn unwind_payment_allocations(
         .collect();
     if payment_lines.is_empty()
         || payment_lines.iter().any(|line| {
-            line.matching_number.as_deref().is_some_and(|owner| {
-                !accepted_matching_numbers.contains(&owner)
-            })
+            line.matching_number
+                .as_deref()
+                .is_some_and(|owner| !accepted_matching_numbers.contains(&owner))
         })
     {
         return Err("Payment clearing lines do not match its recorded allocations".to_string());
@@ -1048,10 +1051,7 @@ fn unwind_payment_allocations(
                 new_values: Some(
                     serde_json::json!({ "amount_residual": restored_residual }).to_string(),
                 ),
-                changed_fields: vec![
-                    "payment_state".to_string(),
-                    "amount_residual".to_string(),
-                ],
+                changed_fields: vec!["payment_state".to_string(), "amount_residual".to_string()],
                 metadata: None,
             },
         );
@@ -1184,6 +1184,7 @@ pub fn cancel_payment(
     let old_state = format!("{:?}", payment.state);
     ctx.db.account_payment().id().update(AccountPayment {
         state: PaymentState::Reversed,
+        reversal_move_id,
         ..payment
     });
     write_audit_log_v2(

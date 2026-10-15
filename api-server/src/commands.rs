@@ -760,7 +760,15 @@ pub(crate) fn validate_reducer_scope(
         for company_path in company_scope_paths {
             let mut value = args.get(company_path.parameter_position);
             for segment in company_path.path {
-                value = value.and_then(|value| value.get(*segment));
+                value = match value {
+                    Some(value) => nested_contract_field(
+                        contract.name,
+                        value,
+                        segment,
+                        company_path.parameter_position,
+                    )?,
+                    None => None,
+                };
             }
             let Some(value) = value else {
                 if company_path.required {
@@ -792,6 +800,34 @@ pub(crate) fn validate_reducer_scope(
         )));
     }
     Ok(company_ids)
+}
+
+/// Generated TypeScript commands serialize nested fields as lower camel case,
+/// while contract scope metadata deliberately retains the canonical Rust/SQL
+/// snake-case field name. Accept either representation, but fail closed when
+/// a caller supplies both spellings because scope authority would otherwise be
+/// ambiguous.
+fn nested_contract_field<'a>(
+    reducer_name: &str,
+    value: &'a Value,
+    snake_name: &str,
+    parameter_position: usize,
+) -> Result<Option<&'a Value>, ApiError> {
+    let Some(fields) = value.as_object() else {
+        return Ok(None);
+    };
+    let camel_name = snake_to_lower_camel(snake_name);
+    let snake_value = fields.get(snake_name);
+    let camel_value = (camel_name != snake_name)
+        .then(|| fields.get(&camel_name))
+        .flatten();
+    if snake_value.is_some() && camel_value.is_some() {
+        return Err(ApiError::Unprocessable(format!(
+            "Reducer '{}' received both '{}' and '{}' for company scope at argument {}",
+            reducer_name, snake_name, camel_name, parameter_position
+        )));
+    }
+    Ok(snake_value.or(camel_value))
 }
 
 fn decode_company_id(
@@ -914,6 +950,24 @@ mod tests {
             validate_reducer_scope(
                 contract,
                 &[json!(7), json!({ "company_id": { "none": [] } })],
+                7,
+            ),
+            Err(ApiError::Unprocessable(_))
+        ));
+    }
+
+    #[test]
+    fn manual_invoice_scope_accepts_generated_camel_case_and_rejects_ambiguity() {
+        let contract = session_operation_contract("erp.create_manual_account_invoice")
+            .expect("manual invoice operation");
+        assert_eq!(
+            validate_reducer_scope(contract, &[json!(7), json!({ "companyId": 42 })], 7).unwrap(),
+            vec![42]
+        );
+        assert!(matches!(
+            validate_reducer_scope(
+                contract,
+                &[json!(7), json!({ "company_id": 42, "companyId": 42 })],
                 7,
             ),
             Err(ApiError::Unprocessable(_))

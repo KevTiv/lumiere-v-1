@@ -759,10 +759,13 @@
     "dashboard": {
       "accountsReceivable": "Accounts Receivable",
       "accountsPayable": "Accounts Payable",
+      "bankOpeningBalances": "Bank opening balances",
       "cashBalance": "Cash Balance",
       "revenueMTD": "Revenue MTD",
       "revenue": "Revenue",
       "invoicesIssued": "Invoices Issued",
+      "keyAccountOpeningBalances": "Key account opening balances",
+      "postedInvoiceTotal": "Posted invoice total",
       "paymentsReceived": "Payments Received"
     },
     "accounts": {
@@ -834,11 +837,13 @@
         },
         "bankRecon": {
           "title": "Bank reconciliation reviewed",
-          "description": "{{count}} unreconciled bank statement line(s) remaining."
+          "description": "{{count}} unreconciled bank statement line(s) remaining.",
+          "scopeUnavailable": "Bank statement ownership cannot be resolved for this period."
         },
         "draftMoves": {
           "title": "Draft moves cleared",
-          "description": "{{count}} draft journal entry(ies) still open."
+          "description": "{{count}} draft journal entry(ies) still open.",
+          "scopeUnavailable": "Journal entry company or period ownership is unavailable."
         },
         "trialBalance": {
           "title": "Trial balance generated",
@@ -850,8 +855,13 @@
         },
         "closePeriod": {
           "title": "Close accounting period",
-          "description": "{{count}} period(s) still open — close when ready."
+          "description": "{{count}} period(s) still open — close when ready.",
+          "selectPeriod": "Select an accounting period to review close readiness."
         }
+      },
+      "targetPeriod": {
+        "label": "Accounting period",
+        "placeholder": "Select a period to evaluate"
       }
     },
     "chartStructure": {

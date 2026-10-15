@@ -48,6 +48,7 @@ pub(crate) mod idempotency;
 pub mod intercompany;
 pub mod journal_entries;
 pub(crate) mod line_params;
+pub mod manual_invoices;
 pub(crate) mod money;
 pub mod ownership_backfill;
 pub mod payment_management;

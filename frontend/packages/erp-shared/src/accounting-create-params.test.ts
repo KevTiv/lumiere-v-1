@@ -3,11 +3,99 @@ import test from "node:test"
 
 import {
   accountPeriodStateTag,
+  manualAccountInvoiceParamsToJson,
   paymentParamsToJson,
+  toCreateManualAccountInvoiceParams,
   toCreatePaymentParamsFromManualForm,
   toUpdateAccountTaxParams,
   updateAccountTaxParamsForWire,
 } from "./accounting-create-params"
+
+test("manual invoice params normalize the modal payload into the generated input", () => {
+  const params = toCreateManualAccountInvoiceParams({
+    idempotencyKey: "0123456789abcdef0123456789abcdef",
+    companyId: "42",
+    moveType: { tag: "OutInvoice" },
+    journalId: "7",
+    partnerId: "11",
+    counterpartAccountId: "13",
+    currencyId: "1",
+    date: "2026-10-15",
+    invoiceDate: "2026-10-15",
+    invoiceDateDue: "2026-11-15",
+    invoicePaymentTermId: "3",
+    ref: " INV-42 ",
+    lines: [{
+      accountId: "19",
+      name: " Consulting ",
+      quantity: "2",
+      priceUnit: "125",
+      discount: "10",
+      taxIds: ["5"],
+      productId: "23",
+    }],
+  })
+
+  assert.ok(params)
+  assert.equal(params.companyId, 42n)
+  assert.deepEqual(params.moveType, { tag: "OutInvoice" })
+  assert.equal(params.invoiceDate.microsSinceUnixEpoch, BigInt(Date.parse("2026-10-15")) * 1000n)
+  assert.equal(params.ref, "INV-42")
+  assert.deepEqual(params.lines, [{
+    accountId: 19n,
+    name: "Consulting",
+    quantity: 2,
+    priceUnit: 125,
+    discount: 10,
+    taxIds: [5n],
+    productId: 23n,
+  }])
+
+  const wire = manualAccountInvoiceParamsToJson(params)
+  assert.equal(wire.company_id, 42)
+  assert.equal(wire.companyId, undefined)
+  assert.deepEqual(wire.move_type, { outInvoice: [] })
+  assert.deepEqual(wire.invoice_date_due, {
+    some: {
+      __timestamp_micros_since_unix_epoch__: Date.parse("2026-11-15") * 1000,
+    },
+  })
+  assert.deepEqual(wire.lines, [{
+    account_id: 19,
+    name: "Consulting",
+    quantity: 2,
+    price_unit: 125,
+    discount: 10,
+    tax_ids: [5],
+    product_id: { some: 23 },
+  }])
+})
+
+test("manual invoice params reject invalid identity, money, and line references", () => {
+  const valid = {
+    idempotencyKey: "0123456789abcdef0123456789abcdef",
+    companyId: "42",
+    moveType: "InInvoice",
+    journalId: "7",
+    partnerId: "11",
+    counterpartAccountId: "13",
+    currencyId: "1",
+    date: "2026-10-15",
+    invoiceDate: "2026-10-15",
+    lines: [{ accountId: "19", name: "Goods", quantity: 1, priceUnit: 25, discount: 0, taxIds: [] }],
+  }
+
+  assert.equal(toCreateManualAccountInvoiceParams({ ...valid, idempotencyKey: "bad" }), null)
+  assert.equal(toCreateManualAccountInvoiceParams({ ...valid, lines: [] }), null)
+  assert.equal(toCreateManualAccountInvoiceParams({
+    ...valid,
+    lines: [{ ...valid.lines[0], priceUnit: -1 }],
+  }), null)
+  assert.equal(toCreateManualAccountInvoiceParams({
+    ...valid,
+    lines: [{ ...valid.lines[0], taxIds: ["bad"] }],
+  }), null)
+})
 
 test("manual payment params require and encode the selected business date", () => {
   const params = toCreatePaymentParamsFromManualForm(
