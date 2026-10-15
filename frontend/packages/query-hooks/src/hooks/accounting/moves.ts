@@ -16,6 +16,7 @@ import type {
 } from "@lumiere/stdb/resource-reads"
 import { createStdbSdk } from "@lumiere/stdb/sdk"
 import { apiFetch, fetchQueryList } from "../../http"
+import { dispatchNamedOperation } from "../../operation-dispatch"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import {
   paymentParamsToJson,
@@ -204,15 +205,14 @@ export function useCreateManualAccountInvoice(organizationId: number) {
       executeOperationWithCanonicalReadback({
         resolveEffect: () =>
           readManualAccountInvoiceEffect(params.companyId, params.idempotencyKey),
-        dispatch: async () => {
-          const { urlPath, init } = stdbBffCommandPost("create_manual_account_invoice", {
+        dispatch: () =>
+          dispatchNamedOperation(
+            "create_manual_account_invoice",
+            {
             params,
-          })
-          return decodeOperationDispatch(
-            await apiFetch(urlPath, init),
+            },
             "Failed to create manual invoice",
-          )
-        },
+          ),
         afterDispatch: () =>
           invalidateStdbQueryResources(
             qc,
