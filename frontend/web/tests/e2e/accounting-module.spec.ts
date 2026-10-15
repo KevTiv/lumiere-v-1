@@ -62,7 +62,7 @@ async function openAndAssertAccountingTab(page: Page, tabId: AccountingTabId) {
     tabId === "dashboard" ? null : tabId,
   )
   await expect(tab).toHaveAttribute("aria-selected", "true")
-  await expect(page.locator('[role="tabpanel"]:visible')).toHaveCount(1)
+  await expect(page.locator('[data-testid^="module-panel-accounting-"]:visible')).toHaveCount(1)
   await expect(page.getByTestId(`module-panel-accounting-${tabId}`)).toBeVisible()
 }
 

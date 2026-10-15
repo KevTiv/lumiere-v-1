@@ -79,15 +79,15 @@ test.describe(
       })
 
       const params = requestParams(dispatch.request())
-      expect(params.idempotencyKey).toBe(expectedRequestKey)
-      expect(scalarQueryId(params.companyId)).toBe(companyId)
+      expect(params.idempotency_key).toBe(expectedRequestKey)
+      expect(scalarQueryId(params.company_id)).toBe(companyId)
       expect(params.lines).toEqual([
         expect.objectContaining({
           name: description,
           quantity: 1,
-          priceUnit: 90,
+          price_unit: 90,
           discount: 0,
-          taxIds: [],
+          tax_ids: [],
         }),
       ])
 
