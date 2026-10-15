@@ -36,12 +36,27 @@ type ScopedCount = {
   count: number
 }
 
-function rowCompanyId(row: Record<string, unknown>): string | null {
+type PeriodCloseLookupRow = {
+  readonly id?: unknown
+  readonly companyId?: unknown
+  readonly company_id?: unknown
+  readonly statementId?: unknown
+  readonly statement_id?: unknown
+  readonly date?: unknown
+  readonly dateFrom?: unknown
+  readonly date_from?: unknown
+  readonly dateTo?: unknown
+  readonly date_to?: unknown
+  readonly isReconciled?: unknown
+  readonly is_reconciled?: unknown
+}
+
+function rowCompanyId(row: PeriodCloseLookupRow): string | null {
   const raw = row.companyId ?? row.company_id
   return raw == null || raw === "" ? null : String(raw)
 }
 
-function rowId(row: Record<string, unknown>, ...keys: string[]): string | null {
+function rowId(row: PeriodCloseLookupRow, ...keys: (keyof PeriodCloseLookupRow)[]): string | null {
   for (const key of keys) {
     const raw = row[key]
     if (raw != null && raw !== "") return String(raw)
@@ -49,7 +64,7 @@ function rowId(row: Record<string, unknown>, ...keys: string[]): string | null {
   return null
 }
 
-function rowDate(row: Record<string, unknown>, ...keys: string[]): Date | null {
+function rowDate(row: PeriodCloseLookupRow, ...keys: (keyof PeriodCloseLookupRow)[]): Date | null {
   for (const key of keys) {
     const value = row[key]
     if (value != null) return kpiDate(value)
@@ -57,7 +72,7 @@ function rowDate(row: Record<string, unknown>, ...keys: string[]): Date | null {
   return null
 }
 
-function rowIsReconciled(row: Record<string, unknown>): boolean {
+function rowIsReconciled(row: PeriodCloseLookupRow): boolean {
   return row.isReconciled === true || row.is_reconciled === true
 }
 
@@ -67,7 +82,7 @@ function isInPeriod(date: Date, dateFrom: Date, dateTo: Date): boolean {
 }
 
 function reportCoversPeriod(
-  row: Record<string, unknown>,
+  row: PeriodCloseLookupRow,
   dateFrom: Date,
   dateTo: Date,
 ): boolean {
@@ -130,7 +145,7 @@ export interface PeriodCloseChecklistProps {
   fiscalYears: Record<string, unknown>[]
   accountPeriods: Record<string, unknown>[]
   moves: Record<string, unknown>[]
-  bankStatements: Record<string, unknown>[]
+  bankStatements: PeriodCloseLookupRow[]
   bankStatementLines: Record<string, unknown>[]
   financialReports: Record<string, unknown>[]
   onNavigateToTab: (tabId: string) => void
@@ -204,7 +219,7 @@ export function PeriodCloseChecklist({
 
   const bankLines = useMemo<ScopedCount>(() => {
     if (!targetRange) return { available: false, count: 0 }
-    const statementsById = new Map<string, Record<string, unknown>[]>()
+    const statementsById = new Map<string, PeriodCloseLookupRow[]>()
     for (const statement of bankStatements) {
       const statementId = rowId(statement, "id")
       if (statementId == null) continue

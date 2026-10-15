@@ -94,6 +94,12 @@ export interface ManualAccountInvoiceEffectRef extends CanonicalRecordRef {
 export type CreateManualAccountInvoiceParams =
   StdbNamedOperationInput<"create_manual_account_invoice">["params"]
 
+type ManualAccountInvoiceEffectPayload = {
+  readonly resource?: unknown
+  readonly id?: unknown
+  readonly href?: unknown
+}
+
 export function decodeManualAccountInvoiceEffect(value: unknown): ManualAccountInvoiceEffectRef | null {
   if (value == null || typeof value !== "object" || Array.isArray(value)) return null
   const data = (value as { data?: unknown }).data
@@ -101,7 +107,7 @@ export function decodeManualAccountInvoiceEffect(value: unknown): ManualAccountI
   if (typeof data !== "object" || Array.isArray(data)) {
     throw new Error("Manual invoice result response is malformed")
   }
-  const row = data as Record<string, unknown>
+  const row = data as ManualAccountInvoiceEffectPayload
   if (
     row.resource !== "account-moves" ||
     typeof row.id !== "string" ||

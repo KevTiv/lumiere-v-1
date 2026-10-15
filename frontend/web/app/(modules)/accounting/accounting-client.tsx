@@ -475,6 +475,71 @@ function copyAsRecords<T extends object>(rows: readonly T[]): Record<string, unk
   return rows.map(copyAsRecord)
 }
 
+type ManualInvoiceAccountLookup = {
+  readonly id?: unknown
+  readonly code?: unknown
+  readonly name?: unknown
+  readonly companyId?: unknown
+  readonly company_id?: unknown
+  readonly deprecated?: unknown
+  readonly isOffBalance?: unknown
+  readonly internalType?: unknown
+  readonly internalGroup?: unknown
+  readonly allowedJournalIds?: unknown
+}
+
+type ManualInvoicePartnerLookup = {
+  readonly id?: unknown
+  readonly name?: unknown
+  readonly displayName?: unknown
+  readonly companyId?: unknown
+  readonly company_id?: unknown
+  readonly deletedAt?: unknown
+  readonly deleted_at?: unknown
+  readonly isCustomer?: unknown
+  readonly customerRank?: unknown
+  readonly isVendor?: unknown
+  readonly supplierRank?: unknown
+}
+
+type ManualInvoiceJournalLookup = {
+  readonly id?: unknown
+  readonly name?: unknown
+  readonly code?: unknown
+  readonly companyId?: unknown
+  readonly company_id?: unknown
+  readonly active?: unknown
+  readonly type?: unknown
+  readonly type_?: unknown
+  readonly currencyId?: unknown
+  readonly currency_id?: unknown
+}
+
+type ManualInvoiceTaxGroupLookup = {
+  readonly id?: unknown
+  readonly taxPayableAccountId?: unknown
+  readonly tax_payable_account_id?: unknown
+  readonly taxReceivableAccountId?: unknown
+  readonly tax_receivable_account_id?: unknown
+}
+
+type ManualInvoiceTaxLookup = {
+  readonly id?: unknown
+  readonly name?: unknown
+  readonly companyId?: unknown
+  readonly company_id?: unknown
+  readonly active?: unknown
+  readonly typeTaxUse?: unknown
+  readonly type_tax_use?: unknown
+  readonly priceInclude?: unknown
+  readonly hasNegativeFactor?: unknown
+  readonly amount?: unknown
+  readonly amountType?: unknown
+  readonly amount_type?: unknown
+  readonly taxGroupId?: unknown
+  readonly tax_group_id?: unknown
+}
+
 function moveTypeTag(row: Record<string, unknown>): string {
   return enumTag(row.moveType ?? row.move_type)
 }
@@ -1053,12 +1118,12 @@ function AccountingClientReady({
 
   const manualInvoiceOptions = useMemo(() => {
     const companyKey = String(operatingCompanyId)
-    const accountLabel = (row: Record<string, unknown>) =>
+    const accountLabel = (row: ManualInvoiceAccountLookup) =>
       `${String(row.code ?? "").trim() ? `${String(row.code)} — ` : ""}${String(row.name ?? row.id ?? "")}`
-    const allowedJournals = (row: Record<string, unknown>) =>
+    const allowedJournals = (row: ManualInvoiceAccountLookup) =>
       Array.isArray(row.allowedJournalIds) ? row.allowedJournalIds.map(String) : []
     const accountsFor = (kind: "invoice" | "bill", counterpart: boolean) =>
-      (accounts as Record<string, unknown>[])
+      (accounts as ManualInvoiceAccountLookup[])
         .filter((row) => String(row.companyId ?? row.company_id ?? "") === companyKey)
         .filter((row) => row.deprecated !== true && row.isOffBalance !== true)
         .filter((row) => enumTag(counterpart ? row.internalType : row.internalGroup) === (
@@ -1066,7 +1131,7 @@ function AccountingClientReady({
         ))
         .map((row) => ({ value: String(row.id), label: accountLabel(row), allowedJournalIds: allowedJournals(row) }))
     const partnersFor = (kind: "invoice" | "bill") =>
-      (contacts as Record<string, unknown>[])
+      (contacts as ManualInvoicePartnerLookup[])
         .filter((row) => row.deletedAt == null && row.deleted_at == null)
         .filter((row) => {
           const rowCompany = row.companyId ?? row.company_id
@@ -1077,7 +1142,7 @@ function AccountingClientReady({
           : row.isVendor === true || Number(row.supplierRank ?? 0) > 0)
         .map((row) => ({ value: String(row.id), label: String(row.displayName ?? row.name ?? row.id) }))
     const journalsFor = (kind: "invoice" | "bill") =>
-      (journals as Record<string, unknown>[])
+      (journals as ManualInvoiceJournalLookup[])
         .filter((row) => String(row.companyId ?? row.company_id ?? "") === companyKey && row.active !== false)
         .filter((row) => enumTag(row.type ?? row.type_) === (kind === "invoice" ? "Sale" : "Purchase"))
         .map((row) => ({
@@ -1086,10 +1151,10 @@ function AccountingClientReady({
           currencyId: String(row.currencyId ?? row.currency_id ?? defaultCurrencyId),
         }))
     const taxGroupById = new Map(
-      (taxGroups as Record<string, unknown>[]).map((row) => [String(row.id), row]),
+      (taxGroups as ManualInvoiceTaxGroupLookup[]).map((row) => [String(row.id), row]),
     )
     const taxesFor = (kind: "invoice" | "bill") =>
-      (taxes as Record<string, unknown>[])
+      (taxes as ManualInvoiceTaxLookup[])
         .filter((row) => String(row.companyId ?? row.company_id ?? "") === companyKey && row.active !== false)
         .filter((row) => [kind === "invoice" ? "Sale" : "Purchase", "None"].includes(enumTag(row.typeTaxUse ?? row.type_tax_use)))
         .filter((row) => row.priceInclude !== true && row.hasNegativeFactor !== true && Number(row.amount ?? 0) >= 0)
