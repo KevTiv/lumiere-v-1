@@ -168,16 +168,18 @@ async fn exercise_manufacturing_cost_projection_upgrade(pool: &Pool) -> Result<(
     ensure!(migration_count(pool).await? == prefix_length as i64);
     let previous_history = applied_migration_history(pool).await?;
     let previous_tables = public_table_names(pool).await?;
-    let expected_cost_tables = [
+    let expected_new_tables = [
         "mrp_production_cost",
         "mrp_productivity_cost",
         "mrp_valuation_config",
         "mrp_workcenter_cost_rate",
+        "purchase_order_creation_operation",
+        "purchase_receipt_operation",
     ];
-    for table in expected_cost_tables {
+    for table in expected_new_tables {
         ensure!(
             !relation_exists(pool, table).await?,
-            "cost table {table} predates migration 14"
+            "table {table} predates its catalog migration"
         );
     }
 
@@ -196,7 +198,7 @@ async fn exercise_manufacturing_cost_projection_upgrade(pool: &Pool) -> Result<(
         .filter(|table| !previous_tables.contains(table))
         .collect();
     ensure!(
-        added_tables == expected_cost_tables,
+        added_tables == expected_new_tables,
         "migration 13 upgrade produced unexpected new tables: {added_tables:?}"
     );
 
