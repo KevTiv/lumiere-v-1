@@ -1,6 +1,6 @@
 "use client"
 
-import { useLayoutEffect, useMemo, useState } from "react"
+import { useLayoutEffect, useMemo, useRef, useState } from "react"
 import type { CreateManualAccountInvoiceParams } from "@lumiere/query-hooks/hooks/accounting"
 import type { CanonicalRecordRef, OperationEffectOutcome } from "@lumiere/query-hooks/hooks/operation-effect"
 import { toCreateManualAccountInvoiceParams } from "@lumiere/erp-shared/accounting-create-params"
@@ -14,6 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea"
 import { isCustomField } from "../forms/config/types"
 import { useFormConfiguration } from "../forms/hooks/use-form-config"
+import { useUnsavedChangesGuard } from "../forms/use-unsaved-changes-guard"
 
 export interface ManualInvoiceOption { value: string; label: string }
 export interface ManualInvoiceJournalOption extends ManualInvoiceOption { currencyId: string }
@@ -27,6 +28,48 @@ export interface ManualInvoiceProductOption extends ManualInvoiceOption {
   price: number
   accountId?: string
   taxIds: string[]
+}
+
+export interface InvoiceTaxOption extends ManualInvoiceOption {
+  rate: number
+  priceIncluded?: boolean
+}
+
+export interface InvoiceFormLine {
+  id: string
+  accountId: bigint
+  description: string
+  quantity: number
+  unitPrice: number
+  taxId?: bigint
+  taxRate: number
+  taxPriceIncluded: boolean
+  discount: number
+  amountUntaxed: number
+  amountTax: number
+  amountTotal: number
+}
+
+export interface InvoiceFormPayload {
+  [key: string]: unknown
+  type: "invoice-draft"
+  idempotencyKey: string
+  moveType: "OutInvoice" | "InInvoice"
+  date: string
+  invoiceDate: string
+  invoiceDateDue?: string
+  dueDate?: string
+  partnerId: bigint
+  invoicePartnerDisplayName: string
+  journalId: bigint
+  currencyId: bigint
+  counterpartAccountId: bigint
+  lineItems: InvoiceFormLine[]
+  amountUntaxed: number
+  amountTax: number
+  amountTotal: number
+  amountResidual: number
+  metadata: string
 }
 
 interface LineItem {
@@ -47,7 +90,7 @@ function taxAmount(subtotal: number, tax?: ManualInvoiceTaxOption): number {
   return subtotal * tax.amount / 100
 }
 
-interface CreateInvoiceModalProps {
+interface ReleasedCreateInvoiceModalProps {
   open: boolean
   kind?: "invoice" | "bill"
   companyId: bigint
@@ -66,12 +109,12 @@ interface CreateInvoiceModalProps {
   formId?: string
 }
 
-export function CreateInvoiceModal({
+function ReleasedCreateInvoiceModal({
   open, kind = "invoice", companyId, onClose, onSave, onCheckStatus, onResolved,
   journalOptions, partnerOptions, counterpartAccountOptions, lineAccountOptions,
   taxOptions = [], productOptions = [], paymentTermOptions = [], organizationId,
   formId = kind === "bill" ? "new-bill" : "new-invoice",
-}: CreateInvoiceModalProps) {
+}: ReleasedCreateInvoiceModalProps) {
   const { t } = useTranslation()
   const today = new Date().toISOString().slice(0, 10)
   const copyKey = kind === "bill" ? "newBill" : "newInvoice"
@@ -147,14 +190,24 @@ export function CreateInvoiceModal({
     const base = line.quantity * line.unitPrice * (1 - line.discount / 100)
     return sum + taxAmount(base, taxOptions.find((option) => option.value === line.taxId))
   }, 0)
-  const money = (value: number) => new Intl.NumberFormat("en-US", {
-    style: "currency", currency: "USD",
+  const money = (value: number) => new Intl.NumberFormat(undefined, {
+    maximumFractionDigits: 2,
   }).format(value)
   const requiredCustomOk = customFields.every((field) =>
     !field.validation.required || String(customValues[field.fieldId] ?? "").trim() !== "")
+  const validInvoiceDate = invoiceDate !== "" && !Number.isNaN(Date.parse(invoiceDate))
+  const validDueDate = dueDate === "" || (
+    !Number.isNaN(Date.parse(dueDate)) && Date.parse(dueDate) >= Date.parse(invoiceDate)
+  )
   const canSave = !locked && !saving && Boolean(journal && partnerId && counterpartAccountId)
     && lineItems.every((line) => line.description.trim() && line.accountId && line.quantity > 0 && line.unitPrice >= 0)
-    && requiredCustomOk
+    && validInvoiceDate && validDueDate && requiredCustomOk
+  const dirty = partnerId !== "" || invoiceDate !== today || dueDate !== "" || paymentTermId !== ""
+    || reference !== "" || paymentReference !== "" || notes !== ""
+    || Object.values(customValues).some((value) => value !== "") || lineItems.length !== 1
+    || lineItems.some((line) => line.description !== "" || line.quantity !== 1 || line.unitPrice !== 0
+      || line.taxId !== "" || line.discount !== 0 || line.productId !== "")
+  const navigationDialog = useUnsavedChangesGuard(open && dirty, open && saving)
 
   const buildParams = (): CreateManualAccountInvoiceParams => {
     if (!journal) throw new Error("Select an accounting journal")
@@ -227,12 +280,16 @@ export function CreateInvoiceModal({
           <FieldSelect label={t(`accounting.forms.${copyKey}.fields.journal`)} value={journalId} onChange={setJournalId} options={journalOptions} />
           <FieldSelect label={kind === "bill" ? "Payable account" : "Receivable account"} value={counterpartAccountId} onChange={setCounterpartAccountId} options={counterpartOptions} />
           <div className="space-y-2"><Label>Currency ID</Label><Input value={journal?.currencyId ?? ""} readOnly /></div>
-          <div className="space-y-2"><Label>{kind === "bill" ? "Bill date" : "Invoice date"}</Label><Input type="date" value={invoiceDate} onChange={(event) => setInvoiceDate(event.target.value)} /></div>
-          <div className="space-y-2"><Label>{t(`accounting.forms.${copyKey}.fields.dueDate`)}</Label><Input type="date" value={dueDate} onChange={(event) => setDueDate(event.target.value)} /></div>
+          <div className="space-y-2"><Label htmlFor="create-invoice-date">{kind === "bill" ? "Bill date" : "Invoice Date"}</Label><Input id="create-invoice-date" type="date" value={invoiceDate} onChange={(event) => setInvoiceDate(event.target.value)} /></div>
+          <div className="space-y-2"><Label htmlFor="create-invoice-due-date">{t(`accounting.forms.${copyKey}.fields.dueDate`)}</Label><Input id="create-invoice-due-date" type="date" min={invoiceDate} value={dueDate} onChange={(event) => setDueDate(event.target.value)} /></div>
           <FieldSelect label="Payment term (optional)" value={paymentTermId || NONE} onChange={(value) => setPaymentTermId(value === NONE ? "" : value)} options={[{ value: NONE, label: "None" }, ...paymentTermOptions]} />
           <div className="space-y-2"><Label>Reference</Label><Input value={reference} onChange={(event) => setReference(event.target.value)} /></div>
           <div className="space-y-2"><Label>Payment reference</Label><Input value={paymentReference} onChange={(event) => setPaymentReference(event.target.value)} /></div>
         </div>
+        {journalOptions.length === 0 ? <ReadinessMessage>{kind === "bill" ? "Configure an active purchase journal before recording a bill." : "Configure an active sales journal before creating an invoice."}</ReadinessMessage> : null}
+        {partnerOptions.length === 0 ? <ReadinessMessage>{kind === "bill" ? "Add an active vendor before recording a bill." : "Add an active customer before creating an invoice."}</ReadinessMessage> : null}
+        {counterpartOptions.length === 0 ? <ReadinessMessage>{kind === "bill" ? "Configure an active payable account before recording a bill." : "Configure an active receivable account before creating an invoice."}</ReadinessMessage> : null}
+        {commercialOptions.length === 0 ? <ReadinessMessage>{kind === "bill" ? "Configure an active expense account before recording a bill." : "Configure an active income account before creating an invoice."}</ReadinessMessage> : null}
         {customFields.length ? <div className="grid gap-4 md:grid-cols-2">{customFields.map((field) =>
           <div key={field.fieldId} className="space-y-2"><Label>{field.label}{field.validation.required ? " *" : ""}</Label><Input data-testid={`create-invoice-custom-${field.fieldId}`} value={customValues[field.fieldId] ?? ""} onChange={(event) => setCustomValues((previous) => ({ ...previous, [field.fieldId]: event.target.value }))} /></div>)}</div> : null}
         <div className="space-y-3">
@@ -241,7 +298,7 @@ export function CreateInvoiceModal({
             <FieldSelect label="Product" value={line.productId || NONE} onChange={(value) => chooseProduct(line, value)} options={[{ value: NONE, label: "No product" }, ...productOptions]} />
             <div className="space-y-2 md:col-span-2"><Label>Description</Label><Input data-testid={index === 0 ? "create-invoice-line-description" : undefined} value={line.description} onChange={(event) => updateLine(line.id, { description: event.target.value })} /></div>
             <FieldSelect label={kind === "bill" ? "Expense account" : "Income account"} value={line.accountId} onChange={(value) => updateLine(line.id, { accountId: value })} options={commercialOptions} />
-            <div className="space-y-2"><Label>Qty</Label><Input type="number" min={0.000001} value={line.quantity} onChange={(event) => updateLine(line.id, { quantity: Number(event.target.value) })} /></div>
+            <div className="space-y-2"><Label htmlFor={`invoice-line-quantity-${line.id}`}>Qty</Label><Input id={`invoice-line-quantity-${line.id}`} type="number" min={0.000001} step="any" value={line.quantity} onChange={(event) => updateLine(line.id, { quantity: Number(event.target.value) })} /></div>
             <div className="space-y-2"><Label>Unit price</Label><Input data-testid={index === 0 ? "create-invoice-line-unit-price" : undefined} type="number" min={0} step="0.01" value={line.unitPrice} onChange={(event) => updateLine(line.id, { unitPrice: Number(event.target.value) })} /></div>
             <div className="flex items-end gap-1"><FieldSelect label="Tax" value={line.taxId || NONE} onChange={(value) => updateLine(line.id, { taxId: value === NONE ? "" : value })} options={[{ value: NONE, label: "No tax" }, ...taxOptions]} /><Button type="button" variant="ghost" size="icon" disabled={lineItems.length === 1} onClick={() => setLineItems((previous) => previous.filter((item) => item.id !== line.id))}><Trash2 className="h-4 w-4" /></Button></div>
             <div className="space-y-2"><Label>Discount %</Label><Input type="number" min={0} max={100} value={line.discount} onChange={(event) => updateLine(line.id, { discount: Number(event.target.value) })} /></div>
@@ -254,6 +311,7 @@ export function CreateInvoiceModal({
       <DialogFooter><Button variant="outline" onClick={close}>{t("common.cancel")}</Button>{locked
         ? <Button onClick={() => void checkStatus()} disabled={saving}>Check previous action</Button>
         : <Button data-testid="create-invoice-save-draft" onClick={() => void save()} disabled={!canSave}>Save as Draft</Button>}</DialogFooter>
+      {navigationDialog}
     </DialogContent>
   </Dialog>
 }
@@ -262,4 +320,164 @@ function FieldSelect({ label, value, onChange, options, testId }: {
   label: string; value: string; onChange: (value: string) => void; options: ManualInvoiceOption[]; testId?: string
 }) {
   return <div className="min-w-0 space-y-2"><Label>{label}</Label><Select value={value} onValueChange={onChange}><SelectTrigger data-testid={testId}><SelectValue placeholder="Select" /></SelectTrigger><SelectContent>{options.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}</SelectContent></Select></div>
+}
+
+interface LegacyCreateInvoiceModalProps {
+  open: boolean
+  onClose: () => void
+  onSave?: (params: InvoiceFormPayload) => void | Promise<void>
+  journalOptions?: ManualInvoiceOption[]
+  partnerOptions?: ManualInvoiceOption[]
+  accountOptions?: ManualInvoiceOption[]
+  counterpartAccountOptions?: ManualInvoiceOption[]
+  taxOptions?: InvoiceTaxOption[]
+  currencyId?: bigint
+  currencyCode?: string
+  documentKind?: "invoice" | "bill"
+  organizationId?: number
+  formId?: string
+}
+
+type CreateInvoiceModalProps = ReleasedCreateInvoiceModalProps | LegacyCreateInvoiceModalProps
+
+export function CreateInvoiceModal(props: CreateInvoiceModalProps) {
+  if ("companyId" in props) return <ReleasedCreateInvoiceModal {...props} />
+  return <LegacyCreateInvoiceModal {...props} />
+}
+
+function LegacyCreateInvoiceModal({
+  open,
+  onClose,
+  onSave,
+  journalOptions = [],
+  partnerOptions = [],
+  accountOptions = [],
+  counterpartAccountOptions = [],
+  taxOptions = [],
+  currencyId,
+  currencyCode,
+  documentKind = "invoice",
+}: LegacyCreateInvoiceModalProps) {
+  const { t } = useTranslation()
+  const today = new Date().toISOString().slice(0, 10)
+  const [partnerId, setPartnerId] = useState("")
+  const [journalId, setJournalId] = useState("")
+  const [counterpartAccountId, setCounterpartAccountId] = useState("")
+  const [invoiceDate, setInvoiceDate] = useState(today)
+  const [dueDate, setDueDate] = useState("")
+  const [line, setLine] = useState({ description: "", quantity: 1, unitPrice: 0, taxId: "", discount: 0 })
+  const [saving, setSaving] = useState(false)
+  const idempotencyKey = useRef<string | null>(null)
+
+  useLayoutEffect(() => {
+    if (!open) return
+    setJournalId((value) => value || journalOptions[0]?.value || "")
+    setCounterpartAccountId((value) => value || counterpartAccountOptions[0]?.value || "")
+  }, [counterpartAccountOptions, journalOptions, open])
+
+  const tax = taxOptions.find((option) => option.value === line.taxId)
+  const entered = line.quantity * line.unitPrice * (1 - line.discount / 100)
+  const amountTax = tax == null ? 0 : tax.priceIncluded
+    ? entered - entered / (1 + tax.rate / 100)
+    : entered * tax.rate / 100
+  const amountUntaxed = tax?.priceIncluded ? entered - amountTax : entered
+  const amountTotal = tax?.priceIncluded ? entered : entered + amountTax
+  const validDate = invoiceDate !== "" && !Number.isNaN(Date.parse(invoiceDate))
+  const validDueDate = dueDate === "" || (
+    !Number.isNaN(Date.parse(dueDate)) && Date.parse(dueDate) >= Date.parse(invoiceDate)
+  )
+  const canSave = !saving && typeof onSave === "function" && currencyId != null &&
+    partnerId !== "" && journalId !== "" && counterpartAccountId !== "" && accountOptions[0]?.value != null &&
+    line.description.trim() !== "" && line.quantity > 0 && line.unitPrice >= 0 && validDate && validDueDate
+
+  const reset = () => {
+    setPartnerId("")
+    setJournalId("")
+    setCounterpartAccountId("")
+    setInvoiceDate(today)
+    setDueDate("")
+    setLine({ description: "", quantity: 1, unitPrice: 0, taxId: "", discount: 0 })
+    idempotencyKey.current = null
+  }
+  const save = async () => {
+    if (!canSave || !onSave || currencyId == null) return
+    setSaving(true)
+    try {
+      idempotencyKey.current ??= `create-manual-invoice:${crypto.randomUUID()}`
+      const accountId = BigInt(accountOptions[0]!.value)
+      const canonicalLine: InvoiceFormLine = {
+        id: "1",
+        accountId,
+        description: line.description.trim(),
+        quantity: line.quantity,
+        unitPrice: line.unitPrice,
+        taxId: line.taxId ? BigInt(line.taxId) : undefined,
+        taxRate: tax?.rate ?? 0,
+        taxPriceIncluded: tax?.priceIncluded ?? false,
+        discount: line.discount,
+        amountUntaxed,
+        amountTax,
+        amountTotal,
+      }
+      await onSave({
+        type: "invoice-draft",
+        idempotencyKey: idempotencyKey.current,
+        moveType: documentKind === "bill" ? "InInvoice" : "OutInvoice",
+        date: invoiceDate,
+        invoiceDate,
+        invoiceDateDue: dueDate || undefined,
+        dueDate: dueDate || undefined,
+        partnerId: BigInt(partnerId),
+        invoicePartnerDisplayName: partnerOptions.find((option) => option.value === partnerId)?.label ?? "",
+        journalId: BigInt(journalId),
+        currencyId,
+        counterpartAccountId: BigInt(counterpartAccountId),
+        lineItems: [canonicalLine],
+        amountUntaxed,
+        amountTax,
+        amountTotal,
+        amountResidual: amountTotal,
+        metadata: JSON.stringify({ invoiceDate, dueDate: dueDate || undefined }),
+      })
+      reset()
+      onClose()
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return <Dialog open={open} onOpenChange={(next) => { if (!next && !saving) onClose() }}>
+    <DialogContent data-testid="create-invoice-modal" className="max-h-[90vh] max-w-4xl overflow-y-auto sm:max-w-4xl">
+      <DialogHeader><DialogTitle>{documentKind === "bill" ? "New bill" : "New invoice"}</DialogTitle></DialogHeader>
+      <div className="grid gap-4 md:grid-cols-2">
+        <FieldSelect label={documentKind === "bill" ? "Vendor" : "Customer"} testId="create-invoice-partner" value={partnerId} onChange={setPartnerId} options={partnerOptions} />
+        <FieldSelect label="Journal" value={journalId} onChange={setJournalId} options={journalOptions} />
+        <FieldSelect label={documentKind === "bill" ? "Payable account" : "Receivable account"} value={counterpartAccountId} onChange={setCounterpartAccountId} options={counterpartAccountOptions} />
+        <div className="space-y-2"><Label htmlFor="legacy-invoice-date">{documentKind === "bill" ? "Bill Date" : "Invoice Date"}</Label><Input id="legacy-invoice-date" type="date" value={invoiceDate} onChange={(event) => setInvoiceDate(event.target.value)} /></div>
+        <div className="space-y-2"><Label htmlFor="legacy-invoice-due-date">Due Date</Label><Input id="legacy-invoice-due-date" type="date" min={invoiceDate} value={dueDate} onChange={(event) => setDueDate(event.target.value)} /></div>
+      </div>
+      <div className="grid gap-3 rounded-md border p-3 md:grid-cols-5">
+        <div className="space-y-2 md:col-span-2"><Label htmlFor="legacy-line-description">Description</Label><Input id="legacy-line-description" data-testid="create-invoice-line-description" value={line.description} onChange={(event) => setLine((value) => ({ ...value, description: event.target.value }))} /></div>
+        <div className="space-y-2"><Label htmlFor="legacy-line-quantity">Qty</Label><Input id="legacy-line-quantity" type="number" min={0.000001} step="any" value={line.quantity} onChange={(event) => setLine((value) => ({ ...value, quantity: Number(event.target.value) }))} /></div>
+        <div className="space-y-2"><Label htmlFor="legacy-line-price">Unit price</Label><Input id="legacy-line-price" data-testid="create-invoice-line-unit-price" type="number" min={0} step="0.01" value={line.unitPrice} onChange={(event) => setLine((value) => ({ ...value, unitPrice: Number(event.target.value) }))} /></div>
+        <FieldSelect label="Tax" testId="create-invoice-line-tax" value={line.taxId || NONE} onChange={(value) => setLine((current) => ({ ...current, taxId: value === NONE ? "" : value }))} options={[{ value: NONE, label: "No tax" }, ...taxOptions]} />
+      </div>
+      <div className="text-right text-sm">Subtotal: {formatLegacyAmount(amountUntaxed, currencyCode)} · Tax: {formatLegacyAmount(amountTax, currencyCode)} · <strong>Total: {formatLegacyAmount(amountTotal, currencyCode)}</strong></div>
+      <DialogFooter><Button variant="outline" onClick={onClose}>{t("common.cancel")}</Button><Button data-testid="create-invoice-save-draft" onClick={() => void save()} disabled={!canSave}>{documentKind === "bill" ? "Save bill draft" : t("accounting.forms.newInvoice.saveDraft")}</Button></DialogFooter>
+    </DialogContent>
+  </Dialog>
+}
+
+function formatLegacyAmount(value: number, currencyCode?: string): string {
+  try {
+    return new Intl.NumberFormat(undefined, currencyCode
+      ? { style: "currency", currency: currencyCode }
+      : { maximumFractionDigits: 2 }).format(value)
+  } catch {
+    return String(value)
+  }
+}
+
+function ReadinessMessage({ children }: { children: string }) {
+  return <p className="rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive" role="status">{children}</p>
 }

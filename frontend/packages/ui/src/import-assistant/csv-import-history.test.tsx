@@ -12,6 +12,8 @@ vi.mock("@lumiere/query-hooks/hooks/import-jobs", () => ({
   useImportJobs: () => queries.jobs,
   useImportJobErrors: () => queries.errors,
   canRollbackImportJob: () => false,
+  canCleanupAbandonedAccountMoveImport: (job: Record<string, unknown>) =>
+    job.table_name === "account_move",
   downloadImportJobErrorsCsv: vi.fn(),
   errorsForJob: (rows: Record<string, unknown>[], job: Record<string, unknown>) => rows.filter((row) => String(row.job_id) === String(job.id)),
 }))
@@ -67,6 +69,24 @@ describe("CSV import outcome history", () => {
     expect(screen.queryByText(/Row 3: Unknown employee/)).toBeNull()
     expect(screen.queryByRole("button", { name: "common.importAssistant.downloadErrors" })).toBeNull()
     expect(screen.getByRole("button", { name: "Refresh history" })).toBeTruthy()
+  })
+  it("does not expose cached cleanup candidates after import history access fails", () => {
+    queries.jobs.data = [
+      { id: 41, table_name: "account_move", status: "success", metadata: "proven-parent" },
+    ]
+    queries.jobs.isError = true
+    render(
+      <CsvImportHistory
+        organizationId={1n}
+        tableName="account_move_line"
+        abandonedAccountingCleanup={{
+          companyId: 7n,
+          authorized: true,
+          onCleanup: vi.fn(),
+        }}
+      />,
+    )
+    expect(screen.queryByText("Abandoned journal import drafts")).toBeNull()
   })
   it("refreshes terminal cached jobs after submission and stops polling on close", () => {
     vi.useFakeTimers()

@@ -1,18 +1,491 @@
 /// Journal entry / customer invoice domain tests.
 use spacetimedb::{ReducerContext, Table};
 
+use crate::accounting::chart_of_accounts::{
+    account_account, account_journal, create_account_account, create_account_journal,
+    CreateAccountAccountParams, CreateAccountJournalParams,
+};
+use crate::accounting::idempotency::accounting_operation_receipt;
 use crate::accounting::journal_entries::{
     account_move, account_move_line, add_account_move_line, cancel_account_move,
-    compute_invoice_totals, create_credit_note_from_invoice, post_invoice,
+    compute_invoice_totals, create_credit_note_from_invoice, create_manual_invoice, post_invoice,
     reset_account_move_to_draft, AddAccountMoveLineParams, CreateCreditNoteParams,
+    CreateManualInvoiceParams, ManualInvoiceLineParams,
 };
-use crate::accounting::tax_management::{account_tax, create_account_tax, CreateAccountTaxParams};
+use crate::accounting::tax_management::{
+    account_tax, account_tax_group, create_account_tax, create_account_tax_group,
+    CreateAccountTaxGroupParams, CreateAccountTaxParams,
+};
+use crate::core::organization::company;
+use crate::core::reference::currency;
 use crate::test_harness::{chart_keys, ensure_test_superuser, OrgFixture};
-use crate::types::{AccountMoveState, PaymentState, TaxAmountType, TaxTypeUse};
+use crate::types::{
+    AccountInternalGroup, AccountMoveState, JournalType, MoveType, PaymentState, TaxAmountType,
+    TaxTypeUse,
+};
 
 use super::helpers::{
     create_balanced_customer_invoice, create_balanced_customer_invoice_on_account,
 };
+
+fn seed_manual_invoice_sales_journal(
+    ctx: &ReducerContext,
+    fixture: &OrgFixture,
+    currency_id: u64,
+    label: &str,
+) -> Result<(u64, u64), String> {
+    let revenue_id = fixture.chart_account_ids[chart_keys::REVENUE];
+    let code = format!("MI{label}{}", fixture.company_id);
+    create_account_journal(
+        ctx,
+        fixture.organization_id,
+        CreateAccountJournalParams {
+            company_id: Some(fixture.company_id),
+            name: "Manual Invoice Sales".to_string(),
+            code: code.clone(),
+            type_: JournalType::Sale,
+            currency_id: Some(currency_id),
+            default_account_id: Some(revenue_id),
+            suspense_account_id: None,
+            loss_account_id: None,
+            profit_account_id: None,
+            bank_account_id: None,
+            payment_credit_account_id: None,
+            payment_debit_account_id: None,
+            invoice_reference_type: None,
+            invoice_reference_model: None,
+            sequence_id: None,
+            refund_sequence_id: None,
+            sequence_override_regex: None,
+            secure_sequence_id: None,
+            alias_name: None,
+            alias_domain: None,
+            sale_activity_type_id: None,
+            sale_activity_user_id: None,
+            sale_activity_note: None,
+            sale_activity_date_deadline: None,
+            restrict_mode_hash_table: false,
+            active: true,
+            at_least_one_inbound: true,
+            at_least_one_outbound: true,
+            dedicated_payment_method_ids: vec![],
+            sale_activity_done: false,
+            metadata: None,
+        },
+    )?;
+    let journal_id = ctx
+        .db
+        .account_journal()
+        .iter()
+        .find(|journal| journal.organization_id == fixture.organization_id && journal.code == code)
+        .map(|journal| journal.id)
+        .ok_or("manual invoice test journal missing")?;
+    Ok((journal_id, currency_id))
+}
+
+fn seed_manual_invoice_tax(
+    ctx: &ReducerContext,
+    fixture: &OrgFixture,
+    label: &str,
+    with_posting_account: bool,
+) -> Result<u64, String> {
+    let posting_accounts = if with_posting_account {
+        let ap = ctx
+            .db
+            .account_account()
+            .id()
+            .find(&fixture.chart_account_ids[chart_keys::AP])
+            .ok_or("manual invoice AP account missing")?;
+        let ar = ctx
+            .db
+            .account_account()
+            .id()
+            .find(&fixture.chart_account_ids[chart_keys::AR])
+            .ok_or("manual invoice AR account missing")?;
+        let payable_code = format!("TAXP{label}{}", fixture.company_id);
+        let receivable_code = format!("TAXR{label}{}", fixture.company_id);
+        for (code, name, user_type_id, internal_group) in [
+            (
+                payable_code.clone(),
+                "Tax payable",
+                ap.user_type_id,
+                AccountInternalGroup::Liability,
+            ),
+            (
+                receivable_code.clone(),
+                "Tax receivable",
+                ar.user_type_id,
+                AccountInternalGroup::Asset,
+            ),
+        ] {
+            create_account_account(
+                ctx,
+                fixture.organization_id,
+                CreateAccountAccountParams {
+                    company_id: Some(fixture.company_id),
+                    code,
+                    name: name.to_string(),
+                    user_type_id,
+                    currency_id: None,
+                    internal_type: None,
+                    internal_group: Some(internal_group),
+                    group_id: None,
+                    reconcile: false,
+                    tax_ids: vec![],
+                    note: None,
+                    opening_debit: 0.0,
+                    opening_credit: 0.0,
+                    allowed_journal_ids: vec![],
+                    non_trade: false,
+                    is_off_balance: false,
+                    metadata: None,
+                },
+            )?;
+        }
+        let payable_id = ctx
+            .db
+            .account_account()
+            .iter()
+            .find(|account| {
+                account.organization_id == fixture.organization_id
+                    && account.company_id == fixture.company_id
+                    && account.code == payable_code
+            })
+            .map(|account| account.id)
+            .ok_or("manual invoice tax payable account missing")?;
+        let receivable_id = ctx
+            .db
+            .account_account()
+            .iter()
+            .find(|account| {
+                account.organization_id == fixture.organization_id
+                    && account.company_id == fixture.company_id
+                    && account.code == receivable_code
+            })
+            .map(|account| account.id)
+            .ok_or("manual invoice tax receivable account missing")?;
+        Some((payable_id, receivable_id))
+    } else {
+        None
+    };
+    let group_name = format!("Manual invoice {label} group {}", fixture.company_id);
+    create_account_tax_group(
+        ctx,
+        fixture.organization_id,
+        fixture.company_id,
+        CreateAccountTaxGroupParams {
+            name: group_name.clone(),
+            sequence: 10,
+            preceding_subtotal: None,
+            tax_payable_account_id: posting_accounts.map(|accounts| accounts.0),
+            tax_receivable_account_id: posting_accounts.map(|accounts| accounts.1),
+            advance_tax_payment_account_id: None,
+            metadata: None,
+        },
+    )?;
+    let group_id = ctx
+        .db
+        .account_tax_group()
+        .iter()
+        .find(|group| {
+            group.organization_id == fixture.organization_id
+                && group.company_id == fixture.company_id
+                && group.name == group_name
+        })
+        .map(|group| group.id)
+        .ok_or("manual invoice tax group missing")?;
+    let tax_name = format!("Manual invoice {label} 8% {}", fixture.company_id);
+    create_account_tax(
+        ctx,
+        fixture.organization_id,
+        fixture.company_id,
+        CreateAccountTaxParams {
+            name: tax_name.clone(),
+            description: None,
+            type_tax_use: TaxTypeUse::Sale,
+            amount_type: TaxAmountType::Percent,
+            amount: 8.0,
+            active: true,
+            price_include: false,
+            include_base_amount: false,
+            is_base_affected: true,
+            sequence: 10,
+            tax_group_id: Some(group_id),
+            country_id: None,
+            country_code: None,
+            tags: vec![],
+            has_negative_factor: false,
+            invoice_repartition_line_ids: vec![],
+            refund_repartition_line_ids: vec![],
+            metadata: None,
+        },
+    )?;
+    ctx.db
+        .account_tax()
+        .iter()
+        .find(|tax| {
+            tax.organization_id == fixture.organization_id
+                && tax.company_id == fixture.company_id
+                && tax.name == tax_name
+        })
+        .map(|tax| tax.id)
+        .ok_or_else(|| "manual invoice tax missing".to_string())
+}
+
+pub fn test_manual_invoice_is_atomic_balanced_and_idempotent(
+    ctx: &ReducerContext,
+) -> Result<(), String> {
+    ensure_test_superuser(ctx)?;
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let currency_id = ctx
+        .db
+        .company()
+        .id()
+        .find(&fixture.company_id)
+        .ok_or("manual invoice test company missing")?
+        .currency_id;
+    let (journal_id, currency_id) =
+        seed_manual_invoice_sales_journal(ctx, &fixture, currency_id, "BASE")?;
+    let revenue_id = fixture.chart_account_ids[chart_keys::REVENUE];
+    let revenue = ctx
+        .db
+        .account_account()
+        .id()
+        .find(&revenue_id)
+        .ok_or("manual invoice revenue account missing")?;
+    if revenue.internal_type.is_some()
+        || revenue.internal_group != Some(AccountInternalGroup::Income)
+    {
+        return Err(
+            "manual invoice regression fixture must exercise internal-group fallback".to_string(),
+        );
+    }
+    let user_type_only_code = format!("4010MI{}", fixture.company_id);
+    create_account_account(
+        ctx,
+        fixture.organization_id,
+        CreateAccountAccountParams {
+            company_id: Some(fixture.company_id),
+            code: user_type_only_code.clone(),
+            name: "User-type classified revenue".to_string(),
+            user_type_id: revenue.user_type_id,
+            currency_id: None,
+            internal_type: None,
+            internal_group: None,
+            group_id: None,
+            reconcile: false,
+            tax_ids: vec![],
+            note: None,
+            opening_debit: 0.0,
+            opening_credit: 0.0,
+            allowed_journal_ids: vec![],
+            non_trade: false,
+            is_off_balance: false,
+            metadata: None,
+        },
+    )?;
+    let user_type_only_revenue_id = ctx
+        .db
+        .account_account()
+        .iter()
+        .find(|account| {
+            account.organization_id == fixture.organization_id
+                && account.company_id == fixture.company_id
+                && account.code == user_type_only_code
+        })
+        .map(|account| account.id)
+        .ok_or("manual invoice user-type classified revenue account missing")?;
+    let receivable_id = fixture.chart_account_ids[chart_keys::AR];
+    let tax_id = seed_manual_invoice_tax(ctx, &fixture, "configured", true)?;
+    let request_id = format!("manual-invoice-alpha:{}", fixture.company_id);
+    let params = CreateManualInvoiceParams {
+        idempotency_key: request_id.clone(),
+        company_id: fixture.company_id,
+        journal_id,
+        move_type: MoveType::OutInvoice,
+        currency_id,
+        partner_id: fixture.partner_id,
+        counterpart_account_id: receivable_id,
+        date: ctx.timestamp,
+        invoice_date: ctx.timestamp,
+        invoice_date_due: Some(ctx.timestamp),
+        ref_: Some("ALPHA-INV-001".to_string()),
+        lines: vec![
+            ManualInvoiceLineParams {
+                account_id: revenue_id,
+                name: "Fractional consulting hours".to_string(),
+                quantity: 1.5,
+                price_unit: 100.0,
+                discount: 0.0,
+                tax_ids: vec![tax_id],
+            },
+            ManualInvoiceLineParams {
+                account_id: user_type_only_revenue_id,
+                name: "Setup".to_string(),
+                quantity: 1.0,
+                price_unit: 50.0,
+                discount: 10.0,
+                tax_ids: vec![],
+            },
+        ],
+        metadata: Some(r#"{"source":"manual-alpha"}"#.to_string()),
+    };
+
+    create_manual_invoice(ctx, fixture.organization_id, params.clone())?;
+    create_manual_invoice(ctx, fixture.organization_id, params.clone())?;
+
+    let receipt = ctx
+        .db
+        .accounting_operation_receipt()
+        .iter()
+        .find(|receipt| {
+            receipt.organization_id == fixture.organization_id
+                && receipt.company_id == fixture.company_id
+                && receipt.action_kind == "create_manual_invoice"
+                && receipt.idempotency_key == request_id
+        })
+        .ok_or("manual invoice receipt missing")?;
+    let move_record = ctx
+        .db
+        .account_move()
+        .id()
+        .find(&receipt.result_id)
+        .ok_or("manual invoice result move missing")?;
+    if move_record.state != AccountMoveState::Draft
+        || (move_record.amount_untaxed - 195.0).abs() > 0.005
+        || (move_record.amount_tax - 12.0).abs() > 0.005
+        || (move_record.amount_total - 207.0).abs() > 0.005
+        || (move_record.amount_residual - 207.0).abs() > 0.005
+        || move_record.currency_id != currency_id
+        || move_record.partner_id != Some(fixture.partner_id)
+    {
+        return Err("manual invoice header/totals were not persisted exactly".to_string());
+    }
+    let lines: Vec<_> = ctx
+        .db
+        .account_move_line()
+        .move_line_by_move()
+        .filter(&move_record.id)
+        .collect();
+    if lines.len() != 4 {
+        return Err(format!(
+            "manual invoice expected 4 lines, got {}",
+            lines.len()
+        ));
+    }
+    let debit: f64 = lines.iter().map(|line| line.debit).sum();
+    let credit: f64 = lines.iter().map(|line| line.credit).sum();
+    if (debit - 207.0).abs() > 0.005 || (credit - 207.0).abs() > 0.005 {
+        return Err(format!(
+            "manual invoice is not balanced: debit={debit} credit={credit}"
+        ));
+    }
+    let fractional = lines
+        .iter()
+        .find(|line| line.name == "Fractional consulting hours")
+        .ok_or("fractional manual invoice line missing")?;
+    if (fractional.quantity - 1.5).abs() > f64::EPSILON
+        || (fractional.price_unit - 100.0).abs() > f64::EPSILON
+        || (fractional.price_subtotal - 150.0).abs() > 0.005
+    {
+        return Err("fractional quantity or exact line amounts were lost".to_string());
+    }
+
+    let mut conflicting = params.clone();
+    conflicting.lines[0].quantity = 2.0;
+    let conflict = create_manual_invoice(ctx, fixture.organization_id, conflicting)
+        .expect_err("changed payload must not reuse a manual invoice idempotency key");
+    if !conflict.contains("different create_manual_invoice input") {
+        return Err(format!("unexpected idempotency conflict: {conflict}"));
+    }
+
+    let before_moves = ctx.db.account_move().iter().count();
+    let before_lines = ctx.db.account_move_line().iter().count();
+    let invalid = CreateManualInvoiceParams {
+        idempotency_key: format!("manual-invoice-invalid:{}", fixture.company_id),
+        lines: vec![ManualInvoiceLineParams {
+            account_id: receivable_id,
+            name: "Wrong-role line".to_string(),
+            quantity: 1.0,
+            price_unit: 25.0,
+            discount: 0.0,
+            tax_ids: vec![],
+        }],
+        ..params.clone()
+    };
+    if create_manual_invoice(ctx, fixture.organization_id, invalid).is_ok() {
+        return Err("manual invoice accepted a receivable account as an income line".to_string());
+    }
+    if ctx.db.account_move().iter().count() != before_moves
+        || ctx.db.account_move_line().iter().count() != before_lines
+    {
+        return Err("rejected manual invoice left partial accounting rows".to_string());
+    }
+
+    let tax_without_posting_account =
+        seed_manual_invoice_tax(ctx, &fixture, "missing-account", false)?;
+    let invalid_tax = CreateManualInvoiceParams {
+        idempotency_key: format!("manual-invoice-invalid-tax:{}", fixture.company_id),
+        lines: vec![ManualInvoiceLineParams {
+            account_id: revenue_id,
+            name: "Tax without ledger account".to_string(),
+            quantity: 1.0,
+            price_unit: 25.0,
+            discount: 0.0,
+            tax_ids: vec![tax_without_posting_account],
+        }],
+        ..params.clone()
+    };
+    if create_manual_invoice(ctx, fixture.organization_id, invalid_tax).is_ok() {
+        return Err("manual invoice accepted a tax without a posting account".to_string());
+    }
+    if ctx.db.account_move().iter().count() != before_moves
+        || ctx.db.account_move_line().iter().count() != before_lines
+    {
+        return Err("rejected tax configuration left partial accounting rows".to_string());
+    }
+
+    let foreign_currency_id = ctx
+        .db
+        .currency()
+        .iter()
+        .find(|currency| {
+            currency.organization_id == fixture.organization_id && currency.code == "EUR"
+        })
+        .map(|currency| currency.id)
+        .ok_or("manual invoice test foreign currency missing")?;
+    let (foreign_journal_id, _) =
+        seed_manual_invoice_sales_journal(ctx, &fixture, foreign_currency_id, "FOREIGN")?;
+    let foreign_currency_invoice = CreateManualInvoiceParams {
+        idempotency_key: format!("manual-invoice-foreign-currency:{}", fixture.company_id),
+        journal_id: foreign_journal_id,
+        currency_id: foreign_currency_id,
+        lines: vec![ManualInvoiceLineParams {
+            account_id: revenue_id,
+            name: "Unconverted foreign amount".to_string(),
+            quantity: 1.0,
+            price_unit: 25.0,
+            discount: 0.0,
+            tax_ids: vec![],
+        }],
+        ..params
+    };
+    let foreign_error =
+        create_manual_invoice(ctx, fixture.organization_id, foreign_currency_invoice)
+            .expect_err("manual invoice must reject foreign currency without FX conversion");
+    if !foreign_error.contains("FX conversion") {
+        return Err(format!(
+            "manual invoice returned the wrong foreign-currency error: {foreign_error}"
+        ));
+    }
+    if ctx.db.account_move().iter().count() != before_moves
+        || ctx.db.account_move_line().iter().count() != before_lines
+    {
+        return Err("rejected foreign-currency invoice left partial accounting rows".to_string());
+    }
+
+    Ok(())
+}
 
 pub fn test_post_customer_invoice_creates_move_lines(ctx: &ReducerContext) -> Result<(), String> {
     ensure_test_superuser(ctx)?;

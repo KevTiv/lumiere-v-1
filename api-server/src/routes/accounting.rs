@@ -8,12 +8,15 @@ use axum::{
     routing::{get, post, put},
     Json, Router,
 };
-use serde::Deserialize;
+use serde::{de::Error as _, Deserialize, Deserializer};
 use serde_json::{json, Value};
 use stdb_auth::has_resource_read_permission;
 use tower_cookies::Cookies;
 
-use crate::commands::dispatch_session_reducer;
+use crate::commands::{
+    dispatch_historical_payment_allocations, dispatch_session_reducer,
+    historical_payment_allocations_contract,
+};
 use crate::error::ApiError;
 use crate::query_exec::{
     execute_authorized_resource_record, execute_resource_query, resolve_membership_company_id,
@@ -23,6 +26,197 @@ use crate::trusted_context::TrustedOperationContext;
 use crate::web_session::{require_org, resolve_session, OrgSession};
 
 const MANUAL_INVOICE_ACTION: &str = "create_manual_account_invoice";
+const MAX_HISTORICAL_PAYMENT_ALLOCATIONS: usize = 500;
+const MAX_HISTORICAL_PAYMENT_IDEMPOTENCY_KEY_BYTES: usize = 256;
+const MAX_HISTORICAL_PAYMENT_METADATA_BYTES: usize = 16_384;
+// Version of this dedicated endpoint's admitted reducer signature. Unrelated
+// generated-contract releases do not change this protocol version.
+const HISTORICAL_PAYMENT_CONTRACT_VERSION: &str = "0.3.108";
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct HistoricalPaymentAllocationsBody {
+    params: HistoricalPaymentAllocationsParams,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct HistoricalPaymentAllocationsParams {
+    #[serde(alias = "idempotencyKey")]
+    idempotency_key: String,
+    #[serde(alias = "companyId")]
+    company_id: u64,
+    #[serde(alias = "paymentTransactionId")]
+    payment_transaction_id: u64,
+    #[serde(alias = "currencyId")]
+    currency_id: u64,
+    allocations: Vec<HistoricalPaymentAllocationInput>,
+    #[serde(default, deserialize_with = "deserialize_optional_sats_string")]
+    metadata: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct HistoricalPaymentAllocationInput {
+    #[serde(alias = "documentMoveId")]
+    document_move_id: u64,
+    #[serde(alias = "allocatedAmount")]
+    allocated_amount: f64,
+    #[serde(alias = "expectedResidualAfter")]
+    expected_residual_after: f64,
+    #[serde(alias = "completesDocumentHistory")]
+    completes_document_history: bool,
+}
+
+fn deserialize_optional_sats_string<'de, D>(deserializer: D) -> Result<Option<String>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let value = Value::deserialize(deserializer)?;
+    match value {
+        Value::Null => Ok(None),
+        Value::String(value) => Ok(Some(value)),
+        Value::Object(fields) if fields.len() == 1 => {
+            if let Some(value) = fields.get("some").and_then(Value::as_str) {
+                return Ok(Some(value.to_owned()));
+            }
+            if fields
+                .get("none")
+                .and_then(Value::as_array)
+                .is_some_and(Vec::is_empty)
+            {
+                return Ok(None);
+            }
+            Err(D::Error::custom(
+                "metadata must be a string, null, or a valid SATS option",
+            ))
+        }
+        _ => Err(D::Error::custom(
+            "metadata must be a string, null, or a valid SATS option",
+        )),
+    }
+}
+
+fn validate_historical_payment_allocations(
+    params: &HistoricalPaymentAllocationsParams,
+) -> Result<(), ApiError> {
+    if params.company_id == 0 || params.payment_transaction_id == 0 || params.currency_id == 0 {
+        return Err(ApiError::BadRequest(
+            "companyId, paymentTransactionId, and currencyId must be positive integers".into(),
+        ));
+    }
+    let key = params.idempotency_key.as_str();
+    if key.is_empty()
+        || key.trim() != key
+        || key.len() > MAX_HISTORICAL_PAYMENT_IDEMPOTENCY_KEY_BYTES
+        || key.chars().any(char::is_control)
+    {
+        return Err(ApiError::BadRequest(
+            "idempotencyKey must be trimmed, non-empty, control-free, and at most 256 bytes".into(),
+        ));
+    }
+    if params.allocations.is_empty()
+        || params.allocations.len() > MAX_HISTORICAL_PAYMENT_ALLOCATIONS
+    {
+        return Err(ApiError::BadRequest(format!(
+            "allocations must contain 1..={MAX_HISTORICAL_PAYMENT_ALLOCATIONS} entries"
+        )));
+    }
+    if params
+        .metadata
+        .as_ref()
+        .is_some_and(|metadata| metadata.len() > MAX_HISTORICAL_PAYMENT_METADATA_BYTES)
+    {
+        return Err(ApiError::BadRequest(format!(
+            "metadata must be at most {MAX_HISTORICAL_PAYMENT_METADATA_BYTES} bytes"
+        )));
+    }
+
+    let mut document_ids = std::collections::BTreeSet::new();
+    for allocation in &params.allocations {
+        if allocation.document_move_id == 0 {
+            return Err(ApiError::BadRequest(
+                "documentMoveId must be a positive integer".into(),
+            ));
+        }
+        if !allocation.allocated_amount.is_finite() || allocation.allocated_amount <= 0.0 {
+            return Err(ApiError::BadRequest(
+                "allocatedAmount must be a finite positive number".into(),
+            ));
+        }
+        if !allocation.expected_residual_after.is_finite()
+            || allocation.expected_residual_after < 0.0
+        {
+            return Err(ApiError::BadRequest(
+                "expectedResidualAfter must be a finite non-negative number".into(),
+            ));
+        }
+        if !document_ids.insert(allocation.document_move_id) {
+            return Err(ApiError::BadRequest(
+                "each documentMoveId may appear only once per payment".into(),
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn historical_payment_reducer_params(params: &HistoricalPaymentAllocationsParams) -> Value {
+    let metadata = params
+        .metadata
+        .as_ref()
+        .map_or_else(|| json!({ "none": [] }), |value| json!({ "some": value }));
+    json!({
+        "idempotency_key": params.idempotency_key,
+        "company_id": params.company_id,
+        "payment_transaction_id": params.payment_transaction_id,
+        "currency_id": params.currency_id,
+        "allocations": params.allocations.iter().map(|allocation| json!({
+            "document_move_id": allocation.document_move_id,
+            "allocated_amount": allocation.allocated_amount,
+            "expected_residual_after": allocation.expected_residual_after,
+            "completes_document_history": allocation.completes_document_history,
+        })).collect::<Vec<_>>(),
+        "metadata": metadata,
+    })
+}
+
+async fn historical_payment_allocations_post(
+    State(state): State<Arc<AppState>>,
+    OrgSession {
+        session,
+        organization_id,
+    }: OrgSession,
+    Json(body): Json<HistoricalPaymentAllocationsBody>,
+) -> Result<Json<Value>, ApiError> {
+    validate_historical_payment_allocations(&body.params)?;
+    let payment_transaction_id = body.params.payment_transaction_id;
+    let params = historical_payment_reducer_params(&body.params);
+    dispatch_historical_payment_allocations(&state, &session, json!([organization_id, params]))
+        .await?;
+    Ok(Json(json!({
+        "data": {
+            "message": "Historical payment allocations applied successfully",
+            "paymentTransactionId": payment_transaction_id,
+        }
+    })))
+}
+
+fn historical_payment_allocations_capability() -> Value {
+    json!({
+        "data": {
+            "reducerName": "apply_historical_payment_allocations",
+            "operationId": "erp.apply_historical_payment_allocations",
+            "contractVersion": HISTORICAL_PAYMENT_CONTRACT_VERSION,
+            "signatureReady": historical_payment_allocations_contract().is_ok(),
+        }
+    })
+}
+
+async fn historical_payment_allocations_capability_get(
+    _: OrgSession,
+) -> Result<Json<Value>, ApiError> {
+    Ok(Json(historical_payment_allocations_capability()))
+}
 
 fn validate_manual_invoice_idempotency_key(value: &str) -> Result<(), ApiError> {
     if value.len() == 32
@@ -753,6 +947,14 @@ pub fn router() -> Router<Arc<AppState>> {
         )
         .route("/accounting/payment-reversals", get(payment_reversals_get))
         .route(
+            "/accounting/historical-payment-allocations",
+            post(historical_payment_allocations_post),
+        )
+        .route(
+            "/accounting/historical-payment-allocations/capability",
+            get(historical_payment_allocations_capability_get),
+        )
+        .route(
             "/accounting/manual-invoice-results/:company_id/:idempotency_key",
             get(manual_invoice_result_get),
         )
@@ -792,6 +994,141 @@ mod tests {
         .is_err());
         assert!(
             receipt_result_id(&[json!({ "result_table": "contact", "result_id": 42 })]).is_err()
+        );
+    }
+
+    fn valid_historical_payment_body() -> HistoricalPaymentAllocationsBody {
+        serde_json::from_value(json!({
+            "params": {
+                "idempotency_key": "rw-alpha-history-22-44",
+                "company_id": 11,
+                "payment_transaction_id": 22,
+                "currency_id": 33,
+                "allocations": [{
+                    "document_move_id": 44,
+                    "allocated_amount": 200000.0,
+                    "expected_residual_after": 300000.0,
+                    "completes_document_history": true
+                }],
+                "metadata": { "some": "{\"source\":\"rwanda-alpha\"}" }
+            }
+        }))
+        .expect("valid historical payment body")
+    }
+
+    #[test]
+    fn historical_payment_body_accepts_generated_and_api_field_shapes() {
+        let generated = valid_historical_payment_body();
+        assert!(validate_historical_payment_allocations(&generated.params).is_ok());
+        assert_eq!(
+            historical_payment_reducer_params(&generated.params)["metadata"],
+            json!({ "some": "{\"source\":\"rwanda-alpha\"}" })
+        );
+
+        let camel: HistoricalPaymentAllocationsBody = serde_json::from_value(json!({
+            "params": {
+                "idempotencyKey": "history-1",
+                "companyId": 11,
+                "paymentTransactionId": 22,
+                "currencyId": 33,
+                "allocations": [{
+                    "documentMoveId": 44,
+                    "allocatedAmount": 20.0,
+                    "expectedResidualAfter": 30.0,
+                    "completesDocumentHistory": false
+                }],
+                "metadata": null
+            }
+        }))
+        .expect("camel-case API body");
+        assert_eq!(camel.params.company_id, 11);
+        assert_eq!(
+            historical_payment_reducer_params(&camel.params)["metadata"],
+            json!({ "none": [] })
+        );
+    }
+
+    #[test]
+    fn historical_payment_body_rejects_authority_and_contract_spoofing() {
+        for extra in [
+            json!({ "organizationId": 99 }),
+            json!({ "reducer": "apply_global_migrations" }),
+            json!({ "actorIdentity": "forged" }),
+        ] {
+            let mut request = json!({
+                "params": {
+                    "idempotencyKey": "history-1",
+                    "companyId": 11,
+                    "paymentTransactionId": 22,
+                    "currencyId": 33,
+                    "allocations": [{
+                        "documentMoveId": 44,
+                        "allocatedAmount": 20.0,
+                        "expectedResidualAfter": 30.0,
+                        "completesDocumentHistory": true
+                    }]
+                }
+            });
+            request
+                .as_object_mut()
+                .expect("request object")
+                .extend(extra.as_object().expect("extra object").clone());
+            assert!(serde_json::from_value::<HistoricalPaymentAllocationsBody>(request).is_err());
+        }
+    }
+
+    #[test]
+    fn historical_payment_validation_rejects_unsafe_batches() {
+        let mut body = valid_historical_payment_body();
+        body.params.idempotency_key = " padded ".into();
+        assert!(matches!(
+            validate_historical_payment_allocations(&body.params),
+            Err(ApiError::BadRequest(_))
+        ));
+
+        let mut body = valid_historical_payment_body();
+        body.params
+            .allocations
+            .push(HistoricalPaymentAllocationInput {
+                document_move_id: 44,
+                allocated_amount: 1.0,
+                expected_residual_after: 299999.0,
+                completes_document_history: true,
+            });
+        assert!(matches!(
+            validate_historical_payment_allocations(&body.params),
+            Err(ApiError::BadRequest(_))
+        ));
+
+        let mut body = valid_historical_payment_body();
+        body.params.allocations[0].allocated_amount = 0.0;
+        assert!(matches!(
+            validate_historical_payment_allocations(&body.params),
+            Err(ApiError::BadRequest(_))
+        ));
+
+        let mut body = valid_historical_payment_body();
+        body.params.company_id = 0;
+        assert!(matches!(
+            validate_historical_payment_allocations(&body.params),
+            Err(ApiError::BadRequest(_))
+        ));
+    }
+
+    #[test]
+    fn historical_payment_capability_is_pinned_to_the_admitted_signature() {
+        assert!(historical_payment_allocations_contract().is_ok());
+        assert_eq!(HISTORICAL_PAYMENT_CONTRACT_VERSION, "0.3.108");
+        assert_eq!(
+            historical_payment_allocations_capability(),
+            json!({
+                "data": {
+                    "reducerName": "apply_historical_payment_allocations",
+                    "operationId": "erp.apply_historical_payment_allocations",
+                    "contractVersion": "0.3.108",
+                    "signatureReady": true,
+                }
+            })
         );
     }
 }

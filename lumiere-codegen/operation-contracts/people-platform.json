@@ -451,6 +451,16 @@
       },
       "evidence": "spacetimedb/src/workflow/approvals.rs: body inserts or appends a new effect without a replay guard"
     },
+    "cleanup_abandoned_account_move_import": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/data_ops/import_tracker.rs: reducer accepts only a successful provenance-bound parent job and treats an exact cleanup replay as success"
+    },
     "clone_workflow_version_to_draft": {
       "semantic_kind": "command",
       "client_facing": true,

@@ -81,6 +81,28 @@
       ]
     },
     {
+      "name": "cleanup_abandoned_account_move_import",
+      "company_paths": [
+        {
+          "path": ["company_id"],
+          "required": true,
+          "nullable": false,
+          "meaning": "selected legal entity owning every abandoned accounting import parent draft"
+        }
+      ]
+    },
+    {
+      "name": "apply_historical_payment_allocations",
+      "company_paths": [
+        {
+          "path": ["params", "company_id"],
+          "required": true,
+          "nullable": false,
+          "meaning": "selected legal entity owning the historical payment transaction and every reconstructed document allocation"
+        }
+      ]
+    },
+    {
       "name": "create_contact",
       "company_paths": [
         {

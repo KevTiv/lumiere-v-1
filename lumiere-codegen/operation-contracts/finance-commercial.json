@@ -251,6 +251,16 @@
       },
       "evidence": "expenses/expense_wave_d.rs: reducer checks current state or duplicate before transition"
     },
+    "apply_historical_payment_allocations": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/historical_payment_migration.rs: batch idempotency receipt and deterministic per-document allocation keys reject conflicting replays before duplicate writes"
+    },
     "apply_index_linked_renewal": {
       "semantic_kind": "internal",
       "client_facing": false,
@@ -1180,6 +1190,16 @@
         "version": 1
       },
       "evidence": "accounting/journal_entries.rs: receipt/key or deterministic update returns before duplicate writes"
+    },
+    "create_manual_invoice": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/journal_entries.rs: receipt/key returns the original balanced draft move before duplicate writes"
     },
     "create_account_period": {
       "semantic_kind": "command",

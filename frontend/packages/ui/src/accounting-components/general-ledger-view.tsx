@@ -80,6 +80,8 @@ interface GeneralLedgerViewProps {
   moves: AccountMove[]
   onCreate?: (data: Record<string, unknown>) => void
   onImportMovesCsv?: () => void
+  onImportOutstandingDocumentsCsv?: () => void
+  onImportHistoricalDocumentsForPaymentReplayCsv?: () => void
   onImportMoveLinesCsv?: () => void
   onPostMove?: (move: AccountMove) => void
   onCancelMove?: (move: AccountMove) => void
@@ -94,6 +96,8 @@ export function GeneralLedgerView({
   moves,
   onCreate,
   onImportMovesCsv,
+  onImportOutstandingDocumentsCsv,
+  onImportHistoricalDocumentsForPaymentReplayCsv,
   onImportMoveLinesCsv,
   onPostMove,
   onCancelMove,
@@ -191,6 +195,23 @@ export function GeneralLedgerView({
                 <Button type="button" variant="outline" onClick={onImportMovesCsv} className="gap-2">
                   <Upload className="h-4 w-4" />
                   {t("accounting.csvImport.toolbarMoves")}
+                </Button>
+              ) : null}
+              {onImportOutstandingDocumentsCsv ? (
+                <Button type="button" variant="outline" onClick={onImportOutstandingDocumentsCsv} className="gap-2">
+                  <Upload className="h-4 w-4" />
+                  {t("accounting.csvImport.toolbarOutstandingDocuments")}
+                </Button>
+              ) : null}
+              {onImportHistoricalDocumentsForPaymentReplayCsv ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={onImportHistoricalDocumentsForPaymentReplayCsv}
+                  className="gap-2"
+                >
+                  <Upload className="h-4 w-4" />
+                  {t("accounting.csvImport.toolbarHistoricalDocumentsForPaymentReplay")}
                 </Button>
               ) : null}
               {onImportMoveLinesCsv ? (

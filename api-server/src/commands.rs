@@ -301,6 +301,70 @@ pub(crate) async fn dispatch_user_evidence_contribution(
     Ok(context)
 }
 
+pub(crate) fn historical_payment_allocations_contract() -> Result<&'static ReducerContract, ApiError>
+{
+    const REDUCER: &str = "apply_historical_payment_allocations";
+    let contract = stdb_client::reducer_contract(REDUCER).ok_or_else(|| {
+        ApiError::Forbidden(
+            "historical payment allocation reducer is absent from the contract".into(),
+        )
+    })?;
+    let company_scope_paths = stdb_client::company_scope_paths(REDUCER);
+    let company_scope_ok = matches!(
+        company_scope_paths,
+        [scope]
+            if scope.parameter_position == 1
+                && scope.path == ["company_id"]
+                && scope.required
+                && !scope.nullable
+    );
+    let signature_ok = contract.name == REDUCER
+        && contract.contract_operation_id == "erp.apply_historical_payment_allocations"
+        && contract.exposure == Exposure::Denied
+        && contract.organization_position == Some(0)
+        && contract.company_position.is_none()
+        && contract.params.len() == 2
+        && contract.params[0].name == "organization_id"
+        && contract.params[0].kind == ScalarKind::UnsignedInteger
+        && contract.params[0].ref_target.is_none()
+        && contract.params[1].name == "params"
+        && contract.params[1].kind == ScalarKind::Composite
+        && contract.params[1].ref_target == Some("ApplyHistoricalPaymentAllocationsParams")
+        && company_scope_ok;
+    if !signature_ok {
+        return Err(ApiError::Forbidden(
+            "historical payment allocation contract no longer matches the admitted boundary".into(),
+        ));
+    }
+    Ok(contract)
+}
+
+/// Dispatch original-total historical payment replay through one fixed BFF
+/// boundary while the reducer remains denied to generic session operations.
+pub(crate) async fn dispatch_historical_payment_allocations(
+    state: &AppState,
+    session: &ApiSession,
+    args: Value,
+) -> Result<TrustedOperationContext, ApiError> {
+    let contract = historical_payment_allocations_contract()?;
+    let args = args.as_array().cloned().ok_or_else(|| {
+        ApiError::Internal("historical payment allocation arguments must be an array".into())
+    })?;
+    let client = state.client_with_token(&session.stdb_token);
+    let context = TrustedOperationContext::from_session_with_placement(
+        session,
+        client,
+        contract.contract_operation_id,
+        &state.organization_placements,
+    )?;
+    let company_scope = validate_reducer_scope(contract, &args, context.organization_id())?;
+    let company_scope = authorize_reducer_company_scope(&context, company_scope).await?;
+    let context = context.with_company_scope(company_scope)?;
+    context.require_current_placement(&state.organization_placements)?;
+    let _ = execute_reducer_call(&context, contract, args).await?;
+    Ok(context)
+}
+
 /// Fixed, deny-by-default evidence mutations admitted only by dedicated BFF
 /// routes. The browser never selects a reducer or operation id.
 pub(crate) async fn dispatch_ai_evidence_mutation(
@@ -938,6 +1002,42 @@ mod tests {
         assert_eq!(contract.name, "create_account_account");
         assert!(session_operation_contract("create_account_account").is_err());
         assert!(session_operation_contract("erp.apply_global_migrations").is_err());
+    }
+
+    #[test]
+    fn historical_payment_replay_has_one_signature_pinned_bff_boundary() {
+        let contract = historical_payment_allocations_contract().expect("historical payment");
+        assert_eq!(contract.exposure, Exposure::Denied);
+        assert!(session_reducer_contract(contract.name).is_err());
+        assert!(session_operation_contract(contract.contract_operation_id).is_err());
+
+        let [company_scope] = stdb_client::company_scope_paths(contract.name) else {
+            panic!("historical payment requires exactly one company scope path");
+        };
+        assert_eq!(company_scope.parameter_position, 1);
+        assert_eq!(company_scope.path, ["company_id"]);
+        assert!(company_scope.required);
+        assert!(!company_scope.nullable);
+
+        let args = [
+            json!(7),
+            json!({
+                "company_id": 42,
+                "payment_transaction_id": 11,
+                "currency_id": 3,
+                "allocations": [],
+                "idempotency_key": "history-1",
+                "metadata": { "none": [] }
+            }),
+        ];
+        assert_eq!(
+            validate_reducer_scope(contract, &args, 7).expect("valid nested company scope"),
+            vec![42]
+        );
+        assert!(matches!(
+            validate_reducer_scope(contract, &args, 8),
+            Err(ApiError::Forbidden(_))
+        ));
     }
 
     #[test]

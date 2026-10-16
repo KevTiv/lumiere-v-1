@@ -7,8 +7,20 @@ import { csvImportHistoryJobs, selectedCsvImportJob } from "../lib/csv-import-hi
 import { Button } from "../components/button"
 import { Label } from "../components/label"
 import { ImportJobStatusPanel } from "./import-job-status-panel"
+import {
+  AbandonedAccountingImportCleanup,
+  type AbandonedAccountingImportCleanupProps,
+} from "./abandoned-accounting-import-cleanup"
 
-export function CsvImportHistory({ organizationId, tableName }: { organizationId: bigint; tableName?: string }) {
+export function CsvImportHistory({
+  organizationId,
+  tableName,
+  abandonedAccountingCleanup,
+}: {
+  organizationId: bigint
+  tableName?: string
+  abandonedAccountingCleanup?: Omit<AbandonedAccountingImportCleanupProps, "jobs">
+}) {
   const { t } = useTranslation()
   const jobsQuery = useImportJobs(organizationId)
   const errorsQuery = useImportJobErrors(organizationId)
@@ -27,6 +39,14 @@ export function CsvImportHistory({ organizationId, tableName }: { organizationId
   const failed = jobsQuery.isError || errorsQuery.isError
   return (
     <div className="space-y-3" aria-live="polite">
+      {abandonedAccountingCleanup ? (
+        <AbandonedAccountingImportCleanup
+          {...abandonedAccountingCleanup}
+          jobs={
+            jobsQuery.isError ? [] : ((jobsQuery.data ?? []) as unknown as ImportJobRow[])
+          }
+        />
+      ) : null}
       <p className="text-sm">
         {t("common.csvImportDialog.historyNotice", { defaultValue: "The file was submitted. This organization’s recent import history may include other users’ imports. Select a job to review its results; jobs are not automatically linked to this file." })}
       </p>

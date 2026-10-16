@@ -15,6 +15,7 @@ import { createCsvImportRequest, supportsTrackedCsvImport, type CsvImportRequest
 import { useTrackedCsvImport } from "@lumiere/query-hooks/hooks/tracked-csv-import"
 import { CsvImportResult } from "../import-assistant/csv-import-result"
 import { CsvImportHistory } from "../import-assistant/csv-import-history"
+import type { AbandonedAccountingImportCleanupProps } from "../import-assistant/abandoned-accounting-import-cleanup"
 import { Button } from "./button"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "./dialog"
 import { Input } from "./input"
@@ -39,6 +40,10 @@ export interface CsvImportModalProps {
   tableName?: string
   /** Use the dedicated tracked API. Legacy onImport remains supported when absent. */
   trackedImport?: TrackedCsvImportScope
+  /** Optional controls for reviewing abandoned accounting parent-phase imports. */
+  abandonedAccountingCleanup?: Omit<AbandonedAccountingImportCleanupProps, "jobs">
+  /** Optional app-level reader that converts CSV or spreadsheet files to canonical CSV text. */
+  fileReader?: (file: File) => Promise<{ csvText: string }>
 }
 
 function downloadTemplate(columns: CsvImportColumns, fileName: string) {
@@ -67,6 +72,8 @@ export function CsvImportModal({
   organizationId,
   tableName,
   trackedImport,
+  abandonedAccountingCleanup,
+  fileReader,
 }: CsvImportModalProps) {
   const { t } = useTranslation()
   const [fileName, setFileName] = useState("")
@@ -86,7 +93,7 @@ export function CsvImportModal({
     setFileName(file?.name ?? "")
     if (!file) return
     try {
-      const text = await file.text()
+      const text = fileReader ? (await fileReader(file)).csvText : await file.text()
       setAnalysis(analyzeCsv(text, columns))
       setCsvText(text)
     } catch (cause) {
@@ -145,19 +152,31 @@ export function CsvImportModal({
         <div className="space-y-4">
           {request ? <CsvImportResult request={request} initialPending={isSubmitting} initialError={error} activeOrganizationId={organizationId} activeCompanyId={trackedImport?.companyId} onNewFile={() => {
             setRequest(null); setSubmitted(false); setError(null); setAnalysis(null); setCsvText(""); setFileName("")
-          }} /> : submitted && organizationId ? (
-            <CsvImportHistory organizationId={organizationId} tableName={tableName} />
+          }} /> : organizationId && (submitted || abandonedAccountingCleanup) ? (
+            <CsvImportHistory
+              organizationId={organizationId}
+              tableName={tableName}
+              abandonedAccountingCleanup={abandonedAccountingCleanup}
+            />
           ) : null}
           {!submitted ? <>
           {trackedImport && !trackSubmission ? <p className="text-sm text-muted-foreground">{t("common.csvImportDialog.manualResultNotice", { defaultValue: "This import uses manual history selection. Its results cannot yet be linked automatically to this file." })}</p> : null}
           <div className="space-y-2">
             <Label htmlFor="csv-import-file">
-              {t("common.csvImportDialog.fileLabel", { defaultValue: "CSV file" })}
+              {fileReader
+                ? t("common.csvImportDialog.spreadsheetFileLabel", {
+                    defaultValue: "CSV or Excel file",
+                  })
+                : t("common.csvImportDialog.fileLabel", { defaultValue: "CSV file" })}
             </Label>
             <Input
               id="csv-import-file"
               type="file"
-              accept=".csv,text/csv,text/plain"
+              accept={
+                fileReader
+                  ? ".csv,.xlsx,.xls,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
+                  : ".csv,text/csv,text/plain"
+              }
               disabled={busy}
               onChange={(event) => void handleFile(event.target.files?.[0])}
             />

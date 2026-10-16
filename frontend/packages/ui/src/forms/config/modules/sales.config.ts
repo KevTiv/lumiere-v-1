@@ -298,6 +298,7 @@ export const salesForms: FormRegistryEntry[] = [
             { value: "GBP", label: "GBP - British Pound", color: "purple" },
             { value: "CAD", label: "CAD - Canadian Dollar", color: "red" },
             { value: "AUD", label: "AUD - Australian Dollar", color: "yellow" },
+            { value: "RWF", label: "RWF - Rwandan Franc", color: "orange" },
           ],
           validation: { required: true },
           aiSuggestions: [],

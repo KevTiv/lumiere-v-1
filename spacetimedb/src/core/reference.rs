@@ -708,21 +708,28 @@ pub(crate) fn require_active_currency_for_organization(
 /// organization.  Bootstrap runs before the caller has an organization
 /// membership, so this internal path intentionally bypasses the superuser
 /// reducer guard while keeping ownership server-derived from `organization_id`.
+fn onboarding_currency_definition(code: &str) -> Option<(&'static str, &'static str, u8, f64)> {
+    match code {
+        "USD" => Some(("US Dollar", "$", 2, 0.01)),
+        "EUR" => Some(("Euro", "€", 2, 0.01)),
+        "GBP" => Some(("British Pound", "£", 2, 0.01)),
+        "CAD" => Some(("Canadian Dollar", "C$", 2, 0.01)),
+        "AUD" => Some(("Australian Dollar", "A$", 2, 0.01)),
+        "JPY" => Some(("Japanese Yen", "¥", 0, 1.0)),
+        "RWF" => Some(("Rwandan Franc", "FRw", 0, 1.0)),
+        _ => None,
+    }
+}
+
 pub(crate) fn seed_currency_for_organization(
     ctx: &ReducerContext,
     organization_id: u64,
     code: &str,
 ) -> Result<Currency, String> {
     let normalized = code.trim().to_uppercase();
-    let (name, symbol, decimal_places, rounding_factor) = match normalized.as_str() {
-        "USD" => ("US Dollar", "$", 2, 0.01),
-        "EUR" => ("Euro", "€", 2, 0.01),
-        "GBP" => ("British Pound", "£", 2, 0.01),
-        "CAD" => ("Canadian Dollar", "C$", 2, 0.01),
-        "AUD" => ("Australian Dollar", "A$", 2, 0.01),
-        "JPY" => ("Japanese Yen", "¥", 0, 1.0),
-        _ => return Err(format!("Unsupported onboarding currency '{normalized}'")),
-    };
+    let (name, symbol, decimal_places, rounding_factor) =
+        onboarding_currency_definition(&normalized)
+            .ok_or_else(|| format!("Unsupported onboarding currency '{normalized}'"))?;
     let organization_code_key = format!("{organization_id}:{normalized}");
     if let Some(existing) = ctx
         .db
@@ -750,6 +757,19 @@ pub(crate) fn seed_currency_for_organization(
         created_at: ctx.timestamp,
         metadata: Some("{\"seed\":\"bootstrap\"}".to_string()),
     }))
+}
+
+#[cfg(test)]
+mod onboarding_currency_tests {
+    use super::onboarding_currency_definition;
+
+    #[test]
+    fn rwandan_franc_is_a_zero_decimal_bootstrap_currency() {
+        assert_eq!(
+            onboarding_currency_definition("RWF"),
+            Some(("Rwandan Franc", "FRw", 0, 1.0))
+        );
+    }
 }
 
 /// Resolves a global `Currency` row by ISO 4217 code (case-insensitive).

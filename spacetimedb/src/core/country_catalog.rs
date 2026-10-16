@@ -58,6 +58,15 @@ pub(crate) const COUNTRIES: &[CountryDefinition] = &[
         languages: &["nl", "en"],
     },
     CountryDefinition {
+        code: "RW",
+        name: "Rwanda",
+        iso3: "RWA",
+        numcode: 646,
+        phone_code: "250",
+        currency_code: "RWF",
+        languages: &["rw", "en", "fr"],
+    },
+    CountryDefinition {
         code: "US",
         name: "United States",
         iso3: "USA",
@@ -103,5 +112,18 @@ mod tests {
             ("NLD", 528, "31", "EUR")
         );
         assert_eq!(nl.languages, &["nl", "en"]);
+    }
+
+    #[test]
+    fn rwanda_reference_uses_rwandan_franc() {
+        let rw = COUNTRIES
+            .iter()
+            .find(|country| country.code == "RW")
+            .expect("RW catalog entry");
+        assert_eq!(
+            (rw.iso3, rw.numcode, rw.phone_code, rw.currency_code),
+            ("RWA", 646, "250", "RWF")
+        );
+        assert_eq!(rw.languages, &["rw", "en", "fr"]);
     }
 }

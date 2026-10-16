@@ -44,11 +44,21 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - name: Check standalone module formatting
+        env:
+          RUSTFMT_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: bash scripts/check-changed-rustfmt.sh spacetimedb
+
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: spacetimedb
           cache-on-failure: true
+
       - name: Check standalone module and tests
         working-directory: spacetimedb
         run: cargo check --locked --tests
@@ -74,8 +84,17 @@ jobs:
           --health-retries=5
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+
+      - name: Check workspace formatting
+        env:
+          RUSTFMT_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: bash scripts/check-changed-rustfmt.sh workspace
 
       - uses: ./.github/actions/prepare-contracts
 
