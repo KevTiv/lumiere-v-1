@@ -6,6 +6,7 @@ import { ArrowDownLeft, ArrowRight, ArrowUpRight, CalendarClock, CheckCheck, Che
 import { useTranslation } from "@lumiere/i18n"
 import { Badge } from "@lumiere/ui/components/badge"
 import { Button } from "@lumiere/ui/components/button"
+import { workspaceStyles } from "@lumiere/ui/lib/workspace-styles"
 import { invoiceRecordHref } from "./invoice-record"
 import {
   buildAccountantOverview, overviewDate, overviewDueDate, overviewLabel, overviewMoneyTotals,
@@ -71,7 +72,7 @@ export function AccountantOverview({ data, companyName, onNavigate, onCreateInvo
     if (collection.state.status !== "ready") return <p className="text-sm text-muted-foreground" role="status">{stateText(collection)}</p>
     const totals = overviewMoneyTotals(collection.rows, data.currencies)
     if (!totals.length) return <p className={large ? "text-xl font-medium tracking-tight" : "text-sm text-muted-foreground"}>{empty}</p>
-    return <div className="space-y-1">{totals.map((total) => <p key={total.currencyId} className={large ? "flex flex-wrap items-baseline gap-x-2 break-words text-xl font-semibold tracking-tight tabular-nums sm:text-2xl" : "text-sm tabular-nums"}>
+    return <div className="space-y-1">{totals.map((total) => <p key={total.currencyId} className={large ? `${workspaceStyles.metricValue} flex flex-wrap items-baseline gap-x-2 break-words text-xl sm:text-2xl` : "text-sm tabular-nums"}>
       {new Intl.NumberFormat(undefined, { maximumFractionDigits: 2, minimumFractionDigits: 2 }).format(total.amount)}
       <span className={large ? "text-xs font-normal tracking-normal text-muted-foreground" : "ml-1 text-xs text-muted-foreground"}>{currencyLabel(total)}</span>
     </p>)}</div>
@@ -104,19 +105,19 @@ export function AccountantOverview({ data, companyName, onNavigate, onCreateInvo
     <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
       <div className="space-y-1">
         <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">{companyName || tr("workspace", "Company workspace")}</p>
-        <h2 className="text-xl font-semibold tracking-tight">{tr("deskTitle", "Your accounting desk")}</h2>
-        <p className="text-sm text-muted-foreground">{tr("description", "Keep balances in view and the next task within reach.")}</p>
+        <h2 className={`${workspaceStyles.sectionTitle} text-xl`}>{tr("deskTitle", "Your accounting desk")}</h2>
+        <p className={workspaceStyles.pageDescription}>{tr("description", "Keep balances in view and the next task within reach.")}</p>
       </div>
-      <div className="flex flex-wrap gap-2">
+      <div className={workspaceStyles.actions}>
         {onCreateJournalEntry && <Button variant="ghost" onClick={onCreateJournalEntry} data-testid="quick-action-journal_entry"><FileText />{tr("newJournalEntry", "Journal entry")}</Button>}
         {onCreateBill && <Button variant="outline" onClick={onCreateBill} data-testid="quick-action-create_bill"><ReceiptText />{tr("newBill", "New bill")}</Button>}
         {onCreateInvoice && <Button onClick={onCreateInvoice} data-testid="quick-action-create_invoice"><FilePlus2 />{tr("newInvoice", "New invoice")}</Button>}
       </div>
     </div>
 
-    <div className="grid grid-cols-2 overflow-hidden rounded-xl border bg-card xl:grid-cols-4">
+    <div className={`${workspaceStyles.surface} grid grid-cols-1 overflow-hidden min-[360px]:grid-cols-2 xl:grid-cols-4`}>
       {summaryCards.map((card, index) => {
-        const className = `flex min-w-0 flex-col gap-3 p-4 text-left transition-colors hover:bg-muted/40 focus-visible:z-10 focus-visible:outline-2 focus-visible:outline-ring sm:gap-4 sm:p-5 ${index > 1 ? "border-t xl:border-t-0" : ""} ${index % 2 === 1 ? "border-l" : ""} ${index === 2 ? "xl:border-l" : ""}`
+        const className = `flex min-w-0 flex-col gap-3 p-4 text-left transition-colors hover:bg-muted/40 focus-visible:z-10 focus-visible:outline-2 focus-visible:outline-ring sm:gap-4 sm:p-5 ${index > 0 ? "border-t min-[360px]:border-t-0" : ""} ${index > 1 ? "min-[360px]:border-t xl:border-t-0" : ""} ${index % 2 === 1 ? "min-[360px]:border-l" : ""} ${index === 2 ? "xl:border-l" : ""}`
         const content = <>
         <div className="flex items-center justify-between gap-2 text-sm text-muted-foreground"><span>{card.label}</span><span className="[&>svg]:size-4">{card.icon}</span></div>
         <div className="flex-1">{card.key === "bank-lines"
@@ -130,19 +131,19 @@ export function AccountantOverview({ data, companyName, onNavigate, onCreateInvo
       })}
     </div>
 
-    <section className="min-w-0 overflow-hidden rounded-xl border bg-card" aria-labelledby="accountant-activity-title">
+    <section className={`${workspaceStyles.surface} min-w-0 overflow-hidden`} aria-labelledby="accountant-activity-title">
       <div className="flex flex-wrap items-start justify-between gap-3 border-b px-5 py-4">
-        <div><h3 id="accountant-activity-title" className="font-semibold">{tr("activityTitle", "Document activity")}</h3><p className="mt-1 text-xs text-muted-foreground">{tr("activityHint", "Posted invoices and vendor bills over the past six months")}</p></div>
+        <div><h3 id="accountant-activity-title" className={workspaceStyles.sectionTitle}>{tr("activityTitle", "Document activity")}</h3><p className={`${workspaceStyles.sectionDescription} mt-1`}>{tr("activityHint", "Posted invoices and vendor bills over the past six months")}</p></div>
         {model.activity.state.status === "ready" && <Badge variant="secondary" className="gap-2 tabular-nums">{tr("activityPosted", "Posted documents")}<span>{activityTotal}</span></Badge>}
       </div>
       <div className="space-y-4 p-5">
         {stateNotice({ rows: [], state: model.activity.state })}
         {model.activity.state.status === "ready" && <>
-          <div className="flex flex-wrap gap-x-5 gap-y-2 text-xs text-muted-foreground"><span className="flex items-center gap-2"><span className="size-2 rounded-sm bg-primary" />{tr("activityInvoices", "Customer invoices")}</span><span className="flex items-center gap-2"><span className="size-2 rounded-sm bg-muted-foreground/50" />{tr("activityBills", "Vendor bills")}</span></div>
+          <div className="flex flex-wrap gap-x-5 gap-y-2 text-xs text-muted-foreground"><span className="flex items-center gap-2"><span className="size-2 rounded-sm bg-chart-1" />{tr("activityInvoices", "Customer invoices")}</span><span className="flex items-center gap-2"><span className="size-2 rounded-sm bg-chart-2" />{tr("activityBills", "Vendor bills")}</span></div>
           {activityTotal === 0 ? <p className="flex min-h-36 items-center justify-center rounded-lg border border-dashed px-4 text-center text-sm text-muted-foreground">{tr("activityEmpty", "No posted documents in this period")}</p> : <div role="img" aria-label={tr("activityAccessible", "Monthly posted document counts. Expand monthly counts below for exact values.")}>
             <div className="grid h-40 grid-cols-6 items-end gap-3 border-b border-dashed px-1 sm:gap-6" aria-hidden="true">
               {model.activity.months.map((month) => <div key={month.startMs} className="flex h-full items-end justify-center gap-1.5 sm:gap-3">
-                {[{ count: month.invoices, className: "bg-primary" }, { count: month.bills, className: "bg-muted-foreground/50" }].map((bar, index) => <div key={index} className="flex h-full w-full max-w-7 flex-col justify-end gap-1">
+                {[{ count: month.invoices, className: "bg-chart-1" }, { count: month.bills, className: "bg-chart-2" }].map((bar, index) => <div key={index} className="flex h-full w-full max-w-7 flex-col justify-end gap-1">
                   <span className="text-center text-[10px] tabular-nums text-muted-foreground">{bar.count || ""}</span><div className={`rounded-t-sm ${bar.className}`} style={{ height: `${bar.count / activityMax * 82}%` }} />
                 </div>)}
               </div>)}

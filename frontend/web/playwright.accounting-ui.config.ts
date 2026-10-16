@@ -4,7 +4,7 @@ import { defineConfig } from "@playwright/test"
 // not authenticate, dispatch accounting operations, or prove backend behavior.
 export default defineConfig({
   testDir: "./tests",
-  testMatch: "accounting-ui.spec.ts",
+  testMatch: ["accounting-ui.spec.ts", "style-templates-ui.spec.ts"],
   workers: 1,
   use: {
     baseURL: "http://127.0.0.1:3111",
@@ -18,7 +18,8 @@ export default defineConfig({
   },
   webServer: {
     command: "node node_modules/next/dist/bin/next dev tests/accounting-ui-fixture --webpack --hostname 127.0.0.1 --port 3111",
-    url: "http://127.0.0.1:3111",
+    // Warm the route containing the actual ModuleView before measuring browser interactions.
+    url: "http://127.0.0.1:3111/style-templates",
     timeout: 120_000,
     reuseExistingServer: !process.env.CI,
   },

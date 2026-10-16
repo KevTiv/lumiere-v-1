@@ -72,13 +72,82 @@ Use these primary sources as reference material; review dates are 2026-09-14. Lu
 | [Vercel Geist colors](https://examples.vercel.com/geist/colors) and [errors](https://vercel.com/geist/error) | Neutral surfaces, explicit text/border/state roles, restrained hierarchy; field/action/panel errors differentiated with useful identifiers. | Replacing the current library wholesale; promotional landing-page layouts in transactional screens. |
 | [Apple design principles](https://developer.apple.com/design/human-interface-guidelines/design-principles), [layout](https://developer.apple.com/design/human-interface-guidelines/layout), [charts](https://developer.apple.com/cn/design/human-interface-guidelines/charts) | Consistency, predictable controls, responsive context preservation, clear feedback, progressive disclosure, readable/accessibly described charts. | Platform-only interaction assumptions, decorative glass behind dense tables, compulsory animation or proprietary bundled fonts. |
 | [PostHog dashboards](https://posthog.com/docs/product-analytics/dashboards) and [chart themes](https://posthog.com/docs/product-analytics/color-themes) | Reusable insight references, visible effective filters, card-level actions, independent refresh, consistent series identity and theme choices. | Raw query editors in ordinary ERP config; copying dashboard filter overrides into security scope; public sharing by default. |
+| [Studio Admin](https://studio-admin.arhamkhnz.com/dashboard/default) | Compact shell, progressive navigation, useful preferences, responsive workspace compositions. | Its monochrome identity, branding, demonstration data, card arrangement or a replacement application/template runtime. No template source was copied. |
 | [WAI tabs](https://www.w3.org/WAI/ARIA/apg/patterns/tabs/) and [WCAG target size](https://www.w3.org/WAI/WCAG22/Understanding/target-size-minimum.html) | Native/standard keyboard semantics and measured hit-target behavior. | Declaring accessibility from screenshots alone. |
 
 ### Visual language
 
-Default: calm neutral canvas, restrained elevation, clear content boundaries, one dominant action per context, readable dense data, and strong typography hierarchy. Retain the existing Geist/system font foundation. Use tabular numerals for aligned quantities and money; reserve monospace mainly for IDs, codes and technical evidence.
+**Implemented default — Lumière / Quiet Precision (2026-10-16):** a warm mineral
+canvas, near-white working surfaces, graphite text and a restrained deep-teal
+interaction accent. Dark mode uses ink/slate surfaces with a lighter teal accent;
+it is independently tuned, not a colour inversion. Retain Geist via the existing
+loaded font variables and system fallbacks. Tabular numerals align quantities and
+money; monospace is for identifiers and technical evidence, not body copy.
 
-Optional **Warm** preset: a PostHog-inspired cream/graphite/amber direction in light mode, with an independently designed dark counterpart, stronger outlines and modest radii. This is our proposed treatment, not an assertion that every PostHog screen uses these exact tokens. Do not copy branding, mascots or logos.
+The visual signature is structural as well as chromatic: a fine leading rule at
+page headers, a consistent title/description scale, tinted active navigation with
+a leading rail, quiet bordered work surfaces, and a document-style paper header.
+Use one implicit dominant action per header; unspecified supporting actions are
+secondary. Explicit caller variants remain intentional overrides. Elevation is
+restrained, not a hierarchy of nested floating cards. There are no decorative
+gradients, borrowed logos, mascots, demo statistics or copied dashboard layouts.
+
+The deep-teal brand accent indicates interaction, **not** "paid", "approved" or
+"healthy". Success, warning, destructive and informational roles retain their
+independent semantics and labels/icons. Shared theme-role regression tests check
+text/action/navigation contrast at 4.5:1 and focus/input boundaries at 3:1 in both
+default/Ocean and light/dark. These selected-token checks are not a blanket WCAG
+certification of every chart, opacity blend or bespoke module composition.
+
+Existing Ocean preferences remain supported with the same renderer structure and
+their own violet/cool accent. Palette, mode, shell and density stay independent;
+this does not create a new ThemeProvider, persisted style field or contract release.
+
+#### Renderer-owned propagation
+
+`lib/workspace-styles.ts` owns the shared page, section, action, navigation,
+surface, metric and document roles. `styles/tokens-base.css`, `theme-extended.css`
+and the existing palettes own colour/contrast; `styles/workspace.css` owns the few
+shared structural rules and coarse-pointer target sizing. Their production entry
+is the existing `app-theme.css`, after Tailwind preflight. A future global style
+change should update these owners, not copy utility strings across module configs.
+
+| Definition/input | Existing renderer path | Shared visual owner |
+| --- | --- | --- |
+| Static `ModuleConfig` and runtime list metadata | `ModuleView` → `DashboardHeader`, `WorkspaceNav`/context tabs, `EntityView` | Page/action/tab roles; shared Table/Card primitives |
+| Static `FormConfig` (plain/card/dialog) | `ModularForm`, `FormModal` | Page/section/form-action roles; shared field primitives |
+| Runtime-merged form metadata | `RuntimeFormModal` → existing `FormModal` → `ModularForm` | Same roles; no runtime-only restyling or different editor |
+| Approved saved `ModuleDraft` collection/detail nodes | `ComposedCollectionDetailHost` | Shared section/surface roles and Card/Table primitives |
+| Dashboard definitions/widgets | Existing adapters → `DashboardWidgetRenderer`, `KpiStrip` and chart renderers | Shared section/surface/metric roles and chart tokens |
+| Invoice composer, review and full record | Existing editor/record owners → `InvoiceDocument`, `RecordPage` | Shared document/page/section/action roles |
+
+Definitions select approved content and presentation intent, not arbitrary brand
+CSS. Do not add raw colours, Tailwind classes or executable styling to tenant or
+AI-authored definitions. Existing trusted checked-in custom components remain
+explicit escape hatches; shared theme tokens apply to them, but their bespoke
+layout still needs a module-level review. This rollout is not proof that every
+custom panel has adopted the common composition.
+
+#### Small-screen acceptance is part of the style
+
+- Test the shared templates at 320, 390, 768 and 1440 CSS pixels. Small phones are
+  a design target, not a scaled desktop screenshot.
+- Titles and action rows wrap without hiding record identity. Fields become full
+  width before their configured desktop column spans apply. Do not hide required
+  actions, amounts, currency, state or errors to achieve a neat screenshot.
+- Wide data tables scroll inside their own panel, not the whole page. Dialog
+  bodies scroll within the viewport and cancel/submit remain reachable. Existing
+  pending/unknown outcomes, dirty edits and focus recovery must survive layout changes.
+- Coarse-pointer Button, Input, Select and tab controls have a 44px minimum target;
+  compact table density never reduces that target. Keep native keyboard semantics,
+  visible focus and non-hover routes to all actions.
+- Exercise light/dark and retained Ocean preferences through actual rendered
+  templates. Browser fixtures use labelled synthetic data and do not establish
+  authenticated financial effects or first-organization admission.
+
+Optional **Warm** preset remains a proposal, not an implemented setting: a more
+pronounced cream/graphite/amber treatment with its own dark counterpart. The new
+default's subtle mineral warmth does not silently add or select that preset.
 
 Keep `theme` (system/light/dark), existing `palette`, existing `shell`, and proposed `density` conceptually separate. Define default/compact/comfortable density as needed without making theme choose permissions, content, chart meaning or business behavior. Avoid adding a parallel ThemeProvider. Preserve existing ocean/css-art users until an explicit migration decision.
 

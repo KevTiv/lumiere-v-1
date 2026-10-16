@@ -14,15 +14,25 @@ The highest-value shift is from “module → dashboard → many entity tabs” 
 
 ## Key Changes
 
-### Studio Admin adoption — 2026-10-16 implementation
+### Lumière workspace refinement — 2026-10-16 implementation
 
-The first implementation uses [Studio Admin](https://studio-admin.arhamkhnz.com/dashboard/default),
+The first implementation studies [Studio Admin](https://studio-admin.arhamkhnz.com/dashboard/default),
 source revision `9bf6d382f24a9538bf64ecb319c1b58b4ee1a0bb`, as the visual and interaction
 reference. The implementation adapts Lumière's existing components and operations;
 no Studio source was copied. The source baseline is Lumière `ff98a918a607`;
 PR #218 integrates main `979de024` and preserves its Rwanda setup, import,
 tax/currency and company-scoped posting safeguards. Every invoice/bill create
 entry point, including overview actions, uses the setup-readiness gate.
+
+The delivered direction is **Lumière / Quiet Precision**, not a Studio skin:
+warm mineral surfaces, graphite type, restrained deep-teal interaction accents,
+leading header/navigation rules and paper-like documents. Dark mode has its own
+ink/slate roles; existing Ocean users retain violet/cool preferences. Status
+meaning remains independent of the brand accent. Shared renderer roles carry
+this direction into static and runtime forms, module/record headers, approved
+saved collection/detail previews, dashboard widgets and invoice documents,
+without adding persisted styling fields. Ownership and propagation are recorded
+in [the design-system plan](erp-ui-design-system-completion-plan.md#5-design-direction-and-source-references).
 
 Delivered in the working tree:
 
@@ -45,6 +55,10 @@ Delivered in the working tree:
   preview, visible payment/PDF actions, and explicit read failures.
 - Global border styling: Tailwind preflight now precedes the shared theme, so the
   neutral border token remains effective.
+- Mobile template behavior: wrapping titles/actions, full-width narrow-screen
+  form fields, bounded dialog scrolling, panel-contained wide tables and 44px
+  coarse-pointer Button/Input/Select/tab targets. Accounting summaries use one
+  column below 360px to retain readable amounts.
 
 Implementation owners remain `DashboardWorkspace`, `WorkspaceNav`, `ModuleView`,
 the Accounting route's overview model and controller, and the shared Accounting
@@ -60,13 +74,21 @@ authenticate, post a payment, create a persisted invoice, or establish U4/U5.
 
 Verification results for this working-tree implementation:
 
-- The integrated full UI suite passed: 622 tests across 102 files, including
+- The integrated full UI suite passed: 635 tests across 105 files, including
   shell preferences, command search, workspace navigation, create gates,
-  accounting lists, setup readiness and invoice submission.
+  accounting lists, setup readiness, invoice submission, shared style propagation
+  and selected light/dark/default/Ocean contrast contracts. This is not a blanket
+  accessibility certification of bespoke layouts or charts.
 - The integrated web unit suite passed: 388 tests, including Next configuration.
 - 34 model/navigation/action tests passed; rerun with the web package's
   `test:accounting-ui:models` script.
-- All 12 browser checks passed again after integration at 1440px and 390px.
+- All 36 browser checks passed after final style integration at 320, 390, 768
+  and 1440px, using the same bundled Geist fonts as production. This includes
+  actual configured module/static-form/saved-preview renderers, default and
+  Ocean light/dark modes, long action labels, opaque form focus rings, 44px
+  coarse controls and a 480px compact-height dialog-footer check. The latter is
+  not native software-keyboard certification; authenticated long-company
+  switching also remains outside this synthetic fixture.
   Use `test:e2e:accounting-ui` with an installed Playwright Chromium, or set
   `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH` to an existing Chromium executable.
 - The type-debt ratchet now has no new opaque-record occurrences and records

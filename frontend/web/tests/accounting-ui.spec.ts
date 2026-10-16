@@ -5,14 +5,15 @@ async function expectNoHorizontalOverflow(page: Page) {
   expect(sizes.document).toBeLessThanOrEqual(sizes.width)
 }
 
-for (const viewport of [{ width: 1440, height: 1000 }, { width: 390, height: 844 }]) {
+for (const viewport of [{ width: 320, height: 844 }, { width: 390, height: 844 }, { width: 768, height: 1000 }, { width: 1440, height: 1000 }]) {
   test.describe(`${viewport.width}px production components with synthetic data`, () => {
-    test.use({ viewport })
+    test.use({ viewport, hasTouch: viewport.width < 1024 })
 
     test.beforeEach(async ({ page }) => {
       await page.goto("/")
       await expect(page.getByTestId("fixture-disclosure")).toContainText("no backend operations")
       await expect(page.getByTestId("fixture-disclosure")).toHaveAttribute("data-hydrated", "true")
+      await page.evaluate(async () => { await document.fonts.ready })
       await expect(page.getByTestId("workspace-header")).toBeVisible()
     })
 
@@ -27,7 +28,15 @@ for (const viewport of [{ width: 1440, height: 1000 }, { width: 390, height: 844
       await expect(page.getByTestId("module-tab-accounting-fiscal-years")).toHaveAttribute("aria-selected", "true")
       await page.getByTestId("module-workspace-accounting-overview").click()
       await expectNoHorizontalOverflow(page)
-      await expect(page.getByRole("navigation", { name: "Accounting workspaces" })).toHaveCSS("border-top-color", "rgb(227, 227, 227)")
+      const border = await page.getByRole("navigation", { name: "Accounting workspaces" }).evaluate((element) => {
+        const probe = document.createElement("span")
+        probe.style.color = "hsl(var(--border))"
+        element.append(probe)
+        const expected = getComputedStyle(probe).color
+        probe.remove()
+        return { actual: getComputedStyle(element).borderTopColor, expected }
+      })
+      expect(border.actual).toBe(border.expected)
       await page.screenshot({ path: testInfo.outputPath(`accounting-${viewport.width}.png`), fullPage: true })
     })
 

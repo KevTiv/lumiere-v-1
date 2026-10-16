@@ -1,4 +1,5 @@
 import { cn } from "@/lib/utils"
+import { workspaceStyles } from "../lib/workspace-styles"
 
 export interface InvoiceCurrency {
   id?: string
@@ -42,7 +43,7 @@ export function InvoiceDocument({ title, company, reference, partnerLabel, partn
     if (line.quantity == null || line.unitPrice == null || line.discount == null) return null
     return line.quantity * line.unitPrice * (1 - line.discount / 100)
   }
-  return <article aria-label="Document preview" className={cn("min-w-0 rounded-lg border bg-card p-5 text-card-foreground shadow-sm sm:p-8", className)}>
+  return <article aria-label="Document preview" className={cn(workspaceStyles.document, "p-5 sm:p-8", className)}>
     <header className="flex flex-wrap items-start justify-between gap-4 border-b pb-6">
       <div><p className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">{draft ? "Draft document" : "Accounting document"}</p><h2 className="mt-2 text-2xl font-semibold tracking-tight">{title}</h2>{company ? <p className="mt-2 text-sm text-muted-foreground">{company}</p> : null}</div>
       <p className="max-w-full break-words font-mono text-sm text-muted-foreground">{reference || "Reference pending"}</p>
