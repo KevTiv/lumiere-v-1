@@ -2,7 +2,7 @@
 -- Migration version: 17
 -- Migration name: 0017_durable_projection_delta
 -- Checksum algorithm: sha256
--- Body checksum: sha256:1eb3aa95306c9fbc3cdcbb125ec6f1cdf7d22b41c540a50d33430f3959b4f8e1
+-- Body checksum: sha256:6e6981f63267896799d61a2076e560ba76f7a338cc79744a59d1411ae5406713
 
 -- Durable projection: purchase_order_creation_operation
 CREATE TABLE IF NOT EXISTS "purchase_order_creation_operation" (
@@ -17,7 +17,7 @@ CREATE TABLE IF NOT EXISTS "purchase_order_creation_operation" (
     CONSTRAINT "purchase_order_creation_operation_pkey" PRIMARY KEY ("id")
 );
 CREATE INDEX IF NOT EXISTS "purchase_order_creation_operation_purchase_order_id" ON "purchase_order_creation_operation" ("purchase_order_id");
-CREATE INDEX IF NOT EXISTS "purchase_order_creation_operation_organization_id_company_id" ON "purchase_order_creation_operation" ("organization_id", "company_id");
+CREATE INDEX IF NOT EXISTS "purchase_order_creation_operation_organization_id" ON "purchase_order_creation_operation" ("organization_id");
 -- Durable projection: purchase_receipt_operation
 CREATE TABLE IF NOT EXISTS "purchase_receipt_operation" (
     "id" TEXT NOT NULL,
@@ -39,4 +39,4 @@ CREATE TABLE IF NOT EXISTS "purchase_receipt_operation" (
     CONSTRAINT "purchase_receipt_operation_pkey" PRIMARY KEY ("id")
 );
 CREATE INDEX IF NOT EXISTS "purchase_receipt_operation_line_id" ON "purchase_receipt_operation" ("line_id");
-CREATE INDEX IF NOT EXISTS "purchase_receipt_operation_organization_id_company_id" ON "purchase_receipt_operation" ("organization_id", "company_id");
+CREATE INDEX IF NOT EXISTS "purchase_receipt_operation_organization_id" ON "purchase_receipt_operation" ("organization_id");
