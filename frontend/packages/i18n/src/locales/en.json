@@ -2927,7 +2927,7 @@
       "quantity": "Bill quantity",
       "price": "Unit price",
       "unavailable": "This bill line has no supported exact PO source. Refresh and review its lineage.",
-      "description": "Review the supplier bill and correct its economic values. PO unit price: {{price}}; received quantity: {{received}}. Expense, payable, bill totals and PO billed quantities update together. Supported for untaxed bills in the company currency; do not widen matching tolerances to clear a variance."
+      "description": "Review the supplier bill and correct its economic values. PO unit price: {{price}}; received quantity: {{received}}. Expense, payable, bill totals and PO billed quantities update together. Existing discounts are preserved. Linked percentage tax rows and currency amounts are recalculated using the bill-date exchange rate. Inconsistent tax or currency evidence must be reviewed; do not widen matching tolerances to clear a variance."
     }
   },
   "crm": {

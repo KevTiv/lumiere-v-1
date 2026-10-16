@@ -7,7 +7,7 @@ use crate::accounting::chart_of_accounts::{
 };
 use crate::accounting::journal_entries::{
     account_move, account_move_line, create_bill_from_purchase_order, post_invoice,
-    CreateBillFromPurchaseOrderParams,
+    update_account_move_line, CreateBillFromPurchaseOrderParams, UpdateAccountMoveLineParams,
 };
 use crate::accounting::tax_management::{
     account_tax, account_tax_group, AccountTax, AccountTaxGroup,
@@ -253,6 +253,7 @@ fn cycle(ctx: &ReducerContext, taxed: bool, foreign: bool, included: bool) -> Re
     if first == second {
         return Err("later receipt reused the earlier bill".into());
     }
+    correct_and_verify(ctx, &fixture, po_id, second, taxed, foreign, included)?;
     let unchanged = ctx
         .db
         .account_move()
@@ -272,6 +273,119 @@ fn cycle(ctx: &ReducerContext, taxed: bool, foreign: bool, included: bool) -> Re
         || unchanged.amount_total_signed != first_after.amount_total_signed
     {
         return Err("partial tax/FX billing altered the prior bill or source conservation".into());
+    }
+    Ok(())
+}
+
+fn correct_and_verify(
+    ctx: &ReducerContext,
+    fixture: &OrgFixture,
+    po_id: u64,
+    bill_id: u64,
+    taxed: bool,
+    foreign: bool,
+    included: bool,
+) -> Result<(), String> {
+    let org = fixture.organization_id;
+    let product = ctx
+        .db
+        .account_move_line()
+        .move_line_by_move()
+        .filter(&bill_id)
+        .find(|line| line.product_id.is_some())
+        .ok_or("product")?;
+    let correction = |quantity, expected_quantity| UpdateAccountMoveLineParams {
+        company_id: Some(fixture.company_id),
+        name: None,
+        debit: None,
+        credit: None,
+        partner_id: None,
+        analytic_account_id: None,
+        metadata: None,
+        quantity: Some(quantity),
+        price_unit: Some(product.price_unit),
+        expected_quantity: Some(expected_quantity),
+        expected_price_unit: Some(product.price_unit),
+    };
+
+    update_account_move_line(ctx, org, product.id, correction(1.0, 2.0))?;
+    verify_corrected_bill(
+        ctx, po_id, bill_id, product.id, taxed, foreign, included, 1.0,
+    )?;
+
+    update_account_move_line(ctx, org, product.id, correction(2.0, 1.0))?;
+    verify_corrected_bill(
+        ctx, po_id, bill_id, product.id, taxed, foreign, included, 2.0,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+fn verify_corrected_bill(
+    ctx: &ReducerContext,
+    po_id: u64,
+    bill_id: u64,
+    product_id: u64,
+    taxed: bool,
+    foreign: bool,
+    included: bool,
+    quantity: f64,
+) -> Result<(), String> {
+    let bill = ctx.db.account_move().id().find(&bill_id).ok_or("bill")?;
+    let lines: Vec<_> = ctx
+        .db
+        .account_move_line()
+        .move_line_by_move()
+        .filter(&bill_id)
+        .collect();
+    let product = lines
+        .iter()
+        .find(|line| line.id == product_id)
+        .ok_or("corrected product")?;
+    let source = ctx
+        .db
+        .purchase_order_line()
+        .purchase_order_line_by_order()
+        .filter(&po_id)
+        .find(|line| line.invoice_lines.contains(&product_id))
+        .ok_or("exact source")?;
+    let net = quantity * 10.0 * 0.9 / if included { 1.2 } else { 1.0 };
+    let tax = if taxed { net * 0.2 } else { 0.0 };
+    let rate = if foreign { 1.25 } else { 1.0 };
+    let ledger = |amount: f64| {
+        if foreign {
+            (amount * rate * 100.0).round() / 100.0
+        } else {
+            amount
+        }
+    };
+    let debit: f64 = lines.iter().map(|line| line.debit).sum();
+    let credit: f64 = lines.iter().map(|line| line.credit).sum();
+    let tax_lines: Vec<_> = lines
+        .iter()
+        .filter(|line| line.tax_line_id.is_some())
+        .collect();
+    if product.quantity != quantity
+        || product.discount != 10.0
+        || (product.price_subtotal - net).abs() > 1e-8
+        || (product.price_total - net - tax).abs() > 1e-8
+        || (bill.amount_untaxed - net).abs() > 1e-8
+        || (bill.amount_tax - tax).abs() > 1e-8
+        || (bill.amount_total - net - tax).abs() > 1e-8
+        || (bill.amount_total_signed - ledger(net) - ledger(tax)).abs() > 1e-8
+        || (debit - credit).abs() > 1e-8
+        || tax_lines.len() != usize::from(taxed)
+        // The first posted bill retained one unit; this draft owns the corrected remainder.
+        || (source.qty_invoiced - (1.0 + quantity)).abs() > 1e-8
+    {
+        return Err(
+            "corrected tax/FX bill did not conserve document, ledger, or source amounts".into(),
+        );
+    }
+    if taxed
+        && ((tax_lines[0].price_total - tax).abs() > 1e-8
+            || (tax_lines[0].tax_base_amount - net).abs() > 1e-8)
+    {
+        return Err("corrected tax row amount or base is inconsistent".into());
     }
     Ok(())
 }
