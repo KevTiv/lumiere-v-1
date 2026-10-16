@@ -3893,7 +3893,7 @@ fn validate_uniform_po_tax_evidence(
 fn validate_uniform_tax_evidence_values(
     lines: impl IntoIterator<Item = (f64, f64, f64)>,
 ) -> Result<(), String> {
-    let mut effective_rate = None;
+    let mut effective_rate: Option<f64> = None;
     for (quantity, price, tax) in lines {
         let gross = quantity * price;
         if !gross.is_finite() || !tax.is_finite() || tax < 0.0 {
