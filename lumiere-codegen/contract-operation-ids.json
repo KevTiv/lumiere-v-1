@@ -1084,6 +1084,7 @@
     "run_purchasing_bill_balanced_test": "erp.run_purchasing_bill_balanced_test",
     "run_purchasing_company_isolation_test": "erp.run_purchasing_company_isolation_test",
     "run_purchasing_incoming_picking_test": "erp.run_purchasing_incoming_picking_test",
+    "run_purchasing_keyed_operations_test": "erp.run_purchasing_keyed_operations_test",
     "run_purchasing_lot_receive_test": "erp.run_purchasing_lot_receive_test",
     "run_purchasing_phase_0_containment_test": "erp.run_purchasing_phase_0_containment_test",
     "run_purchasing_phase_0_fixture_test": "erp.run_purchasing_phase_0_fixture_test",

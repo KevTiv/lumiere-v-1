@@ -3695,6 +3695,11 @@
       "reason": "isolated persisted domain proof; never exposed through the session BFF"
     },
     {
+      "name": "run_purchasing_keyed_operations_test",
+      "exposure": "denied",
+      "reason": "isolated persisted keyed purchasing replay proof; never exposed through the session BFF"
+    },
+    {
       "name": "run_manufacturing_bom_to_close_domain_lifecycle_test",
       "exposure": "denied",
       "reason": "isolated persisted manufacturing lifecycle proof; never exposed through the session BFF"

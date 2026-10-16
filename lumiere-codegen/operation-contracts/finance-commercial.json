@@ -3921,6 +3921,16 @@
       },
       "evidence": "spacetimedb/tests/purchasing/mod.rs: denied test reducer invokes purchasing test assertions"
     },
+    "run_purchasing_keyed_operations_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/tests/purchasing/mod.rs: denied test reducer invokes keyed purchase-order creation and receipt replay assertions"
+    },
     "run_purchasing_lot_receive_test": {
       "semantic_kind": "test",
       "client_facing": false,
