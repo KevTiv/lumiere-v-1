@@ -36,6 +36,7 @@ import {
   purchaseOrderStorageKey,
   type PurchaseOrderCreationResult,
 } from "./purchasing-order-invocation"
+import { toSubmitSupplierIntakeParams } from "./purchasing-supplier-intake"
 import {
   APPLY_LANDED_COST_AFFECTS,
   AWARD_RFQ_BID_AFFECTS,
@@ -1074,7 +1075,9 @@ export function useCreateSupplierIntake(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, Record<string, unknown>>({
     mutationFn: async (params) => {
-      const { urlPath, init } = stdbBffCommandPost("submit_supplier_intake", { params: stdbParamsToJson(params as object) })
+      const { urlPath, init } = stdbBffCommandPost("submit_supplier_intake", {
+        params: toSubmitSupplierIntakeParams(params),
+      })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to submit supplier intake')
     },
@@ -1113,7 +1116,9 @@ export function useSubmitSupplierIntake(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, Record<string, unknown>>({
     mutationFn: async (params) => {
-      const { urlPath, init } = stdbBffCommandPost("submit_supplier_intake", { params: stdbParamsToJson(params as object) })
+      const { urlPath, init } = stdbBffCommandPost("submit_supplier_intake", {
+        params: toSubmitSupplierIntakeParams(params),
+      })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to submit supplier intake')
     },

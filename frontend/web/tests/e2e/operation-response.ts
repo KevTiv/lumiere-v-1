@@ -15,6 +15,12 @@ export function matchesOperationResponse(
 ): boolean {
   const pathname = new URL(response.url()).pathname
   const encodedName = encodeURIComponent(operationName)
+  if (operationName.startsWith("erp.")) {
+    return (
+      pathname === `/api/operations/${encodedName}` ||
+      pathname === `/v1/operations/${encodedName}`
+    )
+  }
   if (
     pathname === `/api/compat/reducer/${encodedName}` ||
     pathname === `/v1/compat/reducer/${encodedName}`
