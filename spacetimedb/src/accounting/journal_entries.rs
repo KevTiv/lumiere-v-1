@@ -1256,6 +1256,7 @@ pub fn post_invoice(
         organization_id,
         move_record.company_id,
         &move_record.move_type,
+        move_record.partner_id,
         move_record.metadata.as_deref(),
     )?;
 
@@ -1367,6 +1368,7 @@ pub fn create_account_move(
         organization_id,
         company_id,
         &params.move_type,
+        params.partner_id,
         params.metadata.as_deref(),
     )?;
 
@@ -1487,6 +1489,7 @@ fn capture_invoice_metadata_for_move(
     organization_id: u64,
     company_id: u64,
     move_type: &MoveType,
+    partner_id: Option<u64>,
     metadata: Option<&str>,
 ) -> Result<Option<String>, String> {
     if matches!(move_type, MoveType::OutInvoice | MoveType::OutRefund) {
@@ -1494,6 +1497,7 @@ fn capture_invoice_metadata_for_move(
             ctx,
             organization_id,
             company_id,
+            partner_id,
             metadata,
         )
         .map(Some)
@@ -1901,6 +1905,7 @@ pub fn create_manual_invoice(
         organization_id,
         params.company_id,
         &params.move_type,
+        Some(params.partner_id),
         params.metadata.as_deref(),
     )?;
     let metadata = manual_invoice_metadata(metadata.as_deref(), &params.idempotency_key);
@@ -2453,6 +2458,7 @@ pub fn post_account_move_impl(
         organization_id,
         move_record.company_id,
         &move_record.move_type,
+        move_record.partner_id,
         move_record.metadata.as_deref(),
     )?;
 
@@ -3037,6 +3043,7 @@ pub fn create_invoice_from_sale_order(
             organization_id,
             order.company_id,
             &MoveType::OutInvoice,
+            Some(order.partner_invoice_id),
             params.metadata.as_deref().or(order.note.as_deref()),
         )?,
     });
@@ -3635,6 +3642,7 @@ pub fn create_credit_note_from_invoice(
         organization_id,
         company_id,
         &MoveType::OutRefund,
+        source.partner_id,
         metadata.as_deref(),
     )?;
 
@@ -4244,6 +4252,14 @@ pub fn bill_timesheets(
     }
     let amount_total = amount_untaxed + amount_tax;
 
+    let invoice_metadata = capture_invoice_metadata_for_move(
+        ctx,
+        organization_id,
+        company_id,
+        &MoveType::OutInvoice,
+        Some(params.partner_id),
+        None,
+    )?;
     let move_row = ctx.db.account_move().insert(AccountMove {
         id: 0,
         organization_id,
@@ -4297,7 +4313,7 @@ pub fn bill_timesheets(
         create_date: Some(ctx.timestamp),
         write_uid: Some(ctx.sender()),
         write_date: Some(ctx.timestamp),
-        metadata: None,
+        metadata: invoice_metadata,
     });
 
     let move_id = move_row.id;
@@ -4525,6 +4541,7 @@ pub fn bill_project_milestone(
         .find(&company_id)
         .ok_or("Company not found")?;
 
+    let invoice_metadata = capture_invoice_metadata_for_move(ctx, organization_id, company_id, &MoveType::OutInvoice, Some(partner_id), Some(&serde_json::json!({ "kind": "project_milestone_bill", "milestone_id": milestone_id, "project_id": milestone.project_id, "percent_complete": percent }).to_string()))?;
     let move_row = ctx.db.account_move().insert(AccountMove {
         id: 0,
         organization_id,
@@ -4578,15 +4595,7 @@ pub fn bill_project_milestone(
         create_date: Some(ctx.timestamp),
         write_uid: Some(ctx.sender()),
         write_date: Some(ctx.timestamp),
-        metadata: Some(
-            serde_json::json!({
-                "kind": "project_milestone_bill",
-                "milestone_id": milestone_id,
-                "project_id": milestone.project_id,
-                "percent_complete": percent,
-            })
-            .to_string(),
-        ),
+        metadata: invoice_metadata,
     });
     let move_id = move_row.id;
 

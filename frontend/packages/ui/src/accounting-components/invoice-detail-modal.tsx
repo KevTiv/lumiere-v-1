@@ -97,7 +97,7 @@ export function InvoiceDetailModal({ invoice, open, onClose, currencyCode, curre
             {onDownloadPdf ? <Button type="button" variant="outline" className="w-full justify-start gap-2" disabled={downloadPdfPending} onClick={onDownloadPdf}><Download className="size-4" />{t("accounting.invoices.invoiceActions.download")}</Button> : null}
             {canCreateCreditNote ? <Button type="button" variant="ghost" className="w-full justify-start gap-2" data-testid="invoice-detail-create-credit-note" onClick={onCreateCreditNote}><FileText className="size-4" />{t("accounting.invoices.invoiceActions.createCreditNote")}</Button> : null}
             {hasMoreActions ? <DropdownMenu><DropdownMenuTrigger asChild><Button type="button" variant="outline" className="w-full justify-between">More actions<MoreHorizontal className="size-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end">
-              {onSendEmail ? <DropdownMenuItem disabled={sendEmailPending} onSelect={onSendEmail}><Send />{t("accounting.invoices.invoiceActions.send")}</DropdownMenuItem> : null}
+              {onSendEmail ? <DropdownMenuItem disabled={sendEmailPending} onSelect={onSendEmail}><Send />Review email</DropdownMenuItem> : null}
               {onArchivePdf ? <DropdownMenuItem disabled={archivePdfPending} onSelect={onArchivePdf}><Archive />Archive to Documents</DropdownMenuItem> : null}
               {isDraft && moveTypeIsInvoiceOrRefund(invoice.moveType) && onRecalculateTotals ? <DropdownMenuItem disabled={recalculateTotalsPending} onSelect={onRecalculateTotals}><Calculator />{t("accounting.invoices.invoiceActions.recalculateTotals")}</DropdownMenuItem> : null}
             </DropdownMenuContent></DropdownMenu> : null}

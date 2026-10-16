@@ -1,6 +1,6 @@
 import { cn } from "@/lib/utils"
 import { workspaceStyles } from "../lib/workspace-styles"
-import { isManagedInvoiceLogoUrl, parseInvoiceContent, parseInvoiceDocumentSnapshot, parseInvoiceNotes, resolveInvoiceContent, type InvoiceDocumentSnapshot, type InvoicePersonalizationProfile } from "@lumiere/erp-shared/invoice-personalization"
+import { invoiceBuyerSnapshot, isManagedInvoiceLogoUrl, parseInvoiceContent, parseInvoiceDocumentSnapshot, parseInvoiceNotes, resolveInvoiceContent, type InvoiceDocumentSnapshot, type InvoicePersonalizationProfile } from "@lumiere/erp-shared/invoice-personalization"
 
 /** Issued content never inherits settings published after the document was captured. */
 export function readInvoiceDocumentContent(metadata: unknown, organizationId?: number | string | bigint, personalized = true) {
@@ -19,9 +19,13 @@ export function readInvoiceDocumentContent(metadata: unknown, organizationId?: n
 export function resolveDraftInvoiceDocument(metadata: unknown, profile: InvoicePersonalizationProfile, profileVersionIds: InvoiceDocumentSnapshot["profileVersionIds"], seller: InvoiceDocumentSnapshot["seller"]) {
   const content = parseInvoiceContent(metadata)
   const notes = parseInvoiceNotes(metadata)
+  const captured = parseInvoiceDocumentSnapshot(metadata)
   if (content.status === "invalid" || notes.status === "invalid") return { personalization: null, personalizationError: content.status === "invalid" ? content.error : notes.status === "invalid" ? notes.error : undefined }
+  if (captured.status === "invalid") return { personalization: null, personalizationError: captured.error }
+  const capturedBuyer = captured.status === "valid" ? invoiceBuyerSnapshot(captured.value) : null
+  const reviewedBuyer = capturedBuyer?.status === "valid" ? capturedBuyer.value : undefined
   return {
-    personalization: { schemaVersion: 1, profileVersionIds, seller, profile: resolveInvoiceContent(profile, content.status === "valid" ? content.value : undefined), notes: notes.status === "valid" ? notes.value : "" } satisfies InvoiceDocumentSnapshot,
+    personalization: { ...(reviewedBuyer ? { schemaVersion: 2 as const, buyer: reviewedBuyer } : { schemaVersion: 1 as const }), profileVersionIds, seller, profile: resolveInvoiceContent(profile, content.status === "valid" ? content.value : undefined), notes: notes.status === "valid" ? notes.value : "" } satisfies InvoiceDocumentSnapshot,
     personalizationError: undefined,
   }
 }
@@ -73,6 +77,8 @@ export function InvoiceDocument({ title, company, reference, partnerLabel, partn
   }
   const profile = personalization?.profile
   const seller = personalization?.seller
+  const buyerRead = personalization ? invoiceBuyerSnapshot(personalization) : null
+  const buyer = buyerRead?.status === "valid" ? buyerRead.value : null
   const accent = ({ teal: "#14635d", blue: "#2457a6", slate: "#334155", violet: "#6941a5", "": "#334155" } as const)[profile?.accent ?? "slate"]
   const logo = profile?.logoUrl && isManagedInvoiceLogoUrl(profile.logoUrl) ? profile.logoUrl : undefined
   const documentNotes = personalization?.notes ?? notes
@@ -100,7 +106,16 @@ export function InvoiceDocument({ title, company, reference, partnerLabel, partn
       <p className="max-w-full font-mono text-sm text-slate-600 [overflow-wrap:anywhere]">{reference || "Reference pending"}</p>
     </header>
     <div className="grid gap-5 py-6 sm:grid-cols-2">
-      <div className="min-w-0"><p className="text-xs font-medium uppercase tracking-wide text-slate-600">{partnerLabel}</p><p className="mt-2 font-medium [overflow-wrap:anywhere]">{partner || "Select a partner"}</p></div>
+      <div className="min-w-0"><p className="text-xs font-medium uppercase tracking-wide text-slate-600">{partnerLabel}</p><p className="mt-2 font-medium [overflow-wrap:anywhere]">{buyer?.name || partner || "Select a partner"}</p>
+        {buyer ? <div className="mt-2 space-y-1 text-xs leading-relaxed text-slate-600" aria-label="Captured customer billing details">
+          {buyer.address.map((line, index) => <p key={index}>{line}</p>)}
+          {buyer.taxId ? <p>Tax ID: {buyer.taxId}</p> : null}
+          {buyer.registrationNumber ? <p>Registration number: {buyer.registrationNumber}</p> : null}
+          {buyer.email ? <p>Email: {buyer.email}</p> : null}
+          {buyer.phone ? <p>Phone: {buyer.phone}</p> : null}
+          {draft ? <p className="pt-2">Captured when this draft was created. Posting refreshes billing details from the linked customer.</p> : null}
+        </div> : personalization ? <p className="mt-2 text-xs leading-relaxed text-slate-600">{draft ? "Customer billing details are unavailable in this preview." : "Customer billing details were not captured on this document."}</p> : null}
+      </div>
       <dl className="min-w-0 space-y-2 text-sm"><div className="flex flex-wrap justify-between gap-x-4 gap-y-1"><dt className="text-slate-600">Issue date</dt><dd>{date || "—"}</dd></div><div className="flex flex-wrap justify-between gap-x-4 gap-y-1"><dt className="text-slate-600">Due date</dt><dd>{dueDate || "—"}</dd></div></dl>
     </div>
     {profile?.notice ? <section aria-label="Notice" className="mb-6 rounded-md border p-3" style={{ borderColor: accent }}><h3 className="text-xs font-semibold uppercase tracking-wide" style={{ color: accent }}>Notice</h3><p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed [overflow-wrap:anywhere]">{profile.notice}</p></section> : null}

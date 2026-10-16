@@ -374,15 +374,14 @@ pub fn mark_mail_message_delivered(
         return Err("mail message does not belong to this organization".to_string());
     }
 
-    let metadata = delivery_metadata.or_else(|| {
-        Some(
-            serde_json::json!({
-                "delivery": "sent",
-                "sent_at": ctx.timestamp.to_duration_since_unix_epoch().unwrap_or_default().as_micros(),
-            })
-            .to_string(),
-        )
-    });
+    let metadata = Some(delivered_metadata(
+        message.metadata.as_deref(),
+        delivery_metadata.as_deref(),
+        ctx.timestamp
+            .to_duration_since_unix_epoch()
+            .unwrap_or_default()
+            .as_micros(),
+    ));
 
     ctx.db.mail_message().id().update(MailMessage {
         metadata,
@@ -405,6 +404,37 @@ pub fn mark_mail_message_delivered(
     );
 
     Ok(())
+}
+
+/// Preserve queue-review evidence across delivery, including legacy malformed metadata.
+/// Provider extras may add keys but cannot rewrite the original reviewed message.
+fn delivered_metadata(existing: Option<&str>, provided: Option<&str>, sent_at: u128) -> String {
+    let mut object = metadata_object(existing).unwrap_or_default();
+    if object.is_empty() && metadata_object(existing).is_none() {
+        if let Some(raw) = existing {
+            object.insert(
+                "legacyMetadata".into(),
+                serde_json::Value::String(raw.into()),
+            );
+        }
+    }
+    match metadata_object(provided) {
+        Some(extra) => {
+            for (key, value) in extra {
+                object.entry(key).or_insert(value);
+            }
+        }
+        None => {
+            if let Some(raw) = provided {
+                object
+                    .entry("deliveryMetadataLegacy".to_string())
+                    .or_insert_with(|| serde_json::Value::String(raw.into()));
+            }
+        }
+    }
+    object.insert("delivery".into(), serde_json::json!("sent"));
+    object.insert("sent_at".into(), serde_json::json!(sent_at));
+    serde_json::Value::Object(object).to_string()
 }
 
 // ── Notification read state ───────────────────────────────────────────────────
@@ -534,4 +564,49 @@ pub fn mark_all_notifications_read(
         });
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod delivery_tests {
+    use super::*;
+
+    #[test]
+    fn delivery_preserves_exact_review_evidence_and_updates_status() {
+        let original = r#"{"delivery":"queued","context_json":"{\"reviewId\":\"unique\"}","mail_template_id":17,"to":"buyer@example.test","subject":"Reviewed subject","html":"Reviewed body","attach_document":false}"#;
+        let result: serde_json::Value = serde_json::from_str(&delivered_metadata(Some(original), Some(r#"{"provider_id":"message17","to":"changed@example.test","subject":"Changed","delivery":"failed","sent_at":0}"#), 123)).expect("metadata");
+        let original: serde_json::Value = serde_json::from_str(original).expect("original");
+        for key in [
+            "context_json",
+            "mail_template_id",
+            "to",
+            "subject",
+            "html",
+            "attach_document",
+        ] {
+            assert_eq!(result[key], original[key]);
+        }
+        assert_eq!(result["delivery"], "sent");
+        assert_eq!(result["sent_at"], 123);
+        assert_eq!(result["provider_id"], "message17");
+    }
+
+    #[test]
+    fn malformed_delivery_metadata_is_preserved_not_interpreted_as_queue_evidence() {
+        for raw in ["legacy raw", "[]", "{bad", "null"] {
+            let result: serde_json::Value = serde_json::from_str(&delivered_metadata(
+                Some(raw),
+                Some("bad provider data"),
+                456,
+            ))
+            .expect("metadata");
+            assert_eq!(result["legacyMetadata"], raw);
+            assert_eq!(result["deliveryMetadataLegacy"], "bad provider data");
+            assert_eq!(result["delivery"], "sent");
+            assert_eq!(result["sent_at"], 456);
+            assert!(result.get("context_json").is_none());
+        }
+        let result: serde_json::Value =
+            serde_json::from_str(&delivered_metadata(None, None, 789)).expect("metadata");
+        assert_eq!(result, serde_json::json!({"delivery":"sent","sent_at":789}));
+    }
 }

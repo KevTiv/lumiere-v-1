@@ -179,6 +179,70 @@ still require the configured runtime test stack. Parent PR security
 classification and authenticated workflow gates
 remain prerequisites for merging this follow-up.
 
+### Accounting workflow gaps — alpha follow-up implementation
+
+This batch follows invoice personalization (#221) and the workspace foundation
+(#218). It adapts the reference dashboard's reusable worklist and review patterns
+within **Quiet Precision**; no reference-project source, theme, or backend is
+imported. Shared Accounting compositions use the existing EntityTable engine,
+semantic tokens, typography and responsive controls rather than a parallel shell.
+
+- Invoice and bill worklists now share search, currency/status/queue filters,
+  named local views, column choices and scoped CSV export. Preferences are scoped
+  by organization, company, user and document kind; anonymous scope is volatile.
+  Canonical URL filters remain authoritative. Unreadable sources hide cached rows
+  and totals; exports retain currency context even when the currency column is
+  hidden. Identifiers stay exact through selection and navigation.
+- Posted customer invoices and credit notes have an explicit email review step:
+  recipient, eligible literal template, acknowledgement and queue confirmation.
+  The existing queue reducer atomically validates the tagged review's exact
+  scope, template content and invoice revision before inserting. Unknown outcomes
+  retain the original request for read-only inspection and never auto-retry.
+  This is **queue-only**: no organization-wide dispatch, editable per-send message,
+  placeholder interpolation, PDF attachment or recipient-delivery claim.
+- The bank workbench replaces raw numeric-ID reconciliation entry with scoped
+  records, canonical document links, signed totals, exact-match review and an
+  explicit confirmation. It requires known currency precision, posted eligible
+  ledger lines and a fully readable Open statement. Unknown outcomes lock competing
+  edits and retain the original scope for read-only recovery. The existing reducer
+  **links bank records only**; it does not settle invoice/payment/ledger balances.
+  FX, partial matches, write-offs and automatic rule application remain excluded.
+- Invoice snapshot V2 captures the linked customer's legal name, address, tax and
+  registration details, email and phone. Draft previews preserve the captured
+  buyer; posting refreshes it from the canonical scoped customer. Issued documents
+  never substitute current CRM data. V1 remains readable with an explicit missing
+  billing-details notice. API/PDF and shared UI readers support both versions;
+  deploy these readers before or with producers that emit V2. No table or reducer
+  signature changes, generated-contract release or data backfill are required.
+- Responsive coverage adds the actual shared worklist, email review, bank
+  workbench and V1/V2 paper document to the synthetic browser fixture at 320,
+  390, 768 and 1440px. Table scrolling stays inside its panel; controls wrap and
+  primary touch targets are 44px. The fixture does not prove authentication,
+  real queue execution, database authorization or PDF-worker execution.
+
+Existing command transport cannot represent write identifiers above JavaScript's
+safe integer range. Those writes fail explicitly before dispatch, rather than
+rounding; readable identifiers and links retain full u64 precision. Existing
+untagged mail callers remain compatible. Delivery metadata now preserves review
+correlation when the dispatcher marks a message sent; that state is not proof
+that the recipient received or opened it.
+
+Remaining accounting work is separate: collections/reminders, bill and receipt
+intake, close/report workflows, per-send content and attachments, multilingual
+templates, richer printable custom fields and actual accounting settlement.
+Parent-stack CI failures and configured-stack runtime checks remain merge gates;
+synthetic component tests must not be presented as equivalent evidence.
+
+Local verification for this batch: 699 shared UI tests, 395 web unit tests,
+34 Accounting model/record checks, 13 shared personalization tests, four bank
+readback tests and 38 isolated exact-source Rust helper tests passed. UI/web
+TypeScript checks, the production Next build, API library compilation and module
+production/test-target compilation passed. The Rust helper harness does not
+execute database reducers; the module test-target check compiles but does not run
+configured-stack scenarios. i18n and browser-operation transport checks passed.
+Removing an unused legacy bank-state helper lowered the tracked opaque-record
+baseline by one (2340 to 2339); no baseline or allowlist was raised.
+
 ### 1. Rebuild the application shell and navigation
 
 - Replace the seven-group, 25-destination sidebar with:

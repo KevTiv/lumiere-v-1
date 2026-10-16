@@ -2,6 +2,7 @@
 
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
+use crate::accounting::journal_entries::account_move;
 use crate::core::messaging::{mail_message, MailMessage};
 use crate::core::organization::require_company_in_organization;
 use crate::documents::invoice_profile::{
@@ -133,6 +134,187 @@ pub struct QueueMailFromTemplateParams {
     pub res_id: u64,
     pub recipient_email: String,
     pub context_json: Option<String>,
+}
+
+// Only the opt-in invoiceReview envelope strengthens the legacy queue contract.
+// These pure views keep the final comparison independent of serialization details.
+struct InvoiceMailReview {
+    organization_id: u64,
+    company_id: u64,
+    move_id: u64,
+    template_id: u64,
+    subject: String,
+    body_html: String,
+    attach_document: bool,
+    revision: Vec<serde_json::Value>,
+}
+
+struct ReviewedMailTemplate<'a> {
+    organization_id: u64,
+    company_id: Option<u64>,
+    model: &'a str,
+    active: bool,
+    subject: &'a str,
+    body_html: &'a str,
+    attach_document: bool,
+}
+
+struct ReviewedMailRecord<'a> {
+    organization_id: u64,
+    company_id: u64,
+    state: &'a str,
+    move_type: &'a str,
+    amount_total: f64,
+    currency_id: u64,
+    name: &'a str,
+    partner_display_name: &'a str,
+    metadata: Option<&'a str>,
+}
+
+fn parse_invoice_mail_review(context: Option<&str>) -> Result<Option<InvoiceMailReview>, String> {
+    let Some(raw) = context else { return Ok(None) };
+    let tagged = raw
+        .match_indices("\"invoiceReview\"")
+        .any(|(offset, key)| raw[offset + key.len()..].trim_start().starts_with(':'));
+    let value: serde_json::Value = match serde_json::from_str(raw) {
+        Ok(value) => value,
+        Err(_) if tagged => return Err("invoice email review context is malformed".into()),
+        Err(_) => return Ok(None),
+    };
+    let Some(review) = value.get("invoiceReview") else {
+        return Ok(None);
+    };
+    if raw.len() > 131_072 {
+        return Err("invoice email review context exceeds 131072 bytes".into());
+    }
+    let review = review
+        .as_object()
+        .ok_or("invoice email review must be an object")?;
+    if review
+        .get("schemaVersion")
+        .and_then(serde_json::Value::as_u64)
+        != Some(1)
+    {
+        return Err("invoice email review schema is unsupported".into());
+    }
+    let text = |key: &str, limit: usize| -> Result<String, String> {
+        let value = review
+            .get(key)
+            .and_then(serde_json::Value::as_str)
+            .ok_or_else(|| format!("invoice email review {key} is unavailable"))?;
+        if value.len() > limit {
+            return Err(format!("invoice email review {key} exceeds {limit} bytes"));
+        }
+        Ok(value.to_string())
+    };
+    let id = |key: &str| -> Result<u64, String> {
+        let value = text(key, 20)?;
+        let parsed = value
+            .parse::<u64>()
+            .ok()
+            .filter(|id| *id > 0)
+            .ok_or_else(|| format!("invoice email review {key} is invalid"))?;
+        if parsed.to_string() != value {
+            return Err(format!("invoice email review {key} is not canonical"));
+        }
+        Ok(parsed)
+    };
+    if text("reviewId", 128)?.trim().is_empty() {
+        return Err("invoice email review ID is required".into());
+    }
+    if review
+        .get("pdfAttached")
+        .and_then(serde_json::Value::as_bool)
+        != Some(false)
+    {
+        return Err("invoice email PDF attachments are not supported".into());
+    }
+    let attach_document = review
+        .get("expectedAttachDocument")
+        .and_then(serde_json::Value::as_bool)
+        .ok_or("invoice email review attachment state is unavailable")?;
+    if attach_document {
+        return Err("invoice email PDF attachments are not supported".into());
+    }
+    let revision: Vec<serde_json::Value> =
+        serde_json::from_str(&text("recordRevision", 65_536)?)
+            .map_err(|_| "invoice email record revision is malformed")?;
+    if revision.len() != 7
+        || revision[0].as_str().is_none()
+        || revision[1].as_str().is_none()
+        || !revision[2].as_f64().is_some_and(f64::is_finite)
+        || revision[3].as_str().is_none()
+        || revision[4].as_str().is_none()
+        || revision[5].as_str().is_none()
+        || !(revision[6].is_null() || revision[6].is_string())
+    {
+        return Err("invoice email record revision is incomplete".into());
+    }
+    Ok(Some(InvoiceMailReview {
+        organization_id: id("organizationId")?,
+        company_id: id("companyId")?,
+        move_id: id("moveId")?,
+        template_id: id("templateId")?,
+        subject: text("expectedSubject", 4096)?,
+        body_html: text("expectedBodyHtml", 65_536)?,
+        attach_document,
+        revision,
+    }))
+}
+
+fn validate_invoice_mail_review(
+    review: &InvoiceMailReview,
+    organization_id: u64,
+    company_id: u64,
+    model: &str,
+    res_id: u64,
+    template_id: u64,
+    template: &ReviewedMailTemplate<'_>,
+    record: &ReviewedMailRecord<'_>,
+) -> Result<(), String> {
+    if model != "account_move"
+        || review.organization_id != organization_id
+        || review.company_id != company_id
+        || review.move_id != res_id
+        || review.template_id != template_id
+        || record.organization_id != organization_id
+        || record.company_id != company_id
+    {
+        return Err(
+            "invoice email review target is outside the reviewed organization/company".into(),
+        );
+    }
+    if template.organization_id != organization_id
+        || template.company_id.is_some_and(|id| id != company_id)
+        || template.model != "account_move"
+        || !template.active
+    {
+        return Err("invoice email template is unavailable in the reviewed company".into());
+    }
+    if template.subject != review.subject
+        || template.body_html != review.body_html
+        || template.attach_document != review.attach_document
+        || template.attach_document
+    {
+        return Err(
+            "invoice email template changed after review; review the current message".into(),
+        );
+    }
+    if record.state != "Posted" || !matches!(record.move_type, "OutInvoice" | "OutRefund") {
+        return Err("invoice email requires a posted outgoing invoice or credit note".into());
+    }
+    let revision = &review.revision;
+    if revision[0].as_str() != Some(record.state)
+        || revision[1].as_str() != Some(record.move_type)
+        || revision[2].as_f64() != Some(record.amount_total)
+        || revision[3].as_str() != Some(record.currency_id.to_string().as_str())
+        || revision[4].as_str() != Some(record.name)
+        || revision[5].as_str() != Some(record.partner_display_name)
+        || revision[6].as_str() != record.metadata
+    {
+        return Err("invoice changed after email review; review the current document".into());
+    }
+    Ok(())
 }
 
 // ── Reducers ─────────────────────────────────────────────────────────────────
@@ -422,6 +604,48 @@ pub fn queue_mail_from_template(
         return Err("recipient_email is required".to_string());
     }
 
+    if let Some(review) = parse_invoice_mail_review(params.context_json.as_deref())? {
+        check_permission(ctx, organization_id, "account_move", "read")?;
+        require_company_in_organization(ctx, organization_id, company_id)?;
+        let record = ctx
+            .db
+            .account_move()
+            .id()
+            .find(params.res_id)
+            .ok_or("reviewed invoice not found")?;
+        validate_invoice_mail_review(
+            &review,
+            organization_id,
+            company_id,
+            &params.model,
+            params.res_id,
+            params.template_id,
+            &ReviewedMailTemplate {
+                organization_id: template.organization_id,
+                company_id: template.company_id,
+                model: &template.model,
+                active: template.is_active,
+                subject: &template.subject,
+                body_html: &template.body_html,
+                attach_document: template.attach_document,
+            },
+            &ReviewedMailRecord {
+                organization_id: record.organization_id,
+                company_id: record.company_id,
+                state: &format!("{:?}", record.state),
+                move_type: &format!("{:?}", record.move_type),
+                amount_total: record.amount_total,
+                currency_id: record.currency_id,
+                name: &record.name,
+                partner_display_name: record
+                    .invoice_partner_display_name
+                    .as_deref()
+                    .unwrap_or_default(),
+                metadata: record.metadata.as_deref(),
+            },
+        )?;
+    }
+
     let delivery_metadata = serde_json::json!({
         "delivery": "queued",
         "to": params.recipient_email.trim(),
@@ -472,4 +696,204 @@ pub fn queue_mail_from_template(
     );
 
     Ok(())
+}
+
+#[cfg(test)]
+mod invoice_mail_review_tests {
+    use super::*;
+    use serde_json::json;
+
+    fn context() -> serde_json::Value {
+        json!({ "invoiceReview": { "schemaVersion": 1, "reviewId": "review-unique", "organizationId": "1", "companyId": "2", "moveId": "3", "templateId": "4", "reference": "INV/3", "pdfFilename": "INV-3.pdf", "pdfAttached": false, "expectedSubject": "Reviewed subject", "expectedBodyHtml": "Reviewed body", "expectedAttachDocument": false, "recordRevision": "[\"Posted\",\"OutInvoice\",1,\"5\",\"INV/3\",\"Buyer\",null]" } })
+    }
+    fn review() -> InvoiceMailReview {
+        parse_invoice_mail_review(Some(&context().to_string()))
+            .expect("context")
+            .expect("tagged")
+    }
+    fn template() -> ReviewedMailTemplate<'static> {
+        ReviewedMailTemplate {
+            organization_id: 1,
+            company_id: None,
+            model: "account_move",
+            active: true,
+            subject: "Reviewed subject",
+            body_html: "Reviewed body",
+            attach_document: false,
+        }
+    }
+    fn record() -> ReviewedMailRecord<'static> {
+        ReviewedMailRecord {
+            organization_id: 1,
+            company_id: 2,
+            state: "Posted",
+            move_type: "OutInvoice",
+            amount_total: 1.0,
+            currency_id: 5,
+            name: "INV/3",
+            partner_display_name: "Buyer",
+            metadata: None,
+        }
+    }
+    fn validate(
+        template: &ReviewedMailTemplate<'_>,
+        record: &ReviewedMailRecord<'_>,
+    ) -> Result<(), String> {
+        validate_invoice_mail_review(&review(), 1, 2, "account_move", 3, 4, template, record)
+    }
+
+    #[test]
+    fn shared_or_exact_company_template_accepts_semantically_equal_numeric_revision() {
+        assert!(validate(&template(), &record()).is_ok());
+        let mut scoped = template();
+        scoped.company_id = Some(2);
+        assert!(validate(&scoped, &record()).is_ok());
+        let mut refund = record();
+        refund.move_type = "OutRefund";
+        let mut review = review();
+        review.revision[1] = json!("OutRefund");
+        review.revision[2] = json!(1.0);
+        assert!(validate_invoice_mail_review(
+            &review,
+            1,
+            2,
+            "account_move",
+            3,
+            4,
+            &scoped,
+            &refund
+        )
+        .is_ok());
+    }
+
+    #[test]
+    fn stale_template_content_attachment_and_classification_are_rejected_atomically() {
+        let mut changed = template();
+        changed.subject = "Changed subject";
+        assert!(validate(&changed, &record()).is_err());
+        let mut changed = template();
+        changed.body_html = "Changed body";
+        assert!(validate(&changed, &record()).is_err());
+        let mut changed = template();
+        changed.attach_document = true;
+        assert!(validate(&changed, &record()).is_err());
+        let mut changed = template();
+        changed.active = false;
+        assert!(validate(&changed, &record()).is_err());
+        let mut changed = template();
+        changed.model = "sale_order";
+        assert!(validate(&changed, &record()).is_err());
+        let mut changed = template();
+        changed.company_id = Some(99);
+        assert!(validate(&changed, &record()).is_err());
+        let mut changed = template();
+        changed.organization_id = 99;
+        assert!(validate(&changed, &record()).is_err());
+    }
+
+    #[test]
+    fn reviewed_target_scope_and_exact_identifiers_cannot_be_substituted() {
+        for (org, company, model, res_id, template_id) in [
+            (9, 2, "account_move", 3, 4),
+            (1, 9, "account_move", 3, 4),
+            (1, 2, "sale_order", 3, 4),
+            (1, 2, "account_move", 9, 4),
+            (1, 2, "account_move", 3, 9),
+        ] {
+            assert!(validate_invoice_mail_review(
+                &review(),
+                org,
+                company,
+                model,
+                res_id,
+                template_id,
+                &template(),
+                &record()
+            )
+            .is_err());
+        }
+        let mut changed = record();
+        changed.organization_id = 9;
+        assert!(validate(&template(), &changed).is_err());
+        let mut changed = record();
+        changed.company_id = 9;
+        assert!(validate(&template(), &changed).is_err());
+    }
+
+    #[test]
+    fn stale_record_revision_or_unsupported_posting_role_is_rejected() {
+        let mut changed = record();
+        changed.amount_total = 2.0;
+        assert!(validate(&template(), &changed).is_err());
+        let mut changed = record();
+        changed.currency_id = 6;
+        assert!(validate(&template(), &changed).is_err());
+        let mut changed = record();
+        changed.name = "INV/changed";
+        assert!(validate(&template(), &changed).is_err());
+        let mut changed = record();
+        changed.partner_display_name = "Changed buyer";
+        assert!(validate(&template(), &changed).is_err());
+        let mut changed = record();
+        changed.metadata = Some("changed snapshot");
+        assert!(validate(&template(), &changed).is_err());
+        let mut changed = record();
+        changed.state = "Draft";
+        assert!(validate(&template(), &changed).is_err());
+        let mut changed = record();
+        changed.move_type = "InInvoice";
+        assert!(validate(&template(), &changed).is_err());
+    }
+
+    #[test]
+    fn malformed_tagged_reviews_and_oversize_contexts_fail_explicitly() {
+        for value in [
+            json!({"invoiceReview":null}),
+            json!({"invoiceReview":{"schemaVersion":2}}),
+        ] {
+            assert!(parse_invoice_mail_review(Some(&value.to_string())).is_err());
+        }
+        for (key, value) in [
+            ("expectedSubject", json!(null)),
+            ("expectedBodyHtml", json!("x".repeat(65_537))),
+            ("recordRevision", json!("[]")),
+            ("expectedAttachDocument", json!(true)),
+            ("pdfAttached", json!(true)),
+            ("companyId", json!("02")),
+            ("reviewId", json!("")),
+        ] {
+            let mut changed = context();
+            changed["invoiceReview"][key] = value;
+            assert!(
+                parse_invoice_mail_review(Some(&changed.to_string())).is_err(),
+                "{key}"
+            );
+        }
+        let mut changed = context();
+        changed["extra"] = json!("x".repeat(131_073));
+        assert!(parse_invoice_mail_review(Some(&changed.to_string())).is_err());
+        assert!(parse_invoice_mail_review(Some("{\"invoiceReview\":bad")).is_err());
+    }
+
+    #[test]
+    fn legacy_untagged_contexts_retain_existing_queue_behavior() {
+        for raw in [
+            None,
+            Some("legacy arbitrary context"),
+            Some("{malformed legacy"),
+            Some("[]"),
+            Some("null"),
+            Some("{\"otherContext\":true}"),
+            Some("{\"unrelated\":\"invoiceReview\""),
+        ] {
+            assert!(parse_invoice_mail_review(raw)
+                .expect("legacy unchanged")
+                .is_none());
+        }
+        let unrelated =
+            json!({"unrelated":"invoiceReview", "payload":"x".repeat(131_073)}).to_string();
+        assert!(parse_invoice_mail_review(Some(&unrelated))
+            .expect("untagged context has no new limit")
+            .is_none());
+    }
 }

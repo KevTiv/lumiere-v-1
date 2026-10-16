@@ -54,4 +54,10 @@ describe("resolveBankStatementReconciliationEffect", () => {
       AmbiguousOperationEffectError,
     )
   })
+
+  it("does not confirm a missing or redacted residual as zero", () => {
+    for (const amountResidual of [null, undefined, "", " ", false]) {
+      assert.equal(resolveBankStatementReconciliationEffect([{ ...line, amountResidual }], [statement], args), null)
+    }
+  })
 })

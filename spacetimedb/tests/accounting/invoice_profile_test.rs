@@ -4,6 +4,7 @@ use spacetimedb::{ReducerContext, Table};
 
 use crate::accounting::journal_entries::{account_move, post_account_move, post_invoice};
 use crate::core::organization::company;
+use crate::crm::contacts::{contact, Contact};
 use crate::documents::invoice_profile::{
     capture_invoice_document_metadata, INVOICE_PROFILE_REPORT_TYPE,
 };
@@ -106,6 +107,91 @@ pub fn test_invoice_profiles_capture_trusted_identity_and_freeze_at_posting(
         false,
     )?;
     let draft = document(ctx, move_id)?;
+    let buyer = ctx
+        .db
+        .contact()
+        .id()
+        .find(fixture.partner_id)
+        .ok_or("fixture buyer missing")?;
+    if draft["schemaVersion"] != 2
+        || draft["buyer"]["partnerId"] != fixture.partner_id.to_string()
+        || draft["buyer"]["name"] != buyer.name
+    {
+        return Err("draft did not capture exact canonical buyer".to_string());
+    }
+    for other_partner in [
+        foreign.partner_id,
+        ctx.db
+            .contact()
+            .insert(Contact {
+                id: 0,
+                company_id: Some(sibling_id),
+                ..buyer.clone()
+            })
+            .id,
+    ] {
+        if capture_invoice_document_metadata(
+            ctx,
+            fixture.organization_id,
+            fixture.company_id,
+            Some(other_partner),
+            None,
+        )
+        .is_ok()
+        {
+            return Err(
+                "buyer capture accepted a foreign organization/company contact".to_string(),
+            );
+        }
+    }
+    let original_company_scope = buyer.company_id;
+    ctx.db.contact().id().update(Contact {
+        company_id: None,
+        ..buyer.clone()
+    });
+    capture_invoice_document_metadata(
+        ctx,
+        fixture.organization_id,
+        fixture.company_id,
+        Some(buyer.id),
+        None,
+    )?;
+    ctx.db.contact().id().update(Contact {
+        deleted_at: Some(ctx.timestamp),
+        ..buyer.clone()
+    });
+    if capture_invoice_document_metadata(
+        ctx,
+        fixture.organization_id,
+        fixture.company_id,
+        Some(buyer.id),
+        None,
+    )
+    .is_ok()
+    {
+        return Err("buyer capture accepted a deleted contact".to_string());
+    }
+    ctx.db.contact().id().update(Contact {
+        merge_target_id: Some(foreign.partner_id),
+        ..buyer.clone()
+    });
+    if capture_invoice_document_metadata(
+        ctx,
+        fixture.organization_id,
+        fixture.company_id,
+        Some(buyer.id),
+        None,
+    )
+    .is_ok()
+    {
+        return Err("buyer capture accepted a merged contact".to_string());
+    }
+    ctx.db.contact().id().update(Contact {
+        name: "Buyer legal name at issue".into(),
+        tax_id: Some("BUYER-ISSUE-TIN".into()),
+        company_id: original_company_scope,
+        ..buyer.clone()
+    });
     let company = ctx
         .db
         .company()
@@ -122,8 +208,14 @@ pub fn test_invoice_profiles_capture_trusted_identity_and_freeze_at_posting(
             "invoice draft identity, inheritance, or version scope was incorrect".to_string(),
         );
     }
-    if capture_invoice_document_metadata(ctx, foreign.organization_id, fixture.company_id, None)
-        .is_ok()
+    if capture_invoice_document_metadata(
+        ctx,
+        foreign.organization_id,
+        fixture.company_id,
+        None,
+        None,
+    )
+    .is_ok()
     {
         return Err("invoice snapshot accepted a foreign organization/company pair".to_string());
     }
@@ -160,6 +252,8 @@ pub fn test_invoice_profiles_capture_trusted_identity_and_freeze_at_posting(
     if issued["profile"]["terms"] != "Posting terms"
         || issued["profile"]["notice"] != ""
         || issued["profileVersionIds"]["organization"] != posting_version.to_string()
+        || issued["buyer"]["name"] != "Buyer legal name at issue"
+        || issued["buyer"]["taxId"] != "BUYER-ISSUE-TIN"
     {
         return Err(
             "post_account_move did not capture current trusted profile versions".to_string(),
@@ -197,6 +291,10 @@ pub fn test_invoice_profiles_capture_trusted_identity_and_freeze_at_posting(
         None,
         serde_json::json!({"terms":"Future default"}),
     )?;
+    ctx.db.contact().id().update(Contact {
+        name: "Later CRM name must not rewrite issued invoices".into(),
+        ..buyer
+    });
     if post_account_move(ctx, fixture.organization_id, move_id).is_ok()
         || post_invoice(
             ctx,
