@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Validate the C0 direct organization-ownership schema invariant.
 
-All 510 relations in the ERP manifest are organization-routed: 505
+All 512 relations in the ERP manifest are organization-routed: 507
 application relations and five persistence/reconstruction protocol relations.
 Platform-control truth that cannot be tenant-owned lives outside this
 manifest, rather than through a global-table exception.
@@ -15,8 +15,8 @@ from pathlib import Path
 from typing import Any
 
 
-EXPECTED_TABLE_COUNT = 510
-APPLICATION_RELATION_COUNT = 505
+EXPECTED_TABLE_COUNT = 512
+APPLICATION_RELATION_COUNT = 507
 PROTOCOL_RELATIONS = frozenset(
     {
         "organization_commit",
