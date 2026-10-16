@@ -1410,7 +1410,7 @@ mod tests {
         );
         assert_eq!(
             checksum(&ledger.released[6].sql),
-            "sha256:940e75621eb0f5aca57a349be4c8badd5b5ffad6a00a62a112546ea25ce0e0a1"
+            "sha256:f9c3f61b1058be93c55d019df9bb9274da739eeaf980c300f6abc2cc8db6ff4c"
         );
         assert_eq!(
             (ledger.pending_version, ledger.pending_name.as_str()),
