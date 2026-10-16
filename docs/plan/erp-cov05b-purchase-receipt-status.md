@@ -1,7 +1,8 @@
 # COV-05b Purchase receipt convergence
 
 **Package:** `COV-05b`  
-**Disposition:** `IMPLEMENTED` — runtime acceptance pending  
+**Disposition:** `REVIEW` — implemented; fresh-stack runtime proof passed
+
 **Stacked base:** PR #61 / `codex/cov05-purchase-order-confirmation`  
 **Operator proof:** [`../../frontend/web/tests/e2e/cov05b-purchase-receipt.spec.ts`](../../frontend/web/tests/e2e/cov05b-purchase-receipt.spec.ts)
 
@@ -28,7 +29,16 @@ confirmed PurchaseOrder
 - stale replay must return 422 without changing quantity or receipt identity;
 - the limited reader must return 403 without changing quantity or receipt identity.
 
-## Runtime validation required
+## Runtime validation
+
+The integrated local gate passed: **1 browser test**, including the exact completed
+move/picking, received quantity, stale 422, and reader 403. Final proof used fresh
+dedicated `lumiere_cov05b_20261011212115_final` /
+`lumiere-cov05b-20261011212115-final`.
+See [COV-05d runtime evidence](erp-cov05d-runtime-evidence.md) for actual commands,
+source fingerprint, initial failures, and service/storage ledger.
+
+Reference commands below require fresh names; never clear an existing user's database:
 
 ```bash
 PG_DATABASE=lumiere_cov05b_e2e make e2e-smoke-setup E2E_STDB_MODULE=lumiere-cov05b-e2e
@@ -37,7 +47,8 @@ PG_DATABASE=lumiere_cov05b_e2e make e2e-single \
   E2E_GREP= E2E_WORKERS=1 E2E_STDB_MODULE=lumiere-cov05b-e2e
 ```
 
-Do not mark this slice `ACCEPTED` until the fresh-stack runtime proof passes.
+Runtime proof is now present. Formal review/CI and full Purchasing U4/U5 certification
+are separate gates; this document does not promote the module.
 
 ## Evidence limit
 
