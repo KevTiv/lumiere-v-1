@@ -265,7 +265,15 @@
     "default_restricted": [
       "name",
       "amount",
-      "company_id"
+      "company_id",
+      "active",
+      "type_tax_use",
+      "amount_type",
+      "price_include",
+      "include_base_amount",
+      "has_negative_factor",
+      "tax_group_id",
+      "invoice_repartition_line_ids"
     ],
     "mandatory": [
       "id",

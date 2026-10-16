@@ -145,6 +145,15 @@ static HTTP_SQL_INCLUDED_COLUMNS: Lazy<HashMap<String, HashSet<String>>> = Lazy:
         "dashboards".to_string(),
         ["widget_ids"].into_iter().map(String::from).collect(),
     );
+    // Purchase-tax eligibility needs explicit repartition evidence, under the
+    // same resource and field authorization as the other tax attributes.
+    m.insert(
+        "account-taxes".to_string(),
+        ["invoice_repartition_line_ids"]
+            .into_iter()
+            .map(String::from)
+            .collect(),
+    );
     m.insert(
         "product-attribute-lines".to_string(),
         ["value_ids"].into_iter().map(String::from).collect(),
@@ -1474,6 +1483,43 @@ mod tests {
             assert!(cols.iter().any(|column| column == "organization_id"));
             assert!(cols.iter().any(|column| column == "name"));
         }
+    }
+
+    #[test]
+    fn purchase_tax_selection_has_canonical_flags_without_bypassing_field_policy() {
+        let columns = resolve_http_sql_columns("account-taxes", None).expect("tax projection");
+        for field in [
+            "active",
+            "type_tax_use",
+            "amount_type",
+            "price_include",
+            "include_base_amount",
+            "has_negative_factor",
+            "tax_group_id",
+            "invoice_repartition_line_ids",
+        ] {
+            assert!(
+                columns.iter().any(|column| column == field),
+                "missing selector evidence: {field}"
+            );
+        }
+
+        let mut access = field_access(&["account-taxes:read"]);
+        access.field_permissions.push(FieldPermissionLike {
+            id: Some(1),
+            organization_id: Some(7),
+            role_id: Some(9),
+            resource: "account-taxes".to_string(),
+            action: "read".to_string(),
+            allowed_fields: vec!["name".to_string()],
+            subject_user_hex: None,
+            subject_role_id: Some(9),
+        });
+        let restricted = resolve_http_sql_columns("account-taxes", Some(&access))
+            .expect("restricted tax projection");
+        assert!(!restricted.iter().any(|column| column == "active"));
+        assert!(!restricted.iter().any(|column| column == "tax_group_id"));
+        assert!(restricted.iter().any(|column| column == "company_id"));
     }
 
     #[test]

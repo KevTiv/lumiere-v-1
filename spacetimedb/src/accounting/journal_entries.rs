@@ -490,6 +490,10 @@ fn compute_invoice_totals_internal(
     let mut amount_tax = 0.0f64;
     let mut amount_total = 0.0f64;
     let mut amount_residual = 0.0f64;
+    let mut untaxed_ledger = 0.0f64;
+    let mut tax_ledger = 0.0f64;
+    let mut total_ledger = 0.0f64;
+    let mut residual_ledger = 0.0f64;
 
     for line in lines {
         let is_counterpart =
@@ -498,15 +502,19 @@ fn compute_invoice_totals_internal(
             // The AR/AP balance is the invoice face value. Summing every debit and credit would
             // count the balanced invoice twice and make a wholly unpaid invoice look partially
             // paid as soon as it is posted.
-            amount_total += line.balance.abs();
-            amount_residual += line.amount_residual.abs();
+            amount_total += line.amount_currency.abs();
+            amount_residual += line.amount_residual_currency.abs();
+            total_ledger += line.balance.abs();
+            residual_ledger += line.amount_residual.abs();
             continue;
         }
 
         if line.tax_line_id.is_some() || line.tax_group_id.is_some() {
             amount_tax += line.price_total.abs();
+            tax_ledger += line.balance.abs();
         } else if !line.exclude_from_invoice_tab {
             amount_untaxed += line.price_subtotal.abs();
+            untaxed_ledger += line.balance.abs();
         }
     }
 
@@ -518,11 +526,15 @@ fn compute_invoice_totals_internal(
         amount_untaxed + amount_tax
     };
     move_record.amount_residual = amount_residual;
-    move_record.amount_untaxed_signed = amount_untaxed;
-    move_record.amount_tax_signed = amount_tax;
-    move_record.amount_total_signed = move_record.amount_total;
+    move_record.amount_untaxed_signed = untaxed_ledger;
+    move_record.amount_tax_signed = tax_ledger;
+    move_record.amount_total_signed = if total_ledger > 0.0 {
+        total_ledger
+    } else {
+        untaxed_ledger + tax_ledger
+    };
     move_record.amount_total_in_currency_signed = move_record.amount_total;
-    move_record.amount_residual_signed = amount_residual;
+    move_record.amount_residual_signed = residual_ledger;
     move_record.write_uid = Some(ctx.sender());
     move_record.write_date = Some(ctx.timestamp);
 
@@ -3566,6 +3578,97 @@ pub fn create_invoice_from_sale_order(
     Ok(())
 }
 
+fn purchase_bill_tax_rules(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    ids: &[u64],
+) -> Result<Vec<crate::accounting::bill_economics::PercentageTax>, String> {
+    let mut taxes = Vec::with_capacity(ids.len());
+    for id in ids {
+        let tax = require_active_tax(ctx, organization_id, company_id, *id, "vendor bill")?;
+        if tax.amount_type != crate::types::TaxAmountType::Percent
+            || !matches!(tax.type_tax_use, TaxTypeUse::Purchase | TaxTypeUse::None)
+            || tax.include_base_amount
+            || tax.has_negative_factor
+            || !tax.invoice_repartition_line_ids.is_empty()
+        {
+            return Err(
+                "vendor bills support non-compounding percentage purchase taxes only".into(),
+            );
+        }
+        taxes.push(crate::accounting::bill_economics::PercentageTax {
+            id: *id,
+            rate: tax.amount,
+            included: tax.price_include,
+        });
+    }
+    Ok(taxes)
+}
+
+fn purchase_bill_fx(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    currency_id: u64,
+    company_currency_id: u64,
+    invoice_date: Timestamp,
+) -> Result<(f64, Option<f64>), String> {
+    require_company_in_organization(ctx, organization_id, company_id)?;
+    let company = ctx
+        .db
+        .company()
+        .id()
+        .find(&company_id)
+        .ok_or("bill company unavailable")?;
+    if company.currency_id != company_currency_id {
+        return Err("bill company currency is inconsistent".into());
+    }
+    if currency_id == company_currency_id {
+        return Ok((1.0, None));
+    }
+
+    crate::core::reference::require_active_currency_for_organization(
+        ctx,
+        organization_id,
+        currency_id,
+    )?;
+    let company_currency = crate::core::reference::require_active_currency_for_organization(
+        ctx,
+        organization_id,
+        company_currency_id,
+    )?;
+    let rate = crate::core::reference::resolve_currency_rate_as_of(
+        ctx,
+        organization_id,
+        company_id,
+        currency_id,
+        company_currency_id,
+        invoice_date,
+    )?;
+    Ok((rate, Some(company_currency.rounding_factor)))
+}
+
+fn set_bill_line_amounts(
+    line: &mut AccountMoveLine,
+    document_amount: f64,
+    ledger_amount: f64,
+    credit: bool,
+) {
+    let sign = if credit { -1.0 } else { 1.0 };
+    line.price = document_amount;
+    line.price_subtotal = document_amount;
+    line.price_total = document_amount;
+    line.debit = if credit { 0.0 } else { ledger_amount };
+    line.credit = if credit { ledger_amount } else { 0.0 };
+    line.balance = sign * ledger_amount;
+    line.amount_currency = sign * document_amount;
+    line.amount_residual = sign * ledger_amount;
+    line.amount_residual_currency = sign * document_amount;
+    line.debit_currency = if credit { 0.0 } else { document_amount };
+    line.credit_currency = if credit { document_amount } else { 0.0 };
+}
+
 /// Create a vendor bill (InInvoice) from a confirmed Purchase Order.
 ///
 /// Lines are created for any PO line where `qty_received > qty_invoiced`.
@@ -3595,12 +3698,29 @@ pub fn create_bill_from_purchase_order(
         return Err("Purchase order must be confirmed before billing".to_string());
     }
 
-    let billable_lines: Vec<_> = ctx
+    let order_lines: Vec<_> = ctx
         .db
         .purchase_order_line()
         .purchase_order_line_by_order()
         .filter(&purchase_order_id)
-        .filter(|l| l.qty_received > l.qty_invoiced)
+        .collect();
+
+    for line in &order_lines {
+        if line.organization_id != organization_id
+            || line.company_id != po.company_id
+            || line.currency_id != po.currency_id
+            || line.partner_id != po.partner_id
+            || !line.qty_received.is_finite()
+            || !line.qty_invoiced.is_finite()
+            || line.qty_received < 0.0
+            || line.qty_invoiced < 0.0
+        {
+            return Err("PO bill source scope or quantities are inconsistent".into());
+        }
+    }
+    let billable_lines: Vec<_> = order_lines
+        .into_iter()
+        .filter(|line| line.qty_received > line.qty_invoiced)
         .collect();
 
     if billable_lines.is_empty() {
@@ -3616,6 +3736,158 @@ pub fn create_bill_from_purchase_order(
         .id()
         .find(&po.company_id)
         .ok_or("Company not found")?;
+
+    let workflow_superuser_bypass =
+        crate::workflow::authorization::require_workflow_company_access(
+            ctx,
+            organization_id,
+            po.company_id,
+            ctx.sender(),
+        )?;
+    if journal
+        .currency_id
+        .is_some_and(|id| id != po.currency_id && id != company.currency_id)
+    {
+        return Err("purchase journal currency is incompatible with the PO".into());
+    }
+
+    let expense_account = require_active_account(
+        ctx,
+        organization_id,
+        po.company_id,
+        params.default_expense_account_id,
+        "expense",
+    )?;
+    let payable_account = require_active_account(
+        ctx,
+        organization_id,
+        po.company_id,
+        params.payable_line.account_id,
+        "payable",
+    )?;
+    if matches!(
+        expense_account.internal_type,
+        Some(AccountTypeInternal::Receivable | AccountTypeInternal::Payable)
+    ) || payable_account.internal_type != Some(AccountTypeInternal::Payable)
+    {
+        return Err("vendor bill expense/payable account roles are invalid".into());
+    }
+
+    for template in [&params.expense_line, &params.payable_line] {
+        if template.tax_line_id.is_some()
+            || template.tax_group_id.is_some()
+            || template.tax_repartition_line_id.is_some()
+            || template.display_type.is_some()
+            || template.payment_id.is_some()
+            || template.statement_line_id.is_some()
+            || template.matching_number.is_some()
+            || template.is_downpayment
+        {
+            return Err(
+                "PO bills cannot inherit tax journal, display, or payment identities from templates"
+                    .into(),
+            );
+        }
+    }
+    if params.expense_line.exclude_from_invoice_tab
+        || params.payable_line.discount != 0.0
+        || !params.payable_line.tax_ids.is_empty()
+        || params.payable_line.product_id.is_some()
+    {
+        return Err(
+            "PO bill templates must preserve expense visibility and a plain payable".into(),
+        );
+    }
+
+    let (fx_rate, company_rounding) = purchase_bill_fx(
+        ctx,
+        organization_id,
+        po.company_id,
+        po.currency_id,
+        company.currency_id,
+        params.invoice_date,
+    )?;
+    let taxes = purchase_bill_tax_rules(
+        ctx,
+        organization_id,
+        po.company_id,
+        &params.expense_line.tax_ids,
+    )?;
+
+    let mut tax_accounts = std::collections::BTreeMap::new();
+    for rule in &taxes {
+        let tax = require_active_tax(ctx, organization_id, po.company_id, rule.id, "vendor bill")?;
+        let group_id = tax
+            .tax_group_id
+            .ok_or("selected purchase tax needs a configured input-tax group")?;
+        let group = ctx
+            .db
+            .account_tax_group()
+            .id()
+            .find(&group_id)
+            .ok_or("input-tax group unavailable")?;
+        if group.organization_id != organization_id || group.company_id != po.company_id {
+            return Err("input-tax group is outside the bill company".into());
+        }
+        let account_id = group
+            .tax_receivable_account_id
+            .ok_or("tax group needs an input-tax account")?;
+        let account =
+            require_active_account(ctx, organization_id, po.company_id, account_id, "input tax")?;
+        if account.internal_group != Some(crate::types::AccountInternalGroup::Asset)
+            || matches!(
+                account.internal_type,
+                Some(AccountTypeInternal::Receivable | AccountTypeInternal::Payable)
+            )
+        {
+            return Err(
+                "input-tax account must be an asset account outside receivable/payable control"
+                    .into(),
+            );
+        }
+        tax_accounts.insert(rule.id, (account_id, group_id));
+    }
+
+    let mut planned_lines = Vec::with_capacity(billable_lines.len());
+    let mut tax_totals = std::collections::BTreeMap::<u64, (f64, f64)>::new();
+    let mut document_total = 0.0;
+    let mut ledger_total = 0.0;
+    for line in billable_lines {
+        let quantity = line.qty_received - line.qty_invoiced;
+        let economics = crate::accounting::bill_economics::calculate(
+            quantity,
+            line.price_unit,
+            params.expense_line.discount,
+            &taxes,
+        )?;
+        let tax_amount: f64 = economics.taxes.values().sum();
+        crate::accounting::bill_economics::validate_po_tax_evidence(
+            line.price_tax,
+            line.product_qty,
+            quantity,
+            params.expense_line.discount,
+            tax_amount,
+        )?;
+        let ledger_subtotal = crate::accounting::bill_economics::ledger_amount(
+            economics.subtotal,
+            fx_rate,
+            company_rounding,
+        )?;
+        document_total += economics.total;
+        ledger_total += ledger_subtotal;
+        for (tax_id, amount) in &economics.taxes {
+            let aggregate = tax_totals.entry(*tax_id).or_default();
+            aggregate.0 += amount;
+            aggregate.1 += economics.subtotal;
+        }
+        planned_lines.push((line, quantity, economics, ledger_subtotal));
+    }
+    for (amount, _) in tax_totals.values() {
+        ledger_total +=
+            crate::accounting::bill_economics::ledger_amount(*amount, fx_rate, company_rounding)?;
+    }
+    validate_pilot_money_amount("vendor bill total", document_total)?;
+    validate_pilot_money_amount("vendor bill company total", ledger_total)?;
 
     let partner_display_name = ctx
         .db
@@ -3654,7 +3926,7 @@ pub fn create_bill_from_purchase_order(
         medium_id: None,
         company_id: po.company_id,
         journal_id: params.journal_id,
-        currency_id: journal.currency_id.unwrap_or(po.currency_id),
+        currency_id: po.currency_id,
         company_currency_id: company.currency_id,
         amount_untaxed: 0.0,
         amount_tax: 0.0,
@@ -3680,14 +3952,9 @@ pub fn create_bill_from_purchase_order(
         metadata: params.metadata.clone().or_else(|| po.notes.clone()),
     });
 
-    let mut amount_untaxed = 0.0f64;
-    let mut amount_tax = 0.0f64;
-    let bill_line_count = billable_lines.len();
-
-    for (seq, line) in billable_lines.into_iter().enumerate() {
-        let qty = line.qty_received - line.qty_invoiced;
-        let subtotal = qty * line.price_unit;
-        let tax_amount = line.price_tax * (qty / line.product_qty.max(1.0));
+    let bill_line_count = planned_lines.len();
+    for (seq, (line, quantity, economics, ledger_subtotal)) in planned_lines.into_iter().enumerate()
+    {
         let analytic_tag_ids = line.analytic_tag_ids.clone();
         let account_analytic_id = line.account_analytic_id;
         let product_id = line.product_id;
@@ -3699,10 +3966,10 @@ pub fn create_bill_from_purchase_order(
         let mut line_params = params.expense_line.clone();
         line_params.account_id = params.default_expense_account_id;
         line_params.name = format!("Product {}", product_id);
-        line_params.debit = subtotal;
+        line_params.debit = ledger_subtotal;
         line_params.credit = 0.0;
         line_params.sequence = seq as u32;
-        line_params.quantity = qty;
+        line_params.quantity = quantity;
         line_params.price_unit = price_unit;
         line_params.partner_id = Some(po.partner_id);
         line_params.product_id = Some(product_id);
@@ -3713,7 +3980,15 @@ pub fn create_bill_from_purchase_order(
         // Always take tags from the PO line — do not treat template `[]` as preserve.
         line_params.analytic_tag_ids = analytic_tag_ids;
 
-        let created_line = insert_draft_account_move_line(ctx, &move_record, line_params)?;
+        let mut created_line = insert_draft_account_move_line(ctx, &move_record, line_params)?;
+        set_bill_line_amounts(
+            &mut created_line,
+            economics.subtotal,
+            ledger_subtotal,
+            false,
+        );
+        created_line.price_total = economics.total;
+        ctx.db.account_move_line().id().update(created_line.clone());
         let mut invoice_lines = line.invoice_lines.clone();
         // Capture provenance while the exact source and inserted row are both known.
         if !invoice_lines.contains(&created_line.id) {
@@ -3723,49 +3998,55 @@ pub fn create_bill_from_purchase_order(
         ctx.db.purchase_order_line().id().update(
             crate::purchasing::purchase_orders::PurchaseOrderLine {
                 invoice_lines,
-                qty_invoiced: qty_invoiced_prev + qty,
-                qty_to_invoice: (product_qty - (qty_invoiced_prev + qty)).max(0.0),
+                qty_invoiced: qty_invoiced_prev + quantity,
+                qty_to_invoice: (product_qty - (qty_invoiced_prev + quantity)).max(0.0),
                 write_uid: ctx.sender(),
                 write_date: ctx.timestamp,
                 ..line
             },
         );
-
-        amount_untaxed += subtotal;
-        amount_tax += tax_amount;
     }
 
-    let amount_total = amount_untaxed + amount_tax;
+    for (offset, (tax_id, (amount, base))) in tax_totals.iter().enumerate() {
+        let (account_id, group_id) = tax_accounts[tax_id];
+        let ledger_amount =
+            crate::accounting::bill_economics::ledger_amount(*amount, fx_rate, company_rounding)?;
+        let mut tax_params = crate::accounting::line_params::journal_line_params(
+            account_id,
+            format!("Purchase tax {tax_id}"),
+            ledger_amount,
+            0.0,
+            (bill_line_count + offset) as u32,
+        );
+        tax_params.quantity = 1.0;
+        tax_params.price_unit = *amount;
+        tax_params.partner_id = Some(po.partner_id);
+        tax_params.tax_line_id = Some(*tax_id);
+        tax_params.tax_group_id = Some(group_id);
+        tax_params.exclude_from_invoice_tab = true;
+        let mut tax_line = insert_draft_account_move_line(ctx, &move_record, tax_params)?;
+        set_bill_line_amounts(&mut tax_line, *amount, ledger_amount, false);
+        tax_line.tax_base_amount = *base;
+        ctx.db.account_move_line().id().update(tax_line);
+    }
 
     let mut payable_params = params.payable_line.clone();
-    payable_params.credit = amount_total;
+    payable_params.credit = ledger_total;
     payable_params.debit = 0.0;
-    payable_params.sequence = bill_line_count as u32;
+    payable_params.sequence = (bill_line_count + tax_totals.len()) as u32;
     payable_params.quantity = 1.0;
-    payable_params.price_unit = amount_total;
+    payable_params.price_unit = document_total;
     if payable_params.name.is_empty() {
         payable_params.name = partner_display_name
             .clone()
             .unwrap_or_else(|| "Accounts Payable".to_string());
     }
     payable_params.partner_id = Some(po.partner_id);
-    insert_draft_account_move_line(ctx, &move_record, payable_params)?;
+    let mut payable = insert_draft_account_move_line(ctx, &move_record, payable_params)?;
+    set_bill_line_amounts(&mut payable, document_total, ledger_total, true);
+    ctx.db.account_move_line().id().update(payable);
 
-    // Update AccountMove totals
-    ctx.db.account_move().id().update(AccountMove {
-        amount_untaxed,
-        amount_tax,
-        amount_total,
-        amount_residual: amount_total,
-        amount_untaxed_signed: amount_untaxed,
-        amount_tax_signed: amount_tax,
-        amount_total_signed: amount_total,
-        amount_total_in_currency_signed: amount_total,
-        amount_residual_signed: amount_total,
-        write_uid: Some(ctx.sender()),
-        write_date: Some(ctx.timestamp),
-        ..move_record.clone()
-    });
+    compute_invoice_totals_internal(ctx, organization_id, move_record.id)?;
 
     // Preserve exact bill relations; Purchasing owns derived invoice coverage.
     let mut updated_invoice_ids = po.invoice_ids.clone();
@@ -3802,7 +4083,13 @@ pub fn create_bill_from_purchase_order(
                 serde_json::json!({
                     "move_type": "InInvoice",
                     "purchase_order_id": purchase_order_id,
-                    "amount_total": amount_total,
+                    "amount_total": document_total,
+                    "company_amount_total": ledger_total,
+                    "currency_id": move_record.currency_id,
+                    "fx_rate": fx_rate,
+                    "tax_ids": params.expense_line.tax_ids,
+                    "discount": params.expense_line.discount,
+                    "workflow_superuser_bypass": workflow_superuser_bypass,
                 })
                 .to_string(),
             ),
