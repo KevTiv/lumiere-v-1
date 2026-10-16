@@ -18,10 +18,11 @@ use crate::workflow::approval_gate::{
 use crate::workflow::approvals::{
     add_workflow_human_task_comment_for_actor, claim_workflow_human_task_for_actor,
     create_workflow_human_task_internal, decide_workflow_human_task_for_actor,
-    invalidate_workflow_human_task_internal, workflow_human_task, workflow_human_task_event,
-    AddWorkflowHumanTaskCommentParams, ClaimWorkflowHumanTaskParams, CreateWorkflowHumanTaskParams,
-    DecideWorkflowHumanTaskParams, InvalidateWorkflowHumanTaskParams, WorkflowHumanTaskDecision,
-    WorkflowHumanTaskStatus, WorkflowTaskGuardedAction,
+    invalidate_workflow_human_task_internal, workflow_human_task, workflow_human_task_candidate,
+    workflow_human_task_event, workflow_human_task_receipt, AddWorkflowHumanTaskCommentParams,
+    ClaimWorkflowHumanTaskParams, CreateWorkflowHumanTaskParams, DecideWorkflowHumanTaskParams,
+    InvalidateWorkflowHumanTaskParams, WorkflowHumanTaskDecision, WorkflowHumanTaskStatus,
+    WorkflowTaskGuardedAction,
 };
 use crate::workflow::definitions::{
     create_workflow, publish_workflow_version, upsert_workflow_edge, upsert_workflow_node,
@@ -91,7 +92,7 @@ fn gate_creates_and_converges_real_guarded_action(ctx: &ReducerContext) -> Resul
             2,
             Some(WorkflowTaskPolicy {
                 kind: WorkflowHumanTaskKind::ApproveReject,
-                assignment: WorkflowTaskAssignment::AnyCandidate,
+                assignment: WorkflowTaskAssignment::AllCandidates,
                 candidate_role_ids: vec![role_id],
                 candidate_group_ids: Vec::new(),
                 candidate_unit_ids: Vec::new(),
@@ -177,6 +178,71 @@ fn gate_creates_and_converges_real_guarded_action(ctx: &ReducerContext) -> Resul
         partner_ref: Some("new vendor quote requiring fresh approval".to_string()),
         ..current
     });
+    let events_before_rejection = ctx
+        .db
+        .workflow_human_task_event()
+        .human_task_event_by_task()
+        .filter(&task_id)
+        .count();
+    let receipts_before_rejection = ctx
+        .db
+        .workflow_human_task_receipt()
+        .human_task_receipt_by_task()
+        .filter(&task_id)
+        .count();
+    let stale_rejection = decide_workflow_human_task_for_actor(
+        ctx,
+        fixture.organization_id,
+        actor,
+        DecideWorkflowHumanTaskParams {
+            company_id: fixture.company_id,
+            task_id,
+            expected_task_revision: 1,
+            expected_instance_revision: 2,
+            decision: WorkflowHumanTaskDecision::Reject,
+            acting_for: None,
+            comment: Some("reject stale quote".to_string()),
+            idempotency_key: format!("stale-gate-rejection-{nonce}"),
+            correlation_id: format!("stale-gate-rejection-correlation-{nonce}"),
+            causation_id: None,
+        },
+    )
+    .err()
+    .ok_or("changed vendor quote was rejected through the stale task")?;
+    assert_contains(&stale_rejection, "subject changed")?;
+    let stale_candidate = ctx
+        .db
+        .workflow_human_task_candidate()
+        .human_task_candidate_by_task()
+        .filter(&task_id)
+        .find(|candidate| candidate.candidate_identity == actor)
+        .ok_or("guarded AllCandidates actor projection missing")?;
+    let stale_task = ctx
+        .db
+        .workflow_human_task()
+        .id()
+        .find(&task_id)
+        .ok_or("stale guarded task missing")?;
+    if stale_task.status != WorkflowHumanTaskStatus::Open
+        || stale_task.revision != 1
+        || stale_candidate.decision.is_some()
+        || ctx
+            .db
+            .workflow_human_task_event()
+            .human_task_event_by_task()
+            .filter(&task_id)
+            .count()
+            != events_before_rejection
+        || ctx
+            .db
+            .workflow_human_task_receipt()
+            .human_task_receipt_by_task()
+            .filter(&task_id)
+            .count()
+            != receipts_before_rejection
+    {
+        return Err("stale guarded rejection recorded evidence or closed its task".to_string());
+    }
     let old_error = decide_workflow_human_task_for_actor(
         ctx,
         fixture.organization_id,

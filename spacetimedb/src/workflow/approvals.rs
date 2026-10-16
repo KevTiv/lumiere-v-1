@@ -670,23 +670,11 @@ pub(crate) fn decide_workflow_human_task_for_actor(
         return Err("workflow task subject revision no longer matches its instance".to_string());
     }
 
-    // Freshness is required for every vote, not only the final AllCandidates
-    // vote that executes the domain action.
-    if params.decision == WorkflowHumanTaskDecision::Approve {
-        if let Some(action) = task.guarded_action.as_ref() {
-            let snapshot = snapshot_guarded_action(
-                ctx,
-                task.organization_id,
-                task.company_id,
-                action.key.clone(),
-                action.schema_version,
-                GuardedActionInput::for_subject(&action.key, task.subject_id),
-            )?;
-            if snapshot.subject_revision_hash != task.subject_revision_hash {
-                return Err("workflow task subject changed after the task was created".to_string());
-            }
-        }
-    }
+    // Re-snapshot every guarded decision before recording a vote, evidence or
+    // terminal state. A stale rejection is just as material as a stale
+    // approval, and an AllCandidates rejection must not persist its vote
+    // before the same freshness proof succeeds.
+    require_current_guarded_task_snapshot(ctx, &task)?;
 
     if task.assignment == WorkflowTaskAssignment::AllCandidates {
         if let Some(partial) = record_all_candidates_vote(
@@ -806,6 +794,27 @@ pub(crate) fn decide_workflow_human_task_for_actor(
         return Err("workflow decision advanced an unexpected number of revisions".to_string());
     }
     Ok(updated)
+}
+
+fn require_current_guarded_task_snapshot(
+    ctx: &ReducerContext,
+    task: &WorkflowHumanTask,
+) -> Result<(), String> {
+    let Some(action) = task.guarded_action.as_ref() else {
+        return Ok(());
+    };
+    let snapshot = snapshot_guarded_action(
+        ctx,
+        task.organization_id,
+        task.company_id,
+        action.key.clone(),
+        action.schema_version,
+        GuardedActionInput::for_subject(&action.key, task.subject_id),
+    )?;
+    if snapshot.subject_revision_hash != task.subject_revision_hash {
+        return Err("workflow task subject changed after the task was created".to_string());
+    }
+    Ok(())
 }
 
 #[reducer]
