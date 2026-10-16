@@ -588,6 +588,11 @@
       "reason": "invoked by an enumerated frontend BFF call site"
     },
     {
+      "name": "cleanup_abandoned_account_move_import",
+      "exposure": "session",
+      "reason": "accounting import recovery action guarded by exact parent-job provenance and reducer-side account_move delete permission"
+    },
+    {
       "name": "clone_workflow_version_to_draft",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
@@ -856,6 +861,11 @@
       "name": "create_account_move",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
+    },
+    {
+      "name": "create_manual_invoice",
+      "exposure": "session",
+      "reason": "invoked by the accounting invoice and bill draft forms"
     },
     {
       "name": "create_account_period",

@@ -413,6 +413,7 @@ export const hrForms: FormRegistryEntry[] = [
             { value: "USD", label: "USD", color: "blue" },
             { value: "EUR", label: "EUR", color: "green" },
             { value: "GBP", label: "GBP", color: "purple" },
+            { value: "RWF", label: "RWF", color: "yellow" },
           ],
           validation: { required: true },
           aiSuggestions: [],

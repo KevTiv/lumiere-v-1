@@ -2,6 +2,7 @@
 
 
 import { stdbBffCommandPost } from "@lumiere/stdb/commands"
+import { stringifyReducerCommandBody } from "@lumiere/api-client"
 import type {
   AccountAccountTypeQueryRow,
   AccountAccountQueryRow,
@@ -40,6 +41,7 @@ import type {
   CreatePaymentFeeParams,
   CreatePaymentParams,
   CreatePaymentTransactionParams,
+  ApplyHistoricalPaymentAllocationsParams as GeneratedApplyHistoricalPaymentAllocationsParams,
   CrossoveredBudget,
   DeleteAccountMoveLineParams,
   DeprecateAccountAccountParams,
@@ -68,7 +70,66 @@ import {
   workflowErrorFromResponse,
 } from "@lumiere/erp-workflows"
 
-import { responseErrorMessage as parseCallError } from "@lumiere/api-client/response-error"
+import {
+  httpResponseError,
+  responseErrorMessage as parseCallError,
+} from "@lumiere/api-client/response-error"
+
+/** Generated reducer input retained as the public UI boundary for one payment batch. */
+export type ApplyHistoricalPaymentAllocationsParams =
+  GeneratedApplyHistoricalPaymentAllocationsParams
+
+/** One document allocation within an atomic historical-payment batch. */
+export type HistoricalPaymentAllocationInput =
+  ApplyHistoricalPaymentAllocationsParams["allocations"][number]
+
+const HISTORICAL_PAYMENT_ALLOCATION_RESOURCES = [
+  "payment-reconciliations",
+  "payment-transactions",
+  "account-payments",
+  "account-moves",
+  "account-move-lines",
+] as const
+
+/**
+ * Apply a posted historical payment to one or more original-total documents.
+ *
+ * The Rust BFF injects organization scope from the authenticated session. The
+ * generated params retain company scope and are encoded with the same SATS
+ * conventions as named reducer commands.
+ */
+export async function applyHistoricalPaymentAllocationsCommand(
+  params: ApplyHistoricalPaymentAllocationsParams,
+): Promise<void> {
+  const response = await apiFetch("/api/accounting/historical-payment-allocations", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: stringifyReducerCommandBody({
+      params: stdbParamsToJson(params, "ApplyHistoricalPaymentAllocationsParams"),
+    }),
+  })
+  if (!response.ok) {
+    throw await httpResponseError(
+      response,
+      "Failed to apply historical payment allocations",
+    )
+  }
+}
+
+export function useApplyHistoricalPaymentAllocations(
+  organizationId: bigint | number,
+) {
+  const qc = useQueryClient()
+  return useMutation<void, Error, ApplyHistoricalPaymentAllocationsParams>({
+    mutationFn: applyHistoricalPaymentAllocationsCommand,
+    onSuccess: () =>
+      invalidateStdbQueryResources(
+        qc,
+        organizationId,
+        HISTORICAL_PAYMENT_ALLOCATION_RESOURCES,
+      ),
+  })
+}
 export function useAccountPaymentTerms(
   organizationId: bigint,
   options?: { staleTime?: number; enabled?: boolean },

@@ -4192,6 +4192,12 @@ pub(crate) fn apply_generated_reconstruction_row(
         },
         "company_country_pack" => {
             use crate::core::country_pack::{company_country_pack as _, CompanyCountryPack};
+            let normalized_row_json =
+                crate::core::country_pack::normalize_country_pack_reconstruction_row_json(
+                    "company_country_pack",
+                    row_json,
+                )?;
+            let row_json = normalized_row_json.as_str();
             let spacetimedb_sats::serde::SerdeWrapper(row) =
                 serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<CompanyCountryPack>>(row_json)
                     .map_err(|error| format!("invalid canonical row JSON for company_country_pack: {error}"))?;
@@ -5048,6 +5054,12 @@ pub(crate) fn apply_generated_reconstruction_row(
         },
         "country_pack_definition" => {
             use crate::core::country_pack::{country_pack_definition as _, CountryPackDefinition};
+            let normalized_row_json =
+                crate::core::country_pack::normalize_country_pack_reconstruction_row_json(
+                    "country_pack_definition",
+                    row_json,
+                )?;
+            let row_json = normalized_row_json.as_str();
             let spacetimedb_sats::serde::SerdeWrapper(row) =
                 serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<CountryPackDefinition>>(row_json)
                     .map_err(|error| format!("invalid canonical row JSON for country_pack_definition: {error}"))?;
@@ -5076,6 +5088,12 @@ pub(crate) fn apply_generated_reconstruction_row(
         },
         "country_pack_tax_rule" => {
             use crate::core::country_pack::{country_pack_tax_rule as _, CountryPackTaxRule};
+            let normalized_row_json =
+                crate::core::country_pack::normalize_country_pack_reconstruction_row_json(
+                    "country_pack_tax_rule",
+                    row_json,
+                )?;
+            let row_json = normalized_row_json.as_str();
             let spacetimedb_sats::serde::SerdeWrapper(row) =
                 serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<CountryPackTaxRule>>(row_json)
                     .map_err(|error| format!("invalid canonical row JSON for country_pack_tax_rule: {error}"))?;

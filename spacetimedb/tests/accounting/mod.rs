@@ -81,6 +81,8 @@ pub fn run_accounting_fixed_asset_ownership_test(ctx: &ReducerContext) -> Result
 pub fn run_accounting_post_invoice_test(ctx: &ReducerContext) -> Result<(), String> {
     journal_entries_test::test_post_customer_invoice_creates_move_lines(ctx)
         .map_err(|e| format!("post_customer_invoice: {e}"))?;
+    journal_entries_test::test_manual_invoice_is_atomic_balanced_and_idempotent(ctx)
+        .map_err(|e| format!("manual_invoice_atomic: {e}"))?;
     journal_entries_test::test_cross_tenant_move_mutations_fail_closed(ctx)
         .map_err(|e| format!("cross_tenant_move_mutations: {e}"))?;
     journal_entries_test::test_create_credit_note_rejects_cross_tenant_invoice(ctx)

@@ -1,0 +1,8 @@
+name,as_of_date,currency,source_amount,lumiere_amount,difference,tolerance,status,reviewed_by,evidence_path,evidence_sha256
+trial_balance_debits,YYYY-MM-DD,RWF,0,0,0,0,pending,,,
+trial_balance_credits,YYYY-MM-DD,RWF,0,0,0,0,pending,,,
+receivables_aging,YYYY-MM-DD,RWF,0,0,0,0,pending,,,
+payables_aging,YYYY-MM-DD,RWF,0,0,0,0,pending,,,
+tax_control,YYYY-MM-DD,RWF,0,0,0,0,pending,,,
+bank_and_cash,YYYY-MM-DD,RWF,0,0,0,0,pending,,,
+retained_earnings,YYYY-MM-DD,RWF,0,0,0,0,pending,,,

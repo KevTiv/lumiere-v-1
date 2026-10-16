@@ -19,6 +19,16 @@ use crate::state::AppState;
 use crate::trusted_context::TrustedOperationContext;
 use crate::web_session::stdb_identity_hex_hint;
 
+const ONBOARDING_CURRENCIES: [(&str, &str, &str, u8); 7] = [
+    ("USD", "US Dollar", "$", 2),
+    ("EUR", "Euro", "€", 2),
+    ("GBP", "British Pound", "£", 2),
+    ("CAD", "Canadian Dollar", "C$", 2),
+    ("AUD", "Australian Dollar", "A$", 2),
+    ("JPY", "Japanese Yen", "¥", 0),
+    ("RWF", "Rwandan Franc", "FRw", 0),
+];
+
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct OrganizationInput {
@@ -281,25 +291,18 @@ async fn bootstrap_currencies_get(
     // rows from another organization. The reducer seeds the selected code
     // after the new organization id exists, so these ids deliberately remain
     // zero and must never be used by an established tenant.
-    let currencies = [
-        ("USD", "US Dollar", "$", 2),
-        ("EUR", "Euro", "€", 2),
-        ("GBP", "British Pound", "£", 2),
-        ("CAD", "Canadian Dollar", "C$", 2),
-        ("AUD", "Australian Dollar", "A$", 2),
-        ("JPY", "Japanese Yen", "¥", 0),
-    ]
-    .into_iter()
-    .map(|(code, name, symbol, decimal_places)| {
-        json!({
-            "id": 0,
-            "code": code,
-            "name": name,
-            "symbol": symbol,
-            "decimalPlaces": decimal_places,
+    let currencies = ONBOARDING_CURRENCIES
+        .into_iter()
+        .map(|(code, name, symbol, decimal_places)| {
+            json!({
+                "id": 0,
+                "code": code,
+                "name": name,
+                "symbol": symbol,
+                "decimalPlaces": decimal_places,
+            })
         })
-    })
-    .collect::<Vec<_>>();
+        .collect::<Vec<_>>();
 
     Ok(Json(json!({ "data": currencies })))
 }
@@ -368,5 +371,10 @@ mod tests {
             tenant_currency_sql(42),
             "SELECT id, code, name, symbol, decimal_places FROM currency WHERE organization_id = 42 AND active = true"
         );
+    }
+
+    #[test]
+    fn onboarding_catalog_includes_zero_decimal_rwandan_franc() {
+        assert!(ONBOARDING_CURRENCIES.contains(&("RWF", "Rwandan Franc", "FRw", 0)));
     }
 }

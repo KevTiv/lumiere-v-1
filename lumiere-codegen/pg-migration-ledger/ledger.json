@@ -34,7 +34,7 @@
     }
   ],
   "pending": {
-    "version": 16,
-    "name": "0016_durable_projection_delta"
+    "version": 17,
+    "name": "0017_durable_projection_delta"
   }
 }

@@ -1,0 +1,424 @@
+{
+  "schemaVersion": 1,
+  "run": {
+    "runId": "replace-me",
+    "executedAt": "1970-01-01T00:00:00Z",
+    "tenantRef": "replace-me",
+    "companyId": 1,
+    "isolatedTenantAcknowledged": true,
+    "migrationMode": "residual_only",
+    "operator": {
+      "name": "replace-me",
+      "email": "replace-me@example.invalid"
+    },
+    "release": {
+      "commit": "0000000000000000000000000000000000000000",
+      "contractVersion": "replace-me",
+      "moduleVersion": "replace-me"
+    },
+    "cutoverDate": "1970-01-01"
+  },
+  "technical": {
+    "checkpoints": [
+      {
+        "id": 1,
+        "status": "pass",
+        "evidence": {
+          "path": "01-rwanda-country-pack.json",
+          "sha256": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+          "runId": "replace-me",
+          "releaseCommit": "0000000000000000000000000000000000000000",
+          "cutoverDate": "1970-01-01"
+        }
+      },
+      {
+        "id": 2,
+        "status": "pass",
+        "evidence": {
+          "path": "02-accounting-readiness.json",
+          "sha256": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+          "runId": "replace-me",
+          "releaseCommit": "0000000000000000000000000000000000000000",
+          "cutoverDate": "1970-01-01"
+        }
+      },
+      {
+        "id": 3,
+        "status": "pass",
+        "evidence": {
+          "path": "03-invoice-and-bill.json",
+          "sha256": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+          "runId": "replace-me",
+          "releaseCommit": "0000000000000000000000000000000000000000",
+          "cutoverDate": "1970-01-01"
+        }
+      },
+      {
+        "id": 4,
+        "status": "pass",
+        "evidence": {
+          "path": "04-opening-balance-retry.json",
+          "sha256": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+          "runId": "replace-me",
+          "releaseCommit": "0000000000000000000000000000000000000000",
+          "cutoverDate": "1970-01-01"
+        }
+      },
+      {
+        "id": 5,
+        "status": "pass",
+        "evidence": {
+          "path": "05-historical-journal.json",
+          "sha256": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+          "runId": "replace-me",
+          "releaseCommit": "0000000000000000000000000000000000000000",
+          "cutoverDate": "1970-01-01"
+        }
+      },
+      {
+        "id": 6,
+        "status": "pass",
+        "evidence": {
+          "path": "06-outstanding-documents.json",
+          "sha256": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+          "runId": "replace-me",
+          "releaseCommit": "0000000000000000000000000000000000000000",
+          "cutoverDate": "1970-01-01"
+        }
+      },
+      {
+        "id": 7,
+        "status": "pass",
+        "evidence": {
+          "path": "07-historical-payment-contract.json",
+          "sha256": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+          "runId": "replace-me",
+          "releaseCommit": "0000000000000000000000000000000000000000",
+          "cutoverDate": "1970-01-01"
+        }
+      },
+      {
+        "id": 8,
+        "status": "not_applicable",
+        "reason": "Residual-only migration does not replay pre-cutover payments."
+      }
+    ],
+    "companionSpecs": [
+      {
+        "name": "accounting-post-reconcile.spec.ts",
+        "status": "fail",
+        "evidence": {
+          "path": "replace-me",
+          "sha256": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+          "runId": "replace-me",
+          "releaseCommit": "0000000000000000000000000000000000000000",
+          "cutoverDate": "1970-01-01"
+        }
+      },
+      {
+        "name": "cov08b-bank-statement-reconcile.spec.ts",
+        "status": "fail",
+        "evidence": {
+          "path": "replace-me",
+          "sha256": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+          "runId": "replace-me",
+          "releaseCommit": "0000000000000000000000000000000000000000",
+          "cutoverDate": "1970-01-01"
+        }
+      }
+    ]
+  },
+  "controlTotals": [
+    {
+      "name": "trial_balance_debits",
+      "asOfDate": "1970-01-01",
+      "currency": "RWF",
+      "sourceAmount": 0,
+      "lumiereAmount": 0,
+      "difference": 0,
+      "tolerance": 0,
+      "status": "fail",
+      "reviewedBy": "replace-me",
+      "evidence": {
+        "path": "replace-me",
+        "sha256": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+        "runId": "replace-me",
+        "releaseCommit": "0000000000000000000000000000000000000000",
+        "cutoverDate": "1970-01-01"
+      }
+    },
+    {
+      "name": "trial_balance_credits",
+      "asOfDate": "1970-01-01",
+      "currency": "RWF",
+      "sourceAmount": 0,
+      "lumiereAmount": 0,
+      "difference": 0,
+      "tolerance": 0,
+      "status": "fail",
+      "reviewedBy": "replace-me",
+      "evidence": {
+        "path": "replace-me",
+        "sha256": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+        "runId": "replace-me",
+        "releaseCommit": "0000000000000000000000000000000000000000",
+        "cutoverDate": "1970-01-01"
+      }
+    },
+    {
+      "name": "receivables_aging",
+      "asOfDate": "1970-01-01",
+      "currency": "RWF",
+      "sourceAmount": 0,
+      "lumiereAmount": 0,
+      "difference": 0,
+      "tolerance": 0,
+      "status": "fail",
+      "reviewedBy": "replace-me",
+      "evidence": {
+        "path": "replace-me",
+        "sha256": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+        "runId": "replace-me",
+        "releaseCommit": "0000000000000000000000000000000000000000",
+        "cutoverDate": "1970-01-01"
+      }
+    },
+    {
+      "name": "payables_aging",
+      "asOfDate": "1970-01-01",
+      "currency": "RWF",
+      "sourceAmount": 0,
+      "lumiereAmount": 0,
+      "difference": 0,
+      "tolerance": 0,
+      "status": "fail",
+      "reviewedBy": "replace-me",
+      "evidence": {
+        "path": "replace-me",
+        "sha256": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+        "runId": "replace-me",
+        "releaseCommit": "0000000000000000000000000000000000000000",
+        "cutoverDate": "1970-01-01"
+      }
+    },
+    {
+      "name": "tax_control",
+      "asOfDate": "1970-01-01",
+      "currency": "RWF",
+      "sourceAmount": 0,
+      "lumiereAmount": 0,
+      "difference": 0,
+      "tolerance": 0,
+      "status": "fail",
+      "reviewedBy": "replace-me",
+      "evidence": {
+        "path": "replace-me",
+        "sha256": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+        "runId": "replace-me",
+        "releaseCommit": "0000000000000000000000000000000000000000",
+        "cutoverDate": "1970-01-01"
+      }
+    },
+    {
+      "name": "bank_and_cash",
+      "asOfDate": "1970-01-01",
+      "currency": "RWF",
+      "sourceAmount": 0,
+      "lumiereAmount": 0,
+      "difference": 0,
+      "tolerance": 0,
+      "status": "fail",
+      "reviewedBy": "replace-me",
+      "evidence": {
+        "path": "replace-me",
+        "sha256": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+        "runId": "replace-me",
+        "releaseCommit": "0000000000000000000000000000000000000000",
+        "cutoverDate": "1970-01-01"
+      }
+    },
+    {
+      "name": "retained_earnings",
+      "asOfDate": "1970-01-01",
+      "currency": "RWF",
+      "sourceAmount": 0,
+      "lumiereAmount": 0,
+      "difference": 0,
+      "tolerance": 0,
+      "status": "fail",
+      "reviewedBy": "replace-me",
+      "evidence": {
+        "path": "replace-me",
+        "sha256": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+        "runId": "replace-me",
+        "releaseCommit": "0000000000000000000000000000000000000000",
+        "cutoverDate": "1970-01-01"
+      }
+    }
+  ],
+  "roleChecks": [
+    {
+      "name": "alpha_power_user",
+      "status": "fail",
+      "evidence": {
+        "path": "replace-me",
+        "sha256": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+        "runId": "replace-me",
+        "releaseCommit": "0000000000000000000000000000000000000000",
+        "cutoverDate": "1970-01-01"
+      }
+    },
+    {
+      "name": "bookkeeper",
+      "status": "fail",
+      "evidence": {
+        "path": "replace-me",
+        "sha256": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+        "runId": "replace-me",
+        "releaseCommit": "0000000000000000000000000000000000000000",
+        "cutoverDate": "1970-01-01"
+      }
+    },
+    {
+      "name": "read_only",
+      "status": "fail",
+      "evidence": {
+        "path": "replace-me",
+        "sha256": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+        "runId": "replace-me",
+        "releaseCommit": "0000000000000000000000000000000000000000",
+        "cutoverDate": "1970-01-01"
+      }
+    }
+  ],
+  "manualChecks": [
+    {
+      "id": 1,
+      "status": "fail",
+      "reviewedBy": "replace-me",
+      "evidence": {
+        "path": "replace-me",
+        "sha256": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+        "runId": "replace-me",
+        "releaseCommit": "0000000000000000000000000000000000000000",
+        "cutoverDate": "1970-01-01"
+      }
+    },
+    {
+      "id": 2,
+      "status": "fail",
+      "reviewedBy": "replace-me",
+      "evidence": {
+        "path": "replace-me",
+        "sha256": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+        "runId": "replace-me",
+        "releaseCommit": "0000000000000000000000000000000000000000",
+        "cutoverDate": "1970-01-01"
+      }
+    },
+    {
+      "id": 3,
+      "status": "fail",
+      "reviewedBy": "replace-me",
+      "evidence": {
+        "path": "replace-me",
+        "sha256": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+        "runId": "replace-me",
+        "releaseCommit": "0000000000000000000000000000000000000000",
+        "cutoverDate": "1970-01-01"
+      }
+    },
+    {
+      "id": 4,
+      "status": "fail",
+      "reviewedBy": "replace-me",
+      "evidence": {
+        "path": "replace-me",
+        "sha256": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+        "runId": "replace-me",
+        "releaseCommit": "0000000000000000000000000000000000000000",
+        "cutoverDate": "1970-01-01"
+      }
+    },
+    {
+      "id": 5,
+      "status": "fail",
+      "reviewedBy": "replace-me",
+      "evidence": {
+        "path": "replace-me",
+        "sha256": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+        "runId": "replace-me",
+        "releaseCommit": "0000000000000000000000000000000000000000",
+        "cutoverDate": "1970-01-01"
+      }
+    },
+    {
+      "id": 6,
+      "status": "fail",
+      "reviewedBy": "replace-me",
+      "evidence": {
+        "path": "replace-me",
+        "sha256": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+        "runId": "replace-me",
+        "releaseCommit": "0000000000000000000000000000000000000000",
+        "cutoverDate": "1970-01-01"
+      }
+    },
+    {
+      "id": 7,
+      "status": "fail",
+      "reviewedBy": "replace-me",
+      "evidence": {
+        "path": "replace-me",
+        "sha256": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+        "runId": "replace-me",
+        "releaseCommit": "0000000000000000000000000000000000000000",
+        "cutoverDate": "1970-01-01"
+      }
+    }
+  ],
+  "signoffs": {
+    "alphaUser": {
+      "decision": "pending",
+      "name": "replace-me",
+      "role": "alpha power user",
+      "runId": "replace-me",
+      "releaseCommit": "0000000000000000000000000000000000000000",
+      "cutoverDate": "1970-01-01"
+    },
+    "accountant": {
+      "decision": "pending",
+      "name": "replace-me",
+      "role": "Rwanda-qualified accountant",
+      "runId": "replace-me",
+      "releaseCommit": "0000000000000000000000000000000000000000",
+      "cutoverDate": "1970-01-01"
+    },
+    "legal": {
+      "decision": "pending",
+      "name": "replace-me",
+      "qualification": "Rwanda-qualified legal reviewer",
+      "rulesetVersion": "replace-me"
+    },
+    "tax": {
+      "decision": "pending",
+      "name": "replace-me",
+      "qualification": "Rwanda-qualified tax reviewer",
+      "rulesetVersion": "replace-me"
+    },
+    "rraVsdc": {
+      "status": "pending"
+    }
+  },
+  "countryPack": {
+    "packKey": "rw",
+    "version": "replace-me",
+    "acceptanceStatus": "review_required",
+    "enabled": false
+  },
+  "exceptions": [],
+  "decisions": {
+    "operationalAlpha": "fail",
+    "statutoryUse": "fail"
+  }
+}
