@@ -7,7 +7,7 @@ use serde_json::Value;
 use crate::error::ApiError;
 use crate::state::AppState;
 use stdb_auth::{
-    select_field_permissions_for_org_sql, select_roles_active_sql,
+    identity_sql_literal, select_field_permissions_for_org_sql, select_roles_active_sql,
     select_user_organization_for_identity_sql, select_user_profile_for_organization_sql,
     FieldAccessContext, FieldPermissionLike,
 };
@@ -149,13 +149,50 @@ pub async fn load_field_access_context(
     }
 
     let perms = role.get("permissions").cloned().unwrap_or(Value::Null);
-    let role_permissions: Vec<String> = match perms {
+    let mut role_permissions: Vec<String> = match perms {
         Value::Array(a) => a
             .into_iter()
             .filter_map(|v| v.as_str().map(|s| s.to_string()))
             .collect(),
         _ => vec![],
     };
+
+    // Supplemental role assignments are additive authority. Resolve them with
+    // the trusted session authority client so the browser never needs access
+    // to private role permission definitions.
+    let identity = identity_sql_literal(identity_hex).map_err(|e| e.to_string())?;
+    let assignment_sql = format!(
+        "SELECT role_id, expires_at FROM user_role_assignment WHERE organization_id = {organization_id} AND user_identity = {identity} AND is_active = true"
+    );
+    let assignments = client
+        .query_sql(&assignment_sql)
+        .await
+        .map_err(|e| e.to_string())?;
+    let (supplemental_role_ids, supplemental_permissions) = supplemental_role_authority(
+        &roles,
+        &assignments,
+        organization_id,
+        chrono::Utc::now().timestamp_micros(),
+    );
+    let mut effective_role_ids = vec![role_id];
+    effective_role_ids.extend(supplemental_role_ids);
+    role_permissions.extend(supplemental_permissions);
+    effective_role_ids.sort_unstable();
+    effective_role_ids.dedup();
+    role_permissions.sort();
+    role_permissions.dedup();
+
+    // FieldAccessContext retains the primary role for compatibility. Convert
+    // supplemental role rules into direct rules for this session so the
+    // field-policy evaluator applies every effective role.
+    for permission in &mut field_permissions {
+        let subject_role_id = permission.subject_role_id.or(permission.role_id);
+        if subject_role_id
+            .is_some_and(|id| id != role_id && effective_role_ids.binary_search(&id).is_ok())
+        {
+            permission.subject_user_hex = Some(identity_hex.to_string());
+        }
+    }
 
     Ok(Some(FieldAccessContext {
         organization_id,
@@ -166,6 +203,92 @@ pub async fn load_field_access_context(
         identity_hex: identity_hex.to_string(),
         field_permissions,
     }))
+}
+
+fn value_u64(value: &Value) -> Option<u64> {
+    value
+        .as_u64()
+        .or_else(|| value.as_str().and_then(|raw| raw.parse().ok()))
+}
+
+fn timestamp_micros(value: &Value) -> Option<i64> {
+    value
+        .as_i64()
+        .or_else(|| value.as_u64().and_then(|raw| i64::try_from(raw).ok()))
+        .or_else(|| value.as_str().and_then(|raw| raw.parse().ok()))
+        .or_else(|| {
+            value
+                .get("__timestamp_micros_since_unix_epoch__")
+                .and_then(timestamp_micros)
+        })
+        .or_else(|| value.get("microsSinceUnixEpoch").and_then(timestamp_micros))
+        .or_else(|| value.get("some").and_then(timestamp_micros))
+}
+
+fn supplemental_role_authority(
+    roles: &[Value],
+    assignments: &[Value],
+    organization_id: u64,
+    now_micros: i64,
+) -> (Vec<u64>, Vec<String>) {
+    let mut role_ids = Vec::new();
+    let mut permissions = Vec::new();
+    for assignment in assignments {
+        if assignment
+            .get("isActive")
+            .or_else(|| assignment.get("is_active"))
+            .and_then(Value::as_bool)
+            == Some(false)
+        {
+            continue;
+        }
+        let current = match assignment
+            .get("expiresAt")
+            .or_else(|| assignment.get("expires_at"))
+        {
+            None | Some(Value::Null) => true,
+            Some(value) => timestamp_micros(value).is_some_and(|expires| expires > now_micros),
+        };
+        if !current {
+            continue;
+        }
+        let Some(assigned_role_id) = assignment
+            .get("roleId")
+            .or_else(|| assignment.get("role_id"))
+            .and_then(value_u64)
+        else {
+            continue;
+        };
+        let Some(assigned_role) = roles.iter().find(|candidate| {
+            candidate.get("id").and_then(value_u64) == Some(assigned_role_id)
+                && candidate
+                    .get("organizationId")
+                    .or_else(|| candidate.get("organization_id"))
+                    .and_then(value_u64)
+                    == Some(organization_id)
+                && candidate
+                    .get("isActive")
+                    .or_else(|| candidate.get("is_active"))
+                    .and_then(Value::as_bool)
+                    .unwrap_or(true)
+        }) else {
+            continue;
+        };
+        role_ids.push(assigned_role_id);
+        if let Some(role_permissions) = assigned_role.get("permissions").and_then(Value::as_array) {
+            permissions.extend(
+                role_permissions
+                    .iter()
+                    .filter_map(Value::as_str)
+                    .map(str::to_owned),
+            );
+        }
+    }
+    role_ids.sort_unstable();
+    role_ids.dedup();
+    permissions.sort();
+    permissions.dedup();
+    (role_ids, permissions)
 }
 
 fn parse_field_permission_row(row: &Value, identity_hex: &str) -> Option<FieldPermissionLike> {
@@ -387,6 +510,61 @@ mod tests {
             None
         );
         assert_eq!(parse_stdb_identity_hex("0x1234"), None);
+    }
+
+    #[test]
+    fn supplemental_role_authority_includes_only_current_active_roles() {
+        let roles = vec![
+            serde_json::json!({
+                "id": 2,
+                "organizationId": 7,
+                "isActive": true,
+                "permissions": ["settings:read", "settings:write"]
+            }),
+            serde_json::json!({
+                "id": 3,
+                "organizationId": 7,
+                "isActive": false,
+                "permissions": ["inactive:read"]
+            }),
+            serde_json::json!({
+                "id": 4,
+                "organizationId": 8,
+                "isActive": true,
+                "permissions": ["other_org:read"]
+            }),
+        ];
+        let assignments = vec![
+            serde_json::json!({ "roleId": 2, "isActive": true, "expiresAt": 2_000 }),
+            serde_json::json!({ "roleId": 3, "isActive": true }),
+            serde_json::json!({ "roleId": 4, "isActive": true }),
+            serde_json::json!({ "roleId": 2, "isActive": false }),
+        ];
+
+        let (role_ids, permissions) = supplemental_role_authority(&roles, &assignments, 7, 1_000);
+
+        assert_eq!(role_ids, vec![2]);
+        assert_eq!(permissions, vec!["settings:read", "settings:write"]);
+    }
+
+    #[test]
+    fn supplemental_role_authority_excludes_expired_assignment() {
+        let roles = vec![serde_json::json!({
+            "id": 2,
+            "organizationId": 7,
+            "isActive": true,
+            "permissions": ["settings:read"]
+        })];
+        let assignments = vec![serde_json::json!({
+            "roleId": 2,
+            "isActive": true,
+            "expiresAt": { "__timestamp_micros_since_unix_epoch__": 999 }
+        })];
+
+        assert_eq!(
+            supplemental_role_authority(&roles, &assignments, 7, 1_000),
+            (vec![], vec![])
+        );
     }
 
     #[tokio::test]

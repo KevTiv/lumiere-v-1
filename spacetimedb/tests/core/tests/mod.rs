@@ -56,7 +56,9 @@ pub fn run_core_sod_test(ctx: &ReducerContext) -> Result<(), String> {
     sod_test::test_opportunity_field_write_policy(ctx)
         .map_err(|e| format!("opp_field_write: {e}"))?;
     sod_test::test_role_assign_revoke_rejects_replay(ctx)
-        .map_err(|e| format!("role_assign_revoke_replay: {e}"))
+        .map_err(|e| format!("role_assign_revoke_replay: {e}"))?;
+    sod_test::test_supplemental_role_authority_filters_stale_assignments(ctx)
+        .map_err(|e| format!("supplemental_role_authority: {e}"))
 }
 
 #[spacetimedb::reducer]

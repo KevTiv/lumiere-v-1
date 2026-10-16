@@ -1382,7 +1382,9 @@ function AccountingClientReady({
       companyConfigured: company != null,
       baseCurrencyConfigured:
         manualInvoiceCurrencyId > 0n &&
-        currencies.some((currency) => currency.id === manualInvoiceCurrencyId),
+        currencies.some(
+          (currency) => String(currency.id) === String(manualInvoiceCurrencyId),
+        ),
       fiscalYearConfigured: companyFiscalYears.length > 0,
       openPeriodAvailable: companyPeriods.some(
         (period) => accountPeriodStateTag(copyAsRecord(period)) === "Open",

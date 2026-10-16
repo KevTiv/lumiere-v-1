@@ -11,7 +11,8 @@ use spacetimedb::{Identity, ReducerContext, Table};
 use crate::accounting::tax_management::account_tax;
 use crate::core::audit::{audit_log, AuditLog};
 use crate::core::permissions::{
-    org_permission, role, PermissionAction, PermissionEffect, PermissionSubject,
+    org_permission, role, user_role_assignment, PermissionAction, PermissionEffect,
+    PermissionSubject,
 };
 use crate::core::reference::{document_sequence, DocumentSequence};
 use crate::core::users::{find_user_profile_for_organization, user_organization};
@@ -28,13 +29,14 @@ pub enum PermissionResolution {
 ///
 /// Resolution order:
 ///   1. Superuser → Allow
-///   2. Role.permissions string list (`"resource:action"` or `"resource:*"`)
-///   3. OrgPermission rows for the org (explicit **Deny** wins over **Allow**)
+///   2. Matching OrgPermission **Deny** rows
+///   3. Role.permissions string list (`"resource:action"` or `"resource:*"`)
+///   4. Matching OrgPermission **Allow** rows
 pub fn resolve_permission(
     ctx: &ReducerContext,
     organization_id: u64,
     user_identity: Identity,
-    role_id: u64,
+    role_ids: &[u64],
     _role_name: &str,
     role_permissions: &[String],
     is_superuser: bool,
@@ -49,6 +51,18 @@ pub fn resolve_permission(
     let wildcard = format!("{}:*", resource);
     let global_wildcard = "*:*".to_string();
 
+    let org_permission = try_org_permission(
+        ctx,
+        organization_id,
+        resource,
+        action,
+        role_ids,
+        user_identity,
+    );
+    if matches!(&org_permission, Some(Err(_))) {
+        return PermissionResolution::Deny;
+    }
+
     if role_permissions.contains(&permission)
         || role_permissions.contains(&wildcard)
         || role_permissions.contains(&global_wildcard)
@@ -56,18 +70,8 @@ pub fn resolve_permission(
         return PermissionResolution::Allow;
     }
 
-    if let Some(r) = try_org_permission(
-        ctx,
-        organization_id,
-        resource,
-        action,
-        role_id,
-        user_identity,
-    ) {
-        return match r {
-            Ok(()) => PermissionResolution::Allow,
-            Err(_) => PermissionResolution::Deny,
-        };
+    if matches!(org_permission, Some(Ok(()))) {
+        return PermissionResolution::Allow;
     }
 
     PermissionResolution::NotGranted
@@ -101,14 +105,49 @@ pub fn check_permission(
         .id()
         .find(&user_org.role_id)
         .ok_or("Role not found")?;
+    if role.organization_id != organization_id || !role.is_active {
+        return Err("Membership role is inactive or belongs to another organization".to_string());
+    }
+
+    // A membership role is the base authority. Active, unexpired
+    // UserRoleAssignment rows add the permissions of their organization-local
+    // roles; this is the same additive model exposed by Settings role
+    // assignment and by session role hydration.
+    let mut effective_role_ids = vec![role.id];
+    let mut effective_permissions = role.permissions.clone();
+    for assignment in ctx
+        .db
+        .user_role_assignment()
+        .role_assign_by_user()
+        .filter(&ctx.sender())
+        .filter(|assignment| {
+            assignment.organization_id == organization_id
+                && assignment.is_active
+                && assignment
+                    .expires_at
+                    .is_none_or(|expires_at| expires_at > ctx.timestamp)
+        })
+    {
+        let Some(assigned_role) = ctx.db.role().id().find(&assignment.role_id) else {
+            continue;
+        };
+        if assigned_role.organization_id == organization_id && assigned_role.is_active {
+            effective_role_ids.push(assigned_role.id);
+            effective_permissions.extend(assigned_role.permissions);
+        }
+    }
+    effective_role_ids.sort_unstable();
+    effective_role_ids.dedup();
+    effective_permissions.sort();
+    effective_permissions.dedup();
 
     match resolve_permission(
         ctx,
         organization_id,
         ctx.sender(),
-        role.id,
+        &effective_role_ids,
         &role.name,
-        &role.permissions,
+        &effective_permissions,
         user.is_superuser,
         resource,
         action,
@@ -125,9 +164,13 @@ pub fn check_permission(
     }
 }
 
-fn org_perm_subject_matches(subject: &PermissionSubject, sender: Identity, role_id: u64) -> bool {
+fn org_perm_subject_matches(
+    subject: &PermissionSubject,
+    sender: Identity,
+    role_ids: &[u64],
+) -> bool {
     match subject {
-        PermissionSubject::Role(r) => *r == role_id,
+        PermissionSubject::Role(r) => role_ids.contains(r),
         PermissionSubject::User(id) => *id == sender,
     }
 }
@@ -153,7 +196,7 @@ fn try_org_permission(
     organization_id: u64,
     resource: &str,
     action: &str,
-    role_id: u64,
+    role_ids: &[u64],
     user_identity: Identity,
 ) -> Option<Result<(), String>> {
     let mut saw_deny = false;
@@ -165,7 +208,7 @@ fn try_org_permission(
         .perm_by_org()
         .filter(&organization_id)
     {
-        if !org_perm_subject_matches(&p.subject, user_identity, role_id) {
+        if !org_perm_subject_matches(&p.subject, user_identity, role_ids) {
             continue;
         }
         if !org_perm_resource_matches(&p.resource, resource) {

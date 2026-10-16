@@ -36,23 +36,34 @@ import {
 } from "./helpers"
 
 async function fetchExactExchangeOrderId(page: import("@playwright/test").Page, returnOrderId: number) {
-  const response = await page.request.get("/api/query/sale-orders")
-  expect(response.ok()).toBe(true)
-  const json = (await response.json()) as { data?: Array<Record<string, unknown>> }
-  const matches = (json.data ?? []).filter((row) => {
-    const origin = String(row.origin ?? "")
-    if (origin === `exchange:RMA/${returnOrderId}`) return true
-    if (typeof row.metadata !== "string") return false
-    try {
-      return String((JSON.parse(row.metadata) as { exchange_return_id?: unknown }).exchange_return_id) === String(returnOrderId)
-    } catch {
-      return false
+  const deadline = Date.now() + 30_000
+  let lastMatches: Array<Record<string, unknown>> = []
+
+  while (Date.now() < deadline) {
+    const response = await page.request.get("/api/query/sale-orders")
+    expect(response.ok()).toBe(true)
+    const json = (await response.json()) as { data?: Array<Record<string, unknown>> }
+    lastMatches = (json.data ?? []).filter((row) => {
+      const origin = String(row.origin ?? "")
+      if (origin === `exchange:RMA/${returnOrderId}`) return true
+      if (typeof row.metadata !== "string") return false
+      try {
+        return String((JSON.parse(row.metadata) as { exchange_return_id?: unknown }).exchange_return_id) === String(returnOrderId)
+      } catch {
+        return false
+      }
+    })
+    if (lastMatches.length === 1) {
+      const id = Number(lastMatches[0]?.id)
+      expect(Number.isSafeInteger(id) && id > 0).toBe(true)
+      return id
     }
-  })
-  expect(matches, "one exact exchange order for the return").toHaveLength(1)
-  const id = Number(matches[0]?.id)
-  expect(Number.isSafeInteger(id) && id > 0).toBe(true)
-  return id
+    expect(lastMatches.length, "at most one exact exchange order for the return").toBeLessThan(2)
+    await page.waitForTimeout(250)
+  }
+
+  expect(lastMatches, "one exact exchange order for the return").toHaveLength(1)
+  throw new Error("unreachable")
 }
 
 /**

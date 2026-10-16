@@ -8,7 +8,7 @@
 use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::core::organization::organization;
-use crate::core::permissions::{role, Role};
+use crate::core::permissions::{role, touch_policy_snapshot_for_user, Role};
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 
 // ============================================================================
@@ -614,6 +614,7 @@ pub fn update_org_member_role(
         role_id: selected_role.id,
         ..membership
     });
+    touch_policy_snapshot_for_user(ctx, membership.organization_id, membership.user_identity);
 
     write_audit_log_v2(
         ctx,
@@ -739,6 +740,7 @@ pub fn update_user_organization_status(
         is_default,
         ..membership
     });
+    touch_policy_snapshot_for_user(ctx, membership.organization_id, membership.user_identity);
 
     write_audit_log_v2(
         ctx,
@@ -790,6 +792,7 @@ pub fn remove_user_from_organization(
         is_active: false,
         ..membership
     });
+    touch_policy_snapshot_for_user(ctx, organization_id, user_identity);
 
     write_audit_log_v2(
         ctx,

@@ -130,7 +130,7 @@ async function receivePoLineQty(
   await fillField(page, "qty", qty)
   const [receiveRes] = await Promise.all([
     page.waitForResponse(
-      (res) => matchesOperationResponse(res, "receive_po_line") && res.ok(),
+      (res) => matchesOperationResponse(res, "erp.receive_po_line_once") && res.ok(),
       { timeout: 30_000 },
     ),
     submitForm(page, "receive-purchase-order-line"),
@@ -348,7 +348,7 @@ test.describe("MVP procure-to-pay workflow", { tag: "@p0" }, () => {
     await expect(recoveryForm.getByTestId("form-field-lineId")).toContainText(await fetchPurchaseOrderLineReceiveLabel(page, orderId, lineId))
     await expect(recoveryForm).toContainText("physically arrived")
     const [recoveryResponse] = await Promise.all([
-      page.waitForResponse((res) => matchesOperationResponse(res, "receive_po_line") && res.ok()),
+      page.waitForResponse((res) => matchesOperationResponse(res, "erp.receive_po_line_once") && res.ok()),
       submitForm(page, "receive-purchase-order-line"),
     ])
     expect(recoveryResponse.ok()).toBe(true)

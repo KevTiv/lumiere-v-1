@@ -116,7 +116,7 @@ test.describe("O2C adversarial certification", { tag: "@p0" }, () => {
     expect(await fetchOrderPickings(page, orderId)).toHaveLength(1)
   })
 
-  test("a reply lost after the server committed reports an unknown outcome, refreshes, and offers no retry", async ({
+  test("a reply lost after the server committed is resolved by canonical readback and offers no retry", async ({
     page,
   }) => {
     test.setTimeout(240_000)
@@ -126,12 +126,12 @@ test.describe("O2C adversarial certification", { tag: "@p0" }, () => {
     const injected = await loseNextResponse(page, "confirm_sales_order")
     await page.getByTestId("entity-action-confirm-orders").click()
 
-    // The user is told the result is unknown, not that it failed or worked.
-    await expect(page.getByText(/Result unknown/i).first()).toBeVisible({ timeout: 30_000 })
-    expect(injected.lost()).toBe(true)
-
-    // The write did commit, exactly once, and re-issuing it is not offered.
+    // The response was lost, but exact order and delivery readback proves that
+    // the write committed. The workflow therefore converges without presenting
+    // an unknown result or offering a potentially duplicating retry.
     await waitForSaleOrderConfirmed(page, orderId)
+    expect(injected.lost()).toBe(true)
+    await expect(page.getByText(/Result unknown/i)).toHaveCount(0)
     await expect(page.getByRole("button", { name: "Retry" })).toHaveCount(0)
     expect(await fetchOrderPickings(page, orderId)).toHaveLength(1)
 

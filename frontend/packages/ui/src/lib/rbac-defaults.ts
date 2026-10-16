@@ -262,14 +262,14 @@ export function roleHasWildcardPermission(role: Role): boolean {
 
 export function buildRbacUserFromServer(
   roles: readonly Role[],
-  serverRoleNames: readonly string[] | undefined,
+  serverRoleIds: readonly (number | string)[] | undefined,
   serverIdentity: string | undefined,
 ): User | null {
   if (!serverIdentity || serverIdentity === "unknown") return null
 
-  const names = (serverRoleNames ?? []).map((n) => n.trim().toLowerCase())
+  const roleIds = new Set((serverRoleIds ?? []).map(String))
   const assignedRoleIds = roles
-    .filter((role) => names.includes(role.name.trim().toLowerCase()))
+    .filter((role) => roleIds.has(role.id))
     .map((role) => role.id)
 
   return {
