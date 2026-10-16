@@ -214,9 +214,7 @@ async fn exercise_account_payment_reversal_identity_upgrade(pool: &Pool) -> Resu
     let frozen_migration_15 = include_str!(
         "../../../../lumiere-codegen/pg-migration-ledger/0015_durable_projection_delta.sql"
     );
-    ensure!(
-        MIGRATIONS[migration_15_index].name == "account_payment_reversal_identity"
-    );
+    ensure!(MIGRATIONS[migration_15_index].name == "account_payment_reversal_identity");
     ensure!(MIGRATIONS[migration_15_index].sql == frozen_migration_15);
 
     apply_migration_prefix(pool, migration_15_index).await?;
@@ -233,9 +231,7 @@ async fn exercise_account_payment_reversal_identity_upgrade(pool: &Pool) -> Resu
 
     let previous_history = applied_migration_history(pool).await?;
     ensure_schema(pool).await?;
-    ensure!(
-        applied_checksum(pool, 15).await? == migration_checksum(frozen_migration_15)
-    );
+    ensure!(applied_checksum(pool, 15).await? == migration_checksum(frozen_migration_15));
 
     let client = pool.get().await?;
     let column = client
@@ -269,9 +265,7 @@ async fn exercise_account_payment_reversal_identity_upgrade(pool: &Pool) -> Resu
         .is_some_and(|value| value.contains("reversal_move_id IS NOT NULL")));
     drop(client);
 
-    ensure!(
-        applied_migration_history(pool).await?[..migration_15_index] == previous_history
-    );
+    ensure!(applied_migration_history(pool).await?[..migration_15_index] == previous_history);
     ensure_schema(pool).await?;
     ensure!(migration_count(pool).await? == MIGRATIONS.len() as i64);
     Ok(())

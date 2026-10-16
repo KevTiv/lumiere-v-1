@@ -348,9 +348,8 @@ pub fn stage_bank_statement_import(
         return Err("Journal does not belong to the specified company".to_string());
     }
 
-    let payload_fingerprint = format!(
-        "journal_id={journal_id};currency_id={currency_id};params={params:?}"
-    );
+    let payload_fingerprint =
+        format!("journal_id={journal_id};currency_id={currency_id};params={params:?}");
     if replayed_result(
         ctx,
         organization_id,
