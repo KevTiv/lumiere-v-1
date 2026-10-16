@@ -849,6 +849,10 @@ function AccountingClientReady({
   const [showCreateInvoice, setShowCreateInvoice] = useState(false)
   const [showCreateBill, setShowCreateBill] = useState(false)
   const [readinessAction, setReadinessAction] = useState<AccountingReadinessAction | undefined>()
+  const [pendingAccountingAction, setPendingAccountingAction] = useState<{
+    action: AccountingReadinessAction
+    onReady: () => void
+  } | null>(null)
   const [creditNoteSource, setCreditNoteSource] = useState<AccountMove | null>(null)
   // Analytic row editors (click row on Analytic tabs)
   const [analyticAccountEdit, setAnalyticAccountEdit] = useState<Record<string, unknown> | null>(null)
@@ -1418,10 +1422,21 @@ function AccountingClientReady({
     [accountingSetup],
   )
 
-  const requestAccountingAction = useCallback(
+  const accountingSetupDataState = mergeModuleStates([
+    accountsRead.state,
+    taxesRead.state,
+    taxGroupsRead.state,
+    companiesRead.state,
+    currenciesRead.state,
+    journalsRead.state,
+    accountTypesRead.state,
+    fiscalYearsRawRead.state,
+    accountPeriodsRawRead.state,
+  ])
+
+  const runAccountingAction = useCallback(
     (action: AccountingReadinessAction, onReady: () => void) => {
       const readiness = readinessByAction[action]
-      setReadinessAction(action)
       if (readiness.isReady) {
         onReady()
         return
@@ -1436,6 +1451,25 @@ function AccountingClientReady({
     },
     [readinessByAction, toast],
   )
+
+  const requestAccountingAction = useCallback(
+    (action: AccountingReadinessAction, onReady: () => void) => {
+      setReadinessAction(action)
+      if (accountingSetupDataState.status === "loading") {
+        setPendingAccountingAction({ action, onReady })
+        return
+      }
+      setPendingAccountingAction(null)
+      runAccountingAction(action, onReady)
+    },
+    [accountingSetupDataState.status, runAccountingAction],
+  )
+
+  useEffect(() => {
+    if (accountingSetupDataState.status === "loading" || pendingAccountingAction == null) return
+    setPendingAccountingAction(null)
+    runAccountingAction(pendingAccountingAction.action, pendingAccountingAction.onReady)
+  }, [accountingSetupDataState.status, pendingAccountingAction, runAccountingAction])
 
   const openInvoiceCreate = useCallback(
     () => requestAccountingAction("invoice", () => setShowCreateInvoice(true)),
