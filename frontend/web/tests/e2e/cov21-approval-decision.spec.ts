@@ -1,3 +1,4 @@
+import { bootstrapFixtureAccountSession } from './fixture-account'
 import { expect, request as playwrightRequest, test, type Browser, type Page, type Request } from "@playwright/test"
 
 import {
@@ -41,16 +42,7 @@ async function provisionIndependentApprover(page: Page, browser: Browser) {
   const signup = await playwrightRequest.newContext({ baseURL })
   let identity: string
   try {
-    const response = await signup.post("/api/auth/signup", {
-      data: { email, password: APPROVER_PASSWORD },
-    })
-    if (!response.ok()) {
-      throw new Error(`approver signup failed (${response.status()}): ${await response.text()}`)
-    }
-    const state = await signup.storageState()
-    const rawIdentity = state.cookies.find((cookie) => cookie.name === "stdb_identity")?.value
-    if (!rawIdentity) throw new Error("approver signup did not set stdb_identity")
-    identity = rawIdentity.replace(/^0x/i, "")
+    identity = await bootstrapFixtureAccountSession(signup, email, APPROVER_PASSWORD)
   } finally {
     await signup.dispose()
   }

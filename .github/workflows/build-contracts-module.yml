@@ -48,7 +48,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: .ci/contracts-module.wasm
-          key: contracts-module-v4-${{ inputs.production && 'production-lean' || 'development' }}-${{ steps.alpha-policy.outputs.digest }}-${{ runner.os }}-${{ hashFiles('spacetimedb/src/**', 'spacetimedb/tests/**', 'spacetimedb/assets/**', 'spacetimedb/Cargo.toml', 'spacetimedb/Cargo.lock', 'crates/presentation-core/src/**', 'crates/presentation-core/Cargo.toml') }}
+          key: contracts-module-v5-${{ inputs.production && 'production-lean' || 'development-fixtures' }}-${{ steps.alpha-policy.outputs.digest }}-${{ runner.os }}-${{ hashFiles('spacetimedb/src/**', 'spacetimedb/tests/**', 'spacetimedb/assets/**', 'spacetimedb/Cargo.toml', 'spacetimedb/Cargo.lock', 'crates/presentation-core/src/**', 'crates/presentation-core/Cargo.toml') }}
 
       - uses: Swatinem/rust-cache@v2
         if: steps.contracts-module.outputs.cache-hit != 'true'
@@ -61,7 +61,9 @@ jobs:
       - name: Compile contracts module
         if: steps.contracts-module.outputs.cache-hit != 'true'
         env:
-          LUMIERE_ENABLE_DEV_REDUCERS: '0'
+          # In-module tests intentionally create multiple fixture tenants.
+          # Production excludes dev-module and never enables this bypass.
+          LUMIERE_ENABLE_DEV_REDUCERS: ${{ inputs.production && '0' || '1' }}
           LUMIERE_ALPHA_FOUNDER_IDENTITIES: ${{ inputs.alpha_founder_identities }}
         run: |
           if [[ '${{ inputs.production }}' == 'true' ]]; then
