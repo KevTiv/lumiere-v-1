@@ -1,6 +1,6 @@
 /** Quantity guidance only. Posting remains authoritative for price and provenance checks. */
 export type PoLineMatchStatus = 'matched' | 'pending' | 'under_received' | 'over_received' | 'under_billed' | 'over_billed' | 'unavailable';
-type Row = Record<string, unknown>;
+interface Row { [field: string]: unknown }
 function quantity(value: unknown): number | undefined {
   if (typeof value !== 'number' && (typeof value !== 'string' || !value.trim())) return undefined;
   const result = Number(value);

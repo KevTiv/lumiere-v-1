@@ -1,4 +1,4 @@
-type Row = Record<string, unknown>;
+interface Row { [field: string]: unknown }
 const field = (row: Row, camel: string, snake: string) => row[camel] ?? row[snake];
 const tag = (value: unknown) => typeof value === 'string' ? value : value && typeof value === 'object' && 'tag' in value ? String(value.tag) : '';
 function finite(value: unknown): number | undefined {

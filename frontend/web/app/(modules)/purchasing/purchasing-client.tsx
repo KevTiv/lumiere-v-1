@@ -1552,7 +1552,7 @@ function PurchasingClientLoaded({
             key: "matchRecovery",
             label: t("purchasing.orderLines.recovery.title"),
             render: (_value, row) => {
-              const order = (orders as Record<string, unknown>[]).find((o) => String(o.id) === String(row.orderId ?? row.order_id))
+              const order = (orders as EntityRow[]).find((o) => String(o.id) === String(row.orderId ?? row.order_id))
               const recovery = purchaseMatchRecovery(row, order)
               return (
                 <div className="max-w-xs space-y-1" data-testid={`po-match-recovery-${String(row.id)}`}>
@@ -1650,13 +1650,13 @@ function PurchasingClientLoaded({
             label: t("purchasing.orderLines.recovery.receiveMissing"),
             requiresSelection: true,
             selection: "single",
-            isApplicable: (rows) => rows.length === 1 && purchasingWorkflow.receiveLine.canPresent(rows[0] as EntityRow) && purchaseMatchRecovery(rows[0], (orders as Record<string, unknown>[]).find((o) => String(o.id) === String(rows[0].orderId ?? rows[0].order_id))).receiptQty != null,
+            isApplicable: (rows) => rows.length === 1 && purchasingWorkflow.receiveLine.canPresent(rows[0] as EntityRow) && purchaseMatchRecovery(rows[0], (orders as EntityRow[]).find((o) => String(o.id) === String(rows[0].orderId ?? rows[0].order_id))).receiptQty != null,
             onClick: (rows) => {
               const selected = rows[0]
               // Re-read the current query row rather than the selection's older snapshot.
-              const line = selected && (lines as Record<string, unknown>[]).find((l) => String(l.id) === String(selected.id))
+              const line = selected && (lines as EntityRow[]).find((l) => String(l.id) === String(selected.id))
               if (!line || !purchasingWorkflow.receiveLine.canPresent(line as EntityRow)) return
-              const order = (orders as Record<string, unknown>[]).find((o) => String(o.id) === String(line.orderId ?? line.order_id))
+              const order = (orders as EntityRow[]).find((o) => String(o.id) === String(line.orderId ?? line.order_id))
               const recovery = purchaseMatchRecovery(line, order)
               if (recovery.receiptQty == null) return
               setQuickActionForm({
@@ -2380,7 +2380,7 @@ function PurchasingClientLoaded({
   const enrichedLines = useMemo(
     () =>
       (lines as Record<string, unknown>[]).map((line) => {
-        const order = (orders as Record<string, unknown>[]).find((o) => String(o.id) === String(line.orderId ?? line.order_id))
+        const order = (orders as EntityRow[]).find((o) => String(o.id) === String(line.orderId ?? line.order_id))
         const match = purchaseMatchRecovery(line, order)
         return {
           ...line,

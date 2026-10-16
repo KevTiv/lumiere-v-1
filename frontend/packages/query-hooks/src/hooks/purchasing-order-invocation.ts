@@ -4,7 +4,22 @@ import { WorkflowError, type RowValueMap } from "@lumiere/erp-workflows"
 
 import type { InvocationScope, ReceiptStorage } from "./purchasing-receipt-invocation"
 
-export type PurchaseOrderOncePayload = Readonly<Record<string, unknown>>
+type StdbOption = { none: never[] } | { some: unknown }
+
+export interface PurchaseOrderOncePayload {
+  partner_id: number
+  currency_id: number
+  origin?: StdbOption
+  partner_ref?: StdbOption
+  notes?: StdbOption
+  date_planned?: StdbOption
+  payment_term_id?: StdbOption
+  fiscal_position_id?: StdbOption
+  incoterm_id?: StdbOption
+  incoterm_location?: StdbOption
+  is_quantity_copy?: StdbOption
+  metadata?: StdbOption
+}
 
 export function keyedOperationU64(value: ScalarId): number {
   const encoded = stdbParamsToJson({ value: scalarToU64(value) }) as { value: number }
@@ -16,11 +31,11 @@ export function toCreatePurchaseOrderOnceParams(params: {
   datePlanned?: unknown; paymentTermId?: ScalarId | null; fiscalPositionId?: ScalarId | null; incotermId?: ScalarId | null
   incotermLocation?: unknown; isQuantityCopy?: unknown; metadata?: unknown
 }): PurchaseOrderOncePayload {
-  const option = (value: unknown) => value == null ? { none: [] } : { some: value }
+  const option = (value: unknown): StdbOption => value == null ? { none: [] } : { some: value }
   const optionalId = (value: ScalarId | null | undefined) => option(value == null ? null : keyedOperationU64(value))
-  const timestamp = (value: unknown) => {
+  const timestamp = (value: unknown): StdbOption => {
     if (value == null) return { none: [] }
-    const encoded = stdbParamsToJson({ value }) as Record<string, unknown>
+    const encoded = stdbParamsToJson({ value }) as { value: unknown }
     return { some: encoded.value }
   }
   return {
