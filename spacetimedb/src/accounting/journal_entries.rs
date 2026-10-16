@@ -20,6 +20,7 @@ use crate::accounting::relations::{
     require_contact_in_scope, require_explicit_company_id,
 };
 use crate::accounting::tax_management::{account_tax, account_tax_group};
+use crate::core::audit::audit_log;
 use crate::core::organization::{company, require_company_in_organization};
 use crate::core::persistence::{record_organization_commit, OrganizationCommitInput, RowChange};
 use crate::crm::contacts::contact;
@@ -3057,14 +3058,120 @@ fn correction_economics(
 }
 
 fn correction_fx(ctx: &ReducerContext, bill: &AccountMove) -> Result<(f64, Option<f64>), String> {
-    purchase_bill_fx(
-        ctx,
-        bill.organization_id,
-        bill.company_id,
-        bill.currency_id,
-        bill.company_currency_id,
-        bill.invoice_date.unwrap_or(bill.date),
+    let created_at = bill
+        .create_date
+        .ok_or("Bill creation timestamp is unavailable")?;
+    let creator = bill.create_uid.ok_or("Bill creator is unavailable")?;
+    let creation_events: Vec<_> = ctx
+        .db
+        .audit_log()
+        .audit_by_table()
+        .filter(&"account_move".to_string())
+        .filter(|event| {
+            event.organization_id == bill.organization_id
+                && event.company_id == Some(bill.company_id)
+                && event.record_id == bill.id
+                && event.action == "CREATE"
+                && event.timestamp == created_at
+                && event.user_identity == creator
+        })
+        .collect();
+    if creation_events.len() != 1 {
+        return Err("Bill FX snapshot audit evidence is missing or ambiguous".into());
+    }
+    let values: serde_json::Value = serde_json::from_str(
+        creation_events[0]
+            .new_values
+            .as_deref()
+            .ok_or("Bill FX snapshot audit evidence is missing")?,
     )
+    .map_err(|_| "Bill FX snapshot audit evidence is invalid")?;
+    let snapshot = values
+        .get("fx_snapshot")
+        .and_then(serde_json::Value::as_object)
+        .ok_or("Bill FX snapshot audit evidence is missing")?;
+
+    let required_u64 = |name: &str| {
+        snapshot
+            .get(name)
+            .and_then(serde_json::Value::as_u64)
+            .ok_or_else(|| format!("Bill FX snapshot {name} is invalid"))
+    };
+    if required_u64("version")? != 1
+        || required_u64("from_currency_id")? != bill.currency_id
+        || required_u64("to_currency_id")? != bill.company_currency_id
+        || snapshot
+            .get("as_of_micros")
+            .and_then(serde_json::Value::as_i64)
+            != Some(
+                bill.invoice_date
+                    .unwrap_or(bill.date)
+                    .to_micros_since_unix_epoch(),
+            )
+    {
+        return Err("Bill FX snapshot does not match the bill identity or date".into());
+    }
+    let rate = snapshot
+        .get("rate")
+        .and_then(serde_json::Value::as_f64)
+        .filter(|rate| rate.is_finite() && *rate > 0.0)
+        .ok_or("Bill FX snapshot rate is invalid")?;
+    let rounding = match snapshot.get("company_rounding") {
+        Some(serde_json::Value::Null) | None => None,
+        Some(value) => Some(
+            value
+                .as_f64()
+                .filter(|rounding| rounding.is_finite() && *rounding > 0.0)
+                .ok_or("Bill FX snapshot rounding is invalid")?,
+        ),
+    };
+
+    if bill.currency_id == bill.company_currency_id {
+        if !correction_equal(rate, 1.0)
+            || rounding.is_some()
+            || snapshot
+                .get("source_kind")
+                .and_then(serde_json::Value::as_str)
+                != Some("identity")
+            || !snapshot
+                .get("source_id")
+                .is_none_or(serde_json::Value::is_null)
+        {
+            return Err("Bill identity-currency FX snapshot is inconsistent".into());
+        }
+        return Ok((rate, rounding));
+    }
+
+    if snapshot
+        .get("source_kind")
+        .and_then(serde_json::Value::as_str)
+        != Some("currency_rate")
+    {
+        return Err("Bill foreign-currency FX snapshot source is invalid".into());
+    }
+    let _source_id = required_u64("source_id")?;
+    let source_date_micros = snapshot
+        .get("source_date_micros")
+        .and_then(serde_json::Value::as_i64)
+        .ok_or("Bill FX snapshot source date is invalid")?;
+    let source_company_id = match snapshot.get("source_company_id") {
+        Some(serde_json::Value::Null) | None => None,
+        Some(value) => Some(
+            value
+                .as_u64()
+                .ok_or("Bill FX snapshot source company is invalid")?,
+        ),
+    };
+    if source_date_micros
+        > bill
+            .invoice_date
+            .unwrap_or(bill.date)
+            .to_micros_since_unix_epoch()
+        || source_company_id.is_some_and(|id| id != bill.company_id)
+    {
+        return Err("Bill FX snapshot source is inconsistent with the bill".into());
+    }
+    Ok((rate, rounding))
 }
 
 fn correction_equal(actual: f64, expected: f64) -> bool {
@@ -3723,6 +3830,15 @@ fn purchase_bill_tax_rules(
     Ok(taxes)
 }
 
+#[derive(Clone, Copy)]
+struct PurchaseBillFx {
+    rate: f64,
+    company_rounding: Option<f64>,
+    source_id: Option<u64>,
+    source_date: Option<Timestamp>,
+    source_company_id: Option<u64>,
+}
+
 fn purchase_bill_fx(
     ctx: &ReducerContext,
     organization_id: u64,
@@ -3730,7 +3846,7 @@ fn purchase_bill_fx(
     currency_id: u64,
     company_currency_id: u64,
     invoice_date: Timestamp,
-) -> Result<(f64, Option<f64>), String> {
+) -> Result<PurchaseBillFx, String> {
     require_company_in_organization(ctx, organization_id, company_id)?;
     let company = ctx
         .db
@@ -3742,7 +3858,13 @@ fn purchase_bill_fx(
         return Err("bill company currency is inconsistent".into());
     }
     if currency_id == company_currency_id {
-        return Ok((1.0, None));
+        return Ok(PurchaseBillFx {
+            rate: 1.0,
+            company_rounding: None,
+            source_id: None,
+            source_date: None,
+            source_company_id: None,
+        });
     }
 
     crate::core::reference::require_active_currency_for_organization(
@@ -3755,7 +3877,7 @@ fn purchase_bill_fx(
         organization_id,
         company_currency_id,
     )?;
-    let rate = crate::core::reference::resolve_currency_rate_as_of(
+    let resolved = crate::core::reference::resolve_currency_rate_snapshot_as_of(
         ctx,
         organization_id,
         company_id,
@@ -3763,7 +3885,13 @@ fn purchase_bill_fx(
         company_currency_id,
         invoice_date,
     )?;
-    Ok((rate, Some(company_currency.rounding_factor)))
+    Ok(PurchaseBillFx {
+        rate: resolved.rate,
+        company_rounding: Some(company_currency.rounding_factor),
+        source_id: resolved.source_id,
+        source_date: resolved.source_date,
+        source_company_id: resolved.source_company_id,
+    })
 }
 
 fn set_bill_line_amounts(
@@ -3916,7 +4044,7 @@ pub fn create_bill_from_purchase_order(
         );
     }
 
-    let (fx_rate, company_rounding) = purchase_bill_fx(
+    let fx_snapshot = purchase_bill_fx(
         ctx,
         organization_id,
         po.company_id,
@@ -3987,8 +4115,8 @@ pub fn create_bill_from_purchase_order(
         )?;
         let ledger_subtotal = crate::accounting::bill_economics::ledger_amount(
             economics.subtotal,
-            fx_rate,
-            company_rounding,
+            fx_snapshot.rate,
+            fx_snapshot.company_rounding,
         )?;
         document_total += economics.total;
         ledger_total += ledger_subtotal;
@@ -4000,8 +4128,11 @@ pub fn create_bill_from_purchase_order(
         planned_lines.push((line, quantity, economics, ledger_subtotal));
     }
     for (amount, _) in tax_totals.values() {
-        ledger_total +=
-            crate::accounting::bill_economics::ledger_amount(*amount, fx_rate, company_rounding)?;
+        ledger_total += crate::accounting::bill_economics::ledger_amount(
+            *amount,
+            fx_snapshot.rate,
+            fx_snapshot.company_rounding,
+        )?;
     }
     validate_pilot_money_amount("vendor bill total", document_total)?;
     validate_pilot_money_amount("vendor bill company total", ledger_total)?;
@@ -4126,8 +4257,11 @@ pub fn create_bill_from_purchase_order(
 
     for (offset, (tax_id, (amount, base))) in tax_totals.iter().enumerate() {
         let (account_id, group_id) = tax_accounts[tax_id];
-        let ledger_amount =
-            crate::accounting::bill_economics::ledger_amount(*amount, fx_rate, company_rounding)?;
+        let ledger_amount = crate::accounting::bill_economics::ledger_amount(
+            *amount,
+            fx_snapshot.rate,
+            fx_snapshot.company_rounding,
+        )?;
         let mut tax_params = crate::accounting::line_params::journal_line_params(
             account_id,
             format!("Purchase tax {tax_id}"),
@@ -4203,7 +4337,19 @@ pub fn create_bill_from_purchase_order(
                     "amount_total": document_total,
                     "company_amount_total": ledger_total,
                     "currency_id": move_record.currency_id,
-                    "fx_rate": fx_rate,
+                    "fx_rate": fx_snapshot.rate,
+                    "fx_snapshot": {
+                        "version": 1,
+                        "rate": fx_snapshot.rate,
+                        "company_rounding": fx_snapshot.company_rounding,
+                        "source_kind": if fx_snapshot.source_id.is_some() { "currency_rate" } else { "identity" },
+                        "source_id": fx_snapshot.source_id,
+                        "source_date_micros": fx_snapshot.source_date.map(|date| date.to_micros_since_unix_epoch()),
+                        "source_company_id": fx_snapshot.source_company_id,
+                        "as_of_micros": params.invoice_date.to_micros_since_unix_epoch(),
+                        "from_currency_id": move_record.currency_id,
+                        "to_currency_id": move_record.company_currency_id,
+                    },
                     "tax_ids": params.expense_line.tax_ids,
                     "discount": params.expense_line.discount,
                     "workflow_superuser_bypass": workflow_superuser_bypass,

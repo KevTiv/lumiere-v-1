@@ -19,7 +19,7 @@ use crate::purchasing::purchase_orders::{
 };
 use crate::test_harness::{ensure_test_superuser, OrgFixture};
 use crate::types::{AccountInternalGroup, JournalType, TaxAmountType, TaxTypeUse};
-use spacetimedb::{ReducerContext, Table};
+use spacetimedb::{ReducerContext, Table, Timestamp};
 
 pub fn test_tax_fx_bill_creation(ctx: &ReducerContext) -> Result<(), String> {
     for (taxed, foreign, included) in [
@@ -226,7 +226,9 @@ fn cycle(ctx: &ReducerContext, taxed: bool, foreign: bool, included: bool) -> Re
             to_currency_id: fixture.currency_id,
             rate: 1.25,
             inverse_rate: 0.8,
-            date: ctx.timestamp,
+            date: Timestamp::from_micros_since_unix_epoch(
+                ctx.timestamp.to_micros_since_unix_epoch() - 2,
+            ),
             created_at: ctx.timestamp,
             metadata: None,
         });
@@ -287,6 +289,24 @@ fn correct_and_verify(
     included: bool,
 ) -> Result<(), String> {
     let org = fixture.organization_id;
+    let bill = ctx.db.account_move().id().find(&bill_id).ok_or("bill")?;
+    if foreign {
+        let invoice_date = bill.invoice_date.ok_or("bill date")?;
+        ctx.db.currency_rate().insert(CurrencyRate {
+            id: 0,
+            organization_id: org,
+            company_id: Some(fixture.company_id),
+            from_currency_id: bill.currency_id,
+            to_currency_id: bill.company_currency_id,
+            rate: 2.0,
+            inverse_rate: 0.5,
+            date: Timestamp::from_micros_since_unix_epoch(
+                invoice_date.to_micros_since_unix_epoch() - 1,
+            ),
+            created_at: ctx.timestamp,
+            metadata: Some("backdated after bill creation".into()),
+        });
+    }
     let product = ctx
         .db
         .account_move_line()
