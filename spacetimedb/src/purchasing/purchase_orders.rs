@@ -3220,16 +3220,12 @@ pub fn convert_purchase_requisition_to_po(
         },
     )?;
 
-    let mut created_orders = ctx
-        .db
-        .purchase_order()
-        .iter()
-        .filter(|p| {
-            p.organization_id == organization_id
-                && p.company_id == company_id
-                && p.partner_id == vendor_id
-                && p.origin.as_deref() == Some(origin.as_str())
-        });
+    let mut created_orders = ctx.db.purchase_order().iter().filter(|p| {
+        p.organization_id == organization_id
+            && p.company_id == company_id
+            && p.partner_id == vendor_id
+            && p.origin.as_deref() == Some(origin.as_str())
+    });
     let po = created_orders
         .next()
         .ok_or("Purchase order not found after requisition conversion")?;
