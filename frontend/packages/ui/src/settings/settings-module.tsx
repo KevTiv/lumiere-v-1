@@ -74,9 +74,10 @@ type SettingsSectionItem = (typeof settingsSections)[number]
 
 interface SettingsModuleProps {
   className?: string
+  uploadInvoiceLogo?: (file: File, companyId: string | null) => Promise<string>
 }
 
-export function SettingsModule({ className }: SettingsModuleProps) {
+export function SettingsModule({ className, uploadInvoiceLogo }: SettingsModuleProps) {
   const { t } = useTranslation()
 
   const [activeSection, setActiveSection] = useState<string | null>(null)
@@ -106,7 +107,7 @@ export function SettingsModule({ className }: SettingsModuleProps) {
       case "custom-fields":
         return <UserCustomFields />
       case "organization":
-        return <OrganizationSettings />
+        return <OrganizationSettings uploadInvoiceLogo={uploadInvoiceLogo} />
       case "ai":
         return <AiSettings />
       default:

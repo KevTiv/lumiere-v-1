@@ -6,6 +6,7 @@ pub mod fixed_assets_test;
 pub mod fx_revaluation_test;
 pub mod helpers;
 pub mod ic_consolidation_test;
+pub mod invoice_profile_test;
 pub mod journal_entries_test;
 pub mod manual_invoices_test;
 pub mod option_vec_semantics_test;
@@ -79,6 +80,8 @@ pub fn run_accounting_fixed_asset_ownership_test(ctx: &ReducerContext) -> Result
 
 #[spacetimedb::reducer]
 pub fn run_accounting_post_invoice_test(ctx: &ReducerContext) -> Result<(), String> {
+    invoice_profile_test::test_invoice_profiles_capture_trusted_identity_and_freeze_at_posting(ctx)
+        .map_err(|error| format!("invoice profile snapshots: {error}"))?;
     journal_entries_test::test_post_customer_invoice_creates_move_lines(ctx)
         .map_err(|e| format!("post_customer_invoice: {e}"))?;
     journal_entries_test::test_manual_invoice_is_atomic_balanced_and_idempotent(ctx)

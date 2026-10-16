@@ -2,6 +2,8 @@
 
 This isolated Next app renders the production application shell, Accounting workspace navigation, accountant overview, invoice composer, and document review components. Its `/style-templates` route also renders a real configured ModuleView and EntityTable, static ModularForm and FormModal, and persisted ComposedCollectionDetailHost. The styles come from the production web stylesheet. Its labeled synthetic records stay in React props; no ERP backend, credentials, migrations, or production authentication bypass are used.
 
+The `/personalization` route renders the actual invoice personalization settings editor, composer, document renderer and snapshot readers. Explicit in-memory publication callbacks model success, rejection and unconfirmed-result reconciliation; they are not backend acceptance tests. An exact managed-shaped, checksum-pinned logo path serves a constant synthetic PNG from this isolated app. The personalization tests permit that one asset request and reject every other `/api/` request. Controlled synthetic issued snapshots demonstrate that later defaults do not alter a captured document, without claiming a real invoice was posted.
+
 Run from `frontend/web`:
 
 ```sh

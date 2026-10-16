@@ -9,6 +9,8 @@ import { useConfirmDialog } from '@lumiere/ui/hooks/use-confirm-dialog';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { CreditCard, Download, ListOrdered, MoreHorizontal, ShoppingCart } from 'lucide-react';
 import { useTranslation } from '@lumiere/i18n';
+import { useInvoicePersonalization } from '@lumiere/query-hooks/hooks/invoice-personalization';
+import { invoiceSellerFromCompany, isInvoiceSellerIdentityReady } from '@lumiere/erp-shared/invoice-personalization';
 import {
   Button,
   EntityDetail,
@@ -57,9 +59,9 @@ import {
   DropdownMenuTrigger,
 } from '@lumiere/ui/components/dropdown-menu';
 import { Skeleton } from '@lumiere/ui/components/skeleton';
-import { InvoiceDocument, formatInvoiceMoney } from '../../../../../../packages/ui/src/accounting-components/invoice-document';
+import { InvoiceDocument, formatInvoiceMoney, readInvoiceDocumentContent, resolveDraftInvoiceDocument } from '../../../../../../packages/ui/src/accounting-components/invoice-document';
 import { ModuleDataNotice } from '../../../../../../packages/ui/src/pages/module-data-notice';
-import { moduleCollection } from '@lumiere/ui/lib/module-data-state';
+import { mergeModuleStates, moduleCollection } from '@lumiere/ui/lib/module-data-state';
 import { formatTimestampLike } from '@lumiere/ui/lib/entity-row-values';
 import { showWorkflowToast } from '@lumiere/ui/lib/workflow-toast';
 import { variantTag, type AnyWorkflowAction, type RowValueMap } from '@lumiere/erp-workflows';
@@ -220,6 +222,8 @@ function InvoicePageLoaded({
     () => resolveInvoiceRecord(moves as unknown as Row[], moveId, operatingCompanyId),
     [moves, moveId, operatingCompanyId],
   );
+  const outgoingDraft = variantTag(move?.state) === 'Draft' && ['OutInvoice', 'OutRefund'].includes(variantTag(move?.moveType ?? move?.move_type));
+  const invoicePersonalization = useInvoicePersonalization({ organizationId, companyId: operatingCompanyId, enabled: outgoingDraft });
   const lines = useMemo(
     () => invoiceRecordLines(moveLines as unknown as Row[], moveId, operatingCompanyId),
     [moveLines, moveId, operatingCompanyId],
@@ -308,6 +312,19 @@ function InvoicePageLoaded({
   const listTab = KIND_TAB[kind];
   const partner = String(move.invoicePartnerDisplayName ?? move.invoice_partner_display_name ?? '').trim();
   const company = companiesRead.rows.find((row) => String(row.id) === String(operatingCompanyId));
+  const capturedContent = readInvoiceDocumentContent(move.metadata, organizationId, kind === 'invoice' || kind === 'creditNote');
+  const identityReady = isInvoiceSellerIdentityReady(company, operatingCompanyId, organizationId);
+  const identityState = companiesRead.state.status === 'ready' && !identityReady ? { status: 'error' as const, message: 'The selected company identity is unavailable. Refresh before posting this invoice.' } : companiesRead.state;
+  const currentDraftContent = outgoingDraft && invoicePersonalization.profile && identityReady
+    ? resolveDraftInvoiceDocument(move.metadata, invoicePersonalization.profile, invoicePersonalization.profileVersionIds, invoiceSellerFromCompany(company, invoicePersonalization.profile))
+    : null;
+  const draftReviewState = outgoingDraft ? mergeModuleStates([identityState, invoicePersonalization.state]) : undefined;
+  const draftContentError = currentDraftContent?.personalizationError ?? capturedContent.personalizationError;
+  const draftReady = !outgoingDraft || draftReviewState?.status === 'ready' && Boolean(currentDraftContent?.personalization) && !draftContentError;
+  const postingActions = headerActions.map((action) => outgoingDraft && !draftReady ? {
+    ...action,
+    blockedReason: () => draftContentError || 'Invoice settings must be available before posting. Refresh and review the current document.',
+  } : action);
   const currency = invoiceRecordCurrency(move, currenciesRead.rows);
   const money = (value: unknown) => formatInvoiceMoney(invoiceRecordAmount(value), currency);
   const dateLabel = (value: unknown) => formatTimestampLike(value)?.toLocaleDateString(undefined, { dateStyle: 'medium', timeZone: 'UTC' }) ?? '—';
@@ -645,9 +662,9 @@ function InvoicePageLoaded({
               </Button>
             ) : null}
             <RecordWorkflowActions
-              actions={headerActions}
+              actions={postingActions}
               record={record}
-              onRun={(action, row) => void action.execute(action.prepare?.(row)).catch(() => undefined)}
+              onRun={(action, row) => { if (outgoingDraft && !draftReady) return; void action.execute(action.prepare?.(row)).catch(() => undefined); }}
               primaryActionIds={new Set(['accounting.invoice.post'])}
               pendingActionIds={workflow.isPending ? new Set(headerActions.map((action) => action.id)) : undefined}
             />
@@ -713,6 +730,7 @@ function InvoicePageLoaded({
                 </div>
                 <ModuleDataNotice state={currenciesRead.state} />
                 <ModuleDataNotice state={companiesRead.state} />
+                {outgoingDraft ? <><ModuleDataNotice state={draftReviewState} /><p className="text-xs text-muted-foreground">Posting captures the latest company invoice settings shown in this review.</p></> : null}
                 <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(18rem,0.45fr)]">
                   <div className="min-w-0 space-y-4 rounded-xl bg-muted/40 p-3 sm:p-5">
                     <div className="flex flex-wrap items-center justify-between gap-2 px-1">
@@ -725,7 +743,9 @@ function InvoicePageLoaded({
                       <InvoiceDocument
                         title={documentTitle}
                         reference={label}
-                        company={String(company?.name ?? '') || undefined}
+                        personalization={outgoingDraft ? currentDraftContent?.personalization : capturedContent.personalization}
+                        notes={capturedContent.notes}
+                        personalizationError={outgoingDraft ? draftContentError : capturedContent.personalizationError}
                         partnerLabel={kind === 'bill' || kind === 'vendorCredit' ? t('accounting.invoices.vendor', { defaultValue: 'Vendor' }) : t('accounting.invoices.customer', { defaultValue: 'Customer' })}
                         partner={partner || undefined}
                         date={dateLabel(move.invoiceDate ?? move.invoice_date ?? move.date)}

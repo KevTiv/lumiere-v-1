@@ -1251,6 +1251,13 @@ pub fn post_invoice(
         move_record.partner_id,
         move_record.amount_total,
     )?;
+    let metadata = capture_invoice_metadata_for_move(
+        ctx,
+        organization_id,
+        move_record.company_id,
+        &move_record.move_type,
+        move_record.metadata.as_deref(),
+    )?;
 
     compute_invoice_totals_internal(ctx, organization_id, move_id)?;
     post_cogs_entries(
@@ -1279,12 +1286,12 @@ pub fn post_invoice(
     mark_move_lines_posted(ctx, move_id, &name)?;
 
     let refreshed = load_account_move_in_scope(ctx, organization_id, move_id)?;
-
     ctx.db.account_move().id().update(AccountMove {
         state: AccountMoveState::Posted,
         name,
         posted_before: true,
         payment_state: PaymentState::NotPaid,
+        metadata,
         write_uid: Some(ctx.sender()),
         write_date: Some(ctx.timestamp),
         ..refreshed
@@ -1355,6 +1362,13 @@ pub fn create_account_move(
 
     let move_type_str = format!("{:?}", params.move_type);
     let date_str = params.date.to_string();
+    let metadata = capture_invoice_metadata_for_move(
+        ctx,
+        organization_id,
+        company_id,
+        &params.move_type,
+        params.metadata.as_deref(),
+    )?;
 
     let move_record = ctx.db.account_move().insert(AccountMove {
         id: 0,
@@ -1418,7 +1432,7 @@ pub fn create_account_move(
         create_date: Some(ctx.timestamp),
         write_uid: Some(ctx.sender()),
         write_date: Some(ctx.timestamp),
-        metadata: params.metadata,
+        metadata,
     });
 
     write_audit_log_v2(
@@ -1466,6 +1480,26 @@ struct CalculatedManualTaxLine {
     account_id: u64,
     amount: f64,
     base_amount: f64,
+}
+
+fn capture_invoice_metadata_for_move(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    move_type: &MoveType,
+    metadata: Option<&str>,
+) -> Result<Option<String>, String> {
+    if matches!(move_type, MoveType::OutInvoice | MoveType::OutRefund) {
+        crate::documents::invoice_profile::capture_invoice_document_metadata(
+            ctx,
+            organization_id,
+            company_id,
+            metadata,
+        )
+        .map(Some)
+    } else {
+        Ok(crate::documents::invoice_profile::without_invoice_document_metadata(metadata))
+    }
 }
 
 fn manual_invoice_metadata(metadata: Option<&str>, request_id: &str) -> String {
@@ -1862,7 +1896,14 @@ pub fn create_manual_invoice(
     validate_pilot_money_amount("invoice tax amount", amount_tax)?;
     validate_pilot_money_amount("invoice total", amount_total)?;
 
-    let metadata = manual_invoice_metadata(params.metadata.as_deref(), &params.idempotency_key);
+    let metadata = capture_invoice_metadata_for_move(
+        ctx,
+        organization_id,
+        params.company_id,
+        &params.move_type,
+        params.metadata.as_deref(),
+    )?;
+    let metadata = manual_invoice_metadata(metadata.as_deref(), &params.idempotency_key);
     let header_params = CreateAccountMoveParams {
         idempotency_key: params.idempotency_key.clone(),
         company_id: Some(params.company_id),
@@ -2407,6 +2448,14 @@ pub fn post_account_move_impl(
 
     ensure_accounting_period_open_for_date(ctx, move_record.company_id, move_record.date)?;
 
+    let metadata = capture_invoice_metadata_for_move(
+        ctx,
+        organization_id,
+        move_record.company_id,
+        &move_record.move_type,
+        move_record.metadata.as_deref(),
+    )?;
+
     // Generate name from document sequence if not set
     let name = if move_record.name.is_empty() {
         let doc_type = match move_record.move_type {
@@ -2424,11 +2473,11 @@ pub fn post_account_move_impl(
 
     // Update move to posted
     let move_record = load_account_move_in_scope(ctx, organization_id, move_id)?;
-
     ctx.db.account_move().id().update(AccountMove {
         state: AccountMoveState::Posted,
         name,
         posted_before: true,
+        metadata,
         write_uid: Some(ctx.sender()),
         write_date: Some(ctx.timestamp),
         ..move_record
@@ -2983,7 +3032,13 @@ pub fn create_invoice_from_sale_order(
         create_date: Some(ctx.timestamp),
         write_uid: Some(ctx.sender()),
         write_date: Some(ctx.timestamp),
-        metadata: params.metadata.clone().or_else(|| order.note.clone()),
+        metadata: capture_invoice_metadata_for_move(
+            ctx,
+            organization_id,
+            order.company_id,
+            &MoveType::OutInvoice,
+            params.metadata.as_deref().or(order.note.as_deref()),
+        )?,
     });
 
     let mut amount_untaxed = 0.0f64;
@@ -3333,7 +3388,9 @@ pub fn create_bill_from_purchase_order(
         create_date: Some(ctx.timestamp),
         write_uid: Some(ctx.sender()),
         write_date: Some(ctx.timestamp),
-        metadata: params.metadata.clone().or_else(|| po.notes.clone()),
+        metadata: crate::documents::invoice_profile::without_invoice_document_metadata(
+            params.metadata.as_deref().or(po.notes.as_deref()),
+        ),
     });
 
     let mut amount_untaxed = 0.0f64;
@@ -3573,6 +3630,13 @@ pub fn create_credit_note_from_invoice(
         })
         .to_string(),
     );
+    let metadata = capture_invoice_metadata_for_move(
+        ctx,
+        organization_id,
+        company_id,
+        &MoveType::OutRefund,
+        metadata.as_deref(),
+    )?;
 
     let credit_note = ctx.db.account_move().insert(AccountMove {
         id: 0,
