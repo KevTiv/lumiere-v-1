@@ -19,7 +19,10 @@ The highest-value shift is from “module → dashboard → many entity tabs” 
 The first implementation uses [Studio Admin](https://studio-admin.arhamkhnz.com/dashboard/default),
 source revision `9bf6d382f24a9538bf64ecb319c1b58b4ee1a0bb`, as the visual and interaction
 reference. The implementation adapts Lumière's existing components and operations;
-no Studio source was copied. The source baseline is Lumière `ff98a918a607`.
+no Studio source was copied. The source baseline is Lumière `ff98a918a607`;
+PR #218 integrates main `979de024` and preserves its Rwanda setup, import,
+tax/currency and company-scoped posting safeguards. Every invoice/bill create
+entry point, including overview actions, uses the setup-readiness gate.
 
 Delivered in the working tree:
 
@@ -57,23 +60,23 @@ authenticate, post a payment, create a persisted invoice, or establish U4/U5.
 
 Verification results for this working-tree implementation:
 
-- 60 focused UI tests passed across nine files (shell preferences, command search,
-  workspace navigation, create gates, accounting lists and invoice submission).
+- The integrated full UI suite passed: 622 tests across 102 files, including
+  shell preferences, command search, workspace navigation, create gates,
+  accounting lists, setup readiness and invoice submission.
+- The integrated web unit suite passed: 388 tests, including Next configuration.
 - 34 model/navigation/action tests passed; rerun with the web package's
   `test:accounting-ui:models` script.
-- 12 browser checks passed at 1440px and 390px. The four overview/navigation
-  checks and four invoice checks passed again after their final relevant changes.
+- All 12 browser checks passed again after integration at 1440px and 390px.
   Use `test:e2e:accounting-ui` with an installed Playwright Chromium, or set
   `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH` to an existing Chromium executable.
-- The full web TypeScript check, targeted UI ESLint, static translation-key
-  validation and duplicate JSON-key checks passed. Missing/redacted invoice
-  amounts display as unavailable, not zero.
-- A webpack production build compiled successfully, but failed prerendering
-  Next's built-in `/_global-error`: unchanged universal React aliases in
-  `frontend/web/next.config.mjs` select application React 19.2.4 instead of the
-  renderer's own React instance. The built-in error page does not import the new
-  shell. This separate build-configuration issue remains unresolved; a clean
-  production build is not claimed.
+- The type-debt ratchet now has no new opaque-record occurrences and records
+  Accounting's reduction from 162 to 150. Missing/redacted invoice amounts
+  display as unavailable, not zero.
+- Default Turbopack production build passed, including all 108 static pages.
+  Removed unnecessary forced React aliases so Next owns renderer-specific
+  resolution; four config regressions cover aliases, headers and runtime BFF.
+- Remote validation and authenticated accounting effects remain separate gates;
+  synthetic browser checks are not posting/reconciliation acceptance.
 
 Open work:
 

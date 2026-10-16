@@ -4441,8 +4441,8 @@ function AccountingClientReady({
         allMovesRead.state, accountsRead.state, journalsRead.state, saleOrdersRead.state,
       ]).status === "ready" ? () => setQuickActionForm({ form: journalEntryFormConfig, action: "createMove" }) : undefined}
       onOpenBankLine={(line, statement) => {
-        setBankStatementDetail(statement)
-        setBankLineMatchFocus(line)
+        setBankStatementDetail({ ...statement })
+        setBankLineMatchFocus({ ...line })
       }}
     />
   )

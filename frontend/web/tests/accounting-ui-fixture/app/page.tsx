@@ -47,7 +47,7 @@ function AccountingFixture() {
           : <section className="mt-5 rounded-xl border bg-card p-5"><h2 className="text-lg font-semibold">{tab.label}</h2><p className="mt-2 text-sm text-muted-foreground">Controlled fixture for workspace navigation and responsive layout.</p><Table><TableHeader><TableRow><TableHead>Record</TableHead><TableHead>State</TableHead></TableRow></TableHeader><TableBody><TableRow><TableCell data-testid="fixture-density-cell">Synthetic record</TableCell><TableCell>Draft</TableCell></TableRow></TableBody></Table></section>}</TabsContent>)}
       </Tabs>
       <CreateInvoiceModal open={invoiceOpen} companyId={1n} onClose={() => setInvoiceOpen(false)}
-        onSave={async () => { setSaved(true); return { kind: "converged", dispatch: "acknowledged", ref: { resource: "account-moves", id: "fixture-only" } } }}
+        onSave={async () => { setSaved(true); return { kind: "converged", dispatch: "acknowledged", ref: { resource: "account-moves", id: "fixture-only" } } as const }}
         onCheckStatus={async () => null}
         journalOptions={[{ value: "1", label: "Sales journal", currencyId: "1" }]}
         partnerOptions={[{ value: "2", label: "Acme Corporation" }]}
