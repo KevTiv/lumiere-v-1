@@ -109,7 +109,11 @@ fn all_candidates_projects_base_and_supplemental_roles(ctx: &ReducerContext) -> 
 
 fn gate_creates_and_converges_real_guarded_action(ctx: &ReducerContext) -> Result<(), String> {
     let fixture = OrgFixture::seed_minimal(ctx)?;
-    let role_id = seed_role(ctx, fixture.organization_id, vec!["workflow_task:approve"]);
+    let role_id = seed_role(
+        ctx,
+        fixture.organization_id,
+        vec!["workflow_task:approve", "workflow_task:reject"],
+    );
     let actor = seed_member(ctx, &fixture, role_id, None);
     let nonce = ctx.rng().gen::<u64>();
     let workflow_key = format!("po-send-approval-{nonce}");
