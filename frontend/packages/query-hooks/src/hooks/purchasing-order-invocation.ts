@@ -171,7 +171,7 @@ export async function executePurchaseOrderCreation(
   const previous = readPendingPurchaseOrder(scope, storage)
   const rows = await ports.read(previous?.operationKey ?? "capability_probe")
   const recovered = previous ? creationResult(previous, rows) : undefined
-  if (recovered) {
+  if (previous && recovered) {
     clearPurchaseOrder(scope, previous, storage)
     return recovered
   }
