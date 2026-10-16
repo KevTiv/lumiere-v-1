@@ -6227,14 +6227,29 @@
           "under_received": "Partial receipt — ordered quantity not fully received.",
           "over_received": "Received quantity exceeds ordered quantity.",
           "under_billed": "Billed less than received — variance {{variance}} units.",
-          "over_billed": "Billed exceeds received — reduce bill qty or receive goods (variance {{variance}})."
-        }
+          "over_billed": "Billed exceeds received — reduce bill qty or receive goods (variance {{variance}}).",
+          "unavailable": "Quantity data is incomplete or invalid. Review the purchase order before proceeding."
+        },
+        "unavailable": "Unavailable"
       },
       "states": {
         "Draft": "Draft",
         "Confirmed": "Confirmed",
         "Done": "Done",
         "Cancelled": "Cancelled"
+      },
+      "recovery": {
+        "title": "Quantity recovery",
+        "unavailable": "Refresh and review this line’s quantities before proceeding.",
+        "reviewBill": "Review the linked bill in the order’s Handoffs tab. Receiving more goods cannot resolve this billing exception safely.",
+        "receiveOrReviewBill": "If the missing goods have arrived, record their receipt. Otherwise review the bill with Accounting.",
+        "reviewReceipt": "Received quantity exceeds the order. Review the receipt and use the existing return process where appropriate.",
+        "reviewUnbilled": "Some received goods remain unbilled. Review existing bills before creating another.",
+        "quantityAligned": "Received and billed quantities align. Bill prices and source links are checked when posting.",
+        "awaitReceipt": "Record goods only after they arrive. Review the order’s receipts for partial deliveries.",
+        "reviewOrder": "Review order and linked bills",
+        "receiveMissing": "Receive missing goods",
+        "confirmReceipt": "Confirm that these goods have physically arrived. Review the quantity and enter a lot where required; do not record a receipt merely to clear a bill exception."
       }
     },
     "rfqs": {
@@ -6767,6 +6782,15 @@
         "noCurrency": "No active currency is available",
         "required": "{{label}} is required",
         "zeroOrGreater": "zero or greater"
+      },
+      "intakeApproval": {
+        "title": "Approve supplier intake",
+        "description": "Select the vendor to link to this supplier request. Approval requires a different person from the submitter.",
+        "submit": "Approve supplier"
+      },
+      "rfqAward": {
+        "description": "Select an open RFQ and one of its submitted bids.",
+        "title": "Award RFQ bid"
       }
     },
     "ops": {
@@ -7020,6 +7044,9 @@
         "contractName": "Contract name",
         "delegateIdentity": "Delegate identity",
         "delegationActive": "Delegation is active",
+        "delegationEnds": "Ends",
+        "delegationReason": "Reason",
+        "delegationStarts": "Starts",
         "endDate": "End date",
         "idempotencyKey": "Idempotency key",
         "intentType": "Intent type",

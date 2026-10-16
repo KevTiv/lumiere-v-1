@@ -1673,6 +1673,7 @@ export function useSetPurchaseApprovalDelegate(
   organizationId: bigint,
   companyId: bigint,
 ) {
+  const qc = useQueryClient()
   return useMutation<void, Error, SetPurchaseApprovalDelegateParams>({
     mutationFn: async (params) => {
       const encoded = stdbParamsToJson({
@@ -1685,6 +1686,9 @@ export function useSetPurchaseApprovalDelegate(
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallErrorPo(r))
     },
+    onSuccess: () => invalidateQueryResources(qc, organizationId, [
+      "workflow-human-tasks-inbox", "workflow-human-tasks", "workflow-human-task-events", "purchase-approval-delegates",
+    ]),
   })
 }
 

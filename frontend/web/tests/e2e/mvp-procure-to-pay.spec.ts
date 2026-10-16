@@ -336,7 +336,22 @@ test.describe("MVP procure-to-pay workflow", { tag: "@p0" }, () => {
     // The rejected post is non-destructive: purchasing can resolve the exact exception by
     // receiving the outstanding quantity through the operator form. The persisted match state
     // must then converge before the same canonical vendor bill can be posted.
-    await receivePoLineQty(page, orderId, lineId, "5")
+    await gotoModule(page, "/purchasing", "purchasing")
+    await selectModuleTab(page, "purchasing", "lines")
+    await expect(page.getByTestId(`po-match-recovery-${lineId}`)).toContainText("missing goods have arrived")
+    await expect(page.getByTestId(`po-match-recovery-${lineId}`).getByRole("link")).toHaveAttribute("href", `/purchasing/orders/${orderId}`)
+    await page.getByTestId(`entity-select-row-${lineId}`).click()
+    await page.getByTestId("entity-action-pol-recover-match").click()
+    const recoveryForm = page.getByTestId("form-modal-receive-purchase-order-line")
+    await expect(recoveryForm).toBeVisible()
+    await expect(recoveryForm.getByTestId("form-field-qty")).toHaveValue("5")
+    await expect(recoveryForm.getByTestId("form-field-lineId")).toContainText(await fetchPurchaseOrderLineReceiveLabel(page, orderId, lineId))
+    await expect(recoveryForm).toContainText("physically arrived")
+    const [recoveryResponse] = await Promise.all([
+      page.waitForResponse((res) => matchesOperationResponse(res, "receive_po_line") && res.ok()),
+      submitForm(page, "receive-purchase-order-line"),
+    ])
+    expect(recoveryResponse.ok()).toBe(true)
     await waitForPoLineMatchStatus(page, lineId, "matched")
 
     await page.reload()
@@ -346,6 +361,7 @@ test.describe("MVP procure-to-pay workflow", { tag: "@p0" }, () => {
       timeout: 30_000,
     })
 
+    await expect(page.getByTestId(`po-match-recovery-${lineId}`)).toContainText("Received and billed quantities align")
     expect(await postDraftBillViaUi(page, billId)).toBe(billId)
     expect(await fetchVendorBillById(page, billId)).toMatchObject({ state: "Posted" })
     await expectNoAppError(page)

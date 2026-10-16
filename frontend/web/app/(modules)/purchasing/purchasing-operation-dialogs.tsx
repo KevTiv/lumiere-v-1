@@ -80,6 +80,7 @@ export interface CreateVendorCreditFormPayload {
 }
 
 export type PurchasingOperationDialogRequest =
+  | { kind: "approve-supplier-intake"; intakeId: string; intakeLabel: string }
   | { kind: "create-rfq"; requisitionId?: string }
   | { kind: "add-rfq-bid"; rfqId?: string }
   | { kind: "award-rfq-bid"; rfqId?: string; bidId?: string }
@@ -110,6 +111,7 @@ export interface PurchasingOperationDialogsProps {
   options: PurchasingOperationDialogOptions
   t: TFunction
   onDismiss: () => void
+  onApproveSupplierIntake: (payload: { intakeId: string; partnerId: string }) => Promise<unknown>
   onCreateRfq: (payload: CreatePurchaseRfqFormPayload) => Promise<unknown>
   onAddRfqBid: (payload: AddPurchaseRfqBidFormPayload) => Promise<unknown>
   onAwardRfqBid: (payload: AwardPurchaseRfqBidFormPayload) => Promise<unknown>
@@ -259,6 +261,39 @@ function useAsyncSubmit(onDismiss: () => void) {
   }
 
   return { pending, error, run }
+}
+
+function ApproveSupplierIntakeDialog({ request, options, t, onDismiss, onSubmit }: {
+  request: Extract<PurchasingOperationDialogRequest, { kind: "approve-supplier-intake" }>
+  options: PurchasingOperationDialogOptions
+  t: TFunction
+  onDismiss: () => void
+  onSubmit: PurchasingOperationDialogsProps["onApproveSupplierIntake"]
+}) {
+  const [partnerId, setPartnerId] = useState("")
+  const submission = useAsyncSubmit(onDismiss)
+  return (
+    <OperationDialog
+      title={t("purchasing.forms.intakeApproval.title", { defaultValue: "Approve supplier intake" })}
+      description={t("purchasing.forms.intakeApproval.description", {
+        defaultValue: "Select the vendor to link to this supplier request. Approval requires a different person from the submitter.",
+      })}
+      submitLabel={t("purchasing.forms.intakeApproval.submit", { defaultValue: "Approve supplier" })}
+      pending={submission.pending}
+      error={submission.error}
+      onDismiss={onDismiss}
+      onSubmit={(event) => {
+        event.preventDefault()
+        void submission.run(() => onSubmit({
+          intakeId: request.intakeId,
+          partnerId: requiredIdString(partnerId, "Vendor"),
+        }))
+      }}
+    >
+      <p>{request.intakeLabel}</p>
+      <ChoiceField id="intake-approval-vendor" label="Vendor" value={partnerId} options={options.vendors} onValueChange={setPartnerId} placeholder="Select a vendor" />
+    </OperationDialog>
+  )
 }
 
 interface CreateRfqDialogProps {
@@ -427,7 +462,7 @@ function AwardRfqBidDialog({ request, options, t, onDismiss, onSubmit }: AwardRf
         id="award-rfq"
         label={t("purchasing.forms.fields.rfq", { defaultValue: "RFQ" })}
         value={rfqId}
-        options={options.rfqs}
+        options={options.rfqs.filter((rfq) => options.rfqBids.some((bid) => bid.rfqId === rfq.value))}
         onValueChange={(value) => {
           setRfqId(value)
           setBidId("")
@@ -574,6 +609,7 @@ export function PurchasingOperationDialogs({
   options,
   t,
   onDismiss,
+  onApproveSupplierIntake,
   onCreateRfq,
   onAddRfqBid,
   onAwardRfqBid,
@@ -583,6 +619,8 @@ export function PurchasingOperationDialogs({
   if (request == null) return null
 
   switch (request.kind) {
+    case "approve-supplier-intake":
+      return <ApproveSupplierIntakeDialog request={request} options={options} t={t} onDismiss={onDismiss} onSubmit={onApproveSupplierIntake} />
     case "create-rfq":
       return <CreateRfqDialog request={request} currencyId={defaultCurrencyId} options={options} t={t} onDismiss={onDismiss} onSubmit={onCreateRfq} />
     case "add-rfq-bid":

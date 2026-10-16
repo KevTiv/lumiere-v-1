@@ -34,6 +34,7 @@ import {
   createVendorCreditFromReturnAction,
   holdSupplierIntakeAction,
   observeAwardedRfq,
+  observeApprovedSupplierIntake,
   observeBlanketRelease,
   observeConfirmedPurchaseOrder,
   observeConfirmedPurchaseReturn,
@@ -289,7 +290,7 @@ export function usePurchasingWorkflow(
         id: "purchasing.supplier-intake.approve",
         command: approveSupplierIntakeCommand,
         affects: SUPPLIER_INTAKE_TRANSITION_AFFECTS,
-        observe: ({ intakeId }) => intakeIn("Approved")(intakeId),
+        observe: async (input) => observeApprovedSupplierIntake(input, await intakes()),
       }),
       holdIntake: typed<SupplierIntakeReasonInput>({
         id: "purchasing.supplier-intake.hold",

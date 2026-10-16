@@ -654,22 +654,6 @@ pub(crate) fn decide_workflow_human_task_for_actor(
     validate_decision(&task, &params.decision, comment.as_deref())?;
     let principal = authorization.acting_for_identity.unwrap_or(actor);
 
-    if task.assignment == WorkflowTaskAssignment::AllCandidates {
-        if let Some(partial) = record_all_candidates_vote(
-            ctx,
-            organization_id,
-            actor,
-            principal,
-            &task,
-            &params,
-            &authorization,
-            &input_hash,
-            comment.clone(),
-        )? {
-            return Ok(partial);
-        }
-    }
-
     let instance = require_instance(
         ctx,
         organization_id,
@@ -684,6 +668,40 @@ pub(crate) fn decide_workflow_human_task_for_actor(
     }
     if instance.subject_revision_hash != task.condition_revision_hash {
         return Err("workflow task subject revision no longer matches its instance".to_string());
+    }
+
+    // Freshness is required for every vote, not only the final AllCandidates
+    // vote that executes the domain action.
+    if params.decision == WorkflowHumanTaskDecision::Approve {
+        if let Some(action) = task.guarded_action.as_ref() {
+            let snapshot = snapshot_guarded_action(
+                ctx,
+                task.organization_id,
+                task.company_id,
+                action.key.clone(),
+                action.schema_version,
+                GuardedActionInput::for_subject(&action.key, task.subject_id),
+            )?;
+            if snapshot.subject_revision_hash != task.subject_revision_hash {
+                return Err("workflow task subject changed after the task was created".to_string());
+            }
+        }
+    }
+
+    if task.assignment == WorkflowTaskAssignment::AllCandidates {
+        if let Some(partial) = record_all_candidates_vote(
+            ctx,
+            organization_id,
+            actor,
+            principal,
+            &task,
+            &params,
+            &authorization,
+            &input_hash,
+            comment.clone(),
+        )? {
+            return Ok(partial);
+        }
     }
 
     let edge = decision_edge(ctx, &task, &params.decision)?;
