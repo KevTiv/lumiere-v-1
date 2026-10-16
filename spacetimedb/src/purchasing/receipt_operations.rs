@@ -8,6 +8,7 @@ use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 #[spacetimedb::table(
     accessor = purchase_receipt_operation,
+    index(accessor = purchase_receipt_operation_by_organization, btree(columns = [organization_id])),
     index(accessor = purchase_receipt_operation_by_scope, btree(columns = [organization_id, company_id])),
     index(accessor = purchase_receipt_operation_by_line, btree(columns = [line_id]))
 )]
