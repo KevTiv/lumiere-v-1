@@ -29,6 +29,21 @@ async function chooseFile() {
 }
 
 describe("CSV submission outcomes", () => {
+  it("shows abandoned accounting cleanup history before a new submission", () => {
+    render(
+      <CsvImportModal
+        config={config}
+        organizationId={1n}
+        tableName="account_move_line"
+        abandonedAccountingCleanup={{ companyId: 7n, authorized: true, onCleanup: vi.fn() }}
+        onImport={vi.fn()}
+        onClose={vi.fn()}
+      />,
+    )
+    expect(screen.getByText("Organization import history")).toBeTruthy()
+    expect(screen.getByRole("button", { name: "Import" })).toBeTruthy()
+  })
+
   it("keeps the dialog open for history and prevents duplicate submission after acceptance", async () => {
     const onClose = vi.fn()
     const onImport = vi.fn().mockResolvedValue(undefined)
@@ -66,6 +81,34 @@ describe("CSV submission outcomes", () => {
       entity: "hr_employee", companyId: "2", fileName: "employees.csv", csvData: "name\nAda\n", requestId: expect.stringMatching(/^[a-f0-9]{32}$/),
     }))
     expect(screen.queryByRole("button", { name: "Import" })).toBeNull()
+  })
+
+  it("uses an optional app spreadsheet reader and submits its converted CSV", async () => {
+    const onImport = vi.fn().mockResolvedValue(undefined)
+    const fileReader = vi.fn().mockResolvedValue({ csvText: "name\nAda\n" })
+    render(
+      <CsvImportModal
+        config={config}
+        fileReader={fileReader}
+        onImport={onImport}
+        onClose={vi.fn()}
+      />,
+    )
+    const file = new File(["workbook"], "employees.xlsx", {
+      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    })
+    fireEvent.change(screen.getByLabelText("CSV or Excel file"), {
+      target: { files: [file] },
+    })
+    await waitFor(() =>
+      expect((screen.getByRole("button", { name: "Import" }) as HTMLButtonElement).disabled).toBe(
+        false,
+      ),
+    )
+    fireEvent.click(screen.getByRole("button", { name: "Import" }))
+
+    await waitFor(() => expect(onImport).toHaveBeenCalledWith("name\nAda\n"))
+    expect(fileReader).toHaveBeenCalledWith(file)
   })
 
 })

@@ -2,7 +2,29 @@ import type { ModuleDataState } from "@lumiere/ui/lib/module-data-state"
 import { kpiDate } from "@lumiere/ui/lib/kpi-tiles"
 import { normalizedTag } from "@lumiere/erp-workflows"
 
-export type OverviewRow = Record<string, unknown>
+/** Read projection: enumerate supported fields while retaining runtime redaction checks. */
+export interface OverviewRow {
+  id?: unknown
+  organizationId?: unknown; organization_id?: unknown
+  companyId?: unknown; company_id?: unknown
+  currencyId?: unknown; currency_id?: unknown
+  state?: unknown; status?: unknown
+  moveType?: unknown; move_type?: unknown
+  paymentType?: unknown; payment_type?: unknown
+  amountTotal?: unknown; amount_total?: unknown
+  amount?: unknown
+  amountResidual?: unknown; amount_residual?: unknown
+  invoiceDate?: unknown; invoice_date?: unknown
+  invoiceDateDue?: unknown; invoice_date_due?: unknown
+  dueDate?: unknown; due_date?: unknown
+  date?: unknown; createdAt?: unknown; createDate?: unknown; create_date?: unknown
+  deletedAt?: unknown; deleted_at?: unknown
+  name?: unknown; title?: unknown; ref?: unknown; reference?: unknown; code?: unknown
+  statementId?: unknown; statement_id?: unknown
+  isReconciled?: unknown; is_reconciled?: unknown
+  reconciledInvoiceIds?: unknown; reconciled_invoice_ids?: unknown
+  reconciledBillIds?: unknown; reconciled_bill_ids?: unknown
+}
 export interface OverviewCollection {
   rows: readonly OverviewRow[]
   state: ModuleDataState
@@ -28,7 +50,7 @@ export interface OverviewActivityMonth {
 export function overviewTag(value: unknown): string {
   return normalizedTag(value)
 }
-function cell(row: OverviewRow, camel: string, snake: string): unknown {
+function cell(row: OverviewRow, camel: keyof OverviewRow, snake: keyof OverviewRow): unknown {
   return row[camel] ?? row[snake]
 }
 function id(value: unknown): string {

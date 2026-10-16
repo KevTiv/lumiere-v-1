@@ -210,6 +210,10 @@
       "name": "apply_global_migrations",
       "shape_fingerprint": "sha256:b63c76350efcb363d4bc6bea459be76a792871a8d32d217da072fd6b3818f0ca"
     },
+    "erp.apply_historical_payment_allocations": {
+      "name": "apply_historical_payment_allocations",
+      "shape_fingerprint": "sha256:50e80a3e94220b39b5285a8cd4534087f6041437fedcb45bb88af0ab50b156e5"
+    },
     "erp.apply_hr_integration_intent": {
       "name": "apply_hr_integration_intent",
       "shape_fingerprint": "sha256:94e46653eb9a01343696348d79f1f76f40027c69e66a4bbe7df5b9935a4166bb"
@@ -613,6 +617,10 @@
     "erp.claim_workflow_human_task": {
       "name": "claim_workflow_human_task",
       "shape_fingerprint": "sha256:45865da0d02caf4813495a4fc64591435c7439605747517092022d5b45ea386a"
+    },
+    "erp.cleanup_abandoned_account_move_import": {
+      "name": "cleanup_abandoned_account_move_import",
+      "shape_fingerprint": "sha256:1b61fd65e22b570aca77945cad7f09abff59e2752d69729d60ba794d846385fa"
     },
     "erp.cleanup_stale_proposal_presence": {
       "name": "cleanup_stale_proposal_presence",
@@ -1425,6 +1433,10 @@
     "erp.create_manual_account_invoice": {
       "name": "create_manual_account_invoice",
       "shape_fingerprint": "sha256:9ad91b5f01e10604918487f90022b00943758ca8a2a473b84eab28ad81f07a76"
+    },
+    "erp.create_manual_invoice": {
+      "name": "create_manual_invoice",
+      "shape_fingerprint": "sha256:763f3fd6a98dda39289cfb7a0d861f454493ffcb43c77eb201e5f5a6198933f9"
     },
     "erp.create_manufacturing_order": {
       "name": "create_manufacturing_order",
@@ -6008,6 +6020,22 @@
       "current_operations_fingerprint": "sha256:a7671fb5a29419595c45acfeb4591a7df1b091c69486e427cf8d0da9d5d55a5c",
       "operation_count": 1446,
       "reason": "COV-08 atomic manual accounting invoice creation and exact payment reversal identity"
+    },
+    {
+      "previous_release": "v0.3.107",
+      "previous_ir_sha256": "sha256:d429d78cadb3a4f36c1777345f9d49dfd947dccd924611911e259bb8ed246e89",
+      "previous_operations_fingerprint": "sha256:a7671fb5a29419595c45acfeb4591a7df1b091c69486e427cf8d0da9d5d55a5c",
+      "current_operations_fingerprint": "sha256:b812cdb909e5802f273497136f93b6027c54cf4a3a49e083ba20617c2b5dfa18",
+      "operation_count": 1448,
+      "reason": "release on top of v0.3.107: add apply_historical_payment_allocations, create_manual_invoice; change the shape of none"
+    },
+    {
+      "previous_release": "v0.3.108",
+      "previous_ir_sha256": "sha256:649f4668f4a2e70f68483202e9fe1cf643c100e2aa30eb5a91404eee140c44b9",
+      "previous_operations_fingerprint": "sha256:b812cdb909e5802f273497136f93b6027c54cf4a3a49e083ba20617c2b5dfa18",
+      "current_operations_fingerprint": "sha256:bfd111e979bdaf3a8238b7f6e8eff2a2a039a4d3c163ec41994f707f7030d56e",
+      "operation_count": 1449,
+      "reason": "release on top of v0.3.108: add cleanup_abandoned_account_move_import; change the shape of none"
     }
   ]
 }

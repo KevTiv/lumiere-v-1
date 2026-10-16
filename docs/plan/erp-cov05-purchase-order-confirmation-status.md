@@ -1,7 +1,8 @@
 # COV-05 Purchase order confirmation convergence
 
 **Package:** `COV-05a`  
-**Disposition:** `IMPLEMENTED` — runtime acceptance pending  
+**Disposition:** `REVIEW` — implemented; fresh-stack runtime proof passed
+
 **Stacked base:** PR #56 / `codex/erp-convergence-cov00a-cov02`  
 **Operator proof:** [`../../frontend/web/tests/e2e/cov05-purchase-order-confirmation.spec.ts`](../../frontend/web/tests/e2e/cov05-purchase-order-confirmation.spec.ts)
 
@@ -32,9 +33,15 @@ The slice reuses the existing Purchasing UI, typed workflow runner, generated op
 - the limited reader must return 403 and preserve the same PO state and receipt set;
 - the workflow result must navigate to `/purchasing?tab=orders&filter=id:<orderId>`.
 
-## Runtime validation required
+## Runtime validation
 
-Run on a fresh first-org stack:
+The integrated local gate passed: **1 browser test**, including exact PO/receipt
+readback, stale 422, and reader 403. Final proof used fresh dedicated
+`lumiere_cov05a_20261011212115_final` / `lumiere-cov05a-20261011212115-final`.
+See [COV-05d runtime evidence](erp-cov05d-runtime-evidence.md) for actual commands,
+source fingerprint, initial failures, and service/storage ledger.
+
+Reference commands below require fresh names; never clear an existing user's database:
 
 ```bash
 PG_DATABASE=lumiere_cov05_e2e make e2e-smoke-setup E2E_STDB_MODULE=lumiere-cov05-e2e
@@ -43,7 +50,8 @@ PG_DATABASE=lumiere_cov05_e2e make e2e-single \
   E2E_GREP= E2E_WORKERS=1 E2E_STDB_MODULE=lumiere-cov05-e2e
 ```
 
-Do not mark this slice `ACCEPTED` until that runtime proof passes.
+Runtime proof is now present. Formal review/CI and full Purchasing U4/U5 certification
+are separate gates; this document does not promote the module.
 
 ## Evidence limit
 
@@ -51,4 +59,6 @@ This slice certifies PO confirmation only. It does not yet certify receiving, pa
 
 ## Next bounded Purchasing slice
 
-COV-05b now owns the exact PO-line receipt slice. After it, certify **vendor-bill creation** without newest-row or id-delta discovery. Replace the current `invoice_ids.at(-1)` semantic readback with a released exact PO→bill relation and include stale/duplicate behavior.
+COV-05b/c also have runtime proof, and COV-05d proves receipt response-loss recovery.
+Next prefer partial receipt/backorder billing or three-way-match rejection/recovery;
+retain the released exact PO/receipt/bill relations rather than rediscovering effects.

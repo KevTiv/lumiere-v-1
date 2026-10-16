@@ -31,36 +31,6 @@ function posthogRewrites() {
   ]
 }
 
-/**
- * Local/dev fallback for Rust-owned generic ERP APIs. Production ingress sends
- * these prefixes directly to api-server, so they do not need Next route files.
- */
-function rustApiRewrites() {
-  const raw = process.env.LUMIERE_API_SERVER_URL?.trim() ?? ''
-  if (!raw || raw === 'false' || raw === 'off') return []
-  const base = raw.replace(/\/$/, '')
-  return [
-    {
-      source: '/api/query/:path*',
-      destination: `${base}/v1/query/:path*`,
-    },
-    {
-      source: '/api/compat/reducer/:path*',
-      destination: `${base}/v1/compat/reducer/:path*`,
-    },
-    {
-      source: '/api/operations/:path*',
-      destination: `${base}/v1/operations/:path*`,
-    },
-    // Settings → Users / Roles read these api-server routes; without a
-    // gateway (local, E2E) they were otherwise unreachable and 404ed in Next.
-    {
-      source: '/api/settings/:path*',
-      destination: `${base}/v1/settings/:path*`,
-    },
-  ]
-}
-
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   output: 'standalone',
@@ -75,7 +45,7 @@ const nextConfig = {
     }]
   },
   async rewrites() {
-    return [...rustApiRewrites(), ...posthogRewrites()]
+    return posthogRewrites()
   },
   typescript: {
     ignoreBuildErrors: true,
@@ -84,23 +54,10 @@ const nextConfig = {
     unoptimized: true,
   },
   transpilePackages: ["@lumiere/ui", "@lumiere/stdb", "@lumiere/presentation-core"],
-  // Force a single React instance across all workspace packages.
-  // @react-three/fiber inside @lumiere/ui would otherwise resolve React from
-  // packages/ui/node_modules, causing "ReactCurrentOwner" undefined errors.
-  webpack: (config) => {
-    config.resolve.alias = {
-      ...config.resolve.alias,
-      react: path.resolve(__dirname, 'node_modules/react'),
-      'react-dom': path.resolve(__dirname, 'node_modules/react-dom'),
-    }
-    return config
-  },
+  // Next owns React aliases for each rendering layer. Pointing them at the
+  // workspace package splits React from Next's server renderer during prerender.
   turbopack: {
     root: path.resolve(__dirname, '../..'),
-    resolveAlias: {
-      react: './frontend/web/node_modules/react',
-      'react-dom': './frontend/web/node_modules/react-dom',
-    },
   },
 }
 

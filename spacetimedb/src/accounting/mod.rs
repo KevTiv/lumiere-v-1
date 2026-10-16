@@ -44,6 +44,7 @@ pub mod fiscal_periods;
 pub mod fixed_assets;
 pub mod fx_metadata;
 pub mod fx_revaluation;
+pub mod historical_payment_migration;
 pub(crate) mod idempotency;
 pub mod intercompany;
 pub mod journal_entries;

@@ -80,6 +80,11 @@ import {
   csvImportForm,
   RecordChatterDialog,
   EntityRecordSheet,
+  AccountingSetupReadinessPanel,
+  evaluateAccountingSetupReadiness,
+  type AccountingReadinessAction,
+  type AccountingReadinessItem,
+  type AccountingSetupReadinessInput,
 } from "@lumiere/ui"
 import { Input } from "@lumiere/ui/components/input"
 import { Label } from "@lumiere/ui/components/label"
@@ -147,6 +152,34 @@ import {
 } from "@/lib/accounting-create-params"
 import type { ClearablePatch } from "@/lib/accounting-create-params"
 import { optionalBigIntU64 } from "@lumiere/erp-shared/form-coercion"
+import {
+  ACCOUNT_MOVE_BUNDLE_COLUMNS,
+  ACCOUNT_MOVE_IMPORT_BUNDLE,
+  accountMoveBundleMappings,
+  accountMoveBundleToken,
+  accountIsEligibleManualInvoiceTaxPosting,
+  accountMatchesManualInvoiceLineType,
+  accountMoveReference,
+  buildAccountMoveLineCsv,
+  buildBundleParentCsv,
+  buildMoveIdMapFromAccountMoves,
+  markAccountMoveBundleParentCsv,
+  markAccountMoveBundleLineCsv,
+  parseCsvText,
+  splitAccountMoveImportCsv,
+  type ColumnMappingMap,
+  type SplitAccountMoveImportResult,
+} from "@lumiere/erp-shared"
+import {
+  HISTORICAL_PAYMENT_REPLAY_IMPORT_COLUMNS,
+  OUTSTANDING_DOCUMENT_IMPORT_COLUMNS,
+  outstandingDocumentSplitArgs,
+  prepareOutstandingDocumentImport,
+  type OutstandingDocumentImportMode,
+} from "@lumiere/erp-shared/outstanding-document-import"
+import { createCsvImportRequest, type CsvImportReceipt } from "@lumiere/query-hooks/hooks/csv-import-request"
+import { useTrackedCsvImport } from "@lumiere/query-hooks/hooks/tracked-csv-import"
+import { useCleanupAbandonedAccountMoveImport } from "@lumiere/query-hooks/hooks/import-jobs"
 import { toAddAccountMoveLineParamsFromForm } from "./account-move-line-forms"
 import { accountMoveLineCanBeDeleted } from "./account-move-line-gates"
 import { stdbParamsToJson } from "@/lib/stdb-params-json"
@@ -166,10 +199,19 @@ import type {
 } from "@lumiere/stdb/types"
 import { accountingModuleConfig } from "@/lib/module-dashboard-configs"
 import { invoiceRecordHref } from "./invoice-record"
+import { historicalPaymentReplayIsCallable } from "./historical-payment-replay-capability"
+import {
+  buildHistoricalPaymentReplayBatches,
+  resolveHistoricalImportResume,
+  validateHistoricalPaymentReplayCapability,
+  validateHistoricalPaymentReplaySources,
+  type HistoricalImportResume,
+} from "./historical-payment-import"
 import { accountMovePivotSetup } from "@lumiere/ui/lib/accounting-pivot-configs"
 import { PaymentOperationsPanel } from "./payment-operations-panel"
 import { useAccountingModuleSubscription } from "@/lib/module-subscription-hooks"
 import { chatterTargetFromRow, type ChatterTarget } from "@/lib/record-chatter"
+import { readImportFile } from "@/lib/import-spreadsheet-file"
 import {
   useAccountAccounts,
   useAccountMoves,
@@ -309,6 +351,7 @@ import {
   useCreateAccountBankStatement,
   useUpdateAccountBankStatement,
   useAccountingCsvImportMutations,
+  useApplyHistoricalPaymentAllocations,
   useAccountPayments,
   useAccountPaymentTerms,
   useAccountPaymentTermLines,
@@ -411,6 +454,7 @@ import type {
   AccountMove,
   AccountPeriod,
   CrossoveredBudget,
+  CreateManualAccountInvoiceParams,
 } from "@lumiere/query-hooks/hooks/accounting"
 import {
   InvoiceListView,
@@ -439,6 +483,7 @@ import {
   taxJurisdictionsTableConfig,
   taxSchedulesTableConfig,
 } from "./read-sections"
+import { apiFetch, fetchQueryList } from "@lumiere/query-hooks/http"
 import { persistCustomFieldsToEav } from "@/lib/persist-record-custom-fields"
 import { useDefaultOperatingCompanyBigInt } from "@lumiere/query-hooks/hooks/use-operating-company"
 import { useCompanies } from "@lumiere/query-hooks/hooks/organization-company"
@@ -674,11 +719,26 @@ function moveLineIdsFromRow(line: Record<string, unknown>): bigint[] {
 type AccountingCsvImportKind =
   | "account"
   | "accountMove"
+  | "outstandingDocuments"
+  | "historicalDocumentsForPaymentReplay"
   | "accountMoveLine"
   | "tax"
   | "budget"
   | "budgetLine"
   | "analytic"
+
+const HISTORICAL_PAYMENT_REPLAY_CALLABLE = historicalPaymentReplayIsCallable()
+
+function assertBundleImportSucceeded(
+  stage: string,
+  receipt: CsvImportReceipt,
+): void {
+  if (receipt.status === "success" && receipt.errorRows === 0) return
+  const firstError = receipt.errors[0]?.errorMessage
+  throw new Error(
+    `${stage} import job #${receipt.jobId} finished ${receipt.status} with ${receipt.errorRows} rejected row${receipt.errorRows === 1 ? "" : "s"}.${firstError ? ` ${firstError}` : " Review the import job before retrying."}`,
+  )
+}
 
 interface AccountingClientProps {
   initialBudgets?: CrossoveredBudget[]
@@ -778,6 +838,7 @@ function AccountingClientReady({
   // Create invoice / bill modals
   const [showCreateInvoice, setShowCreateInvoice] = useState(false)
   const [showCreateBill, setShowCreateBill] = useState(false)
+  const [readinessAction, setReadinessAction] = useState<AccountingReadinessAction | undefined>()
   const [creditNoteSource, setCreditNoteSource] = useState<AccountMove | null>(null)
   // Analytic row editors (click row on Analytic tabs)
   const [analyticAccountEdit, setAnalyticAccountEdit] = useState<Record<string, unknown> | null>(null)
@@ -1114,6 +1175,12 @@ function AccountingClientReady({
     )
   }, [companies, currencySelectOptions, operatingCompanyId])
 
+  const manualInvoiceCurrencyId = useMemo(
+    () =>
+      companies.find((company) => company.id === operatingCompanyId)?.currencyId ?? 0n,
+    [companies, operatingCompanyId],
+  )
+
   const manualInvoiceOptions = useMemo(() => {
     const companyKey = String(operatingCompanyId)
     const accountLabel = (row: ManualInvoiceAccountLookup) =>
@@ -1190,11 +1257,229 @@ function AccountingClientReady({
     [companies],
   )
 
+  const invoicePartnerSelectOptions = useMemo(
+    () => contactRowsToAccountingPartnerSelectOptions(contacts),
+    [contacts],
+  )
+
+  const manualInvoiceAccountOptions = useMemo(() => {
+    const eligibleAccounts = accounts.filter(
+      (account) =>
+        account.companyId === operatingCompanyId &&
+        account.deprecated === false &&
+        (account.currencyId == null || account.currencyId === manualInvoiceCurrencyId),
+    )
+    const toOptions = (rows: typeof accounts) =>
+      rows.map((account) => ({
+        value: String(account.id),
+        label: `${account.code ? `${account.code} — ` : ""}${account.name ?? account.id}`,
+      }))
+    const lineOptions = (expectedType: "Income" | "Expense") =>
+      toOptions(
+        eligibleAccounts.filter((account) =>
+          accountMatchesManualInvoiceLineType(account, accountTypes, expectedType),
+        ),
+      )
+    const counterpartOptions = (expectedType: "Receivable" | "Payable") =>
+      toOptions(
+        eligibleAccounts.filter(
+          (account) => enumTag(account.internalType) === expectedType,
+        ),
+      )
+
+    return {
+      income: lineOptions("Income"),
+      expense: lineOptions("Expense"),
+      receivable: counterpartOptions("Receivable"),
+      payable: counterpartOptions("Payable"),
+    }
+  }, [accountTypes, accounts, manualInvoiceCurrencyId, operatingCompanyId])
+
+  const manualInvoiceJournalOptions = useMemo(() => {
+    const eligible = (journalType: "Sale" | "Purchase") =>
+      accountJournalRowsToSelectOptions(
+        journals.filter(
+          (journal) =>
+            journal.companyId === operatingCompanyId &&
+            journal.active === true &&
+            enumTag(journal.type) === journalType &&
+            (journal.currencyId == null || journal.currencyId === manualInvoiceCurrencyId),
+        ),
+      )
+    return { sales: eligible("Sale"), purchases: eligible("Purchase") }
+  }, [journals, manualInvoiceCurrencyId, operatingCompanyId])
+
+  const manualInvoiceTaxOptions = useMemo(() => {
+    const accountById = new Map(accounts.map((account) => [account.id, account]))
+    const groupById = new Map(taxGroups.map((group) => [group.id, group]))
+    const eligible = (taxUse: "Sale" | "Purchase") =>
+      taxes
+        .filter((tax) => {
+          const amount = Number(tax.amount)
+          if (
+            tax.companyId !== operatingCompanyId ||
+            tax.active !== true ||
+            tax.hasNegativeFactor === true ||
+            enumTag(tax.typeTaxUse) !== taxUse ||
+            enumTag(tax.amountType) !== "Percent" ||
+            !Number.isFinite(amount) ||
+            amount < 0 ||
+            amount > 100 ||
+            tax.taxGroupId == null
+          ) {
+            return false
+          }
+          const group = groupById.get(tax.taxGroupId)
+          if (group == null || group.companyId !== operatingCompanyId) return false
+          const postingAccountId =
+            taxUse === "Sale" ? group.taxPayableAccountId : group.taxReceivableAccountId
+          if (postingAccountId == null) return false
+          const postingAccount = accountById.get(postingAccountId)
+          if (
+            postingAccount == null ||
+            !accountIsEligibleManualInvoiceTaxPosting(
+              postingAccount,
+              operatingCompanyId,
+              manualInvoiceCurrencyId,
+            )
+          ) {
+            return false
+          }
+          return true
+        })
+        .map((tax) => ({
+          value: String(tax.id),
+          label: `${tax.name} (${Number(tax.amount)}%)`,
+          rate: Number(tax.amount),
+          priceIncluded: Boolean(tax.priceInclude),
+        }))
+    return { sales: eligible("Sale"), purchases: eligible("Purchase") }
+  }, [accounts, manualInvoiceCurrencyId, operatingCompanyId, taxGroups, taxes])
+
+  const accountingSetup = useMemo<AccountingSetupReadinessInput>(() => {
+    const company = companies.find(
+      (candidate) => String(candidate.id) === String(operatingCompanyId),
+    )
+    const companyFiscalYears = fiscalYearsRaw.filter((fiscalYear) => {
+      return String(fiscalYear.companyId) === String(operatingCompanyId)
+    })
+    const companyPeriods = accountPeriodsRaw.filter((period) => {
+      return String(period.companyId) === String(operatingCompanyId)
+    })
+    const activeCompanyTaxes = taxes.filter(
+      (tax) => tax.companyId === operatingCompanyId && tax.active === true,
+    )
+    const usableTaxCount =
+      manualInvoiceTaxOptions.sales.length + manualInvoiceTaxOptions.purchases.length
+
+    return {
+      companyConfigured: company != null,
+      baseCurrencyConfigured:
+        manualInvoiceCurrencyId > 0n &&
+        currencies.some((currency) => currency.id === manualInvoiceCurrencyId),
+      fiscalYearConfigured: companyFiscalYears.length > 0,
+      openPeriodAvailable: companyPeriods.some(
+        (period) => accountPeriodStateTag(copyAsRecord(period)) === "Open",
+      ),
+      salesJournalConfigured: manualInvoiceJournalOptions.sales.length > 0,
+      purchaseJournalConfigured: manualInvoiceJournalOptions.purchases.length > 0,
+      receivableAccountConfigured: manualInvoiceAccountOptions.receivable.length > 0,
+      payableAccountConfigured: manualInvoiceAccountOptions.payable.length > 0,
+      incomeAccountConfigured: manualInvoiceAccountOptions.income.length > 0,
+      expenseAccountConfigured: manualInvoiceAccountOptions.expense.length > 0,
+      taxConfiguration:
+        activeCompanyTaxes.length === 0
+          ? "missing"
+          : usableTaxCount < activeCompanyTaxes.length
+            ? "needs-review"
+            : "ready",
+    }
+  }, [
+    accountPeriodsRaw,
+    companies,
+    currencies,
+    fiscalYearsRaw,
+    manualInvoiceAccountOptions,
+    manualInvoiceCurrencyId,
+    manualInvoiceJournalOptions,
+    manualInvoiceTaxOptions,
+    operatingCompanyId,
+    taxes,
+  ])
+
+  const readinessByAction = useMemo(
+    () => ({
+      invoice: evaluateAccountingSetupReadiness(accountingSetup, "invoice"),
+      bill: evaluateAccountingSetupReadiness(accountingSetup, "bill"),
+      import: evaluateAccountingSetupReadiness(accountingSetup, "import"),
+    }),
+    [accountingSetup],
+  )
+
+  const requestAccountingAction = useCallback(
+    (action: AccountingReadinessAction, onReady: () => void) => {
+      const readiness = readinessByAction[action]
+      setReadinessAction(action)
+      if (readiness.isReady) {
+        onReady()
+        return
+      }
+      const first = readiness.blockingItems[0]
+      toast({
+        variant: "destructive",
+        title: `${first?.label ?? "Accounting setup"} is required`,
+        description:
+          first?.reason ?? "Complete the accounting setup requirements shown above first.",
+      })
+    },
+    [readinessByAction, toast],
+  )
+
+  const openInvoiceCreate = useCallback(
+    () => requestAccountingAction("invoice", () => setShowCreateInvoice(true)),
+    [requestAccountingAction],
+  )
+  const openBillCreate = useCallback(
+    () => requestAccountingAction("bill", () => setShowCreateBill(true)),
+    [requestAccountingAction],
+  )
+  const openAccountingMoveImport = useCallback(
+    () => requestAccountingAction("import", () => setCsvKind("accountMove")),
+    [requestAccountingAction],
+  )
+  const openAccountingMoveLineImport = useCallback(
+    () => requestAccountingAction("import", () => setCsvKind("accountMoveLine")),
+    [requestAccountingAction],
+  )
+  const openOutstandingDocumentImport = useCallback(
+    () => requestAccountingAction("import", () => setCsvKind("outstandingDocuments")),
+    [requestAccountingAction],
+  )
+  const openHistoricalDocumentPaymentReplayImport = useCallback(
+    () => requestAccountingAction("import", () => setCsvKind("historicalDocumentsForPaymentReplay")),
+    [requestAccountingAction],
+  )
+
+  const handleReadinessResolve = useCallback(
+    (item: AccountingReadinessItem) => {
+      if (item.id === "company" || item.id === "base-currency") {
+        window.location.assign("/settings")
+        return
+      }
+      if (item.id === "fiscal-year") setAccountingActiveTab("fiscal-years")
+      else if (item.id === "open-period") setAccountingActiveTab("account-periods")
+      else if (item.id === "sales-journal" || item.id === "purchase-journal") {
+        setAccountingActiveTab("account-journals")
+      } else if (item.id.endsWith("-account")) setAccountingActiveTab("accounts")
+      else setAccountingActiveTab("taxes")
+    },
+    [setAccountingActiveTab],
+  )
+
   const partnerSelectOptions = useMemo(() => {
-    const fromApi = contactRowsToAccountingPartnerSelectOptions(contacts)
-    if (fromApi.length > 0) return fromApi
+    if (invoicePartnerSelectOptions.length > 0) return invoicePartnerSelectOptions
     return [{ value: "", label: t("common.lookup.noPartners"), disabled: true }]
-  }, [contacts, t])
+  }, [invoicePartnerSelectOptions, t])
 
   const invoiceMoveSelectOptions = useMemo(() => {
     const invoiceMoves = (allMoves as Record<string, unknown>[]).filter((row) =>
@@ -1873,7 +2158,7 @@ function AccountingClientReady({
   const updateBudgetLineActuals = useUpdateBudgetLineActuals(organizationId)
   const createBudgetPost = useCreateBudgetPost(organizationId)
   const updateBudgetPost = useUpdateBudgetPost(organizationId)
-  const postMove = usePostAccountMove(organizationId)
+  const postMove = usePostAccountMove(organizationId, operatingCompanyId)
   const createCreditNote = useCreateCreditNoteFromInvoice(organizationId)
   const mailTemplatesQuery = useMailTemplates(organizationId, organizationId > 0)
   const queueMailFromTemplate = useQueueMailFromTemplate(
@@ -1944,6 +2229,13 @@ function AccountingClientReady({
 
   const updateAccountMoveLine = useUpdateAccountMoveLine(organizationId, operatingCompanyId)
   const csvImports = useAccountingCsvImportMutations(organizationId, operatingCompanyId)
+  const trackedBundleImport = useTrackedCsvImport()
+  const cleanupAbandonedImport = useCleanupAbandonedAccountMoveImport(
+    orgId,
+    operatingCompanyId,
+  )
+  const applyHistoricalPaymentAllocations =
+    useApplyHistoricalPaymentAllocations(organizationId)
 
   const createAccountPayment = useCreateAccountPayment(organizationId)
   const cancelAccountPayment = useCancelAccountPayment(organizationId)
@@ -4143,8 +4435,8 @@ function AccountingClientReady({
         currencies: currenciesRead,
       }}
       onNavigate={setAccountingActiveTab}
-      onCreateInvoice={checkPermission("account_move", "create").allowed && manualInvoiceReadState.status === "ready" ? () => setShowCreateInvoice(true) : undefined}
-      onCreateBill={checkPermission("account_move", "create").allowed && manualInvoiceReadState.status === "ready" ? () => setShowCreateBill(true) : undefined}
+      onCreateInvoice={checkPermission("account_move", "create").allowed && manualInvoiceReadState.status === "ready" ? openInvoiceCreate : undefined}
+      onCreateBill={checkPermission("account_move", "create").allowed && manualInvoiceReadState.status === "ready" ? openBillCreate : undefined}
       onCreateJournalEntry={checkPermission("account_move", "create").allowed && mergeModuleStates([
         allMovesRead.state, accountsRead.state, journalsRead.state, saleOrdersRead.state,
       ]).status === "ready" ? () => setQuickActionForm({ form: journalEntryFormConfig, action: "createMove" }) : undefined}
@@ -4382,8 +4674,15 @@ function AccountingClientReady({
   const actionUsable = (action: string) =>
     !isAccountingDataAction(action) || tabUsable(actionTabs[action])
   const csvTabs: Record<AccountingCsvImportKind, AccountingTab> = {
-    account: "accounts", accountMove: "journal-entries", accountMoveLine: "journal-entries",
-    tax: "taxes", budget: "budgets", budgetLine: "budgets", analytic: "analytic",
+    account: "accounts",
+    accountMove: "journal-entries",
+    outstandingDocuments: "journal-entries",
+    historicalDocumentsForPaymentReplay: "journal-entries",
+    accountMoveLine: "journal-entries",
+    tax: "taxes",
+    budget: "budgets",
+    budgetLine: "budgets",
+    analytic: "analytic",
   }
   const quickActionUsable = quickActionForm == null || actionUsable(quickActionForm.action)
   const csvUsable = csvKind == null || tabUsable(csvTabs[csvKind])
@@ -4554,18 +4853,280 @@ function AccountingClientReady({
     [],
   )
 
+  const submitAccountMoveBundle = useCallback(
+    async ({
+      headers,
+      split,
+      parentMapping,
+      lineMapping,
+      fileNamePrefix,
+      resume,
+    }: {
+      headers: string[]
+      split: SplitAccountMoveImportResult
+      parentMapping: ColumnMappingMap
+      lineMapping: ColumnMappingMap
+      fileNamePrefix: string
+      resume?: HistoricalImportResume
+    }) => {
+      const canonicalParentCsv = buildBundleParentCsv(
+        split.parentHeaders,
+        split.parentRows,
+        parentMapping,
+      )
+      const bundleToken = accountMoveBundleToken(canonicalParentCsv)
+      if (resume?.phase === "complete") {
+        return { bundleToken, moveIdByRef: resume.moveIdByReference }
+      }
+      const parentCsv = markAccountMoveBundleParentCsv(canonicalParentCsv)
+      let moveIdByRef =
+        resume?.phase === "lines_pending" ? resume.moveIdByReference : undefined
+      if (!moveIdByRef) {
+        const parentReceipt = await trackedBundleImport.mutateAsync(
+          createCsvImportRequest(
+            orgId,
+            "account_move",
+            parentCsv,
+            `${fileNamePrefix}-headers.csv`,
+            { companyId: operatingCompanyId },
+          ),
+        )
+        assertBundleImportSucceeded("Journal entry header", parentReceipt)
+
+        let importedMoves = await fetchQueryList<"account-moves">(
+          `/api/query/account-moves?companyId=${encodeURIComponent(String(operatingCompanyId))}`,
+          "Failed to resolve imported journal entries",
+        )
+        for (let attempt = 0; attempt < 4; attempt += 1) {
+          const availableRefs = new Set(
+            importedMoves
+              .filter((move) => String(move.companyId) === String(operatingCompanyId))
+              .map((move) => accountMoveReference({ id: move.id, ref: move.ref }))
+              .filter(Boolean),
+          )
+          if (split.parentLinkValues.every((reference) => availableRefs.has(reference))) break
+          await new Promise((resolve) => setTimeout(resolve, 250 * (attempt + 1)))
+          importedMoves = await fetchQueryList<"account-moves">(
+            `/api/query/account-moves?companyId=${encodeURIComponent(String(operatingCompanyId))}`,
+            "Failed to resolve imported journal entries",
+          )
+        }
+
+        const afterMoveLinks = importedMoves
+          .filter((move) => String(move.companyId) === String(operatingCompanyId))
+          .map((move) => ({ id: move.id, ref: move.ref }))
+        moveIdByRef = buildMoveIdMapFromAccountMoves(
+          afterMoveLinks,
+          split.parentLinkValues,
+        )
+      }
+      const lineCsv = markAccountMoveBundleLineCsv(
+        buildAccountMoveLineCsv(
+          headers,
+          split.lineRows,
+          lineMapping,
+          moveIdByRef,
+        ),
+        bundleToken,
+      )
+      const lineReceipt = await trackedBundleImport.mutateAsync(
+        createCsvImportRequest(
+          orgId,
+          "account_move_line",
+          lineCsv,
+          `${fileNamePrefix}-lines.csv`,
+          { companyId: operatingCompanyId },
+        ),
+      )
+      assertBundleImportSucceeded("Journal entry line", lineReceipt)
+      return { bundleToken, moveIdByRef }
+    },
+    [operatingCompanyId, orgId, trackedBundleImport],
+  )
+
+  const importAccountMoveBundle = useCallback(
+    async (text: string) => {
+      const parsed = parseCsvText(text)
+      const headers = parsed.headers.map((header) => header.trim().toLowerCase())
+      if (new Set(headers).size !== headers.length) {
+        throw new Error("The journal import contains duplicate column names.")
+      }
+
+      const { parentMapping, lineMapping } = accountMoveBundleMappings(headers)
+      const split = splitAccountMoveImportCsv({
+        headers,
+        rows: parsed.rows,
+        parentMapping,
+        lineMapping,
+        parentLinkSourceColumn: ACCOUNT_MOVE_IMPORT_BUNDLE.parentLinkField,
+      })
+      await submitAccountMoveBundle({
+        headers,
+        split,
+        parentMapping,
+        lineMapping,
+        fileNamePrefix: "journal-entry",
+      })
+    },
+    [submitAccountMoveBundle],
+  )
+
+  const importOutstandingDocuments = useCallback(
+    async (text: string, mode: OutstandingDocumentImportMode) => {
+      const parsed = parseCsvText(text)
+      const headers = parsed.headers.map((header) => header.trim().toLowerCase())
+      if (new Set(headers).size !== headers.length) {
+        throw new Error("The outstanding-document import contains duplicate column names.")
+      }
+      const supportedColumns: ReadonlySet<string> = new Set([
+        ...(mode === "reconstruct_original_total"
+          ? HISTORICAL_PAYMENT_REPLAY_IMPORT_COLUMNS.required
+          : OUTSTANDING_DOCUMENT_IMPORT_COLUMNS.required),
+        ...(mode === "reconstruct_original_total"
+          ? HISTORICAL_PAYMENT_REPLAY_IMPORT_COLUMNS.optional
+          : OUTSTANDING_DOCUMENT_IMPORT_COLUMNS.optional),
+      ])
+      const mapping = Object.fromEntries(
+        headers
+          .filter((header) => supportedColumns.has(header))
+          .map((header) => [header, header]),
+      )
+      const prepared = prepareOutstandingDocumentImport({
+        headers,
+        rows: parsed.rows,
+        mapping,
+        mode,
+        companyCurrencyId: manualInvoiceCurrencyId,
+        importBatchIdentity:
+          mode === "reconstruct_original_total"
+            ? accountMoveBundleToken(text)
+            : undefined,
+      })
+      let resume: HistoricalImportResume | undefined
+      if (mode === "reconstruct_original_total") {
+        const capabilityResponse = await apiFetch(
+          "/api/accounting/historical-payment-allocations/capability",
+        )
+        if (!capabilityResponse.ok) {
+          throw new Error(
+            `Historical payment replay capability check failed (${capabilityResponse.status})`,
+          )
+        }
+        validateHistoricalPaymentReplayCapability(await capabilityResponse.json())
+        validateHistoricalPaymentReplaySources({
+          groups: prepared.paymentReplayGroups,
+          paymentTransactions: await fetchQueryList<"payment-transactions">(
+            `/api/query/payment-transactions?companyId=${encodeURIComponent(String(operatingCompanyId))}`,
+            "Failed to validate historical payment transactions",
+          ),
+          companyId: operatingCompanyId,
+        })
+      }
+      const split = splitAccountMoveImportCsv(outstandingDocumentSplitArgs(prepared))
+      if (mode === "reconstruct_original_total") {
+        const canonicalParentCsv = buildBundleParentCsv(
+          split.parentHeaders,
+          split.parentRows,
+          prepared.parentMapping,
+        )
+        const bundleToken = accountMoveBundleToken(canonicalParentCsv)
+        const [existingMoves, existingLines] = await Promise.all([
+          fetchQueryList<"account-moves">(
+            `/api/query/account-moves?companyId=${encodeURIComponent(String(operatingCompanyId))}`,
+            "Failed to inspect existing historical documents",
+          ),
+          fetchQueryList<"account-move-lines">(
+            `/api/query/account-move-lines?companyId=${encodeURIComponent(String(operatingCompanyId))}`,
+            "Failed to inspect existing historical document lines",
+          ),
+        ])
+        resume = resolveHistoricalImportResume({
+          checks: prepared.documentResumeChecks,
+          existingMoves,
+          existingLines,
+          companyId: operatingCompanyId,
+          bundleToken,
+          markedParentCsv: markAccountMoveBundleParentCsv(canonicalParentCsv),
+          importBatchIdentity: prepared.importBatchIdentity,
+        })
+      }
+      const imported = await submitAccountMoveBundle({
+        headers: prepared.headers,
+        split,
+        parentMapping: prepared.parentMapping,
+        lineMapping: prepared.lineMapping,
+        fileNamePrefix:
+          mode === "reconstruct_original_total"
+            ? "historical-document-payment-replay"
+            : "outstanding-document",
+        resume,
+      })
+      if (mode === "reconstruct_original_total") {
+        const moveIds = [...new Set(imported.moveIdByRef.values())].sort((left, right) =>
+          BigInt(left) < BigInt(right) ? -1 : 1,
+        )
+        for (const moveId of moveIds) {
+          try {
+            await postMove.mutateAsync(moveId)
+          } catch (cause) {
+            const detail = cause instanceof Error ? cause.message : String(cause)
+            throw new Error(
+              `Original-total document ${moveId} was imported but could not be posted before payment replay. Complete any required approval, then retry this file. ${detail}`,
+            )
+          }
+        }
+        const batches = buildHistoricalPaymentReplayBatches({
+          groups: prepared.paymentReplayGroups,
+          moveIdByReference: imported.moveIdByRef,
+          companyId: operatingCompanyId,
+          bundleToken: imported.bundleToken,
+        })
+        for (const batch of batches) {
+          try {
+            await applyHistoricalPaymentAllocations.mutateAsync(batch)
+          } catch (cause) {
+            const detail = cause instanceof Error ? cause.message : String(cause)
+            throw new Error(
+              `Documents were imported and posted, but payment transaction ${batch.paymentTransactionId} could not be replayed. Correct the payment and retry this file; completed batches are idempotent. ${detail}`,
+            )
+          }
+        }
+      }
+    },
+    [
+      applyHistoricalPaymentAllocations,
+      manualInvoiceCurrencyId,
+      operatingCompanyId,
+      postMove,
+      submitAccountMoveBundle,
+    ],
+  )
+
   const csvFormConfig = useMemo(() => {
     if (!csvKind) return null
     const titleKey: Record<AccountingCsvImportKind, string> = {
       account: "accounting.csvImport.accountsTitle",
       accountMove: "accounting.csvImport.movesTitle",
+      outstandingDocuments: "accounting.csvImport.outstandingDocumentsTitle",
+      historicalDocumentsForPaymentReplay:
+        "accounting.csvImport.historicalDocumentsForPaymentReplayTitle",
       accountMoveLine: "accounting.csvImport.moveLinesTitle",
       tax: "accounting.csvImport.taxTitle",
       budget: "accounting.csvImport.budgetTitle",
       budgetLine: "accounting.csvImport.budgetLineTitle",
       analytic: "accounting.csvImport.analyticTitle",
     }
-    return csvImportForm(t, t(titleKey[csvKind]))
+    return csvImportForm(
+      t,
+      t(titleKey[csvKind]),
+      csvKind === "accountMove"
+        ? t("accounting.csvImport.movesBundleDescription")
+        : csvKind === "outstandingDocuments"
+          ? t("accounting.csvImport.outstandingDocumentsDescription")
+          : csvKind === "historicalDocumentsForPaymentReplay"
+            ? t("accounting.csvImport.historicalDocumentsForPaymentReplayDescription")
+            : undefined,
+    )
   }, [csvKind, t])
 
   // ── Config: inject rich custom content for invoices/bills/accounts/ledger ───
@@ -4611,7 +5172,7 @@ function AccountingClientReady({
                     initialFilters={invoiceFilters}
                     onInitialFilterClear={clearInvoiceFilter}
                     onSelectInvoice={(invoice) => setInvoiceSheetRecord(copyAsRecord(invoice))}
-                    onCreateInvoice={() => setShowCreateInvoice(true)}
+                    onCreateInvoice={openInvoiceCreate}
                     onRecalculateTotals={(inv) =>
                       void runMutation(() => computeInvoiceTotals.mutateAsync(inv.id as string | number | bigint))
                     }
@@ -4637,7 +5198,7 @@ function AccountingClientReady({
                     currencyOptions={invoiceCurrencyOptions}
                     initialFilters={invoiceFilters}
                     onInitialFilterClear={clearInvoiceFilter}
-                    onCreateBill={() => setShowCreateBill(true)}
+                    onCreateBill={openBillCreate}
                     onSelectBill={(bill) => setInvoiceSheetRecord(copyAsRecord(bill))}
                     onRecalculateTotals={(bill) =>
                       void runMutation(() => computeInvoiceTotals.mutateAsync(bill.id as string | number | bigint))
@@ -4683,8 +5244,23 @@ function AccountingClientReady({
                 customContent: (
                   <GeneralLedgerView
                     moves={allMoves}
-                    onImportMovesCsv={canImportCsv("accountMove") ? () => setCsvKind("accountMove") : undefined}
-                    onImportMoveLinesCsv={canImportCsv("accountMoveLine") ? () => setCsvKind("accountMoveLine") : undefined}
+                    onImportMovesCsv={canImportCsv("accountMove") ? openAccountingMoveImport : undefined}
+                    onImportOutstandingDocumentsCsv={
+                      canImportCsv("accountMove") && canImportCsv("accountMoveLine")
+                        ? openOutstandingDocumentImport
+                        : undefined
+                    }
+                    onImportHistoricalDocumentsForPaymentReplayCsv={
+                      HISTORICAL_PAYMENT_REPLAY_CALLABLE &&
+                      canImportCsv("accountMove") &&
+                      canImportCsv("accountMoveLine") &&
+                      checkPermission("account_move", "write").allowed &&
+                      checkPermission("payment_transaction", "read").allowed &&
+                      checkPermission("payment_reconciliation", "create").allowed
+                        ? openHistoricalDocumentPaymentReplayImport
+                        : undefined
+                    }
+                    onImportMoveLinesCsv={canImportCsv("accountMoveLine") ? openAccountingMoveLineImport : undefined}
                     onCreate={() => setQuickActionForm({ form: journalEntryFormConfig, action: "createMove" })}
                     onPostMove={(move) => postDraft(move)}
                     onCancelMove={(move) =>
@@ -5275,6 +5851,12 @@ function AccountingClientReady({
       matchEliminationEntries.mutateAsync,
       unmatchEliminationEntry.mutateAsync,
       addCsvToolbar,
+      openInvoiceCreate,
+      openBillCreate,
+      openAccountingMoveImport,
+      openAccountingMoveLineImport,
+      openOutstandingDocumentImport,
+      openHistoricalDocumentPaymentReplayImport,
       computeInvoiceTotals.isPending,
       operatingCompanyId,
       resolveConsolidationPeriodId,
@@ -5400,6 +5982,12 @@ function AccountingClientReady({
   return (
     <>
       {activeTabUsable && formDialog}
+      <AccountingSetupReadinessPanel
+        setup={accountingSetup}
+        action={readinessAction}
+        onResolve={handleReadinessResolve}
+        className="mb-4"
+      />
       <ModuleView
         config={config}
         data={data}
@@ -5552,17 +6140,77 @@ function AccountingClientReady({
 
       {csvKind && csvUsable && csvFormConfig ? (
         <CsvImportModal
-          trackedImport={{ companyId: operatingCompanyId }}
+          fileReader={readImportFile}
+          trackedImport={
+            csvKind === "accountMove" ||
+            csvKind === "outstandingDocuments" ||
+            csvKind === "historicalDocumentsForPaymentReplay"
+              ? undefined
+              : { companyId: operatingCompanyId }
+          }
           organizationId={orgId}
-          tableName={{ account: "account_account", accountMove: "account_move", accountMoveLine: "account_move_line", tax: "account_tax", budget: "crossovered_budget", budgetLine: "crossovered_budget_lines", analytic: "account_analytic_account" }[csvKind]}
+          abandonedAccountingCleanup={
+            (csvKind === "accountMove" ||
+              csvKind === "outstandingDocuments" ||
+              csvKind === "historicalDocumentsForPaymentReplay") &&
+            operatingCompanyId > 0n &&
+            checkPermission("account_move", "delete").allowed
+              ? {
+                  companyId: operatingCompanyId,
+                  authorized: true,
+                  pendingJobId: cleanupAbandonedImport.isPending
+                    ? String(cleanupAbandonedImport.variables ?? "")
+                    : null,
+                  onCleanup: (parentJobId) =>
+                    cleanupAbandonedImport.mutateAsync(parentJobId),
+                }
+              : undefined
+          }
+          tableName={{
+            account: "account_account",
+            accountMove: "account_move_line",
+            outstandingDocuments: "account_move_line",
+            historicalDocumentsForPaymentReplay: "account_move_line",
+            accountMoveLine: "account_move_line",
+            tax: "account_tax",
+            budget: "crossovered_budget",
+            budgetLine: "crossovered_budget_lines",
+            analytic: "account_analytic_account",
+          }[csvKind]}
           key={csvKind}
           onClose={() => setCsvKind(null)}
           config={csvFormConfig}
-          columns={CSV_IMPORT_CONTRACTS[csvKind === "tax" ? "taxRate" : csvKind === "analytic" ? "analyticAccount" : csvKind]}
-          templateFileName={`accounting-${csvKind}-import-template.csv`}
+          columns={
+            csvKind === "accountMove"
+              ? ACCOUNT_MOVE_BUNDLE_COLUMNS
+              : csvKind === "outstandingDocuments"
+                ? OUTSTANDING_DOCUMENT_IMPORT_COLUMNS
+                : csvKind === "historicalDocumentsForPaymentReplay"
+                  ? HISTORICAL_PAYMENT_REPLAY_IMPORT_COLUMNS
+                  : CSV_IMPORT_CONTRACTS[
+                      csvKind === "tax"
+                        ? "taxRate"
+                        : csvKind === "analytic"
+                          ? "analyticAccount"
+                          : csvKind
+                    ]
+          }
+          templateFileName={
+            csvKind === "accountMove"
+              ? "accounting-journal-entry-with-lines-template.csv"
+              : csvKind === "outstandingDocuments"
+                ? "accounting-outstanding-invoices-and-bills-template.csv"
+                : csvKind === "historicalDocumentsForPaymentReplay"
+                  ? "accounting-historical-invoices-and-bills-payment-replay-template.csv"
+                  : `accounting-${csvKind}-import-template.csv`
+          }
           onImport={async (text) => {
             if (csvKind === "account") await csvImports.importAccount.mutateAsync(text)
-            else if (csvKind === "accountMove") await csvImports.importAccountMove.mutateAsync(text)
+            else if (csvKind === "accountMove") await importAccountMoveBundle(text)
+            else if (csvKind === "outstandingDocuments")
+              await importOutstandingDocuments(text, "cutover_open_residual")
+            else if (csvKind === "historicalDocumentsForPaymentReplay")
+              await importOutstandingDocuments(text, "reconstruct_original_total")
             else if (csvKind === "accountMoveLine") await csvImports.importAccountMoveLine.mutateAsync(text)
             else if (csvKind === "tax") await csvImports.importTaxRate.mutateAsync(text)
             else if (csvKind === "budget") await csvImports.importBudget.mutateAsync(text)
@@ -5648,7 +6296,7 @@ function AccountingClientReady({
         taxOptions={manualInvoiceOptions.invoice.taxes}
         productOptions={manualInvoiceOptions.invoice.products}
         paymentTermOptions={paymentTermSelectOptions.filter((option) => option.value !== "")}
-        onSave={async (params) => {
+        onSave={async (params: CreateManualAccountInvoiceParams) => {
           const outcome = await createManualInvoice.mutateAsync(params)
           if (outcome.kind === "converged" || outcome.kind === "already-applied") {
             await persistAccountMoveCustomFieldsExact(params.metadata, outcome.ref.id)
@@ -5678,7 +6326,7 @@ function AccountingClientReady({
         taxOptions={manualInvoiceOptions.bill.taxes}
         productOptions={manualInvoiceOptions.bill.products}
         paymentTermOptions={paymentTermSelectOptions.filter((option) => option.value !== "")}
-        onSave={async (params) => {
+        onSave={async (params: CreateManualAccountInvoiceParams) => {
           const outcome = await createManualInvoice.mutateAsync(params)
           if (outcome.kind === "converged" || outcome.kind === "already-applied") {
             await persistAccountMoveCustomFieldsExact(params.metadata, outcome.ref.id)

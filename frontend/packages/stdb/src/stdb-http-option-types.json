@@ -772,6 +772,9 @@
   "ApplyExpenseAdvanceParams": {
     "metadata": "string"
   },
+  "ApplyHistoricalPaymentAllocationsParams": {
+    "metadata": "string"
+  },
   "ApplyOmnichannelAllocationParams": {
     "preferred_route_id": "u64",
     "channel": "string",
@@ -1180,9 +1183,13 @@
     "metadata": "string"
   },
   "CountryPackDefinition": {
+    "effective_from": "timestamp",
+    "effective_to": "timestamp",
     "metadata": "string"
   },
   "CountryPackTaxRule": {
+    "effective_from": "timestamp",
+    "effective_to": "timestamp",
     "metadata": "string"
   },
   "CreateAccountAccountParams": {
@@ -2007,6 +2014,11 @@
     "invoice_payment_term_id": "u64",
     "ref": "string",
     "payment_reference": "string",
+    "metadata": "string"
+  },
+  "CreateManualInvoiceParams": {
+    "invoice_date_due": "timestamp",
+    "ref": "string",
     "metadata": "string"
   },
   "CreateMessageBatchParams": {

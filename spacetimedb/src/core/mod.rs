@@ -1,3 +1,4 @@
+mod alpha_admission;
 pub mod audit;
 pub mod auth;
 /// `core` — Foundation & Infrastructure

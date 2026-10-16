@@ -20,6 +20,8 @@ mod password_resets;
 mod profiles;
 mod schema;
 mod service_identities;
+mod workos;
+pub use workos::insert_workos_identity;
 
 pub use credentials::{
     attach_workos_subject, find_user_credential_by_email, find_user_credential_by_platform_id,
@@ -27,7 +29,8 @@ pub use credentials::{
     insert_user_credential, replace_password_hash,
 };
 pub use password_resets::{
-    consume_password_reset_token, find_password_reset_token, insert_password_reset_token,
+    complete_password_reset, consume_password_reset_token, find_password_reset_token,
+    insert_password_reset_token,
 };
 pub use profiles::{
     find_user_profile_by_platform_id, find_user_profile_by_stdb_identity, update_user_email,

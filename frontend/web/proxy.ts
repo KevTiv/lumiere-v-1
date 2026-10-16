@@ -1,5 +1,7 @@
-import { NextResponse } from 'next/server'
-import type { NextRequest } from 'next/server'
+import { workOsRedirectUri } from './lib/workos-config'
+import { authkit, handleAuthkitHeaders } from '@workos-inc/authkit-nextjs'
+import { isWorkOsEnabled } from './lib/auth-mode'
+import { NextResponse, NextRequest } from 'next/server'
 import { requiresPrivatePageLogin } from './lib/private-release-policy'
 
 /**
@@ -30,8 +32,24 @@ function isAuthenticated(request: NextRequest): boolean {
   return false
 }
 
-export function proxy(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
+
+  if (isWorkOsEnabled()) {
+    // Preserve the custom pathname marker while AuthKit strips forged internal headers,
+    // verifies/refreshes the sealed browser session, and propagates its response cookies.
+    const headers = new Headers(request.headers)
+    headers.set('x-lumiere-pathname', pathname)
+    const forwarded = new NextRequest(request, { headers })
+    const result = await authkit(forwarded, { redirectUri: workOsRedirectUri() })
+    const privatePage = requiresPrivatePageLogin(pathname, process.env.NODE_ENV === 'production', Boolean(result.session.user))
+    const response = handleAuthkitHeaders(forwarded, result.headers, privatePage ? {
+      redirect: new URL(`/sign-in?callbackUrl=${encodeURIComponent(pathname)}`, workOsRedirectUri()),
+    } : {})
+    response.headers.set('Cache-Control', 'private, no-store')
+    response.headers.set('X-Robots-Tag', 'noindex, nofollow, noarchive')
+    return response
+  }
 
   // Allow all API routes - authentication is handled in route handlers
   // This supports both cookies (web) and Bearer tokens (Expo/mobile)

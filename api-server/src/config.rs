@@ -31,6 +31,7 @@ pub struct Config {
     pub projection_lag_budget_secs: u64,
     /// When set, password auth routes return 410 (same as Next.js + WorkOS).
     pub workos_client_id: Option<String>,
+    pub workos_auth: Option<crate::session::workos::WorkosAuthConfig>,
     /// AES-256 key for `stdb_token_enc` (32 bytes, 64 hex chars). Required for password auth.
     pub stdb_credential_encryption_key: Option<[u8; 32]>,
     pub resend_api_key: Option<String>,
@@ -282,6 +283,9 @@ impl Config {
             .ok()
             .filter(|s| !s.trim().is_empty());
 
+        let workos_auth =
+            crate::session::workos::WorkosAuthConfig::from_env(workos_client_id.as_deref())?;
+
         let stdb_credential_encryption_key = std::env::var("STDB_CREDENTIAL_ENCRYPTION_KEY")
             .ok()
             .and_then(|h| {
@@ -417,6 +421,7 @@ impl Config {
             ai_gateway_url,
             projection_lag_budget_secs,
             workos_client_id,
+            workos_auth,
             stdb_credential_encryption_key,
             resend_api_key,
             resend_from_email,

@@ -2,7 +2,7 @@
 
 import { useCallback, useMemo, useState } from "react"
 import { useTranslation } from "@lumiere/i18n"
-import { assertCsvSafeForAi, parseCsvText } from "@lumiere/erp-shared/csv-import-safety"
+import { assertCsvSafeForAi } from "@lumiere/erp-shared/csv-import-safety"
 import {
   useAnalyzeImportMapping,
   usePreviewImportMapping,
@@ -14,12 +14,22 @@ import { useProducts } from "@lumiere/query-hooks/hooks/inventory"
 import {
   templatesForEntity,
   useDeleteImportMappingTemplate,
+  useFinalizeImportAssistantJob,
   useImportMappingTemplates,
   useSaveImportMappingTemplate,
   type ImportMappingTemplateRow,
 } from "@lumiere/query-hooks/hooks/import-mapping-templates"
 import {
+  jobsForEntity,
+  useImportJobErrors,
+  useImportJobs,
+  useRollbackImportJob,
+  type ImportJobErrorRow,
+  type ImportJobRow,
+} from "@lumiere/query-hooks/hooks/import-jobs"
+import {
   FormModal,
+  ImportJobStatusPanel,
   ImportMappingTable,
   ImportPreviewGrid,
   mappingRecordFromAnalysis,
@@ -32,7 +42,6 @@ import { phCapture } from "@/lib/posthog-browser"
 import {
   defaultDuplicateActions,
   detectImportDuplicates,
-  filterCsvForImport,
   type ImportDuplicateAction,
   type ImportDuplicateRowState,
 } from "@/lib/import-duplicate-detection"
@@ -42,8 +51,18 @@ import {
   wizardEntityByKey,
   type ImportEntityOption,
 } from "@/lib/import-entities"
+import {
+  buildMappedImportCsv,
+  filterMappingForHeaders,
+  readImportFile,
+} from "@/lib/import-spreadsheet-file"
+import { previewAllImportRows } from "@/lib/import-preview-batches"
 
 type WizardStep = "upload" | "analyze" | "map" | "preview" | "import"
+
+function importJobCount(job: ImportJobRow, camel: keyof ImportJobRow, snake: keyof ImportJobRow) {
+  return Number(job[camel] ?? job[snake] ?? 0)
+}
 
 export type GuidedImportWizardProps = {
   organizationId: number
@@ -57,7 +76,10 @@ export function GuidedImportWizard({ organizationId }: GuidedImportWizardProps) 
   const preview = usePreviewImportMapping()
   const saveTemplate = useSaveImportMappingTemplate(orgId)
   const deleteTemplate = useDeleteImportMappingTemplate(orgId)
+  const finalizeImport = useFinalizeImportAssistantJob(orgId)
+  const rollbackImport = useRollbackImportJob(orgId)
   const templatesQuery = useImportMappingTemplates(orgId)
+  const importJobsQuery = useImportJobs(orgId)
   const contactsQuery = useContacts(orgId)
   const productsQuery = useProducts(orgId)
 
@@ -66,6 +88,9 @@ export function GuidedImportWizard({ organizationId }: GuidedImportWizardProps) 
   const [csvText, setCsvText] = useState("")
   const [headers, setHeaders] = useState<string[]>([])
   const [rows, setRows] = useState<string[][]>([])
+  const [sourceFileName, setSourceFileName] = useState("")
+  const [sourceFormat, setSourceFormat] = useState<"csv" | "xlsx">("csv")
+  const [sourceSheetName, setSourceSheetName] = useState<string | undefined>()
   const [analysis, setAnalysis] = useState<ImportAnalyzeResponse | null>(null)
   const [mapping, setMapping] = useState<Record<string, string>>({})
   const [previewResult, setPreviewResult] = useState<ImportPreviewResponse | null>(null)
@@ -78,6 +103,9 @@ export function GuidedImportWizard({ organizationId }: GuidedImportWizardProps) 
   const [appliedTemplateId, setAppliedTemplateId] = useState<string | null>(null)
   const [saveTemplateOpen, setSaveTemplateOpen] = useState(false)
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
+  const [importedJobId, setImportedJobId] = useState<string | null>(null)
+  const [rollbackConfirmId, setRollbackConfirmId] = useState<string | null>(null)
+  const importErrorsQuery = useImportJobErrors(orgId, importedJobId != null)
 
   const entityOption = wizardEntityByKey(wizardKey) ?? wizardEntityByKey("contact")!
   const targetEntity = entityOption.tableName
@@ -87,10 +115,28 @@ export function GuidedImportWizard({ organizationId }: GuidedImportWizardProps) 
     targetEntity,
   )
   const selectedTemplate = selectedTemplateRow(entityTemplates, selectedTemplateId)
+  const entityJobs = useMemo(
+    () =>
+      jobsForEntity(
+        (importJobsQuery.data ?? []) as unknown as ImportJobRow[],
+        targetEntity,
+        5,
+      ),
+    [importJobsQuery.data, targetEntity],
+  )
+  const activeJob = useMemo(
+    () =>
+      importedJobId
+        ? ((importJobsQuery.data ?? []) as unknown as ImportJobRow[]).find(
+            (job) => String(job.id ?? "") === importedJobId,
+          )
+        : undefined,
+    [importJobsQuery.data, importedJobId],
+  )
 
   const stepLabel = useMemo(() => {
     const labels: Record<WizardStep, string> = {
-      upload: t("settings.import.stepUpload", "1. Upload CSV"),
+      upload: t("settings.import.stepUpload", "1. Upload file"),
       analyze: t("settings.import.stepAnalyze", "2. Analyze columns"),
       map: t("settings.import.stepMap", "3. Map columns"),
       preview: t("settings.import.stepPreview", "4. Preview"),
@@ -151,6 +197,8 @@ export function GuidedImportWizard({ organizationId }: GuidedImportWizardProps) 
     setError(null)
     setSelectedTemplateId(null)
     setAppliedTemplateId(null)
+    setImportedJobId(null)
+    setRollbackConfirmId(null)
     analyze.reset()
     preview.reset()
   }, [analyze, preview])
@@ -162,29 +210,41 @@ export function GuidedImportWizard({ organizationId }: GuidedImportWizardProps) 
       setCsvText("")
       setHeaders([])
       setRows([])
+      setSourceFileName("")
+      setSourceFormat("csv")
+      setSourceSheetName(undefined)
     },
     [resetFlow],
   )
 
-  const onFile = useCallback(async (file: File | null) => {
-    if (!file) return
-    setError(null)
-    resetFlow()
-    try {
-      const text = await file.text()
-      const parsed = parseCsvText(text)
-      assertCsvSafeForAi(parsed.headers, parsed.rows.slice(0, 50))
-      setCsvText(text)
-      setHeaders(parsed.headers)
-      setRows(parsed.rows)
-      setStep("upload")
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
-      setCsvText("")
-      setHeaders([])
-      setRows([])
-    }
-  }, [resetFlow])
+  const onFile = useCallback(
+    async (file: File | null) => {
+      if (!file) return
+      const templateId = selectedTemplateId
+      setError(null)
+      resetFlow()
+      setSelectedTemplateId(templateId)
+      try {
+        const parsed = await readImportFile(file)
+        assertCsvSafeForAi(parsed.headers, parsed.rows.slice(0, 50))
+        setCsvText(parsed.csvText)
+        setHeaders(parsed.headers)
+        setRows(parsed.rows)
+        setSourceFileName(file.name)
+        setSourceFormat(parsed.format)
+        setSourceSheetName(parsed.sheetName)
+        setStep("upload")
+      } catch (e) {
+        setError(e instanceof Error ? e.message : String(e))
+        setCsvText("")
+        setHeaders([])
+        setRows([])
+        setSourceFileName("")
+        setSourceSheetName(undefined)
+      }
+    },
+    [resetFlow, selectedTemplateId],
+  )
 
   const applyTemplateMapping = useCallback(
     (templateId: string | null) => {
@@ -192,10 +252,16 @@ export function GuidedImportWizard({ organizationId }: GuidedImportWizardProps) 
       const template = selectedTemplateRow(entityTemplates, templateId)
       const prior = priorMappingsFromTemplate(template)
       if (!prior) return
-      setMapping(prior)
+      const compatible = filterMappingForHeaders(prior, headers)
+      setMapping(compatible)
       setAppliedTemplateId(templateId)
+      setStatus(
+        t("settings.import.templateApplied", "Applied {{count}} saved column mappings.", {
+          count: Object.keys(compatible).length,
+        }),
+      )
     },
-    [analysis, entityTemplates],
+    [analysis, entityTemplates, headers, t],
   )
 
   const runAnalyze = useCallback(async () => {
@@ -205,19 +271,22 @@ export function GuidedImportWizard({ organizationId }: GuidedImportWizardProps) 
     setPreviewResult(null)
     setDuplicateStates([])
     setStep("analyze")
-    setAppliedTemplateId(selectedTemplateId)
     try {
-      const priorMappings = priorMappingsFromTemplate(selectedTemplate)
+      const priorMappings = filterMappingForHeaders(
+        priorMappingsFromTemplate(selectedTemplate) ?? {},
+        headers,
+      )
       const result = await analyze.mutateAsync({
         targetEntity,
         headers,
         sampleRows: rows.slice(0, 50),
         csvText,
-        ...(priorMappings ? { priorMappings } : {}),
+        ...(Object.keys(priorMappings).length > 0 ? { priorMappings } : {}),
       })
       setAnalysis(result)
+      setAppliedTemplateId(Object.keys(priorMappings).length > 0 ? selectedTemplateId : null)
       setMapping(
-        priorMappings && Object.keys(priorMappings).length > 0
+        Object.keys(priorMappings).length > 0
           ? priorMappings
           : mappingRecordFromAnalysis(result),
       )
@@ -239,13 +308,10 @@ export function GuidedImportWizard({ organizationId }: GuidedImportWizardProps) 
     setStatus(null)
     setConfirmImportWithErrors(false)
     try {
-      const result = await preview.mutateAsync({
-        targetEntity,
-        headers,
-        rows,
-        mapping,
-        maxRows: 25,
-      })
+      const result = await previewAllImportRows(
+        { targetEntity, headers, rows, mapping },
+        (batch) => preview.mutateAsync(batch),
+      )
       setPreviewResult(result)
       const duplicates = detectImportDuplicates({
         entity: entityOption,
@@ -265,9 +331,21 @@ export function GuidedImportWizard({ organizationId }: GuidedImportWizardProps) 
     () => (previewResult?.validation_errors ?? []).filter((item) => item.severity === "error"),
     [previewResult],
   )
+  const previewWarnings = previewResult?.warnings.length ?? 0
+  const duplicateSkipCount = duplicateStates.filter((item) => item.action === "skip").length
+  const mappedColumnCount = Object.values(mapping).filter((value) => value !== "__skip__").length
 
   const runImport = useCallback(async () => {
     if (!csvText.trim()) return
+    if (!previewResult || previewResult.rows.length !== rows.length) {
+      setError(
+        t(
+          "settings.import.fullPreviewRequired",
+          "Every source row must pass preview before import. Run preview again.",
+        ),
+      )
+      return
+    }
     if (previewErrors.length > 0 && !confirmImportWithErrors) {
       setError(
         t(
@@ -285,10 +363,7 @@ export function GuidedImportWizard({ organizationId }: GuidedImportWizardProps) 
       const skipRows = new Set(
         duplicateStates.filter((item) => item.action === "skip").map((item) => item.rowIndex),
       )
-      const importCsv =
-        skipRows.size > 0
-          ? filterCsvForImport({ csvText, headers, rows, skipRowIndexes: skipRows })
-          : csvText
+      const importCsv = buildMappedImportCsv(headers, rows, mapping, skipRows)
 
       const importRes = await fetch(`/api/import/${targetEntity}`, {
         method: "POST",
@@ -313,6 +388,45 @@ export function GuidedImportWizard({ organizationId }: GuidedImportWizardProps) 
         )
       }
 
+      const jobId = importJson.record.id
+      setImportedJobId(jobId)
+      setStep("import")
+      setStatus(
+        t("settings.import.done", "Imported {{count}} rows.", {
+          count: importJson.rowsImported ?? 0,
+        }),
+      )
+
+      try {
+        await finalizeImport.mutateAsync({
+          jobId: BigInt(jobId),
+          templateId: appliedTemplateId ? BigInt(appliedTemplateId) : null,
+          metadata: {
+            source_file_name: sourceFileName,
+            source_format: sourceFormat,
+            source_sheet_name: sourceSheetName ?? null,
+            source_rows: rows.length,
+            previewed_rows: previewResult?.rows.length ?? 0,
+            preview_errors: previewErrors.length,
+            preview_warnings: previewResult?.warnings.length ?? 0,
+            duplicates_skipped: skipRows.size,
+            mapping,
+          },
+        })
+      } catch (finalizeError) {
+        setError(
+          t(
+            "settings.import.reconciliationMetadataFailed",
+            "The import completed, but its reconciliation details could not be attached: {{message}}",
+            {
+              message:
+                finalizeError instanceof Error ? finalizeError.message : String(finalizeError),
+            },
+          ),
+        )
+      }
+      await Promise.all([importJobsQuery.refetch(), importErrorsQuery.refetch()])
+
       phCapture("ai_import_completed", {
         entity: targetEntity,
         rows_imported: importJson.rowsImported ?? 0,
@@ -320,12 +434,6 @@ export function GuidedImportWizard({ organizationId }: GuidedImportWizardProps) 
         duplicates_skipped: skipRows.size,
         template_id: appliedTemplateId,
       })
-      setStep("import")
-      setStatus(
-        t("settings.import.done", "Imported {{count}} rows.", {
-          count: importJson.rowsImported ?? 0,
-        }),
-      )
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
     } finally {
@@ -336,9 +444,17 @@ export function GuidedImportWizard({ organizationId }: GuidedImportWizardProps) 
     confirmImportWithErrors,
     csvText,
     duplicateStates,
+    finalizeImport,
     headers,
+    importErrorsQuery,
+    importJobsQuery,
+    mapping,
+    previewResult,
     previewErrors.length,
     rows,
+    sourceFileName,
+    sourceFormat,
+    sourceSheetName,
     targetEntity,
     t,
   ])
@@ -373,6 +489,24 @@ export function GuidedImportWizard({ organizationId }: GuidedImportWizardProps) 
       prev.map((item) => (item.rowIndex === rowIndex ? { ...item, action } : item)),
     )
   }, [])
+
+  const handleRollback = useCallback(async () => {
+    if (!activeJob?.id) return
+    const jobId = String(activeJob.id)
+    if (rollbackConfirmId !== jobId) {
+      setRollbackConfirmId(jobId)
+      return
+    }
+    setError(null)
+    try {
+      await rollbackImport.mutateAsync(BigInt(jobId))
+      setRollbackConfirmId(null)
+      setStatus(t("settings.import.rollbackComplete", "Import rolled back."))
+      await Promise.all([importJobsQuery.refetch(), importErrorsQuery.refetch()])
+    } catch (rollbackError) {
+      setError(rollbackError instanceof Error ? rollbackError.message : String(rollbackError))
+    }
+  }, [activeJob, importErrorsQuery, importJobsQuery, rollbackConfirmId, rollbackImport, t])
 
   return (
     <div className="rounded-lg border p-4 space-y-4" data-testid="guided-import-wizard">
@@ -430,15 +564,35 @@ export function GuidedImportWizard({ organizationId }: GuidedImportWizardProps) 
         </label>
 
         <label className="text-sm space-y-1">
-          <span className="block text-muted-foreground">{t("settings.import.file", "CSV file")}</span>
+          <span className="block text-muted-foreground">
+            {t("settings.import.file", "CSV or Excel file")}
+          </span>
           <input
             type="file"
-            accept=".csv,text/csv"
+            accept=".csv,.xlsx,.xls,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
             onChange={(e) => void onFile(e.target.files?.[0] ?? null)}
             data-testid="guided-import-file"
           />
         </label>
       </div>
+
+      {sourceFileName ? (
+        <div className="rounded border bg-muted/30 p-3 text-sm" data-testid="guided-import-source-summary">
+          <span className="font-medium">{sourceFileName}</span>
+          <span className="ml-2 text-muted-foreground">
+            {sourceFormat.toUpperCase()}
+            {sourceSheetName ? ` · ${sourceSheetName}` : ""} · {rows.length}{" "}
+            {t("settings.import.dataRows", "data rows")}
+          </span>
+        </div>
+      ) : (
+        <p className="text-xs text-muted-foreground">
+          {t(
+            "settings.import.fileHint",
+            "Use CSV or .xlsx. For older .xls workbooks, save a copy as .xlsx first.",
+          )}
+        </p>
+      )}
 
       {selectedTemplateId ? (
         <div className="flex gap-2">
@@ -456,6 +610,23 @@ export function GuidedImportWizard({ organizationId }: GuidedImportWizardProps) 
 
       {step === "map" && analysis ? (
         <div data-testid="guided-import-mapping">
+          <div className="mb-3 grid gap-2 text-sm sm:grid-cols-3">
+            <div className="rounded border p-2">
+              <span className="text-muted-foreground">
+                {t("settings.import.sourceColumns", "Source columns")}: {headers.length}
+              </span>
+            </div>
+            <div className="rounded border p-2">
+              <span className="text-muted-foreground">
+                {t("settings.import.mappedColumns", "Mapped columns")}: {mappedColumnCount}
+              </span>
+            </div>
+            <div className="rounded border p-2">
+              <span className="text-muted-foreground">
+                {t("settings.import.unmappedRequired", "Unmapped target fields")}: {analysis.unmapped_target_fields.length}
+              </span>
+            </div>
+          </div>
           <ImportMappingTable
             headers={headers}
             analysis={analysis}
@@ -478,7 +649,28 @@ export function GuidedImportWizard({ organizationId }: GuidedImportWizardProps) 
 
       {step === "preview" && previewResult ? (
         <div className="space-y-4" data-testid="guided-import-preview">
-          <ImportPreviewGrid preview={previewResult} />
+          <div className="rounded-md border p-3" data-testid="guided-import-reconciliation">
+            <p className="mb-2 text-sm font-medium">
+              {t("settings.import.reconciliation", "Pre-import reconciliation")}
+            </p>
+            <div className="grid gap-2 text-sm sm:grid-cols-2 lg:grid-cols-5">
+              <div><span className="text-muted-foreground">{t("settings.import.sourceRows", "Source rows")}:</span> {rows.length}</div>
+              <div><span className="text-muted-foreground">{t("settings.import.previewRows", "Previewed")}:</span> {previewResult.rows.length}</div>
+              <div><span className="text-muted-foreground">{t("settings.import.previewErrors", "Errors")}:</span> {previewErrors.length}</div>
+              <div><span className="text-muted-foreground">{t("settings.import.previewWarnings", "Warnings")}:</span> {previewWarnings}</div>
+              <div><span className="text-muted-foreground">{t("settings.import.rowsToImport", "Rows to import")}:</span> {Math.max(0, rows.length - duplicateSkipCount)}</div>
+            </div>
+          </div>
+          <ImportPreviewGrid preview={{ ...previewResult, rows: previewResult.rows.slice(0, 25) }} />
+          {previewResult.rows.length > 25 ? (
+            <p className="text-xs text-muted-foreground">
+              {t(
+                "settings.import.previewDisplayLimit",
+                "All {{count}} rows were validated; the table shows the first 25.",
+                { count: previewResult.rows.length },
+              )}
+            </p>
+          ) : null}
           {duplicateStates.length > 0 ? (
             <div className="space-y-2" data-testid="guided-import-duplicates">
               <p className="text-sm font-medium text-amber-700">
@@ -575,6 +767,124 @@ export function GuidedImportWizard({ organizationId }: GuidedImportWizardProps) 
 
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
       {status ? <p className="text-sm text-muted-foreground">{status}</p> : null}
+
+      {importedJobId ? (
+        <div className="space-y-2" data-testid="guided-import-result">
+          {activeJob ? (
+            <ImportJobStatusPanel
+              job={activeJob}
+              errors={(importErrorsQuery.data ?? []) as ImportJobErrorRow[]}
+              isLoading={importJobsQuery.isLoading || importErrorsQuery.isLoading}
+              fileName={
+                String(activeJob.fileName ?? activeJob.file_name ?? "") ||
+                sourceFileName ||
+                undefined
+              }
+              onRollback={() => void handleRollback()}
+              isRollbackPending={rollbackImport.isPending}
+            />
+          ) : (
+            <p className="rounded border p-3 text-sm text-muted-foreground">
+              {t(
+                "settings.import.jobRefreshing",
+                "Import job #{{id}} is complete. Refreshing its reconciliation record…",
+                { id: importedJobId },
+              )}
+            </p>
+          )}
+          {rollbackConfirmId ? (
+            <div className="flex flex-wrap items-center gap-2 rounded border border-destructive/40 p-3 text-sm">
+              <span>
+                {t(
+                  "settings.import.rollbackConfirm",
+                  "Rollback removes every record created by this import. Confirm rollback?",
+                )}
+              </span>
+              <Button
+                type="button"
+                variant="destructive"
+                size="sm"
+                disabled={rollbackImport.isPending}
+                onClick={() => void handleRollback()}
+              >
+                {t("settings.import.confirmRollback", "Confirm rollback")}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setRollbackConfirmId(null)}
+              >
+                {t("common.cancel", "Cancel")}
+              </Button>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+
+      <div className="space-y-2" data-testid="guided-import-history">
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-sm font-medium">
+            {t("settings.import.recentImports", "Recent imports for this entity")}
+          </p>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            disabled={importJobsQuery.isFetching}
+            onClick={() => void importJobsQuery.refetch()}
+          >
+            {t("common.refresh", "Refresh")}
+          </Button>
+        </div>
+        {entityJobs.length > 0 ? (
+          <div className="overflow-x-auto rounded border text-xs">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b bg-muted/50 text-left">
+                  <th className="p-2">{t("settings.import.job", "Job")}</th>
+                  <th className="p-2">{t("settings.import.status", "Status")}</th>
+                  <th className="p-2">{t("settings.import.importedRows", "Imported")}</th>
+                  <th className="p-2">{t("settings.import.errorRows", "Errors")}</th>
+                  <th className="p-2">{t("settings.import.action", "Action")}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {entityJobs.map((job) => {
+                  const jobId = String(job.id ?? "")
+                  return (
+                    <tr key={jobId} className="border-b">
+                      <td className="p-2">#{jobId}</td>
+                      <td className="p-2">{String(job.status ?? "pending")}</td>
+                      <td className="p-2">
+                        {importJobCount(job, "importedRows", "imported_rows")}/
+                        {importJobCount(job, "totalRows", "total_rows")}
+                      </td>
+                      <td className="p-2">{importJobCount(job, "errorRows", "error_rows")}</td>
+                      <td className="p-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setImportedJobId(jobId)}
+                        >
+                          {t("settings.import.reviewJob", "Review")}
+                        </Button>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <p className="text-xs text-muted-foreground">
+            {importJobsQuery.isLoading
+              ? t("common.loading", "Loading…")
+              : t("settings.import.noRecentImports", "No tracked imports for this entity yet.")}
+          </p>
+        )}
+      </div>
 
       <FormModal
         open={saveTemplateOpen}

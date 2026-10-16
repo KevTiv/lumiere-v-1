@@ -407,11 +407,9 @@ fn covered_lines(released: &[ReleasedMigration]) -> Result<BTreeMap<String, Vec<
                     }
                     delta_statement.push_str(line.trim());
                     if line.trim_end().ends_with(';') {
-                        if let Some(line) = canonical_delta_statement(
-                            table,
-                            &delta_statement,
-                            migration.version,
-                        )? {
+                        if let Some(line) =
+                            canonical_delta_statement(table, &delta_statement, migration.version)?
+                        {
                             covered_table.push(line);
                         }
                         delta_statement.clear();
@@ -439,11 +437,7 @@ fn covered_lines(released: &[ReleasedMigration]) -> Result<BTreeMap<String, Vec<
 /// executable SQL, while compatibility checks compare their schema effects.
 /// A partial unique index on one nullable column is an authored invariant that
 /// has no schema-IR equivalent, so it is deliberately omitted from that shape.
-fn canonical_delta_statement(
-    table: &str,
-    statement: &str,
-    version: u32,
-) -> Result<Option<String>> {
+fn canonical_delta_statement(table: &str, statement: &str, version: u32) -> Result<Option<String>> {
     let normalized = statement.split_whitespace().collect::<Vec<_>>().join(" ");
     let alter_prefix = format!("ALTER TABLE {} ADD COLUMN IF NOT EXISTS ", quote(table));
     if let Some(definition) = normalized
@@ -504,6 +498,32 @@ fn canonical_columns<'a>(lines: &[&'a str]) -> Vec<&'a str> {
     columns
 }
 
+/// Column additions already owned by an explicit api-server migration.
+///
+/// These exact table/definition pairs are removed only from the comparison
+/// with the frozen generated baseline. Any later type, nullability, or name
+/// change still fails closed and requires another authored migration.
+fn is_authored_column_addition(table: &str, line: &str) -> bool {
+    matches!(
+        (table, line.strip_suffix(',').unwrap_or(line)),
+        (
+            "country_pack_definition",
+            "    \"acceptance_status\" TEXT NOT NULL"
+        ) | ("country_pack_definition", "    \"effective_from\" BIGINT")
+            | ("country_pack_definition", "    \"effective_to\" BIGINT")
+            | (
+                "country_pack_tax_rule",
+                "    \"pack_version\" TEXT NOT NULL"
+            )
+            | ("country_pack_tax_rule", "    \"effective_from\" BIGINT")
+            | ("country_pack_tax_rule", "    \"effective_to\" BIGINT")
+            | (
+                "company_country_pack",
+                "    \"pinned_pack_version\" TEXT NOT NULL"
+            )
+    )
+}
+
 /// The follow-up body for what `current` adds over `covered`, or an empty
 /// string when nothing is new.  Tables are processed in name order.
 ///
@@ -538,6 +558,10 @@ fn pending_delta_body(
             .partition(|line| is_index_line(line));
         let (now_columns, now_rest) = split_table_shape(now_shape);
         let (covered_columns, covered_rest) = split_table_shape(covered_shape);
+        let now_columns = now_columns
+            .into_iter()
+            .filter(|line| !is_authored_column_addition(table, line))
+            .collect::<Vec<_>>();
         if canonical_columns(&now_columns) != canonical_columns(&covered_columns)
             || now_rest != covered_rest
         {
@@ -1189,6 +1213,70 @@ mod tests {
     }
 
     #[test]
+    fn the_country_pack_version_pin_is_covered_by_the_authored_migration() {
+        let mut manifest = fixture_manifest();
+        manifest.tables[1].rust_name = "CompanyCountryPack".into();
+        manifest.tables[1].sql_name = "company_country_pack".into();
+        manifest.tables[1].indexes[0].name = "company_country_pack_organization_id".into();
+        let policies = serde_json::json!({"version": 1, "policies": [
+            policy("global", "snapshot-only", "none", None),
+            policy(
+                "company_country_pack",
+                "upsert-current",
+                "organization_index",
+                Some("organization_id")
+            ),
+        ]});
+        let baseline = emit_durable_migration(&manifest, &policies).unwrap().sql;
+        let ledger = ledger_from(&[(1, BASELINE, &baseline)], PENDING);
+        manifest.tables[1].columns.push(GeneratedColumn {
+            name: "pinned_pack_version".into(),
+            sql_name: "pinned_pack_version".into(),
+            ty: GeneratedType::String,
+            nullable: false,
+        });
+
+        let set = emit_durable_migrations(&manifest, &policies, &ledger).unwrap();
+
+        assert_eq!(set.migrations.len(), 1);
+        assert!(set.migrations[0].released);
+        assert!(set.manifest.contains("pinned_pack_version"));
+    }
+
+    #[test]
+    fn country_pack_authored_columns_are_exactly_scoped() {
+        for (table, definition) in [
+            (
+                "country_pack_definition",
+                "    \"acceptance_status\" TEXT NOT NULL,",
+            ),
+            ("country_pack_definition", "    \"effective_from\" BIGINT,"),
+            ("country_pack_definition", "    \"effective_to\" BIGINT,"),
+            (
+                "country_pack_tax_rule",
+                "    \"pack_version\" TEXT NOT NULL,",
+            ),
+            ("country_pack_tax_rule", "    \"effective_from\" BIGINT,"),
+            ("country_pack_tax_rule", "    \"effective_to\" BIGINT,"),
+            (
+                "company_country_pack",
+                "    \"pinned_pack_version\" TEXT NOT NULL,",
+            ),
+        ] {
+            assert!(is_authored_column_addition(table, definition));
+        }
+
+        assert!(!is_authored_column_addition(
+            "country_pack_definition",
+            "    \"acceptance_status\" TEXT,"
+        ));
+        assert!(!is_authored_column_addition(
+            "country_pack_tax_rule",
+            "    \"pack_version\" BIGINT NOT NULL,"
+        ));
+    }
+
+    #[test]
     fn an_authored_add_column_delta_covers_the_generated_shape() {
         let baseline = released_baseline(&fixture_manifest());
         let mut changed = fixture_manifest();
@@ -1231,7 +1319,9 @@ mod tests {
         .unwrap_err();
 
         assert!(
-            error.to_string().contains("outside its table block 'tenant'"),
+            error
+                .to_string()
+                .contains("outside its table block 'tenant'"),
             "{error}"
         );
     }
@@ -1319,7 +1409,7 @@ mod tests {
         );
         assert_eq!(
             (ledger.pending_version, ledger.pending_name.as_str()),
-            (16, "0016_durable_projection_delta")
+            (17, "0017_durable_projection_delta")
         );
     }
 }

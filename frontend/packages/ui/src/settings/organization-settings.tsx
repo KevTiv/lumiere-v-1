@@ -8,7 +8,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Switch } from "@/components/ui/switch"
 import { Badge } from "@/components/ui/badge"
 import { Textarea } from "@/components/ui/textarea"
 import { useToast } from "@/hooks/use-toast"
@@ -52,6 +51,7 @@ import {
 import { createCountryForm, createCurrencyForm } from "../lib/settings-platform-form-configs"
 import { useRBAC } from "@/lib/rbac-context"
 import { cn } from "@/lib/utils"
+import { CountryPackReadinessPanel } from "./country-pack-readiness-panel"
 
 type OrgMasterCsvKind =
   | "country"
@@ -136,15 +136,6 @@ export function OrganizationSettings() {
 
   const countryPackCatalog = useCountryPackCatalog(orgReady)
   const companyCountryPacks = useCompanyCountryPacks(selectedCompanyBigInt, orgReady && selectedCompanyBigInt > 0n)
-
-  const countryPackEnabledByKey = useMemo(() => {
-    const map = new Map<string, boolean>()
-    for (const row of companyCountryPacks.data ?? []) {
-      const key = String(row.packKey ?? (row as { pack_key?: string }).pack_key ?? "").toLowerCase()
-      if (key) map.set(key, Boolean(row.enabled))
-    }
-    return map
-  }, [companyCountryPacks.data])
 
   const legalNameDefaults = useMemo(
     () => ({ name: strVal(selectedCompany?.name) }),
@@ -727,90 +718,30 @@ export function OrganizationSettings() {
       ) : null}
 
       {orgReady && selectedCompanyId ? (
-        <Card>
-          <CardHeader>
-            <CardTitle>{t("settings.organization.countryPacks.cardTitle")}</CardTitle>
-            <CardDescription>{t("settings.organization.countryPacks.cardDescription")}</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4 max-w-xl">
-            {countryPackCatalog.isLoading || companyCountryPacks.isLoading ? (
-              <p className="text-sm text-muted-foreground">{t("common.loading")}</p>
-            ) : (countryPackCatalog.data ?? []).length === 0 ? (
-              <p className="text-sm text-muted-foreground">{t("settings.organization.countryPacks.emptyCatalog")}</p>
-            ) : (
-              <ul className="divide-y rounded-md border">
-                {(countryPackCatalog.data ?? []).map((pack) => {
-                  const packKey = String(
-                    pack.packKey ?? (pack as { pack_key?: string }).pack_key ?? "",
-                  ).toLowerCase()
-                  const countryCode = String(
-                    pack.countryCode ?? (pack as { country_code?: string }).country_code ?? "",
-                  )
-                  const region = String(pack.region ?? "")
-                  const enabled = countryPackEnabledByKey.get(packKey) ?? false
-                  const companyCountry = strVal(selectedCompany?.addressCountryCode)
-                  const countryMismatch =
-                    companyCountry.length > 0 &&
-                    countryCode.length > 0 &&
-                    companyCountry.toUpperCase() !== countryCode.toUpperCase()
-                  return (
-                    <li
-                      key={packKey}
-                      className="flex items-center justify-between gap-4 px-4 py-3"
-                    >
-                      <div className="min-w-0 space-y-1">
-                        <p className="text-sm font-medium">{pack.name}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {countryCode}
-                          {region ? ` · ${t("settings.organization.countryPacks.regionLabel", { region })}` : ""}
-                        </p>
-                        {countryMismatch ? (
-                          <p className="text-xs text-amber-600 dark:text-amber-500">
-                            {t("settings.organization.countryPacks.countryMismatch", {
-                              companyCountry,
-                              packCountry: countryCode,
-                            })}
-                          </p>
-                        ) : null}
-                      </div>
-                      <div className="flex shrink-0 items-center gap-2">
-                        <Badge variant={enabled ? "default" : "secondary"}>
-                          {enabled
-                            ? t("settings.organization.countryPacks.enabled")
-                            : t("settings.organization.countryPacks.disabled")}
-                        </Badge>
-                        <Switch
-                          checked={enabled}
-                          disabled={setCompanyCountryPack.isPending}
-                          onCheckedChange={(checked) => {
-                            void setCompanyCountryPack
-                              .mutateAsync({
-                                companyId: selectedCompanyBigInt,
-                                organizationId: orgId,
-                                packKey,
-                                enabled: checked,
-                              })
-                              .then(() =>
-                                toast({ title: t("settings.organization.countryPacks.toggleSuccess") }),
-                              )
-                              .catch((e: unknown) =>
-                                toast({
-                                  title: t("settings.organization.countryPacks.toggleError"),
-                                  description: e instanceof Error ? e.message : String(e),
-                                  variant: "destructive",
-                                }),
-                              )
-                          }}
-                          aria-label={pack.name}
-                        />
-                      </div>
-                    </li>
-                  )
-                })}
-              </ul>
-            )}
-          </CardContent>
-        </Card>
+        <CountryPackReadinessPanel
+          definitions={countryPackCatalog.data ?? []}
+          activations={companyCountryPacks.data ?? []}
+          companyCountryCode={strVal(selectedCompany?.addressCountryCode)}
+          isLoading={countryPackCatalog.isLoading || companyCountryPacks.isLoading}
+          isPending={setCompanyCountryPack.isPending}
+          onEnabledChange={async (packKey, enabled) => {
+            try {
+              await setCompanyCountryPack.mutateAsync({
+                companyId: selectedCompanyBigInt,
+                organizationId: orgId,
+                packKey,
+                enabled,
+              })
+              toast({ title: t("settings.organization.countryPacks.toggleSuccess") })
+            } catch (e) {
+              toast({
+                title: t("settings.organization.countryPacks.toggleError"),
+                description: e instanceof Error ? e.message : String(e),
+                variant: "destructive",
+              })
+            }
+          }}
+        />
       ) : null}
 
       {orgReady ? (

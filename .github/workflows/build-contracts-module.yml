@@ -8,6 +8,11 @@ on:
         required: false
         default: false
         type: boolean
+      alpha_founder_identities:
+        description: Exact comma-separated alpha founder SpacetimeDB identities compiled into the artifact
+        required: false
+        default: ''
+        type: string
 
 env:
   CONTRACTS_MODULE_ARTIFACT: contracts-module
@@ -30,12 +35,20 @@ jobs:
         with:
           targets: wasm32-unknown-unknown
 
+      - name: Fingerprint alpha admission policy
+        id: alpha-policy
+        env:
+          ALPHA_FOUNDER_IDENTITIES: ${{ inputs.alpha_founder_identities }}
+        run: |
+          policy_hash="$(printf '%s' "$ALPHA_FOUNDER_IDENTITIES" | sha256sum | cut -d ' ' -f 1)"
+          echo "digest=$policy_hash" >> "$GITHUB_OUTPUT"
+
       - name: Restore compiled contracts module
         id: contracts-module
         uses: actions/cache@v4
         with:
           path: .ci/contracts-module.wasm
-          key: contracts-module-v3-${{ inputs.production && 'production-lean' || 'development' }}-${{ runner.os }}-${{ hashFiles('spacetimedb/src/**', 'spacetimedb/tests/**', 'spacetimedb/assets/**', 'spacetimedb/Cargo.toml', 'spacetimedb/Cargo.lock', 'crates/presentation-core/src/**', 'crates/presentation-core/Cargo.toml') }}
+          key: contracts-module-v5-${{ inputs.production && 'production-lean' || 'development-fixtures' }}-${{ steps.alpha-policy.outputs.digest }}-${{ runner.os }}-${{ hashFiles('spacetimedb/src/**', 'spacetimedb/tests/**', 'spacetimedb/assets/**', 'spacetimedb/Cargo.toml', 'spacetimedb/Cargo.lock', 'crates/presentation-core/src/**', 'crates/presentation-core/Cargo.toml') }}
 
       - uses: Swatinem/rust-cache@v2
         if: steps.contracts-module.outputs.cache-hit != 'true'
@@ -49,11 +62,14 @@ jobs:
         if: steps.contracts-module.outputs.cache-hit != 'true'
         env:
           LUMIERE_ENABLE_DEV_REDUCERS: '0'
+          LUMIERE_ALPHA_FOUNDER_IDENTITIES: ${{ inputs.alpha_founder_identities }}
         run: |
           if [[ '${{ inputs.production }}' == 'true' ]]; then
             make contracts-module-production-ci
           else
-            make contracts-module-ci
+            # Development in-module tests intentionally create fixture tenants.
+            # The production branch never overrides the default denial above.
+            LUMIERE_ENABLE_DEV_REDUCERS=1 make contracts-module-ci
           fi
 
       - name: Export contracts module

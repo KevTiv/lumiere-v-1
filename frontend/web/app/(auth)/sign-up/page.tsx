@@ -12,9 +12,10 @@ import { Label } from "@lumiere/ui/components/label"
 import { redirectToWorkOsSignUp } from "@/app/actions/workos-auth"
 import { phCapture, phCaptureException, phIdentify } from "@/lib/posthog-browser"
 
-const useWorkOsAuth = Boolean(process.env.NEXT_PUBLIC_WORKOS_REDIRECT_URI)
+import { useWorkOsAuthMode } from '@/lib/auth-mode-context'
 
 export default function SignUpPage() {
+  const useWorkOsAuth = useWorkOsAuthMode()
   const { t } = useTranslation()
   const router = useRouter()
   const [email, setEmail] = useState("")

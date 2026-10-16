@@ -40,7 +40,7 @@ pub struct CompanyScopeParams {
 }
 
 /// Params for creating an organization.
-/// Scope: no scope param (any authenticated user can create an org).
+/// Scope: no scope param (server-approved alpha founders only).
 #[derive(SpacetimeType, Clone, Debug)]
 pub struct CreateOrganizationParams {
     pub name: String,
@@ -293,6 +293,18 @@ pub(crate) fn insert_organization_with_owner(
     ctx: &ReducerContext,
     params: CreateOrganizationParams,
 ) -> Result<(Organization, Role), String> {
+    let has_membership_history = ctx
+        .db
+        .user_organization()
+        .user_org_by_user()
+        .filter(&ctx.sender())
+        .next()
+        .is_some();
+    crate::core::alpha_admission::require_alpha_founder(
+        &ctx.sender().to_hex().to_string(),
+        has_membership_history,
+    )?;
+
     if params.name.is_empty() {
         return Err("Organization name cannot be empty".to_string());
     }
@@ -381,8 +393,8 @@ pub(crate) fn insert_organization_with_owner(
     Ok((org, owner_role))
 }
 
-/// Create a new top-level Organization. No permission check — any authenticated
-/// user can create an org (they become its first admin via the bootstrap below).
+/// Create a new top-level Organization for a server-approved alpha founder.
+/// Admission and the single-organization quota are enforced at the shared insert.
 #[spacetimedb::reducer]
 pub fn create_organization(
     ctx: &ReducerContext,

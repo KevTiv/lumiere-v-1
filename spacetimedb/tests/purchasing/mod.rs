@@ -1,5 +1,6 @@
 //! Purchasing domain test suite — invoke via `run_purchasing_*_test` reducers.
 pub mod gap_fixes_test;
+pub mod invoice_provenance_test;
 pub mod phase0_containment_test;
 pub mod phase0_fixture_test;
 pub mod phase1_landed_costs_test;
@@ -8,6 +9,7 @@ pub mod phase1_relational_integrity_test;
 pub mod phase1_returns_advanced_test;
 pub mod phase2_blanket_release_test;
 pub mod purchase_bill_test;
+pub mod strict_provenance_test;
 pub mod wave_e_test;
 
 use spacetimedb::ReducerContext;
@@ -15,7 +17,9 @@ use spacetimedb::ReducerContext;
 #[spacetimedb::reducer]
 pub fn run_purchasing_bill_balanced_test(ctx: &ReducerContext) -> Result<(), String> {
     purchase_bill_test::test_po_confirm_to_balanced_bill(ctx)
-        .map_err(|e| format!("po_confirm_to_balanced_bill: {e}"))
+        .map_err(|e| format!("po_confirm_to_balanced_bill: {e}"))?;
+    invoice_provenance_test::test_purchase_bill_exact_invoice_provenance(ctx)
+        .map_err(|e| format!("purchase_bill_exact_invoice_provenance: {e}"))
 }
 
 #[spacetimedb::reducer]
@@ -44,6 +48,12 @@ pub fn run_purchasing_wave_e_test(ctx: &ReducerContext) -> Result<(), String> {
         .map_err(|e| format!("company_isolation_on_receive_and_bill: {e}"))?;
     wave_e_test::test_price_match_blocks_post_invoice(ctx)
         .map_err(|e| format!("price_match_blocks_post_invoice: {e}"))?;
+    strict_provenance_test::test_strict_po_provenance_exact_source_post(ctx)
+        .map_err(|e| format!("strict_po_provenance_exact_source_post: {e}"))?;
+    strict_provenance_test::test_strict_po_provenance_rejections(ctx)
+        .map_err(|e| format!("strict_po_provenance_rejections: {e}"))?;
+    strict_provenance_test::test_strict_provenance_manual_vendor_bill(ctx)
+        .map_err(|e| format!("strict_provenance_manual_vendor_bill: {e}"))?;
     Ok(())
 }
 

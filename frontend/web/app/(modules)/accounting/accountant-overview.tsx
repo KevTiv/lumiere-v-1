@@ -86,7 +86,7 @@ export function AccountantOverview({ data, companyName, onNavigate, onCreateInvo
     return totals.map((total) => `${new Intl.NumberFormat(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(total.amount)} ${currencyLabel(total)}`).join(" · ")
   }
   function recordLink(row: OverviewRow, key: OverviewQueueKey): string | undefined {
-    if (["overdue", "draft-invoices", "draft-bills"].includes(key)) return invoiceRecordHref(row)
+    if (["overdue", "draft-invoices", "draft-bills"].includes(key)) return invoiceRecordHref({ id: row.id, moveType: row.moveType ?? row.move_type })
     if (key === "unlinked-payments" || key === "deadlines") {
       const tab = key === "deadlines" ? "tax-deadlines" : "payments"
       return `/accounting?tab=${tab}&filter=${encodeURIComponent(`id:${String(row.id)}`)}`
@@ -207,7 +207,7 @@ export function AccountantOverview({ data, companyName, onNavigate, onCreateInvo
       <div className="flex items-center justify-between gap-3 border-b px-5 py-4"><div><h3 id="accountant-recent-title" className="font-semibold">{tr("recent", "Recent invoices and bills")}</h3><p className="mt-1 text-xs text-muted-foreground">{tr("recentHint", "Open a document to review its details and next action.")}</p></div><FileText className="size-4 shrink-0 text-muted-foreground" /></div>
       <div className="px-5">{stateNotice(model.recent)}{model.recent.state.status === "ready" && (model.recent.rows.length === 0
         ? <p className="py-8 text-center text-sm text-muted-foreground">{tr("noRecent", "Your invoices and bills will appear here.")}</p>
-        : <div className="divide-y">{model.recent.rows.map((row) => <Link key={String(row.id)} href={invoiceRecordHref(row)!} className="flex items-center gap-3 py-4 transition-colors hover:bg-muted/40 focus-visible:outline-2 focus-visible:outline-ring">
+        : <div className="divide-y">{model.recent.rows.map((row) => <Link key={String(row.id)} href={invoiceRecordHref({ id: row.id, moveType: row.moveType ?? row.move_type })!} className="flex items-center gap-3 py-4 transition-colors hover:bg-muted/40 focus-visible:outline-2 focus-visible:outline-ring">
           <span className="hidden size-9 shrink-0 items-center justify-center rounded-lg border sm:flex"><FileText className="size-4 text-muted-foreground" /></span>
           <span className="min-w-0 flex-1"><span className="block truncate text-sm font-medium">{overviewLabel(row)}</span><span className="mt-1 block text-xs text-muted-foreground">{overviewDate(row) ? new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeZone: "UTC" }).format(overviewDate(row)!) : "—"}</span></span>
           <span className="max-w-[40%] break-words text-right text-sm tabular-nums">{recordAmount(row)}</span>

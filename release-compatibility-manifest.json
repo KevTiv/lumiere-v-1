@@ -5,21 +5,21 @@
     "ir_version": 2,
     "ir_path": "ir/lumiere-contract-ir-v2.json",
     "pin_path": "ir/PIN.json",
-    "artifact_sha256": "d429d78cadb3a4f36c1777345f9d49dfd947dccd924611911e259bb8ed246e89",
-    "schema_hash": "sha256:c29dc319f5d56e67c382db7406db241ce74ece4f8a3b8e589e2d4619ee449ffc",
-    "source_commit": "e2af96b57080b9278b28fd7fd4907a1af675be5c",
-    "source_repository": "https://github.com/KevTiv/lumiere-v-1.git"
+    "artifact_sha256": "7cc56b148646660b0c43d4b3332cb1855c273c84e09ef36eafad1ee5913a2152",
+    "schema_hash": "sha256:36d1b43549ff0991f639dbb8d14c1d21ab85009e32258e4ec6ca38dbaa4a1901",
+    "source_commit": "fe864a8311e2774484b3f96b384a8c04f892d0ec",
+    "source_repository": "https://github.com/KevTiv/lumiere-v-1"
   },
   "lumiere_contracts": {
     "package": "lumiere-contracts",
-    "version": "0.3.107",
-    "tag": "v0.3.107",
-    "revision": "83b393d76fe644167a1bb33150ec203291175452",
+    "version": "0.3.109",
+    "tag": "v0.3.109",
+    "revision": "9be60d086eb0b200b2ad4a7765c85bc2413e0bbc",
     "repository": "ssh://git@github.com/KevTiv/lumiere-contracts.git"
   },
   "operation_history": {
     "path": "lumiere-codegen/contract-operation-history.json",
-    "checksum": "sha256:8837b248b4cf28d7d67c7891d7cb5f2089d436c156128afd644bd418e8d93033"
+    "checksum": "sha256:586267cf4f675856237245ccbd72aca6189ce26b93554d2167255062dd2e65d8"
   },
   "stdb_module": {
     "name": "lumiere_v1",
@@ -35,8 +35,8 @@
     "manifest_path": "manifests/durable-pg-schema-manifest.json",
     "checksum": "sha256:5598834cc650011744abb9b9ad090e6ba09bfc824bc6d853f89f34930ef8d9ab",
     "application_catalog_path": "api-server/src/cold_tier/migrate.rs",
-    "application_catalog_version": 15,
-    "application_catalog_checksum": "sha256:fc38f99335fcdd24db80838f8eed41044deb415f01130814bfb62106414f4271"
+    "application_catalog_version": 16,
+    "application_catalog_checksum": "sha256:98e9830b005b4b6f7344756affb425d771d5fee0412569cf9fba66845c668642"
   },
   "services": {
     "api_server": {
@@ -51,10 +51,10 @@
   "minimum_client_contract": {
     "version": "ir-v2",
     "ir_version": 2,
-    "generated_contract_release": "0.3.107"
+    "generated_contract_release": "0.3.109"
   },
   "deployment": {
-    "config_generation": 3,
+    "config_generation": 4,
     "config_sources": [
       {
         "path": ".env.docker.example",
@@ -62,7 +62,7 @@
       },
       {
         "path": "frontend/web/.env.example",
-        "sha256": "33e8f8b976ceb57021eb8c3803d000a4a8909bb3a3caf9d0bdfe0d49d3f3902c"
+        "sha256": "428dbfae049111962c2bb0adf8c260bc61f4665ce2d0d5d95e02f904cbf98556"
       }
     ]
   }
