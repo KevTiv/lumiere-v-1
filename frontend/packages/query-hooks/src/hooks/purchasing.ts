@@ -32,7 +32,7 @@ import { invalidateQueryResources } from "./workflow"
 import {
   executePurchaseOrderCreation,
   keyedOperationU64,
-  purchaseOrderOncePayload,
+  toCreatePurchaseOrderOnceParams,
   purchaseOrderStorageKey,
   type PurchaseOrderCreationResult,
 } from "./purchasing-order-invocation"
@@ -318,7 +318,7 @@ export function useCreatePurchaseOrder(
       if (typeof window === "undefined" || typeof navigator === "undefined" || !navigator.locks) {
         throw new WorkflowError("validation", "This browser cannot safely coordinate purchase order retries")
       }
-      const payload = purchaseOrderOncePayload(params)
+      const payload = toCreatePurchaseOrderOnceParams(params)
       const read = (operationKey: string) => {
         const query = new URLSearchParams({ companyId: scopedCompanyId.toString(), operationKey })
         return fetchQueryList(`/api/query/purchase-order-creations?${query}`, "Cannot read canonical purchase order creation")

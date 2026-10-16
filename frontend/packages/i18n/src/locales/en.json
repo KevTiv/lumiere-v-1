@@ -6788,10 +6788,6 @@
         "title": "Approve supplier intake",
         "description": "Select the vendor to link to this supplier request. Approval requires a different person from the submitter.",
         "submit": "Approve supplier"
-      },
-      "rfqAward": {
-        "description": "Select an open RFQ and one of its submitted bids.",
-        "title": "Award RFQ bid"
       }
     },
     "ops": {
@@ -6800,6 +6796,7 @@
       "advancedTitle": "Advanced procurement",
       "approve": "Approve",
       "awardRfqBid": "Award RFQ bid",
+      "actingAs": "Acting as",
       "cannotSelfApprove": "Requester cannot approve their own request (SoD)",
       "confirmPurchaseReturn": "Confirm purchase return",
       "createBlanket": "Create blanket order",
@@ -6809,8 +6806,14 @@
       "createPurchaseReturn": "Create purchase return",
       "createRfq": "Create RFQ",
       "createVendorCredit": "Create vendor credit",
+      "delegationEnds": "Ends",
+      "delegationReason": "Reason",
+      "delegationStarts": "Starts",
+      "myself": "Myself",
       "noPendingApproval": "No pending approval request for this order.",
       "openInWorkflow": "Open in Workflow",
+      "selectPrincipal": "Select an eligible principal",
+      "selectPrincipalHelp": "Select a currently eligible principal before approving or rejecting.",
       "prompt": {
         "bidId": "Bid ID",
         "bidPriceUnit": "Bid unit price",

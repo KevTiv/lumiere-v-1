@@ -3,7 +3,7 @@ import test from "node:test"
 
 import {
   executePurchaseOrderCreation,
-  purchaseOrderOncePayload,
+  toCreatePurchaseOrderOnceParams,
   purchaseOrderStorageKey,
   type PendingPurchaseOrder,
 } from "./purchasing-order-invocation"
@@ -95,7 +95,7 @@ test("new PO creation probes capability, dispatches once, and requires exact rea
 })
 
 test("PO once payload uses exact SATS option and timestamp encoding", () => {
-  assert.deepEqual(purchaseOrderOncePayload({
+  assert.deepEqual(toCreatePurchaseOrderOnceParams({
     partnerId: 3n,
     currencyId: 4n,
     origin: "REQ-1",

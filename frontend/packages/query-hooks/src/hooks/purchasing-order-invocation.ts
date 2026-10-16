@@ -11,7 +11,7 @@ export function keyedOperationU64(value: ScalarId): number {
   return encoded.value
 }
 
-export function purchaseOrderOncePayload(params: {
+export function toCreatePurchaseOrderOnceParams(params: {
   partnerId: ScalarId; currencyId: ScalarId; origin?: unknown; partnerRef?: unknown; notes?: unknown
   datePlanned?: unknown; paymentTermId?: ScalarId | null; fiscalPositionId?: ScalarId | null; incotermId?: ScalarId | null
   incotermLocation?: unknown; isQuantityCopy?: unknown; metadata?: unknown
