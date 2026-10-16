@@ -30,6 +30,8 @@ import { useRBAC } from "../lib/rbac-context"
 import { exportDashboardToPng } from "../lib/export-dashboard-png"
 import { KpiStrip } from "../components/kpi-strip"
 import { filterRowsByKpi, activeKpiTile, toggleKpiKey, type KpiTileDef } from "../lib/kpi-tiles"
+import { WorkspaceNav } from "./workspace-nav"
+import { moduleTabHref } from "../lib/workspace-navigation"
 
 /** When set, tab create forms use STDB-merged {@link RuntimeFormModal} instead of static-only FormModal. */
 export interface ModuleViewRuntimeForms {
@@ -119,8 +121,8 @@ export function ModuleView({
     rawRouteTab && config.tabs.some((tab) => tab.id === rawRouteTab) ? rawRouteTab : null
   const [internalTab, setInternalTab] = useState(routeTab ?? defaultTab)
   useEffect(() => {
-    if (activeTabProp === undefined && routeTab) setInternalTab(routeTab)
-  }, [activeTabProp, routeTab])
+    if (activeTabProp === undefined) setInternalTab(routeTab ?? defaultTab)
+  }, [activeTabProp, routeTab, defaultTab])
   const [isHydrated, setIsHydrated] = useState(false)
   const activeTab = activeTabProp ?? internalTab
   const prevActiveTabRef = useRef<string | null>(null)
@@ -128,13 +130,9 @@ export function ModuleView({
     onActiveTabChange?.(v)
     if (activeTabProp !== undefined) return
     setInternalTab(v)
-    const params = new URLSearchParams(searchParams?.toString() ?? "")
-    // Record filters belong to the tab they were opened on.
-    params.delete("filter")
-    if (v === defaultTab) params.delete("tab")
-    else params.set("tab", v)
-    const query = params.toString()
-    router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false })
+    const href = moduleTabHref(pathname, searchParams?.toString() ?? "", v, defaultTab)
+    if (config.workspaceNav) router.push(href, { scroll: false })
+    else router.replace(href, { scroll: false })
   }
   const tabListRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
@@ -200,6 +198,16 @@ export function ModuleView({
       />
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className={"flex-col flex"}>
+        {config.workspaceNav ? (
+          <WorkspaceNav
+            moduleId={config.id}
+            tabs={config.tabs}
+            config={config.workspaceNav}
+            activeTab={activeTab}
+            onTabChange={setActiveTab}
+            hrefForTab={(tabId) => moduleTabHref(pathname, searchParams?.toString() ?? "", tabId, defaultTab)}
+          />
+        ) : (
         <div
           ref={tabListRef}
           className="-mx-1 overflow-x-auto px-1 pb-1 [scrollbar-width:thin]"
@@ -233,6 +241,7 @@ export function ModuleView({
           )}
         </TabsList>
         </div>
+        )}
 
         {config.tabs.map((tab) => (
           <TabsContent

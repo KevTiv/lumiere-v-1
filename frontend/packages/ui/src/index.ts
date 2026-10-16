@@ -125,6 +125,7 @@ export * from "./components/trend-badge";
 export * from "./components/kpi-strip";
 export * from "./lib/kpi-tiles";
 export * from "./pages/dashboard-sidebar";
+export * from "./pages/dashboard-workspace";
 export * from "./pages/dashboard-widget-renderer";
 export * from "./pages/stored-dashboard-view";
 export * from "./lib/dashboard-types";

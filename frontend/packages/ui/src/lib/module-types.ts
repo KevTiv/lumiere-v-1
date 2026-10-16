@@ -81,6 +81,22 @@ export interface ModuleConfig {
    * those before the first grouped tab lead the row, the rest trail it.
    */
   tabGroups?: ModuleTabGroup[]
+  /** Job-oriented navigation over the existing canonical tab IDs. */
+  workspaceNav?: ModuleWorkspaceNav
+}
+
+export interface ModuleWorkspace {
+  id: string
+  label: string
+  /** The first available tab is the workspace's landing destination. */
+  tabIds: readonly string[]
+}
+
+export interface ModuleWorkspaceNav {
+  label?: string
+  workspaces: readonly ModuleWorkspace[]
+  overflow?: readonly ModuleWorkspace[]
+  overflowLabel?: string
 }
 
 export interface ModuleTabGroup {

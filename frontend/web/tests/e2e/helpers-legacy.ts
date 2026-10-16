@@ -70,6 +70,10 @@ export async function gotoModule(page: Page, route: string, moduleId?: string) {
 
 /** Select a module tab and wait until its panel is the active interaction surface. */
 export async function selectModuleTab(page: Page, moduleId: string, tabId: string) {
+  if (moduleId === "accounting") {
+    await openAccountingTab(page, tabId)
+    return
+  }
   const tab = page.getByTestId(`module-tab-${moduleId}-${tabId}`)
   await tab.click()
   await expect(tab).toHaveAttribute("aria-selected", "true")
@@ -95,7 +99,18 @@ export async function openEntityCreate(
 }
 
 export async function openAccountingTab(page: Page, tabId: string) {
-  await page.getByTestId(`module-tab-accounting-${tabId}`).click()
+  // Accounting exposes the current workspace's views, rather than all views
+  // simultaneously. Use its supported deep link so domain-flow tests can reach
+  // advanced views without depending on the navigation's grouping or labels.
+  const target = new URL("/accounting", page.url())
+  if (tabId !== "dashboard") target.searchParams.set("tab", tabId)
+  await page.goto(target.toString())
+  const moduleView = page.getByTestId("module-view-accounting")
+  await expect(moduleView).toBeVisible()
+  await expect(moduleView).toHaveAttribute("data-hydrated", "true")
+  await expect(page.getByTestId(`module-tab-accounting-${tabId}`)).toHaveAttribute("aria-selected", "true")
+  await expect(page.locator('[role="tabpanel"]:visible')).toHaveCount(1)
+  await expectNoAppError(page)
 }
 
 /** Click each module tab in order, assert no app error, optionally run per-tab checks. */
@@ -106,7 +121,8 @@ export async function assertModuleTabs(
   assertTab?: (page: Page, tabId: string) => Promise<void>,
 ) {
   for (const tabId of tabIds) {
-    await page.getByTestId(`module-tab-${moduleId}-${tabId}`).click()
+    if (moduleId === "accounting") await openAccountingTab(page, tabId)
+    else await page.getByTestId(`module-tab-${moduleId}-${tabId}`).click()
     await expectNoAppError(page)
     if (assertTab) {
       await assertTab(page, tabId)
@@ -371,9 +387,12 @@ export async function openTabAndCancelCreate(
   tabId: string,
   formId: string,
 ) {
-  const tab = page.getByTestId(`module-tab-${moduleId}-${tabId}`)
-  await tab.click()
-  await expect(tab).toHaveAttribute("aria-selected", "true")
+  if (moduleId === "accounting") await openAccountingTab(page, tabId)
+  else {
+    const tab = page.getByTestId(`module-tab-${moduleId}-${tabId}`)
+    await tab.click()
+    await expect(tab).toHaveAttribute("aria-selected", "true")
+  }
   // The tab switch also updates ?tab=, which can re-render the panel; click
   // (unlike scrollIntoViewIfNeeded) re-resolves a replaced element.
   const createBtn = page.getByTestId(`module-create-${moduleId}-${tabId}`)
@@ -1834,7 +1853,7 @@ export async function postDraftCreditNoteMove(page: Page, creditNoteId: number):
 /** @deprecated Use {@link postDraftCreditNoteMove} — credit notes are not listed on journal entries. */
 export async function postDraftCreditNoteViaGl(page: Page, partnerName: string): Promise<void> {
   await gotoModule(page, "/accounting", "accounting")
-  await page.getByTestId("module-tab-accounting-invoices").click()
+  await openAccountingTab(page, "invoices")
   const rows = activeTabCustomTableRows(page).filter({ hasText: partnerName })
   await expect(rows.first()).toBeVisible({ timeout: 30_000 })
 
@@ -1955,7 +1974,7 @@ export async function openInvoiceDetailModalFromRecordSheet(page: Page): Promise
 /** Open invoice detail and post draft via accounting invoices tab. */
 export async function postDraftInvoiceViaUi(page: Page, moveId: number): Promise<number> {
   await gotoModule(page, "/accounting", "accounting")
-  await page.getByTestId("module-tab-accounting-invoices").click()
+  await openAccountingTab(page, "invoices")
   await selectCustomTableRowById(page, moveId)
   await openInvoiceDetailModalFromRecordSheet(page)
 
@@ -1974,12 +1993,12 @@ export async function postDraftInvoiceViaUi(page: Page, moveId: number): Promise
 /** Open one exact draft vendor bill in the accounting Bills tab. */
 async function openDraftVendorBillModal(page: Page, billId: number): Promise<void> {
   await gotoModule(page, "/accounting", "accounting")
-  await page.getByTestId("module-tab-accounting-bills").click()
+  await openAccountingTab(page, "bills")
   // The bill projection is available through the API before the accounting
   // list's query cache necessarily sees it. Rebuild the page once after the
   // tab is active so all procure-to-pay row-visibility flows use fresh data.
   await page.reload({ waitUntil: "domcontentloaded" })
-  await page.getByTestId("module-tab-accounting-bills").click()
+  await openAccountingTab(page, "bills")
   await selectCustomTableRowById(page, billId)
   await openInvoiceDetailModalFromRecordSheet(page)
   await expect(page.getByTestId("invoice-detail-post-draft")).toBeVisible({ timeout: 15_000 })
@@ -2582,7 +2601,7 @@ export async function expectMailMessageForRecord(
 
 export async function openFiscalSetupWizard(page: Page) {
   await gotoModule(page, "/accounting", "accounting")
-  await page.getByTestId("module-tab-accounting-fiscal-years").click()
+  await openAccountingTab(page, "fiscal-years")
   await page.getByTestId("entity-action-fy-setup-wizard").click()
   await expect(page.getByTestId("form-modal-fiscal-setup-wizard")).toBeVisible()
 }

@@ -17,7 +17,6 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import {
@@ -32,8 +31,6 @@ import {
   Plus,
   MoreHorizontal,
   Eye,
-  Download,
-  Trash2,
   Filter,
   CreditCard,
   Calculator,
@@ -45,7 +42,6 @@ import { TablePager, usePagedRows } from "../components/table-pager"
 import { accountingListStatusBadgeClass } from "../lib/theme-colors"
 import type { AccountMove } from "../lib/accounting-types"
 import {
-  microsSinceEpochToDate,
   moveStateIsDraft,
   moveTypeIsInvoiceOrRefund,
   stbEnumTag,
@@ -54,6 +50,8 @@ import { useTranslation } from "@lumiere/i18n"
 import { EmptyStateCard } from "../components/empty-state-card"
 import { decideListEmptyState } from "../lib/list-empty-state"
 import { useRBAC } from "../lib/rbac-context"
+import { accountingCurrencySummaries, accountingDocumentHref, accountingListMoney, accountingListStatus, accountingSummaryValue, matchesAccountingListFilters, type AccountingListDisplayProps } from "./accounting-list-display"
+import { AccountingListFilters, AccountingListSummary } from "./accounting-list-summary"
 
 type BillStatus = "draft" | "pending" | "approved" | "partial" | "paid" | "overdue" | "cancelled"
 
@@ -68,20 +66,7 @@ const statusConfig: Record<BillStatus, { labelKey: string; pillClass: string }> 
 }
 
 function getBillStatus(move: AccountMove): BillStatus {
-  // Typed account-move reads expose algebraic enums as tagged objects (for
-  // example `{ tag: "Draft" }`), while legacy rows may still be strings.
-  // Normalize both representations before deriving the badge/filter status.
-  const state = stbEnumTag(move.state)
-  const paymentState = stbEnumTag(move.paymentState)
-  if (state === "Cancelled") return "cancelled"
-  if (moveStateIsDraft(move.state)) return "draft"
-  if (paymentState === "Paid") return "paid"
-  if ((move.amountResidual ?? 0) > 0 && move.invoiceDateDue) {
-    const due = microsSinceEpochToDate(move.invoiceDateDue)
-    if (due != null && due < new Date()) return "overdue"
-  }
-  if (paymentState === "InPayment") return "partial"
-  return "pending"
+  return accountingListStatus(move, "bill") as BillStatus
 }
 
 function formatTimestamp(ts?: { microsSinceUnixEpoch: bigint } | null): string {
@@ -90,10 +75,7 @@ function formatTimestamp(ts?: { microsSinceUnixEpoch: bigint } | null): string {
   return new Date(ms).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
 }
 
-const formatCurrency = (v: number) =>
-  new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(v)
-
-interface BillsListViewProps {
+interface BillsListViewProps extends AccountingListDisplayProps {
   bills: AccountMove[]
   onSelectBill?: (bill: AccountMove) => void
   onCreateBill?: () => void
@@ -107,6 +89,9 @@ export function BillsListView({
   onCreateBill,
   onPayBill,
   onRecalculateTotals,
+  currencyOptions = [],
+  initialFilters = {},
+  onInitialFilterClear,
 }: BillsListViewProps) {
   const { t } = useTranslation()
   const [searchQuery, setSearchQuery] = useState("")
@@ -126,16 +111,16 @@ export function BillsListView({
       const matchesTile =
         tileFilter == null ||
         (tileFilter === "pending" ? ["pending", "approved", "partial"].includes(status) : status === tileFilter)
-      return matchesSearch && matchesStatus && matchesTile
+      return matchesSearch && matchesStatus && matchesTile && matchesAccountingListFilters(bill, initialFilters, "bill")
     })
     // Newest first, matching EntityTable's default (auto-inc ids only increase).
     .sort((a, b) => Number(b.id) - Number(a.id))
-  const pager = usePagedRows(filtered, `${searchQuery}|${statusFilter}|${tileFilter}`)
+  const pager = usePagedRows(filtered, `${searchQuery}|${statusFilter}|${tileFilter}|${JSON.stringify(initialFilters)}`)
   const emptyKind = decideListEmptyState({
     totalRows: bills.length,
     visibleRows: filtered.length,
     search: searchQuery,
-    filters: { status: statusFilter === "all" ? undefined : statusFilter, tile: tileFilter ?? undefined },
+    filters: { ...initialFilters, status: statusFilter === "all" ? undefined : statusFilter, tile: tileFilter ?? undefined },
   })
 
   const stats = {
@@ -143,9 +128,8 @@ export function BillsListView({
     paid: bills.filter((b) => getBillStatus(b) === "paid").length,
     pending: bills.filter((b) => ["pending", "approved", "partial"].includes(getBillStatus(b))).length,
     overdue: bills.filter((b) => getBillStatus(b) === "overdue").length,
-    totalAmount: bills.reduce((s, b) => s + (b.amountTotal ?? 0), 0),
-    totalDue: bills.reduce((s, b) => s + (b.amountResidual ?? 0), 0),
   }
+  const currencySummaries = accountingCurrencySummaries(bills, currencyOptions)
 
   return (
     <div className="space-y-6">
@@ -164,28 +148,29 @@ export function BillsListView({
               setStatusFilter("all")
             },
           })),
-          { key: "billed", label: t("accounting.bills.totalBilled"), value: formatCurrency(stats.totalAmount), active: false },
-          { key: "owed", label: t("accounting.bills.amountOwed"), value: formatCurrency(stats.totalDue), active: false },
+          { key: "billed", label: t("accounting.bills.totalBilled"), value: accountingSummaryValue(currencySummaries, "total"), active: false },
+          { key: "owed", label: t("accounting.bills.amountOwed"), value: accountingSummaryValue(currencySummaries, "residual"), active: false },
         ]}
       />
+      <AccountingListSummary groups={currencySummaries} />
 
       {/* Table */}
       <Card>
         <CardHeader className="pb-4">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-wrap items-center justify-between gap-3">
             <CardTitle>{t("accounting.bills.title")}</CardTitle>
-            <Button onClick={onCreateBill} className="gap-2"><Plus className="h-4 w-4" />{t("accounting.actions.newBill")}</Button>
+            {canCreate && onCreateBill ? <Button onClick={onCreateBill} className="gap-2"><Plus className="h-4 w-4" />{t("accounting.actions.newBill")}</Button> : null}
           </div>
-          <div className="flex items-center gap-4 mt-4">
-            <div className="relative flex-1 max-w-sm">
+          <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center">
+            <div className="relative min-w-0 flex-1 sm:max-w-sm">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input placeholder={t("accounting.bills.searchPlaceholder")} value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-10" />
+              <Input aria-label={t("accounting.bills.searchPlaceholder")} placeholder={t("accounting.bills.searchPlaceholder")} value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-10" />
             </div>
             <Select value={statusFilter} onValueChange={(v) => {
               setStatusFilter(v as BillStatus | "all")
               setTileFilter(null)
             }}>
-              <SelectTrigger className="w-[150px]">
+              <SelectTrigger className="w-full sm:w-[160px]" aria-label={t("accounting.journalEntries.state")}>
                 <Filter className="h-4 w-4 mr-2" /><SelectValue placeholder={t("accounting.journalEntries.state")} />
               </SelectTrigger>
               <SelectContent>
@@ -200,9 +185,10 @@ export function BillsListView({
               </SelectContent>
             </Select>
           </div>
+          <AccountingListFilters initialFilters={initialFilters} onInitialFilterClear={onInitialFilterClear} />
         </CardHeader>
         <CardContent>
-          <Table>
+          <Table className="min-w-[760px]">
             <TableHeader>
               <TableRow>
                 <TableHead>{t("accounting.bills.billNumber")}</TableHead>
@@ -246,6 +232,7 @@ export function BillsListView({
                             setSearchQuery("")
                             setStatusFilter("all")
                             setTileFilter(null)
+                            onInitialFilterClear?.("*")
                           },
                         }}
                       />
@@ -255,37 +242,38 @@ export function BillsListView({
               ) : pager.pageRows.map((bill) => {
                 const status = getBillStatus(bill)
                 const conf = statusConfig[status]
+                const canPay = onPayBill && stbEnumTag(bill.state).toLowerCase() === "posted" && (bill.amountResidual ?? 0) > 0
                 return (
                   <TableRow
                     key={String(bill.id)}
                     data-testid={`entity-row-${bill.id}`}
-                    className="cursor-pointer hover:bg-muted/50"
+                    className={cn("hover:bg-muted/50", onSelectBill && "cursor-pointer")}
                     onClick={() => onSelectBill?.(bill)}
                   >
-                    <TableCell className="font-medium">{bill.name}</TableCell>
+                    <TableCell className="font-medium"><a href={accountingDocumentHref(bill)} onClick={(event) => event.stopPropagation()} className="rounded-sm underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">{bill.name || `#${bill.id}`}</a></TableCell>
                     <TableCell>
                       <p className="font-medium">{bill.invoicePartnerDisplayName ?? `Partner #${bill.partnerId}`}</p>
                     </TableCell>
                     <TableCell>{formatTimestamp(bill.invoiceDate)}</TableCell>
                     <TableCell>{formatTimestamp(bill.invoiceDateDue)}</TableCell>
-                    <TableCell className="font-medium">{formatCurrency(bill.amountTotal ?? 0)}</TableCell>
+                    <TableCell className="font-medium tabular-nums">{accountingListMoney(bill.amountTotal, bill, currencyOptions)}</TableCell>
                     <TableCell>
                       <span className={cn("font-medium", (bill.amountResidual ?? 0) > 0 ? "text-foreground" : "text-success")}>
-                        {formatCurrency(bill.amountResidual ?? 0)}
+                        {accountingListMoney(bill.amountResidual, bill, currencyOptions)}
                       </span>
                     </TableCell>
                     <TableCell>
                       <Badge className={cn("font-medium", conf.pillClass)}>{t(conf.labelKey as any)}</Badge>
                     </TableCell>
                     <TableCell>
-                      <DropdownMenu>
+                      {(onSelectBill || onRecalculateTotals && moveStateIsDraft(bill.state) && moveTypeIsInvoiceOrRefund(bill.moveType) || canPay) ? <DropdownMenu>
                         <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                          <Button variant="ghost" size="icon" className="h-8 w-8"><MoreHorizontal className="h-4 w-4" /></Button>
+                          <Button variant="ghost" size="icon" className="h-8 w-8" aria-label={`Actions for ${bill.name || bill.id}`}><MoreHorizontal className="h-4 w-4" /></Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onSelectBill?.(bill) }}>
+                          {onSelectBill ? <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onSelectBill(bill) }}>
                             <Eye className="h-4 w-4 mr-2" />{t("accounting.invoices.invoiceActions.viewDetails")}
-                          </DropdownMenuItem>
+                          </DropdownMenuItem> : null}
                           {onRecalculateTotals &&
                             moveStateIsDraft(bill.state) &&
                             moveTypeIsInvoiceOrRefund(bill.moveType) && (
@@ -299,16 +287,13 @@ export function BillsListView({
                                 {t("accounting.bills.billActions.recalculateTotals")}
                               </DropdownMenuItem>
                             )}
-                          {(bill.amountResidual ?? 0) > 0 && (
+                          {canPay && (
                             <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onPayBill?.(bill) }}>
                               <CreditCard className="h-4 w-4 mr-2" />{t("accounting.bills.billActions.payBill")}
                             </DropdownMenuItem>
                           )}
-                          <DropdownMenuItem><Download className="h-4 w-4 mr-2" />{t("accounting.bills.billActions.download")}</DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem className="text-destructive"><Trash2 className="h-4 w-4 mr-2" />{t("common.delete")}</DropdownMenuItem>
                         </DropdownMenuContent>
-                      </DropdownMenu>
+                      </DropdownMenu> : null}
                     </TableCell>
                   </TableRow>
                 )

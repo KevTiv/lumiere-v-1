@@ -29,6 +29,7 @@ import {
   fetchFulfillmentPickingIdBySaleOrderId,
   fillField,
   gotoModule,
+  openAccountingTab,
   isoDate,
   openEntityCreate,
   openSettingsSection,
@@ -383,17 +384,17 @@ test.describe("MVP lead-to-cash workflow", { tag: "@p0" }, () => {
     })
 
     await gotoModule(page, "/accounting", "accounting")
-    await page.getByTestId("module-tab-accounting-invoices").click()
+    await openAccountingTab(page, "invoices")
     await expectSeededText(page, leadName, "/api/query/account-moves")
     await page.reload({ waitUntil: "domcontentloaded" })
     await gotoModule(page, "/accounting", "accounting")
-    await page.getByTestId("module-tab-accounting-invoices").click()
+    await openAccountingTab(page, "invoices")
     await expectSeededText(page, leadName, "/api/query/account-moves")
 
     // Step 11 — create payment → post → register on invoice (UI)
     const { partnerId, amountTotal, currencyId } = await fetchInvoiceMoveDetails(page, moveId)
 
-    await page.getByTestId("module-tab-accounting-payments").click()
+    await openAccountingTab(page, "payments")
     await page.getByTestId("module-create-accounting-payments").click()
     await expect(page.getByTestId("form-modal-new-account-payment")).toBeVisible()
     await chooseSelectOptionByValue(page, "partnerId", partnerId)

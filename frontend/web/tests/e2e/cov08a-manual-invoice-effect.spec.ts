@@ -62,7 +62,7 @@ test.describe(
         })
       }, browserRequestUuid)
 
-      await page.getByTestId("quick-action-create_invoice").click()
+      await page.getByTestId("accountant-overview").getByRole("button", { name: "New invoice", exact: true }).click()
       await expect(page.getByTestId("create-invoice-modal")).toBeVisible()
       await fillManualInvoice(page, description)
 
@@ -164,7 +164,7 @@ test.describe(
           value: () => value,
         })
       }, browserRequestUuid)
-      await page.getByTestId("quick-action-create_invoice").click()
+      await page.getByTestId("accountant-overview").getByRole("button", { name: "New invoice", exact: true }).click()
       await fillManualInvoice(page, description)
       let replayDispatches = 0
       const countReplay = (request: Request) => {

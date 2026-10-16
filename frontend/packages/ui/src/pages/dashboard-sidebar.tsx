@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useContext, useEffect, useMemo } from "react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
@@ -19,6 +19,8 @@ import {
 } from "lucide-react"
 import { buildNavGroups, type NavGroup } from "../lib/navigation-catalog"
 import { isFirstOrgSurfaceAdmitted } from "../lib/product-surface-catalog"
+import { Sidebar, SidebarProvider, useSidebar } from "../components/sidebar"
+import { DashboardWorkspaceContext } from "./dashboard-workspace"
 
 interface DashboardSidebarProps {
   forceCollapsed?: boolean
@@ -50,7 +52,14 @@ function sidebarUserInitials(label: string): string {
   return words.slice(0, 2).map((word) => word[0]!.toUpperCase()).join("")
 }
 
-export function DashboardSidebar({
+export function DashboardSidebar(props: DashboardSidebarProps) {
+  const inWorkspace = useContext(DashboardWorkspaceContext)
+  return inWorkspace ? <DashboardSidebarContent {...props} /> : (
+    <SidebarProvider><DashboardSidebarContent {...props} /></SidebarProvider>
+  )
+}
+
+function DashboardSidebarContent({
   forceCollapsed,
   onOpenJournal,
   onOpenNotebook,
@@ -60,13 +69,20 @@ export function DashboardSidebar({
   onSignOut,
   userProfile,
 }: DashboardSidebarProps) {
-  const [collapsed, setCollapsed] = useState(false)
+  const { state, isMobile, toggleSidebar, setOpenMobile } = useSidebar()
   const { checkPermission, currentUser, roles, isAdmin } = useRBAC()
   const pathname = usePathname()
   const router = useRouter()
   const { t } = useTranslation()
-  const isCollapsed = forceCollapsed || collapsed
+  const isCollapsed = !isMobile && (forceCollapsed || state === "collapsed")
   const userLabel = sidebarUserLabel(userProfile) || currentUser?.name?.trim() || ""
+
+  useEffect(() => { setOpenMobile(false) }, [pathname, setOpenMobile])
+
+  const runQuickAction = (action: () => void) => {
+    setOpenMobile(false)
+    action()
+  }
 
   const userIsAdmin = isAdmin()
   const navGroups = useMemo(
@@ -85,22 +101,17 @@ export function DashboardSidebar({
   }
 
   return (
-    <aside
-      data-testid="dashboard-sidebar"
-      className={cn(
-        "h-screen bg-sidebar border-r border-sidebar-border flex flex-col transition-[width] duration-200",
-        isCollapsed ? "w-16" : "w-64"
-      )}
-    >
-      <div className="flex h-14 items-center justify-between border-b border-sidebar-border px-3">
+    <Sidebar collapsible="icon" variant="sidebar">
+    <aside id="dashboard-navigation" data-testid="dashboard-sidebar" className="flex h-full min-h-0 flex-col bg-sidebar">
+      <div className="flex h-14 shrink-0 items-center justify-between border-b border-sidebar-border px-3">
         {!isCollapsed && (
           <span className="truncate text-sm font-semibold tracking-[-0.01em] text-sidebar-foreground">{t("nav.erpSystem")}</span>
         )}
         <Button
           variant="ghost"
           size="icon"
-          onClick={() => setCollapsed(!collapsed)}
-          aria-label={isCollapsed ? "Expand navigation" : "Collapse navigation"}
+          onClick={toggleSidebar}
+          aria-label={isMobile ? t("workspaceShell.closeNavigation", { defaultValue: "Close navigation" }) : isCollapsed ? t("workspaceShell.expandNavigation", { defaultValue: "Expand navigation" }) : t("workspaceShell.collapseNavigation", { defaultValue: "Collapse navigation" })}
           className="text-sidebar-foreground hover:bg-sidebar-accent"
         >
           {isCollapsed ? <Menu className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
@@ -134,6 +145,9 @@ export function DashboardSidebar({
                       href={item.href}
                       data-testid={`sidebar-link-${item.href.replace(/^\//, "")}`}
                       title={isCollapsed ? item.label : undefined}
+                      aria-label={isCollapsed ? item.label : undefined}
+                      aria-current={active ? "page" : undefined}
+                      onClick={() => setOpenMobile(false)}
                       onMouseEnter={() => router.prefetch(item.href)}
                       className={cn(
                         "relative w-full flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring/20",
@@ -189,7 +203,7 @@ export function DashboardSidebar({
         {onOpenJournal && quickActionIsVisible("journal") && (
           <button
             type="button"
-            onClick={onOpenJournal}
+            onClick={() => runQuickAction(onOpenJournal)}
             title="Open Journal"
             aria-label="Open Journal"
             className={cn(
@@ -208,7 +222,7 @@ export function DashboardSidebar({
         {onOpenNotebook && quickActionIsVisible("notebook") && (
           <button
             type="button"
-            onClick={onOpenNotebook}
+            onClick={() => runQuickAction(onOpenNotebook)}
             title="Open Notebook"
             aria-label="Open Notebook"
             className={cn(
@@ -227,7 +241,7 @@ export function DashboardSidebar({
         {onOpenAIChat && quickActionIsVisible("ai-assistant") && (
           <button
             type="button"
-            onClick={onOpenAIChat}
+            onClick={() => runQuickAction(onOpenAIChat)}
             title="Open AI Assistant"
             aria-label="Open AI Assistant"
             data-testid="sidebar-open-ai-chat"
@@ -270,6 +284,7 @@ export function DashboardSidebar({
               isCollapsed && "px-0 justify-center",
             )}
             title={isCollapsed ? t("nav.signOut") : undefined}
+            aria-label={t("nav.signOut")}
             onClick={() => {
               void onSignOut()
             }}
@@ -281,5 +296,6 @@ export function DashboardSidebar({
         ) : null}
       </div>
     </aside>
+    </Sidebar>
   )
 }

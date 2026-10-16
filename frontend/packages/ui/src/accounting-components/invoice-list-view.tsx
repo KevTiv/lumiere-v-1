@@ -17,7 +17,6 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import {
@@ -32,9 +31,6 @@ import {
   Plus,
   MoreHorizontal,
   Eye,
-  Send,
-  Download,
-  Trash2,
   Filter,
   Calculator,
 } from "lucide-react"
@@ -45,7 +41,6 @@ import { TablePager, usePagedRows } from "../components/table-pager"
 import { accountingListStatusBadgeClass } from "../lib/theme-colors"
 import type { AccountMove } from "../lib/accounting-types"
 import {
-  microsSinceEpochToDate,
   moveStateIsDraft,
   moveTypeIsInvoiceOrRefund,
 } from "../lib/accounting-move-utils"
@@ -53,6 +48,8 @@ import { useTranslation } from "@lumiere/i18n"
 import { EmptyStateCard } from "../components/empty-state-card"
 import { decideListEmptyState } from "../lib/list-empty-state"
 import { useRBAC } from "../lib/rbac-context"
+import { accountingCurrencySummaries, accountingDocumentHref, accountingListMoney, accountingListStatus, accountingSummaryValue, matchesAccountingListFilters, type AccountingListDisplayProps } from "./accounting-list-display"
+import { AccountingListFilters, AccountingListSummary } from "./accounting-list-summary"
 
 // State display mapping
 type DisplayStatus = "draft" | "sent" | "partial" | "paid" | "overdue" | "cancelled"
@@ -67,19 +64,7 @@ const statusConfig: Record<DisplayStatus, { labelKey: string; pillClass: string 
 }
 
 function getMoveStatus(move: AccountMove): DisplayStatus {
-  const state = String(move.state)
-  const paymentState = String(move.paymentState)
-
-  if (state === "Cancelled") return "cancelled"
-  if (state === "Draft") return "draft"
-  if (paymentState === "Paid") return "paid"
-  if (paymentState === "InPayment") return "partial"
-  if ((move.amountResidual ?? 0) > 0 && move.invoiceDateDue) {
-    const due = microsSinceEpochToDate(move.invoiceDateDue)
-    if (due != null && due < new Date()) return "overdue"
-  }
-  if (paymentState === "Partial") return "partial"
-  return "sent"
+  return accountingListStatus(move, "invoice") as DisplayStatus
 }
 
 function formatTimestamp(ts?: { microsSinceUnixEpoch?: bigint | number } | number | null): string {
@@ -93,10 +78,7 @@ function formatTimestamp(ts?: { microsSinceUnixEpoch?: bigint | number } | numbe
   return new Date(ms).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
 }
 
-const formatCurrency = (amount: number) =>
-  new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(amount)
-
-interface InvoiceListViewProps {
+interface InvoiceListViewProps extends AccountingListDisplayProps {
   invoices: AccountMove[]
   onSelectInvoice?: (invoice: AccountMove) => void
   onCreateInvoice?: () => void
@@ -108,6 +90,9 @@ export function InvoiceListView({
   onSelectInvoice,
   onCreateInvoice,
   onRecalculateTotals,
+  currencyOptions = [],
+  initialFilters = {},
+  onInitialFilterClear,
 }: InvoiceListViewProps) {
   const { t } = useTranslation()
   const [searchQuery, setSearchQuery] = useState("")
@@ -126,16 +111,16 @@ export function InvoiceListView({
       const matchesStatus = statusFilter === "all" || status === statusFilter
       const matchesTile =
         tileFilter == null || (tileFilter === "pending" ? ["sent", "partial"].includes(status) : status === tileFilter)
-      return matchesSearch && matchesStatus && matchesTile
+      return matchesSearch && matchesStatus && matchesTile && matchesAccountingListFilters(inv, initialFilters, "invoice")
     })
     // Newest first, matching EntityTable's default (auto-inc ids only increase).
     .sort((a, b) => Number(b.id) - Number(a.id))
-  const pager = usePagedRows(filtered, `${searchQuery}|${statusFilter}|${tileFilter}`)
+  const pager = usePagedRows(filtered, `${searchQuery}|${statusFilter}|${tileFilter}|${JSON.stringify(initialFilters)}`)
   const emptyKind = decideListEmptyState({
     totalRows: invoices.length,
     visibleRows: filtered.length,
     search: searchQuery,
-    filters: { status: statusFilter === "all" ? undefined : statusFilter, tile: tileFilter ?? undefined },
+    filters: { ...initialFilters, status: statusFilter === "all" ? undefined : statusFilter, tile: tileFilter ?? undefined },
   })
 
   const stats = {
@@ -143,9 +128,8 @@ export function InvoiceListView({
     paid: invoices.filter((i) => getMoveStatus(i) === "paid").length,
     pending: invoices.filter((i) => ["sent", "partial"].includes(getMoveStatus(i))).length,
     overdue: invoices.filter((i) => getMoveStatus(i) === "overdue").length,
-    totalAmount: invoices.reduce((s, i) => s + (i.amountTotal ?? 0), 0),
-    totalDue: invoices.reduce((s, i) => s + (i.amountResidual ?? 0), 0),
   }
+  const currencySummaries = accountingCurrencySummaries(invoices, currencyOptions)
 
   return (
     <div className="space-y-6">
@@ -164,28 +148,29 @@ export function InvoiceListView({
               setStatusFilter("all")
             },
           })),
-          { key: "invoiced", label: t("accounting.invoices.totalInvoiced"), value: formatCurrency(stats.totalAmount), active: false },
-          { key: "outstanding", label: t("accounting.invoices.outstandingBalance"), value: formatCurrency(stats.totalDue), active: false },
+          { key: "invoiced", label: t("accounting.invoices.totalInvoiced"), value: accountingSummaryValue(currencySummaries, "total"), active: false },
+          { key: "outstanding", label: t("accounting.invoices.outstandingBalance"), value: accountingSummaryValue(currencySummaries, "residual"), active: false },
         ]}
       />
+      <AccountingListSummary groups={currencySummaries} />
 
       {/* Table */}
       <Card>
         <CardHeader className="pb-4">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-wrap items-center justify-between gap-3">
             <CardTitle>{t("accounting.invoices.title")}</CardTitle>
-            <Button onClick={onCreateInvoice} className="gap-2"><Plus className="h-4 w-4" />{t("accounting.actions.newInvoice")}</Button>
+            {canCreate && onCreateInvoice ? <Button onClick={onCreateInvoice} className="gap-2"><Plus className="h-4 w-4" />{t("accounting.actions.newInvoice")}</Button> : null}
           </div>
-          <div className="flex items-center gap-4 mt-4">
-            <div className="relative flex-1 max-w-sm">
+          <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center">
+            <div className="relative min-w-0 flex-1 sm:max-w-sm">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input placeholder={t("accounting.invoices.searchPlaceholder")} value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-10" />
+              <Input aria-label={t("accounting.invoices.searchPlaceholder")} placeholder={t("accounting.invoices.searchPlaceholder")} value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-10" />
             </div>
             <Select value={statusFilter} onValueChange={(v) => {
               setStatusFilter(v as DisplayStatus | "all")
               setTileFilter(null)
             }}>
-              <SelectTrigger className="w-[150px]">
+              <SelectTrigger className="w-full sm:w-[160px]" aria-label={t("accounting.journalEntries.state")}>
                 <Filter className="h-4 w-4 mr-2" /><SelectValue placeholder={t("accounting.journalEntries.state")} />
               </SelectTrigger>
               <SelectContent>
@@ -199,9 +184,10 @@ export function InvoiceListView({
               </SelectContent>
             </Select>
           </div>
+          <AccountingListFilters initialFilters={initialFilters} onInitialFilterClear={onInitialFilterClear} />
         </CardHeader>
         <CardContent>
-          <Table>
+          <Table className="min-w-[760px]">
             <TableHeader>
               <TableRow>
                 <TableHead>{t("accounting.invoices.title")}</TableHead>
@@ -245,6 +231,7 @@ export function InvoiceListView({
                             setSearchQuery("")
                             setStatusFilter("all")
                             setTileFilter(null)
+                            onInitialFilterClear?.("*")
                           },
                         }}
                       />
@@ -258,33 +245,33 @@ export function InvoiceListView({
                   <TableRow
                     key={String(inv.id)}
                     data-testid={`entity-row-${inv.id}`}
-                    className="cursor-pointer hover:bg-muted/50"
+                    className={cn("hover:bg-muted/50", onSelectInvoice && "cursor-pointer")}
                     onClick={() => onSelectInvoice?.(inv)}
                   >
-                    <TableCell className="font-medium">{inv.name}</TableCell>
+                    <TableCell className="font-medium"><a href={accountingDocumentHref(inv)} onClick={(event) => event.stopPropagation()} className="rounded-sm underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">{inv.name || `#${inv.id}`}</a></TableCell>
                     <TableCell>
                       <p className="font-medium">{inv.invoicePartnerDisplayName ?? `Partner #${inv.partnerId}`}</p>
                     </TableCell>
                     <TableCell>{formatTimestamp(inv.invoiceDate)}</TableCell>
                     <TableCell>{formatTimestamp(inv.invoiceDateDue)}</TableCell>
-                    <TableCell className="font-medium">{formatCurrency(inv.amountTotal ?? 0)}</TableCell>
+                    <TableCell className="font-medium tabular-nums">{accountingListMoney(inv.amountTotal, inv, currencyOptions)}</TableCell>
                     <TableCell>
                       <span className={cn("font-medium", (inv.amountResidual ?? 0) > 0 ? "text-foreground" : "text-success")}>
-                        {formatCurrency(inv.amountResidual ?? 0)}
+                        {accountingListMoney(inv.amountResidual, inv, currencyOptions)}
                       </span>
                     </TableCell>
                     <TableCell>
                       <Badge className={cn("font-medium", conf.pillClass)}>{t(conf.labelKey as any)}</Badge>
                     </TableCell>
                     <TableCell>
-                      <DropdownMenu>
+                      {(onSelectInvoice || onRecalculateTotals && moveStateIsDraft(inv.state) && moveTypeIsInvoiceOrRefund(inv.moveType)) ? <DropdownMenu>
                         <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                          <Button variant="ghost" size="icon" className="h-8 w-8"><MoreHorizontal className="h-4 w-4" /></Button>
+                          <Button variant="ghost" size="icon" className="h-8 w-8" aria-label={`Actions for ${inv.name || inv.id}`}><MoreHorizontal className="h-4 w-4" /></Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onSelectInvoice?.(inv) }}>
+                          {onSelectInvoice ? <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onSelectInvoice(inv) }}>
                             <Eye className="h-4 w-4 mr-2" />{t("accounting.invoices.invoiceActions.viewDetails")}
-                          </DropdownMenuItem>
+                          </DropdownMenuItem> : null}
                           {onRecalculateTotals &&
                             moveStateIsDraft(inv.state) &&
                             moveTypeIsInvoiceOrRefund(inv.moveType) && (
@@ -298,12 +285,8 @@ export function InvoiceListView({
                                 {t("accounting.invoices.invoiceActions.recalculateTotals")}
                               </DropdownMenuItem>
                             )}
-                          <DropdownMenuItem><Send className="h-4 w-4 mr-2" />{t("accounting.invoices.invoiceActions.sendInvoice")}</DropdownMenuItem>
-                          <DropdownMenuItem><Download className="h-4 w-4 mr-2" />{t("accounting.invoices.invoiceActions.downloadPDF")}</DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem className="text-destructive"><Trash2 className="h-4 w-4 mr-2" />{t("common.delete")}</DropdownMenuItem>
                         </DropdownMenuContent>
-                      </DropdownMenu>
+                      </DropdownMenu> : null}
                     </TableCell>
                   </TableRow>
                 )

@@ -1,6 +1,8 @@
 /* Semantic tokens — neutral dashboard default (HSL channels + hsl(var(--*)) in @theme) */
 
 :root {
+  --table-cell-y: 0.625rem;
+  --table-head-height: 2.5rem;
   --background: 0 0% 98%;
   --foreground: 0 0% 5%;
 
@@ -45,6 +47,12 @@
   --sidebar-accent-foreground: 0 0% 5%;
   --sidebar-border: 0 0% 89%;
   --sidebar-ring: 0 0% 5%;
+}
+
+/* Compact tables retain control sizes and keyboard targets while reducing row whitespace. */
+:root[data-density="compact"] {
+  --table-cell-y: 0.375rem;
+  --table-head-height: 2.25rem;
 }
 
 .dark {

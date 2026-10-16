@@ -4,6 +4,7 @@ import {
   fetchDefaultCompanyId,
   fetchSessionOrganizationId,
   gotoModule,
+  openAccountingTab,
   scalarQueryId,
   signIn,
   smokeName,
@@ -142,7 +143,7 @@ test.describe("COV-08b exact bank statement reconciliation", { tag: ["@p0", "@co
     if (lineId == null) throw new Error("created bank statement line not found")
 
     await gotoModule(page, "accounting")
-    await page.getByTestId("module-tab-accounting-bank-statements").click()
+    await openAccountingTab(page, "bank-statements")
     const row = page.getByTestId(`entity-row-${statementId}`)
     await expect(row).toContainText(statementName)
     await row.click()

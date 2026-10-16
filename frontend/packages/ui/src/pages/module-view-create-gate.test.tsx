@@ -5,10 +5,11 @@ import type { ModuleConfig } from "../lib/module-types"
 import type { PolicyRule, Role, User } from "../lib/rbac-types"
 import { RBACProvider } from "../lib/rbac-context"
 
+const navigation = vi.hoisted(() => ({ search: "", replace: vi.fn(), push: vi.fn() }))
 vi.mock("next/navigation", () => ({
   usePathname: () => "/sales",
-  useRouter: () => ({ replace: vi.fn(), push: vi.fn() }),
-  useSearchParams: () => new URLSearchParams(),
+  useRouter: () => ({ replace: navigation.replace, push: navigation.push }),
+  useSearchParams: () => new URLSearchParams(navigation.search),
 }))
 vi.mock("@lumiere/erp-session", () => ({ useErpSession: () => ({ companyIds: [1] }) }))
 vi.mock("@lumiere/query-hooks/ai-ui-context", () => ({
@@ -81,7 +82,47 @@ beforeAll(() => {
   // jsdom lacks scrollIntoView, which ModuleView calls for the active tab.
   Element.prototype.scrollIntoView = vi.fn()
 })
-afterEach(cleanup)
+afterEach(() => {
+  cleanup()
+  navigation.search = ""
+  vi.clearAllMocks()
+})
+
+describe("ModuleView workspace URL state", () => {
+  const workspaceConfig: ModuleConfig = {
+    id: "sales", title: "Sales", defaultTab: "dashboard",
+    workspaceNav: { workspaces: [
+      { id: "overview", label: "Overview", tabIds: ["dashboard"] },
+      { id: "receivables", label: "Receivables", tabIds: ["invoices", "credit-control"] },
+    ] },
+    tabs: ["dashboard", "invoices", "credit-control"].map((id) => ({ id, label: id, type: "custom", customContent: `${id} records` })),
+  }
+  const view = () => <RBACProvider initialUser={user} initialRoles={[role([])]} initialPolicies={[]}><ModuleView config={workspaceConfig} /></RBACProvider>
+
+  it("restores a secondary deep link and resets overview when history removes the tab parameter", () => {
+    navigation.search = "tab=credit-control"
+    const { rerender } = render(view())
+    expect(screen.getByRole("tab", { name: "credit-control" }).getAttribute("aria-selected")).toBe("true")
+    navigation.search = ""
+    rerender(view())
+    expect(screen.getByRole("tab", { name: "dashboard" }).getAttribute("aria-selected")).toBe("true")
+    expect(screen.getByRole("tabpanel").textContent).toBe("dashboard records")
+    navigation.search = "tab=invoices"
+    rerender(view())
+    expect(screen.getByRole("tabpanel").textContent).toBe("invoices records")
+  })
+
+  it("creates canonical history entries and clears filters when entering another workspace", () => {
+    navigation.search = "company=2&filter=state:posted"
+    render(view())
+    const link = screen.getByRole("link", { name: "Receivables" })
+    expect(link.getAttribute("href")).toBe("/sales?company=2&tab=invoices")
+    fireEvent.click(link)
+    expect(navigation.push).toHaveBeenCalledWith("/sales?company=2&tab=invoices", { scroll: false })
+    expect(navigation.replace).not.toHaveBeenCalled()
+    expect(screen.getByRole("tabpanel").textContent).toBe("invoices records")
+  })
+})
 
 describe("ModuleView header create button", () => {
   const testId = "module-create-sales-orders"
