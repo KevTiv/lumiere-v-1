@@ -27,6 +27,7 @@ import { ActivityRingWidget } from "./widgets/activity-ring-widget"
 import { CountdownWidget } from "./widgets/countdown-widget"
 import { IosTileWidget } from "./widgets/ios-tile-widget"
 import { QuickActionsWidget } from "./widgets/quick-actions-widget"
+import { workspaceStyles } from "../lib/workspace-styles"
 
 interface WidgetRendererProps {
   widget: DashboardWidget
@@ -190,7 +191,7 @@ export function DashboardWidgetRenderer({ widget, widthClass, testId, isLoading 
       <div className={widthClass} data-testid={testId}>
         <div className="mb-3 flex items-center justify-between gap-2">
           {widget.title ? (
-            <h3 className="text-sm font-medium text-muted-foreground">{widget.title}</h3>
+            <h3 className={workspaceStyles.sectionTitle}>{widget.title}</h3>
           ) : (
             <span />
           )}
@@ -207,7 +208,7 @@ export function DashboardWidgetRenderer({ widget, widthClass, testId, isLoading 
     <div className={widthClass} data-testid={testId}>
       <Card className="h-full">
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1">
-          <CardTitle className="text-sm font-semibold">{widget.title}</CardTitle>
+          <CardTitle className={workspaceStyles.sectionTitle}>{widget.title}</CardTitle>
           {isChart || canExportCsv ? (
             <div className="flex shrink-0 items-center gap-1">{exportButtons}</div>
           ) : null}

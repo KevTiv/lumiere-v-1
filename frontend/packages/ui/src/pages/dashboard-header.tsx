@@ -19,6 +19,7 @@ import {
   DropdownMenuTrigger,
 } from "../components/dropdown-menu"
 import { RefreshCw, Download, ChevronDown, Calendar } from "lucide-react"
+import { workspaceStyles } from "../lib/workspace-styles"
 
 interface ActionItem {
   label: string
@@ -71,9 +72,11 @@ export function DashboardHeader({
 }: DashboardHeaderProps) {
   const trailing = useContext(HeaderTrailingContext)
   const selectedTimeRange = timeRanges.find((range) => range.value === timeRange) ?? timeRanges[2]
+  const hasPrimaryAction = primaryAction != null && primaryAction !== false
+  const firstImplicitAction = hasPrimaryAction ? -1 : actions?.findIndex((action) => action.variant == null) ?? -1
 
   return (
-    <header className="mb-6 flex flex-col justify-between gap-4 border-b border-border/70 pb-5 md:flex-row md:items-end">
+    <header className={workspaceStyles.pageHeader} data-ui="page-header">
       <div className="min-w-0 space-y-1">
         {breadcrumbs && breadcrumbs.length > 0 ? (
           <Breadcrumb>
@@ -98,17 +101,17 @@ export function DashboardHeader({
             </BreadcrumbList>
           </Breadcrumb>
         ) : null}
-        <h1 className="truncate text-2xl font-semibold tracking-[-0.02em]">{title}</h1>
+        <h1 className={workspaceStyles.pageTitle} data-ui="page-title">{title}</h1>
         {description && (
-          <p className="max-w-3xl text-sm leading-6 text-muted-foreground">{description}</p>
+          <p className={workspaceStyles.pageDescription}>{description}</p>
         )}
       </div>
-      <div className="flex flex-wrap items-center gap-2">
+      <div className={workspaceStyles.actions}>
         {primaryAction}
-        {actions?.map((action) => (
+        {actions?.map((action, index) => (
           <Button
             key={action.label}
-            variant={action.variant ?? "default"}
+            variant={action.variant ?? (index === firstImplicitAction ? "default" : "outline")}
             onClick={action.onClick}
             data-testid={action.testId}
           >

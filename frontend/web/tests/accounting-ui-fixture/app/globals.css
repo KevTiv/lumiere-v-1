@@ -2,4 +2,4 @@
 @source "../../../../packages/ui/src";
 @source "../../../app/(modules)/accounting";
 
-body { margin: 0; font-family: Arial, sans-serif; }
+body { margin: 0; }

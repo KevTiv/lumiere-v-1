@@ -150,9 +150,9 @@ function DashboardSidebarContent({
                       onClick={() => setOpenMobile(false)}
                       onMouseEnter={() => router.prefetch(item.href)}
                       className={cn(
-                        "relative w-full flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring/20",
+                        "relative w-full flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring",
                         active
-                          ? "bg-sidebar-accent text-sidebar-foreground shadow-xs ring-1 ring-sidebar-border"
+                          ? "bg-sidebar-accent text-sidebar-accent-foreground before:absolute before:inset-y-2 before:start-0 before:w-0.5 before:rounded-full before:bg-sidebar-primary"
                           : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-foreground"
                       )}
                     >

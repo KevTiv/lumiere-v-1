@@ -11,6 +11,7 @@ import { TabsList, TabsTrigger } from "../components/tabs"
 import type { ModuleTab, ModuleWorkspaceNav } from "../lib/module-types"
 import { resolveWorkspaceNavigation } from "../lib/workspace-navigation"
 import { cn } from "../lib/utils"
+import { workspaceStyles } from "../lib/workspace-styles"
 
 interface WorkspaceNavProps {
   moduleId: string
@@ -37,8 +38,8 @@ export function WorkspaceNav({ moduleId, tabs, config, activeTab, onTabChange, h
   }
 
   return (
-    <div className="space-y-3" data-testid={`module-tabs-${moduleId}`}>
-      <nav aria-label={config.label ?? "Workspaces"} className="flex flex-wrap items-center gap-1 rounded-xl border bg-muted/30 p-1.5">
+    <div className="min-w-0 space-y-3" data-testid={`module-tabs-${moduleId}`}>
+      <nav aria-label={config.label ?? "Workspaces"} className={workspaceStyles.workspaceNav} data-ui="workspace-nav">
         {workspaces.map((workspace) => (
           <a
             key={workspace.id}
@@ -47,8 +48,8 @@ export function WorkspaceNav({ moduleId, tabs, config, activeTab, onTabChange, h
             aria-current={activeWorkspace?.id === workspace.id ? "page" : undefined}
             data-testid={`module-workspace-${moduleId}-${workspace.id}`}
             className={cn(
-              "rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-background/70 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-              activeWorkspace?.id === workspace.id && "bg-background text-foreground shadow-sm ring-1 ring-border/60",
+              workspaceStyles.workspaceLink,
+              activeWorkspace?.id === workspace.id && workspaceStyles.workspaceLinkActive,
             )}
           >
             {workspace.label}
@@ -92,13 +93,13 @@ export function WorkspaceNav({ moduleId, tabs, config, activeTab, onTabChange, h
           </DropdownMenu>
         )}
       </nav>
-      <TabsList variant="line" aria-label={`${activeWorkspace?.label ?? activeOverflow?.label ?? "Workspace"} views`} className="h-auto w-full flex-wrap justify-start gap-1 border-b border-border p-0 group-data-horizontal/tabs:h-auto">
+      <TabsList variant="line" data-ui="context-tabs" aria-label={`${activeWorkspace?.label ?? activeOverflow?.label ?? "Workspace"} views`} className="h-auto w-full flex-wrap justify-start gap-1 border-b border-border p-0 group-data-horizontal/tabs:h-auto">
         {localTabs.map((tab) => (
           <TabsTrigger
             key={tab.id}
             value={tab.id}
             data-testid={`module-tab-${moduleId}-${tab.id}`}
-            className="-mb-px h-auto flex-none rounded-none border-0 border-b-2 border-transparent px-3 py-2 after:hidden data-active:border-foreground data-active:text-foreground"
+            className={workspaceStyles.tabTrigger}
           >
             {tab.label}
           </TabsTrigger>

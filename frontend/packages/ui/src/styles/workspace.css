@@ -1,0 +1,51 @@
+/* Quiet precision: a small renderer vocabulary, never per-module brand CSS. */
+.ui-page-header {
+  border-inline-start: 2px solid hsl(var(--primary) / 0.45);
+  padding-inline-start: 1rem;
+}
+
+.ui-page-title {
+  min-width: 0;
+  font-size: clamp(1.5rem, 1.2rem + 0.6vw, 1.875rem);
+  font-weight: 600;
+  line-height: 1.25;
+  letter-spacing: -0.025em;
+  overflow-wrap: anywhere;
+}
+
+.ui-document {
+  border-block-start: 3px solid hsl(var(--primary));
+}
+
+/* Wrapped translated/configured labels grow the row; icon controls stay square. */
+.ui-actions > :is(button, a):not([data-size*="icon"]) {
+  height: auto;
+  padding-block: 0.375rem;
+  overflow-wrap: anywhere;
+}
+
+/* Density changes data whitespace, not the size of touch interaction targets. */
+@media (pointer: coarse) {
+  [data-slot="button"],
+  [data-slot="sidebar-trigger"],
+  [data-slot="tabs-trigger"],
+  [data-slot="select-trigger"],
+  [data-slot="dialog-close"],
+  [data-slot="input"] {
+    min-height: 2.75rem;
+  }
+  #dashboard-navigation nav a,
+  .ui-workspace-link {
+    min-height: 2.75rem;
+  }
+  [data-slot="button"][data-size*="icon"] {
+    min-width: 2.75rem;
+  }
+  [data-slot="dialog-close"] {
+    min-width: 2.75rem;
+  }
+  [data-slot="dialog-header"] {
+    padding-inline-end: 3.5rem;
+  }
+}
+

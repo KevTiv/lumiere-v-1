@@ -32,6 +32,7 @@ import { KpiStrip } from "../components/kpi-strip"
 import { filterRowsByKpi, activeKpiTile, toggleKpiKey, type KpiTileDef } from "../lib/kpi-tiles"
 import { WorkspaceNav } from "./workspace-nav"
 import { moduleTabHref } from "../lib/workspace-navigation"
+import { workspaceStyles } from "../lib/workspace-styles"
 
 /** When set, tab create forms use STDB-merged {@link RuntimeFormModal} instead of static-only FormModal. */
 export interface ModuleViewRuntimeForms {
@@ -182,7 +183,7 @@ export function ModuleView({
 
   return (
     <div
-      className="flex flex-col min-h-full gap-2"
+      className="flex min-h-full min-w-0 flex-col gap-2"
       data-testid={`module-view-${config.id}`}
       data-hydrated={isHydrated ? "true" : "false"}
     >
@@ -197,7 +198,7 @@ export function ModuleView({
         onExport={showDashboardExport ? () => void handleDashboardExport() : undefined}
       />
 
-      <Tabs value={activeTab} onValueChange={setActiveTab} className={"flex-col flex"}>
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="flex min-w-0 flex-col">
         {config.workspaceNav ? (
           <WorkspaceNav
             moduleId={config.id}
@@ -215,6 +216,7 @@ export function ModuleView({
         >
         <TabsList
           variant="line"
+          data-ui="context-tabs"
           className="h-auto w-max min-w-full justify-start gap-1 border-b border-border p-0 group-data-horizontal/tabs:h-auto"
         >
           {buildModuleTabRow(config.tabs, config.tabGroups).map((item) =>
@@ -229,9 +231,7 @@ export function ModuleView({
             ) : (
               <TabsTrigger
                 key={item.tab.id}
-                // Natural width with an underline on the active tab; the
-                // default pseudo-underline is clipped by the scroll container.
-                className="-mb-px flex-none rounded-none border-0 border-b-2 border-transparent px-2.5 pb-2.5 pt-1.5 after:hidden data-active:border-foreground data-active:text-foreground"
+                className={workspaceStyles.tabTrigger}
                 value={item.tab.id}
                 data-testid={`module-tab-${config.id}-${item.tab.id}`}
               >
