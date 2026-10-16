@@ -1,9 +1,9 @@
 import assert from "node:assert/strict"
 import test from "node:test"
-import { approvalSelection, requireUnchangedApproval } from "./approval-controls"
+import { approvalActorOptions, approvalSelection, requireUnchangedApproval, resolveApprovalActor } from "./approval-controls"
 
 const principal = "ab".repeat(32)
-const row = { id: 41, companyId: 7, revision: 3, instanceRevision: 9, status: "Open", actingForOptions: [{ identityHex: principal, label: "Approver" }] }
+const row = { id: 41, companyId: 7, revision: 3, instanceRevision: 9, status: "Open", directlyEligible: true, actingForOptions: [{ identityHex: principal, label: "Approver" }] }
 
 test("approval retains exactly the operator's company and revisions", () => {
   assert.deepEqual(approvalSelection(row, 7), { requestId: 41, companyId: 7, expectedTaskRevision: 3, expectedInstanceRevision: 9, actingFor: null })
@@ -15,8 +15,25 @@ test("approval retains exactly the operator's company and revisions", () => {
 
 test("a delegate can select only a currently projected principal", () => {
   assert.equal(approvalSelection(row, 7, principal).actingFor, principal)
-  assert.throws(() => approvalSelection(row, 7, "cd".repeat(32)), /unavailable/)
-  assert.throws(() => approvalSelection({ ...row, actingForOptions: [] }, 7, principal), /unavailable/)
+  assert.throws(() => approvalSelection(row, 7, "cd".repeat(32)), /eligible approval principal/)
+  assert.throws(() => approvalSelection({ ...row, actingForOptions: [] }, 7, principal), /eligible approval principal/)
+})
+
+test("actor resolution fails closed and auto-selects only an unambiguous principal", () => {
+  const delegatedOnly = { ...row, directlyEligible: false }
+  assert.equal(resolveApprovalActor(row), "")
+  assert.equal(resolveApprovalActor(delegatedOnly), principal)
+  assert.equal(resolveApprovalActor(delegatedOnly, ""), null)
+  assert.equal(resolveApprovalActor({ ...delegatedOnly, actingForOptions: [] }), null)
+  assert.equal(resolveApprovalActor({ ...delegatedOnly, actingForOptions: [
+    ...delegatedOnly.actingForOptions, { identityHex: "cd".repeat(32), label: "Second" },
+  ] }), null)
+  assert.throws(() => approvalSelection({ ...delegatedOnly, actingForOptions: [] }, 7), /eligible approval principal/)
+  assert.deepEqual(approvalActorOptions({ ...row, actingForOptions: [
+    { identityHex: `0x${principal.toUpperCase()}`, label: " Approver " },
+    { identityHex: principal, label: "Duplicate" },
+    { identityHex: "invalid", label: "Invalid" },
+  ] }), [{ identityHex: principal, label: "Approver" }])
 })
 
 test("stale task, workflow, company and delegation selections fail before dispatch", () => {

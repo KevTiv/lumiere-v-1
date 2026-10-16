@@ -11,7 +11,11 @@ import {
   useApproveApprovalRequest,
   useRejectApprovalRequest,
 } from '@lumiere/query-hooks/hooks/approvals'
-import { approvalSelection } from '@lumiere/query-hooks/hooks/approval-controls'
+import {
+  approvalActorOptions,
+  approvalSelection,
+  resolveApprovalActor,
+} from '@lumiere/query-hooks/hooks/approval-controls'
 import { useOperatingCompanyId } from '@lumiere/query-hooks/hooks/use-operating-company'
 import { Button, formText, useFormDialog } from '@lumiere/ui'
 
@@ -108,7 +112,7 @@ export function PurchasingOpsSod({
     operatingCompanyId ?? 0,
   )
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null)
-  const [actingFor, setActingFor] = useState('')
+  const [actingFor, setActingFor] = useState<string | undefined>(undefined)
   const [actionError, setActionError] = useState<string | null>(null)
   const [advancedPending, setAdvancedPending] = useState(false)
 
@@ -151,6 +155,16 @@ export function PurchasingOpsSod({
     const me = normalizeIdentityHex(identity)
     return requester !== '' && me !== '' && requester === me
   }, [pendingApprovalForSelected, identity])
+
+  const actorOptions = pendingApprovalForSelected
+    ? approvalActorOptions(pendingApprovalForSelected)
+    : []
+  const selectedActor = pendingApprovalForSelected
+    ? resolveApprovalActor(pendingApprovalForSelected, actingFor)
+    : null
+  const needsActorSelection = pendingApprovalForSelected != null && selectedActor == null
+  const showActorSelection = pendingApprovalForSelected != null &&
+    (pendingApprovalForSelected.directlyEligible !== true || actorOptions.length > 0)
 
   const runAdvanced = async (fn?: () => Promise<void>) => {
     if (!fn) return
@@ -224,7 +238,7 @@ export function PurchasingOpsSod({
                     data-testid={`purchasing-ops-po-${id}`}
                     onClick={() => {
                       setSelectedOrderId(id)
-                      setActingFor('')
+                      setActingFor(undefined)
                       setActionError(null)
                     }}
                   >
@@ -239,18 +253,23 @@ export function PurchasingOpsSod({
           </ul>
           {selectedOrderId ? (
             <div className="flex flex-wrap gap-2">
-              {pendingApprovalForSelected?.actingForOptions?.length ? (
+              {showActorSelection ? (
                 <label className="flex items-center gap-2 text-sm">
                   {t('purchasing.ops.actingAs', { defaultValue: 'Acting as' })}
                   <select
                     className="rounded border bg-background px-2 py-1"
                     data-testid="purchasing-ops-acting-for"
-                    value={actingFor}
+                    value={selectedActor ?? ''}
                     onChange={(event) => setActingFor(event.target.value)}
                     disabled={approveRequest.isPending || rejectRequest.isPending}
                   >
-                    <option value="">{t('purchasing.ops.myself', { defaultValue: 'Myself' })}</option>
-                    {pendingApprovalForSelected.actingForOptions.map((option) => (
+                    {pendingApprovalForSelected.directlyEligible === true ? (
+                      <option value="">{t('purchasing.ops.myself', { defaultValue: 'Myself' })}</option>
+                    ) : null}
+                    {pendingApprovalForSelected.directlyEligible !== true && needsActorSelection ? (
+                      <option value="">{t('purchasing.ops.selectPrincipal', { defaultValue: 'Select an eligible principal' })}</option>
+                    ) : null}
+                    {actorOptions.map((option) => (
                       <option key={option.identityHex} value={option.identityHex}>{option.label}</option>
                     ))}
                   </select>
@@ -262,6 +281,7 @@ export function PurchasingOpsSod({
                 disabled={
                   !pendingApprovalForSelected ||
                   isApprovalRequester ||
+                  needsActorSelection ||
                   approveRequest.isPending ||
                   rejectRequest.isPending ||
                   operatingCompanyId == null
@@ -288,7 +308,7 @@ export function PurchasingOpsSod({
                         return
                       }
                       await approveRequest.mutateAsync(
-                        approvalSelection(pendingApprovalForSelected, Number(operatingCompanyId), actingFor),
+                        approvalSelection(pendingApprovalForSelected, Number(operatingCompanyId), selectedActor),
                       )
                     } catch (e) {
                       setActionError(
@@ -307,6 +327,7 @@ export function PurchasingOpsSod({
                 disabled={
                   !pendingApprovalForSelected ||
                   isApprovalRequester ||
+                  needsActorSelection ||
                   approveRequest.isPending ||
                   rejectRequest.isPending ||
                   operatingCompanyId == null
@@ -332,7 +353,7 @@ export function PurchasingOpsSod({
                         )
                         return
                       }
-                      const selection = approvalSelection(pendingApprovalForSelected, Number(operatingCompanyId), actingFor)
+                      const selection = approvalSelection(pendingApprovalForSelected, Number(operatingCompanyId), selectedActor)
                       const values = await askForm({
                         title: t('purchasing.ops.reject', { defaultValue: 'Reject' }),
                         submitLabel: t('purchasing.ops.reject', { defaultValue: 'Reject' }),
@@ -387,6 +408,13 @@ export function PurchasingOpsSod({
                   {t('purchasing.ops.cannotSelfApprove', {
                     defaultValue:
                       'Requester cannot approve their own request (SoD)',
+                  })}
+                </p>
+              ) : null}
+              {needsActorSelection ? (
+                <p className="w-full text-xs text-muted-foreground" role="status">
+                  {t('purchasing.ops.selectPrincipalHelp', {
+                    defaultValue: 'Select a currently eligible principal before approving or rejecting.',
                   })}
                 </p>
               ) : null}
