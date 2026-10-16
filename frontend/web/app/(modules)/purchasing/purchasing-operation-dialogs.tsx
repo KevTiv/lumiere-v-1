@@ -282,16 +282,29 @@ function ApproveSupplierIntakeDialog({ request, options, t, onDismiss, onSubmit 
       pending={submission.pending}
       error={submission.error}
       onDismiss={onDismiss}
+      t={t}
       onSubmit={(event) => {
         event.preventDefault()
         void submission.run(() => onSubmit({
           intakeId: request.intakeId,
-          partnerId: requiredIdString(partnerId, "Vendor"),
+          partnerId: requiredIdString(
+            partnerId,
+            t("purchasing.forms.fields.vendor", { defaultValue: "Vendor" }),
+            t,
+          ),
         }))
       }}
     >
       <p>{request.intakeLabel}</p>
-      <ChoiceField id="intake-approval-vendor" label="Vendor" value={partnerId} options={options.vendors} onValueChange={setPartnerId} placeholder="Select a vendor" />
+      <ChoiceField
+        id="intake-approval-vendor"
+        label={t("purchasing.forms.fields.vendor", { defaultValue: "Vendor" })}
+        value={partnerId}
+        options={options.vendors}
+        onValueChange={setPartnerId}
+        placeholder={t("purchasing.forms.placeholders.vendor", { defaultValue: "Select a vendor" })}
+        t={t}
+      />
     </OperationDialog>
   )
 }
