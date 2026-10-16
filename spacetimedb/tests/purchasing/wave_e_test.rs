@@ -186,10 +186,8 @@ pub fn test_requisition_convert_copies_lines(ctx: &ReducerContext) -> Result<(),
         return Err(format!("unexpected self-approval error: {self_approval}"));
     }
     let independent_requester = Identity::from_byte_array([0x5a; 32]);
-    ctx.db
-        .purchase_requisition()
-        .id()
-        .update(crate::purchasing::purchase_orders::PurchaseRequisition {
+    ctx.db.purchase_requisition().id().update(
+        crate::purchasing::purchase_orders::PurchaseRequisition {
             user_id: independent_requester,
             ..ctx
                 .db
@@ -197,7 +195,8 @@ pub fn test_requisition_convert_copies_lines(ctx: &ReducerContext) -> Result<(),
                 .id()
                 .find(&requisition.id)
                 .ok_or("submitted requisition missing")?
-        });
+        },
+    );
     approve_purchase_requisition(ctx, org_id, requisition.id)?;
     let approved = ctx
         .db
@@ -217,7 +216,9 @@ pub fn test_requisition_convert_copies_lines(ctx: &ReducerContext) -> Result<(),
     .err()
     .ok_or("cross-company requisition conversion was accepted")?;
     if !company_mismatch.contains("requested company") {
-        return Err(format!("unexpected company mismatch error: {company_mismatch}"));
+        return Err(format!(
+            "unexpected company mismatch error: {company_mismatch}"
+        ));
     }
     convert_purchase_requisition_to_po(ctx, org_id, company_id, requisition.id)?;
     // Same-request/lost-response retry resolves to the already-related PO.
