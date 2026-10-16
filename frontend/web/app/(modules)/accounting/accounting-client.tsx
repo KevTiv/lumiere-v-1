@@ -4410,6 +4410,8 @@ function AccountingClientReady({
         deadlines: taxDeadlinesRead,
         periods: accountPeriodsRawRead,
         currencies: currenciesRead,
+        companies: companiesRead,
+        budgets: budgetsRead,
       }}
       onNavigate={setAccountingActiveTab}
       onCreateInvoice={checkPermission("account_move", "create").allowed && manualInvoiceReadState.status === "ready" ? openInvoiceCreate : undefined}

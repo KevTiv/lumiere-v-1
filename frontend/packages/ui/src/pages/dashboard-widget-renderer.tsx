@@ -36,6 +36,8 @@ interface WidgetRendererProps {
   /** While the module's data loads, show a placeholder instead of zeros. */
   isLoading?: boolean
   exportProvenance?: ReportExportSourceProvenance
+  /** Domain-specific wording for legitimate zero-valued series. */
+  emptyMessage?: string
 }
 
 /** A chart with no points, or only zero values, renders as an empty frame. */
@@ -64,7 +66,7 @@ const CHART_WIDGET_TYPES = new Set<WidgetType>([
   "funnel-chart",
 ])
 
-export function DashboardWidgetRenderer({ widget, widthClass, testId, isLoading = false, exportProvenance }: WidgetRendererProps) {
+export function DashboardWidgetRenderer({ widget, widthClass, testId, isLoading = false, exportProvenance, emptyMessage }: WidgetRendererProps) {
   const chartRef = useRef<HTMLDivElement>(null)
   const useCard = widget.useCard !== false
   const isChart = CHART_WIDGET_TYPES.has(widget.type)
@@ -82,7 +84,7 @@ export function DashboardWidgetRenderer({ widget, widthClass, testId, isLoading 
     if (isChart && chartIsEmpty(widget)) {
       return (
         <div className="flex h-56 items-center justify-center rounded-lg border border-dashed border-border text-sm text-muted-foreground">
-          No data for this period yet.
+          {emptyMessage ?? "No data for this period yet."}
         </div>
       )
     }

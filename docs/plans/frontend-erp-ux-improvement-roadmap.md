@@ -243,6 +243,51 @@ configured-stack scenarios. i18n and browser-operation transport checks passed.
 Removing an unused legacy bank-state helper lowered the tracked opaque-record
 baseline by one (2340 to 2339); no baseline or allowlist was raised.
 
+### Financial dashboard restoration — Accounting
+
+The workflow-first Accounting desk now also carries a visual financial layer;
+the operational queues are retained, not replaced. Three linked sections expose
+Financial overview, Accounting insights and Action queues, with 44px section
+links for narrow screens.
+
+- Financial overview separates current posted invoice/bill residuals from
+  selected-period posted amounts and prior-period percentage comparisons.
+  Rolling 30/90/180 UTC-calendar-day windows include today in progress. Historical
+  residuals are not reconstructed from today's balance; zero prior baselines
+  are explicitly unavailable rather than infinite growth.
+- Shared area/bar dashboard widgets render monthly posted invoice/bill amounts,
+  current AR/AP aging, and canonical budget planned versus actual. Invoice/bill
+  measures exclude credit notes and are not recognized revenue, expenses, net
+  ledger balances or cash flow. Whole eligible budgets
+  overlapping the period are shown without proration, in the company's confirmed
+  base currency only.
+- Each view has one exact currency ID, authoritative decimal precision and
+  minor-unit arithmetic; currencies are never combined or inferred from labels.
+  Unknown scope, redacted fields, unsafe totals and non-ready reads hide affected
+  figures, charts and exports instead of showing reassuring zeros or stale data.
+  Independent sources remain independently available.
+- Charts inherit Quiet Precision and the existing dark/Ocean palettes through
+  the shared renderer and chart tokens. Readable data tables accompany the charts;
+  CSV/PNG exports use existing helpers with company/currency/basis provenance.
+  Budget charts and chart exports show the first eight eligible budgets by name
+  with explicit scope metadata; the scrollable data table retains every budget.
+  Invoice/bill links retain the selected currency's canonical filter.
+- Existing overdue, draft-review, bank-line matching and monthly document-count
+  views remain present. No financial writes, backend contract changes or new
+  deployment are part of this dashboard restoration.
+
+Restoration verification: all 92 isolated browser cases passed (6.9 minutes,
+exit 0), retaining the prior 80 cases and adding 12 financial cases across
+320/390/768/1440px. Financial cases also check currency/period/company changes,
+CSV scope, dark chart tokens, 44px controls, no page overflow, unavailable-source
+invalidation, no browser runtime errors and no unexpected ERP API requests.
+Shared UI passed 700 tests (113 files), web unit passed 395, and Accounting
+model/record checks passed 47. UI/web TypeScript, production Next build, focused
+lint, i18n keys/duplicates, operation transport and whitespace checks passed;
+opaque-record debt remained 2339/2339. Desktop/mobile light/dark screenshots
+were visually inspected. These are synthetic component checks, not authenticated
+backend or deployment verification; existing rollout and merge gates still apply.
+
 ### 1. Rebuild the application shell and navigation
 
 - Replace the seven-group, 25-destination sidebar with:
