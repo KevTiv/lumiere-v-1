@@ -1676,6 +1676,22 @@ function PurchasingClientLoaded({
               await receiveLine.execute(receiveLine.prepare(first), { navigateToNext: true }).catch(() => undefined)
             },
           },
+          {
+            id: "pol-resolve-receipt",
+            label: t("purchasing.actions.resolveReceipt"),
+            requiresSelection: true,
+            selection: "single",
+            isApplicable: (rows) =>
+              rows.length === 1 &&
+              purchasingWorkflow.canResolveReceipt(String(rows[0].id)),
+            onClick: async (rows) => {
+              if (rows[0]) {
+                await purchasingWorkflow
+                  .resolveReceipt(String(rows[0].id))
+                  .catch(() => undefined)
+              }
+            },
+          },
         ],
       },
     }
@@ -1689,6 +1705,8 @@ function PurchasingClientLoaded({
     orders,
     lines,
     purchasingWorkflow.receiveLine,
+    purchasingWorkflow.canResolveReceipt,
+    purchasingWorkflow.resolveReceipt,
   ])
 
   const requisitionsEntityConfig = useMemo((): EntityViewConfig => {

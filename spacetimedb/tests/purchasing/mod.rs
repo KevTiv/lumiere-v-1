@@ -1,6 +1,7 @@
 //! Purchasing domain test suite — invoke via `run_purchasing_*_test` reducers.
 pub mod gap_fixes_test;
 pub mod invoice_provenance_test;
+pub mod order_creation_identity_test;
 pub mod phase0_containment_test;
 pub mod phase0_fixture_test;
 pub mod phase1_landed_costs_test;
@@ -9,6 +10,7 @@ pub mod phase1_relational_integrity_test;
 pub mod phase1_returns_advanced_test;
 pub mod phase2_blanket_release_test;
 pub mod purchase_bill_test;
+pub mod receipt_replay_test;
 pub mod strict_provenance_test;
 pub mod tax_fx_bill_test;
 pub mod wave_e_test;
@@ -111,6 +113,14 @@ pub fn run_purchasing_phase2_blanket_release_test(ctx: &ReducerContext) -> Resul
 }
 
 #[spacetimedb::reducer]
+pub fn run_purchasing_keyed_operations_test(ctx: &ReducerContext) -> Result<(), String> {
+    order_creation_identity_test::test_exact_purchase_order_creation_identity(ctx)
+        .map_err(|e| format!("purchase_order_creation_identity: {e}"))?;
+    receipt_replay_test::test_durable_partial_receipt(ctx)
+        .map_err(|e| format!("receipt_replay_identity: {e}"))
+}
+
+#[spacetimedb::reducer]
 pub fn run_all_purchasing_tests(ctx: &ReducerContext) -> Result<(), String> {
     run_purchasing_bill_balanced_test(ctx)?;
     run_purchasing_incoming_picking_test(ctx)?;
@@ -125,5 +135,6 @@ pub fn run_all_purchasing_tests(ctx: &ReducerContext) -> Result<(), String> {
     run_purchasing_phase1_purchase_orders_test(ctx)?;
     run_purchasing_phase1_returns_advanced_test(ctx)?;
     run_purchasing_phase2_blanket_release_test(ctx)?;
+    run_purchasing_keyed_operations_test(ctx)?;
     Ok(())
 }

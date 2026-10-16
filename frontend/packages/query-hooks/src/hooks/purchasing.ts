@@ -464,6 +464,37 @@ export async function receivePurchaseOrderLineCommand({
   }
 }
 
+/** Dispatch a receipt with the durable identity preserved by the caller. */
+export async function receivePurchaseOrderLineOnceCommand(
+  companyId: bigint,
+  lineId: string,
+  pending: import("./purchasing-receipt-invocation").PendingReceipt,
+): Promise<void> {
+  const r = await apiFetch("/api/operations/erp.receive_po_line_once", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      companyId: companyId.toString(),
+      lineId: toScalarU64(lineId),
+      params: {
+        operationKey: pending.operationKey,
+        quantity: pending.quantity,
+        lotId: pending.lotId,
+        expectedReceived: pending.expectedReceived,
+        expectedMoveId: pending.expectedMoveId,
+        expectedPickingId: pending.expectedPickingId,
+      },
+    }),
+  })
+  if (!r.ok) {
+    throw workflowErrorFromResponse(
+      r.status,
+      await r.text().catch(() => ""),
+      "Failed to receive purchase order line",
+    )
+  }
+}
+
 export async function awardPurchaseRfqBidCommand(
   companyId: bigint,
   { rfqId, bidId }: { rfqId: ScalarId; bidId: ScalarId },
