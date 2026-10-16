@@ -617,9 +617,11 @@ fn find_effective_delegation(
                 && delegation.delegatee_identity == delegatee_identity
                 && delegation.valid_from <= at
                 && at < delegation.valid_until
-                && delegation.role_id.map_or(!eligible_role_ids.is_empty(), |role_id| {
-                    eligible_role_ids.contains(&role_id)
-                })
+                && delegation
+                    .role_id
+                    .map_or(!eligible_role_ids.is_empty(), |role_id| {
+                        eligible_role_ids.contains(&role_id)
+                    })
         })
         .min_by_key(|delegation| delegation.id)
 }
