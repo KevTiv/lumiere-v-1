@@ -4,7 +4,9 @@ use spacetimedb::rand::Rng;
 use spacetimedb::{Identity, ReducerContext, Table};
 
 use crate::core::organization::company;
-use crate::core::permissions::{role, sod_conflict_rule, Role, SodConflictRule};
+use crate::core::permissions::{
+    role, sod_conflict_rule, user_role_assignment, Role, SodConflictRule, UserRoleAssignment,
+};
 use crate::core::users::{user_organization, user_profile, UserOrganization, UserProfile};
 use crate::purchasing::purchase_orders::{purchase_order, PurchaseOrder};
 use crate::test_harness::{ensure_test_superuser, OrgFixture};
@@ -42,10 +44,66 @@ const REVISION_B: &str = "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
 pub fn test_workflow_human_tasks(ctx: &ReducerContext) -> Result<(), String> {
     ensure_test_superuser(ctx)?;
     gate_creates_and_converges_real_guarded_action(ctx)?;
+    all_candidates_projects_base_and_supplemental_roles(ctx)?;
     claim_comment_decision_and_replay(ctx)?;
     reject_requires_comment_and_invalidation_wins(ctx)?;
     authorization_is_rechecked_at_decision_time(ctx)?;
     guarded_action_failure_does_not_consume_task(ctx)?;
+    Ok(())
+}
+
+fn all_candidates_projects_base_and_supplemental_roles(ctx: &ReducerContext) -> Result<(), String> {
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let candidate_role = seed_role(ctx, fixture.organization_id, vec!["workflow_task:approve"]);
+    let member_role = seed_role(ctx, fixture.organization_id, Vec::new());
+    let base_candidate = seed_member(ctx, &fixture, candidate_role, None);
+    let supplemental_candidate = seed_member(ctx, &fixture, member_role, None);
+    let expired_candidate = seed_member(ctx, &fixture, member_role, None);
+    ctx.db.user_role_assignment().insert(UserRoleAssignment {
+        id: 0,
+        user_identity: supplemental_candidate,
+        role_id: candidate_role,
+        organization_id: fixture.organization_id,
+        assigned_by: ctx.sender(),
+        assigned_at: ctx.timestamp,
+        expires_at: None,
+        is_active: true,
+        metadata: Some(r#"{"test":"human-task"}"#.to_string()),
+    });
+    ctx.db.user_role_assignment().insert(UserRoleAssignment {
+        id: 0,
+        user_identity: expired_candidate,
+        role_id: candidate_role,
+        organization_id: fixture.organization_id,
+        assigned_by: ctx.sender(),
+        assigned_at: ctx.timestamp,
+        expires_at: Some(ctx.timestamp),
+        is_active: true,
+        metadata: Some(r#"{"test":"expired-human-task"}"#.to_string()),
+    });
+
+    let seeded = seed_task_runtime(
+        ctx,
+        &fixture,
+        candidate_role,
+        new_identity(ctx),
+        WorkflowTaskAssignment::AllCandidates,
+        false,
+        None,
+    )?;
+    let projected: Vec<_> = ctx
+        .db
+        .workflow_human_task_candidate()
+        .human_task_candidate_by_task()
+        .filter(&seeded.task_id)
+        .map(|candidate| candidate.candidate_identity)
+        .collect();
+    if projected.len() != 2
+        || !projected.contains(&base_candidate)
+        || !projected.contains(&supplemental_candidate)
+    {
+        return Err("AllCandidates did not project base and supplemental roles".to_string());
+    }
     Ok(())
 }
 

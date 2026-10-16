@@ -7,7 +7,7 @@
 use sha2::{Digest, Sha256};
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
-use crate::core::permissions::{role, user_role_assignment};
+use crate::core::permissions::role;
 use crate::core::users::user_organization;
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 
@@ -1363,19 +1363,25 @@ fn project_all_candidates(
 ) -> Result<Vec<Identity>, String> {
     let mut identities = BTreeSet::new();
     if !policy.candidate_role_ids.is_empty() {
-        for assignment in ctx
+        for membership in ctx
             .db
-            .user_role_assignment()
-            .role_assign_by_org()
+            .user_organization()
+            .user_org_by_org()
             .filter(&organization_id)
         {
-            if assignment.is_active
-                && policy.candidate_role_ids.contains(&assignment.role_id)
-                && assignment
-                    .expires_at
-                    .is_none_or(|expires| expires > ctx.timestamp)
-            {
-                identities.insert(assignment.user_identity);
+            if !membership.is_active || !membership.company_id.is_none_or(|id| id == company_id) {
+                continue;
+            }
+            let has_candidate_role = super::authorization::current_workflow_roles(
+                ctx,
+                organization_id,
+                membership.user_identity,
+                ctx.timestamp,
+            )?
+            .iter()
+            .any(|role| policy.candidate_role_ids.contains(&role.role_id));
+            if has_candidate_role {
+                identities.insert(membership.user_identity);
             }
         }
     }
