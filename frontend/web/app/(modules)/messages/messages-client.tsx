@@ -1,7 +1,8 @@
 "use client"
 import { mapDashboardWidgets, withDashboardSections } from "@lumiere/ui/lib/dashboard-sections"
 
-import { useCallback, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
+import { canUseModuleData, mergeModuleStates, moduleCollection } from "@lumiere/ui/lib/module-data-state"
 import { useTranslation } from "@lumiere/i18n"
 import { useErpSession } from "@lumiere/erp-session"
 import {
@@ -94,8 +95,10 @@ function MessagesClientLoaded({ initialMessages, initialFollowers, organizationI
   const moduleConfig = useMemo(() => messagesModuleConfig(t), [t])
   const { orgId } = orgBigInts(organizationId)
   const [quickActionForm, setQuickActionForm] = useState<{ form: FormConfig; action: string } | null>(null)
-  const { data: messages = [] } = useMailMessages(orgId, initialMessages)
-  const { data: followers = [] } = useMailFollowers(orgId, initialFollowers)
+  const messagesRead = moduleCollection(useMailMessages(orgId, initialMessages))
+  const messages = messagesRead.rows
+  const followersRead = moduleCollection(useMailFollowers(orgId, initialFollowers))
+  const followers = followersRead.rows
   const { data: contacts = [] } = useContacts(orgId)
   const { data: users = [] } = useUsers(orgId)
   const { data: accountMoves = [] } = useAccountMoves(orgId)
@@ -247,11 +250,31 @@ function MessagesClientLoaded({ initialMessages, initialFollowers, organizationI
     [messages, myNotifications, followers, withAuthorNames],
   )
 
+  const inboxState = mergeModuleStates([messagesRead.state, followersRead.state])
+  const dataState = {
+    dashboard: inboxState,
+    messages: messagesRead.state,
+    notifications: inboxState,
+    followers: followersRead.state,
+  }
+  const actionTabs: Record<string, keyof typeof dataState> = {
+    createMessage: "messages", subscribeToRecord: "followers", unsubscribeFromRecord: "followers",
+  }
+  const actionUsable = (action: string) => {
+    const tab = actionTabs[action]
+    return tab == null || canUseModuleData(dataState[tab])
+  }
+  const quickActionUsable = quickActionForm == null || actionUsable(quickActionForm.action)
+  useEffect(() => {
+    if (!quickActionUsable) setQuickActionForm(null)
+  }, [quickActionUsable])
+
   const handleFormSubmit = async (
     _tabId: string,
     action: string,
     formData: Record<string, unknown>,
   ) => {
+    if (!actionUsable(action)) throw new Error("Required data is unavailable. Refresh and try again.")
     if (action === "createMessage") {
       const body = String(formData.body ?? "").trim()
       if (!body) return
@@ -306,11 +329,12 @@ function MessagesClientLoaded({ initialMessages, initialFollowers, organizationI
       <ModuleView
         config={config}
         data={data}
+        dataState={dataState}
         onFormSubmit={handleFormSubmit}
         isPending={isFormMutationPending}
       />
       <FormModal
-        open={quickActionForm !== null}
+        open={quickActionForm !== null && quickActionUsable}
         onOpenChange={(open) => !open && setQuickActionForm(null)}
         config={quickActionForm?.form ?? mailMessageFormConfig}
         isPending={isFormMutationPending}

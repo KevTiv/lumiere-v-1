@@ -1,7 +1,7 @@
 "use client"
 import { accountMoveHref } from "@lumiere/erp-shared/record-links"
 import { mapDashboardWidgets, withDashboardSections } from "@lumiere/ui/lib/dashboard-sections"
-import { canUseModuleData, moduleQueryState } from "@lumiere/ui/lib/module-data-state"
+import { canUseModuleData, mergeModuleStates, moduleCollection } from "@lumiere/ui/lib/module-data-state"
 import { withInlineEdits } from "@lumiere/ui/lib/with-inline-edits"
 import {
   inlineNumberAbove,
@@ -186,15 +186,18 @@ function ExpensesClientLoaded({
   const [toolbarError, setToolbarError] = useState<string | null>(null)
   const [timelineSheet, setTimelineSheet] = useState<Record<string, unknown> | null>(null)
 
-  const expensesQuery = useExpenses(orgId, initialExpenses)
-  const sheetsQuery = useExpenseSheets(orgId, initialSheets)
-  const expensesState = moduleQueryState(expensesQuery)
-  const sheetsState = moduleQueryState(sheetsQuery)
-  const expensesRaw = canUseModuleData(expensesState) ? expensesQuery.data ?? [] : []
-  const sheetsRaw = canUseModuleData(sheetsState) ? sheetsQuery.data ?? [] : []
-  const { data: sheetsToApprove = [] } = useExpenseSheetsToApprove(orgId)
-  const { data: missingReceipts = [] } = useExpensesMissingReceipt(orgId)
-  const { data: unmatchedCards = [] } = useExpenseCardStatementUnmatched(orgId)
+  const expensesRead = moduleCollection(useExpenses(orgId, initialExpenses))
+  const expensesRaw = expensesRead.rows
+  const sheetsRead = moduleCollection(useExpenseSheets(orgId, initialSheets))
+  const sheetsRaw = sheetsRead.rows
+  const sheetsToApproveRead = moduleCollection(useExpenseSheetsToApprove(orgId))
+  const sheetsToApprove = sheetsToApproveRead.rows
+  const missingReceiptsRead = moduleCollection(useExpensesMissingReceipt(orgId))
+  const missingReceipts = missingReceiptsRead.rows
+  const unmatchedCardsRead = moduleCollection(useExpenseCardStatementUnmatched(orgId))
+  const unmatchedCards = unmatchedCardsRead.rows
+  const expensesUsable = canUseModuleData(expensesRead.state)
+  const sheetsUsable = canUseModuleData(sheetsRead.state)
   const timelineQuery = useExpenseSheetApprovalTimeline(
     organizationId,
     timelineSheet ? rowId(timelineSheet) : undefined,
@@ -260,7 +263,7 @@ function ExpensesClientLoaded({
   const submitExpenseSheet = useSubmitExpenseSheet(orgId, operatingCompanyId)
   const approveExpenseSheet = useApproveExpenseSheet(orgId, operatingCompanyId)
   const refuseExpenseSheet = useRefuseExpenseSheet(orgId)
-  const finance = useExpenseReportFinance(orgId, operatingCompanyId)
+  const finance = useExpenseReportFinance(orgId, operatingCompanyId, sheetsUsable)
   const setExpenseAllocations = useSetExpenseAllocations(orgId)
   const csvImports = useExpensesCsvImportMutations(orgId)
 
@@ -622,11 +625,37 @@ function ExpensesClientLoaded({
     }
   }, [expenses, sheets, employees])
 
+  const dataState = {
+    dashboard: mergeModuleStates([
+      expensesRead.state, sheetsRead.state, sheetsToApproveRead.state, missingReceiptsRead.state, unmatchedCardsRead.state,
+    ]),
+    expenses: expensesRead.state,
+    "expense-sheets": sheetsRead.state,
+  }
+  const actionUsable = (action: string) =>
+    action === "createExpense" ? expensesUsable
+      : action === "createExpenseSheet" || action === "createSheet" ? sheetsUsable : true
+  const quickActionUsable = quickActionForm == null || actionUsable(quickActionForm.action)
+  const csvUsable = csvKind == null || (csvKind === "expense" ? expensesUsable : sheetsUsable)
+  const rowActionUsable = rowAction == null || (rowAction.tabId === "expenses" ? expensesUsable : sheetsUsable)
+  useEffect(() => {
+    // Dialogs close when the collection their rows came from is denied or fails.
+    if (!quickActionUsable) setQuickActionForm(null)
+    // Keep CSV request identity and recovery mounted when the source becomes unavailable.
+    if (!rowActionUsable) setRowAction(null)
+    if (!expensesUsable) setWorkflowForm(null)
+    if (!sheetsUsable) {
+      setConfirmDialog(null)
+      setTimelineSheet(null)
+    }
+  }, [quickActionUsable, rowActionUsable, expensesUsable, sheetsUsable])
+
   const handleFormSubmit = async (
     _tabId: string,
     action: string,
     formData: Record<string, unknown>,
   ) => {
+    if (!actionUsable(action)) throw new Error(t("common.recordsUnavailable", { defaultValue: "Records could not be loaded." }))
     if (action === "createExpense") {
       const plRaw = formData.pricelistId
       const empRaw = formData.employeeId
@@ -742,6 +771,7 @@ function ExpensesClientLoaded({
 
   const handleWorkflowSubmit = async (formData: Record<string, unknown>) => {
     if (!workflowForm) return
+    if (!expensesUsable) throw new Error(t("common.recordsUnavailable", { defaultValue: "Records could not be loaded." }))
     if (workflowForm.kind === "editExpense") {
       const id = rowId(workflowForm.row)
       if (!id) return
@@ -855,13 +885,13 @@ function ExpensesClientLoaded({
       <ModuleView
         config={config}
         data={data}
-        dataState={{ expenses: expensesState, "expense-sheets": sheetsState }}
+        dataState={dataState}
         onFormSubmit={handleFormSubmit}
         onRowClick={handleRowClick}
         isPending={isFormMutationPending}
       />
       <FormModal
-        open={quickActionForm !== null}
+        open={quickActionForm !== null && quickActionUsable}
         onOpenChange={(open) => !open && setQuickActionForm(null)}
         config={quickActionForm?.form ?? expenseFormConfig}
         isPending={isFormMutationPending}
@@ -875,6 +905,7 @@ function ExpensesClientLoaded({
 
       {csvKind && csvFormConfig ? (
         <CsvImportModal
+          sourceState={csvKind === "expense" ? expensesRead.state : sheetsRead.state}
           trackedImport={{ companyId: operatingCompanyId }}
           organizationId={orgId}
           tableName={csvKind === "expense" ? "hr_expense" : "hr_expense_sheet"}
@@ -885,13 +916,14 @@ function ExpensesClientLoaded({
           templateFileName={`${csvKind}-import-template.csv`}
           isPending={isFormMutationPending}
           onImport={async (text) => {
+            if (!csvUsable) throw new Error(t("common.recordsUnavailable", { defaultValue: "Records could not be loaded." }))
             if (csvKind === "expense") await csvImports.importExpense.mutateAsync(text)
             else await csvImports.importExpenseSheet.mutateAsync(text)
           }}
         />
       ) : null}
 
-      <Dialog open={rowAction !== null} onOpenChange={(open) => !open && setRowAction(null)}>
+      <Dialog open={rowAction !== null && rowActionUsable} onOpenChange={(open) => !open && setRowAction(null)}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>
@@ -1096,7 +1128,7 @@ function ExpensesClientLoaded({
         </DialogContent>
       </Dialog>
 
-      <Dialog open={timelineSheet !== null} onOpenChange={(open) => !open && setTimelineSheet(null)}>
+      <Dialog open={timelineSheet !== null && sheetsUsable} onOpenChange={(open) => !open && setTimelineSheet(null)}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>{t("expenses.workflow.approvalTimeline")}</DialogTitle>
@@ -1160,7 +1192,7 @@ function ExpensesClientLoaded({
       </Dialog>
 
       <Dialog
-        open={confirmDialog !== null}
+        open={confirmDialog !== null && sheetsUsable}
         onOpenChange={(open) => {
           if (!open) {
             setConfirmDialog(null)
@@ -1199,6 +1231,7 @@ function ExpensesClientLoaded({
             {confirmDialog?.kind === "submit" && (
               <Button
                 onClick={() => {
+                  if (!sheetsUsable) return
                   const row = confirmDialog.row
                   setConfirmDialog(null)
                   void submitExpenseSheet.mutateAsync(rowId(row)).catch((e) =>
@@ -1212,6 +1245,7 @@ function ExpensesClientLoaded({
             {confirmDialog?.kind === "approve" && (
               <Button
                 onClick={() => {
+                  if (!sheetsUsable) return
                   const row = confirmDialog.row
                   setConfirmDialog(null)
                   void approveExpenseSheet.mutateAsync(rowId(row)).catch((e) =>
@@ -1226,6 +1260,7 @@ function ExpensesClientLoaded({
               <Button
                 variant="destructive"
                 onClick={() => {
+                  if (!sheetsUsable) return
                   const row = confirmDialog.row
                   const reason = refuseReason.trim()
                   setConfirmDialog(null)
@@ -1246,7 +1281,7 @@ function ExpensesClientLoaded({
       </Dialog>
 
       {finance.modal}
-      {workflowFormConfig && workflowForm && (
+      {workflowFormConfig && workflowForm && expensesUsable && (
         <FormModal
           key={`${workflowForm.kind}-${rowId(workflowForm.row)}`}
           open

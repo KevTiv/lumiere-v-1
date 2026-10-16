@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   FormModal,
   mergeFieldDefaultValues,
@@ -33,9 +33,13 @@ type Row = Record<string, unknown>;
  * Post / reimburse / rebill dialogs for an expense report, shared by the list and the report page.
  * Render `modal` once and call `open(kind, row)`.
  */
-export function useExpenseReportFinance(orgId: bigint, operatingCompanyId: bigint) {
+export function useExpenseReportFinance(orgId: bigint, operatingCompanyId: bigint, enabled = true) {
   const { t } = useTranslation();
   const [active, setActive] = useState<{ kind: FinanceKind; row: Row } | null>(null);
+  // A denied or failed expense-report read closes the dialog instead of acting on stale rows.
+  useEffect(() => {
+    if (!enabled) setActive(null);
+  }, [enabled]);
 
   const { data: accountJournals = [] } = useAccountJournals(orgId);
   const { data: accountAccounts = [] } = useAccountAccounts(orgId);
@@ -93,6 +97,7 @@ export function useExpenseReportFinance(orgId: bigint, operatingCompanyId: bigin
 
   const submit = async (formData: Record<string, unknown>) => {
     if (!active) return;
+    if (!enabled) throw new Error(t('common.recordsUnavailable', { defaultValue: 'Records could not be loaded.' }));
     const sheetId = sheetIdOf(active.row);
     try {
       if (active.kind === 'postReport') {
@@ -118,10 +123,15 @@ export function useExpenseReportFinance(orgId: bigint, operatingCompanyId: bigin
     }
   };
 
-  const open = useCallback((kind: FinanceKind, row: Row) => setActive({ kind, row }), []);
+  const open = useCallback(
+    (kind: FinanceKind, row: Row) => {
+      if (enabled) setActive({ kind, row });
+    },
+    [enabled],
+  );
 
   const modal =
-    active && config ? (
+    enabled && active && config ? (
       <FormModal
         key={`${active.kind}-${sheetIdOf(active.row)}`}
         open

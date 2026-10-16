@@ -7,6 +7,7 @@ import { withInlineEdits } from '@lumiere/ui/lib/with-inline-edits';
 import { inlineNumberAtLeast, requiredInlineText } from '@/lib/inline-edit-params';
 
 import { useMemo, useState, useEffect, useCallback } from 'react';
+import { canUseModuleData, mergeModuleStates, moduleCollection } from '@lumiere/ui/lib/module-data-state';
 import dynamic from 'next/dynamic';
 import { useTranslation } from '@lumiere/i18n';
 import {
@@ -478,7 +479,7 @@ function InventoryClientLoaded({
 }: InventoryClientLoadedProps) {
   useInventoryModuleSubscription();
   const { t } = useTranslation();
-  const { askForm, formDialog } = useFormDialog();
+  const { askForm, cancelForm, formDialog } = useFormDialog();
   const { orgId } = orgBigInts(organizationId);
   const selectedOperatingCompanyId =
     useDefaultOperatingCompanyBigInt(organizationId);
@@ -550,66 +551,67 @@ function InventoryClientLoaded({
     useState<TimeRangeValue>('30d');
   const openErpAiChat = useOpenErpAiChat();
 
-  const { data: products = [], isLoading: productsLoading } = useProducts(
-    orgId,
-    initialProducts,
-  );
-  const { data: productCategories = [] } = useProductCategories(
-    orgId,
-    initialProductCategories,
-  );
+  const productsRead = moduleCollection(useProducts(orgId, initialProducts));
+  const products = productsRead.rows;
+  const productsLoading = productsRead.state.status === 'loading';
+  const productCategoriesRead = moduleCollection(useProductCategories(orgId, initialProductCategories));
+  const productCategories = productCategoriesRead.rows;
   const { data: uoms = [] } = useUoms(orgId, initialUoms);
   const { data: stockInventories = [] } = useStockInventories(orgId);
   const { data: iotDevices = [] } = useIotDevices(orgId);
-  const { data: stockQuants = [], isLoading: stockQuantsLoading } =
-    useStockQuants(orgId, initialStockQuants);
-  const { data: transfers = [], isLoading: transfersLoading } =
-    useStockPickings(orgId, initialTransfers);
-  const { data: warehouses = [] } = useWarehouses(orgId, initialWarehouses);
-  const { data: adjustments = [] } = useInventoryAdjustments(
-    orgId,
-    initialAdjustments,
-  );
-  const { data: locations = [] } = useStockLocations(
-    orgId,
-    initialStockLocations,
-  );
-  const { data: lots = [] } = useProductionLots(orgId);
-  const { data: serials = [] } = useStockProductionSerials(
-    orgId,
-    initialStockProductionSerials,
-  );
-  const { data: qualityChecks = [] } = useQualityChecks(orgId);
+  const stockQuantsRead = moduleCollection(useStockQuants(orgId, initialStockQuants));
+  const stockQuants = stockQuantsRead.rows;
+  const stockQuantsLoading = stockQuantsRead.state.status === 'loading';
+  const transfersRead = moduleCollection(useStockPickings(orgId, initialTransfers));
+  const transfers = transfersRead.rows;
+  const transfersLoading = transfersRead.state.status === 'loading';
+  const warehousesRead = moduleCollection(useWarehouses(orgId, initialWarehouses));
+  const warehouses = warehousesRead.rows;
+  const adjustmentsRead = moduleCollection(useInventoryAdjustments(orgId, initialAdjustments));
+  const adjustments = adjustmentsRead.rows;
+  const locationsRead = moduleCollection(useStockLocations(orgId, initialStockLocations));
+  const locations = locationsRead.rows;
+  const lotsRead = moduleCollection(useProductionLots(orgId));
+  const lots = lotsRead.rows;
+  const serialsRead = moduleCollection(useStockProductionSerials(orgId, initialStockProductionSerials));
+  const serials = serialsRead.rows;
+  const qualityChecksRead = moduleCollection(useQualityChecks(orgId));
+  const qualityChecks = qualityChecksRead.rows;
   const { data: qualityTeams = [] } = useQualityTeams(orgId);
-  const { data: cycleCounts = [] } = useStockCycleCounts(
-    orgId,
-    initialStockCycleCounts,
-  );
-  const { data: pickingWaves = [] } = usePickingWaves(orgId);
-  const { data: stockPackages = [] } = useStockPackages(orgId);
-  const { data: warehouseTasks = [] } = useWarehouseTasks(orgId);
-  const { data: stockRoutes = [] } = useStockRoutes(orgId);
-  const { data: stockRules = [] } = useStockRules(orgId);
-  const { data: stockMoves = [] } = useStockMoves(orgId, initialStockMoves);
-  const { data: inventoryValuations = [] } = useInventoryValuations(
-    orgId,
-    initialInventoryValuations,
-  );
-  const { data: replenishmentRulesList = [] } = useReplenishmentRules(
-    orgId,
-    initialReplenishmentRules,
-  );
-  const { data: barcodeRules = [] } = useBarcodeRules(orgId);
-  const { data: adjustmentReasons = [] } = useAdjustmentReasons(orgId);
-  const { data: barcodeNomenclatures = [] } = useBarcodeNomenclatures(orgId);
-  const { data: serialLotTraceability = [] } = useSerialLotTraceability(orgId);
-  const { data: stockTraceabilityReports = [] } =
-    useStockTraceabilityReports(orgId);
-  const { data: shortAtpExceptions = [] } =
-    useInventoryExceptionsShortAtp(orgId);
-  const { data: expiredLotExceptions = [] } =
-    useInventoryExceptionsExpiredLots(orgId);
-  const { data: openQcExceptions = [] } = useInventoryExceptionsOpenQc(orgId);
+  const cycleCountsRead = moduleCollection(useStockCycleCounts(orgId, initialStockCycleCounts));
+  const cycleCounts = cycleCountsRead.rows;
+  const pickingWavesRead = moduleCollection(usePickingWaves(orgId));
+  const pickingWaves = pickingWavesRead.rows;
+  const stockPackagesRead = moduleCollection(useStockPackages(orgId));
+  const stockPackages = stockPackagesRead.rows;
+  const warehouseTasksRead = moduleCollection(useWarehouseTasks(orgId));
+  const warehouseTasks = warehouseTasksRead.rows;
+  const stockRoutesRead = moduleCollection(useStockRoutes(orgId));
+  const stockRoutes = stockRoutesRead.rows;
+  const stockRulesRead = moduleCollection(useStockRules(orgId));
+  const stockRules = stockRulesRead.rows;
+  const stockMovesRead = moduleCollection(useStockMoves(orgId, initialStockMoves));
+  const stockMoves = stockMovesRead.rows;
+  const inventoryValuationsRead = moduleCollection(useInventoryValuations(orgId, initialInventoryValuations));
+  const inventoryValuations = inventoryValuationsRead.rows;
+  const replenishmentRulesListRead = moduleCollection(useReplenishmentRules(orgId, initialReplenishmentRules));
+  const replenishmentRulesList = replenishmentRulesListRead.rows;
+  const barcodeRulesRead = moduleCollection(useBarcodeRules(orgId));
+  const barcodeRules = barcodeRulesRead.rows;
+  const adjustmentReasonsRead = moduleCollection(useAdjustmentReasons(orgId));
+  const adjustmentReasons = adjustmentReasonsRead.rows;
+  const barcodeNomenclaturesRead = moduleCollection(useBarcodeNomenclatures(orgId));
+  const barcodeNomenclatures = barcodeNomenclaturesRead.rows;
+  const serialLotTraceabilityRead = moduleCollection(useSerialLotTraceability(orgId));
+  const serialLotTraceability = serialLotTraceabilityRead.rows;
+  const stockTraceabilityReportsRead = moduleCollection(useStockTraceabilityReports(orgId));
+  const stockTraceabilityReports = stockTraceabilityReportsRead.rows;
+  const shortAtpExceptionsRead = moduleCollection(useInventoryExceptionsShortAtp(orgId));
+  const shortAtpExceptions = shortAtpExceptionsRead.rows;
+  const expiredLotExceptionsRead = moduleCollection(useInventoryExceptionsExpiredLots(orgId));
+  const expiredLotExceptions = expiredLotExceptionsRead.rows;
+  const openQcExceptionsRead = moduleCollection(useInventoryExceptionsOpenQc(orgId));
+  const openQcExceptions = openQcExceptionsRead.rows;
   const { data: orgUsers = [] } = useOrgUsers();
   const { data: pricelists = [] } = usePricelists(orgId, initialPricelists);
   const { data: contacts = [] } = useContacts(orgId);
@@ -5064,11 +5066,104 @@ function InventoryClientLoaded({
     [data.transfers, transfersLoading, t],
   );
 
+  const dataState = {
+    dashboard: mergeModuleStates([
+      productsRead.state, stockQuantsRead.state, transfersRead.state, adjustmentsRead.state, stockMovesRead.state,
+      shortAtpExceptionsRead.state, expiredLotExceptionsRead.state, openQcExceptionsRead.state,
+    ]),
+    products: productsRead.state,
+    'product-categories': productCategoriesRead.state,
+    stock: stockQuantsRead.state,
+    transfers: transfersRead.state,
+    'stock-moves': stockMovesRead.state,
+    warehouses: warehousesRead.state,
+    adjustments: adjustmentsRead.state,
+    locations: locationsRead.state,
+    lots: lotsRead.state,
+    serials: serialsRead.state,
+    quality: qualityChecksRead.state,
+    'cycle-counts': cycleCountsRead.state,
+    'picking-waves': pickingWavesRead.state,
+    'stock-packages': stockPackagesRead.state,
+    'warehouse-tasks': warehouseTasksRead.state,
+    routes: stockRoutesRead.state,
+    rules: stockRulesRead.state,
+    valuations: inventoryValuationsRead.state,
+    replenishment: replenishmentRulesListRead.state,
+    'barcode-rules': barcodeRulesRead.state,
+    'barcode-nomenclatures': barcodeNomenclaturesRead.state,
+    'adjustment-reasons': adjustmentReasonsRead.state,
+    'traceability-records': serialLotTraceabilityRead.state,
+    'traceability-reports': stockTraceabilityReportsRead.state,
+    'cycle-wizard': mergeModuleStates([locationsRead.state, cycleCountsRead.state, productsRead.state]),
+    'location-tree': locationsRead.state,
+    'quality-alerts': qualityChecksRead.state,
+  };
+  type InventoryTab = keyof typeof dataState;
+  const tabUsable = (tab: string | undefined) =>
+    tab == null || !(tab in dataState) || canUseModuleData(dataState[tab as InventoryTab]);
+  const actionTabs: Record<string, InventoryTab> = {
+    createProduct: 'products', createTransfer: 'transfers', createStockPicking: 'transfers',
+    createStockLocation: 'locations', createWarehouse: 'warehouses', createQualityCheck: 'quality',
+    createQualityAlert: 'quality-alerts', createReplenishmentRule: 'replenishment',
+    createPickingWave: 'picking-waves', createProductCategory: 'product-categories',
+    createBarcodeRule: 'barcode-rules', createAdjustmentReason: 'adjustment-reasons',
+    createTraceabilityRecord: 'traceability-records', createTraceabilityReport: 'traceability-reports',
+    createStockQuant: 'stock',
+  };
+  const csvTabs: Partial<Record<InventoryCsvImportKind, InventoryTab>> = {
+    productCategory: 'product-categories', product: 'products', productVariant: 'products',
+    warehouse: 'warehouses', stockLocation: 'locations', stockQuant: 'stock', lot: 'lots',
+  };
+  const quickActionUsable = quickActionForm == null || tabUsable(actionTabs[quickActionForm.action]);
+  const csvSourceTab = csvKind == null ? undefined : csvTabs[csvKind];
+  const csvSourceState = csvSourceTab == null ? undefined : dataState[csvSourceTab];
+  const productsUsable = tabUsable('products');
+  const warehousesUsable = tabUsable('warehouses');
+  const stockUsable = tabUsable('stock');
+  const transfersUsable = tabUsable('transfers');
+  const serialsUsable = tabUsable('serials');
+  const lotsUsable = tabUsable('lots');
+  const qualityUsable = tabUsable('quality');
+  // Prompted row commands act on the active tab's rows.
+  const activeTabUsable = tabUsable(activeTab);
+  useEffect(() => {
+    // Dialogs close when the collection their rows came from is denied or fails.
+    if (!quickActionUsable) setQuickActionForm(null);
+    if (!productsUsable) {
+      setEditProductRow(null);
+      setVariantProductId(null);
+      setSupplierLineProductId(null);
+      setPackagingProductId(null);
+    }
+    if (!warehousesUsable) setEditWarehouseRow(null);
+    if (!stockUsable) setMoveQuantRow(null);
+    if (!transfersUsable) {
+      setPartialTransferPicking(null);
+      setAssignPickingId(null);
+    }
+    if (!serialsUsable) {
+      setSelectedSerialRow(null);
+      setBlockSerialId(null);
+    }
+    if (!lotsUsable) setSelectedLotRow(null);
+    if (!qualityUsable) {
+      setCreateQualityAlertOpen(false);
+      setAssignQualityAlertId(null);
+      setSolveQualityAlertId(null);
+    }
+    if (!activeTabUsable) cancelForm();
+  }, [
+    quickActionUsable, productsUsable, warehousesUsable, stockUsable, transfersUsable,
+    serialsUsable, lotsUsable, qualityUsable, activeTabUsable, cancelForm,
+  ]);
+
   const handleFormSubmit = async (
     _tabId: string,
     action: string,
     formData: Record<string, unknown>,
   ) => {
+    if (!tabUsable(actionTabs[action])) throw new Error('Required data is unavailable. Refresh and try again.');
     if (action === 'createProduct') {
       const pricelistRaw = formData.pricelistId;
       if (pricelistRaw === '' || pricelistRaw == null) return;
@@ -5391,7 +5486,7 @@ function InventoryClientLoaded({
 
   return (
     <>
-      {formDialog}
+      {activeTabUsable && formDialog}
       {/* key={operatingCompanyId} forces React to remount ModuleView when the operating company
           changes, preventing stale inventory rows from a previous company leaking into the new view. */}
       <ModuleView
@@ -5405,6 +5500,7 @@ function InventoryClientLoaded({
           stock: stockQuantsLoading,
           transfers: transfersLoading,
         }}
+        dataState={dataState}
         kpiStrips={kpiStrips}
         onFormSubmit={handleFormSubmit}
         isPending={isFormMutationPending}
@@ -5438,7 +5534,7 @@ function InventoryClientLoaded({
         </div>
       ) : null}
       <FormModal
-        open={selectedSerialRow !== null}
+        open={selectedSerialRow !== null && serialsUsable}
         onOpenChange={(open) => !open && setSelectedSerialRow(null)}
         config={serialDetailModalConfig}
         isPending={isFormMutationPending}
@@ -5461,7 +5557,7 @@ function InventoryClientLoaded({
         }
       />
       <FormModal
-        open={selectedLotRow !== null}
+        open={selectedLotRow !== null && lotsUsable}
         onOpenChange={(open) => !open && setSelectedLotRow(null)}
         config={lotDetailModalConfig}
         isPending={isFormMutationPending}
@@ -5473,7 +5569,7 @@ function InventoryClientLoaded({
             ? `block-serial-${String(blockSerialId)}`
             : 'block-serial-closed'
         }
-        open={blockSerialId !== null}
+        open={blockSerialId !== null && serialsUsable}
         onOpenChange={(open) => !open && setBlockSerialId(null)}
         config={blockSerialForm(t)}
         isPending={isFormMutationPending}
@@ -5491,7 +5587,7 @@ function InventoryClientLoaded({
         }}
       />
       <FormModal
-        open={createQualityAlertOpen}
+        open={createQualityAlertOpen && qualityUsable}
         onOpenChange={setCreateQualityAlertOpen}
         config={qualityAlertCreateFormConfig}
         isPending={isFormMutationPending}
@@ -5507,7 +5603,7 @@ function InventoryClientLoaded({
             ? `assign-alert-${String(assignQualityAlertId)}`
             : 'assign-alert-closed'
         }
-        open={assignQualityAlertId !== null}
+        open={assignQualityAlertId !== null && qualityUsable}
         onOpenChange={(open) => !open && setAssignQualityAlertId(null)}
         config={assignQualityAlertFormConfig}
         isPending={isFormMutationPending}
@@ -5531,7 +5627,7 @@ function InventoryClientLoaded({
             ? `solve-alert-${String(solveQualityAlertId)}`
             : 'solve-alert-closed'
         }
-        open={solveQualityAlertId !== null}
+        open={solveQualityAlertId !== null && qualityUsable}
         onOpenChange={(open) => !open && setSolveQualityAlertId(null)}
         config={solveQualityAlertForm(t)}
         isPending={isFormMutationPending}
@@ -5548,7 +5644,7 @@ function InventoryClientLoaded({
         }}
       />
       <FormModal
-        open={quickActionForm !== null}
+        open={quickActionForm !== null && quickActionUsable}
         onOpenChange={(open) => !open && setQuickActionForm(null)}
         config={quickActionForm?.form ?? productFormConfig}
         isPending={isFormMutationPending}
@@ -5569,7 +5665,7 @@ function InventoryClientLoaded({
             ? `edit-product-${String(editProductRow.id)}`
             : 'edit-product-closed'
         }
-        open={editProductRow !== null}
+        open={editProductRow !== null && productsUsable}
         onOpenChange={(open) => !open && setEditProductRow(null)}
         config={editProductModalConfig}
         isPending={isFormMutationPending}
@@ -5611,7 +5707,7 @@ function InventoryClientLoaded({
             ? `variant-${String(variantProductId)}`
             : 'variant-closed'
         }
-        open={variantProductId !== null}
+        open={variantProductId !== null && productsUsable}
         onOpenChange={(open) => !open && setVariantProductId(null)}
         config={newProductVariantForm(t)}
         isPending={isFormMutationPending}
@@ -5636,7 +5732,7 @@ function InventoryClientLoaded({
             ? `edit-wh-${String(editWarehouseRow.id)}`
             : 'edit-wh-closed'
         }
-        open={editWarehouseRow !== null}
+        open={editWarehouseRow !== null && warehousesUsable}
         onOpenChange={(open) => !open && setEditWarehouseRow(null)}
         config={editWarehouseModalConfig}
         isPending={isFormMutationPending}
@@ -5704,7 +5800,7 @@ function InventoryClientLoaded({
           });
         }}
       />
-      {moveQuantRow != null && moveQuantFormConfig ? (
+      {moveQuantRow != null && stockUsable && moveQuantFormConfig ? (
         <FormModal
           key={`move-quant-${String(moveQuantRow.id ?? '')}`}
           open
@@ -5750,7 +5846,7 @@ function InventoryClientLoaded({
           }}
         />
       ) : null}
-      {partialTransferPicking != null && partialTransferFormConfig ? (
+      {partialTransferPicking != null && transfersUsable && partialTransferFormConfig ? (
         <FormModal
           key={`partial-transfer-${String(partialTransferPicking.id ?? '')}`}
           open
@@ -5811,7 +5907,7 @@ function InventoryClientLoaded({
             ? `assign-${String(assignPickingId)}`
             : 'assign-closed'
         }
-        open={assignPickingId !== null}
+        open={assignPickingId !== null && transfersUsable}
         onOpenChange={(open) => !open && setAssignPickingId(null)}
         config={assignUserFormConfig}
         isPending={isFormMutationPending}
@@ -5834,7 +5930,7 @@ function InventoryClientLoaded({
             ? `supplier-${String(supplierLineProductId)}`
             : 'supplier-closed'
         }
-        open={supplierLineProductId !== null}
+        open={supplierLineProductId !== null && productsUsable}
         onOpenChange={(open) => !open && setSupplierLineProductId(null)}
         config={productSupplierLineFormConfig}
         isPending={isFormMutationPending}
@@ -5872,7 +5968,7 @@ function InventoryClientLoaded({
             ? `pkg-${String(packagingProductId)}`
             : 'pkg-closed'
         }
-        open={packagingProductId !== null}
+        open={packagingProductId !== null && productsUsable}
         onOpenChange={(open) => !open && setPackagingProductId(null)}
         config={productPackagingFormConfig}
         isPending={isFormMutationPending}
@@ -5903,6 +5999,7 @@ function InventoryClientLoaded({
       />
       {csvKind === 'product' ? (
         <ImportAssistantWizard
+          sourceState={csvSourceState}
           key="product-assistant"
           open
           organizationId={organizationId}
@@ -5926,6 +6023,7 @@ function InventoryClientLoaded({
       ) : null}
       {csvKind && csvKind !== 'product' && csvFormConfig ? (
         <CsvImportModal
+          sourceState={csvSourceState}
           trackedImport={{ companyId: operatingCompanyId }}
           organizationId={orgId}
           tableName={{ uomCategory: "uom_category", uom: "uom", productCategory: "product_category", product: "product", productVariant: "product_variant", warehouse: "warehouse", stockLocation: "stock_location", stockQuant: "stock_quant", lot: "stock_production_lot" }[csvKind]}
