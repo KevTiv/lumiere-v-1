@@ -71,8 +71,9 @@ fn cycle(ctx: &ReducerContext, taxed: bool, foreign: bool, included: bool) -> Re
     };
     ctx.db.purchase_order_line().id().update(PurchaseOrderLine {
         currency_id: doc_currency,
+        price_subtotal: if included { 25.0 } else { 30.0 },
         price_tax: tax_on_order,
-        price_total: 30.0 + tax_on_order,
+        price_total: if included { 30.0 } else { 30.0 + tax_on_order },
         ..source
     });
     // A functional-currency journal must not replace the PO document currency.
@@ -191,7 +192,7 @@ fn cycle(ctx: &ReducerContext, taxed: bool, foreign: bool, included: bool) -> Re
     if taxed {
         expense_line.tax_ids = vec![tax.id];
     }
-    let params = CreateBillFromPurchaseOrderParams {
+    let mut params = CreateBillFromPurchaseOrderParams {
         journal_id: journal.id,
         default_expense_account_id: expense,
         invoice_date: ctx.timestamp,
@@ -199,6 +200,12 @@ fn cycle(ctx: &ReducerContext, taxed: bool, foreign: bool, included: bool) -> Re
         payable_line: empty_move_line(ap),
         metadata: None,
     };
+    let discount_error = create_bill_from_purchase_order(ctx, org, po_id, params.clone())
+        .expect_err("PO bill discount without PO evidence must fail");
+    if !discount_error.contains("zero discount") {
+        return Err("PO bill discount rejection was not explicit".into());
+    }
+    params.expense_line.discount = 0.0;
     // Missing rates and mappings fail before canonical bills, rows or quantities change.
     if foreign {
         rejected(ctx, org, po_id, params.clone())?;
@@ -328,6 +335,38 @@ fn correct_and_verify(
         expected_price_unit: Some(product.price_unit),
     };
 
+    let direct_amount_error = update_account_move_line(
+        ctx,
+        org,
+        product.id,
+        UpdateAccountMoveLineParams {
+            company_id: Some(fixture.company_id),
+            name: None,
+            debit: Some(product.debit / 2.0),
+            credit: None,
+            partner_id: None,
+            analytic_account_id: None,
+            metadata: None,
+            quantity: None,
+            price_unit: None,
+            expected_quantity: None,
+            expected_price_unit: None,
+        },
+    )
+    .expect_err("direct PO bill amount edits must fail");
+    if !direct_amount_error.contains("amounts are derived")
+        || ctx
+            .db
+            .account_move_line()
+            .id()
+            .find(&product.id)
+            .ok_or("product after rejected edit")?
+            .debit
+            != product.debit
+    {
+        return Err("rejected direct PO bill amount edit changed accounting evidence".into());
+    }
+
     update_account_move_line(ctx, org, product.id, correction(1.0, 2.0))?;
     verify_corrected_bill(
         ctx, po_id, bill_id, product.id, taxed, foreign, included, 1.0,
@@ -368,7 +407,7 @@ fn verify_corrected_bill(
         .filter(&po_id)
         .find(|line| line.invoice_lines.contains(&product_id))
         .ok_or("exact source")?;
-    let net = quantity * 10.0 * 0.9 / if included { 1.2 } else { 1.0 };
+    let net = quantity * 10.0 / if included { 1.2 } else { 1.0 };
     let tax = if taxed { net * 0.2 } else { 0.0 };
     let rate = if foreign { 1.25 } else { 1.0 };
     let ledger = |amount: f64| {
@@ -385,7 +424,7 @@ fn verify_corrected_bill(
         .filter(|line| line.tax_line_id.is_some())
         .collect();
     if product.quantity != quantity
-        || product.discount != 10.0
+        || product.discount != 0.0
         || (product.price_subtotal - net).abs() > 1e-8
         || (product.price_total - net - tax).abs() > 1e-8
         || (bill.amount_untaxed - net).abs() > 1e-8
@@ -518,7 +557,7 @@ fn create_and_verify(
         .move_line_by_move()
         .filter(&bill.id)
         .collect();
-    let net = quantity * 10.0 * 0.9 / if included { 1.2 } else { 1.0 };
+    let net = quantity * 10.0 / if included { 1.2 } else { 1.0 };
     let tax_amount = if taxed { net * 0.2 } else { 0.0 };
     let rate = if foreign { 1.25 } else { 1.0 };
     let ledger = |a: f64| {
@@ -549,7 +588,7 @@ fn create_and_verify(
         || (debit - credit).abs() > 1e-8
         || (bill.amount_total_signed - ledger(net) - ledger(tax_amount)).abs() > 1e-8
         || product.quantity != quantity
-        || product.discount != 10.0
+        || product.discount != 0.0
         || taxes.len() != if taxed { 1 } else { 0 }
         || source
             .invoice_lines

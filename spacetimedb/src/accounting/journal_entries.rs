@@ -3240,6 +3240,40 @@ fn apply_correction_amounts(line: &mut AccountMoveLine, amount: f64, ledger: f64
     line.credit_currency = if credit { amount } else { 0.0 };
 }
 
+fn is_po_owned_vendor_bill(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    move_record: &AccountMove,
+) -> Result<bool, String> {
+    if move_record.move_type != MoveType::InInvoice {
+        return Ok(false);
+    }
+    let owners: Vec<_> = ctx
+        .db
+        .purchase_order()
+        .iter()
+        .filter_map(|order| {
+            let occurrences = order
+                .invoice_ids
+                .iter()
+                .filter(|id| **id == move_record.id)
+                .count();
+            (occurrences > 0).then_some((order, occurrences))
+        })
+        .collect();
+    if owners.is_empty() {
+        return Ok(false);
+    }
+    if owners.len() != 1
+        || owners[0].1 != 1
+        || owners[0].0.organization_id != organization_id
+        || owners[0].0.company_id != move_record.company_id
+    {
+        return Err("PO-owned bill has invalid or cross-scope purchase-order lineage".into());
+    }
+    Ok(true)
+}
+
 #[spacetimedb::reducer]
 pub fn update_account_move_line(
     ctx: &ReducerContext,
@@ -3280,6 +3314,13 @@ pub fn update_account_move_line(
         || move_record.organization_id != organization_id
     {
         return Err("Move line does not belong to this scope".into());
+    }
+    if (params.debit.is_some() || params.credit.is_some())
+        && is_po_owned_vendor_bill(ctx, organization_id, &move_record)?
+    {
+        return Err(
+            "PO-owned bill amounts are derived; use the reviewed economic correction path".into(),
+        );
     }
     if params.quantity.is_some() || params.price_unit.is_some() {
         return correct_po_bill_line(ctx, organization_id, line, &params);
@@ -3839,6 +3880,58 @@ struct PurchaseBillFx {
     source_company_id: Option<u64>,
 }
 
+fn validate_uniform_po_tax_evidence(
+    lines: &[crate::purchasing::purchase_orders::PurchaseOrderLine],
+) -> Result<(), String> {
+    validate_uniform_tax_evidence_values(
+        lines
+            .iter()
+            .map(|line| (line.product_qty, line.price_unit, line.price_tax)),
+    )
+}
+
+fn validate_uniform_tax_evidence_values(
+    lines: impl IntoIterator<Item = (f64, f64, f64)>,
+) -> Result<(), String> {
+    let mut effective_rate = None;
+    for (quantity, price, tax) in lines {
+        let gross = quantity * price;
+        if !gross.is_finite() || !tax.is_finite() || tax < 0.0 {
+            return Err("PO line tax evidence is invalid".into());
+        }
+        if gross.abs() <= 1e-12 {
+            if tax.abs() > 1e-8 {
+                return Err("zero-value PO line carries unexplained tax evidence".into());
+            }
+            continue;
+        }
+        let rate = tax / gross;
+        if let Some(expected) = effective_rate {
+            if (rate - expected).abs() > 1e-8 {
+                return Err("PO lines have mixed tax evidence; per-line tax identities are required before billing".into());
+            }
+        } else {
+            effective_rate = Some(rate);
+        }
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod po_tax_evidence_tests {
+    use super::validate_uniform_tax_evidence_values;
+
+    #[test]
+    fn mixed_line_tax_evidence_fails_closed() {
+        assert!(
+            validate_uniform_tax_evidence_values([(1.0, 100.0, 20.0), (1.0, 50.0, 10.0)]).is_ok()
+        );
+        let error = validate_uniform_tax_evidence_values([(1.0, 100.0, 20.0), (1.0, 50.0, 0.0)])
+            .unwrap_err();
+        assert!(error.contains("per-line tax identities"));
+    }
+}
+
 fn purchase_bill_fx(
     ctx: &ReducerContext,
     organization_id: u64,
@@ -3971,6 +4064,7 @@ pub fn create_bill_from_purchase_order(
     if billable_lines.is_empty() {
         return Err("No received quantity to bill on this purchase order".to_string());
     }
+    validate_uniform_po_tax_evidence(&billable_lines)?;
 
     let journal =
         load_active_journal_in_scope(ctx, organization_id, po.company_id, params.journal_id)?;
@@ -4035,12 +4129,13 @@ pub fn create_bill_from_purchase_order(
         }
     }
     if params.expense_line.exclude_from_invoice_tab
+        || params.expense_line.discount != 0.0
         || params.payable_line.discount != 0.0
         || !params.payable_line.tax_ids.is_empty()
         || params.payable_line.product_id.is_some()
     {
         return Err(
-            "PO bill templates must preserve expense visibility and a plain payable".into(),
+            "PO bill templates require zero discount, expense visibility, and a plain payable until PO lines retain discount evidence".into(),
         );
     }
 

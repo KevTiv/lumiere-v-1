@@ -23,9 +23,9 @@ use crate::inventory::product::{product, product_supplier_info, product_variant,
 use crate::inventory::tracking::stock_production_lot;
 use crate::manufacturing::relations::{require_uom_compatible, require_uom_in_org};
 use crate::sales::oms_extensions::{account_fiscal_position, account_incoterm};
-use crate::types::TaxTypeUse;
 use crate::types::{
     ExclusiveMode, IsQuantityCopy, LineState, PoInvoiceStatus, PoState, RequisitionState,
+    TaxAmountType, TaxTypeUse,
 };
 use crate::workflow::action_registry::{
     GuardedActionInput, GuardedActionKey, GUARDED_ACTION_SCHEMA_VERSION,
@@ -504,6 +504,44 @@ fn require_purchase_taxes(
         }
     }
     Ok(())
+}
+
+fn purchase_line_amounts(
+    ctx: &ReducerContext,
+    tax_ids: &[u64],
+    gross: f64,
+) -> Result<(f64, f64, f64), String> {
+    let taxes: Vec<_> = tax_ids
+        .iter()
+        .map(|tax_id| {
+            ctx.db
+                .account_tax()
+                .id()
+                .find(tax_id)
+                .ok_or_else(|| "Purchase tax not found".to_string())
+        })
+        .collect::<Result<_, _>>()?;
+    if taxes
+        .iter()
+        .all(|tax| tax.amount_type == TaxAmountType::Percent && tax.amount >= 0.0)
+    {
+        let rules: Vec<_> = taxes
+            .iter()
+            .map(|tax| crate::accounting::bill_economics::PercentageTax {
+                id: tax.id,
+                rate: tax.amount,
+                included: tax.price_include,
+            })
+            .collect();
+        let economics = crate::accounting::bill_economics::percentage_tax_amounts(gross, &rules)?;
+        return Ok((
+            economics.subtotal,
+            economics.taxes.values().sum(),
+            economics.total,
+        ));
+    }
+    let tax = calculate_tax(ctx, tax_ids, gross);
+    Ok((gross, tax, gross + tax))
 }
 
 fn require_product_variant_for_product(
@@ -1687,8 +1725,8 @@ fn add_purchase_order_line_impl(
         params.lot_id,
     )?;
 
-    let subtotal = params.quantity * params.price_unit;
-    let tax = calculate_tax(ctx, &params.tax_ids, subtotal);
+    let (subtotal, tax, total) =
+        purchase_line_amounts(ctx, &params.tax_ids, params.quantity * params.price_unit)?;
     let company_id = order.company_id;
 
     let line = ctx.db.purchase_order_line().insert(PurchaseOrderLine {
@@ -1707,7 +1745,7 @@ fn add_purchase_order_line_impl(
         product_template_id: None,
         price_unit: params.price_unit,
         price_subtotal: subtotal,
-        price_total: subtotal + tax,
+        price_total: total,
         price_tax: tax,
         order_id,
         account_analytic_id: params.account_analytic_id,
@@ -1990,17 +2028,20 @@ pub fn update_purchase_order_line(
         lot_id,
     )?;
 
-    let subtotal = quantity * price_unit;
-    // Preserve existing tax when caller omits tax_ids (do not wipe to []).
-    let tax = match &params.tax_ids {
-        Some(ids) => calculate_tax(ctx, ids, subtotal),
-        None => {
-            if line.price_subtotal.abs() > f64::EPSILON {
-                subtotal * (line.price_tax / line.price_subtotal)
-            } else {
-                line.price_tax
+    // Tax identities are not retained on legacy PO lines. Repricing a taxed
+    // line without explicit identities would manufacture new aggregate evidence.
+    let (subtotal, tax, total) = match &params.tax_ids {
+        Some(ids) => purchase_line_amounts(ctx, ids, quantity * price_unit)?,
+        None if params.quantity.is_some() || params.price_unit.is_some() => {
+            if line.price_tax.abs() > 1e-8 {
+                return Err(
+                    "Taxed PO line repricing requires explicit purchase tax identities".into(),
+                );
             }
+            let subtotal = quantity * price_unit;
+            (subtotal, 0.0, subtotal)
         }
+        None => (line.price_subtotal, line.price_tax, line.price_total),
     };
 
     let date_planned = params.date_planned.or(line.date_planned);
@@ -2020,7 +2061,7 @@ pub fn update_purchase_order_line(
         price_unit,
         price_subtotal: subtotal,
         price_tax: tax,
-        price_total: subtotal + tax,
+        price_total: total,
         date_planned,
         product_variant_id,
         account_analytic_id,

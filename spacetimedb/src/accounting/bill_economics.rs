@@ -9,6 +9,43 @@ pub(crate) struct PercentageTax {
     pub included: bool,
 }
 
+/// Compute non-compounding percentage taxes from a gross amount. Both PO entry
+/// and vendor-bill creation use this function so inclusive/exclusive composition
+/// cannot drift between source evidence and the accounting document.
+pub(crate) fn percentage_tax_amounts(
+    gross: f64,
+    taxes: &[PercentageTax],
+) -> Result<BillEconomics, String> {
+    if !gross.is_finite() || gross < 0.0 {
+        return Err("gross amount is invalid".into());
+    }
+    let mut included_rate = 0.0;
+    let mut ids = BTreeSet::new();
+    for tax in taxes {
+        if !ids.insert(tax.id) || !tax.rate.is_finite() || tax.rate < 0.0 {
+            return Err("duplicate or invalid percentage tax".into());
+        }
+        if tax.included {
+            included_rate += tax.rate / 100.0;
+        }
+    }
+
+    let subtotal = gross / (1.0 + included_rate);
+    let amounts: BTreeMap<_, _> = taxes
+        .iter()
+        .map(|tax| (tax.id, subtotal * (tax.rate / 100.0)))
+        .collect();
+    let total = subtotal + amounts.values().sum::<f64>();
+    if !included_rate.is_finite() || !subtotal.is_finite() || !total.is_finite() {
+        return Err("bill economic amounts are not finite".into());
+    }
+    Ok(BillEconomics {
+        subtotal,
+        taxes: amounts,
+        total,
+    })
+}
+
 pub(crate) struct BillEconomics {
     pub subtotal: f64,
     pub taxes: BTreeMap<u64, f64>,
@@ -31,37 +68,7 @@ pub(crate) fn calculate(
         return Err("bill quantity, unit price, or discount is invalid".into());
     }
 
-    let gross = quantity * price * (1.0 - discount / 100.0);
-    let mut included_rate = 0.0;
-    let mut ids = BTreeSet::new();
-    for tax in taxes {
-        if !ids.insert(tax.id) || !tax.rate.is_finite() || tax.rate < 0.0 {
-            return Err("duplicate or invalid percentage tax".into());
-        }
-        if tax.included {
-            included_rate += tax.rate / 100.0;
-        }
-    }
-
-    let subtotal = gross / (1.0 + included_rate);
-    let amounts: BTreeMap<_, _> = taxes
-        .iter()
-        .map(|tax| (tax.id, subtotal * (tax.rate / 100.0)))
-        .collect();
-    let total = subtotal + amounts.values().sum::<f64>();
-    if !gross.is_finite()
-        || !included_rate.is_finite()
-        || !subtotal.is_finite()
-        || !total.is_finite()
-    {
-        return Err("bill economic amounts are not finite".into());
-    }
-
-    Ok(BillEconomics {
-        subtotal,
-        taxes: amounts,
-        total,
-    })
+    percentage_tax_amounts(quantity * price * (1.0 - discount / 100.0), taxes)
 }
 
 /// Verify an explicitly selected rule against the PO's retained aggregate tax.
@@ -165,6 +172,29 @@ mod tests {
             ),
             (200.0, 40.0, 20.0, 260.0)
         );
+    }
+
+    #[test]
+    fn po_source_tax_total_uses_the_same_inclusive_exclusive_composition() {
+        let values = percentage_tax_amounts(
+            120.0,
+            &[
+                PercentageTax {
+                    id: 1,
+                    rate: 20.0,
+                    included: true,
+                },
+                PercentageTax {
+                    id: 2,
+                    rate: 10.0,
+                    included: false,
+                },
+            ],
+        )
+        .unwrap();
+        assert_eq!(values.subtotal, 100.0);
+        assert_eq!(values.taxes.values().sum::<f64>(), 30.0);
+        assert_eq!(values.total, 130.0);
     }
 
     #[test]
