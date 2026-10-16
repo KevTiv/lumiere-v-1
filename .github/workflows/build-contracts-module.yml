@@ -61,15 +61,15 @@ jobs:
       - name: Compile contracts module
         if: steps.contracts-module.outputs.cache-hit != 'true'
         env:
-          # In-module tests intentionally create multiple fixture tenants.
-          # Production excludes dev-module and never enables this bypass.
-          LUMIERE_ENABLE_DEV_REDUCERS: ${{ inputs.production && '0' || '1' }}
+          LUMIERE_ENABLE_DEV_REDUCERS: '0'
           LUMIERE_ALPHA_FOUNDER_IDENTITIES: ${{ inputs.alpha_founder_identities }}
         run: |
           if [[ '${{ inputs.production }}' == 'true' ]]; then
             make contracts-module-production-ci
           else
-            make contracts-module-ci
+            # Development in-module tests intentionally create fixture tenants.
+            # The production branch never overrides the default denial above.
+            LUMIERE_ENABLE_DEV_REDUCERS=1 make contracts-module-ci
           fi
 
       - name: Export contracts module
