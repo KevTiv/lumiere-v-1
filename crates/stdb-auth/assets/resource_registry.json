@@ -5114,6 +5114,25 @@
     ],
     "table": "purchase_order_line"
   },
+  "purchase-order-creations": {
+    "aliases": [
+      "purchase-order-creations",
+      "purchase_order_creation_operation"
+    ],
+    "default_restricted": [
+      "operation_key",
+      "purchase_order_id",
+      "payload_hash",
+      "created_by",
+      "created_at"
+    ],
+    "mandatory": [
+      "id",
+      "organization_id",
+      "company_id"
+    ],
+    "table": "purchase_order_creation_operation"
+  },
   "purchase-orders": {
     "aliases": [
       "purchase-orders",
@@ -5179,6 +5198,33 @@
       "organization_id"
     ],
     "table": "purchase_order"
+  },
+  "purchase-receipt-operations": {
+    "aliases": [
+      "purchase-receipt-operations",
+      "purchase_receipt_operation"
+    ],
+    "default_restricted": [
+      "operation_key",
+      "line_id",
+      "order_id",
+      "quantity",
+      "lot_id",
+      "received_before",
+      "received_after",
+      "move_id",
+      "picking_id",
+      "continuation_move_id",
+      "continuation_picking_id",
+      "created_by",
+      "created_at"
+    ],
+    "mandatory": [
+      "id",
+      "organization_id",
+      "company_id"
+    ],
+    "table": "purchase_receipt_operation"
   },
   "purchase-requisition-lines": {
     "aliases": [

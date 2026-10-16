@@ -2011,6 +2011,16 @@
       },
       "evidence": "purchasing/purchase_orders.rs: reducer inserts/appends or performs an unguarded domain mutation"
     },
+    "create_purchase_order_once": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "purchasing/order_creation_operations.rs: atomic scoped key relation returns the exact purchase order for same-input replay and rejects conflicting reuse"
+    },
     "create_purchase_requisition": {
       "semantic_kind": "command",
       "client_facing": true,
@@ -3080,6 +3090,16 @@
         "version": 1
       },
       "evidence": "purchasing/purchase_orders.rs: reducer checks current state or duplicate before transition"
+    },
+    "receive_po_line_once": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "purchasing/receipt_operations.rs: atomic uniquely scoped invocation receipt rejects conflicting reuse and returns same-input replay after current authorization"
     },
     "recognize_amortization_line": {
       "semantic_kind": "command",

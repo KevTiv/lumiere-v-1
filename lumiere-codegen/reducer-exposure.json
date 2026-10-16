@@ -1664,6 +1664,11 @@
       "reason": "invoked by an enumerated frontend BFF call site"
     },
     {
+      "name": "create_purchase_order_once",
+      "exposure": "session",
+      "reason": "reviewed keyed purchase-order create: producer rechecks current create permission, actor/company scope and exact immutable request identity"
+    },
+    {
       "name": "create_purchase_requisition",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
@@ -3153,6 +3158,11 @@
       "name": "receive_po_line",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
+    },
+    {
+      "name": "receive_po_line_once",
+      "exposure": "session",
+      "reason": "Purchasing operator keyed receipt workflow; producer rechecks current write permission, scope and exact invocation identity"
     },
     {
       "name": "recognize_amortization_line",
