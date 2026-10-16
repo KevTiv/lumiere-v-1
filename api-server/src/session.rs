@@ -1,5 +1,7 @@
 //! Session resolution from an authenticated SpacetimeDB token and membership.
 
+pub mod workos;
+
 use serde_json::Value;
 
 use crate::error::ApiError;
@@ -60,6 +62,14 @@ pub async fn load_field_access_context(
     let Some(profile) = profiles.first() else {
         return Ok(None);
     };
+    if profile
+        .get("isActive")
+        .or_else(|| profile.get("is_active"))
+        .and_then(Value::as_bool)
+        != Some(true)
+    {
+        return Ok(None);
+    }
 
     let is_superuser = profile
         .get("isSuperuser")
@@ -248,6 +258,9 @@ pub async fn resolve_api_session(
     cookie_token: Option<&str>,
     x_std_identity: Option<&str>,
 ) -> Result<Option<ApiSession>, ApiError> {
+    if state.config.workos_client_id.is_some() {
+        return workos::resolve_session(state, authorization, cookie_token).await;
+    }
     // A supplied credential always identifies the interactive actor, even in
     // local mock mode. Never replace an invalid or denied browser credential
     // with the server's privileged token.

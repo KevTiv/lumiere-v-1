@@ -1,3 +1,4 @@
+import { bootstrapFixtureAccountSession } from './fixture-account'
 import fs from "node:fs"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
@@ -352,11 +353,7 @@ async function signupIdentityHex(email: string, password: string): Promise<strin
   const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? "http://127.0.0.1:3100"
   const isolated = await playwrightRequest.newContext({ baseURL })
   try {
-    const signup = await isolated.post("/api/auth/signup", { data: { email, password } })
-    if (!signup.ok()) throw new Error(`signup failed (${signup.status()}): ${await signup.text()}`)
-    const identity = (await isolated.storageState()).cookies.find((c) => c.name === "stdb_identity")
-    if (!identity?.value) throw new Error("signup did not set stdb_identity cookie")
-    return identity.value.replace(/^0x/i, "")
+    return await bootstrapFixtureAccountSession(isolated, email, password)
   } finally {
     await isolated.dispose()
   }

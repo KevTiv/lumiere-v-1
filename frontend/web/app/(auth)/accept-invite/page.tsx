@@ -11,9 +11,10 @@ import { Input } from "@lumiere/ui/components/input"
 import { Label } from "@lumiere/ui/components/label"
 import { redirectToWorkOsForInvite } from "@/app/actions/workos-auth"
 
-const useWorkOsAuth = Boolean(process.env.NEXT_PUBLIC_WORKOS_REDIRECT_URI)
+import { useWorkOsAuthMode } from '@/lib/auth-mode-context'
 
 export default function AcceptInvitePage() {
+  const useWorkOsAuth = useWorkOsAuthMode()
   const { t } = useTranslation()
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -81,7 +82,7 @@ export default function AcceptInvitePage() {
       <Card>
         <CardHeader>
           <CardTitle>{t("auth.acceptInvite.title")}</CardTitle>
-          <CardDescription>{t("auth.acceptInvite.descriptionWorkOs")}</CardDescription>
+          <CardDescription>Sign in with your approved account. Your administrator must approve your organization membership.</CardDescription>
         </CardHeader>
 
         <CardContent className="space-y-4">
@@ -95,7 +96,7 @@ export default function AcceptInvitePage() {
             </Button>
           </form>
           <p className="text-xs text-muted-foreground text-center">
-            {t("auth.acceptInvite.workOsInviteHint")}
+            An invitation alone does not grant access during this alpha.
           </p>
         </CardContent>
 

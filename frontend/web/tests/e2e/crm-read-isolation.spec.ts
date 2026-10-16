@@ -1,3 +1,4 @@
+import { bootstrapFixtureAccountSession } from './fixture-account'
 import {
   expect,
   request as playwrightRequest,
@@ -355,12 +356,7 @@ async function bootstrapTenant(browser: Browser, label: string): Promise<TenantF
   let branchContext: BrowserContext | undefined
 
   try {
-    const signup = await api.post("/api/auth/signup", {
-      data: { email: `${suffix}@example.test`, password: E2E_PASSWORD },
-    })
-    if (!signup.ok()) {
-      throw new Error(`tenant signup failed (${signup.status()}): ${await signup.text()}`)
-    }
+    await bootstrapFixtureAccountSession(api, `${suffix}@example.test`, E2E_PASSWORD)
 
     const currenciesResponse = await api.get("/api/bootstrap/currencies")
     if (!currenciesResponse.ok()) {
@@ -880,18 +876,7 @@ async function bootstrapTenant(browser: Browser, label: string): Promise<TenantF
     const branchSignup = await playwrightRequest.newContext({ baseURL: e2eBaseUrl() })
     let branchIdentityHex: string
     try {
-      const signupResponse = await branchSignup.post("/api/auth/signup", {
-        data: { email: branchEmail, password: E2E_PASSWORD },
-      })
-      if (!signupResponse.ok()) {
-        throw new Error(
-          `branch user signup failed (${signupResponse.status()}): ${await signupResponse.text()}`,
-        )
-      }
-      const state = await branchSignup.storageState()
-      const identity = state.cookies.find((cookie) => cookie.name === "stdb_identity")?.value
-      if (!identity) throw new Error("branch user signup did not set stdb_identity")
-      branchIdentityHex = identity.replace(/^0x/i, "")
+      branchIdentityHex = await bootstrapFixtureAccountSession(branchSignup, branchEmail, E2E_PASSWORD)
     } finally {
       await branchSignup.dispose()
     }

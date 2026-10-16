@@ -14,6 +14,7 @@ use stdb_client::{Exposure, ReducerCall, ReducerContract, ScalarKind, StdbClient
 /// organization session. Each variant has an explicit reducer allowlist.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum InternalRouteAuthority {
+    InvitationCreation,
     InvitationAcceptance,
     PasswordRecovery,
     PlatformProfileProjection,
@@ -23,6 +24,7 @@ pub(crate) enum InternalRouteAuthority {
 impl InternalRouteAuthority {
     fn permits(self, reducer: &str) -> bool {
         match self {
+            Self::InvitationCreation => reducer == "create_user_invite",
             Self::InvitationAcceptance => matches!(
                 reducer,
                 "add_org_member"
@@ -501,7 +503,14 @@ pub(crate) async fn dispatch_internal_reducer(
     let invitation_membership = authority == InternalRouteAuthority::InvitationAcceptance
         && reducer == "add_org_member"
         && contract.exposure == Exposure::Session;
-    if contract.exposure != Exposure::Denied && !invitation_membership {
+    // Invitation creation has a generated session contract, but the module
+    // requires a trusted issuer. Only the validated invitation route may use
+    // this exception; ordinary session dispatch retains its original actor.
+    let invitation_creation = authority == InternalRouteAuthority::InvitationCreation
+        && reducer == "create_user_invite"
+        && organization_id.is_some()
+        && contract.exposure == Exposure::Session;
+    if contract.exposure != Exposure::Denied && !invitation_membership && !invitation_creation {
         return Err(ApiError::Forbidden(format!(
             "internal reducer '{reducer}' must be denied to sessions"
         )));
@@ -1062,6 +1071,9 @@ mod tests {
 
     #[test]
     fn internal_route_authorities_are_narrow_and_non_interchangeable() {
+        assert!(InternalRouteAuthority::InvitationCreation.permits("create_user_invite"));
+        assert!(!InternalRouteAuthority::InvitationCreation.permits("add_org_member"));
+        assert!(!InternalRouteAuthority::InvitationAcceptance.permits("create_user_invite"));
         assert!(InternalRouteAuthority::PasswordRecovery.permits("bind_password_reset_token"));
         assert!(!InternalRouteAuthority::PasswordRecovery.permits("project_user_profile"));
         assert!(InternalRouteAuthority::ProviderWebhook.permits("receive_crm_provider_message"));

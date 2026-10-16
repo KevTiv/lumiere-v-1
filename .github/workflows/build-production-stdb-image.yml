@@ -25,6 +25,7 @@ jobs:
     uses: ./.github/workflows/build-contracts-module.yml
     with:
       production: true
+      alpha_founder_identities: ${{ vars.LUMIERE_ALPHA_FOUNDER_IDENTITIES }}
   publish:
     needs: module
     runs-on: ubuntu-latest

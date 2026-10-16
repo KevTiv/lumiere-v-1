@@ -15,6 +15,84 @@ Print the checklist without validating:
 scripts/check-prod-env.sh --list
 ```
 
+## WorkOS alpha admission
+
+Configure `WORKOS_CLIENT_ID` consistently on web and API to select hosted
+authentication. Web also needs `WORKOS_API_KEY`, a strong `WORKOS_COOKIE_PASSWORD`
+(at least 32 characters), `WORKOS_REDIRECT_URI` pointing to its
+`/auth/callback`, and `LUMIERE_API_SERVER_URL` pointing directly to the private
+Rust API, never back to Kong. Register the exact callback and logout URLs in
+WorkOS. Disable public registration in the WorkOS dashboard for this alpha.
+Keep web and API private behind Kong, including on provider-generated domains,
+and keep SpacetimeDB reachable only by the trusted service network. Moving API
+authentication to WorkOS does not revoke previously issued SpacetimeDB tokens
+at the database itself; review legacy credentials and memberships before release.
+
+The API requires `WORKOS_API_KEY`, the exact trusted token `WORKOS_ISSUER`, and
+`LUMIERE_WORKOS_ALPHA_ADMISSIONS`. The issuer must match the provider token and
+be one of the supported `https://api.workos.com` issuer forms; do not derive it
+from an unverified token. Admissions are an explicit JSON array, for example:
+
+```json
+[{"user_id":"user_approved","email":"approved@example.com","organization_id":123,"workos_organization_id":"org_approved","allow_provision":false}]
+```
+
+Use real immutable provider IDs and exact lowercase emails. Provider and local
+organization IDs have different meanings; the former must exactly match the
+provider token, while the latter must have an active local membership. Omit
+both organization fields only for a deliberately approved founder without an
+organization. Missing, malformed, or duplicate admissions fail startup. Email
+domain matching and invitations alone never approve membership. Existing
+credentials need an operator-verified immutable WorkOS subject link; this patch
+does not automatically link existing accounts by email.
+
+`allow_provision:true` permits creation of a new explicitly admitted identity
+and canonical profile on the authenticated bridge. It does not grant organization
+membership. For a founder, first provision the identity, then approve its returned
+SpacetimeDB identity in `LUMIERE_ALPHA_FOUNDER_IDENTITIES`, rebuild and publish the
+production module, and allow the founder to complete onboarding. This list is
+compiled into the module: comma-separated lowercase 64-character hex identities,
+at most 100, without spaces, prefixes, or wildcards. An absent or malformed list
+blocks all new founders. Any prior membership, including inactive membership,
+blocks further founder creation. Existing tenant access does not require founder
+approval. Remove `allow_provision` after provisioning and pin the numeric local
+organization ID once onboarding completes.
+
+Set repository variable `LUMIERE_ALPHA_FOUNDER_IDENTITIES` before the production
+module build. The reusable build receives this input and includes its fingerprint
+in the artifact cache key. Changing runtime variables on an already compiled
+publisher cannot change this policy. Policy changes need a fresh immutable build
+and the existing ordered release process. Use a fresh release commit when an
+image for the previous commit was already published; commit tags are immutable.
+Production uses `--no-default-features`;
+developer reducer flags cannot bypass admission in that artifact.
+
+Kong sends browser API requests through Next.js, where AuthKit refreshes its
+sealed session and forwards only the provider access token to Rust. Rust verifies
+the signature, issuer, expiry, exact admission, canonical verified email, and
+live provider session before using the internal per-user database credential.
+That credential is never returned by the WorkOS bridge. Provider failure or
+revocation denies new requests; this intentionally adds provider latency on each
+authenticated request. At most 32 validations run concurrently, and a session
+absent from the first 100 provider results is denied. Cached signing keys refresh
+every five minutes, so a newly rotated key may temporarily deny valid tokens.
+Browser WebSockets use a 60-second HTTP-only provider-token cookie scoped to
+`/v1/realtime`, with an exact Origin check. Sockets end within 60 seconds or token
+expiry and revalidate on reconnect, bounding revocation for open subscriptions.
+Hosted realtime uses the current browser origin and requires a same-origin
+gateway, including in local development. If using the public redirect variable
+instead of `WORKOS_REDIRECT_URI`, supply it during the web image build.
+
+Native public signup and password recovery return HTTP 410 during alpha. Legacy
+native database credentials do not support immediate revocation; a password
+change alone cannot make recovery secure. WorkOS mode also disables native
+password and invitation endpoints. Hosted invitation membership automation is
+pending; operators must approve subjects and establish local memberships using
+the existing trusted administration process. Verify approved and denied sign-in,
+founder bootstrap, cross-tenant denial, refresh, logout, and provider outage on
+an isolated stack before release. No external WorkOS configuration or deployment
+is performed by this patch.
+
 ## Shared immutable Rust runtime image
 
 `lumiere-contracts` is a versioned library dependency, not a Railway service.

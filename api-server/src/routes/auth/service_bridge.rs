@@ -12,14 +12,6 @@ use serde_json::{json, Value};
 use std::sync::Arc;
 
 #[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub(super) struct WorkosBridgeBody {
-    email: String,
-    workos_user_id: String,
-    email_verified: bool,
-}
-
-#[derive(Debug, Deserialize)]
 pub(super) struct BootstrapCredentialBody {
     email: String,
     password: String,
@@ -48,110 +40,17 @@ pub(super) fn require_service_token<'a>(
 pub(super) async fn workos_bridge(
     State(state): State<Arc<AppState>>,
     headers: axum::http::HeaderMap,
-    Json(body): Json<WorkosBridgeBody>,
+    Json(_body): Json<Value>,
 ) -> Result<Json<Value>, ApiError> {
-    require_service_token(&state, &headers)?;
-
-    let email = body.email.trim().to_lowercase();
-    let workos_user_id = body.workos_user_id.trim();
-    if email.is_empty() || !email.contains('@') || workos_user_id.is_empty() {
-        return Err(ApiError::BadRequest("WorkOS identity is incomplete".into()));
-    }
-    let key = state
-        .config
-        .stdb_credential_encryption_key
-        .as_ref()
-        .ok_or_else(|| {
-            ApiError::Internal("STDB_CREDENTIAL_ENCRYPTION_KEY not configured".into())
-        })?;
-    let pool = pg_pool::shared_pool().ok_or_else(|| {
-        ApiError::Unavailable("platform authentication storage is unavailable".into())
-    })?;
-
-    let existing = platform_control::find_user_credential_by_workos_user_id(pool, workos_user_id)
-        .await
-        .map_err(ApiError::internal)?
-        .or(
-            platform_control::find_user_credential_by_email(pool, &email)
-                .await
-                .map_err(ApiError::internal)?,
-        );
-
-    let (platform_user_id, identity_hex, token) = if let Some(row) = existing {
-        let linked_subject = row.get::<_, Option<String>>("workos_user_id");
-        if linked_subject
-            .as_deref()
-            .is_some_and(|subject| subject != workos_user_id)
-        {
-            return Err(ApiError::Conflict(
-                "This email is already linked to a different SSO identity".into(),
-            ));
-        }
-        let platform_user_id = PlatformId::new(row.get::<_, String>("platform_user_id"))
-            .map_err(ApiError::internal)?;
-        if !platform_control::attach_workos_subject(
-            pool,
-            &platform_user_id,
-            workos_user_id,
-            body.email_verified,
-        )
-        .await
-        .map_err(ApiError::internal)?
-        {
-            return Err(ApiError::Conflict(
-                "WorkOS identity could not be linked".into(),
-            ));
-        }
-        let identity_hex = row.get::<_, String>("stdb_identity_hex");
-        let token = decrypt_token(key, &row.get::<_, String>("stdb_token_enc"))?;
-        (platform_user_id, identity_hex, token)
-    } else {
-        let (identity, token) = state
-            .stdb
-            .provision_identity()
-            .await
-            .map_err(ApiError::internal)?;
-        let identity_hex = normalize_identity_hex_for_sql(&identity);
-        let platform_user_id = PlatformId::generate();
-        platform_control::insert_user_credential(
-            pool,
-            &platform_control::UserCredential {
-                platform_user_id: platform_user_id.clone(),
-                email: email.clone(),
-                stdb_identity_hex: identity_hex.clone(),
-                password_hash: None,
-                workos_user_id: Some(workos_user_id.to_string()),
-                stdb_token_enc: encrypt_token(key, &token)?,
-                email_verified: body.email_verified,
-            },
-        )
-        .await
-        .map_err(ApiError::internal)?;
-        platform_control::upsert_user_profile(
-            pool,
-            &platform_control::UserProfile {
-                platform_user_id: platform_user_id.clone(),
-                stdb_identity_hex: identity_hex.clone(),
-                email: email.clone(),
-                email_verified: body.email_verified,
-                name: String::new(),
-                first_name: None,
-                last_name: None,
-                timezone: "UTC".into(),
-                language: "en".into(),
-                is_active: true,
-                is_superuser: false,
-            },
-        )
-        .await
-        .map_err(ApiError::internal)?;
-        (platform_user_id, identity_hex, token)
-    };
-
+    let token = headers
+        .get(axum::http::header::AUTHORIZATION)
+        .and_then(|value| value.to_str().ok())
+        .and_then(|value| value.strip_prefix("Bearer "))
+        .ok_or(ApiError::Unauthorized)?;
+    let binding = crate::session::workos::verify_binding(&state, token, true).await?;
     Ok(Json(json!({
-        "platformUserId": platform_user_id.as_str(),
-        "identity": identity_hex,
-        "token": token,
+        "platformUserId": binding.platform_user_id.as_str(),
+        "identity": binding.identity_hex,
     })))
 }
 

@@ -14,22 +14,20 @@ import {
 } from "@/app/actions/workos-auth"
 import { phCapture, phCaptureException, phIdentify } from "@/lib/posthog-browser"
 
-const useWorkOsAuth = Boolean(process.env.NEXT_PUBLIC_WORKOS_REDIRECT_URI)
+import { safeAuthReturnTo } from '@/lib/auth-mode'
+import { useWorkOsAuthMode } from '@/lib/auth-mode-context'
 
-function safeCallbackUrl(value: string | null) {
-  if (!value || !value.startsWith('/') || value.startsWith('//')) return '/overview'
-  return value
-}
 
 export default function SignInPage() {
+  const useWorkOsAuth = useWorkOsAuthMode()
   const { t } = useTranslation()
   const router = useRouter()
   const searchParams = useSearchParams()
-  const callbackUrl = safeCallbackUrl(searchParams.get("callbackUrl"))
+  const callbackUrl = safeAuthReturnTo(searchParams.get("callbackUrl"))
 
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(searchParams.get("error") === "admission_denied" ? "Your account is not approved for this alpha. Contact your administrator." : null)
   const [loading, setLoading] = useState(false)
 
   async function handleSubmit(e: React.FormEvent) {

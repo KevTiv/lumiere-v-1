@@ -1,0 +1,135 @@
+import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
+import { test } from 'node:test'
+import { runInNewContext } from 'node:vm'
+import ts from 'typescript'
+import { NextRequest, NextResponse } from 'next/server'
+import { safeAuthReturnTo } from './auth-mode'
+
+function loadSource(file: string, dependencies: Record<string, unknown>, globals: Record<string, unknown> = {}) {
+  const source = readFileSync(new URL(file, import.meta.url), 'utf8')
+  const compiled = ts.transpileModule(source, {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
+  }).outputText
+  dependencies['./workos-config'] ??= { workOsRedirectUri: () => 'https://web.test/auth/callback' }
+  dependencies['@/lib/workos-config'] ??= { workOsRedirectUri: () => 'https://web.test/auth/callback' }
+  const module = { exports: {} as any }
+  runInNewContext(compiled, {
+    module, exports: module.exports, Headers, URL, console,
+    process: { env: { WORKOS_CLIENT_ID: 'client', LUMIERE_API_SERVER_URL: 'http://api.test' } },
+    require: (name: string) => {
+      assert.ok(name in dependencies, `Unexpected dependency ${name}`)
+      return dependencies[name]
+    }, ...globals,
+  })
+  return module.exports
+}
+
+test('OAuth destinations reject absolute, protocol-relative, backslash and control redirects', () => {
+  for (const path of ['https://evil.test', '//evil.test', '/\\evil.test', '/\nevil', '/\tevil']) assert.equal(safeAuthReturnTo(path), '/overview')
+  assert.equal(safeAuthReturnTo('/accounting?tab=invoices'), '/accounting?tab=invoices')
+})
+
+test('BFF forwards refreshed provider credentials and removes browser cookies and forged identity', async () => {
+  const calls: Array<{ url: string; init: RequestInit }> = []
+  const api = loadSource('./api-server-forward.ts', {
+    './auth-mode': { isWorkOsEnabled: () => true }, 'next/server': { NextResponse },
+    '@workos-inc/authkit-nextjs': { withAuth: async () => ({ accessToken: 'provider-token' }) },
+  }, { fetch: async (url: string, init: RequestInit) => {
+    calls.push({ url, init }); return new Response('{}', { headers: { 'set-cookie': 'stdb_token=internal' } })
+  } })
+  const response = await api.forwardToApiServerRequired(new NextRequest('https://web.test/api/query/companies', {
+    headers: { cookie: 'stdb_token=legacy; wos-session=sealed', 'x-stdb-identity': 'forged' },
+  }))
+  assert.equal(calls[0].url, 'http://api.test/v1/query/companies')
+  const headers = new Headers(calls[0].init.headers)
+  assert.equal(headers.get('authorization'), 'Bearer provider-token')
+  assert.equal(headers.get('cookie'), null)
+  assert.equal(headers.get('x-stdb-identity'), null)
+  assert.equal(response.headers.get('set-cookie'), null)
+})
+
+test('BFF preserves explicit invalid bearer and rejects cross-origin cookie writes', async () => {
+  const calls: RequestInit[] = []
+  const api = loadSource('./api-server-forward.ts', {
+    './auth-mode': { isWorkOsEnabled: () => true }, 'next/server': { NextResponse },
+    '@workos-inc/authkit-nextjs': { withAuth: async () => ({ accessToken: 'provider-token' }) },
+  }, { fetch: async (_url: string, init: RequestInit) => { calls.push(init); return new Response('{}', { status: 401 }) } })
+  const rejected = await api.forwardToApiServerRequired(new NextRequest('https://web.test/api/query/companies', { headers: { authorization: 'invalid' } }))
+  assert.equal(rejected.status, 401)
+  assert.equal(new Headers(calls[0].headers).get('authorization'), 'invalid')
+  const crossOrigin = await api.forwardToApiServerRequired(new NextRequest('https://web.test/api/operations/create', {
+    method: 'POST', headers: { origin: 'https://evil.test' }, body: '{}',
+  }))
+  assert.equal(crossOrigin.status, 403)
+  assert.equal(calls.length, 1)
+})
+
+test('callback rejects legacy invite state and clears sealed session on rejection', async () => {
+  let options: any; let admitted = 0; let cleared = 0
+  const deleted: Array<{ name: string; value: string }> = []
+  loadSource('../app/auth/callback/route.ts', {
+    '@workos-inc/authkit-nextjs': { handleAuth: (value: unknown) => { options = value; return () => {} } },
+    'next/headers': { cookies: async () => ({ set: (name: string, value: string) => deleted.push({ name, value }) }) },
+    'next/server': { NextRequest, NextResponse }, '@/lib/auth-mode': { isWorkOsEnabled: () => true },
+    '@/app/actions/save-stdb-token': { clearStdbSession: async () => { cleared++ } },
+    '@/lib/workos-stdb-bridge': { bridgeWorkOsUserToStdbSession: async () => { admitted++ } },
+  })
+  await assert.rejects(options.onSuccess({ accessToken: 'provider', state: 'legacy-invite' }))
+  assert.equal(admitted, 0)
+  const result = await options.onError({ request: new NextRequest('https://web.test/auth/callback') })
+  assert.equal(result.headers.get('location'), 'https://web.test/sign-in?error=admission_denied')
+  assert.equal(deleted[0].name, 'wos-session'); assert.equal(deleted[0].value, ''); assert.equal(cleared, 1)
+})
+
+
+test('realtime credential is HTTP-only, path-scoped, bounded and never returned in JSON', async () => {
+  const endpoint = loadSource('../app/api/auth/realtime-session/route.ts', {
+    '@workos-inc/authkit-nextjs': { withAuth: async () => ({ accessToken: 'provider-token' }) },
+    'next/server': { NextRequest, NextResponse }, '@/lib/auth-mode': { isWorkOsEnabled: () => true },
+  })
+  const response = await endpoint.POST(new NextRequest('https://web.test/api/auth/realtime-session', {
+    method: 'POST', headers: { origin: 'https://web.test' },
+  }))
+  assert.equal(response.status, 200)
+  assert.equal(await response.text(), '{"ready":true}')
+  const cookie = response.headers.get('set-cookie')!
+  assert.match(cookie, /HttpOnly/)
+  assert.match(cookie, /Path=\/v1\/realtime/)
+  assert.match(cookie, /Max-Age=60/)
+  assert.match(cookie, /SameSite=strict/i)
+  const forbidden = await endpoint.POST(new NextRequest('https://web.test/api/auth/realtime-session', {
+    method: 'POST', headers: { origin: 'https://evil.test' },
+  }))
+  assert.equal(forbidden.status, 403)
+})
+
+
+test('hosted realtime ignores external URLs and localhost direct-port defaults', () => {
+  const realtime = loadSource('../../packages/query-hooks/src/hooks/realtime.ts', {
+    react: { useEffect: () => {}, useRef: () => {} },
+    './stdb': { invalidateStdbQueryResources: () => {} },
+  }, {
+    process: { env: { NEXT_PUBLIC_REALTIME_WS_URL: 'wss://external.test/ws', NEXT_PUBLIC_API_GATEWAY_URL: 'https://direct.test' } },
+    window: { location: { protocol: 'http:', host: 'localhost:3000', hostname: 'localhost', port: '3000' } },
+  })
+  assert.equal(realtime.resolveRealtimeWsUrl(true), 'ws://localhost:3000/v1/realtime/ws')
+  assert.equal(realtime.resolveRealtimeWsUrl(false), 'wss://external.test/ws')
+})
+
+
+test('WorkOS uses the runtime server callback URI before the public build-time value', () => {
+  const config = loadSource('./workos-config.ts', { 'server-only': {} }, {
+    process: { env: { NODE_ENV: 'production', WORKOS_REDIRECT_URI: 'https://runtime.test/auth/callback', NEXT_PUBLIC_WORKOS_REDIRECT_URI: 'https://build.test/auth/callback' } },
+  })
+  assert.equal(config.workOsRedirectUri(), 'https://runtime.test/auth/callback')
+})
+
+test('WorkOS rejects insecure production callbacks and authority or URL suffix injection', () => {
+  for (const uri of ['http://app.test/auth/callback', 'https:///app.test/auth/callback', 'https://user:password@app.test/auth/callback', 'https://app.test/auth/callback?next=evil', 'https://app.test/auth/callback#fragment', '//app.test/auth/callback', 'https://app.test/other', 'https://app.test/\\evil']) {
+    const config = loadSource('./workos-config.ts', { 'server-only': {} }, {
+      process: { env: { NODE_ENV: 'production', WORKOS_REDIRECT_URI: uri } },
+    })
+    assert.throws(() => config.workOsRedirectUri())
+  }
+})
