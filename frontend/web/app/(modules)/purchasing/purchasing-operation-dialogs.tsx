@@ -21,6 +21,7 @@ import {
   SelectValue,
 } from "@lumiere/ui/components/select"
 import { Textarea } from "@lumiere/ui/components/textarea"
+import { selectedRfqCurrencyId } from "./purchase-order-forms"
 
 export interface PurchasingDialogOption {
   value: string
@@ -91,9 +92,13 @@ export interface PurchasingRfqBidDialogOption extends PurchasingDialogOption {
   rfqId: string
 }
 
+export interface PurchasingRfqDialogOption extends PurchasingDialogOption {
+  currencyId: string
+}
+
 export interface PurchasingOperationDialogOptions {
   requisitions: PurchasingDialogOption[]
-  rfqs: PurchasingDialogOption[]
+  rfqs: PurchasingRfqDialogOption[]
   rfqBids: PurchasingRfqBidDialogOption[]
   vendors: PurchasingDialogOption[]
   products: PurchasingDialogOption[]
@@ -388,7 +393,7 @@ interface AddRfqBidDialogProps {
   onSubmit: (payload: AddPurchaseRfqBidFormPayload) => Promise<unknown>
 }
 
-function AddRfqBidDialog({ request, currencyId, options, t, onDismiss, onSubmit }: AddRfqBidDialogProps) {
+function AddRfqBidDialog({ request, options, t, onDismiss, onSubmit }: AddRfqBidDialogProps) {
   const [rfqId, setRfqId] = useState(request.rfqId ?? "")
   const [partnerId, setPartnerId] = useState("")
   const [priceUnit, setPriceUnit] = useState("0")
@@ -398,7 +403,8 @@ function AddRfqBidDialog({ request, currencyId, options, t, onDismiss, onSubmit 
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     void submission.run(async () => {
-      if (currencyId == null || currencyId <= 0n) throw new Error(t("purchasing.forms.validation.noCurrency", { defaultValue: "No active currency is available" }))
+      const currencyId = selectedRfqCurrencyId(options.rfqs, rfqId)
+      if (currencyId == null) throw new Error(t("purchasing.forms.validation.noCurrency", { defaultValue: "The selected RFQ currency is unavailable" }))
       await onSubmit({
         rfqId: requiredId(rfqId, t("purchasing.forms.fields.rfq", { defaultValue: "RFQ" }), t),
         partnerId: requiredId(partnerId, t("purchasing.forms.fields.vendor", { defaultValue: "Vendor" }), t),

@@ -10,6 +10,7 @@ import {
   linesOfOrder,
   purchaseOrderHeaderDefaults,
   purchaseOrderLineEditDefaults,
+  selectedRfqCurrencyId,
   toReceiveLineInput,
   toUpdatePurchaseOrderHeaderArgs,
 } from './purchase-order-forms';
@@ -107,4 +108,14 @@ test('quantity can be invoiced only on lines received beyond what is invoiced', 
   assert.equal(canInvoicePurchaseOrderLine({ qtyReceived: 5, qtyInvoiced: 2 }), true);
   assert.equal(canInvoicePurchaseOrderLine({ qtyReceived: 5, qtyInvoiced: 5 }), false);
   assert.equal(canInvoicePurchaseOrderLine({ qtyReceived: 0 }), false);
+});
+
+test('RFQ bids derive currency from the selected RFQ', () => {
+  const rfqs = [
+    { value: '10', currencyId: '1' },
+    { value: '11', currencyId: '7' },
+  ];
+  assert.equal(selectedRfqCurrencyId(rfqs, '11'), 7n);
+  assert.equal(selectedRfqCurrencyId(rfqs, 'missing'), null);
+  assert.equal(selectedRfqCurrencyId([{ value: '12', currencyId: '' }], '12'), null);
 });

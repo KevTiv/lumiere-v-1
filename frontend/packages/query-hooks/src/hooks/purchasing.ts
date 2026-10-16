@@ -2,6 +2,7 @@
 
 
 import { stdbBffCommandPost } from "@lumiere/stdb/commands"
+import { useErpSession } from "@lumiere/erp-session"
 /**
  * Purchasing hooks — Phase 4 of API Gateway Refactor
  *
@@ -28,6 +29,13 @@ import {
 import { scalarToU64 as toScalarU64, type ScalarId } from "@lumiere/erp-shared/u64"
 import { invalidateStdbQueryResources } from "./stdb"
 import { invalidateQueryResources } from "./workflow"
+import {
+  executePurchaseOrderCreation,
+  keyedOperationU64,
+  purchaseOrderOncePayload,
+  purchaseOrderStorageKey,
+  type PurchaseOrderCreationResult,
+} from "./purchasing-order-invocation"
 import {
   APPLY_LANDED_COST_AFFECTS,
   AWARD_RFQ_BID_AFFECTS,
@@ -82,14 +90,6 @@ function mergeReducerParams(
     if (v !== undefined) out[k] = v
   }
   return out
-}
-
-const CREATE_PURCHASE_ORDER_DEFAULTS: Record<string, unknown> = {
-  invoiceIds: [],
-  pickingIds: [],
-  messageFollowerIds: [],
-  messageIds: [],
-  activityIds: [],
 }
 
 const CREATE_PURCHASE_REQUISITION_DEFAULTS: Record<string, unknown> = {
@@ -308,15 +308,41 @@ export function useCreatePurchaseOrder(
   options?: { companyId?: bigint },
 ) {
   const qc = useQueryClient()
+  const { identity } = useErpSession()
   const scopedCompanyId = options?.companyId
-  return useMutation<void, Error, CreatePurchaseOrderParams>({
+  return useMutation<PurchaseOrderCreationResult, Error, CreatePurchaseOrderParams>({
     mutationFn: async (params) => {
-      const merged = mergeReducerParams(CREATE_PURCHASE_ORDER_DEFAULTS, params)
-      const scoped = withCompanyScope(merged, scopedCompanyId)
-      const { urlPath, init } = stdbBffCommandPost("create_purchase_order", { params: stdbParamsToJson(scoped as object, "CreatePurchaseOrderParams") })
-
-      const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error('Failed to create purchase order')
+      if (scopedCompanyId == null || scopedCompanyId <= 0n) throw new WorkflowError("validation", "companyId is required to create a purchase order")
+      const actorHex = identity?.replace(/^0x/i, "").toLowerCase() ?? ""
+      const scope = { organizationId, companyId: scopedCompanyId, actorHex }
+      if (typeof window === "undefined" || typeof navigator === "undefined" || !navigator.locks) {
+        throw new WorkflowError("validation", "This browser cannot safely coordinate purchase order retries")
+      }
+      const payload = purchaseOrderOncePayload(params)
+      const read = (operationKey: string) => {
+        const query = new URLSearchParams({ companyId: scopedCompanyId.toString(), operationKey })
+        return fetchQueryList(`/api/query/purchase-order-creations?${query}`, "Cannot read canonical purchase order creation")
+      }
+      let result: PurchaseOrderCreationResult | undefined
+      await navigator.locks.request(purchaseOrderStorageKey(scope), async () => {
+        result = await executePurchaseOrderCreation(scope, payload, window.localStorage, {
+          makeKey: () => crypto.randomUUID(),
+          read,
+          dispatch: async (pending) => {
+            const response = await apiFetch("/api/operations/erp.create_purchase_order_once", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                companyId: keyedOperationU64(scopedCompanyId),
+                params: { operation_key: pending.operationKey, ...pending.payload },
+              }),
+            })
+            if (!response.ok) throw workflowErrorFromResponse(response.status, await response.text().catch(() => ""), "Failed to create purchase order")
+          },
+        })
+      })
+      if (!result) throw new WorkflowError("server_failure", "Purchase order creation did not complete")
+      return result
     },
     onSuccess: () =>
       qc.invalidateQueries({ queryKey: ['purchase-orders', rqBigIntKey(organizationId)] }),
@@ -474,15 +500,15 @@ export async function receivePurchaseOrderLineOnceCommand(
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      companyId: companyId.toString(),
-      lineId: toScalarU64(lineId),
+      companyId: keyedOperationU64(companyId),
+      lineId: keyedOperationU64(lineId),
       params: {
-        operationKey: pending.operationKey,
+        operation_key: pending.operationKey,
         quantity: pending.quantity,
-        lotId: pending.lotId,
-        expectedReceived: pending.expectedReceived,
-        expectedMoveId: pending.expectedMoveId,
-        expectedPickingId: pending.expectedPickingId,
+        lot_id: pending.lotId == null ? { none: [] } : { some: keyedOperationU64(pending.lotId) },
+        expected_received: pending.expectedReceived,
+        expected_move_id: pending.expectedMoveId == null ? { none: [] } : { some: keyedOperationU64(pending.expectedMoveId) },
+        expected_picking_id: pending.expectedPickingId == null ? { none: [] } : { some: keyedOperationU64(pending.expectedPickingId) },
       },
     }),
   })

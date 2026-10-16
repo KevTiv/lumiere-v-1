@@ -1191,6 +1191,7 @@ function PurchasingClientLoaded({
         .map((row) => ({
           value: String(row.id ?? ""),
           label: String(row.name ?? `RFQ ${String(row.id ?? "")}`),
+          currencyId: String(row.currencyId ?? row.currency_id ?? ""),
         })),
       rfqBids: submittedBids.map((row) => ({
         value: String(row.id ?? ""),

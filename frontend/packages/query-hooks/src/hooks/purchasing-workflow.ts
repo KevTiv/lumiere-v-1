@@ -80,8 +80,8 @@ import {
   clearReceiptInvocation,
   executeReceiptInvocation,
   observeReceiptInvocation,
-  readPendingReceipt,
   receiptStorageKey,
+  resolveReceiptInvocation,
   type InvocationScope,
   type PendingReceipt,
 } from "./purchasing-receipt-invocation"
@@ -156,6 +156,7 @@ type ResolveReceiptInput = {
   lineId: string
   pendingReceipt?: PendingReceipt
   receiptEvidence?: RowValueMap[]
+  rebased?: boolean
 }
 type VendorCreditInput = CreateVendorCreditInput<VendorCreditFromReturnParams>
 type ReleaseInput = ReleaseBlanketInput<ReleaseBlanketToPoParams>
@@ -242,6 +243,12 @@ export function usePurchasingWorkflow(
       )
     }
     const observePending = async (input: ResolveReceiptInput) => {
+      if (input.rebased) {
+        return {
+          outcome: "applied" as const,
+          next: recordRef("purchase_order_line", input.lineId, "purchasing"),
+        }
+      }
       const proof = observeReceiptInvocation(
         input.pendingReceipt,
         input.receiptEvidence ??
@@ -346,18 +353,21 @@ export function usePurchasingWorkflow(
       resolveReceipt: typed<ResolveReceiptInput>({
         id: "purchasing.line.resolve-receipt",
         command: async (input) => {
-          input.pendingReceipt = readPendingReceipt(
-            receiptScope(),
-            input.lineId,
-            window.localStorage,
-          )
-          if (!input.pendingReceipt) {
-            throw new WorkflowError(
-              "validation",
-              "No pending receipt exists for this actor and line",
-            )
+          if (typeof navigator === "undefined" || !navigator.locks) {
+            throw new WorkflowError("validation", "This browser cannot safely coordinate receipt recovery")
           }
-          input.receiptEvidence = await receiptEvidence(input.pendingReceipt.operationKey)
+          const scope = receiptScope()
+          await navigator.locks.request(receiptStorageKey(scope, input.lineId), async () => {
+            const result = await resolveReceiptInvocation(
+              scope,
+              input.lineId,
+              window.localStorage,
+              receiptEvidence,
+            )
+            input.pendingReceipt = result.pending
+            if (result.kind === "applied") input.receiptEvidence = result.evidence
+            else input.rebased = true
+          })
         },
         affects: RECEIVE_PO_LINE_AFFECTS,
         observe: observePending,
