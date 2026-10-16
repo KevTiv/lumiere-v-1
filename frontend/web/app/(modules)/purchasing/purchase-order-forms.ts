@@ -15,7 +15,7 @@ export const purchaseOrderState = (row: Row): string => enumTag(row.state);
 
 /** Currency is owned by the RFQ; a bid must never inherit an unrelated UI default. */
 export function selectedRfqCurrencyId(
-  rfqs: readonly Array<{ value: string; currencyId: string }>,
+  rfqs: ReadonlyArray<{ value: string; currencyId: string }>,
   rfqId: string,
 ): bigint | null {
   const raw = rfqs.find((option) => option.value === rfqId)?.currencyId.trim() ?? '';
