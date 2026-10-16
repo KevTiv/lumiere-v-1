@@ -335,7 +335,10 @@ pub fn execute_guarded_action(
         params.input.clone(),
     )?;
     if before.subject_revision_hash != params.expected_subject_revision_hash {
-        return Err("guarded action subject changed after approval was requested".to_string());
+        return Err(
+            "guarded action subject changed after approval was requested (revision mismatch)"
+                .to_string(),
+        );
     }
 
     execute_adapter(
