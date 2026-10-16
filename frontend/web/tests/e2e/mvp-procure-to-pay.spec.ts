@@ -350,4 +350,46 @@ test.describe("MVP procure-to-pay workflow", { tag: "@p0" }, () => {
     expect(await fetchVendorBillById(page, billId)).toMatchObject({ state: "Posted" })
     await expectNoAppError(page)
   })
+  test("corrects a PO bill price atomically and posts the same bill after recovery", async ({ page }) => {
+    test.setTimeout(240_000)
+    const vendorId = await fetchVendorPartnerIdByName(page, VENDOR_NAME)
+    const { orderId } = await createConfirmedPoWithLine(page, smokeName("price-recovery"), vendorId, "3")
+    const lineId = await fetchOnlyPurchaseOrderLineId(page, orderId)
+    await receivePoLineQty(page, orderId, lineId, "3")
+    await createBillFromPo(page, orderId)
+    const billIds = await fetchPurchaseOrderInvoiceIds(page, orderId)
+    expect(billIds).toHaveLength(1)
+    const billId = billIds[0]
+    const sourceResponse = await page.request.get("/api/query/purchase-order-lines")
+    expect(sourceResponse.ok()).toBe(true)
+    const sourcePayload = await sourceResponse.json() as { data: Record<string, unknown>[] }
+    const source = sourcePayload.data.find((l) => Number(l.id) === lineId)
+    const expenseIds = (source?.invoiceLines ?? source?.invoice_lines) as unknown[] | undefined
+    expect(expenseIds).toHaveLength(1)
+    const expenseId = Number(expenseIds![0])
+    const correctPrice = async (price: string, expectedPrice: string) => {
+      await page.goto(`/accounting/invoices/${billId}`)
+      await selectEntityRowById(page, expenseId)
+      await page.getByTestId("entity-action-bill-line-correct-economics").click()
+      await expect(page.getByTestId("form-field-quantity")).toHaveValue("3")
+      await expect(page.getByTestId("form-field-priceUnit")).toHaveValue(expectedPrice)
+      await fillField(page, "priceUnit", price)
+      const [response] = await Promise.all([
+        page.waitForResponse((r) => matchesOperationResponse(r, "update_account_move_line") && r.ok()),
+        page.getByRole("dialog").getByRole("button", { name: /submit|save|confirm/i }).click(),
+      ])
+      expect(response.ok()).toBe(true)
+      await assertMoveLinesBalanced(page, billId)
+      await expect.poll(async () => Number((await fetchVendorBillById(page, billId))?.amountTotal)).toBe(3 * Number(price))
+    }
+    await correctPrice("505", "500")
+    await expectPostDraftBillRejected(page, billId, /three-way match failed.*bill price/i)
+    expect(await fetchVendorBillById(page, billId)).toMatchObject({ state: "Draft" })
+    await correctPrice("500", "505")
+    expect(await postDraftBillViaUi(page, billId)).toBe(billId)
+    expect(await fetchVendorBillById(page, billId)).toMatchObject({ state: "Posted" })
+    await page.reload()
+    await expectNoAppError(page)
+  })
+
 })

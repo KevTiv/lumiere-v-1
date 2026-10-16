@@ -2921,6 +2921,13 @@
         "postedLocked": "A posted statement can no longer be edited.",
         "reference": "Reference"
       }
+    },
+    "billCorrection": {
+      "action": "Correct bill quantity / price",
+      "quantity": "Bill quantity",
+      "price": "Unit price",
+      "unavailable": "This bill line has no supported exact PO source. Refresh and review its lineage.",
+      "description": "Review the supplier bill and correct its economic values. PO unit price: {{price}}; received quantity: {{received}}. Expense, payable, bill totals and PO billed quantities update together. Supported for untaxed bills in the company currency; do not widen matching tolerances to clear a variance."
     }
   },
   "crm": {

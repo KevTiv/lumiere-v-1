@@ -1,3 +1,4 @@
+import { UpdateAccountMoveLineParams } from "@lumiere/contracts/generated/types";
 import type { ReducerCommandContractMeta } from "./types";
 
 /**
@@ -287,4 +288,9 @@ export function accountingCommandContract(
     expectations:
       "Authenticated api-server session with organization scope; args must match SpacetimeDB u64 JSON rules (see stringifyReducerCallBody).",
   };
+}
+
+/** Enable economic correction only with the canonical extended parameter codec. */
+export function accountingBillCorrectionAvailable(): boolean {
+  return ["quantity", "priceUnit", "expectedQuantity", "expectedPriceUnit"].every((field) => Object.hasOwn(UpdateAccountMoveLineParams.elements, field));
 }
