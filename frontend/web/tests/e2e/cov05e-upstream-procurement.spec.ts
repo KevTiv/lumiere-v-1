@@ -1,4 +1,5 @@
 import { expect, test, type Locator, type Page, type Response } from "@playwright/test"
+import { stdbBffCommandPost } from "@lumiere/stdb/commands"
 
 import {
   activeTabEntityTable,
@@ -59,6 +60,16 @@ async function operation(page: Page, reducer: string, click: () => Promise<unkno
     click(),
   ])
   return response
+}
+
+async function requisitionApprovalRequest(page: Page, requisitionId: number) {
+  const { urlPath, init } = stdbBffCommandPost("approve_purchase_requisition", {
+    requisitionId,
+  })
+  return page.request.post(urlPath, {
+    headers: { "Content-Type": "application/json" },
+    data: JSON.parse(String(init.body)),
+  })
 }
 
 async function selectRow(page: Page, tab: string, recordId: number) {
@@ -167,8 +178,10 @@ test.describe("COV-05e upstream procurement", { tag: ["@p0", "@cov05", "@unauthe
         await selectRow(page, "requisitions", reqId)
         await expect(page.getByTestId("entity-action-req-convert-po")).toBeDisabled()
         await expect(page.getByTestId("entity-action-req-create-rfq")).toBeDisabled()
-        const selfApproval = await rowAction(page, "requisitions", reqId, "req-approve", "approve_purchase_requisition")
+        await expect(page.getByTestId("entity-action-req-approve")).toBeDisabled()
+        const selfApproval = await requisitionApprovalRequest(page, reqId)
         expect(selfApproval.status()).toBe(422)
+        expect(await selfApproval.text()).toMatch(/independent approver/i)
         expect(await state(approver, "purchase-requisitions", reqId)).toBe("InProgress")
         const approved = await rowAction(approver, "requisitions", reqId, "req-approve", "approve_purchase_requisition")
         expect(approved.ok(), await approved.text()).toBe(true)

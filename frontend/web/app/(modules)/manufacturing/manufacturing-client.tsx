@@ -50,6 +50,7 @@ import { ManufacturingRowDialog } from "./manufacturing-row-dialog"
 import { createBomComponentsField } from "./bom-components-field"
 import { ManufacturingActionResult } from "./manufacturing-action-result"
 import { ManufacturingCostSettings } from "./manufacturing-cost-settings"
+import { withManufacturingLiveCreateForm } from "./manufacturing-live-create-forms"
 import { useMrpWorkcenterCostRates } from "@lumiere/query-hooks/hooks/manufacturing-costs"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
 import {
@@ -163,10 +164,7 @@ function ManufacturingClientLoaded({
         ? "Unavailable"
         : "Loading"
   const { data: qualityChecks = [] } = useQualityChecks(orgId);
-  // BOM creation and manufacturing-order creation are commonly consecutive
-  // steps. Reconcile the product seed on every manufacturing mount so a fresh
-  // product cannot disappear behind a still-fresh cross-navigation cache.
-  const { data: products = [] } = useProducts(orgId, initialProducts, { authoritativeOnMount: true });
+  const { data: products = [] } = useProducts(orgId, initialProducts);
   const { data: warehouses = [] } = useWarehouses(orgId, initialWarehouses);
   const { data: transfers = [] } = useStockPickings(
     orgId,
@@ -434,7 +432,12 @@ function ManufacturingClientLoaded({
     () =>
       ({
         ...moduleConfig,
-        tabs: withDashboardSections(moduleConfig, liveSections).tabs.map((tab) => {
+        tabs: withDashboardSections(moduleConfig, liveSections).tabs.map((staticTab) => {
+          const tab = withManufacturingLiveCreateForm(staticTab, {
+            orders: moFormConfig,
+            boms: bomFormConfig,
+            workcenters: workcenterFormConfig,
+          })
           if (tab.id === "cost-settings") return { ...tab, customContent: <ManufacturingCostSettings organizationId={orgId} companyId={operatingCompanyId} /> }
           if (tab.id === "orders" && tab.entityConfig && tab.entityConfig.view.mode === "table") {
             // The row opens the action form; the order's name opens its page.
