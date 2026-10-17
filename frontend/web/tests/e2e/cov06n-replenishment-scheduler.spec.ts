@@ -4,6 +4,7 @@ import { fetchContactIdByName, fetchDefaultCompanyId, gotoModule, scalarQueryId,
 import { command, create, id, location, password, product, rows, value } from "./cov-scheduler-manufacturing-fixtures"
 import { createProductSupplierInfoFixture, createStockQuantFixture, fetchQuantsAtProductLocation } from "./inventory-quant-fixtures"
 import { fetchPickingMoveStates, fetchPickingState, runPickingActionViaInventoryUi } from "./inventory-picking-fixtures"
+import { canonicalOptionValue, canonicalRow } from "./sod-evidence"
 
 function timestamp(millis: number) {
   return { microsSinceUnixEpoch: BigInt(millis) * 1_000n }
@@ -89,7 +90,13 @@ test.describe("COV-06n operator replenishment schedule and cancel", {
       expect(demands).toHaveLength(1)
       const demandId = id(demands[0]!)
       const completedRule = (await rows(page, "replenishment-rules")).find(row => id(row) === ruleId)
-      const demandMetadata = JSON.parse(String(value(completedRule ?? {}, "metadata", "metadata"))) as {
+      expect(completedRule?.metadata).toBeUndefined()
+      // Supplemental persisted evidence only: internal metadata is deliberately
+      // absent from the governed API. The UI/API effect proof above is retained.
+      const demandEvidence = await canonicalRow(page, "replenishment-rules", ruleId)
+      expect(scalarQueryId(demandEvidence.company_id)).toBe(companyId)
+      expect(scalarQueryId(demandEvidence.organization_id)).toBe(id(rule, "organizationId", "organization_id"))
+      const demandMetadata = JSON.parse(String(canonicalOptionValue(demandEvidence.metadata))) as {
         demand_type?: string
         demand_id?: number
         order_qty?: number
@@ -179,7 +186,11 @@ test.describe("COV-06n operator replenishment schedule and cancel", {
       expect(Number(value(buyLines[0]!, "priceUnit", "price_unit"))).toBe(12)
       expect(id(buyLines[0]!, "productId", "product_id")).toBe(id(buyItem))
       const completedBuyRule = (await rows(page, "replenishment-rules")).find(row => id(row) === buyRuleId)
-      const buyMetadata = JSON.parse(String(value(completedBuyRule ?? {}, "metadata", "metadata"))) as {
+      expect(completedBuyRule?.metadata).toBeUndefined()
+      const buyEvidence = await canonicalRow(page, "replenishment-rules", buyRuleId)
+      expect(scalarQueryId(buyEvidence.company_id)).toBe(companyId)
+      expect(scalarQueryId(buyEvidence.organization_id)).toBe(id(buyRule, "organizationId", "organization_id"))
+      const buyMetadata = JSON.parse(String(canonicalOptionValue(buyEvidence.metadata))) as {
         demand_type?: string
         demand_id?: number
         order_qty?: number

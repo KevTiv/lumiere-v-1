@@ -364,9 +364,9 @@ async function signupIdentityHex(email: string, password: string): Promise<strin
  * Provision a non-superuser organization member holding exactly `permissions`
  * (pattern from auth-permission-enforcement.spec.ts). `ownerPage` is the seeded admin session.
  */
-export async function provisionActor(ownerPage: Page, label: string, permissions: string[]): Promise<Actor> {
+export async function provisionActor(ownerPage: Page, label: string, permissions: string[], scopedCompanyId?: number): Promise<Actor> {
   const organizationId = await fetchSessionOrganizationId(ownerPage)
-  const companyId = await fetchDefaultCompanyId(ownerPage)
+  const companyId = scopedCompanyId ?? await fetchDefaultCompanyId(ownerPage)
   const roleName = smokeName(`pretenant-${label}`)
   await callReducerBff(ownerPage, "create_role", [
     organizationId,
