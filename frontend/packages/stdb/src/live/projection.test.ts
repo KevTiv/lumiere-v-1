@@ -8,6 +8,7 @@ import {
 } from "./projection.ts"
 import { RESOURCE_REGISTRY } from "../generated/query-registry.ts"
 import { PURCHASING_WORKSPACE_RESOURCE_KEYS } from "../subscriptions/purchasing-workspace.ts"
+import { MANUFACTURING_WORKSPACE_RESOURCE_KEYS } from "../subscriptions/manufacturing-workspace.ts"
 import { directRowCacheEnabled } from "./direct-subscription-mode.ts"
 
 describe("direct subscription cache boundary", () => {
@@ -127,6 +128,10 @@ describe("live/projection", () => {
     assert.ok(PURCHASING_WORKSPACE_RESOURCE_KEYS.includes("products"))
     assert.ok(PURCHASING_WORKSPACE_RESOURCE_KEYS.includes("uoms"))
     assert.ok(!PURCHASING_WORKSPACE_RESOURCE_KEYS.includes("contacts"))
+  })
+
+  it("keeps manufacturing product selectors live", () => {
+    assert.ok(MANUFACTURING_WORKSPACE_RESOURCE_KEYS.includes("products"))
   })
 
   it("sortRowsForResource orders opportunity stages by sequence", () => {

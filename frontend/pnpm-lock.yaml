@@ -297,8 +297,8 @@ importers:
   packages/presentation-core:
     dependencies:
       '@lumiere/contracts':
-        specifier: file:../../vendor/lumiere-contracts-0.3.109.tgz
-        version: file:vendor/lumiere-contracts-0.3.109.tgz(@tanstack/react-query@5.96.2(react@19.2.4))(react@19.2.4)(undici@6.23.0)
+        specifier: file:../../vendor/lumiere-contracts-0.3.120.tgz
+        version: file:vendor/lumiere-contracts-0.3.120.tgz(@tanstack/react-query@5.96.2(react@19.2.4))(react@19.2.4)(undici@6.23.0)
       ajv:
         specifier: 8.18.0
         version: 8.18.0
@@ -322,8 +322,8 @@ importers:
         specifier: workspace:*
         version: link:../api-client
       '@lumiere/contracts':
-        specifier: file:../../vendor/lumiere-contracts-0.3.109.tgz
-        version: file:vendor/lumiere-contracts-0.3.109.tgz(@tanstack/react-query@5.96.2(react@19.2.4))(react@19.2.4)(undici@6.23.0)
+        specifier: file:../../vendor/lumiere-contracts-0.3.120.tgz
+        version: file:vendor/lumiere-contracts-0.3.120.tgz(@tanstack/react-query@5.96.2(react@19.2.4))(react@19.2.4)(undici@6.23.0)
       '@lumiere/erp-session':
         specifier: workspace:*
         version: link:../erp-session
@@ -365,8 +365,8 @@ importers:
         specifier: workspace:*
         version: link:../api-client
       '@lumiere/contracts':
-        specifier: file:../../vendor/lumiere-contracts-0.3.109.tgz
-        version: file:vendor/lumiere-contracts-0.3.109.tgz(@tanstack/react-query@5.96.2(react@19.2.4))(react@19.2.4)(undici@6.23.0)
+        specifier: file:../../vendor/lumiere-contracts-0.3.120.tgz
+        version: file:vendor/lumiere-contracts-0.3.120.tgz(@tanstack/react-query@5.96.2(react@19.2.4))(react@19.2.4)(undici@6.23.0)
       react:
         specifier: '>=19'
         version: 19.2.4
@@ -2265,9 +2265,9 @@ packages:
   '@lezer/python@1.1.18':
     resolution: {integrity: sha512-31FiUrU7z9+d/ElGQLJFXl+dKOdx0jALlP3KEOsGTex8mvj+SoE1FgItcHWK/axkxCHGUSpqIHt6JAWfWu9Rhg==}
 
-  '@lumiere/contracts@file:vendor/lumiere-contracts-0.3.109.tgz':
-    resolution: {integrity: sha512-gtpoN1zvmV+82Wop6DMHXxtYA6n1H05bOSdEJMZZDKYKQuhhE4A7IgDqYW6BbvQp4xUHulcqoFUXWPu4I5TPQg==, tarball: file:vendor/lumiere-contracts-0.3.109.tgz}
-    version: 0.3.109
+  '@lumiere/contracts@file:vendor/lumiere-contracts-0.3.120.tgz':
+    resolution: {integrity: sha512-PjQsPstSuCwL/0OEZwlQvj/gLdMTRp/1JlljPc3icPOs8bvlTokFuDuvobbxQD1u96AVBhWLXFO/hERzzKQBNw==, tarball: file:vendor/lumiere-contracts-0.3.120.tgz}
+    version: 0.3.120
 
   '@marijn/find-cluster-break@1.0.2':
     resolution: {integrity: sha512-l0h88YhZFyKdXIFNfSWpyjStDjGHwZ/U7iobcK1cQQD8sejsONdQtTVU+1wVN1PBw40PiiHB1vA5S7VTfQiP9g==}
@@ -11150,7 +11150,7 @@ snapshots:
       '@lezer/highlight': 1.2.3
       '@lezer/lr': 1.4.8
 
-  '@lumiere/contracts@file:vendor/lumiere-contracts-0.3.109.tgz(@tanstack/react-query@5.96.2(react@19.2.4))(react@19.2.4)(undici@6.23.0)':
+  '@lumiere/contracts@file:vendor/lumiere-contracts-0.3.120.tgz(@tanstack/react-query@5.96.2(react@19.2.4))(react@19.2.4)(undici@6.23.0)':
     dependencies:
       spacetimedb: 2.8.2(@tanstack/react-query@5.96.2(react@19.2.4))(react@19.2.4)(undici@6.23.0)
     transitivePeerDependencies:

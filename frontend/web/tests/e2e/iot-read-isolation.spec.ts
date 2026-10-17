@@ -6,11 +6,13 @@ import {
   fetchDefaultCompanyId,
   fetchSessionOrganizationId,
   scalarQueryId,
+  signIn,
   smokeName,
 } from "./helpers"
 
 const none = { none: [] as [] }
 const some = <T,>(value: T) => ({ some: value })
+const PERSONA_PASSWORD = process.env.E2E_FIRST_ORG_PERSONA_PASSWORD ?? "Password123$"
 
 type QueryRow = Record<string, unknown>
 
@@ -43,7 +45,10 @@ function rowCompanyId(row: QueryRow): number | null {
 }
 
 test.describe("IoT HTTP company isolation", { tag: "@p0" }, () => {
-  test("isolates same-organization companies and strips sensitive payload fields", async ({ page }) => {
+  test("isolates same-organization companies and strips sensitive payload fields", async ({
+    browser,
+    page,
+  }) => {
     const organizationId = await fetchSessionOrganizationId(page)
     const defaultCompanyId = await fetchDefaultCompanyId(page)
     const companies = await queryRows(page, "companies", defaultCompanyId)
@@ -97,22 +102,29 @@ test.describe("IoT HTTP company isolation", { tag: "@p0" }, () => {
     ])
     await callReducerBff(page, "generate_hub_pairing_token", [organizationId, defaultCompanyId])
 
-    // Creating a sibling company does not silently expand the signed-in
-    // principal's company scope. Exercise the trusted BFF boundary instead of
-    // using that principal to manufacture a cross-company fixture.
-    const forgedBranchWrite = await callReducerBffResult(page, "register_iot_hub", [
-      organizationId,
-      branchCompanyId,
-      {
-        name: branchSerial,
-        serial: branchSerial,
-        ip_address: some("192.0.2.11"),
-        firmware_version: some("1.0.0"),
-        metadata: none,
-      },
-    ])
-    expect(forgedBranchWrite.status).toBe(403)
-    expect(forgedBranchWrite.error ?? "").toMatch(/company scope mismatch/i)
+    // Organization administrators may switch to sibling companies. Prove the
+    // tenant boundary with a company-bound persona whose membership must not
+    // expand merely because the sibling exists.
+    const readerContext = await browser.newContext({ storageState: { cookies: [], origins: [] } })
+    try {
+      const readerPage = await readerContext.newPage()
+      await signIn(readerPage, "fixture.reader@example.test", PERSONA_PASSWORD)
+      const forgedBranchWrite = await callReducerBffResult(readerPage, "register_iot_hub", [
+        organizationId,
+        branchCompanyId,
+        {
+          name: branchSerial,
+          serial: branchSerial,
+          ip_address: some("192.0.2.11"),
+          firmware_version: some("1.0.0"),
+          metadata: none,
+        },
+      ])
+      expect(forgedBranchWrite.status).toBe(403)
+      expect(forgedBranchWrite.error ?? "").toMatch(/company scope mismatch/i)
+    } finally {
+      await readerContext.close()
+    }
 
     const defaultHub = await waitForRow(
       page,
@@ -192,6 +204,10 @@ test.describe("IoT HTTP company isolation", { tag: "@p0" }, () => {
     expect(telemetry).not.toHaveProperty("rawValue")
     expect(telemetry).not.toHaveProperty("raw_value")
 
+    // The organization administrator is allowed to select a sibling company,
+    // but the selected company must still constrain every returned row. The
+    // company-bound reader above separately proves that callers cannot expand
+    // their own scope by forging this query parameter.
     for (const resource of [
       "iot-actions",
       "iot-alerts",
@@ -202,7 +218,12 @@ test.describe("IoT HTTP company isolation", { tag: "@p0" }, () => {
       "iot-thresholds",
     ]) {
       const response = await page.request.get(`/api/query/${resource}?companyId=${branchCompanyId}`)
-      expect(response.status(), resource).toBe(403)
+      expect(response.ok(), resource).toBe(true)
+      const body = (await response.json()) as { data?: QueryRow[] }
+      expect(
+        (body.data ?? []).every((row) => rowCompanyId(row) === branchCompanyId),
+        `${resource} leaked a row from another company`,
+      ).toBe(true)
     }
   })
 })

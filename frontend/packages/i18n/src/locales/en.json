@@ -2921,6 +2921,13 @@
         "postedLocked": "A posted statement can no longer be edited.",
         "reference": "Reference"
       }
+    },
+    "billCorrection": {
+      "action": "Correct bill quantity / price",
+      "quantity": "Bill quantity",
+      "price": "Unit price",
+      "unavailable": "This bill line has no supported exact PO source. Refresh and review its lineage.",
+      "description": "Review the supplier bill and correct its economic values. PO unit price: {{price}}; received quantity: {{received}}. Expense, payable, bill totals and PO billed quantities update together. Existing discounts are preserved. Linked percentage tax rows and currency amounts are recalculated using the bill-date exchange rate. Inconsistent tax or currency evidence must be reviewed; do not widen matching tolerances to clear a variance."
     }
   },
   "crm": {
@@ -6220,14 +6227,29 @@
           "under_received": "Partial receipt — ordered quantity not fully received.",
           "over_received": "Received quantity exceeds ordered quantity.",
           "under_billed": "Billed less than received — variance {{variance}} units.",
-          "over_billed": "Billed exceeds received — reduce bill qty or receive goods (variance {{variance}})."
-        }
+          "over_billed": "Billed exceeds received — reduce bill qty or receive goods (variance {{variance}}).",
+          "unavailable": "Quantity data is incomplete or invalid. Review the purchase order before proceeding."
+        },
+        "unavailable": "Unavailable"
       },
       "states": {
         "Draft": "Draft",
         "Confirmed": "Confirmed",
         "Done": "Done",
         "Cancelled": "Cancelled"
+      },
+      "recovery": {
+        "title": "Quantity recovery",
+        "unavailable": "Refresh and review this line’s quantities before proceeding.",
+        "reviewBill": "Review the linked bill in the order’s Handoffs tab. Receiving more goods cannot resolve this billing exception safely.",
+        "receiveOrReviewBill": "If the missing goods have arrived, record their receipt. Otherwise review the bill with Accounting.",
+        "reviewReceipt": "Received quantity exceeds the order. Review the receipt and use the existing return process where appropriate.",
+        "reviewUnbilled": "Some received goods remain unbilled. Review existing bills before creating another.",
+        "quantityAligned": "Received and billed quantities align. Bill prices and source links are checked when posting.",
+        "awaitReceipt": "Record goods only after they arrive. Review the order’s receipts for partial deliveries.",
+        "reviewOrder": "Review order and linked bills",
+        "receiveMissing": "Receive missing goods",
+        "confirmReceipt": "Confirm that these goods have physically arrived. Review the quantity and enter a lot where required; do not record a receipt merely to clear a bill exception."
       }
     },
     "rfqs": {
@@ -6371,6 +6393,7 @@
       "addLineForm": "Add line…",
       "invoiceQtyForm": "Invoice qty…",
       "receiveFullOpenQty": "Receive all open qty",
+      "resolveReceipt": "Resolve pending receipt",
       "lockSelected": "Lock",
       "unlockSelected": "Unlock",
       "editLineForm": "Edit draft line…",
@@ -6408,11 +6431,11 @@
         "refundableLine": "Create a refundable return line"
       },
       "rfq": {
-        "title": "New request for quotation",
+        "title": "Create request for quotation",
         "description": "Request pricing from vendors for a purchase requirement."
       },
       "rfqBid": {
-        "title": "New RFQ bid",
+        "title": "Add RFQ bid",
         "description": "Record a vendor bid for a request for quotation."
       },
       "rfqAward": {
@@ -6678,7 +6701,7 @@
       },
       "createBillFromOrder": {
         "title": "Create bill from purchase order",
-        "description": "Generate a vendor bill for the selected confirmed purchase order.",
+        "description": "Bill the received quantity in the purchase order currency. The bill date selects the exchange rate. Select the purchase tax matching the order; its tax group must have an input-tax account.",
         "submitLabel": "Create bill",
         "sections": {
           "accounting": "Accounting"
@@ -6688,6 +6711,9 @@
           "defaultExpenseAccountId": "Default expense account",
           "payableAccountId": "Payable account",
           "invoiceDate": "Bill date",
+          "taxId": "Purchase tax",
+          "taxHint": "Applies to all billable lines and must agree with their PO tax amounts.",
+          "discount": "Supplier discount (%)",
           "payableLineName": "Payable line label (optional)",
           "narration": "Bill notes",
           "narrationPlaceholder": "Defaults to the purchase order's notes if left blank…",
@@ -6696,6 +6722,7 @@
           "payableExcludeFromInvoiceTab": "Exclude payable line from bill tab",
           "payableBlocked": "Block payable line"
         },
+        "noTax": "No tax",
         "noPayableAccounts": "No payable accounts — create chart of accounts first",
         "noJournals": "No purchase journals — create one in Accounting",
         "noAccounts": "No GL accounts — create chart of accounts first"
@@ -6756,6 +6783,11 @@
         "noCurrency": "No active currency is available",
         "required": "{{label}} is required",
         "zeroOrGreater": "zero or greater"
+      },
+      "intakeApproval": {
+        "title": "Approve supplier intake",
+        "description": "Select the vendor to link to this supplier request. Approval requires a different person from the submitter.",
+        "submit": "Approve supplier"
       }
     },
     "ops": {
@@ -6764,6 +6796,7 @@
       "advancedTitle": "Advanced procurement",
       "approve": "Approve",
       "awardRfqBid": "Award RFQ bid",
+      "actingAs": "Acting as",
       "cannotSelfApprove": "Requester cannot approve their own request (SoD)",
       "confirmPurchaseReturn": "Confirm purchase return",
       "createBlanket": "Create blanket order",
@@ -6773,8 +6806,14 @@
       "createPurchaseReturn": "Create purchase return",
       "createRfq": "Create RFQ",
       "createVendorCredit": "Create vendor credit",
+      "delegationEnds": "Ends",
+      "delegationReason": "Reason",
+      "delegationStarts": "Starts",
+      "myself": "Myself",
       "noPendingApproval": "No pending approval request for this order.",
       "openInWorkflow": "Open in Workflow",
+      "selectPrincipal": "Select an eligible principal",
+      "selectPrincipalHelp": "Select a currently eligible principal before approving or rejecting.",
       "prompt": {
         "bidId": "Bid ID",
         "bidPriceUnit": "Bid unit price",
@@ -7009,6 +7048,9 @@
         "contractName": "Contract name",
         "delegateIdentity": "Delegate identity",
         "delegationActive": "Delegation is active",
+        "delegationEnds": "Ends",
+        "delegationReason": "Reason",
+        "delegationStarts": "Starts",
         "endDate": "End date",
         "idempotencyKey": "Idempotency key",
         "intentType": "Intent type",

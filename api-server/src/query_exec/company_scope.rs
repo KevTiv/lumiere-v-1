@@ -180,7 +180,10 @@ async fn has_organization_wide_company_access(
     let role_sql = format!(
         "SELECT id, name, permissions, is_active FROM role WHERE organization_id = {organization_id}"
     );
-    let roles = client.query_sql(&role_sql).await.map_err(ApiError::internal)?;
+    let roles = client
+        .query_sql(&role_sql)
+        .await
+        .map_err(ApiError::internal)?;
     let role_ids = current_company_scope_role_ids(
         &memberships,
         &assignments,
@@ -576,6 +579,7 @@ pub(crate) fn accounting_resource(resource: &str) -> bool {
             | "payment-reversals"
             | "payment-transactions"
             | "profit-loss-lines"
+            | "saved-reports"
             | "tax-deadlines"
             | "tax-groups"
             | "tax-schedules"

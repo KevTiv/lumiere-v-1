@@ -421,8 +421,7 @@ async function adminPrepareAssignedPicking(page: Page): Promise<number> {
         warehouse_id: warehouseId,
         order_lines: [],
         origin: orderOrigin,
-        // `origin` is not in the governed sale-orders read projection;
-        // `client_order_ref` is, so it carries the exact readback key.
+        // `client_order_ref` carries the exact customer-facing readback key.
         client_order_ref: orderOrigin,
       },
     ],

@@ -140,7 +140,7 @@ test.describe("COV-21 exact human-task decision", { tag: ["@dev-fixture", "@cov2
       await fillField(page, "origin", origin)
       const [createPoRes] = await Promise.all([
         page.waitForResponse(
-          (res) => matchesOperationResponse(res, "create_purchase_order") && res.ok(),
+          (res) => matchesOperationResponse(res, "erp.create_purchase_order_once") && res.ok(),
           { timeout: 30_000 },
         ),
         submitForm(page, "new-purchase-order"),

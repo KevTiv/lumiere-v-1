@@ -1503,7 +1503,7 @@ export function toUpdateAccountMoveLineParams(
 }
 
 export function updateAccountMoveLineParamsToJson(params: Record<string, unknown>): Record<string, unknown> {
-  return stdbParamsToJson(params)
+  return stdbParamsToJson(params, 'UpdateAccountMoveLineParams')
 }
 
 // ── Tax (Extended) ────────────────────────────────────────────────────────────

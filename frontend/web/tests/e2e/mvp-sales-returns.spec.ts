@@ -16,7 +16,6 @@ import {
   fillField,
   gotoModule,
   openEntityCreate,
-  postDraftCreditNoteMove,
   postDraftInvoiceViaUi,
   selectEntityRowById,
   selectEntityRowByText,
@@ -24,6 +23,7 @@ import {
   submitForm,
   waitForAuditLogEntry,
   waitForEntityActionEnabled,
+  waitForMovePosted,
   waitForOpportunityLineExists,
   waitForReturnOrderState,
   waitForSaleOrderBillableLines,
@@ -36,23 +36,52 @@ import {
 } from "./helpers"
 
 async function fetchExactExchangeOrderId(page: import("@playwright/test").Page, returnOrderId: number) {
-  const response = await page.request.get("/api/query/sale-orders")
-  expect(response.ok()).toBe(true)
-  const json = (await response.json()) as { data?: Array<Record<string, unknown>> }
-  const matches = (json.data ?? []).filter((row) => {
-    const origin = String(row.origin ?? "")
-    if (origin === `exchange:RMA/${returnOrderId}`) return true
-    if (typeof row.metadata !== "string") return false
-    try {
-      return String((JSON.parse(row.metadata) as { exchange_return_id?: unknown }).exchange_return_id) === String(returnOrderId)
-    } catch {
-      return false
+  const deadline = Date.now() + 30_000
+  let lastMatches: Array<Record<string, unknown>> = []
+
+  while (Date.now() < deadline) {
+    const response = await page.request.get("/api/query/sale-orders")
+    expect(response.ok()).toBe(true)
+    const json = (await response.json()) as { data?: Array<Record<string, unknown>> }
+    lastMatches = (json.data ?? []).filter((row) => {
+      const origin = String(row.origin ?? "")
+      if (origin === `exchange:RMA/${returnOrderId}`) return true
+      if (typeof row.metadata !== "string") return false
+      try {
+        return String((JSON.parse(row.metadata) as { exchange_return_id?: unknown }).exchange_return_id) === String(returnOrderId)
+      } catch {
+        return false
+      }
+    })
+    if (lastMatches.length === 1) {
+      const id = Number(lastMatches[0]?.id)
+      expect(Number.isSafeInteger(id) && id > 0).toBe(true)
+      return id
     }
+    expect(lastMatches.length, "at most one exact exchange order for the return").toBeLessThan(2)
+    await page.waitForTimeout(250)
+  }
+
+  expect(lastMatches, "one exact exchange order for the return").toHaveLength(1)
+  throw new Error("unreachable")
+}
+
+async function replayAcceptedOperation(page: import("@playwright/test").Page, response: import("@playwright/test").Response) {
+  return page.request.post(new URL(response.url()).pathname, {
+    headers: { "Content-Type": "application/json" },
+    data: response.request().postDataJSON(),
   })
-  expect(matches, "one exact exchange order for the return").toHaveLength(1)
-  const id = Number(matches[0]?.id)
-  expect(Number.isSafeInteger(id) && id > 0).toBe(true)
-  return id
+}
+
+async function countMovesForSaleOrder(page: import("@playwright/test").Page, orderId: number) {
+  const res = await page.request.get("/api/query/account-moves")
+  expect(res.ok()).toBe(true)
+  const json = (await res.json()) as { data?: Array<Record<string, unknown>> }
+  return (json.data ?? []).filter(
+    (row) =>
+      Number(row.saleOrderId ?? row.sale_order_id) === orderId &&
+      /invoice/i.test(JSON.stringify(row.moveType ?? row.move_type ?? "")),
+  ).length
 }
 
 /**
@@ -195,7 +224,7 @@ test.describe("MVP sales returns (RMA)", { tag: "@p0" }, () => {
     await chooseSelectOptionByLabel(page, "journalId", journalLabel)
     await chooseSelectOptionByLabel(page, "defaultIncomeAccountId", incomeLabel)
     await chooseSelectOptionByLabel(page, "receivableAccountId", receivableLabel)
-    await Promise.all([
+    const [invoiceResponse] = await Promise.all([
       page.waitForResponse(
         (res) =>
           matchesOperationResponse(res, "create_invoice_from_sale_order") && res.ok(),
@@ -204,6 +233,9 @@ test.describe("MVP sales returns (RMA)", { tag: "@p0" }, () => {
       submitForm(page, "create-invoice-from-sale-order"),
     ])
     const invoiceMoveId = await fetchDraftInvoiceMoveIdForSaleOrder(page, orderId)
+    // Replaying the exact accepted command must be refused and must not create a second invoice.
+    expect((await replayAcceptedOperation(page, invoiceResponse)).ok()).toBe(false)
+    expect(await countMovesForSaleOrder(page, orderId)).toBe(1)
     await postDraftInvoiceViaUi(page, invoiceMoveId)
 
     const saleOrderLabel = await fetchSaleOrderSelectLabel(page, orderId)
@@ -276,7 +308,7 @@ test.describe("MVP sales returns (RMA)", { tag: "@p0" }, () => {
     await chooseSelectOptionByLabel(page, "journalId", journalLabel)
     await chooseSelectOptionByLabel(page, "defaultIncomeAccountId", incomeLabel)
     await chooseSelectOptionByLabel(page, "receivableAccountId", receivableLabel)
-    await Promise.all([
+    const [creditNoteResponse] = await Promise.all([
       page.waitForResponse(
         (res) =>
           matchesOperationResponse(res, "create_credit_note_from_return_order") && res.ok(),
@@ -287,7 +319,20 @@ test.describe("MVP sales returns (RMA)", { tag: "@p0" }, () => {
     await waitForReturnOrderState(page, returnOrderId, "refunded")
 
     const creditNoteId = await fetchDraftCreditNoteMoveIdForReturnOrder(page, returnOrderId)
-    await postDraftCreditNoteMove(page, creditNoteId)
+    // The exact accepted credit-note command is not accepted twice, and the credit note stays unique.
+    expect((await replayAcceptedOperation(page, creditNoteResponse)).ok()).toBe(false)
+    expect(await fetchDraftCreditNoteMoveIdForReturnOrder(page, returnOrderId)).toBe(creditNoteId)
+    // Credit notes have no list tab; the operator posts them from the document page.
+    await page.goto(`/accounting/invoices/${creditNoteId}`)
+    const postCreditNote = page.getByTestId("record-workflow-action-accounting.invoice.post").first()
+    await expect(postCreditNote).toBeEnabled({ timeout: 30_000 })
+    await Promise.all([
+      page.waitForResponse((res) => matchesOperationResponse(res, "post_invoice") && res.ok(), {
+        timeout: 30_000,
+      }),
+      postCreditNote.click(),
+    ])
+    await waitForMovePosted(page, creditNoteId)
 
     await expect
       .poll(async () => {

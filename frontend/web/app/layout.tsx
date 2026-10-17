@@ -9,7 +9,12 @@ import './globals.css'
 
 import { getBrowserStdbSession, hasAuthenticatedIdentity } from '@/lib/browser-session'
 import { requireServerQueryRows, serverFetchQueryListState } from '@/lib/server-query'
-import { resolveSessionCompanyIds, resolveSessionRoleNames } from '@/lib/session-company-scope'
+import {
+  resolveSessionAuthorityExpiryMicros,
+  resolveSessionCompanyIds,
+  resolveSessionRoleIds,
+  resolveSessionRoleNames,
+} from '@/lib/session-company-scope'
 
 export const metadata: Metadata = {
   title: 'Lumiere ERP',
@@ -44,6 +49,8 @@ export default async function RootLayout({
   const fieldAccess = session?.fieldAccess
 
   let serverRoleNames: string[] = []
+  let serverRoleIds: number[] = []
+  let authorityExpiresAtMicros: number | null = null
   let companyIds: readonly number[] | undefined
   if (identityHex && organizationId != null && session) {
     {
@@ -57,11 +64,15 @@ export default async function RootLayout({
       const allRoles = requireServerQueryRows(rolesState, "roles")
       const companies = requireServerQueryRows(companiesState, "companies")
       const memberships = requireServerQueryRows(membershipsState, "user-organization")
-      serverRoleNames = resolveSessionRoleNames({
+      const roleInput = {
+        organizationId,
         roles: allRoles,
         memberships,
         assignments,
-      })
+      }
+      serverRoleNames = resolveSessionRoleNames(roleInput)
+      serverRoleIds = resolveSessionRoleIds(roleInput)
+      authorityExpiresAtMicros = resolveSessionAuthorityExpiryMicros(roleInput)
       const validCompanies = companies
         .map((row) => ({
           id: Number(row["id"]),
@@ -92,6 +103,8 @@ export default async function RootLayout({
         <Providers
           serverIdentity={identityHex}
           serverRoleNames={serverRoleNames}
+          serverRoleIds={serverRoleIds}
+          authorityExpiresAtMicros={authorityExpiresAtMicros}
           organizationId={organizationId}
           companyIds={companyIds}
           fieldAccess={fieldAccess}

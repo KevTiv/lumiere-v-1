@@ -2372,6 +2372,18 @@
     "date_end",
     "metadata"
   ],
+  "CreatePurchaseOrderOnceParams": [
+    "origin",
+    "partner_ref",
+    "notes",
+    "date_planned",
+    "payment_term_id",
+    "fiscal_position_id",
+    "incoterm_id",
+    "incoterm_location",
+    "is_quantity_copy",
+    "metadata"
+  ],
   "CreatePurchaseOrderParams": [
     "company_id",
     "origin",
@@ -4552,6 +4564,13 @@
     "lot_id",
     "metadata"
   ],
+  "PurchaseReceiptOperation": [
+    "lot_id",
+    "move_id",
+    "picking_id",
+    "continuation_move_id",
+    "continuation_picking_id"
+  ],
   "PurchaseRequisition": [
     "origin",
     "ordering_date",
@@ -4707,6 +4726,11 @@
     "location_id",
     "lot_id",
     "metadata"
+  ],
+  "ReceivePoLineOnceParams": [
+    "lot_id",
+    "expected_move_id",
+    "expected_picking_id"
   ],
   "RecognizeAmortizationLineParams": [
     "reference",
@@ -5866,6 +5890,10 @@
     "metadata"
   ],
   "UpdateAccountMoveLineParams": [
+    "quantity",
+    "price_unit",
+    "expected_quantity",
+    "expected_price_unit",
     "company_id",
     "name",
     "debit",

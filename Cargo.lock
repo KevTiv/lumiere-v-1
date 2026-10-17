@@ -2072,7 +2072,7 @@ dependencies = [
 
 [[package]]
 name = "lumiere-contracts"
-version = "0.3.109"
+version = "0.3.120"
 dependencies = [
  "serde_json",
  "sha2 0.10.9",

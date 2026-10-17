@@ -117,6 +117,9 @@
       "balance",
       "account_id",
       "partner_id",
+      "product_id",
+      "quantity",
+      "price_unit",
       "company_id"
     ],
     "mandatory": [
@@ -139,6 +142,7 @@
       "journal_id",
       "partner_id",
       "currency_id",
+      "company_currency_id",
       "invoice_date",
       "invoice_date_due",
       "invoice_origin",
@@ -149,6 +153,7 @@
       "amount_total",
       "amount_residual",
       "payment_state",
+      "posted_before",
       "metadata"
     ],
     "mandatory": [
@@ -265,7 +270,15 @@
     "default_restricted": [
       "name",
       "amount",
-      "company_id"
+      "company_id",
+      "active",
+      "type_tax_use",
+      "amount_type",
+      "price_include",
+      "include_base_amount",
+      "has_negative_factor",
+      "tax_group_id",
+      "invoice_repartition_line_ids"
     ],
     "mandatory": [
       "id",
@@ -5070,8 +5083,11 @@
     ],
     "default_restricted": [
       "product_id",
+      "product_uom",
       "product_qty",
       "price_unit",
+      "state",
+      "invoice_lines",
       "qty_received",
       "qty_invoiced",
       "qty_to_invoice"
@@ -5094,6 +5110,8 @@
       "product_id",
       "product_qty",
       "price_unit",
+      "state",
+      "invoice_lines",
       "qty_received",
       "qty_invoiced",
       "qty_to_invoice"
@@ -5105,6 +5123,25 @@
       "order_id"
     ],
     "table": "purchase_order_line"
+  },
+  "purchase-order-creations": {
+    "aliases": [
+      "purchase-order-creations",
+      "purchase_order_creation_operation"
+    ],
+    "default_restricted": [
+      "operation_key",
+      "purchase_order_id",
+      "payload_hash",
+      "created_by",
+      "created_at"
+    ],
+    "mandatory": [
+      "id",
+      "organization_id",
+      "company_id"
+    ],
+    "table": "purchase_order_creation_operation"
   },
   "purchase-orders": {
     "aliases": [
@@ -5172,6 +5209,33 @@
     ],
     "table": "purchase_order"
   },
+  "purchase-receipt-operations": {
+    "aliases": [
+      "purchase-receipt-operations",
+      "purchase_receipt_operation"
+    ],
+    "default_restricted": [
+      "operation_key",
+      "line_id",
+      "order_id",
+      "quantity",
+      "lot_id",
+      "received_before",
+      "received_after",
+      "move_id",
+      "picking_id",
+      "continuation_move_id",
+      "continuation_picking_id",
+      "created_by",
+      "created_at"
+    ],
+    "mandatory": [
+      "id",
+      "organization_id",
+      "company_id"
+    ],
+    "table": "purchase_receipt_operation"
+  },
   "purchase-requisition-lines": {
     "aliases": [
       "purchase-requisition-lines",
@@ -5200,7 +5264,11 @@
     "default_restricted": [
       "state",
       "company_id",
-      "description"
+      "description",
+      "origin",
+      "user_id",
+      "write_uid",
+      "purchase_ids"
     ],
     "mandatory": [
       "id",
@@ -5256,7 +5324,8 @@
       "partner_id",
       "price_unit",
       "amount_total",
-      "state"
+      "state",
+      "notes"
     ],
     "mandatory": [
       "id",
@@ -5292,7 +5361,9 @@
       "company_id",
       "requisition_id",
       "awarded_bid_id",
-      "purchase_order_id"
+      "purchase_order_id",
+      "notes",
+      "currency_id"
     ],
     "mandatory": [
       "id",
@@ -5388,7 +5459,10 @@
       "product_id",
       "location_id",
       "company_id",
-      "active"
+      "active",
+      "last_run",
+      "next_run",
+      "metadata"
     ],
     "mandatory": [
       "id",
@@ -5720,6 +5794,7 @@
     "default_restricted": [
       "reference",
       "client_order_ref",
+      "origin",
       "state",
       "partner_id",
       "company_id",
@@ -6338,7 +6413,15 @@
     "default_restricted": [
       "name",
       "company_id",
-      "active"
+      "subscription_id",
+      "product_id",
+      "product_uom_qty",
+      "price_unit",
+      "discount",
+      "price_subtotal",
+      "recurring_rule_type",
+      "recurring_interval",
+      "line_is_recurring"
     ],
     "mandatory": [
       "id",
@@ -6537,7 +6620,10 @@
       "company_name",
       "contact_name",
       "email",
-      "phone"
+      "phone",
+      "submitted_by",
+      "approved_by",
+      "partner_id"
     ],
     "mandatory": [
       "id",

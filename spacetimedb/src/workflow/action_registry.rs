@@ -335,7 +335,10 @@ pub fn execute_guarded_action(
         params.input.clone(),
     )?;
     if before.subject_revision_hash != params.expected_subject_revision_hash {
-        return Err("guarded action subject changed after approval was requested".to_string());
+        return Err(
+            "guarded action subject changed after approval was requested (revision mismatch)"
+                .to_string(),
+        );
     }
 
     execute_adapter(
@@ -466,6 +469,9 @@ fn purchase_order_snapshot(
         field("company_id", order.company_id),
         debug_field("state", &order.state),
         field("partner_id", order.partner_id),
+        debug_field("origin", &order.origin),
+        debug_field("partner_ref", &order.partner_ref),
+        field("dest_address_id", option_u64(order.dest_address_id)),
         field("currency_id", order.currency_id),
         float_field("amount_untaxed", order.amount_untaxed),
         float_field("amount_tax", order.amount_tax),
@@ -475,6 +481,24 @@ fn purchase_order_snapshot(
         field("date_order", order.date_order.to_micros_since_unix_epoch()),
         field("date_planned", option_timestamp(order.date_planned)),
         field("is_locked", order.is_locked),
+        field("incoterm_id", option_u64(order.incoterm_id)),
+        debug_field("incoterm_location", &order.incoterm_location),
+        field(
+            "match_qty_tolerance",
+            order
+                .match_qty_tolerance
+                .map(f64::to_bits)
+                .map(|n| n.to_string())
+                .unwrap_or_else(|| "none".to_string()),
+        ),
+        field(
+            "match_price_tolerance",
+            order
+                .match_price_tolerance
+                .map(f64::to_bits)
+                .map(|n| n.to_string())
+                .unwrap_or_else(|| "none".to_string()),
+        ),
     ];
     let mut lines: Vec<_> = ctx
         .db
@@ -496,6 +520,9 @@ fn purchase_order_snapshot(
             field("line.sequence", line.sequence),
             field("line.product_id", line.product_id),
             field("line.product_uom", line.product_uom),
+            field("line.partner_id", line.partner_id),
+            field("line.lot_id", option_u64(line.lot_id)),
+            field("line.date_planned", option_timestamp(line.date_planned)),
             float_field("line.product_qty", line.product_qty),
             float_field("line.price_unit", line.price_unit),
             float_field("line.price_subtotal", line.price_subtotal),
@@ -746,6 +773,8 @@ fn payment_snapshot(
         field("currency_id", payment.currency_id),
         field("date", payment.date.to_micros_since_unix_epoch()),
         field("journal_id", payment.journal_id),
+        debug_field("ref", &payment.ref_),
+        debug_field("memo", &payment.memo),
         field("reconciled_invoice_ids", joined_ids(&invoice_ids)),
         field("reconciled_bill_ids", joined_ids(&bill_ids)),
     ];

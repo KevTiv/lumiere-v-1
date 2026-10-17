@@ -19,6 +19,7 @@ import { showWorkflowToast } from '@lumiere/ui/lib/workflow-toast';
 import {
   useAccountAccounts,
   useAccountJournals,
+  useAccountTaxes,
   useAccountPaymentTerms,
 } from '@lumiere/query-hooks/hooks/accounting';
 import { useContacts } from '@lumiere/query-hooks/hooks/crm';
@@ -50,6 +51,7 @@ import {
 } from '@/lib/purchasing-create-params';
 import {
   enumTag,
+  billTaxOptions,
   purchaseOrderHeaderDefaults,
   purchaseOrderLineEditDefaults,
   toReceiveLineInput,
@@ -96,6 +98,7 @@ export function useBillFormConfig(organizationId: number) {
   const { orgId } = orgBigInts(organizationId);
   const { data: accountJournals = [] } = useAccountJournals(orgId);
   const { data: accountAccounts = [] } = useAccountAccounts(orgId);
+  const { data: taxes = [] } = useAccountTaxes(orgId);
 
   return useMemo(() => {
     const { journalOptions, expenseOptions, payableOptions } = billLookupOptions(
@@ -107,8 +110,9 @@ export function useBillFormConfig(organizationId: number) {
       journalId: journalOptions,
       defaultExpenseAccountId: expenseOptions,
       payableAccountId: payableOptions,
+      taxId: billTaxOptions(t, taxes as Row[]),
     });
-  }, [t, accountJournals, accountAccounts]);
+  }, [t, accountJournals, accountAccounts, taxes]);
 }
 
 interface CreateBillDialogProps {

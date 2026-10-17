@@ -201,7 +201,8 @@ test.describe(
         ).toBe(422)
         expect(await requisitionByOrigin(page, origin)).toEqual(approvedSnapshot)
 
-        // A stale/foreign company reference cannot redirect the conversion.
+        // The trusted operation boundary rejects a foreign company scope
+        // before the reducer can use it to redirect the conversion.
         expect(
           (await requisitionRequest(
             buyerPage,
@@ -209,7 +210,7 @@ test.describe(
             requisitionId,
             companyId + 9_999,
           )).status(),
-        ).toBe(422)
+        ).toBe(403)
         expect(
           (await requisitionByOrigin(page, origin))?.purchaseIds ??
             (await requisitionByOrigin(page, origin))?.purchase_ids ??

@@ -26,11 +26,17 @@ pub fn run_analytics_record_report_run_test(ctx: &ReducerContext) -> Result<(), 
         .map_err(|e| format!("record_report_run: {e}"))
 }
 
+pub fn run_analytics_widget_definition_validation_test(ctx: &ReducerContext) -> Result<(), String> {
+    relational_integrity_test::test_dashboard_widget_definition_validated_at_write(ctx)
+        .map_err(|e| format!("widget_definition_validation: {e}"))
+}
+
 #[spacetimedb::reducer]
 pub fn run_all_analytics_tests(ctx: &ReducerContext) -> Result<(), String> {
     run_analytics_dashboard_company_scope_test(ctx)?;
     run_analytics_cross_company_widget_add_test(ctx)?;
     run_analytics_dashboard_widget_idempotency_test(ctx)?;
+    run_analytics_widget_definition_validation_test(ctx)?;
     relational_integrity_test::test_generated_owner_report_records_ordered_commit(ctx)
         .map_err(|e| format!("generated_owner_report_ordered_commit: {e}"))?;
     run_analytics_record_report_run_test(ctx)?;

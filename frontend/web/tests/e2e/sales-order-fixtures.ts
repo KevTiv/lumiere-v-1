@@ -19,6 +19,7 @@ import {
   waitForBffQueryMinRows,
   waitForSaleOrderConfirmed,
   waitForSaleOrderLineExists,
+  reloadSettled,
 } from "./helpers"
 
 export const SEEDED_CUSTOMER_NAME = "Acme Corporation"
@@ -253,7 +254,7 @@ export async function expectOrderSummary(
 ) {
   await gotoModule(page, "/sales", "sales")
   if (expected.reload) {
-    await page.reload({ waitUntil: "domcontentloaded" })
+    await reloadSettled(page)
     await gotoModule(page, "/sales", "sales")
   }
   await page.getByTestId("module-tab-sales-orders").click()

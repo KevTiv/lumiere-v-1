@@ -61,7 +61,10 @@ pub(super) async fn read(
     let scoped = context.with_company_scope(vec![company_id])?;
     scoped.require_company_scope(&[company_id])?;
     let sql = scoped_sql(scoped.organization_id(), company_id, scoped.field_access())?;
-    owner_client.query_sql(&sql).await.map_err(ApiError::internal)
+    owner_client
+        .query_sql(&sql)
+        .await
+        .map_err(ApiError::internal)
 }
 
 #[cfg(test)]

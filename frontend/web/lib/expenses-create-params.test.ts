@@ -29,6 +29,22 @@ describe("expense operator create params", () => {
     assert.equal(params.currencyId, 2n)
   })
 
+  it("defaults an untouched quantity input to one", () => {
+    const params = toCreateExpenseParams(
+      {
+        employeeId: "7",
+        name: "Hotel",
+        date: "2026-10-13",
+        totalAmount: "73.17",
+        quantity: "",
+      },
+      { currencyId: "2", pricelistId: "4" },
+    )
+
+    assert.ok(params)
+    assert.equal(params.quantity, 1)
+  })
+
   it("generates non-empty command identities and rejects invalid attachment ids", () => {
     const first = newExpenseClientRequestId()
     const second = newExpenseClientRequestId()

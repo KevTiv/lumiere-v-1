@@ -168,16 +168,18 @@ async fn exercise_manufacturing_cost_projection_upgrade(pool: &Pool) -> Result<(
     ensure!(migration_count(pool).await? == prefix_length as i64);
     let previous_history = applied_migration_history(pool).await?;
     let previous_tables = public_table_names(pool).await?;
-    let expected_cost_tables = [
+    let expected_new_tables = [
         "mrp_production_cost",
         "mrp_productivity_cost",
         "mrp_valuation_config",
         "mrp_workcenter_cost_rate",
+        "purchase_order_creation_operation",
+        "purchase_receipt_operation",
     ];
-    for table in expected_cost_tables {
+    for table in expected_new_tables {
         ensure!(
             !relation_exists(pool, table).await?,
-            "cost table {table} predates migration 14"
+            "table {table} predates its catalog migration"
         );
     }
 
@@ -196,7 +198,7 @@ async fn exercise_manufacturing_cost_projection_upgrade(pool: &Pool) -> Result<(
         .filter(|table| !previous_tables.contains(table))
         .collect();
     ensure!(
-        added_tables == expected_cost_tables,
+        added_tables == expected_new_tables,
         "migration 13 upgrade produced unexpected new tables: {added_tables:?}"
     );
 
@@ -214,9 +216,7 @@ async fn exercise_account_payment_reversal_identity_upgrade(pool: &Pool) -> Resu
     let frozen_migration_15 = include_str!(
         "../../../../lumiere-codegen/pg-migration-ledger/0015_durable_projection_delta.sql"
     );
-    ensure!(
-        MIGRATIONS[migration_15_index].name == "account_payment_reversal_identity"
-    );
+    ensure!(MIGRATIONS[migration_15_index].name == "account_payment_reversal_identity");
     ensure!(MIGRATIONS[migration_15_index].sql == frozen_migration_15);
 
     apply_migration_prefix(pool, migration_15_index).await?;
@@ -233,9 +233,7 @@ async fn exercise_account_payment_reversal_identity_upgrade(pool: &Pool) -> Resu
 
     let previous_history = applied_migration_history(pool).await?;
     ensure_schema(pool).await?;
-    ensure!(
-        applied_checksum(pool, 15).await? == migration_checksum(frozen_migration_15)
-    );
+    ensure!(applied_checksum(pool, 15).await? == migration_checksum(frozen_migration_15));
 
     let client = pool.get().await?;
     let column = client
@@ -269,9 +267,7 @@ async fn exercise_account_payment_reversal_identity_upgrade(pool: &Pool) -> Resu
         .is_some_and(|value| value.contains("reversal_move_id IS NOT NULL")));
     drop(client);
 
-    ensure!(
-        applied_migration_history(pool).await?[..migration_15_index] == previous_history
-    );
+    ensure!(applied_migration_history(pool).await?[..migration_15_index] == previous_history);
     ensure_schema(pool).await?;
     ensure!(migration_count(pool).await? == MIGRATIONS.len() as i64);
     Ok(())
