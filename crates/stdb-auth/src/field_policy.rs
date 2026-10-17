@@ -1536,6 +1536,23 @@ mod tests {
     }
 
     #[test]
+    fn expense_readback_exposes_exact_amount_date_and_currency_with_field_masks() {
+        let columns = resolve_http_sql_columns("expenses", None).unwrap();
+        for field in ["date", "total_amount", "currency_id"] {
+            assert!(
+                columns.iter().any(|column| column == field),
+                "missing expenses.{field}"
+            );
+        }
+        let mut access = field_access(&["hr_expense:read"]);
+        select_fields(&mut access, "expenses", &["name"]);
+        let masked = resolve_http_sql_columns("expenses", Some(&access)).unwrap();
+        for field in ["date", "total_amount", "currency_id"] {
+            assert!(!masked.iter().any(|column| column == field));
+        }
+    }
+
+    #[test]
     fn resolve_http_sql_columns_includes_location_and_lock_for_lots() {
         let cols = resolve_http_sql_columns("stock-production-lots", None)
             .expect("stock-production-lots columns");
