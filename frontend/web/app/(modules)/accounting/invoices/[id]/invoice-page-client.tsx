@@ -7,7 +7,7 @@ import { useRBAC } from '@/lib/rbac-context';
 import { useUnsavedChangesGuard } from '@lumiere/ui';
 import { useConfirmDialog } from '@lumiere/ui/hooks/use-confirm-dialog';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { ListOrdered, MoreHorizontal, ShoppingCart } from 'lucide-react';
+import { CreditCard, Download, ListOrdered, MoreHorizontal, ShoppingCart } from 'lucide-react';
 import { useTranslation } from '@lumiere/i18n';
 import {
   Button,
@@ -57,6 +57,10 @@ import {
   DropdownMenuTrigger,
 } from '@lumiere/ui/components/dropdown-menu';
 import { Skeleton } from '@lumiere/ui/components/skeleton';
+import { InvoiceDocument, formatInvoiceMoney } from '../../../../../../packages/ui/src/accounting-components/invoice-document';
+import { ModuleDataNotice } from '../../../../../../packages/ui/src/pages/module-data-notice';
+import { moduleCollection } from '@lumiere/ui/lib/module-data-state';
+import { formatTimestampLike } from '@lumiere/ui/lib/entity-row-values';
 import { showWorkflowToast } from '@lumiere/ui/lib/workflow-toast';
 import { variantTag, type AnyWorkflowAction, type RowValueMap } from '@lumiere/erp-workflows';
 import { buildAccountLabelMap, buildSourceDocumentLabelMap } from '@lumiere/stdb/read-models';
@@ -75,6 +79,8 @@ import { useInvoiceToPaymentWorkflow } from '@lumiere/query-hooks/hooks/accounti
 import { useCreateDocument } from '@lumiere/query-hooks/hooks/documents';
 import { usePurchaseOrders } from '@lumiere/query-hooks/hooks/purchasing';
 import { useSaleOrders } from '@lumiere/query-hooks/hooks/sales';
+import { useCompanies } from '@lumiere/query-hooks/hooks/organization-company';
+import { useCurrencies } from '@lumiere/query-hooks/hooks/settings';
 import {
   downloadDocumentPdf,
   useDispatchQueuedMail,
@@ -103,6 +109,7 @@ import {
 } from '../../invoice-actions';
 import { invoiceKind, invoiceStatus } from '../../invoice-status';
 import { RegisterPaymentOnInvoiceDialog } from '../../register-payment-on-invoice-dialog';
+import { invoiceDocumentLines, invoiceRecordAmount, invoiceRecordCurrency, invoiceRecordLines, resolveInvoiceRecord, sameCompany } from './invoice-record';
 
 interface InvoicePageClientProps {
   moveId: string;
@@ -160,11 +167,18 @@ function InvoicePageLoaded({
   const resetPendingGuard = useUnsavedChangesGuard(false, resetMove.isPending);
   const { confirm: confirmReset, dialog: resetDialog } = useConfirmDialog();
 
-  const { data: moves = [], isLoading: movesLoading } = useAccountMoves(orgId, { enabled: true });
-  const { data: moveLines = [] } = useAccountMoveLines(orgId, { enabled: true });
-  const { data: accounts = [] } = useAccountAccounts(orgId, { enabled: true });
-  const { data: saleOrders = [] } = useSaleOrders(orgId);
-  const { data: purchaseOrders = [] } = usePurchaseOrders(orgId);
+  const movesRead = moduleCollection(useAccountMoves(orgId, { enabled: true }));
+  const linesRead = moduleCollection(useAccountMoveLines(orgId, { enabled: true }));
+  const accountsRead = moduleCollection(useAccountAccounts(orgId, { enabled: true }));
+  const salesRead = moduleCollection(useSaleOrders(orgId));
+  const purchasesRead = moduleCollection(usePurchaseOrders(orgId));
+  const companiesRead = moduleCollection(useCompanies(organizationId, true));
+  const currenciesRead = moduleCollection(useCurrencies());
+  const moves = movesRead.rows;
+  const moveLines = linesRead.rows;
+  const accounts = accountsRead.rows;
+  const saleOrders = salesRead.rows;
+  const purchaseOrders = purchasesRead.rows;
 
   const mailTemplates = useMailTemplates(organizationId, true);
   const queueMail = useQueueMailFromTemplate(organizationId, Number(operatingCompanyId));
@@ -203,12 +217,12 @@ function InvoicePageLoaded({
   const [docBusy, setDocBusy] = useState<'download' | 'archive' | 'send' | null>(null);
 
   const move = useMemo(
-    () => (moves as unknown as Row[]).find((row) => String(row.id) === moveId),
-    [moves, moveId],
+    () => resolveInvoiceRecord(moves as unknown as Row[], moveId, operatingCompanyId),
+    [moves, moveId, operatingCompanyId],
   );
   const lines = useMemo(
-    () => (moveLines as unknown as Row[]).filter((line) => String(line.moveId ?? line.move_id ?? '') === moveId),
-    [moveLines, moveId],
+    () => invoiceRecordLines(moveLines as unknown as Row[], moveId, operatingCompanyId),
+    [moveLines, moveId, operatingCompanyId],
   );
   const accountLabelMap = useMemo(() => buildAccountLabelMap(accounts as Row[]), [accounts]);
   const sourceDocumentLabelMap = useMemo(
@@ -244,8 +258,8 @@ function InvoicePageLoaded({
   // Previous / next follow the list the document was opened from, else its own kind, newest first.
   const kind = move ? invoiceKind(move) : 'entry';
   const siblings = useMemo(
-    () => (move ? (moves as unknown as Row[]).filter((row) => invoiceKind(row) === kind) : []),
-    [moves, move, kind],
+    () => (move ? (moves as unknown as Row[]).filter((row) => sameCompany(row, operatingCompanyId) && invoiceKind(row) === kind) : []),
+    [moves, move, kind, operatingCompanyId],
   );
   const navigation = useRecordNavigation<Row>({
     rows: siblings,
@@ -255,11 +269,14 @@ function InvoicePageLoaded({
   });
 
   if (!move) {
-    if (movesLoading) {
+    if (movesRead.state.status !== 'ready' && movesRead.state.status !== 'loading') {
+      return <ModuleDataNotice state={movesRead.state} />;
+    }
+    if (movesRead.state.status === 'loading') {
       return (
         <div className="space-y-4" data-testid="invoice-page-loading">
           <Skeleton className="h-6 w-64" />
-          <Skeleton className="h-10 w-96" />
+          <Skeleton className="h-10 w-full max-w-96" />
           <Skeleton className="h-64 w-full" />
         </div>
       );
@@ -290,10 +307,32 @@ function InvoicePageLoaded({
   const status = invoiceStatus(move, t);
   const listTab = KIND_TAB[kind];
   const partner = String(move.invoicePartnerDisplayName ?? move.invoice_partner_display_name ?? '').trim();
+  const company = companiesRead.rows.find((row) => String(row.id) === String(operatingCompanyId));
+  const currency = invoiceRecordCurrency(move, currenciesRead.rows);
+  const money = (value: unknown) => formatInvoiceMoney(invoiceRecordAmount(value), currency);
+  const dateLabel = (value: unknown) => formatTimestampLike(value)?.toLocaleDateString(undefined, { dateStyle: 'medium', timeZone: 'UTC' }) ?? '—';
+  const total = invoiceRecordAmount(move.amountTotal ?? move.amount_total);
+  const residual = invoiceRecordAmount(move.amountResidual ?? move.amount_residual);
+  const documentTitle = kind === 'bill' ? t('accounting.manualInvoice.billTitle', { defaultValue: 'Vendor bill' })
+    : kind === 'invoice' ? t('accounting.manualInvoice.invoiceTitle', { defaultValue: 'Customer invoice' })
+      : kind === 'creditNote' || kind === 'vendorCredit' ? t('accounting.invoices.creditNote', { defaultValue: 'Credit note' })
+        : t('accounting.tabs.journalEntries', { defaultValue: 'Journal entry' });
+  const detailBase = accountMoveDetailConfig(t);
+  const detailConfig = {
+    ...detailBase,
+    sections: detailBase.sections.map((section) => ({
+      ...section,
+      fields: section.fields.map((field) => ({
+        ...field,
+        width: 'full' as const,
+        ...(field.type === 'currency' ? { render: (value: unknown) => money(value) } : {}),
+      })),
+    })),
+  };
 
   const saleOrderId = move.saleOrderId ?? move.sale_order_id;
   const purchaseOrder = (purchaseOrders as unknown as Row[]).find((order) =>
-    Array.isArray(order.invoiceIds ?? order.invoice_ids)
+    sameCompany(order, operatingCompanyId) && Array.isArray(order.invoiceIds ?? order.invoice_ids)
       ? ((order.invoiceIds ?? order.invoice_ids) as unknown[]).map(String).includes(moveId)
       : false,
   );
@@ -396,12 +435,6 @@ function InvoicePageLoaded({
       },
     },
     {
-      id: 'register-payment',
-      label: t('accounting.invoices.invoiceActions.registerPayment', { defaultValue: 'Register payment' }),
-      show: canRegisterPayment(move, kind),
-      run: () => setRegisterOpen(true),
-    },
-    {
       id: 'reconcile-payment',
       label: t('accounting.invoices.invoiceActions.reconcilePayment', { defaultValue: 'Reconcile payment' }),
       show: canReconcilePayment(move, kind) && checkPermission('account_move', 'write').allowed,
@@ -412,15 +445,6 @@ function InvoicePageLoaded({
       label: t('accounting.invoices.invoiceActions.cancel', { defaultValue: 'Cancel document' }),
       show: canCancelMove(move),
       run: () => setCancelOpen(true),
-    },
-    {
-      id: 'download-pdf',
-      label: t('accounting.invoices.invoiceActions.download'),
-      show: true,
-      run: () =>
-        withBusy('download', t('accounting.invoices.invoiceActions.download'), () =>
-          downloadDocumentPdf('account-move', Number(moveId)),
-        ),
     },
     {
       id: 'archive-pdf',
@@ -547,10 +571,23 @@ function InvoicePageLoaded({
       ]
     : [];
   const linesView = linesBase.view as EntityTableConfig;
-  const linesConfig = { ...linesBase, view: { ...linesView, actions: [...(linesView.actions ?? []), ...lineActions] } };
+  const linesConfig = {
+    ...linesBase,
+    view: {
+      ...linesView,
+      columns: linesView.columns.map((column) => column.type === 'currency' ? {
+        ...column,
+        render: (value: unknown, row: Row) => formatInvoiceMoney(invoiceRecordAmount(value), invoiceRecordCurrency({
+          currencyId: row.companyCurrencyId ?? row.company_currency_id,
+        }, currenciesRead.rows)),
+      } : column),
+      actions: [...(linesView.actions ?? []), ...lineActions],
+    },
+  };
 
   return (
     <>
+      <ModuleDataNotice state={movesRead.state} />
       <RecordPage
         testIdPrefix="invoice"
         breadcrumbs={[
@@ -601,6 +638,12 @@ function InvoicePageLoaded({
         }
         actions={
           <>
+            {canRegisterPayment(move, kind) ? (
+              <Button size="sm" disabled={workflow.isPending} onClick={() => setRegisterOpen(true)} data-testid="invoice-action-register-payment">
+                <CreditCard className="mr-1 h-4 w-4" />
+                {t('accounting.invoices.invoiceActions.registerPayment', { defaultValue: 'Register payment' })}
+              </Button>
+            ) : null}
             <RecordWorkflowActions
               actions={headerActions}
               record={record}
@@ -608,6 +651,16 @@ function InvoicePageLoaded({
               primaryActionIds={new Set(['accounting.invoice.post'])}
               pendingActionIds={workflow.isPending ? new Set(headerActions.map((action) => action.id)) : undefined}
             />
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={docBusy != null}
+              data-testid="invoice-action-download-pdf"
+              onClick={() => void withBusy('download', t('accounting.invoices.invoiceActions.download'), () => downloadDocumentPdf('account-move', Number(moveId)))}
+            >
+              <Download className="mr-1 h-4 w-4" />
+              {t('accounting.invoices.invoiceActions.download')}
+            </Button>
             {canCreditNote ? (
               <Button variant="outline" size="sm" onClick={() => setCreditNoteOpen(true)} data-testid="invoice-credit-note">
                 {t('accounting.forms.createCreditNote.title')}
@@ -644,13 +697,68 @@ function InvoicePageLoaded({
           {
             id: 'overview',
             label: t('common.overview', { defaultValue: 'Overview' }),
-            content: <EntityDetail config={accountMoveDetailConfig(t)} data={move} />,
+            content: (
+              <div className="space-y-6" data-testid="invoice-financial-overview">
+                <div className="grid gap-3 sm:grid-cols-3">
+                  {[
+                    { label: t('accounting.invoices.total', { defaultValue: 'Document total' }), value: money(total) },
+                    { label: t('accounting.invoices.amountDue', { defaultValue: 'Amount due' }), value: money(residual) },
+                    { label: t('accounting.invoices.dueDate', { defaultValue: 'Due date' }), value: dateLabel(move.invoiceDateDue ?? move.invoice_date_due) },
+                  ].map((metric) => (
+                    <div key={metric.label} className="min-w-0 rounded-xl border bg-card p-4">
+                      <p className="text-xs font-medium text-muted-foreground">{metric.label}</p>
+                      <p className="mt-2 break-words text-xl font-semibold tracking-tight tabular-nums">{metric.value}</p>
+                    </div>
+                  ))}
+                </div>
+                <ModuleDataNotice state={currenciesRead.state} />
+                <ModuleDataNotice state={companiesRead.state} />
+                <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(18rem,0.45fr)]">
+                  <div className="min-w-0 space-y-4 rounded-xl bg-muted/40 p-3 sm:p-5">
+                    <div className="flex flex-wrap items-center justify-between gap-2 px-1">
+                      <h2 className="text-sm font-medium">{t('accounting.invoices.documentPreview', { defaultValue: 'Document preview' })}</h2>
+                      <span className="text-xs text-muted-foreground">{t('accounting.invoices.pdfHint', { defaultValue: 'Download PDF for the printable document' })}</span>
+                    </div>
+                    <ModuleDataNotice state={linesRead.state} />
+                    {linesRead.state.status === 'loading' ? <Skeleton className="h-96 w-full" /> : null}
+                    {linesRead.state.status === 'ready' || linesRead.state.status === 'partial' ? (
+                      <InvoiceDocument
+                        title={documentTitle}
+                        reference={label}
+                        company={String(company?.name ?? '') || undefined}
+                        partnerLabel={kind === 'bill' || kind === 'vendorCredit' ? t('accounting.invoices.vendor', { defaultValue: 'Vendor' }) : t('accounting.invoices.customer', { defaultValue: 'Customer' })}
+                        partner={partner || undefined}
+                        date={dateLabel(move.invoiceDate ?? move.invoice_date ?? move.date)}
+                        dueDate={dateLabel(move.invoiceDateDue ?? move.invoice_date_due)}
+                        currency={currency}
+                        lines={kind === 'entry' ? undefined : invoiceDocumentLines(lines)}
+                        subtotal={invoiceRecordAmount(move.amountUntaxed ?? move.amount_untaxed)}
+                        tax={invoiceRecordAmount(move.amountTax ?? move.amount_tax)}
+                        total={total}
+                        draft={isDraft}
+                      />
+                    ) : null}
+                  </div>
+                  <aside className="min-w-0 rounded-xl border bg-card p-4" aria-label={t('accounting.invoices.recordDetails', { defaultValue: 'Record details' })}>
+                    <h2 className="mb-4 text-sm font-semibold">{t('accounting.invoices.recordDetails', { defaultValue: 'Record details' })}</h2>
+                    <EntityDetail config={detailConfig} data={move} />
+                  </aside>
+                </div>
+              </div>
+            ),
           },
           {
             id: 'lines',
             label: t('accounting.tabs.moveLines'),
             content: (
-              <EntityView config={{ ...linesConfig, title: '', description: undefined }} data={lines} useCard={false} />
+              <div className="space-y-4">
+                <ModuleDataNotice state={linesRead.state} />
+                <ModuleDataNotice state={accountsRead.state} />
+                {linesRead.state.status === 'loading' ? <Skeleton className="h-64 w-full" /> : null}
+                {linesRead.state.status === 'ready' || linesRead.state.status === 'partial' ? (
+                  <EntityView config={{ ...linesConfig, title: '', description: undefined }} data={lines} useCard={false} />
+                ) : null}
+              </div>
             ),
           },
           {

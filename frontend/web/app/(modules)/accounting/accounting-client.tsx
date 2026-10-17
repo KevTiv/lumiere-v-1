@@ -1,9 +1,11 @@
 "use client"
-import { mapDashboardWidgets, withDashboardSections } from "@lumiere/ui/lib/dashboard-sections"
 import { useModuleTab } from "@/hooks/use-module-tab"
+import { AccountantOverview } from "./accountant-overview"
+import { currencyCatalogContainsId } from "@/lib/accounting-setup-reference"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { useRouter } from "next/navigation"
+import { usePathname, useRouter, useSearchParams } from "next/navigation"
+import { useClearModuleUrlFilter, useModuleUrlFilters } from "@lumiere/ui/lib/module-url-filters"
 import { canUseModuleData, mergeModuleStates, moduleCollection } from "@lumiere/ui/lib/module-data-state"
 import { useTranslation } from "@lumiere/i18n"
 import { useConfirmDialog } from "@lumiere/ui/hooks/use-confirm-dialog"
@@ -79,11 +81,6 @@ import {
   csvImportForm,
   RecordChatterDialog,
   EntityRecordSheet,
-  type TimeRangeValue,
-  isTimestampInRange,
-  percentChange,
-  previousPeriodMs,
-  timeRangeToMs,
   AccountingSetupReadinessPanel,
   evaluateAccountingSetupReadiness,
   type AccountingReadinessAction,
@@ -610,22 +607,6 @@ function taxDeadlineStatusStr(row: Record<string, unknown>): string {
   return String(v ?? "")
 }
 
-/**
- * Move/payment timestamp → milliseconds since epoch.
- * Handles raw microsecond numbers (> 1e15), millisecond numbers, and
- * `{ microsSinceUnixEpoch }` objects.
- */
-function flexibleTimestampMs(value: unknown): number | null {
-  if (value == null) return null
-  if (typeof value === "object" && "microsSinceUnixEpoch" in (value as Record<string, unknown>)) {
-    const micros = Number((value as { microsSinceUnixEpoch: unknown }).microsSinceUnixEpoch)
-    return Number.isFinite(micros) && micros !== 0 ? micros / 1000 : null
-  }
-  const n = typeof value === "bigint" ? Number(value) : Number(value)
-  if (!Number.isFinite(n) || n === 0) return null
-  return n > 1e15 ? n / 1000 : n
-}
-
 /** SpacetimeDB timestamp JSON → milliseconds since epoch. */
 function stdbTimestampToMs(ts: unknown): number | null {
   if (ts == null) return null
@@ -804,6 +785,17 @@ function AccountingClientReady({
   operatingCompanyId,
 }: AccountingClientReadyProps) {
   const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
+  const invoiceFilters = useModuleUrlFilters()
+  const clearModuleFilter = useClearModuleUrlFilter()
+  const clearInvoiceFilter = useCallback((key: string) => {
+    if (key !== "*") return clearModuleFilter(key)
+    const params = new URLSearchParams(searchParams.toString())
+    params.delete("filter")
+    const query = params.toString()
+    router.replace(`${pathname}${query ? `?${query}` : ""}`, { scroll: false })
+  }, [clearModuleFilter, pathname, router, searchParams])
   useAccountingModuleSubscription()
   const { t } = useTranslation()
   const { confirm: confirmDialog, dialog: confirmDialogNode } = useConfirmDialog()
@@ -824,6 +816,7 @@ function AccountingClientReady({
   const { activeTab: accountingActiveTab, setActiveTab: setAccountingActiveTab } = useModuleTab(
     moduleConfigBase.defaultTab ?? "dashboard",
     accountingTabIds,
+    { history: "push" },
   )
   /** BigInt organization id for `useStdbQuery` cache keys (not SpacetimeDB `company_id` reducers). */
   const { orgId } = orgBigInts(organizationId)
@@ -843,8 +836,6 @@ function AccountingClientReady({
   const [selectedInvoice, setSelectedInvoice] = useState<AccountMove | null>(null)
   // Invoice/bill record sheet (row click on invoices/bills tabs)
   const [invoiceSheetRecord, setInvoiceSheetRecord] = useState<Record<string, unknown> | null>(null)
-  // Dashboard time range (trend deltas compare against the previous period)
-  const [dashboardTimeRange, setDashboardTimeRange] = useState<TimeRangeValue>("30d")
   // Create invoice / bill modals
   const [showCreateInvoice, setShowCreateInvoice] = useState(false)
   const [showCreateBill, setShowCreateBill] = useState(false)
@@ -1165,6 +1156,14 @@ function AccountingClientReady({
   }, [paymentTerms, t])
 
   const currencySelectOptions = useMemo(() => currencyOptionsFromRows(currencies), [currencies])
+  const invoiceCurrencyOptions = useMemo(() => currencies.map((row) => {
+    const code = String(row.code ?? "").trim().toUpperCase()
+    return {
+      value: String(row.id),
+      label: String(row.code ?? row.name ?? row.id),
+      code: /^[A-Z]{3}$/.test(code) ? code : undefined,
+    }
+  }), [currencies])
 
   const defaultCurrencyId = useMemo(() => {
     const company = (companies as Record<string, unknown>[]).find(
@@ -1377,8 +1376,7 @@ function AccountingClientReady({
     return {
       companyConfigured: company != null,
       baseCurrencyConfigured:
-        manualInvoiceCurrencyId > 0n &&
-        currencies.some((currency) => currency.id === manualInvoiceCurrencyId),
+        currencyCatalogContainsId(currencies, manualInvoiceCurrencyId),
       fiscalYearConfigured: companyFiscalYears.length > 0,
       openPeriodAvailable: companyPeriods.some(
         (period) => accountPeriodStateTag(copyAsRecord(period)) === "Open",
@@ -4416,226 +4414,39 @@ function AccountingClientReady({
     [allMoves],
   )
 
-  // ── Live KPIs for dashboard ─────────────────────────────────────────────────
-  const liveSections = useMemo(() => {
-    const ar = invoices.reduce((s, m) => s + Number(m.amountResidual ?? 0), 0)
-    const ap = bills.reduce((s, m) => s + Number(m.amountResidual ?? 0), 0)
-    const bankOpeningBalances = accounts
-      .filter((a) => a.isBankAccount)
-      .reduce((s, a) => s + Number(a.openingBalance ?? 0), 0)
-
-    const currentRange = timeRangeToMs(dashboardTimeRange)
-    const previousRange = previousPeriodMs(dashboardTimeRange)
-    const inRange = (ms: number | null, range: { startMs: number; endMs: number }) =>
-      ms != null && isTimestampInRange(ms, range.startMs, range.endMs)
-
-    const moveDateMs = (row: Record<string, unknown>): number | null =>
-      flexibleTimestampMs(
-        row.invoiceDate ?? row.invoice_date ?? row.date ?? row.createDate ?? row.create_date,
-      )
-
-    const currentIssuedInvoices = invoices.filter((m) =>
-      inRange(moveDateMs(m as Record<string, unknown>), currentRange),
-    )
-    const previousIssuedInvoices = invoices.filter((m) =>
-      inRange(moveDateMs(m as Record<string, unknown>), previousRange),
-    )
-
-    const revenueOf = (rows: typeof invoices) =>
-      rows
-        .filter((m) => moveStateStr(m as Record<string, unknown>) === "Posted")
-        .reduce((s, m) => s + Number(m.amountTotal ?? 0), 0)
-    const currentPostedInvoiceTotal = revenueOf(currentIssuedInvoices)
-    const previousPostedInvoiceTotal = revenueOf(previousIssuedInvoices)
-
-    const paymentRows = accountPayments as Record<string, unknown>[]
-    const paymentsReceivedIn = (range: { startMs: number; endMs: number }) =>
-      paymentRows
-        .filter((p) => enumTag(p.state) !== "Reversed")
-        .filter((p) => enumTag(p.paymentType ?? p.payment_type) !== "Outbound")
-        .filter((p) =>
-          inRange(flexibleTimestampMs(p.date ?? p.paymentDate ?? p.createDate ?? p.create_date), range),
-        )
-        .reduce((s, p) => s + Number(p.amount ?? 0), 0)
-    const currentPaymentsReceived = paymentsReceivedIn(currentRange)
-    const previousPaymentsReceived = paymentsReceivedIn(previousRange)
-
-    return mapDashboardWidgets(moduleConfigBase, (w) => {
-        if (w.type === "stat-cards") {
-          return {
-            ...w,
-            data: {
-              stats: [
-                { label: t("accounting.dashboard.accountsReceivable"), value: `$${ar.toLocaleString()}`, icon: "TrendingUp" },
-                { label: t("accounting.dashboard.accountsPayable"), value: `$${ap.toLocaleString()}`, icon: "TrendingDown" },
-                {
-                  label: t("accounting.dashboard.bankOpeningBalances", {
-                    defaultValue: "Bank opening balances",
-                  }),
-                  value: `$${bankOpeningBalances.toLocaleString()}`,
-                  icon: "DollarSign",
-                },
-                {
-                  label: t("accounting.dashboard.postedInvoiceTotal", {
-                    defaultValue: "Posted invoice total",
-                  }),
-                  value: `$${currentPostedInvoiceTotal.toLocaleString()}`,
-                  change: percentChange(currentPostedInvoiceTotal, previousPostedInvoiceTotal),
-                  icon: "BarChart2",
-                },
-                {
-                  label: t("accounting.dashboard.invoicesIssued"),
-                  value: String(currentIssuedInvoices.length),
-                  change: percentChange(currentIssuedInvoices.length, previousIssuedInvoices.length),
-                  icon: "FileText",
-                },
-                {
-                  label: t("accounting.dashboard.paymentsReceived"),
-                  value: `$${currentPaymentsReceived.toLocaleString()}`,
-                  change: percentChange(currentPaymentsReceived, previousPaymentsReceived),
-                  icon: "dollar",
-                },
-              ],
-            },
-          }
-        }
-        if (w.type === "cash-flow") {
-          return { ...w, data: { arTotal: ar, apTotal: ap, netPosition: ar - ap } }
-        }
-        if (w.type === "quick-actions") {
-          const handlers: Record<string, () => void> = {
-            create_invoice: openInvoiceCreate,
-            create_bill: openBillCreate,
-            journal_entry: () => setQuickActionForm({ form: journalEntryFormConfig, action: "createMove" }),
-            create_tax: () => setQuickActionForm({ form: newTaxForm(t), action: "createTax" }),
-            currency_rate: () =>
-              setQuickActionForm({ form: currencyRateFormConfig, action: "createCurrencyRate" }),
-          }
-
-          return {
-            ...w,
-            data: {
-              ...w.data,
-              actions: w.data.actions.map((a) => ({ ...a, onClick: handlers[a.id] })),
-            },
-          }
-        }
-        if (w.id === "acc-overdue") {
-          const nowMs = Date.now()
-          const overdueInvoices = invoices.filter((m) => {
-            if (moveStateStr(m as Record<string, unknown>) !== "Posted") return false
-            if (Number(m.amountResidual ?? 0) <= 0) return false
-            const dueMs = flexibleTimestampMs(m.invoiceDateDue)
-            return dueMs != null && dueMs < nowMs
-          })
-          const totalAmount = overdueInvoices.reduce((s, m) => s + Number(m.amountResidual ?? 0), 0)
-          const oldestDays = overdueInvoices.reduce((max, m) => {
-            if (!m.invoiceDateDue) return max
-            const dueMs = flexibleTimestampMs(m.invoiceDateDue)
-            if (dueMs == null) return max
-            const days = Math.max(0, Math.round((nowMs - dueMs) / 86400000))
-            return Math.max(max, days)
-          }, 0)
-          return { ...w, data: { count: overdueInvoices.length, totalAmount, oldestDays } }
-        }
-        if (w.id === "acc-budget") {
-          const budgetRows = budgets.slice(0, 5).map((b) => ({
-            name: String(b.name ?? ""),
-            planned: Number(b.totalPlanned ?? 0),
-            actual: Number(b.totalPractical ?? 0),
-            variance: Number(b.variancePercentage ?? 0),
-          }))
-          return { ...w, data: { budgets: budgetRows } }
-        }
-        if (w.id === "acc-balances") {
-          const accountRows = accounts.slice(0, 5).map((a) => ({
-            code: String(a.code ?? ""),
-            name: String(a.name ?? ""),
-            balance: Number(a.openingBalance ?? 0),
-            type: String(a.internalGroup ?? "Asset"),
-          }))
-          return {
-            ...w,
-            title: t("accounting.dashboard.keyAccountOpeningBalances", {
-              defaultValue: "Key account opening balances",
-            }),
-            data: { accounts: accountRows },
-          }
-        }
-        if (w.id === "accounting-ar-ap-aging") {
-          const nowMs = Date.now()
-          const buckets = ["Current", "1-30", "31-60", "61-90", "90+"] as const
-          const bucketFor = (row: Record<string, unknown>): (typeof buckets)[number] => {
-            const dueMs = flexibleTimestampMs(row.invoiceDateDue ?? row.invoice_date_due)
-            if (dueMs == null || dueMs >= nowMs) return "Current"
-            const days = Math.floor((nowMs - dueMs) / 86_400_000)
-            if (days <= 0) return "Current"
-            if (days <= 30) return "1-30"
-            if (days <= 60) return "31-60"
-            if (days <= 90) return "61-90"
-            return "90+"
-          }
-          const totals = new Map(buckets.map((b) => [b, { AR: 0, AP: 0 }]))
-          for (const m of invoices) {
-            const residual = Number(m.amountResidual ?? 0)
-            if (residual > 0) totals.get(bucketFor(m as Record<string, unknown>))!.AR += residual
-          }
-          for (const m of bills) {
-            const residual = Number(m.amountResidual ?? 0)
-            if (residual > 0) totals.get(bucketFor(m as Record<string, unknown>))!.AP += residual
-          }
-          const values = buckets.map((bucket) => ({
-            bucket,
-            AR: Math.round(totals.get(bucket)!.AR),
-            AP: Math.round(totals.get(bucket)!.AP),
-          }))
-          return { ...w, data: { ...(w.data as Record<string, unknown>), values } }
-        }
-        if (w.id === "acc-tax-deadlines") {
-          const nowMs = Date.now()
-          const rows = (taxDeadlines as Record<string, unknown>[])
-            .filter((d) => d.deletedAt == null && d.deleted_at == null)
-            .filter((d) => {
-              const st = taxDeadlineStatusStr(d)
-              return st !== "Completed" && st !== "Waived"
-            })
-            .sort((a, b) => {
-              const ta = stdbTimestampToMs(a.dueDate ?? a.due_date) ?? Number.POSITIVE_INFINITY
-              const tb = stdbTimestampToMs(b.dueDate ?? b.due_date) ?? Number.POSITIVE_INFINITY
-              return ta - tb
-            })
-            .slice(0, 5)
-          const deadlines = rows.map((d) => {
-            const dueMs = stdbTimestampToMs(d.dueDate ?? d.due_date) ?? nowMs
-            const daysUntil = Math.round((dueMs - nowMs) / 86_400_000)
-            return {
-              title: String(d.title ?? ""),
-              dueDate: new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(
-                new Date(dueMs),
-              ),
-              status: taxDeadlineStatusStr(d),
-              daysUntil,
-            }
-          })
-          return { ...w, data: { deadlines } }
-        }
-        return w
-          })
-  }, [
-    accounts,
-    invoices,
-    bills,
-    budgets,
-    taxDeadlines,
-    accountPayments,
-    dashboardTimeRange,
-    moduleConfigBase,
-    t,
-    journalEntryFormConfig,
-    currencyRateFormConfig,
-    openInvoiceCreate,
-    openBillCreate,
+  // Each overview card owns its source state; an unavailable auxiliary read must
+  // never become a zero balance or hide the other independently available queues.
+  const manualInvoiceReadState = mergeModuleStates([
+    accountsRead.state, accountTypesRead.state, journalsRead.state, contactsRead.state, taxesRead.state,
+    productsRead.state, paymentTermsRead.state, currenciesRead.state, companiesRead.state, taxGroupsRead.state,
+    fiscalYearsRawRead.state, accountPeriodsRawRead.state,
   ])
+  const accountantOverview = (
+    <AccountantOverview
+      companyName={companyLabelMap.get(String(operatingCompanyId))}
+      data={{
+        organizationId,
+        companyId: operatingCompanyId,
+        moves: allMovesRead,
+        payments: accountPaymentsRead,
+        bankStatements: bankStatementsRead,
+        bankLines: bankStatementLinesRead,
+        deadlines: taxDeadlinesRead,
+        periods: accountPeriodsRawRead,
+        currencies: currenciesRead,
+      }}
+      onNavigate={setAccountingActiveTab}
+      onCreateInvoice={checkPermission("account_move", "create").allowed && manualInvoiceReadState.status === "ready" ? openInvoiceCreate : undefined}
+      onCreateBill={checkPermission("account_move", "create").allowed && manualInvoiceReadState.status === "ready" ? openBillCreate : undefined}
+      onCreateJournalEntry={checkPermission("account_move", "create").allowed && mergeModuleStates([
+        allMovesRead.state, accountsRead.state, journalsRead.state, saleOrdersRead.state,
+      ]).status === "ready" ? () => setQuickActionForm({ form: journalEntryFormConfig, action: "createMove" }) : undefined}
+      onOpenBankLine={(line, statement) => {
+        setBankStatementDetail({ ...statement })
+        setBankLineMatchFocus({ ...line })
+      }}
+    />
+  )
 
   const chartStructurePanel = useMemo(
     () => (
@@ -4684,9 +4495,7 @@ function AccountingClientReady({
 
   // ── Form submit handler (entity tabs: taxes, budgets) ───────────────────────
   const dataState = {
-    dashboard: mergeModuleStates([
-      accountsRead.state, allMovesRead.state, budgetsRead.state, taxDeadlinesRead.state, accountPaymentsRead.state,
-    ]),
+    dashboard: { status: "ready" } as const,
     accounts: mergeModuleStates([accountsRead.state, accountTypesRead.state, accountGroupsRead.state]),
     "journal-entries": mergeModuleStates([
       allMovesRead.state,
@@ -4878,6 +4687,22 @@ function AccountingClientReady({
   }
   const quickActionUsable = quickActionForm == null || actionUsable(quickActionForm.action)
   const csvUsable = csvKind == null || tabUsable(csvTabs[csvKind])
+  // Overview can open these dialogs while a different source's tab is active.
+  // Close them when their own primary reads stop being usable.
+  const bankDetailUsable = canUseModuleData(bankStatementsRead.state) && canUseModuleData(bankStatementLinesRead.state)
+  const manualInvoiceDataReady = manualInvoiceReadState.status === "ready"
+  useEffect(() => {
+    if (!bankDetailUsable) {
+      setBankStatementDetail(null)
+      setBankLineMatchFocus(null)
+      setBankLineEdit(null)
+      setBankLineCreateOpen(false)
+    }
+    if (!manualInvoiceDataReady) {
+      setShowCreateInvoice(false)
+      setShowCreateBill(false)
+    }
+  }, [bankDetailUsable, manualInvoiceDataReady])
   // Record sheets, row editors and prompts are opened from the active tab's rows.
   const activeTabUsable = tabUsable(accountingActiveTab)
   useEffect(() => {
@@ -5313,7 +5138,10 @@ function AccountingClientReady({
       return {
         ...moduleWithoutTabs,
         tabs: (() => {
-          const mapped = withDashboardSections(moduleConfigBase, liveSections).tabs.map((tab) => {
+          const mapped = moduleConfigBase.tabs.map((tab) => {
+            if (tab.id === "dashboard") {
+              return { ...tab, type: "custom" as const, customContent: accountantOverview }
+            }
             if (tab.id === "analytic-lines") {
               return {
                 ...tab,
@@ -5341,6 +5169,9 @@ function AccountingClientReady({
                   >
                   <InvoiceListView
                     invoices={invoices}
+                    currencyOptions={invoiceCurrencyOptions}
+                    initialFilters={invoiceFilters}
+                    onInitialFilterClear={clearInvoiceFilter}
                     onSelectInvoice={(invoice) => setInvoiceSheetRecord(copyAsRecord(invoice))}
                     onCreateInvoice={openInvoiceCreate}
                     onRecalculateTotals={(inv) =>
@@ -5365,6 +5196,9 @@ function AccountingClientReady({
                   >
                   <BillsListView
                     bills={bills}
+                    currencyOptions={invoiceCurrencyOptions}
+                    initialFilters={invoiceFilters}
+                    onInitialFilterClear={clearInvoiceFilter}
                     onCreateBill={openBillCreate}
                     onSelectBill={(bill) => setInvoiceSheetRecord(copyAsRecord(bill))}
                     onRecalculateTotals={(bill) =>
@@ -5918,7 +5752,10 @@ function AccountingClientReady({
       } as ModuleConfig
     },
     [
-      liveSections,
+      accountantOverview,
+      invoiceCurrencyOptions,
+      invoiceFilters,
+      clearInvoiceFilter,
       chartStructurePanel,
       invoices,
       bills,
@@ -6161,8 +5998,6 @@ function AccountingClientReady({
         onRowClick={handleEntityRowClick}
         activeTab={accountingActiveTab}
         onActiveTabChange={setAccountingActiveTab}
-        dashboardTimeRange={dashboardTimeRange}
-        onDashboardTimeRangeChange={setDashboardTimeRange}
         runtimeForms={{
           organizationId,
           roleId: runtimeRoleId,
@@ -6389,6 +6224,8 @@ function AccountingClientReady({
       {/* Invoice detail */}
       <InvoiceDetailModal
         invoice={selectedInvoice}
+        currencyId={selectedInvoice ? String(selectedInvoice.currencyId ?? "") : undefined}
+        currencyCode={selectedInvoice ? invoiceCurrencyOptions.find((currency) => currency.value === String(selectedInvoice.currencyId))?.code : undefined}
         open={!!selectedInvoice}
         onClose={() => setSelectedInvoice(null)}
         onPostDraft={selectedInvoice ? () => postDraft(selectedInvoice) : undefined}
@@ -6453,6 +6290,7 @@ function AccountingClientReady({
         onClose={() => setShowCreateInvoice(false)}
         organizationId={organizationId}
         journalOptions={manualInvoiceOptions.invoice.journals}
+        currencyOptions={invoiceCurrencyOptions}
         partnerOptions={manualInvoiceOptions.invoice.partners}
         counterpartAccountOptions={manualInvoiceOptions.invoice.counterpart}
         lineAccountOptions={manualInvoiceOptions.invoice.commercial}
@@ -6482,6 +6320,7 @@ function AccountingClientReady({
         onClose={() => setShowCreateBill(false)}
         organizationId={organizationId}
         journalOptions={manualInvoiceOptions.bill.journals}
+        currencyOptions={invoiceCurrencyOptions}
         partnerOptions={manualInvoiceOptions.bill.partners}
         counterpartAccountOptions={manualInvoiceOptions.bill.counterpart}
         lineAccountOptions={manualInvoiceOptions.bill.commercial}

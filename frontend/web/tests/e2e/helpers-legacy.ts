@@ -70,12 +70,17 @@ export async function gotoModule(page: Page, route: string, moduleId?: string) {
 
 /** Select a module tab and wait until its panel is the active interaction surface. */
 export async function selectModuleTab(page: Page, moduleId: string, tabId: string) {
+  if (moduleId === "accounting") {
+    await openAccountingTab(page, tabId)
+    return
+  }
   const tab = page.getByTestId(`module-tab-${moduleId}-${tabId}`)
   await tab.click()
   await expect(tab).toHaveAttribute("aria-selected", "true")
-  // Base UI may regenerate the tab/tabpanel ids during the state transition.
-  // The selected tab and the single visible panel are the stable behavior.
-  await expect(page.locator('[role="tabpanel"]:visible')).toHaveCount(1)
+  // Nested charts and unrelated workspaces can have their own active panels.
+  // Assert the module's exact panel, not every tabpanel in the document.
+  await expect(page.locator(`[data-testid^="module-panel-${moduleId}-"]:visible`)).toHaveCount(1)
+  await expect(page.getByTestId(`module-panel-${moduleId}-${tabId}`)).toBeVisible()
 }
 
 /** Open an entity tab’s create modal and wait for the form dialog. */
@@ -95,7 +100,19 @@ export async function openEntityCreate(
 }
 
 export async function openAccountingTab(page: Page, tabId: string) {
-  await page.getByTestId(`module-tab-accounting-${tabId}`).click()
+  // Accounting exposes the current workspace's views, rather than all views
+  // simultaneously. Use its supported deep link so domain-flow tests can reach
+  // advanced views without depending on the navigation's grouping or labels.
+  const target = new URL("/accounting", page.url())
+  if (tabId !== "dashboard") target.searchParams.set("tab", tabId)
+  await page.goto(target.toString())
+  const moduleView = page.getByTestId("module-view-accounting")
+  await expect(moduleView).toBeVisible()
+  await expect(moduleView).toHaveAttribute("data-hydrated", "true")
+  await expect(page.getByTestId(`module-tab-accounting-${tabId}`)).toHaveAttribute("aria-selected", "true")
+  await expect(page.locator('[data-testid^="module-panel-accounting-"]:visible')).toHaveCount(1)
+  await expect(page.getByTestId(`module-panel-accounting-${tabId}`)).toBeVisible()
+  await expectNoAppError(page)
 }
 
 /** Click each module tab in order, assert no app error, optionally run per-tab checks. */
@@ -106,7 +123,8 @@ export async function assertModuleTabs(
   assertTab?: (page: Page, tabId: string) => Promise<void>,
 ) {
   for (const tabId of tabIds) {
-    await page.getByTestId(`module-tab-${moduleId}-${tabId}`).click()
+    if (moduleId === "accounting") await openAccountingTab(page, tabId)
+    else await page.getByTestId(`module-tab-${moduleId}-${tabId}`).click()
     await expectNoAppError(page)
     if (assertTab) {
       await assertTab(page, tabId)
@@ -371,9 +389,12 @@ export async function openTabAndCancelCreate(
   tabId: string,
   formId: string,
 ) {
-  const tab = page.getByTestId(`module-tab-${moduleId}-${tabId}`)
-  await tab.click()
-  await expect(tab).toHaveAttribute("aria-selected", "true")
+  if (moduleId === "accounting") await openAccountingTab(page, tabId)
+  else {
+    const tab = page.getByTestId(`module-tab-${moduleId}-${tabId}`)
+    await tab.click()
+    await expect(tab).toHaveAttribute("aria-selected", "true")
+  }
   // The tab switch also updates ?tab=, which can re-render the panel; click
   // (unlike scrollIntoViewIfNeeded) re-resolves a replaced element.
   const createBtn = page.getByTestId(`module-create-${moduleId}-${tabId}`)
@@ -742,7 +763,7 @@ export async function submitForm(page: Page, formId: string) {
     await expect(modal).toBeHidden({ timeout: 15_000 })
   } catch {
     const fieldErrors = await modal.locator(".text-destructive, [role='alert']").allTextContents()
-    const toastErrors = await page.getByRole("status").allTextContents().catch(() => [] as string[])
+    const toastErrors = await page.locator('[role="status"], [data-sonner-toast]').allTextContents().catch(() => [] as string[])
     const detail = [...fieldErrors, ...toastErrors].filter(Boolean).join("; ")
     throw new Error(
       `Form "${formId}" did not close after submit${detail ? `: ${detail}` : ""}`,
@@ -1834,7 +1855,7 @@ export async function postDraftCreditNoteMove(page: Page, creditNoteId: number):
 /** @deprecated Use {@link postDraftCreditNoteMove} — credit notes are not listed on journal entries. */
 export async function postDraftCreditNoteViaGl(page: Page, partnerName: string): Promise<void> {
   await gotoModule(page, "/accounting", "accounting")
-  await page.getByTestId("module-tab-accounting-invoices").click()
+  await openAccountingTab(page, "invoices")
   const rows = activeTabCustomTableRows(page).filter({ hasText: partnerName })
   await expect(rows.first()).toBeVisible({ timeout: 30_000 })
 
@@ -1955,18 +1976,18 @@ export async function openInvoiceDetailModalFromRecordSheet(page: Page): Promise
 /** Open invoice detail and post draft via accounting invoices tab. */
 export async function postDraftInvoiceViaUi(page: Page, moveId: number): Promise<number> {
   await gotoModule(page, "/accounting", "accounting")
-  await page.getByTestId("module-tab-accounting-invoices").click()
+  await openAccountingTab(page, "invoices")
   await selectCustomTableRowById(page, moveId)
   await openInvoiceDetailModalFromRecordSheet(page)
 
   const [postRes] = await Promise.all([
     page.waitForResponse(
-      (res) => matchesOperationResponse(res, "post_invoice") && res.ok(),
+      (res) => matchesOperationResponse(res, "post_invoice"),
       { timeout: 30_000 },
     ),
     page.getByTestId("invoice-detail-post-draft").click(),
   ])
-  expect(postRes.ok()).toBe(true)
+  await expectReducerHttpResponseOk("post_invoice", postRes)
   await waitForMovePosted(page, moveId)
   return moveId
 }
@@ -1974,12 +1995,12 @@ export async function postDraftInvoiceViaUi(page: Page, moveId: number): Promise
 /** Open one exact draft vendor bill in the accounting Bills tab. */
 async function openDraftVendorBillModal(page: Page, billId: number): Promise<void> {
   await gotoModule(page, "/accounting", "accounting")
-  await page.getByTestId("module-tab-accounting-bills").click()
+  await openAccountingTab(page, "bills")
   // The bill projection is available through the API before the accounting
   // list's query cache necessarily sees it. Rebuild the page once after the
   // tab is active so all procure-to-pay row-visibility flows use fresh data.
   await page.reload({ waitUntil: "domcontentloaded" })
-  await page.getByTestId("module-tab-accounting-bills").click()
+  await openAccountingTab(page, "bills")
   await selectCustomTableRowById(page, billId)
   await openInvoiceDetailModalFromRecordSheet(page)
   await expect(page.getByTestId("invoice-detail-post-draft")).toBeVisible({ timeout: 15_000 })
@@ -2582,7 +2603,7 @@ export async function expectMailMessageForRecord(
 
 export async function openFiscalSetupWizard(page: Page) {
   await gotoModule(page, "/accounting", "accounting")
-  await page.getByTestId("module-tab-accounting-fiscal-years").click()
+  await openAccountingTab(page, "fiscal-years")
   await page.getByTestId("entity-action-fy-setup-wizard").click()
   await expect(page.getByTestId("form-modal-fiscal-setup-wizard")).toBeVisible()
 }
@@ -2885,7 +2906,7 @@ export async function waitForWorkflowVersionStatus(
 /** Seed a minimal publishable linear draft (start → end) via BFF reducers. */
 export async function seedPublishableWorkflowDraft(
   page: Page,
-  options?: { workflowKey?: string; model?: string; name?: string; signalKey?: string },
+  options?: { workflowKey?: string; model?: string; name?: string; signalKey?: string; companyId?: number },
 ): Promise<{
   organizationId: number
   companyId: number
@@ -2895,7 +2916,7 @@ export async function seedPublishableWorkflowDraft(
   draftRevision: number
 }> {
   const organizationId = await fetchSessionOrganizationId(page)
-  const companyId = await fetchDefaultCompanyId(page)
+  const companyId = options?.companyId ?? await fetchDefaultCompanyId(page)
   const workflowKey = (options?.workflowKey ?? smokeName("wf")).toLowerCase().replace(/-/g, "_")
   const model = options?.model ?? "e2e.subject"
   const name = options?.name ?? `E2E ${workflowKey}`
@@ -3089,7 +3110,7 @@ export async function seedPurchaseOrderApprovalWorkflow(
 /** Publish a company-scoped approval workflow for the guarded Sales confirm action. */
 export async function seedSaleOrderApprovalWorkflow(
   page: Page,
-  options: { workflowKey: string; name: string },
+  options: { workflowKey: string; name: string; companyId?: number },
 ): Promise<{ organizationId: number; versionId: number; revision: number }> {
   const seeded = await seedPublishableWorkflowDraft(page, {
     ...options,

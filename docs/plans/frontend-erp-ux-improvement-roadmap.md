@@ -14,6 +14,110 @@ The highest-value shift is from “module → dashboard → many entity tabs” 
 
 ## Key Changes
 
+### Lumière workspace refinement — 2026-10-16 implementation
+
+The first implementation studies [Studio Admin](https://studio-admin.arhamkhnz.com/dashboard/default),
+source revision `9bf6d382f24a9538bf64ecb319c1b58b4ee1a0bb`, as the visual and interaction
+reference. The implementation adapts Lumière's existing components and operations;
+no Studio source was copied. The source baseline is Lumière `ff98a918a607`;
+PR #218 integrates main `979de024` and preserves its Rwanda setup, import,
+tax/currency and company-scoped posting safeguards. Every invoice/bill create
+entry point, including overview actions, uses the setup-readiness gate.
+
+The delivered direction is **Lumière / Quiet Precision**, not a Studio skin:
+warm mineral surfaces, graphite type, restrained deep-teal interaction accents,
+leading header/navigation rules and paper-like documents. Dark mode has its own
+ink/slate roles; existing Ocean users retain violet/cool preferences. Status
+meaning remains independent of the brand accent. Shared renderer roles carry
+this direction into static and runtime forms, module/record headers, approved
+saved collection/detail previews, dashboard widgets and invoice documents,
+without adding persisted styling fields. Ownership and propagation are recorded
+in [the design-system plan](erp-ui-design-system-completion-plan.md#5-design-direction-and-source-references).
+
+Delivered in the working tree:
+
+- Shared responsive shell: existing Sidebar primitives supply a mobile drawer,
+  compact sticky header, visible command search, current company, notifications,
+  theme, table density, content width and persisted navigation preferences.
+- Accounting navigation: seven primary workspaces with contextual local views and
+  an Advanced / Configuration menu. All 32 existing destinations retain their
+  canonical `?tab=` IDs. Browser history and filter clearing preserve context.
+- Accountant Home: currency-separated posted receivables/payables, exact document
+  links, overdue/draft/bank/payment/deadline/period queues, recent documents, and
+  six months of posted document counts with an accessible monthly table. Each
+  source retains its own unavailable/loading/denied state.
+- Invoice and bill lists: canonical document anchors, controlled URL filters,
+  exact overview drill-downs, per-currency totals, permission-aware create controls,
+  and removal of unsupported menu actions.
+- Invoice composer: responsive editor and live document preview, mobile Edit /
+  Preview controls, fixed totals/actions, and preserved uncertain-submission
+  reconciliation. The existing full-page record adds financial context, document
+  preview, visible payment/PDF actions, and explicit read failures.
+- Global border styling: Tailwind preflight now precedes the shared theme, so the
+  neutral border token remains effective.
+- Mobile template behavior: wrapping titles/actions, full-width narrow-screen
+  form fields, bounded dialog scrolling, panel-contained wide tables and 44px
+  coarse-pointer Button/Input/Select/tab targets. Accounting summaries use one
+  column below 360px to retain readable amounts.
+
+Implementation owners remain `DashboardWorkspace`, `WorkspaceNav`, `ModuleView`,
+the Accounting route's overview model and controller, and the shared Accounting
+components. The existing ThemeProvider owns appearance/density; the existing
+command palette owns navigation/search; the generated operations and application
+hooks continue to own accounting effects. No contract release is required.
+
+Verification uses focused component/model tests and an isolated browser fixture
+that imports the actual production components and stylesheet at desktop and phone
+widths. Its synthetic data and callbacks are explicitly labelled; it does not
+authenticate, post a payment, create a persisted invoice, or establish U4/U5.
+`frontend/web/playwright.accounting-ui.config.ts` is the reproducible browser entry.
+
+Verification results for this working-tree implementation:
+
+- The integrated full UI suite passed: 635 tests across 105 files, including
+  shell preferences, command search, workspace navigation, create gates,
+  accounting lists, setup readiness, invoice submission, shared style propagation
+  and selected light/dark/default/Ocean contrast contracts. This is not a blanket
+  accessibility certification of bespoke layouts or charts.
+- The integrated web unit suite passed: 388 tests, including Next configuration.
+- 34 model/navigation/action tests passed; rerun with the web package's
+  `test:accounting-ui:models` script.
+- All 36 browser checks passed after final style integration at 320, 390, 768
+  and 1440px, using the same bundled Geist fonts as production. This includes
+  actual configured module/static-form/saved-preview renderers, default and
+  Ocean light/dark modes, long action labels, opaque form focus rings, 44px
+  coarse controls and a 480px compact-height dialog-footer check. The latter is
+  not native software-keyboard certification; authenticated long-company
+  switching also remains outside this synthetic fixture.
+  Use `test:e2e:accounting-ui` with an installed Playwright Chromium, or set
+  `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH` to an existing Chromium executable.
+- The type-debt ratchet now has no new opaque-record occurrences and records
+  Accounting's reduction from 162 to 150. Missing/redacted invoice amounts
+  display as unavailable, not zero.
+- Default Turbopack production build passed, including all 108 static pages.
+  Removed unnecessary forced React aliases so Next owns renderer-specific
+  resolution; four config regressions cover aliases, headers and runtime BFF.
+- Remote validation and authenticated accounting effects remain separate gates;
+  synthetic browser checks are not posting/reconciliation acceptance.
+
+Open work:
+
+- Split the 54-resource Accounting subscription and broad route controller into
+  mounted workspace controllers with bounded subscriptions. Disabling individual
+  reads alone would leave false-ready/empty states and incomplete form lookups.
+- Add import-review summaries and an allocation-residual projection before
+  claiming a true unallocated-payment balance. The current queue is explicitly
+  payments without invoice links.
+- Add a richer synthetic accounting scenario through the existing seed workflow;
+  verify its reference-data/tax prerequisites and canonical effects in an isolated
+  tenant before any live Alpha execution.
+- Run the revised accounting golden workflows against a configured authenticated
+  stack, followed by operator usability/accessibility review and explicit product
+  admission. First-organization exposure remains unchanged and at REVIEW.
+- Adopt the shared compositions in CRM/Sales, Purchasing/Inventory, Documents,
+  Projects, Messages and administration. Those module-specific layouts remain
+  separate implementation work; the common shell already applies to them.
+
 ### 1. Rebuild the application shell and navigation
 
 - Replace the seven-group, 25-destination sidebar with:

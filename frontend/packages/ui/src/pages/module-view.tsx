@@ -30,6 +30,9 @@ import { useRBAC } from "../lib/rbac-context"
 import { exportDashboardToPng } from "../lib/export-dashboard-png"
 import { KpiStrip } from "../components/kpi-strip"
 import { filterRowsByKpi, activeKpiTile, toggleKpiKey, type KpiTileDef } from "../lib/kpi-tiles"
+import { WorkspaceNav } from "./workspace-nav"
+import { moduleTabHref } from "../lib/workspace-navigation"
+import { workspaceStyles } from "../lib/workspace-styles"
 
 /** When set, tab create forms use STDB-merged {@link RuntimeFormModal} instead of static-only FormModal. */
 export interface ModuleViewRuntimeForms {
@@ -119,8 +122,8 @@ export function ModuleView({
     rawRouteTab && config.tabs.some((tab) => tab.id === rawRouteTab) ? rawRouteTab : null
   const [internalTab, setInternalTab] = useState(routeTab ?? defaultTab)
   useEffect(() => {
-    if (activeTabProp === undefined && routeTab) setInternalTab(routeTab)
-  }, [activeTabProp, routeTab])
+    if (activeTabProp === undefined) setInternalTab(routeTab ?? defaultTab)
+  }, [activeTabProp, routeTab, defaultTab])
   const [isHydrated, setIsHydrated] = useState(false)
   const activeTab = activeTabProp ?? internalTab
   const prevActiveTabRef = useRef<string | null>(null)
@@ -128,13 +131,9 @@ export function ModuleView({
     onActiveTabChange?.(v)
     if (activeTabProp !== undefined) return
     setInternalTab(v)
-    const params = new URLSearchParams(searchParams?.toString() ?? "")
-    // Record filters belong to the tab they were opened on.
-    params.delete("filter")
-    if (v === defaultTab) params.delete("tab")
-    else params.set("tab", v)
-    const query = params.toString()
-    router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false })
+    const href = moduleTabHref(pathname, searchParams?.toString() ?? "", v, defaultTab)
+    if (config.workspaceNav) router.push(href, { scroll: false })
+    else router.replace(href, { scroll: false })
   }
   const tabListRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
@@ -184,7 +183,7 @@ export function ModuleView({
 
   return (
     <div
-      className="flex flex-col min-h-full gap-2"
+      className="flex min-h-full min-w-0 flex-col gap-2"
       data-testid={`module-view-${config.id}`}
       data-hydrated={isHydrated ? "true" : "false"}
     >
@@ -199,7 +198,17 @@ export function ModuleView({
         onExport={showDashboardExport ? () => void handleDashboardExport() : undefined}
       />
 
-      <Tabs value={activeTab} onValueChange={setActiveTab} className={"flex-col flex"}>
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="flex min-w-0 flex-col">
+        {config.workspaceNav ? (
+          <WorkspaceNav
+            moduleId={config.id}
+            tabs={config.tabs}
+            config={config.workspaceNav}
+            activeTab={activeTab}
+            onTabChange={setActiveTab}
+            hrefForTab={(tabId) => moduleTabHref(pathname, searchParams?.toString() ?? "", tabId, defaultTab)}
+          />
+        ) : (
         <div
           ref={tabListRef}
           className="-mx-1 overflow-x-auto px-1 pb-1 [scrollbar-width:thin]"
@@ -207,6 +216,7 @@ export function ModuleView({
         >
         <TabsList
           variant="line"
+          data-ui="context-tabs"
           className="h-auto w-max min-w-full justify-start gap-1 border-b border-border p-0 group-data-horizontal/tabs:h-auto"
         >
           {buildModuleTabRow(config.tabs, config.tabGroups).map((item) =>
@@ -221,9 +231,7 @@ export function ModuleView({
             ) : (
               <TabsTrigger
                 key={item.tab.id}
-                // Natural width with an underline on the active tab; the
-                // default pseudo-underline is clipped by the scroll container.
-                className="-mb-px flex-none rounded-none border-0 border-b-2 border-transparent px-2.5 pb-2.5 pt-1.5 after:hidden data-active:border-foreground data-active:text-foreground"
+                className={workspaceStyles.tabTrigger}
                 value={item.tab.id}
                 data-testid={`module-tab-${config.id}-${item.tab.id}`}
               >
@@ -233,6 +241,7 @@ export function ModuleView({
           )}
         </TabsList>
         </div>
+        )}
 
         {config.tabs.map((tab) => (
           <TabsContent

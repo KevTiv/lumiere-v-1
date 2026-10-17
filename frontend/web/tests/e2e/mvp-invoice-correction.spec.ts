@@ -15,6 +15,7 @@ import {
   fetchSalesInvoiceJournalLabel,
   fillField,
   gotoModule,
+  openAccountingTab,
   openEntityCreate,
   openInvoiceDetailModalFromRecordSheet,
   postDraftCreditNoteMove,
@@ -190,7 +191,7 @@ test.describe("MVP invoice correction", { tag: "@p0" }, () => {
     expect(invoiceMoveId).toBeGreaterThan(0)
 
     await gotoModule(page, "/accounting", "accounting")
-    await page.getByTestId("module-tab-accounting-invoices").click()
+    await openAccountingTab(page, "invoices")
     const invoiceRow = page.locator("table tbody tr").filter({ hasText: leadName }).first()
     await expect(invoiceRow).toBeVisible({ timeout: 30_000 })
     await invoiceRow.click()

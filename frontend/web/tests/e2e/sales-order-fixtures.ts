@@ -130,8 +130,8 @@ export interface PickingSnapshot {
 }
 
 /** Every non-return picking of an order (its delivery and any backorders), from the query API. */
-export async function fetchOrderPickings(page: Page, orderId: number): Promise<PickingSnapshot[]> {
-  const res = await page.request.get("/api/query/stock-pickings")
+export async function fetchOrderPickings(page: Page, orderId: number, companyId?: number): Promise<PickingSnapshot[]> {
+  const res = await page.request.get(`/api/query/stock-pickings${companyId == null ? "" : `?companyId=${companyId}`}`)
   if (!res.ok()) return []
   const json = (await res.json()) as { data?: Array<Record<string, unknown>> }
   return (json.data ?? [])

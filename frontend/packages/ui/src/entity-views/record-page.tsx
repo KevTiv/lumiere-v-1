@@ -15,6 +15,7 @@ import {
   BreadcrumbSeparator,
 } from "../components/breadcrumb"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/tabs"
+import { workspaceStyles } from "../lib/workspace-styles"
 
 export interface RecordPageCrumb {
   label: string
@@ -78,7 +79,7 @@ export function RecordPage({
   className,
 }: RecordPageProps) {
   return (
-    <div className={cn("space-y-6", className)} data-testid={`${testIdPrefix}-page`}>
+    <div className={cn("min-w-0 space-y-6", className)} data-testid={`${testIdPrefix}-page`}>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <Breadcrumb>
           <BreadcrumbList>
@@ -112,18 +113,18 @@ export function RecordPage({
       </div>
 
       <header className="space-y-4">
-        <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className={workspaceStyles.pageHeader} data-ui="page-header">
           <div className="min-w-0 space-y-1">
             <div className="flex flex-wrap items-center gap-3">
-              <h1 className="text-2xl font-semibold tracking-tight" data-testid={`${testIdPrefix}-title`}>
+              <h1 className={workspaceStyles.pageTitle} data-ui="page-title" data-testid={`${testIdPrefix}-title`}>
                 {title}
               </h1>
               {badge}
             </div>
-            {subtitle ? <p className="text-sm text-muted-foreground">{subtitle}</p> : null}
+            {subtitle ? <p className={workspaceStyles.pageDescription}>{subtitle}</p> : null}
           </div>
           {actions ? (
-            <div className="flex flex-wrap items-center gap-2" data-testid={`${testIdPrefix}-actions`}>
+            <div className={workspaceStyles.actions} data-testid={`${testIdPrefix}-actions`}>
               {actions}
             </div>
           ) : null}
@@ -132,10 +133,11 @@ export function RecordPage({
         {statusBar}
       </header>
 
-      <Tabs value={activeTab} onValueChange={(tabId) => onTabChange(String(tabId))} className="flex flex-col">
+      <Tabs value={activeTab} onValueChange={(tabId) => onTabChange(String(tabId))} className="flex min-w-0 flex-col">
         <div className="-mx-1 overflow-x-auto px-1 pb-1 [scrollbar-width:thin]">
           <TabsList
             variant="line"
+            data-ui="context-tabs"
             className="h-auto w-max min-w-full justify-start gap-1 border-b border-border p-0 group-data-horizontal/tabs:h-auto"
           >
             {tabs.map((tab) => (
@@ -143,7 +145,7 @@ export function RecordPage({
                 key={tab.id}
                 value={tab.id}
                 data-testid={`${testIdPrefix}-tab-${tab.id}`}
-                className="-mb-px flex-none rounded-none border-0 border-b-2 border-transparent px-2.5 pb-2.5 pt-1.5 after:hidden data-active:border-foreground data-active:text-foreground"
+                className={workspaceStyles.tabTrigger}
               >
                 {tab.label}
               </TabsTrigger>

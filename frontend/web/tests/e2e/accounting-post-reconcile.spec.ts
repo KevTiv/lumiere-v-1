@@ -7,6 +7,7 @@ import {
   fetchDefaultCompanyId,
   fetchSessionOrganizationId,
   gotoModule,
+  openAccountingTab,
   scalarQueryId,
   signIn,
   smokeName,
@@ -432,7 +433,7 @@ test.describe("Accounting journal entry post + reconcile", { tag: "@p0" }, () =>
     const entryMoveId = await fetchDraftMoveIdByRef(page, entryRef)
 
     await gotoModule(page, "/accounting", "accounting")
-    await page.getByTestId("module-tab-accounting-journal-entries").click()
+    await openAccountingTab(page, "journal-entries")
     const entryRow = page.getByTestId(`entity-row-${entryMoveId}`)
     await expect(entryRow).toBeVisible({ timeout: 30_000 })
     await entryRow.click()
@@ -457,7 +458,7 @@ test.describe("Accounting journal entry post + reconcile", { tag: "@p0" }, () =>
     await page.keyboard.press("Escape")
     await expect(postButton).toBeHidden({ timeout: 15_000 })
 
-    await page.getByTestId("module-tab-accounting-payments").click()
+    await openAccountingTab(page, "payments")
     await page.getByTestId("entity-action-pay-reconcile-moves").click()
     await expect(page.getByTestId("form-modal-reconcile-payment-invoice")).toBeVisible({
       timeout: 15_000,

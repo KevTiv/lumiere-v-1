@@ -11,6 +11,22 @@ import {
 } from "./stdb-params-json"
 
 describe("stdbParamsToJson", () => {
+  it("encodes requisition line optional fields for typed commands and compat calls", () => {
+    const params = {
+      lines: [
+        { productId: 7n, productUom: 1n, productUomQty: 2, name: "Laptop", sequence: 10 },
+        { productId: 8n, productUom: 1n, productUomQty: 1 },
+      ],
+    }
+    const expected = [
+      { product_id: 7, product_uom: 1, product_uom_qty: 2, name: { some: "Laptop" }, sequence: { some: 10 } },
+      { product_id: 8, product_uom: 1, product_uom_qty: 1, name: { none: [] }, sequence: { none: [] } },
+    ]
+    assert.deepEqual(stdbParamsToJson(params, "CreatePurchaseRequisitionParams").lines, expected)
+    const encoded = encodeReducerCallArgs("create_purchase_requisition", [1, params])
+    assert.deepEqual((encoded[1] as Record<string, unknown>).lines, expected)
+  })
+
   it("fills every Option field of nested BOM lines", () => {
     const params = stdbParamsToJson(
       {

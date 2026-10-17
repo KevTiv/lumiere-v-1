@@ -20,10 +20,10 @@
   --neutral-950: 0 0% 5%;
 
   /* Status (success / warning / info) — tune for contrast vs --background */
-  --success: 142 56% 34%;
+  --success: 142 56% 28%;
   --success-foreground: 0 0% 100%;
-  --warning: 35 84% 44%;
-  --warning-foreground: 0 0% 5%;
+  --warning: 35 84% 29%;
+  --warning-foreground: 0 0% 100%;
   --info: 221 70% 46%;
   --info-foreground: 0 0% 100%;
 
@@ -31,8 +31,8 @@
   --category-1: 221 70% 46%;
   --category-2: 0 62% 48%;
   --category-3: 270 48% 48%;
-  --category-4: 142 56% 34%;
-  --category-5: 35 84% 44%;
+  --category-4: 142 56% 28%;
+  --category-5: 35 84% 29%;
   --category-6: 215 12% 42%;
   --category-7: 175 45% 34%;
 }
@@ -54,10 +54,10 @@
   --success-foreground: 0 0% 5%;
   --warning: 35 84% 56%;
   --warning-foreground: 0 0% 5%;
-  --info: 221 68% 62%;
+  --info: 221 68% 72%;
   --info-foreground: 0 0% 5%;
 
-  --category-1: 221 68% 62%;
+  --category-1: 221 68% 72%;
   --category-2: 0 64% 62%;
   --category-3: 270 48% 64%;
   --category-4: 142 52% 50%;

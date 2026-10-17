@@ -29,6 +29,7 @@ import {
   fetchFulfillmentPickingIdBySaleOrderId,
   fillField,
   gotoModule,
+  openAccountingTab,
   isoDate,
   openEntityCreate,
   openSettingsSection,
@@ -165,11 +166,8 @@ test.describe("MVP lead-to-cash workflow", { tag: "@p0" }, () => {
     await fillField(page, "name", contactName)
     await fillField(page, "email", `${contactName}@example.test`)
     await submitForm(page, "new-contact")
-    await page
-      .waitForResponse((res) => res.url().includes("/api/query/contacts") && res.ok(), {
-        timeout: 30_000,
-      })
-      .catch(() => undefined)
+    // The exact row is the readiness signal; a cached query may not refetch
+    // after submit, and a response listener registered here can miss the fetch.
     await expect(page.getByText(contactName).first()).toBeVisible({ timeout: 30_000 })
 
     // Step 4 — lead (UI: must start qualified for conversion)
@@ -300,12 +298,6 @@ test.describe("MVP lead-to-cash workflow", { tag: "@p0" }, () => {
     // Step 8 — confirm → assign → validate delivery (UI)
     await gotoModule(page, "/sales", "sales")
     await page.getByTestId("module-tab-sales-fulfillment").click()
-    await page
-      .waitForResponse(
-        (res) => res.url().includes("/api/query/stock-pickings") && res.ok(),
-        { timeout: 30_000 },
-      )
-      .catch(() => undefined)
     const pickingId = await fetchFulfillmentPickingIdBySaleOrderId(page, orderId)
     await selectEntityRowById(page, pickingId)
     await waitForEntityActionEnabled(page, "entity-action-confirm-picking")
@@ -383,17 +375,17 @@ test.describe("MVP lead-to-cash workflow", { tag: "@p0" }, () => {
     })
 
     await gotoModule(page, "/accounting", "accounting")
-    await page.getByTestId("module-tab-accounting-invoices").click()
+    await openAccountingTab(page, "invoices")
     await expectSeededText(page, leadName, "/api/query/account-moves")
     await page.reload({ waitUntil: "domcontentloaded" })
     await gotoModule(page, "/accounting", "accounting")
-    await page.getByTestId("module-tab-accounting-invoices").click()
+    await openAccountingTab(page, "invoices")
     await expectSeededText(page, leadName, "/api/query/account-moves")
 
     // Step 11 — create payment → post → register on invoice (UI)
     const { partnerId, amountTotal, currencyId } = await fetchInvoiceMoveDetails(page, moveId)
 
-    await page.getByTestId("module-tab-accounting-payments").click()
+    await openAccountingTab(page, "payments")
     await page.getByTestId("module-create-accounting-payments").click()
     await expect(page.getByTestId("form-modal-new-account-payment")).toBeVisible()
     await chooseSelectOptionByValue(page, "partnerId", partnerId)
@@ -639,12 +631,6 @@ test.describe("MVP lead-to-cash workflow", { tag: "@p0" }, () => {
 
     await gotoModule(page, "/sales", "sales")
     await page.getByTestId("module-tab-sales-fulfillment").click()
-    await page
-      .waitForResponse(
-        (res) => res.url().includes("/api/query/stock-pickings") && res.ok(),
-        { timeout: 30_000 },
-      )
-      .catch(() => undefined)
     const pickingId = await fetchFulfillmentPickingIdBySaleOrderId(page, orderId)
     await selectEntityRowById(page, pickingId)
     await waitForEntityActionEnabled(page, "entity-action-confirm-picking")
