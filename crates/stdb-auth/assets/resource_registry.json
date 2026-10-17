@@ -2084,6 +2084,9 @@
     "default_restricted": [
       "name",
       "employee_id",
+      "date",
+      "total_amount",
+      "currency_id",
       "state",
       "company_id"
     ],
