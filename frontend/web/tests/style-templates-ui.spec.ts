@@ -24,7 +24,8 @@ for (const width of [320, 390, 768, 1440]) {
       const requests: string[] = []
       apiRequests.set(page, requests)
       page.on("request", (request) => { if (new URL(request.url()).pathname.startsWith("/api/")) requests.push(request.url()) })
-      await page.goto("/style-templates")
+      // Hydration and font checks below define readiness for this fixture.
+      await page.goto("/style-templates", { waitUntil: "domcontentloaded" })
       await expect(page.getByTestId("style-fixture-disclosure")).toHaveAttribute("data-hydrated", "true")
       await expect(page.getByTestId("module-view-style-templates")).toHaveAttribute("data-hydrated", "true")
       await page.evaluate(async () => { await document.fonts.ready })
@@ -122,7 +123,7 @@ for (const width of [320, 390, 768, 1440]) {
       await page.getByRole("button", { name: "Ocean palette", exact: true }).click()
       await expect(page.locator("html")).toHaveClass(/dark/)
       await expect(page.locator("html")).toHaveAttribute("data-palette", "ocean")
-      await page.reload()
+      await page.reload({ waitUntil: "domcontentloaded" })
       await expect(page.getByTestId("style-fixture-disclosure")).toHaveAttribute("data-hydrated", "true")
       await expect(page.locator("html")).toHaveClass(/dark/)
       await expect(page.locator("html")).toHaveAttribute("data-palette", "ocean")
