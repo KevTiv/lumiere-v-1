@@ -85,12 +85,26 @@ instead of `WORKOS_REDIRECT_URI`, supply it during the web image build.
 
 Native public signup and password recovery return HTTP 410 during alpha. Legacy
 native database credentials do not support immediate revocation; a password
-change alone cannot make recovery secure. WorkOS mode also disables native
-password and invitation endpoints. Hosted invitation membership automation is
-pending; operators must approve subjects and establish local memberships using
-the existing trusted administration process. Verify approved and denied sign-in,
-founder bootstrap, cross-tenant denial, refresh, logout, and provider outage on
-an isolated stack before release. No external WorkOS configuration or deployment
+change alone cannot make recovery secure. WorkOS mode disables native password and self-registration endpoints. Hosted
+organization invites use the existing scoped administrator route, send links
+to `/auth/invite/prepare`, and exchange plaintext tokens for encrypted,
+HTTP-only, ten-minute browser handoffs. A WorkOS-authenticated invitee must
+already have an explicit admission mapping for their immutable provider subject,
+verified email and exact local/provider organization; `allow_provision:true`
+must be set for a new account before its first bridge. Invite acceptance is
+single-use and grants only the administrator-selected active role. A provider
+sign-in or email-domain match alone never grants membership. Newly admitted
+identities must not be linked automatically to existing email accounts.
+
+Hosted acceptance currently uses a fail-closed ordered reducer handoff:
+invite consumption precedes membership and binding. If a later reducer fails,
+the invite stays consumed and an administrator must verify membership and reissue
+a new invitation. This is **not** a cross-reducer atomic transaction; do not
+interpret a transient error as success or retry a consumed token.
+
+Verify approved and denied sign-in, founder bootstrap, cross-tenant denial,
+invitation acceptance/replay/expiry, refresh, logout, and provider outage on an
+isolated stack before release. No external WorkOS configuration or deployment
 is performed by this patch.
 
 ## Shared immutable Rust runtime image
