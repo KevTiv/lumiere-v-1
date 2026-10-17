@@ -39,11 +39,8 @@ pub(super) async fn invite(
     cookies: Cookies,
     Json(body): Json<InviteBody>,
 ) -> Result<impl IntoResponse, ApiError> {
-    if state.config.workos_client_id.is_some() {
-        return Err(ApiError::Gone(
-            "Invitations use the WorkOS membership flow".into(),
-        ));
-    }
+    // Hosted users may create invitations only through this same authenticated,
+    // scoped administrator path. Acceptance separately requires exact WorkOS admission.
     let email = normalized_auth_email(&body.email)?;
     let session = resolve_session(&state, &headers, &cookies)
         .await?
@@ -176,7 +173,12 @@ pub(super) async fn invite(
         let from = state.config.resend_from_email.clone();
         let app = state.config.app_url.clone();
         let to = email.clone();
-        let link = format!("{app}/accept-invite?token={}", urlencoding::encode(&token));
+        let path = if state.config.workos_client_id.is_some() {
+            "/auth/invite/prepare"
+        } else {
+            "/accept-invite"
+        };
+        let link = format!("{app}{path}?token={}", urlencoding::encode(&token));
         let text = format!(
             "Your colleague has invited you to join {org_name} on Lumiere ERP.\n\nAccept:\n{link}\n\nExpires in 7 days."
         );
@@ -204,24 +206,28 @@ pub(super) async fn invite(
 #[derive(Debug, Deserialize)]
 pub(super) struct AcceptInviteBody {
     token: String,
-    email: String,
-    password: String,
+    // Hosted acceptance derives identity and email solely from the verified provider.
+    email: Option<String>,
+    password: Option<String>,
 }
 
 pub(super) async fn accept_invite(
     State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
     cookies: Cookies,
     Json(body): Json<AcceptInviteBody>,
 ) -> Result<impl IntoResponse, ApiError> {
     if state.config.workos_client_id.is_some() {
-        return Err(ApiError::Gone(
-            "Invitation acceptance uses WorkOS. Open the invitation link and use Continue with WorkOS."
-                .into(),
-        ));
+        return Ok(Json(accept_workos_invite(&state, &headers, &body.token).await?));
     }
 
-    validate_native_password(&body.password)?;
-    let email = normalized_auth_email(&body.email)?;
+    let password = body.password.as_deref().ok_or_else(|| {
+        ApiError::BadRequest("A password is required for native invitation acceptance".into())
+    })?;
+    let email = normalized_auth_email(body.email.as_deref().ok_or_else(|| {
+        ApiError::BadRequest("An email is required for native invitation acceptance".into())
+    })?)?;
+    validate_native_password(password)?;
     if body.token.len() != 43 {
         return Err(ApiError::BadRequest("Invalid or expired invitation".into()));
     }
@@ -261,7 +267,7 @@ pub(super) async fn accept_invite(
         .ok_or_else(|| ApiError::BadRequest("Invite role not found".into()))?;
     let (member_identity, stdb_token, platform_user_id, new_credential) =
         if let Some(existing) = find_credential_by_email(&state, &email).await? {
-            let tok = authenticate_invite_credential(&existing, body.password.clone(), key).await?;
+            let tok = authenticate_invite_credential(&existing, password.to_owned(), key).await?;
             (
                 existing.identity_hex.clone(),
                 tok,
@@ -269,7 +275,7 @@ pub(super) async fn accept_invite(
                 None,
             )
         } else {
-            let password_hash = hash_native_password(body.password.clone()).await?;
+            let password_hash = hash_native_password(password.to_owned()).await?;
             let (identity, token) = state
                 .stdb
                 .provision_identity()
@@ -388,6 +394,129 @@ pub(super) async fn accept_invite(
     set_stdb_session_cookies(&state.config, &cookies, &stdb_token, &id_hex);
 
     Ok(Json(json!({ "redirectTo": "/overview" })))
+}
+
+
+/** A hosted invitation is never a substitute for alpha admission. All three
+ * authorities must agree: WorkOS subject+verified email, admission org, and
+ * an unexpired administrator-issued single-use invitation.
+ */
+fn hosted_invite_matches(
+    approved_organization_id: Option<u64>,
+    verified_email: &str,
+    invite_organization_id: u64,
+    invite_email: &str,
+) -> bool {
+    approved_organization_id == Some(invite_organization_id)
+        && !verified_email.is_empty()
+        && verified_email.eq_ignore_ascii_case(invite_email)
+}
+
+async fn accept_workos_invite(
+    state: &AppState,
+    headers: &HeaderMap,
+    token: &str,
+) -> Result<Value, ApiError> {
+    let bearer = headers
+        .get(axum::http::header::AUTHORIZATION)
+        .and_then(|value| value.to_str().ok())
+        .and_then(|value| value.strip_prefix("Bearer "))
+        .filter(|value| !value.is_empty())
+        .ok_or(ApiError::Unauthorized)?;
+    // Verify immutable WorkOS subject, canonical verified email, live session,
+    // explicit admission and token/identity binding before touching the invite.
+    let binding = crate::session::workos::verify_binding(state, bearer, false).await?;
+    if token.len() != 43 || !token.bytes().all(|c| c.is_ascii_alphanumeric() || c == b'_' || c == b'-') {
+        return Err(ApiError::BadRequest("Invalid or expired invitation".into()));
+    }
+    let hash = hex::encode(Sha256::digest(token.as_bytes()));
+    let invite = find_invite_by_token_hash(state, &hash)
+        .await?
+        .ok_or_else(|| ApiError::BadRequest("Invalid or expired invitation".into()))?;
+    if invite.accepted_at.is_some() || invite.expires_at <= now_micros() as i64 {
+        return Err(ApiError::BadRequest("Invalid or expired invitation".into()));
+    }
+    if !hosted_invite_matches(
+        binding.organization_id,
+        &binding.email,
+        invite.organization_id,
+        &invite.email,
+    ) {
+        return Err(ApiError::Forbidden("Invitation is not approved for this WorkOS identity and organization".into()));
+    }
+    let role_name = get_role_name_in_organization(state, invite.role_id, invite.organization_id)
+        .await?
+        .ok_or_else(|| ApiError::BadRequest("Invite role not found".into()))?;
+
+    // Existing trusted reducers enforce invite single-use, active issuer authority,
+    // active role and the organization member cap. An interrupted handoff fails
+    // closed; operator reissue is required if a subsequent reducer fails.
+    dispatch_internal_reducer(
+        state,
+        InternalRouteAuthority::InvitationAcceptance,
+        Some(invite.organization_id),
+        "mark_invite_accepted",
+        json!([invite.id]),
+    ).await?;
+    dispatch_internal_reducer(
+        state,
+        InternalRouteAuthority::InvitationAcceptance,
+        Some(invite.organization_id),
+        "add_org_member",
+        json!([
+            identity_json_for_reducer_call(&binding.identity_hex),
+            invite.organization_id,
+            {
+                "role_name": role_name,
+                "company_id": Value::Null,
+                "job_title": Value::Null,
+                "department_id": Value::Null,
+                "employee_id": Value::Null,
+                "is_active": true,
+                "is_default": true,
+                "metadata": Value::Null,
+            }
+        ]),
+    ).await?;
+    dispatch_internal_reducer(
+        state,
+        InternalRouteAuthority::InvitationAcceptance,
+        Some(invite.organization_id),
+        "bind_user_credential",
+        json!([
+            binding.platform_user_id.as_str(),
+            identity_json_for_reducer_call(&binding.identity_hex),
+            binding.email,
+        ]),
+    ).await?;
+    dispatch_internal_reducer(
+        state,
+        InternalRouteAuthority::InvitationAcceptance,
+        Some(invite.organization_id),
+        "bind_user_profile",
+        json!([
+            binding.platform_user_id.as_str(),
+            identity_json_for_reducer_call(&binding.identity_hex),
+        ]),
+    ).await?;
+
+    // Hosted sessions remain provider-owned; never mint a native STDB cookie.
+    Ok(json!({ "redirectTo": "/overview" }))
+}
+
+#[cfg(test)]
+mod hosted_invite_tests {
+    use super::hosted_invite_matches;
+
+    #[test]
+    fn requires_matching_approved_organization_and_verified_email() {
+        assert!(hosted_invite_matches(Some(7), "approved@example.test", 7, "approved@example.test"));
+        assert!(hosted_invite_matches(Some(7), "APPROVED@example.test", 7, "approved@example.test"));
+        assert!(!hosted_invite_matches(None, "approved@example.test", 7, "approved@example.test"));
+        assert!(!hosted_invite_matches(Some(8), "approved@example.test", 7, "approved@example.test"));
+        assert!(!hosted_invite_matches(Some(7), "other@example.test", 7, "approved@example.test"));
+        assert!(!hosted_invite_matches(Some(7), "", 7, "approved@example.test"));
+    }
 }
 
 fn json_u64(value: &Value) -> Option<u64> {

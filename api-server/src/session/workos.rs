@@ -205,6 +205,8 @@ async fn provider_get<T: serde::de::DeserializeOwned>(
 }
 pub struct VerifiedBinding {
     pub platform_user_id: PlatformId,
+    /// Canonical, provider-verified and explicitly admitted email (not user input).
+    pub email: String,
     pub identity_hex: String,
     pub stdb_token: String,
     pub organization_id: Option<u64>,
@@ -384,6 +386,7 @@ pub async fn verify_binding(
     }
     Ok(VerifiedBinding {
         platform_user_id,
+        email: admission.email.clone(),
         identity_hex,
         stdb_token,
         organization_id: admission.organization_id,
