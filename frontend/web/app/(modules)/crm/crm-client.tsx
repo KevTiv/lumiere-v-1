@@ -174,7 +174,8 @@ import {
   previousPeriodMs,
   timeRangeToMs,
 } from "@lumiere/ui"
-import { useCallback, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
+import { canUseModuleData, mergeModuleStates, moduleCollection } from "@lumiere/ui/lib/module-data-state"
 import { useRouter } from "next/navigation"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
 import { useDefaultOperatingCompanyBigInt } from "@lumiere/query-hooks/hooks/use-operating-company"
@@ -426,14 +427,25 @@ function CrmClientLoaded({
   const [csvKind, setCsvKind] = useState<CrmCsvImportKind | null>(null)
   const [dashboardTimeRange, setDashboardTimeRange] = useState<TimeRangeValue>("30d")
 
-  const { data: leads = [], isLoading: leadsLoading } = useLeads(orgId, initialLeads)
-  const { data: opportunities = [], isLoading: opportunitiesLoading } = useOpportunities(orgId, initialOpportunities)
-  const { data: opportunityLines = [] } = useOpportunityLines(orgId)
-  const { data: contacts = [], isLoading: contactsLoading } = useContacts(orgId, initialContacts)
-  const { data: contactTags = [] } = useContactTags(orgId)
-  const { data: contactCategories = [] } = useContactCategories(orgId)
-  const { data: contactSegments = [] } = useContactSegments(orgId)
-  const { data: activities = [] } = useActivities(orgId)
+  const leadsRead = moduleCollection(useLeads(orgId, initialLeads))
+  const leads = leadsRead.rows
+  const leadsLoading = leadsRead.state.status === "loading"
+  const opportunitiesRead = moduleCollection(useOpportunities(orgId, initialOpportunities))
+  const opportunities = opportunitiesRead.rows
+  const opportunitiesLoading = opportunitiesRead.state.status === "loading"
+  const opportunityLinesRead = moduleCollection(useOpportunityLines(orgId))
+  const opportunityLines = opportunityLinesRead.rows
+  const contactsRead = moduleCollection(useContacts(orgId, initialContacts))
+  const contacts = contactsRead.rows
+  const contactsLoading = contactsRead.state.status === "loading"
+  const contactTagsRead = moduleCollection(useContactTags(orgId))
+  const contactTags = contactTagsRead.rows
+  const contactCategoriesRead = moduleCollection(useContactCategories(orgId))
+  const contactCategories = contactCategoriesRead.rows
+  const contactSegmentsRead = moduleCollection(useContactSegments(orgId))
+  const contactSegments = contactSegmentsRead.rows
+  const activitiesRead = moduleCollection(useActivities(orgId))
+  const activities = activitiesRead.rows
   const { data: opportunityStages = [] } = useOpportunityStages(orgId)
   const { data: leadLostReasons = [] } = useLeadLostReasons(orgId)
   const { data: pricelists = [] } = usePricelists(orgId)
@@ -647,7 +659,7 @@ function CrmClientLoaded({
   const replaceContactCategories = useReplaceContactCategories(orgId)
   const removeContactCategories = useRemoveContactCategories(orgId)
   const clearContactCategories = useClearContactCategories(orgId)
-  const { askForm, formDialog } = useFormDialog()
+  const { askForm, cancelForm, formDialog } = useFormDialog()
   const csvImports = useCrmCsvImportMutations(orgId)
   const { data: forecastSnapshots = [] } = useCrmForecastSnapshots(orgId)
   const createForecastSnapshot = useCreateForecastSnapshot(orgId)
@@ -2106,11 +2118,46 @@ function CrmClientLoaded({
     [enrichedOpportunities, kpiCurrencies, opportunitiesLoading, t],
   )
 
+  const dataState = {
+    dashboard: mergeModuleStates([leadsRead.state, opportunitiesRead.state, contactsRead.state, activitiesRead.state]),
+    leads: leadsRead.state,
+    opportunities: opportunitiesRead.state,
+    "opportunity-lines": opportunityLinesRead.state,
+    contacts: contactsRead.state,
+    activities: activitiesRead.state,
+    "contact-tags": contactTagsRead.state,
+    "contact-categories": contactCategoriesRead.state,
+    "contact-segments": contactSegmentsRead.state,
+  }
+  type CrmTab = keyof typeof dataState
+  const tabUsable = (tab: CrmTab | undefined) => tab == null || canUseModuleData(dataState[tab])
+  const actionTabs: Record<string, CrmTab> = {
+    createLead: "leads", createOpportunity: "opportunities", createContact: "contacts",
+    createActivity: "activities", createContactCategory: "contact-categories",
+    createContactTag: "contact-tags", createContactSegment: "contact-segments",
+    createOpportunityLine: "opportunity-lines",
+  }
+  const csvTabs: Record<CrmCsvImportKind, CrmTab> = { contact: "contacts", lead: "leads", opportunity: "opportunities" }
+  const quickActionUsable = quickActionForm == null || tabUsable(actionTabs[quickActionForm.action])
+  const workflowUsable = workflowModal == null || tabUsable(
+    "leadId" in workflowModal ? "leads" : "opportunityId" in workflowModal ? "opportunities" : "contacts",
+  )
+  const csvSourceState = csvKind == null ? undefined : dataState[csvTabs[csvKind]]
+  // Prompted category dialogs act on selected contacts and their categories.
+  const promptsUsable = tabUsable("contacts") && tabUsable("contact-categories")
+  useEffect(() => {
+    // Dialogs close when the collection their rows came from is denied or fails.
+    if (!quickActionUsable) setQuickActionForm(null)
+    if (!workflowUsable) setWorkflowModal(null)
+    if (!promptsUsable) cancelForm()
+  }, [quickActionUsable, workflowUsable, promptsUsable, cancelForm])
+
   const handleFormSubmit = async (
     _tabId: string,
     action: string,
     formData: Record<string, unknown>,
   ) => {
+    if (!tabUsable(actionTabs[action])) throw new Error("Required data is unavailable. Refresh and try again.")
     if (action === "createLead") {
       const p = toCreateLeadParams(formData)
       if (p) {
@@ -2210,6 +2257,7 @@ function CrmClientLoaded({
 
   const handleWorkflowSubmit = async (formData: Record<string, unknown>) => {
     if (!workflowModal) return
+    if (!workflowUsable) throw new Error("Required data is unavailable. Refresh and try again.")
     setWorkflowSubmitError(null)
     try {
       if (workflowModal.kind === "convertLead") {
@@ -2457,6 +2505,7 @@ function CrmClientLoaded({
         config={config}
         data={data}
         dataLoading={dataLoading}
+        dataState={dataState}
         kpiStrips={kpiStrips}
         entityBoardContext={entityBoardContext}
         onFormSubmit={handleFormSubmit}
@@ -2472,7 +2521,7 @@ function CrmClientLoaded({
         }}
       />
       <RuntimeFormModal
-        open={quickActionForm !== null}
+        open={quickActionForm !== null && quickActionUsable}
         onOpenChange={(open) => !open && setQuickActionForm(null)}
         staticConfig={quickActionForm?.form ?? newLeadForm(t)}
         moduleId="crm"
@@ -2487,10 +2536,10 @@ function CrmClientLoaded({
           }
         }}
       />
-      {formDialog}
+      {promptsUsable && formDialog}
       <RuntimeFormModal
         key={workflowModalKey}
-        open={workflowModal !== null}
+        open={workflowModal !== null && workflowUsable}
         onOpenChange={(open) => {
           if (!open) {
             setWorkflowModal(null)
@@ -2510,6 +2559,7 @@ function CrmClientLoaded({
       />
       {csvKind ? (
         <ImportAssistantWizard
+          sourceState={csvSourceState}
           key={csvKind}
           open
           organizationId={organizationId}

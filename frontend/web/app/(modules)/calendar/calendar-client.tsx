@@ -13,6 +13,7 @@ import { useActivities, useCreateActivity } from "@lumiere/query-hooks/hooks/crm
 import type { FormConfig, CalendarEvent as UICalendarEvent, ViewMode } from "@lumiere/ui"
 import { FormModal, ModuleView, newCalendarEventForm, newActivityForm, MissingOrganization } from "@lumiere/ui"
 import { useEffect, useMemo, useState } from "react"
+import { canUseModuleData, moduleCollection } from "@lumiere/ui/lib/module-data-state"
 import { CalendarView } from "../../../../packages/ui/src/calendar-components/calendar-view"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
 import { calendarEventHref } from "./calendar-event"
@@ -58,8 +59,10 @@ function CalendarClientLoaded({ initialEvents, organizationId }: CalendarClientL
   const [selectedDate, setSelectedDate] = useState<Date | null>(null)
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null)
-  const { data: events = [] } = useCalendarEvents(orgId, initialEvents)
-  const { data: activities = [] } = useActivities(orgId)
+  const eventsRead = moduleCollection(useCalendarEvents(orgId, initialEvents))
+  const events = eventsRead.rows
+  const activitiesRead = moduleCollection(useActivities(orgId))
+  const activities = activitiesRead.rows
   const createCalendarEvent = useCreateCalendarEvent(orgId)
   const updateCalendarEvent = useUpdateCalendarEvent(orgId)
   const deleteCalendarEvent = useDeleteCalendarEvent(orgId)
@@ -227,11 +230,28 @@ function CalendarClientLoaded({ initialEvents, organizationId }: CalendarClientL
     [events, activities],
   )
 
+  const dataState = {
+    dashboard: eventsRead.state,
+    calendar: eventsRead.state,
+    events: eventsRead.state,
+    activities: activitiesRead.state,
+  }
+  const eventsUsable = canUseModuleData(eventsRead.state)
+  const actionUsable = (action: string) =>
+    action === "createActivity" ? canUseModuleData(activitiesRead.state) : eventsUsable
+  const quickActionUsable = quickActionForm == null || actionUsable(quickActionForm.action)
+  useEffect(() => {
+    // Event dialogs and selection must not outlive a denied or failed events read.
+    if (!quickActionUsable) setQuickActionForm(null)
+    if (!eventsUsable) setSelectedEventId(null)
+  }, [quickActionUsable, eventsUsable])
+
   const handleFormSubmit = async (
     _tabId: string,
     action: string,
     formData: Record<string, unknown>,
   ) => {
+    if (!actionUsable(action)) throw new Error("Required data is unavailable. Refresh and try again.")
     if (action === "createActivity") {
       const p = toCreateActivityParams(formData)
       if (p) await createActivity.mutateAsync(p)
@@ -275,13 +295,14 @@ function CalendarClientLoaded({ initialEvents, organizationId }: CalendarClientL
       <ModuleView
         config={config}
         data={data}
+        dataState={dataState}
         onFormSubmit={handleFormSubmit}
         isPending={isPending}
       />
 
       <FormModal
         key={formModalKey}
-        open={quickActionForm !== null}
+        open={quickActionForm !== null && quickActionUsable}
         onOpenChange={(open) => !open && setQuickActionForm(null)}
         config={quickActionForm?.form ?? newCalendarEventForm(t)}
         isPending={isPending}

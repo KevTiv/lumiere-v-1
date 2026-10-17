@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useRef, useState } from "react"
 import { useTranslation } from "@lumiere/i18n"
 import type { FormConfig } from "../lib/form-types"
 import {
@@ -16,6 +16,8 @@ import { useTrackedCsvImport } from "@lumiere/query-hooks/hooks/tracked-csv-impo
 import { CsvImportResult } from "../import-assistant/csv-import-result"
 import { CsvImportHistory } from "../import-assistant/csv-import-history"
 import type { AbandonedAccountingImportCleanupProps } from "../import-assistant/abandoned-accounting-import-cleanup"
+import type { ModuleDataState } from "../lib/module-data-state"
+import { ModuleDataNotice } from "../pages/module-data-notice"
 import { Button } from "./button"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "./dialog"
 import { Input } from "./input"
@@ -44,6 +46,8 @@ export interface CsvImportModalProps {
   abandonedAccountingCleanup?: Omit<AbandonedAccountingImportCleanupProps, "jobs">
   /** Optional app-level reader that converts CSV or spreadsheet files to canonical CSV text. */
   fileReader?: (file: File) => Promise<{ csvText: string }>
+  /** Gate new submissions without discarding an existing tracked request or its recovery UI. */
+  sourceState?: ModuleDataState
 }
 
 function downloadTemplate(columns: CsvImportColumns, fileName: string) {
@@ -74,6 +78,7 @@ export function CsvImportModal({
   trackedImport,
   abandonedAccountingCleanup,
   fileReader,
+  sourceState,
 }: CsvImportModalProps) {
   const { t } = useTranslation()
   const [fileName, setFileName] = useState("")
@@ -85,8 +90,13 @@ export function CsvImportModal({
   const [request, setRequest] = useState<CsvImportRequest | null>(null)
   const trackedMutation = useTrackedCsvImport()
   const trackSubmission = trackedImport && tableName && supportsTrackedCsvImport(tableName)
+  const sourceReady = sourceState === undefined || sourceState.status === "ready"
+  const sourceReadyRef = useRef(sourceReady)
+  sourceReadyRef.current = sourceReady
+  const busy = isPending || isSubmitting || trackedMutation.isPending
 
   const handleFile = async (file: File | undefined) => {
+    if (!sourceReadyRef.current || busy || submitted || request) return
     setError(null)
     setAnalysis(null)
     setCsvText("")
@@ -94,15 +104,18 @@ export function CsvImportModal({
     if (!file) return
     try {
       const text = fileReader ? (await fileReader(file)).csvText : await file.text()
+      // A read can settle after access/readiness changes. Do not restore its preview.
+      if (!sourceReadyRef.current) return
       setAnalysis(analyzeCsv(text, columns))
       setCsvText(text)
     } catch (cause) {
+      if (!sourceReadyRef.current) return
       setError(cause instanceof Error ? cause.message : String(cause))
     }
   }
 
   const handleSubmit = async () => {
-    if (!canSubmitCsvImport(analysis)) return
+    if (!sourceReadyRef.current || busy || submitted || request || !canSubmitCsvImport(analysis)) return
     setError(null)
     setIsSubmitting(true)
     try {
@@ -139,8 +152,6 @@ export function CsvImportModal({
     }
   }
 
-  const busy = isPending || isSubmitting || trackedMutation.isPending
-
   return (
     <Dialog open onOpenChange={(next) => !next && !busy && onClose()}>
       <DialogContent className="sm:max-w-2xl">
@@ -150,9 +161,12 @@ export function CsvImportModal({
         </DialogHeader>
 
         <div className="space-y-4">
+          <ModuleDataNotice state={sourceState} />
+          {sourceState?.status === "loading" ? <p role="status" className="text-sm text-muted-foreground">{t("common.loading", { defaultValue: "Loading…" })}</p> : null}
           {request ? <CsvImportResult request={request} initialPending={isSubmitting} initialError={error} activeOrganizationId={organizationId} activeCompanyId={trackedImport?.companyId} onNewFile={() => {
+            if (!sourceReadyRef.current || busy) return
             setRequest(null); setSubmitted(false); setError(null); setAnalysis(null); setCsvText(""); setFileName("")
-          }} /> : organizationId && (submitted || abandonedAccountingCleanup) ? (
+          }} /> : sourceReady && organizationId && (submitted || abandonedAccountingCleanup) ? (
             <CsvImportHistory
               organizationId={organizationId}
               tableName={tableName}
@@ -177,7 +191,7 @@ export function CsvImportModal({
                   ? ".csv,.xlsx,.xls,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
                   : ".csv,text/csv,text/plain"
               }
-              disabled={busy}
+              disabled={busy || !sourceReady}
               onChange={(event) => void handleFile(event.target.files?.[0])}
             />
             {columns ? (
@@ -193,7 +207,7 @@ export function CsvImportModal({
             ) : null}
           </div>
 
-          {analysis ? (
+          {analysis && sourceReady ? (
             <div className="space-y-3">
               <p className="text-sm text-muted-foreground">
                 {t("common.csvImportDialog.rowCount", {
@@ -246,7 +260,7 @@ export function CsvImportModal({
           ) : null}
 
           </> : null}
-          {error && !request ? (
+          {error && !request && sourceReady ? (
             <p role="alert" className="text-sm text-destructive">
               {error}
             </p>
@@ -257,7 +271,7 @@ export function CsvImportModal({
           <Button type="button" variant="outline" disabled={busy} onClick={onClose}>
             {submitted ? t("common.close", { defaultValue: "Close" }) : config.cancelLabel ?? t("common.cancel")}
           </Button>
-          {!submitted ? <Button type="button" disabled={busy || !canSubmitCsvImport(analysis)} onClick={() => void handleSubmit()}>
+          {!submitted ? <Button type="button" disabled={busy || !sourceReady || !canSubmitCsvImport(analysis)} onClick={() => void handleSubmit()}>
             {config.submitLabel ?? t("common.csvImportDialog.submit", { defaultValue: "Import" })}
           </Button> : null}
         </DialogFooter>

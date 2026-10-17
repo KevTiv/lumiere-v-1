@@ -37,6 +37,45 @@ PR #154 through PR #175 stack now has monotonic ancestry. The successful Release
 contracts run `38155126649` published and pinned immutable
 `lumiere-contracts@0.3.99` in commit `3f191c7f5`.
 
+## Current-stack shared read-state rollout (2026-10-16)
+
+**State:** REVIEW — successor to PR #182, based on integrated UI PR #218
+(`29b5f80e`), retaining current main's domain operations and safeguards.
+
+PR #182's shared collection helpers, shared tests, ModuleView shutdown behavior
+and Accounting adoption are already incorporated. They are not reimported.
+The remaining collection states and dialog/action gates are ported into Calendar,
+CRM, Documents, Fleet, Helpdesk, Inventory, IoT, Messages, Proposals, Purchasing,
+Sales and Workflows. HR, Expenses, Projects and Manufacturing extend their newer
+partial safeguards without replacing current record links, company guards,
+material/cost checks, finance operations or protected secondary panels.
+
+Denied and failed primary reads suppress cached rows and prevent new mutations;
+async form submission guards reject with an error rather than resolve as a
+false success. The existing state contract still distinguishes loading, empty,
+partial and ready data. The existing operations, RBAC and readback owners remain
+unchanged; this slice needs no new contract release.
+
+Import recovery is deliberately retained: source-read failures no longer unmount
+CSV or assistant dialogs or clear their selected session. Optional `sourceState`
+props block new file/submit actions and hide unsubmitted stale previews, while
+keeping existing submitted request identity, status and result/recovery controls.
+No mutation is automatically replayed. Mounted component regressions cover
+readiness loss before submit, during a file read and after submission.
+
+Validation limits remain explicit. TypeScript, component/model checks and source
+integration are not sixteen-module authenticated browser certification. Existing
+CRM `contact-category-actions.test.ts` has a baseline mismatch for `{ none: [] }`;
+both helper and test are unchanged by this successor. The standard web unit script
+does not currently execute that separately invoked test. A full runtime/keyboard/
+denial/reconnect matrix and current-head remote CI remain required before claiming
+general COV-26 acceptance. PR #218's accounting browser fixture is synthetic and
+does not prove these other modules' backend effects.
+
+PR #181 was closed as superseded after auditing its baseline, generated HR
+descriptors, C4 database names, C8 policy count and CI/census changes against main
+`979de024`; the stale baseline is not reapplied.
+
 ## Reports / Analytics bounded pass (2026-10-10)
 
 **State:** IMPLEMENTED — source read states, truthful definition handling,
