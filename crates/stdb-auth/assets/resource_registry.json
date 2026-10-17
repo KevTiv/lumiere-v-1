@@ -5083,6 +5083,7 @@
     ],
     "default_restricted": [
       "product_id",
+      "product_uom",
       "product_qty",
       "price_unit",
       "state",
@@ -5323,7 +5324,8 @@
       "partner_id",
       "price_unit",
       "amount_total",
-      "state"
+      "state",
+      "notes"
     ],
     "mandatory": [
       "id",
@@ -5359,7 +5361,9 @@
       "company_id",
       "requisition_id",
       "awarded_bid_id",
-      "purchase_order_id"
+      "purchase_order_id",
+      "notes",
+      "currency_id"
     ],
     "mandatory": [
       "id",

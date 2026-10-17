@@ -36,7 +36,8 @@ export async function signIn(
     .catch(() => false)
 
   if (!emailVisible) {
-    await expect(page.getByTestId("dashboard-sidebar")).toBeVisible()
+    await expect(page.getByTestId("dashboard-sidebar")).toHaveCount(1, { timeout: 30_000 })
+    await expect(page.getByTestId("dashboard-sidebar").first()).toBeVisible()
     await expectNoAppError(page)
     return
   }
@@ -46,7 +47,8 @@ export async function signIn(
   await page.getByRole("button", { name: /sign in/i }).click()
 
   await expect(page).not.toHaveURL(/\/sign-in(?:\?|$)/)
-  await expect(page.getByTestId("dashboard-sidebar")).toBeVisible()
+  await expect(page.getByTestId("dashboard-sidebar")).toHaveCount(1, { timeout: 30_000 })
+  await expect(page.getByTestId("dashboard-sidebar").first()).toBeVisible()
   await expectNoAppError(page)
 }
 
@@ -55,7 +57,7 @@ export async function expectAuthenticatedShell(page: Page) {
   // client shell can briefly coexist; wait for exactly one before asserting on it
   // (a strict-mode violation is not retried).
   await expect(page.getByTestId("dashboard-sidebar")).toHaveCount(1, { timeout: 30_000 })
-  await expect(page.getByTestId("dashboard-sidebar")).toBeVisible()
+  await expect(page.getByTestId("dashboard-sidebar").first()).toBeVisible()
   await expect(page.getByTestId("sidebar-user")).toBeVisible()
   await expect(page.getByTestId("sidebar-sign-out")).toBeVisible()
   await expectNoAppError(page)
