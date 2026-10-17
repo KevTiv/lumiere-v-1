@@ -4,7 +4,7 @@ import { selectModuleTab } from "./e2e/helpers"
 const expect = baseExpect.configure({ timeout: 15_000 })
 
 test("domain tab helper selects the module panel alongside nested and independent panels", async ({ page }) => {
-  await page.goto("/navigation?module=sales")
+  await page.goto("/navigation?module=sales", { waitUntil: "domcontentloaded" })
   await expect(page.getByTestId("navigation-disclosure")).toHaveAttribute("data-hydrated", "true")
   // The fixture has both an independent local workspace and nested chart tabs.
   await expect(page.locator('[role="tabpanel"]:visible')).toHaveCount(3)
@@ -21,7 +21,7 @@ for (const width of [320, 390, 768, 1440]) {
     await page.setViewportSize({ width, height: 950 })
     const apiRequests: string[] = []
     page.on("request", (request) => { if (new URL(request.url()).pathname.startsWith("/api/")) apiRequests.push(request.url()) })
-    await page.goto("/navigation?module=sales&company=7&tab=order-lines&filter=state:draft&highlight=2")
+    await page.goto("/navigation?module=sales&company=7&tab=order-lines&filter=state:draft&highlight=2", { waitUntil: "domcontentloaded" })
     await expect(page.getByTestId("navigation-disclosure")).toHaveAttribute("data-hydrated", "true")
     await expect(page.getByTestId("module-workspace-sales-orders")).toHaveAttribute("aria-current", "page")
     await expect(page.getByTestId("module-tab-sales-order-lines")).toHaveAttribute("aria-selected", "true")
@@ -31,7 +31,7 @@ for (const width of [320, 390, 768, 1440]) {
     await expect(page.getByTestId("module-tab-sales-order-lines")).toHaveAttribute("aria-selected", "true")
     await page.goForward()
     await expect(page.getByTestId("module-tab-sales-deliveries")).toHaveAttribute("aria-selected", "true")
-    await page.reload()
+    await page.reload({ waitUntil: "domcontentloaded" })
     await expect(page.getByTestId("module-workspace-sales-fulfillment")).toHaveAttribute("aria-current", "page")
 
     let sharedNavClass: string | null = null
