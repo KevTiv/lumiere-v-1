@@ -1,14 +1,16 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import { afterEach, describe, expect, it, vi } from "vitest"
-import type { ReactNode } from "react"
+import { forwardRef, type ReactNode } from "react"
 
 vi.mock("@lumiere/i18n", () => ({
   useTranslation: () => ({ t: (key: string) => key }),
 }))
 
 vi.mock("@/components/ui/scroll-area", () => ({
-  ScrollArea: ({ children, className }: { children: ReactNode; className?: string }) => (
-    <div className={className}>{children}</div>
+  ScrollArea: forwardRef<HTMLDivElement, { children: ReactNode; className?: string }>(
+    function MockScrollArea({ children, className }, ref) {
+      return <div ref={ref} className={className}>{children}</div>
+    },
   ),
 }))
 
@@ -91,7 +93,7 @@ describe("AI chat workspace", () => {
     )
     expect(screen.getByTestId("erp-ai-chat-panel").getAttribute("data-mode")).toBe("side")
     expect(await screen.findByText("A draft is ready")).toBeTruthy()
-    expect(screen.getByText("Item record")).toBeTruthy()
+    expect(screen.getByText(/Item record/)).toBeTruthy()
     expect(screen.getByTestId("assistant-action-draft").textContent).toContain("10")
   })
 })
