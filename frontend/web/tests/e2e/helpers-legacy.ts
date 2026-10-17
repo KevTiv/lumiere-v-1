@@ -110,7 +110,8 @@ export async function openAccountingTab(page: Page, tabId: string) {
   await expect(moduleView).toBeVisible()
   await expect(moduleView).toHaveAttribute("data-hydrated", "true")
   await expect(page.getByTestId(`module-tab-accounting-${tabId}`)).toHaveAttribute("aria-selected", "true")
-  await expect(page.locator('[role="tabpanel"]:visible')).toHaveCount(1)
+  await expect(page.locator('[data-testid^="module-panel-accounting-"]:visible')).toHaveCount(1)
+  await expect(page.getByTestId(`module-panel-accounting-${tabId}`)).toBeVisible()
   await expectNoAppError(page)
 }
 
