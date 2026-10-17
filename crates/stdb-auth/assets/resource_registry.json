@@ -5200,7 +5200,13 @@
     "default_restricted": [
       "state",
       "company_id",
-      "description"
+      "description",
+      "origin",
+      "user_id",
+      "vendor_id",
+      "line_ids",
+      "purchase_ids",
+      "order_count"
     ],
     "mandatory": [
       "id",
@@ -5388,7 +5394,19 @@
       "product_id",
       "location_id",
       "company_id",
-      "active"
+      "active",
+      "warehouse_id",
+      "uom_id",
+      "product_min_qty",
+      "product_max_qty",
+      "qty_multiple",
+      "qty_to_order",
+      "lead_days",
+      "route_id",
+      "trigger",
+      "group_id",
+      "last_run",
+      "next_run"
     ],
     "mandatory": [
       "id",
