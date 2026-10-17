@@ -712,7 +712,7 @@ export function useCreateDashboard(organizationId: bigint) {
       const params = toCreateDashboardParams(formData)
       if (!params.name.trim()) throw new Error('Dashboard name is required')
       const companyId = companyIdFromDashboardForm(formData)
-      const { urlPath, init } = stdbBffCommandPost("create_dashboard", { companyId: companyId, params: stdbParamsToJson(params) })
+      const { urlPath, init } = stdbBffCommandPost("create_dashboard", { companyId: companyId, params: stdbParamsToJson(params, "CreateDashboardParams") })
 
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create dashboard')

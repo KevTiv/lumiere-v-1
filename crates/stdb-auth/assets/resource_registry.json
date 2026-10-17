@@ -6409,7 +6409,15 @@
     "default_restricted": [
       "name",
       "company_id",
-      "active"
+      "subscription_id",
+      "product_id",
+      "product_uom_qty",
+      "price_unit",
+      "discount",
+      "price_subtotal",
+      "recurring_rule_type",
+      "recurring_interval",
+      "line_is_recurring"
     ],
     "mandatory": [
       "id",

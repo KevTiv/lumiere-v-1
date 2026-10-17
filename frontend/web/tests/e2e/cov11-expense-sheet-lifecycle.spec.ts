@@ -2,7 +2,6 @@ import { createHash } from "node:crypto"
 import { expect, test, type Page, type Request } from "@playwright/test"
 
 import {
-  callReducerBff,
   chooseFirstEnabledOption,
   chooseSelectOptionByLabel,
   fetchAccountIdByCode,
@@ -204,7 +203,13 @@ test.describe(
       await page.getByTestId("module-tab-expenses-expenses").click()
       await page.getByTestId("module-create-expenses-expenses").click()
       await fillField(page, "name", expenseName)
-      await fillField(page, "totalAmount", "73.17")
+      // A unique amount per run: re-running against a persistent database must
+      // not trip the duplicate-expense fraud hold on the earlier run's line.
+      await fillField(
+        page,
+        "totalAmount",
+        (50 + (Date.now() % 90_000) / 100).toFixed(2),
+      )
       await fillField(page, "date", isoDate(0))
       await chooseFirstEnabledOption(page, "pricelistId")
       await chooseFirstEnabledOption(page, "employeeId")
@@ -323,14 +328,14 @@ test.describe(
         )
         if (!existingFinanceEmployee) {
           const financeEmployeeName = smokeName("cov11-finance-approver")
-          await callReducerBff(page, "create_employee", [
+          await callOwnerRaw("create_employee", [
             organizationId,
             {
               company_id: some(companyId),
               name: financeEmployeeName,
               job_id: none,
               department_id: none,
-              employment_type: { tag: "FullTime" },
+              employment_type: { fullTime: [] },
               work_email: some("fixture.finance@example.test"),
               employee_number: none,
               job_title: some("Expense approver"),

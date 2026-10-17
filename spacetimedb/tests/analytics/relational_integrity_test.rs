@@ -484,3 +484,90 @@ pub fn test_record_report_run_is_exact_and_replay_safe(ctx: &ReducerContext) -> 
     }
     Ok(())
 }
+
+/// COV-20: stored widget definitions are validated at write time and a
+/// rejected definition is never persisted.
+pub fn test_dashboard_widget_definition_validated_at_write(
+    ctx: &ReducerContext,
+) -> Result<(), String> {
+    ensure_test_superuser(ctx)?;
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let base = |name: &str| CreateDashboardWidgetParams {
+        name: name.to_string(),
+        widget_type: WidgetType::Kpi,
+        model: "sale_order".to_string(),
+        fields: vec![],
+        position_x: 0,
+        position_y: 0,
+        width: 4,
+        height: 4,
+        is_active: true,
+        domain: None,
+        group_by: None,
+        aggregation: None,
+        chart_type: None,
+        sort_order: None,
+        limit: None,
+        refresh_interval: None,
+        configuration: None,
+        metadata: None,
+    };
+    let count = |ctx: &ReducerContext| {
+        ctx.db
+            .dashboard_widget()
+            .iter()
+            .filter(|w| w.organization_id == fixture.organization_id)
+            .count()
+    };
+
+    let bad: Vec<(&str, CreateDashboardWidgetParams, &str)> = vec![
+        ("not-json", CreateDashboardWidgetParams { domain: Some("{oops".into()), ..base("COV20 bad json") }, "not valid JSON"),
+        ("array", CreateDashboardWidgetParams { domain: Some("[1]".into()), ..base("COV20 bad array") }, "JSON object"),
+        ("empty-op", CreateDashboardWidgetParams { domain: Some(r#"{"state":{}}"#.into()), ..base("COV20 empty op") }, "no operator"),
+        ("bad-op", CreateDashboardWidgetParams { domain: Some(r#"{"state":{"$regex":"x"}}"#.into()), ..base("COV20 bad op") }, "Unsupported"),
+        ("in-scalar", CreateDashboardWidgetParams { domain: Some(r#"{"state":{"$in":"a"}}"#.into()), ..base("COV20 in scalar") }, "array"),
+        ("gt-text", CreateDashboardWidgetParams { domain: Some(r#"{"amount":{"$gt":"abc"}}"#.into()), ..base("COV20 gt text") }, "numeric"),
+        ("sort-dir", CreateDashboardWidgetParams { sort_order: Some(r#"{"amount":"sideways"}"#.into()), ..base("COV20 sort dir") }, "asc or desc"),
+        ("sort-multi", CreateDashboardWidgetParams { sort_order: Some(r#"{"a":"asc","b":"desc"}"#.into()), ..base("COV20 sort multi") }, "exactly one"),
+        ("binding", CreateDashboardWidgetParams { configuration: Some(r#"{"version":2,"timeField":"date"}"#.into()), ..base("COV20 binding") }, "binding"),
+    ];
+    for (label, params, expect) in bad {
+        let before = count(ctx);
+        let err = create_dashboard_widget(ctx, fixture.organization_id, None, params)
+            .err()
+            .ok_or_else(|| format!("{label}: malformed definition was accepted"))?;
+        if !err.contains(expect) {
+            return Err(format!("{label}: unexpected rejection: {err}"));
+        }
+        if count(ctx) != before {
+            return Err(format!("{label}: rejected definition was persisted"));
+        }
+    }
+
+    create_dashboard_widget(
+        ctx,
+        fixture.organization_id,
+        None,
+        CreateDashboardWidgetParams {
+            domain: Some(r#"{"state":{"$in":["sale","done"]},"amount":{"$gte":10}}"#.into()),
+            sort_order: Some(r#"{"amount":"desc"}"#.into()),
+            configuration: Some(
+                r#"{"version":1,"timeField":"date_order","measureField":"amount_total","missingTimestampPolicy":"reject","missingMeasurePolicy":"reject"}"#.into(),
+            ),
+            ..base("COV20 valid")
+        },
+    )?;
+    create_dashboard_widget(
+        ctx,
+        fixture.organization_id,
+        None,
+        CreateDashboardWidgetParams {
+            configuration: Some(r#"{"stacked":true}"#.into()),
+            ..base("COV20 freeform config")
+        },
+    )?;
+    if count(ctx) != 2 {
+        return Err("valid definitions must both persist".to_string());
+    }
+    Ok(())
+}
