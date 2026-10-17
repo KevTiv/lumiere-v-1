@@ -25,7 +25,7 @@ test.describe("COV-08 invoice payment identity and recovery", { tag: ["@p0", "@c
   test("operator settles an invoice; exact payment identity and replays hold", async ({ page }) => {
     test.setTimeout(300_000)
     const moveId = await createAndPostInvoice(page, "cov08-inv")
-    const { partnerId, paymentId, reference, createResponse } = await createAndPostPayment(page, moveId)
+    const { partnerId, paymentId, reference } = await createAndPostPayment(page, moveId)
 
     await openRegisterForm(page, paymentId, moveId)
     const [registerResponse] = await Promise.all([
@@ -50,22 +50,34 @@ test.describe("COV-08 invoice payment identity and recovery", { tag: ["@p0", "@c
     const replayRegister = await replay(page, registerResponse)
     expect(replayRegister.ok(), "settled invoice must refuse the replayed register request").toBe(false)
     expect(await moveSnapshot(page, moveId)).toEqual(settled)
-    void createResponse
   })
 
-  // KNOWN DEFECT (COV-08/E): create_payment carries no idempotency key, so replaying the exact
-  // accepted request creates a second payment with the same reference. test.fail() keeps the gap
-  // visible: it flips to a failure the day the replay is refused, forcing this to be promoted.
-  test("replaying the accepted create_payment request creates no duplicate payment", async ({ page }) => {
-    test.fail(true, "create_payment replay is not idempotent: a second payment with the same reference is created")
+  // create_payment is idempotent on the command's key: an identical replay converges to the same
+  // payment, and the same key with different input is rejected. Neither may add a payment.
+  test("replaying the accepted create_payment request converges and a conflicting replay is rejected", async ({
+    page,
+  }) => {
     test.setTimeout(300_000)
     const moveId = await createAndPostInvoice(page, "cov08-dup")
-    const { reference, createResponse } = await createAndPostPayment(page, moveId)
-    const replayCreate = await replay(page, createResponse)
-    expect(replayCreate.ok(), "the replayed create_payment must be refused").toBe(false)
-    expect(
-      (await rows(page, "account-payments")).filter((row) => scalarQueryString(row.ref ?? row.ref_) === reference),
-    ).toHaveLength(1)
+    const { partnerId, paymentId, reference, createResponse, amountTotal } = await createAndPostPayment(page, moveId)
+    const owners = async () =>
+      (await rows(page, "account-payments")).filter((row) => scalarQueryString(row.ref ?? row.ref_) === reference)
+    expect(await owners()).toHaveLength(1)
+
+    const identical = await replay(page, createResponse)
+    expect(identical.ok(), "an identical replay converges instead of failing").toBe(true)
+    expect(await owners()).toHaveLength(1)
+
+    const body = createResponse.request().postDataJSON() as { params: Record<string, unknown> }
+    const conflicting = await page.request.post(new URL(createResponse.url()).pathname, {
+      headers: { "Content-Type": "application/json" },
+      data: { ...body, params: { ...body.params, amount: Number(amountTotal) + 1 } },
+    })
+    expect(conflicting.ok(), "the same key with different input must be rejected").toBe(false)
+
+    const after = await owners()
+    expect(after).toHaveLength(1)
+    expect(await fetchPaymentIdByExactReference(page, partnerId, reference, { state: "Paid" })).toBe(paymentId)
   })
 
   test("a register-payment reply lost after commit converges once by canonical readback and offers no retry", async ({

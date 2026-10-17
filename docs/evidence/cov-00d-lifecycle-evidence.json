@@ -40,7 +40,7 @@
         "O": {"status": "proven", "reason": "Contact, lead, opportunity, order, fulfilment, invoice, return, exchange and credit-note posting are each an operator UI transition in one executed spec; the credit note is posted from its document page.", "evidence": [{"path": "frontend/web/tests/e2e/mvp-sales-returns.spec.ts", "role": "principal-operator-transition", "claim": "complete operator-driven sales lifecycle through return and credit note"}]},
         "E": {"status": "proven", "reason": "Executed: exact order/delivery/invoice/return/exchange/credit-note identities, refused replay of the accepted confirm, invoice and credit-note commands, lost-reply readback with no retry, double click, stale session and concurrent confirm yielding one delivery. Retry and concurrency are proven for confirmation only; replay is proven for confirm, invoice and credit note.", "evidence": [{"path": "frontend/web/tests/e2e/o2c-certification.spec.ts", "claim": "replay, lost-response, double-click, stale-session and concurrency proof for order confirmation"}, {"path": "frontend/web/tests/e2e/mvp-sales-returns.spec.ts", "claim": "exact invoice, return, exchange and credit-note relations with refused replays"}]}
       },
-      "missing_proof": ["all principal transitions through UI", "canonical fulfillment/invoice/return links", "lost-response and concurrency recovery"],
+      "missing_proof": ["concurrency and lost-response recovery for invoice, return and credit-note creation (proven for order confirmation only)"],
       "next_packages": ["COV-04", "COV-25", "COV-27"]
     },
     {
@@ -57,7 +57,7 @@
         "O": {"status": "proven", "reason": "Purchase order, line, confirmation, receipt, bill creation, bill posting, payment creation, payment posting and payment registration are each operator UI transitions in the executed spec.", "evidence": [{"path": "frontend/web/tests/e2e/mvp-procure-to-pay.spec.ts", "role": "principal-operator-transition", "claim": "operator-driven procure-to-pay path through bill and payment"}]},
         "E": {"status": "proven", "reason": "Executed: PO, sole line, bill (via purchase_order.invoice_ids) and payment (unique reference) resolved by exact identity; the replayed create-bill command is refused without a second bill; a create-bill reply lost after commit converges by canonical readback to exactly one bill with no retry offered.", "evidence": [{"path": "frontend/web/tests/e2e/mvp-procure-to-pay.spec.ts", "claim": "exact PO, line, bill and payment identity with refused replay and lost-response convergence"}]}
       },
-      "missing_proof": ["exact PO, receipt, bill and payment identities", "operator approval and stale-reference path", "retry and duplicate protection"],
+      "missing_proof": ["operator approval and stale-reference path"],
       "next_packages": ["COV-05", "COV-08", "COV-27"]
     },
     {
@@ -100,15 +100,15 @@
       "surface_ids": ["accounting"],
       "primary_lifecycle": "invoice or journal through posting, payment, reconciliation and close",
       "current_floor": "U3",
-      "launch_admission": "review",
+      "launch_admission": "enabled",
       "operator_evidence_mode": "ui-primary",
       "dimensions": {
         "D": {"status": "proven", "reason": "Journal, payment, period-lock and posted-immutability invariants have focused domain suites.", "evidence": [{"path": "spacetimedb/tests/accounting/journal_entries_test.rs", "claim": "journal and posting domain invariants"}]},
         "A": {"status": "proven", "reason": "Invoice creation, posting, payment, settlement and journal-entry reconcile run through the authenticated generated operations with no compatibility reducer calls; accepted requests are replayed through the same endpoint.", "evidence": [{"path": "frontend/web/tests/e2e/cov08-invoice-payment-recovery.spec.ts", "claim": "authenticated generated-operation invoice, payment and settlement path"}, {"path": "frontend/web/tests/e2e/accounting-post-reconcile.spec.ts", "claim": "authenticated generated-operation journal entry post and reconcile with stale-replay and read-only denial"}]},
         "O": {"status": "proven", "reason": "The manual invoice is created and posted from the UI, the payment is created, posted and registered from the UI, and the journal entry and its lines are created, posted and reconciled from the UI; no backend setup remains.", "evidence": [{"path": "frontend/web/tests/e2e/cov08-invoice-payment-recovery.spec.ts", "role": "principal-operator-transition", "claim": "operator-complete invoice, payment and settlement path"}, {"path": "frontend/web/tests/e2e/accounting-post-reconcile.spec.ts", "role": "partial-operator-transition", "claim": "operator-complete journal entry and reconcile path"}]},
-        "E": {"status": "partial", "reason": "Executed: exact payment reference identity, refused replay of the accepted register-payment command on a settled invoice, and a register-payment reply lost after commit converging once to a zero residual. Not proven: replaying the accepted create_payment command is accepted and creates a duplicate payment, recorded as an expected-failure test, so duplicate protection is a known defect.", "evidence": [{"path": "frontend/web/tests/e2e/cov08-invoice-payment-recovery.spec.ts", "claim": "payment identity, refused settlement replay and lost-response convergence; create_payment replay defect pinned with test.fail"}, {"path": "frontend/web/tests/e2e/pretenant-payment-adversarial.spec.ts", "claim": "adversarial payment and allocation evidence"}]}
+        "E": {"status": "proven", "reason": "Executed: exact payment reference identity; an identical replay of the accepted create_payment command converges to the same single payment (the reducer is idempotent on its key, with domain tests for replay and conflict); the same key with different input is rejected; replay of the accepted register-payment command on a settled invoice is refused; and a register-payment reply lost after commit converges once to a zero residual. Reversal references and closed-period lost-response posting are not covered.", "evidence": [{"path": "frontend/web/tests/e2e/cov08-invoice-payment-recovery.spec.ts", "claim": "payment identity, create_payment replay convergence and conflict rejection, refused settlement replay, lost-response convergence"}, {"path": "spacetimedb/tests/accounting/payments_test.rs", "claim": "create_payment replay and conflicting-replay domain invariants"}]}
       },
-      "missing_proof": ["operator-complete invoice/payment/reconcile path", "exact payment and reversal refs", "closed-period and lost-response browser proof"],
+      "missing_proof": ["exact reversal refs", "closed-period and lost-response browser proof for posting"],
       "next_packages": ["COV-08", "BASE-04", "COV-27"]
     },
     {
