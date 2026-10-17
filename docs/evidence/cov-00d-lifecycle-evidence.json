@@ -40,7 +40,7 @@
         "O": {"status": "proven", "reason": "Contact, lead, opportunity, order, fulfilment, invoice, return, exchange and credit-note posting are each an operator UI transition in one executed spec; the credit note is posted from its document page.", "evidence": [{"path": "frontend/web/tests/e2e/mvp-sales-returns.spec.ts", "role": "principal-operator-transition", "claim": "complete operator-driven sales lifecycle through return and credit note"}]},
         "E": {"status": "proven", "reason": "Executed: exact order/delivery/invoice/return/exchange/credit-note identities, refused replay of the accepted confirm, invoice and credit-note commands, lost-reply readback with no retry, double click, stale session and concurrent confirm yielding one delivery. Retry and concurrency are proven for confirmation only; replay is proven for confirm, invoice and credit note.", "evidence": [{"path": "frontend/web/tests/e2e/o2c-certification.spec.ts", "claim": "replay, lost-response, double-click, stale-session and concurrency proof for order confirmation"}, {"path": "frontend/web/tests/e2e/mvp-sales-returns.spec.ts", "claim": "exact invoice, return, exchange and credit-note relations with refused replays"}]}
       },
-      "missing_proof": [],
+      "missing_proof": ["concurrency and lost-response recovery for invoice, return and credit-note creation (proven for order confirmation only)"],
       "next_packages": ["COV-04", "COV-25", "COV-27"]
     },
     {
