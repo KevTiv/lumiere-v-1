@@ -60,6 +60,10 @@ def catalog_exposure(surface_id: str, catalog: str) -> str | None:
     if pending:
         return "review"
 
+    alpha = re.search(rf"alphaFinanceSurface\(\s*\"{re.escape(surface_id)}\"\s*,", catalog)
+    if alpha:
+        return "enabled"
+
     explicit = re.search(
         rf"\{{\s*id:\s*\"{re.escape(surface_id)}\"[\s\S]*?"
         r"firstOrgExposure:\s*\"(?P<exposure>enabled|admin-only|hidden|review)\"[\s\S]*?\n\s*\},",
