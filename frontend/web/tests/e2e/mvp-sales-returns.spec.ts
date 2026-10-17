@@ -16,7 +16,6 @@ import {
   fillField,
   gotoModule,
   openEntityCreate,
-  postDraftCreditNoteMove,
   postDraftInvoiceViaUi,
   selectEntityRowById,
   selectEntityRowByText,
@@ -24,6 +23,7 @@ import {
   submitForm,
   waitForAuditLogEntry,
   waitForEntityActionEnabled,
+  waitForMovePosted,
   waitForOpportunityLineExists,
   waitForReturnOrderState,
   waitForSaleOrderBillableLines,
@@ -64,6 +64,24 @@ async function fetchExactExchangeOrderId(page: import("@playwright/test").Page, 
 
   expect(lastMatches, "one exact exchange order for the return").toHaveLength(1)
   throw new Error("unreachable")
+}
+
+async function replayAcceptedOperation(page: import("@playwright/test").Page, response: import("@playwright/test").Response) {
+  return page.request.post(new URL(response.url()).pathname, {
+    headers: { "Content-Type": "application/json" },
+    data: response.request().postDataJSON(),
+  })
+}
+
+async function countMovesForSaleOrder(page: import("@playwright/test").Page, orderId: number) {
+  const res = await page.request.get("/api/query/account-moves")
+  expect(res.ok()).toBe(true)
+  const json = (await res.json()) as { data?: Array<Record<string, unknown>> }
+  return (json.data ?? []).filter(
+    (row) =>
+      Number(row.saleOrderId ?? row.sale_order_id) === orderId &&
+      /invoice/i.test(JSON.stringify(row.moveType ?? row.move_type ?? "")),
+  ).length
 }
 
 /**
@@ -206,7 +224,7 @@ test.describe("MVP sales returns (RMA)", { tag: "@p0" }, () => {
     await chooseSelectOptionByLabel(page, "journalId", journalLabel)
     await chooseSelectOptionByLabel(page, "defaultIncomeAccountId", incomeLabel)
     await chooseSelectOptionByLabel(page, "receivableAccountId", receivableLabel)
-    await Promise.all([
+    const [invoiceResponse] = await Promise.all([
       page.waitForResponse(
         (res) =>
           matchesOperationResponse(res, "create_invoice_from_sale_order") && res.ok(),
@@ -215,6 +233,9 @@ test.describe("MVP sales returns (RMA)", { tag: "@p0" }, () => {
       submitForm(page, "create-invoice-from-sale-order"),
     ])
     const invoiceMoveId = await fetchDraftInvoiceMoveIdForSaleOrder(page, orderId)
+    // Replaying the exact accepted command must be refused and must not create a second invoice.
+    expect((await replayAcceptedOperation(page, invoiceResponse)).ok()).toBe(false)
+    expect(await countMovesForSaleOrder(page, orderId)).toBe(1)
     await postDraftInvoiceViaUi(page, invoiceMoveId)
 
     const saleOrderLabel = await fetchSaleOrderSelectLabel(page, orderId)
@@ -287,7 +308,7 @@ test.describe("MVP sales returns (RMA)", { tag: "@p0" }, () => {
     await chooseSelectOptionByLabel(page, "journalId", journalLabel)
     await chooseSelectOptionByLabel(page, "defaultIncomeAccountId", incomeLabel)
     await chooseSelectOptionByLabel(page, "receivableAccountId", receivableLabel)
-    await Promise.all([
+    const [creditNoteResponse] = await Promise.all([
       page.waitForResponse(
         (res) =>
           matchesOperationResponse(res, "create_credit_note_from_return_order") && res.ok(),
@@ -298,7 +319,20 @@ test.describe("MVP sales returns (RMA)", { tag: "@p0" }, () => {
     await waitForReturnOrderState(page, returnOrderId, "refunded")
 
     const creditNoteId = await fetchDraftCreditNoteMoveIdForReturnOrder(page, returnOrderId)
-    await postDraftCreditNoteMove(page, creditNoteId)
+    // The exact accepted credit-note command is not accepted twice, and the credit note stays unique.
+    expect((await replayAcceptedOperation(page, creditNoteResponse)).ok()).toBe(false)
+    expect(await fetchDraftCreditNoteMoveIdForReturnOrder(page, returnOrderId)).toBe(creditNoteId)
+    // Credit notes have no list tab; the operator posts them from the document page.
+    await page.goto(`/accounting/invoices/${creditNoteId}`)
+    const postCreditNote = page.getByTestId("record-workflow-action-accounting.invoice.post").first()
+    await expect(postCreditNote).toBeEnabled({ timeout: 30_000 })
+    await Promise.all([
+      page.waitForResponse((res) => matchesOperationResponse(res, "post_invoice") && res.ok(), {
+        timeout: 30_000,
+      }),
+      postCreditNote.click(),
+    ])
+    await waitForMovePosted(page, creditNoteId)
 
     await expect
       .poll(async () => {
