@@ -9,7 +9,7 @@ import { ThemeProvider, useTheme } from "../../../../../packages/ui/src/componen
 import { RBACProvider } from "../../../../../packages/ui/src/lib/rbac-context"
 import { ModuleView } from "../../../../../packages/ui/src/pages/module-view"
 import { Button } from "../../../../../packages/ui/src/components/button"
-import { Tabs, TabsContent } from "../../../../../packages/ui/src/components/tabs"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../../../../packages/ui/src/components/tabs"
 import { WorkspaceTabsList, WorkspaceTabsTrigger } from "../../../../../packages/ui/src/components/workspace-tabs"
 import type { ModuleConfig, ModuleWorkspaceNav } from "../../../../../packages/ui/src/lib/module-types"
 import { businessWorkspaceNavigation, type BusinessWorkspaceModule } from "../../../../lib/business-workspace-navigation"
@@ -34,7 +34,17 @@ function Preview() {
   const config: ModuleConfig = {
     id: module, title: module, defaultTab: "dashboard",
     workspaceNav: nav && { ...nav, workspaces: nav.workspaces.map((group) => ({ ...group, label: longNames ? `${group.label} ${"InternationalWorkspace".repeat(8)}` : group.label })) },
-    tabs: [...ids, "future-extension"].map((id) => ({ id, label: id, type: "custom", customContent: <p data-testid="navigation-content">{id} content — synthetic data only.</p> })),
+    tabs: [...ids, "future-extension"].map((id) => ({ id, label: id, type: "custom", customContent: <>
+      <p data-testid="navigation-content">{id} content — synthetic data only.</p>
+      {id === "dashboard" && <Tabs defaultValue="summary">
+        <TabsList aria-label="Synthetic chart views">
+          <TabsTrigger value="summary">Summary</TabsTrigger>
+          <TabsTrigger value="trend" data-testid="fixture-chart-trend">Trend</TabsTrigger>
+        </TabsList>
+        <TabsContent value="summary">Synthetic chart summary</TabsContent>
+        <TabsContent value="trend" data-testid="fixture-chart-trend-panel">Synthetic chart trend</TabsContent>
+      </Tabs>}
+    </> })),
   }
   const { activeTab, setActiveTab } = useModuleTab("dashboard", config.tabs.map((tab) => tab.id))
   return <main className="mx-auto min-w-0 max-w-7xl space-y-5 p-4 sm:p-6">

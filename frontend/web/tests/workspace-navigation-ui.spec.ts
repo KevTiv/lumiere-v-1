@@ -1,6 +1,19 @@
 import { expect as baseExpect, test } from "@playwright/test"
+import { selectModuleTab } from "./e2e/helpers"
 
 const expect = baseExpect.configure({ timeout: 15_000 })
+
+test("domain tab helper selects the module panel alongside nested and independent panels", async ({ page }) => {
+  await page.goto("/navigation?module=sales")
+  await expect(page.getByTestId("navigation-disclosure")).toHaveAttribute("data-hydrated", "true")
+  // The fixture has both an independent local workspace and nested chart tabs.
+  await expect(page.locator('[role="tabpanel"]:visible')).toHaveCount(3)
+  await selectModuleTab(page, "sales", "dashboard")
+  await expect(page.getByTestId("module-panel-sales-dashboard")).toBeVisible()
+  await page.getByTestId("fixture-chart-trend").click()
+  await selectModuleTab(page, "sales", "dashboard")
+  await expect(page.getByTestId("fixture-chart-trend-panel")).toBeVisible()
+})
 
 for (const width of [320, 390, 768, 1440]) {
   test(`consistent workspaces, history, overflow and touch targets at ${width}px`, async ({ page }) => {
@@ -40,7 +53,7 @@ for (const width of [320, 390, 768, 1440]) {
         await link.click()
         await page.waitForURL(destination)
         await expect(link).toHaveAttribute("aria-current", "page")
-        const local = root.getByRole("tab")
+        const local = root.getByTestId(`module-tabs-${module}`).getByRole("tab")
         for (const tab of await local.all()) expect((await tab.boundingBox())!.height).toBeGreaterThanOrEqual(44)
         if (await local.count() > 1) {
           await local.first().focus()
