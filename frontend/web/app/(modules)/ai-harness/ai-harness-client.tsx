@@ -27,7 +27,7 @@ export function AiHarnessClient({
     <div className="flex flex-col gap-2">
     <DashboardHeader title={t("aiHarness.title")} description={t("aiHarness.description")} />
     <Tabs value={tab} onValueChange={setTab} className="flex flex-col gap-6">
-      <TabsList>
+      <TabsList scrollable>
         <TabsTrigger value="report-composer">
           {t("aiHarness.tabs.reportComposer")}
         </TabsTrigger>

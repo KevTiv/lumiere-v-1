@@ -89,12 +89,15 @@ export function EntityRecordSheet({
                 </div>
               )}
 
-              <Tabs defaultValue="overview" className="flex flex-col">
-                <TabsList variant="default" className="w-full flex flex-wrap justify-start gap-2">
-                  <TabsTrigger value="overview">Overview</TabsTrigger>
+              <Tabs defaultValue="overview" className="min-w-0 flex flex-col">
+                <TabsList scrollable variant="default" className="justify-start gap-2">
+                  <TabsTrigger value="overview" className="flex-none">
+                    Overview
+                  </TabsTrigger>
                   {config.customTabs?.map((tab) => (
                     <TabsTrigger
                       key={tab.id}
+                      className="flex-none"
                       value={tab.id}
                       data-testid={`entity-record-sheet-tab-${tab.id}`}
                     >
@@ -102,11 +105,17 @@ export function EntityRecordSheet({
                     </TabsTrigger>
                   ))}
                   {showDiscussion && (
-                    <TabsTrigger value="discussion" data-testid="entity-record-sheet-tab-discussion">
+                    <TabsTrigger
+                      value="discussion"
+                      className="flex-none"
+                      data-testid="entity-record-sheet-tab-discussion"
+                    >
                       Discussion
                     </TabsTrigger>
                   )}
-                  <TabsTrigger value="audit">Audit</TabsTrigger>
+                  <TabsTrigger value="audit" className="flex-none">
+                    Audit
+                  </TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="overview" className="mt-4">
