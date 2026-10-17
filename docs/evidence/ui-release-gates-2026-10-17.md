@@ -57,10 +57,12 @@ it is not counted as passing. A separate built-fixture verification is pending.
 - GitGuardian incident 38282193 requires maintainer classification. The removed
   test key was already present in main history; rewriting only this UI stack
   cannot remove that historical finding. No suppression or dismissal was made.
-- PR #222's source branch is watched by Railway. Publishing its frontend changes
-  may deploy them; publication is held for the user's deployment choice.
+- Railway's web service is pinned to an older PR #222 commit. The user has now
+  explicitly requested the updated UI deployment. Publish the fixes and pin that
+  same web service to the verified revision; this does not approve a PR merge.
 - Preserve compatible contracts and API/UI V1+V2 readers before/with V2 module
   producers. A frontend-only deployment does not release backend fixes.
 
-No merge, Railway deployment, production data mutation or automatic replay was
-performed in this repair turn.
+The UI deployment is a separate follow-up to local verification. It does not
+release the API/reducer fixes or authorize database clearing. No PR merge,
+production data mutation or automatic replay was performed during verification.
