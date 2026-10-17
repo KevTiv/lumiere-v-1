@@ -38,6 +38,7 @@ import {
   waitForPurchaseOrderState,
   waitForPoLineMatchStatus,
   waitForPaymentPosted,
+  reloadSettled,
 } from "./helpers"
 
 const VENDOR_NAME = "Globex Corp"
@@ -251,7 +252,7 @@ test.describe("MVP procure-to-pay workflow", { tag: "@p0" }, () => {
     ])
     expect(registerPaymentResponse.ok()).toBe(true)
 
-    await page.reload({ waitUntil: "domcontentloaded" })
+    await reloadSettled(page)
     await gotoModule(page, "/accounting", "accounting")
     await page.getByTestId("module-tab-accounting-payments").click()
     await expect(page.getByTestId(`entity-row-${paymentId}`)).toContainText(VENDOR_NAME)

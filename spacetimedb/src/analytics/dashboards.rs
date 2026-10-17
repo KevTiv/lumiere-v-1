@@ -196,6 +196,97 @@ fn dashboard_widget_matches_create(
 // REDUCERS
 // ============================================================================
 
+/// Write-time validation of the stored widget definition. Mirrors the
+/// resolver's fail-closed parsing (domain, sort order, time/measure binding)
+/// so a malformed definition is rejected at write time, not at render time.
+pub(crate) fn validate_widget_definition(
+    domain: Option<&str>,
+    sort_order: Option<&str>,
+    configuration: Option<&str>,
+) -> Result<(), String> {
+    use serde_json::Value;
+
+    if let Some(domain) = domain.map(str::trim).filter(|d| !d.is_empty()) {
+        let parsed: Value = serde_json::from_str(domain)
+            .map_err(|_| "Widget filter definition is not valid JSON".to_string())?;
+        let Value::Object(filters) = parsed else {
+            return Err("Widget filter definition must be a JSON object".to_string());
+        };
+        for (field, expected) in &filters {
+            if field.trim().is_empty() {
+                return Err("Widget filter definition has an empty field name".to_string());
+            }
+            let Value::Object(operators) = expected else {
+                continue;
+            };
+            if operators.is_empty() {
+                return Err(format!("The filter for {field} has no operator"));
+            }
+            for (operator, operand) in operators {
+                match operator.as_str() {
+                    "$in" if !operand.is_array() => {
+                        return Err(format!("The $in filter for {field} must use an array"));
+                    }
+                    "$in" | "$ne" => {}
+                    "$gte" | "$lte" | "$gt" | "$lt" => {
+                        let numeric = match operand {
+                            Value::Number(_) => true,
+                            Value::String(text) => text.trim().parse::<f64>().is_ok_and(f64::is_finite),
+                            _ => false,
+                        };
+                        if !numeric {
+                            return Err(format!("The {operator} filter for {field} needs a numeric operand"));
+                        }
+                    }
+                    other => {
+                        return Err(format!("Unsupported widget filter operator: {other}"));
+                    }
+                }
+            }
+        }
+    }
+
+    if let Some(sort) = sort_order.map(str::trim).filter(|s| !s.is_empty()) {
+        let parsed: Value = serde_json::from_str(sort)
+            .map_err(|_| "Widget sort order is not valid JSON".to_string())?;
+        let Value::Object(fields) = parsed else {
+            return Err("Widget sort order must be a JSON object".to_string());
+        };
+        let mut entries = fields.iter();
+        match (entries.next(), entries.next()) {
+            (Some((field, direction)), None) => {
+                let direction = direction.as_str().unwrap_or("").to_ascii_lowercase();
+                if field.trim().is_empty() || (direction != "asc" && direction != "desc") {
+                    return Err("Widget sort direction must be asc or desc".to_string());
+                }
+            }
+            _ => return Err("Widget sort order must contain exactly one field".to_string()),
+        }
+    }
+
+    // The stored configuration is the widget's time/measure binding; the
+    // resolver fails closed on anything else, so reject it here as well.
+    if let Some(config) = configuration.map(str::trim).filter(|c| !c.is_empty()) {
+        let valid = match serde_json::from_str::<Value>(config) {
+            Ok(Value::Object(map)) => {
+                let optional_text = |key: &str| {
+                    matches!(map.get(key), None | Some(Value::Null) | Some(Value::String(_)))
+                };
+                map.get("version").and_then(Value::as_u64) == Some(1)
+                    && optional_text("timeField")
+                    && optional_text("measureField")
+                    && map.get("missingTimestampPolicy").and_then(Value::as_str) == Some("reject")
+                    && map.get("missingMeasurePolicy").and_then(Value::as_str) == Some("reject")
+            }
+            _ => false,
+        };
+        if !valid {
+            return Err("Widget time or measure binding is invalid".to_string());
+        }
+    }
+    Ok(())
+}
+
 /// Create a dashboard widget
 #[reducer]
 pub fn create_dashboard_widget(
@@ -205,6 +296,12 @@ pub fn create_dashboard_widget(
     params: CreateDashboardWidgetParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "dashboard_widget", "create")?;
+
+    validate_widget_definition(
+        params.domain.as_deref(),
+        params.sort_order.as_deref(),
+        params.configuration.as_deref(),
+    )?;
 
     if let Some(cid) = company_id {
         require_company_in_organization(ctx, organization_id, cid)?;

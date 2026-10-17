@@ -145,6 +145,7 @@ async function expectSubscriptionFocus(page: Page, subscriptionId: number) {
     && url.searchParams.get("tab") === "subscriptions"
     && url.searchParams.getAll("filter").length === 1
     && url.searchParams.get("filter") === `id:${subscriptionId}`)
+  await expect(page.getByTestId("module-tab-subscriptions-subscriptions")).toHaveCount(1, { timeout: 30_000 })
   await expect(page.getByTestId("module-tab-subscriptions-subscriptions"))
     .toHaveAttribute("aria-selected", "true")
   const table = activeTabEntityTable(page)
@@ -153,6 +154,7 @@ async function expectSubscriptionFocus(page: Page, subscriptionId: number) {
 }
 
 async function openMountedSubscriptionHandoffs(page: Page, subscriptionId: number) {
+  await expect(page.getByTestId("module-tab-subscriptions-subscriptions")).toHaveCount(1, { timeout: 30_000 })
   await expect(page.getByTestId("module-tab-subscriptions-subscriptions"))
     .toHaveAttribute("aria-selected", "true")
   const row = activeTabEntityTable(page).getByTestId(`entity-row-${subscriptionId}`)
@@ -173,6 +175,8 @@ async function expectAccountingFocus(page: Page, tab: string, id: number) {
     && url.searchParams.get("tab") === tab
     && url.searchParams.getAll("filter").length === 1
     && url.searchParams.get("filter") === `id:${id}`)
+  // Wait for the streamed page to settle on a single tab strip before asserting.
+  await expect(page.getByTestId(`module-tab-accounting-${tab}`)).toHaveCount(1, { timeout: 30_000 })
   await expect(page.getByTestId(`module-tab-accounting-${tab}`)).toHaveAttribute("aria-selected", "true")
   const table = activeTabEntityTable(page)
   await expect(table.getByTestId(`entity-row-${id}`)).toBeVisible()

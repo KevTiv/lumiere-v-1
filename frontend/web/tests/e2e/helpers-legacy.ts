@@ -36,7 +36,8 @@ export async function signIn(
     .catch(() => false)
 
   if (!emailVisible) {
-    await expect(page.getByTestId("dashboard-sidebar")).toBeVisible()
+    await expect(page.getByTestId("dashboard-sidebar")).toHaveCount(1, { timeout: 30_000 })
+    await expect(page.getByTestId("dashboard-sidebar").first()).toBeVisible()
     await expectNoAppError(page)
     return
   }
@@ -46,15 +47,30 @@ export async function signIn(
   await page.getByRole("button", { name: /sign in/i }).click()
 
   await expect(page).not.toHaveURL(/\/sign-in(?:\?|$)/)
-  await expect(page.getByTestId("dashboard-sidebar")).toBeVisible()
+  await expect(page.getByTestId("dashboard-sidebar")).toHaveCount(1, { timeout: 30_000 })
+  await expect(page.getByTestId("dashboard-sidebar").first()).toBeVisible()
   await expectNoAppError(page)
 }
 
 export async function expectAuthenticatedShell(page: Page) {
-  await expect(page.getByTestId("dashboard-sidebar")).toBeVisible()
+  // While a streamed page is still resolving, its server-rendered shell and the
+  // client shell can briefly coexist; wait for exactly one before asserting on it
+  // (a strict-mode violation is not retried).
+  await expect(page.getByTestId("dashboard-sidebar")).toHaveCount(1, { timeout: 30_000 })
+  await expect(page.getByTestId("dashboard-sidebar").first()).toBeVisible()
   await expect(page.getByTestId("sidebar-user")).toBeVisible()
   await expect(page.getByTestId("sidebar-sign-out")).toBeVisible()
   await expectNoAppError(page)
+}
+
+/**
+ * Reload and wait for the streamed page to settle on a single shell: right after
+ * DOMContentLoaded the Suspense fallback and the streamed content can coexist, so
+ * strict test-id locators would see duplicates.
+ */
+export async function reloadSettled(page: Page) {
+  await page.reload({ waitUntil: "domcontentloaded" })
+  await expect(page.getByTestId("dashboard-sidebar")).toHaveCount(1, { timeout: 30_000 })
 }
 
 export async function gotoModule(page: Page, route: string, moduleId?: string) {
@@ -349,7 +365,7 @@ export async function expectSeededText(
     // the current route/tab, but reload once so its query cache is rebuilt from
     // the already-observed projected row.
     try {
-      await page.reload({ waitUntil: "domcontentloaded" })
+      await reloadSettled(page)
       await expect(page.getByText(text).first()).toBeVisible({ timeout: 30_000 })
       return
     } catch (refreshError) {
@@ -1978,7 +1994,7 @@ async function openDraftVendorBillModal(page: Page, billId: number): Promise<voi
   // The bill projection is available through the API before the accounting
   // list's query cache necessarily sees it. Rebuild the page once after the
   // tab is active so all procure-to-pay row-visibility flows use fresh data.
-  await page.reload({ waitUntil: "domcontentloaded" })
+  await reloadSettled(page)
   await page.getByTestId("module-tab-accounting-bills").click()
   await selectCustomTableRowById(page, billId)
   await openInvoiceDetailModalFromRecordSheet(page)
@@ -2961,7 +2977,7 @@ export async function seedPublishableWorkflowDraft(
 
   // BFF seed bypasses React Query mutations — hard reload clears the 30s stale cache.
   await gotoModule(page, "/workflows", "workflows")
-  await page.reload({ waitUntil: "domcontentloaded" })
+  await reloadSettled(page)
   await expectAuthenticatedShell(page)
 
   return {

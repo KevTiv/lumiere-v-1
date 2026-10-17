@@ -207,7 +207,8 @@ test.describe("COV-05e upstream procurement", { tag: ["@p0", "@cov05", "@unauthe
           const rfqDialog = page.getByRole("dialog", { name: "Create request for quotation" })
           await expect(rfqDialog.getByLabel("Requisition", { exact: true })).toContainText(key)
           await choose(page, rfqDialog, "Product", productName)
-          await choose(page, rfqDialog, "Unit of measure", uomName)
+          // UoM options are labelled "name (symbol)".
+          await choose(page, rfqDialog, "Unit of measure", new RegExp(`^${uomName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}( \\(|$)`))
           await rfqDialog.getByLabel("Quantity", { exact: true }).fill("7")
           await rfqDialog.getByLabel("Notes", { exact: true }).fill(key)
           const rfqCreate = await operation(page, "create_purchase_rfq", () => rfqDialog.getByRole("button", { name: "Create RFQ", exact: true }).click())

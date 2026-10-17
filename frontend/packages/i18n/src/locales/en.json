@@ -6431,11 +6431,11 @@
         "refundableLine": "Create a refundable return line"
       },
       "rfq": {
-        "title": "New request for quotation",
+        "title": "Create request for quotation",
         "description": "Request pricing from vendors for a purchase requirement."
       },
       "rfqBid": {
-        "title": "New RFQ bid",
+        "title": "Add RFQ bid",
         "description": "Record a vendor bid for a request for quotation."
       },
       "rfqAward": {
