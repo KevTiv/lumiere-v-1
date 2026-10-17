@@ -6,13 +6,14 @@ import {
   fetchPurchaseOrderInvoiceIds,
   fetchVendorBillById,
 } from "./purchasing-order-fixtures"
+import { postGeneratedOperationOk } from "./generated-operation"
+import { loseNextResponse } from "./pretenant-support"
 import {
   chooseFirstEnabledOption,
   chooseSelectOptionByLabel,
   chooseSelectOptionByValue,
   assertMoveLinesBalanced,
   clickEntityActionAndWaitForReducer,
-  callReducerBff,
   expectNoAppError,
   expectPostDraftBillRejected,
   fetchAccountSelectLabelByInternalType,
@@ -23,7 +24,6 @@ import {
   fetchOnlyPurchaseOrderLineId,
   fetchPurchaseOrderLineReceiveLabel,
   fetchPurchaseOrderSelectLabel,
-  fetchSessionOrganizationId,
   fetchVendorBillJournalLabel,
   fetchVendorPartnerIdByName,
   fillField,
@@ -139,7 +139,11 @@ async function receivePoLineQty(
   expect(receiveRes.ok()).toBe(true)
 }
 
-async function createBillFromPo(page: import("@playwright/test").Page, orderId: number) {
+async function createBillFromPo(
+  page: import("@playwright/test").Page,
+  orderId: number,
+  options: { loseResponse?: boolean } = {},
+) {
   // Receiving a stocked line may navigate to the new receipt (navigateToNext), and that
   // client-side push can land after the receive form closes. Reload purchasing so the bill
   // step never races it.
@@ -158,6 +162,13 @@ async function createBillFromPo(page: import("@playwright/test").Page, orderId: 
   await chooseSelectOptionByLabel(page, "defaultExpenseAccountId", expenseLabel)
   await chooseSelectOptionByLabel(page, "payableAccountId", payableLabel)
   await fillField(page, "invoiceDate", new Date().toISOString().slice(0, 10))
+  if (options.loseResponse) {
+    const injected = await loseNextResponse(page, "create_bill_from_purchase_order")
+    await submitForm(page, "create-bill-from-purchase-order")
+    await expect(page.getByText(/Result unknown/i).first()).toBeVisible({ timeout: 30_000 })
+    expect(injected.lost()).toBe(true)
+    return null
+  }
   const [billRes] = await Promise.all([
     page.waitForResponse(
       (res) =>
@@ -188,6 +199,7 @@ test.describe("MVP procure-to-pay workflow", { tag: "@p0" }, () => {
     await receivePoLineQty(page, orderId, lineId, "2")
 
     const billResponse = await createBillFromPo(page, orderId)
+    if (billResponse == null) throw new Error("expected the accepted bill response")
 
     const moveId = await fetchDraftVendorBillMoveIdForPurchaseOrder(page, orderId)
     await assertMoveLinesBalanced(page, moveId)
@@ -266,6 +278,32 @@ test.describe("MVP procure-to-pay workflow", { tag: "@p0" }, () => {
     await expectNoAppError(page)
   })
 
+  test("a lost create-bill response reports an unknown outcome and the bill exists exactly once", async ({
+    page,
+  }) => {
+    test.setTimeout(240_000)
+
+    const origin = smokeName("mvp-po-lost-bill")
+    const vendorPartnerId = await fetchVendorPartnerIdByName(page, VENDOR_NAME)
+    const { orderId } = await createConfirmedPoWithLine(page, origin, vendorPartnerId, "2")
+    const lineId = await fetchOnlyPurchaseOrderLineId(page, orderId)
+    await receivePoLineQty(page, orderId, lineId, "2")
+
+    const before = await fetchPurchaseOrderInvoiceIds(page, orderId)
+    await createBillFromPo(page, orderId, { loseResponse: true })
+
+    // The write committed once; the operator is not offered a blind retry.
+    await expect
+      .poll(async () => (await fetchPurchaseOrderInvoiceIds(page, orderId)).filter((id) => !before.includes(id)))
+      .toHaveLength(1)
+    await expect(page.getByRole("button", { name: "Retry" })).toHaveCount(0)
+    const moveId = await fetchDraftVendorBillMoveIdForPurchaseOrder(page, orderId)
+    await assertMoveLinesBalanced(page, moveId)
+    await postDraftBillViaUi(page, moveId)
+    expect(await fetchPurchaseOrderInvoiceIds(page, orderId)).toHaveLength(before.length + 1)
+    await expectNoAppError(page)
+  })
+
   test("partial receive bills and posts with matched status", async ({ page }) => {
     test.setTimeout(240_000)
 
@@ -319,8 +357,7 @@ test.describe("MVP procure-to-pay workflow", { tag: "@p0" }, () => {
     const billId = invoiceIdsAfter.find((id) => !invoiceIdsBefore.includes(id))
     if (billId == null) throw new Error("Expected one PO-owned vendor bill")
 
-    const orgId = await fetchSessionOrganizationId(page)
-    await callReducerBff(page, "invoice_po_line", [orgId, lineId, 5])
+    await postGeneratedOperationOk(page, "invoice_po_line", { lineId: BigInt(lineId), qty: 5 })
 
     await waitForPoLineMatchStatus(page, lineId, "over_billed")
 
