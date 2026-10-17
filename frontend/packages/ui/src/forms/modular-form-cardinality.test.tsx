@@ -70,3 +70,32 @@ describe("ModularForm array fields", () => {
     await waitFor(() => expect(submit).toHaveBeenCalledWith({ "custom:regions": ["retired", "locked", "north"] }))
   })
 })
+
+describe("ModularForm asynchronous hidden context", () => {
+  function referenceForm(checkId: string): FormConfig {
+    return { id: "quality", title: "Quality", sections: [{ id: "main", fields: [
+      { type: "hidden", id: "checkId", name: "checkId", defaultValue: checkId },
+      { type: "text", id: "note", name: "note", label: "Review note", defaultValue: "Initial note" },
+    ] }] }
+  }
+
+  it("binds late context without discarding edits or replacing an existing binding", async () => {
+    const submit = vi.fn()
+    const { rerender } = render(<ModularForm config={referenceForm("")} onSubmit={submit} />)
+    fireEvent.change(screen.getByTestId("form-field-note"), { target: { value: "Operator review" } })
+    rerender(<ModularForm config={referenceForm("17")} onSubmit={submit} />)
+    fireEvent.click(screen.getByRole("button", { name: "common.submit" }))
+    await waitFor(() => expect(submit).toHaveBeenCalledWith({ checkId: "17", note: "Operator review" }))
+    rerender(<ModularForm config={referenceForm("18")} onSubmit={submit} />)
+    fireEvent.click(screen.getByRole("button", { name: "common.submit" }))
+    await waitFor(() => expect(submit).toHaveBeenLastCalledWith({ checkId: "17", note: "Operator review" }))
+  })
+
+  it("does not mark a pristine form dirty when reference data arrives", async () => {
+    const dirty = vi.fn()
+    const { rerender } = render(<ModularForm config={referenceForm("")} onDirtyChange={dirty} />)
+    rerender(<ModularForm config={referenceForm("17")} onDirtyChange={dirty} />)
+    await waitFor(() => expect((screen.getByTestId("form-field-checkId") as HTMLInputElement).value).toBe("17"))
+    expect(dirty).not.toHaveBeenCalledWith(true)
+  })
+})

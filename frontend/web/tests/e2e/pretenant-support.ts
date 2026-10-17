@@ -1,4 +1,5 @@
 import { bootstrapFixtureAccountSession } from './fixture-account'
+import { matchesOperationFaultTarget } from "./operation-response"
 import fs from "node:fs"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
@@ -466,8 +467,9 @@ export function seededRng(seed: number): () => number {
 export async function loseNextResponse(page: Page, urlPart: string): Promise<{ lost: () => boolean }> {
   let lost = false
   await page.route(
-    (url) => url.pathname.includes(urlPart),
+    (url) => matchesOperationFaultTarget(url, urlPart),
     async (route) => {
+      if (route.request().method() !== "POST") return route.continue()
       if (lost) return route.continue()
       lost = true
       await route.fetch()

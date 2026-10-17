@@ -100,6 +100,9 @@ export function toCreateExpenseParams(
   if (employeeId === undefined || parsedCurrencyId === undefined || date === null) return null
 
   const lineKind = parseLineKind(formData.lineKind)
+  // Optional numeric inputs are empty strings, not undefined. A blank quantity
+  // means one item; Number("") would instead send zero and fail reducer validation.
+  const quantity = optionalString(formData.quantity) ?? "1"
   const mileageDistance =
     formData.mileageDistance != null && String(formData.mileageDistance).trim() !== ""
       ? Number(formData.mileageDistance)
@@ -114,7 +117,7 @@ export function toCreateExpenseParams(
     name: String(formData.name ?? ""),
     date,
     unitAmount: Number(formData.totalAmount ?? formData.unitAmount ?? 0),
-    quantity: Number(formData.quantity ?? 1),
+    quantity: Number(quantity),
     currencyId: parsedCurrencyId,
     description: optionalString(formData.description),
     productId: optionalBigIntU64(formData.productId),
