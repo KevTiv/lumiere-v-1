@@ -15,15 +15,15 @@
       "surface_ids": ["crm"],
       "primary_lifecycle": "lead to opportunity to customer and Sales handoff",
       "current_floor": "U3",
-      "launch_admission": "review",
+      "launch_admission": "enabled",
       "operator_evidence_mode": "ui-primary",
       "dimensions": {
         "D": {"status": "proven", "reason": "Opportunity conversion and replay invariants have focused domain coverage.", "evidence": [{"path": "spacetimedb/tests/crm/opportunity_lifecycle_test.rs", "claim": "domain opportunity lifecycle and conversion invariants"}]},
         "A": {"status": "proven", "reason": "The reference action uses the generated operation endpoint and typed receipt/readback path.", "evidence": [{"path": "frontend/packages/query-hooks/src/hooks/crm-opportunity-conversion.ts", "claim": "generated conversion dispatch and canonical readback"}]},
         "O": {"status": "proven", "reason": "The browser creates and converts through visible CRM forms and actions.", "evidence": [{"path": "frontend/web/tests/e2e/cov01d-opportunity-order-effect.spec.ts", "role": "principal-operator-transition", "claim": "visible opportunity conversion action performs the principal transition"}]},
-        "E": {"status": "partial", "reason": "Exact 0..1 relation and replay are proven; direct navigation and lost-response UI recovery remain incomplete.", "evidence": [{"path": "frontend/web/tests/e2e/cov01d-opportunity-order-effect.spec.ts", "claim": "exact opportunity relation and no-redispatch replay proof"}]}
+        "E": {"status": "proven", "reason": "Exact 0..1 sale-order relation, result-link navigation with refresh, replay without redispatch and reader denial are proven; a conversion whose response is lost after the server committed, and a stale second session, both reconcile to the one committed order with no second dispatch; a denied persona sees a module load error with retry instead of an application crash. Executed 2026-10-17.", "evidence": [{"path": "frontend/web/tests/e2e/cov01d-opportunity-order-effect.spec.ts", "claim": "exact opportunity relation and no-redispatch replay proof"}, {"path": "frontend/web/tests/e2e/cov03-lost-response-conversion.spec.ts", "claim": "executed: lost-response and stale-session reconciliation, denied-module recovery"}]}
       },
-      "missing_proof": ["result-link navigation", "stale and denied UI recovery", "committed-response-lost UI reconciliation"],
+      "missing_proof": ["human usability/accessibility review"],
       "next_packages": ["COV-01e", "COV-03", "COV-27"]
     },
     {
@@ -151,7 +151,7 @@
       "surface_ids": ["expenses"],
       "primary_lifecycle": "capture and expense through submit, approve, post and reimburse",
       "current_floor": "U2",
-      "launch_admission": "review",
+      "launch_admission": "enabled",
       "operator_evidence_mode": "ui-primary",
       "dimensions": {
         "D": {"status": "proven", "reason": "Expense wave suites cover approval, posting, reimbursement and duplicate guards.", "evidence": [{"path": "spacetimedb/tests/expenses/wave_f_test.rs", "claim": "expense posting and close integrity"}]},
@@ -168,7 +168,7 @@
       "surface_ids": ["subscriptions"],
       "primary_lifecycle": "plan and subscription through recurring billing, payment, amendment and cancellation",
       "current_floor": "U2",
-      "launch_admission": "review",
+      "launch_admission": "enabled",
       "operator_evidence_mode": "ui-primary",
       "dimensions": {
         "D": {"status": "proven", "reason": "Subscription wave suites cover lifecycle and billing-domain behavior.", "evidence": [{"path": "spacetimedb/tests/subscriptions/wave_a_test.rs", "claim": "subscription lifecycle domain invariants"}]},
@@ -304,7 +304,7 @@
       "surface_ids": ["reports"],
       "primary_lifecycle": "configure and run report through inspect, drill, export and schedule",
       "current_floor": "U3",
-      "launch_admission": "review",
+      "launch_admission": "enabled",
       "operator_evidence_mode": "ui-primary",
       "dimensions": {
         "D": {"status": "proven", "reason": "Analytics relationship integrity is tested, the resolver guards malformed filters and completeness, and create_dashboard_widget now rejects malformed stored filter, sort and binding definitions at write time; the in-DB case ran and passed in run_all_analytics_tests and the live reducer rejected each malformed definition without persisting it (2026-10-17).", "evidence": [{"path": "spacetimedb/tests/analytics/relational_integrity_test.rs", "claim": "analytics relation and tenant invariants plus write-time stored-definition rejection"}, {"path": "frontend/packages/ui/src/lib/stored-dashboard-resolver.test.ts", "claim": "fail-closed definition and completeness semantics"}, {"path": "frontend/web/tests/e2e/cov20-dashboard-lifecycle.spec.ts", "claim": "executed: five malformed definitions rejected by the live reducer, none persisted"}]},
