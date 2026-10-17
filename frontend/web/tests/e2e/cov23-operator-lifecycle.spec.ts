@@ -1,10 +1,13 @@
 import { expect, request as playwrightRequest, test, type Browser, type Page, type Response } from "@playwright/test"
 
+import { toCreateCompanyParams } from "@lumiere/erp-shared/settings-create-params"
+import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
+
 import { bootstrapFixtureAccountSession } from "./fixture-account"
+import { postGeneratedOperationOk } from "./generated-operation"
 import {
-  callReducerBff,
-  fetchDefaultCompanyId,
   fetchSessionOrganizationId,
+  fetchDefaultCompanyId,
   gotoModule,
   scalarQueryId,
   signIn,
@@ -61,6 +64,91 @@ async function toggleRoleInSettings(page: Page, roleId: number, reducer: string,
   return accepted
 }
 
+/**
+ * Setup through the authenticated generated operation (session-scoped, contract-validated).
+ * The Settings → Roles → Create Role form cannot be used: it posts `create_role` without the
+ * CreateRoleParams type name, so optional fields reach the module un-encoded and the call
+ * fails with HTTP 500 ("invalid type: string ... metadata"). Granting is still driven in the UI.
+ */
+async function createRoleViaOperation(page: Page, name: string, permission: string): Promise<number> {
+  await postGeneratedOperationOk(page, "create_role", {
+    params: stdbParamsToJson(
+      {
+        name,
+        description: null,
+        parentId: null,
+        permissions: [permission],
+        isActive: true,
+        metadata: null,
+      },
+      "CreateRoleParams",
+    ),
+  })
+  const created = (await rows(page, "/api/query/roles")).filter((row) => row.name === name)
+  expect(created).toHaveLength(1)
+  const roleId = scalarQueryId(created[0]?.id)
+  if (roleId == null) throw new Error("created role has no id")
+  return roleId
+}
+
+/**
+ * Setup through the generated operations. The Settings forms for these two steps are not usable
+ * here: Add existing user (role ID) posts the identity as a bare "0x…" string and fails with
+ * HTTP 500 (the module expects an identity object), and the Settings → Organization → Create
+ * company button sends no request in this build. Grant, switch, revoke and recovery are UI-driven.
+ */
+async function createBranchCompany(page: Page, name: string): Promise<number> {
+  const defaultCompanyId = await fetchDefaultCompanyId(page)
+  const parent = (await rows(page, "/api/query/companies")).find(
+    (row) => scalarQueryId(row.id) === defaultCompanyId,
+  )
+  const currencyId = scalarQueryId(parent?.currencyId ?? parent?.currency_id)
+  if (currencyId == null) throw new Error("default company has no currency")
+  const params = toCreateCompanyParams(
+    {
+      name,
+      code: name.slice(-12),
+      parentId: String(defaultCompanyId),
+      currencyId: BigInt(currencyId),
+      fiscalYearEndMonth: 12,
+      fiscalYearEndDay: 31,
+      isParent: false,
+    },
+    { currencyId: BigInt(currencyId) },
+  )
+  if (!params) throw new Error("company params rejected")
+  await postGeneratedOperationOk(page, "create_company", {
+    params: stdbParamsToJson(params as object, "CreateCompanyParams"),
+  })
+  await expect
+    .poll(async () => (await rows(page, "/api/query/companies")).filter((row) => row.name === name).length, {
+      timeout: 30_000,
+    })
+    .toBe(1)
+  const id = scalarQueryId((await rows(page, "/api/query/companies")).find((row) => row.name === name)?.id)
+  if (id == null) throw new Error("created company has no id")
+  return id
+}
+
+async function addMemberViaOperation(page: Page, identityHex: string, roleName: string) {
+  await postGeneratedOperationOk(page, "add_org_member", {
+    userIdentity: { __identity__: `0x${identityHex}` } as never,
+    params: stdbParamsToJson(
+      {
+        roleName,
+        companyId: BigInt(await fetchDefaultCompanyId(page)),
+        jobTitle: null,
+        departmentId: null,
+        employeeId: null,
+        isActive: true,
+        isDefault: true,
+        metadata: null,
+      },
+      "AddOrgMemberParams",
+    ),
+  })
+}
+
 async function activeCompanyId(page: Page) {
   return page.evaluate(() => {
     const raw = localStorage.getItem("lumiere:active-company")
@@ -76,27 +164,9 @@ async function runGrantSwitchRevokeRecover(
   afterPersonaSignIn?: (persona: Page) => Promise<void>,
 ) {
   const organizationId = await fetchSessionOrganizationId(page)
-  const defaultCompanyId = await fetchDefaultCompanyId(page)
-  const defaultCompany = (await rows(page, "/api/query/companies")).find(
-    (row) => scalarQueryId(row.id) === defaultCompanyId,
-  )
-  const currencyId = scalarQueryId(defaultCompany?.currencyId ?? defaultCompany?.currency_id)
-  if (currencyId == null) throw new Error("default company has no currency")
-
-  // Setup only: a role granting a capability the persona does not already hold.
+  // Setup: a role granting a capability the persona does not hold.
   const roleName = smokeName("cov23-life-role")
-  await callReducerBff(page, "create_role", [organizationId, {
-    name: roleName,
-    description: "COV-23 operator lifecycle proof",
-    parent_id: null,
-    permissions: ["dashboard:settings:read"],
-    is_active: true,
-    metadata: null,
-  }])
-  const created = (await rows(page, "/api/query/roles")).filter((row) => row.name === roleName)
-  expect(created).toHaveLength(1)
-  const roleId = scalarQueryId(created[0]?.id)
-  if (roleId == null) throw new Error("created role has no id")
+  const roleId = await createRoleViaOperation(page, roleName, "dashboard:settings:read")
 
   // The persona signs in ONCE and keeps this session for the whole lifecycle.
   const personaContext = await browser.newContext({ storageState: { cookies: [], origins: [] } })
@@ -118,29 +188,7 @@ async function runGrantSwitchRevokeRecover(
 
     // 2. Operator switches to a new branch company through the switcher.
     const branchName = smokeName("cov23-life-branch")
-    await callReducerBff(page, "create_company", [organizationId, {
-      name: branchName,
-      code: smokeName("c23l").slice(-12),
-      currency_id: currencyId,
-      fiscal_year_end_month: 12,
-      fiscal_year_end_day: 31,
-      is_parent: false,
-      parent_id: { some: defaultCompanyId },
-      tax_id: { none: [] },
-      company_registry: { none: [] },
-      address_street: { none: [] },
-      address_city: { none: [] },
-      address_zip: { none: [] },
-      address_country_code: { some: "NL" },
-      metadata: { some: JSON.stringify({ fixture: "COV-23", purpose: "operator-lifecycle" }) },
-    }])
-    await expect.poll(async () =>
-      (await rows(page, "/api/query/companies")).find((row) => row.name === branchName) ?? null,
-      { timeout: 30_000 }).not.toBeNull()
-    const branchId = scalarQueryId(
-      (await rows(page, "/api/query/companies")).find((row) => row.name === branchName)?.id,
-    )
-    if (branchId == null) throw new Error("branch company has no id")
+    const branchId = await createBranchCompany(page, branchName)
 
     const adminPage = await page.context().newPage()
     try {
@@ -241,33 +289,15 @@ test.describe("COV-23 operator lifecycle", { tag: ["@p0", "@cov23"] }, () => {
       ])
       // Let the post-bootstrap redirect and refresh finish before navigating again.
       await owner.waitForLoadState("networkidle")
-      await gotoModule(owner, "/settings")
+      await expect(async () => {
+        await gotoModule(owner, "/settings")
+      }).toPass({ timeout: 60_000 })
       await expect(owner.getByTestId("settings-section-users")).toBeVisible({ timeout: 30_000 })
 
-      // Setup in the new organization: a base role, then the second account as a member of it.
+      // A base role is seeded; the owner then admits the second account by generated operation (the Settings add-member form fails, see helper).
       const baseRole = smokeName("c23-base")
-      await callReducerBff(owner, "create_role", [organizationId, {
-        name: baseRole,
-        description: "COV-23 bootstrap lifecycle base role",
-        parent_id: null,
-        permissions: ["organization:read"],
-        is_active: true,
-        metadata: null,
-      }])
-      await callReducerBff(owner, "add_org_member", [
-        identities[memberEmail],
-        organizationId,
-        {
-          role_name: baseRole,
-          company_id: await fetchDefaultCompanyId(owner),
-          job_title: null,
-          department_id: null,
-          employee_id: null,
-          is_active: true,
-          is_default: true,
-          metadata: null,
-        },
-      ])
+      await createRoleViaOperation(owner, baseRole, "dashboard:tasks:read")
+      await addMemberViaOperation(owner, identities[memberEmail], baseRole)
 
       // 2-5. Grant, company switch, revoke and recovery in the freshly bootstrapped organization.
       await runGrantSwitchRevokeRecover(browser, owner, memberEmail, password, async (member) => {
