@@ -125,11 +125,24 @@ test.describe("O2C adversarial certification", { tag: "@p0" }, () => {
     await selectOrderForConfirm(page, orderId)
 
     const injected = await loseNextResponse(page, "confirm_sales_order")
+    // A lost reply alone can be resolved by exact canonical readback. Keep
+    // verification unavailable too, to exercise the genuinely unknown branch.
+    let holdReadback = true
+    await page.route((url) => [
+      "/api/query/sale-orders", "/api/query/stock-pickings", "/api/query/workflow-human-tasks-inbox",
+    ].includes(url.pathname), async (route) => {
+      if (holdReadback && injected.lost() && route.request().method() === "GET") {
+        await route.fulfill({ status: 503, contentType: "application/json", body: JSON.stringify({ error: "Injected canonical readback outage" }) })
+      } else await route.continue()
+    })
     await page.getByTestId("entity-action-confirm-orders").click()
 
     // The user is told the result is unknown, not that it failed or worked.
     await expect(page.getByText(/Result unknown/i).first()).toBeVisible({ timeout: 30_000 })
     expect(injected.lost()).toBe(true)
+    await expect(page.getByRole("button", { name: "Retry" })).toHaveCount(0)
+    holdReadback = false
+    await page.reload({ waitUntil: "domcontentloaded" })
 
     // The write did commit, exactly once, and re-issuing it is not offered.
     await waitForSaleOrderConfirmed(page, orderId)

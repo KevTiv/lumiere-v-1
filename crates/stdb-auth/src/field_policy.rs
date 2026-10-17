@@ -1443,6 +1443,50 @@ mod tests {
     }
 
     #[test]
+    fn tax_readiness_has_explicit_active_type_and_posting_account_evidence() {
+        let taxes = resolve_http_sql_columns("account-taxes", None).unwrap();
+        for field in [
+            "active",
+            "type_tax_use",
+            "amount_type",
+            "tax_group_id",
+            "has_negative_factor",
+            "price_include",
+        ] {
+            assert!(
+                taxes.iter().any(|column| column == field),
+                "missing {field}"
+            );
+        }
+        let groups = resolve_http_sql_columns("tax-groups", None).unwrap();
+        for field in ["tax_payable_account_id", "tax_receivable_account_id"] {
+            assert!(
+                groups.iter().any(|column| column == field),
+                "missing {field}"
+            );
+        }
+        let mut access = field_access(&["account_tax:read"]);
+        select_fields(&mut access, "account-taxes", &["name"]);
+        assert!(!resolve_http_sql_columns("account-taxes", Some(&access))
+            .unwrap()
+            .iter()
+            .any(|column| column == "active"));
+    }
+
+    #[test]
+    fn sales_exchange_origin_is_readable_without_exposing_internal_metadata() {
+        let columns = resolve_http_sql_columns("sale-orders", None).unwrap();
+        assert!(columns.iter().any(|column| column == "origin"));
+        assert!(!columns.iter().any(|column| column == "metadata"));
+        let mut access = field_access(&["sale_order:read"]);
+        select_fields(&mut access, "sale-orders", &["state"]);
+        assert!(!resolve_http_sql_columns("sale-orders", Some(&access))
+            .unwrap()
+            .iter()
+            .any(|column| column == "origin"));
+    }
+
+    #[test]
     fn resolve_http_sql_columns_includes_location_and_lock_for_lots() {
         let cols = resolve_http_sql_columns("stock-production-lots", None)
             .expect("stock-production-lots columns");

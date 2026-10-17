@@ -265,7 +265,16 @@
     "default_restricted": [
       "name",
       "amount",
-      "company_id"
+      "company_id",
+      "active",
+      "type_tax_use",
+      "amount_type",
+      "tax_group_id",
+      "has_negative_factor",
+      "price_include",
+      "include_base_amount",
+      "is_base_affected",
+      "sequence"
     ],
     "mandatory": [
       "id",
@@ -5737,6 +5746,7 @@
     ],
     "default_restricted": [
       "reference",
+      "origin",
       "client_order_ref",
       "state",
       "partner_id",
@@ -6630,7 +6640,10 @@
     "default_restricted": [
       "name",
       "sequence",
-      "company_id"
+      "company_id",
+      "tax_payable_account_id",
+      "tax_receivable_account_id",
+      "advance_tax_payment_account_id"
     ],
     "mandatory": [
       "id",
