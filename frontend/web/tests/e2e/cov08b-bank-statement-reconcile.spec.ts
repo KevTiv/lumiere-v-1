@@ -104,7 +104,7 @@ test.describe("COV-08b exact bank statement reconciliation", { tag: ["@p0", "@co
       counterpart_account_id: accounts[0], currency_id: currencyId,
       date: timestampNow(), invoice_date: timestampNow(),
       invoice_date_due: { none: [] }, invoice_payment_term_id: { none: [] },
-      ref_: { some: invoiceReference }, payment_reference: { none: [] }, metadata: { none: [] },
+      ref: { some: invoiceReference }, payment_reference: { none: [] }, metadata: { none: [] },
       lines: [{ account_id: accounts[1], name: invoiceReference, quantity: 1, price_unit: 25, discount: 0, tax_ids: [], product_id: { none: [] } }],
     }])
     const move = (await queryRows(page, "account-moves")).find((row) => (row.ref ?? row.ref_) === invoiceReference)
