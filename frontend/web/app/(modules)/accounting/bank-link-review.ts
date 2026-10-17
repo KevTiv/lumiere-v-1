@@ -4,11 +4,21 @@ import {
   reconciliationSelection,
   type ReconciliationRequest,
   type ReconciliationSource,
+  type ReconciliationBankLineSource,
 } from "../../../../packages/ui/src/accounting-components/reconciliation-workbench-model"
 import type {
   BankReconciliationLineProjection,
   BankReconciliationStatementProjection,
 } from "@lumiere/query-hooks/hooks/accounting/bank-statements"
+
+/** Preserve decoded Option::None as known-empty, never invent redacted fields. */
+export function bankLineFromQueryRow(row: ReconciliationBankLineSource): ReconciliationBankLineSource {
+  const line = { ...row }
+  for (const key of ["currencyId", "foreignCurrencyId"] as const) {
+    if (Object.prototype.hasOwnProperty.call(row, key) && row[key] === undefined) line[key] = null
+  }
+  return line
+}
 
 /** Recheck the current source immediately before dispatching a reviewed link. */
 export function canDispatchReviewedBankLink(source: ReconciliationSource, request: ReconciliationRequest, allowed: boolean): boolean {

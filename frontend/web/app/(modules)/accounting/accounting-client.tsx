@@ -7,7 +7,7 @@ import { invoiceSellerFromCompany, invoiceSellerCompanyFromQueryRow, isInvoiceSe
 import { formatInvoiceMoney, resolveDraftInvoiceDocument } from "../../../../packages/ui/src/accounting-components/invoice-document"
 import { ReconciliationWorkbench, type ReconciliationOutcome } from "../../../../packages/ui/src/accounting-components/reconciliation-workbench"
 import type { ReconciliationRequest, ReconciliationSource } from "../../../../packages/ui/src/accounting-components/reconciliation-workbench-model"
-import { bankLinkReadbackConfirms, canDispatchReviewedBankLink } from "./bank-link-review"
+import { bankLineFromQueryRow, bankLinkReadbackConfirms, canDispatchReviewedBankLink } from "./bank-link-review"
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
@@ -4340,13 +4340,14 @@ function AccountingClientReady({
     id: currentBankStatement ? String(currentBankStatement.currencyId) : undefined,
     code: invoiceCurrencyOptions.find((currency) => currency.value === String(currentBankStatement?.currencyId))?.code,
   })
+  const bankLinkLines = bankStatementLines.map(bankLineFromQueryRow)
   const bankLinkSource: ReconciliationSource = {
     organizationId, companyId: operatingCompanyId, companyCurrencyId: invoiceCompany?.currencyId,
     state: mergeModuleStates([bankStatementsRead.state, bankStatementLinesRead.state, allMovesRead.state,
       accountMoveLinesRead.state, accountsRead.state, currenciesRead.state, companiesRead.state]),
     statement: currentBankStatement,
-    line: bankStatementLines.find((row) => String(row.id) === String(bankLineMatchFocus?.id)) ?? null,
-    bankLines: bankStatementLines, moves: allMoves, moveLines: accountMoveLines,
+    line: bankLinkLines.find((row) => String(row.id) === String(bankLineMatchFocus?.id)) ?? null,
+    bankLines: bankLinkLines, moves: allMoves, moveLines: accountMoveLines,
     accounts, currencies, suggestions: bankMatchCandidates, partners: contacts,
   }
   const bankLinkAccess = useRef({ source: bankLinkSource, allowed: false })

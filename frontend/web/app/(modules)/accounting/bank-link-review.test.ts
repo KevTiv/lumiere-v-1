@@ -1,11 +1,26 @@
 import assert from "node:assert/strict"
 import test from "node:test"
-import { bankLinkReadbackConfirms, canDispatchReviewedBankLink } from "./bank-link-review"
+import { bankLineFromQueryRow, bankLinkReadbackConfirms, canDispatchReviewedBankLink } from "./bank-link-review"
+import { decodeTypedResourceQueryResponse } from "@lumiere/stdb/resource-reads"
 import type { ReconciliationRequest, ReconciliationSource } from "../../../../packages/ui/src/accounting-components/reconciliation-workbench-model"
 
 const request: ReconciliationRequest = { organizationId: "7", companyId: "11", statementId: "30", lineId: "31", moveLineIds: ["9007199254740992", "9007199254740993"], amountResidual: 0 }
 const statement = { id: "30", organizationId: "7", companyId: "11", state: "Open" }
 const line = { id: "31", organizationId: "7", statementId: "30", isReconciled: true, amountResidual: 0, moveIds: [...request.moveLineIds] }
+
+test("bank currency options retain known-empty values through the real typed decoder, not redaction", () => {
+  const decoded = decodeTypedResourceQueryResponse("bank-statement-lines", {
+    data: [{ id: "31", organizationId: "7", currencyId: null, foreignCurrencyId: null }],
+  })[0]!
+  assert.equal(Object.hasOwn(decoded, "foreignCurrencyId"), true)
+  assert.equal(decoded.foreignCurrencyId, undefined)
+  assert.equal(bankLineFromQueryRow(decoded).foreignCurrencyId, null)
+  assert.equal(bankLineFromQueryRow(decoded).currencyId, null)
+  const redacted = decodeTypedResourceQueryResponse("bank-statement-lines", { data: [{ id: "31", organizationId: "7" }] })[0]!
+  assert.equal(Object.hasOwn(bankLineFromQueryRow(redacted), "foreignCurrencyId"), false)
+  assert.equal(Object.hasOwn(bankLineFromQueryRow(redacted), "currencyId"), false)
+  assert.equal(bankLineFromQueryRow({ currencyId: 7n, foreignCurrencyId: 8n }).foreignCurrencyId, 8n)
+})
 
 test("bank-link readback confirms exact scope and adjacent large identifiers without rounding", () => {
   assert.equal(bankLinkReadbackConfirms(request, [line], [statement]), true)
