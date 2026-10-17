@@ -63,6 +63,7 @@ function isCanonicalOrderUrl(url: URL, orderId: number): boolean {
 
 async function expectCanonicalOrderFocus(page: Page, orderId: number) {
   await expect(page).toHaveURL((url) => isCanonicalOrderUrl(url, orderId))
+  await expect(page.getByTestId("module-tab-sales-orders")).toHaveCount(1, { timeout: 30_000 })
   await expect(page.getByTestId("module-tab-sales-orders")).toHaveAttribute("aria-selected", "true")
 
   const table = activeTabEntityTable(page)
