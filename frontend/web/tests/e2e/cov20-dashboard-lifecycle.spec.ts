@@ -1,7 +1,7 @@
 import { execFileSync } from "node:child_process"
 import { createHash } from "node:crypto"
 import { readFile } from "node:fs/promises"
-import { expect, test, type Page, type Request } from "@playwright/test"
+import { expect, test, type Download, type Page, type Request } from "@playwright/test"
 
 import {
   chooseFirstEnabledOption,
@@ -235,15 +235,12 @@ test.describe(
       await expect(page.getByTestId("stored-dashboard-denied")).toHaveCount(0)
       await expect(page.getByTestId("stored-dashboard-error")).toHaveCount(0)
 
-      const downloads: Awaited<ReturnType<Page["waitForEvent"]>>[] = []
+      const downloads: Download[] = []
       page.on("download", (download) => downloads.push(download))
       await page.getByRole("button", { name: /export/i }).first().click()
       await expect.poll(() => downloads.length, { timeout: 45_000 }).toBe(2)
       const named = new Map<string, string>()
-      for (const download of downloads as Array<{
-        suggestedFilename(): string
-        path(): Promise<string | null>
-      }>) {
+      for (const download of downloads) {
         const filePath = await download.path()
         if (filePath) named.set(download.suggestedFilename(), filePath)
       }

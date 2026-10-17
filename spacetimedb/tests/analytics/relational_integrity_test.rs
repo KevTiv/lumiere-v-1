@@ -521,17 +521,94 @@ pub fn test_dashboard_widget_definition_validated_at_write(
     };
 
     let bad: Vec<(&str, CreateDashboardWidgetParams, &str)> = vec![
-        ("not-json", CreateDashboardWidgetParams { domain: Some("{oops".into()), ..base("COV20 bad json") }, "not valid JSON"),
-        ("array", CreateDashboardWidgetParams { domain: Some("[1]".into()), ..base("COV20 bad array") }, "JSON object"),
-        ("empty-op", CreateDashboardWidgetParams { domain: Some(r#"{"state":{}}"#.into()), ..base("COV20 empty op") }, "no operator"),
-        ("bad-op", CreateDashboardWidgetParams { domain: Some(r#"{"state":{"$regex":"x"}}"#.into()), ..base("COV20 bad op") }, "Unsupported"),
-        ("in-scalar", CreateDashboardWidgetParams { domain: Some(r#"{"state":{"$in":"a"}}"#.into()), ..base("COV20 in scalar") }, "array"),
-        ("gt-text", CreateDashboardWidgetParams { domain: Some(r#"{"amount":{"$gt":"abc"}}"#.into()), ..base("COV20 gt text") }, "numeric"),
-        ("sort-dir", CreateDashboardWidgetParams { sort_order: Some(r#"{"amount":"sideways"}"#.into()), ..base("COV20 sort dir") }, "asc or desc"),
-        ("sort-multi", CreateDashboardWidgetParams { sort_order: Some(r#"{"a":"asc","b":"desc"}"#.into()), ..base("COV20 sort multi") }, "exactly one"),
-        ("binding", CreateDashboardWidgetParams { configuration: Some(r#"{"version":2,"timeField":"date"}"#.into()), ..base("COV20 binding") }, "binding"),
-        ("freeform-config", CreateDashboardWidgetParams { configuration: Some(r#"{"stacked":true}"#.into()), ..base("COV20 freeform config") }, "binding"),
-        ("config-not-json", CreateDashboardWidgetParams { configuration: Some("nope".into()), ..base("COV20 config junk") }, "binding"),
+        (
+            "not-json",
+            CreateDashboardWidgetParams {
+                domain: Some("{oops".into()),
+                ..base("COV20 bad json")
+            },
+            "not valid JSON",
+        ),
+        (
+            "array",
+            CreateDashboardWidgetParams {
+                domain: Some("[1]".into()),
+                ..base("COV20 bad array")
+            },
+            "JSON object",
+        ),
+        (
+            "empty-op",
+            CreateDashboardWidgetParams {
+                domain: Some(r#"{"state":{}}"#.into()),
+                ..base("COV20 empty op")
+            },
+            "no operator",
+        ),
+        (
+            "bad-op",
+            CreateDashboardWidgetParams {
+                domain: Some(r#"{"state":{"$regex":"x"}}"#.into()),
+                ..base("COV20 bad op")
+            },
+            "Unsupported",
+        ),
+        (
+            "in-scalar",
+            CreateDashboardWidgetParams {
+                domain: Some(r#"{"state":{"$in":"a"}}"#.into()),
+                ..base("COV20 in scalar")
+            },
+            "array",
+        ),
+        (
+            "gt-text",
+            CreateDashboardWidgetParams {
+                domain: Some(r#"{"amount":{"$gt":"abc"}}"#.into()),
+                ..base("COV20 gt text")
+            },
+            "numeric",
+        ),
+        (
+            "sort-dir",
+            CreateDashboardWidgetParams {
+                sort_order: Some(r#"{"amount":"sideways"}"#.into()),
+                ..base("COV20 sort dir")
+            },
+            "asc or desc",
+        ),
+        (
+            "sort-multi",
+            CreateDashboardWidgetParams {
+                sort_order: Some(r#"{"a":"asc","b":"desc"}"#.into()),
+                ..base("COV20 sort multi")
+            },
+            "exactly one",
+        ),
+        (
+            "binding",
+            CreateDashboardWidgetParams {
+                configuration: Some(r#"{"version":2,"timeField":"date"}"#.into()),
+                ..base("COV20 binding")
+            },
+            "binding",
+        ),
+        (
+            "freeform-config",
+            CreateDashboardWidgetParams {
+                configuration: Some(r#"{"stacked":true}"#.into()),
+                ..base("COV20 freeform config")
+            },
+            "binding",
+        ),
+        (
+            "config-not-json",
+            CreateDashboardWidgetParams {
+                configuration: Some("nope".into()),
+                ..base("COV20 config junk")
+            },
+            "binding",
+        ),
     ];
     for (label, params, expect) in bad {
         let before = count(ctx);

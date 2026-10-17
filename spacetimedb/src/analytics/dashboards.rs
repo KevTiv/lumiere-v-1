@@ -231,11 +231,15 @@ pub(crate) fn validate_widget_definition(
                     "$gte" | "$lte" | "$gt" | "$lt" => {
                         let numeric = match operand {
                             Value::Number(_) => true,
-                            Value::String(text) => text.trim().parse::<f64>().is_ok_and(f64::is_finite),
+                            Value::String(text) => {
+                                text.trim().parse::<f64>().is_ok_and(f64::is_finite)
+                            }
                             _ => false,
                         };
                         if !numeric {
-                            return Err(format!("The {operator} filter for {field} needs a numeric operand"));
+                            return Err(format!(
+                                "The {operator} filter for {field} needs a numeric operand"
+                            ));
                         }
                     }
                     other => {
@@ -270,7 +274,10 @@ pub(crate) fn validate_widget_definition(
         let valid = match serde_json::from_str::<Value>(config) {
             Ok(Value::Object(map)) => {
                 let optional_text = |key: &str| {
-                    matches!(map.get(key), None | Some(Value::Null) | Some(Value::String(_)))
+                    matches!(
+                        map.get(key),
+                        None | Some(Value::Null) | Some(Value::String(_))
+                    )
                 };
                 map.get("version").and_then(Value::as_u64) == Some(1)
                     && optional_text("timeField")
