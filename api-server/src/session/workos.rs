@@ -461,8 +461,33 @@ fn may_bootstrap_without_membership(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
     use jsonwebtoken::{encode, EncodingKey, Header};
+    use openssl::rsa::Rsa;
     use serde_json::json;
+    use std::sync::LazyLock;
+
+    struct TestSigningKeys {
+        encoding: EncodingKey,
+        jwks: JwkSet,
+    }
+
+    // Test-only trust roots are generated in memory, never committed or written
+    // to disk. This reuses the OpenSSL library already in the API dependency tree.
+    static SIGNING_KEYS: LazyLock<TestSigningKeys> = LazyLock::new(|| {
+        let rsa = Rsa::generate(2048).expect("ephemeral test RSA key");
+        let pem = rsa
+            .private_key_to_pem()
+            .expect("ephemeral test RSA encoding");
+        let encoding = EncodingKey::from_rsa_pem(&pem).expect("generated RSA signing key");
+        let jwks = serde_json::from_value(json!({"keys": [{
+            "kty": "RSA", "kid": "test-key", "use": "sig", "alg": "RS256",
+            "n": URL_SAFE_NO_PAD.encode(rsa.n().to_vec()),
+            "e": URL_SAFE_NO_PAD.encode(rsa.e().to_vec())
+        }]}))
+        .expect("ephemeral test JWKS");
+        TestSigningKeys { encoding, jwks }
+    });
     fn config() -> WorkosAuthConfig {
         WorkosAuthConfig {
             client_id: "client_test".into(),
@@ -487,22 +512,17 @@ mod tests {
     fn token(claims: &serde_json::Value, kid: &str) -> String {
         let mut header = Header::new(Algorithm::RS256);
         header.kid = Some(kid.into());
-        encode(
-            &header,
-            claims,
-            &EncodingKey::from_rsa_pem(include_bytes!("fixtures/workos-test-private.pem")).unwrap(),
-        )
-        .unwrap()
+        encode(&header, claims, &SIGNING_KEYS.encoding).unwrap()
     }
     #[test]
     fn only_trusted_current_rsa_tokens_are_accepted() {
         let config = config();
-        let keys = serde_json::from_str(include_str!("fixtures/workos-test-jwks.json")).unwrap();
+        let keys = &SIGNING_KEYS.jwks;
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap()
             .as_secs();
-        assert!(verify_claims(&token(&claims(), "test-key"), &keys, &config, now).is_ok());
+        assert!(verify_claims(&token(&claims(), "test-key"), keys, &config, now).is_ok());
         for (name, value) in [
             ("iss", json!("https://attacker.test")),
             ("exp", json!(now - 1)),
@@ -515,21 +535,21 @@ mod tests {
             let mut c = claims();
             c[name] = value;
             assert!(
-                verify_claims(&token(&c, "test-key"), &keys, &config, now).is_err(),
+                verify_claims(&token(&c, "test-key"), keys, &config, now).is_err(),
                 "{name}"
             );
         }
-        assert!(verify_claims(&token(&claims(), "unknown-key"), &keys, &config, now).is_err());
+        assert!(verify_claims(&token(&claims(), "unknown-key"), keys, &config, now).is_err());
         let hs = encode(
             &Header::default(),
             &claims(),
             &EncodingKey::from_secret(b"test"),
         )
         .unwrap();
-        assert!(verify_claims(&hs, &keys, &config, now).is_err());
+        assert!(verify_claims(&hs, keys, &config, now).is_err());
         let mut long = claims();
         long["exp"] = json!(now + 3601);
-        assert!(verify_claims(&token(&long, "test-key"), &keys, &config, now).is_err());
+        assert!(verify_claims(&token(&long, "test-key"), keys, &config, now).is_err());
     }
     #[test]
     fn admission_requires_exact_verified_subject_email_and_organization() {

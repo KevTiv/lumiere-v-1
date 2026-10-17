@@ -98,6 +98,24 @@ export function ModularForm({
 
   const [values, setValues] = useState<Record<string, unknown>>(getInitialValues)
   const baselineRef = useRef<Record<string, unknown>>(values)
+  useEffect(() => {
+    // Reference reads may finish after the dialog mounts. Bind a newly known
+    // hidden context once, without resetting edits or replacing a reviewed ID.
+    const empty = (value: unknown) => value === "" || value == null
+    setValues((previous) => {
+      let next = previous
+      for (const section of config.sections) {
+        for (const field of section.fields) {
+          if (field.type !== "hidden" || empty(field.defaultValue)
+            || !empty(previous[field.name]) || !empty(baselineRef.current[field.name])) continue
+          if (next === previous) next = { ...previous }
+          next[field.name] = field.defaultValue
+          baselineRef.current = { ...baselineRef.current, [field.name]: field.defaultValue }
+        }
+      }
+      return next
+    })
+  }, [config])
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [aiPanelOpen, setAiPanelOpen] = useState(false)

@@ -93,7 +93,7 @@ test.describe("COV-04 sale-order confirmation", { tag: ["@p0", "@cov04", "@unaut
     try {
       await signIn(requester, "fixture.sales@example.test", PERSONA_PASSWORD)
       const requested = await confirmRequest(requester, companyId, orderId)
-      expect(requested.ok()).toBe(true)
+      expect(requested.ok(), await requested.text()).toBe(true)
 
       const taskId = await waitForPendingApprovalRequest(page, "sale_order", orderId)
       await expect.poll(() => exactActiveApprovalTaskIds(page, orderId)).toEqual([taskId])
