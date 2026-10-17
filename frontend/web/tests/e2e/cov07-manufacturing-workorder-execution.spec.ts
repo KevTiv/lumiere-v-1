@@ -555,7 +555,7 @@ test.describe(
           .toBe(qualityCheckId)
 
         await gotoModule(warehousePage, "/manufacturing", "manufacturing")
-        await selectModuleTab(warehousePage, "manufacturing", "quality")
+        await warehousePage.getByTestId("module-tab-manufacturing-quality").click()
         await expect(
           warehousePage
             .locator('[role="tabpanel"]:visible')
