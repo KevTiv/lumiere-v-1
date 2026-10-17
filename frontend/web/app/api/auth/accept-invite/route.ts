@@ -5,7 +5,7 @@ import {
   hostedInviteCookieOptions,
   openHostedInvite,
 } from '@/lib/hosted-invite-token'
-import { type NextRequest, NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 
 export async function POST(request: NextRequest) {
   if (!isWorkOsEnabled()) return forwardToApiServerRequired(request)

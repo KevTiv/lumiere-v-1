@@ -218,7 +218,9 @@ pub(super) async fn accept_invite(
     Json(body): Json<AcceptInviteBody>,
 ) -> Result<impl IntoResponse, ApiError> {
     if state.config.workos_client_id.is_some() {
-        return Ok(Json(accept_workos_invite(&state, &headers, &body.token).await?));
+        return Ok(Json(
+            accept_workos_invite(&state, &headers, &body.token).await?,
+        ));
     }
 
     let password = body.password.as_deref().ok_or_else(|| {
@@ -396,7 +398,6 @@ pub(super) async fn accept_invite(
     Ok(Json(json!({ "redirectTo": "/overview" })))
 }
 
-
 /** A hosted invitation is never a substitute for alpha admission. All three
  * authorities must agree: WorkOS subject+verified email, admission org, and
  * an unexpired administrator-issued single-use invitation.
@@ -426,7 +427,11 @@ async fn accept_workos_invite(
     // Verify immutable WorkOS subject, canonical verified email, live session,
     // explicit admission and token/identity binding before touching the invite.
     let binding = crate::session::workos::verify_binding(state, bearer, false).await?;
-    if token.len() != 43 || !token.bytes().all(|c| c.is_ascii_alphanumeric() || c == b'_' || c == b'-') {
+    if token.len() != 43
+        || !token
+            .bytes()
+            .all(|c| c.is_ascii_alphanumeric() || c == b'_' || c == b'-')
+    {
         return Err(ApiError::BadRequest("Invalid or expired invitation".into()));
     }
     let hash = hex::encode(Sha256::digest(token.as_bytes()));
@@ -442,7 +447,9 @@ async fn accept_workos_invite(
         invite.organization_id,
         &invite.email,
     ) {
-        return Err(ApiError::Forbidden("Invitation is not approved for this WorkOS identity and organization".into()));
+        return Err(ApiError::Forbidden(
+            "Invitation is not approved for this WorkOS identity and organization".into(),
+        ));
     }
     let role_name = get_role_name_in_organization(state, invite.role_id, invite.organization_id)
         .await?
@@ -457,7 +464,8 @@ async fn accept_workos_invite(
         Some(invite.organization_id),
         "mark_invite_accepted",
         json!([invite.id]),
-    ).await?;
+    )
+    .await?;
     dispatch_internal_reducer(
         state,
         InternalRouteAuthority::InvitationAcceptance,
@@ -477,7 +485,8 @@ async fn accept_workos_invite(
                 "metadata": Value::Null,
             }
         ]),
-    ).await?;
+    )
+    .await?;
     dispatch_internal_reducer(
         state,
         InternalRouteAuthority::InvitationAcceptance,
@@ -488,7 +497,8 @@ async fn accept_workos_invite(
             identity_json_for_reducer_call(&binding.identity_hex),
             binding.email,
         ]),
-    ).await?;
+    )
+    .await?;
     dispatch_internal_reducer(
         state,
         InternalRouteAuthority::InvitationAcceptance,
@@ -498,7 +508,8 @@ async fn accept_workos_invite(
             binding.platform_user_id.as_str(),
             identity_json_for_reducer_call(&binding.identity_hex),
         ]),
-    ).await?;
+    )
+    .await?;
 
     // Hosted sessions remain provider-owned; never mint a native STDB cookie.
     Ok(json!({ "redirectTo": "/overview" }))
@@ -510,12 +521,20 @@ mod hosted_invite_tests {
 
     #[test]
     fn requires_matching_approved_organization_and_verified_email() {
-        assert!(hosted_invite_matches(Some(7), "approved@example.test", 7, "approved@example.test"));
-        assert!(hosted_invite_matches(Some(7), "APPROVED@example.test", 7, "approved@example.test"));
-        assert!(!hosted_invite_matches(None, "approved@example.test", 7, "approved@example.test"));
-        assert!(!hosted_invite_matches(Some(8), "approved@example.test", 7, "approved@example.test"));
-        assert!(!hosted_invite_matches(Some(7), "other@example.test", 7, "approved@example.test"));
-        assert!(!hosted_invite_matches(Some(7), "", 7, "approved@example.test"));
+        let cases = [
+            (Some(7), "approved@example.test", 7, "approved@example.test", true),
+            (Some(7), "APPROVED@example.test", 7, "approved@example.test", true),
+            (None, "approved@example.test", 7, "approved@example.test", false),
+            (Some(8), "approved@example.test", 7, "approved@example.test", false),
+            (Some(7), "other@example.test", 7, "approved@example.test", false),
+            (Some(7), "", 7, "approved@example.test", false),
+        ];
+        for (org, email, invite_org, invite_email, expected) in cases {
+            assert_eq!(
+                hosted_invite_matches(org, email, invite_org, invite_email),
+                expected
+            );
+        }
     }
 }
 
