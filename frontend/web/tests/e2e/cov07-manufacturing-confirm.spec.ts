@@ -277,7 +277,7 @@ test.describe(
           PERSONA_PASSWORD,
         )
         await gotoModule(warehousePage, "/manufacturing", "manufacturing")
-        await selectModuleTab(warehousePage, "manufacturing", "orders")
+        await warehousePage.getByTestId("module-tab-manufacturing-orders").click()
 
         const panel = warehousePage.locator('[role="tabpanel"]:visible')
         await panel.getByLabel("Search records").fill(origin)
