@@ -852,7 +852,7 @@ export async function acceptEntityActionConfirm(page: Page) {
 export async function clickEntityActionAndWaitForReducer(
   page: Page,
   actionTestId: string,
-  reducerName: StdbBffReducerKey,
+  reducerName: StdbBffReducerKey | `erp.${string}`,
   options?: { timeoutMs?: number },
 ) {
   await waitForEntityActionEnabled(page, actionTestId)

@@ -128,4 +128,20 @@ mod tests {
             }
         }
     }
+
+    #[test]
+    fn replenishment_projection_exposes_scheduler_state() {
+        let entry =
+            registry_get("replenishment-rules").expect("replenishment rules must be registered");
+
+        for field in ["last_run", "next_run", "metadata"] {
+            assert!(
+                entry
+                    .default_restricted
+                    .iter()
+                    .any(|candidate| candidate == field),
+                "replenishment projection must expose {field}"
+            );
+        }
+    }
 }

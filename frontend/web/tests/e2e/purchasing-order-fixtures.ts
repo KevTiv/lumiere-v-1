@@ -251,7 +251,7 @@ export async function receivePurchaseLineViaUi(
   await clickEntityActionAndWaitForReducer(
     page,
     "entity-action-pol-receive-qty",
-    "receive_po_line",
+    "erp.receive_po_line_once",
   )
 }
 

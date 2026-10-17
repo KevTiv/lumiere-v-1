@@ -23,18 +23,11 @@ import {
   submitForm,
 } from "./helpers"
 import { matchesOperationResponse } from "./operation-response"
+import { product as createProductFixture, id as fixtureId } from "./cov-scheduler-manufacturing-fixtures"
+import { createStockQuantFixture } from "./inventory-quant-fixtures"
 
 const PERSONA_PASSWORD =
   process.env.E2E_FIRST_ORG_PERSONA_PASSWORD ?? "Password123$"
-
-type ProductRow = {
-  id?: unknown
-  uomId?: unknown
-  uom_id?: unknown
-  tracking?: unknown
-  type?: unknown
-  type_?: unknown
-}
 
 type BomRow = { id?: unknown }
 
@@ -64,30 +57,23 @@ async function queryRows<T>(page: Page, resource: string): Promise<T[]> {
   return ((await response.json()) as { data?: T[] }).data ?? []
 }
 
-async function fetchUntrackedProduct(page: Page): Promise<{
-  id: number
-  uomId: number
-}> {
-  const products = await queryRows<ProductRow>(page, "products")
-  const product = products.find((row) => {
-    const id = scalarQueryId(row.id)
-    const uomId = scalarQueryId(row.uomId ?? row.uom_id)
-    const tracking = stateTag(row.tracking).toLowerCase()
-    const type = String(row.type ?? row.type_ ?? "").toLowerCase()
-    return (
-      id != null &&
-      uomId != null &&
-      tracking !== "lot" &&
-      tracking !== "serial" &&
-      type !== "service"
-    )
-  })
-  const id = scalarQueryId(product?.id)
-  const uomId = scalarQueryId(product?.uomId ?? product?.uom_id)
-  if (id == null || uomId == null) {
-    throw new Error("no untracked storable product in seed data")
-  }
-  return { id, uomId }
+async function createUntrackedProductWithStock(
+  page: Page,
+  companyId: number,
+  sourceLocationId: number,
+): Promise<{ id: number; uomId: number }> {
+  const product = await createProductFixture(page)
+  const productId = fixtureId(product)
+  const uomId = fixtureId(product, "uomId", "uom_id")
+  await createStockQuantFixture(
+    page,
+    companyId,
+    productId,
+    sourceLocationId,
+    `cov07c-source-${productId}`,
+    10,
+  )
+  return { id: productId, uomId }
 }
 
 async function fetchFirstStockPicking(page: Page): Promise<{
@@ -435,8 +421,12 @@ test.describe(
       await signIn(page)
       const companyId = await fetchDefaultCompanyId(page)
       const warehouseId = await fetchFirstWarehouseId(page)
-      const product = await fetchUntrackedProduct(page)
       const picking = await fetchFirstStockPicking(page)
+      const product = await createUntrackedProductWithStock(
+        page,
+        companyId,
+        picking.locationSrcId,
+      )
       const bomId = await createSetupBom(
         page,
         companyId,

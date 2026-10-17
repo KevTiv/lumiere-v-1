@@ -1,6 +1,5 @@
 import { expect, test } from "@playwright/test"
 import type { Page } from "@playwright/test"
-import { stdbBffCallUrl } from "@lumiere/stdb/commands"
 
 import {
   activeTabEntityTable,
@@ -143,7 +142,7 @@ test.describe(
       let postCommitStockReads = 0
       operator.on("request", (request) => {
         if (request.method() === "POST" &&
-            matchesOperationResponse(request, "receive_po_line")) {
+            matchesOperationResponse(request, "erp.receive_po_line_once")) {
           actionRequests += 1
         }
         if (upstreamProcessed &&
@@ -165,7 +164,7 @@ test.describe(
         await fillField(operator, "qty", String(REQUESTED_QTY))
 
         await operator.route(
-          (url) => url.pathname === stdbBffCallUrl("receive_po_line"),
+          (url) => url.pathname === "/api/operations/erp.receive_po_line_once",
           async (route) => {
             // Never send a second consequential request upstream, even if the
             // client regresses to retrying; the request counter still fails.

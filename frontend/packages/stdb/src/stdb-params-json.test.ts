@@ -331,6 +331,22 @@ describe("stdbParamsToJson", () => {
     assert.equal(line.product_id, 3)
   })
 
+  it("stdbParamsToJson SATS-encodes nested purchase requisition line Option fields", () => {
+    const params = stdbParamsToJson({
+      lines: [{
+        productId: 3n,
+        productUom: 1n,
+        productUomQty: 2,
+        name: "Operator requisition",
+        sequence: 10,
+      }],
+    }, "CreatePurchaseRequisitionParams")
+    const line = (params.lines as Record<string, unknown>[])[0]
+    assert.deepEqual(line.name, { some: "Operator requisition" })
+    assert.deepEqual(line.sequence, { some: 10 })
+    assert.equal(line.product_id, 3)
+  })
+
   it("encodeReducerCallArgs SATS-encodes CreateCreditNoteFromReturnOrderParams metadata", () => {
     const encoded = encodeReducerCallArgs("create_credit_note_from_return_order", [
       1,

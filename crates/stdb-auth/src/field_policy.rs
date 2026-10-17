@@ -176,6 +176,11 @@ static HTTP_SQL_INCLUDED_COLUMNS: Lazy<HashMap<String, HashSet<String>>> = Lazy:
             .map(String::from)
             .collect(),
     );
+    // Replenishment scheduler readback needs the last computed run summary.
+    m.insert(
+        "replenishment-rules".to_string(),
+        ["metadata"].into_iter().map(String::from).collect(),
+    );
     // Exact COV-06/07 readbacks resolve effects through these owned relations.
     m.insert(
         "stock-pickings".to_string(),
@@ -187,6 +192,20 @@ static HTTP_SQL_INCLUDED_COLUMNS: Lazy<HashMap<String, HashSet<String>>> = Lazy:
             .into_iter()
             .map(String::from)
             .collect(),
+    );
+    // Immutable close-cost readback links the exact output stock moves and
+    // journal lines created by the manufacturing close transaction.
+    m.insert(
+        "mrp-production-costs".to_string(),
+        [
+            "raw_move_ids",
+            "output_move_ids",
+            "productivity_cost_ids",
+            "account_move_line_ids",
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect(),
     );
     m.insert(
         "mrp-workorders".to_string(),
@@ -1214,14 +1233,22 @@ mod tests {
     }
 
     #[test]
-    fn resolve_http_sql_columns_includes_qty_fields_for_purchase_order_lines() {
-        let cols = resolve_http_sql_columns("purchase-order-lines", None)
-            .expect("purchase-order-lines columns");
-        for field in ["qty_received", "qty_invoiced", "qty_to_invoice"] {
-            assert!(
-                cols.iter().any(|c| c == field),
-                "expected {field} in purchase-order-lines projection, got: {cols:?}"
-            );
+    fn resolve_http_sql_columns_includes_match_recovery_fields_for_purchase_order_lines() {
+        for resource in ["purchase-order-lines", "purchase-order-lines-over-billed"] {
+            let cols =
+                resolve_http_sql_columns(resource, None).expect("purchase-order-lines columns");
+            for field in [
+                "state",
+                "invoice_lines",
+                "qty_received",
+                "qty_invoiced",
+                "qty_to_invoice",
+            ] {
+                assert!(
+                    cols.iter().any(|c| c == field),
+                    "expected {field} in {resource} projection, got: {cols:?}"
+                );
+            }
         }
     }
 
@@ -1309,6 +1336,27 @@ mod tests {
             assert!(
                 cols.iter().any(|column| column == field),
                 "expected {field} in sale-orders projection, got: {cols:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn resolve_http_sql_columns_exposes_sale_order_origin_for_exchange_readback() {
+        let cols = resolve_http_sql_columns("sale-orders", None).expect("sale-orders columns");
+        assert!(
+            cols.iter().any(|column| column == "origin"),
+            "expected origin in sale-orders projection, got: {cols:?}"
+        );
+    }
+
+    #[test]
+    fn resolve_http_sql_columns_exposes_replenishment_scheduler_state() {
+        let cols = resolve_http_sql_columns("replenishment-rules", None)
+            .expect("replenishment-rule columns");
+        for field in ["last_run", "next_run", "metadata"] {
+            assert!(
+                cols.iter().any(|column| column == field),
+                "expected {field} in replenishment-rules projection, got: {cols:?}"
             );
         }
     }
@@ -1459,6 +1507,27 @@ mod tests {
             vec!["reconciled_invoice_ids", "reconciled_bill_ids"]
         );
         assert!(filter_http_sql_unsafe_columns(&cols, Some("subscriptions")).is_empty());
+    }
+
+    #[test]
+    fn manufacturing_cost_http_projection_keeps_exact_effect_ids() {
+        let cols = resolve_http_sql_columns(
+            "mrp-production-costs",
+            Some(&field_access(&["mrp-production-costs:read"])),
+        )
+        .expect("manufacturing cost columns");
+
+        for field in [
+            "raw_move_ids",
+            "output_move_ids",
+            "productivity_cost_ids",
+            "account_move_line_ids",
+        ] {
+            assert!(
+                cols.iter().any(|column| column == field),
+                "manufacturing cost projection must expose {field}: {cols:?}"
+            );
+        }
     }
 
     #[test]

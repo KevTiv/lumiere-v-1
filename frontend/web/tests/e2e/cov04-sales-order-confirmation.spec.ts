@@ -97,10 +97,12 @@ test.describe("COV-04 sale-order confirmation", { tag: ["@p0", "@cov04", "@unaut
 
       const taskId = await waitForPendingApprovalRequest(page, "sale_order", orderId)
       await expect.poll(() => exactActiveApprovalTaskIds(page, orderId)).toEqual([taskId])
-      // The candidate-scoped inbox does not expose an admin-only task to its
-      // requester. The Sales client must keep the outcome unknown rather than
-      // infer a task by order state, name, or time.
-      expect(await exactActiveApprovalTaskIds(requester, orderId)).toEqual([])
+      // The sales role has no workflow-read grant, so the private candidate
+      // inbox must fail closed before it can expose an admin-only task. The
+      // Sales client must keep the outcome unknown rather than infer a task by
+      // order state, name, or time.
+      const requesterInbox = await requester.request.get("/api/query/workflow-human-tasks-inbox")
+      expect(requesterInbox.status()).toBe(403)
       expect(await fetchOrderPickings(page, orderId)).toEqual([])
 
       await gotoApprovals(page)
